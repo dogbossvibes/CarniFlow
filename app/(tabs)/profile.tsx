@@ -1,0 +1,618 @@
+import { QuickAddSheet } from "@/components/QuickAddSheet";
+import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
+import { Glass, isGlass } from "@/components/ui/Glass";
+import { C } from "@/constants/colors";
+import { useDogs } from "@/hooks/useDogs";
+import { usePlan } from "@/hooks/usePlan";
+import { useProfile } from "@/hooks/useProfile";
+import { useSession } from "@/hooks/useSession";
+import { useTrainingSessions } from "@/hooks/useTrainingSessions";
+import { signOut, deleteAccount } from "@/services/auth";
+import { setShareTrainingsDefault } from "@/services/profileService";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import {
+    Alert,
+    Image,
+    Linking,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+type IconName = React.ComponentProps<typeof Ionicons>["name"];
+
+function EinstellungZeile({
+  icon,
+  label,
+  wert,
+  gefahr,
+  onPress,
+}: {
+  icon: IconName;
+  label: string;
+  wert?: string;
+  gefahr?: boolean;
+  onPress?: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={s.zeile}
+      onPress={onPress}
+      activeOpacity={0.7}
+      disabled={!onPress}
+    >
+      <View style={[s.zeileIcon, gefahr && s.zeileIconGefahr]}>
+        <Ionicons name={icon} size={17} color={gefahr ? C.danger : C.muted} />
+      </View>
+      <Text style={[s.zeileLabel, gefahr && { color: C.danger }]}>{label}</Text>
+      <View style={s.zeileRechts}>
+        {wert && <Text style={s.zeileWert}>{wert}</Text>}
+        {!gefahr && (
+          <Ionicons name="chevron-forward" size={14} color={C.subtle} />
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+export default function ProfilScreen() {
+  const router = useRouter();
+  const { user } = useSession();
+  const { dogs } = useDogs();
+  const { sessions } = useTrainingSessions();
+  const { profile, isTrainer, refresh: refreshProfile } = useProfile();
+
+  const toggleShare = async (value: boolean) => {
+    if (!user?.id) return;
+    await setShareTrainingsDefault(user.id, value);
+    refreshProfile();
+  };
+  const { isPremium, expiresAt } = usePlan();
+
+  const anzeigeName = user?.user_metadata?.full_name ?? "Hundesportler";
+  const email = user?.email ?? "";
+  const initialen = anzeigeName
+    .split(" ")
+    .map((w: string) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const handleAbmelden = () => {
+    Alert.alert("Abmelden", "Möchtest du dich wirklich abmelden?", [
+      { text: "Zurück", style: "cancel" },
+      {
+        text: "Abmelden",
+        style: "destructive",
+        onPress: async () => {
+          await signOut();
+          router.replace("/(auth)/login");
+        },
+      },
+    ]);
+  };
+
+  const handleKontoLoeschen = () => {
+    Alert.alert(
+      "Konto löschen",
+      "Alle deine Daten (Hunde, Trainingseinheiten, Notizen) werden unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.",
+      [
+        { text: "Zurück", style: "cancel" },
+        {
+          text: "Endgültig löschen",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Bist du sicher?",
+              `Das Konto für ${email} wird dauerhaft gelöscht.`,
+              [
+                { text: "Zurück", style: "cancel" },
+                {
+                  text: "Ja, löschen",
+                  style: "destructive",
+                  onPress: async () => {
+                    if (!user?.id) return;
+                    // Vollständige Löschung serverseitig (Storage + auth.users CASCADE).
+                    const { error } = await deleteAccount();
+                    if (error) {
+                      Alert.alert("Fehler", "Konto konnte nicht gelöscht werden. Bitte kontaktiere support@anyvo.app.");
+                      return;
+                    }
+                    router.replace("/(auth)/login");
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  return (
+    <SafeAreaView style={s.safe} edges={["top"]}>
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.inhalt}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Kopfzeile */}
+        <View style={s.kopf}>
+          <Text style={s.augenbraue}>DEIN KONTO</Text>
+          <Text style={s.titel}>Profil</Text>
+        </View>
+
+        {/* Identitätskarte */}
+        <View style={s.identitaet}>
+          <LinearGradient
+            colors={["#1A1A08", "#111111"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={s.avatarKreis}>
+            <LinearGradient
+              colors={[`${C.accent}30`, `${C.accent}10`]}
+              style={StyleSheet.absoluteFill}
+            />
+            <Text style={s.avatarText}>{initialen || "?"}</Text>
+          </View>
+          <View style={s.identitaetInfo}>
+            <Text style={s.anzeigeName}>{anzeigeName}</Text>
+            <Text style={s.emailText}>{email}</Text>
+          </View>
+          <TouchableOpacity style={s.bearbeitenBtn} activeOpacity={0.7}>
+            <Ionicons name="create-outline" size={17} color={C.muted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Premium-Status-Button unter der Identitätskarte */}
+        <TouchableOpacity
+          style={[s.planBtn, isPremium && s.planBtnAktiv]}
+          onPress={() => router.push('/premium')}
+          activeOpacity={0.8}
+        >
+          {isPremium && (
+            <LinearGradient
+              colors={[`${C.accent}15`, 'transparent']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <Ionicons
+            name={isPremium ? "star" : "star-outline"}
+            size={15}
+            color={isPremium ? C.accent : C.muted}
+          />
+          <Text style={[s.planBtnText, isPremium && s.planBtnTextAktiv]}>
+            {isPremium ? "Premium aktiv" : "Upgrade auf Premium"}
+          </Text>
+          {!isPremium && (
+            <Ionicons name="chevron-forward" size={14} color={C.subtle} />
+          )}
+        </TouchableOpacity>
+
+        {/* Statistiken */}
+        <View style={[s.statsReihe, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+          {[
+            { label: "HUNDE", wert: String(dogs.length) },
+            { label: "EINHEITEN", wert: String(sessions.length) },
+            { label: "SERIE", wert: "—" },
+          ].map(({ label, wert }, i, arr) => (
+            <View
+              key={label}
+              style={[s.stat, i < arr.length - 1 && s.statTrenner]}
+            >
+              <Text style={s.statWert}>{wert}</Text>
+              <Text style={s.statLabel}>{label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Premium-Banner — nur für Free-User */}
+        {!isPremium && (
+          <View style={s.proBanner}>
+            <Image
+              source={require("@/assets/images/yam20.jpg")}
+              style={s.proBannerImg}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={["rgba(5,5,5,0.2)", "rgba(5,5,5,0.55)", "rgba(5,5,5,0.92)"]}
+              locations={[0, 0.5, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={["transparent", "rgba(0,255,204,0.08)"]}
+              style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 80 }}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={["rgba(5,5,5,0.6)", "transparent", "rgba(5,5,5,0.6)"]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            <View style={s.proInhalt}>
+              <View style={s.proAbzeichen}>
+                <LinearGradient
+                  colors={["#00FFCC", "#00FFCC"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text style={s.proAbzeichenText}>PRO</Text>
+              </View>
+              <Text style={s.proUeberschrift}>
+                Schalte dein{"\n"}volles Potenzial frei.
+              </Text>
+              <Text style={s.proUntertitel}>
+                Erweiterte Analysen, unbegrenzte Einheiten, PDF-Export.
+              </Text>
+              <AnimatedPressable style={s.proBtn} onPress={() => router.push('/premium')} scale={0.97}>
+                <LinearGradient
+                  colors={["#00FFCC", "#00FFCC"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text style={s.proBtnText}>Upgrade — CHF 5.90 / Monat</Text>
+              </AnimatedPressable>
+            </View>
+          </View>
+        )}
+
+        {/* Premium-Status — nur für Premium-User */}
+        {isPremium && (
+          <View style={s.premiumKarte}>
+            <LinearGradient
+              colors={["rgba(0,255,204,0.08)", "rgba(0,240,200,0.05)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={s.premiumKopf}>
+              <View style={s.proAbzeichen}>
+                <LinearGradient
+                  colors={["#00FFCC", "#00FFCC"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text style={s.proAbzeichenText}>PRO</Text>
+              </View>
+              <View style={s.premiumAktivBadge}>
+                <Ionicons name="checkmark-circle" size={13} color={C.success} />
+                <Text style={s.premiumAktivText}>Aktiv</Text>
+              </View>
+            </View>
+            <Text style={s.premiumTitel}>Premium aktiv</Text>
+            <Text style={s.premiumSub}>
+              {expiresAt
+                ? `Verlängert sich am ${expiresAt.toLocaleDateString("de-CH")}`
+                : "Unbegrenzt aktiv"}
+            </Text>
+          </View>
+        )}
+
+        {/* Konto-Einstellungen */}
+        <Text style={s.abschnitt}>KONTO</Text>
+        <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+          <EinstellungZeile
+            icon="notifications-outline"
+            label="Benachrichtigungen"
+            wert="An"
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="moon-outline"
+            label="Erscheinungsbild"
+            wert="Dunkel"
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="shield-checkmark-outline"
+            label="Datenschutz"
+            onPress={() => router.push('/privacy')}
+          />
+        </View>
+
+        <Text style={s.abschnitt}>TRAINER</Text>
+        <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+          <EinstellungZeile
+            icon="people-outline"
+            label="Meine Trainer"
+            onPress={() => router.push('/trainer')}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="ribbon-outline"
+            label={isTrainer ? 'Mein Trainer-Profil' : 'Trainer werden'}
+            onPress={() => router.push('/trainer/edit')}
+          />
+          <View style={s.trenner} />
+          <View style={s.zeile}>
+            <View style={s.zeileIcon}>
+              <Ionicons name="share-social-outline" size={17} color={C.muted} />
+            </View>
+            <Text style={[s.zeileLabel, { flex: 1 }]}>Neue Einheiten teilen</Text>
+            <Switch
+              value={profile?.share_trainings_default ?? false}
+              onValueChange={toggleShare}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+            />
+          </View>
+        </View>
+
+        <Text style={s.abschnitt}>SUPPORT</Text>
+        <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+          <EinstellungZeile icon="help-circle-outline" label="Hilfecenter" />
+          <View style={s.trenner} />
+          <EinstellungZeile icon="chatbubble-outline" label="Feedback senden" />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="document-text-outline"
+            label="AGB & Datenschutz"
+            onPress={() => router.push('/privacy')}
+          />
+        </View>
+
+        <View style={[s.karte, isGlass && s.glassTransparent, { marginBottom: 24 }]}>{isGlass && <Glass style={s.glassBg} />}
+          <EinstellungZeile
+            icon="log-out-outline"
+            label="Abmelden"
+            gefahr
+            onPress={handleAbmelden}
+          />
+        </View>
+
+        <View style={[s.karte, isGlass && s.glassTransparent, { marginBottom: 0 }]}>{isGlass && <Glass style={s.glassBg} />}
+          <EinstellungZeile
+            icon="trash-outline"
+            label="Konto löschen"
+            gefahr
+            onPress={handleKontoLoeschen}
+          />
+        </View>
+
+        <Text style={s.version}>ANYVO v1.0.0</Text>
+      </ScrollView>
+      <QuickAddSheet />
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bg },
+  scroll: { flex: 1 },
+  inhalt: { paddingHorizontal: 20, paddingBottom: 120 },
+
+  kopf: { paddingTop: 16, paddingBottom: 22 },
+  augenbraue: {
+    fontSize: 10,
+    color: C.muted,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  titel: {
+    fontSize: 28,
+    color: C.white,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+
+  identitaet: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 20,
+    gap: 14,
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+  avatarKreis: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: `${C.accent}40`,
+    overflow: "hidden",
+  },
+  avatarText: { fontSize: 20, color: C.accent, fontWeight: "900" },
+  identitaetInfo: { flex: 1 },
+  anzeigeName: {
+    fontSize: 17,
+    color: C.white,
+    fontWeight: "700",
+    marginBottom: 3,
+  },
+  emailText: { fontSize: 13, color: C.muted },
+  bearbeitenBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.cardAlt,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  statsReihe: {
+    flexDirection: "row",
+    backgroundColor: C.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.border,
+    marginBottom: 24,
+    overflow: "hidden",
+  },
+  stat: { flex: 1, alignItems: "center", paddingVertical: 18 },
+  statTrenner: { borderRightWidth: 1, borderRightColor: C.border },
+  statWert: {
+    fontSize: 22,
+    color: C.white,
+    fontWeight: "900",
+    marginBottom: 3,
+    letterSpacing: -0.5,
+  },
+  statLabel: {
+    fontSize: 9,
+    color: C.muted,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+  },
+
+  proBanner: {
+    height: 240,
+    borderRadius: 24,
+    overflow: "hidden",
+    marginBottom: 28,
+    borderWidth: 1,
+    borderColor: `${C.accent}20`,
+    justifyContent: "flex-end",
+    backgroundColor: C.bg,
+  },
+  proBannerImg: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    width: '100%', height: '100%',
+  },
+  proInhalt: { padding: 22 },
+  proAbzeichen: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: "hidden",
+    alignSelf: "flex-start",
+    marginBottom: 12,
+  },
+  proAbzeichenText: {
+    fontSize: 11,
+    color: C.accentText,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+  },
+  proUeberschrift: {
+    fontSize: 26,
+    color: C.white,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+    lineHeight: 30,
+    marginBottom: 8,
+  },
+  proUntertitel: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.55)",
+    marginBottom: 18,
+    lineHeight: 19,
+  },
+  proBtn: {
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  proBtnText: { fontSize: 15, color: C.accentText, fontWeight: "900" },
+
+  abschnitt: {
+    fontSize: 10,
+    color: C.muted,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+    marginBottom: 10,
+  },
+  karte: {
+    backgroundColor: C.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+    overflow: "hidden",
+    marginBottom: 24,
+  },
+  glassTransparent: { backgroundColor: "transparent" },
+  glassBg:          { ...StyleSheet.absoluteFillObject },
+  zeile: { flexDirection: "row", alignItems: "center", padding: 16, gap: 12 },
+  zeileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: C.cardAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zeileIconGefahr: { backgroundColor: C.dangerDim },
+  zeileLabel: { flex: 1, fontSize: 15, color: C.white, fontWeight: "500" },
+  zeileRechts: { flexDirection: "row", alignItems: "center", gap: 4 },
+  zeileWert: { fontSize: 13, color: C.muted },
+  trenner: { height: 1, backgroundColor: C.border, marginLeft: 64 },
+
+  version: {
+    textAlign: "center",
+    fontSize: 12,
+    color: C.subtle,
+    marginTop: 20,
+  },
+
+  planBtn: {
+    flexDirection:     "row",
+    alignItems:        "center",
+    gap:               8,
+    borderRadius:      14,
+    borderWidth:       1,
+    borderColor:       C.border,
+    backgroundColor:   C.card,
+    paddingHorizontal: 16,
+    paddingVertical:   13,
+    marginBottom:      14,
+    overflow:          "hidden",
+  },
+  planBtnAktiv:    { borderColor: `${C.accent}40` },
+  planBtnText:     { flex: 1, fontSize: 14, color: C.muted,  fontWeight: "600" },
+  planBtnTextAktiv:{ flex: 1, fontSize: 14, color: C.accent, fontWeight: "700" },
+
+  premiumKarte: {
+    borderRadius:    24,
+    borderWidth:     1,
+    borderColor:     `${C.accent}25`,
+    padding:         22,
+    marginBottom:    28,
+    overflow:        "hidden",
+    gap:             6,
+  },
+  premiumKopf: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    gap:            10,
+    marginBottom:   10,
+  },
+  premiumAktivBadge: {
+    flexDirection:  "row",
+    alignItems:     "center",
+    gap:            4,
+    backgroundColor: C.successDim,
+    borderRadius:   20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth:    1,
+    borderColor:    `${C.success}30`,
+  },
+  premiumAktivText: { fontSize: 12, color: C.success, fontWeight: "700" },
+  premiumTitel: { fontSize: 20, color: C.white, fontWeight: "900", letterSpacing: -0.3 },
+  premiumSub:   { fontSize: 13, color: C.muted },
+});

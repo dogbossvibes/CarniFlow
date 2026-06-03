@@ -1,0 +1,158 @@
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Redirect, Tabs } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import { GlassView } from 'expo-glass-effect';
+import { isGlass } from '@/components/ui/Glass';
+import { Image } from 'expo-image';
+import { useEffect } from 'react';
+import { C } from '@/constants/colors';
+import { useSession } from '@/hooks/useSession';
+import { useProfile } from '@/hooks/useProfile';
+import { registerForPush } from '@/lib/push';
+
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+function TabIcon({ name, focused, size }: { name: IconName; focused: boolean; size: number }) {
+  return (
+    <View style={[s.iconWrap, focused && s.iconWrapActive]}>
+      <Ionicons
+        name={focused ? name : (`${name}-outline` as IconName)}
+        size={focused ? size : size - 1}
+        color={focused ? C.accent : C.muted}
+      />
+    </View>
+  );
+}
+
+function ApportIcon({ color, size = 24 }: { color: string; size?: number }) {
+  return (
+    <Image
+      source={require('@/assets/images/iconapport.png')}
+      style={{ width: size, height: size }}
+      contentFit="contain"
+      tintColor={color}
+    />
+  );
+}
+
+function ApportTabIcon({ focused, size }: { focused: boolean; size: number }) {
+  return (
+    <View style={[s.iconWrap, focused && s.iconWrapActive]}>
+      <ApportIcon
+        color={focused ? C.accent : C.muted}
+        size={focused ? size : size - 1}
+      />
+    </View>
+  );
+}
+
+function TabBarBackground() {
+  // iOS 26+: echtes Liquid Glass; sonst der bisherige Blur.
+  if (isGlass) return <GlassView style={StyleSheet.absoluteFill} glassEffectStyle="regular" />;
+  return <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />;
+}
+
+export default function TabLayout() {
+  const { session, loading } = useSession();
+  const { isTrainer } = useProfile();
+
+  // Push-Token registrieren, sobald eingeloggt (best-effort, nur Dev/Prod-Build).
+  const uid = session?.user.id;
+  useEffect(() => { if (uid) registerForPush(uid); }, [uid]);
+
+  if (loading) {
+    return (
+      <View style={s.loader}>
+        <ActivityIndicator size="large" color={C.accent} />
+      </View>
+    );
+  }
+
+  if (!session) return <Redirect href="/(auth)/login" />;
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          position:          'absolute',
+          backgroundColor:   isGlass ? 'transparent' : 'rgba(10,10,10,0.80)',
+          borderTopColor:    C.border,
+          borderTopWidth:    isGlass ? 0 : 1,
+          height:            Platform.OS === 'ios' ? 88 : 66,
+          paddingBottom:     Platform.OS === 'ios' ? 28 : 10,
+          paddingTop:        10,
+          paddingHorizontal: 8,
+        },
+        tabBarBackground: () => <TabBarBackground />,
+        tabBarActiveTintColor:   C.accent,
+        tabBarInactiveTintColor: C.muted,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
+        sceneStyle: { backgroundColor: C.bg },
+      }}
+    >
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: 'Start',
+          tabBarIcon: ({ focused, size }) => <TabIcon name="home"    focused={focused} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="dogs"
+        options={{
+          title: 'Hunde',
+          tabBarIcon: ({ focused, size }) => <TabIcon name="paw"     focused={focused} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="training"
+        options={{
+          title: 'Training',
+          tabBarIcon: ({ focused, size }) => <ApportTabIcon focused={focused} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="clients"
+        options={{
+          title: 'Kunden',
+          href: isTrainer ? undefined : null,
+          tabBarIcon: ({ focused, size }) => <TabIcon name="people" focused={focused} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="activity"
+        options={{
+          title: 'Aktivität',
+          href: isTrainer ? undefined : null,
+          tabBarIcon: ({ focused, size }) => <TabIcon name="newspaper" focused={focused} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: 'Analyse',
+          tabBarIcon: ({ focused, size }) => <TabIcon name="pulse" focused={focused} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profil',
+          tabBarIcon: ({ focused, size }) => <TabIcon name="person"  focused={focused} size={size} />,
+        }}
+      />
+    </Tabs>
+  );
+}
+
+const s = StyleSheet.create({
+  loader:        { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  iconWrap:      { width: 36, height: 28, alignItems: 'center', justifyContent: 'center' },
+  iconWrapActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: C.accent,
+    paddingBottom:     2,
+  },
+});
