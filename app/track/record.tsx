@@ -9,12 +9,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import * as Speech from 'expo-speech';
 import { C } from '@/constants/colors';
 import { finishTrackSession } from '@/services/trackingService';
 import { TrackPath } from '@/components/tracking/TrackPath';
 import { deviationFromTrack, distanceM, nearestArticleDist, type LatLng } from '@/lib/trackGuidance';
 import type { TrackPoint, TrackArticle } from '@/types/tracking';
+
+// expo-speech ist ein natives Modul. In einem Dev-Client, der OHNE expo-speech
+// gebaut wurde, fehlt 'ExpoSpeech' → der Import würde crashen. Deshalb defensiv
+// laden: fehlt das Modul, bleibt die Sprachausgabe stumm (GPS/Tracking läuft
+// normal weiter). Nach einem neuen Dev-/EAS-Build ist die Stimme automatisch da.
+let Speech: typeof import('expo-speech') | null = null;
+try { Speech = require('expo-speech'); } catch { Speech = null; }
+const SPEECH_AVAILABLE = Speech != null;
+
+function speakNow(msg: string) {
+  try { Speech?.stop(); Speech?.speak(msg, { language: 'de-DE', rate: 1.0 }); } catch { /* ignore */ }
+}
+function stopSpeech() {
+  try { Speech?.stop(); } catch { /* ignore */ }
+}
 
 // Gegenstand-Materialien (werden in article.notiz gespeichert; typ bleibt 'gegenstand').
 const MATERIALS = ['Holz', 'Leder', 'Stoff', 'Metall', 'Plastik', 'Knochen', 'Divers'];
@@ -62,7 +76,7 @@ export default function TrackRecordScreen() {
   const searchSubRef   = useRef<Location.LocationSubscription | null>(null);
   const searchPtsRef   = useRef<LatLng[]>([]);
   const walkedRef      = useRef<number>(0);            // gelaufene Meter (Suche)
-  const voiceOnRef     = useRef<boolean>(true);        // Spiegel für Watch-Closure
+  const voiceOnRef     = useRef<boolean>(SPEECH_AVAILABLE); // Spiegel für Watch-Closure
   const lastSpeakRef   = useRef<number>(0);            // letzte Ansage (ms)
   const spokenDistRef  = useRef<number>(0);            // letzter angesagter Meilenstein
   const deviationActiveRef = useRef<boolean>(false);   // läuft gerade abseits?
@@ -78,7 +92,7 @@ export default function TrackRecordScreen() {
   const [liegeElapsed, setLiegeElapsed] = useState(0);
   const [sucheElapsed, setSucheElapsed] = useState(0); // Such-Dauer (live)
   const [sucheDist,    setSucheDist]    = useState(0);  // gelaufene Meter (Suche)
-  const [voiceOn,      setVoiceOn]      = useState(true);
+  const [voiceOn,      setVoiceOn]      = useState(SPEECH_AVAILABLE);
   const [objModal,    setObjModal]    = useState(false);
   const [saving,      setSaving]      = useState(false);
 
@@ -148,8 +162,7 @@ export default function TrackRecordScreen() {
   const speak = useCallback((msg: string) => {
     if (!voiceOnRef.current) return;
     lastSpeakRef.current = Date.now();
-    Speech.stop();
-    Speech.speak(msg, { language: 'de-DE', rate: 1.0 });
+    speakNow(msg);
   }, []);
 
   // Wird bei jedem GPS-Fix während der Suche aufgerufen: Pfad aufzeichnen,
@@ -218,14 +231,14 @@ export default function TrackRecordScreen() {
     return () => {
       sub?.remove();
       searchSubRef.current = null;
-      Speech.stop();
+      stopSpeech();
     };
   }, [phase, onSearchPosition, speak]);
 
   // voiceOn-State in Ref spiegeln (für die GPS-Closure) + bei Aus sofort stoppen.
   useEffect(() => {
     voiceOnRef.current = voiceOn;
-    if (!voiceOn) Speech.stop();
+    if (!voiceOn) stopSpeech();
   }, [voiceOn]);
 
   // Android-Zurück abfangen
@@ -241,7 +254,7 @@ export default function TrackRecordScreen() {
       { text: 'Abbrechen', style: 'destructive', onPress: () => {
         subRef.current?.remove();
         searchSubRef.current?.remove();
-        Speech.stop();
+        stopSpeech();
         if (timerRef.current) clearInterval(timerRef.current);
         if (liegeTimerRef.current) clearInterval(liegeTimerRef.current);
         if (searchTimerRef.current) clearInterval(searchTimerRef.current);
@@ -305,7 +318,7 @@ export default function TrackRecordScreen() {
     if (searchTimerRef.current) clearInterval(searchTimerRef.current);
     searchSubRef.current?.remove();
     searchSubRef.current = null;
-    Speech.stop();
+    stopSpeech();
     setSaving(true);
 
     const pts = pointsRef.current.map(p => ({ lat: p.lat, lng: p.lng }));
@@ -476,8 +489,9 @@ export default function TrackRecordScreen() {
                 </View>
               </View>
               <TouchableOpacity
-                style={[s.voiceBtn, voiceOn && s.voiceBtnOn]}
+                style={[s.voiceBtn, voiceOn && s.voiceBtnOn, !SPEECH_AVAILABLE && { opacity: 0.4 }]}
                 onPress={() => setVoiceOn(v => !v)}
+                disabled={!SPEECH_AVAILABLE}
                 activeOpacity={0.7}
               >
                 <Ionicons
