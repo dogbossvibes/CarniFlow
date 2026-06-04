@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,18 +6,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useDogs } from '@/hooks/useDogs';
+import { useSession } from '@/hooks/useSession';
 import { DISCIPLINES, customToDiscipline, type Discipline } from '@/constants/disciplines';
 import { HeroImage } from '@/components/training/HeroImage';
 import { DisciplineCard } from '@/components/training/DisciplineCard';
-import { useActiveTraining } from '@/stores/activeTraining';
+import { useActiveTraining, startUnit, addExercise } from '@/stores/activeTraining';
+import { createTrainingUnit } from '@/services/trainingUnitService';
+import { DogIcon } from '@/components/ui/DogIcon';
 import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { tapHaptic } from '@/lib/haptics';
 
 export default function UnitStartScreen() {
   const router = useRouter();
   const { dogs } = useDogs();
+  const { session } = useSession();
   const active = useActiveTraining();
   const { categories, refresh } = useCustomCategories();
+  const creating = useRef(false);
 
   // Eigene Kategorien aktualisieren, wenn man vom Anlegen zurückkehrt.
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
@@ -31,6 +36,28 @@ export default function UnitStartScreen() {
   const creator = DISCIPLINES.find(d => d.custom)!;
   const cards   = [...fixed, ...categories.map(customToDiscipline)];
 
+  // Standard-Sparten (Fährte, Unterordnung, Schutzdienst) direkt ohne
+  // Übungs-/Unterkategorie-Auswahl ins Live-Tracking starten.
+  const startDirect = async (disc: Discipline, dogId: string, dogName: string | null) => {
+    const ownerId = session?.user.id;
+    if (!ownerId) { Alert.alert('Fehler', 'Sitzung fehlt.'); return; }
+
+    if (!active.unitId) {
+      if (creating.current) return;
+      creating.current = true;
+      const { data, error } = await createTrainingUnit(ownerId, dogId);
+      creating.current = false;
+      if (error || !data) {
+        Alert.alert('Fehler', error?.message ?? 'Einheit konnte nicht gestartet werden.');
+        return;
+      }
+      startUnit({ unitId: data.id, dogId, dogName: dogName || null });
+    }
+    // Eintrag auf Sparten-Ebene (kein Unterkategorie-Name).
+    addExercise({ discipline: disc.label, exercise_name: disc.label, rating: null, notes: null, duration_sec: null });
+    router.replace('/unit/live');
+  };
+
   const handleDiscipline = (disc: Discipline) => {
     const dogId   = addMode ? active.dogId : selectedDogId;
     const dogName = addMode ? active.dogName : dogs.find(d => d.id === dogId)?.name ?? null;
@@ -38,6 +65,15 @@ export default function UnitStartScreen() {
       Alert.alert('Hund wählen', 'Bitte wähle zuerst einen Hund für diese Einheit.');
       return;
     }
+
+    // Eigene/individuelle Kategorien behalten die Übungsauswahl; die festen
+    // Standard-Sparten starten direkt ohne Unterkategorie.
+    const isCustom = disc.key.startsWith('custom:');
+    if (!isCustom) {
+      startDirect(disc, dogId, dogName);
+      return;
+    }
+
     if (disc.exercises.length === 0) {
       Alert.alert('Keine Übungen', 'Diese Kategorie hat noch keine Übungen.');
       return;
@@ -80,7 +116,7 @@ export default function UnitStartScreen() {
         {/* Hundauswahl bzw. fixierter Hund */}
         {addMode ? (
           <View style={s.lockedDog}>
-            <Ionicons name="paw" size={14} color={C.accent} />
+            <DogIcon size={14} color={C.accent} />
             <Text style={s.lockedDogTxt}>{active.dogName ?? 'Hund'}</Text>
           </View>
         ) : (
@@ -100,7 +136,7 @@ export default function UnitStartScreen() {
                       activeOpacity={0.8}
                     >
                       {aktiv && <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />}
-                      <Ionicons name="paw" size={13} color={aktiv ? C.accentText : C.muted} />
+                      <DogIcon size={13} color={aktiv ? C.accentText : C.muted} />
                       <Text style={[s.dogChipTxt, aktiv && s.dogChipTxtActive]}>{d.name}</Text>
                     </TouchableOpacity>
                   );

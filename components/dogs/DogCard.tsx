@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { DogIcon } from '@/components/ui/DogIcon';
 import type { Dog } from '@/types';
 
 function altersLabel(geburtsDatum: string | null): string {
@@ -30,7 +31,7 @@ export function DogCard({ dog, onPress }: Props) {
         />
       ) : (
         <View style={[s.avatar, { backgroundColor: `${C.accent}14` }]}>
-          <Ionicons name="paw" size={24} color={C.accent} />
+          <DogIcon size={24} color={C.accent} />
         </View>
       )}
 

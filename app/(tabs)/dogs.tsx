@@ -1,6 +1,7 @@
 import { DogCard } from "@/components/dogs/DogCard";
 import { QuickAddSheet } from "@/components/QuickAddSheet";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
+import { DogIcon } from "@/components/ui/DogIcon";
 import { C } from "@/constants/colors";
 import { useDogs } from "@/hooks/useDogs";
 import { usePlan } from "@/hooks/usePlan";
@@ -93,7 +94,7 @@ export default function HundeScreen() {
             <View style={s.leer}>
               <View style={s.leerRing}>
                 <View style={s.leerIcon}>
-                  <Ionicons name="paw-outline" size={36} color={C.accent} />
+                  <DogIcon size={36} color={C.accent} />
                 </View>
               </View>
               <Text style={s.leerTitel}>

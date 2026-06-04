@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { DogIcon } from '@/components/ui/DogIcon';
 import { disciplineColor } from '@/constants/disciplines';
 import { useActiveTraining, updateExercise, removeExercise } from '@/stores/activeTraining';
 import { tapHaptic } from '@/lib/haptics';
@@ -65,7 +66,7 @@ export default function LiveScreen() {
           <Text style={s.timerLabel}>{running ? 'TRAINING LÄUFT' : 'PAUSIERT'}</Text>
           <Text style={s.timer}>{formatTime(elapsed)}</Text>
           <View style={s.dogChip}>
-            <Ionicons name="paw" size={13} color={C.accent} />
+            <DogIcon size={13} color={C.accent} />
             <Text style={s.dogChipTxt}>{active.dogName ?? 'Hund'}</Text>
           </View>
         </View>

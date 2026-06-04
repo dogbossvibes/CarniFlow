@@ -29,6 +29,7 @@ import { C } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { DogIcon } from '@/components/ui/DogIcon';
 import { signIn, signUp, signInWithGoogle, signInWithApple, isAppleAuthAvailable } from '@/services/auth';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -203,7 +204,7 @@ export default function LoginScreen() {
                     end={{ x: 1, y: 1 }}
                     style={StyleSheet.absoluteFill}
                   />
-                  <Ionicons name="paw" size={15} color={C.accentText} />
+                  <DogIcon size={15} color={C.accentText} />
                 </View>
                 <Text style={s.logoPillText}>ANYVO</Text>
               </View>

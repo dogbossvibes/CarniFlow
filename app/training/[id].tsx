@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { DogIcon } from '@/components/ui/DogIcon';
 import {
   getTrainingSessionById,
   updateTrainingSession,
@@ -38,7 +39,7 @@ const KATEGORIEN: { id: TrainingCategory; label: string; icon: IconName }[] = [
   { id: 'IGP',             label: 'IGP',       icon: 'shield-outline' },
   { id: 'IBGH',            label: 'IBGH',       icon: 'ribbon-outline' },
   { id: 'Mondioring',      label: 'Mondioring', icon: 'flag-outline'   },
-  { id: 'Alltagstraining', label: 'Alltag',     icon: 'paw-outline'    },
+  { id: 'Alltagstraining', label: 'Alltag',     icon: 'home-outline'   },
 ];
 
 function formatDauer(min: number): string {
@@ -297,7 +298,7 @@ export default function TrainingDetailScreen() {
           {/* Hund */}
           {einheit.dog?.name ? (
             <View style={s.hundBadge}>
-              <Ionicons name="paw" size={12} color={C.muted} />
+              <DogIcon size={12} color={C.muted} />
               <Text style={s.hundBadgeText}>{einheit.dog.name}</Text>
             </View>
           ) : null}

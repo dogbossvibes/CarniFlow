@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { DogIcon } from '@/components/ui/DogIcon';
 import { Glass, isGlass } from '@/components/ui/Glass';
 import { C } from '@/constants/colors';
 import { disciplineColor } from '@/constants/disciplines';
@@ -35,7 +36,7 @@ export function UnitListCard({ unit, onPress, clientName }: { unit: TrainingUnit
         <View style={s.dateWrap}>
           <Text style={s.date}>{formatDate(unit.session_date)}</Text>
           <View style={s.dogChip}>
-            <Ionicons name="paw" size={11} color={C.accent} />
+            <DogIcon size={11} color={C.accent} />
             <Text style={s.dogTxt}>{unit.dog?.name ?? '—'}</Text>
           </View>
         </View>

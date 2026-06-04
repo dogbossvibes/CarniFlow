@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { C } from '@/constants/colors';
+import { DogIcon } from '@/components/ui/DogIcon';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { createTrackSession } from '@/services/trackingService';
@@ -163,7 +164,7 @@ export default function TrackSetupScreen() {
                   activeOpacity={0.75}
                 >
                   {aktiv && <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />}
-                  <Ionicons name="paw" size={13} color={aktiv ? C.accentText : C.muted} />
+                  <DogIcon size={13} color={aktiv ? C.accentText : C.muted} />
                   <Text style={[s.dogChipTxt, aktiv && s.dogChipTxtActive]}>{d.name}</Text>
                 </TouchableOpacity>
               );

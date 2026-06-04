@@ -6,6 +6,7 @@ import { GlassView } from 'expo-glass-effect';
 import { isGlass } from '@/components/ui/Glass';
 import { Image } from 'expo-image';
 import { useEffect } from 'react';
+import { DogIcon } from '@/components/ui/DogIcon';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
@@ -40,6 +41,17 @@ function ApportTabIcon({ focused, size }: { focused: boolean; size: number }) {
   return (
     <View style={[s.iconWrap, focused && s.iconWrapActive]}>
       <ApportIcon
+        color={focused ? C.accent : C.muted}
+        size={focused ? size : size - 1}
+      />
+    </View>
+  );
+}
+
+function DogTabIcon({ focused, size }: { focused: boolean; size: number }) {
+  return (
+    <View style={[s.iconWrap, focused && s.iconWrapActive]}>
+      <DogIcon
         color={focused ? C.accent : C.muted}
         size={focused ? size : size - 1}
       />
@@ -103,7 +115,7 @@ export default function TabLayout() {
         name="dogs"
         options={{
           title: 'Hunde',
-          tabBarIcon: ({ focused, size }) => <TabIcon name="paw"     focused={focused} size={size} />,
+          tabBarIcon: ({ focused, size }) => <DogTabIcon focused={focused} size={size} />,
         }}
       />
       <Tabs.Screen

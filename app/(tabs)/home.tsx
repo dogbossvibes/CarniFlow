@@ -348,25 +348,25 @@ export default function HomeScreen() {
             <SchnellAktion
               icon="add-circle-outline"
               label="Hund"
-              farbe={C.accent}
+              farbe="#ff5f00"
               onPress={() => router.push("/add-dog")}
             />
             <SchnellAktion
               label="Training"
-              farbe={C.warning}
+              farbe="#b34300"
               onPress={() => router.push("/unit/start")}
-              customIcon={<ApportIcon color={C.warning} size={22} />}
+              customIcon={<ApportIcon color="#b34300" size={22} />}
             />
             <SchnellAktion
               icon="map-outline"
               label="Fährte"
-              farbe={C.success}
+              farbe="#ffaf80"
               onPress={() => router.push("/track/setup" as never)}
             />
             <SchnellAktion
               icon="stats-chart-outline"
               label="Fortschritt"
-              farbe="#60A5FA"
+              farbe="#ffd7bf"
               onPress={() => router.push("/(tabs)/analytics")}
             />
           </View>
