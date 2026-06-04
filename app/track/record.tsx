@@ -9,9 +9,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
+import * as Speech from 'expo-speech';
 import { C } from '@/constants/colors';
 import { finishTrackSession } from '@/services/trackingService';
 import { TrackPath } from '@/components/tracking/TrackPath';
+import { deviationFromTrack, distanceM, nearestArticleDist, type LatLng } from '@/lib/trackGuidance';
 import type { TrackPoint, TrackArticle } from '@/types/tracking';
 
 // Gegenstand-Materialien (werden in article.notiz gespeichert; typ bleibt 'gegenstand').
@@ -56,6 +58,15 @@ export default function TrackRecordScreen() {
   const liegezeitRef  = useRef<number | null>(null);  // eingefrorene Liegezeit (min)
   const searchStartRef = useRef<number | null>(null); // Such-Start
   const searchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Such-Phase: GPS-Pfad ablaufen + Sprach-Führung
+  const searchSubRef   = useRef<Location.LocationSubscription | null>(null);
+  const searchPtsRef   = useRef<LatLng[]>([]);
+  const walkedRef      = useRef<number>(0);            // gelaufene Meter (Suche)
+  const voiceOnRef     = useRef<boolean>(true);        // Spiegel für Watch-Closure
+  const lastSpeakRef   = useRef<number>(0);            // letzte Ansage (ms)
+  const spokenDistRef  = useRef<number>(0);            // letzter angesagter Meilenstein
+  const deviationActiveRef = useRef<boolean>(false);   // läuft gerade abseits?
+  const articleNearRef = useRef<boolean>(false);       // gerade nah an Gegenstand?
 
   const [phase,       setPhase]       = useState<'legen' | 'liegezeit' | 'suche'>('legen');
   const [displayPts,  setDisplayPts]  = useState<{ lat: number; lng: number }[]>([]);
@@ -66,6 +77,8 @@ export default function TrackRecordScreen() {
   const [accuracy,    setAccuracy]    = useState<number | null>(null);
   const [liegeElapsed, setLiegeElapsed] = useState(0);
   const [sucheElapsed, setSucheElapsed] = useState(0); // Such-Dauer (live)
+  const [sucheDist,    setSucheDist]    = useState(0);  // gelaufene Meter (Suche)
+  const [voiceOn,      setVoiceOn]      = useState(true);
   const [objModal,    setObjModal]    = useState(false);
   const [saving,      setSaving]      = useState(false);
 
@@ -131,6 +144,90 @@ export default function TrackRecordScreen() {
     return () => { if (searchTimerRef.current) clearInterval(searchTimerRef.current); };
   }, [phase]);
 
+  // Deutsche Ansage (entprellt via lastSpeakRef in der Auswertung).
+  const speak = useCallback((msg: string) => {
+    if (!voiceOnRef.current) return;
+    lastSpeakRef.current = Date.now();
+    Speech.stop();
+    Speech.speak(msg, { language: 'de-DE', rate: 1.0 });
+  }, []);
+
+  // Wird bei jedem GPS-Fix während der Suche aufgerufen: Pfad aufzeichnen,
+  // gelaufene Distanz zählen und passende Sprach-Führung auslösen.
+  const onSearchPosition = useCallback((loc: Location.LocationObject) => {
+    const cur: LatLng = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+    const pts = searchPtsRef.current;
+    if (pts.length > 0) walkedRef.current += distanceM(pts[pts.length - 1], cur);
+    pts.push(cur);
+    setSucheDist(Math.round(walkedRef.current));
+
+    if (!voiceOnRef.current) return;
+    const now   = Date.now();
+    const since = now - lastSpeakRef.current;
+
+    const laid: LatLng[] = pointsRef.current.map(p => ({ lat: p.lat, lng: p.lng }));
+    const { dist: dev, side } = deviationFromTrack(cur, laid);
+
+    const offene = articleRef.current
+      .filter(a => !a.gefunden && a.typ === 'gegenstand' && a.lat != null && a.lng != null)
+      .map(a => ({ lat: a.lat as number, lng: a.lng as number }));
+    const artDist = nearestArticleDist(cur, offene);
+
+    // 1) Gegenstand ganz nah (höchste Priorität).
+    if (artDist < 5) {
+      if (!articleNearRef.current && since > 6000) {
+        articleNearRef.current = true;
+        speak('Achtung, Gegenstand ganz in der Nähe.');
+      }
+      return;
+    }
+    if (artDist > 8) articleNearRef.current = false;
+
+    // 2) Abweichung von der Fährte.
+    if (dev > 8 && since > 7000) {
+      deviationActiveRef.current = true;
+      speak(`Du weichst ${Math.round(dev)} Meter${side ? ' nach ' + side : ''} ab.`);
+      return;
+    }
+    if (dev < 3 && deviationActiveRef.current && since > 5000) {
+      deviationActiveRef.current = false;
+      speak('Wieder auf der Fährte.');
+      return;
+    }
+
+    // 3) Distanz-Meilensteine alle 25 m (nur wenn auf der Fährte).
+    const milestone = Math.floor(walkedRef.current / 25) * 25;
+    if (milestone >= 25 && milestone > spokenDistRef.current && dev <= 8 && since > 5000) {
+      spokenDistRef.current = milestone;
+      speak(`${milestone} Meter gelaufen.`);
+    }
+  }, [speak]);
+
+  // Such-Phase: GPS-Pfad aufzeichnen + Sprach-Führung (Vordergrund).
+  useEffect(() => {
+    if (phase !== 'suche') return;
+    let sub: Location.LocationSubscription | null = null;
+    (async () => {
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1500, distanceInterval: 1 },
+        onSearchPosition,
+      );
+      searchSubRef.current = sub;
+    })();
+    speak('Suche gestartet. Lauf der Fährte.');
+    return () => {
+      sub?.remove();
+      searchSubRef.current = null;
+      Speech.stop();
+    };
+  }, [phase, onSearchPosition, speak]);
+
+  // voiceOn-State in Ref spiegeln (für die GPS-Closure) + bei Aus sofort stoppen.
+  useEffect(() => {
+    voiceOnRef.current = voiceOn;
+    if (!voiceOn) Speech.stop();
+  }, [voiceOn]);
+
   // Android-Zurück abfangen
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -143,6 +240,8 @@ export default function TrackRecordScreen() {
       { text: 'Weiter', style: 'cancel' },
       { text: 'Abbrechen', style: 'destructive', onPress: () => {
         subRef.current?.remove();
+        searchSubRef.current?.remove();
+        Speech.stop();
         if (timerRef.current) clearInterval(timerRef.current);
         if (liegeTimerRef.current) clearInterval(liegeTimerRef.current);
         if (searchTimerRef.current) clearInterval(searchTimerRef.current);
@@ -204,6 +303,9 @@ export default function TrackRecordScreen() {
   // Suche beenden → alles speichern (inkl. Gefunden-Status der Gegenstände).
   const finishSuche = async () => {
     if (searchTimerRef.current) clearInterval(searchTimerRef.current);
+    searchSubRef.current?.remove();
+    searchSubRef.current = null;
+    Speech.stop();
     setSaving(true);
 
     const pts = pointsRef.current.map(p => ({ lat: p.lat, lng: p.lng }));
@@ -373,7 +475,17 @@ export default function TrackRecordScreen() {
                   <Text style={s.headerLabel}>SUCHE</Text>
                 </View>
               </View>
-              <View style={{ width: 36 }} />
+              <TouchableOpacity
+                style={[s.voiceBtn, voiceOn && s.voiceBtnOn]}
+                onPress={() => setVoiceOn(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={voiceOn ? 'volume-high' : 'volume-mute'}
+                  size={18}
+                  color={voiceOn ? C.accent : C.muted}
+                />
+              </TouchableOpacity>
             </View>
 
             <View style={s.suchePathWrap}>
@@ -390,6 +502,11 @@ export default function TrackRecordScreen() {
               <View style={s.statItem}>
                 <Text style={s.statVal}>{fmtDuration(sucheElapsed)}</Text>
                 <Text style={s.statLbl}>SUCH-DAUER</Text>
+              </View>
+              <View style={s.statDiv} />
+              <View style={s.statItem}>
+                <Text style={s.statVal}>{sucheDist}</Text>
+                <Text style={s.statLbl}>GELAUFEN m</Text>
               </View>
               <View style={s.statDiv} />
               <View style={s.statItem}>
@@ -529,6 +646,12 @@ const s = StyleSheet.create({
   liegeHint:   { fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 20 },
 
   // Suche (Fährte ablaufen)
+  voiceBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  voiceBtnOn: { borderColor: `${C.accent}55`, backgroundColor: `${C.accent}12` },
   suchePathWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   sucheHint: { fontSize: 13, color: C.muted, textAlign: 'center', paddingHorizontal: 24, marginBottom: 10 },
   sucheList: { flex: 1, marginHorizontal: 20 },
