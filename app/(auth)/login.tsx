@@ -111,8 +111,9 @@ export default function LoginScreen() {
   const handleGoogle = async () => {
     setOauthLaden(true); setFehler(null);
     try {
-      const { error } = await signInWithGoogle();
+      const { error, cancelled } = await signInWithGoogle();
       if (error) throw error;
+      if (cancelled) return;
       router.replace('/(tabs)/home');
     } catch (err: unknown) {
       setFehler(err instanceof Error ? uebersetzeFehler(err.message) : 'Google-Anmeldung noch nicht geklappt — versuch es nochmal!');

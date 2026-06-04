@@ -9,6 +9,7 @@ import { useDogs } from "@/hooks/useDogs";
 import { useSession } from "@/hooks/useSession";
 import { useTrainingFeed } from "@/hooks/useTrainingFeed";
 import type { FeedItem } from "@/services/trainingFeed";
+import { useHomeLayout } from "@/stores/homeLayout";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -95,6 +96,7 @@ export default function HomeScreen() {
   const { user } = useSession();
   const { dogs, loading: hundeLoading, refresh: refreshDogs } = useDogs();
   const { feed, loading: feedLoading, refresh: refreshFeed } = useTrainingFeed();
+  const layout = useHomeLayout();
 
   useFocusEffect(
     useCallback(() => {
@@ -225,6 +227,7 @@ export default function HomeScreen() {
         </View>
 
         {/* ── WOCHENSTREIFEN ── */}
+        {layout.woche && (
         <View style={[s.wocheKarte, isGlass && s.cardGlass]}>
           {isGlass && <Glass style={s.glassBg} />}
           <Text style={s.wocheLabel}>DIESE WOCHE</Text>
@@ -249,8 +252,10 @@ export default function HomeScreen() {
             })}
           </View>
         </View>
+        )}
 
         {/* ── HAUPTAKTIONEN ── */}
+        {layout.hauptaktionen && (
         <View style={s.mainActions}>
           <AnimatedPressable style={s.mainCard} scale={0.96} onPress={() => router.push("/unit/start")}>
             <LinearGradient
@@ -270,9 +275,10 @@ export default function HomeScreen() {
             <Text style={s.mainSub}>Nachträglich erfassen</Text>
           </AnimatedPressable>
         </View>
+        )}
 
         {/* ── LETZTE EINHEITEN ── */}
-        {feed.length > 0 && (
+        {layout.letzteEinheiten && feed.length > 0 && (
           <View style={s.sektion}>
             <View style={s.sektionKopf}>
               <Text style={s.sektionTitel}>Letzte Einheiten</Text>
@@ -294,6 +300,7 @@ export default function HomeScreen() {
         )}
 
         {/* ── MEINE HUNDE ── */}
+        {layout.hunde && (
         <View style={s.sektion}>
           <View style={s.sektionKopf}>
             <Text style={s.sektionTitel}>Meine Hunde</Text>
@@ -331,8 +338,10 @@ export default function HomeScreen() {
             </AnimatedPressable>
           )}
         </View>
+        )}
 
         {/* ── SCHNELLZUGRIFF ── */}
+        {layout.schnellzugriff && (
         <View style={[s.sektion, { marginBottom: 120 }]}>
           <Text style={s.sektionTitel}>Schnellzugriff</Text>
           <View style={s.aktionen}>
@@ -362,6 +371,9 @@ export default function HomeScreen() {
             />
           </View>
         </View>
+        )}
+
+        {!layout.schnellzugriff && <View style={{ height: 120 }} />}
       </ScrollView>
       <QuickAddSheet />
     </SafeAreaView>

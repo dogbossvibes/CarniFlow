@@ -65,7 +65,7 @@ export async function deleteAccount(): Promise<{ error: Error | null }> {
   return { error: null };
 }
 
-export async function signInWithGoogle(): Promise<{ error: Error | null }> {
+export async function signInWithGoogle(): Promise<{ error: Error | null; cancelled?: boolean }> {
   const redirectTo = makeRedirectUri({
     scheme: 'anyvo',
     path:   'auth/callback',
@@ -92,11 +92,20 @@ export async function signInWithGoogle(): Promise<{ error: Error | null }> {
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
-  if (result.type === 'success') {
-    const { error: exchErr } = await supabase.auth.exchangeCodeForSession(result.url);
-    if (exchErr) return { error: exchErr };
-    return { error: null };
-  }
+  // User dismissed the browser or cancelled consent — not an error.
+  if (result.type !== 'success') return { error: null, cancelled: true };
 
-  return { error: null };
+  // Pull the PKCE authorization code out of the redirect URL.
+  // exchangeCodeForSession expects ONLY the code string, not the whole URL —
+  // passing the full URL sends it verbatim as auth_code and always fails.
+  const queryString = result.url.split('?')[1] ?? '';
+  const params      = new URLSearchParams(queryString);
+  const code        = params.get('code');
+  const oauthErr    = params.get('error_description') ?? params.get('error');
+
+  if (oauthErr) return { error: new Error(oauthErr) };
+  if (!code)    return { error: new Error('Kein Anmelde-Code von Google erhalten.') };
+
+  const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
+  return { error: exchErr ?? null };
 }

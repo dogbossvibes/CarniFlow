@@ -4,6 +4,7 @@ import { Glass, isGlass } from "@/components/ui/Glass";
 import { C } from "@/constants/colors";
 import { useDogs } from "@/hooks/useDogs";
 import { usePlan } from "@/hooks/usePlan";
+import { useNotificationSetting } from "@/hooks/useNotificationSetting";
 import { useProfile } from "@/hooks/useProfile";
 import { useSession } from "@/hooks/useSession";
 import { useTrainingSessions } from "@/hooks/useTrainingSessions";
@@ -73,6 +74,23 @@ export default function ProfilScreen() {
     await setShareTrainingsDefault(user.id, value);
     refreshProfile();
   };
+
+  const benachrichtigungen = useNotificationSetting(user?.id);
+
+  const handleBenachrichtigungen = async (value: boolean) => {
+    const { blocked } = await benachrichtigungen.toggle(value);
+    if (blocked) {
+      Alert.alert(
+        "Benachrichtigungen blockiert",
+        "Aktiviere Benachrichtigungen für ANYVO in den Systemeinstellungen, um Erinnerungen und Kommentare zu erhalten.",
+        [
+          { text: "Später", style: "cancel" },
+          { text: "Einstellungen öffnen", onPress: benachrichtigungen.openSystemSettings },
+        ]
+      );
+    }
+  };
+
   const { isPremium, expiresAt } = usePlan();
 
   const anzeigeName = user?.user_metadata?.full_name ?? "Hundesportler";
@@ -121,7 +139,7 @@ export default function ProfilScreen() {
                     // Vollständige Löschung serverseitig (Storage + auth.users CASCADE).
                     const { error } = await deleteAccount();
                     if (error) {
-                      Alert.alert("Fehler", "Konto konnte nicht gelöscht werden. Bitte kontaktiere support@anyvo.app.");
+                      Alert.alert("Fehler", "Konto konnte nicht gelöscht werden. Bitte kontaktiere shadesofym@gmail.com.");
                       return;
                     }
                     router.replace("/(auth)/login");
@@ -307,16 +325,24 @@ export default function ProfilScreen() {
         {/* Konto-Einstellungen */}
         <Text style={s.abschnitt}>KONTO</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
-          <EinstellungZeile
-            icon="notifications-outline"
-            label="Benachrichtigungen"
-            wert="An"
-          />
+          <View style={s.zeile}>
+            <View style={s.zeileIcon}>
+              <Ionicons name="notifications-outline" size={17} color={C.muted} />
+            </View>
+            <Text style={[s.zeileLabel, { flex: 1 }]}>Benachrichtigungen</Text>
+            <Switch
+              value={benachrichtigungen.enabled}
+              onValueChange={handleBenachrichtigungen}
+              disabled={benachrichtigungen.busy || !benachrichtigungen.loaded}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+            />
+          </View>
           <View style={s.trenner} />
           <EinstellungZeile
-            icon="moon-outline"
-            label="Erscheinungsbild"
-            wert="Dunkel"
+            icon="home-outline"
+            label="Startbildschirm"
+            onPress={() => router.push('/home-customize')}
           />
           <View style={s.trenner} />
           <EinstellungZeile
@@ -356,7 +382,11 @@ export default function ProfilScreen() {
 
         <Text style={s.abschnitt}>SUPPORT</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
-          <EinstellungZeile icon="help-circle-outline" label="Hilfecenter" />
+          <EinstellungZeile
+            icon="help-circle-outline"
+            label="Hilfecenter"
+            onPress={() => router.push('/help')}
+          />
           <View style={s.trenner} />
           <EinstellungZeile icon="chatbubble-outline" label="Feedback senden" />
           <View style={s.trenner} />

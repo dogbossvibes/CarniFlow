@@ -17,7 +17,7 @@ interface Section {
 const SECTIONS: Section[] = [
   {
     title: '1. Verantwortliche Stelle',
-    body:  'ANYVO\nE-Mail: support@anyvo.app\n\nDiese Datenschutzerklärung gilt für die ANYVO-App (iOS und Android).',
+    body:  'ANYVO\nE-Mail: shadesofym@gmail.com\n\nDiese Datenschutzerklärung gilt für die ANYVO-App (iOS und Android).',
   },
   {
     title: '2. Welche Daten wir erheben',
@@ -37,7 +37,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: '6. Deine Rechte',
-    body:  'Du hast das Recht auf:\n• Auskunft über gespeicherte Daten\n• Berichtigung unrichtiger Daten\n• Löschung deiner Daten (direkt in der App möglich)\n• Einschränkung der Verarbeitung\n• Datenportabilität\n\nFür Anfragen wende dich an: support@anyvo.app',
+    body:  'Du hast das Recht auf:\n• Auskunft über gespeicherte Daten\n• Berichtigung unrichtiger Daten\n• Löschung deiner Daten (direkt in der App möglich)\n• Einschränkung der Verarbeitung\n• Datenportabilität\n\nFür Anfragen wende dich an: shadesofym@gmail.com',
   },
   {
     title: '7. Datensicherheit',
@@ -53,7 +53,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: '10. Kontakt',
-    body:  'Fragen zum Datenschutz:\nsupport@anyvo.app',
+    body:  'Fragen zum Datenschutz:\nshadesofym@gmail.com',
   },
 ];
 

@@ -45,6 +45,16 @@ export async function registerForPush(userId: string) {
   }
 }
 
+// Entfernt den Push-Token am Profil, sobald der Nutzer Benachrichtigungen
+// deaktiviert — so stellt der Server keine Pushes mehr an dieses Gerät zu.
+export async function unregisterFromPush(userId: string) {
+  try {
+    await supabase.from('profiles').update({ push_token: null }).eq('id', userId);
+  } catch {
+    // Best-effort — beim nächsten Aktivieren wird ohnehin neu registriert.
+  }
+}
+
 // Stößt die serverseitige Push-Zustellung an (Edge Function mit service_role,
 // die Empfänger + Token ermittelt). Best-effort.
 export async function notifyNewComment(unitId: string) {

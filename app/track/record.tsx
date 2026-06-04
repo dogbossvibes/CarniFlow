@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert, BackHandler, Modal, Platform, StyleSheet,
+  Alert, BackHandler, Modal, Platform, ScrollView, StyleSheet,
   Text, TouchableOpacity, useWindowDimensions, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ import { TrackPath } from '@/components/tracking/TrackPath';
 import type { TrackPoint, TrackArticle } from '@/types/tracking';
 
 // Gegenstand-Materialien (werden in article.notiz gespeichert; typ bleibt 'gegenstand').
-const MATERIALS = ['Holz', 'Leder', 'Stoff', 'Metall', 'Plastik', 'Knochen'];
+const MATERIALS = ['Holz', 'Leder', 'Stoff', 'Metall', 'Plastik', 'Knochen', 'Divers'];
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
@@ -53,9 +53,11 @@ export default function TrackRecordScreen() {
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const layEndRef  = useRef<number | null>(null);     // Lege-Ende → Start der Liegezeit
   const liegeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const liegezeitRef  = useRef<number | null>(null);
+  const liegezeitRef  = useRef<number | null>(null);  // eingefrorene Liegezeit (min)
+  const searchStartRef = useRef<number | null>(null); // Such-Start
+  const searchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [phase,       setPhase]       = useState<'legen' | 'liegezeit'>('legen');
+  const [phase,       setPhase]       = useState<'legen' | 'liegezeit' | 'suche'>('legen');
   const [displayPts,  setDisplayPts]  = useState<{ lat: number; lng: number }[]>([]);
   const [articles,    setArticles]    = useState<TrackArticle[]>([]);
   const [elapsed,     setElapsed]     = useState(0);   // Lege-Dauer
@@ -63,10 +65,13 @@ export default function TrackRecordScreen() {
   const [gpsOk,       setGpsOk]       = useState(false);
   const [accuracy,    setAccuracy]    = useState<number | null>(null);
   const [liegeElapsed, setLiegeElapsed] = useState(0);
+  const [sucheElapsed, setSucheElapsed] = useState(0); // Such-Dauer (live)
   const [objModal,    setObjModal]    = useState(false);
   const [saving,      setSaving]      = useState(false);
 
-  const pathSize = Math.min(width - 40, 360);
+  const pathSize       = Math.min(width - 40, 360);
+  const suchePathSize  = Math.min(width - 140, 200);
+  const gefundenCount  = articles.filter(a => a.gefunden).length;
 
   // GPS-Aufzeichnung während des Legens
   const startGPS = useCallback(async () => {
@@ -117,6 +122,15 @@ export default function TrackRecordScreen() {
     return () => { if (liegeTimerRef.current) clearInterval(liegeTimerRef.current); };
   }, [phase]);
 
+  // Phase „suche": Such-Dauer hochzählen ab Such-Start (Zeitstempel-basiert).
+  useEffect(() => {
+    if (phase !== 'suche' || searchStartRef.current == null) return;
+    const tick = () => setSucheElapsed(Math.floor((Date.now() - searchStartRef.current!) / 1000));
+    tick();
+    searchTimerRef.current = setInterval(tick, 1000);
+    return () => { if (searchTimerRef.current) clearInterval(searchTimerRef.current); };
+  }, [phase]);
+
   // Android-Zurück abfangen
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -131,6 +145,7 @@ export default function TrackRecordScreen() {
         subRef.current?.remove();
         if (timerRef.current) clearInterval(timerRef.current);
         if (liegeTimerRef.current) clearInterval(liegeTimerRef.current);
+        if (searchTimerRef.current) clearInterval(searchTimerRef.current);
         router.back();
       }},
     ]);
@@ -166,12 +181,29 @@ export default function TrackRecordScreen() {
     ]);
   };
 
-  // Suche starten → Liegezeit einfrieren + alles speichern
-  const startSucheUndSpeichern = async () => {
+  // Suche starten → Liegezeit einfrieren, in die Such-Phase wechseln (Fährte ablaufen).
+  const startSuche = () => {
     if (liegeTimerRef.current) clearInterval(liegeTimerRef.current);
     liegezeitRef.current = layEndRef.current != null
       ? Math.max(0, Math.round((Date.now() - layEndRef.current) / 60000))
       : null;
+    searchStartRef.current = Date.now();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setPhase('suche');
+  };
+
+  // Gegenstand während der Suche als gefunden / nicht gefunden markieren.
+  const toggleGefunden = (index: number) => {
+    const a = articleRef.current[index];
+    if (!a) return;
+    a.gefunden = !a.gefunden;
+    setArticles([...articleRef.current]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  // Suche beenden → alles speichern (inkl. Gefunden-Status der Gegenstände).
+  const finishSuche = async () => {
+    if (searchTimerRef.current) clearInterval(searchTimerRef.current);
     setSaving(true);
 
     const pts = pointsRef.current.map(p => ({ lat: p.lat, lng: p.lng }));
@@ -280,7 +312,7 @@ export default function TrackRecordScreen() {
               </View>
             </Modal>
           </>
-        ) : (
+        ) : phase === 'liegezeit' ? (
           /* ── LIEGEZEIT ── */
           <>
             <View style={s.header}>
@@ -318,14 +350,95 @@ export default function TrackRecordScreen() {
 
             <View style={s.finishWrap}>
               <TouchableOpacity
+                style={s.finishBtn}
+                onPress={startSuche}
+                activeOpacity={0.85}
+              >
+                <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />
+                <Ionicons name="search" size={20} color={C.accentText} />
+                <Text style={s.finishTxt}>Suche starten</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          /* ── SUCHE (Fährte ablaufen) ── */
+          <>
+            <View style={s.header}>
+              <TouchableOpacity style={s.abortBtn} onPress={confirmAbort} activeOpacity={0.7}>
+                <Ionicons name="close" size={20} color={C.muted} />
+              </TouchableOpacity>
+              <View style={s.headerCenter}>
+                <View style={s.recRow}>
+                  <View style={s.recDot} />
+                  <Text style={s.headerLabel}>SUCHE</Text>
+                </View>
+              </View>
+              <View style={{ width: 36 }} />
+            </View>
+
+            <View style={s.suchePathWrap}>
+              <TrackPath
+                points={displayPts}
+                articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
+                width={suchePathSize}
+                height={suchePathSize}
+                padding={24}
+              />
+            </View>
+
+            <View style={s.statsBar}>
+              <View style={s.statItem}>
+                <Text style={s.statVal}>{fmtDuration(sucheElapsed)}</Text>
+                <Text style={s.statLbl}>SUCH-DAUER</Text>
+              </View>
+              <View style={s.statDiv} />
+              <View style={s.statItem}>
+                <Text style={[s.statVal, gefundenCount > 0 && { color: C.accent }]}>
+                  {gefundenCount}/{articles.length}
+                </Text>
+                <Text style={s.statLbl}>GEFUNDEN</Text>
+              </View>
+            </View>
+
+            {articles.length > 0 ? (
+              <>
+                <Text style={s.sucheHint}>Tippe einen Gegenstand an, sobald der Hund ihn anzeigt.</Text>
+                <ScrollView style={s.sucheList} contentContainerStyle={{ gap: 8 }} showsVerticalScrollIndicator={false}>
+                  {articles.map((a, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[s.sucheItem, a.gefunden && s.sucheItemDone]}
+                      onPress={() => toggleGefunden(i)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={a.gefunden ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={22}
+                        color={a.gefunden ? C.success : C.subtle}
+                      />
+                      <Text style={[s.sucheItemTxt, a.gefunden && { color: C.white }]}>
+                        {a.typ === 'verleitung' ? '⚠️ Verleitung' : `📍 ${a.notiz ?? 'Gegenstand'}`} #{i + 1}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            ) : (
+              <View style={s.sucheEmpty}>
+                <Text style={s.sucheEmptyTxt}>Keine Gegenstände platziert — beende die Suche, wenn der Hund fertig ist.</Text>
+              </View>
+            )}
+
+            <View style={s.finishWrap}>
+              <TouchableOpacity
                 style={[s.finishBtn, saving && { opacity: 0.5 }]}
-                onPress={startSucheUndSpeichern}
+                onPress={finishSuche}
                 disabled={saving}
                 activeOpacity={0.85}
               >
                 <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />
                 <Ionicons name="checkmark-circle" size={20} color={C.accentText} />
-                <Text style={s.finishTxt}>{saving ? 'Wird gespeichert…' : 'Suche starten & speichern'}</Text>
+                <Text style={s.finishTxt}>{saving ? 'Wird gespeichert…' : 'Suche beenden & speichern'}</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -414,6 +527,20 @@ const s = StyleSheet.create({
   liegeCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 14 },
   liegeTimer:  { fontSize: 64, color: C.white, fontWeight: '900', letterSpacing: -2, fontVariant: ['tabular-nums'] },
   liegeHint:   { fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 20 },
+
+  // Suche (Fährte ablaufen)
+  suchePathWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+  sucheHint: { fontSize: 13, color: C.muted, textAlign: 'center', paddingHorizontal: 24, marginBottom: 10 },
+  sucheList: { flex: 1, marginHorizontal: 20 },
+  sucheItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border,
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  sucheItemDone: { borderColor: `${C.success}55`, backgroundColor: `${C.success}10` },
+  sucheItemTxt:  { flex: 1, fontSize: 14, color: C.muted, fontWeight: '600' },
+  sucheEmpty:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  sucheEmptyTxt: { fontSize: 14, color: C.subtle, textAlign: 'center', lineHeight: 20 },
 
   summaryCard: {
     marginHorizontal: 20, marginBottom: 12, backgroundColor: C.card, borderRadius: 18,
