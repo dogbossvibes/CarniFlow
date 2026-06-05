@@ -33,6 +33,10 @@ export default function HundHinzufuegenScreen() {
   const [geschlecht,  setGeschlecht]  = useState<Geschlecht>(null);
   const [geburtsDat,  setGeburtsDat]  = useState('');
   const [gewichtKg,   setGewichtKg]   = useState('');
+  const [titel,       setTitel]       = useState('');   // Leistungsabzeichen, kommagetrennt
+  const [vater,       setVater]       = useState('');
+  const [mutter,      setMutter]      = useState('');
+  const [zwinger,     setZwinger]     = useState('');
   const [bildUri,     setBildUri]     = useState<string | null>(null);
   const [fehler,      setFehler]      = useState<string | null>(null);
   const [laden,       setLaden]       = useState(false);
@@ -83,6 +87,8 @@ export default function HundHinzufuegenScreen() {
       }
     }
 
+    const titlesArr = titel.split(',').map(t => t.trim()).filter(Boolean);
+
     const { error: err } = await addDog(session.user.id, {
       name:       name.trim(),
       breed:      rasse.trim() || null,
@@ -90,6 +96,10 @@ export default function HundHinzufuegenScreen() {
       birth_date: geburtsDat.trim() || null,
       weight_kg:  gewichtKg ? parseFloat(gewichtKg) : null,
       photo_url:  photoUrl,
+      titles:     titlesArr,
+      sire:       vater.trim()   || null,
+      dam:        mutter.trim()  || null,
+      kennel:     zwinger.trim() || null,
     });
 
     setLaden(false);
@@ -235,6 +245,39 @@ export default function HundHinzufuegenScreen() {
               onChangeText={setGewichtKg}
               keyboardType="decimal-pad"
             />
+
+            <Input
+              label="Leistungsabzeichen"
+              placeholder="z. B. IGP 3, IBGH 3, Obedience"
+              value={titel}
+              onChangeText={setTitel}
+              autoCapitalize="characters"
+            />
+          </View>
+
+          <Text style={s.gruppeLabel}>ABSTAMMUNG</Text>
+          <View style={s.felder}>
+            <Input
+              label="Vater"
+              placeholder="Name des Vaters"
+              value={vater}
+              onChangeText={setVater}
+              autoCapitalize="words"
+            />
+            <Input
+              label="Mutter"
+              placeholder="Name der Mutter"
+              value={mutter}
+              onChangeText={setMutter}
+              autoCapitalize="words"
+            />
+            <Input
+              label="Zuchtstätte"
+              placeholder="z. B. vom Haus Milinski"
+              value={zwinger}
+              onChangeText={setZwinger}
+              autoCapitalize="words"
+            />
           </View>
 
           {fehler ? (
@@ -353,6 +396,7 @@ const s = StyleSheet.create({
 
   felder:    { gap: 16, marginBottom: 22 },
   feldLabel: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10 },
+  gruppeLabel: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 14 },
 
   geschlechtReihe: { flexDirection: 'row', gap: 12 },
   geschlechtBtn: {

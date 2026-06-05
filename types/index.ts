@@ -20,10 +20,16 @@ export type Dog = {
   weight_kg:  number | null;
   gender:     'male' | 'female' | null;
   photo_url:  string | null;
+  // Leistungsabzeichen / Titel (z. B. ['IGP 3', 'IBGH 3', 'Obedience'])
+  titles:     string[] | null;
+  // Abstammung
+  sire:       string | null;   // Vater
+  dam:        string | null;   // Mutter
+  kennel:     string | null;   // Zuchtstätte
   created_at: string;
 };
 
-export type NewDog = Pick<Dog, 'name' | 'breed' | 'birth_date' | 'weight_kg' | 'gender' | 'photo_url'>;
+export type NewDog = Pick<Dog, 'name' | 'breed' | 'birth_date' | 'weight_kg' | 'gender' | 'photo_url' | 'titles' | 'sire' | 'dam' | 'kennel'>;
 
 export type TrainingCategory = 'IGP' | 'IBGH' | 'Mondioring' | 'Alltagstraining';
 export type TrainingType     = 'privat' | 'trainer';

@@ -47,6 +47,10 @@ export default function HundBearbeitenScreen() {
   const [geburtsDatCH,  setGeburtsDatCH]  = useState('');
   const [geburtsDatISO, setGeburtsDatISO] = useState<string | null>(null);
   const [gewicht,       setGewicht]       = useState('');
+  const [titel,         setTitel]         = useState('');   // Leistungsabzeichen, kommagetrennt
+  const [vater,         setVater]         = useState('');
+  const [mutter,        setMutter]        = useState('');
+  const [zwinger,       setZwinger]       = useState('');
   const [neuesBildUri,  setNeuesBildUri]  = useState<string | null>(null);
   const [fehler,        setFehler]        = useState<string | null>(null);
   const [speichern,     setSpeichern]     = useState(false);
@@ -65,6 +69,10 @@ export default function HundBearbeitenScreen() {
       setGeburtsDatCH(isoZuCH(d.birth_date));
       setGeburtsDatISO(d.birth_date);
       setGewicht(d.weight_kg != null ? String(d.weight_kg) : '');
+      setTitel((d.titles ?? []).join(', '));
+      setVater(d.sire ?? '');
+      setMutter(d.dam ?? '');
+      setZwinger(d.kennel ?? '');
     });
   }, [id]);
 
@@ -124,6 +132,11 @@ export default function HundBearbeitenScreen() {
       }
     }
 
+    const titlesArr = titel
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+
     const { error: err } = await updateDog(hund.id, {
       name:       name.trim(),
       breed:      rasse.trim() || null,
@@ -131,6 +144,10 @@ export default function HundBearbeitenScreen() {
       birth_date: geburtsDatISO,
       weight_kg:  gewicht ? parseFloat(gewicht.replace(',', '.')) : null,
       photo_url:  photoUrl,
+      titles:     titlesArr,
+      sire:       vater.trim()   || null,
+      dam:        mutter.trim()  || null,
+      kennel:     zwinger.trim() || null,
     });
 
     setSpeichern(false);
@@ -292,6 +309,39 @@ export default function HundBearbeitenScreen() {
               onChangeText={setGewicht}
               keyboardType="decimal-pad"
             />
+
+            <Input
+              label="Leistungsabzeichen"
+              placeholder="z. B. IGP 3, IBGH 3, Obedience"
+              value={titel}
+              onChangeText={setTitel}
+              autoCapitalize="characters"
+            />
+          </View>
+
+          <Text style={s.gruppeLabel}>ABSTAMMUNG</Text>
+          <View style={s.felder}>
+            <Input
+              label="Vater"
+              placeholder="Name des Vaters"
+              value={vater}
+              onChangeText={setVater}
+              autoCapitalize="words"
+            />
+            <Input
+              label="Mutter"
+              placeholder="Name der Mutter"
+              value={mutter}
+              onChangeText={setMutter}
+              autoCapitalize="words"
+            />
+            <Input
+              label="Zuchtstätte"
+              placeholder="z. B. vom Haus Milinski"
+              value={zwinger}
+              onChangeText={setZwinger}
+              autoCapitalize="words"
+            />
           </View>
 
           {fehler ? (
@@ -404,6 +454,7 @@ const s = StyleSheet.create({
 
   felder:    { gap: 16, marginBottom: 22 },
   feldLabel: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10 },
+  gruppeLabel: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 14 },
 
   geschlechtReihe: { flexDirection: 'row', gap: 12 },
   geschlechtBtn: {
