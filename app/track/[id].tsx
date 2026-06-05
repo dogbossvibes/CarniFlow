@@ -12,6 +12,8 @@ import {
   getTrackSessionById, getTrackPoints, getTrackArticles, deleteTrackSession,
 } from '@/services/trackingService';
 import { TrackPath } from '@/components/tracking/TrackPath';
+import { TrackMap, MAPS_AVAILABLE, type MapType } from '@/components/tracking/TrackMap';
+import { SoftBoundary } from '@/components/ui/SoftBoundary';
 import { Glass, isGlass } from '@/components/ui/Glass';
 import type { TrackSession, TrackPoint, TrackArticle } from '@/types/tracking';
 
@@ -46,6 +48,7 @@ export default function TrackDetailScreen() {
   const [points,   setPoints]   = useState<TrackPoint[]>([]);
   const [articles, setArticles] = useState<TrackArticle[]>([]);
   const [loading,  setLoading]  = useState(true);
+  const [mapType,  setMapType]  = useState<MapType>('satellite');
 
   useEffect(() => {
     (async () => {
@@ -122,23 +125,67 @@ export default function TrackDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Map / Path */}
-        <View style={s.pathCard}>
-          <LinearGradient colors={['#0A0A10', '#080810']} style={StyleSheet.absoluteFill} />
-          <TrackPath
-            points={pathPoints}
-            articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
-            width={pathSize}
-            height={pathSize}
-            padding={28}
-            bgColor="transparent"
-          />
-          {pathPoints.length === 0 && (
-            <View style={s.noPath}>
-              <Ionicons name="map-outline" size={28} color={C.subtle} />
-              <Text style={s.noPathTxt}>Keine GPS-Daten</Text>
+        {MAPS_AVAILABLE && pathPoints.length > 0 ? (
+          <View style={s.mapCard}>
+            <SoftBoundary
+              fallback={
+                <View style={s.pathCard}>
+                  <LinearGradient colors={['#0A0A10', '#080810']} style={StyleSheet.absoluteFill} />
+                  <TrackPath
+                    points={pathPoints}
+                    articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
+                    width={pathSize}
+                    height={pathSize}
+                    padding={28}
+                    bgColor="transparent"
+                  />
+                </View>
+              }
+            >
+              <TrackMap
+                points={pathPoints}
+                articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
+                mapType={mapType}
+                fit
+                follow={false}
+                showUser={false}
+              />
+            </SoftBoundary>
+
+            <View style={s.mapTypeRow}>
+              {(['standard', 'satellite', 'hybrid'] as MapType[]).map(t => (
+                <TouchableOpacity
+                  key={t}
+                  style={[s.mapTypeBtn, mapType === t && s.mapTypeBtnOn]}
+                  onPress={() => setMapType(t)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.mapTypeTxt, mapType === t && s.mapTypeTxtOn]}>
+                    {t === 'standard' ? 'Karte' : t === 'satellite' ? 'Satellit' : 'Hybrid'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-        </View>
+          </View>
+        ) : (
+          <View style={s.pathCard}>
+            <LinearGradient colors={['#0A0A10', '#080810']} style={StyleSheet.absoluteFill} />
+            <TrackPath
+              points={pathPoints}
+              articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
+              width={pathSize}
+              height={pathSize}
+              padding={28}
+              bgColor="transparent"
+            />
+            {pathPoints.length === 0 && (
+              <View style={s.noPath}>
+                <Ionicons name="map-outline" size={28} color={C.subtle} />
+                <Text style={s.noPathTxt}>Keine GPS-Daten</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Metadata chips */}
         {((track.surface_types?.length ?? 0) > 0 || (track.terrain_conditions?.length ?? 0) > 0 || track.wetter || track.windrichtung) && (
@@ -236,6 +283,12 @@ const s = StyleSheet.create({
   content: { paddingHorizontal: 20, paddingTop: 4 },
 
   pathCard: { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.border, marginBottom: 14, alignItems: 'center', justifyContent: 'center', minHeight: 200 },
+  mapCard:  { height: 300, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.border, marginBottom: 14, backgroundColor: '#0A0A10' },
+  mapTypeRow:   { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 },
+  mapTypeBtn:   { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  mapTypeBtnOn: { borderColor: C.accent, backgroundColor: 'rgba(0,0,0,0.75)' },
+  mapTypeTxt:   { fontSize: 11, color: C.muted, fontWeight: '700' },
+  mapTypeTxtOn: { color: C.accent },
   noPath:   { position: 'absolute', alignItems: 'center', gap: 8 },
   noPathTxt:{ fontSize: 13, color: C.subtle },
 

@@ -12,6 +12,8 @@ import * as Location from 'expo-location';
 import { C } from '@/constants/colors';
 import { finishTrackSession } from '@/services/trackingService';
 import { TrackPath } from '@/components/tracking/TrackPath';
+import { TrackMap, MAPS_AVAILABLE, type MapType } from '@/components/tracking/TrackMap';
+import { SoftBoundary } from '@/components/ui/SoftBoundary';
 import { deviationFromTrack, distanceM, nearestArticleDist, type LatLng } from '@/lib/trackGuidance';
 import type { TrackPoint, TrackArticle } from '@/types/tracking';
 
@@ -95,6 +97,9 @@ export default function TrackRecordScreen() {
   const [voiceOn,      setVoiceOn]      = useState(SPEECH_AVAILABLE);
   const [objModal,    setObjModal]    = useState(false);
   const [saving,      setSaving]      = useState(false);
+  const [mapType,     setMapType]     = useState<MapType>('satellite');
+
+  const articlesForMap = articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }));
 
   const pathSize       = Math.min(width - 40, 360);
   const suchePathSize  = Math.min(width - 140, 200);
@@ -361,15 +366,37 @@ export default function TrackRecordScreen() {
             </View>
 
             <View style={s.pathWrap}>
-              <TrackPath
-                points={displayPts}
-                articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
-                width={pathSize}
-                height={pathSize}
-                padding={32}
-              />
+              {MAPS_AVAILABLE ? (
+                <View style={s.mapFill}>
+                  <SoftBoundary
+                    fallback={
+                      <TrackPath points={displayPts} articles={articlesForMap} width={pathSize} height={pathSize} padding={32} />
+                    }
+                  >
+                    <TrackMap points={displayPts} articles={articlesForMap} mapType={mapType} />
+                  </SoftBoundary>
+
+                  <View style={s.mapTypeRow}>
+                    {(['standard', 'satellite', 'hybrid'] as MapType[]).map(t => (
+                      <TouchableOpacity
+                        key={t}
+                        style={[s.mapTypeBtn, mapType === t && s.mapTypeBtnOn]}
+                        onPress={() => setMapType(t)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[s.mapTypeTxt, mapType === t && s.mapTypeTxtOn]}>
+                          {t === 'standard' ? 'Karte' : t === 'satellite' ? 'Satellit' : 'Hybrid'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <TrackPath points={displayPts} articles={articlesForMap} width={pathSize} height={pathSize} padding={32} />
+              )}
+
               {displayPts.length === 0 && (
-                <View style={s.waitingOverlay}>
+                <View style={s.waitingOverlay} pointerEvents="none">
                   <Ionicons name="navigate-outline" size={32} color={C.subtle} />
                   <Text style={s.waitingTxt}>Warte auf GPS…</Text>
                 </View>
@@ -605,6 +632,13 @@ const s = StyleSheet.create({
 
   pathWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, position: 'relative' },
   waitingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 10 },
+
+  mapFill: { position: 'absolute', top: 12, left: 20, right: 20, bottom: 12, borderRadius: 16, overflow: 'hidden', backgroundColor: '#0A0A10' },
+  mapTypeRow: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 },
+  mapTypeBtn: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
+  mapTypeBtnOn: { borderColor: C.accent, backgroundColor: 'rgba(0,0,0,0.75)' },
+  mapTypeTxt: { fontSize: 11, color: C.muted, fontWeight: '700' },
+  mapTypeTxtOn: { color: C.accent },
   waitingTxt: { fontSize: 14, color: C.subtle, fontWeight: '600' },
 
   statsBar: {
