@@ -24,7 +24,6 @@ import { tapHaptic } from '@/lib/haptics';
 
 const LIVE   = '#00F5D4';
 const PAUSE  = '#FF9A3D';
-const GOAL_SEC = 60 * 60;   // Standard-Trainingsziel: 60 Minuten
 
 const RING = 48;
 const STROKE = 3;
@@ -74,7 +73,8 @@ export function LiveTrainingBar() {
   if (!active.unitId) return null;
 
   const sec      = Math.floor(elapsedMs(active, now) / 1000);
-  const progress = Math.min(1, sec / GOAL_SEC);
+  const goalSec  = Math.max(1, active.goalMinutes * 60);
+  const progress = Math.min(1, sec / goalSec);
   const erreicht = progress >= 1;
   const farbe    = active.paused ? PAUSE : LIVE;
   const dog      = dogs.find(d => d.id === active.dogId);

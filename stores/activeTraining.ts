@@ -22,6 +22,7 @@ interface ActiveTrainingState {
   paused:        boolean;
   pausedAt:      number | null;    // Date.now() beim Pausieren
   accumPausedMs: number;           // bisher pausierte Gesamtzeit
+  goalMinutes:   number;           // Trainingsziel (steuert den Fortschrittsring)
 }
 
 const EMPTY: ActiveTrainingState = {
@@ -33,6 +34,7 @@ const EMPTY: ActiveTrainingState = {
   paused:        false,
   pausedAt:      null,
   accumPausedMs: 0,
+  goalMinutes:   60,
 };
 
 let state: ActiveTrainingState = EMPTY;
@@ -52,8 +54,13 @@ export function startUnit(args: { unitId: string; dogId: string; dogName: string
   state = {
     unitId: args.unitId, dogId: args.dogId, dogName: args.dogName,
     startedAt: Date.now(), exercises: [],
-    paused: false, pausedAt: null, accumPausedMs: 0,
+    paused: false, pausedAt: null, accumPausedMs: 0, goalMinutes: 60,
   };
+  emit();
+}
+
+export function setGoalMinutes(min: number) {
+  state = { ...state, goalMinutes: min };
   emit();
 }
 

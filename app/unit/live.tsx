@@ -8,7 +8,7 @@ import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { disciplineColor } from '@/constants/disciplines';
-import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs } from '@/stores/activeTraining';
+import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs, setGoalMinutes } from '@/stores/activeTraining';
 import { tapHaptic } from '@/lib/haptics';
 
 function formatTime(sec: number): string {
@@ -65,6 +65,24 @@ export default function LiveScreen() {
           <View style={s.dogChip}>
             <DogIcon size={13} color={C.accent} />
             <Text style={s.dogChipTxt}>{active.dogName ?? 'Hund'}</Text>
+          </View>
+
+          <View style={s.zielRow}>
+            <Text style={s.zielLabel}>ZIEL</Text>
+            {[30, 45, 60, 90].map(min => {
+              const aktiv = active.goalMinutes === min;
+              return (
+                <TouchableOpacity
+                  key={min}
+                  style={[s.zielChip, aktiv && s.zielChipOn]}
+                  onPress={() => { tapHaptic(); setGoalMinutes(min); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.zielChipTxt, aktiv && s.zielChipTxtOn]}>{min}</Text>
+                </TouchableOpacity>
+              );
+            })}
+            <Text style={s.zielUnit}>Min</Text>
           </View>
         </View>
 
@@ -130,6 +148,14 @@ const s = StyleSheet.create({
   timer:      { fontSize: 64, color: C.white, fontWeight: '900', letterSpacing: -2, fontVariant: ['tabular-nums'] },
   dogChip:    { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 7 },
   dogChipTxt: { fontSize: 13, color: C.white, fontWeight: '700' },
+
+  zielRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  zielLabel:  { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1, marginRight: 2 },
+  zielChip:   { minWidth: 34, alignItems: 'center', backgroundColor: C.card, borderRadius: 9, borderWidth: 1, borderColor: C.border, paddingHorizontal: 8, paddingVertical: 5 },
+  zielChipOn: { borderColor: C.accent, backgroundColor: C.accentDim },
+  zielChipTxt:   { fontSize: 13, color: C.muted, fontWeight: '700' },
+  zielChipTxtOn: { color: C.accent },
+  zielUnit:   { fontSize: 11, color: C.muted, fontWeight: '600', marginLeft: 2 },
 
   scroll:  { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 18 },
