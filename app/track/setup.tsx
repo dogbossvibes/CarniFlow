@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { C } from '@/constants/colors';
 import { DogIcon } from '@/components/ui/DogIcon';
+import { GpsSourcePicker } from '@/components/tracking/GpsSourcePicker';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { createTrackSession } from '@/services/trackingService';
@@ -171,6 +172,9 @@ export default function TrackSetupScreen() {
             })}
           </ScrollView>
         )}
+
+        {/* GPS-Quelle (iPhone / externes BLE-GPS) */}
+        <GpsSourcePicker />
 
         {/* Untergrund */}
         <Text style={s.label}>UNTERGRUND *</Text>

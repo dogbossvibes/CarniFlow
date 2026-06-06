@@ -84,7 +84,15 @@
       "expo-apple-authentication",
       "expo-font",
       "@sentry/react-native",
-      "expo-asset"
+      "expo-asset",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["central"],
+          "bluetoothAlwaysPermission": "ANYVO nutzt Bluetooth, um externe GPS-Empfänger für die Fährten-Aufzeichnung zu koppeln."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

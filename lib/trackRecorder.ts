@@ -17,6 +17,25 @@ interface RecState { points: TrackPoint[]; accuracy: number | null; }
 let state: RecState = { points: [], accuracy: null };
 const listeners = new Set<() => void>();
 let watchSub: Location.LocationSubscription | null = null;
+let externalMode = false;   // true = Punkte kommen von externem BLE-GPS
+
+// Externes GPS aktiv? Dann überspringt startRecording das Telefon-GPS.
+export function setExternalMode(on: boolean) { externalMode = on; }
+export function isExternalMode() { return externalMode; }
+
+// Einzelnen Punkt von extern (BLE-GPS / NMEA) einspeisen.
+export function pushPoint(lat: number, lng: number, accuracy: number | null = null) {
+  const pts = state.points.slice();
+  pts.push({
+    lat, lng,
+    accuracy_m: accuracy,
+    altitude_m: null,
+    timestamp:  new Date().toISOString(),
+    seq:        pts.length,
+  });
+  state = { points: pts, accuracy: accuracy != null ? Math.round(accuracy) : state.accuracy };
+  emit();
+}
 
 function emit() { for (const l of listeners) l(); }
 
@@ -60,6 +79,9 @@ const UPDATE_OPTS = {
 export interface StartResult { ok: boolean; background: boolean; }
 
 export async function startRecording(): Promise<StartResult> {
+  // Externes GPS liefert die Punkte selbst (über pushPoint) — kein Telefon-GPS.
+  if (externalMode) return { ok: true, background: false };
+
   const fg = await Location.requestForegroundPermissionsAsync();
   if (fg.status !== 'granted') return { ok: false, background: false };
 
