@@ -18,6 +18,10 @@ interface ActiveTrainingState {
   dogName:   string | null;
   startedAt: number | null;        // Date.now() beim Start
   exercises: DraftExercise[];
+  // Pause-Verwaltung (geteilt von Live-Screen + Live-Bar)
+  paused:        boolean;
+  pausedAt:      number | null;    // Date.now() beim Pausieren
+  accumPausedMs: number;           // bisher pausierte Gesamtzeit
 }
 
 const EMPTY: ActiveTrainingState = {
@@ -26,6 +30,9 @@ const EMPTY: ActiveTrainingState = {
   dogName:   null,
   startedAt: null,
   exercises: [],
+  paused:        false,
+  pausedAt:      null,
+  accumPausedMs: 0,
 };
 
 let state: ActiveTrainingState = EMPTY;
@@ -42,8 +49,38 @@ function set(patch: Partial<ActiveTrainingState>) {
 
 // ── Actions ───────────────────────────────────────────────────
 export function startUnit(args: { unitId: string; dogId: string; dogName: string | null }) {
-  state = { unitId: args.unitId, dogId: args.dogId, dogName: args.dogName, startedAt: Date.now(), exercises: [] };
+  state = {
+    unitId: args.unitId, dogId: args.dogId, dogName: args.dogName,
+    startedAt: Date.now(), exercises: [],
+    paused: false, pausedAt: null, accumPausedMs: 0,
+  };
   emit();
+}
+
+export function pauseUnit() {
+  if (state.paused || state.startedAt == null) return;
+  state = { ...state, paused: true, pausedAt: Date.now() };
+  emit();
+}
+
+export function resumeUnit() {
+  if (!state.paused) return;
+  const add = state.pausedAt != null ? Date.now() - state.pausedAt : 0;
+  state = { ...state, paused: false, pausedAt: null, accumPausedMs: state.accumPausedMs + add };
+  emit();
+}
+
+// Vergangene Trainingszeit in ms (Pausen herausgerechnet). `now` von außen,
+// damit Komponenten im Sekundentakt aktualisieren können.
+export function elapsedMs(s: ActiveTrainingState, now: number): number {
+  if (s.startedAt == null) return 0;
+  const pausedNow = s.paused && s.pausedAt != null ? now - s.pausedAt : 0;
+  return Math.max(0, now - s.startedAt - s.accumPausedMs - pausedNow);
+}
+
+// Zuletzt gewählte Sparte (für die Live-Bar-Anzeige).
+export function currentDiscipline(s: ActiveTrainingState): string | null {
+  return s.exercises.length ? s.exercises[s.exercises.length - 1].discipline : null;
 }
 
 export function addExercise(ex: DraftExercise) {

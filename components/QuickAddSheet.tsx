@@ -4,12 +4,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { tapHaptic } from '@/lib/haptics';
+import { useActiveTraining } from '@/stores/activeTraining';
+import { LiveTrainingBar } from '@/components/training/LiveTrainingBar';
 
 // Schwebendes „+": Shortcut in den vereinheitlichten units-Flow.
-// (Früher ein eigenes Schnell-Formular für training_sessions — abgelöst, damit
-// es nur noch EINEN Erfassungsweg gibt.)
+// Während eines laufenden Trainings wird der Button durch die Live-Bar ersetzt.
 export function QuickAddSheet() {
   const router = useRouter();
+  const active = useActiveTraining();
+
+  if (active.unitId) return <LiveTrainingBar />;
+
   return (
     <TouchableOpacity
       style={s.fab}

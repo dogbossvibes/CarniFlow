@@ -8,7 +8,7 @@ import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { disciplineColor } from '@/constants/disciplines';
-import { useActiveTraining, updateExercise, removeExercise } from '@/stores/activeTraining';
+import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs } from '@/stores/activeTraining';
 import { tapHaptic } from '@/lib/haptics';
 
 function formatTime(sec: number): string {
@@ -39,16 +39,13 @@ export default function LiveScreen() {
   const router = useRouter();
   const active = useActiveTraining();
 
-  const [elapsed, setElapsed] = useState(() =>
-    active.startedAt ? Math.floor((Date.now() - active.startedAt) / 1000) : 0,
-  );
-  const [running, setRunning] = useState(true);
-
+  const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => setElapsed(e => e + 1), 1000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [running]);
+  }, []);
+  const elapsed = Math.floor(elapsedMs(active, now) / 1000);
+  const running = !active.paused;
 
   // Kein aktives Training → zurück zum Start.
   if (!active.unitId) return <Redirect href="/unit/start" />;
@@ -107,7 +104,7 @@ export default function LiveScreen() {
           <AnimatedPressable
             style={s.pauseBtn}
             scale={0.95}
-            onPress={() => { tapHaptic(); setRunning(r => !r); }}
+            onPress={() => { tapHaptic(); active.paused ? resumeUnit() : pauseUnit(); }}
           >
             <Ionicons name={running ? 'pause' : 'play'} size={22} color={C.white} />
             <Text style={s.pauseTxt}>{running ? 'Pause' : 'Weiter'}</Text>
