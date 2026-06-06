@@ -15,6 +15,7 @@ import { TrackPath } from '@/components/tracking/TrackPath';
 import { TrackMap, MAPS_AVAILABLE, type MapType } from '@/components/tracking/TrackMap';
 import { SoftBoundary } from '@/components/ui/SoftBoundary';
 import { deviationFromTrack, distanceM, nearestArticleDist, type LatLng } from '@/lib/trackGuidance';
+import { startRecording, stopRecording, resetRecorder, useRecorder } from '@/lib/trackRecorder';
 import type { TrackPoint, TrackArticle } from '@/types/tracking';
 
 // expo-speech ist ein natives Modul. In einem Dev-Client, der OHNE expo-speech
@@ -66,7 +67,6 @@ export default function TrackRecordScreen() {
 
   const pointsRef  = useRef<TrackPoint[]>([]);
   const articleRef = useRef<TrackArticle[]>([]);
-  const subRef     = useRef<Location.LocationSubscription | null>(null);
   const startRef   = useRef<number>(Date.now());      // Lege-Start
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const layEndRef  = useRef<number | null>(null);     // Lege-Ende → Start der Liegezeit
@@ -105,45 +105,37 @@ export default function TrackRecordScreen() {
   const suchePathSize  = Math.min(width - 140, 200);
   const gefundenCount  = articles.filter(a => a.gefunden).length;
 
-  // GPS-Aufzeichnung während des Legens
-  const startGPS = useCallback(async () => {
-    const sub = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 2000, distanceInterval: 1 },
-      loc => {
-        setGpsOk(true);
-        setAccuracy(loc.coords.accuracy != null ? Math.round(loc.coords.accuracy) : null);
-        const pt: TrackPoint = {
-          lat:        loc.coords.latitude,
-          lng:        loc.coords.longitude,
-          accuracy_m: loc.coords.accuracy,
-          altitude_m: loc.coords.altitude,
-          timestamp:  new Date(loc.timestamp).toISOString(),
-          seq:        pointsRef.current.length,
-        };
-        pointsRef.current.push(pt);
-        if (pointsRef.current.length % 3 === 0 || pointsRef.current.length <= 3) {
-          const pts = pointsRef.current.map(p => ({ lat: p.lat, lng: p.lng }));
-          setDisplayPts(pts);
-          setDistanz(Math.round(totalDistance(pts)));
-        }
-      },
-    );
-    subRef.current = sub;
-  }, []);
+  // GPS-Punkte aus dem (ggf. Hintergrund-)Recorder in die bestehende Logik
+  // spiegeln, damit Anzeige, Gegenstände & Speichern unverändert funktionieren.
+  const rec = useRecorder();
+  useEffect(() => {
+    pointsRef.current = rec.points;
+    if (rec.points.length > 0) {
+      setGpsOk(true);
+      setAccuracy(rec.accuracy);
+      const pts = rec.points.map(p => ({ lat: p.lat, lng: p.lng }));
+      setDisplayPts(pts);
+      setDistanz(Math.round(totalDistance(pts)));
+    }
+  }, [rec]);
 
-  // Phase „legen": GPS + Lege-Timer
+  // Phase „legen": Aufzeichnung starten (Hintergrund wenn möglich) + Lege-Timer
   useEffect(() => {
     if (phase !== 'legen') return;
-    startGPS();
+    resetRecorder();
+    startRecording().then(res => {
+      if (!res.ok) {
+        Alert.alert('GPS freischalten', 'Bitte erlaube den Standortzugriff: Einstellungen → ANYVO → Standort.');
+      }
+    });
     startRef.current = Date.now();
     timerRef.current = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
     }, 1000);
     return () => {
-      subRef.current?.remove();
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [startGPS, phase]);
+  }, [phase]);
 
   // Phase „liegezeit": Count-up ab Lege-Ende (aus Zeitstempel → background-fest)
   useEffect(() => {
@@ -257,7 +249,8 @@ export default function TrackRecordScreen() {
     Alert.alert('Abbrechen?', 'Die bisher gelegte Fährte geht verloren.', [
       { text: 'Weiter', style: 'cancel' },
       { text: 'Abbrechen', style: 'destructive', onPress: () => {
-        subRef.current?.remove();
+        stopRecording();
+        resetRecorder();
         searchSubRef.current?.remove();
         stopSpeech();
         if (timerRef.current) clearInterval(timerRef.current);
@@ -288,8 +281,7 @@ export default function TrackRecordScreen() {
     Alert.alert('Fährte gelegt?', 'Danach läuft die Liegezeit automatisch.', [
       { text: 'Weiter legen', style: 'cancel' },
       { text: 'Fertig gelegt', onPress: () => {
-        subRef.current?.remove();
-        subRef.current = null;
+        stopRecording();
         if (timerRef.current) clearInterval(timerRef.current);
         layEndRef.current = Date.now();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

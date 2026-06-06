@@ -46,7 +46,10 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "ANYVO nutzt deinen Standort für die Fährten-Aufzeichnung sowie um Trainingsort und Wetter automatisch einzutragen.",
-          "locationAlwaysAndWhenInUsePermission": "ANYVO nutzt deinen Standort für die Fährten-Aufzeichnung sowie um Trainingsort und Wetter automatisch einzutragen."
+          "locationAlwaysAndWhenInUsePermission": "ANYVO nutzt deinen Standort im Hintergrund, um die Fährten-Aufzeichnung bei gesperrtem Display fortzusetzen.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

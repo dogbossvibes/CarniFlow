@@ -3,6 +3,7 @@
 import 'react-native-get-random-values';       // patches crypto.getRandomValues
 import 'react-native-url-polyfill/auto';        // patches URL constructor
 import '@/lib/crypto-polyfill';                 // patches crypto.subtle.digest via expo-crypto
+import '@/lib/trackRecorder';                   // registriert den Background-Location-Task beim Start
 
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
