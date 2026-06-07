@@ -20,6 +20,7 @@ import {
   elapsedMs,
   useActiveTraining,
 } from '@/stores/activeTraining';
+import { useBarMinimized } from '@/stores/liveBarScroll';
 import { tapHaptic } from '@/lib/haptics';
 
 const LIVE   = '#00F5D4';
@@ -42,6 +43,7 @@ export function LiveTrainingBar() {
   const router = useRouter();
   const active = useActiveTraining();
   const { dogs } = useDogs();
+  const minimized = useBarMinimized();
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -67,8 +69,19 @@ export function LiveTrainingBar() {
     }
   }, [active.paused]);
 
-  const dotStyle  = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
-  const barStyle  = useAnimatedStyle(() => ({ transform: [{ scale: mount.value }], opacity: mount.value }));
+  // Minimieren beim Scrollen: Name/Disziplin einklappen.
+  const col = useSharedValue(0);
+  useEffect(() => {
+    col.value = withTiming(minimized ? 1 : 0, { duration: 220, easing: Easing.inOut(Easing.quad) });
+  }, [minimized]);
+
+  const dotStyle      = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+  const barStyle      = useAnimatedStyle(() => ({ transform: [{ scale: mount.value }], opacity: mount.value }));
+  const collapseStyle = useAnimatedStyle(() => ({
+    opacity:  1 - col.value,
+    maxWidth: (1 - col.value) * 150,
+    height:   (1 - col.value) * 32,
+  }));
 
   if (!active.unitId) return null;
 
@@ -111,14 +124,16 @@ export function LiveTrainingBar() {
             </View>
           </View>
 
-          {/* Mitte: LIVE + Name + Disziplin */}
+          {/* Mitte: LIVE (immer) + Name/Disziplin (klappt beim Scrollen ein) */}
           <View style={s.center}>
             <View style={s.liveRow}>
               <Animated.View style={[s.dot, { backgroundColor: farbe }, dotStyle]} />
               <Text style={[s.liveTxt, { color: farbe }]}>{active.paused ? 'PAUSED' : erreicht ? 'ZIEL ✓' : 'LIVE'}</Text>
             </View>
-            <Text style={s.name} numberOfLines={1}>{active.dogName ?? 'Hund'}</Text>
-            {disziplin ? <Text style={s.disc} numberOfLines={1}>{disziplin}</Text> : null}
+            <Animated.View style={[s.nameWrap, collapseStyle]}>
+              <Text style={s.name} numberOfLines={1}>{active.dogName ?? 'Hund'}</Text>
+              {disziplin ? <Text style={s.disc} numberOfLines={1}>{disziplin}</Text> : null}
+            </Animated.View>
           </View>
 
           {/* Rechts: Timer */}
@@ -133,7 +148,7 @@ const s = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, bottom: 28, alignItems: 'center' },
   bar: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    height: 64, minWidth: 240, maxWidth: 290, borderRadius: 32,
+    height: 64, minWidth: 150, maxWidth: 290, borderRadius: 32,
     paddingLeft: 8, paddingRight: 18,
     borderWidth: 1, overflow: 'hidden',
     shadowColor: LIVE, shadowOpacity: 0.18, shadowRadius: 30, shadowOffset: { width: 0, height: 0 },
@@ -145,8 +160,9 @@ const s = StyleSheet.create({
     borderWidth: 2, alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  center:  { flex: 1, justifyContent: 'center' },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  center:   { justifyContent: 'center', flexShrink: 1 },
+  nameWrap: { overflow: 'hidden', justifyContent: 'center' },
+  liveRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot:     { width: 7, height: 7, borderRadius: 4 },
   liveTxt: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   name:    { fontSize: 15, color: '#FFFFFF', fontWeight: '800', marginTop: 1 },

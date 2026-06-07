@@ -2,6 +2,7 @@ import { DogCard } from "@/components/dogs/DogCard";
 import { QuickAddSheet } from "@/components/QuickAddSheet";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { DogIcon } from "@/components/ui/DogIcon";
+import { reportScroll } from "@/stores/liveBarScroll";
 import { C } from "@/constants/colors";
 import { useDogs } from "@/hooks/useDogs";
 import { usePlan } from "@/hooks/usePlan";
@@ -76,6 +77,8 @@ export default function HundeScreen() {
           style={s.scroll}
           contentContainerStyle={[s.inhalt, dogs.length === 0 && s.inhaltLeer]}
           showsVerticalScrollIndicator={false}
+          onScroll={(e) => reportScroll(e.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={loading}

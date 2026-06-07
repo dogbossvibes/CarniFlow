@@ -4,6 +4,7 @@ import { Glass, isGlass } from "@/components/ui/Glass";
 import { C } from "@/constants/colors";
 import { useDogs } from "@/hooks/useDogs";
 import { usePlan } from "@/hooks/usePlan";
+import { reportScroll } from "@/stores/liveBarScroll";
 import { useNotificationSetting } from "@/hooks/useNotificationSetting";
 import { useProfile } from "@/hooks/useProfile";
 import { useSession } from "@/hooks/useSession";
@@ -159,6 +160,8 @@ export default function ProfilScreen() {
         style={s.scroll}
         contentContainerStyle={s.inhalt}
         showsVerticalScrollIndicator={false}
+        onScroll={(e) => reportScroll(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
       >
         {/* Kopfzeile */}
         <View style={s.kopf}>

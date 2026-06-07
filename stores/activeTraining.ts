@@ -1,8 +1,10 @@
 import { useSyncExternalStore } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Flüchtiger Zustand der LAUFENDEN Trainingseinheit (vor dem Speichern).
-// Bewusst ohne externe State-Lib: ein minimaler Store über
-// useSyncExternalStore, geteilt über alle unit/-Screens hinweg.
+// Zustand der LAUFENDEN Trainingseinheit (vor dem Speichern). Über
+// useSyncExternalStore geteilt + in AsyncStorage persistiert, damit eine
+// laufende Einheit App-Wechsel/Neustart übersteht. Der Timer ist zeitstempel-
+// basiert (startedAt/pausedAt) und läuft dadurch korrekt weiter.
 
 export interface DraftExercise {
   discipline:    string;
@@ -37,12 +39,38 @@ const EMPTY: ActiveTrainingState = {
   goalMinutes:   60,
 };
 
+const STORAGE_KEY = 'active_training';
+const MAX_AGE_MS  = 24 * 60 * 60 * 1000;   // ältere Einheiten verwerfen
+
 let state: ActiveTrainingState = EMPTY;
 const listeners = new Set<() => void>();
 
+function persist() {
+  // Nur eine echte laufende Einheit speichern, sonst Eintrag entfernen.
+  if (state.unitId) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+  else              AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+}
+
 function emit() {
   for (const l of listeners) l();
+  persist();
 }
+
+// Beim App-Start eine noch laufende Einheit wiederherstellen.
+AsyncStorage.getItem(STORAGE_KEY)
+  .then(raw => {
+    if (!raw) return;
+    try {
+      const saved = JSON.parse(raw) as ActiveTrainingState;
+      if (saved?.unitId && saved.startedAt && Date.now() - saved.startedAt < MAX_AGE_MS) {
+        state = { ...EMPTY, ...saved };
+        for (const l of listeners) l();   // ohne erneutes persist
+      } else {
+        AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+      }
+    } catch { /* defekt → ignorieren */ }
+  })
+  .catch(() => {});
 
 function set(patch: Partial<ActiveTrainingState>) {
   state = { ...state, ...patch };

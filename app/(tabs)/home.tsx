@@ -10,6 +10,7 @@ import { useSession } from "@/hooks/useSession";
 import { useTrainingFeed } from "@/hooks/useTrainingFeed";
 import type { FeedItem } from "@/services/trainingFeed";
 import { useHomeLayout } from "@/stores/homeLayout";
+import { reportScroll } from "@/stores/liveBarScroll";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -125,6 +126,8 @@ export default function HomeScreen() {
         style={s.scroll}
         contentContainerStyle={s.inhalt}
         showsVerticalScrollIndicator={false}
+        onScroll={(e) => reportScroll(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
       >
         {/* ── HEADER ── */}
         <View style={s.header}>
