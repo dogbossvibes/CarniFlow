@@ -47,9 +47,13 @@ export async function createTrackSession(ownerId: string, data: NewTrackSession)
 
 export async function finishTrackSession(
   sessionId:  string,
-  updates:    { distanz_m: number; dauer_sec: number; rating: number | null; notizen: string | null; liegezeit_min?: number | null },
-  points:     Omit<TrackPoint,   'id' | 'track_id'>[],
-  articles:   Omit<TrackArticle, 'id' | 'track_id' | 'created_at'>[],
+  updates:    {
+    distanz_m: number; dauer_sec: number; rating: number | null; notizen: string | null;
+    liegezeit_min?: number | null; such_dauer_sec?: number | null; such_distanz_m?: number | null;
+  },
+  points:       Omit<TrackPoint,   'id' | 'track_id'>[],
+  articles:     Omit<TrackArticle, 'id' | 'track_id' | 'created_at'>[],
+  searchPoints: Omit<TrackPoint,   'id' | 'track_id'>[] = [],
 ) {
   const { error: sessErr } = await supabase
     .from('track_sessions')
@@ -57,10 +61,15 @@ export async function finishTrackSession(
     .eq('id', sessionId);
   if (sessErr) return { error: sessErr };
 
-  if (points.length > 0) {
+  // Gelegte Fährte + abgelaufener Suchweg, getrennt über `phase`.
+  const allPoints = [
+    ...points.map(p       => ({ ...p, phase: 'lay'    as const })),
+    ...searchPoints.map(p => ({ ...p, phase: 'search' as const })),
+  ];
+  if (allPoints.length > 0) {
     // Batch-insert in chunks of 500 to stay within Supabase limits
-    for (let i = 0; i < points.length; i += 500) {
-      const chunk = points.slice(i, i + 500).map(p => ({ ...p, track_id: sessionId }));
+    for (let i = 0; i < allPoints.length; i += 500) {
+      const chunk = allPoints.slice(i, i + 500).map(p => ({ ...p, track_id: sessionId }));
       const { error } = await supabase.from('track_points').insert(chunk);
       if (error) return { error };
     }

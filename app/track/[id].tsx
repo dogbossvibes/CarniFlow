@@ -12,7 +12,8 @@ import {
   getTrackSessionById, getTrackPoints, getTrackArticles, deleteTrackSession,
 } from '@/services/trackingService';
 import { TrackPath } from '@/components/tracking/TrackPath';
-import { TrackMap, MAPS_AVAILABLE, type MapType } from '@/components/tracking/TrackMap';
+import { MAPS_AVAILABLE, type MapType } from '@/components/tracking/TrackMap';
+import { TrackSearchMap } from '@/components/tracking/TrackSearchMap';
 import { SoftBoundary } from '@/components/ui/SoftBoundary';
 import { Glass, isGlass } from '@/components/ui/Glass';
 import type { TrackSession, TrackPoint, TrackArticle } from '@/types/tracking';
@@ -99,7 +100,11 @@ export default function TrackDetailScreen() {
 
   const gegenstände = articles.filter(a => a.typ === 'gegenstand');
   const verleitungen = articles.filter(a => a.typ === 'verleitung');
-  const pathPoints = points.map(p => ({ lat: p.lat, lng: p.lng }));
+  // Gelegte Fährte vs. abgelaufener Suchweg getrennt (phase).
+  const layPoints    = points.filter(p => p.phase !== 'search').map(p => ({ lat: p.lat, lng: p.lng }));
+  const searchPoints = points.filter(p => p.phase === 'search').map(p => ({ lat: p.lat, lng: p.lng }));
+  const pathPoints   = layPoints.length ? layPoints : points.map(p => ({ lat: p.lat, lng: p.lng }));
+  const articlesForMap = articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }));
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -142,11 +147,12 @@ export default function TrackDetailScreen() {
                 </View>
               }
             >
-              <TrackMap
-                points={pathPoints}
-                articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
+              <TrackSearchMap
+                layPoints={pathPoints}
+                searchPoints={searchPoints}
+                articles={articlesForMap}
+                goal={pathPoints.length ? pathPoints[pathPoints.length - 1] : null}
                 mapType={mapType}
-                fit
                 follow={false}
                 showUser={false}
               />

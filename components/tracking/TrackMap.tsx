@@ -14,6 +14,9 @@ try { Maps = require('react-native-maps'); } catch { Maps = null; }
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 export const MAPS_AVAILABLE = Maps != null && !isExpoGo;
 
+// Wiederverwendung des (defensiv geladenen) Moduls in anderen Karten-Komponenten.
+export const RNMaps = Maps;
+
 export type MapType = 'standard' | 'satellite' | 'hybrid';
 
 interface Props {

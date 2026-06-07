@@ -14,12 +14,16 @@ export interface TrackSession {
   liegezeit_min: number | null;
   distanz_m:     number | null;
   dauer_sec:     number | null;
+  such_dauer_sec:  number | null;
+  such_distanz_m:  number | null;
   rating:        number | null;
   notizen:       string | null;
   status:        TrackStatus;
   created_at:    string;
   dog?:          { name: string };
 }
+
+export type TrackPhase = 'lay' | 'search';
 
 export interface TrackPoint {
   id?:         string;
@@ -30,6 +34,7 @@ export interface TrackPoint {
   altitude_m:  number | null;
   timestamp:   string;
   seq:         number;
+  phase?:      TrackPhase;   // 'lay' (gelegt) | 'search' (Suchweg)
 }
 
 export interface TrackArticle {
@@ -44,4 +49,7 @@ export interface TrackArticle {
   created_at?: string;
 }
 
-export type NewTrackSession = Omit<TrackSession, 'id' | 'owner_id' | 'created_at' | 'status' | 'dog'>;
+export type NewTrackSession = Omit<
+  TrackSession,
+  'id' | 'owner_id' | 'created_at' | 'status' | 'dog' | 'such_dauer_sec' | 'such_distanz_m'
+>;
