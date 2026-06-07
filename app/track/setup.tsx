@@ -11,6 +11,7 @@ import * as Location from 'expo-location';
 import { C } from '@/constants/colors';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { GpsSourcePicker } from '@/components/tracking/GpsSourcePicker';
+import { LiveConditionsCard } from '@/components/tracking/LiveConditionsCard';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { createTrackSession } from '@/services/trackingService';
@@ -132,19 +133,8 @@ export default function TrackSetupScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Weather / Location chip */}
-        {(wetterLaden || ort || wetter) && (
-          <View style={s.metaReihe}>
-            {wetterLaden ? (
-              <ActivityIndicator size="small" color={C.accent} />
-            ) : (
-              <>
-                {ort     ? <View style={s.chip}><Text style={s.chipTxt}>📍 {ort}</Text></View>     : null}
-                {wetter  ? <View style={s.chip}><Text style={s.chipTxt}>{wetter}</Text></View>      : null}
-              </>
-            )}
-          </View>
-        )}
+        {/* Live-Bedingungen: Wind · Wetter · GPS-Qualität · Mini-Karte */}
+        <LiveConditionsCard />
 
         {/* Dog selection */}
         <Text style={s.label}>HUND *</Text>
