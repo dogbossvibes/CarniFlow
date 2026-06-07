@@ -1,4 +1,5 @@
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import Constants from 'expo-constants';
 import { C } from '@/constants/colors';
 import type { TrackArticle } from '@/types/tracking';
 
@@ -7,7 +8,11 @@ import type { TrackArticle } from '@/types/tracking';
 // SoftBoundary ab — siehe Verwendung in track/record.tsx.)
 let Maps: typeof import('react-native-maps') | null = null;
 try { Maps = require('react-native-maps'); } catch { Maps = null; }
-export const MAPS_AVAILABLE = Maps != null;
+
+// In Expo Go fehlt das native Karten-Modul und rendert nur einen schwarzen
+// Kasten (ohne Fehler → SoftBoundary greift nicht). Dort lieber die Pfad-Grafik.
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
+export const MAPS_AVAILABLE = Maps != null && !isExpoGo;
 
 export type MapType = 'standard' | 'satellite' | 'hybrid';
 
@@ -60,6 +65,7 @@ export function TrackMap({
 
   return (
     <MapView
+      provider={Maps.PROVIDER_DEFAULT}
       style={[StyleSheet.absoluteFill, style]}
       mapType={mapType}
       showsUserLocation={showUser}
