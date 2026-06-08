@@ -92,6 +92,12 @@
           "modes": ["central"],
           "bluetoothAlwaysPermission": "ANYVO nutzt Bluetooth, um externe GPS-Empfänger für die Fährten-Aufzeichnung zu koppeln."
         }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "ANYVO fügt deine Trainingstermine zu deinem Kalender hinzu."
+        }
       ]
     ],
     "experiments": {
