@@ -11,6 +11,7 @@ export type Profile = {
   is_trainer:              boolean | null;     // als Trainer registriert
   trainer_name:            string | null;
   trainer_since:           string | null;
+  aktive_sparten:          string[] | null;    // im Profil gewählte Sparten
   created_at:              string;
 };
 

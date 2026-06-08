@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
+import { useProfile } from '@/hooks/useProfile';
 import { DISCIPLINES, customToDiscipline, type Discipline } from '@/constants/disciplines';
 import { HeroImage } from '@/components/training/HeroImage';
 import { DisciplineCard } from '@/components/training/DisciplineCard';
@@ -20,6 +21,7 @@ export default function UnitStartScreen() {
   const router = useRouter();
   const { dogs } = useDogs();
   const { session } = useSession();
+  const { profile } = useProfile();
   const active = useActiveTraining();
   const { categories, refresh } = useCustomCategories();
   const creating = useRef(false);
@@ -32,7 +34,9 @@ export default function UnitStartScreen() {
     addMode ? active.dogId : dogs.length === 1 ? dogs[0].id : null,
   );
 
-  const fixed   = DISCIPLINES.filter(d => !d.custom);
+  // Feste Sparten nach den im Profil aktivierten filtern (Fallback: alle).
+  const aktiveSparten = profile?.aktive_sparten ?? null;
+  const fixed   = DISCIPLINES.filter(d => !d.custom && (!aktiveSparten || aktiveSparten.includes(d.label)));
   const creator = DISCIPLINES.find(d => d.custom)!;
   const cards   = [...fixed, ...categories.map(customToDiscipline)];
 

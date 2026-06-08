@@ -13,6 +13,9 @@ import { signOut, deleteAccount } from "@/services/auth";
 import { setShareTrainingsDefault } from "@/services/profileService";
 import { getMyInvitations } from "@/services/umfrageService";
 import type { TrainerUmfrage } from "@/types/umfrage";
+import { supabase } from "@/lib/supabase";
+import { queryClient } from "@/lib/queryClient";
+import { ALLE_SPARTEN, DEFAULT_SPARTEN } from "@/constants/sparten";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -83,6 +86,17 @@ export default function ProfilScreen() {
 
   const [einladungen, setEinladungen] = useState<TrainerUmfrage[]>([]);
   useEffect(() => { if (user?.id) getMyInvitations(user.id).then(setEinladungen); }, [user?.id]);
+
+  const [aktiveSparten, setAktiveSparten] = useState<string[]>(DEFAULT_SPARTEN);
+  useEffect(() => { setAktiveSparten(profile?.aktive_sparten ?? DEFAULT_SPARTEN); }, [profile?.aktive_sparten]);
+
+  const toggleSparte = async (id: string) => {
+    const neu = aktiveSparten.includes(id) ? aktiveSparten.filter(x => x !== id) : [...aktiveSparten, id];
+    setAktiveSparten(neu);
+    if (!user?.id) return;
+    await supabase.from('profiles').update({ aktive_sparten: neu }).eq('id', user.id);
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+  };
 
   const handleBenachrichtigungen = async (value: boolean) => {
     const { blocked } = await benachrichtigungen.toggle(value);
@@ -440,6 +454,31 @@ export default function ProfilScreen() {
           </>
         )}
 
+        <Text style={s.abschnitt}>MEINE SPARTEN</Text>
+        <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+          <Text style={s.sparteHint}>Aktiviere die Sparten, die du trainierst. Sie erscheinen in der Trainingserfassung.</Text>
+          {ALLE_SPARTEN.map((sp, i) => {
+            const aktiv = aktiveSparten.includes(sp.id);
+            return (
+              <View key={sp.id}>
+                <View style={s.zeile}>
+                  <View style={[s.sparteIcon, aktiv && s.sparteIconOn]}>
+                    <Text style={{ fontSize: 16 }}>{sp.icon}</Text>
+                  </View>
+                  <Text style={[s.zeileLabel, { flex: 1 }, !aktiv && { color: C.muted }]}>{sp.label}</Text>
+                  <Switch
+                    value={aktiv}
+                    onValueChange={() => toggleSparte(sp.id)}
+                    trackColor={{ false: C.cardAlt, true: C.accent }}
+                    thumbColor={C.white}
+                  />
+                </View>
+                {i < ALLE_SPARTEN.length - 1 && <View style={s.trenner} />}
+              </View>
+            );
+          })}
+        </View>
+
         <Text style={s.abschnitt}>SUPPORT</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
           <EinstellungZeile
@@ -641,6 +680,9 @@ const s = StyleSheet.create({
   regBtnTxt:  { fontSize: 14, color: C.accent, fontWeight: "700" },
   upgradeBtn: { backgroundColor: C.warningDim, borderRadius: 12, borderWidth: 1, borderColor: `${C.warning}40`, paddingVertical: 13, alignItems: "center" },
   upgradeBtnTxt: { fontSize: 14, color: C.warning, fontWeight: "700" },
+  sparteHint:    { fontSize: 12, color: C.muted, lineHeight: 17, padding: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  sparteIcon:    { width: 36, height: 36, borderRadius: 10, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" },
+  sparteIconOn:  { backgroundColor: C.accentDim, borderColor: `${C.accent}40` },
   karte: {
     backgroundColor: C.card,
     borderRadius: 18,
