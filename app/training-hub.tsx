@@ -36,7 +36,7 @@ export default function TrainingHubScreen() {
   const [tab, setTab] = useState<Tab>('timeline');
   const [createOpen, setCreateOpen] = useState(false);
   const [reschedule, setReschedule] = useState<CalendarEvent | null>(null);
-  const { isTrainer } = useProfile();
+  const { hasTrainerAccess } = useProfile();
   const [umfragen, setUmfragen] = useState<TrainerUmfrage[]>([]);
   useEffect(() => { if (uid) getMyInvitations(uid).then(setUmfragen); }, [uid]);
 
@@ -76,7 +76,7 @@ export default function TrainingHubScreen() {
           <Text style={s.eyebrow}>PLANUNG</Text>
           <Text style={s.title}>Training Hub</Text>
         </View>
-        {isTrainer && (
+        {hasTrainerAccess && (
           <TouchableOpacity style={s.backBtn} onPress={() => router.push('/umfrage')} activeOpacity={0.7}>
             <Ionicons name="megaphone-outline" size={18} color={ACCENT} />
           </TouchableOpacity>

@@ -8,6 +8,9 @@ export type Profile = {
   trial_used:              boolean;
   role:                    'user' | 'trainer' | 'admin';
   share_trainings_default: boolean;
+  is_trainer:              boolean | null;     // als Trainer registriert
+  trainer_name:            string | null;
+  trainer_since:           string | null;
   created_at:              string;
 };
 

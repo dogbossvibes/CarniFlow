@@ -28,6 +28,10 @@ export function useProfile() {
   const planExpiresAt = profile?.plan_expires_at ? new Date(profile.plan_expires_at) : null;
   const role = profile?.role ?? 'user';
 
+  // Als Trainer registriert (eigenes Flag) — voller Trainer-Zugang nur mit Pro.
+  const isTrainerProfile = profile?.is_trainer === true;
+  const hasTrainerAccess = isTrainerProfile && isPremium;
+
   return {
     profile,
     loading:       uid ? query.isPending : false,
@@ -35,6 +39,8 @@ export function useProfile() {
     planExpiresAt,
     role,
     isTrainer:     role === 'trainer',
+    isTrainerProfile,
+    hasTrainerAccess,
     refresh:       query.refetch,
   };
 }

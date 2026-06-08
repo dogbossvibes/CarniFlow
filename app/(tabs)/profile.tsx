@@ -71,7 +71,7 @@ export default function ProfilScreen() {
   const { user } = useSession();
   const { dogs } = useDogs();
   const { sessions } = useTrainingSessions();
-  const { profile, isTrainer, refresh: refreshProfile } = useProfile();
+  const { profile, isTrainer, isTrainerProfile, hasTrainerAccess, refresh: refreshProfile } = useProfile();
 
   const toggleShare = async (value: boolean) => {
     if (!user?.id) return;
@@ -387,23 +387,39 @@ export default function ProfilScreen() {
               thumbColor={C.white}
             />
           </View>
-          {isTrainer && (
-            <>
-              <View style={s.trenner} />
-              <EinstellungZeile
-                icon="megaphone-outline"
-                label="Terminumfrage erstellen"
-                onPress={() => router.push('/umfrage')}
-              />
-              <View style={s.trenner} />
-              <EinstellungZeile
-                icon="stats-chart-outline"
-                label="Meine Umfragen"
-                onPress={() => router.push('/umfrage/meine')}
-              />
-            </>
-          )}
         </View>
+
+        {/* Trainer-Tools — nur mit Trainer-Profil + Pro */}
+        <Text style={s.abschnitt}>TRAINER-TOOLS</Text>
+        {hasTrainerAccess ? (
+          <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+            <EinstellungZeile icon="megaphone-outline" label="Terminumfrage erstellen" onPress={() => router.push('/umfrage')} />
+            <View style={s.trenner} />
+            <EinstellungZeile icon="stats-chart-outline" label="Meine Umfragen" onPress={() => router.push('/umfrage/meine')} />
+          </View>
+        ) : isTrainerProfile ? (
+          <View style={s.gateCard}>
+            <Text style={s.gateTitle}>👨‍🏫 Trainer-Profil vorhanden</Text>
+            <Text style={s.gateSub}>Erneuere Pro, um Terminumfragen und Trainer-Features zu nutzen.</Text>
+            <TouchableOpacity style={s.upgradeBtn} onPress={() => router.push('/premium')} activeOpacity={0.85}>
+              <Text style={s.upgradeBtnTxt}>Plan erneuern →</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={s.gateCard}>
+            <Text style={s.gateTitle}>Als Trainer registrieren</Text>
+            <Text style={s.gateSub}>Erstelle Terminumfragen und verwalte deine Kunden — verfügbar ab Pro.</Text>
+            {isPremium ? (
+              <TouchableOpacity style={s.regBtn} onPress={() => router.push('/trainer/registrieren')} activeOpacity={0.85}>
+                <Text style={s.regBtnTxt}>Jetzt als Trainer registrieren →</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={s.upgradeBtn} onPress={() => router.push('/premium')} activeOpacity={0.85}>
+                <Text style={s.upgradeBtnTxt}>🔒 Pro erforderlich — Upgrade</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {einladungen.length > 0 && (
           <>
@@ -611,6 +627,20 @@ const s = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 10,
   },
+  gateCard: {
+    backgroundColor: C.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 16,
+    marginBottom: 24,
+  },
+  gateTitle:  { fontSize: 15, color: C.white, fontWeight: "700", marginBottom: 6 },
+  gateSub:    { fontSize: 13, color: C.muted, lineHeight: 19, marginBottom: 14 },
+  regBtn:     { backgroundColor: C.accentDim, borderRadius: 12, borderWidth: 1, borderColor: `${C.accent}40`, paddingVertical: 13, alignItems: "center" },
+  regBtnTxt:  { fontSize: 14, color: C.accent, fontWeight: "700" },
+  upgradeBtn: { backgroundColor: C.warningDim, borderRadius: 12, borderWidth: 1, borderColor: `${C.warning}40`, paddingVertical: 13, alignItems: "center" },
+  upgradeBtnTxt: { fontSize: 14, color: C.warning, fontWeight: "700" },
   karte: {
     backgroundColor: C.card,
     borderRadius: 18,
