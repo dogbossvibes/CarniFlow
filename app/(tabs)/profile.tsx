@@ -11,6 +11,9 @@ import { useSession } from "@/hooks/useSession";
 import { useTrainingSessions } from "@/hooks/useTrainingSessions";
 import { signOut, deleteAccount } from "@/services/auth";
 import { setShareTrainingsDefault } from "@/services/profileService";
+import { getMyInvitations } from "@/services/umfrageService";
+import type { TrainerUmfrage } from "@/types/umfrage";
+import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -77,6 +80,9 @@ export default function ProfilScreen() {
   };
 
   const benachrichtigungen = useNotificationSetting(user?.id);
+
+  const [einladungen, setEinladungen] = useState<TrainerUmfrage[]>([]);
+  useEffect(() => { if (user?.id) getMyInvitations(user.id).then(setEinladungen); }, [user?.id]);
 
   const handleBenachrichtigungen = async (value: boolean) => {
     const { blocked } = await benachrichtigungen.toggle(value);
@@ -381,7 +387,42 @@ export default function ProfilScreen() {
               thumbColor={C.white}
             />
           </View>
+          {isTrainer && (
+            <>
+              <View style={s.trenner} />
+              <EinstellungZeile
+                icon="megaphone-outline"
+                label="Terminumfrage erstellen"
+                onPress={() => router.push('/umfrage')}
+              />
+              <View style={s.trenner} />
+              <EinstellungZeile
+                icon="stats-chart-outline"
+                label="Meine Umfragen"
+                onPress={() => router.push('/umfrage/meine')}
+              />
+            </>
+          )}
         </View>
+
+        {einladungen.length > 0 && (
+          <>
+            <Text style={s.abschnitt}>EINLADUNGEN</Text>
+            <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+              {einladungen.map((u, i) => (
+                <View key={u.id}>
+                  <EinstellungZeile
+                    icon="megaphone-outline"
+                    label={`Umfrage von ${u.trainer_name}`}
+                    wert={u.training_arten.join(', ') || undefined}
+                    onPress={() => router.push(`/umfrage/${u.id}`)}
+                  />
+                  {i < einladungen.length - 1 && <View style={s.trenner} />}
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         <Text style={s.abschnitt}>SUPPORT</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
