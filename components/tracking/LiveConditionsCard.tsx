@@ -29,18 +29,25 @@ export function LiveConditionsCard() {
 
   useEffect(() => { getLiveConditions().then(setCond); }, []);
 
-  // Live-GPS-Genauigkeit.
+  // GPS beim Öffnen vorwärmen: erst ein schneller Erst-Fix (Balanced) für eine
+  // sofortige Genauigkeitsanzeige, dann der präzise Live-Watch (BestForNavigation).
   useEffect(() => {
     let sub: Location.LocationSubscription | null = null;
+    let active = true;
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
+      try {
+        const quick = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (active) setAcc(quick.coords.accuracy ?? null);
+      } catch { /* Erst-Fix optional */ }
+      if (!active) return;
       sub = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 2000, distanceInterval: 0 },
         loc => setAcc(loc.coords.accuracy ?? null),
       );
     })();
-    return () => sub?.remove();
+    return () => { active = false; sub?.remove(); };
   }, []);
 
   // Kompass-Pfeil zur Windrichtung animieren.

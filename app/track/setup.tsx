@@ -26,6 +26,8 @@ const UNTERGRUND = [
   'Stoppelacker',
   'sandiger Boden',
   'Waldboden',
+  'Lehmiger Boden',
+  'Normale Grashöhe',
 ];
 
 const BESCHAFFENHEIT = [
@@ -38,6 +40,8 @@ const BESCHAFFENHEIT = [
   'Morgentau',
   'trocken',
   'harter Boden',
+  'Aktueller Regen',
+  'Normaler Boden',
 ];
 
 const WIND: TrackWindrichtung[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
