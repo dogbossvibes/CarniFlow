@@ -9,6 +9,7 @@ import { useTrainerAppointments } from '@/hooks/useTrainerAppointments';
 import { NextAppointmentCard } from '@/components/calendar/NextAppointmentCard';
 import { TrainingRecommendationCard } from '@/components/calendar/TrainingRecommendationCard';
 import { TrainerAppointmentCard } from '@/components/calendar/TrainerAppointmentCard';
+import { TrainerAppointmentRequest } from '@/components/calendar/TrainerAppointmentRequest';
 import { TimelineView } from '@/components/calendar/TimelineView';
 import { WeekView } from '@/components/calendar/WeekView';
 import { MonthView } from '@/components/calendar/MonthView';
@@ -24,7 +25,7 @@ const ACCENT = '#00F5D4';
 export default function TrainingHubScreen() {
   const router = useRouter();
   const { events, loading, refresh } = useTrainingCalendar();
-  const { pending, accept, decline } = useTrainerAppointments();
+  const { pending, incoming, accept, decline } = useTrainerAppointments();
   const [tab, setTab] = useState<Tab>('timeline');
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -65,6 +66,15 @@ export default function TrainingHubScreen() {
         <View style={{ marginTop: 20 }}>
           <TrainingRecommendationCard events={events} />
         </View>
+
+        {incoming.length > 0 && (
+          <View style={{ paddingHorizontal: 20, marginTop: 20, gap: 10 }}>
+            <Text style={s.sectionLbl}>TERMIN-ANFRAGEN AN DICH</Text>
+            {incoming.map(e => (
+              <TrainerAppointmentRequest key={e.id} event={e} onAccept={() => accept(e.id)} onDecline={() => decline(e.id)} />
+            ))}
+          </View>
+        )}
 
         {pending.length > 0 && (
           <View style={{ paddingHorizontal: 20, marginTop: 20, gap: 10 }}>

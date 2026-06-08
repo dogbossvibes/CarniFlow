@@ -12,11 +12,13 @@ export function getCalendarEvents(userId: string) {
     .order('start_at', { ascending: true });
 }
 
-// Eigenen Termin anlegen (sofort bestätigt).
+// Eigenen Termin anlegen. Mit verknüpfter Trainer:in wird daraus eine
+// Anfrage (Status „pending"), die der/die Trainer:in bestätigen muss.
 export async function createOwnEvent(userId: string, ev: NewCalendarEvent) {
+  const status = ev.trainer_id ? 'pending' : 'confirmed';
   return supabase
     .from('calendar_events')
-    .insert({ ...ev, owner_id: userId, created_by: userId, status: 'confirmed' })
+    .insert({ ...ev, owner_id: userId, created_by: userId, status })
     .select(SELECT)
     .single();
 }

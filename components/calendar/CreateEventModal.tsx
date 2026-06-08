@@ -7,13 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
+import { supabase } from '@/lib/supabase';
 import { createOwnEvent } from '@/services/calendarService';
 import { scheduleEventReminders } from '@/lib/eventReminders';
 import { AppointmentTypeGrid } from '@/components/calendar/AppointmentTypeGrid';
 import { DogSelectionCards } from '@/components/calendar/DogSelectionCards';
 import { LocationPickerCard } from '@/components/calendar/LocationPickerCard';
 import { ReminderCard } from '@/components/calendar/ReminderCard';
-import { TrainerSelector } from '@/components/calendar/TrainerSelector';
+import { ConnectedTrainerSelector } from '@/components/calendar/ConnectedTrainerSelector';
 import { StickyCreateAppointmentButton } from '@/components/calendar/StickyCreateAppointmentButton';
 import type { CalendarEvent, EventType } from '@/types/calendar';
 
@@ -85,6 +86,8 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
     if (error || !data) { Alert.alert('Fehler', error?.message ?? 'Konnte nicht gespeichert werden.'); return; }
 
     scheduleEventReminders(data as CalendarEvent);
+    // Trainer-Termin ist eine Anfrage → Trainer:in per Push benachrichtigen (best-effort).
+    if (trainerId) supabase.functions.invoke('notify-appointment', { body: { eventId: (data as CalendarEvent).id } }).catch(() => {});
     onCreated(data as CalendarEvent);
     reset();
     onClose();
@@ -106,7 +109,7 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
             {types.includes('trainer') && (
               <>
                 <Text style={[s.label, { marginTop: 18 }]}>TRAINER</Text>
-                <TrainerSelector value={trainerId} onChange={setTrainerId} />
+                <ConnectedTrainerSelector value={trainerId} onChange={setTrainerId} />
               </>
             )}
 
