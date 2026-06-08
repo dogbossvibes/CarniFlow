@@ -11,6 +11,7 @@ import { useTrainingFeed } from "@/hooks/useTrainingFeed";
 import type { FeedItem } from "@/services/trainingFeed";
 import { useHomeLayout } from "@/stores/homeLayout";
 import { reportScroll } from "@/stores/liveBarScroll";
+import { HomeTimelineCard } from "@/components/calendar/HomeTimelineCard";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -229,32 +230,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ── WOCHENSTREIFEN ── */}
+        {/* ── SMART TRAINING TIMELINE ── */}
         {layout.woche && (
-        <View style={[s.wocheKarte, isGlass && s.cardGlass]}>
-          {isGlass && <Glass style={s.glassBg} />}
-          <Text style={s.wocheLabel}>DIESE WOCHE</Text>
-          <View style={s.wocheReihe}>
-            {TAGE.map((t, i) => {
-              const istHeute = i === heuteIdx;
-              const hatEinheit = hatEinheitAnTag(feed, i);
-              return (
-                <View key={t} style={s.tagSpalte}>
-                  <Text style={[s.tagText, istHeute && s.tagTextAktiv]}>
-                    {t}
-                  </Text>
-                  <View
-                    style={[
-                      s.tagPunkt,
-                      istHeute && s.tagPunktHeute,
-                      hatEinheit && s.tagPunktGefuellt,
-                    ]}
-                  />
-                </View>
-              );
-            })}
+          <View style={{ marginBottom: 24 }}>
+            <HomeTimelineCard />
           </View>
-        </View>
         )}
 
         {/* ── HAUPTAKTIONEN ── */}
