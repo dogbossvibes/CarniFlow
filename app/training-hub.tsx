@@ -10,11 +10,13 @@ import { NextAppointmentCard } from '@/components/calendar/NextAppointmentCard';
 import { TrainingRecommendationCard } from '@/components/calendar/TrainingRecommendationCard';
 import { TrainerAppointmentCard } from '@/components/calendar/TrainerAppointmentCard';
 import { TrainerAppointmentRequest } from '@/components/calendar/TrainerAppointmentRequest';
+import { RescheduleModal } from '@/components/calendar/RescheduleModal';
 import { TimelineView } from '@/components/calendar/TimelineView';
 import { WeekView } from '@/components/calendar/WeekView';
 import { MonthView } from '@/components/calendar/MonthView';
 import { CreateEventModal } from '@/components/calendar/CreateEventModal';
-import { deleteCalendarEvent } from '@/services/calendarService';
+import { deleteCalendarEvent, updateCalendarEvent } from '@/services/calendarService';
+import { useSession } from '@/hooks/useSession';
 import { cancelEventReminders } from '@/lib/eventReminders';
 import { addEventToDeviceCalendar, DEVICE_CALENDAR_AVAILABLE } from '@/lib/deviceCalendar';
 import type { CalendarEvent } from '@/types/calendar';
@@ -24,10 +26,22 @@ const ACCENT = '#00F5D4';
 
 export default function TrainingHubScreen() {
   const router = useRouter();
+  const { session } = useSession();
+  const uid = session?.user.id;
   const { events, loading, refresh } = useTrainingCalendar();
   const { pending, incoming, accept, decline } = useTrainerAppointments();
   const [tab, setTab] = useState<Tab>('timeline');
   const [createOpen, setCreateOpen] = useState(false);
+  const [reschedule, setReschedule] = useState<CalendarEvent | null>(null);
+
+  // Trainer schlägt neue Zeit vor → Zeit aktualisieren, created_by auf den
+  // Trainer setzen (Anfrage geht zur Bestätigung an die Kund:in zurück).
+  const submitReschedule = async (startISO: string, endISO: string | null) => {
+    if (!reschedule || !uid) return;
+    await updateCalendarEvent(reschedule.id, { start_at: startISO, end_at: endISO, created_by: uid });
+    setReschedule(null);
+    refresh();
+  };
 
   const onEventPress = (e: CalendarEvent) => {
     const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [];
@@ -71,7 +85,7 @@ export default function TrainingHubScreen() {
           <View style={{ paddingHorizontal: 20, marginTop: 20, gap: 10 }}>
             <Text style={s.sectionLbl}>TERMIN-ANFRAGEN AN DICH</Text>
             {incoming.map(e => (
-              <TrainerAppointmentRequest key={e.id} event={e} onAccept={() => accept(e.id)} onDecline={() => decline(e.id)} />
+              <TrainerAppointmentRequest key={e.id} event={e} onAccept={() => accept(e.id)} onDecline={() => decline(e.id)} onSuggest={() => setReschedule(e)} />
             ))}
           </View>
         )}
@@ -114,6 +128,7 @@ export default function TrainingHubScreen() {
       </TouchableOpacity>
 
       <CreateEventModal visible={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => refresh()} />
+      <RescheduleModal visible={!!reschedule} event={reschedule} onClose={() => setReschedule(null)} onSubmit={submitReschedule} />
     </SafeAreaView>
   );
 }
