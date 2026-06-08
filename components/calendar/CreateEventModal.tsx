@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
-import { supabase } from '@/lib/supabase';
 import { createOwnEvent } from '@/services/calendarService';
 import { scheduleEventReminders } from '@/lib/eventReminders';
 import { AppointmentTypeGrid } from '@/components/calendar/AppointmentTypeGrid';
@@ -86,8 +85,6 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
     if (error || !data) { Alert.alert('Fehler', error?.message ?? 'Konnte nicht gespeichert werden.'); return; }
 
     scheduleEventReminders(data as CalendarEvent);
-    // Trainer-Termin ist eine Anfrage → Trainer:in per Push benachrichtigen (best-effort).
-    if (trainerId) supabase.functions.invoke('notify-appointment', { body: { eventId: (data as CalendarEvent).id } }).catch(() => {});
     onCreated(data as CalendarEvent);
     reset();
     onClose();

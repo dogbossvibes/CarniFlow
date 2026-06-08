@@ -38,6 +38,11 @@ export async function createUmfrage(args: {
     const inv = args.kundenIds.map(uid => ({ umfrage_id: umfrage.id, user_id: uid }));
     const { error: iErr } = await supabase.from('umfrage_einladungen').insert(inv);
     if (iErr) return { error: iErr.message };
+
+    // Eingeladene per Push benachrichtigen (best-effort; Edge-Function notify-appointment).
+    supabase.functions.invoke('notify-appointment', {
+      body: { umfrage_id: umfrage.id, trainer_name: args.trainerName, training_arten: args.arten },
+    }).catch(() => {});
   }
   return { error: null };
 }
