@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,6 +17,9 @@ import { MonthView } from '@/components/calendar/MonthView';
 import { CreateEventModal } from '@/components/calendar/CreateEventModal';
 import { deleteCalendarEvent, updateCalendarEvent } from '@/services/calendarService';
 import { useSession } from '@/hooks/useSession';
+import { useProfile } from '@/hooks/useProfile';
+import { getMyInvitations } from '@/services/umfrageService';
+import type { TrainerUmfrage } from '@/types/umfrage';
 import { cancelEventReminders } from '@/lib/eventReminders';
 import { addEventToDeviceCalendar, DEVICE_CALENDAR_AVAILABLE } from '@/lib/deviceCalendar';
 import type { CalendarEvent } from '@/types/calendar';
@@ -33,6 +36,9 @@ export default function TrainingHubScreen() {
   const [tab, setTab] = useState<Tab>('timeline');
   const [createOpen, setCreateOpen] = useState(false);
   const [reschedule, setReschedule] = useState<CalendarEvent | null>(null);
+  const { isTrainer } = useProfile();
+  const [umfragen, setUmfragen] = useState<TrainerUmfrage[]>([]);
+  useEffect(() => { if (uid) getMyInvitations(uid).then(setUmfragen); }, [uid]);
 
   // Trainer schlägt neue Zeit vor → Zeit aktualisieren, created_by auf den
   // Trainer setzen (Anfrage geht zur Bestätigung an die Kund:in zurück).
@@ -70,6 +76,11 @@ export default function TrainingHubScreen() {
           <Text style={s.eyebrow}>PLANUNG</Text>
           <Text style={s.title}>Training Hub</Text>
         </View>
+        {isTrainer && (
+          <TouchableOpacity style={s.backBtn} onPress={() => router.push('/umfrage')} activeOpacity={0.7}>
+            <Ionicons name="megaphone-outline" size={18} color={ACCENT} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
@@ -86,6 +97,22 @@ export default function TrainingHubScreen() {
             <Text style={s.sectionLbl}>TERMIN-ANFRAGEN AN DICH</Text>
             {incoming.map(e => (
               <TrainerAppointmentRequest key={e.id} event={e} onAccept={() => accept(e.id)} onDecline={() => decline(e.id)} onSuggest={() => setReschedule(e)} />
+            ))}
+          </View>
+        )}
+
+        {umfragen.length > 0 && (
+          <View style={{ paddingHorizontal: 20, marginTop: 20, gap: 10 }}>
+            <Text style={s.sectionLbl}>TERMINUMFRAGEN</Text>
+            {umfragen.map(u => (
+              <TouchableOpacity key={u.id} style={s.umfrageCard} onPress={() => router.push(`/umfrage/${u.id}`)} activeOpacity={0.8}>
+                <View style={s.umfrageIcon}><Ionicons name="megaphone" size={18} color={ACCENT} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.umfrageTitle} numberOfLines={1}>{u.trainer_name}</Text>
+                  <Text style={s.umfrageSub} numberOfLines={1}>{u.training_arten.join(' · ') || 'Terminumfrage'}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={C.subtle} />
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -141,6 +168,10 @@ const s = StyleSheet.create({
   title:   { fontSize: 26, color: C.white, fontWeight: '900', letterSpacing: -0.5 },
   content: { paddingBottom: 20 },
   sectionLbl: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5 },
+  umfrageCard:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: `${ACCENT}33`, padding: 14 },
+  umfrageIcon:  { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,245,212,0.12)' },
+  umfrageTitle: { fontSize: 15, color: C.white, fontWeight: '700' },
+  umfrageSub:   { fontSize: 12, color: C.muted, marginTop: 2 },
   tabRow:  { flexDirection: 'row', backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 4, marginHorizontal: 20, marginTop: 22 },
   tab:     { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
   tabOn:   { backgroundColor: 'rgba(0,245,212,0.14)' },
