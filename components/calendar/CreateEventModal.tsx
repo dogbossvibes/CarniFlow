@@ -1,31 +1,33 @@
 import { useState } from 'react';
 import {
-  Alert, KeyboardAvoidingView, Modal, Platform, ScrollView,
+  Alert, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
-import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { createOwnEvent } from '@/services/calendarService';
 import { scheduleEventReminders } from '@/lib/eventReminders';
-import { EVENT_TYPES, type EventType, type EventRepeat, type CalendarEvent } from '@/types/calendar';
+import { AppointmentTypeGrid } from '@/components/calendar/AppointmentTypeGrid';
+import { DogSelectionCards } from '@/components/calendar/DogSelectionCards';
+import { LocationPickerCard } from '@/components/calendar/LocationPickerCard';
+import { ReminderCard } from '@/components/calendar/ReminderCard';
+import { TrainerSelector } from '@/components/calendar/TrainerSelector';
+import { StickyCreateAppointmentButton } from '@/components/calendar/StickyCreateAppointmentButton';
+import type { CalendarEvent, EventType } from '@/types/calendar';
 
-const TYPE_ORDER: EventType[] = ['training', 'tracking', 'trainer', 'video', 'seminar', 'competition', 'reminder', 'custom'];
-const REMINDERS = [{ l: '15 Min', v: 15 }, { l: '1 Std', v: 60 }, { l: '1 Tag', v: 1440 }];
-const REPEATS: { l: string; v: EventRepeat }[] = [{ l: 'Einmalig', v: 'none' }, { l: 'Täglich', v: 'daily' }, { l: 'Wöchentlich', v: 'weekly' }, { l: 'Monatlich', v: 'monthly' }];
+const ACCENT = '#00F5D4';
 
-function fmtDateInput(text: string): string {
-  const c = text.replace(/\D/g, '');
+function fmtDateInput(t: string): string {
+  const c = t.replace(/\D/g, '');
   if (c.length >= 4) return `${c.slice(0, 2)}.${c.slice(2, 4)}.${c.slice(4, 8)}`;
   if (c.length >= 2) return `${c.slice(0, 2)}.${c.slice(2)}`;
   return c;
 }
-function fmtTimeInput(text: string): string {
-  const c = text.replace(/\D/g, '');
-  if (c.length >= 2) return `${c.slice(0, 2)}:${c.slice(2, 4)}`;
-  return c;
+function fmtTimeInput(t: string): string {
+  const c = t.replace(/\D/g, '');
+  return c.length >= 2 ? `${c.slice(0, 2)}:${c.slice(2, 4)}` : c;
 }
 function toISO(dateCH: string, timeHM: string): string | null {
   const dm = dateCH.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
@@ -37,41 +39,47 @@ function toISO(dateCH: string, timeHM: string): string | null {
 
 export function CreateEventModal({ visible, onClose, onCreated }: { visible: boolean; onClose: () => void; onCreated: (e: CalendarEvent) => void }) {
   const { session } = useSession();
-  const { dogs } = useDogs();
 
-  const [type, setType]   = useState<EventType>('training');
-  const [title, setTitle] = useState('');
-  const [date, setDate]   = useState('');
-  const [start, setStart] = useState('');
-  const [end, setEnd]     = useState('');
-  const [dogId, setDogId] = useState<string | null>(null);
+  const [types, setTypes]   = useState<EventType[]>(['training']);
+  const [title, setTitle]   = useState('');
+  const [date, setDate]     = useState('');
+  const [start, setStart]   = useState('');
+  const [end, setEnd]       = useState('');
+  const [dogIds, setDogIds] = useState<string[]>([]);
   const [location, setLocation] = useState('');
-  const [discipline, setDiscipline] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes]   = useState('');
+  const [notesOpen, setNotesOpen] = useState(false);
   const [reminders, setReminders] = useState<number[]>([60]);
-  const [repeat, setRepeat] = useState<EventRepeat>('none');
+  const [pushOn, setPushOn] = useState(true);
+  const [trainerId, setTrainerId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const reset = () => {
-    setType('training'); setTitle(''); setDate(''); setStart(''); setEnd('');
-    setDogId(null); setLocation(''); setDiscipline(''); setNotes(''); setReminders([60]); setRepeat('none');
-  };
+  const toggle = <T,>(arr: T[], v: T) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
 
-  const toggleReminder = (v: number) => setReminders(r => r.includes(v) ? r.filter(x => x !== v) : [...r, v]);
+  const reset = () => {
+    setTypes(['training']); setTitle(''); setDate(''); setStart(''); setEnd('');
+    setDogIds([]); setLocation(''); setNotes(''); setNotesOpen(false);
+    setReminders([60]); setPushOn(true); setTrainerId(null);
+  };
 
   const save = async () => {
     if (!session?.user.id) return;
-    if (!title.trim())   { Alert.alert('Titel fehlt', 'Bitte gib dem Termin einen Titel.'); return; }
+    if (types.length === 0) { Alert.alert('Art wählen', 'Bitte wähle mindestens eine Termin-Art.'); return; }
+    if (!title.trim())      { Alert.alert('Titel fehlt', 'Bitte gib dem Termin einen Titel.'); return; }
     const startISO = toISO(date, start);
-    if (!startISO)       { Alert.alert('Datum/Zeit', 'Bitte Datum (TT.MM.JJJJ) und Startzeit (HH:MM) angeben.'); return; }
+    if (!startISO)          { Alert.alert('Datum/Zeit', 'Bitte Datum (TT.MM.JJJJ) und Startzeit (HH:MM) angeben.'); return; }
     const endISO = end ? toISO(date, end) : null;
 
     setSaving(true);
     const { data, error } = await createOwnEvent(session.user.id, {
-      dog_id: dogId, trainer_id: null, type, title: title.trim(),
-      start_at: startISO, end_at: endISO,
-      location: location.trim() || null, discipline: discipline.trim() || null,
-      notes: notes.trim() || null, reminder_minutes: reminders, repeat,
+      type: types[0], types,
+      dog_id: dogIds[0] ?? null, dog_ids: dogIds,
+      trainer_id: trainerId,
+      title: title.trim(), start_at: startISO, end_at: endISO,
+      location: location.trim() || null, discipline: null,
+      notes: notes.trim() || null,
+      reminder_minutes: pushOn ? reminders : [],
+      repeat: 'none',
     });
     setSaving(false);
     if (error || !data) { Alert.alert('Fehler', error?.message ?? 'Konnte nicht gespeichert werden.'); return; }
@@ -92,76 +100,66 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={s.label}>ART</Text>
-            <View style={s.chipsWrap}>
-              {TYPE_ORDER.map(t => {
-                const m = EVENT_TYPES[t]; const aktiv = type === t;
-                return (
-                  <TouchableOpacity key={t} style={[s.typeChip, aktiv && { borderColor: m.color, backgroundColor: `${m.color}1A` }]} onPress={() => setType(t)} activeOpacity={0.8}>
-                    <Text style={{ fontSize: 14 }}>{m.emoji}</Text>
-                    <Text style={[s.typeChipTxt, aktiv && { color: m.color }]}>{m.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <Text style={s.label}>ART  ·  Mehrfachauswahl</Text>
+            <AppointmentTypeGrid selected={types} onToggle={t => setTypes(p => toggle(p, t))} />
 
-            <Field label="TITEL"><TextInput style={s.input} value={title} onChangeText={setTitle} placeholder="z. B. Fährtentraining" placeholderTextColor={C.subtle} /></Field>
-
-            <View style={s.row3}>
-              <Field label="DATUM" flex={1.3}><TextInput style={s.input} value={date} onChangeText={t => setDate(fmtDateInput(t))} placeholder="TT.MM.JJJJ" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={10} /></Field>
-              <Field label="START" flex={1}><TextInput style={s.input} value={start} onChangeText={t => setStart(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
-              <Field label="ENDE" flex={1}><TextInput style={s.input} value={end} onChangeText={t => setEnd(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
-            </View>
-
-            {dogs.length > 0 && (
+            {types.includes('trainer') && (
               <>
-                <Text style={s.label}>HUND</Text>
-                <View style={s.chipsWrap}>
-                  {dogs.map(d => {
-                    const aktiv = dogId === d.id;
-                    return (
-                      <TouchableOpacity key={d.id} style={[s.chip, aktiv && s.chipOn]} onPress={() => setDogId(aktiv ? null : d.id)} activeOpacity={0.8}>
-                        <Text style={[s.chipTxt, aktiv && s.chipTxtOn]}>🐕 {d.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <Text style={[s.label, { marginTop: 18 }]}>TRAINER</Text>
+                <TrainerSelector value={trainerId} onChange={setTrainerId} />
               </>
             )}
 
-            <Field label="ORT"><TextInput style={s.input} value={location} onChangeText={setLocation} placeholder="z. B. Grenchen" placeholderTextColor={C.subtle} /></Field>
-            <Field label="DISZIPLIN"><TextInput style={s.input} value={discipline} onChangeText={setDiscipline} placeholder="optional" placeholderTextColor={C.subtle} /></Field>
-            <Field label="NOTIZEN"><TextInput style={[s.input, { minHeight: 70, textAlignVertical: 'top' }]} value={notes} onChangeText={setNotes} placeholder="optional" placeholderTextColor={C.subtle} multiline /></Field>
+            <Text style={[s.label, { marginTop: 18 }]}>TITEL</Text>
+            <TextInput style={s.input} value={title} onChangeText={setTitle} placeholder="z. B. Fährtentraining" placeholderTextColor={C.subtle} />
 
-            <Text style={s.label}>ERINNERUNG</Text>
-            <View style={s.chipsWrap}>
-              {REMINDERS.map(r => {
-                const aktiv = reminders.includes(r.v);
-                return <TouchableOpacity key={r.v} style={[s.chip, aktiv && s.chipOn]} onPress={() => toggleReminder(r.v)} activeOpacity={0.8}><Text style={[s.chipTxt, aktiv && s.chipTxtOn]}>{r.l}</Text></TouchableOpacity>;
-              })}
+            <View style={s.timeRow}>
+              <GlassField label="DATUM" flex={1.3}><TextInput style={s.glassInput} value={date} onChangeText={t => setDate(fmtDateInput(t))} placeholder="TT.MM.JJJJ" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={10} /></GlassField>
+              <GlassField label="START" flex={1}><TextInput style={s.glassInput} value={start} onChangeText={t => setStart(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></GlassField>
+              <GlassField label="ENDE" flex={1}><TextInput style={s.glassInput} value={end} onChangeText={t => setEnd(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></GlassField>
             </View>
 
-            <Text style={s.label}>WIEDERHOLUNG</Text>
-            <View style={s.chipsWrap}>
-              {REPEATS.map(r => {
-                const aktiv = repeat === r.v;
-                return <TouchableOpacity key={r.v} style={[s.chip, aktiv && s.chipOn]} onPress={() => setRepeat(r.v)} activeOpacity={0.8}><Text style={[s.chipTxt, aktiv && s.chipTxtOn]}>{r.l}</Text></TouchableOpacity>;
-              })}
-            </View>
+            <Text style={[s.label, { marginTop: 18 }]}>HUND</Text>
+            <DogSelectionCards selected={dogIds} onToggle={id => setDogIds(p => toggle(p, id))} />
 
-            <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={save} disabled={saving} activeOpacity={0.85}>
-              <Text style={s.saveTxt}>{saving ? 'Speichert…' : 'Termin erstellen'}</Text>
+            <Text style={[s.label, { marginTop: 18 }]}>ORT</Text>
+            <LocationPickerCard value={location} onChange={setLocation} />
+
+            {/* Notizen – einklappbar */}
+            <TouchableOpacity
+              style={[s.notesHead, { marginTop: 18 }]}
+              onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setNotesOpen(o => !o); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="document-text-outline" size={18} color={ACCENT} />
+              <Text style={s.notesHeadTxt}>Notizen</Text>
+              <Ionicons name={notesOpen ? 'chevron-up' : 'chevron-down'} size={16} color={C.muted} />
             </TouchableOpacity>
-            <View style={{ height: 24 }} />
+            {notesOpen && (
+              <TextInput style={[s.input, { minHeight: 90, textAlignVertical: 'top', marginTop: 10 }]} value={notes} onChangeText={setNotes} placeholder="Notizen zum Termin…" placeholderTextColor={C.subtle} multiline />
+            )}
+
+            <View style={{ marginTop: 18 }}>
+              <ReminderCard selected={reminders} onToggle={m => setReminders(p => toggle(p, m))} pushOn={pushOn} setPushOn={setPushOn} />
+            </View>
+
+            <View style={{ height: 20 }} />
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <StickyCreateAppointmentButton onPress={save} loading={saving} />
       </SafeAreaView>
     </Modal>
   );
 }
 
-function Field({ label, children, flex }: { label: string; children: React.ReactNode; flex?: number }) {
-  return <View style={[{ marginBottom: 14 }, flex != null && { flex }]}><Text style={s.label}>{label}</Text>{children}</View>;
+function GlassField({ label, children, flex }: { label: string; children: React.ReactNode; flex: number }) {
+  return (
+    <View style={[s.glassCard, { flex }]}>
+      <Text style={s.glassLabel}>{label}</Text>
+      {children}
+    </View>
+  );
 }
 
 const s = StyleSheet.create({
@@ -170,16 +168,12 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: 20, color: C.white, fontWeight: '900' },
   closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   body:   { paddingHorizontal: 20, paddingTop: 6 },
-  label:  { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
+  label:  { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10 },
   input:  { backgroundColor: C.input, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 12, color: C.white, fontSize: 15 },
-  row3:   { flexDirection: 'row', gap: 10 },
-  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  typeChip:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, paddingHorizontal: 12, paddingVertical: 9 },
-  typeChipTxt: { fontSize: 13, color: C.muted, fontWeight: '600' },
-  chip:    { borderRadius: 20, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, paddingHorizontal: 14, paddingVertical: 9 },
-  chipOn:  { borderColor: '#00F5D4', backgroundColor: 'rgba(0,245,212,0.12)' },
-  chipTxt: { fontSize: 13, color: C.muted, fontWeight: '600' },
-  chipTxtOn: { color: '#00F5D4', fontWeight: '700' },
-  saveBtn: { backgroundColor: '#00F5D4', borderRadius: 16, height: 54, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  saveTxt: { fontSize: 16, color: '#001210', fontWeight: '900' },
+  timeRow:{ flexDirection: 'row', gap: 10, marginTop: 18 },
+  glassCard:  { backgroundColor: 'rgba(20,20,20,0.6)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', padding: 12 },
+  glassLabel: { fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
+  glassInput: { color: C.white, fontSize: 15, fontWeight: '700', padding: 0 },
+  notesHead:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16 },
+  notesHeadTxt: { flex: 1, fontSize: 15, color: C.white, fontWeight: '600' },
 });
