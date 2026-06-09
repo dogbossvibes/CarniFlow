@@ -241,39 +241,6 @@ const S = StyleSheet.create({
   featureIcon:    { fontSize: 18, width: 26, textAlign: 'center' },
   featureLabel:   { flex: 1, fontSize: 14, color: C.white, fontWeight: '500' },
 
-  // Pläne
-  abschnitt: {
-    fontSize:     10,
-    color:        C.muted,
-    fontWeight:   '700',
-    letterSpacing: 1.5,
-    marginBottom: 10,
-  },
-  planKarte: {
-    backgroundColor: C.card,
-    borderRadius:    16,
-    borderWidth:     1,
-    borderColor:     C.border,
-    padding:         16,
-    marginBottom:    10,
-    overflow:        'hidden',
-  },
-  planKarteAktiv: { borderColor: C.accent },
-  planBadge: {
-    position:        'absolute',
-    top:             10,
-    right:           10,
-    borderRadius:    6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    overflow:        'hidden',
-  },
-  planBadgeTxt: { fontSize: 10, color: C.accentText, fontWeight: '800' },
-  planZeile:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  planName:    { fontSize: 15, color: C.white,  fontWeight: '700' },
-  planPeriod:  { fontSize: 12, color: C.muted,  marginTop: 2 },
-  planPreis:   { fontSize: 19, color: C.white,  fontWeight: '900', letterSpacing: -0.5 },
-
   // CTA
   kaufenBtn: {
     height:        56,
@@ -288,20 +255,6 @@ const S = StyleSheet.create({
 
   infoBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, marginTop: 8, marginBottom: 12 },
   infoTxt: { flex: 1, fontSize: 13, color: C.muted, lineHeight: 18 },
-
-  trialBtn: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'center',
-    gap:             8,
-    height:          52,
-    borderRadius:    16,
-    borderWidth:     1,
-    borderColor:     `${C.accent}30`,
-    backgroundColor: C.accentDim,
-    marginBottom:    12,
-  },
-  trialBtnTxt: { fontSize: 15, color: C.accent, fontWeight: '700' },
 
   legal: { fontSize: 12, color: C.subtle, textAlign: 'center', marginTop: 8 },
 });
