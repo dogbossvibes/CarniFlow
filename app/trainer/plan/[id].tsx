@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
-import { useClients } from '@/hooks/useTrainer';
+import { getMyClientConnections } from '@/services/connectionService';
 import { deletePlan, getPlan, updateShared } from '@/services/trainingPlanService';
 import { successHaptic, tapHaptic } from '@/lib/haptics';
 import type { TrainingPlan } from '@/types/trainingPlan';
@@ -14,7 +14,7 @@ export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { session } = useSession();
-  const { clients } = useClients();
+  const [active, setActive] = useState<{ id: string; name: string | null }[]>([]);
 
   const [plan, setPlan]     = useState<TrainingPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,8 +26,14 @@ export default function PlanDetailScreen() {
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  useEffect(() => {
+    if (!session?.user.id) return;
+    getMyClientConnections(session.user.id).then(cs =>
+      setActive(cs.filter(c => c.status === 'accepted').map(c => ({ id: c.counterpartId, name: c.counterpartName }))),
+    );
+  }, [session]);
+
   const isOwner = !!plan && plan.trainer_id === session?.user.id;
-  const active  = clients.filter(c => c.status === 'active');
 
   const toggleShare = async (clientId: string) => {
     if (!plan) return;
@@ -93,9 +99,9 @@ export default function PlanDetailScreen() {
                 <Text style={s.noClients}>Noch keine verbundenen Kund:innen.</Text>
               ) : (
                 active.map(c => {
-                  const on = plan.shared_with.includes(c.clientId);
+                  const on = plan.shared_with.includes(c.id);
                   return (
-                    <TouchableOpacity key={c.clientId} style={[s.clientRow, on && s.clientRowOn]} onPress={() => toggleShare(c.clientId)} activeOpacity={0.8}>
+                    <TouchableOpacity key={c.id} style={[s.clientRow, on && s.clientRowOn]} onPress={() => toggleShare(c.id)} activeOpacity={0.8}>
                       <View style={[s.checkbox, on && s.checkboxOn]}>{on && <Ionicons name="checkmark" size={14} color={C.accentText} />}</View>
                       <Text style={s.clientName}>{c.name ?? 'Kunde'}</Text>
                     </TouchableOpacity>

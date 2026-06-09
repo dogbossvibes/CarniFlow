@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -9,7 +9,7 @@ import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { useClients } from '@/hooks/useTrainer';
+import { getMyClientConnections } from '@/services/connectionService';
 import { createPlan } from '@/services/trainingPlanService';
 import { successHaptic, tapHaptic } from '@/lib/haptics';
 
@@ -17,8 +17,8 @@ export default function PlanNeuScreen() {
   const router = useRouter();
   const { session } = useSession();
   const { profile } = useProfile();
-  const { clients } = useClients();
 
+  const [active, setActive]         = useState<{ id: string; name: string | null }[]>([]);
   const [title, setTitle]           = useState('');
   const [discipline, setDiscipline] = useState('');
   const [notes, setNotes]           = useState('');
@@ -26,7 +26,13 @@ export default function PlanNeuScreen() {
   const [shared, setShared]         = useState<string[]>([]);
   const [saving, setSaving]         = useState(false);
 
-  const active = clients.filter(c => c.status === 'active');
+  useEffect(() => {
+    if (!session?.user.id) return;
+    getMyClientConnections(session.user.id).then(cs =>
+      setActive(cs.filter(c => c.status === 'accepted').map(c => ({ id: c.counterpartId, name: c.counterpartName }))),
+    );
+  }, [session]);
+
   const toggleShare = (id: string) => setShared(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
   const save = async () => {
@@ -87,12 +93,11 @@ export default function PlanNeuScreen() {
             <Text style={s.noClients}>Noch keine verbundenen Kund:innen.</Text>
           ) : (
             active.map(c => {
-              const on = shared.includes(c.clientId);
+              const on = shared.includes(c.id);
               return (
-                <TouchableOpacity key={c.clientId} style={[s.clientRow, on && s.clientRowOn]} onPress={() => { tapHaptic(); toggleShare(c.clientId); }} activeOpacity={0.8}>
+                <TouchableOpacity key={c.id} style={[s.clientRow, on && s.clientRowOn]} onPress={() => { tapHaptic(); toggleShare(c.id); }} activeOpacity={0.8}>
                   <View style={[s.checkbox, on && s.checkboxOn]}>{on && <Ionicons name="checkmark" size={14} color={C.accentText} />}</View>
                   <Text style={s.clientName}>{c.name ?? 'Kunde'}</Text>
-                  {c.dogNames.length > 0 && <Text style={s.clientDogs}>🐾 {c.dogNames.join(', ')}</Text>}
                 </TouchableOpacity>
               );
             })

@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase';
 import type {
   Connection, ConnectionPermissions, ConnectionStatus, ConnectionView, ConnectionInvite, PermissionKey,
 } from '@/types/connection';
+import type { ActivityItem } from '@/types/trainer';
+import type { TrainingUnit } from '@/types/trainingUnit';
 
 // Neuer Invite-Code: 6 Zeichen, gut lesbar (ohne 0/O/1/I).
 function genInviteCode(): string {
@@ -115,4 +117,31 @@ export function updatePermission(connectionId: string, key: PermissionKey, value
 export async function getAcceptedCounterparts(userId: string): Promise<{ connectionId: string; counterpartId: string }[]> {
   const conns = await listConnections(userId);
   return conns.filter(c => c.status === 'accepted').map(c => ({ connectionId: c.id, counterpartId: c.counterpartId }));
+}
+
+// Trainer-Sicht: akzeptierte Kunden (ich bin connected_user_id).
+export async function getMyClientConnections(trainerId: string): Promise<ConnectionView[]> {
+  const conns = await listConnections(trainerId);
+  return conns.filter(c => c.myRole === 'connected');
+}
+
+// Trainer-Sicht: Aktivitäts-Feed verbundener Kunden. RLS (can_view) liefert nur
+// Einheiten zurück, für die view_trainings gesetzt ist.
+export async function getConnectedActivity(trainerId: string): Promise<ActivityItem[]> {
+  const accepted = (await listConnections(trainerId))
+    .filter(c => c.myRole === 'connected' && c.status === 'accepted');
+  const clientIds = accepted.map(c => c.counterpartId);
+  if (!clientIds.length) return [];
+
+  const { data } = await supabase
+    .from('training_units')
+    .select('*, dog:dogs(name), exercises:training_exercises(*)')
+    .in('owner_id', clientIds)
+    .eq('status', 'completed')
+    .order('session_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  const units = (data as TrainingUnit[]) ?? [];
+
+  const nameByClient = new Map(accepted.map(c => [c.counterpartId, c.counterpartName]));
+  return units.map(u => ({ ...u, clientName: nameByClient.get(u.owner_id) ?? null }));
 }

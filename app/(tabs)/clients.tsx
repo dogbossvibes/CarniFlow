@@ -1,45 +1,65 @@
-import { useCallback } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Share, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { useClients } from '@/hooks/useTrainer';
-import { respondToRequest, removeRelationship } from '@/services/coachService';
-import { queryClient } from '@/lib/queryClient';
+import { useSession } from '@/hooks/useSession';
+import {
+  getMyClientConnections, respondToConnection, removeConnection, createInvite, getMyInvites,
+} from '@/services/connectionService';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
-import type { ClientSummary } from '@/types/trainer';
+import type { ConnectionInvite, ConnectionView } from '@/types/connection';
 
-function initial(name: string | null) {
-  return (name?.trim()?.[0] ?? '?').toUpperCase();
-}
-function formatDate(d: string | null): string {
-  if (!d) return 'Noch keine geteilte Einheit';
-  const [y, mo, day] = d.split('-');
-  return `Zuletzt aktiv: ${day}.${mo}.${y}`;
-}
+function initial(name: string | null) { return (name?.trim()?.[0] ?? '?').toUpperCase(); }
 
 export default function ClientsScreen() {
-  const { clients, loading, refresh } = useClients();
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  const { session } = useSession();
+  const meId = session?.user.id;
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['clients'] });
+  const [clients, setClients] = useState<ConnectionView[]>([]);
+  const [invite, setInvite]   = useState<ConnectionInvite | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy]       = useState(false);
 
-  const accept = async (c: ClientSummary) => {
-    tapHaptic();
-    await respondToRequest(c.relationshipId, 'active');
+  const load = useCallback(async () => {
+    if (!meId) return;
+    setLoading(true);
+    const [cs, invites] = await Promise.all([getMyClientConnections(meId), getMyInvites(meId)]);
+    setClients(cs);
+    const active = invites.find(i => !i.expires_at || new Date(i.expires_at) > new Date()) ?? invites[0] ?? null;
+    setInvite(active);
+    setLoading(false);
+  }, [meId]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const makeCode = async () => {
+    if (!meId) return;
+    setBusy(true);
+    const { data, error } = await createInvite(meId);
+    setBusy(false);
+    if (error || !data) { Alert.alert('Fehler', error ?? 'Code konnte nicht erstellt werden.'); return; }
     successHaptic();
-    invalidate();
+    setInvite(data);
   };
-  const reject = async (c: ClientSummary) => {
-    tapHaptic();
-    await removeRelationship(c.relationshipId);
-    invalidate();
+
+  const shareCode = async () => {
+    if (!invite) return;
+    await Share.share({ message: `Verbinde dich mit mir in ANYVO mit dem Code: ${invite.code}` });
+  };
+
+  const accept = async (c: ConnectionView) => { tapHaptic(); await respondToConnection(c.id, 'accepted'); successHaptic(); load(); };
+  const decline = async (c: ConnectionView) => { tapHaptic(); await respondToConnection(c.id, 'declined'); load(); };
+  const remove  = (c: ConnectionView) => {
+    Alert.alert('Verbindung trennen?', `${c.counterpartName ?? 'Kunde'} wird entfernt.`, [
+      { text: 'Abbrechen', style: 'cancel' },
+      { text: 'Trennen', style: 'destructive', onPress: async () => { await removeConnection(c.id); load(); } },
+    ]);
   };
 
   const pending = clients.filter(c => c.status === 'pending');
-  const active  = clients.filter(c => c.status === 'active');
+  const active  = clients.filter(c => c.status === 'accepted');
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -49,13 +69,37 @@ export default function ClientsScreen() {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        {/* Einladungscode */}
+        <View style={s.inviteCard}>
+          <Text style={s.inviteLabel}>DEIN EINLADUNGSCODE</Text>
+          {invite ? (
+            <>
+              <Text style={s.inviteCode}>{invite.code}</Text>
+              <View style={s.inviteBtns}>
+                <TouchableOpacity style={s.inviteBtn} onPress={shareCode} activeOpacity={0.85}>
+                  <Ionicons name="share-outline" size={16} color={C.accentText} />
+                  <Text style={s.inviteBtnTxt}>Teilen</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.inviteBtnAlt} onPress={makeCode} disabled={busy} activeOpacity={0.85}>
+                  <Text style={s.inviteBtnAltTxt}>Neuer Code</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <TouchableOpacity style={s.inviteBtn} onPress={makeCode} disabled={busy} activeOpacity={0.85}>
+              {busy ? <ActivityIndicator size="small" color={C.accentText} />
+                : <><Ionicons name="add" size={16} color={C.accentText} /><Text style={s.inviteBtnTxt}>Code erstellen</Text></>}
+            </TouchableOpacity>
+          )}
+        </View>
+
         {loading ? (
           <ActivityIndicator color={C.accent} style={{ marginTop: 40 }} />
         ) : clients.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="people-outline" size={32} color={C.subtle} />
             <Text style={s.emptyTitle}>Noch keine Kunden</Text>
-            <Text style={s.emptyTxt}>Teile deinen Trainer-Code, damit sich Kund:innen verbinden.</Text>
+            <Text style={s.emptyTxt}>Teile deinen Code, damit sich Kund:innen verbinden.</Text>
           </View>
         ) : (
           <>
@@ -63,15 +107,15 @@ export default function ClientsScreen() {
               <>
                 <Text style={s.section}>OFFENE ANFRAGEN</Text>
                 {pending.map(c => (
-                  <View key={c.relationshipId} style={s.card}>
+                  <View key={c.id} style={s.card}>
                     <View style={[s.avatar, { backgroundColor: `${C.warning}1A` }]}>
-                      <Text style={[s.avatarTxt, { color: C.warning }]}>{initial(c.name)}</Text>
+                      <Text style={[s.avatarTxt, { color: C.warning }]}>{initial(c.counterpartName)}</Text>
                     </View>
                     <View style={s.flex}>
-                      <Text style={s.name}>{c.name ?? 'Neue Anfrage'}</Text>
+                      <Text style={s.name}>{c.counterpartName ?? 'Neue Anfrage'}</Text>
                       <Text style={s.sub}>möchte sich verbinden</Text>
                     </View>
-                    <TouchableOpacity style={s.rejectBtn} onPress={() => reject(c)} activeOpacity={0.8}>
+                    <TouchableOpacity style={s.rejectBtn} onPress={() => decline(c)} activeOpacity={0.8}>
                       <Ionicons name="close" size={18} color={C.danger} />
                     </TouchableOpacity>
                     <TouchableOpacity style={s.acceptBtn} onPress={() => accept(c)} activeOpacity={0.8}>
@@ -86,21 +130,13 @@ export default function ClientsScreen() {
               <>
                 <Text style={s.section}>VERBUNDEN ({active.length})</Text>
                 {active.map(c => (
-                  <View key={c.relationshipId} style={s.card}>
-                    <View style={s.avatar}>
-                      <Text style={s.avatarTxt}>{initial(c.name)}</Text>
-                    </View>
+                  <View key={c.id} style={s.card}>
+                    <View style={s.avatar}><Text style={s.avatarTxt}>{initial(c.counterpartName)}</Text></View>
                     <View style={s.flex}>
-                      <Text style={s.name}>{c.name ?? 'Kunde'}</Text>
-                      <Text style={s.sub}>
-                        {c.dogNames.length ? `🐾 ${c.dogNames.join(', ')}` : 'Kein Hund angelegt'}
-                      </Text>
-                      <View style={s.metaRow}>
-                        <Text style={s.metaPill}>{c.trainingCount} Trainings</Text>
-                        <Text style={s.activity}>{formatDate(c.lastActivity)}</Text>
-                      </View>
+                      <Text style={s.name}>{c.counterpartName ?? 'Kunde'}</Text>
+                      <Text style={s.sub}>Verbunden</Text>
                     </View>
-                    <AnimatedPressable style={s.unlinkBtn} scale={0.9} onPress={() => reject(c)}>
+                    <AnimatedPressable style={s.unlinkBtn} scale={0.9} onPress={() => remove(c)}>
                       <Ionicons name="link-outline" size={16} color={C.muted} />
                     </AnimatedPressable>
                   </View>
@@ -125,22 +161,27 @@ const s = StyleSheet.create({
   scroll:  { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 4 },
 
-  section: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginTop: 18, marginBottom: 12 },
+  inviteCard:  { backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.accentMid, padding: 18, marginBottom: 18, alignItems: 'center' },
+  inviteLabel: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5 },
+  inviteCode:  { fontSize: 34, color: C.accent, fontWeight: '900', letterSpacing: 6, marginTop: 8, marginBottom: 14 },
+  inviteBtns:  { flexDirection: 'row', gap: 10 },
+  inviteBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.accent, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 11 },
+  inviteBtnTxt:{ fontSize: 14, color: C.accentText, fontWeight: '800' },
+  inviteBtnAlt:   { backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11 },
+  inviteBtnAltTxt:{ fontSize: 14, color: C.muted, fontWeight: '700' },
 
+  section: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginTop: 18, marginBottom: 12 },
   card:   { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 10 },
   avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.cardAlt, alignItems: 'center', justifyContent: 'center' },
   avatarTxt: { fontSize: 18, color: C.white, fontWeight: '800' },
   name:   { fontSize: 15, color: C.white, fontWeight: '700' },
   sub:    { fontSize: 13, color: C.muted, fontWeight: '500', marginTop: 2 },
-  metaRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
-  metaPill: { fontSize: 11, color: C.accentText, fontWeight: '800', backgroundColor: C.accent, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, overflow: 'hidden' },
-  activity: { fontSize: 11, color: C.subtle },
 
   acceptBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   rejectBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.dangerDim, borderWidth: 1, borderColor: `${C.danger}30`, alignItems: 'center', justifyContent: 'center' },
   unlinkBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
 
-  empty:      { alignItems: 'center', gap: 8, marginTop: 60, paddingHorizontal: 30 },
+  empty:      { alignItems: 'center', gap: 8, marginTop: 40, paddingHorizontal: 30 },
   emptyTitle: { fontSize: 16, color: C.white, fontWeight: '700', marginTop: 6 },
   emptyTxt:   { fontSize: 13, color: C.subtle, textAlign: 'center' },
 });

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSession } from '@/hooks/useSession';
-import { useClients } from '@/hooks/useTrainer';
+import { getMyClientConnections } from '@/services/connectionService';
 import { createUmfrage } from '@/services/umfrageService';
 import type { NeuerTermin } from '@/types/umfrage';
 
@@ -24,7 +24,13 @@ function fmtTime(t: string): string {
 export default function UmfrageErstellenScreen() {
   const router = useRouter();
   const { session } = useSession();
-  const { clients } = useClients();
+  const [clients, setClients] = useState<{ id: string; name: string | null }[]>([]);
+  useEffect(() => {
+    if (!session?.user.id) return;
+    getMyClientConnections(session.user.id).then(cs =>
+      setClients(cs.filter(c => c.status === 'accepted').map(c => ({ id: c.counterpartId, name: c.counterpartName }))),
+    );
+  }, [session]);
 
   const [trainerName, setTrainerName] = useState('');
   const [arten, setArten] = useState<string[]>([]);
@@ -114,8 +120,8 @@ export default function UmfrageErstellenScreen() {
         ) : (
           <View style={S.chipRow}>
             {clients.map(k => (
-              <TouchableOpacity key={k.clientId} style={[S.chip, kunden.includes(k.clientId) && S.chipOn]} onPress={() => setKunden(p => toggle(p, k.clientId))}>
-                <Text style={[S.chipTxt, kunden.includes(k.clientId) && S.chipTxtOn]}>{k.name ?? 'Unbekannt'}</Text>
+              <TouchableOpacity key={k.id} style={[S.chip, kunden.includes(k.id) && S.chipOn]} onPress={() => setKunden(p => toggle(p, k.id))}>
+                <Text style={[S.chipTxt, kunden.includes(k.id) && S.chipTxtOn]}>{k.name ?? 'Unbekannt'}</Text>
               </TouchableOpacity>
             ))}
           </View>

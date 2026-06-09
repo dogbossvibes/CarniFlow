@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -16,7 +16,7 @@ import { C } from '@/constants/colors';
 import { HeroImage } from '@/components/training/HeroImage';
 import { CommentThread } from '@/components/training/CommentThread';
 import { disciplineColor } from '@/constants/disciplines';
-import { getTrainingUnitById, deleteTrainingUnit, setUnitShared } from '@/services/trainingUnitService';
+import { getTrainingUnitById, deleteTrainingUnit } from '@/services/trainingUnitService';
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic } from '@/lib/haptics';
 import type { TrainingUnit, AudioFile } from '@/types/trainingUnit';
@@ -107,15 +107,6 @@ export default function UnitDetailScreen() {
     })();
   }, [id]);
 
-  const toggleShare = async (value: boolean) => {
-    if (!unit) return;
-    setUnit({ ...unit, shared_with_trainer: value });   // optimistisch
-    const { error } = await setUnitShared(unit.id, value);
-    if (error) { setUnit({ ...unit, shared_with_trainer: !value }); Alert.alert('Fehler', error.message); return; }
-    queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
-    queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
-  };
-
   const handleDelete = () => {
     tapHaptic();
     Alert.alert('Einheit löschen?', 'Diese Aktion kann nicht rückgängig gemacht werden.', [
@@ -178,21 +169,18 @@ export default function UnitDetailScreen() {
             </View>
           </View>
 
-          {/* Datenschutz: mit Trainer teilen (nur Owner) */}
+          {/* Sichtbarkeit wird zentral über die Trainer-Berechtigungen gesteuert. */}
           {!isReadOnly && (
-          <View style={[s.shareRow, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}
-            <Ionicons name="share-social-outline" size={18} color={unit.shared_with_trainer ? C.accent : C.muted} />
+          <TouchableOpacity style={[s.shareRow, isGlass && s.cardGlass]} activeOpacity={0.8}
+            onPress={() => router.push('/trainer')}>
+            {isGlass && <Glass style={s.glassBg} />}
+            <Ionicons name="shield-checkmark-outline" size={18} color={C.muted} />
             <View style={s.flex}>
-              <Text style={s.shareTitle}>Mit Trainer teilen</Text>
-              <Text style={s.shareSub}>Verbundene Trainer sehen diese Einheit</Text>
+              <Text style={s.shareTitle}>Wer sieht das?</Text>
+              <Text style={s.shareSub}>Sichtbarkeit pro Trainer unter „Meine Trainer" festlegen</Text>
             </View>
-            <Switch
-              value={unit.shared_with_trainer}
-              onValueChange={toggleShare}
-              trackColor={{ false: C.cardAlt, true: C.accent }}
-              thumbColor={C.white}
-            />
-          </View>
+            <Ionicons name="chevron-forward" size={16} color={C.subtle} />
+          </TouchableOpacity>
           )}
 
           <Text style={s.label}>ÜBUNGEN</Text>

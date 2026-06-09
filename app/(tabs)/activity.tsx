@@ -1,16 +1,24 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { UnitListCard } from '@/components/training/UnitListCard';
-import { useClientActivity } from '@/hooks/useTrainer';
+import { useSession } from '@/hooks/useSession';
+import { getConnectedActivity } from '@/services/connectionService';
+import type { ActivityItem } from '@/types/trainer';
 
 export default function ActivityScreen() {
   const router = useRouter();
-  const { activity, loading, refresh } = useClientActivity();
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  const { session } = useSession();
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  useFocusEffect(useCallback(() => {
+    if (!session?.user.id) return;
+    setLoading(true);
+    getConnectedActivity(session.user.id).then(a => { setActivity(a); setLoading(false); });
+  }, [session]));
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

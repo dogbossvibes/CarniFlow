@@ -1,15 +1,25 @@
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
-import { useMyTrainers } from '@/hooks/useTrainer';
+import { useSession } from '@/hooks/useSession';
+import { listConnections } from '@/services/connectionService';
 import { tapHaptic } from '@/lib/haptics';
+import type { ConnectionView } from '@/types/connection';
 
 const ACCENT = '#00F5D4';
 
 export function ConnectedTrainerSelector({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
   const router = useRouter();
-  const { trainers } = useMyTrainers();
+  const { session } = useSession();
+  const [trainers, setTrainers] = useState<ConnectionView[]>([]);
+  useEffect(() => {
+    if (!session?.user.id) return;
+    listConnections(session.user.id).then(cs =>
+      setTrainers(cs.filter(c => c.myRole === 'owner' && c.status === 'accepted')),
+    );
+  }, [session]);
 
   if (trainers.length === 0) {
     return (
@@ -23,25 +33,21 @@ export function ConnectedTrainerSelector({ value, onChange }: { value: string | 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.row}>
       {trainers.map(t => {
-        const active = value === t.trainerId;
-        const type = t.specialties?.[0] ?? 'Trainer';
+        const active = value === t.counterpartId;
         return (
           <TouchableOpacity
-            key={t.relationshipId}
+            key={t.id}
             style={[s.card, active && s.cardActive]}
-            onPress={() => { tapHaptic(); onChange(active ? null : t.trainerId); }}
+            onPress={() => { tapHaptic(); onChange(active ? null : t.counterpartId); }}
             activeOpacity={0.85}
           >
             <View style={s.top}>
               <View style={[s.avatar, active && { borderColor: ACCENT }]}>
                 <Ionicons name="person" size={20} color={active ? ACCENT : C.muted} />
               </View>
-              {active
-                ? <View style={s.check}><Ionicons name="checkmark" size={13} color="#001210" /></View>
-                : t.isVerified ? <Ionicons name="shield-checkmark" size={16} color={ACCENT} /> : null}
+              {active && <View style={s.check}><Ionicons name="checkmark" size={13} color="#001210" /></View>}
             </View>
-            <Text style={[s.name, active && { color: C.white }]} numberOfLines={1}>{t.name ?? 'Trainer'}</Text>
-            <Text style={s.type} numberOfLines={1}>{type}</Text>
+            <Text style={[s.name, active && { color: C.white }]} numberOfLines={1}>{t.counterpartName ?? 'Trainer'}</Text>
             <View style={s.statusRow}>
               <View style={s.statusDot} />
               <Text style={s.status}>Verbunden</Text>
