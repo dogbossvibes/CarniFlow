@@ -16,20 +16,36 @@ export function getCalendarEvents(userId: string) {
 // Anfrage (Status „pending"), die der/die Trainer:in bestätigen muss.
 export async function createOwnEvent(userId: string, ev: NewCalendarEvent) {
   const status = ev.trainer_id ? 'pending' : 'confirmed';
-  return supabase
+  const res = await supabase
     .from('calendar_events')
     .insert({ ...ev, owner_id: userId, created_by: userId, status })
     .select(SELECT)
     .single();
+  // Bucht die Kund:in einen Termin mit Trainer:in → diese benachrichtigen.
+  if (!res.error && ev.trainer_id) notifyAppointment(userId, ev.trainer_id, ev.title, '📅 Neue Terminanfrage').catch(() => {});
+  return res;
 }
 
 // Trainer legt Termin für eine:n Kund:in an (Status „pending").
 export async function createTrainerEvent(trainerId: string, clientOwnerId: string, ev: NewCalendarEvent) {
-  return supabase
+  const res = await supabase
     .from('calendar_events')
     .insert({ ...ev, owner_id: clientOwnerId, created_by: trainerId, trainer_id: trainerId, status: 'pending' })
     .select(SELECT)
     .single();
+  if (!res.error) notifyAppointment(trainerId, clientOwnerId, ev.title, '📅 Neuer Termin').catch(() => {});
+  return res;
+}
+
+// Termin-Push (best-effort): senderId informiert recipientId.
+async function notifyAppointment(senderId: string, recipientId: string, title: string, heading: string) {
+  try {
+    const { data: prof } = await supabase.from('profiles').select('full_name, trainer_name').eq('id', senderId).single();
+    const name = (prof?.trainer_name ?? prof?.full_name ?? 'Jemand') as string;
+    await supabase.functions.invoke('notify', {
+      body: { user_ids: [recipientId], title: heading, body: `${name}: ${title}`, data: { type: 'appointment' } },
+    });
+  } catch { /* best-effort */ }
 }
 
 export function updateCalendarEvent(id: string, updates: Partial<CalendarEvent>) {

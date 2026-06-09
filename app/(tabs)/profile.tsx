@@ -384,6 +384,18 @@ export default function ProfilScreen() {
           />
           <View style={s.trenner} />
           <EinstellungZeile
+            icon="clipboard-outline"
+            label="Meine Trainingspläne"
+            onPress={() => router.push('/plaene')}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="chatbubbles-outline"
+            label="Nachrichten"
+            onPress={() => router.push('/chat')}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
             icon="ribbon-outline"
             label={isTrainer ? 'Mein Trainer-Profil' : 'Trainer werden'}
             onPress={() => router.push('/trainer/edit')}
@@ -407,6 +419,8 @@ export default function ProfilScreen() {
         <Text style={s.abschnitt}>TRAINER-TOOLS</Text>
         {hasTrainerAccess ? (
           <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+            <EinstellungZeile icon="grid-outline" label="Trainer-Dashboard" onPress={() => router.push('/trainer/dashboard')} />
+            <View style={s.trenner} />
             <EinstellungZeile icon="megaphone-outline" label="Terminumfrage erstellen" onPress={() => router.push('/umfrage')} />
             <View style={s.trenner} />
             <EinstellungZeile icon="stats-chart-outline" label="Meine Umfragen" onPress={() => router.push('/umfrage/meine')} />
