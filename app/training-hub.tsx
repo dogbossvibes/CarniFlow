@@ -17,7 +17,7 @@ import { MonthView } from '@/components/calendar/MonthView';
 import { CreateEventModal } from '@/components/calendar/CreateEventModal';
 import { deleteCalendarEvent, updateCalendarEvent } from '@/services/calendarService';
 import { useSession } from '@/hooks/useSession';
-import { useProfile } from '@/hooks/useProfile';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { getMyInvitations } from '@/services/umfrageService';
 import type { TrainerUmfrage } from '@/types/umfrage';
 import { cancelEventReminders } from '@/lib/eventReminders';
@@ -36,7 +36,7 @@ export default function TrainingHubScreen() {
   const [tab, setTab] = useState<Tab>('timeline');
   const [createOpen, setCreateOpen] = useState(false);
   const [reschedule, setReschedule] = useState<CalendarEvent | null>(null);
-  const { hasTrainerAccess } = useProfile();
+  const { isTrainerModule } = useCapabilities();
   const [umfragen, setUmfragen] = useState<TrainerUmfrage[]>([]);
   useEffect(() => { if (uid) getMyInvitations(uid).then(setUmfragen); }, [uid]);
 
@@ -76,7 +76,7 @@ export default function TrainingHubScreen() {
           <Text style={s.eyebrow}>PLANUNG</Text>
           <Text style={s.title}>Training Hub</Text>
         </View>
-        {hasTrainerAccess && (
+        {isTrainerModule && (
           <TouchableOpacity style={s.backBtn} onPress={() => router.push('/umfrage')} activeOpacity={0.7}>
             <Ionicons name="megaphone-outline" size={18} color={ACCENT} />
           </TouchableOpacity>

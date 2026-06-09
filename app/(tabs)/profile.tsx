@@ -4,6 +4,7 @@ import { Glass, isGlass } from "@/components/ui/Glass";
 import { C } from "@/constants/colors";
 import { useDogs } from "@/hooks/useDogs";
 import { usePlan } from "@/hooks/usePlan";
+import { useCapabilities } from "@/hooks/useCapabilities";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { useNotificationSetting } from "@/hooks/useNotificationSetting";
 import { useProfile } from "@/hooks/useProfile";
@@ -74,7 +75,7 @@ export default function ProfilScreen() {
   const { user } = useSession();
   const { dogs } = useDogs();
   const { sessions } = useTrainingSessions();
-  const { profile, isTrainer, isTrainerProfile, hasTrainerAccess, refresh: refreshProfile } = useProfile();
+  const { profile, refresh: refreshProfile } = useProfile();
 
   const toggleShare = async (value: boolean) => {
     if (!user?.id) return;
@@ -112,7 +113,9 @@ export default function ProfilScreen() {
     }
   };
 
-  const { isPremium, expiresAt } = usePlan();
+  const { expiresAt } = usePlan();
+  const { isPro, isTrainerModule, plan } = useCapabilities();
+  const PLAN_LABEL = { free: 'Free', pro: 'Pro', trainer: 'Trainer' } as const;
 
   const anzeigeName = user?.user_metadata?.full_name ?? "Hundesportler";
   const email = user?.email ?? "";
@@ -213,13 +216,13 @@ export default function ProfilScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Premium-Status-Button unter der Identitätskarte */}
+        {/* Mitgliedschaft-Button unter der Identitätskarte */}
         <TouchableOpacity
-          style={[s.planBtn, isPremium && s.planBtnAktiv]}
+          style={[s.planBtn, isPro && s.planBtnAktiv]}
           onPress={() => router.push('/premium')}
           activeOpacity={0.8}
         >
-          {isPremium && (
+          {isPro && (
             <LinearGradient
               colors={[`${C.accent}15`, 'transparent']}
               start={{ x: 0, y: 0.5 }}
@@ -228,14 +231,14 @@ export default function ProfilScreen() {
             />
           )}
           <Ionicons
-            name={isPremium ? "star" : "star-outline"}
+            name={isPro ? "star" : "star-outline"}
             size={15}
-            color={isPremium ? C.accent : C.muted}
+            color={isPro ? C.accent : C.muted}
           />
-          <Text style={[s.planBtnText, isPremium && s.planBtnTextAktiv]}>
-            {isPremium ? "Premium aktiv" : "Upgrade auf Premium"}
+          <Text style={[s.planBtnText, isPro && s.planBtnTextAktiv]}>
+            {plan === 'trainer' ? 'Trainer aktiv' : plan === 'pro' ? 'Pro aktiv' : 'Upgrade auf Pro'}
           </Text>
-          {!isPremium && (
+          {!isPro && (
             <Ionicons name="chevron-forward" size={14} color={C.subtle} />
           )}
         </TouchableOpacity>
@@ -258,7 +261,7 @@ export default function ProfilScreen() {
         </View>
 
         {/* Premium-Banner — nur für Free-User */}
-        {!isPremium && (
+        {!isPro && (
           <View style={s.proBanner}>
             <Image
               source={require("@/assets/images/yam20.jpg")}
@@ -312,8 +315,8 @@ export default function ProfilScreen() {
           </View>
         )}
 
-        {/* Premium-Status — nur für Premium-User */}
-        {isPremium && (
+        {/* Mitgliedschafts-Status — nur für Pro/Trainer */}
+        {isPro && (
           <View style={s.premiumKarte}>
             <LinearGradient
               colors={["rgba(0,255,204,0.08)", "rgba(0,240,200,0.05)"]}
@@ -329,14 +332,14 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 0 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proAbzeichenText}>PRO</Text>
+                <Text style={s.proAbzeichenText}>{plan === 'trainer' ? 'TRAINER' : 'PRO'}</Text>
               </View>
               <View style={s.premiumAktivBadge}>
                 <Ionicons name="checkmark-circle" size={13} color={C.success} />
                 <Text style={s.premiumAktivText}>Aktiv</Text>
               </View>
             </View>
-            <Text style={s.premiumTitel}>Premium aktiv</Text>
+            <Text style={s.premiumTitel}>{plan === 'trainer' ? 'Trainer aktiv' : 'Pro aktiv'}</Text>
             <Text style={s.premiumSub}>
               {expiresAt
                 ? `Verlängert sich am ${expiresAt.toLocaleDateString("de-CH")}`
@@ -397,7 +400,7 @@ export default function ProfilScreen() {
           <View style={s.trenner} />
           <EinstellungZeile
             icon="ribbon-outline"
-            label={isTrainer ? 'Mein Trainer-Profil' : 'Trainer werden'}
+            label={isTrainerModule ? 'Mein Trainer-Profil' : 'Trainer werden'}
             onPress={() => router.push('/trainer/edit')}
           />
           <View style={s.trenner} />
@@ -415,37 +418,23 @@ export default function ProfilScreen() {
           </View>
         </View>
 
-        {/* Trainer-Tools — nur mit Trainer-Profil + Pro */}
+        {/* Trainer-Tools — nur mit Trainer-Modul */}
         <Text style={s.abschnitt}>TRAINER-TOOLS</Text>
-        {hasTrainerAccess ? (
+        {isTrainerModule ? (
           <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
-            <EinstellungZeile icon="grid-outline" label="Trainer-Dashboard" onPress={() => router.push('/trainer/dashboard')} />
+            <EinstellungZeile icon="grid-outline" label="Trainer-Hub" onPress={() => router.push('/(tabs)/hub')} />
             <View style={s.trenner} />
             <EinstellungZeile icon="megaphone-outline" label="Terminumfrage erstellen" onPress={() => router.push('/umfrage')} />
             <View style={s.trenner} />
             <EinstellungZeile icon="stats-chart-outline" label="Meine Umfragen" onPress={() => router.push('/umfrage/meine')} />
           </View>
-        ) : isTrainerProfile ? (
-          <View style={s.gateCard}>
-            <Text style={s.gateTitle}>👨‍🏫 Trainer-Profil vorhanden</Text>
-            <Text style={s.gateSub}>Erneuere Pro, um Terminumfragen und Trainer-Features zu nutzen.</Text>
-            <TouchableOpacity style={s.upgradeBtn} onPress={() => router.push('/premium')} activeOpacity={0.85}>
-              <Text style={s.upgradeBtnTxt}>Plan erneuern →</Text>
-            </TouchableOpacity>
-          </View>
         ) : (
           <View style={s.gateCard}>
-            <Text style={s.gateTitle}>Als Trainer registrieren</Text>
-            <Text style={s.gateSub}>Erstelle Terminumfragen und verwalte deine Kunden — verfügbar ab Pro.</Text>
-            {isPremium ? (
-              <TouchableOpacity style={s.regBtn} onPress={() => router.push('/trainer/registrieren')} activeOpacity={0.85}>
-                <Text style={s.regBtnTxt}>Jetzt als Trainer registrieren →</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={s.upgradeBtn} onPress={() => router.push('/premium')} activeOpacity={0.85}>
-                <Text style={s.upgradeBtnTxt}>🔒 Pro erforderlich — Upgrade</Text>
-              </TouchableOpacity>
-            )}
+            <Text style={s.gateTitle}>Trainer-Modul freischalten</Text>
+            <Text style={s.gateSub}>Verwalte Kunden, Trainingspläne, Umfragen und Chats — mit dem Trainer-Plan.</Text>
+            <TouchableOpacity style={s.upgradeBtn} onPress={() => router.push('/premium')} activeOpacity={0.85}>
+              <Text style={s.upgradeBtnTxt}>{isPro ? 'Trainer freischalten →' : '🔒 Trainer-Plan ansehen'}</Text>
+            </TouchableOpacity>
           </View>
         )}
 

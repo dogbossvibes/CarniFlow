@@ -10,10 +10,11 @@ export const PURCHASES_AVAILABLE = Purchases != null;
 const IOS_KEY     = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '';
 const ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '';
 
-// Zwei Stufen: Kunde (customer) und Trainer (trainer). Das Trainer-Abo enthält
-// die Kundenfunktionen — Entitlement-Namen müssen im RevenueCat-Dashboard so heißen.
-export const ENTITLEMENTS = { customer: 'customer', trainer: 'trainer' } as const;
-export type Tier = 'customer' | 'trainer';
+// Zwei Stufen: Pro und Trainer. Das Trainer-Abo enthält die Pro-Funktionen —
+// Entitlement-Namen müssen im RevenueCat-Dashboard so heißen.
+// Produkte: anyvo_pro_monthly (CHF 7.90) / anyvo_trainer_monthly (CHF 29.90).
+export const ENTITLEMENTS = { pro: 'pro', trainer: 'trainer' } as const;
+export type Tier = 'pro' | 'trainer';
 
 let configured = false;
 
@@ -48,13 +49,13 @@ export interface EntitlementResult {
 
 function fromInfo(info: any): EntitlementResult {
   const active = info?.entitlements?.active ?? {};
-  if (active[ENTITLEMENTS.trainer])  return { ok: true, tier: 'trainer',  expiration: active[ENTITLEMENTS.trainer].expirationDate ?? null };
-  if (active[ENTITLEMENTS.customer]) return { ok: true, tier: 'customer', expiration: active[ENTITLEMENTS.customer].expirationDate ?? null };
+  if (active[ENTITLEMENTS.trainer]) return { ok: true, tier: 'trainer', expiration: active[ENTITLEMENTS.trainer].expirationDate ?? null };
+  if (active[ENTITLEMENTS.pro])     return { ok: true, tier: 'pro',     expiration: active[ENTITLEMENTS.pro].expirationDate ?? null };
   return { ok: true, tier: null, expiration: null };
 }
 
 function tierOf(productId: string): Tier {
-  return /trainer/i.test(productId) ? 'trainer' : 'customer';
+  return /trainer/i.test(productId) ? 'trainer' : 'pro';
 }
 
 export async function getPackages(): Promise<PurchasePackage[]> {

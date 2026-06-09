@@ -5,14 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
-import { useProfile } from '@/hooks/useProfile';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { getMyPlans } from '@/services/trainingPlanService';
 import type { TrainingPlan } from '@/types/trainingPlan';
 
 export default function TrainerPlaeneScreen() {
   const router = useRouter();
   const { session } = useSession();
-  const { hasTrainerAccess } = useProfile();
+  const { isTrainerModule } = useCapabilities();
   const [plans, setPlans]   = useState<TrainingPlan[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,13 +24,13 @@ export default function TrainerPlaeneScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  if (!hasTrainerAccess) {
+  if (!isTrainerModule) {
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
         <Header onBack={() => router.back()} />
         <View style={s.locked}>
           <Ionicons name="lock-closed" size={32} color={C.muted} />
-          <Text style={s.lockedTxt}>Trainer-Abo erforderlich</Text>
+          <Text style={s.lockedTxt}>Trainer-Modul erforderlich</Text>
           <TouchableOpacity style={s.upgrade} onPress={() => router.push('/premium')} activeOpacity={0.85}>
             <Text style={s.upgradeTxt}>Trainer freischalten</Text>
           </TouchableOpacity>

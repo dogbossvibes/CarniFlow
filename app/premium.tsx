@@ -20,6 +20,7 @@ import { queryClient } from '@/lib/queryClient';
 import { usePlan } from '@/hooks/usePlan';
 import { getPackages, buyPackage, restorePurchases, purchasesReady, type PurchasePackage, type Tier } from '@/lib/purchases';
 import { recordSubscription } from '@/services/subscriptionService';
+import { setCapabilities } from '@/services/capabilityService';
 
 // ─── Daten ────────────────────────────────────────────────────────────────────
 
@@ -45,8 +46,8 @@ const TRAINER_EXTRA = [
 ];
 
 const PLAN_META: Record<Tier, { name: string; fallbackPrice: string; tagline: string }> = {
-  customer: { name: 'Kunde',   fallbackPrice: 'CHF 7.90',  tagline: 'Alle Trainings-Features' },
-  trainer:  { name: 'Trainer', fallbackPrice: 'CHF 29.90', tagline: 'Kunde + Trainer-Tools' },
+  pro:     { name: 'Pro',     fallbackPrice: 'CHF 7.90',  tagline: 'Alle Trainings-Features' },
+  trainer: { name: 'Trainer', fallbackPrice: 'CHF 29.90', tagline: 'Pro + Trainer-Modul' },
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -57,21 +58,22 @@ export default function PremiumScreen() {
 
   const [laden, setLaden] = useState(false);
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
-  const [selectedTier, setSelectedTier] = useState<Tier>('customer');
+  const [selectedTier, setSelectedTier] = useState<Tier>('pro');
 
   // Angebote von RevenueCat laden (Store-Preise). Leer = IAP nicht konfiguriert.
   useEffect(() => { (async () => setPackages(await getPackages()))(); }, []);
   const iapReady = purchasesReady() && packages.length > 0;
   const pkgFor = (tier: Tier) => packages.find(p => p.tier === tier) ?? null;
 
-  // Stufe in profiles aktivieren (Trainer setzt zusätzlich role + is_trainer).
+  // Stufe über Capabilities freischalten (Trainer impliziert Pro).
+  // profiles.plan bleibt als Spiegel für Trial/Ablauf erhalten.
   const activateTier = async (tier: Tier, expiration: string | null, productId?: string | null) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const patch: Record<string, unknown> = { plan: 'premium', plan_expires_at: expiration, trial_used: true };
-    if (tier === 'trainer') { patch.role = 'trainer'; patch.is_trainer = true; }
-    await supabase.from('profiles').update(patch).eq('id', user.id);
+    await setCapabilities(user.id, { pro_member: true, ...(tier === 'trainer' ? { trainer_module: true } : {}) });
+    await supabase.from('profiles').update({ plan: 'premium', plan_expires_at: expiration, trial_used: true }).eq('id', user.id);
     await recordSubscription({ userId: user.id, tier, productId, expiresAt: expiration });
+    queryClient.invalidateQueries({ queryKey: ['capabilities'] });
     queryClient.invalidateQueries({ queryKey: ['profile'] });
   };
 
@@ -110,11 +112,13 @@ export default function PremiumScreen() {
       if (!user) throw new Error('Nicht eingeloggt.');
       const expires = new Date();
       expires.setDate(expires.getDate() + 7);
+      await setCapabilities(user.id, { pro_member: true });
       const { error } = await supabase
         .from('profiles')
         .update({ plan: 'premium', plan_expires_at: expires.toISOString(), trial_used: true })
         .eq('id', user.id);
       if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['capabilities'] });
       Alert.alert('7 Tage gratis!', 'Dein Test ist aktiv. Viel Spaß mit allen Features!', [{ text: "Los geht's!", onPress: () => router.back() }]);
     } catch {
       Alert.alert('Ups, kurze Pause 🐾', 'Test noch nicht aktiviert — versuch es nochmal!');
@@ -188,7 +192,7 @@ export default function PremiumScreen() {
         {/* Plan-Auswahl: Kunde / Trainer */}
         {iapReady && (
           <View style={S.planSelRow}>
-            {(['customer', 'trainer'] as Tier[]).map(tier => {
+            {(['pro', 'trainer'] as Tier[]).map(tier => {
               const aktiv = selectedTier === tier;
               const m = PLAN_META[tier];
               return (

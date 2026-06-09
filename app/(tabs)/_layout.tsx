@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
-import { useProfile } from '@/hooks/useProfile';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { registerForPush } from '@/lib/push';
 import { configurePurchases } from '@/lib/purchases';
 
@@ -68,7 +68,7 @@ function TabBarBackground() {
 
 export default function TabLayout() {
   const { session, loading } = useSession();
-  const { isTrainer } = useProfile();
+  const { isTrainerModule } = useCapabilities();
 
   // Push-Token registrieren, sobald eingeloggt (best-effort, nur Dev/Prod-Build).
   const uid = session?.user.id;
@@ -132,21 +132,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="clients"
+        name="hub"
         options={{
-          title: 'Kunden',
-          href: isTrainer ? undefined : null,
-          tabBarIcon: ({ focused, size }) => <TabIcon name="people" focused={focused} size={size} />,
+          title: 'Hub',
+          href: isTrainerModule ? undefined : null,
+          tabBarIcon: ({ focused, size }) => <TabIcon name="grid" focused={focused} size={size} />,
         }}
       />
-      <Tabs.Screen
-        name="activity"
-        options={{
-          title: 'Aktivität',
-          href: isTrainer ? undefined : null,
-          tabBarIcon: ({ focused, size }) => <TabIcon name="newspaper" focused={focused} size={size} />,
-        }}
-      />
+      {/* In den Hub gefaltet — als Tab ausgeblendet, aber aus dem Hub erreichbar. */}
+      <Tabs.Screen name="clients"  options={{ href: null }} />
+      <Tabs.Screen name="activity" options={{ href: null }} />
       <Tabs.Screen
         name="analytics"
         options={{
