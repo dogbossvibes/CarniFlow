@@ -1,6 +1,7 @@
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, useRouter } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
 import { isGlass } from '@/components/ui/Glass';
@@ -69,6 +70,7 @@ function TabBarBackground() {
 export default function TabLayout() {
   const { session, loading } = useSession();
   const { isTrainerModule } = useCapabilities();
+  const router = useRouter();
 
   // Push-Token registrieren, sobald eingeloggt (best-effort, nur Dev/Prod-Build).
   const uid = session?.user.id;
@@ -78,6 +80,21 @@ export default function TabLayout() {
       configurePurchases(uid);   // RevenueCat (Apple IAP) initialisieren
     }
   }, [uid]);
+
+  // Push-Tap → in den passenden Bereich navigieren (data.type aus notify-Function).
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(resp => {
+      const data = resp.notification.request.content.data as { type?: string } | undefined;
+      switch (data?.type) {
+        case 'message':     router.push('/chat'); break;
+        case 'plan':        router.push('/plaene'); break;
+        case 'activity':    router.push('/(tabs)/activity'); break;
+        case 'appointment': router.push('/training-hub'); break;
+        case 'comment':     router.push('/(tabs)/training'); break;
+      }
+    });
+    return () => sub.remove();
+  }, [router]);
 
   if (loading) {
     return (

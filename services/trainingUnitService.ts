@@ -2,20 +2,25 @@ import { supabase } from '@/lib/supabase';
 import type { TrainingUnit, TrainingExercise, AudioFile } from '@/types/trainingUnit';
 import type { TrainingMetrics } from '@/types/analytics';
 
-// Trainer:innen der Kund:in über neue, geteilte Aktivität informieren (best-effort).
+// Verbundene Trainer:innen mit view_trainings-Berechtigung über neue Aktivität
+// der Kund:in informieren (best-effort, connection-basiert).
 async function notifyTrainersOfActivity(ownerId: string, title: string) {
   try {
-    const { data: rels } = await supabase
-      .from('coach_relationships').select('trainer_id')
-      .eq('client_id', ownerId).eq('status', 'active');
-    const trainerIds = (rels ?? []).map(r => r.trainer_id);
+    const { data: conns } = await supabase
+      .from('connections')
+      .select('connected_user_id, connection_permissions(view_trainings)')
+      .eq('owner_user_id', ownerId)
+      .eq('status', 'accepted');
+    const trainerIds = (conns ?? [])
+      .filter((c: any) => c.connection_permissions?.view_trainings ?? c.connection_permissions?.[0]?.view_trainings)
+      .map((c: any) => c.connected_user_id as string);
     if (!trainerIds.length) return;
 
     const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', ownerId).single();
     const name = (prof?.full_name ?? 'Eine Kund:in') as string;
 
     await supabase.functions.invoke('notify', {
-      body: { user_ids: trainerIds, title, body: `${name} hat eine Einheit mit dir geteilt.`, data: { type: 'activity' } },
+      body: { user_ids: trainerIds, title, body: `${name} hat eine neue Einheit abgeschlossen.`, data: { type: 'activity' } },
     });
   } catch { /* best-effort */ }
 }
@@ -92,10 +97,9 @@ export async function finishTrainingUnit(
     if (error) return { error };
   }
 
-  if (updates.shared_with_trainer) {
-    const { data: u } = await supabase.from('training_units').select('owner_id').eq('id', unitId).single();
-    if (u?.owner_id) notifyTrainersOfActivity(u.owner_id, '🐾 Neues Training').catch(() => {});
-  }
+  // Verbundene Trainer:innen (mit view_trainings) über die neue Einheit informieren.
+  const { data: u } = await supabase.from('training_units').select('owner_id').eq('id', unitId).single();
+  if (u?.owner_id) notifyTrainersOfActivity(u.owner_id, '🐾 Neues Training').catch(() => {});
   return { error: null };
 }
 
@@ -119,7 +123,7 @@ export async function createDocumentedUnit(
       .insert(exercises.map(e => ({ ...e, unit_id: data.id })));
     if (exErr) return { error: exErr, data: null };
   }
-  if (unit.shared_with_trainer) notifyTrainersOfActivity(ownerId, '🐾 Neue Aktivität').catch(() => {});
+  notifyTrainersOfActivity(ownerId, '🐾 Neue Aktivität').catch(() => {});
   return { error: null, data };
 }
 
@@ -143,15 +147,6 @@ export async function updateDocumentedUnit(
     if (exErr) return { error: exErr };
   }
   return { error: null };
-}
-
-export async function setUnitShared(id: string, shared: boolean) {
-  const res = await supabase.from('training_units').update({ shared_with_trainer: shared }).eq('id', id);
-  if (!res.error && shared) {
-    const { data: u } = await supabase.from('training_units').select('owner_id').eq('id', id).single();
-    if (u?.owner_id) notifyTrainersOfActivity(u.owner_id, '🐾 Einheit geteilt').catch(() => {});
-  }
-  return res;
 }
 
 export function deleteTrainingUnit(id: string) {
