@@ -11,6 +11,7 @@ import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { registerForPush } from '@/lib/push';
+import { configurePurchases } from '@/lib/purchases';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -71,7 +72,12 @@ export default function TabLayout() {
 
   // Push-Token registrieren, sobald eingeloggt (best-effort, nur Dev/Prod-Build).
   const uid = session?.user.id;
-  useEffect(() => { if (uid) registerForPush(uid); }, [uid]);
+  useEffect(() => {
+    if (uid) {
+      registerForPush(uid);
+      configurePurchases(uid);   // RevenueCat (Apple IAP) initialisieren
+    }
+  }, [uid]);
 
   if (loading) {
     return (
