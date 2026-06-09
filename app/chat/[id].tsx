@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
+  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,13 +13,14 @@ import {
 } from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { C } from '@/constants/colors';
+import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
-import { uploadAudio, uploadVideo } from '@/services/mediaService';
+import { uploadAudio, uploadVideo, uploadImage } from '@/services/mediaService';
 import { signMediaUrl } from '@/lib/mediaUrl';
-import { getThread, markThreadRead, sendMessage, subscribeThread } from '@/services/messageService';
+import { getMessages, getOrCreateChat, markRead, sendMessage, subscribeChat } from '@/services/chatService';
 import { tapHaptic } from '@/lib/haptics';
-import type { Message } from '@/types/message';
+import type { ChatMessage, ChatMessageType } from '@/types/chat';
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -32,8 +33,11 @@ export default function ChatThreadScreen() {
   const { session } = useSession();
   const { profile } = useProfile();
   const meId = session?.user.id;
+  const connectionId = id;
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatId, setChatId]   = useState<string | null>(null);
+  const [counterpartId, setCounterpartId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading]   = useState(true);
   const [text, setText]         = useState('');
   const [sending, setSending]   = useState(false);
@@ -45,32 +49,47 @@ export default function ChatThreadScreen() {
 
   const senderName = profile?.trainer_name ?? profile?.full_name ?? 'Jemand';
 
-  const load = useCallback(async () => {
-    if (!meId || !id) return;
-    const t = await getThread(meId, id);
-    setMessages(t);
-    setLoading(false);
-    markThreadRead(meId, id);
-  }, [meId, id]);
-
-  useEffect(() => { load(); }, [load]);
-
-  // Realtime: eingehende Nachrichten anhängen.
+  // Connection laden (Gegenüber bestimmen) + Chat holen/anlegen + Nachrichten.
   useEffect(() => {
-    if (!meId || !id) return;
-    const unsub = subscribeThread(meId, id, m => {
+    if (!meId || !connectionId) return;
+    let active = true;
+    (async () => {
+      const { data: conn } = await supabase
+        .from('connections').select('owner_user_id, connected_user_id')
+        .eq('id', connectionId).maybeSingle();
+      if (conn && active) {
+        setCounterpartId(conn.owner_user_id === meId ? conn.connected_user_id : conn.owner_user_id);
+      }
+      const cid = await getOrCreateChat(connectionId);
+      if (!active) return;
+      setChatId(cid);
+      if (cid) {
+        const msgs = await getMessages(cid);
+        if (!active) return;
+        setMessages(msgs);
+        markRead(cid, meId);
+      }
+      setLoading(false);
+    })();
+    return () => { active = false; };
+  }, [meId, connectionId]);
+
+  // Realtime.
+  useEffect(() => {
+    if (!chatId || !meId) return;
+    const unsub = subscribeChat(chatId, meId, m => {
       setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]);
-      markThreadRead(meId, id);
+      markRead(chatId, meId);
     });
     return unsub;
-  }, [meId, id]);
+  }, [chatId, meId]);
 
-  const push = (m: Message) => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]);
+  const push = (m: ChatMessage) => setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]);
 
-  const doSend = async (payload: { body?: string; audioUrl?: string; videoUrl?: string }) => {
-    if (!meId || !id) return;
+  const doSend = async (type: ChatMessageType, content: string) => {
+    if (!meId || !chatId || !counterpartId) return;
     setSending(true);
-    const { data, error } = await sendMessage({ senderId: meId, recipientId: id, senderName, ...payload });
+    const { data, error } = await sendMessage({ chatId, senderId: meId, recipientId: counterpartId, senderName, type, content });
     setSending(false);
     if (error || !data) { Alert.alert('Fehler', error ?? 'Senden fehlgeschlagen.'); return; }
     push(data);
@@ -80,7 +99,7 @@ export default function ChatThreadScreen() {
     const t = text.trim();
     if (!t) return;
     setText('');
-    await doSend({ body: t });
+    await doSend('text', t);
   };
 
   // ── Sprachnachricht ──
@@ -106,22 +125,26 @@ export default function ChatThreadScreen() {
       if (!uri) return;
       setSending(true);
       const { url } = await uploadAudio(uri);
-      await doSend({ audioUrl: url });
+      await doSend('voice', url);
     } catch { Alert.alert('Ups', 'Sprachnachricht konnte nicht gesendet werden.'); }
     finally { setSending(false); }
   };
 
-  // ── Video-Feedback ──
-  const pickVideo = async () => {
+  // ── Bild / Video ──
+  const pickMedia = async (kind: 'image' | 'video') => {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) { Alert.alert('Zugriff nötig', 'Bitte Mediathek-Zugriff erlauben.'); return; }
-      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], quality: 0.7, videoMaxDuration: 120 });
+      const res = await ImagePicker.launchImageLibraryAsync(
+        kind === 'image'
+          ? { mediaTypes: ['images'], quality: 0.8 }
+          : { mediaTypes: ['videos'], quality: 0.7, videoMaxDuration: 120 },
+      );
       if (res.canceled || !res.assets[0]) return;
       setSending(true);
-      const { url } = await uploadVideo(res.assets[0].uri);
-      await doSend({ videoUrl: url });
-    } catch { Alert.alert('Ups', 'Video konnte nicht gesendet werden.'); }
+      const { url } = kind === 'image' ? await uploadImage(res.assets[0].uri) : await uploadVideo(res.assets[0].uri);
+      await doSend(kind, url);
+    } catch { Alert.alert('Ups', 'Medium konnte nicht gesendet werden.'); }
     finally { setSending(false); }
   };
 
@@ -142,12 +165,8 @@ export default function ChatThreadScreen() {
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           >
-            {messages.length === 0 && (
-              <Text style={s.emptyTxt}>Noch keine Nachrichten. Schreib die erste!</Text>
-            )}
-            {messages.map(m => (
-              <Bubble key={m.id} m={m} mine={m.sender_id === meId} />
-            ))}
+            {messages.length === 0 && <Text style={s.emptyTxt}>Noch keine Nachrichten. Schreib die erste!</Text>}
+            {messages.map(m => <Bubble key={m.id} m={m} mine={m.sender_id === meId} />)}
           </ScrollView>
         )}
 
@@ -163,7 +182,10 @@ export default function ChatThreadScreen() {
             </View>
           ) : (
             <>
-              <TouchableOpacity style={s.iconBtn} onPress={pickVideo} disabled={sending} hitSlop={6}>
+              <TouchableOpacity style={s.iconBtn} onPress={() => pickMedia('image')} disabled={sending} hitSlop={6}>
+                <Ionicons name="image-outline" size={22} color={C.muted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.iconBtn} onPress={() => pickMedia('video')} disabled={sending} hitSlop={6}>
                 <Ionicons name="videocam-outline" size={22} color={C.muted} />
               </TouchableOpacity>
               <TouchableOpacity style={s.iconBtn} onPress={() => { tapHaptic(); startRec(); }} disabled={sending} hitSlop={6}>
@@ -184,13 +206,15 @@ export default function ChatThreadScreen() {
   );
 }
 
-function Bubble({ m, mine }: { m: Message; mine: boolean }) {
+function Bubble({ m, mine }: { m: ChatMessage; mine: boolean }) {
+  const url = m.content ?? '';
   return (
     <View style={[s.bubbleWrap, mine ? s.wrapMine : s.wrapOther]}>
       <View style={[s.bubble, mine ? s.bubbleMine : s.bubbleOther]}>
-        {m.body ? <Text style={[s.bubbleTxt, mine && { color: C.accentText }]}>{m.body}</Text> : null}
-        {m.audio_url ? <AudioBubble url={m.audio_url} mine={mine} /> : null}
-        {m.video_url ? <VideoBubble url={m.video_url} /> : null}
+        {m.message_type === 'text'  && <Text style={[s.bubbleTxt, mine && { color: C.accentText }]}>{m.content}</Text>}
+        {m.message_type === 'voice' && <AudioBubble url={url} mine={mine} />}
+        {m.message_type === 'image' && <ImageBubble url={url} />}
+        {m.message_type === 'video' && <VideoBubble url={url} />}
         <Text style={[s.bubbleTime, mine ? { color: 'rgba(6,6,6,0.5)' } : { color: C.subtle }]}>{fmtTime(m.created_at)}</Text>
       </View>
     </View>
@@ -234,16 +258,21 @@ function AudioBubble({ url, mine }: { url: string; mine: boolean }) {
   );
 }
 
+function ImageBubble({ url }: { url: string }) {
+  const [uri, setUri] = useState<string | null>(null);
+  useEffect(() => { let on = true; signMediaUrl(url).then(u => { if (on) setUri(u); }); return () => { on = false; }; }, [url]);
+  if (!uri) return <View style={s.imageLoading}><ActivityIndicator color={C.accent} /></View>;
+  return <Image source={{ uri }} style={s.image} resizeMode="cover" />;
+}
+
 function VideoBubble({ url }: { url: string }) {
   const player = useVideoPlayer(null, p => { p.loop = false; });
   const [ready, setReady] = useState(false);
-
   useEffect(() => {
     let on = true;
     signMediaUrl(url).then(u => { if (on) { player.replace({ uri: u }); setReady(true); } });
     return () => { on = false; };
   }, [url, player]);
-
   if (!ready) return <View style={s.videoLoading}><ActivityIndicator color={C.accent} /></View>;
   return <VideoView player={player} style={s.video} nativeControls contentFit="cover" />;
 }
@@ -270,11 +299,13 @@ const s = StyleSheet.create({
   audioBtn:  { width: 32, height: 32, borderRadius: 16, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' },
   audioTxt:  { fontSize: 14, color: C.white, fontWeight: '600' },
 
+  image:        { width: 220, height: 220, borderRadius: 12, backgroundColor: '#000' },
+  imageLoading: { width: 220, height: 220, borderRadius: 12, backgroundColor: C.cardAlt, alignItems: 'center', justifyContent: 'center' },
   video:        { width: 220, height: 150, borderRadius: 12, backgroundColor: '#000' },
   videoLoading: { width: 220, height: 150, borderRadius: 12, backgroundColor: C.cardAlt, alignItems: 'center', justifyContent: 'center' },
 
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bg },
-  iconBtn:  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bg },
+  iconBtn:  { width: 38, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   input:    { flex: 1, maxHeight: 120, backgroundColor: C.input, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, color: C.white, fontSize: 15 },
   sendBtn:  { width: 40, height: 40, borderRadius: 20, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
 

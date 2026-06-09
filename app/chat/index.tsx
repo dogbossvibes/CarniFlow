@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
-import { getConversations } from '@/services/messageService';
-import type { Conversation } from '@/types/message';
+import { getConversations } from '@/services/chatService';
+import type { ChatConversation } from '@/types/chat';
 
 function initial(name: string | null) { return (name?.trim()?.[0] ?? '?').toUpperCase(); }
 function fmtTime(iso: string | null): string {
@@ -21,7 +21,7 @@ function fmtTime(iso: string | null): string {
 export default function ChatListScreen() {
   const router = useRouter();
   const { session } = useSession();
-  const [convos, setConvos] = useState<Conversation[]>([]);
+  const [convos, setConvos] = useState<ChatConversation[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
@@ -48,19 +48,19 @@ export default function ChatListScreen() {
           <View style={s.empty}>
             <Ionicons name="chatbubbles-outline" size={32} color={C.subtle} />
             <Text style={s.emptyTitle}>Noch keine Gespräche</Text>
-            <Text style={s.emptyTxt}>Sobald du mit einer Trainer:in oder Kund:in verbunden bist, kannst du hier chatten.</Text>
+            <Text style={s.emptyTxt}>Sobald du mit jemandem verbunden bist, kannst du hier chatten.</Text>
           </View>
         ) : (
           convos.map(c => (
-            <TouchableOpacity key={c.userId} style={s.row} onPress={() => router.push(`/chat/${c.userId}?name=${encodeURIComponent(c.name ?? '')}`)} activeOpacity={0.85}>
+            <TouchableOpacity key={c.connectionId} style={s.row} onPress={() => router.push(`/chat/${c.connectionId}?name=${encodeURIComponent(c.name ?? '')}`)} activeOpacity={0.85}>
               <View style={s.avatar}><Text style={s.avatarTxt}>{initial(c.name)}</Text></View>
               <View style={{ flex: 1 }}>
                 <View style={s.rowTop}>
-                  <Text style={s.name} numberOfLines={1}>{c.name ?? (c.role === 'trainer' ? 'Trainer' : 'Kunde')}</Text>
+                  <Text style={s.name} numberOfLines={1}>{c.name ?? 'Verbindung'}</Text>
                   <Text style={s.time}>{fmtTime(c.lastAt)}</Text>
                 </View>
                 <Text style={[s.preview, c.unread > 0 && s.previewUnread]} numberOfLines={1}>
-                  {c.lastBody || (c.role === 'trainer' ? 'Deine Trainer:in' : 'Deine Kund:in')}
+                  {c.lastPreview || 'Noch keine Nachricht'}
                 </Text>
               </View>
               {c.unread > 0 && <View style={s.badge}><Text style={s.badgeTxt}>{c.unread}</Text></View>}
