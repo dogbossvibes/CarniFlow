@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -219,6 +220,11 @@ export default function PremiumScreen() {
             </TouchableOpacity>
 
             <Text style={S.legal}>Zahlung über deinen App-Store-Account · Abo verlängert sich automatisch und ist jederzeit kündbar.</Text>
+            <View style={S.linksRow}>
+              <Text style={S.link} onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>Nutzungsbedingungen</Text>
+              <Text style={S.legal}>·</Text>
+              <Text style={S.link} onPress={() => router.push('/privacy')}>Datenschutz</Text>
+            </View>
           </>
         ) : (
           <>
@@ -341,4 +347,6 @@ const S = StyleSheet.create({
   infoTxt: { flex: 1, fontSize: 13, color: C.muted, lineHeight: 18 },
 
   legal: { fontSize: 12, color: C.subtle, textAlign: 'center', marginTop: 8 },
+  linksRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 6 },
+  link: { fontSize: 12, color: C.accent, fontWeight: '600' },
 });
