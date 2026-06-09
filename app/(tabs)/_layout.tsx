@@ -11,6 +11,7 @@ import { DogIcon } from '@/components/ui/DogIcon';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useHubBadge } from '@/hooks/useHubBadge';
 import { registerForPush } from '@/lib/push';
 import { configurePurchases } from '@/lib/purchases';
 
@@ -70,6 +71,7 @@ function TabBarBackground() {
 export default function TabLayout() {
   const { session, loading } = useSession();
   const { isTrainerModule } = useCapabilities();
+  const hubBadge = useHubBadge();
   const router = useRouter();
 
   // Push-Token registrieren, sobald eingeloggt (best-effort, nur Dev/Prod-Build).
@@ -148,24 +150,28 @@ export default function TabLayout() {
           tabBarIcon: ({ focused, size }) => <ApportTabIcon focused={focused} size={size} />,
         }}
       />
+      {/* Slot 4: Hub (Trainer) ODER Analyse (Kunde) — gegenseitig exklusiv. */}
       <Tabs.Screen
         name="hub"
         options={{
           title: 'Hub',
           href: isTrainerModule ? undefined : null,
+          tabBarBadge: hubBadge > 0 ? hubBadge : undefined,
+          tabBarBadgeStyle: { backgroundColor: C.accent, color: C.accentText, fontSize: 10, fontWeight: '800' },
           tabBarIcon: ({ focused, size }) => <TabIcon name="grid" focused={focused} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: 'Analyse',
+          href: isTrainerModule ? null : undefined,
+          tabBarIcon: ({ focused, size }) => <TabIcon name="bar-chart" focused={focused} size={size} />,
         }}
       />
       {/* In den Hub gefaltet — als Tab ausgeblendet, aber aus dem Hub erreichbar. */}
       <Tabs.Screen name="clients"  options={{ href: null }} />
       <Tabs.Screen name="activity" options={{ href: null }} />
-      <Tabs.Screen
-        name="analytics"
-        options={{
-          title: 'Analyse',
-          tabBarIcon: ({ focused, size }) => <TabIcon name="pulse" focused={focused} size={size} />,
-        }}
-      />
       <Tabs.Screen
         name="profile"
         options={{

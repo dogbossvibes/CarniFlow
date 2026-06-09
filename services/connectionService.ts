@@ -125,6 +125,16 @@ export async function getMyClientConnections(trainerId: string): Promise<Connect
   return conns.filter(c => c.myRole === 'connected');
 }
 
+// Offene Kundenanfragen an mich (für den Hub-Badge).
+export async function getPendingClientCount(trainerId: string): Promise<number> {
+  const { count } = await supabase
+    .from('connections')
+    .select('id', { count: 'exact', head: true })
+    .eq('connected_user_id', trainerId)
+    .eq('status', 'pending');
+  return count ?? 0;
+}
+
 // Trainer-Sicht: Aktivitäts-Feed verbundener Kunden. RLS (can_view) liefert nur
 // Einheiten zurück, für die view_trainings gesetzt ist.
 export async function getConnectedActivity(trainerId: string): Promise<ActivityItem[]> {
