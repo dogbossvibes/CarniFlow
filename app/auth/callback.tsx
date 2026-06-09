@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -36,13 +36,31 @@ export default function AuthCallback() {
       return;
     }
 
+    // NATIVE: Der Code wird bereits in services/auth.ts über
+    // WebBrowser.openAuthSessionAsync eingelöst. PKCE-Codes sind single-use —
+    // ein zweiter exchangeCodeForSession hier würde "invalid flow state"
+    // werfen. Also NICHT erneut einlösen; nur auf die Session warten, die
+    // auth.ts gleich setzt, und weiterleiten.
+    if (Platform.OS !== 'web') {
+      exchanged.current = true;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) { router.replace('/(tabs)/home'); return; }
+        // Session evtl. noch nicht da → kurz auf das Auth-Event warten.
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
+          if (s) { subscription.unsubscribe(); router.replace('/(tabs)/home'); }
+        });
+      });
+      return;
+    }
+
     // Params not yet available — wait for the next render.
     if (!code) return;
 
     exchanged.current = true;
 
+    // WEB: Hier gibt es kein openAuthSessionAsync — der Callback MUSS einlösen.
     // Pass just the authorization code; supabase-js reads the stored
-    // code_verifier from AsyncStorage and exchanges them together.
+    // code_verifier from storage and exchanges them together.
     supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
       if (error) {
         setErrMsg(error.message);
