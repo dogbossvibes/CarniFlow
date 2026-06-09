@@ -40,7 +40,7 @@ export function PremiumGate({ feature, description, children, isPremium }: Props
           style={StyleSheet.absoluteFill}
         />
         <Ionicons name="star" size={13} color={C.accentText} />
-        <Text style={S.btnTxt}>Premium — CHF 5.90 / Mt</Text>
+        <Text style={S.btnTxt}>Premium freischalten</Text>
       </View>
     </TouchableOpacity>
   );

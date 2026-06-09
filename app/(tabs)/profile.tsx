@@ -306,7 +306,7 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proBtnText}>Upgrade — CHF 5.90 / Monat</Text>
+                <Text style={s.proBtnText}>30 Tage gratis testen</Text>
               </AnimatedPressable>
             </View>
           </View>

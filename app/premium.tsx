@@ -30,22 +30,13 @@ const FEATURES = [
   { icon: '☁️', label: 'Cloud Backup' },
 ];
 
-type PlanId = 'monthly' | 'yearly' | 'lifetime';
-
-const PLAENE: { id: PlanId; name: string; price: string; period: string; months: number; badge?: string }[] = [
-  { id: 'monthly',  name: 'Monatlich', price: 'CHF 5.90',  period: 'pro Monat',  months: 1  },
-  { id: 'yearly',   name: 'Jährlich',  price: 'CHF 32.90', period: 'pro Jahr',   months: 12, badge: 'Spare 53%' },
-  { id: 'lifetime', name: 'Lifetime',  price: 'CHF 109.–', period: 'einmalig',   months: 0  },
-];
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PremiumScreen() {
   const router  = useRouter();
   const { isPremium, trialUsed, expiresAt } = usePlan();
 
-  const [selected, setSelected] = useState<PlanId>('yearly');
-  const [laden,    setLaden]    = useState(false);
+  const [laden, setLaden] = useState(false);
 
   const activateTrial = async () => {
     setLaden(true);
@@ -69,14 +60,6 @@ export default function PremiumScreen() {
     } finally {
       setLaden(false);
     }
-  };
-
-  const purchase = () => {
-    Alert.alert(
-      'In Kürze verfügbar',
-      'Die In-App-Zahlung wird bald verfügbar sein.\n\nAktiviere jetzt den 30-Tage-Trial!',
-      [{ text: 'OK' }]
-    );
   };
 
   // ── Bereits Premium ──
@@ -152,80 +135,33 @@ export default function PremiumScreen() {
           ))}
         </View>
 
-        {/* Plan-Auswahl */}
-        <Text style={S.abschnitt}>PLAN WÄHLEN</Text>
-        {PLAENE.map((p) => {
-          const aktiv = selected === p.id;
-          return (
-            <TouchableOpacity
-              key={p.id}
-              style={[S.planKarte, aktiv && S.planKarteAktiv]}
-              onPress={() => setSelected(p.id)}
-              activeOpacity={0.8}
-            >
-              {aktiv && (
-                <LinearGradient
-                  colors={[`${C.accent}10`, 'transparent']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              )}
-              {p.badge && (
-                <View style={S.planBadge}>
-                  <LinearGradient
-                    colors={['#00FFCC', '#00FFCC']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <Text style={S.planBadgeTxt}>{p.badge}</Text>
-                </View>
-              )}
-              <View style={S.planZeile}>
-                <View>
-                  <Text style={[S.planName, aktiv && { color: C.accent }]}>{p.name}</Text>
-                  <Text style={S.planPeriod}>{p.period}</Text>
-                </View>
-                <Text style={[S.planPreis, aktiv && { color: C.accent }]}>{p.price}</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-
-        {/* Kaufen */}
-        <AnimatedPressable
-          style={S.kaufenBtn}
-          onPress={purchase}
-          disabled={laden}
-          scale={0.97}
-        >
-          <LinearGradient
-            colors={['#00FFCC', '#00FFCC', '#00f0c8']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          {laden
-            ? <ActivityIndicator color={C.accentText} />
-            : <Text style={S.kaufenBtnTxt}>Jetzt upgraden</Text>
-          }
-        </AnimatedPressable>
-
-        {/* Trial */}
-        {!trialUsed && (
-          <TouchableOpacity
-            style={S.trialBtn}
+        {/* Aktivierung: 30 Tage gratis */}
+        {!trialUsed ? (
+          <AnimatedPressable
+            style={S.kaufenBtn}
             onPress={activateTrial}
             disabled={laden}
-            activeOpacity={0.8}
+            scale={0.97}
           >
-            <Ionicons name="gift-outline" size={16} color={C.accent} />
-            <Text style={S.trialBtnTxt}>30 Tage gratis testen</Text>
-          </TouchableOpacity>
+            <LinearGradient
+              colors={['#00FFCC', '#00FFCC', '#00f0c8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {laden
+              ? <ActivityIndicator color={C.accentText} />
+              : <Text style={S.kaufenBtnTxt}>30 Tage gratis aktivieren</Text>
+            }
+          </AnimatedPressable>
+        ) : (
+          <View style={S.infoBox}>
+            <Ionicons name="time-outline" size={18} color={C.muted} />
+            <Text style={S.infoTxt}>Du hast deinen Gratis-Monat bereits genutzt. Weitere Optionen folgen bald.</Text>
+          </View>
         )}
 
-        <Text style={S.legal}>Jederzeit kündbar · Keine versteckten Kosten</Text>
+        <Text style={S.legal}>30 Tage gratis · Jederzeit kündbar · Keine Zahlungsdaten nötig</Text>
 
       </ScrollView>
     </SafeAreaView>
@@ -349,6 +285,9 @@ const S = StyleSheet.create({
     overflow:      'hidden',
   },
   kaufenBtnTxt: { fontSize: 16, color: C.accentText, fontWeight: '900', letterSpacing: 0.3 },
+
+  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, marginTop: 8, marginBottom: 12 },
+  infoTxt: { flex: 1, fontSize: 13, color: C.muted, lineHeight: 18 },
 
   trialBtn: {
     flexDirection:   'row',

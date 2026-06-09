@@ -51,7 +51,7 @@ const FAQS: Faq[] = [
   },
   {
     frage:   'Was bringt mir Premium?',
-    antwort: 'Premium schaltet erweiterte Analysen, unbegrenzte Einheiten und den PDF-Export frei. Du kannst es im Profil über „Upgrade auf Premium" abschließen.',
+    antwort: 'Premium schaltet erweiterte Analysen, unbegrenzte Einheiten und den PDF-Export frei. Du kannst es im Profil mit dem 30-Tage-Gratis-Test aktivieren.',
   },
   {
     frage:   'Wie werden meine Daten geschützt?',
