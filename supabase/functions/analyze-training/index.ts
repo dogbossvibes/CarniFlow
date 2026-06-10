@@ -38,35 +38,27 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'claude-opus-4-8',
         max_tokens: 1000,
-        output_config: {
-          format: {
-            type: 'json_schema',
-            schema: {
-              type: 'object',
-              properties: {
-                summary: { type: 'string' },
-                strengths: { type: 'array', items: { type: 'string' } },
-                improvements: { type: 'array', items: { type: 'string' } },
-                recommendation: { type: 'string' },
-                score: { type: 'integer' },
-              },
-              required: ['summary', 'strengths', 'improvements', 'recommendation', 'score'],
-              additionalProperties: false,
+        // Strukturierte Ausgabe via Tool-Use (offizieller Anthropic-Weg):
+        // tool_choice erzwingt den Aufruf → die Analyse kommt als tool_use.input.
+        tools: [{
+          name: 'record_analysis',
+          description: 'Gibt die strukturierte Trainingsanalyse zurück.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              summary:        { type: 'string',  description: 'Zusammenfassung (2-3 Sätze)' },
+              strengths:      { type: 'array', items: { type: 'string' }, description: '2-4 Stärken' },
+              improvements:   { type: 'array', items: { type: 'string' }, description: '1-3 Verbesserungspunkte' },
+              recommendation: { type: 'string',  description: 'Konkrete Empfehlung (2-3 Sätze)' },
+              score:          { type: 'integer', description: 'Gesamtscore 0-100' },
             },
+            required: ['summary', 'strengths', 'improvements', 'recommendation', 'score'],
           },
-        },
+        }],
+        tool_choice: { type: 'tool', name: 'record_analysis' },
         messages: [{
           role: 'user',
-          content: `Du bist ein professioneller Hundetraining-Analyst.
-Analysiere die Trainingseinheiten von Hund "${dogName}" 
-und antworte NUR mit JSON ohne Markdown:
-{
-  "summary": "Zusammenfassung (2-3 Sätze)",
-  "strengths": ["Stärke 1", "Stärke 2", "Stärke 3"],
-  "improvements": ["Verbesserung 1", "Verbesserung 2"],
-  "recommendation": "Empfehlung (2-3 Sätze)",
-  "score": 85
-}
+          content: `Du bist ein professioneller Hundetraining-Analyst. Analysiere die Trainingseinheiten von Hund "${dogName}" und rufe das Tool record_analysis mit deiner Analyse auf Deutsch auf.
 
 Trainingsdaten:
 ${JSON.stringify(trainings.slice(0, 20), null, 2)}`
@@ -75,9 +67,19 @@ ${JSON.stringify(trainings.slice(0, 20), null, 2)}`
     })
 
     const data = await response.json()
-    const text = data.content[0].text
-    const clean = text.replace(/```json|```/g, '').trim()
-    const analysis = JSON.parse(clean)
+    if (!response.ok) {
+      throw new Error(data?.error?.message ?? `Anthropic API ${response.status}`)
+    }
+
+    // Bei erzwungenem tool_choice liefert das Modell einen tool_use-Block,
+    // dessen input bereits das validierte JSON-Objekt ist.
+    const block = Array.isArray(data.content)
+      ? data.content.find((b: any) => b.type === 'tool_use')
+      : null
+    if (!block?.input) {
+      throw new Error('Keine strukturierte Analyse erhalten')
+    }
+    const analysis = block.input
 
     return new Response(
       JSON.stringify(analysis),
