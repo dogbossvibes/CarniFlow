@@ -5,7 +5,6 @@ import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
 import { isGlass } from '@/components/ui/Glass';
-import { Image } from 'expo-image';
 import { useEffect } from 'react';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { C } from '@/constants/colors';
@@ -24,28 +23,6 @@ function TabIcon({ name, focused, size }: { name: IconName; focused: boolean; si
         name={focused ? name : (`${name}-outline` as IconName)}
         size={focused ? size : size - 1}
         color={focused ? C.accent : C.muted}
-      />
-    </View>
-  );
-}
-
-function ApportIcon({ color, size = 24 }: { color: string; size?: number }) {
-  return (
-    <Image
-      source={require('@/assets/images/iconapport.png')}
-      style={{ width: size, height: size }}
-      contentFit="contain"
-      tintColor={color}
-    />
-  );
-}
-
-function ApportTabIcon({ focused, size }: { focused: boolean; size: number }) {
-  return (
-    <View style={[s.iconWrap, focused && s.iconWrapActive]}>
-      <ApportIcon
-        color={focused ? C.accent : C.muted}
-        size={focused ? size : size - 1}
       />
     </View>
   );
@@ -147,7 +124,7 @@ export default function TabLayout() {
         name="training"
         options={{
           title: 'Training',
-          tabBarIcon: ({ focused, size }) => <ApportTabIcon focused={focused} size={size} />,
+          tabBarIcon: ({ focused, size }) => <TabIcon name="barbell" focused={focused} size={size} />,
         }}
       />
       {/* Slot 4: Hub (Trainer) ODER Analyse (Kunde) — gegenseitig exklusiv. */}
