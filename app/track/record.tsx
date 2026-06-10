@@ -34,8 +34,9 @@ function stopSpeech() {
   try { Speech?.stop(); } catch { /* ignore */ }
 }
 
-// Gegenstand-Materialien (werden in article.notiz gespeichert; typ bleibt 'gegenstand').
-const MATERIALS = ['Holz', 'Leder', 'Stoff', 'Metall', 'Plastik', 'Knochen', 'Divers'];
+// Gegenstand-Materialien (werden in article.notiz gespeichert; typ bleibt
+// 'gegenstand' → Dübel werden genauso angekündigt wie andere Gegenstände).
+const MATERIALS = ['Holz', 'Dübel', 'Leder', 'Stoff', 'Metall', 'Plastik', 'Knochen', 'Divers'];
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
