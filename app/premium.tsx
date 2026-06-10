@@ -46,7 +46,7 @@ const TRAINER_EXTRA = [
 ];
 
 const PLAN_META: Record<Tier, { name: string; fallbackPrice: string; tagline: string }> = {
-  pro:     { name: 'Pro',     fallbackPrice: 'CHF 7.90',  tagline: 'Alle Trainings-Features' },
+  pro:     { name: 'Pro',     fallbackPrice: 'CHF 8.00',  tagline: 'Alle Trainings-Features' },
   trainer: { name: 'Trainer', fallbackPrice: 'CHF 29.90', tagline: 'Pro + Trainer-Modul' },
 };
 
