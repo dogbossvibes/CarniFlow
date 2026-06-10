@@ -15,7 +15,7 @@ import { TrackPath } from '@/components/tracking/TrackPath';
 import { TrackMap, MAPS_AVAILABLE, type MapType } from '@/components/tracking/TrackMap';
 import { TrackSearchMap } from '@/components/tracking/TrackSearchMap';
 import { SoftBoundary } from '@/components/ui/SoftBoundary';
-import { deviationFromTrack, distanceM, nearestArticleDist, type LatLng } from '@/lib/trackGuidance';
+import { cornerLabel, detectCorners, deviationFromTrack, distanceM, nearestArticleDist, type Corner, type LatLng } from '@/lib/trackGuidance';
 import { startRecording, stopRecording, resetRecorder, useRecorder } from '@/lib/trackRecorder';
 import type { TrackPoint, TrackArticle } from '@/types/tracking';
 
@@ -91,6 +91,9 @@ export default function TrackRecordScreen() {
   const spokenDistRef  = useRef<number>(0);            // letzter angesagter Meilenstein
   const deviationActiveRef = useRef<boolean>(false);   // läuft gerade abseits?
   const articleNearRef = useRef<boolean>(false);       // gerade nah an Gegenstand?
+  const articleAheadRef = useRef<boolean>(false);      // Gegenstand-Vorwarnung aktiv?
+  const cornersRef     = useRef<Corner[]>([]);         // erkannte Winkel der Fährte
+  const cornerSpokenRef = useRef<Set<number>>(new Set()); // bereits angesagte Winkel
 
   const [phase,       setPhase]       = useState<'legen' | 'liegezeit' | 'suche' | 'abschluss'>('legen');
   const [displayPts,  setDisplayPts]  = useState<{ lat: number; lng: number }[]>([]);
@@ -221,6 +224,32 @@ export default function TrackRecordScreen() {
     }
     if (artDist > 8) articleNearRef.current = false;
 
+    // 1b) Gegenstand voraus (Vorwarnung, einmal pro Annäherung).
+    if (artDist >= 5 && artDist < 12) {
+      if (!articleAheadRef.current && since > 5000) {
+        articleAheadRef.current = true;
+        speak(`Gegenstand kommt, etwa ${Math.round(artDist)} Meter.`);
+        return;
+      }
+    } else if (artDist > 14) {
+      articleAheadRef.current = false;
+    }
+
+    // 1c) Winkel voraus — nur wenn halbwegs auf der Fährte; jeder Winkel einmal.
+    if (dev <= 8) {
+      let nextC: Corner | null = null, nextD = Infinity;
+      for (const c of cornersRef.current) {
+        if (cornerSpokenRef.current.has(c.index)) continue;
+        const d = distanceM(cur, c.point);
+        if (d < nextD) { nextD = d; nextC = c; }
+      }
+      if (nextC && nextD < 12 && since > 5000) {
+        cornerSpokenRef.current.add(nextC.index);
+        speak(`In ${Math.round(nextD)} Metern ${cornerLabel(nextC.kind)} nach ${nextC.direction}.`);
+        return;
+      }
+    }
+
     // 2) Abweichung von der Fährte.
     if (dev > 8 && since > 7000) {
       deviationActiveRef.current = true;
@@ -244,6 +273,10 @@ export default function TrackRecordScreen() {
   // Such-Phase: GPS-Pfad aufzeichnen + Sprach-Führung (Vordergrund).
   useEffect(() => {
     if (phase !== 'suche') return;
+    // Winkel der gelegten Fährte einmalig erkennen (für die Voraus-Ansagen).
+    const laidLatLng = pointsRef.current.map(p => ({ lat: p.lat, lng: p.lng }));
+    cornersRef.current = detectCorners(laidLatLng);
+    cornerSpokenRef.current = new Set();
     let sub: Location.LocationSubscription | null = null;
     (async () => {
       sub = await Location.watchPositionAsync(
