@@ -36,8 +36,25 @@ serve(async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-opus-4-8',
         max_tokens: 1000,
+        output_config: {
+          format: {
+            type: 'json_schema',
+            schema: {
+              type: 'object',
+              properties: {
+                summary: { type: 'string' },
+                strengths: { type: 'array', items: { type: 'string' } },
+                improvements: { type: 'array', items: { type: 'string' } },
+                recommendation: { type: 'string' },
+                score: { type: 'integer' },
+              },
+              required: ['summary', 'strengths', 'improvements', 'recommendation', 'score'],
+              additionalProperties: false,
+            },
+          },
+        },
         messages: [{
           role: 'user',
           content: `Du bist ein professioneller Hundetraining-Analyst.
