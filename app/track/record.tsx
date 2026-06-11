@@ -36,17 +36,15 @@ export default function TrackRecordScreen() {
   const gegenstaende = markers.filter(m => m.type === 'gegenstand').length;
 
   const handleFinish = () => {
-    Alert.alert('Fährte beenden?', 'Die gelegte Fährte wird gespeichert.', [
+    Alert.alert('Fährte gelegt?', 'Die gelegte Fährte wird gespeichert — danach geht es zur Ausarbeitung.', [
       { text: 'Weiter legen', style: 'cancel' },
-      { text: 'Beenden', style: 'destructive', onPress: async () => {
+      { text: 'Fertig gelegt', onPress: async () => {
         if (!id) return;
         setFinishing(true);
         const { error } = await rec.finish(id);
         setFinishing(false);
         if (error) { Alert.alert('Speichern fehlgeschlagen', 'Training konnte nicht gespeichert werden. Bitte prüfe deine Verbindung.'); return; }
-        Alert.alert('Fährte gespeichert', 'Die gelegte Fährte ist gespeichert. Die Ausarbeitung folgt.', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)/training' as never) },
-        ]);
+        router.replace(`/track/run?id=${id}` as never);
       } },
     ]);
   };

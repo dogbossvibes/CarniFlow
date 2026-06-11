@@ -1,329 +1,91 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet,
-  Text, TouchableOpacity, useWindowDimensions, View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
-import {
-  getTrackSessionById, getTrackPoints, getTrackArticles, deleteTrackSession,
-} from '@/services/trackingService';
-import { TrackPath } from '@/components/tracking/TrackPath';
-import { MAPS_AVAILABLE, type MapType } from '@/components/tracking/TrackMap';
-import { TrackSearchMap } from '@/components/tracking/TrackSearchMap';
-import { SoftBoundary } from '@/components/ui/SoftBoundary';
-import { Glass, isGlass } from '@/components/ui/Glass';
-import type { TrackSession, TrackPoint, TrackArticle } from '@/types/tracking';
+import { AnyvoButton } from '@/components/ui/AnyvoButton';
+import { AnyvoStatCard } from '@/components/ui/AnyvoStatCard';
+import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
+import { getTrackSessionById } from '@/features/tracking/services/trackService';
+import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import type { LatLng } from '@/features/tracking/utils/gpsFilter';
 
-function fmtDuration(sec: number | null): string {
-  if (!sec) return '—';
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
+function fmtDur(sec: number | null) { if (sec == null) return '—'; const m = Math.floor(sec / 60), s = sec % 60; return `${m}:${String(s).padStart(2, '0')}`; }
 
-function fmtDate(d: string): string {
-  const [y, mo, day] = d.split('-');
-  return `${day}.${mo}.${y}`;
-}
-
-function StatCard({ label, value, icon }: { label: string; value: string; icon: string }) {
-  return (
-    <View style={sc.statCard}>
-      <Text style={sc.statIcon}>{icon}</Text>
-      <Text style={sc.statVal}>{value}</Text>
-      <Text style={sc.statLbl}>{label}</Text>
-    </View>
-  );
-}
-
-export default function TrackDetailScreen() {
-  const router = useRouter();
+export default function TrackCompletionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { width } = useWindowDimensions();
-
-  const [track,    setTrack]    = useState<TrackSession | null>(null);
-  const [points,   setPoints]   = useState<TrackPoint[]>([]);
-  const [articles, setArticles] = useState<TrackArticle[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [mapType,  setMapType]  = useState<MapType>('satellite');
+  const router = useRouter();
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const [trackRes, ptsRes, artRes] = await Promise.all([
-        getTrackSessionById(id),
-        getTrackPoints(id),
-        getTrackArticles(id),
-      ]);
-      setTrack(trackRes.data as TrackSession);
-      setPoints((ptsRes.data as TrackPoint[]) ?? []);
-      setArticles((artRes.data as TrackArticle[]) ?? []);
-      setLoading(false);
-    })();
+    useTrackingStore.getState().reset();  // Flow abgeschlossen → Store leeren
+    if (!id) return;
+    getTrackSessionById(id).then(r => { setData(r.data); setLoading(false); });
   }, [id]);
 
-  const handleDelete = () => {
-    Alert.alert('Fährte löschen?', 'Diese Aktion kann nicht rückgängig gemacht werden.', [
-      { text: 'Zurück', style: 'cancel' },
-      { text: 'Löschen', style: 'destructive', onPress: async () => {
-        await deleteTrackSession(id);
-        router.back();
-      }},
-    ]);
-  };
+  if (loading) return <View style={s.center}><ActivityIndicator color={C.trackPrimary} size="large" /></View>;
+  if (!data)   return <View style={s.center}><Text style={s.muted}>Fährte nicht gefunden.</Text></View>;
 
-  const pathSize = Math.min(width - 40, 400);
-
-  if (loading) {
-    return (
-      <SafeAreaView style={s.safe} edges={['top']}>
-        <View style={s.loader}>
-          <ActivityIndicator size="large" color={C.accent} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!track) {
-    return (
-      <SafeAreaView style={s.safe} edges={['top']}>
-        <View style={s.loader}>
-          <Text style={s.errTxt}>Fährte nicht gefunden.</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const gegenstände = articles.filter(a => a.typ === 'gegenstand');
-  const verleitungen = articles.filter(a => a.typ === 'verleitung');
-  // Gelegte Fährte vs. abgelaufener Suchweg getrennt (phase).
-  const layPoints    = points.filter(p => p.phase !== 'search').map(p => ({ lat: p.lat, lng: p.lng }));
-  const searchPoints = points.filter(p => p.phase === 'search').map(p => ({ lat: p.lat, lng: p.lng }));
-  const pathPoints   = layPoints.length ? layPoints : points.map(p => ({ lat: p.lat, lng: p.lng }));
-  const articlesForMap = articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }));
+  const lay: LatLng[] = (data.points ?? []).map((p: any) => ({ lat: p.latitude, lng: p.longitude }));
+  const run: LatLng[] = ((data.runs ?? [])[0]?.run_points ?? []).map((p: any) => ({ lat: p.lat, lng: p.lng }));
+  const markers: MapMarker[] = (data.markers ?? []).map((m: any) => ({ type: m.marker_type, lat: m.latitude, lng: m.longitude }));
+  const center = lay[Math.floor(lay.length / 2)] ?? null;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={22} color={C.white} />
-        </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.eyebrow}>FÄHRTE · {fmtDate(track.session_date)}</Text>
-          <Text style={s.title} numberOfLines={1}>
-            {track.dog?.name ?? 'Unbekannter Hund'}
-          </Text>
+          <Text style={s.eyebrow}>FÄHRTE ABGESCHLOSSEN</Text>
+          <Text style={s.title}>{data.dog?.name ?? 'Fährte'}</Text>
         </View>
-        <TouchableOpacity style={s.deleteBtn} onPress={handleDelete} activeOpacity={0.7}>
-          <Ionicons name="trash-outline" size={18} color={C.danger} />
-        </TouchableOpacity>
+        <View style={s.check}><Ionicons name="checkmark" size={20} color="#04110F" /></View>
       </View>
 
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Map / Path */}
-        {MAPS_AVAILABLE && pathPoints.length > 0 ? (
-          <View style={s.mapCard}>
-            <SoftBoundary
-              fallback={
-                <View style={s.pathCard}>
-                  <LinearGradient colors={['#0A0A10', '#080810']} style={StyleSheet.absoluteFill} />
-                  <TrackPath
-                    points={pathPoints}
-                    articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
-                    width={pathSize}
-                    height={pathSize}
-                    padding={28}
-                    bgColor="transparent"
-                  />
-                </View>
-              }
-            >
-              <TrackSearchMap
-                layPoints={pathPoints}
-                searchPoints={searchPoints}
-                articles={articlesForMap}
-                goal={pathPoints.length ? pathPoints[pathPoints.length - 1] : null}
-                mapType={mapType}
-                follow={false}
-                showUser={false}
-              />
-            </SoftBoundary>
-
-            <View style={s.mapTypeRow}>
-              {(['standard', 'satellite', 'hybrid'] as MapType[]).map(t => (
-                <TouchableOpacity
-                  key={t}
-                  style={[s.mapTypeBtn, mapType === t && s.mapTypeBtnOn]}
-                  onPress={() => setMapType(t)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.mapTypeTxt, mapType === t && s.mapTypeTxtOn]}>
-                    {t === 'standard' ? 'Karte' : t === 'satellite' ? 'Satellit' : 'Hybrid'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ) : (
-          <View style={s.pathCard}>
-            <LinearGradient colors={['#0A0A10', '#080810']} style={StyleSheet.absoluteFill} />
-            <TrackPath
-              points={pathPoints}
-              articles={articles.map(a => ({ lat: a.lat, lng: a.lng, typ: a.typ, gefunden: a.gefunden }))}
-              width={pathSize}
-              height={pathSize}
-              padding={28}
-              bgColor="transparent"
-            />
-            {pathPoints.length === 0 && (
-              <View style={s.noPath}>
-                <Ionicons name="map-outline" size={28} color={C.subtle} />
-                <Text style={s.noPathTxt}>Keine GPS-Daten</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Metadata chips */}
-        {((track.surface_types?.length ?? 0) > 0 || (track.terrain_conditions?.length ?? 0) > 0 || track.wetter || track.windrichtung) && (
-          <View style={s.metaRow}>
-            {track.surface_types?.map(t => <View key={`s-${t}`} style={s.metaChip}><Text style={s.metaChipTxt}>🌍 {t}</Text></View>)}
-            {track.terrain_conditions?.map(t => <View key={`c-${t}`} style={s.metaChip}><Text style={s.metaChipTxt}>{t}</Text></View>)}
-            {track.wetter       && <View style={s.metaChip}><Text style={s.metaChipTxt}>{track.wetter}</Text></View>}
-            {track.windrichtung && <View style={s.metaChip}><Text style={s.metaChipTxt}>💨 Wind {track.windrichtung}</Text></View>}
-            {track.liegezeit_min != null && <View style={s.metaChip}><Text style={s.metaChipTxt}>⏱ {track.liegezeit_min} min Liegezeit</Text></View>}
-          </View>
-        )}
-
-        {/* Stats grid */}
-        <View style={s.statsGrid}>
-          <StatCard label="DISTANZ"  value={track.distanz_m ? `${Math.round(track.distanz_m)} m` : '—'} icon="📏" />
-          <StatCard label="DAUER"    value={fmtDuration(track.dauer_sec ?? null)} icon="⏱" />
-          <StatCard label="GEGENSTÄNDE" value={String(gegenstände.length)} icon="📦" />
-          <StatCard label="PUNKTE"   value={String(points.length)} icon="📍" />
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        <View style={s.statGrid}>
+          <AnyvoStatCard value={`${Math.round(data.distance_meters ?? 0)} m`} label="LÄNGE" accent style={s.statCell} />
+          <AnyvoStatCard value={fmtDur(data.search_duration_seconds)} label="SUCHDAUER" style={s.statCell} />
+          <AnyvoStatCard value={`${data.lying_time_minutes ?? '—'}`} label="LIEGEZEIT" style={s.statCell} />
+          <AnyvoStatCard value={`${data.articles_found ?? 0}/${data.articles_total ?? 0}`} label="GEGENSTÄNDE" style={s.statCell} />
+          <AnyvoStatCard value={data.average_deviation_meters != null ? `${data.average_deviation_meters} m` : '—'} label="Ø ABWEICHUNG" style={s.statCell} />
         </View>
 
-        {/* Rating */}
-        {track.rating != null && (
-          <>
-            <Text style={s.sectionTitle}>BEWERTUNG</Text>
-            <View style={s.ratingRow}>
-              {[1,2,3,4,5].map(n => (
-                <Ionicons
-                  key={n}
-                  name={n <= track.rating! ? 'star' : 'star-outline'}
-                  size={26}
-                  color={n <= track.rating! ? C.star : C.border}
-                />
-              ))}
-            </View>
-          </>
-        )}
+        <View style={s.mapCard}>
+          <TrackingMap layPoints={lay} runPoints={run} markers={markers} currentPosition={center} follow={false} mapType="hybrid" />
+        </View>
 
-        {/* Articles */}
-        {articles.length > 0 && (
-          <>
-            <Text style={s.sectionTitle}>GEGENSTÄNDE & VERLEITUNGEN</Text>
-            <View style={[s.card, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}
-              {articles.map((a, i) => (
-                <View key={i} style={[s.articleRow, i < articles.length - 1 && s.articleBorder]}>
-                  <View style={[s.articleDot, { backgroundColor: a.typ === 'verleitung' ? `${C.danger}20` : `${C.warning}20` }]}>
-                    <Ionicons
-                      name={a.typ === 'verleitung' ? 'warning' : 'cube'}
-                      size={14}
-                      color={a.typ === 'verleitung' ? C.danger : C.warning}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.articleLabel}>
-                      {a.typ === 'verleitung' ? 'Verleitung' : 'Gegenstand'} #{i + 1}
-                    </Text>
-                    {a.notiz ? <Text style={s.articleNotiz}>{a.notiz}</Text> : null}
-                  </View>
-                  {a.gefunden && (
-                    <Ionicons name="checkmark-circle" size={16} color={C.success} />
-                  )}
-                </View>
-              ))}
-            </View>
-          </>
-        )}
+        {data.notes ? (
+          <View style={s.notesCard}>
+            <Text style={s.notesLabel}>NOTIZEN</Text>
+            <Text style={s.notesTxt}>{data.notes}</Text>
+          </View>
+        ) : null}
 
-        {/* Notes */}
-        {track.notizen && (
-          <>
-            <Text style={s.sectionTitle}>NOTIZEN</Text>
-            <View style={[s.card, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}
-              <Text style={s.notesTxt}>{track.notizen}</Text>
-            </View>
-          </>
-        )}
-
-        <View style={{ height: 60 }} />
+        <View style={{ gap: 10, marginTop: 16 }}>
+          <AnyvoButton label="Fertig" icon="checkmark-done" onPress={() => router.replace('/(tabs)/training' as never)} big />
+          <AnyvoButton label="Neue Fährte" icon="add" variant="secondary" onPress={() => router.replace('/track/setup' as never)} />
+        </View>
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: C.bg },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  errTxt: { color: C.muted, fontSize: 14 },
-
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  backBtn:  { width: 38, height: 38, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  deleteBtn:{ width: 38, height: 38, borderRadius: 12, backgroundColor: C.dangerDim, borderWidth: 1, borderColor: `${C.danger}30`, alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 2, marginBottom: 2 },
-  title:   { fontSize: 20, color: C.white, fontWeight: '900', letterSpacing: -0.4 },
-
-  scroll:  { flex: 1 },
+  safe:    { flex: 1, backgroundColor: C.trackBg },
+  center:  { flex: 1, backgroundColor: C.trackBg, alignItems: 'center', justifyContent: 'center' },
+  muted:   { color: C.trackTextMut, fontSize: 14 },
+  header:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14 },
+  eyebrow: { fontSize: 9, color: C.trackPrimary, fontWeight: '800', letterSpacing: 2 },
+  title:   { fontSize: 24, color: C.trackText, fontWeight: '900', letterSpacing: -0.5 },
+  check:   { width: 38, height: 38, borderRadius: 19, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: 20, paddingTop: 4 },
-
-  pathCard: { borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.border, marginBottom: 14, alignItems: 'center', justifyContent: 'center', minHeight: 200 },
-  mapCard:  { height: 300, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.border, marginBottom: 14, backgroundColor: '#0A0A10' },
-  mapTypeRow:   { position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 },
-  mapTypeBtn:   { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  mapTypeBtnOn: { borderColor: C.accent, backgroundColor: 'rgba(0,0,0,0.75)' },
-  mapTypeTxt:   { fontSize: 11, color: C.muted, fontWeight: '700' },
-  mapTypeTxtOn: { color: C.accent },
-  noPath:   { position: 'absolute', alignItems: 'center', gap: 8 },
-  noPathTxt:{ fontSize: 13, color: C.subtle },
-
-  metaRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  metaChip:    { backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 6 },
-  metaChipTxt: { fontSize: 12, color: C.muted, fontWeight: '600' },
-
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-
-  sectionTitle: { fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10, marginTop: 8 },
-
-  ratingRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
-
-  card: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 4, marginBottom: 16, overflow: 'hidden' },
-  cardGlass: { backgroundColor: 'transparent' },
-  glassBg:   { ...StyleSheet.absoluteFillObject },
-
-  articleRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  articleBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
-  articleDot:    { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  articleLabel:  { fontSize: 14, color: C.white, fontWeight: '600' },
-  articleNotiz:  { fontSize: 12, color: C.muted, marginTop: 2 },
-
-  notesTxt: { fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 21, padding: 16 },
-});
-
-const sc = StyleSheet.create({
-  statCard: { width: '47%', backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16, alignItems: 'center', gap: 4 },
-  statIcon: { fontSize: 20 },
-  statVal:  { fontSize: 18, color: C.white, fontWeight: '900', letterSpacing: -0.5 },
-  statLbl:  { fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 1.2 },
+  statGrid:{ flexDirection: 'row', flexWrap: 'wrap', backgroundColor: C.trackCard, borderRadius: 20, borderWidth: 1, borderColor: C.trackBorder, paddingVertical: 14 },
+  statCell:{ flexBasis: '33.33%', flexGrow: 0, paddingVertical: 8 },
+  mapCard: { height: 220, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.trackBorder, marginTop: 16, backgroundColor: C.trackSurface },
+  notesCard:{ backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 16, marginTop: 16 },
+  notesLabel:{ fontSize: 10, color: C.trackTextMut, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
+  notesTxt: { fontSize: 14, color: C.trackTextSec, lineHeight: 21 },
 });
