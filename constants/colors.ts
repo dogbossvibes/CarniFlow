@@ -37,6 +37,23 @@ export const C = {
   warningDim: 'rgba(255,184,0,0.10)',
   danger:     '#FF3B30',
   dangerDim:  'rgba(255,59,48,0.10)',
+
+  // Fährtenmodul-Palette (Spec) — eigene Tokens, brechen bestehende C.* nicht.
+  trackBg:        '#050505',
+  trackSurface:   '#0D0D0D',
+  trackCard:      '#111111',
+  trackCardAlt:   '#161616',
+  trackBorder:    'rgba(255,255,255,0.08)',
+  trackPrimary:   '#00F5D4',
+  trackPrimaryDk: '#00BFA6',
+  trackGlow:      'rgba(0,245,212,0.35)',
+  trackText:      '#FFFFFF',
+  trackTextSec:   '#8B8B8B',
+  trackTextMut:   '#5F5F5F',
+  trackWarning:   '#FFB020',
+  trackDanger:    '#FF4D4D',
+  trackBlue:      '#4DA3FF',
+  trackPurple:    '#9B5CFF',
 } as const;
 
 export type ColorKey = keyof typeof C;
