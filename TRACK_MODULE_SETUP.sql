@@ -3,7 +3,7 @@
 -- werden als training_sessions-Zeile (type='track') gespeichert, Detaildaten in
 -- track_points / track_markers / track_runs.
 
--- ── training_sessions um Track-Spalten erweitern ────────────
+-- ── training_sessions um Track-Spalten erweitern (NUR ADD COLUMN) ──
 alter table public.training_sessions add column if not exists type                     text default 'training';
 alter table public.training_sessions add column if not exists status                   text default 'completed';
 alter table public.training_sessions add column if not exists title                    text;
@@ -33,8 +33,14 @@ alter table public.training_sessions add column if not exists duration_seconds  
 
 create index if not exists training_sessions_type_idx on public.training_sessions (type);
 
+-- ── Alte/halbe Track-Detailtabellen entfernen (kein echter Datenbestand) ──
+-- Verhindert Schema-Konflikte (alt: track_id, neu: session_id).
+drop table if exists public.track_runs    cascade;
+drop table if exists public.track_markers cascade;
+drop table if exists public.track_points  cascade;
+
 -- ── track_points ────────────────────────────────────────────
-create table if not exists public.track_points (
+create table public.track_points (
   id          uuid primary key default gen_random_uuid(),
   session_id  uuid not null references public.training_sessions(id) on delete cascade,
   latitude    double precision not null,
@@ -47,10 +53,10 @@ create table if not exists public.track_points (
   point_type  text not null default 'lay',   -- 'lay' | 'run'
   created_at  timestamptz default now()
 );
-create index if not exists track_points_session_idx on public.track_points (session_id, timestamp);
+create index track_points_session_idx on public.track_points (session_id, timestamp);
 
 -- ── track_markers ───────────────────────────────────────────
-create table if not exists public.track_markers (
+create table public.track_markers (
   id                  uuid primary key default gen_random_uuid(),
   session_id          uuid not null references public.training_sessions(id) on delete cascade,
   marker_type         text not null check (marker_type in ('gegenstand','winkel','verleitung','sprachmarker')),
@@ -63,10 +69,10 @@ create table if not exists public.track_markers (
   found               boolean not null default false,
   created_at          timestamptz default now()
 );
-create index if not exists track_markers_session_idx on public.track_markers (session_id);
+create index track_markers_session_idx on public.track_markers (session_id);
 
 -- ── track_runs (Ablauf/Suche) ───────────────────────────────
-create table if not exists public.track_runs (
+create table public.track_runs (
   id                       uuid primary key default gen_random_uuid(),
   session_id               uuid not null references public.training_sessions(id) on delete cascade,
   started_at               timestamptz,
@@ -78,22 +84,21 @@ create table if not exists public.track_runs (
   run_points               jsonb,
   created_at               timestamptz default now()
 );
-create index if not exists track_runs_session_idx on public.track_runs (session_id);
+create index track_runs_session_idx on public.track_runs (session_id);
 
 -- ── RLS: Zugriff nur über die eigene Parent-Session ─────────
 alter table public.track_points  enable row level security;
 alter table public.track_markers enable row level security;
 alter table public.track_runs    enable row level security;
 
-do $$
-declare t text;
-begin
-  foreach t in array array['track_points','track_markers','track_runs'] loop
-    execute format('drop policy if exists "owner via session" on public.%I', t);
-    execute format($p$
-      create policy "owner via session" on public.%I for all to authenticated
-      using (exists (select 1 from public.training_sessions s where s.id = session_id and s.owner_id = auth.uid()))
-      with check (exists (select 1 from public.training_sessions s where s.id = session_id and s.owner_id = auth.uid()))
-    $p$, t);
-  end loop;
-end $$;
+create policy "owner via session" on public.track_points for all to authenticated
+  using (exists (select 1 from public.training_sessions s where s.id = session_id and s.owner_id = auth.uid()))
+  with check (exists (select 1 from public.training_sessions s where s.id = session_id and s.owner_id = auth.uid()));
+
+create policy "owner via session" on public.track_markers for all to authenticated
+  using (exists (select 1 from public.training_sessions s where s.id = session_id and s.owner_id = auth.uid()))
+  with check (exists (select 1 from public.training_sessions s where s.id = session_id and s.owner_id = auth.uid()));
+
+create policy "owner via session" on public.track_runs for all to authenticated
+  using (exists (select 1 from public.training_sessions s where s.id = session_id and s.owner_id = auth.uid()))
+  with check (exists (select 1 from public.training_sessions s where s.id = session_id and s.owner_id = auth.uid()));
