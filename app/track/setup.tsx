@@ -9,6 +9,7 @@ import { DogIcon } from '@/components/ui/DogIcon';
 import { AnyvoChip } from '@/components/ui/AnyvoChip';
 import { AnyvoPill } from '@/components/ui/AnyvoPill';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
+import { GpsSourcePicker } from '@/components/tracking/GpsSourcePicker';
 import { GpsQualityPill } from '@/features/tracking/components/GpsQualityPill';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
@@ -103,6 +104,9 @@ export default function TrackSetupScreen() {
               );
             })}
         </ScrollView>
+
+        <Text style={s.label}>GPS-QUELLE</Text>
+        <GpsSourcePicker />
 
         <Text style={s.label}>UNTERGRUND *</Text>
         <View style={s.wrap}>{UNTERGRUND.map(i => <AnyvoChip key={i} label={i} active={surface.includes(i)} onPress={() => setSurface(p => toggle(p, i))} />)}</View>

@@ -143,6 +143,9 @@ export function getRecordedPoints(): TrackPoint[] {
 function subscribe(cb: () => void) { listeners.add(cb); return () => listeners.delete(cb); }
 function getSnapshot() { return state; }
 
+// Für den neuen Fährten-Flow: auf eingehende (auch externe BLE-) Punkte hören.
+export const subscribeRecorder = subscribe;
+
 export function useRecorder(): RecState {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

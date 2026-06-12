@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import { useTrackingStore, type MarkerType, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { shouldAcceptTrackPoint, calculateAverageAccuracy, type GpsSample } from '@/features/tracking/utils/gpsFilter';
+import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/services/trackService';
 
 const WATCH_OPTS: Location.LocationOptions = {
@@ -14,14 +15,14 @@ const WATCH_OPTS: Location.LocationOptions = {
 // Die Screen-UI liest den State direkt aus useTrackingStore.
 export function useTrackRecording() {
   const store    = useTrackingStore;
-  const watchRef = useRef<Location.LocationSubscription | null>(null);
+  const watchRef = useRef<(() => void) | null>(null);
   const headRef  = useRef<Location.LocationSubscription | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startMs  = useRef<number>(0);
   const lastRef  = useRef<GpsSample | null>(null);
 
   const stopAll = useCallback(() => {
-    watchRef.current?.remove(); watchRef.current = null;
+    watchRef.current?.(); watchRef.current = null;
     headRef.current?.remove();  headRef.current = null;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
@@ -43,22 +44,17 @@ export function useTrackRecording() {
     }
   }, [store]);
 
-  const onFix = useCallback((loc: Location.LocationObject) => {
+  const onFix = useCallback((sample: StreamSample) => {
     const s = store.getState();
     if (s.isPaused) return;
-    const sample: GpsSample = {
-      lat: loc.coords.latitude, lng: loc.coords.longitude,
-      accuracy: loc.coords.accuracy, t: loc.timestamp || Date.now(),
-    };
     // Live-Marker immer aktualisieren …
     s.setCurrentPosition({ lat: sample.lat, lng: sample.lng }, sample.accuracy);
     // … aber nur akzeptierte Punkte gehen in die Linie.
     if (shouldAcceptTrackPoint(lastRef.current, sample)) {
       lastRef.current = sample;
       const tp: TrackPointSample = {
-        lat: sample.lat, lng: sample.lng, accuracy: loc.coords.accuracy,
-        altitude: loc.coords.altitude, speed: loc.coords.speed,
-        heading: loc.coords.heading, t: sample.t!,
+        lat: sample.lat, lng: sample.lng, accuracy: sample.accuracy,
+        altitude: sample.altitude, speed: sample.speed, heading: sample.course, t: sample.t!,
       };
       s.addTrackPoint(tp);
     }
@@ -75,7 +71,7 @@ export function useTrackRecording() {
       store.getState().setDuration(Math.floor((Date.now() - startMs.current) / 1000));
     }, 1000);
 
-    watchRef.current = await Location.watchPositionAsync(WATCH_OPTS, onFix);
+    watchRef.current = await startPositionStream(onFix, WATCH_OPTS);
     try {
       headRef.current = await Location.watchHeadingAsync(h => store.getState().setHeading(h.trueHeading ?? h.magHeading));
     } catch { /* Heading optional */ }

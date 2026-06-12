@@ -4,6 +4,7 @@ import { useTrackingStore, type TrackPointSample } from '@/features/tracking/sto
 import {
   shouldAcceptTrackPoint, calculateDistance, calculateDeviationFromTrack, type GpsSample, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
+import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { detectCorners, cornerLabel, nearestArticleDist, type Corner } from '@/lib/trackGuidance';
 import { startTrackRun, finishTrackRun, markArticleFound, saveTrackRunPoints } from '@/features/tracking/services/trackService';
 
@@ -20,7 +21,7 @@ const WATCH_OPTS: Location.LocationOptions = { accuracy: Location.Accuracy.BestF
 // „Gegenstand gefunden", Speichern. Liest Lay-Fährte/Marker aus dem Store.
 export function useTrackRun(voiceOnRef: { current: boolean }) {
   const store    = useTrackingStore;
-  const watchRef = useRef<Location.LocationSubscription | null>(null);
+  const watchRef = useRef<(() => void) | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startMs  = useRef<number>(0);
   const runIdRef = useRef<string | null>(null);
@@ -36,7 +37,7 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
   const deviating = useRef(false);
 
   const stopAll = useCallback(() => {
-    watchRef.current?.remove(); watchRef.current = null;
+    watchRef.current?.(); watchRef.current = null;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     shutUp();
   }, []);
@@ -48,15 +49,14 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
     say(msg);
   }, [voiceOnRef]);
 
-  const onFix = useCallback((loc: Location.LocationObject) => {
+  const onFix = useCallback((sample: StreamSample) => {
     const s = store.getState();
-    const sample: GpsSample = { lat: loc.coords.latitude, lng: loc.coords.longitude, accuracy: loc.coords.accuracy, t: loc.timestamp || Date.now() };
     if (!shouldAcceptTrackPoint(lastRef.current, sample)) {
       s.setCurrentPosition({ lat: sample.lat, lng: sample.lng }, sample.accuracy);
       return;
     }
     lastRef.current = sample;
-    const tp: TrackPointSample = { lat: sample.lat, lng: sample.lng, accuracy: loc.coords.accuracy, t: sample.t! };
+    const tp: TrackPointSample = { lat: sample.lat, lng: sample.lng, accuracy: sample.accuracy, t: sample.t! };
     s.addRunPoint(tp);
 
     const cur: LatLng = { lat: sample.lat, lng: sample.lng };
@@ -100,7 +100,7 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
     s.startRun();
     startMs.current = Date.now();
     timerRef.current = setInterval(() => s.setSearchDuration(Math.floor((Date.now() - startMs.current) / 1000)), 1000);
-    watchRef.current = await Location.watchPositionAsync(WATCH_OPTS, onFix);
+    watchRef.current = await startPositionStream(onFix, WATCH_OPTS);
     speak('Suche gestartet. Lauf der Fährte.');
     return { error: null };
   }, [onFix, speak, store]);
