@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '@/features/tracking/utils/gpsFilter';
+import { schedulePersist, clearPending } from '@/features/tracking/store/trackPersist';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
 export type OrientationMode = 'north' | 'heading' | 'track';
@@ -84,10 +85,22 @@ const INITIAL = {
   mapOrientationMode:    'north' as OrientationMode,
 };
 
+// Snapshot des Aufnahme-Zustands für den lokalen Offline-Puffer.
+function persist(get: () => TrackingState) {
+  schedulePersist(() => {
+    const s = get();
+    return {
+      sessionId: s.currentSessionId, trackPoints: s.trackPoints, markers: s.markers,
+      runPoints: s.runPoints, distanceMeters: s.distanceMeters, durationSeconds: s.durationSeconds,
+      savedAt: Date.now(),
+    };
+  });
+}
+
 export const useTrackingStore = create<TrackingState>((set, get) => ({
   ...INITIAL,
 
-  startRecording: (sessionId) => set({ ...INITIAL, currentSessionId: sessionId, isRecording: true }),
+  startRecording: (sessionId) => { clearPending(); set({ ...INITIAL, currentSessionId: sessionId, isRecording: true }); },
   pauseRecording: () => set({ isPaused: true }),
   resumeRecording: () => set({ isPaused: false }),
   stopRecording: () => set({ isRecording: false, isPaused: false }),
@@ -103,9 +116,10 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
       gpsAccuracy:     p.accuracy ?? null,
       gpsQuality:      getGpsQuality(p.accuracy),
     });
+    persist(get);
   },
 
-  addMarker: (m) => set(s => ({ markers: [...s.markers, m] })),
+  addMarker: (m) => { set(s => ({ markers: [...s.markers, m] })); persist(get); },
 
   startRun: () => set({ isRunningTrack: true, runPoints: [], searchDurationSeconds: 0, articlesFound: 0 }),
   stopRun:  () => set({ isRunningTrack: false }),
@@ -113,6 +127,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   addRunPoint: (p) => {
     const { runPoints } = get();
     set({ runPoints: [...runPoints, p], currentPosition: { lat: p.lat, lng: p.lng }, gpsAccuracy: p.accuracy ?? null, gpsQuality: getGpsQuality(p.accuracy) });
+    persist(get);
   },
 
   markArticleFound: (markerId) => set(s => ({
@@ -126,5 +141,5 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setSearchDuration: (sec) => set({ searchDurationSeconds: sec }),
   setMapFollowMode: (on) => set({ mapFollowMode: on }),
   setMapOrientationMode: (m) => set({ mapOrientationMode: m }),
-  reset: () => set({ ...INITIAL }),
+  reset: () => { clearPending(); set({ ...INITIAL }); },
 }));

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -65,6 +65,12 @@ export function TrackingMap({
   const start = layPoints[0] ?? null;
   const initial = currentPosition ?? start;
 
+  // Koordinaten nur neu berechnen, wenn ein Punkt hinzukommt (Länge ändert sich),
+  // nicht bei jedem Positions-Fix → flüssigere Karte, weniger Renderlast.
+  const layCoords = useMemo(() => layPoints.map(p => ({ latitude: p.lat, longitude: p.lng })), [layPoints.length]);
+  const runCoords = useMemo(() => (runPoints ?? []).map(p => ({ latitude: p.lat, longitude: p.lng })), [runPoints?.length]);
+  const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers.length]);
+
   return (
     <View style={[StyleSheet.absoluteFill, style]}>
       <MapView
@@ -81,14 +87,12 @@ export function TrackingMap({
         }}
       >
         {/* Gelegte Fährte: türkis gestrichelt */}
-        {layPoints.length > 1 && (
-          <Polyline coordinates={layPoints.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-            strokeColor={C.trackPrimary} strokeWidth={4} lineDashPattern={[8, 8]} />
+        {layCoords.length > 1 && (
+          <Polyline coordinates={layCoords} strokeColor={C.trackPrimary} strokeWidth={4} lineDashPattern={[8, 8]} />
         )}
         {/* Gelaufener Ablauf: blau, durchgezogen */}
-        {runPoints && runPoints.length > 1 && (
-          <Polyline coordinates={runPoints.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-            strokeColor={C.trackBlue} strokeWidth={4} />
+        {runCoords.length > 1 && (
+          <Polyline coordinates={runCoords} strokeColor={C.trackBlue} strokeWidth={4} />
         )}
 
         {start && (
@@ -97,7 +101,7 @@ export function TrackingMap({
           </Marker>
         )}
 
-        {markers.filter(m => m.lat != null && m.lng != null).map((m, i) => (
+        {markerList.map((m, i) => (
           <Marker key={i} coordinate={{ latitude: m.lat as number, longitude: m.lng as number }} anchor={{ x: 0.5, y: 0.5 }}>
             <View style={[s.markerDot, { backgroundColor: MARKER_COLOR[m.type] }]} />
           </Marker>
