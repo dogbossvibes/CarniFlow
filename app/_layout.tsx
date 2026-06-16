@@ -59,6 +59,8 @@ export default function RootLayout() {
         <Stack.Screen name="add-dog"  options={{ presentation: 'modal' }} />
         <Stack.Screen name="edit-dog"      options={{ presentation: 'modal' }} />
         <Stack.Screen name="training/[id]" />
+        <Stack.Screen name="track/index" />
+        <Stack.Screen name="track/historie" />
         <Stack.Screen name="track/setup" />
         <Stack.Screen name="track/[id]" />
         <Stack.Screen name="track/record" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />

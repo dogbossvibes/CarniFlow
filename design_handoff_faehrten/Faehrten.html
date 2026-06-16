@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ANYVO · Fährten</title>
+<style>
+  html, body { margin: 0; background: #0e0f11; }
+  /* tweak-driven overrides */
+  .no-glow .card-glow { box-shadow: none !important; border-color: var(--line) !important; }
+  /* design-canvas dark backdrop so phone frames sit on a studio bg */
+  .dc-viewport, .dc-root { background: #0e0f11 !important; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script>
+// Bootstrap loader — the preview serve requires the ?t= auth token on every
+// sub-resource request; Babel/<link> fetch relative URLs without it (401).
+// So we fetch each file WITH the token, compile together, and run.
+(async () => {
+  const T = new URLSearchParams(location.search).get('t');
+  const tok = T ? ('?t=' + encodeURIComponent(T)) : '';
+  const grab = async (f) => (await fetch(f + tok)).text();
+  try {
+    // CSS
+    const css = await grab('anyvo.css');
+    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    // JS modules, in dependency order
+    const files = ['ios-frame.jsx','design-canvas.jsx','tweaks-panel.jsx','icons.jsx','viz.jsx','chrome.jsx','flow.jsx','overviews.jsx','app.jsx','main.jsx'];
+    let code = '';
+    for (const f of files) {
+      const src = await grab(f);
+      code += '\n/* ===== ' + f + ' ===== */\n(function(){\n' + src + '\n})();\n';
+    }
+    const out = Babel.transform(code, { presets: ['react'], filename: 'anyvo-faehrten.jsx' }).code;
+    (0, eval)(out);
+  } catch (e) {
+    document.getElementById('root').innerHTML = '<pre style="color:#ff5d6c;font:14px monospace;padding:24px;white-space:pre-wrap">' + (e && e.stack || e) + '</pre>';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>

@@ -64,12 +64,12 @@ export default function TrainingScreen() {
 
         {/* Sekundäre Aktionen */}
         <View style={s.actions}>
-          <AnimatedPressable style={s.actionCard} scale={0.97} onPress={() => router.push('/track/setup' as never)}>
+          <AnimatedPressable style={s.actionCard} scale={0.97} onPress={() => router.push('/track' as never)}>
             <View style={[s.actionIcon, { backgroundColor: `${C.success}1A` }]}>
               <Ionicons name="map" size={20} color={C.success} />
             </View>
-            <Text style={s.actionLabel}>Fährte (GPS)</Text>
-            <Text style={s.actionSub}>Mit Live-Tracking</Text>
+            <Text style={s.actionLabel}>Fährten</Text>
+            <Text style={s.actionSub}>Übersicht & Logbuch</Text>
           </AnimatedPressable>
           <AnimatedPressable style={s.actionCard} scale={0.97} onPress={() => router.push('/unit/history')}>
             <View style={[s.actionIcon, { backgroundColor: `${C.accent}1A` }]}>

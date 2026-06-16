@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
-import { AnyvoButton } from '@/components/ui/AnyvoButton';
-import { GpsQualityPill } from '@/features/tracking/components/GpsQualityPill';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
-import { TrackStatsPanel } from '@/features/tracking/components/TrackStatsPanel';
+import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { MarkerBottomSheet } from '@/features/tracking/components/MarkerBottomSheet';
+import {
+  LiveButton, LiveDogPill, LiveMetricBar, LiveTimer, LiveTopBar, type LiveView,
+} from '@/features/tracking/components/LiveChrome';
 import { useTrackRecording } from '@/features/tracking/hooks/useTrackRecording';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { getTrackSessionDogName } from '@/features/tracking/services/trackService';
 
 export default function TrackRecordScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,10 +20,12 @@ export default function TrackRecordScreen() {
   const startedRef = useRef(false);
   const [sheet, setSheet] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [view, setView] = useState<LiveView>('map');
+  const [dogName, setDogName] = useState('Hund');
 
   const {
     trackPoints, markers, currentPosition, heading, distanceMeters, durationSeconds,
-    gpsAccuracy, gpsQuality, isPaused, mapFollowMode, setMapFollowMode,
+    gpsAccuracy, isPaused, mapFollowMode,
   } = useTrackingStore();
 
   useEffect(() => {
@@ -30,10 +34,12 @@ export default function TrackRecordScreen() {
     rec.start(id).then(({ error }) => {
       if (error) { Alert.alert('Aufnahme', error, [{ text: 'OK', onPress: () => router.back() }]); }
     });
+    getTrackSessionDogName(id).then(r => { if (r.data) setDogName(r.data); });
   }, [id]);
 
   const mapMarkers: MapMarker[] = markers.map(m => ({ type: m.type, lat: m.lat, lng: m.lng }));
   const gegenstaende = markers.filter(m => m.type === 'gegenstand').length;
+  const winkel = markers.filter(m => m.type === 'winkel').length;
 
   const handleFinish = () => {
     Alert.alert('Fährte gelegt?', 'Die gelegte Fährte wird gespeichert — danach geht es zur Ausarbeitung.', [
@@ -51,31 +57,36 @@ export default function TrackRecordScreen() {
 
   return (
     <View style={s.root}>
-      <TrackingMap
-        layPoints={trackPoints}
-        markers={mapMarkers}
-        currentPosition={currentPosition}
-        heading={heading}
-        follow={mapFollowMode}
-        onToggleFollow={() => setMapFollowMode(!mapFollowMode)}
-      />
+      <SafeAreaView edges={['top']} style={s.safe}>
+        <LiveTopBar onBack={() => router.back()} paused={isPaused} view={view} onView={setView} />
 
-      <SafeAreaView edges={['top']} pointerEvents="box-none" style={s.topSafe}>
-        <View style={s.topBar}>
-          <View>
-            <Text style={s.eyebrow}>FÄHRTE AUFNEHMEN</Text>
-            <Text style={s.title}>{isPaused ? 'Pausiert' : 'Fährte legen'}</Text>
-          </View>
-          <GpsQualityPill quality={gpsQuality} accuracy={gpsAccuracy} />
+        <View style={s.mapWrap}>
+          {view === 'map' ? (
+            <TrackingMap
+              layPoints={trackPoints} markers={mapMarkers} currentPosition={currentPosition}
+              heading={heading} follow={mapFollowMode} hideControls
+            />
+          ) : (
+            <View style={s.sketch}><TrackSketch legs={winkel} objects={gegenstaende} w={360} h={520} progress={1} /></View>
+          )}
+
+          <LiveTimer seconds={durationSeconds} label="Aufnahme" />
+          <LiveDogPill name={dogName} />
+          <LiveMetricBar items={[
+            { value: `${Math.round(distanceMeters)} m`, label: 'Distanz' },
+            { value: String(gegenstaende), label: 'Gegenst.' },
+            { value: String(winkel), label: 'Winkel' },
+            { value: gpsAccuracy != null ? `${Math.round(gpsAccuracy)} m` : '—', label: 'GPS' },
+          ]} />
         </View>
-      </SafeAreaView>
 
-      <SafeAreaView edges={['bottom']} style={s.bottom} pointerEvents="box-none">
-        <TrackStatsPanel distanceMeters={distanceMeters} durationSeconds={durationSeconds} articles={String(gegenstaende)} />
-        <AnyvoButton label="Marker setzen" icon="add-circle" variant="secondary" onPress={() => setSheet(true)} style={{ marginTop: 12 }} />
-        <View style={s.ctrlRow}>
-          <AnyvoButton label={isPaused ? 'Fortsetzen' : 'Pause'} icon={isPaused ? 'play' : 'pause'} variant="secondary" onPress={() => (isPaused ? rec.resume() : rec.pause())} style={{ flex: 1 }} />
-          <AnyvoButton label="Beenden" icon="stop" variant="danger" onPress={handleFinish} loading={finishing} style={{ flex: 1 }} />
+        <View style={s.controls}>
+          <LiveButton icon="add-circle-outline" label="Marker" onPress={() => setSheet(true)} />
+          <LiveButton
+            icon={isPaused ? 'play' : 'pause'} label={isPaused ? 'Weiter' : 'Pause'}
+            active={isPaused} onPress={() => (isPaused ? rec.resume() : rec.pause())}
+          />
+          <LiveButton icon="stop" label="Stop & Weiter" variant="danger" flex={1.3} onPress={handleFinish} disabled={finishing} />
         </View>
       </SafeAreaView>
 
@@ -85,11 +96,9 @@ export default function TrackRecordScreen() {
 }
 
 const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: C.trackBg },
-  topSafe: { position: 'absolute', top: 0, left: 0, right: 0 },
-  topBar:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
-  eyebrow: { fontSize: 9, color: C.trackPrimary, fontWeight: '800', letterSpacing: 2 },
-  title:   { fontSize: 20, color: C.trackText, fontWeight: '900', letterSpacing: -0.4 },
-  bottom:  { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: 8 },
-  ctrlRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  root:     { flex: 1, backgroundColor: C.trackBg },
+  safe:     { flex: 1 },
+  mapWrap:  { flex: 1, marginHorizontal: 14, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: C.trackBorder, backgroundColor: '#08100e' },
+  sketch:   { flex: 1, backgroundColor: '#08100e' },
+  controls: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 26 },
 });

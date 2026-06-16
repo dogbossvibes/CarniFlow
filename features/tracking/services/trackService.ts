@@ -22,6 +22,13 @@ export interface NewTrackSessionInput {
   weatherCondition:   string | null;
   latitude:           number | null;
   longitude:          number | null;
+  // Plan-Parameter (Fährte planen)
+  plannedLengthSteps?: number;        // geplante Länge in Schritten
+  corners?:            number;        // geplante Winkel
+  articles?:           number;        // geplante Gegenstände
+  distraction?:        boolean;       // Verleitung (Fremdfährte)
+  humidity?:           number | null; // Luftfeuchte %
+  windSpeed?:          number | null; // km/h
 }
 
 export async function createTrackSession(ownerId: string, input: NewTrackSessionInput): Promise<Result<{ id: string }>> {
@@ -41,14 +48,25 @@ export async function createTrackSession(ownerId: string, input: NewTrackSession
         surface_types:      input.surfaceTypes,
         terrain_conditions: input.terrainConditions,
         lying_time_minutes: input.lyingTimeMinutes,
+        corners_total:      input.corners ?? null,
+        articles_total:     input.articles ?? null,
+        distractions_total: input.distraction ? 1 : 0,
         notes:              input.notes,
         ort:                input.locationName,
         wetter:             input.weatherCondition,
         location_name:      input.locationName,
         temperature:        input.temperature,
+        humidity:           input.humidity ?? null,
+        wind_speed:         input.windSpeed ?? null,
         weather_condition:  input.weatherCondition,
         latitude:           input.latitude,
         longitude:          input.longitude,
+        // geplante Parameter zusätzlich strukturiert ablegen (für Vorschau/Live)
+        track_data:         { plan: {
+          length: input.plannedLengthSteps ?? null, angles: input.corners ?? 0,
+          objects: input.articles ?? 0, age: input.lyingTimeMinutes,
+          surface: input.surfaceTypes[0] ?? null, distraction: !!input.distraction,
+        } },
       })
       .select('id')
       .single();
@@ -190,6 +208,35 @@ export async function finishTrackRun(runId: string, sessionId: string, summary: 
     if (sErr) return fail('finishTrackRun.session', sErr);
     return { data: null, error: null };
   } catch (e) { return fail('finishTrackRun', e); }
+}
+
+// ── Auswertung speichern ─────────────────────────────────────
+export interface EvaluationInput {
+  legs:   { name: string; score: number; max: number }[];
+  rating: number;                                   // 0–100 Gesamtscore
+  notes:  string | null;
+}
+
+export async function saveTrackEvaluation(sessionId: string, input: EvaluationInput): Promise<Result<null>> {
+  try {
+    const { error } = await supabase.from('training_sessions').update({
+      rating:     input.rating,
+      notes:      input.notes,
+      track_data: { legs: input.legs, score: input.rating, evaluated_at: new Date().toISOString() },
+    }).eq('id', sessionId);
+    if (error) return fail('saveTrackEvaluation', error);
+    return { data: null, error: null };
+  } catch (e) { return fail('saveTrackEvaluation', e); }
+}
+
+// Leichter Lookup: nur Hundename (für Live-Overlays, ohne Punkte/Marker zu laden).
+export async function getTrackSessionDogName(id: string): Promise<Result<string | null>> {
+  try {
+    const { data, error } = await supabase
+      .from('training_sessions').select('dog:dogs(name)').eq('id', id).single();
+    if (error) return fail('getTrackSessionDogName', error);
+    return { data: (data as any)?.dog?.name ?? null, error: null };
+  } catch (e) { return fail('getTrackSessionDogName', e); }
 }
 
 // ── Lesen ────────────────────────────────────────────────────

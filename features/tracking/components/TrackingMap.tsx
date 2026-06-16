@@ -27,12 +27,13 @@ interface Props {
   mapType?:         MapType;
   onToggleFollow?:  () => void;
   onCompass?:       () => void;
+  hideControls?:    boolean;   // FAB-Spalte ausblenden (z. B. für Live-Overlays)
   style?:           StyleProp<ViewStyle>;
 }
 
 export function TrackingMap({
   layPoints, runPoints, markers = [], currentPosition, heading,
-  follow, mapType = 'hybrid', onToggleFollow, onCompass, style,
+  follow, mapType = 'hybrid', onToggleFollow, onCompass, hideControls, style,
 }: Props) {
   const mapRef = useRef<any>(null);
 
@@ -44,6 +45,17 @@ export function TrackingMap({
       latitudeDelta: 0.0016, longitudeDelta: 0.0016,
     }, 600);
   }, [currentPosition, follow]);
+
+  // Koordinaten nur neu berechnen, wenn ein Punkt hinzukommt (Länge ändert sich),
+  // nicht bei jedem Positions-Fix → flüssigere Karte, weniger Renderlast.
+  // Hooks stehen bewusst VOR dem Fallback-Return (rules-of-hooks); die .length-Deps
+  // sind ebenfalls Absicht (Re-Memo nur bei neuem Punkt, nicht bei Fix-Update).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const layCoords = useMemo(() => layPoints.map(p => ({ latitude: p.lat, longitude: p.lng })), [layPoints.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const runCoords = useMemo(() => (runPoints ?? []).map(p => ({ latitude: p.lat, longitude: p.lng })), [runPoints?.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers.length]);
 
   const recenter = () => {
     const p = currentPosition ?? layPoints[layPoints.length - 1] ?? null;
@@ -64,12 +76,6 @@ export function TrackingMap({
   const MapView = RNMaps.default, Polyline = RNMaps.Polyline, Marker = RNMaps.Marker;
   const start = layPoints[0] ?? null;
   const initial = currentPosition ?? start;
-
-  // Koordinaten nur neu berechnen, wenn ein Punkt hinzukommt (Länge ändert sich),
-  // nicht bei jedem Positions-Fix → flüssigere Karte, weniger Renderlast.
-  const layCoords = useMemo(() => layPoints.map(p => ({ latitude: p.lat, longitude: p.lng })), [layPoints.length]);
-  const runCoords = useMemo(() => (runPoints ?? []).map(p => ({ latitude: p.lat, longitude: p.lng })), [runPoints?.length]);
-  const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers.length]);
 
   return (
     <View style={[StyleSheet.absoluteFill, style]}>
@@ -120,11 +126,13 @@ export function TrackingMap({
       </MapView>
 
       {/* Floating Buttons rechts */}
-      <View style={s.fabCol}>
-        {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
-        <Fab icon="locate" onPress={recenter} />
-        {onToggleFollow && <Fab icon={follow ? 'lock-closed' : 'lock-open'} active={follow} onPress={onToggleFollow} />}
-      </View>
+      {!hideControls && (
+        <View style={s.fabCol}>
+          {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
+          <Fab icon="locate" onPress={recenter} />
+          {onToggleFollow && <Fab icon={follow ? 'lock-closed' : 'lock-open'} active={follow} onPress={onToggleFollow} />}
+        </View>
+      )}
     </View>
   );
 }

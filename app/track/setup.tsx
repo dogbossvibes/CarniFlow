@@ -1,159 +1,201 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
-import { DogIcon } from '@/components/ui/DogIcon';
-import { AnyvoChip } from '@/components/ui/AnyvoChip';
-import { AnyvoPill } from '@/components/ui/AnyvoPill';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
-import { GpsSourcePicker } from '@/components/tracking/GpsSourcePicker';
-import { GpsQualityPill } from '@/features/tracking/components/GpsQualityPill';
+import { TrackSketch } from '@/features/tracking/components/TrackSketch';
+import { TrackSlider } from '@/features/tracking/components/TrackSlider';
+import { Field, Stepper, Toggle, WeatherStrip } from '@/features/tracking/components/PlanControls';
+import { FaehrtenHeader, SectionLabel } from '@/features/tracking/components/FaehrtenChrome';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
-import { getLocationAndWeather } from '@/services/weatherService';
+import { getLiveConditions, type LiveConditions } from '@/services/weatherService';
 import { createTrackSession } from '@/features/tracking/services/trackService';
-import { getGpsQuality, type GpsQuality } from '@/features/tracking/utils/gpsFilter';
 
-const UNTERGRUND = ['Kurzgras', 'Hohe Wiese', 'lockerer Acker', 'Stoppelacker', 'sandiger Boden', 'Waldboden'];
-const BESCHAFFENHEIT = ['gefrorener Boden', 'Schnee', 'Nass nach Regen', 'ebenes Gelände', 'Hanglage', 'unebenes Gelände', 'Morgentau', 'trocken', 'harter Boden'];
+const AGES = [{ k: '30 min', m: 30 }, { k: '1 h', m: 60 }, { k: '2 h', m: 120 }, { k: '3 h', m: 180 }];
+const SURFACES = ['Acker', 'Wiese', 'Wald', 'Mischung'];
 
-export default function TrackSetupScreen() {
+interface Plan { length: number; angles: number; objects: number; age: number; surface: string; distraction: boolean }
+
+export default function TrackPlanenScreen() {
   const router = useRouter();
-  const { dogs } = useDogs();
   const { session } = useSession();
+  const { dogs } = useDogs();
+  const params = useLocalSearchParams<{ dogId?: string }>();
 
-  const [dogId, setDogId]         = useState<string | null>(dogs.length === 1 ? dogs[0].id : null);
-  const [surface, setSurface]     = useState<string[]>([]);
-  const [terrain, setTerrain]     = useState<string[]>([]);
-  const [liegezeit, setLiegezeit] = useState(90);
-  const [notes, setNotes]         = useState('');
-  const [ort, setOrt]             = useState('');
-  const [wetter, setWetter]       = useState('');
-  const [coords, setCoords]       = useState<{ lat: number; lng: number } | null>(null);
-  const [gpsQ, setGpsQ]           = useState<GpsQuality | null>(null);
-  const [gpsAcc, setGpsAcc]       = useState<number | null>(null);
-  const [saving, setSaving]       = useState(false);
+  const [dogId, setDogId] = useState<string | null>(params.dogId ?? null);
+  const [plan, setPlan]   = useState<Plan>({ length: 600, angles: 3, objects: 3, age: 60, surface: 'Acker', distraction: true });
+  const [wx, setWx]       = useState<LiveConditions | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const info = await getLocationAndWeather();
-      if (info.location) setOrt(info.location);
-      if (info.weather)  setWetter(info.weather);
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
-          setCoords({ lat: fix.coords.latitude, lng: fix.coords.longitude });
-          setGpsAcc(fix.coords.accuracy ?? null);
-          setGpsQ(getGpsQuality(fix.coords.accuracy));
-        }
-      } catch { /* GPS optional hier */ }
-    })();
-  }, []);
+  const activeDog = dogs.find(d => d.id === dogId) ?? dogs[0] ?? null;
 
-  const toggle = (arr: string[], v: string) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
-  const dogName = dogs.find(d => d.id === dogId)?.name ?? '—';
-  const temp = (() => { const m = wetter.match(/(-?\d+(?:[.,]\d+)?)\s*°/); return m ? parseFloat(m[1].replace(',', '.')) : null; })();
-  const canStart = !!dogId && surface.length > 0;
+  useEffect(() => { getLiveConditions().then(setWx); }, []);
 
-  const handleCreate = async () => {
-    if (!canStart || !session?.user.id) return;
+  const upd = <K extends keyof Plan>(k: K, v: Plan[K]) => setPlan(p => ({ ...p, [k]: v }));
+  const ageLabel = AGES.find(a => a.m === plan.age)?.k ?? `${plan.age} min`;
+
+  const previewCells: [string, string][] = [
+    [`${plan.length}`, 'Länge'],
+    [`${plan.angles} Winkel`, 'Verlauf'],
+    [`${plan.objects} Gegenst.`, 'Apportier'],
+    [ageLabel, 'Alter'],
+  ];
+
+  const create = async (): Promise<string | null> => {
+    const uid = session?.user.id;
+    if (!uid || !activeDog) { Alert.alert('Hund wählen', 'Bitte zuerst einen Hund auswählen.'); return null; }
     setSaving(true);
-    const { data, error } = await createTrackSession(session.user.id, {
-      dogId: dogId!, surfaceTypes: surface, terrainConditions: terrain,
-      lyingTimeMinutes: liegezeit, notes: notes.trim() || null,
-      locationName: ort || null, temperature: temp, weatherCondition: wetter || null,
-      latitude: coords?.lat ?? null, longitude: coords?.lng ?? null,
+    const { data, error } = await createTrackSession(uid, {
+      dogId: activeDog.id,
+      surfaceTypes: [plan.surface],
+      terrainConditions: [],
+      lyingTimeMinutes: plan.age,
+      notes: null,
+      locationName: wx?.location || null,
+      temperature: wx?.temp ?? null,
+      weatherCondition: wx ? `${wx.emoji} ${wx.temp ?? '–'}°C` : null,
+      latitude: wx?.lat ?? null,
+      longitude: wx?.lng ?? null,
+      plannedLengthSteps: plan.length,
+      corners: plan.angles,
+      articles: plan.objects,
+      distraction: plan.distraction,
+      humidity: wx?.humidity ?? null,
+      windSpeed: wx?.windSpeed ?? null,
     });
     setSaving(false);
-    if (error || !data) { Alert.alert('Fehler', error ?? 'Fährte konnte nicht angelegt werden.'); return; }
-    router.replace(`/track/record?id=${data.id}` as never);
+    if (error || !data) { Alert.alert('Fehler', error ?? 'Fährte konnte nicht angelegt werden.'); return null; }
+    return data.id;
   };
+
+  const onLive  = async () => { const id = await create(); if (id) router.replace(`/track/record?id=${id}` as never); };
+  const onDraft = async () => { const id = await create(); if (id) router.replace('/track' as never); };
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.header}>
-        <TouchableOpacity style={s.back} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={22} color={C.trackText} /></TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.eyebrow}>FÄHRTENMODUL</Text>
-          <Text style={s.title}>Neue Fährte</Text>
-        </View>
-      </View>
+      <FaehrtenHeader title="FÄHRTE PLANEN" onBack={() => router.back()} dog={activeDog} dogs={dogs} onDog={setDogId} />
 
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <View style={s.pillRow}>
-          {ort ? <AnyvoPill icon="location" label={ort} /> : null}
-          {wetter ? <AnyvoPill icon="partly-sunny" label={wetter} /> : null}
-          <GpsQualityPill quality={gpsQ} accuracy={gpsAcc} />
-          <AnyvoPill icon="paw" label={dogName} tint={dogId ? C.trackPrimary : undefined} />
-        </View>
-
-        <Text style={s.label}>HUND *</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={s.dogRow}>
-          {dogs.length === 0 ? <Text style={s.empty}>Zuerst einen Hund anlegen</Text> :
-            dogs.map(d => {
-              const on = dogId === d.id;
-              return (
-                <TouchableOpacity key={d.id} style={[s.dogChip, on && s.dogChipOn]} onPress={() => setDogId(on ? null : d.id)} activeOpacity={0.8}>
-                  <DogIcon size={13} color={on ? '#04110F' : C.trackTextSec} />
-                  <Text style={[s.dogTxt, on && s.dogTxtOn]}>{d.name}</Text>
-                </TouchableOpacity>
-              );
-            })}
-        </ScrollView>
-
-        <Text style={s.label}>GPS-QUELLE</Text>
-        <GpsSourcePicker />
-
-        <Text style={s.label}>UNTERGRUND *</Text>
-        <View style={s.wrap}>{UNTERGRUND.map(i => <AnyvoChip key={i} label={i} active={surface.includes(i)} onPress={() => setSurface(p => toggle(p, i))} />)}</View>
-
-        <Text style={s.label}>BESCHAFFENHEIT</Text>
-        <View style={s.wrap}>{BESCHAFFENHEIT.map(i => <AnyvoChip key={i} label={i} active={terrain.includes(i)} onPress={() => setTerrain(p => toggle(p, i))} />)}</View>
-
-        <Text style={s.label}>LIEGEZEIT</Text>
-        <View style={s.stepper}>
-          <TouchableOpacity style={s.stepBtn} onPress={() => setLiegezeit(v => Math.max(0, v - 5))} activeOpacity={0.8}><Ionicons name="remove" size={22} color={C.trackText} /></TouchableOpacity>
-          <View style={s.stepCenter}>
-            <Text style={s.stepVal}>{liegezeit}</Text>
-            <Text style={s.stepUnit}>Minuten</Text>
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        {/* Vorschau */}
+        <View style={[s.card, s.cardGlow, { padding: 0, overflow: 'hidden', marginBottom: 16 }]}>
+          <View style={s.preview}>
+            <TrackSketch legs={plan.angles} objects={plan.objects} w={320} h={188} progress={1} showLabels />
           </View>
-          <TouchableOpacity style={s.stepBtn} onPress={() => setLiegezeit(v => v + 5)} activeOpacity={0.8}><Ionicons name="add" size={22} color={C.trackText} /></TouchableOpacity>
+          <View style={s.previewFooter}>
+            {previewCells.map((c, i) => (
+              <View key={i} style={[s.previewCell, i > 0 && s.previewDivider]}>
+                <Text style={s.previewVal}>{c[0]}</Text>
+                <Text style={s.previewLabel}>{c[1]}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        <Text style={s.label}>NOTIZEN</Text>
-        <TextInput style={s.notes} value={notes} onChangeText={setNotes} placeholder="Notizen zur Fährte hinzufügen…" placeholderTextColor={C.trackTextMut} multiline />
+        {/* Parameter */}
+        <SectionLabel>Parameter</SectionLabel>
+        <View style={{ gap: 11 }}>
+          <View style={[s.card, { padding: 16 }]}>
+            <View style={s.lenHead}>
+              <Text style={s.lenLabel}>Länge</Text>
+              <Text style={s.lenVal}>{plan.length} <Text style={s.lenUnit}>Schritt</Text></Text>
+            </View>
+            <TrackSlider value={plan.length} min={200} max={1500} step={50} onChange={v => upd('length', v)} minLabel="200" maxLabel="1500" />
+          </View>
+          <Field icon="git-branch" label="Winkel" hint="Anzahl Richtungswechsel">
+            <Stepper value={plan.angles} set={v => upd('angles', v)} min={0} max={5} />
+          </Field>
+          <Field icon="flag" label="Gegenstände" hint="Apportierstücke auf der Fährte">
+            <Stepper value={plan.objects} set={v => upd('objects', v)} min={0} max={5} />
+          </Field>
+        </View>
 
-        <AnyvoButton label="Fährte anlegen" icon="navigate-circle" onPress={handleCreate} disabled={!canStart} loading={saving} big style={{ marginTop: 24 }} />
-        <View style={{ height: 40 }} />
+        {/* Liegezeit */}
+        <View style={{ height: 18 }} />
+        <SectionLabel>Liegezeit</SectionLabel>
+        <View style={s.chipRow}>
+          {AGES.map(a => {
+            const on = plan.age === a.m;
+            return (
+              <TouchableOpacity key={a.m} style={[s.chip, on && s.chipOn]} onPress={() => upd('age', a.m)} activeOpacity={0.8}>
+                <Text style={[s.chipTxt, on && s.chipTxtOn]}>{a.k}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Untergrund */}
+        <View style={{ height: 18 }} />
+        <SectionLabel>Untergrund</SectionLabel>
+        <View style={s.chipRow}>
+          {SURFACES.map(srf => {
+            const on = plan.surface === srf;
+            return (
+              <TouchableOpacity key={srf} style={[s.chip, on && s.chipOn]} onPress={() => upd('surface', srf)} activeOpacity={0.8}>
+                <Text style={[s.chipTxt, on && s.chipTxtOn]}>{srf}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Verleitung */}
+        <View style={{ height: 18 }} />
+        <Field icon="shuffle" label="Verleitung" hint="Fremdfährte kreuzen lassen">
+          <Toggle on={plan.distraction} onToggle={() => upd('distraction', !plan.distraction)} />
+        </Field>
+
+        {/* Bedingungen */}
+        <View style={{ height: 18 }} />
+        <SectionLabel>Bedingungen</SectionLabel>
+        <View style={[s.card, { padding: 16 }]}>
+          <WeatherStrip wx={wx} />
+          <View style={s.wxHint}>
+            <Ionicons name="sparkles-outline" size={16} color={C.trackPrimary} />
+            <Text style={s.wxHintTxt}>{wx?.location ? `${wx.location} — aktuelle Bedingungen.` : 'Wetter wird geladen…'}</Text>
+          </View>
+        </View>
+
+        <View style={{ height: 24 }} />
       </ScrollView>
+
+      {/* Footer */}
+      <View style={s.footer}>
+        <AnyvoButton label="Entwurf" variant="secondary" onPress={onDraft} disabled={saving || !activeDog} style={{ flex: 1 }} />
+        <AnyvoButton label="Live starten" icon="play" onPress={onLive} loading={saving} disabled={!activeDog} style={{ flex: 1.4 }} />
+      </View>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: C.trackBg },
-  header:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
-  back:    { width: 38, height: 38, borderRadius: 12, backgroundColor: C.trackCardAlt, borderWidth: 1, borderColor: C.trackBorder, alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { fontSize: 9, color: C.trackPrimary, fontWeight: '800', letterSpacing: 2 },
-  title:   { fontSize: 24, color: C.trackText, fontWeight: '900', letterSpacing: -0.5 },
-  content: { paddingHorizontal: 20, paddingTop: 4 },
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  label:   { fontSize: 10, color: C.trackTextMut, fontWeight: '700', letterSpacing: 1.5, marginTop: 22, marginBottom: 10 },
-  dogRow:  { paddingHorizontal: 20, gap: 8 },
-  dogChip: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 14, paddingVertical: 9 },
-  dogChipOn: { borderColor: C.trackPrimary, backgroundColor: C.trackPrimary },
-  dogTxt:  { fontSize: 13, color: C.trackTextSec, fontWeight: '700' },
-  dogTxtOn:{ color: '#04110F' },
-  empty:   { fontSize: 13, color: C.trackTextMut, paddingHorizontal: 20 },
-  wrap:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  stepper: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.trackCard, borderRadius: 18, borderWidth: 1, borderColor: C.trackBorder, padding: 6 },
-  stepBtn: { width: 56, height: 56, borderRadius: 14, backgroundColor: C.trackCardAlt, alignItems: 'center', justifyContent: 'center' },
-  stepCenter: { flex: 1, alignItems: 'center' },
-  stepVal: { fontSize: 34, color: C.trackText, fontWeight: '900', letterSpacing: -1 },
-  stepUnit:{ fontSize: 11, color: C.trackTextMut, fontWeight: '600', marginTop: -4 },
-  notes:   { backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 14, color: C.trackText, fontSize: 15, minHeight: 90, textAlignVertical: 'top' },
+  content: { paddingHorizontal: 18, paddingTop: 4, paddingBottom: 8 },
+
+  card:     { backgroundColor: C.trackCard, borderRadius: 20, borderWidth: 1, borderColor: C.trackBorder },
+  cardGlow: { borderColor: C.trackPrimaryDk + '38', shadowColor: C.trackPrimary, shadowOpacity: 0.22, shadowRadius: 22, shadowOffset: { width: 0, height: 12 }, elevation: 5 },
+
+  preview:      { height: 188, backgroundColor: '#08100e' },
+  previewFooter:{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: C.trackBorder },
+  previewCell:  { flex: 1, paddingVertical: 11, paddingHorizontal: 6, alignItems: 'center' },
+  previewDivider:{ borderLeftWidth: 1, borderLeftColor: C.trackBorder },
+  previewVal:   { fontSize: 13.5, fontWeight: '800', color: C.trackText },
+  previewLabel: { fontSize: 8, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
+
+  lenHead:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 },
+  lenLabel: { fontSize: 14, fontWeight: '700', color: C.trackText },
+  lenVal:   { fontSize: 17, fontWeight: '800', color: C.trackPrimary },
+  lenUnit:  { fontSize: 11, color: C.trackTextSec, fontWeight: '600' },
+
+  chipRow:  { flexDirection: 'row', gap: 8 },
+  chip:     { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: C.trackCard, borderWidth: 1, borderColor: C.trackBorder, alignItems: 'center' },
+  chipOn:   { backgroundColor: C.trackPrimaryDk + '22', borderColor: C.trackPrimary },
+  chipTxt:  { fontSize: 13, color: C.trackTextSec, fontWeight: '600' },
+  chipTxtOn:{ color: C.trackPrimary, fontWeight: '700' },
+
+  wxHint:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 13, paddingTop: 13, borderTopWidth: 1, borderTopColor: C.trackBorder },
+  wxHintTxt: { fontSize: 12.5, color: 'rgba(255,255,255,0.8)', flex: 1 },
+
+  footer:  { flexDirection: 'row', gap: 10, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 26, borderTopWidth: 1, borderTopColor: C.trackBorder, backgroundColor: C.trackBg },
 });
