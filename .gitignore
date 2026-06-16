@@ -45,3 +45,6 @@ app-example
 
 # Supabase CLI temp
 supabase/.temp/
+
+# Claude Code transiente Dateien
+.claude/scheduled_tasks.lock
