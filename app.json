@@ -13,7 +13,7 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -89,7 +89,9 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
-          "modes": ["central"],
+          "modes": [
+            "central"
+          ],
           "bluetoothAlwaysPermission": "ANYVO nutzt Bluetooth, um externe GPS-Empfänger für die Fährten-Aufzeichnung zu koppeln."
         }
       ],
@@ -97,6 +99,13 @@
         "expo-calendar",
         {
           "calendarPermission": "ANYVO fügt deine Trainingstermine zu deinem Kalender hinzu."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "speechRecognitionPermission": "ANYVO nutzt Spracherkennung für Sprachbefehle im Fährtenmodus.",
+          "microphonePermission": "ANYVO benötigt das Mikrofon für Sprachmemos und Sprachbefehle."
         }
       ]
     ],

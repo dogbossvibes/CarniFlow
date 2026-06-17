@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Modal, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
@@ -13,6 +13,10 @@ import { useTrackRecording } from '@/features/tracking/hooks/useTrackRecording';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { getTrackSessionDogName } from '@/features/tracking/services/trackService';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { VoiceCommandButton } from '@/features/voice/components/VoiceCommandButton';
+import { VoiceRecorderCard } from '@/features/voice/components/VoiceRecorderCard';
+import { uploadVoiceNote } from '@/features/voice/services/voiceUploadService';
+import type { VoiceCommand } from '@/features/voice/services/voiceCommandParser';
 
 export default function TrackRecordScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,6 +24,7 @@ export default function TrackRecordScreen() {
   const rec = useTrackRecording();
   const startedRef = useRef(false);
   const [sheet, setSheet] = useState(false);
+  const [voiceMarker, setVoiceMarker] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [view, setView] = useState<LiveView>('map');
   const [dogName, setDogName] = useState('Hund');
@@ -57,6 +62,13 @@ export default function TrackRecordScreen() {
     ]);
   };
 
+  const onVoiceCommand = (cmd: VoiceCommand) => {
+    if (cmd.type === 'ADD_MARKER') rec.addMarker(cmd.markerType);
+    else if (cmd.type === 'PAUSE') { if (!isPaused) rec.pause(); }
+    else if (cmd.type === 'RESUME') { if (isPaused) rec.resume(); }
+    else if (cmd.type === 'STOP_RECORDING') handleFinish();
+  };
+
   return (
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.safe}>
@@ -82,6 +94,10 @@ export default function TrackRecordScreen() {
           ]} />
         </View>
 
+        <View style={s.voiceRow}>
+          <VoiceCommandButton onCommand={onVoiceCommand} />
+        </View>
+
         <View style={s.controls}>
           <LiveButton icon="add-circle-outline" label="Marker" onPress={() => setSheet(true)} />
           <LiveButton
@@ -93,7 +109,29 @@ export default function TrackRecordScreen() {
       </SafeAreaView>
 
       <MarkerBottomSheet visible={sheet} onClose={() => setSheet(false)}
-        onSelect={c => rec.addMarker(c.type, { material: c.material })} />
+        onSelect={c => { if (c.type === 'sprachmarker') setVoiceMarker(true); else rec.addMarker(c.type, { material: c.material }); }} />
+
+      {/* Sprachmarker: Notiz an aktueller Position aufnehmen */}
+      <Modal visible={voiceMarker} transparent animationType="slide" onRequestClose={() => setVoiceMarker(false)}>
+        <View style={s.sheetBackdrop}>
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>Sprachmarker</Text>
+            <VoiceRecorderCard
+              onCancel={() => setVoiceMarker(false)}
+              onSave={async (uri, duration) => {
+                setVoiceMarker(false);
+                const pos = currentPosition;
+                rec.addMarker('sprachmarker');
+                await uploadVoiceNote({
+                  localUri: uri, context: 'track_marker', trainingSessionId: id, durationSeconds: duration,
+                  metadata: { latitude: pos?.lat ?? null, longitude: pos?.lng ?? null, distanceFromStart: Math.round(distanceMeters), timestamp: Date.now() },
+                });
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -102,6 +140,11 @@ const s = StyleSheet.create({
   root:     { flex: 1, backgroundColor: C.trackBg },
   safe:     { flex: 1 },
   mapWrap:  { flex: 1, marginHorizontal: 14, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: C.trackBorder, backgroundColor: '#08100e' },
+  voiceRow: { alignItems: 'center', paddingTop: 12 },
+  sheetBackdrop:{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  sheet:    { backgroundColor: C.trackBg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, paddingBottom: 36, borderTopWidth: 1, borderColor: C.trackBorder },
+  sheetHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, marginBottom: 14 },
+  sheetTitle: { fontSize: 16, color: C.trackText, fontWeight: '800', marginBottom: 14, marginLeft: 2 },
   sketch:   { flex: 1, backgroundColor: '#08100e' },
   controls: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 26 },
 });

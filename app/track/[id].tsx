@@ -15,6 +15,7 @@ import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
 import { FaehrtenHeader, SectionLabel, relDate } from '@/features/tracking/components/FaehrtenChrome';
 import { getTrackSessionById, saveTrackEvaluation } from '@/features/tracking/services/trackService';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
+import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
@@ -170,6 +171,9 @@ export default function TrackAuswertungScreen() {
               <View style={s.tagRow}>{tags.map(t => <Tag key={t}>{t}</Tag>)}</View>
             )}
           </View>
+
+          <View style={{ height: 18 }} />
+          <SmartFeedbackSection dogId={data.dog_id} />
 
           <View style={{ height: 24 }} />
         </ScrollView>

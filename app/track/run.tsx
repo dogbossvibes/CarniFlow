@@ -14,6 +14,8 @@ import { useTrackRun, SPEECH_AVAILABLE } from '@/features/tracking/hooks/useTrac
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { calculateDeviationFromTrack } from '@/features/tracking/utils/gpsFilter';
 import { getTrackSessionDogName, setTrackLyingTime } from '@/features/tracking/services/trackService';
+import { VoiceCommandButton } from '@/features/voice/components/VoiceCommandButton';
+import type { VoiceCommand } from '@/features/voice/services/voiceCommandParser';
 
 export default function TrackRunScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,7 +30,7 @@ export default function TrackRunScreen() {
 
   const {
     trackPoints, runPoints, markers, currentPosition, heading, distanceMeters, searchDurationSeconds,
-    articlesFound, isRunningTrack, gpsAccuracy, mapFollowMode, layFinishedAt, setCurrentPosition,
+    articlesFound, isRunningTrack, gpsAccuracy, mapFollowMode, layFinishedAt, setCurrentPosition, setMapFollowMode,
   } = useTrackingStore();
 
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
@@ -89,6 +91,15 @@ export default function TrackRunScreen() {
     ]);
   };
 
+  const onVoiceCommand = (cmd: VoiceCommand) => {
+    if (cmd.type === 'STOP_RECORDING') { handleFinish(); return; }
+    if (cmd.type === 'CENTER_MAP') { setMapFollowMode(true); return; }
+    if (cmd.type === 'AUDIO_ON') { setVoiceOn(true); return; }
+    if (cmd.type === 'AUDIO_OFF') { setVoiceOn(false); return; }
+    if (!isRunningTrack) return;
+    if (cmd.type === 'ADD_MARKER' && cmd.markerType === 'gegenstand' && articlesFound < articlesTotal) run.foundArticle();
+  };
+
   return (
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.safe}>
@@ -112,6 +123,10 @@ export default function TrackRunScreen() {
             { value: liveDev != null ? `${devOff ? '+' : ''}${liveDev.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
             { value: gpsAccuracy != null ? `${Math.round(gpsAccuracy)} m` : '—', label: 'GPS' },
           ]} />
+        </View>
+
+        <View style={s.voiceRow}>
+          <VoiceCommandButton onCommand={onVoiceCommand} />
         </View>
 
         <View style={s.controls}>
@@ -138,5 +153,6 @@ const s = StyleSheet.create({
   safe:     { flex: 1 },
   mapWrap:  { flex: 1, marginHorizontal: 14, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: C.trackBorder, backgroundColor: '#08100e' },
   sketch:   { flex: 1, backgroundColor: '#08100e' },
+  voiceRow: { alignItems: 'center', paddingTop: 12 },
   controls: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 26, minHeight: 86 },
 });

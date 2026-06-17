@@ -15,6 +15,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { HeroImage } from '@/components/training/HeroImage';
 import { CommentThread } from '@/components/training/CommentThread';
+import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
+import { VoiceNotesList } from '@/features/voice/components/VoiceNotesList';
+import { VoiceRecorderCard } from '@/features/voice/components/VoiceRecorderCard';
+import { useVoiceNotes } from '@/features/voice/hooks/useVoiceNotes';
 import { disciplineColor } from '@/constants/disciplines';
 import { getTrainingUnitById, deleteTrainingUnit } from '@/services/trainingUnitService';
 import { queryClient } from '@/lib/queryClient';
@@ -97,6 +101,8 @@ export default function UnitDetailScreen() {
   const [unit, setUnit]       = useState<TrainingUnit | null>(null);
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<string | null>(null);   // Foto-Vollbild
+  const [voiceSheet, setVoiceSheet] = useState(false);
+  const voiceNotes = useVoiceNotes({ trainingUnitId: id });
 
   useEffect(() => {
     (async () => {
@@ -177,7 +183,7 @@ export default function UnitDetailScreen() {
             <Ionicons name="shield-checkmark-outline" size={18} color={C.muted} />
             <View style={s.flex}>
               <Text style={s.shareTitle}>Wer sieht das?</Text>
-              <Text style={s.shareSub}>Sichtbarkeit pro Trainer unter „Meine Trainer" festlegen</Text>
+              <Text style={s.shareSub}>Sichtbarkeit pro Trainer unter „Meine Trainer“ festlegen</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={C.subtle} />
           </TouchableOpacity>
@@ -239,6 +245,23 @@ export default function UnitDetailScreen() {
             </>
           )}
 
+          {/* Sprachmemos */}
+          <View style={{ marginTop: 8 }}>
+            <View style={s.voiceHead}>
+              <Text style={s.sectionLabel}>Sprachmemos</Text>
+              {!isReadOnly && (
+                <TouchableOpacity style={s.voiceAdd} onPress={() => setVoiceSheet(true)} activeOpacity={0.8}>
+                  <Ionicons name="mic" size={14} color={C.accent} />
+                  <Text style={s.voiceAddTxt}>Hinzufügen</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <VoiceNotesList trainingUnitId={id} />
+          </View>
+
+          {/* Smart Feedback (KI-Coach) — nur in der eigenen Sicht */}
+          {!isReadOnly && <SmartFeedbackSection dogId={unit.dog_id} />}
+
           {/* Kommentare / Nachrichten (Trainer ↔ Kunde) */}
           {id ? <CommentThread unitId={id} /> : null}
 
@@ -276,11 +299,36 @@ export default function UnitDetailScreen() {
           </SafeAreaView>
         </GestureHandlerRootView>
       </Modal>
+
+      {/* Sprachmemo aufnehmen */}
+      <Modal visible={voiceSheet} transparent animationType="slide" onRequestClose={() => setVoiceSheet(false)}>
+        <View style={s.sheetBackdrop}>
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <Text style={s.sheetTitle}>Sprachmemo</Text>
+            <VoiceRecorderCard
+              onCancel={() => setVoiceSheet(false)}
+              onSave={async (uri, duration) => {
+                setVoiceSheet(false);
+                await voiceNotes.add({ localUri: uri, context: 'training_note', trainingUnitId: id, dogId: unit?.dog_id ?? null, durationSeconds: duration });
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const s = StyleSheet.create({
+  voiceHead:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionLabel: { fontSize: 11, color: C.muted, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
+  voiceAdd:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: C.accentDim },
+  voiceAddTxt:  { fontSize: 12, color: C.accent, fontWeight: '700' },
+  sheetBackdrop:{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  sheet:        { backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, paddingBottom: 36, borderTopWidth: 1, borderColor: C.border },
+  sheetHandle:  { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: C.borderLight, marginBottom: 14 },
+  sheetTitle:   { fontSize: 16, color: C.white, fontWeight: '800', marginBottom: 14, marginLeft: 2 },
   root:   { flex: 1, backgroundColor: C.bg },
   flex:   { flex: 1 },
   scroll: { paddingBottom: 0 },

@@ -12,6 +12,7 @@ import type { FeedItem } from "@/services/trainingFeed";
 import { useHomeLayout } from "@/stores/homeLayout";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { HomeTimelineCard } from "@/components/calendar/HomeTimelineCard";
+import { AiCoachCard } from "@/features/ai/components/AiCoachCard";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -236,6 +237,11 @@ export default function HomeScreen() {
             <HomeTimelineCard />
           </View>
         )}
+
+        {/* ── KI-COACH (kompakt) ── */}
+        <View style={{ marginBottom: 24 }}>
+          <AiCoachCard />
+        </View>
 
         {/* ── HAUPTAKTIONEN ── */}
         {layout.hauptaktionen && (

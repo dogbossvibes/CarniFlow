@@ -18,8 +18,9 @@ const MATERIALS: { material: MarkerMaterial; icon: IconName; label: string }[] =
 ];
 
 const OTHERS: { type: MarkerType; icon: IconName; title: string; sub: string; color: string }[] = [
-  { type: 'winkel',     icon: 'git-branch', title: 'Winkel',     sub: 'Richtungswechsel markieren', color: C.trackWarning },
-  { type: 'verleitung', icon: 'warning',    title: 'Verleitung', sub: 'Fremdfährte / Ablenkung',    color: C.trackPurple },
+  { type: 'winkel',       icon: 'git-branch', title: 'Winkel',       sub: 'Richtungswechsel markieren', color: C.trackWarning },
+  { type: 'verleitung',   icon: 'warning',    title: 'Verleitung',   sub: 'Fremdfährte / Ablenkung',    color: C.trackPurple },
+  { type: 'sprachmarker', icon: 'mic',        title: 'Sprachmarker', sub: 'Notiz an dieser Stelle aufnehmen', color: C.trackBlue },
 ];
 
 export function MarkerBottomSheet({
