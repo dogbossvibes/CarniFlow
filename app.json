@@ -13,7 +13,7 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -107,7 +107,8 @@
           "speechRecognitionPermission": "ANYVO nutzt Spracherkennung für Sprachbefehle im Fährtenmodus.",
           "microphonePermission": "ANYVO benötigt das Mikrofon für Sprachmemos und Sprachbefehle."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

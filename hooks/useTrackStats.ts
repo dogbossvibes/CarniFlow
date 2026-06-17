@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { getTrackStats } from '@/services/trackingService';
+import { getTrackStatsRows } from '@/features/tracking/services/trackService';
 import { useSession } from '@/hooks/useSession';
 
-// Aggregierte Kennzahlen aus dem GPS-Fährtenmodul (track_sessions).
+// Aggregierte Kennzahlen aus dem aktiven Fährtenmodul (training_sessions type='track').
 export function useTrackStats() {
   const { session } = useSession();
   const uid = session?.user.id;
@@ -11,10 +11,10 @@ export function useTrackStats() {
     queryKey: ['trackStats', uid],
     enabled:  !!uid,
     queryFn:  async () => {
-      const { data } = await getTrackStats(uid!);
-      const rows = (data as { distanz_m: number | null }[]) ?? [];
+      const { data } = await getTrackStatsRows(uid!);
+      const rows = data ?? [];
       return {
-        meters: rows.reduce((sum, r) => sum + (r.distanz_m ?? 0), 0),
+        meters: rows.reduce((sum, r) => sum + (r.distance_meters ?? 0), 0),
         count:  rows.length,
       };
     },

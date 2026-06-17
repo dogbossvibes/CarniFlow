@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { initMonitoring, captureError } from '@/lib/monitoring';
+import { SyncProvider } from '@/features/sync/components/SyncProvider';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN).
 initMonitoring();
@@ -49,6 +50,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
     <SessionProvider>
       <StatusBar style="light" />
+      <SyncProvider />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
@@ -67,6 +69,7 @@ export default function RootLayout() {
         <Stack.Screen name="track/setup" />
         <Stack.Screen name="track/[id]" />
         <Stack.Screen name="track/record" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+        <Stack.Screen name="sync" />
       </Stack>
     </SessionProvider>
     </QueryClientProvider>

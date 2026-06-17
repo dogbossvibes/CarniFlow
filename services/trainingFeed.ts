@@ -1,6 +1,5 @@
 import type { TrainingUnit, TrainingExercise } from '@/types/trainingUnit';
 import type { TrainingSession } from '@/types';
-import type { TrackSession } from '@/types/tracking';
 
 // Nicht-destruktive Lese-Vereinheitlichung: altes (training_sessions), neues
 // (training_units) und GPS-Fährten (track_sessions) werden zu EINER
@@ -55,13 +54,15 @@ export function unitToFeedItem(u: TrainingUnit): FeedItem {
   return { ...u, source: 'unit' };
 }
 
-export function trackToFeedItem(t: TrackSession): FeedItem {
+// Aktive Fährten leben in training_sessions(type='track') — Zeile dorthin mappen.
+export function trackRowToFeedItem(t: any): FeedItem {
+  const dauer = t.search_duration_seconds ?? t.duration_seconds ?? null;
   const exercise: TrainingExercise = {
     discipline:    'Fährte',
-    exercise_name: 'GPS-Fährte',
-    rating:        t.rating,
-    notes:         t.notizen,
-    duration_sec:  t.dauer_sec,
+    exercise_name: t.surface_types?.[0] ? `Fährte · ${t.surface_types[0]}` : 'GPS-Fährte',
+    rating:        t.rating ?? null,
+    notes:         t.notes ?? null,
+    duration_sec:  dauer,
     seq_index:     0,
   };
   return {
@@ -69,12 +70,12 @@ export function trackToFeedItem(t: TrackSession): FeedItem {
     owner_id:     t.owner_id,
     dog_id:       t.dog_id,
     session_date: t.session_date,
-    started_at:   null,
-    ended_at:     null,
-    duration_sec: t.dauer_sec,
-    rating:       t.rating,
+    started_at:   t.started_at ?? null,
+    ended_at:     t.ended_at ?? null,
+    duration_sec: dauer,
+    rating:       t.rating ?? null,
     score:        null,
-    notes:        t.notizen,
+    notes:        t.notes ?? null,
     photos:       [],
     videos:       [],
     audio_files:  [],
@@ -96,12 +97,12 @@ export function trackToFeedItem(t: TrackSession): FeedItem {
 export function buildFeed(
   units: TrainingUnit[],
   sessions: TrainingSession[],
-  tracks: TrackSession[] = [],
+  tracks: any[] = [],
 ): FeedItem[] {
   const items = [
     ...units.map(unitToFeedItem),
     ...sessions.map(sessionToFeedItem),
-    ...tracks.map(trackToFeedItem),
+    ...tracks.map(trackRowToFeedItem),
   ];
   return items.sort((a, b) => {
     if (a.session_date !== b.session_date) return a.session_date < b.session_date ? 1 : -1;

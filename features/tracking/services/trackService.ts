@@ -240,6 +240,17 @@ export async function setTrackLyingTime(sessionId: string, minutes: number): Pro
   } catch (e) { return fail('setTrackLyingTime', e); }
 }
 
+// Aggregat-Kennzahlen aus den aktiven Fährten (training_sessions type='track').
+export async function getTrackStatsRows(ownerId: string): Promise<Result<{ distance_meters: number | null }[]>> {
+  try {
+    const { data, error } = await supabase
+      .from('training_sessions').select('distance_meters')
+      .eq('owner_id', ownerId).eq('type', 'track').eq('status', 'completed');
+    if (error) return fail('getTrackStatsRows', error);
+    return { data: (data ?? []) as { distance_meters: number | null }[], error: null };
+  } catch (e) { return fail('getTrackStatsRows', e); }
+}
+
 // Leichter Lookup: nur Hundename (für Live-Overlays, ohne Punkte/Marker zu laden).
 export async function getTrackSessionDogName(id: string): Promise<Result<string | null>> {
   try {

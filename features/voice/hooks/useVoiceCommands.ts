@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
-import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
+import { SpeechModule, useSpeechRecognitionEvent, SPEECH_RECOGNITION_AVAILABLE } from '@/features/voice/services/speechRecognition';
 import { useVoiceStore } from '@/features/voice/store/voiceStore';
 import { parseVoiceCommand, type VoiceCommand } from '@/features/voice/services/voiceCommandParser';
 
@@ -14,8 +14,9 @@ export function useVoiceCommands(onCommand: (cmd: VoiceCommand) => void) {
   useEffect(() => { onCmdRef.current = onCommand; }, [onCommand]);
 
   const begin = useCallback(() => {
+    if (!SpeechModule) return;
     try {
-      ExpoSpeechRecognitionModule.start({ lang: 'de-DE', interimResults: false, continuous: true });
+      SpeechModule.start({ lang: 'de-DE', interimResults: false, continuous: true });
       store.getState().setListening(true);
     } catch (e) { console.warn('[useVoiceCommands] start', e); }
   }, [store]);
@@ -33,8 +34,12 @@ export function useVoiceCommands(onCommand: (cmd: VoiceCommand) => void) {
   useSpeechRecognitionEvent('error', () => { store.getState().setListening(false); });
 
   const enable = useCallback(async () => {
+    if (!SPEECH_RECOGNITION_AVAILABLE || !SpeechModule) {
+      Alert.alert('Sprachsteuerung', 'Spracherkennung ist in dieser App-Version nicht verfügbar (neuer Build nötig).');
+      return;
+    }
     try {
-      const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      const perm = await SpeechModule.requestPermissionsAsync();
       if (!perm.granted) { Alert.alert('Spracherkennung', 'Bitte erlaube Mikrofon & Spracherkennung in den Einstellungen.'); return; }
       store.getState().setVoiceCommandEnabled(true);
       begin();
@@ -43,12 +48,12 @@ export function useVoiceCommands(onCommand: (cmd: VoiceCommand) => void) {
 
   const disable = useCallback(() => {
     store.getState().setVoiceCommandEnabled(false);
-    try { ExpoSpeechRecognitionModule.stop(); } catch { /* egal */ }
+    try { SpeechModule?.stop(); } catch { /* egal */ }
     store.getState().setListening(false);
   }, [store]);
 
   // Beim Verlassen sauber stoppen.
-  useEffect(() => () => { try { ExpoSpeechRecognitionModule.stop(); } catch { /* egal */ } }, []);
+  useEffect(() => () => { try { SpeechModule?.stop(); } catch { /* egal */ } }, []);
 
-  return { enabled: voiceCommandEnabled, isListening, lastCommand: lastRecognizedCommand, enable, disable };
+  return { enabled: voiceCommandEnabled, isListening, lastCommand: lastRecognizedCommand, available: SPEECH_RECOGNITION_AVAILABLE, enable, disable };
 }

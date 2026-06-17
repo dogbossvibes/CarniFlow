@@ -376,6 +376,12 @@ export default function ProfilScreen() {
             label="Datenschutz"
             onPress={() => router.push('/privacy')}
           />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="sync-outline"
+            label="Sync-Center"
+            onPress={() => router.push('/sync')}
+          />
         </View>
 
         <Text style={s.abschnitt}>TRAINER</Text>

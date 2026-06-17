@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import type { TrainingUnit } from '@/types/trainingUnit';
 import type { TrainingSession } from '@/types';
-import type { TrackSession } from '@/types/tracking';
 import { getTrainingUnits } from '@/services/trainingUnitService';
 import { getTrainingSessions } from '@/services/training';
-import { getTrackSessions } from '@/services/trackingService';
+import { getUserTrackSessions } from '@/features/tracking/services/trackService';
 import { buildFeed, type FeedItem } from '@/services/trainingFeed';
 import { useSession } from '@/hooks/useSession';
 
@@ -22,11 +21,12 @@ export function useTrainingFeed(dogId?: string) {
       const [u, s, t] = await Promise.all([
         getTrainingUnits(uid!, dogId),
         getTrainingSessions(uid!, dogId),
-        getTrackSessions(uid!, dogId),
+        getUserTrackSessions(uid!),
       ]);
       const units    = (u.data as TrainingUnit[])    ?? [];
       const sessions = (s.data as TrainingSession[]) ?? [];
-      const tracks   = (t.data as TrackSession[])    ?? [];
+      // Aktive Fährten aus training_sessions(type='track'), abgeschlossen + ggf. nach Hund.
+      const tracks   = ((t.data ?? []) as any[]).filter(r => r.status === 'completed' && (!dogId || r.dog_id === dogId));
       return buildFeed(units, sessions, tracks);
     },
   });

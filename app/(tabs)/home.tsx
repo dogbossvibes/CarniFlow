@@ -13,6 +13,7 @@ import { useHomeLayout } from "@/stores/homeLayout";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { HomeTimelineCard } from "@/components/calendar/HomeTimelineCard";
 import { AiCoachCard } from "@/features/ai/components/AiCoachCard";
+import { OfflineBanner } from "@/features/sync/components/OfflineBanner";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -230,6 +231,8 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+
+        <OfflineBanner />
 
         {/* ── SMART TRAINING TIMELINE ── */}
         {layout.woche && (
