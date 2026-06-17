@@ -13,8 +13,8 @@ export interface GpsSample extends LatLng {
 export type GpsQuality = 'sehr-gut' | 'gut' | 'mittel' | 'schwach';
 
 // Schwellen
-export const MAX_ACCURACY_M   = 15;   // schlechter → Punkt verwerfen / Warnung
-export const MIN_STEP_M        = 1.5;  // erst ab dieser Distanz neuen Punkt akzeptieren
+export const MAX_ACCURACY_M   = 25;   // schlechter → Punkt verwerfen (Rest glättet die Karte)
+export const MIN_STEP_M        = 1.0;  // erst ab dieser Distanz neuen Punkt akzeptieren
 export const MAX_SPEED_MPS     = 12;   // ~43 km/h: schneller = unrealistischer Sprung
 
 export const calculateDistance = distanceM;

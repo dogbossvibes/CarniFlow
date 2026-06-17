@@ -83,6 +83,7 @@ export async function saveTrackMarker(sessionId: string, m: MarkerSample): Promi
       .insert({
         session_id:          sessionId,
         marker_type:         m.type,
+        material:            m.material ?? null,
         latitude:            m.lat,
         longitude:           m.lng,
         accuracy:            m.accuracy,
@@ -227,6 +228,16 @@ export async function saveTrackEvaluation(sessionId: string, input: EvaluationIn
     if (error) return fail('saveTrackEvaluation', error);
     return { data: null, error: null };
   } catch (e) { return fail('saveTrackEvaluation', e); }
+}
+
+// Gemessene Liegezeit (Minuten) auf der Session speichern — beim Start der Ausarbeitung.
+export async function setTrackLyingTime(sessionId: string, minutes: number): Promise<Result<null>> {
+  try {
+    const { error } = await supabase.from('training_sessions')
+      .update({ lying_time_minutes: minutes }).eq('id', sessionId);
+    if (error) return fail('setTrackLyingTime', error);
+    return { data: null, error: null };
+  } catch (e) { return fail('setTrackLyingTime', e); }
 }
 
 // Leichter Lookup: nur Hundename (für Live-Overlays, ohne Punkte/Marker zu laden).

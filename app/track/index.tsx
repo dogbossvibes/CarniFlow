@@ -81,11 +81,12 @@ export default function TrackOverviewScreen() {
     return { lay, run, markers, center, hasGps: lay.length > 1 };
   }, [hero]);
 
+  const startHref = (effectiveDogId ? `/track/setup?dogId=${effectiveDogId}` : '/track/setup') as never;
   const actions: { icon: IconName; label: string; go: () => void; primary?: boolean }[] = [
-    { icon: 'add',           label: 'Planen',     go: () => router.push((effectiveDogId ? `/track/setup?dogId=${effectiveDogId}` : '/track/setup') as never), primary: true },
-    { icon: 'play',          label: 'Live',       go: () => router.push((effectiveDogId ? `/track/setup?dogId=${effectiveDogId}` : '/track/setup') as never) },
-    { icon: 'layers',        label: 'Logbuch',    go: () => router.push('/track/historie' as never) },
-    { icon: 'stats-chart',   label: 'Auswertung', go: () => router.push((last ? `/track/${last.id}` : '/track/setup') as never) },
+    { icon: 'play',          label: 'Fährte legen', go: () => router.push(startHref), primary: true },
+    { icon: 'stats-chart',   label: 'Auswertung',   go: () => router.push((last ? `/track/${last.id}` : startHref) as never) },
+    { icon: 'layers',        label: 'Logbuch',      go: () => router.push('/track/historie' as never) },
+    { icon: 'sparkles',      label: 'Insights',     go: () => router.push('/analyse/insights' as never) },
   ];
 
   return (

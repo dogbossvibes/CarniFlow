@@ -3,6 +3,7 @@ import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '
 import { schedulePersist, clearPending } from '@/features/tracking/store/trackPersist';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
+export type MarkerMaterial = 'stoff' | 'holz' | 'leder' | 'plastik' | 'diverses';
 export type OrientationMode = 'north' | 'heading' | 'track';
 
 export interface TrackPointSample extends LatLng {
@@ -16,6 +17,7 @@ export interface TrackPointSample extends LatLng {
 export interface MarkerSample {
   id:                string;
   type:              MarkerType;
+  material:          MarkerMaterial | null;   // nur bei Gegenständen
   lat:               number | null;
   lng:               number | null;
   accuracy:          number | null;
@@ -42,6 +44,7 @@ interface TrackingState {
   durationSeconds:     number;
   searchDurationSeconds: number;
   articlesFound:       number;
+  layFinishedAt:       number | null;   // ms: Zeitpunkt "Fertig gelegt" → Liegezeit-Timer
   mapFollowMode:       boolean;
   mapOrientationMode:  OrientationMode;
 
@@ -60,6 +63,7 @@ interface TrackingState {
   setHeading: (deg: number | null) => void;
   setDuration: (sec: number) => void;
   setSearchDuration: (sec: number) => void;
+  setLayFinishedAt: (ms: number | null) => void;
   setMapFollowMode: (on: boolean) => void;
   setMapOrientationMode: (m: OrientationMode) => void;
   reset: () => void;
@@ -81,6 +85,7 @@ const INITIAL = {
   durationSeconds:       0,
   searchDurationSeconds: 0,
   articlesFound:         0,
+  layFinishedAt:         null as number | null,
   mapFollowMode:         true,
   mapOrientationMode:    'north' as OrientationMode,
 };
@@ -139,6 +144,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setHeading: (deg) => set({ heading: deg }),
   setDuration: (sec) => set({ durationSeconds: sec }),
   setSearchDuration: (sec) => set({ searchDurationSeconds: sec }),
+  setLayFinishedAt: (ms) => set({ layFinishedAt: ms }),
   setMapFollowMode: (on) => set({ mapFollowMode: on }),
   setMapOrientationMode: (m) => set({ mapOrientationMode: m }),
   reset: () => { clearPending(); set({ ...INITIAL }); },

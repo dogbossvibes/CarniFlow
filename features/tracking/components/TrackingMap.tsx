@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyl
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
-import type { LatLng } from '@/features/tracking/utils/gpsFilter';
+import { removeGpsJitter, smoothTrackPoints, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import type { MarkerType } from '@/features/tracking/store/trackingStore';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
@@ -50,10 +50,16 @@ export function TrackingMap({
   // nicht bei jedem Positions-Fix → flüssigere Karte, weniger Renderlast.
   // Hooks stehen bewusst VOR dem Fallback-Return (rules-of-hooks); die .length-Deps
   // sind ebenfalls Absicht (Re-Memo nur bei neuem Punkt, nicht bei Fix-Update).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const layCoords = useMemo(() => layPoints.map(p => ({ latitude: p.lat, longitude: p.lng })), [layPoints.length]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const runCoords = useMemo(() => (runPoints ?? []).map(p => ({ latitude: p.lat, longitude: p.lng })), [runPoints?.length]);
+  // Rohe GPS-Punkte sind verrauscht → Ausreißer entfernen + glätten, damit die
+  // gezeichnete Linie dem echten Weg folgt (statt Zickzack). Recompute bei neuem Punkt.
+  const layCoords = useMemo(
+    () => smoothTrackPoints(removeGpsJitter(layPoints)).map(p => ({ latitude: p.lat, longitude: p.lng })),
+    [layPoints],
+  );
+  const runCoords = useMemo(
+    () => smoothTrackPoints(removeGpsJitter(runPoints ?? [])).map(p => ({ latitude: p.lat, longitude: p.lng })),
+    [runPoints],
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers.length]);
 

@@ -8,12 +8,12 @@ import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import {
-  LiveButton, LiveDogPill, LiveMetricBar, LiveTimer, LiveTopBar, type LiveView,
+  LiveButton, LiveDogPill, LiveMetricBar, LiveTimer, LiveTopBar, fmtClock, type LiveView,
 } from '@/features/tracking/components/LiveChrome';
 import { useTrackRun, SPEECH_AVAILABLE } from '@/features/tracking/hooks/useTrackRun';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { calculateDeviationFromTrack } from '@/features/tracking/utils/gpsFilter';
-import { getTrackSessionDogName } from '@/features/tracking/services/trackService';
+import { getTrackSessionDogName, setTrackLyingTime } from '@/features/tracking/services/trackService';
 
 export default function TrackRunScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,12 +28,21 @@ export default function TrackRunScreen() {
 
   const {
     trackPoints, runPoints, markers, currentPosition, heading, distanceMeters, searchDurationSeconds,
-    articlesFound, isRunningTrack, gpsAccuracy, mapFollowMode, setCurrentPosition,
+    articlesFound, isRunningTrack, gpsAccuracy, mapFollowMode, layFinishedAt, setCurrentPosition,
   } = useTrackingStore();
 
   useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
 
   useEffect(() => { if (id) getTrackSessionDogName(id).then(r => { if (r.data) setDogName(r.data); }); }, [id]);
+
+  // Liegezeit-Timer: zählt seit "Fertig gelegt" hoch, bis die Ausarbeitung startet.
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    if (isRunningTrack || !layFinishedAt) return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [isRunningTrack, layFinishedAt]);
+  const lyingSec = layFinishedAt ? Math.max(0, Math.floor((nowMs - layFinishedAt) / 1000)) : 0;
 
   // Vorschau-Position vor Suchstart.
   useEffect(() => {
@@ -61,7 +70,9 @@ export default function TrackRunScreen() {
     setStarting(true);
     const { error } = await run.start(id);
     setStarting(false);
-    if (error) Alert.alert('Suche', error === 'Kein aktiver Ablauf.' ? error : 'Konnte nicht gestartet werden. Bitte erneut versuchen.');
+    if (error) { Alert.alert('Suche', error === 'Kein aktiver Ablauf.' ? error : 'Konnte nicht gestartet werden. Bitte erneut versuchen.'); return; }
+    // Gemessene Liegezeit festhalten (non-blocking).
+    if (layFinishedAt) void setTrackLyingTime(id, Math.round(lyingSec / 60));
   };
 
   const handleFinish = () => {
@@ -81,7 +92,7 @@ export default function TrackRunScreen() {
   return (
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.safe}>
-        <LiveTopBar onBack={() => router.back()} view={view} onView={setView} />
+        <LiveTopBar onBack={() => router.back()} resting={!isRunningTrack} view={view} onView={setView} />
 
         <View style={s.mapWrap}>
           {view === 'map' ? (
@@ -93,7 +104,7 @@ export default function TrackRunScreen() {
             <View style={s.sketch}><TrackSketch legs={winkel} objects={articlesTotal} w={360} h={520} progress={1} /></View>
           )}
 
-          <LiveTimer seconds={searchDurationSeconds} label="Suchdauer" />
+          <LiveTimer seconds={isRunningTrack ? searchDurationSeconds : lyingSec} label={isRunningTrack ? 'Suchdauer' : 'Liegezeit'} />
           <LiveDogPill name={dogName} />
           <LiveMetricBar items={[
             { value: `${Math.round(distanceMeters)} m`, label: 'Distanz' },
@@ -105,7 +116,7 @@ export default function TrackRunScreen() {
 
         <View style={s.controls}>
           {!isRunningTrack ? (
-            <AnyvoButton label="Suche starten" icon="play" onPress={handleStart} loading={starting} big style={{ flex: 1 }} />
+            <AnyvoButton label={`Ausarbeiten starten · liegt ${fmtClock(lyingSec)}`} icon="play" onPress={handleStart} loading={starting} big style={{ flex: 1 }} />
           ) : (
             <>
               <LiveButton icon="flag" label="Gegenstand" onPress={() => run.foundArticle()} disabled={articlesFound >= articlesTotal} />

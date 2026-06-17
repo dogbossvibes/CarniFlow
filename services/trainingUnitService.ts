@@ -1,6 +1,26 @@
 import { supabase } from '@/lib/supabase';
 import type { TrainingUnit, TrainingExercise, AudioFile } from '@/types/trainingUnit';
 import type { TrainingMetrics } from '@/types/analytics';
+import { createEmbeddingForTrainingSession, createEmbeddingForExerciseNote } from '@/features/ai/services/trainingEmbeddingService';
+
+// Embeddings für die semantische Suche erzeugen — NON-BLOCKING (fire-and-forget,
+// schluckt Fehler intern). Darf das Speichern der Einheit nie aufhalten.
+function embedUnitContent(
+  unitId: string, dogId: string | null, notes: string | null,
+  exercises: { discipline: string; notes: string | null }[], sessionDate?: string | null,
+) {
+  const category = exercises[0]?.discipline ?? null;
+  const metadata = { unit_id: unitId, dog_id: dogId, category, session_date: sessionDate ?? null };
+  if (notes && notes.trim()) {
+    void createEmbeddingForTrainingSession({ sourceId: unitId, content: notes, metadata });
+  }
+  const exNotes = exercises
+    .map(e => (e.notes ? `${e.discipline}: ${e.notes}` : null))
+    .filter(Boolean).join('\n');
+  if (exNotes) {
+    void createEmbeddingForExerciseNote({ sourceId: unitId, content: exNotes, metadata });
+  }
+}
 
 // Verbundene Trainer:innen mit view_trainings-Berechtigung über neue Aktivität
 // der Kund:in informieren (best-effort, connection-basiert).
@@ -98,8 +118,9 @@ export async function finishTrainingUnit(
   }
 
   // Verbundene Trainer:innen (mit view_trainings) über die neue Einheit informieren.
-  const { data: u } = await supabase.from('training_units').select('owner_id').eq('id', unitId).single();
+  const { data: u } = await supabase.from('training_units').select('owner_id, dog_id, session_date').eq('id', unitId).single();
   if (u?.owner_id) notifyTrainersOfActivity(u.owner_id, '🐾 Neues Training').catch(() => {});
+  embedUnitContent(unitId, u?.dog_id ?? null, updates.notes, exercises, u?.session_date);
   return { error: null };
 }
 
@@ -124,6 +145,7 @@ export async function createDocumentedUnit(
     if (exErr) return { error: exErr, data: null };
   }
   notifyTrainersOfActivity(ownerId, '🐾 Neue Aktivität').catch(() => {});
+  embedUnitContent(data.id, data.dog_id ?? null, data.notes ?? null, exercises, data.session_date ?? null);
   return { error: null, data };
 }
 
@@ -149,7 +171,9 @@ export async function updateDocumentedUnit(
   return { error: null };
 }
 
-export function deleteTrainingUnit(id: string) {
+export async function deleteTrainingUnit(id: string) {
+  // Zugehörige Embeddings mitlöschen (Units verknüpfen über source_id, kein FK-Cascade).
+  await supabase.from('training_embeddings').delete().eq('source_id', id);
   return supabase.from('training_units').delete().eq('id', id);
 }
 

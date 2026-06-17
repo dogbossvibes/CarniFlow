@@ -12,6 +12,7 @@ import {
 import { useTrackRecording } from '@/features/tracking/hooks/useTrackRecording';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { getTrackSessionDogName } from '@/features/tracking/services/trackService';
+import { metersToSteps } from '@/features/tracking/utils/steps';
 
 export default function TrackRecordScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,7 +26,7 @@ export default function TrackRecordScreen() {
 
   const {
     trackPoints, markers, currentPosition, heading, distanceMeters, durationSeconds,
-    gpsAccuracy, isPaused, mapFollowMode,
+    isPaused, mapFollowMode,
   } = useTrackingStore();
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function TrackRecordScreen() {
   const mapMarkers: MapMarker[] = markers.map(m => ({ type: m.type, lat: m.lat, lng: m.lng }));
   const gegenstaende = markers.filter(m => m.type === 'gegenstand').length;
   const winkel = markers.filter(m => m.type === 'winkel').length;
+  const steps = metersToSteps(distanceMeters);
 
   const handleFinish = () => {
     Alert.alert('Fährte gelegt?', 'Die gelegte Fährte wird gespeichert — danach geht es zur Ausarbeitung.', [
@@ -73,10 +75,10 @@ export default function TrackRecordScreen() {
           <LiveTimer seconds={durationSeconds} label="Aufnahme" />
           <LiveDogPill name={dogName} />
           <LiveMetricBar items={[
+            { value: String(steps), label: 'Schritte' },
             { value: `${Math.round(distanceMeters)} m`, label: 'Distanz' },
             { value: String(gegenstaende), label: 'Gegenst.' },
             { value: String(winkel), label: 'Winkel' },
-            { value: gpsAccuracy != null ? `${Math.round(gpsAccuracy)} m` : '—', label: 'GPS' },
           ]} />
         </View>
 
@@ -90,7 +92,8 @@ export default function TrackRecordScreen() {
         </View>
       </SafeAreaView>
 
-      <MarkerBottomSheet visible={sheet} onClose={() => setSheet(false)} onSelect={type => rec.addMarker(type)} />
+      <MarkerBottomSheet visible={sheet} onClose={() => setSheet(false)}
+        onSelect={c => rec.addMarker(c.type, { material: c.material })} />
     </View>
   );
 }

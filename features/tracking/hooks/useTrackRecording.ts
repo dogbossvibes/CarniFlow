@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
-import { useTrackingStore, type MarkerType, type TrackPointSample } from '@/features/tracking/store/trackingStore';
+import { useTrackingStore, type MarkerType, type MarkerMaterial, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { shouldAcceptTrackPoint, calculateAverageAccuracy, type GpsSample } from '@/features/tracking/utils/gpsFilter';
 import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/services/trackService';
@@ -81,12 +81,13 @@ export function useTrackRecording() {
   const pause  = useCallback(() => store.getState().pauseRecording(), [store]);
   const resume = useCallback(() => store.getState().resumeRecording(), [store]);
 
-  const addMarker = useCallback(async (type: MarkerType, opts?: { note?: string; audioUrl?: string }) => {
+  const addMarker = useCallback(async (type: MarkerType, opts?: { note?: string; audioUrl?: string; material?: MarkerMaterial }) => {
     const s = store.getState();
     const pos = s.currentPosition;
     const marker = {
       id: `${type}-${Date.now()}`,
       type,
+      material: opts?.material ?? null,
       lat: pos?.lat ?? null,
       lng: pos?.lng ?? null,
       accuracy: s.gpsAccuracy,
@@ -105,6 +106,7 @@ export function useTrackRecording() {
     stopAll();
     const s = store.getState();
     s.stopRecording();
+    s.setLayFinishedAt(Date.now());   // Start der Liegezeit
     const accAvg = calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy));
     const res = await finishTrackRecording(sessionId, s.trackPoints, {
       layingDurationSeconds: s.durationSeconds,

@@ -27,10 +27,11 @@ function RecDot() {
 }
 
 export function LiveTopBar({
-  onBack, paused, view, onView,
+  onBack, paused, resting, view, onView,
 }: {
   onBack: () => void;
   paused?: boolean;
+  resting?: boolean;   // Fährte liegt (vor der Ausarbeitung) → ruhiger Zustand, kein REC-Blinken
   view?: LiveView;
   onView?: (v: LiveView) => void;
 }) {
@@ -39,10 +40,17 @@ export function LiveTopBar({
       <TouchableOpacity style={s.backBtn} onPress={onBack} hitSlop={8} activeOpacity={0.8}>
         <Ionicons name="chevron-back" size={17} color={C.trackText} />
       </TouchableOpacity>
-      <View style={[s.livePill, paused && s.livePillPaused]}>
-        {paused ? <View style={[s.recDot, { opacity: 0.5 }]} /> : <RecDot />}
-        <Text style={[s.liveTxt, paused && { color: C.trackTextSec }]}>{paused ? 'PAUSE' : 'LIVE'}</Text>
-      </View>
+      {resting ? (
+        <View style={s.restPill}>
+          <Ionicons name="time-outline" size={13} color={C.trackPrimary} />
+          <Text style={s.restTxt}>LIEGT</Text>
+        </View>
+      ) : (
+        <View style={[s.livePill, paused && s.livePillPaused]}>
+          {paused ? <View style={[s.recDot, { opacity: 0.5 }]} /> : <RecDot />}
+          <Text style={[s.liveTxt, paused && { color: C.trackTextSec }]}>{paused ? 'PAUSE' : 'LIVE'}</Text>
+        </View>
+      )}
       <View style={{ flex: 1 }} />
       {view && onView && (
         <View style={s.segment}>
@@ -126,6 +134,8 @@ const s = StyleSheet.create({
 
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(255,93,108,0.14)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.3)' },
   livePillPaused: { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: C.trackBorder },
+  restPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: C.trackPrimaryDk + '22', borderWidth: 1, borderColor: C.trackPrimary + '55' },
+  restTxt:  { fontSize: 11, fontWeight: '800', letterSpacing: 1.4, color: C.trackPrimary },
   recDot:   { width: 8, height: 8, borderRadius: 4, backgroundColor: C.trackDanger },
   liveTxt:  { fontSize: 11, fontWeight: '800', letterSpacing: 1.4, color: '#ff8a94' },
 

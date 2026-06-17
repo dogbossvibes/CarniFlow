@@ -14,6 +14,7 @@ import { TrackScoreRing } from '@/features/tracking/components/TrackScoreRing';
 import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
 import { FaehrtenHeader, SectionLabel, relDate } from '@/features/tracking/components/FaehrtenChrome';
 import { getTrackSessionById, saveTrackEvaluation } from '@/features/tracking/services/trackService';
+import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
@@ -64,7 +65,20 @@ export default function TrackAuswertungScreen() {
     setSaving(true);
     const { error } = await saveTrackEvaluation(id, { legs, rating: score, notes: notes.trim() || null });
     setSaving(false);
-    if (!error) router.replace('/track' as never);
+    if (!error) {
+      // Semantik-Embedding (non-blocking) — darf das Speichern nicht aufhalten.
+      const surf = data.surface_types?.[0] ?? 'Fährte';
+      const text = `Fährte ${surf}, ${data.corners_total ?? 0} Winkel, ${data.articles_total ?? 0} Gegenstände, `
+        + `Score ${score}/100${notes.trim() ? `. Notiz: ${notes.trim()}` : ''}`;
+      void createEmbeddingForTrackSummary({
+        trainingSessionId: id, sourceId: id, content: text, contentSummary: notes.trim() || undefined,
+        metadata: {
+          dog_id: data.dog_id, category: 'Fährte', score,
+          surface_types: data.surface_types ?? [], session_date: data.session_date ?? null,
+        },
+      });
+      router.replace('/track' as never);
+    }
   };
 
   if (loading) return <View style={s.center}><ActivityIndicator color={C.trackPrimary} size="large" /></View>;

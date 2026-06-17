@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   ActivityIndicator, Alert, ScrollView, StyleSheet, Text,
   TouchableOpacity, useWindowDimensions, View,
@@ -38,6 +38,7 @@ export default function AnalyticsScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiOverride, setAiOverride] = useState<TrainingAnalysis | null>(null);
   const { width }              = useWindowDimensions();
+  const router                 = useRouter();
 
   const selectedDog = dogs[dogIdx] ?? null;
   const {
@@ -180,6 +181,23 @@ export default function AnalyticsScreen() {
           contentContainerStyle={s.content}
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Smart Search / Insights (KI-Semantiksuche) ── */}
+          <TouchableOpacity
+            onPress={() => router.push('/analyse/insights' as never)}
+            activeOpacity={0.85}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 15, paddingVertical: 14,
+              borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, marginBottom: 16 }}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="sparkles" size={19} color={C.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, color: C.white, fontWeight: '700' }}>Smart Search</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Trainings nach Bedeutung durchsuchen</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.muted} />
+          </TouchableOpacity>
+
           {/* ── Hero Score Card ── */}
           <View style={s.heroCard}>
             <LinearGradient
