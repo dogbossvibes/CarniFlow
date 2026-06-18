@@ -4,6 +4,7 @@ import { schedulePersist, clearPending } from '@/features/tracking/store/trackPe
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
 export type MarkerMaterial = 'stoff' | 'holz' | 'leder' | 'plastik' | 'diverses';
+export type AngleKind = 'links' | 'rechts' | 'spitz' | 'absatz';
 export type OrientationMode = 'north' | 'heading' | 'track';
 
 export interface TrackPointSample extends LatLng {
@@ -18,6 +19,7 @@ export interface MarkerSample {
   id:                string;
   type:              MarkerType;
   material:          MarkerMaterial | null;   // nur bei Gegenständen
+  angleKind:         AngleKind | null;        // nur bei Winkeln
   lat:               number | null;
   lng:               number | null;
   accuracy:          number | null;

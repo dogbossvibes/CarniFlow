@@ -77,6 +77,16 @@ export default function TrackRunScreen() {
     if (layFinishedAt) void setTrackLyingTime(id, Math.round(lyingSec / 60));
   };
 
+  const handleCancel = () => {
+    Alert.alert('Ausarbeitung abbrechen?', 'Die Ausarbeitung wird nicht gespeichert. Die gelegte Fährte bleibt erhalten.', [
+      { text: 'Weiter', style: 'cancel' },
+      { text: 'Abbrechen', style: 'destructive', onPress: () => {
+        useTrackingStore.getState().reset();
+        router.replace('/track' as never);
+      } },
+    ]);
+  };
+
   const handleFinish = () => {
     Alert.alert('Suche beenden?', 'Die Ausarbeitung wird gespeichert — danach geht es zur Auswertung.', [
       { text: 'Weiter suchen', style: 'cancel' },
@@ -103,7 +113,7 @@ export default function TrackRunScreen() {
   return (
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.safe}>
-        <LiveTopBar onBack={() => router.back()} resting={!isRunningTrack} view={view} onView={setView} />
+        <LiveTopBar onBack={handleCancel} resting={!isRunningTrack} view={view} onView={setView} />
 
         <View style={s.mapWrap}>
           {view === 'map' ? (

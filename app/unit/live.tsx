@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,7 +8,7 @@ import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { disciplineColor } from '@/constants/disciplines';
-import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs, setGoalMinutes } from '@/stores/activeTraining';
+import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs, setGoalMinutes, resetUnit } from '@/stores/activeTraining';
 import { tapHaptic } from '@/lib/haptics';
 
 function formatTime(sec: number): string {
@@ -55,9 +55,22 @@ export default function LiveScreen() {
     router.push({ pathname: '/unit/summary', params: { duration: String(elapsed) } });
   };
 
+  const handleCancel = () => {
+    tapHaptic();
+    Alert.alert('Training abbrechen?', 'Die laufende Einheit wird verworfen und nicht gespeichert.', [
+      { text: 'Weiter trainieren', style: 'cancel' },
+      { text: 'Verwerfen', style: 'destructive', onPress: () => { resetUnit(); router.replace('/(tabs)/training' as never); } },
+    ]);
+  };
+
   return (
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.flex}>
+        {/* Zurück / Abbrechen */}
+        <TouchableOpacity style={s.cancelBtn} onPress={handleCancel} hitSlop={8} activeOpacity={0.8}>
+          <Ionicons name="chevron-back" size={22} color={C.white} />
+        </TouchableOpacity>
+
         {/* Timer-Kopf */}
         <View style={s.timerWrap}>
           <Text style={s.timerLabel}>{running ? 'TRAINING LÄUFT' : 'PAUSIERT'}</Text>
@@ -143,6 +156,7 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   flex: { flex: 1 },
 
+  cancelBtn:  { position: 'absolute', top: 8, left: 16, zIndex: 10, width: 38, height: 38, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   timerWrap:  { alignItems: 'center', paddingTop: 18, paddingBottom: 18, gap: 8, borderBottomWidth: 1, borderBottomColor: C.border },
   timerLabel: { fontSize: 11, color: C.accent, fontWeight: '800', letterSpacing: 2 },
   timer:      { fontSize: 64, color: C.white, fontWeight: '900', letterSpacing: -2, fontVariant: ['tabular-nums'] },

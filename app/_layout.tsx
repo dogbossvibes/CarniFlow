@@ -70,6 +70,7 @@ export default function RootLayout() {
         <Stack.Screen name="track/[id]" />
         <Stack.Screen name="track/record" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="sync" />
+        <Stack.Screen name="dev/offline-debug" />
       </Stack>
     </SessionProvider>
     </QueryClientProvider>

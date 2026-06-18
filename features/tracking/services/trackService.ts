@@ -84,6 +84,7 @@ export async function saveTrackMarker(sessionId: string, m: MarkerSample): Promi
         session_id:          sessionId,
         marker_type:         m.type,
         material:            m.material ?? null,
+        angle_kind:          m.angleKind ?? null,
         latitude:            m.lat,
         longitude:           m.lng,
         accuracy:            m.accuracy,
@@ -209,6 +210,15 @@ export async function finishTrackRun(runId: string, sessionId: string, summary: 
     if (sErr) return fail('finishTrackRun.session', sErr);
     return { data: null, error: null };
   } catch (e) { return fail('finishTrackRun', e); }
+}
+
+// Fährte verwerfen (Abbrechen): Session + Punkte/Marker/Runs (FK-Cascade) löschen.
+export async function deleteTrackSession(id: string): Promise<Result<null>> {
+  try {
+    const { error } = await supabase.from('training_sessions').delete().eq('id', id);
+    if (error) return fail('deleteTrackSession', error);
+    return { data: null, error: null };
+  } catch (e) { return fail('deleteTrackSession', e); }
 }
 
 // ── Auswertung speichern ─────────────────────────────────────

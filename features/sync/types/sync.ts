@@ -82,6 +82,7 @@ export interface LocalTrackMarker {
   session_remote_id:  string | null;
   marker_type:        string;
   material:           string | null;
+  angle_kind:         string | null;
   latitude:           number | null;
   longitude:          number | null;
   accuracy:           number | null;

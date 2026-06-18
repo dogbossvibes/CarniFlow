@@ -26,7 +26,7 @@ export async function createLocalTrackPointsBatch(sessionLocalId: string, points
 }
 
 export interface NewTrackMarker {
-  marker_type: string; material?: string | null;
+  marker_type: string; material?: string | null; angle_kind?: string | null;
   latitude?: number | null; longitude?: number | null; accuracy?: number | null;
   distance_from_start?: number | null; note?: string | null; audio_local_uri?: string | null;
 }
@@ -35,9 +35,9 @@ export async function createLocalTrackMarker(sessionLocalId: string, m: NewTrack
   const db = await getLocalDb();
   const id = newLocalId('mk');
   await db.runAsync(
-    `insert into local_track_markers (local_id, remote_id, session_local_id, session_remote_id, marker_type, material, latitude, longitude, accuracy, distance_from_start, note, audio_local_uri, audio_remote_url, created_at, sync_status, payload_json)
-     values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, 'pending', null)`,
-    id, sessionLocalId, m.marker_type, m.material ?? null, m.latitude ?? null, m.longitude ?? null,
+    `insert into local_track_markers (local_id, remote_id, session_local_id, session_remote_id, marker_type, material, angle_kind, latitude, longitude, accuracy, distance_from_start, note, audio_local_uri, audio_remote_url, created_at, sync_status, payload_json)
+     values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, 'pending', null)`,
+    id, sessionLocalId, m.marker_type, m.material ?? null, m.angle_kind ?? null, m.latitude ?? null, m.longitude ?? null,
     m.accuracy ?? null, m.distance_from_start ?? null, m.note ?? null, m.audio_local_uri ?? null, nowIso(),
   );
   return id;

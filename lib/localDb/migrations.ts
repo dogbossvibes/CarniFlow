@@ -127,4 +127,9 @@ export const MIGRATIONS: LocalMigration[] = [
     );
     create index if not exists idx_sq_status on sync_queue (status, priority);`,
   },
+  {
+    version: 6,
+    name: 'add_angle_kind_to_local_track_markers',
+    sql: `alter table local_track_markers add column angle_kind text;`,
+  },
 ];

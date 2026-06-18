@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
-import { useTrackingStore, type MarkerType, type MarkerMaterial, type TrackPointSample } from '@/features/tracking/store/trackingStore';
+import { useTrackingStore, type MarkerType, type MarkerMaterial, type AngleKind, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { shouldAcceptTrackPoint, calculateAverageAccuracy, type GpsSample } from '@/features/tracking/utils/gpsFilter';
 import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/services/trackService';
@@ -107,13 +107,14 @@ export function useTrackRecording() {
   const pause  = useCallback(() => store.getState().pauseRecording(), [store]);
   const resume = useCallback(() => store.getState().resumeRecording(), [store]);
 
-  const addMarker = useCallback(async (type: MarkerType, opts?: { note?: string; audioUrl?: string; material?: MarkerMaterial }) => {
+  const addMarker = useCallback(async (type: MarkerType, opts?: { note?: string; audioUrl?: string; material?: MarkerMaterial; angleKind?: AngleKind }) => {
     const s = store.getState();
     const pos = s.currentPosition;
     const marker = {
       id: `${type}-${Date.now()}`,
       type,
       material: opts?.material ?? null,
+      angleKind: opts?.angleKind ?? null,
       lat: pos?.lat ?? null,
       lng: pos?.lng ?? null,
       accuracy: s.gpsAccuracy,
@@ -125,7 +126,7 @@ export function useTrackRecording() {
     };
     s.addMarker(marker);
     if (localSessionId.current) {
-      try { await createLocalTrackMarker(localSessionId.current, { marker_type: marker.type, material: marker.material, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null }); }
+      try { await createLocalTrackMarker(localSessionId.current, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null }); }
       catch (e) { console.warn('[localTrack] marker', e); }
     }
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker); // best-effort, Fehler wird geloggt

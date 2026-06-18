@@ -65,7 +65,7 @@ export async function createRemoteTrackMarkersBatch(remoteSessionId: string, mar
   try {
     if (markers.length === 0) return { data: null, error: null };
     const rows = markers.map(m => ({
-      session_id: remoteSessionId, marker_type: m.marker_type, material: m.material,
+      session_id: remoteSessionId, marker_type: m.marker_type, material: m.material, angle_kind: m.angle_kind,
       latitude: m.latitude, longitude: m.longitude, accuracy: m.accuracy,
       distance_from_start: m.distance_from_start, note: m.note, audio_url: m.audio_remote_url, found: false,
     }));

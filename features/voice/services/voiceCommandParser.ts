@@ -1,9 +1,9 @@
-import type { MarkerType } from '@/features/tracking/store/trackingStore';
+import type { MarkerType, AngleKind } from '@/features/tracking/store/trackingStore';
 
 // Sprachbefehle für den Fährtenmodus. Erkennt kurze Kommandos inkl.
 // Schweizerdeutsch-/Synonym-Varianten.
 export type VoiceCommand =
-  | { type: 'ADD_MARKER'; markerType: MarkerType; label: string }
+  | { type: 'ADD_MARKER'; markerType: MarkerType; label: string; angleKind?: AngleKind }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'STOP_RECORDING' }
@@ -21,7 +21,11 @@ const RULES: { match: RegExp; cmd: () => VoiceCommand }[] = [
   { match: /\b(weiter|fortsetz|wiiter|fortfahren|resume)\b/, cmd: () => ({ type: 'RESUME' }) },
   { match: /\b(pause|pausier|anhalten|halt|stop)\b/, cmd: () => ({ type: 'PAUSE' }) },
   { match: /\b(gegenstand|gegenständ|artikel|objekt|apport)\b/, cmd: () => ({ type: 'ADD_MARKER', markerType: 'gegenstand', label: 'Gegenstand' }) },
-  { match: /\b(winkel|ecke|links?winkel|rechts?winkel|wink|kurve)\b/, cmd: () => ({ type: 'ADD_MARKER', markerType: 'winkel', label: 'Winkel' }) },
+  { match: /\b(absatz)\b/, cmd: () => ({ type: 'ADD_MARKER', markerType: 'winkel', label: 'Absatz', angleKind: 'absatz' }) },
+  { match: /\b(spitzwinkel|spitzer winkel|spitz)\b/, cmd: () => ({ type: 'ADD_MARKER', markerType: 'winkel', label: 'Spitzwinkel', angleKind: 'spitz' }) },
+  { match: /\b(linkswinkel|links\s?winkel|winkel links)\b/, cmd: () => ({ type: 'ADD_MARKER', markerType: 'winkel', label: 'Linkswinkel', angleKind: 'links' }) },
+  { match: /\b(rechtswinkel|rechts\s?winkel|winkel rechts)\b/, cmd: () => ({ type: 'ADD_MARKER', markerType: 'winkel', label: 'Rechtswinkel', angleKind: 'rechts' }) },
+  { match: /\b(winkel|ecke|wink|kurve)\b/, cmd: () => ({ type: 'ADD_MARKER', markerType: 'winkel', label: 'Winkel' }) },
   { match: /\b(verleitung|ablenkung|fremdfährte|fremd|verleit)\b/, cmd: () => ({ type: 'ADD_MARKER', markerType: 'verleitung', label: 'Verleitung' }) },
 ];
 

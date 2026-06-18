@@ -90,6 +90,7 @@ export function TrackingMap({
         provider={RNMaps.PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFill}
         mapType={mapType}
+        showsUserLocation
         showsCompass={false}
         showsMyLocationButton={false}
         initialRegion={{

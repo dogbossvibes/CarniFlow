@@ -11,8 +11,9 @@ import {
 } from '@/features/tracking/components/LiveChrome';
 import { useTrackRecording } from '@/features/tracking/hooks/useTrackRecording';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
-import { getTrackSessionDogName } from '@/features/tracking/services/trackService';
+import { getTrackSessionDogName, deleteTrackSession } from '@/features/tracking/services/trackService';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { suggestAngleKind } from '@/features/tracking/utils/angleClassify';
 import { VoiceCommandButton } from '@/features/voice/components/VoiceCommandButton';
 import { VoiceRecorderCard } from '@/features/voice/components/VoiceRecorderCard';
 import { uploadVoiceNote } from '@/features/voice/services/voiceUploadService';
@@ -44,9 +45,22 @@ export default function TrackRecordScreen() {
   }, [id]);
 
   const mapMarkers: MapMarker[] = markers.map(m => ({ type: m.type, lat: m.lat, lng: m.lng }));
+  const suggestedAngle = suggestAngleKind(trackPoints.map(p => ({ lat: p.lat, lng: p.lng })));
   const gegenstaende = markers.filter(m => m.type === 'gegenstand').length;
   const winkel = markers.filter(m => m.type === 'winkel').length;
   const steps = metersToSteps(distanceMeters);
+
+  const handleCancel = () => {
+    Alert.alert('Fährte abbrechen?', 'Die laufende Aufnahme wird verworfen und nichts gespeichert.', [
+      { text: 'Weiter aufnehmen', style: 'cancel' },
+      { text: 'Verwerfen', style: 'destructive', onPress: async () => {
+        rec.stopAll();
+        useTrackingStore.getState().reset();
+        if (id) await deleteTrackSession(id);
+        router.replace('/track' as never);
+      } },
+    ]);
+  };
 
   const handleFinish = () => {
     Alert.alert('Fährte gelegt?', 'Die gelegte Fährte wird gespeichert — danach geht es zur Ausarbeitung.', [
@@ -63,7 +77,7 @@ export default function TrackRecordScreen() {
   };
 
   const onVoiceCommand = (cmd: VoiceCommand) => {
-    if (cmd.type === 'ADD_MARKER') rec.addMarker(cmd.markerType);
+    if (cmd.type === 'ADD_MARKER') rec.addMarker(cmd.markerType, { angleKind: cmd.angleKind });
     else if (cmd.type === 'PAUSE') { if (!isPaused) rec.pause(); }
     else if (cmd.type === 'RESUME') { if (isPaused) rec.resume(); }
     else if (cmd.type === 'STOP_RECORDING') handleFinish();
@@ -72,7 +86,7 @@ export default function TrackRecordScreen() {
   return (
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.safe}>
-        <LiveTopBar onBack={() => router.back()} paused={isPaused} view={view} onView={setView} />
+        <LiveTopBar onBack={handleCancel} paused={isPaused} view={view} onView={setView} />
 
         <View style={s.mapWrap}>
           {view === 'map' ? (
@@ -108,8 +122,8 @@ export default function TrackRecordScreen() {
         </View>
       </SafeAreaView>
 
-      <MarkerBottomSheet visible={sheet} onClose={() => setSheet(false)}
-        onSelect={c => { if (c.type === 'sprachmarker') setVoiceMarker(true); else rec.addMarker(c.type, { material: c.material }); }} />
+      <MarkerBottomSheet visible={sheet} onClose={() => setSheet(false)} suggestedAngle={suggestedAngle}
+        onSelect={c => { if (c.type === 'sprachmarker') setVoiceMarker(true); else rec.addMarker(c.type, { material: c.material, angleKind: c.angleKind }); }} />
 
       {/* Sprachmarker: Notiz an aktueller Position aufnehmen */}
       <Modal visible={voiceMarker} transparent animationType="slide" onRequestClose={() => setVoiceMarker(false)}>
