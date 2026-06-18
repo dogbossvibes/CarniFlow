@@ -1,8 +1,4 @@
-// @ts-nocheck — jest-Globals (describe/it/expect) sind erst mit Test-Runner typisiert.
-// Tests für das Subscription-/Capability-Modell.
-// HINWEIS: Im Projekt ist (noch) kein Test-Runner konfiguriert. Diese Datei ist
-// jest-kompatibel geschrieben und läuft, sobald z. B. jest-expo eingerichtet ist
-// (npx expo install jest-expo jest @types/jest + "test": "jest").
+// Tests für das Subscription-/Capability-Modell (jest-expo, `npm test`).
 import {
   hasCapability, planToCapabilities, isTrainerPlan, planOfProduct,
   ACTIVE_CAPABILITIES, TRAINER_CAPABILITIES, PRODUCT_IDS,
