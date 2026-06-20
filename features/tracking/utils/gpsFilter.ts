@@ -13,7 +13,10 @@ export interface GpsSample extends LatLng {
 export type GpsQuality = 'sehr-gut' | 'gut' | 'mittel' | 'schwach';
 
 // Schwellen
-export const MAX_ACCURACY_M   = 25;   // schlechter → Punkt verwerfen (Rest glättet die Karte)
+// 40 m trennt echtes GPS (im Freien meist 5–15 m, unter Bäumen bis ~35 m) sauber
+// von groben Funkmast-Fixes (Apple-Coarse liefert i. d. R. 65 m / 165 m / 1000 m).
+// 25 m war für Fährten auf Feld/Wald zu streng → es wurden alle Punkte verworfen.
+export const MAX_ACCURACY_M   = 40;   // schlechter → Punkt verwerfen (Rest glättet die Karte)
 export const MIN_STEP_M        = 1.0;  // erst ab dieser Distanz neuen Punkt akzeptieren
 export const MAX_SPEED_MPS     = 12;   // ~43 km/h: schneller = unrealistischer Sprung
 
@@ -22,12 +25,16 @@ export const calculateDeviationFromTrack = deviationFromTrack;
 
 // Entscheidet, ob ein neuer Fix als Trackpunkt akzeptiert wird.
 export function shouldAcceptTrackPoint(last: GpsSample | null, next: GpsSample): boolean {
-  // 1) Zu ungenau → verwerfen.
-  if (next.accuracy != null && next.accuracy > MAX_ACCURACY_M) return false;
+  // 1) Ersten Punkt IMMER annehmen — sonst bleibt der Track leer, wenn der erste
+  //    Fix ungenau ist (typisch direkt nach App-Start). Ohne Startanker zeichnet
+  //    die Karte keine Linie ("bleibt grad").
   if (!last) return true;
 
+  // 2) Danach: zu ungenau → verwerfen.
+  if (next.accuracy != null && next.accuracy > MAX_ACCURACY_M) return false;
+
   const dist = distanceM(last, next);
-  // 2) Mindestabstand (filtert Stand-Jitter).
+  // 3) Mindestabstand (filtert Stand-Jitter).
   if (dist < MIN_STEP_M) return false;
 
   // 3) Speed-Sanity: großer Sprung in kurzer Zeit → verwerfen.

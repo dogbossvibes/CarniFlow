@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import { isExternalMode, subscribeRecorder, getRecordedPoints, resetRecorder } from '@/lib/trackRecorder';
+import { precisionLocationClient as client } from '@/features/tracking/native/precisionLocationClient';
 import type { GpsSample } from '@/features/tracking/utils/gpsFilter';
 
 // Reichere Probe inkl. der Felder, die nur Telefon-GPS liefert.
@@ -9,9 +10,11 @@ export interface StreamSample extends GpsSample {
   course?:   number | null;   // Bewegungsrichtung (Telefon-GPS)
 }
 
-// Einheitliche Positions-Quelle: externes BLE-GPS (über lib/trackRecorder.pushPoint)
-// wenn verbunden, sonst Telefon-GPS via watchPositionAsync. Gibt eine
-// Aufräum-Funktion zurück. So müssen die Hooks die Quelle nicht kennen.
+// Einheitliche Positions-Quelle für die Fährtenaufnahme:
+//   1) externes BLE-GPS (über lib/trackRecorder.pushPoint), wenn verbunden
+//   2) sonst die native Precision-Engine (anyvo-precision-location), die intern
+//      auf expo-location zurückfällt, falls das native Modul nicht im Build ist.
+// Gibt eine Aufräum-Funktion zurück. Die Hooks müssen die Quelle nicht kennen.
 export async function startPositionStream(
   onSample: (s: StreamSample) => void,
   opts: Location.LocationOptions,
@@ -30,9 +33,21 @@ export async function startPositionStream(
     return unsub;
   }
 
-  const sub = await Location.watchPositionAsync(opts, loc => onSample({
-    lat: loc.coords.latitude, lng: loc.coords.longitude, accuracy: loc.coords.accuracy,
-    t: loc.timestamp || Date.now(), altitude: loc.coords.altitude, speed: loc.coords.speed, course: loc.coords.heading,
+  // Native Precision-Engine (Telefon-GPS) — fällt intern auf expo-location zurück.
+  const sub = client.onLocation(loc => onSample({
+    lat: loc.latitude,
+    lng: loc.longitude,
+    accuracy: loc.accuracy ?? null,
+    t: loc.timestamp || Date.now(),
+    altitude: loc.altitude ?? null,
+    speed: loc.speed ?? null,
+    course: loc.heading ?? loc.bearing ?? null,
   }));
-  return () => sub.remove();
+  await client.start({
+    intervalMs: opts.timeInterval ?? 1000,
+    mode: 'tracking_dog_sport',   // BestForNavigation, kein Auto-Pause
+    enableHeading: false,         // Heading läuft separat über watchHeadingAsync
+    allowBackground: false,
+  });
+  return () => { sub.remove(); void client.stop(); };
 }

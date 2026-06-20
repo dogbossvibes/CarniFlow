@@ -1,28 +1,48 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import { useTrackingStore, type MarkerType, type MarkerMaterial, type AngleKind, type TrackPointSample } from '@/features/tracking/store/trackingStore';
-import { shouldAcceptTrackPoint, calculateAverageAccuracy, type GpsSample } from '@/features/tracking/utils/gpsFilter';
+import { calculateAverageAccuracy, calculateDistance } from '@/features/tracking/utils/gpsFilter';
 import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
-import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/services/trackService';
+import { finishTrackRecording, saveTrackMarker, saveTrackEngineData } from '@/features/tracking/services/trackService';
 import { supabase } from '@/lib/supabase';
+import { isNativeModuleAvailable } from '@/modules/anyvo-precision-location';
 import { createLocalTrainingSession, updateTrainingSyncStatus } from '@/features/training/repositories/localTrainingRepository';
 import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
+import { TrackingSessionEngine } from '@/features/tracking/engine/trackingSessionEngine';
+
+// Summe der Schritt-Distanzen über eine Punktfolge (Meter).
+function sumDistance(pts: TrackPointSample[]): number {
+  let d = 0;
+  for (let i = 1; i < pts.length; i++) d += calculateDistance(pts[i - 1], pts[i]);
+  return d;
+}
+
+// Ø / bester (kleinster) / schlechtester (größter) Genauigkeitswert.
+function accuracyStats(values: (number | null | undefined)[]): { avg: number | null; best: number | null; worst: number | null } {
+  const nums = values.filter((v): v is number => v != null);
+  if (nums.length === 0) return { avg: null, best: null, worst: null };
+  const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+  return { avg: Math.round(avg * 100) / 100, best: Math.min(...nums), worst: Math.max(...nums) };
+}
 
 const WATCH_OPTS: Location.LocationOptions = {
   accuracy:         Location.Accuracy.BestForNavigation,
   timeInterval:     1000,
-  distanceInterval: 0,   // zeitbasiert; Min-Distanz macht der gpsFilter
+  distanceInterval: 0,   // zeitbasiert; Filterung macht die Tracking-Engine
 };
 
-// Steuert die Lay-Aufnahme: Permissions, Live-Watch, GPS-Filter, Timer, Marker.
-// Die Screen-UI liest den State direkt aus useTrackingStore.
+// Steuert die Lay-Aufnahme: Permissions, Live-Watch, Tracking-Engine, Timer,
+// Marker. Die Pipeline (Roh → Filter → Fusion → Clean) liegt in der
+// TrackingSessionEngine; dieser Hook verdrahtet sie mit Store + lokaler DB.
 export function useTrackRecording() {
   const store    = useTrackingStore;
   const watchRef = useRef<(() => void) | null>(null);
   const headRef  = useRef<Location.LocationSubscription | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startMs  = useRef<number>(0);
-  const lastRef  = useRef<GpsSample | null>(null);
+  const engineRef = useRef<TrackingSessionEngine | null>(null);
+
   // Offline-First: lokale SQLite-Session + Punkt-Puffer (crash-/akkusicher).
   const localSessionId = useRef<string | null>(null);
   const ptBuffer = useRef<{ latitude: number; longitude: number; accuracy: number | null; altitude: number | null; speed: number | null; heading: number | null; timestamp: string }[]>([]);
@@ -60,19 +80,30 @@ export function useTrackRecording() {
   const onFix = useCallback((sample: StreamSample) => {
     const s = store.getState();
     if (s.isPaused) return;
-    // Live-Marker immer aktualisieren …
+    // Live-Marker immer aktualisieren.
     s.setCurrentPosition({ lat: sample.lat, lng: sample.lng }, sample.accuracy);
-    // … aber nur akzeptierte Punkte gehen in die Linie.
-    if (shouldAcceptTrackPoint(lastRef.current, sample)) {
-      lastRef.current = sample;
-      const tp: TrackPointSample = {
-        lat: sample.lat, lng: sample.lng, accuracy: sample.accuracy,
-        altitude: sample.altitude, speed: sample.speed, heading: sample.course, t: sample.t!,
-      };
-      s.addTrackPoint(tp);
-      // Laufend lokal sichern (Batch alle 25 Punkte).
-      ptBuffer.current.push({ latitude: tp.lat, longitude: tp.lng, accuracy: tp.accuracy ?? null, altitude: tp.altitude ?? null, speed: tp.speed ?? null, heading: tp.heading ?? null, timestamp: new Date(tp.t).toISOString() });
+
+    const engine = engineRef.current;
+    if (!engine) return;
+    const r = engine.ingest({
+      lat: sample.lat, lng: sample.lng, accuracy: sample.accuracy,
+      altitude: sample.altitude, speed: sample.speed, course: sample.course, t: sample.t,
+    });
+
+    s.addRawTrackPoint(r.raw);     // Raw Track (ungefiltert)
+    s.setGpsStats(r.stats);
+    s.setMotionStatus(r.status);
+
+    if (r.clean) {                 // Clean Track (gefiltert + gefusioniert)
+      s.addTrackPoint(r.clean);
+      ptBuffer.current.push({
+        latitude: r.clean.lat, longitude: r.clean.lng, accuracy: r.clean.accuracy,
+        altitude: r.clean.altitude, speed: r.clean.speed, heading: r.clean.heading,
+        timestamp: new Date(r.clean.t).toISOString(),
+      });
       if (ptBuffer.current.length >= 25) void flushPoints();
+    } else {
+      s.addRejectedTrackPoint(r.raw);   // nicht akzeptiert → Debug-Punkt
     }
   }, [store, flushPoints]);
 
@@ -80,10 +111,11 @@ export function useTrackRecording() {
     const ready = await ensureReady();
     if (ready.error) return ready;
 
-    lastRef.current = null;
+    engineRef.current = new TrackingSessionEngine();   // frische Aufnahme
+
     store.getState().startRecording(sessionId);
     startMs.current = Date.now();
-    // Lokale SQLite-Session anlegen (remote_id = bereits angelegte Server-Session).
+    // Lokale SQLite-Session anlegen.
     ptBuffer.current = [];
     localSessionId.current = null;
     try {
@@ -109,20 +141,24 @@ export function useTrackRecording() {
 
   const addMarker = useCallback(async (type: MarkerType, opts?: { note?: string; audioUrl?: string; material?: MarkerMaterial; angleKind?: AngleKind }) => {
     const s = store.getState();
+    const now = Date.now();
+    // Präzisions-Platzierung: stabilisierter Median der letzten guten Punkte
+    // statt des springenden letzten Fix; aktiviert intern den Drift-Schutz.
+    const placed = engineRef.current?.beginObjectPlacement(now, s.trackPoints.length) ?? null;
     const pos = s.currentPosition;
     const marker = {
-      id: `${type}-${Date.now()}`,
+      id: `${type}-${now}`,
       type,
       material: opts?.material ?? null,
       angleKind: opts?.angleKind ?? null,
-      lat: pos?.lat ?? null,
-      lng: pos?.lng ?? null,
-      accuracy: s.gpsAccuracy,
+      lat: placed?.lat ?? pos?.lat ?? null,
+      lng: placed?.lng ?? pos?.lng ?? null,
+      accuracy: placed?.accuracy ?? s.gpsAccuracy,
       distance_from_start: Math.round(s.distanceMeters * 10) / 10,
       note: opts?.note ?? null,
       audio_url: opts?.audioUrl ?? null,
       found: false,
-      t: Date.now(),
+      t: now,
     };
     s.addMarker(marker);
     if (localSessionId.current) {
@@ -148,10 +184,34 @@ export function useTrackRecording() {
       cornersTotal:          s.markers.filter(m => m.type === 'winkel').length,
       distractionsTotal:     s.markers.filter(m => m.type === 'verleitung').length,
     });
-    // Lokale Session-Markierung: online ok → synced; sonst pending (Sync später).
     if (localSessionId.current) {
       try { await updateTrainingSyncStatus(localSessionId.current, res.error ? 'pending' : 'synced', res.error); } catch { /* best-effort */ }
     }
+
+    // Engine-/Precision-Daten best-effort ablegen (separate Tabelle). Schwere
+    // Blobs (raw/rejected) nur im Dev-Mode → Produktivdaten bleiben schlank.
+    try {
+      const acc = accuracyStats(s.trackPoints.map(p => p.accuracy));
+      await saveTrackEngineData(sessionId, {
+        engine:                 isNativeModuleAvailable() ? 'native_precision' : 'expo_fallback',
+        platform:               Platform.OS,
+        rawGnssAvailable:       null,
+        averageAccuracy:        acc.avg,
+        bestAccuracy:           acc.best,
+        worstAccuracy:          acc.worst,
+        distanceRawMeters:      Math.round(sumDistance(s.rawTrackPoints) * 10) / 10,
+        distanceFilteredMeters: Math.round(s.distanceMeters * 10) / 10,
+        rejectionRate:          s.gpsStats.rejectionRate ?? null,
+        gpsStats:               s.gpsStats,
+        objects:                s.markers,
+        filteredTrackPoints:    s.trackPoints,
+        rawTrackPoints:         s.rawTrackPoints,
+        rejectedPoints:         s.rejectedTrackPoints,
+        startedAt:              startMs.current ? new Date(startMs.current).toISOString() : null,
+        endedAt:                new Date().toISOString(),
+      }, { includeHeavyBlobs: __DEV__ });
+    } catch (e) { console.warn('[localTrack] engine data', e); }
+
     return { error: res.error };
   }, [stopAll, store, flushPoints]);
 

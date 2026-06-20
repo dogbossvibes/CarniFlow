@@ -156,6 +156,59 @@ export async function finishTrackRecording(
   } catch (e) { return fail('finishTrackRecording', e); }
 }
 
+// ── Track-Engine-Daten (Precision-Metriken + optionale Debug-Blobs) ──
+// 1:1 zur Session in track_engine_sessions. Best-effort: schlägt es fehl (z. B.
+// Migration noch nicht eingespielt), bleibt die Aufnahme trotzdem gültig.
+export interface TrackEngineData {
+  engine:                 string;            // 'native_precision' | 'expo_fallback'
+  platform:               string;            // 'ios' | 'android' | 'web'
+  rawGnssAvailable:       boolean | null;
+  averageAccuracy:        number | null;
+  bestAccuracy:           number | null;
+  worstAccuracy:          number | null;
+  distanceRawMeters:      number | null;
+  distanceFilteredMeters: number | null;
+  rejectionRate:          number | null;     // 0..1
+  gpsStats:               unknown | null;
+  objects:                unknown | null;
+  filteredTrackPoints:    unknown | null;
+  rawTrackPoints:         unknown | null;    // groß → nur Dev/Debug
+  rejectedPoints:         unknown | null;    // groß → nur Dev/Debug
+  startedAt:              string | null;     // ISO
+  endedAt:                string | null;     // ISO
+}
+
+export async function saveTrackEngineData(
+  sessionId: string, data: TrackEngineData, opts?: { includeHeavyBlobs?: boolean },
+): Promise<Result<null>> {
+  const heavy = opts?.includeHeavyBlobs ?? false;
+  try {
+    const { error } = await supabase.from('track_engine_sessions').upsert({
+      session_id:               sessionId,
+      engine:                   data.engine,
+      platform:                 data.platform,
+      raw_gnss_available:       data.rawGnssAvailable,
+      average_accuracy:         data.averageAccuracy,
+      best_accuracy:            data.bestAccuracy,
+      worst_accuracy:           data.worstAccuracy,
+      distance_raw_meters:      data.distanceRawMeters,
+      distance_filtered_meters: data.distanceFilteredMeters,
+      rejection_rate:           data.rejectionRate,
+      gps_stats:                data.gpsStats ?? null,
+      objects:                  data.objects ?? null,
+      filtered_track_points:    data.filteredTrackPoints ?? null,
+      // große Blobs nicht unnötig speichern — nur im Dev/Debug-Mode.
+      raw_track_points:         heavy ? (data.rawTrackPoints ?? null) : null,
+      rejected_points:          heavy ? (data.rejectedPoints ?? null) : null,
+      started_at:               data.startedAt,
+      ended_at:                 data.endedAt,
+      updated_at:               new Date().toISOString(),
+    }, { onConflict: 'session_id' });
+    if (error) return fail('saveTrackEngineData', error);
+    return { data: null, error: null };
+  } catch (e) { return fail('saveTrackEngineData', e); }
+}
+
 // ── Ablauf (Run) ─────────────────────────────────────────────
 export async function startTrackRun(sessionId: string): Promise<Result<{ id: string }>> {
   try {
@@ -288,13 +341,15 @@ export async function getUserTrackSessions(ownerId: string): Promise<Result<any[
 
 export async function getTrackSessionById(id: string): Promise<Result<any>> {
   try {
-    const [{ data: session, error: sErr }, { data: points }, { data: markers }, { data: runs }] = await Promise.all([
+    const [{ data: session, error: sErr }, { data: points }, { data: markers }, { data: runs }, engineRes] = await Promise.all([
       supabase.from('training_sessions').select('*, dog:dogs(name)').eq('id', id).single(),
       supabase.from('track_points').select('*').eq('session_id', id).order('timestamp'),
       supabase.from('track_markers').select('*').eq('session_id', id),
       supabase.from('track_runs').select('*').eq('session_id', id).order('created_at'),
+      // best-effort: alte Fährten / fehlende Migration → null (Fehler ignoriert).
+      supabase.from('track_engine_sessions').select('*').eq('session_id', id).maybeSingle(),
     ]);
     if (sErr) return fail('getTrackSessionById', sErr);
-    return { data: { ...session, points: points ?? [], markers: markers ?? [], runs: runs ?? [] }, error: null };
+    return { data: { ...session, points: points ?? [], markers: markers ?? [], runs: runs ?? [], engine: engineRes?.data ?? null }, error: null };
   } catch (e) { return fail('getTrackSessionById', e); }
 }

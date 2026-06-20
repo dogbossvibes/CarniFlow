@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { schedulePersist, clearPending } from '@/features/tracking/store/trackPersist';
+import { EMPTY_GPS_STATS, type GpsStats, type TrackPointStatus } from '@/features/tracking/engine/types';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
 export type MarkerMaterial = 'stoff' | 'holz' | 'leder' | 'plastik' | 'diverses';
@@ -39,7 +40,11 @@ interface TrackingState {
   heading:             number | null;
   gpsAccuracy:         number | null;
   gpsQuality:          GpsQuality | null;
-  trackPoints:         TrackPointSample[];
+  trackPoints:         TrackPointSample[];   // gefilterte/geglättete Linie (Clean Track)
+  rawTrackPoints:      TrackPointSample[];    // ungefilterte Rohpunkte (Debug/Analyse)
+  rejectedTrackPoints: TrackPointSample[];    // verworfene Rohpunkte (Debug) — kein Linienpunkt
+  gpsStats:            GpsStats;              // Live-Qualität: raw/filtered/rejected/Rate
+  motionStatus:        TrackPointStatus | null; // moving/slow/stationary/drift/sharp_turn
   markers:             MarkerSample[];
   runPoints:           TrackPointSample[];
   distanceMeters:      number;
@@ -56,6 +61,10 @@ interface TrackingState {
   resumeRecording: () => void;
   stopRecording: () => void;
   addTrackPoint: (p: TrackPointSample) => void;
+  addRawTrackPoint: (p: TrackPointSample) => void;
+  addRejectedTrackPoint: (p: TrackPointSample) => void;
+  setGpsStats: (s: GpsStats) => void;
+  setMotionStatus: (s: TrackPointStatus | null) => void;
   addMarker: (m: MarkerSample) => void;
   startRun: () => void;
   stopRun: () => void;
@@ -81,6 +90,10 @@ const INITIAL = {
   gpsAccuracy:           null,
   gpsQuality:            null as GpsQuality | null,
   trackPoints:           [] as TrackPointSample[],
+  rawTrackPoints:        [] as TrackPointSample[],
+  rejectedTrackPoints:   [] as TrackPointSample[],
+  gpsStats:              EMPTY_GPS_STATS,
+  motionStatus:          null as TrackPointStatus | null,
   markers:               [] as MarkerSample[],
   runPoints:             [] as TrackPointSample[],
   distanceMeters:        0,
@@ -125,6 +138,11 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     });
     persist(get);
   },
+
+  addRawTrackPoint: (p) => set(s => ({ rawTrackPoints: [...s.rawTrackPoints, p] })),
+  addRejectedTrackPoint: (p) => set(s => ({ rejectedTrackPoints: [...s.rejectedTrackPoints, p] })),
+  setGpsStats: (stats) => set({ gpsStats: stats }),
+  setMotionStatus: (st) => set({ motionStatus: st }),
 
   addMarker: (m) => { set(s => ({ markers: [...s.markers, m] })); persist(get); },
 

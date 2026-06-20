@@ -20,6 +20,8 @@ export interface MapMarker { type: MarkerType; lat: number | null; lng: number |
 interface Props {
   layPoints:        LatLng[];
   runPoints?:       LatLng[];
+  rawPoints?:       LatLng[];   // ungefilterte Rohspur (Debug) — grau, ungeglättet
+  rejectedPoints?:  LatLng[];   // verworfene Punkte (Debug) — kleine rote Punkte
   markers?:         MapMarker[];
   currentPosition:  LatLng | null;
   heading?:         number | null;
@@ -32,7 +34,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, markers = [], currentPosition, heading,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], currentPosition, heading,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, hideControls, style,
 }: Props) {
   const mapRef = useRef<any>(null);
@@ -59,6 +61,16 @@ export function TrackingMap({
   const runCoords = useMemo(
     () => smoothTrackPoints(removeGpsJitter(runPoints ?? [])).map(p => ({ latitude: p.lat, longitude: p.lng })),
     [runPoints],
+  );
+  // Rohspur bewusst UNGEGLÄTTET (zeigt das echte GPS-Rauschen für die Analyse).
+  const rawCoords = useMemo(
+    () => (rawPoints ?? []).map(p => ({ latitude: p.lat, longitude: p.lng })),
+    [rawPoints],
+  );
+  // Verworfene Punkte (Debug): gekappt (Perf), als kleine rote Punkte.
+  const rejectedCoords = useMemo(
+    () => (rejectedPoints ?? []).slice(-60).map(p => ({ latitude: p.lat, longitude: p.lng })),
+    [rejectedPoints],
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers.length]);
@@ -99,6 +111,10 @@ export function TrackingMap({
           latitudeDelta: 0.0016, longitudeDelta: 0.0016,
         }}
       >
+        {/* Rohspur (Debug): grau, dünn, ungeglättet — zeigt GPS-Drift */}
+        {rawCoords.length > 1 && (
+          <Polyline coordinates={rawCoords} strokeColor="rgba(255,255,255,0.35)" strokeWidth={2} />
+        )}
         {/* Gelegte Fährte: türkis gestrichelt */}
         {layCoords.length > 1 && (
           <Polyline coordinates={layCoords} strokeColor={C.trackPrimary} strokeWidth={4} lineDashPattern={[8, 8]} />
@@ -107,6 +123,13 @@ export function TrackingMap({
         {runCoords.length > 1 && (
           <Polyline coordinates={runCoords} strokeColor={C.trackBlue} strokeWidth={4} />
         )}
+
+        {/* Verworfene Punkte (Debug): kleine rote Marker */}
+        {rejectedCoords.map((c, i) => (
+          <Marker key={`rej-${i}`} coordinate={c} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <View style={s.rejectDot} />
+          </Marker>
+        ))}
 
         {start && (
           <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} anchor={{ x: 0.5, y: 0.5 }}>
@@ -160,6 +183,7 @@ const s = StyleSheet.create({
   fabActive:   { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary },
   startDot:    { width: 16, height: 16, borderRadius: 8, backgroundColor: C.trackPrimary, borderWidth: 3, borderColor: '#04110F' },
   markerDot:   { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#04110F' },
+  rejectDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,77,77,0.75)' },
   posGlow:     { width: 40, height: 40, borderRadius: 20, backgroundColor: C.trackGlow, alignItems: 'center', justifyContent: 'center' },
   posCore:     { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
 });

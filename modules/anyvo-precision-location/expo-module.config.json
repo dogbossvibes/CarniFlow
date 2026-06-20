@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["AnyvoPrecisionLocationModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.anyvoprecisionlocation.AnyvoPrecisionLocationModule"]
+  }
+}
