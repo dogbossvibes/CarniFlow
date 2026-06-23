@@ -6,10 +6,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
-import { getUserTrackSessions } from '@/features/tracking/services/trackService';
+import { getUserTrackSessions, deleteTrackSession } from '@/features/tracking/services/trackService';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { FaehrtenHeader, fmtAge, relDate } from '@/features/tracking/components/FaehrtenChrome';
 import { trackScore } from '@/features/tracking/utils/trackScore';
+import { SwipeableTrainingItem } from '@/components/training/SwipeableTrainingItem';
+import { useToast } from '@/components/ui/Toast';
 
 const FILTERS = ['Alle', 'Acker', 'Wiese', 'Wald'] as const;
 
@@ -22,6 +24,16 @@ export default function TrackHistorieScreen() {
   const [rows, setRows]     = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('Alle');
+  const { showToast, toast } = useToast();
+
+  // Fährte löschen: optimistisch aus der Liste, dann Supabase (RLS = nur eigene).
+  const handleDelete = useCallback(async (id: string) => {
+    const prev = rows;
+    setRows(rs => rs.filter(r => r.id !== id));
+    const { error } = await deleteTrackSession(id);
+    if (error) { setRows(prev); showToast('Training konnte nicht gelöscht werden.'); }
+    else showToast('Training gelöscht');
+  }, [rows, showToast]);
 
   const activeDog = dogs.find(d => d.id === dogId) ?? dogs[0] ?? null;
   const effectiveDogId = activeDog?.id ?? null;
@@ -45,7 +57,7 @@ export default function TrackHistorieScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <FaehrtenHeader title="LOGBUCH" onBack={() => router.back()} dog={activeDog} dogs={dogs} onDog={setDogId} />
+      <FaehrtenHeader title="LOGBUCH" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} dog={activeDog} dogs={dogs} onDog={setDogId} />
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={s.filters}>
@@ -73,7 +85,8 @@ export default function TrackHistorieScreen() {
               const angles = r.corners_total ?? 0;
               const objects = r.articles_total ?? 0;
               return (
-                <TouchableOpacity key={r.id} style={s.row} activeOpacity={0.85}
+                <SwipeableTrainingItem key={r.id} trainingId={r.id} onDelete={handleDelete} bottomGap={0}>
+                <TouchableOpacity style={s.row} activeOpacity={0.85}
                   onPress={() => router.push(`/track/${r.id}` as never)}>
                   <View style={s.sketch}>
                     <TrackSketch legs={angles} objects={objects} size={64} progress={1} />
@@ -95,12 +108,14 @@ export default function TrackHistorieScreen() {
                     <Text style={s.scoreLabel}>PUNKTE</Text>
                   </View>
                 </TouchableOpacity>
+                </SwipeableTrainingItem>
               );
             })}
           </View>
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
+      {toast}
     </SafeAreaView>
   );
 }

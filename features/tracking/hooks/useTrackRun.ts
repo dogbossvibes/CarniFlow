@@ -52,7 +52,11 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
   const onFix = useCallback((sample: StreamSample) => {
     const s = store.getState();
     if (!shouldAcceptTrackPoint(lastRef.current, sample)) {
-      s.setCurrentPosition({ lat: sample.lat, lng: sample.lng }, sample.accuracy);
+      // Verworfen (Mini-Schritt / GPS-Jitter im Stand) → Puck halten,
+      // nur Genauigkeit aktualisieren, statt auf den springenden Rohfix zu setzen.
+      const last = s.currentPosition;
+      if (last) s.setCurrentPosition(last, sample.accuracy);
+      else s.setCurrentPosition({ lat: sample.lat, lng: sample.lng }, sample.accuracy);
       return;
     }
     lastRef.current = sample;

@@ -1,21 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { C } from '@/constants/colors';
-import { AnyvoButton } from '@/components/ui/AnyvoButton';
+import { FT } from '@/constants/colors';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
-import {
-  LiveButton, LiveDogPill, LiveMetricBar, LiveTimer, LiveTopBar, fmtClock, type LiveView,
-} from '@/features/tracking/components/LiveChrome';
+import { fmtClock, type LiveView } from '@/features/tracking/components/LiveChrome';
 import { useTrackRun, SPEECH_AVAILABLE } from '@/features/tracking/hooks/useTrackRun';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { calculateDeviationFromTrack } from '@/features/tracking/utils/gpsFilter';
 import { getTrackSessionDogName, setTrackLyingTime } from '@/features/tracking/services/trackService';
 import { VoiceCommandButton } from '@/features/voice/components/VoiceCommandButton';
 import type { VoiceCommand } from '@/features/voice/services/voiceCommandParser';
+
+// Blinkender LIVE-Punkt (anyvoRec).
+function RecDot() {
+  const op = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(op, { toValue: 0.25, duration: 600, useNativeDriver: true }),
+      Animated.timing(op, { toValue: 1, duration: 600, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [op]);
+  return <Animated.View className="w-2 h-2 rounded-full bg-ft-bad" style={{ opacity: op }} />;
+}
 
 export default function TrackRunScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -110,46 +122,121 @@ export default function TrackRunScreen() {
     if (cmd.type === 'ADD_MARKER' && cmd.markerType === 'gegenstand' && articlesFound < articlesTotal) run.foundArticle();
   };
 
-  return (
-    <View style={s.root}>
-      <SafeAreaView edges={['top']} style={s.safe}>
-        <LiveTopBar onBack={handleCancel} resting={!isRunningTrack} view={view} onView={setView} />
+  const metrics: { value: string; label: string; warn?: boolean }[] = [
+    { value: `${Math.round(distanceMeters)} m`, label: 'Distanz' },
+    { value: `${articlesFound}/${articlesTotal}`, label: 'Gegenst.' },
+    { value: liveDev != null ? `${devOff ? '+' : ''}${liveDev.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
+    { value: gpsAccuracy != null ? `${Math.round(gpsAccuracy)} m` : '—', label: 'GPS' },
+  ];
 
-        <View style={s.mapWrap}>
+  return (
+    <View className="flex-1 bg-ft-bg">
+      <SafeAreaView edges={['top']} className="flex-1">
+        {/* Top-Bar: Zurück · LIVE/LIEGT · Karte/Skizze */}
+        <View className="flex-row items-center gap-3 px-[18px] pb-[10px]">
+          <Pressable
+            className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center"
+            onPress={handleCancel} hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={18} color={FT.text} />
+          </Pressable>
+          {isRunningTrack ? (
+            <View className="flex-row items-center gap-[7px] px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,93,108,0.14)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.3)' }}>
+              <RecDot />
+              <Text className="text-[11px] font-extrabold tracking-[1.4px] text-[#ff8a94]">LIVE</Text>
+            </View>
+          ) : (
+            <View className="flex-row items-center gap-[6px] px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(21,230,195,0.13)', borderWidth: 1, borderColor: 'rgba(21,230,195,0.33)' }}>
+              <Ionicons name="time-outline" size={13} color={FT.acc} />
+              <Text className="text-[11px] font-extrabold tracking-[1.4px] text-ft-acc">LIEGT</Text>
+            </View>
+          )}
+          <View className="flex-1" />
+          <View className="flex-row bg-white/5 rounded-[11px] p-[3px] gap-[2px]">
+            {(['map', 'sketch'] as const).map(k => {
+              const on = view === k;
+              return (
+                <Pressable key={k} onPress={() => setView(k)} className={`px-[11px] py-1.5 rounded-lg ${on ? 'bg-ft-acc' : ''}`}>
+                  <Text className={`text-[11.5px] font-bold ${on ? 'text-ft-acc-text' : 'text-ft-muted'}`}>{k === 'map' ? 'Karte' : 'Skizze'}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Karte / Skizze */}
+        <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
           {view === 'map' ? (
             <TrackingMap
               layPoints={trackPoints} runPoints={runPoints} markers={mapMarkers}
               currentPosition={currentPosition} heading={heading} follow={mapFollowMode} hideControls
             />
           ) : (
-            <View style={s.sketch}><TrackSketch legs={winkel} objects={articlesTotal} w={360} h={520} progress={1} /></View>
+            <View className="flex-1 bg-[#08100e]"><TrackSketch legs={winkel} objects={articlesTotal} w={360} h={520} progress={1} /></View>
           )}
 
-          <LiveTimer seconds={isRunningTrack ? searchDurationSeconds : lyingSec} label={isRunningTrack ? 'Suchdauer' : 'Liegezeit'} />
-          <LiveDogPill name={dogName} />
-          <LiveMetricBar items={[
-            { value: `${Math.round(distanceMeters)} m`, label: 'Distanz' },
-            { value: `${articlesFound}/${articlesTotal}`, label: 'Gegenst.' },
-            { value: liveDev != null ? `${devOff ? '+' : ''}${liveDev.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
-            { value: gpsAccuracy != null ? `${Math.round(gpsAccuracy)} m` : '—', label: 'GPS' },
-          ]} />
+          {/* Timer (oben links) */}
+          <View className="absolute top-[14px] left-[14px] rounded-[16px] px-4 py-[10px] bg-ft-glass border border-ft-glass-line">
+            <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{fmtClock(isRunningTrack ? searchDurationSeconds : lyingSec)}</Text>
+            <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{isRunningTrack ? 'Suchdauer' : 'Liegezeit'}</Text>
+          </View>
+
+          {/* Hunde-Pill (oben rechts) */}
+          <View className="absolute top-[14px] right-[14px] flex-row items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 bg-ft-glass border border-ft-glass-line">
+            <View className="w-[26px] h-[26px] rounded-full bg-ft-acc items-center justify-center">
+              <Text className="text-[12px] font-extrabold text-ft-acc-text">{(dogName?.[0] ?? '?').toUpperCase()}</Text>
+            </View>
+            <Text className="text-[12.5px] font-bold text-ft-text">{dogName}</Text>
+          </View>
+
+          {/* Metrik-Leiste (unten) */}
+          <View className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
+            {metrics.map((mm, i) => (
+              <View key={i} className={`flex-1 items-center ${i > 0 ? 'border-l border-ft-line' : ''}`}>
+                <Text className={`text-[15px] font-black ${mm.warn ? 'text-ft-warn' : 'text-ft-text'}`} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{mm.value}</Text>
+                <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{mm.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        <View style={s.voiceRow}>
+        {/* Voice-Command */}
+        <View className="items-center pt-3">
           <VoiceCommandButton onCommand={onVoiceCommand} />
         </View>
 
-        <View style={s.controls}>
+        {/* Steuerung */}
+        <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px] min-h-[86px]">
           {!isRunningTrack ? (
-            <AnyvoButton label={`Ausarbeiten starten · liegt ${fmtClock(lyingSec)}`} icon="play" onPress={handleStart} loading={starting} big style={{ flex: 1 }} />
+            <Pressable className="flex-1 h-[60px] rounded-[18px] flex-row items-center justify-center gap-2 bg-ft-acc" onPress={handleStart} disabled={starting}>
+              {starting ? <ActivityIndicator color={FT.accText} /> : <Ionicons name="play" size={18} color={FT.accText} />}
+              <Text className="text-[14px] font-extrabold text-ft-acc-text">Ausarbeiten starten · liegt {fmtClock(lyingSec)}</Text>
+            </Pressable>
           ) : (
             <>
-              <LiveButton icon="flag" label="Gegenstand" onPress={() => run.foundArticle()} disabled={articlesFound >= articlesTotal} />
-              <LiveButton
-                icon={voiceOn ? 'volume-high' : 'volume-mute'} label={voiceOn ? 'Ton an' : 'Ton aus'}
-                active={voiceOn} onPress={() => setVoiceOn(v => !v)}
-              />
-              <LiveButton icon="stop" label="Stop & Auswerten" variant="danger" flex={1.3} onPress={handleFinish} disabled={finishing} />
+              <Pressable
+                className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
+                style={articlesFound >= articlesTotal ? { opacity: 0.45 } : undefined}
+                onPress={() => run.foundArticle()} disabled={articlesFound >= articlesTotal}
+              >
+                <Ionicons name="flag" size={20} color={FT.text} />
+                <Text className="text-[10.5px] font-extrabold text-ft-text">Gegenstand</Text>
+              </Pressable>
+              <Pressable
+                className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] ${voiceOn ? 'bg-ft-acc' : 'bg-white/5 border border-ft-line-strong'}`}
+                onPress={() => setVoiceOn(v => !v)}
+              >
+                <Ionicons name={voiceOn ? 'volume-high' : 'volume-mute'} size={20} color={voiceOn ? FT.accText : FT.text} />
+                <Text className={`text-[10.5px] font-extrabold ${voiceOn ? 'text-ft-acc-text' : 'text-ft-text'}`}>{voiceOn ? 'Ton an' : 'Ton aus'}</Text>
+              </Pressable>
+              <Pressable
+                className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
+                style={[{ flex: 1.3 }, finishing ? { opacity: 0.45 } : null]}
+                onPress={handleFinish} disabled={finishing}
+              >
+                <Ionicons name="stop" size={20} color="#2a060a" />
+                <Text className="text-[10.5px] font-extrabold text-[#2a060a]">Stop & Auswerten</Text>
+              </Pressable>
             </>
           )}
         </View>
@@ -157,12 +244,3 @@ export default function TrackRunScreen() {
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  root:     { flex: 1, backgroundColor: C.trackBg },
-  safe:     { flex: 1 },
-  mapWrap:  { flex: 1, marginHorizontal: 14, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: C.trackBorder, backgroundColor: '#08100e' },
-  sketch:   { flex: 1, backgroundColor: '#08100e' },
-  voiceRow: { alignItems: 'center', paddingTop: 12 },
-  controls: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 26, minHeight: 86 },
-});

@@ -81,7 +81,7 @@ export default function TrackOverviewScreen() {
     return { lay, run, markers, center, hasGps: lay.length > 1 };
   }, [hero]);
 
-  const startHref = (effectiveDogId ? `/track/setup?dogId=${effectiveDogId}` : '/track/setup') as never;
+  const startHref = (effectiveDogId ? `/track/legen?dogId=${effectiveDogId}` : '/track/legen') as never;
   const actions: { icon: IconName; label: string; go: () => void; primary?: boolean }[] = [
     { icon: 'play',          label: 'Fährte legen', go: () => router.push(startHref), primary: true },
     { icon: 'stats-chart',   label: 'Auswertung',   go: () => router.push((last ? `/track/${last.id}` : startHref) as never) },
@@ -91,7 +91,11 @@ export default function TrackOverviewScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <FaehrtenHeader title="FÄHRTEN" dog={activeDog} dogs={dogs} onDog={setDogId} />
+      <FaehrtenHeader
+        title="FÄHRTEN"
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/training' as never))}
+        dog={activeDog} dogs={dogs} onDog={setDogId}
+      />
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {/* ── große Karten-Card (letzte Fährte) ── */}

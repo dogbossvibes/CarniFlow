@@ -38,22 +38,49 @@ export const C = {
   danger:     '#FF3B30',
   dangerDim:  'rgba(255,59,48,0.10)',
 
-  // Fährtenmodul-Palette (Spec) — eigene Tokens, brechen bestehende C.* nicht.
-  trackBg:        '#050505',
-  trackSurface:   '#0D0D0D',
-  trackCard:      '#111111',
-  trackCardAlt:   '#161616',
-  trackBorder:    'rgba(255,255,255,0.08)',
-  trackPrimary:   '#00F5D4',
-  trackPrimaryDk: '#00BFA6',
-  trackGlow:      'rgba(0,245,212,0.35)',
-  trackText:      '#FFFFFF',
-  trackTextSec:   '#8B8B8B',
-  trackTextMut:   '#5F5F5F',
-  trackWarning:   '#FFB020',
-  trackDanger:    '#FF4D4D',
+  // Fährtenmodul-Palette — auf anyvo-Tokens (design_handoff_faehrten/anyvo.css)
+  // angeglichen, damit alle Fährten-Screens denselben Mint-Look haben wie der
+  // neue Legen/Ausarbeiten-Flow (FT). Eigene Tokens, brechen bestehende C.* nicht.
+  trackBg:        '#000000',                 // anyvo --bg
+  trackSurface:   '#0d0e10',                 // --surface
+  trackCard:      '#141518',                 // --surface-2
+  trackCardAlt:   '#1b1d21',                 // --surface-3
+  trackBorder:    'rgba(255,255,255,0.075)', // --line
+  trackPrimary:   '#15e6c3',                 // --acc (Mint)
+  trackPrimaryDk: '#00c9d6',                 // --acc-2
+  trackGlow:      'rgba(21,230,195,0.45)',   // --acc-glow
+  trackText:      '#ffffff',                 // --text
+  trackTextSec:   'rgba(255,255,255,0.56)',  // --muted
+  trackTextMut:   'rgba(255,255,255,0.34)',  // --faint
+  trackWarning:   '#ffb547',                 // --warn
+  trackDanger:    '#ff5d6c',                 // --bad
   trackBlue:      '#4DA3FF',
   trackPurple:    '#9B5CFF',
 } as const;
 
 export type ColorKey = keyof typeof C;
+
+// ── Fährten-Tab Design-Tokens (1:1 aus design_handoff_faehrten/anyvo.css) ──
+// Eigenes Token-Set für das neue Fährten-Design (Mint #15e6c3), damit der
+// Redesign-Flow konsistent ist, ohne bestehende C.track*-Screens zu verändern.
+export const FT = {
+  bg:         '#000000',
+  surface:    '#0d0e10',
+  surface2:   '#141518',
+  surface3:   '#1b1d21',
+  line:       'rgba(255,255,255,0.075)',
+  lineStrong: 'rgba(255,255,255,0.14)',
+  acc:        '#15e6c3',   // Primär-Akzent (Mint)
+  acc2:       '#00c9d6',   // Gradient-Partner
+  accDim:     'rgba(21,230,195,0.13)',
+  accGlow:    'rgba(21,230,195,0.45)',
+  accText:    '#04201b',   // Text auf Mint-Buttons
+  warn:       '#ffb547',
+  bad:        '#ff5d6c',
+  text:       '#ffffff',
+  muted:      'rgba(255,255,255,0.56)',
+  faint:      'rgba(255,255,255,0.34)',
+  glass:      'rgba(20,22,25,0.62)',
+  glassLine:  'rgba(255,255,255,0.09)',
+  rLg: 26, rMd: 20, rSm: 14,
+} as const;

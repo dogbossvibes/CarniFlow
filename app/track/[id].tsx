@@ -100,7 +100,7 @@ export default function TrackAuswertungScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <FaehrtenHeader title="AUSWERTUNG" onBack={() => router.back()} />
+      <FaehrtenHeader title="AUSWERTUNG" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

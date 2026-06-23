@@ -127,6 +127,7 @@ export default function TabLayout() {
           tabBarIcon: ({ focused, size }) => <TabIcon name="barbell" focused={focused} size={size} />,
         }}
       />
+      {/* Fährten: kein eigener Tab — Einstieg über Training → „Fährte (GPS)". */}
       {/* Slot 4: Hub (Trainer) ODER Analyse (Kunde) — gegenseitig exklusiv. */}
       <Tabs.Screen
         name="hub"

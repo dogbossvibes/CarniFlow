@@ -7,7 +7,9 @@ import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { HeroImage } from '@/components/training/HeroImage';
 import { UnitListCard } from '@/components/training/UnitListCard';
+import { SwipeableTrainingItem } from '@/components/training/SwipeableTrainingItem';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
+import { useFeedDelete } from '@/hooks/useFeedDelete';
 import type { FeedItem } from '@/services/trainingFeed';
 
 // Vereinheitlichter Trainings-Hub: der units-Flow ist der einzige
@@ -16,6 +18,7 @@ import type { FeedItem } from '@/services/trainingFeed';
 export default function TrainingScreen() {
   const router = useRouter();
   const { feed, loading, refresh } = useTrainingFeed();
+  const { onDelete: deleteItem, toast } = useFeedDelete();
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -66,10 +69,10 @@ export default function TrainingScreen() {
         <View style={s.actions}>
           <AnimatedPressable style={s.actionCard} scale={0.97} onPress={() => router.push('/track' as never)}>
             <View style={[s.actionIcon, { backgroundColor: `${C.success}1A` }]}>
-              <Ionicons name="map" size={20} color={C.success} />
+              <Ionicons name="navigate" size={20} color={C.success} />
             </View>
-            <Text style={s.actionLabel}>Fährten</Text>
-            <Text style={s.actionSub}>Übersicht & Logbuch</Text>
+            <Text style={s.actionLabel}>Fährte (GPS)</Text>
+            <Text style={s.actionSub}>Live legen & Logbuch</Text>
           </AnimatedPressable>
           <AnimatedPressable style={s.actionCard} scale={0.97} onPress={() => router.push('/unit/history')}>
             <View style={[s.actionIcon, { backgroundColor: `${C.accent}1A` }]}>
@@ -92,12 +95,15 @@ export default function TrainingScreen() {
           </View>
         ) : (
           feed.slice(0, 20).map(item => (
-            <UnitListCard key={`${item.source}-${item.id}`} unit={item} onPress={() => openItem(item)} />
+            <SwipeableTrainingItem key={`${item.source}-${item.id}`} trainingId={item.id} onDelete={() => deleteItem(item)}>
+              <UnitListCard unit={item} onPress={() => openItem(item)} />
+            </SwipeableTrainingItem>
           ))
         )}
 
         <View style={{ height: 120 }} />
       </ScrollView>
+      {toast}
     </SafeAreaView>
   );
 }

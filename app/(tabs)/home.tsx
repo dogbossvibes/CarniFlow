@@ -4,10 +4,12 @@ import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
 import { ApportIcon } from "@/components/ui/ApportIcon";
 import { UnitListCard } from "@/components/training/UnitListCard";
+import { SwipeableTrainingItem } from "@/components/training/SwipeableTrainingItem";
 import { C } from "@/constants/colors";
 import { useDogs } from "@/hooks/useDogs";
 import { useSession } from "@/hooks/useSession";
 import { useTrainingFeed } from "@/hooks/useTrainingFeed";
+import { useFeedDelete } from "@/hooks/useFeedDelete";
 import type { FeedItem } from "@/services/trainingFeed";
 import { useHomeLayout } from "@/stores/homeLayout";
 import { reportScroll } from "@/stores/liveBarScroll";
@@ -100,6 +102,7 @@ export default function HomeScreen() {
   const { user } = useSession();
   const { dogs, loading: hundeLoading, refresh: refreshDogs } = useDogs();
   const { feed, loading: feedLoading, refresh: refreshFeed } = useTrainingFeed();
+  const { onDelete: deleteItem, toast } = useFeedDelete();
   const layout = useHomeLayout();
 
   useFocusEffect(
@@ -282,11 +285,13 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             {feed.slice(0, 3).map((item) => (
-              <UnitListCard
+              <SwipeableTrainingItem
                 key={`${item.source}-${item.id}`}
-                unit={item}
-                onPress={() => openFeedItem(item)}
-              />
+                trainingId={item.id}
+                onDelete={() => deleteItem(item)}
+              >
+                <UnitListCard unit={item} onPress={() => openFeedItem(item)} />
+              </SwipeableTrainingItem>
             ))}
           </View>
         )}
@@ -353,7 +358,7 @@ export default function HomeScreen() {
               icon="map-outline"
               label="Fährte"
               farbe="#ffaf80"
-              onPress={() => router.push("/track/setup" as never)}
+              onPress={() => router.push("/track/legen" as never)}
             />
             <SchnellAktion
               icon="stats-chart-outline"
@@ -368,6 +373,7 @@ export default function HomeScreen() {
         {!layout.schnellzugriff && <View style={{ height: 120 }} />}
       </ScrollView>
       <QuickAddSheet />
+      {toast}
     </SafeAreaView>
   );
 }

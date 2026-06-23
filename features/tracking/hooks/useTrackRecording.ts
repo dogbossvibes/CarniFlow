@@ -1,30 +1,20 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
-import { useTrackingStore, type MarkerType, type MarkerMaterial, type AngleKind, type TrackPointSample } from '@/features/tracking/store/trackingStore';
-import { calculateAverageAccuracy, calculateDistance } from '@/features/tracking/utils/gpsFilter';
+import { useTrackingStore, type MarkerType, type MarkerMaterial, type AngleKind } from '@/features/tracking/store/trackingStore';
+import { calculateAverageAccuracy } from '@/features/tracking/utils/gpsFilter';
 import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { finishTrackRecording, saveTrackMarker, saveTrackEngineData } from '@/features/tracking/services/trackService';
 import { supabase } from '@/lib/supabase';
 import { isNativeModuleAvailable } from '@/modules/anyvo-precision-location';
+import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
+import { computeSessionStats, type StatsGnssSample } from '@/features/tracking/engine/trackingStats';
 import { createLocalTrainingSession, updateTrainingSyncStatus } from '@/features/training/repositories/localTrainingRepository';
 import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
 import { TrackingSessionEngine } from '@/features/tracking/engine/trackingSessionEngine';
+import type { GnssStatusAndroid, ProviderStatus } from '@/features/tracking/native/types';
 
-// Summe der Schritt-Distanzen über eine Punktfolge (Meter).
-function sumDistance(pts: TrackPointSample[]): number {
-  let d = 0;
-  for (let i = 1; i < pts.length; i++) d += calculateDistance(pts[i - 1], pts[i]);
-  return d;
-}
-
-// Ø / bester (kleinster) / schlechtester (größter) Genauigkeitswert.
-function accuracyStats(values: (number | null | undefined)[]): { avg: number | null; best: number | null; worst: number | null } {
-  const nums = values.filter((v): v is number => v != null);
-  if (nums.length === 0) return { avg: null, best: null, worst: null };
-  const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
-  return { avg: Math.round(avg * 100) / 100, best: Math.min(...nums), worst: Math.max(...nums) };
-}
+type Unsub = { remove: () => void };
 
 const WATCH_OPTS: Location.LocationOptions = {
   accuracy:         Location.Accuracy.BestForNavigation,
@@ -32,9 +22,11 @@ const WATCH_OPTS: Location.LocationOptions = {
   distanceInterval: 0,   // zeitbasiert; Filterung macht die Tracking-Engine
 };
 
-// Steuert die Lay-Aufnahme: Permissions, Live-Watch, Tracking-Engine, Timer,
-// Marker. Die Pipeline (Roh → Filter → Fusion → Clean) liegt in der
-// TrackingSessionEngine; dieser Hook verdrahtet sie mit Store + lokaler DB.
+// Steuert die Lay-Aufnahme mit EINER GPS-Quelle für Warmup UND Aufnahme.
+// Wichtig: kein Quellen-Handoff (vermeidet das frühere Race, bei dem der
+// gemeinsame native Client nach dem Aufnahmestart wieder gestoppt wurde →
+// keine Wegstrecke). `startWarmup()` öffnet den Stream einmal, `beginRecording()`
+// schaltet nur die Engine/Recording-Logik scharf; derselbe Stream läuft weiter.
 export function useTrackRecording() {
   const store    = useTrackingStore;
   const watchRef = useRef<(() => void) | null>(null);
@@ -42,6 +34,13 @@ export function useTrackRecording() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startMs  = useRef<number>(0);
   const engineRef = useRef<TrackingSessionEngine | null>(null);
+  const recordingRef = useRef(false);   // true ⇒ Fixes werden in die Linie aufgenommen
+
+  // GNSS-/Provider-Daten der Aufnahme (Android nativ; iOS/Fallback = leer).
+  const gnssSamplesRef = useRef<StatsGnssSample[]>([]);
+  const rawGnssRef     = useRef<boolean | null>(null);
+  const gnssSubRef     = useRef<Unsub | null>(null);
+  const providerSubRef = useRef<Unsub | null>(null);
 
   // Offline-First: lokale SQLite-Session + Punkt-Puffer (crash-/akkusicher).
   const localSessionId = useRef<string | null>(null);
@@ -55,36 +54,30 @@ export function useTrackRecording() {
   }, []);
 
   const stopAll = useCallback(() => {
+    recordingRef.current = false;
     watchRef.current?.(); watchRef.current = null;
     headRef.current?.remove();  headRef.current = null;
+    gnssSubRef.current?.remove(); gnssSubRef.current = null;
+    providerSubRef.current?.remove(); providerSubRef.current = null;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
   }, []);
 
   useEffect(() => () => stopAll(), [stopAll]);
 
-  // Berechtigung + erster Fix. Gibt Fehlertext zurück oder null.
-  const ensureReady = useCallback(async (): Promise<{ error: string | null }> => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') return { error: 'Standortberechtigung fehlt. Bitte in den Einstellungen erlauben.' };
-    try {
-      const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
-      store.getState().setCurrentPosition(
-        { lat: fix.coords.latitude, lng: fix.coords.longitude }, fix.coords.accuracy,
-      );
-      return { error: null };
-    } catch {
-      return { error: 'Kein GPS-Signal. Bitte kurz im Freien warten und erneut versuchen.' };
-    }
-  }, [store]);
-
+  // EIN Fix-Handler für Warmup UND Aufnahme.
   const onFix = useCallback((sample: StreamSample) => {
     const s = store.getState();
+
+    // Warmup (noch nicht scharf): nur Live-Position + Genauigkeit für die Anzeige.
+    if (!recordingRef.current) {
+      s.setCurrentPosition({ lat: sample.lat, lng: sample.lng }, sample.accuracy);
+      return;
+    }
     if (s.isPaused) return;
-    // Live-Marker immer aktualisieren.
-    s.setCurrentPosition({ lat: sample.lat, lng: sample.lng }, sample.accuracy);
 
     const engine = engineRef.current;
-    if (!engine) return;
+    if (!engine) { s.setCurrentPosition({ lat: sample.lat, lng: sample.lng }, sample.accuracy); return; }
+
     const r = engine.ingest({
       lat: sample.lat, lng: sample.lng, accuracy: sample.accuracy,
       altitude: sample.altitude, speed: sample.speed, course: sample.course, t: sample.t,
@@ -93,6 +86,17 @@ export function useTrackRecording() {
     s.addRawTrackPoint(r.raw);     // Raw Track (ungefiltert)
     s.setGpsStats(r.stats);
     s.setMotionStatus(r.status);
+
+    // Live-Puck driftruhig: gefusionierte Position bei Bewegung, im Stand/Drift
+    // halten (nur Genauigkeit) → der Punkt steht still, wenn du stehst.
+    if (r.clean) {
+      s.setCurrentPosition({ lat: r.clean.lat, lng: r.clean.lng }, r.clean.accuracy);
+    } else if (r.status === 'stationary' || r.status === 'drift') {
+      const last = s.currentPosition;
+      if (last) s.setCurrentPosition(last, r.raw.accuracy);
+    } else {
+      s.setCurrentPosition({ lat: r.raw.lat, lng: r.raw.lng }, r.raw.accuracy);
+    }
 
     if (r.clean) {                 // Clean Track (gefiltert + gefusioniert)
       s.addTrackPoint(r.clean);
@@ -107,17 +111,57 @@ export function useTrackRecording() {
     }
   }, [store, flushPoints]);
 
-  const start = useCallback(async (sessionId: string): Promise<{ error: string | null }> => {
-    const ready = await ensureReady();
-    if (ready.error) return ready;
+  // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
+  const startWarmup = useCallback(async (): Promise<{ error: string | null }> => {
+    if (watchRef.current) return { error: null };   // Stream läuft bereits
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return { error: 'Standortberechtigung fehlt. Bitte in den Einstellungen erlauben.' };
+    try {
+      watchRef.current = await startPositionStream(onFix, WATCH_OPTS);
+    } catch {
+      return { error: 'GPS konnte nicht gestartet werden. Bitte kurz im Freien erneut versuchen.' };
+    }
+    return { error: null };
+  }, [onFix]);
+
+  // Aufnahme scharf schalten: Engine + Timer + lokale Session + GNSS. Nutzt den
+  // bereits laufenden Warmup-Stream weiter (kein Neustart der GPS-Quelle).
+  const beginRecording = useCallback(async (sessionId: string): Promise<{ error: string | null }> => {
+    // Sicherheitsnetz: falls der Stream (noch) nicht läuft, jetzt öffnen.
+    if (!watchRef.current) {
+      const w = await startWarmup();
+      if (w.error) return w;
+    }
 
     engineRef.current = new TrackingSessionEngine();   // frische Aufnahme
-
     store.getState().startRecording(sessionId);
     startMs.current = Date.now();
-    // Lokale SQLite-Session anlegen.
     ptBuffer.current = [];
     localSessionId.current = null;
+
+    timerRef.current = setInterval(() => {
+      store.getState().setDuration(Math.floor((Date.now() - startMs.current) / 1000));
+    }, 1000);
+
+    try {
+      headRef.current = await Location.watchHeadingAsync(h => store.getState().setHeading(h.trueHeading ?? h.magHeading));
+    } catch { /* Heading optional */ }
+
+    // GNSS-/Provider-Status (Android nativ) für Engine-Daten sammeln.
+    gnssSamplesRef.current = [];
+    rawGnssRef.current = null;
+    try {
+      gnssSubRef.current = precisionLocationClient.onGnssStatus((g: GnssStatusAndroid) => {
+        gnssSamplesRef.current.push({ satelliteCount: g.satelliteCount, usedInFixCount: g.usedInFixCount, averageCn0DbHz: g.averageCn0DbHz });
+      });
+      providerSubRef.current = precisionLocationClient.onProviderStatus((p: ProviderStatus) => {
+        rawGnssRef.current = p.rawGnssAvailable ?? p.rawGnssActive ?? p.rawGnssSupported ?? rawGnssRef.current;
+      });
+      const ps = await precisionLocationClient.getProviderStatus();
+      if (ps) rawGnssRef.current = ps.rawGnssAvailable ?? ps.rawGnssActive ?? ps.rawGnssSupported ?? rawGnssRef.current;
+    } catch { /* GNSS/Provider optional */ }
+
+    // Lokale SQLite-Session (Offline-First) — best-effort, blockiert die Aufnahme nicht.
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -125,16 +169,11 @@ export function useTrackRecording() {
         localSessionId.current = local.local_id;
       }
     } catch (e) { console.warn('[localTrack] start', e); }
-    timerRef.current = setInterval(() => {
-      store.getState().setDuration(Math.floor((Date.now() - startMs.current) / 1000));
-    }, 1000);
 
-    watchRef.current = await startPositionStream(onFix, WATCH_OPTS);
-    try {
-      headRef.current = await Location.watchHeadingAsync(h => store.getState().setHeading(h.trueHeading ?? h.magHeading));
-    } catch { /* Heading optional */ }
+    // Ganz zum Schluss scharf schalten → ab jetzt fließen Fixes in die Linie.
+    recordingRef.current = true;
     return { error: null };
-  }, [ensureReady, onFix, store]);
+  }, [startWarmup, store]);
 
   const pause  = useCallback(() => store.getState().pauseRecording(), [store]);
   const resume = useCallback(() => store.getState().resumeRecording(), [store]);
@@ -191,18 +230,24 @@ export function useTrackRecording() {
     // Engine-/Precision-Daten best-effort ablegen (separate Tabelle). Schwere
     // Blobs (raw/rejected) nur im Dev-Mode → Produktivdaten bleiben schlank.
     try {
-      const acc = accuracyStats(s.trackPoints.map(p => p.accuracy));
+      const sessionStats = computeSessionStats({
+        rawPoints:      s.rawTrackPoints,
+        filteredPoints: s.trackPoints,
+        rejectedPoints: s.rejectedTrackPoints.map(() => ({})),   // nur Anzahl relevant (kein Reason im Store)
+        objectCount:    s.markers.length,
+        gnssSamples:    gnssSamplesRef.current,
+      });
       await saveTrackEngineData(sessionId, {
         engine:                 isNativeModuleAvailable() ? 'native_precision' : 'expo_fallback',
         platform:               Platform.OS,
-        rawGnssAvailable:       null,
-        averageAccuracy:        acc.avg,
-        bestAccuracy:           acc.best,
-        worstAccuracy:          acc.worst,
-        distanceRawMeters:      Math.round(sumDistance(s.rawTrackPoints) * 10) / 10,
-        distanceFilteredMeters: Math.round(s.distanceMeters * 10) / 10,
-        rejectionRate:          s.gpsStats.rejectionRate ?? null,
-        gpsStats:               s.gpsStats,
+        rawGnssAvailable:       rawGnssRef.current,
+        averageAccuracy:        sessionStats.averageAccuracy,
+        bestAccuracy:           sessionStats.bestAccuracy,
+        worstAccuracy:          sessionStats.worstAccuracy,
+        distanceRawMeters:      sessionStats.rawDistanceMeters,
+        distanceFilteredMeters: sessionStats.filteredDistanceMeters,
+        rejectionRate:          sessionStats.rejectionRate,
+        gpsStats:               { ...s.gpsStats, session: sessionStats },
         objects:                s.markers,
         filteredTrackPoints:    s.trackPoints,
         rawTrackPoints:         s.rawTrackPoints,
@@ -215,5 +260,5 @@ export function useTrackRecording() {
     return { error: res.error };
   }, [stopAll, store, flushPoints]);
 
-  return { ensureReady, start, pause, resume, addMarker, finish, stopAll };
+  return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll };
 }

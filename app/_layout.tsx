@@ -4,9 +4,11 @@ import 'react-native-get-random-values';       // patches crypto.getRandomValues
 import 'react-native-url-polyfill/auto';        // patches URL constructor
 import '@/lib/crypto-polyfill';                 // patches crypto.subtle.digest via expo-crypto
 import '@/lib/trackRecorder';                   // registriert den Background-Location-Task beim Start
+import '../global.css';                         // NativeWind (Tailwind) — Theme/Tokens
 
 import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider } from '@/lib/session-context';
 import { queryClient } from '@/lib/queryClient';
@@ -47,6 +49,7 @@ const eb = StyleSheet.create({
 
 export default function RootLayout() {
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <QueryClientProvider client={queryClient}>
     <SessionProvider>
       <StatusBar style="light" />
@@ -66,13 +69,13 @@ export default function RootLayout() {
         <Stack.Screen name="analyse/smart-search" />
         <Stack.Screen name="analyse/insights" />
         <Stack.Screen name="analyse/coach" />
-        <Stack.Screen name="track/setup" />
         <Stack.Screen name="track/[id]" />
-        <Stack.Screen name="track/record" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+        <Stack.Screen name="track/legen"  options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="sync" />
         <Stack.Screen name="dev/offline-debug" />
       </Stack>
     </SessionProvider>
     </QueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

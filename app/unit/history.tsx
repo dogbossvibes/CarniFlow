@@ -5,12 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { UnitListCard } from '@/components/training/UnitListCard';
+import { SwipeableTrainingItem } from '@/components/training/SwipeableTrainingItem';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
+import { useFeedDelete } from '@/hooks/useFeedDelete';
 import type { FeedItem } from '@/services/trainingFeed';
 
 export default function HistoryScreen() {
   const router = useRouter();
   const { feed, loading, refresh } = useTrainingFeed();
+  const { onDelete: deleteItem, toast } = useFeedDelete();
 
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
@@ -48,11 +51,14 @@ export default function HistoryScreen() {
           </View>
         ) : (
           feed.map(item => (
-            <UnitListCard key={`${item.source}-${item.id}`} unit={item} onPress={() => openItem(item)} />
+            <SwipeableTrainingItem key={`${item.source}-${item.id}`} trainingId={item.id} onDelete={() => deleteItem(item)}>
+              <UnitListCard unit={item} onPress={() => openItem(item)} />
+            </SwipeableTrainingItem>
           ))
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
+      {toast}
     </SafeAreaView>
   );
 }
