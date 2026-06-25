@@ -152,6 +152,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       lat: c.latitude, lng: c.longitude, accuracy: c.accuracy ?? null,
       altitude: c.altitude ?? null, speed: c.speed ?? null, t: loc.timestamp || Date.now(),
     };
+    if (__DEV__) console.log('[trackRecorder] fix', { accuracy: raw.accuracy, recording: recordingRef.current });
 
     // Warmup: nur Live-Position + Genauigkeit anzeigen (für das Overlay).
     if (!recordingRef.current) { s.setCurrentPosition({ lat: raw.lat, lng: raw.lng }, raw.accuracy); return; }
@@ -225,12 +226,15 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   // Aufnahme scharf schalten: Track-Refs zurücksetzen, Timer + lokale Session
   // starten und den bereits laufenden Warmup-Stream weiterlaufen lassen.
-  const beginRecording = useCallback(async (sessionId: string): Promise<{ error: string | null }> => {
+  const beginRecording = useCallback(async (sessionId: string | null): Promise<{ error: string | null }> => {
     if (!watchRef.current) {
       const w = await startWarmup();
       if (w.error) return w;
     }
 
+    // ── SOFORT scharf schalten (synchron, VOR jedem await/Netz-Call) ──
+    // So hängt die Aufnahme nie an Login/Supabase/Heading. Fixes fließen ab
+    // hier in die Linie, der Timer läuft sofort.
     pointsRef.current = [];
     emaRef.current = null;
     lastRawRef.current = null;
@@ -240,17 +244,19 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
     store.getState().startRecording(sessionId);
     startMs.current = Date.now();
-
-    // Eigener Sekunden-Timer — unabhängig vom GPS-Takt.
+    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       store.getState().setDuration(Math.floor((Date.now() - startMs.current) / 1000));
     }, 1000);
+    recordingRef.current = true;   // ← ab jetzt akzeptiert onFix die Fixes
+    if (__DEV__) console.log('[trackRecorder] recording started', { sessionId });
 
+    // ── ab hier nur best-effort, blockiert die Aufnahme nicht ──
     try {
       headRef.current = await Location.watchHeadingAsync(h => store.getState().setHeading(h.trueHeading ?? h.magHeading));
     } catch { /* Heading optional */ }
 
-    // Lokale SQLite-Session (Offline-First) — best-effort, blockiert nicht.
+    // Lokale SQLite-Session (Offline-First) — best-effort.
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -259,7 +265,6 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       }
     } catch (e) { console.warn('[trackRecorder] start', e); }
 
-    recordingRef.current = true;   // ab jetzt fließen Fixes in die Linie
     return { error: null };
   }, [startWarmup, store]);
 
@@ -290,12 +295,15 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   }, [store, commitMarker]);
 
   // Aufnahme beenden + Lay-Punkte/Summary persistieren.
-  const finish = useCallback(async (sessionId: string): Promise<{ error: string | null }> => {
+  const finish = useCallback(async (sessionId: string | null): Promise<{ error: string | null }> => {
     stopAll();
     const s = store.getState();
     s.stopRecording();
     s.setLayFinishedAt(Date.now());
     await flushPoints();
+    // Ohne Remote-Session (offline) bleibt die Aufnahme lokal in SQLite und
+    // wird später synchronisiert — kein Remote-Update möglich.
+    if (!sessionId) return { error: null };
     const accAvg = calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy));
     const res = await finishTrackRecording(sessionId, s.trackPoints, {
       layingDurationSeconds: s.durationSeconds,

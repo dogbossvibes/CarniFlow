@@ -133,32 +133,39 @@ export default function LegenScreen() {
     });
   }, [currentPosition]);
 
-  // Aufnahme scharf schalten: Session anlegen, denselben Stream aufnehmen lassen.
+  // Aufnahme scharf schalten — LOKAL ZUERST: die Aufnahme darf NIE an Login/Netz
+  // hängen. Erst sofort recorden (Timer + Linie laufen), dann die Remote-Session
+  // best-effort im Hintergrund anlegen und ihre ID nachreichen.
   const begin = useCallback(async () => {
     if (beganRef.current) return;
-    const uid = session?.user.id;
-    if (!uid || !activeDog) return;
     beganRef.current = true;
-    const { data, error } = await createTrackSession(uid, {
-      dogId: activeDog.id, surfaceTypes: [surface], terrainConditions: condition ? [condition] : [],
-      lyingTimeMinutes: 0, notes: null, locationName: null,
-      temperature:      weather?.temperature ?? null,
-      weatherCondition: weather?.weatherCondition ?? null,
-      windSpeed:        weather?.windSpeed ?? null,
-      humidity:         weather?.humidity ?? null,
-      latitude: currentPosition?.lat ?? null, longitude: currentPosition?.lng ?? null,
-      distraction: false,
-    });
-    if (error || !data) { beganRef.current = false; showToast('Fährte konnte nicht gestartet werden.'); return; }
-    sessionIdRef.current = data.id;
-    const r = await rec.beginRecording(data.id);
+
+    const r = await rec.beginRecording(null);   // sofort scharf (recording=true, Timer)
     if (r.error) { beganRef.current = false; showToast(r.error); return; }
     setPhase('recording');
     haptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
     showToast('Fährte läuft');
+
+    // Remote-Session im Hintergrund (blockiert die Aufnahme nicht).
+    const uid = session?.user.id;
+    if (uid && activeDog) {
+      createTrackSession(uid, {
+        dogId: activeDog.id, surfaceTypes: [surface], terrainConditions: condition ? [condition] : [],
+        lyingTimeMinutes: 0, notes: null, locationName: null,
+        temperature:      weather?.temperature ?? null,
+        weatherCondition: weather?.weatherCondition ?? null,
+        windSpeed:        weather?.windSpeed ?? null,
+        humidity:         weather?.humidity ?? null,
+        latitude: currentPosition?.lat ?? null, longitude: currentPosition?.lng ?? null,
+        distraction: false,
+      }).then(({ data, error }) => {
+        if (!error && data) { sessionIdRef.current = data.id; useTrackingStore.getState().setCurrentSession(data.id); }
+        else showToast('Offline — wird später synchronisiert.');
+      }).catch(() => showToast('Offline — wird später synchronisiert.'));
+    }
   }, [session, activeDog, rec, showToast, surface, condition, weather, currentPosition]);
 
-  useEffect(() => () => { rec.stopAll(); }, [rec]);
+  useEffect(() => () => { rec.stopAll(); }, [rec.stopAll]);
 
   const mapMarkers: MapMarker[] = markers.map(mk => ({ type: mk.type, lat: mk.lat, lng: mk.lng }));
   const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
@@ -166,9 +173,13 @@ export default function LegenScreen() {
 
   const onStop = async () => {
     const id = sessionIdRef.current;
-    if (!id) { router.canGoBack() ? router.back() : router.replace('/track' as never); return; }
-    await rec.finish(id);
-    router.replace(`/track/run?id=${id}` as never);   // → Liegezeit / Ausarbeiten
+    await rec.finish(id);   // toleriert null (offline → nur lokal gesichert)
+    if (id) {
+      router.replace(`/track/run?id=${id}` as never);   // → Liegezeit / Ausarbeiten
+    } else {
+      showToast('Lokal gesichert — Auswertung nach Sync verfügbar.');
+      router.canGoBack() ? router.back() : router.replace('/track' as never);
+    }
   };
 
   const metrics: [string, string][] = [

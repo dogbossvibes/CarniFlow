@@ -1,0 +1,293 @@
+/**
+ * useSearchRecorder.ts — ANYVO Ausarbeiten / Suche (Expo / React Native)
+ *
+ * Phase 2 nach dem Legen: der Hund arbeitet die gelegte Fährte aus.
+ * Liefert live:
+ *   - Spur des Hundes (geglättet)            -> Polyline
+ *   - Abweichung von der Soll-Fährte (m)     -> "ABWEICH."
+ *   - Abriss / Neuansatz-Erkennung           -> breaks[] (rote Marker)  ← HIER, nicht im Legen
+ *   - Gegenstand-Verweisen (Annäherung)      -> foundObjects
+ *   - Live-Score nach IGP/IFH                 -> score
+ *
+ * Eingabe: das beim Legen gespeicherte Track-Snapshot (points, objects, level).
+ *
+ * Deps: expo-location  (+ optional expo-haptics)
+ *
+ * Nutzung:
+ *   const s = useSearchRecorder({ laidPoints, laidObjects, level: 'ifh1' });
+ *   s.start(); ...; const result = s.stop();
+ *   <Polyline coordinates={s.points} /> ; s.breaks.map(...) ; metrics: s.deviationM, s.foundCount, s.score
+ */
+import { useCallback, useEffect, useRef, useState } from 'react';
+import * as Location from 'expo-location';
+// import * as Haptics from 'expo-haptics';
+
+import { distM, bearingDeg } from './useTrackRecorder'; // Helfer wiederverwenden
+
+export type LatLng = { latitude: number; longitude: number };
+export type SearchObject = { at: LatLng; index: number; material: string };
+export type Break = { at: LatLng; t: number; recoveredAfterM?: number };
+
+// ── Parameter ──
+const MAX_FIX_ACCURACY = 20;     // m — schlechte Fixes verwerfen
+const MIN_SEGMENT = 1.5;         // m — Distanz-Gate (Hund/Mensch langsamer als Joggen)
+const SMOOTH_ALPHA = 0.4;        // EMA
+const ON_TRACK_M = 3.0;          // m — innerhalb = "auf der Fährte"
+const BREAK_THRESHOLD_M = 6.0;   // m — darüber für BREAK_HOLD = Abriss
+const BREAK_HOLD_MS = 4000;      // ms — so lange muss die Abweichung halten
+const RECOVER_M = 3.0;           // m — wieder unter diesem Wert = Neuansatz/erholt
+const OBJECT_HIT_M = 2.5;        // m — so nah an einem Gegenstand = verwiesen/gefunden
+const DEV_EMA = 0.25;            // Glättung der angezeigten Abweichung
+
+// ── Soll-Werte je Stufe (für Score-Gewichtung) ──
+// IFH/FH: Halten der Fährte 79 P + Gegenstände 21 P = 100 P
+// IGP:    Fährte gesamt 100 P (Ausarbeitung + Gegenstände), hier vereinfacht gewichtet.
+type Level = 'igp1' | 'igp2' | 'igp3' | 'ifh1' | 'ifh2' | 'igpfh' | 'training';
+const SCORE_MODEL: Record<Level, { trackPts: number; objectPts: number; objects: number }> = {
+  igp1:    { trackPts: 79, objectPts: 21, objects: 3 },
+  igp2:    { trackPts: 79, objectPts: 21, objects: 3 },
+  igp3:    { trackPts: 79, objectPts: 21, objects: 3 },
+  ifh1:    { trackPts: 79, objectPts: 21, objects: 4 },
+  ifh2:    { trackPts: 79, objectPts: 21, objects: 7 },
+  igpfh:   { trackPts: 79, objectPts: 21, objects: 7 },
+  training:{ trackPts: 79, objectPts: 21, objects: 3 },
+};
+
+// ── kürzeste Distanz Punkt → Polyliniensegmente (Meter, planar-Näherung) ──
+function distToPolyline(p: LatLng, line: LatLng[]): number {
+  if (line.length === 0) return Infinity;
+  if (line.length === 1) return distM(p, line[0]);
+  // lokale Meter-Projektion um p (klein genug für Fährten)
+  const mPerLat = 111320;
+  const mPerLng = 111320 * Math.cos((p.latitude * Math.PI) / 180);
+  const X = (q: LatLng) => ({ x: (q.longitude - p.longitude) * mPerLng, y: (q.latitude - p.latitude) * mPerLat });
+  let best = Infinity;
+  for (let i = 1; i < line.length; i++) {
+    const a = X(line[i - 1]), b = X(line[i]);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? -(a.x * dx + a.y * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = a.x + t * dx, cy = a.y + t * dy;
+    const d = Math.hypot(cx, cy);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+export interface SearchRecorder {
+  ready: boolean;
+  recording: boolean;
+  paused: boolean;
+  points: LatLng[];          // Spur des Hundes (geglättet)
+  position: LatLng | null;
+  deviationM: number;        // aktuelle (geglättete) Abweichung von der Soll-Fährte
+  onTrack: boolean;          // gerade auf der Fährte?
+  breaks: Break[];           // erkannte Abrisse
+  foundObjects: number;      // verwiesene Gegenstände
+  totalObjects: number;
+  distanceM: number;
+  elapsedS: number;
+  score: number;             // Live-Score 0..100
+  accuracy: number | null;
+  start: () => void;
+  stop: () => SearchResult;
+  setPaused: (p: boolean) => void;
+  markObject: () => void;    // manuelles Verweisen (Hundeführer bestätigt)
+}
+export type SearchResult = {
+  points: LatLng[]; breaks: Break[]; foundObjects: number; totalObjects: number;
+  deviationAvgM: number; distanceM: number; durationS: number; score: number;
+};
+
+export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: SearchObject[]; level: Level }): SearchRecorder {
+  const { laidPoints, laidObjects, level } = opts;
+  const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
+  const totalObjects = laidObjects.length || model.objects;
+
+  // ── State (UI) ──
+  const [ready, setReady] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [paused, setPausedState] = useState(false);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [position, setPosition] = useState<LatLng | null>(null);
+  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, score: 100 });
+  const [elapsedS, setElapsedS] = useState(0);
+
+  // ── Refs (live im Callback) ──
+  const recordingRef = useRef(false);
+  const pausedRef = useRef(false);
+  const pointsRef = useRef<LatLng[]>([]);
+  const breaksRef = useRef<Break[]>([]);
+  const smoothRef = useRef<LatLng | null>(null);
+  const distRef = useRef(0);
+  const devEmaRef = useRef(0);
+  const devSumRef = useRef(0);     // für Durchschnitt
+  const devCountRef = useRef(0);
+  const offTrackSinceRef = useRef<number | null>(null);
+  const inBreakRef = useRef(false);
+  const foundRef = useRef<Set<number>>(new Set());
+  const watchRef = useRef<Location.LocationSubscription | null>(null);
+  const startMsRef = useRef(0);
+
+  // ── Live-Score: 79 P fürs Halten (skaliert mit Zeit auf der Fährte − Abriss-Strafen) + 21 P Gegenstände ──
+  const computeScore = useCallback(() => {
+    const onTrackRatio = devCountRef.current ? 1 - Math.min(1, (devSumRef.current / devCountRef.current) / 12) : 1;
+    const breakPenalty = breaksRef.current.length * 4; // je Abriss −4 (anpassbar)
+    const trackScore = Math.max(0, model.trackPts * onTrackRatio - breakPenalty);
+    const objScore = totalObjects ? (foundRef.current.size / totalObjects) * model.objectPts : model.objectPts;
+    return Math.round(Math.max(0, Math.min(100, trackScore + objScore)));
+  }, [model, totalObjects]);
+
+  const pushSnapshot = useCallback(() => {
+    setSnap({
+      points: pointsRef.current.slice(),
+      breaks: breaksRef.current.slice(),
+      found: foundRef.current.size,
+      deviationM: Math.round(devEmaRef.current * 10) / 10,
+      onTrack: devEmaRef.current <= ON_TRACK_M,
+      distanceM: distRef.current,
+      score: computeScore(),
+    });
+  }, [computeScore]);
+
+  // ── Watch ab Mount ──
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted' || !mounted) return;
+      setReady(true);
+      watchRef.current = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 },
+        (loc) => onFix(loc)
+      );
+    })();
+    return () => { mounted = false; watchRef.current?.remove(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Timer ──
+  useEffect(() => {
+    if (!recording || paused) return;
+    const id = setInterval(() => setElapsedS(Math.floor((Date.now() - startMsRef.current) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [recording, paused]);
+
+  // ── Kernlogik ──
+  const onFix = useCallback((loc: Location.LocationObject) => {
+    const acc = loc.coords.accuracy ?? 99;
+    setAccuracy(Math.round(acc));
+
+    const raw: LatLng = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+    const prev = smoothRef.current;
+    const sm: LatLng = prev
+      ? { latitude: prev.latitude + SMOOTH_ALPHA * (raw.latitude - prev.latitude),
+          longitude: prev.longitude + SMOOTH_ALPHA * (raw.longitude - prev.longitude) }
+      : raw;
+    smoothRef.current = sm;
+    setPosition(sm);
+
+    if (!recordingRef.current || pausedRef.current) return;
+    if (acc > MAX_FIX_ACCURACY) return;
+
+    const pts = pointsRef.current;
+    if (pts.length > 0) {
+      const d = distM(pts[pts.length - 1], sm);
+      if (d < MIN_SEGMENT) return;
+      distRef.current += d;
+    }
+    pts.push(sm);
+
+    // ── Abweichung von der Soll-Fährte ──
+    const dev = distToPolyline(sm, laidPoints);
+    devEmaRef.current = devEmaRef.current ? devEmaRef.current + DEV_EMA * (dev - devEmaRef.current) : dev;
+    devSumRef.current += dev; devCountRef.current += 1;
+
+    // ── Abriss-/Neuansatz-Erkennung ──
+    const now = Date.now();
+    if (!inBreakRef.current) {
+      if (dev > BREAK_THRESHOLD_M) {
+        if (offTrackSinceRef.current == null) offTrackSinceRef.current = now;
+        else if (now - offTrackSinceRef.current >= BREAK_HOLD_MS) {
+          // bestätigter Abriss
+          inBreakRef.current = true;
+          breaksRef.current.push({ at: sm, t: Math.floor((now - startMsRef.current) / 1000) });
+          // Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }
+      } else {
+        offTrackSinceRef.current = null; // wieder dran, Zähler zurück
+      }
+    } else {
+      // im Abriss: warten auf Neuansatz (wieder nah an der Fährte)
+      if (dev <= RECOVER_M) {
+        inBreakRef.current = false;
+        offTrackSinceRef.current = null;
+        const b = breaksRef.current[breaksRef.current.length - 1];
+        if (b) b.recoveredAfterM = Math.round(distRef.current);
+      }
+    }
+
+    // ── Gegenstand verwiesen? (Annäherung an abgelegte Gegenstände) ──
+    laidObjects.forEach((o, i) => {
+      if (!foundRef.current.has(i) && distM(sm, o.at) <= OBJECT_HIT_M) {
+        foundRef.current.add(i);
+        // Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    });
+
+    pushSnapshot();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [laidPoints, laidObjects, pushSnapshot]);
+
+  // ── Steuerung ──
+  const start = useCallback(() => {
+    pointsRef.current = []; breaksRef.current = [];
+    smoothRef.current = null; distRef.current = 0;
+    devEmaRef.current = 0; devSumRef.current = 0; devCountRef.current = 0;
+    offTrackSinceRef.current = null; inBreakRef.current = false;
+    foundRef.current = new Set();
+    startMsRef.current = Date.now(); setElapsedS(0);
+    pausedRef.current = false; setPausedState(false);
+    recordingRef.current = true; setRecording(true);
+    if (__DEV__) console.log('[searchRecorder] recording started');
+    pushSnapshot();
+  }, [pushSnapshot]);
+
+  const stop = useCallback((): SearchResult => {
+    recordingRef.current = false; setRecording(false);
+    const durationS = Math.floor((Date.now() - startMsRef.current) / 1000);
+    return {
+      points: pointsRef.current.slice(),
+      breaks: breaksRef.current.slice(),
+      foundObjects: foundRef.current.size,
+      totalObjects,
+      deviationAvgM: devCountRef.current ? Math.round((devSumRef.current / devCountRef.current) * 10) / 10 : 0,
+      distanceM: distRef.current,
+      durationS,
+      score: computeScore(),
+    };
+  }, [computeScore, totalObjects]);
+
+  const setPaused = useCallback((p: boolean) => { pausedRef.current = p; setPausedState(p); }, []);
+
+  // manuelles Verweisen (Hundeführer drückt "Gegenstand"): nächstgelegenen ungefundenen markieren
+  const markObject = useCallback(() => {
+    const cur = smoothRef.current; if (!cur) return;
+    let bestI = -1, bestD = Infinity;
+    laidObjects.forEach((o, i) => {
+      if (foundRef.current.has(i)) return;
+      const d = distM(cur, o.at);
+      if (d < bestD) { bestD = d; bestI = i; }
+    });
+    if (bestI >= 0) { foundRef.current.add(bestI); pushSnapshot(); }
+  }, [laidObjects, pushSnapshot]);
+
+  return {
+    ready, recording, paused,
+    points: snap.points, position, deviationM: snap.deviationM, onTrack: snap.onTrack,
+    breaks: snap.breaks, foundObjects: snap.found, totalObjects,
+    distanceM: snap.distanceM, elapsedS, score: snap.score, accuracy,
+    start, stop, setPaused, markObject,
+  };
+}

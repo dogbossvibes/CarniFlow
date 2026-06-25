@@ -1,21 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FT } from '@/constants/colors';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
-import { fmtClock, type LiveView } from '@/features/tracking/components/LiveChrome';
-import { useTrackRun, SPEECH_AVAILABLE } from '@/features/tracking/hooks/useTrackRun';
+import { fmtClock } from '@/features/tracking/components/LiveChrome';
+import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
-import { calculateDeviationFromTrack } from '@/features/tracking/utils/gpsFilter';
-import { getTrackSessionDogName, setTrackLyingTime } from '@/features/tracking/services/trackService';
-import { VoiceCommandButton } from '@/features/voice/components/VoiceCommandButton';
-import type { VoiceCommand } from '@/features/voice/services/voiceCommandParser';
+import { startTrackRun, finishTrackRun, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 
-// Blinkender LIVE-Punkt (anyvoRec).
+// Blinkender LIVE-Punkt.
 function RecDot() {
   const op = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -29,73 +25,61 @@ function RecDot() {
   return <Animated.View className="w-2 h-2 rounded-full bg-ft-bad" style={{ opacity: op }} />;
 }
 
+// AUSARBEITEN — der Hund läuft die gelegte Fährte ab. Snapshot (laidPoints,
+// laidObjects, level) wird beim Betreten aus dem Lege-Store übernommen; der
+// useSearchRecorder startet genau einmal und liefert Spur, Abrisse, Abweichung,
+// Metriken und Live-Score. Stop → Auswertung via s.stop().
 export default function TrackRunScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const voiceOnRef = useRef(SPEECH_AVAILABLE);
-  const run = useTrackRun(voiceOnRef);
-  const [voiceOn, setVoiceOn] = useState(SPEECH_AVAILABLE);
-  const [starting, setStarting] = useState(false);
-  const [finishing, setFinishing] = useState(false);
-  const [view, setView] = useState<LiveView>('map');
+
+  // Snapshot der gelegten Fährte EINMAL beim Betreten festhalten (stabil).
+  const [snap] = useState(() => {
+    const st = useTrackingStore.getState();
+    const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
+    return {
+      laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),                       // für die Karte
+      laidPoints: st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng })),             // für den Recorder
+      laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number }, index: i, material: m.material ?? '' })),
+      laidMarkers: st.markers,
+      level: 'training' as Level,
+    };
+  });
+
+  const s = useSearchRecorder({ laidPoints: snap.laidPoints, laidObjects: snap.laidObjects, level: snap.level });
+
+  const [view, setView] = useState<'map' | 'sketch'>('map');
   const [dogName, setDogName] = useState('Hund');
+  const [finishing, setFinishing] = useState(false);
+  const startedRef = useRef(false);
+  const runIdRef = useRef<string | null>(null);
 
-  const {
-    trackPoints, runPoints, markers, currentPosition, heading, distanceMeters, searchDurationSeconds,
-    articlesFound, isRunningTrack, gpsAccuracy, mapFollowMode, layFinishedAt, setCurrentPosition, setMapFollowMode,
-  } = useTrackingStore();
-
-  useEffect(() => { voiceOnRef.current = voiceOn; }, [voiceOn]);
+  // Start GENAU EINMAL beim Betreten.
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    s.start();
+    if (id) startTrackRun(id).then(({ data }) => { if (data) runIdRef.current = data.id; }).catch(() => {});
+  }, [s, id]);
 
   useEffect(() => { if (id) getTrackSessionDogName(id).then(r => { if (r.data) setDogName(r.data); }); }, [id]);
 
-  // Liegezeit-Timer: zählt seit "Fertig gelegt" hoch, bis die Ausarbeitung startet.
-  const [nowMs, setNowMs] = useState(Date.now());
-  useEffect(() => {
-    if (isRunningTrack || !layFinishedAt) return;
-    const t = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [isRunningTrack, layFinishedAt]);
-  const lyingSec = layFinishedAt ? Math.max(0, Math.floor((nowMs - layFinishedAt) / 1000)) : 0;
+  // Hundespur / Abriss / Position → Karten-Koordinaten ({lat,lng}).
+  const runPoints = useMemo(() => s.points.map(p => ({ lat: p.latitude, lng: p.longitude })), [s.points]);
+  const breakPts  = useMemo(() => s.breaks.map(b => ({ lat: b.at.latitude, lng: b.at.longitude })), [s.breaks]);
+  const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
-  // Vorschau-Position vor Suchstart.
-  useEffect(() => {
-    if (isRunningTrack) return;
-    (async () => {
-      try {
-        const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
-        setCurrentPosition({ lat: fix.coords.latitude, lng: fix.coords.longitude }, fix.coords.accuracy);
-      } catch { /* optional */ }
-    })();
-  }, []);
+  const mapMarkers: MapMarker[] = snap.laidMarkers.map(m => ({ type: m.type, lat: m.lat, lng: m.lng }));
+  const winkel = snap.laidMarkers.filter(m => m.type === 'winkel').length;
 
-  const mapMarkers: MapMarker[] = markers.map(m => ({ type: m.type, lat: m.lat, lng: m.lng }));
-  const articlesTotal = markers.filter(m => m.type === 'gegenstand').length;
-  const winkel = markers.filter(m => m.type === 'winkel').length;
-  // Abweichung nur sinnvoll, wenn eine gelegte Spur existiert (sonst Infinity).
-  const rawDev = currentPosition && trackPoints.length > 1
-    ? calculateDeviationFromTrack(currentPosition, trackPoints.map(p => ({ lat: p.lat, lng: p.lng }))).dist
-    : null;
-  const liveDev = rawDev != null && Number.isFinite(rawDev) ? rawDev : null;
-  const devOff = liveDev != null && liveDev > 8;
-
-  const handleStart = async () => {
-    if (!id) return;
-    setStarting(true);
-    const { error } = await run.start(id);
-    setStarting(false);
-    if (error) { Alert.alert('Suche', error === 'Kein aktiver Ablauf.' ? error : 'Konnte nicht gestartet werden. Bitte erneut versuchen.'); return; }
-    // Gemessene Liegezeit festhalten (non-blocking).
-    if (layFinishedAt) void setTrackLyingTime(id, Math.round(lyingSec / 60));
-  };
+  const hasLaid = snap.laidPoints.length > 1;
+  const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
+  const devOff = devShown != null && devShown > 8;
 
   const handleCancel = () => {
     Alert.alert('Ausarbeitung abbrechen?', 'Die Ausarbeitung wird nicht gespeichert. Die gelegte Fährte bleibt erhalten.', [
       { text: 'Weiter', style: 'cancel' },
-      { text: 'Abbrechen', style: 'destructive', onPress: () => {
-        useTrackingStore.getState().reset();
-        router.replace('/track' as never);
-      } },
+      { text: 'Abbrechen', style: 'destructive', onPress: () => { s.stop(); useTrackingStore.getState().reset(); router.replace('/track' as never); } },
     ]);
   };
 
@@ -103,55 +87,49 @@ export default function TrackRunScreen() {
     Alert.alert('Suche beenden?', 'Die Ausarbeitung wird gespeichert — danach geht es zur Auswertung.', [
       { text: 'Weiter suchen', style: 'cancel' },
       { text: 'Beenden', style: 'destructive', onPress: async () => {
-        if (!id) return;
         setFinishing(true);
-        const { error } = await run.finish(id);
+        const res = s.stop();   // ← Search-Recorder beenden
+        const runId = runIdRef.current;
+        if (id && runId) {
+          await finishTrackRun(runId, id, {
+            durationSeconds:        res.durationS,
+            distanceMeters:         res.distanceM,
+            averageDeviationMeters: res.deviationAvgM,
+            articlesFound:          res.foundObjects,
+            runPoints:              res.points.map(p => ({ lat: p.latitude, lng: p.longitude, t: Date.now() })),
+          }).catch(() => {});
+        }
         setFinishing(false);
-        if (error) { Alert.alert('Speichern fehlgeschlagen', 'Training konnte nicht gespeichert werden. Bitte prüfe deine Verbindung.'); return; }
-        router.replace(`/track/${id}` as never);
+        router.replace((id ? `/track/${id}` : '/track') as never);
       } },
     ]);
   };
 
-  const onVoiceCommand = (cmd: VoiceCommand) => {
-    if (cmd.type === 'STOP_RECORDING') { handleFinish(); return; }
-    if (cmd.type === 'CENTER_MAP') { setMapFollowMode(true); return; }
-    if (cmd.type === 'AUDIO_ON') { setVoiceOn(true); return; }
-    if (cmd.type === 'AUDIO_OFF') { setVoiceOn(false); return; }
-    if (!isRunningTrack) return;
-    if (cmd.type === 'ADD_MARKER' && cmd.markerType === 'gegenstand' && articlesFound < articlesTotal) run.foundArticle();
-  };
-
   const metrics: { value: string; label: string; warn?: boolean }[] = [
-    { value: `${Math.round(distanceMeters)} m`, label: 'Distanz' },
-    { value: `${articlesFound}/${articlesTotal}`, label: 'Gegenst.' },
-    { value: liveDev != null ? `${devOff ? '+' : ''}${liveDev.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
-    { value: gpsAccuracy != null ? `${Math.round(gpsAccuracy)} m` : '—', label: 'GPS' },
+    { value: `${Math.round(s.distanceM)} m`, label: 'Distanz' },
+    { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
+    { value: devShown != null ? `${devOff ? '+' : ''}${devShown.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
+    { value: s.accuracy != null ? `${Math.round(s.accuracy)} m` : '—', label: 'GPS' },
   ];
 
   return (
     <View className="flex-1 bg-ft-bg">
       <SafeAreaView edges={['top']} className="flex-1">
-        {/* Top-Bar: Zurück · LIVE/LIEGT · Karte/Skizze */}
+        {/* Top-Bar */}
         <View className="flex-row items-center gap-3 px-[18px] pb-[10px]">
-          <Pressable
-            className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center"
-            onPress={handleCancel} hitSlop={8}
-          >
+          <Pressable className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center" onPress={handleCancel} hitSlop={8}>
             <Ionicons name="chevron-back" size={18} color={FT.text} />
           </Pressable>
-          {isRunningTrack ? (
-            <View className="flex-row items-center gap-[7px] px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,93,108,0.14)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.3)' }}>
-              <RecDot />
-              <Text className="text-[11px] font-extrabold tracking-[1.4px] text-[#ff8a94]">LIVE</Text>
-            </View>
-          ) : (
-            <View className="flex-row items-center gap-[6px] px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(21,230,195,0.13)', borderWidth: 1, borderColor: 'rgba(21,230,195,0.33)' }}>
-              <Ionicons name="time-outline" size={13} color={FT.acc} />
-              <Text className="text-[11px] font-extrabold tracking-[1.4px] text-ft-acc">LIEGT</Text>
-            </View>
-          )}
+          <View className="flex-row items-center gap-[7px] px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,93,108,0.14)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.3)' }}>
+            <RecDot />
+            <Text className="text-[11px] font-extrabold tracking-[1.4px] text-[#ff8a94]">LIVE</Text>
+          </View>
           <View className="flex-1" />
+          {/* Live-Score */}
+          <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-ft-acc-dim border border-[rgba(21,230,195,0.4)]">
+            <Ionicons name="trophy" size={12} color={FT.acc} />
+            <Text className="text-[12px] font-extrabold text-ft-acc" style={{ fontVariant: ['tabular-nums'] }}>{s.score}</Text>
+          </View>
           <View className="flex-row bg-white/5 rounded-[11px] p-[3px] gap-[2px]">
             {(['map', 'sketch'] as const).map(k => {
               const on = view === k;
@@ -168,17 +146,18 @@ export default function TrackRunScreen() {
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
           {view === 'map' ? (
             <TrackingMap
-              layPoints={trackPoints} runPoints={runPoints} markers={mapMarkers}
-              currentPosition={currentPosition} heading={heading} follow={mapFollowMode} hideControls
+              layPoints={snap.laidLatLng} dimLay
+              runPoints={runPoints} markers={mapMarkers} breaks={breakPts}
+              currentPosition={curPos} follow hideControls
             />
           ) : (
-            <View className="flex-1 bg-[#08100e]"><TrackSketch legs={winkel} objects={articlesTotal} w={360} h={520} progress={1} /></View>
+            <View className="flex-1 bg-[#08100e]"><TrackSketch legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
           )}
 
           {/* Timer (oben links) */}
           <View className="absolute top-[14px] left-[14px] rounded-[16px] px-4 py-[10px] bg-ft-glass border border-ft-glass-line">
-            <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{fmtClock(isRunningTrack ? searchDurationSeconds : lyingSec)}</Text>
-            <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{isRunningTrack ? 'Suchdauer' : 'Liegezeit'}</Text>
+            <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{fmtClock(s.elapsedS)}</Text>
+            <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">Suchdauer</Text>
           </View>
 
           {/* Hunde-Pill (oben rechts) */}
@@ -200,45 +179,24 @@ export default function TrackRunScreen() {
           </View>
         </View>
 
-        {/* Voice-Command */}
-        <View className="items-center pt-3">
-          <VoiceCommandButton onCommand={onVoiceCommand} />
-        </View>
-
         {/* Steuerung */}
-        <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px] min-h-[86px]">
-          {!isRunningTrack ? (
-            <Pressable className="flex-1 h-[60px] rounded-[18px] flex-row items-center justify-center gap-2 bg-ft-acc" onPress={handleStart} disabled={starting}>
-              {starting ? <ActivityIndicator color={FT.accText} /> : <Ionicons name="play" size={18} color={FT.accText} />}
-              <Text className="text-[14px] font-extrabold text-ft-acc-text">Ausarbeiten starten · liegt {fmtClock(lyingSec)}</Text>
-            </Pressable>
-          ) : (
-            <>
-              <Pressable
-                className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-                style={articlesFound >= articlesTotal ? { opacity: 0.45 } : undefined}
-                onPress={() => run.foundArticle()} disabled={articlesFound >= articlesTotal}
-              >
-                <Ionicons name="flag" size={20} color={FT.text} />
-                <Text className="text-[10.5px] font-extrabold text-ft-text">Gegenstand</Text>
-              </Pressable>
-              <Pressable
-                className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] ${voiceOn ? 'bg-ft-acc' : 'bg-white/5 border border-ft-line-strong'}`}
-                onPress={() => setVoiceOn(v => !v)}
-              >
-                <Ionicons name={voiceOn ? 'volume-high' : 'volume-mute'} size={20} color={voiceOn ? FT.accText : FT.text} />
-                <Text className={`text-[10.5px] font-extrabold ${voiceOn ? 'text-ft-acc-text' : 'text-ft-text'}`}>{voiceOn ? 'Ton an' : 'Ton aus'}</Text>
-              </Pressable>
-              <Pressable
-                className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-                style={[{ flex: 1.3 }, finishing ? { opacity: 0.45 } : null]}
-                onPress={handleFinish} disabled={finishing}
-              >
-                <Ionicons name="stop" size={20} color="#2a060a" />
-                <Text className="text-[10.5px] font-extrabold text-[#2a060a]">Stop & Auswerten</Text>
-              </Pressable>
-            </>
-          )}
+        <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
+          <Pressable
+            className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
+            style={s.foundObjects >= s.totalObjects ? { opacity: 0.45 } : undefined}
+            onPress={s.markObject} disabled={s.foundObjects >= s.totalObjects}
+          >
+            <Ionicons name="flag" size={20} color={FT.text} />
+            <Text className="text-[10.5px] font-extrabold text-ft-text">Gegenstand</Text>
+          </Pressable>
+          <Pressable
+            className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
+            style={[{ flex: 1.3 }, finishing ? { opacity: 0.45 } : null]}
+            onPress={handleFinish} disabled={finishing}
+          >
+            {finishing ? <ActivityIndicator color="#2a060a" /> : <Ionicons name="stop" size={20} color="#2a060a" />}
+            <Text className="text-[10.5px] font-extrabold text-[#2a060a]">Stop & Auswerten</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     </View>

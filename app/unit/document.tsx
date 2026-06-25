@@ -47,8 +47,10 @@ interface SelExercise { discipline: string; name: string }
 
 export default function DocumentScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, duration } = useLocalSearchParams<{ id?: string; duration?: string }>();
   const editing = !!id;
+  // Vom Timer mitgegebene Dauer (Sekunden) → Minuten vorbefüllen.
+  const initialMin = duration ? Math.max(1, Math.round(Number(duration) / 60)) : 45;
   const { dogs } = useDogs();
   const { session } = useSession();
   const { profile } = useProfile();
@@ -66,7 +68,7 @@ export default function DocumentScreen() {
   const [description, setDescription] = useState('');
   const [score, setScore] = useState(0);
   const [date, setDate] = useState(new Date());
-  const [durationMin, setDurationMin] = useState(45);
+  const [durationMin, setDurationMin] = useState(initialMin);
   const [photos, setPhotos] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
   const [audio, setAudio] = useState<AudioNote[]>([]);

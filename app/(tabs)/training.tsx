@@ -41,15 +41,15 @@ export default function TrainingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Hero-CTA: neue Einheit starten */}
-        <AnimatedPressable style={s.heroWrap} scale={0.98} onPress={() => router.push('/unit/start')}>
+        {/* Hero-CTA: neue Einheit starten — direkt der Timer, ohne Sparten-Vorauswahl */}
+        <AnimatedPressable style={s.heroWrap} scale={0.98} onPress={() => router.push('/unit/timer')}>
           <HeroImage height={200} rounded overlay={0.88}>
             <View style={s.heroInner}>
               <Text style={s.heroEyebrow}>NEUE EINHEIT</Text>
               <Text style={s.heroTitle}>Training starten</Text>
               <View style={s.heroBtn}>
                 <Ionicons name="play" size={15} color={C.accentText} />
-                <Text style={s.heroBtnTxt}>Sparte wählen</Text>
+                <Text style={s.heroBtnTxt}>Timer starten</Text>
               </View>
             </View>
           </HeroImage>

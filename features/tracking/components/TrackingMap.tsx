@@ -23,6 +23,8 @@ interface Props {
   rawPoints?:       LatLng[];   // ungefilterte Rohspur (Debug) — grau, ungeglättet
   rejectedPoints?:  LatLng[];   // verworfene Punkte (Debug) — kleine rote Punkte
   markers?:         MapMarker[];
+  breaks?:          LatLng[];   // Abriss-Punkte (Ausarbeiten) — rote Marker
+  dimLay?:          boolean;    // Soll-Fährte gedimmt zeichnen (Ausarbeiten)
   currentPosition:  LatLng | null;
   heading?:         number | null;
   follow:           boolean;
@@ -34,7 +36,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], currentPosition, heading,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], breaks, dimLay, currentPosition, heading,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, hideControls, style,
 }: Props) {
   const mapRef = useRef<any>(null);
@@ -115,9 +117,9 @@ export function TrackingMap({
         {rawCoords.length > 1 && (
           <Polyline coordinates={rawCoords} strokeColor="rgba(255,255,255,0.35)" strokeWidth={2} />
         )}
-        {/* Gelegte Fährte: türkis gestrichelt */}
+        {/* Gelegte Fährte: türkis gestrichelt (im Ausarbeiten gedimmt als Soll) */}
         {layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={C.trackPrimary} strokeWidth={4} lineDashPattern={[8, 8]} />
+          <Polyline coordinates={layCoords} strokeColor={dimLay ? 'rgba(21,230,195,0.32)' : C.trackPrimary} strokeWidth={dimLay ? 3 : 4} lineDashPattern={[8, 8]} />
         )}
         {/* Gelaufener Ablauf: blau, durchgezogen */}
         {runCoords.length > 1 && (
@@ -140,6 +142,13 @@ export function TrackingMap({
         {markerList.map((m, i) => (
           <Marker key={i} coordinate={{ latitude: m.lat as number, longitude: m.lng as number }} anchor={{ x: 0.5, y: 0.5 }}>
             <View style={[s.markerDot, { backgroundColor: MARKER_COLOR[m.type] }]} />
+          </Marker>
+        ))}
+
+        {/* Abriss-Marker (Ausarbeiten): rotes Kreuz-Symbol */}
+        {(breaks ?? []).map((b, i) => (
+          <Marker key={`brk-${i}`} coordinate={{ latitude: b.lat, longitude: b.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <View style={s.breakDot}><Ionicons name="close" size={11} color="#fff" /></View>
           </Marker>
         ))}
 
@@ -184,6 +193,7 @@ const s = StyleSheet.create({
   startDot:    { width: 16, height: 16, borderRadius: 8, backgroundColor: C.trackPrimary, borderWidth: 3, borderColor: '#04110F' },
   markerDot:   { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#04110F' },
   rejectDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,77,77,0.75)' },
+  breakDot:    { width: 18, height: 18, borderRadius: 9, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#2a060a', alignItems: 'center', justifyContent: 'center' },
   posGlow:     { width: 40, height: 40, borderRadius: 20, backgroundColor: C.trackGlow, alignItems: 'center', justifyContent: 'center' },
   posCore:     { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
 });

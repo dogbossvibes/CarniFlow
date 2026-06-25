@@ -252,7 +252,7 @@ export default function HomeScreen() {
         {/* ── HAUPTAKTIONEN ── */}
         {layout.hauptaktionen && (
         <View style={s.mainActions}>
-          <AnimatedPressable style={s.mainCard} scale={0.96} onPress={() => router.push("/unit/start")}>
+          <AnimatedPressable style={s.mainCard} scale={0.96} onPress={() => router.push("/unit/timer")}>
             <LinearGradient
               colors={["#00FFCC", "#00FFCC"]}
               start={{ x: 0, y: 0 }}
@@ -261,7 +261,7 @@ export default function HomeScreen() {
             />
             <Ionicons name="play-circle" size={26} color={C.accentText} />
             <Text style={s.mainTitelDark}>Training starten</Text>
-            <Text style={s.mainSubDark}>Live mittracken</Text>
+            <Text style={s.mainSubDark}>Timer · danach dokumentieren</Text>
           </AnimatedPressable>
 
           <AnimatedPressable style={[s.mainCard, s.mainCardAlt]} scale={0.96} onPress={() => router.push("/unit/document")}>
@@ -351,7 +351,7 @@ export default function HomeScreen() {
             <SchnellAktion
               label="Training"
               farbe="#b34300"
-              onPress={() => router.push("/unit/start")}
+              onPress={() => router.push("/unit/timer")}
               customIcon={<ApportIcon color="#b34300" size={22} />}
             />
             <SchnellAktion

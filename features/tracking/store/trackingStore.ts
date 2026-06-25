@@ -56,7 +56,8 @@ interface TrackingState {
   mapOrientationMode:  OrientationMode;
 
   // Actions
-  startRecording: (sessionId: string) => void;
+  startRecording: (sessionId: string | null) => void;
+  setCurrentSession: (sessionId: string) => void;   // Remote-Session-ID nachreichen
   pauseRecording: () => void;
   resumeRecording: () => void;
   stopRecording: () => void;
@@ -121,6 +122,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   ...INITIAL,
 
   startRecording: (sessionId) => { clearPending(); set({ ...INITIAL, currentSessionId: sessionId, isRecording: true }); },
+  setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
   pauseRecording: () => set({ isPaused: true }),
   resumeRecording: () => set({ isPaused: false }),
   stopRecording: () => set({ isRecording: false, isPaused: false }),
