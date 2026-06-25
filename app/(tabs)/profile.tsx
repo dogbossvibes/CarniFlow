@@ -5,8 +5,10 @@ import { C } from "@/constants/colors";
 import { useDogs } from "@/hooks/useDogs";
 import { usePlan } from "@/hooks/usePlan";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import { useAccess } from "@/hooks/useAccess";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { useNotificationSetting } from "@/hooks/useNotificationSetting";
+import { useCrashReporting } from "@/hooks/useCrashReporting";
 import { useProfile } from "@/hooks/useProfile";
 import { useSession } from "@/hooks/useSession";
 import { useTrainingSessions } from "@/hooks/useTrainingSessions";
@@ -84,6 +86,7 @@ export default function ProfilScreen() {
   };
 
   const benachrichtigungen = useNotificationSetting(user?.id);
+  const crashReporting = useCrashReporting();
 
   const [einladungen, setEinladungen] = useState<TrainerUmfrage[]>([]);
   useEffect(() => { if (user?.id) getMyInvitations(user.id).then(setEinladungen); }, [user?.id]);
@@ -115,6 +118,7 @@ export default function ProfilScreen() {
 
   const { expiresAt } = usePlan();
   const { isPro, isTrainerModule, plan } = useCapabilities();
+  const { access } = useAccess();
   const PLAN_LABEL = { free: 'Free', pro: 'Pro', trainer: 'Trainer' } as const;
 
   const anzeigeName = user?.user_metadata?.full_name ?? "Hundesportler";
@@ -332,18 +336,24 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 0 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proAbzeichenText}>{plan === 'trainer' ? 'TRAINER' : 'PRO'}</Text>
+                <Text style={s.proAbzeichenText}>{access.isLifetime ? 'LIFETIME' : plan === 'trainer' ? 'TRAINER' : 'PRO'}</Text>
               </View>
               <View style={s.premiumAktivBadge}>
                 <Ionicons name="checkmark-circle" size={13} color={C.success} />
                 <Text style={s.premiumAktivText}>Aktiv</Text>
               </View>
             </View>
-            <Text style={s.premiumTitel}>{plan === 'trainer' ? 'Trainer aktiv' : 'Pro aktiv'}</Text>
+            <Text style={s.premiumTitel}>
+              {access.isLifetime
+                ? (access.hasTrainerAccess ? 'Lifetime Trainer Zugriff aktiv' : 'Lifetime Zugriff aktiv')
+                : (plan === 'trainer' ? 'Trainer aktiv' : 'Pro aktiv')}
+            </Text>
             <Text style={s.premiumSub}>
-              {expiresAt
-                ? `Verlängert sich am ${expiresAt.toLocaleDateString("de-CH")}`
-                : "Unbegrenzt aktiv"}
+              {access.isLifetime
+                ? 'Du hast lebenslangen Zugriff auf diese Funktionen.'
+                : expiresAt
+                  ? `Verlängert sich am ${expiresAt.toLocaleDateString("de-CH")}`
+                  : "Unbegrenzt aktiv"}
             </Text>
           </View>
         )}
@@ -382,6 +392,19 @@ export default function ProfilScreen() {
             label="Sync-Center"
             onPress={() => router.push('/sync')}
           />
+          <View style={s.trenner} />
+          <View style={s.zeile}>
+            <View style={s.zeileIcon}>
+              <Ionicons name="bug-outline" size={17} color={C.muted} />
+            </View>
+            <Text style={[s.zeileLabel, { flex: 1 }]}>Absturzberichte senden</Text>
+            <Switch
+              value={crashReporting.enabled}
+              onValueChange={crashReporting.toggle}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+            />
+          </View>
         </View>
 
         <Text style={s.abschnitt}>TRAINER</Text>
@@ -500,8 +523,8 @@ export default function ProfilScreen() {
           <View style={s.trenner} />
           <EinstellungZeile
             icon="document-text-outline"
-            label="AGB & Datenschutz"
-            onPress={() => router.push('/privacy')}
+            label="Nutzungsbedingungen (AGB)"
+            onPress={() => router.push('/terms')}
           />
         </View>
 

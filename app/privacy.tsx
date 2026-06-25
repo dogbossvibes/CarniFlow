@@ -2,12 +2,17 @@ import { C } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
-  ScrollView, StyleSheet, Text,
+  Linking, ScrollView, StyleSheet, Text,
   TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const UPDATED = '29. Mai 2026';
+const UPDATED = '24. Juni 2026';
+
+// Verantwortliche Stelle (revDSG: Identität der verantwortlichen Person).
+const CONTROLLER_NAME    = 'Sandra Müller (ANYVO)';
+const CONTROLLER_ADDRESS = 'Heid 196A, 3159 Riedstätt, Schweiz';
+const CONTACT_EMAIL      = 'shadesofym@gmail.com';
 
 interface Section {
   title: string;
@@ -17,43 +22,47 @@ interface Section {
 const SECTIONS: Section[] = [
   {
     title: '1. Verantwortliche Stelle',
-    body:  'ANYVO\nE-Mail: shadesofym@gmail.com\n\nDiese Datenschutzerklärung gilt für die ANYVO-App (iOS und Android).',
+    body:  `${CONTROLLER_NAME}\n${CONTROLLER_ADDRESS}\nE-Mail: ${CONTACT_EMAIL}\n\nDiese Datenschutzerklärung gilt für die ANYVO-App (iOS und Android). Sie richtet sich nach dem revidierten Schweizer Datenschutzgesetz (revDSG). Für Nutzer:innen in der EU/im EWR gilt zusätzlich die DSGVO.`,
   },
   {
-    title: '2. Welche Daten wir erheben',
-    body:  '• Konto: E-Mail-Adresse, optionaler Anzeigename\n• Hunde: Name, Rasse, Geburtsdatum, Gewicht, Geschlecht, Foto\n• Trainingseinheiten: Datum, Kategorie, Typ, Trainer, Dauer, Bewertung, Notizen, Fotos, Videos, Sprachnotizen\n• Leistungsmetriken: Motivation, Konzentration, Präzision, Ausdauer, Trieblage, Impulskontrolle\n• Standort & Wetter: Stadt/Region und Temperatur werden beim Anlegen einer Einheit automatisch ermittelt (nur wenn du die Berechtigung erteilst)\n• Push-Token: ein Gerätekennzeichen für Benachrichtigungen (nur wenn du Mitteilungen erlaubst)\n\nWir erheben KEINE Tracking- oder Werbedaten und nutzen keine Analyse-SDKs.',
+    title: '2. Welche Daten wir verarbeiten',
+    body:  '• Konto: E-Mail-Adresse, optionaler Anzeigename, bei Apple-Anmeldung die von Apple übermittelte Kennung\n• Hunde: Name, Rasse, Geschlecht, Geburtsdatum, Gewicht, Farbe, Sparte/Stufe/Bestwert, Mikrochip-Nr., Tasso-Registrierung, Tierarzt, Impfung, Futter, Foto, Abstammung\n• Trainingseinheiten: Datum, Kategorie, Typ, Trainer, Dauer, Bewertung, Notizen, Fotos, Videos, Sprachnotizen (Audio)\n• Leistungsmetriken: z. B. Motivation, Konzentration, Präzision, Ausdauer, Trieblage, Impulskontrolle\n• Präziser Standort & Fährten: Während einer aktiven Fährten-/Streckenaufnahme werden exakte GPS-Wegpunkte, Marker und die zurückgelegte Route erfasst und gespeichert (nur mit deiner Standort-Berechtigung; Erfassung auch kurz im Hintergrund während laufender Aufnahme)\n• Wetter: zur Position werden Temperatur, Wind und Luftfeuchte abgerufen\n• Mitteilungen: Push-Token (Gerätekennzeichen), nur wenn du Mitteilungen erlaubst\n• Abo/Käufe: Kauf- und Abo-Status (über RevenueCat)\n• Absturz-/Fehlerberichte: technische Diagnosedaten zur Fehlerbehebung (standardmäßig aktiv, im Profil jederzeit deaktivierbar)\n\nWir nutzen KEINE Werbe-Tracking- oder Profiling-SDKs zu Werbezwecken.',
   },
   {
-    title: '3. Zweck der Verarbeitung',
-    body:  '• Bereitstellung der Trainings-Tracking-Funktionen\n• KI-gestützte Analyse deiner Trainingsfortschritte (Claude, Anthropic)\n• Trainer-Betreuung: Wenn du eine Einheit als „geteilt" markierst, kann deine verbundene Trainer:in sie inkl. Übungen, Notizen, Medien und Hundenamen einsehen und kommentieren. Pro Einheit widerrufbar; Verbindung jederzeit trennbar.\n• Kommunikation bei Support-Anfragen',
+    title: '3. Zwecke und Rechtsgrundlagen',
+    body:  '• Bereitstellung der App- und Tracking-Funktionen — zur Vertragserfüllung\n• Standorterfassung, Mitteilungen, Mikrofon/Sprachnotizen, geteilte Einheiten — auf Grundlage deiner Einwilligung (jederzeit widerrufbar)\n• KI-gestützte Analyse/Coaching und Sprachnotiz-Transkription — zur Vertragserfüllung bzw. auf deine Veranlassung\n• Stabilität und Sicherheit (Absturzberichte) — berechtigtes Interesse\n• Trainer-Betreuung: Markierst du eine Einheit als „geteilt", kann deine verbundene Trainer:in sie inkl. Übungen, Notizen, Medien und Hundenamen einsehen und kommentieren. Pro Einheit widerrufbar; Verbindung jederzeit trennbar.',
   },
   {
-    title: '4. Drittanbieter',
-    body:  'Supabase (Supabase Inc., USA) — Authentifizierung, Datenbank, Dateispeicher. Deine Daten werden verschlüsselt übertragen und auf Servern in der EU gespeichert.\n\nAnthropic (USA) — KI-Analyse. Beim Starten einer KI-Analyse werden Trainingsdaten der letzten Einheiten übermittelt: Metriken, Bewertungen, Dauer sowie Notizen, Übungstitel und Hundename. Es werden keine Kontodaten (E-Mail) übertragen.\n\nOpen-Meteo (Schweiz) — kostenloser Wetterdienst ohne API-Schlüssel. Es werden nur GPS-Koordinaten übermittelt; keine personenbezogenen Daten.',
+    title: '4. Drittanbieter / Auftragsbearbeiter',
+    body:  '• Supabase (Supabase Inc., USA) — Authentifizierung, Datenbank, Dateispeicher (Fotos, Videos, Sprachnotizen). Übertragung verschlüsselt; Speicherung in der EU (Region Irland).\n• Anthropic (USA) — KI-Coaching/-Analyse. Übermittelt werden Trainingsdaten (Metriken, Bewertungen, Dauer, Notizen, Übungstitel, Hundename), keine E-Mail-Adresse.\n• OpenAI (USA) — Transkription von Sprachnotizen (das Audio wird zur Umwandlung in Text übermittelt). Über die API werden die Inhalte nicht zum Training der Modelle verwendet.\n• Open-Meteo (Deutschland/EU) — Wetterdienst ohne API-Schlüssel; übermittelt werden nur GPS-Koordinaten.\n• RevenueCat (USA) — Abwicklung/Verwaltung von Abos und Käufen.\n• Sentry (Functional Software Inc., USA; Datenspeicherung in der EU/Deutschland) — Absturz-/Fehlerdiagnose; in der App deaktivierbar.\n• Apple — Anmeldung mit Apple, Push (APNs), Kaufabwicklung im App Store. Google (FCM) für Push auf Android.\n• Expo (USA) — Zustellung von Push-Mitteilungen (Push-Token).',
   },
   {
-    title: '5. Datenspeicherung',
-    body:  'Deine Daten werden so lange gespeichert, wie dein Konto aktiv ist. Du kannst dein Konto und alle zugehörigen Daten jederzeit dauerhaft löschen (Einstellungen → Konto löschen).',
+    title: '5. Bekanntgabe ins Ausland',
+    body:  'Einige Anbieter (u. a. Supabase, Anthropic, OpenAI, RevenueCat, Apple) sind in den USA ansässig oder können Daten dort verarbeiten (Sentry verarbeitet die Diagnosedaten in der EU/Deutschland, das Unternehmen sitzt jedoch in den USA). Die Übermittlung erfolgt auf Basis geeigneter Garantien (EU-Standardvertragsklauseln bzw. Swiss-/EU-US Data Privacy Framework). Auf Wunsch stellen wir Informationen zu den Garantien bereit.',
   },
   {
-    title: '6. Deine Rechte',
-    body:  'Du hast das Recht auf:\n• Auskunft über gespeicherte Daten\n• Berichtigung unrichtiger Daten\n• Löschung deiner Daten (direkt in der App möglich)\n• Einschränkung der Verarbeitung\n• Datenportabilität\n\nFür Anfragen wende dich an: shadesofym@gmail.com',
+    title: '6. Standort & Fährten',
+    body:  'Die präzise Standorterfassung erfolgt nur, wenn du die Berechtigung erteilst, und nur während einer aktiven Aufnahme. Dabei werden GPS-Wegpunkte und Marker gespeichert, um die Strecke darzustellen und auszuwerten. Du kannst die Berechtigung jederzeit in den Geräteeinstellungen widerrufen; einzelne Aufnahmen lassen sich in der App löschen.',
   },
   {
-    title: '7. Datensicherheit',
-    body:  'Alle Verbindungen sind TLS-verschlüsselt. Passwörter werden niemals im Klartext gespeichert. Der Zugriff auf Daten ist durch Row-Level Security (RLS) auf deinen Account beschränkt.',
+    title: '7. Speicherdauer & lokale Daten',
+    body:  'Deine Daten werden gespeichert, solange dein Konto aktiv ist. Für die Offline-Nutzung legt die App eine lokale Kopie (u. a. Trainings-/Streckendaten) verschlüsselt auf deinem Gerät ab; Fotos/Videos/Sprachnotizen liegen vor dem Hochladen kurz lokal vor. Beim Löschen eines Hundes oder des Kontos werden die zugehörigen Daten entfernt.',
   },
   {
-    title: '8. Kinder',
+    title: '8. Deine Rechte',
+    body:  'Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenherausgabe/-portabilität sowie Widerruf erteilter Einwilligungen. In der App kannst du einzelne Hunde löschen sowie dein Konto inkl. aller Daten dauerhaft entfernen (Profil → „Konto löschen"). Beschwerden kannst du an die zuständige Aufsichtsbehörde richten — in der Schweiz an den EDÖB, in der EU an deine Datenschutzbehörde.\n\nKontakt für Anfragen: ' + CONTACT_EMAIL,
+  },
+  {
+    title: '9. Datensicherheit',
+    body:  'Alle Verbindungen sind TLS-verschlüsselt. Passwörter werden niemals im Klartext gespeichert. Der Zugriff auf Daten ist serverseitig durch Row-Level Security (RLS) auf dein Konto beschränkt.',
+  },
+  {
+    title: '10. Kinder',
     body:  'ANYVO richtet sich nicht an Kinder unter 16 Jahren. Wir erheben wissentlich keine Daten von Minderjährigen.',
   },
   {
-    title: '9. Änderungen',
-    body:  'Wesentliche Änderungen dieser Erklärung werden in der App angekündigt. Das Datum der letzten Aktualisierung steht oben auf dieser Seite.',
-  },
-  {
-    title: '10. Kontakt',
-    body:  'Fragen zum Datenschutz:\nshadesofym@gmail.com',
+    title: '11. Änderungen & Kontakt',
+    body:  'Wesentliche Änderungen dieser Erklärung kündigen wir in der App an; das Datum oben zeigt die letzte Aktualisierung. Fragen zum Datenschutz: ' + CONTACT_EMAIL,
   },
 ];
 
@@ -89,6 +98,11 @@ export default function PrivacyScreen() {
             <Text style={s.sectionBody}>{sec.body}</Text>
           </View>
         ))}
+
+        <TouchableOpacity style={s.webLink} onPress={() => Linking.openURL('https://anyvo.app/datenschutz')} activeOpacity={0.7}>
+          <Ionicons name="globe-outline" size={15} color={C.accent} />
+          <Text style={s.webLinkText}>Im Web ansehen: anyvo.app/datenschutz</Text>
+        </TouchableOpacity>
 
         <View style={{ height: 60 }} />
       </ScrollView>
@@ -140,4 +154,6 @@ const s = StyleSheet.create({
     color:     'rgba(255,255,255,0.65)',
     lineHeight: 21,
   },
+  webLink:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, marginTop: 4 },
+  webLinkText: { fontSize: 13, color: C.accent, fontWeight: '700' },
 });

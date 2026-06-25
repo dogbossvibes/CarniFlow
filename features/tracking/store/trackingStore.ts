@@ -4,7 +4,7 @@ import { schedulePersist, clearPending } from '@/features/tracking/store/trackPe
 import { EMPTY_GPS_STATS, type GpsStats, type TrackPointStatus } from '@/features/tracking/engine/types';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
-export type MarkerMaterial = 'stoff' | 'holz' | 'leder' | 'plastik' | 'diverses';
+export type MarkerMaterial = 'stoff' | 'holz' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
 export type AngleKind = 'links' | 'rechts' | 'spitz' | 'absatz';
 export type OrientationMode = 'north' | 'heading' | 'track';
 

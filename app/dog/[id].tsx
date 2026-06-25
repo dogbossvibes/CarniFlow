@@ -24,7 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SignedImage } from '@/components/ui/SignedImage';
 import { ProgressRing } from '@/components/ui/ProgressRing';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
-import { getDogById } from '@/services/dogs';
+import { getDogById, updateDog } from '@/services/dogs';
 import type { Dog } from '@/types';
 import type { FeedItem } from '@/services/trainingFeed';
 
@@ -81,6 +81,11 @@ function datumKurz(iso: string): string {
   return y && m && d ? `${d}.${m}.${y}` : iso;
 }
 
+// Baut Label/Wert-Zeilen, lässt leere Werte weg.
+function mkRows(...pairs: [string, string | null | undefined][]): [string, string][] {
+  return pairs.filter(([, v]) => !!v).map(([l, v]) => [l, v as string]);
+}
+
 // Item-Punkte 0–100: Doku-Score (1–10 → ×10), sonst Sterne/Übungs-Ø (1–5 → ×20).
 function punkte(it: FeedItem): number | null {
   if (it.score != null) return Math.round(it.score * 10);
@@ -108,6 +113,7 @@ export default function HundProfilScreen() {
   const [fehler, setFehler]   = useState<string | null>(null);
   const [fabOffen, setFabOffen] = useState(false);
   const [ahnenOffen, setAhnenOffen] = useState(false);
+  const [fav, setFav] = useState(false);   // „Herz" — Favorit
 
   const { feed, loading: feedLaden } = useTrainingFeed(id);
 
@@ -117,8 +123,16 @@ export default function HundProfilScreen() {
       setLaden(false);
       if (error || !data) { setFehler(error?.message ?? 'Hund nicht gefunden'); return; }
       setHund(data as Dog);
+      setFav(!!(data as Dog).is_favorite);
     });
   }, [id]);
+
+  const toggleFav = () => {
+    if (!hund) return;
+    const next = !fav;
+    setFav(next);   // optimistisch
+    updateDog(hund.id, { is_favorite: next }).then(({ error }) => { if (error) setFav(!next); });
+  };
 
   // ── Abgeleitete Werte ──
   const stats = useMemo(() => {
@@ -165,6 +179,16 @@ export default function HundProfilScreen() {
   }, [feed]);
 
   const hatAbstammung = !!(hund?.sire || hund?.dam || hund?.kennel);
+
+  // Steckbrief-Gruppen (Sport / Identität / Gesundheit) — nur was gefüllt ist.
+  const steckbrief = useMemo(() => {
+    if (!hund) return [];
+    return [
+      { titel: 'Sport',      rows: mkRows(['Sparte', hund.discipline], ['Stufe', hund.level], ['Bestwert', hund.best_score]) },
+      { titel: 'Identität',  rows: mkRows(['Farbe', hund.color], ['Mikrochip', hund.microchip_number], ['Tasso', hund.tasso_registered ? 'Registriert' : null]) },
+      { titel: 'Gesundheit', rows: mkRows(['Tierarzt', hund.vet], ['Impfung', hund.vaccination], ['Futter', hund.food]) },
+    ].filter(g => g.rows.length > 0);
+  }, [hund]);
 
   // ── Animationen ──
   const grow  = useSharedValue(0);
@@ -224,13 +248,18 @@ export default function HundProfilScreen() {
             <TouchableOpacity style={s.navBtn} onPress={() => router.back()} activeOpacity={0.8}>
               <Ionicons name="chevron-back" size={20} color={P.text} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={s.navBtn}
-              onPress={() => router.push({ pathname: '/edit-dog', params: { id: hund.id } })}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="create-outline" size={18} color={P.text} />
-            </TouchableOpacity>
+            <View style={s.navRight}>
+              <TouchableOpacity style={[s.navBtn, fav && s.navBtnFav]} onPress={toggleFav} activeOpacity={0.8}>
+                <Ionicons name={fav ? 'heart' : 'heart-outline'} size={18} color={fav ? '#ff5d6c' : P.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.navBtn}
+                onPress={() => router.push({ pathname: '/edit-dog', params: { id: hund.id } })}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="create-outline" size={18} color={P.text} />
+              </TouchableOpacity>
+            </View>
           </SafeAreaView>
 
           <View style={s.heroUnten}>
@@ -355,6 +384,23 @@ export default function HundProfilScreen() {
           </>
         )}
 
+        {/* ── 6b. STECKBRIEF (Sport / Identität / Gesundheit) ── */}
+        {steckbrief.map(g => (
+          <View key={g.titel}>
+            <Text style={s.sektionTitel}>{g.titel}</Text>
+            <View style={s.card}>
+              <View style={s.steckbriefBody}>
+                {g.rows.map(([label, wert], i) => (
+                  <View key={label} style={[s.ahnenZeile, i < g.rows.length - 1 && s.zeileTrenner]}>
+                    <Text style={s.ahnenLabel}>{label}</Text>
+                    <Text style={s.ahnenWert}>{wert}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        ))}
+
         {/* ── 7. ABSTAMMUNG ── */}
         {hatAbstammung && (
           <>
@@ -448,11 +494,13 @@ const s = StyleSheet.create({
   hero:    { height: 340, justifyContent: 'space-between', overflow: 'hidden' },
   heroImg: { position: 'absolute', width: '100%', height: '100%' },
   heroNav: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8 },
+  navRight: { flexDirection: 'row', gap: 10 },
   navBtn: {
     width: 42, height: 42, borderRadius: 21,
     backgroundColor: 'rgba(0,0,0,0.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center', justifyContent: 'center',
   },
+  navBtnFav: { backgroundColor: 'rgba(255,93,108,0.18)', borderColor: 'rgba(255,93,108,0.45)' },
   heroUnten:  { paddingHorizontal: 20, paddingBottom: 20 },
   heroName:   { fontSize: 38, color: P.text, fontWeight: '900', letterSpacing: -1 },
   heroMetaRow:{ flexDirection: 'row', marginTop: 2 },
@@ -520,6 +568,8 @@ const s = StyleSheet.create({
   ahnenKopf:     { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16 },
   ahnenKopfText: { flex: 1, fontSize: 15, color: P.text, fontWeight: '600' },
   ahnenBody:     { paddingHorizontal: 16, paddingBottom: 8, borderTopWidth: 1, borderTopColor: P.border, paddingTop: 4 },
+  steckbriefBody:{ paddingHorizontal: 16, paddingVertical: 2 },
+  zeileTrenner:  { borderBottomWidth: 1, borderBottomColor: P.border },
   ahnenZeile:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 },
   ahnenLabel:    { fontSize: 13, color: P.sub, fontWeight: '600' },
   ahnenWert:     { fontSize: 14, color: P.text, fontWeight: '700', flexShrink: 1, textAlign: 'right', marginLeft: 16 },

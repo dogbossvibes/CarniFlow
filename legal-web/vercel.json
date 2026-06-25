@@ -1,0 +1,8 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/privacy", "destination": "/datenschutz", "permanent": true },
+    { "source": "/terms", "destination": "/agb", "permanent": true }
+  ]
+}

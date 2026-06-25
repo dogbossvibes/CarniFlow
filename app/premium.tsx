@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -15,6 +15,7 @@ import {
   activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription,
 } from '@/services/subscriptionService';
 import { PLAN_META, type SubscriptionPlan } from '@/features/subscription/plans';
+import { useAccess } from '@/hooks/useAccess';
 
 interface CardDef { plan: SubscriptionPlan; badge?: string; features: string[]; founder?: boolean }
 
@@ -33,6 +34,7 @@ export default function PremiumScreen() {
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
   const [slots, setSlots] = useState<{ used: number; remaining: number }>({ used: 0, remaining: 77 });
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
+  const { access } = useAccess();
 
   useEffect(() => {
     (async () => {
@@ -123,6 +125,24 @@ export default function PremiumScreen() {
           <Text style={S.headerSub}>Nur Monatsabos · jederzeit kündbar.</Text>
         </View>
 
+        {access.isLifetime ? (
+          <View style={[S.card, S.cardCurrent]}>
+            <View style={S.cardHead}>
+              <View style={{ flex: 1 }}>
+                <View style={S.nameRow}>
+                  <Text style={S.cardName}>{access.hasTrainerAccess ? 'Lifetime Trainer Zugriff aktiv' : 'Lifetime Zugriff aktiv'}</Text>
+                  <View style={S.badge}><Text style={S.badgeTxt}>LIFETIME</Text></View>
+                </View>
+              </View>
+            </View>
+            <View style={S.featureList}>
+              <View style={S.featureRow}>
+                <Ionicons name="checkmark-circle" size={15} color={C.accent} />
+                <Text style={S.featureTxt}>Du hast lebenslangen Zugriff auf diese Funktionen.</Text>
+              </View>
+            </View>
+          </View>
+        ) : (<>
         {CARDS.map(card => {
           const meta = PLAN_META[card.plan];
           const isCurrent = currentPlan === card.plan;
@@ -172,9 +192,10 @@ export default function PremiumScreen() {
         <TouchableOpacity onPress={handleRestore} style={S.restoreBtn} activeOpacity={0.7}>
           <Text style={S.restoreTxt}>Käufe wiederherstellen</Text>
         </TouchableOpacity>
-        <Text style={S.legal}>Zahlung über deinen App-Store-Account · jederzeit kündbar.</Text>
+        </>)}
+        {!access.isLifetime && <Text style={S.legal}>Zahlung über deinen App-Store-Account · jederzeit kündbar.</Text>}
         <View style={S.linksRow}>
-          <Text style={S.link} onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>Nutzungsbedingungen</Text>
+          <Text style={S.link} onPress={() => router.push('/terms')}>Nutzungsbedingungen</Text>
           <Text style={S.legal}>·</Text>
           <Text style={S.link} onPress={() => router.push('/privacy')}>Datenschutz</Text>
         </View>

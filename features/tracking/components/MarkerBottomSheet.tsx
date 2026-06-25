@@ -9,11 +9,13 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 export interface MarkerChoice { type: MarkerType; material?: MarkerMaterial; angleKind?: AngleKind }
 
 const MATERIALS: { material: MarkerMaterial; icon: IconName; label: string }[] = [
-  { material: 'stoff',    icon: 'shirt-outline',       label: 'Stoff' },
   { material: 'holz',     icon: 'leaf-outline',        label: 'Holz' },
+  { material: 'stoff',    icon: 'shirt-outline',       label: 'Stoff' },
   { material: 'leder',    icon: 'bag-outline',         label: 'Leder' },
   { material: 'plastik',  icon: 'cube-outline',        label: 'Plastik' },
-  { material: 'diverses', icon: 'ellipsis-horizontal', label: 'Diverses' },
+  { material: 'metall',   icon: 'magnet-outline',      label: 'Metall' },
+  { material: 'teppich',  icon: 'grid-outline',        label: 'Teppich' },
+  { material: 'diverses', icon: 'ellipsis-horizontal', label: 'Divers' },
 ];
 
 const ANGLES: { kind: AngleKind; icon: IconName; label: string }[] = [

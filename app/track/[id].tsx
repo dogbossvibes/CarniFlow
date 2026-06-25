@@ -92,6 +92,21 @@ export default function TrackAuswertungScreen() {
   const aTotal = data.articles_total ?? 0;
   const distractions = data.distractions_total ?? 0;
 
+  // Bedingungen (echtes Wetter zur Startposition + Untergrund/Beschaffenheit).
+  const weatherCond: string | null = data.weather_condition ?? data.wetter ?? null;
+  const temp: number | null     = data.temperature ?? null;
+  const wind: number | null     = data.wind_speed ?? null;
+  const humidity: number | null = data.humidity ?? null;
+  const terrain: string[]       = data.terrain_conditions ?? [];
+  const condStats: { icon: IconName; label: string; value: string }[] = [
+    ...(weatherCond     ? [{ icon: 'partly-sunny-outline' as IconName, label: 'Wetter',     value: weatherCond }] : []),
+    ...(temp != null     ? [{ icon: 'thermometer-outline' as IconName, label: 'Temperatur', value: `${temp.toFixed(1)} °C` }] : []),
+    ...(wind != null     ? [{ icon: 'flag-outline'        as IconName, label: 'Wind',       value: `${Math.round(wind)} km/h` }] : []),
+    ...(humidity != null ? [{ icon: 'water-outline'       as IconName, label: 'Feuchte',    value: `${Math.round(humidity)} %` }] : []),
+  ];
+  const condTags = [surface, ...terrain].filter(Boolean);
+  const hasConditions = condStats.length > 0 || condTags.length > 0;
+
   const highlights: { icon: IconName; value: string; label: string }[] = [
     { icon: 'flag',          value: `${aFound}/${aTotal}`, label: 'Gegenstände' },
     { icon: 'git-branch',    value: String(corners),       label: 'Winkel' },
@@ -128,6 +143,33 @@ export default function TrackAuswertungScreen() {
               </View>
             ))}
           </View>
+
+          {/* Bedingungen — Wetter (echt) + Untergrund/Beschaffenheit */}
+          {hasConditions && (
+            <>
+              <SectionLabel>Bedingungen</SectionLabel>
+              <View style={[s.card, { padding: 16, marginBottom: 16 }]}>
+                {condStats.length > 0 && (
+                  <View style={s.condGrid}>
+                    {condStats.map((cnd, i) => (
+                      <View key={i} style={s.condItem}>
+                        <View style={s.condIcon}><Ionicons name={cnd.icon} size={17} color={C.trackPrimary} /></View>
+                        <View>
+                          <Text style={s.condLabel}>{cnd.label}</Text>
+                          <Text style={s.condValue}>{cnd.value}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {condTags.length > 0 && (
+                  <View style={[s.tagRow, condStats.length > 0 && { marginTop: 14 }]}>
+                    {condTags.map((t, i) => <Tag key={i}>{t}</Tag>)}
+                  </View>
+                )}
+              </View>
+            </>
+          )}
 
           {/* Bewertung pro Abschnitt */}
           <SectionLabel>Bewertung pro Abschnitt</SectionLabel>
@@ -227,6 +269,12 @@ const s = StyleSheet.create({
   totalLabel:{ fontSize: 10, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1.4 },
   totalVal:  { fontSize: 22, color: C.trackPrimary, fontWeight: '900' },
   totalMax:  { fontSize: 14, color: C.trackTextMut, fontWeight: '700' },
+
+  condGrid:  { flexDirection: 'row', flexWrap: 'wrap', rowGap: 16, columnGap: 12 },
+  condItem:  { width: '46%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  condIcon:  { width: 38, height: 38, borderRadius: 12, backgroundColor: C.trackPrimaryDk + '24', alignItems: 'center', justifyContent: 'center' },
+  condLabel: { fontSize: 9, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  condValue: { fontSize: 15, color: C.trackText, fontWeight: '800', marginTop: 1 },
 
   mapCard: { height: 190, overflow: 'hidden', marginBottom: 16, padding: 0 },
   legend:  { position: 'absolute', left: 14, bottom: 12, flexDirection: 'row', gap: 14 },

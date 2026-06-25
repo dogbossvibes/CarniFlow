@@ -343,7 +343,11 @@ export default function LoginScreen() {
             </Animated.View>
 
             <Text style={s.rechtlich}>
-              Mit der Nutzung stimmst du unseren AGB & Datenschutzrichtlinien zu.
+              Mit der Nutzung stimmst du unseren{' '}
+              <Text style={s.rechtlichLink} onPress={() => router.push('/terms')}>AGB</Text>
+              {' & '}
+              <Text style={s.rechtlichLink} onPress={() => router.push('/privacy')}>Datenschutzrichtlinien</Text>
+              {' '}zu.
             </Text>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -510,6 +514,7 @@ const s = StyleSheet.create({
     marginTop:  20,
     lineHeight: 16,
   },
+  rechtlichLink: { color: C.accent, fontWeight: '700' },
 
   erfolgSafe: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   erfolgWrap: { alignItems: 'center', paddingHorizontal: 32 },

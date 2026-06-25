@@ -301,8 +301,10 @@ class AnyvoPrecisionLocationModule : Module() {
     var cn0Max = Double.NEGATIVE_INFINITY
     for (i in 0 until count) {
       if (status.usedInFix(i)) used++
-      if (status.hasCn0DbHz(i)) {
-        val v = status.getCn0DbHz(i).toDouble()
+      // GnssStatus hat kein hasCn0DbHz(); getCn0DbHz() liefert immer einen Wert
+      // (0, wenn nicht verfügbar) → nur positive Messwerte berücksichtigen.
+      val v = status.getCn0DbHz(i).toDouble()
+      if (v > 0.0) {
         cn0Sum += v; cn0Count++
         if (v > cn0Max) cn0Max = v
       }

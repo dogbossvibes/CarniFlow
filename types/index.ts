@@ -29,11 +29,30 @@ export type Dog = {
   // Abstammung
   sire:       string | null;   // Vater
   dam:        string | null;   // Mutter
-  kennel:     string | null;   // Zuchtstätte
+  kennel:     string | null;   // Zuchtstätte / Zwinger
+  is_favorite: boolean | null; // „Herz" — Favorit-Markierung
+  // Identität
+  color:            string | null;   // Farbe
+  microchip_number: string | null;   // Mikrochip-Nr.
+  tasso_registered: boolean | null;  // bei Tasso registriert
+  // Sport
+  discipline: string | null;   // Sparte (IGP, Mondioring …)
+  level:      string | null;   // Stufe
+  best_score: string | null;   // Bestwert
+  // Gesundheit
+  vet:         string | null;  // Tierarzt
+  vaccination: string | null;  // Impfung (Datum/Notiz)
+  food:        string | null;  // Futter
   created_at: string;
 };
 
-export type NewDog = Pick<Dog, 'name' | 'breed' | 'birth_date' | 'weight_kg' | 'gender' | 'photo_url' | 'titles' | 'sire' | 'dam' | 'kennel'>;
+export type NewDog = Pick<Dog,
+  | 'name' | 'breed' | 'birth_date' | 'weight_kg' | 'gender' | 'photo_url' | 'titles'
+  | 'sire' | 'dam' | 'kennel' | 'is_favorite'
+  | 'color' | 'microchip_number' | 'tasso_registered'
+  | 'discipline' | 'level' | 'best_score'
+  | 'vet' | 'vaccination' | 'food'
+>;
 
 export type TrainingCategory = 'IGP' | 'IBGH' | 'Mondioring' | 'Alltagstraining';
 export type TrainingType     = 'privat' | 'trainer';

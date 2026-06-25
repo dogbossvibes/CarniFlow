@@ -48,3 +48,6 @@ supabase/.temp/
 
 # Claude Code transiente Dateien
 .claude/scheduled_tasks.lock
+
+# Google Play Service Account (Secret – nicht committen)
+google-play-service-account.json

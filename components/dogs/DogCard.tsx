@@ -1,96 +1,94 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SignedImage } from '@/components/ui/SignedImage';
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { C } from '@/constants/colors';
-import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { SignedImage } from '@/components/ui/SignedImage';
 import { DogIcon } from '@/components/ui/DogIcon';
+import { FT } from '@/constants/colors';
+import { updateDog } from '@/services/dogs';
 import type { Dog } from '@/types';
 
-function altersLabel(geburtsDatum: string | null): string {
-  if (!geburtsDatum) return '';
-  const monate = Math.floor((Date.now() - new Date(geburtsDatum).getTime()) / (30 * 24 * 3600 * 1000));
-  return monate < 12 ? `${monate} Mon.` : `${Math.floor(monate / 12)} J.`;
+// ── ListRich — reichhaltige Hunde-Listenkarte im ANYVO-Look (NativeWind, ft-Tokens).
+//    Avatar · Name · Rasse/Geschlecht · Info-Chips (Alter, Gewicht, Titel)
+//    + Favorit-Herz („Herz"-Feld) + Schnell-Bearbeiten.
+
+function alterLabel(birth: string | null): string | null {
+  if (!birth) return null;
+  const monate = Math.floor((Date.now() - new Date(birth).getTime()) / (30 * 24 * 3600 * 1000));
+  if (monate < 0) return null;
+  return monate < 12 ? `${monate} Mon.` : `${(monate / 12).toFixed(monate % 12 === 0 ? 0 : 1)} J.`;
+}
+
+function Chip({ label, accent }: { label: string; accent?: boolean }) {
+  return (
+    <View className={`rounded-[8px] px-2 py-[3px] border ${accent ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.4)]' : 'bg-white/5 border-ft-line'}`}>
+      <Text className={`text-[11px] font-semibold ${accent ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
+    </View>
+  );
 }
 
 type Props = { dog: Dog; onPress?: () => void };
 
 export function DogCard({ dog, onPress }: Props) {
   const router = useRouter();
-  const alter  = altersLabel(dog.birth_date);
+  const [fav, setFav] = useState(!!dog.is_favorite);
 
-  const handlePress = onPress ?? (() => router.push(`/dog/${dog.id}` as never));
+  const alter = alterLabel(dog.birth_date);
+  const gender = dog.gender === 'male' ? '♂ Rüde' : dog.gender === 'female' ? '♀ Hündin' : null;
+  const titles = (dog.titles ?? []).slice(0, 2);
+
+  const openDetail = onPress ?? (() => router.push(`/dog/${dog.id}` as never));
+
+  const toggleFav = () => {
+    const next = !fav;
+    setFav(next);                                   // optimistisch
+    updateDog(dog.id, { is_favorite: next }).then(({ error }) => { if (error) setFav(!next); });
+  };
 
   return (
-    <AnimatedPressable style={s.card} onPress={handlePress}>
+    <Pressable
+      onPress={openDetail}
+      style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+      className="flex-row items-center gap-[14px] rounded-ft-md border border-ft-line-strong bg-ft-surface2 p-4"
+    >
       {dog.photo_url ? (
-        <SignedImage
-          url={dog.photo_url}
-          style={s.avatarImage}
-          contentFit="cover"
-        />
+        <SignedImage url={dog.photo_url} style={{ width: 60, height: 60, borderRadius: 17 }} contentFit="cover" />
       ) : (
-        <View style={[s.avatar, { backgroundColor: `${C.accent}14` }]}>
-          <DogIcon size={24} color={C.accent} />
+        <View className="w-[60px] h-[60px] rounded-[17px] items-center justify-center bg-ft-acc-dim">
+          <DogIcon size={26} color={FT.acc} />
         </View>
       )}
 
-      <View style={s.info}>
-        <Text style={s.name}>{dog.name}</Text>
-        {dog.breed ? <Text style={s.breed} numberOfLines={1}>{dog.breed}</Text> : null}
-        <View style={s.badges}>
-          {alter ? <Badge label={alter} color={C.accent} /> : null}
-          {dog.gender ? <Badge label={dog.gender === 'male' ? '♂ Rüde' : '♀ Hündin'} color={C.muted} /> : null}
+      <View className="flex-1 gap-[3px]">
+        <Text className="text-[16.5px] font-extrabold text-ft-text" numberOfLines={1}>{dog.name}</Text>
+        {(dog.breed || gender) ? (
+          <Text className="text-[12.5px] text-ft-muted" numberOfLines={1}>
+            {dog.breed ?? ''}{dog.breed && gender ? ' · ' : ''}{gender ?? ''}
+          </Text>
+        ) : null}
+        <View className="flex-row flex-wrap gap-1.5 mt-1.5">
+          {alter ? <Chip label={alter} /> : null}
+          {dog.weight_kg != null ? <Chip label={`${dog.weight_kg} kg`} /> : null}
+          {titles.map((t, i) => <Chip key={`${t}-${i}`} label={t} accent />)}
         </View>
       </View>
 
-      <TouchableOpacity
-        style={s.editBtn}
-        onPress={() => router.push({ pathname: '/edit-dog', params: { id: dog.id } } as never)}
-        activeOpacity={0.7}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons name="pencil-outline" size={15} color={C.muted} />
-      </TouchableOpacity>
-    </AnimatedPressable>
+      <View className="items-center gap-2">
+        <Pressable
+          onPress={toggleFav}
+          hitSlop={8}
+          className={`w-9 h-9 rounded-[11px] items-center justify-center border ${fav ? 'bg-[rgba(255,93,108,0.14)] border-[rgba(255,93,108,0.4)]' : 'bg-white/5 border-ft-line'}`}
+        >
+          <Ionicons name={fav ? 'heart' : 'heart-outline'} size={16} color={fav ? FT.bad : FT.muted} />
+        </Pressable>
+        <Pressable
+          onPress={() => router.push({ pathname: '/edit-dog', params: { id: dog.id } } as never)}
+          hitSlop={8}
+          className="w-9 h-9 rounded-[11px] items-center justify-center bg-white/5 border border-ft-line"
+        >
+          <Ionicons name="pencil-outline" size={15} color={FT.muted} />
+        </Pressable>
+      </View>
+    </Pressable>
   );
 }
-
-function Badge({ label, color }: { label: string; color: string }) {
-  return (
-    <View style={[s.badge, { backgroundColor: `${color}15` }]}>
-      <Text style={[s.badgeText, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
-const s = StyleSheet.create({
-  card: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    backgroundColor: C.card,
-    borderRadius:    18,
-    borderWidth:     1,
-    borderColor:     C.border,
-    padding:         16,
-    gap:             14,
-  },
-  avatar:      { width: 54, height: 54, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  avatarImage: { width: 54, height: 54, borderRadius: 16 },
-  info:      { flex: 1, gap: 2 },
-  name:      { fontSize: 16, color: C.white, fontWeight: '700', letterSpacing: -0.2 },
-  breed:     { fontSize: 13, color: C.muted },
-  badges:    { flexDirection: 'row', gap: 6, marginTop: 6 },
-  badge:     { borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 11, fontWeight: '600' },
-  editBtn: {
-    width:           34,
-    height:          34,
-    borderRadius:    10,
-    backgroundColor: C.card,
-    borderWidth:     1,
-    borderColor:     C.border,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-});

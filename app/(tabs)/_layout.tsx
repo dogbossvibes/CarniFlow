@@ -7,6 +7,7 @@ import { GlassView } from 'expo-glass-effect';
 import { isGlass } from '@/components/ui/Glass';
 import { useEffect } from 'react';
 import { DogIcon } from '@/components/ui/DogIcon';
+import { ApportierholzIcon } from '@/components/ui/ApportierholzIcon';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -32,6 +33,17 @@ function DogTabIcon({ focused, size }: { focused: boolean; size: number }) {
   return (
     <View style={[s.iconWrap, focused && s.iconWrapActive]}>
       <DogIcon
+        color={focused ? C.accent : C.muted}
+        size={focused ? size : size - 1}
+      />
+    </View>
+  );
+}
+
+function TrainingTabIcon({ focused, size }: { focused: boolean; size: number }) {
+  return (
+    <View style={[s.iconWrap, focused && s.iconWrapActive]}>
+      <ApportierholzIcon
         color={focused ? C.accent : C.muted}
         size={focused ? size : size - 1}
       />
@@ -124,7 +136,7 @@ export default function TabLayout() {
         name="training"
         options={{
           title: 'Training',
-          tabBarIcon: ({ focused, size }) => <TabIcon name="barbell" focused={focused} size={size} />,
+          tabBarIcon: ({ focused, size }) => <TrainingTabIcon focused={focused} size={size} />,
         }}
       />
       {/* Fährten: kein eigener Tab — Einstieg über Training → „Fährte (GPS)". */}

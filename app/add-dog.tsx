@@ -19,6 +19,7 @@ import { C } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { addDog } from '@/services/dogs';
+import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
 import { uploadDogImage } from '@/services/storage';
 import { useSession } from '@/hooks/useSession';
 
@@ -37,6 +38,15 @@ export default function HundHinzufuegenScreen() {
   const [vater,       setVater]       = useState('');
   const [mutter,      setMutter]      = useState('');
   const [zwinger,     setZwinger]     = useState('');
+  const [sparte,      setSparte]      = useState('');
+  const [stufe,       setStufe]       = useState('');
+  const [bestwert,    setBestwert]    = useState('');
+  const [farbe,       setFarbe]       = useState('');
+  const [mikrochip,   setMikrochip]   = useState('');
+  const [tasso,       setTasso]       = useState(false);
+  const [tierarzt,    setTierarzt]    = useState('');
+  const [impfung,     setImpfung]     = useState('');
+  const [futter,      setFutter]      = useState('');
   const [bildUri,     setBildUri]     = useState<string | null>(null);
   const [fehler,      setFehler]      = useState<string | null>(null);
   const [laden,       setLaden]       = useState(false);
@@ -100,6 +110,16 @@ export default function HundHinzufuegenScreen() {
       sire:       vater.trim()   || null,
       dam:        mutter.trim()  || null,
       kennel:     zwinger.trim() || null,
+      discipline:       sparte.trim()    || null,
+      level:            stufe.trim()     || null,
+      best_score:       bestwert.trim()  || null,
+      color:            farbe.trim()     || null,
+      microchip_number: mikrochip.trim() || null,
+      tasso_registered: tasso,
+      vet:              tierarzt.trim()  || null,
+      vaccination:      impfung.trim()   || null,
+      food:             futter.trim()    || null,
+      is_favorite:      false,
     });
 
     setLaden(false);
@@ -272,12 +292,41 @@ export default function HundHinzufuegenScreen() {
               autoCapitalize="words"
             />
             <Input
-              label="Zuchtstätte"
+              label="Zuchtstätte / Zwinger"
               placeholder="z. B. vom Haus Milinski"
               value={zwinger}
               onChangeText={setZwinger}
               autoCapitalize="words"
             />
+          </View>
+
+          <Text style={s.gruppeLabel}>SPORT</Text>
+          <View style={s.felder}>
+            <ChipSelect label="SPARTE" options={DOG_DISCIPLINES} value={sparte} onChange={setSparte} />
+            <ChipSelect label="STUFE" options={DOG_LEVELS} value={stufe} onChange={setStufe} />
+            <Input label="Bestwert" placeholder="z. B. 98 / 96 / 97" value={bestwert} onChangeText={setBestwert} />
+          </View>
+
+          <Text style={s.gruppeLabel}>IDENTITÄT</Text>
+          <View style={s.felder}>
+            <Input label="Farbe" placeholder="z. B. schwarz-marken" value={farbe} onChangeText={setFarbe} autoCapitalize="words" />
+            <Input label="Mikrochip-Nr." placeholder="15-stellige Chipnummer" value={mikrochip} onChangeText={setMikrochip} keyboardType="numbers-and-punctuation" />
+            <TouchableOpacity style={[s.tassoRow, tasso && s.tassoRowAktiv]} onPress={() => setTasso(t => !t)} activeOpacity={0.85}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.tassoTitel}>Bei Tasso registriert</Text>
+                <Text style={s.tassoUnter}>Haustier-Zentralregister</Text>
+              </View>
+              <View style={[s.switch, tasso && s.switchOn]}>
+                <View style={[s.knob, tasso && s.knobOn]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={s.gruppeLabel}>GESUNDHEIT</Text>
+          <View style={s.felder}>
+            <Input label="Tierarzt" placeholder="Praxis / Name" value={tierarzt} onChangeText={setTierarzt} autoCapitalize="words" />
+            <Input label="Impfung" placeholder="z. B. Tollwut 03/2026" value={impfung} onChangeText={setImpfung} />
+            <Input label="Futter" placeholder="z. B. Royal Canin" value={futter} onChangeText={setFutter} autoCapitalize="words" />
           </View>
 
           {fehler ? (
@@ -428,4 +477,17 @@ const s = StyleSheet.create({
     marginBottom:    16,
   },
   fehlerText: { flex: 1, fontSize: 13, color: C.danger },
+
+  tassoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    height: 56, paddingHorizontal: 16, borderRadius: 14,
+    borderWidth: 1, borderColor: C.border, backgroundColor: C.input,
+  },
+  tassoRowAktiv: { borderColor: C.accent },
+  tassoTitel: { fontSize: 15, color: C.white, fontWeight: '600' },
+  tassoUnter: { fontSize: 12, color: C.muted, marginTop: 1 },
+  switch: { width: 46, height: 28, borderRadius: 14, backgroundColor: C.border, padding: 3, justifyContent: 'center' },
+  switchOn: { backgroundColor: C.accent },
+  knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
+  knobOn: { alignSelf: 'flex-end' },
 });

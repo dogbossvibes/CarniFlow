@@ -19,8 +19,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { C } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
+import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
-import { getDogById, updateDog } from '@/services/dogs';
+import { getDogById, updateDog, deleteDogWithDependents } from '@/services/dogs';
 import { uploadDogImage } from '@/services/storage';
 import { useSession } from '@/hooks/useSession';
 import type { Dog } from '@/types';
@@ -51,10 +53,24 @@ export default function HundBearbeitenScreen() {
   const [vater,         setVater]         = useState('');
   const [mutter,        setMutter]        = useState('');
   const [zwinger,       setZwinger]       = useState('');
+  // Sport
+  const [sparte,        setSparte]        = useState('');
+  const [stufe,         setStufe]         = useState('');
+  const [bestwert,      setBestwert]      = useState('');
+  // Identität
+  const [farbe,         setFarbe]         = useState('');
+  const [mikrochip,     setMikrochip]     = useState('');
+  const [tasso,         setTasso]         = useState(false);
+  // Gesundheit
+  const [tierarzt,      setTierarzt]      = useState('');
+  const [impfung,       setImpfung]       = useState('');
+  const [futter,        setFutter]        = useState('');
   const [neuesBildUri,  setNeuesBildUri]  = useState<string | null>(null);
   const [fehler,        setFehler]        = useState<string | null>(null);
   const [speichern,     setSpeichern]     = useState(false);
   const [bildLaden,     setBildLaden]     = useState(false);
+  const [loeschOffen,   setLoeschOffen]   = useState(false);
+  const [loeschen,      setLoeschen]      = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -73,6 +89,15 @@ export default function HundBearbeitenScreen() {
       setVater(d.sire ?? '');
       setMutter(d.dam ?? '');
       setZwinger(d.kennel ?? '');
+      setSparte(d.discipline ?? '');
+      setStufe(d.level ?? '');
+      setBestwert(d.best_score ?? '');
+      setFarbe(d.color ?? '');
+      setMikrochip(d.microchip_number ?? '');
+      setTasso(!!d.tasso_registered);
+      setTierarzt(d.vet ?? '');
+      setImpfung(d.vaccination ?? '');
+      setFutter(d.food ?? '');
     });
   }, [id]);
 
@@ -148,6 +173,15 @@ export default function HundBearbeitenScreen() {
       sire:       vater.trim()   || null,
       dam:        mutter.trim()  || null,
       kennel:     zwinger.trim() || null,
+      discipline:       sparte.trim()    || null,
+      level:            stufe.trim()     || null,
+      best_score:       bestwert.trim()  || null,
+      color:            farbe.trim()     || null,
+      microchip_number: mikrochip.trim() || null,
+      tasso_registered: tasso,
+      vet:              tierarzt.trim()  || null,
+      vaccination:      impfung.trim()   || null,
+      food:             futter.trim()    || null,
     });
 
     setSpeichern(false);
@@ -158,6 +192,16 @@ export default function HundBearbeitenScreen() {
     }
 
     router.back();
+  };
+
+  const handleLoeschen = async () => {
+    if (!hund) return;
+    setLoeschen(true);
+    const { error } = await deleteDogWithDependents(hund.id);
+    setLoeschen(false);
+    if (error) { setLoeschOffen(false); setFehler('Löschen fehlgeschlagen — versuch es nochmal.'); return; }
+    setLoeschOffen(false);
+    router.replace('/dogs' as never);
   };
 
   const aktuellesBild = neuesBildUri ?? hund?.photo_url ?? null;
@@ -336,12 +380,41 @@ export default function HundBearbeitenScreen() {
               autoCapitalize="words"
             />
             <Input
-              label="Zuchtstätte"
+              label="Zuchtstätte / Zwinger"
               placeholder="z. B. vom Haus Milinski"
               value={zwinger}
               onChangeText={setZwinger}
               autoCapitalize="words"
             />
+          </View>
+
+          <Text style={s.gruppeLabel}>SPORT</Text>
+          <View style={s.felder}>
+            <ChipSelect label="SPARTE" options={DOG_DISCIPLINES} value={sparte} onChange={setSparte} />
+            <ChipSelect label="STUFE" options={DOG_LEVELS} value={stufe} onChange={setStufe} />
+            <Input label="Bestwert" placeholder="z. B. 98 / 96 / 97" value={bestwert} onChangeText={setBestwert} />
+          </View>
+
+          <Text style={s.gruppeLabel}>IDENTITÄT</Text>
+          <View style={s.felder}>
+            <Input label="Farbe" placeholder="z. B. schwarz-marken" value={farbe} onChangeText={setFarbe} autoCapitalize="words" />
+            <Input label="Mikrochip-Nr." placeholder="15-stellige Chipnummer" value={mikrochip} onChangeText={setMikrochip} keyboardType="numbers-and-punctuation" />
+            <TouchableOpacity style={[s.tassoRow, tasso && s.tassoRowAktiv]} onPress={() => setTasso(t => !t)} activeOpacity={0.85}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.tassoTitel}>Bei Tasso registriert</Text>
+                <Text style={s.tassoUnter}>Haustier-Zentralregister</Text>
+              </View>
+              <View style={[s.switch, tasso && s.switchOn]}>
+                <View style={[s.knob, tasso && s.knobOn]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={s.gruppeLabel}>GESUNDHEIT</Text>
+          <View style={s.felder}>
+            <Input label="Tierarzt" placeholder="Praxis / Name" value={tierarzt} onChangeText={setTierarzt} autoCapitalize="words" />
+            <Input label="Impfung" placeholder="z. B. Tollwut 03/2026" value={impfung} onChangeText={setImpfung} />
+            <Input label="Futter" placeholder="z. B. Royal Canin" value={futter} onChangeText={setFutter} autoCapitalize="words" />
           </View>
 
           {fehler ? (
@@ -352,8 +425,28 @@ export default function HundBearbeitenScreen() {
           ) : null}
 
           <Button label="Änderungen speichern" onPress={handleSpeichern} loading={speichern} />
+
+          <TouchableOpacity style={s.loeschBtn} onPress={() => setLoeschOffen(true)} activeOpacity={0.8}>
+            <Ionicons name="trash-outline" size={16} color={C.danger} />
+            <Text style={s.loeschText}>Hund löschen</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Bestätigungs-Sheet: Hund + abhängige Daten löschen */}
+      <AnyvoBottomSheet visible={loeschOffen} onClose={() => { if (!loeschen) setLoeschOffen(false); }} title="Hund löschen?">
+        <Text style={s.loeschHinweis}>
+          {hund?.name ? `„${hund.name}"` : 'Dieser Hund'} und alle zugehörigen Trainings, Fährten und Auswertungen werden dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden.
+        </Text>
+        <View style={s.loeschAktionen}>
+          <TouchableOpacity style={s.abbrechenBtn} onPress={() => setLoeschOffen(false)} disabled={loeschen} activeOpacity={0.8}>
+            <Text style={s.abbrechenText}>Abbrechen</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.endgueltigBtn} onPress={handleLoeschen} disabled={loeschen} activeOpacity={0.85}>
+            {loeschen ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.endgueltigText}>Endgültig löschen</Text>}
+          </TouchableOpacity>
+        </View>
+      </AnyvoBottomSheet>
     </SafeAreaView>
   );
 }
@@ -486,4 +579,38 @@ const s = StyleSheet.create({
     marginBottom:    16,
   },
   fehlerText: { flex: 1, fontSize: 13, color: C.danger },
+
+  // Tasso-Toggle
+  tassoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    height: 56, paddingHorizontal: 16, borderRadius: 14,
+    borderWidth: 1, borderColor: C.border, backgroundColor: C.input,
+  },
+  tassoRowAktiv: { borderColor: C.accent },
+  tassoTitel: { fontSize: 15, color: C.white, fontWeight: '600' },
+  tassoUnter: { fontSize: 12, color: C.muted, marginTop: 1 },
+  switch: { width: 46, height: 28, borderRadius: 14, backgroundColor: C.border, padding: 3, justifyContent: 'center' },
+  switchOn: { backgroundColor: C.accent },
+  knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
+  knobOn: { alignSelf: 'flex-end' },
+
+  // Löschen
+  loeschBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginTop: 14, height: 50, borderRadius: 14,
+    borderWidth: 1, borderColor: `${C.danger}40`, backgroundColor: C.dangerDim,
+  },
+  loeschText: { fontSize: 14, color: C.danger, fontWeight: '700' },
+  loeschHinweis: { fontSize: 14, color: C.trackTextSec, lineHeight: 21, marginBottom: 18 },
+  loeschAktionen: { flexDirection: 'row', gap: 12, paddingBottom: 4 },
+  abbrechenBtn: {
+    flex: 1, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: C.border, backgroundColor: C.card,
+  },
+  abbrechenText: { fontSize: 15, color: C.white, fontWeight: '700' },
+  endgueltigBtn: {
+    flex: 1.3, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.danger,
+  },
+  endgueltigText: { fontSize: 15, color: '#fff', fontWeight: '800' },
 });

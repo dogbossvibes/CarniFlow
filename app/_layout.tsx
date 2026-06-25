@@ -19,8 +19,8 @@ import { C } from '@/constants/colors';
 import { initMonitoring, captureError } from '@/lib/monitoring';
 import { SyncProvider } from '@/features/sync/components/SyncProvider';
 
-// Crash-/Error-Reporting initialisieren (no-op ohne DSN).
-initMonitoring();
+// Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
+void initMonitoring();
 
 // Globaler Fehler-Fallback: fängt Render-Fehler im gesamten Baum ab,
 // meldet sie und bietet einen Neustart-Button (statt Blank-Crash).

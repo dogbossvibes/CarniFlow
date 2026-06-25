@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -9,13 +9,26 @@ import { useSession } from '@/hooks/useSession';
 import { useDogs } from '@/hooks/useDogs';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
-import { useTrackRecording } from '@/features/tracking/hooks/useTrackRecording';
+import { useTrackRecorder } from '@/features/tracking/hooks/useTrackRecorder';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { createTrackSession } from '@/features/tracking/services/trackService';
-import { findSharpTurns } from '@/features/tracking/engine/turnDetection';
+import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
 import { ANGLE_LABEL } from '@/features/tracking/utils/angleClassify';
 import { useToast } from '@/components/ui/Toast';
-import type { AngleKind } from '@/features/tracking/store/trackingStore';
+import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
+import type { AngleKind, MarkerMaterial } from '@/features/tracking/store/trackingStore';
+
+type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
+// Gegenstand-Materialien (Reihenfolge wie im Sheet).
+const GEGENSTAND_MATERIALS: { material: MarkerMaterial; icon: MatIcon; label: string }[] = [
+  { material: 'holz',     icon: 'leaf-outline',        label: 'Holz' },
+  { material: 'stoff',    icon: 'shirt-outline',       label: 'Stoff' },
+  { material: 'leder',    icon: 'bag-outline',         label: 'Leder' },
+  { material: 'plastik',  icon: 'cube-outline',        label: 'Plastik' },
+  { material: 'metall',   icon: 'magnet-outline',      label: 'Metall' },
+  { material: 'teppich',  icon: 'grid-outline',        label: 'Teppich' },
+  { material: 'diverses', icon: 'ellipsis-horizontal', label: 'Divers' },
+];
 
 function clock(sec: number) {
   const m = String(Math.floor(sec / 60)).padStart(2, '0');
@@ -27,7 +40,7 @@ const haptic = (fn: () => void) => { try { fn(); } catch { /* haptics optional *
 
 // Untergrund + Beschaffenheit (vor dem Legen wählbar, während GPS stabilisiert).
 const SURFACES = ['Acker', 'Wiese', 'Wald', 'Mischung'] as const;
-const CONDITIONS = ['Nass', 'Trocken', 'Schnee', 'Gefroren'] as const;
+const CONDITIONS = ['Normal', 'Nass', 'Trocken', 'Schnee', 'Gefroren'] as const;
 
 // Blinkender LIVE-Punkt (anyvoRec).
 function RecDot() {
@@ -51,19 +64,38 @@ export default function LegenScreen() {
   const params = useLocalSearchParams<{ dogId?: string }>();
   const { session } = useSession();
   const { dogs } = useDogs();
-  const rec = useTrackRecording();
   const { showToast, toast } = useToast();
 
   const [phase, setPhase] = useState<'warmup' | 'recording'>('warmup');
   const [view, setView] = useState<'map' | 'sketch'>('map');
-  const [surface, setSurface] = useState<string>('Acker');        // Untergrund
+  const [surface, setSurface] = useState<string>('Acker');         // Untergrund
   const [condition, setCondition] = useState<string | null>(null); // Beschaffenheit
+  const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (Open-Meteo)
+  const [weatherState, setWeatherState] = useState<'idle' | 'loading' | 'failed'>('idle');
+  const weatherFetchedRef = useRef(false);
   const [lastAngle, setLastAngle] = useState<AngleKind | null>(null);
   const [warmupElapsed, setWarmupElapsed] = useState(0);
+  const [materialSheet, setMaterialSheet] = useState(false);   // Gegenstand-Material wählen
   const beganRef = useRef(false);
   const warmupStartedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
-  const markedTurns = useRef<Set<number>>(new Set());
+
+  // Automatisch erkannter Winkel (rechts/links/spitz) → Haptik + Hinweis.
+  // Der Marker wird im Recorder direkt am Scheitel gesetzt.
+  const onAngle = useCallback((kind: AngleKind) => {
+    setLastAngle(kind);
+    haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+    showToast(`${ANGLE_LABEL[kind]} erkannt`);
+  }, [showToast]);
+
+  const rec = useTrackRecorder({ onAngle });
+
+  // Gegenstand mit gewähltem Material setzen.
+  const placeGegenstand = useCallback((material: MarkerMaterial) => {
+    setMaterialSheet(false);
+    haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+    void rec.addMarker('gegenstand', { material });
+  }, [rec]);
 
   const activeDog = dogs.find(d => d.id === params.dogId) ?? dogs[0] ?? null;
 
@@ -72,8 +104,9 @@ export default function LegenScreen() {
     distanceMeters, durationSeconds, isPaused, mapFollowMode,
   } = useTrackingStore();
 
-  // GPS bereit, sobald Genauigkeit ≤ 15 m — oder manuell nach 15 s.
-  const canStart = (gpsAccuracy != null && gpsAccuracy <= 15) || warmupElapsed >= 15;
+  // GPS wirklich bereit (gute Genauigkeit) vs. nur manuell freigegeben (nach 15 s).
+  const gpsReady = gpsAccuracy != null && gpsAccuracy <= 15;
+  const canStart = gpsReady || warmupElapsed >= 15;
 
   // EINEN GPS-Stream beim Öffnen starten (Warmup). Genau einmal.
   useEffect(() => {
@@ -89,6 +122,17 @@ export default function LegenScreen() {
     return () => clearInterval(t);
   }, [phase]);
 
+  // Echtes Wetter zur GPS-Position holen — einmalig, sobald eine Position vorliegt.
+  useEffect(() => {
+    if (weatherFetchedRef.current || !currentPosition) return;
+    weatherFetchedRef.current = true;
+    setWeatherState('loading');
+    fetchCurrentWeather(currentPosition.lat, currentPosition.lng).then(w => {
+      if (w) { setWeather(w); setWeatherState('idle'); }
+      else { setWeatherState('failed'); }
+    });
+  }, [currentPosition]);
+
   // Aufnahme scharf schalten: Session anlegen, denselben Stream aufnehmen lassen.
   const begin = useCallback(async () => {
     if (beganRef.current) return;
@@ -97,34 +141,22 @@ export default function LegenScreen() {
     beganRef.current = true;
     const { data, error } = await createTrackSession(uid, {
       dogId: activeDog.id, surfaceTypes: [surface], terrainConditions: condition ? [condition] : [],
-      lyingTimeMinutes: 0, notes: null, locationName: null, temperature: null,
-      weatherCondition: null, latitude: null, longitude: null, distraction: false,
-      humidity: null, windSpeed: null,
+      lyingTimeMinutes: 0, notes: null, locationName: null,
+      temperature:      weather?.temperature ?? null,
+      weatherCondition: weather?.weatherCondition ?? null,
+      windSpeed:        weather?.windSpeed ?? null,
+      humidity:         weather?.humidity ?? null,
+      latitude: currentPosition?.lat ?? null, longitude: currentPosition?.lng ?? null,
+      distraction: false,
     });
     if (error || !data) { beganRef.current = false; showToast('Fährte konnte nicht gestartet werden.'); return; }
     sessionIdRef.current = data.id;
     const r = await rec.beginRecording(data.id);
     if (r.error) { beganRef.current = false; showToast(r.error); return; }
     setPhase('recording');
-    haptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)); // Abriss
-    showToast('Abriss gesetzt — Fährte läuft');
-  }, [session, activeDog, rec, showToast, surface, condition]);
-
-  // Automatische Winkel-Erkennung auf der Clean-Linie (rechts/links/spitz) + Haptik.
-  useEffect(() => {
-    if (phase !== 'recording') return;
-    const pts = trackPoints.map(p => ({ lat: p.lat, lng: p.lng }));
-    if (pts.length < 3) return;
-    for (const turn of findSharpTurns(pts)) {
-      if (markedTurns.current.has(turn.index)) continue;
-      markedTurns.current.add(turn.index);
-      const kind: AngleKind = turn.turnDeg > 110 ? 'spitz' : turn.direction;
-      setLastAngle(kind);
-      rec.addMarker('winkel', { angleKind: kind });
-      haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
-      showToast(`${ANGLE_LABEL[kind]} erkannt`);
-    }
-  }, [trackPoints, phase, rec, showToast]);
+    haptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
+    showToast('Fährte läuft');
+  }, [session, activeDog, rec, showToast, surface, condition, weather, currentPosition]);
 
   useEffect(() => () => { rec.stopAll(); }, [rec]);
 
@@ -223,54 +255,90 @@ export default function LegenScreen() {
             ))}
           </View>
 
-          {/* Warmup-Overlay: GPS-Status + Untergrund/Beschaffenheit wählen + Start */}
+          {/* Warmup-Overlay: GPS-Status + Bedingungen wählen + Start */}
           {phase === 'warmup' && (
-            <View className="absolute inset-0 bg-black/70 items-center justify-center px-6 gap-[8px]">
-              <ActivityIndicator size="large" color={FT.acc} />
-              <Text className="text-[18px] text-ft-text font-extrabold mt-1.5">GPS wird stabilisiert</Text>
-              <Text className="text-[14px] text-ft-muted font-semibold mb-2">
-                {gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : 'Suche Satelliten…'}
-              </Text>
-
-              {/* Untergrund */}
-              <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Untergrund</Text>
-              <View className="flex-row flex-wrap gap-2 self-start mb-1">
-                {SURFACES.map(sfc => {
-                  const on = surface === sfc;
-                  return (
-                    <Pressable key={sfc} onPress={() => setSurface(sfc)}
-                      className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
-                      <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{sfc}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {/* Beschaffenheit */}
-              <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Beschaffenheit</Text>
-              <View className="flex-row flex-wrap gap-2 self-start">
-                {CONDITIONS.map(c => {
-                  const on = condition === c;
-                  return (
-                    <Pressable key={c} onPress={() => setCondition(on ? null : c)}
-                      className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
-                      <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{c}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {/* Start (frei ab GPS bereit; nach 15 s manuell trotz Ungenauigkeit) */}
-              <Pressable
-                className={`flex-row items-center justify-center gap-2 mt-4 rounded-[16px] px-[20px] py-3 self-stretch ${canStart ? 'bg-ft-acc' : 'bg-white/10'}`}
-                onPress={() => { if (canStart) void begin(); }}
-                disabled={!canStart}
+            <View className="absolute inset-0 bg-black/75">
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 22 }}
               >
-                <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
-                <Text className={`text-[14px] font-extrabold ${canStart ? 'text-ft-acc-text' : 'text-ft-muted'}`}>
-                  {canStart ? 'Fährte legen' : 'Warte auf GPS…'}
-                </Text>
-              </Pressable>
+                <View className="items-center gap-[8px]">
+                  {gpsReady
+                    ? <Ionicons name="checkmark-circle" size={40} color={FT.acc} />
+                    : <ActivityIndicator size="large" color={FT.acc} />}
+                  <Text className="text-[18px] text-ft-text font-extrabold mt-1.5">
+                    {gpsReady ? 'GPS bereit' : 'GPS wird stabilisiert'}
+                  </Text>
+                  <Text className="text-[14px] font-semibold mb-2" style={{ color: gpsReady ? FT.acc : FT.muted }}>
+                    {gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : 'Suche Satelliten…'}
+                  </Text>
+
+                  {/* Untergrund */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Untergrund</Text>
+                  <View className="flex-row flex-wrap gap-2 self-start mb-1">
+                    {SURFACES.map(sfc => {
+                      const on = surface === sfc;
+                      return (
+                        <Pressable key={sfc} onPress={() => setSurface(sfc)}
+                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{sfc}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Beschaffenheit */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Beschaffenheit</Text>
+                  <View className="flex-row flex-wrap gap-2 self-start mb-1">
+                    {CONDITIONS.map(c => {
+                      const on = condition === c;
+                      return (
+                        <Pressable key={c} onPress={() => setCondition(on ? null : c)}
+                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{c}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Wetter</Text>
+                  <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
+                    {weatherState === 'loading' ? (
+                      <View className="flex-row items-center gap-2">
+                        <ActivityIndicator size="small" color={FT.muted} />
+                        <Text className="text-[13px] font-semibold text-ft-muted">Wetter wird geladen…</Text>
+                      </View>
+                    ) : weather ? (
+                      <>
+                        <View className="flex-row items-center gap-2 mb-1">
+                          <Ionicons name="partly-sunny-outline" size={17} color={FT.acc} />
+                          <Text className="text-[15px] font-extrabold text-ft-text">{weather.weatherCondition}</Text>
+                        </View>
+                        <View className="flex-row flex-wrap gap-x-4 gap-y-0.5">
+                          <Text className="text-[13px] font-semibold text-ft-muted">🌡️ {weather.temperature.toFixed(1)} °C</Text>
+                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h</Text>
+                          <Text className="text-[13px] font-semibold text-ft-muted">💧 {weather.humidity.toFixed(0)} %</Text>
+                        </View>
+                      </>
+                    ) : (
+                      <Text className="text-[13px] font-semibold text-ft-muted">Wetter nicht verfügbar (kein Netz)</Text>
+                    )}
+                  </View>
+
+                  {/* Start (frei ab GPS bereit; nach 15 s manuell trotz Ungenauigkeit) */}
+                  <Pressable
+                    className={`flex-row items-center justify-center gap-2 mt-4 rounded-[16px] px-[20px] py-3 self-stretch ${canStart ? 'bg-ft-acc' : 'bg-white/10'}`}
+                    onPress={() => { if (canStart) void begin(); }}
+                    disabled={!canStart}
+                  >
+                    <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
+                    <Text className={`text-[14px] font-extrabold ${canStart ? 'text-ft-acc-text' : 'text-ft-muted'}`}>
+                      {canStart ? 'Fährte legen' : 'Warte auf GPS…'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
             </View>
           )}
         </View>
@@ -279,7 +347,7 @@ export default function LegenScreen() {
         <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            onPress={() => rec.addMarker('gegenstand')} disabled={phase !== 'recording'}
+            onPress={() => setMaterialSheet(true)} disabled={phase !== 'recording'}
           >
             <Ionicons name="cube-outline" size={20} color={FT.text} />
             <Text className="text-[10.5px] font-extrabold text-ft-text">Gegenstand</Text>
@@ -300,6 +368,26 @@ export default function LegenScreen() {
           </Pressable>
         </View>
       </SafeAreaView>
+
+      {/* Gegenstand: Material wählen */}
+      <AnyvoBottomSheet visible={materialSheet} onClose={() => setMaterialSheet(false)} title="Gegenstand-Material">
+        <View className="flex-row flex-wrap gap-[10px] pb-2">
+          {GEGENSTAND_MATERIALS.map(m => (
+            <Pressable
+              key={m.material}
+              onPress={() => placeGegenstand(m.material)}
+              style={{ width: '30.5%', flexGrow: 1 }}
+              className="items-center gap-[7px] py-[14px] rounded-[16px] bg-white/5 border border-ft-line-strong"
+            >
+              <View className="w-[42px] h-[42px] rounded-[13px] items-center justify-center bg-ft-acc-dim">
+                <Ionicons name={m.icon} size={20} color={FT.acc} />
+              </View>
+              <Text className="text-[12.5px] font-bold text-ft-text">{m.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </AnyvoBottomSheet>
+
       {toast}
     </View>
   );
