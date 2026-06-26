@@ -182,11 +182,13 @@ export default function LegenScreen() {
     }
   };
 
-  const metrics: [string, string][] = [
-    [`${Math.round(distanceMeters)} m`, 'Distanz'],
-    [String(gegenstaende), 'Gegenst.'],
-    [String(winkel), 'Winkel'],
-    [lastAngle ? ANGLE_LABEL[lastAngle].replace('winkel', 'w.') : '–', 'Letzter'],
+  // GPS ab >45 m warnen — dann landen keine Linienpunkte (Filter), Distanz bleibt 0.
+  const gpsPoor = gpsAccuracy != null && gpsAccuracy > 45;
+  const metrics: { value: string; label: string; warn?: boolean }[] = [
+    { value: `${Math.round(distanceMeters)} m`, label: 'Distanz' },
+    { value: String(gegenstaende), label: 'Gegenst.' },
+    { value: String(winkel), label: 'Winkel' },
+    { value: gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : '–', label: 'GPS', warn: gpsPoor },
   ];
 
   return (
@@ -258,10 +260,10 @@ export default function LegenScreen() {
 
           {/* Metrik-Leiste (unten) */}
           <View className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
-            {metrics.map(([val, cap], i) => (
+            {metrics.map((mm, i) => (
               <View key={i} className={`flex-1 items-center ${i > 0 ? 'border-l border-ft-line' : ''}`}>
-                <Text className="text-[15px] font-black text-ft-text" style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{val}</Text>
-                <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{cap}</Text>
+                <Text className={`text-[15px] font-black ${mm.warn ? 'text-ft-warn' : 'text-ft-text'}`} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{mm.value}</Text>
+                <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{mm.label}</Text>
               </View>
             ))}
           </View>

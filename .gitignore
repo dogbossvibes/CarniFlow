@@ -51,3 +51,7 @@ supabase/.temp/
 
 # Google Play Service Account (Secret – nicht committen)
 google-play-service-account.json
+
+# Debug-Screenshots (lokal)
+fahertescreen.PNG
+faehrtenscreen2.PNG

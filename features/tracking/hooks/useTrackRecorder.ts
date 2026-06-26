@@ -11,6 +11,7 @@ import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/servi
 import { supabase } from '@/lib/supabase';
 import { createLocalTrainingSession, updateTrainingSyncStatus } from '@/features/training/repositories/localTrainingRepository';
 import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
+import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Robuste Live-Aufnahme der Fährte. Bewusst eigenständig und einfach gehalten,
@@ -27,7 +28,7 @@ import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/
 // ──────────────────────────────────────────────────────────────────────────
 
 // Filter-/Glättungs-Parameter.
-const MAX_ACCURACY_M = 30;   // gröber → Fix verwerfen (Funkmast-/Coarse-Fixes raus)
+const MAX_ACCURACY_M = 45;   // gröber → kein LINIEN-Punkt (Puck folgt trotzdem). Feld unter Bäumen ~30-45 m.
 const MAX_SPEED_MPS  = 12;   // ~43 km/h: schnellerer Sprung = unrealistisch → verwerfen
 const MIN_STEP_M     = 2.0;  // Distanz-Gate: erst ab 2 m neuen Linienpunkt setzen
 const EMA_ALPHA      = 0.4;  // Glättung: Gewicht des neuen Fix (0 = träge, 1 = roh)
@@ -154,11 +155,20 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     };
     if (__DEV__) console.log('[trackRecorder] fix', { accuracy: raw.accuracy, recording: recordingRef.current });
 
-    // Warmup: nur Live-Position + Genauigkeit anzeigen (für das Overlay).
-    if (!recordingRef.current) { s.setCurrentPosition({ lat: raw.lat, lng: raw.lng }, raw.accuracy); return; }
-    if (s.isPaused) return;
+    // EMA-Glättung der Position — IMMER (Warmup wie Aufnahme). So folgt der
+    // Live-Puck stets der echten Position und friert NIE ein, auch bei mäßigem
+    // GPS. Der Genauigkeits-/Speed-Filter blockt nur das Setzen von LINIEN-Punkten.
+    const prevEma = emaRef.current;
+    const ema: LatLng = prevEma
+      ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
+      : { lat: raw.lat, lng: raw.lng };
+    emaRef.current = ema;
+    s.setCurrentPosition(ema, raw.accuracy);
 
-    // 1) Schlechte Fixes verwerfen.
+    // Ab hier nur die aufgezeichnete LINIE.
+    if (!recordingRef.current || s.isPaused) return;
+
+    // 1) Zu ungenauer / unrealistischer Fix → kein Linienpunkt (Puck steht schon).
     if (raw.accuracy == null || raw.accuracy > MAX_ACCURACY_M) return;
     const prevRaw = lastRawRef.current;
     if (prevRaw) {
@@ -167,16 +177,6 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (dt > 0 && d / dt > MAX_SPEED_MPS) return;   // unrealistischer Sprung
     }
     lastRawRef.current = raw;
-
-    // 2) EMA-Glättung der Position.
-    const prevEma = emaRef.current;
-    const ema: LatLng = prevEma
-      ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
-      : { lat: raw.lat, lng: raw.lng };
-    emaRef.current = ema;
-
-    // Live-Puck folgt der geglätteten Position.
-    s.setCurrentPosition(ema, raw.accuracy);
 
     // 3) Distanz-Gate: erst ab MIN_STEP_M einen neuen Linienpunkt setzen.
     const pts = pointsRef.current;
@@ -211,6 +211,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (watchRef.current) return { error: null };
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return { error: 'Standortberechtigung fehlt. Bitte in den Einstellungen erlauben.' };
+    // iOS: falls „Genauer Standort" reduziert ist, einmalig präzise Ortung
+    // anfragen (nutzt NSLocationTemporaryUsageDescriptionDictionary). Best-effort;
+    // no-op ohne natives Modul oder wenn bereits präzise.
+    precisionLocationClient.requestTemporaryFullAccuracy('TrackingDogSportPrecision').catch(() => {});
     try {
       watchRef.current = await Location.watchPositionAsync(WATCH_OPTS, onFix);
     } catch {
