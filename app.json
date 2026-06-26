@@ -38,7 +38,7 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 17
+      "versionCode": 18
     },
     "web": {
       "output": "static",
