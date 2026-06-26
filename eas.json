@@ -36,7 +36,9 @@
     "production": {
       "autoIncrement": false,
       "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "false",
+        "SENTRY_ORG": "anyvo",
+        "SENTRY_PROJECT": "react-native",
         "EXPO_PUBLIC_SENTRY_DSN": "https://054d4a80ebe200ea945b0969bfadd5b5@o4511622198984704.ingest.de.sentry.io/4511622205145168",
         "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_ZiTVVQxsNEwsVSRGvfXWBfoZOmn"
       },
