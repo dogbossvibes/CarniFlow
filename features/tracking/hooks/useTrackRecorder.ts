@@ -220,10 +220,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     } catch {
       return { error: 'GPS konnte nicht gestartet werden. Bitte kurz im Freien erneut versuchen.' };
     }
-    // Sofort einen Einmal-Fix holen, damit der Warmup direkt ±X m zeigt und nicht
-    // auf den ersten Stream-Fix wartet (sonst „Suche Satelliten…" gefühlt endlos).
-    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation })
-      .then(onFix)
+    // Sofort-Anzeige der letzten BEKANNTEN Position (gecacht). WICHTIG:
+    // KEIN getCurrentPositionAsync hier — das teilt sich auf iOS den
+    // CLLocationManager mit watchPositionAsync und stoppt beim Abschluss den
+    // laufenden Stream (→ onFix feuerte nie wieder, Spur blieb leer).
+    // getLastKnownPositionAsync startet KEINE neue Anfrage und stört den Watch nicht.
+    Location.getLastKnownPositionAsync()
+      .then(loc => { if (loc) onFix(loc); })
       .catch(() => { /* Stream liefert ohnehin laufend Fixes */ });
     return { error: null };
   }, [onFix]);
