@@ -117,9 +117,10 @@ export function TrackingMap({
         {rawCoords.length > 1 && (
           <Polyline coordinates={rawCoords} strokeColor="rgba(255,255,255,0.35)" strokeWidth={2} />
         )}
-        {/* Gelegte Fährte: türkis gestrichelt (im Ausarbeiten gedimmt als Soll) */}
+        {/* Gelegte Fährte: beim Legen durchgezogen türkis; im Ausarbeiten gedimmt
+            gestrichelt als Soll-Referenz (zur blauen Ist-Linie unterscheidbar). */}
         {layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={dimLay ? 'rgba(21,230,195,0.32)' : C.trackPrimary} strokeWidth={dimLay ? 3 : 4} lineDashPattern={[8, 8]} />
+          <Polyline coordinates={layCoords} strokeColor={dimLay ? 'rgba(21,230,195,0.32)' : C.trackPrimary} strokeWidth={dimLay ? 3 : 4} lineDashPattern={dimLay ? [8, 8] : undefined} />
         )}
         {/* Gelaufener Ablauf: blau, durchgezogen */}
         {runCoords.length > 1 && (

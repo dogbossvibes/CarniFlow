@@ -8,7 +8,7 @@
  * Portiert aus design_handoff_faehrten/useSearchRecorder.ts; der Helfer distM
  * (Haversine auf {latitude,longitude}) ist hier lokal definiert.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 
 export type LatLng = { latitude: number; longitude: number };
@@ -36,6 +36,14 @@ const RECOVER_M = 3.0;           // m — wieder unter diesem Wert = Neuansatz/e
 const OBJECT_HIT_M = 2.5;        // m — so nah an einem Gegenstand = verwiesen/gefunden
 const DEV_EMA = 0.25;            // Glättung der angezeigten Abweichung
 
+// ── Reihenfolge-bewusste Projektion (Fortschritt entlang der Soll-Fährte) ──
+const LOOKAHEAD_M = 20;          // m — so weit voraus wird auf die Soll-Fährte projiziert
+const BACK_M = 4;                // m — kleine Toleranz nach hinten (Jitter)
+const ADVANCE_DEV_M = 12;        // m — nur bei Abweichung darunter rückt der Fortschritt vor
+// Strenge Abweichungs-Skala für die Wertung: volle Punkte bis FULL_DEV_M, 0 ab ZERO_DEV_M.
+const FULL_DEV_M = 1.5;
+const ZERO_DEV_M = 10;
+
 // ── Soll-Werte je Stufe (für Score-Gewichtung) ──
 type Level = 'igp1' | 'igp2' | 'igp3' | 'ifh1' | 'ifh2' | 'igpfh' | 'training';
 const SCORE_MODEL: Record<Level, { trackPts: number; objectPts: number; objects: number }> = {
@@ -48,15 +56,31 @@ const SCORE_MODEL: Record<Level, { trackPts: number; objectPts: number; objects:
   training:{ trackPts: 79, objectPts: 21, objects: 3 },
 };
 
-// ── kürzeste Distanz Punkt → Polyliniensegmente (Meter, planar-Näherung) ──
-function distToPolyline(p: LatLng, line: LatLng[]): number {
-  if (line.length === 0) return Infinity;
-  if (line.length === 1) return distM(p, line[0]);
+// ── Bogenlängen (kumuliert) entlang der Soll-Fährte ──
+function buildArc(line: LatLng[]): { cum: number[]; total: number } {
+  const cum: number[] = [0];
+  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + distM(line[i - 1], line[i]));
+  return { cum, total: cum.length ? cum[cum.length - 1] : 0 };
+}
+
+// Projiziert p auf die Soll-Fährte, aber NUR innerhalb eines Fortschritts-Fensters
+// [fromM - BACK_M, fromM + LOOKAHEAD_M]. So zählt die Abweichung gegen den ERWARTETEN
+// nächsten Abschnitt — nicht gegen irgendeinen geometrisch nahen Teil der Fährte.
+// Liefert die senkrechte Abweichung (m) und die projizierte Bogenlänge atM (m).
+function projectForward(
+  p: LatLng, line: LatLng[], cum: number[], fromM: number, lookaheadM: number, backM: number,
+): { devM: number; atM: number } {
+  if (line.length < 2) return { devM: line.length ? distM(p, line[0]) : Infinity, atM: fromM };
+  const total = cum[cum.length - 1];
+  const lo = Math.max(0, fromM - backM);
+  const hi = Math.min(total, fromM + lookaheadM);
   const mPerLat = 111320;
   const mPerLng = 111320 * Math.cos((p.latitude * Math.PI) / 180);
   const X = (q: LatLng) => ({ x: (q.longitude - p.longitude) * mPerLng, y: (q.latitude - p.latitude) * mPerLat });
-  let best = Infinity;
+  let best = Infinity, bestAt = fromM;
   for (let i = 1; i < line.length; i++) {
+    const segLo = cum[i - 1], segHi = cum[i];
+    if (segHi < lo || segLo > hi) continue;          // Segment außerhalb des Fensters
     const a = X(line[i - 1]), b = X(line[i]);
     const dx = b.x - a.x, dy = b.y - a.y;
     const len2 = dx * dx + dy * dy;
@@ -64,9 +88,10 @@ function distToPolyline(p: LatLng, line: LatLng[]): number {
     t = Math.max(0, Math.min(1, t));
     const cx = a.x + t * dx, cy = a.y + t * dy;
     const d = Math.hypot(cx, cy);
-    if (d < best) best = d;
+    if (d < best) { best = d; bestAt = segLo + t * (segHi - segLo); }
   }
-  return best;
+  if (!Number.isFinite(best)) return { devM: Infinity, atM: fromM };
+  return { devM: best, atM: bestAt };
 }
 
 export interface SearchRecorder {
@@ -101,13 +126,17 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
   const totalObjects = laidObjects.length || model.objects;
 
+  // Bogenlängen der Soll-Fährte (stabil, da laidPoints aus dem Snapshot stammt).
+  const arc = useMemo(() => buildArc(laidPoints), [laidPoints]);
+  const hasTrack = arc.total > 1;
+
   // ── State (UI) ──
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState(false);
   const [paused, setPausedState] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [position, setPosition] = useState<LatLng | null>(null);
-  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, score: 100 });
+  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, score: 0 });
   const [elapsedS, setElapsedS] = useState(0);
 
   // ── Refs (live im Callback) ──
@@ -125,14 +154,23 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const foundRef = useRef<Set<number>>(new Set());
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const startMsRef = useRef(0);
+  const cursorMRef = useRef(0);      // aktueller Fortschritt entlang der Soll-Fährte (m)
+  const maxCursorMRef = useRef(0);   // weitester erreichter Fortschritt (für Coverage)
 
   const computeScore = useCallback(() => {
-    const onTrackRatio = devCountRef.current ? 1 - Math.min(1, (devSumRef.current / devCountRef.current) / 12) : 1;
+    // Ohne Soll-Fährte (Freilauf-Training) gibt es nichts zu bewerten → neutral.
+    const avgDev = devCountRef.current ? devSumRef.current / devCountRef.current : Infinity;
+    // Strenge Abweichungs-Skala: volle Punkte bis FULL_DEV_M, linear auf 0 bis ZERO_DEV_M.
+    const onTrackRatio = !hasTrack
+      ? 1
+      : (devCountRef.current ? Math.max(0, Math.min(1, (ZERO_DEV_M - avgDev) / (ZERO_DEV_M - FULL_DEV_M))) : 0);
+    // Coverage: wie viel der Fährte in richtiger Reihenfolge abgelaufen wurde.
+    const coverage = !hasTrack ? 1 : Math.max(0, Math.min(1, maxCursorMRef.current / arc.total));
     const breakPenalty = breaksRef.current.length * 4;
-    const trackScore = Math.max(0, model.trackPts * onTrackRatio - breakPenalty);
+    const trackScore = Math.max(0, model.trackPts * onTrackRatio * coverage - breakPenalty);
     const objScore = totalObjects ? (foundRef.current.size / totalObjects) * model.objectPts : model.objectPts;
     return Math.round(Math.max(0, Math.min(100, trackScore + objScore)));
-  }, [model, totalObjects]);
+  }, [model, totalObjects, hasTrack, arc.total]);
 
   const pushSnapshot = useCallback(() => {
     setSnap({
@@ -171,8 +209,20 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     }
     pts.push(sm);
 
-    // ── Abweichung von der Soll-Fährte ──
-    const dev = distToPolyline(sm, laidPoints);
+    // ── Abweichung von der Soll-Fährte (reihenfolge-bewusst) ──
+    // Projektion nur auf das ERWARTETE Fenster ab dem aktuellen Fortschritt; der
+    // Cursor rückt nur vor, wenn der Hund nah genug an der erwarteten Stelle ist.
+    let dev: number;
+    if (hasTrack) {
+      const proj = projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
+      dev = Number.isFinite(proj.devM) ? proj.devM : ZERO_DEV_M;
+      if (dev <= ADVANCE_DEV_M && proj.atM > cursorMRef.current) {
+        cursorMRef.current = proj.atM;
+        if (proj.atM > maxCursorMRef.current) maxCursorMRef.current = proj.atM;
+      }
+    } else {
+      dev = 0;
+    }
     devEmaRef.current = devEmaRef.current ? devEmaRef.current + DEV_EMA * (dev - devEmaRef.current) : dev;
     devSumRef.current += dev; devCountRef.current += 1;
 
@@ -205,7 +255,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     });
 
     pushSnapshot();
-  }, [laidPoints, laidObjects, pushSnapshot]);
+  }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum]);
 
   // ── Watch ab Mount ──
   useEffect(() => {
@@ -235,6 +285,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     smoothRef.current = null; distRef.current = 0;
     devEmaRef.current = 0; devSumRef.current = 0; devCountRef.current = 0;
     offTrackSinceRef.current = null; inBreakRef.current = false;
+    cursorMRef.current = 0; maxCursorMRef.current = 0;
     foundRef.current = new Set();
     startMsRef.current = Date.now(); setElapsedS(0);
     pausedRef.current = false; setPausedState(false);
