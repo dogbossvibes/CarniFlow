@@ -13,7 +13,7 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "20",
+      "buildNumber": "21",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {
@@ -38,7 +38,7 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 20,
+      "versionCode": 21,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCriuMb0ZKmtn52yNH7AjmfGWsaUEuNDdg"
@@ -117,7 +117,8 @@
           "microphonePermission": "ANYVO benötigt das Mikrofon für Sprachmemos und Sprachbefehle."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-live-activity"
     ],
     "experiments": {
       "typedRoutes": true,

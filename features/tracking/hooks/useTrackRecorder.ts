@@ -12,6 +12,8 @@ import { supabase } from '@/lib/supabase';
 import { createLocalTrainingSession, updateTrainingSyncStatus } from '@/features/training/repositories/localTrainingRepository';
 import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
+import { setTrackFixHandler, startBackgroundUpdates, stopBackgroundUpdates } from '@/features/tracking/native/backgroundLocationTask';
+import { startFaehrteActivity, updateFaehrteActivity, stopFaehrteActivity } from '@/features/tracking/native/faehrteLiveActivity';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Robuste Live-Aufnahme der Fährte. Bewusst eigenständig und einfach gehalten,
@@ -66,6 +68,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startMs  = useRef<number>(0);
   const recordingRef = useRef(false);   // true ⇒ Fixes fließen in die Linie
+  const bgActiveRef  = useRef(false);   // true ⇒ Hintergrund-Updates (Foreground-Service) laufen
 
   // Track-Zustand in Refs → kein Stale-Closure im Fix-Handler.
   const pointsRef     = useRef<AcceptedPoint[]>([]);   // akzeptierte, geglättete Linie
@@ -74,6 +77,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const lastCornerAtRef = useRef<number>(-Infinity);   // cumDist des letzten Winkels
   const onAngleRef    = useRef<TrackRecorderOptions['onAngle']>(opts?.onAngle);
   onAngleRef.current  = opts?.onAngle;
+  // Stabile Brücke vom globalen Hintergrund-Task zum jeweils aktuellen onFix.
+  const onFixRef      = useRef<(loc: Location.LocationObject) => void>(() => {});
 
   // Offline-First: lokale SQLite-Session + Punkt-Puffer.
   const localSessionId = useRef<string | null>(null);
@@ -92,7 +97,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     watchRef.current?.remove(); watchRef.current = null;
     headRef.current?.remove();  headRef.current = null;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-  }, []);
+    if (bgActiveRef.current) {
+      bgActiveRef.current = false;
+      setTrackFixHandler(null);
+      void stopBackgroundUpdates();
+    }
+    const st = store.getState();
+    stopFaehrteActivity({ elapsedS: st.durationSeconds, distanceM: st.distanceMeters });
+  }, [store]);
 
   useEffect(() => () => stopAll(), [stopAll]);
 
@@ -205,6 +217,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // 4) Winkel-Erkennung auf der frischen Linie.
     detectCorner();
   }, [store, flushPoints, detectCorner]);
+  onFixRef.current = onFix;
 
   // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
   const startWarmup = useCallback(async (): Promise<{ error: string | null }> => {
@@ -253,10 +266,33 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     startMs.current = Date.now();
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      store.getState().setDuration(Math.floor((Date.now() - startMs.current) / 1000));
+      const sec = Math.floor((Date.now() - startMs.current) / 1000);
+      const st = store.getState();
+      st.setDuration(sec);
+      // Live Activity gedrosselt aktualisieren (alle 3 s, nicht im Sekundentakt).
+      if (sec % 3 === 0) updateFaehrteActivity({ elapsedS: sec, distanceM: st.distanceMeters, paused: st.isPaused });
     }, 1000);
     recordingRef.current = true;   // ← ab jetzt akzeptiert onFix die Fixes
+    startFaehrteActivity();        // iOS: Lockscreen / Dynamic Island (no-op sonst)
     if (__DEV__) console.log('[trackRecorder] recording started', { sessionId });
+
+    // ── Hintergrund-Aufnahme: auf Foreground-Service-GPS umschalten, damit die
+    // Spur auch bei Display-aus / App in der Tasche weiterläuft. Zeigt dabei die
+    // kleine Status-Anzeige (Android-Notification / iOS blaue Pille). Best-effort:
+    // ohne „Immer"-Berechtigung bleibt der Vordergrund-Watch als Fallback aktiv.
+    try {
+      const bg = await Location.requestBackgroundPermissionsAsync();
+      if (bg.status === 'granted') {
+        setTrackFixHandler(loc => onFixRef.current(loc));
+        await startBackgroundUpdates({
+          notificationTitle: '🐾 Fährte läuft',
+          notificationBody:  'Aufnahme aktiv – tippen, um ANYVO zu öffnen',
+          notificationColor: '#15E6C3',
+        });
+        watchRef.current?.remove(); watchRef.current = null;   // Warmup-Watch ablösen
+        bgActiveRef.current = true;
+      }
+    } catch (e) { console.warn('[trackRecorder] background', e); /* Fallback: Vordergrund-Watch bleibt */ }
 
     // ── ab hier nur best-effort, blockiert die Aufnahme nicht ──
     try {
