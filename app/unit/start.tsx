@@ -100,11 +100,6 @@ export default function UnitStartScreen() {
             <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
               <Ionicons name="chevron-back" size={22} color={C.white} />
             </TouchableOpacity>
-            {!addMode && (
-              <TouchableOpacity style={s.backBtn} onPress={() => router.push('/unit/history')} activeOpacity={0.7}>
-                <Ionicons name="time-outline" size={20} color={C.white} />
-              </TouchableOpacity>
-            )}
           </View>
           <View style={s.heroText}>
             <Text style={s.eyebrow}>ANYVO</Text>

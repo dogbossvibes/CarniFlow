@@ -1,16 +1,14 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { C } from '@/constants/colors';
 import type { DogTrainingItem } from './types';
 
-// Liste der letzten Trainings + „Alle anzeigen". Leerzustand bei fehlenden Daten.
+// Liste der letzten Trainings. Leerzustand bei fehlenden Daten.
 export function DogTrainingList({
-  items, onOpen, onShowAll,
+  items, onOpen,
 }: {
   items: DogTrainingItem[];
   onOpen?: (item: DogTrainingItem) => void;
-  onShowAll: () => void;
 }) {
   return (
     <View style={s.wrap}>
@@ -39,7 +37,6 @@ export function DogTrainingList({
           ))}
         </View>
       )}
-      <AnyvoButton label="Alle Trainings anzeigen" variant="secondary" icon="list-outline" onPress={onShowAll} />
     </View>
   );
 }

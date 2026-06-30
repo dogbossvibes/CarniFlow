@@ -277,12 +277,6 @@ export default function HomeScreen() {
           <View style={s.sektion}>
             <View style={s.sektionKopf}>
               <Text style={s.sektionTitel}>Letzte Einheiten</Text>
-              <TouchableOpacity
-                onPress={() => router.push("/unit/history")}
-                activeOpacity={0.7}
-              >
-                <Text style={s.sektionLink}>Verlauf</Text>
-              </TouchableOpacity>
             </View>
             {feed.slice(0, 3).map((item) => (
               <SwipeableTrainingItem

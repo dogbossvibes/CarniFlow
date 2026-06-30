@@ -28,7 +28,6 @@ export default function CoachScreen() {
     if (cta.kind === 'plan')        router.push('/unit/start' as never);
     else if (cta.kind === 'open')   router.push((cta.source === 'track' ? `/track/${cta.id}` : { pathname: '/unit/detail', params: { id: cta.id } }) as never);
     else if (cta.kind === 'similar') router.push({ pathname: '/analyse/smart-search', params: { q: cta.query } } as never);
-    else if (cta.kind === 'share')  router.push('/unit/history' as never);
   };
   const onInsightCta = (i: AiInsight) => runCta(i.cta);
   const onRecCta = (r: CoachRecommendation) => runCta(r.cta);

@@ -63,7 +63,6 @@ export default function DogHubRoute() {
     onSettings:         () => dog && router.push({ pathname: '/edit-dog', params: { id: dog.id } }),
     onStartTraining:    () => router.push('/unit/start'),
     onStartFaehrte:     () => dog && router.push(`/track/legen?dogId=${dog.id}` as never),
-    onShowAllTrainings: () => router.push('/unit/history' as never),
     onQuickAction:      () => router.push('/unit/start'),
     onOpenTraining:     openTraining,
     onAddHealth:        () => dog && router.push(`/dog-health/${dog.id}` as never),

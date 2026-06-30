@@ -46,7 +46,7 @@ export default function DogHubPreviewScreen() {
   if (hub) {
     const actions: DogHubActions = {
       onBack: () => setHub(null),
-      onSettings: noop, onStartTraining: noop, onStartFaehrte: noop, onShowAllTrainings: noop,
+      onSettings: noop, onStartTraining: noop, onStartFaehrte: noop,
       onQuickAction: noop, onAddHealth: noop, onAddDoc: noop, onOpenDocument: noop, onEditGoal: noop, onChat: noop, onUpgrade: noop,
     };
     return <DogHubScreen vm={hub} actions={actions} aiUnlocked />;
@@ -83,8 +83,8 @@ export default function DogHubPreviewScreen() {
         </Section>
 
         <Section title="Letzte Trainings">
-          <DogTrainingList items={malu.recentTrainings} onShowAll={noop} />
-          <DogTrainingList items={[]} onShowAll={noop} />
+          <DogTrainingList items={malu.recentTrainings} />
+          <DogTrainingList items={[]} />
         </Section>
 
         <Section title="Fährte (mit / ohne Daten)">

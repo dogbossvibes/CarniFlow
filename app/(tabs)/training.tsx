@@ -1,32 +1,16 @@
-import { useCallback } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { HeroImage } from '@/components/training/HeroImage';
-import { UnitListCard } from '@/components/training/UnitListCard';
-import { SwipeableTrainingItem } from '@/components/training/SwipeableTrainingItem';
-import { useTrainingFeed } from '@/hooks/useTrainingFeed';
-import { useFeedDelete } from '@/hooks/useFeedDelete';
-import type { FeedItem } from '@/services/trainingFeed';
 
-// Vereinheitlichter Trainings-Hub: der units-Flow ist der einzige
-// Erfassungsweg. Alte training_sessions + GPS-Fährten erscheinen (lesend)
-// im gemeinsamen Verlauf.
+// Training-Hub: fokussiert auf Timer + Fährten-Tool (+ nachträglich
+// dokumentieren). Der vollständige Verlauf (/unit/history) wurde app-weit
+// entfernt — Verlauf gibt es nur noch als Mini-Vorschau auf Home.
 export default function TrainingScreen() {
   const router = useRouter();
-  const { feed, loading, refresh } = useTrainingFeed();
-  const { onDelete: deleteItem, toast } = useFeedDelete();
-
-  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
-
-  const openItem = (item: FeedItem) => {
-    if      (item.source === 'unit')  router.push({ pathname: '/unit/detail', params: { id: item.id } });
-    else if (item.source === 'track') router.push(`/track/${item.id}` as never);
-    else                              router.push(`/training/${item.id}` as never);
-  };
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -65,45 +49,20 @@ export default function TrainingScreen() {
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </AnimatedPressable>
 
-        {/* Sekundäre Aktionen */}
-        <View style={s.actions}>
-          <AnimatedPressable style={s.actionCard} scale={0.97} onPress={() => router.push('/track' as never)}>
-            <View style={[s.actionIcon, { backgroundColor: `${C.success}1A` }]}>
-              <Ionicons name="navigate" size={20} color={C.success} />
-            </View>
-            <Text style={s.actionLabel}>Fährte (GPS)</Text>
-            <Text style={s.actionSub}>Live legen & Logbuch</Text>
-          </AnimatedPressable>
-          <AnimatedPressable style={s.actionCard} scale={0.97} onPress={() => router.push('/unit/history')}>
-            <View style={[s.actionIcon, { backgroundColor: `${C.accent}1A` }]}>
-              <Ionicons name="time" size={20} color={C.accent} />
-            </View>
-            <Text style={s.actionLabel}>Voller Verlauf</Text>
-            <Text style={s.actionSub}>Alle Einheiten</Text>
-          </AnimatedPressable>
-        </View>
-
-        {/* Verlauf (vereinheitlicht) */}
-        <Text style={s.sektionTitel}>Verlauf</Text>
-        {loading ? (
-          <ActivityIndicator color={C.accent} style={{ marginTop: 30 }} />
-        ) : feed.length === 0 ? (
-          <View style={s.empty}>
-            <Ionicons name="footsteps-outline" size={30} color={C.subtle} />
-            <Text style={s.emptyTitle}>Noch keine Einheiten</Text>
-            <Text style={s.emptyTxt}>Starte oben dein erstes Training.</Text>
+        {/* Fährten-Tool */}
+        <AnimatedPressable style={s.faehrteCard} scale={0.98} onPress={() => router.push('/track' as never)}>
+          <View style={[s.actionIcon, { backgroundColor: `${C.success}1A` }]}>
+            <Ionicons name="navigate" size={20} color={C.success} />
           </View>
-        ) : (
-          feed.slice(0, 20).map(item => (
-            <SwipeableTrainingItem key={`${item.source}-${item.id}`} trainingId={item.id} onDelete={() => deleteItem(item)}>
-              <UnitListCard unit={item} onPress={() => openItem(item)} />
-            </SwipeableTrainingItem>
-          ))
-        )}
+          <View style={s.flex}>
+            <Text style={s.docTitel}>Fährte (GPS)</Text>
+            <Text style={s.docSub}>Live legen & ausarbeiten</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={C.muted} />
+        </AnimatedPressable>
 
         <View style={{ height: 120 }} />
       </ScrollView>
-      {toast}
     </SafeAreaView>
   );
 }
@@ -125,20 +84,11 @@ const s = StyleSheet.create({
   heroBtn:    { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start', backgroundColor: C.accent, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 9, marginTop: 4 },
   heroBtnTxt: { fontSize: 14, color: C.accentText, fontWeight: '800' },
 
-  docBtn:   { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingVertical: 16, marginBottom: 12 },
-  flex:     { flex: 1 },
-  docTitel: { fontSize: 15, color: C.white, fontWeight: '700' },
-  docSub:   { fontSize: 12, color: C.muted, fontWeight: '500', marginTop: 2 },
+  docBtn:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingVertical: 16, marginBottom: 12 },
+  faehrteCard:{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingVertical: 16 },
+  flex:      { flex: 1 },
+  docTitel:  { fontSize: 15, color: C.white, fontWeight: '700' },
+  docSub:    { fontSize: 12, color: C.muted, fontWeight: '500', marginTop: 2 },
 
-  actions:    { flexDirection: 'row', gap: 12, marginBottom: 8 },
-  actionCard: { flex: 1, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, padding: 16, gap: 8 },
   actionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  actionLabel:{ fontSize: 14, color: C.white, fontWeight: '700' },
-  actionSub:  { fontSize: 12, color: C.muted, fontWeight: '500' },
-
-  sektionTitel: { fontSize: 18, color: C.white, fontWeight: '800', letterSpacing: -0.3, marginTop: 24, marginBottom: 14 },
-
-  empty:      { alignItems: 'center', gap: 8, marginTop: 40, paddingHorizontal: 30 },
-  emptyTitle: { fontSize: 16, color: C.white, fontWeight: '700', marginTop: 6 },
-  emptyTxt:   { fontSize: 13, color: C.subtle, textAlign: 'center' },
 });

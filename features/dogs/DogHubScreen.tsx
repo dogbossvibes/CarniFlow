@@ -20,7 +20,6 @@ export interface DogHubActions {
   onSettings:         () => void;
   onStartTraining:    () => void;
   onStartFaehrte:     () => void;
-  onShowAllTrainings: () => void;
   onQuickAction:      (k: QuickActionKey) => void;
   onOpenTraining?:    (item: DogTrainingItem) => void;
   onAddHealth:        () => void;
@@ -116,7 +115,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked }: { vm: DogHubVM; action
                   <Text style={s.sectionLabel}>Schnellstart</Text>
                   <DogQuickActions onSelect={actions.onQuickAction} />
                   <Text style={s.sectionLabel}>Letzte Trainings</Text>
-                  <DogTrainingList items={vm.recentTrainings} onOpen={actions.onOpenTraining} onShowAll={actions.onShowAllTrainings} />
+                  <DogTrainingList items={vm.recentTrainings} onOpen={actions.onOpenTraining} />
                 </>
               )}
               {tab === 'faehrte'  && <DogFaehrteSummary data={vm.faehrte} onStart={actions.onStartFaehrte} />}

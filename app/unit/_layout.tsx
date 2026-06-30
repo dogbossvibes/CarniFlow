@@ -14,7 +14,6 @@ export default function UnitLayout() {
       <Stack.Screen name="[discipline]" />
       <Stack.Screen name="live" />
       <Stack.Screen name="summary" options={{ animation: 'fade' }} />
-      <Stack.Screen name="history" />
       <Stack.Screen name="detail" />
       <Stack.Screen name="new-category" />
       <Stack.Screen name="stats" />
