@@ -162,9 +162,9 @@ export function StatTriple({ total, avg, streak }: { total: number; avg: number 
   );
 }
 
-export function TrackRow({ h, onPress }: { h: TrackRowData; onPress: () => void }) {
+export function TrackRow({ h, onPress, onLongPress }: { h: TrackRowData; onPress: () => void; onLongPress?: () => void }) {
   return (
-    <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity style={s.row} onPress={onPress} onLongPress={onLongPress} delayLongPress={350} activeOpacity={0.85}>
       <View style={s.rowSketch}>
         <TrackSketch legs={h.angles} objects={h.objects} size={56} progress={1} />
       </View>

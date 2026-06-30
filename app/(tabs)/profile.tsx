@@ -8,6 +8,8 @@ import { useCapabilities } from "@/hooks/useCapabilities";
 import { useAccess } from "@/hooks/useAccess";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { useNotificationSetting } from "@/hooks/useNotificationSetting";
+import { useAutoDetectSetting } from "@/hooks/useAutoDetectSetting";
+import { useVolumeKeyArticleSetting } from "@/hooks/useVolumeKeyArticleSetting";
 import { useCrashReporting } from "@/hooks/useCrashReporting";
 import { useProfile } from "@/hooks/useProfile";
 import { useSession } from "@/hooks/useSession";
@@ -27,6 +29,7 @@ import {
     Alert,
     Image,
     Linking,
+    Platform,
     ScrollView,
     StyleSheet,
     Switch,
@@ -87,6 +90,18 @@ export default function ProfilScreen() {
 
   const benachrichtigungen = useNotificationSetting(user?.id);
   const crashReporting = useCrashReporting();
+  const winkelErkennung = useAutoDetectSetting();
+  const volumeKeyArticle = useVolumeKeyArticleSetting();
+
+  const showShortcutHelp = () => Alert.alert(
+    'Gegenstand per Kurzbefehl',
+    'So legst du dir einen Schnell-Gegenstand auf eine Taste:\n\n' +
+    '1. App „Kurzbefehle" öffnen → neuen Kurzbefehl erstellen.\n' +
+    '2. Aktion „URL öffnen" hinzufügen, URL: anyvo://track/quick-add-article\n' +
+    '3. Den Kurzbefehl unter Einstellungen → Bedienungshilfen → Tippen → Auf Rückseite tippen ' +
+    '(oder auf den Action-Button) zuweisen.\n\n' +
+    'Während einer laufenden Fährtenaufnahme setzt das Auslösen einen Gegenstand.',
+  );
 
   const [einladungen, setEinladungen] = useState<TrainerUmfrage[]>([]);
   useEffect(() => { if (user?.id) getMyInvitations(user.id).then(setEinladungen); }, [user?.id]);
@@ -406,6 +421,77 @@ export default function ProfilScreen() {
             />
           </View>
         </View>
+
+        {/* Fährten-Einstellungen */}
+        <Text style={s.abschnitt}>FÄHRTEN</Text>
+        <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+          <View style={s.zeile}>
+            <View style={s.zeileIcon}>
+              <Ionicons name="git-branch-outline" size={17} color={C.muted} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.zeileLabel}>Winkel automatisch erkennen</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                Winkel, Spitzwinkel & Abriss. Gegenstände bleiben manuell.
+              </Text>
+            </View>
+            <Switch
+              value={winkelErkennung.autoDetect}
+              onValueChange={(v) => void winkelErkennung.setAutoDetect(v)}
+              disabled={!winkelErkennung.loaded}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+            />
+          </View>
+
+          <View style={s.trenner} />
+          {Platform.OS === 'android' ? (
+            <View style={s.zeile}>
+              <View style={s.zeileIcon}>
+                <Ionicons name="volume-high-outline" size={17} color={C.muted} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.zeileLabel}>Lautstärke-Taste = Gegenstand</Text>
+                <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                  Während der Aufnahme setzt die Lautstärke-Taste einen Gegenstand.
+                </Text>
+              </View>
+              <Switch
+                value={volumeKeyArticle.enabled}
+                onValueChange={(v) => void volumeKeyArticle.setEnabled(v)}
+                disabled={!volumeKeyArticle.loaded}
+                trackColor={{ false: C.cardAlt, true: C.accent }}
+                thumbColor={C.white}
+              />
+            </View>
+          ) : (
+            <TouchableOpacity style={s.zeile} onPress={showShortcutHelp} activeOpacity={0.7}>
+              <View style={s.zeileIcon}>
+                <Ionicons name="flash-outline" size={17} color={C.muted} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.zeileLabel}>Gegenstand per Kurzbefehl</Text>
+                <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                  Schnell-Gegenstand auf Back-Tap / Action-Button legen.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={C.muted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {__DEV__ && (
+          <>
+            <Text style={s.abschnitt}>ENTWICKLUNG</Text>
+            <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+              <TouchableOpacity style={s.zeile} onPress={() => router.push('/dev/dog-hub-preview' as never)} activeOpacity={0.7}>
+                <View style={s.zeileIcon}><Ionicons name="cube-outline" size={17} color={C.muted} /></View>
+                <Text style={[s.zeileLabel, { flex: 1 }]}>Dog Hub – Preview</Text>
+                <Ionicons name="chevron-forward" size={18} color={C.muted} />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         <Text style={s.abschnitt}>TRAINER</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}

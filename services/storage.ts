@@ -61,6 +61,27 @@ export async function uploadTrainingAudio(uri: string): Promise<string> {
   return data.publicUrl;
 }
 
+// Privater Bucket `dog-documents` (siehe DOG_DOCUMENTS_STORAGE.sql). Pfad
+// MUSS `<owner_id>/<dog_id>/<datei>` sein (RLS-Policy). Gibt den OBJEKT-PFAD
+// zurück (kein Public-URL — Signed-URL wird beim Öffnen erzeugt).
+export async function uploadDogDocument(uri: string, dogId: string, fileName: string, mime: string): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Nicht eingeloggt');
+
+  const safe = (fileName || 'datei').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const path = `${user.id}/${dogId}/${Date.now()}_${safe}`;
+
+  const formData = new FormData();
+  formData.append('file', { uri, name: safe, type: mime } as any);
+
+  const { error } = await supabase.storage
+    .from('dog-documents')
+    .upload(path, formData, { contentType: mime, upsert: false });
+
+  if (error) throw error;
+  return path;
+}
+
 export async function uploadDogImage(uri: string, _userId: string): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Nicht eingeloggt');

@@ -15,6 +15,8 @@ export function SwipeableTrainingItem({
   children,
   enabled = true,
   bottomGap = 12,
+  confirmTitle = 'Training löschen?',
+  confirmMessage = 'Möchtest du dieses Training wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
 }: {
   trainingId: string;
   onDelete: (id: string) => void;
@@ -23,13 +25,16 @@ export function SwipeableTrainingItem({
   // Unterer Abstand der roten Aktion, damit sie bündig zur Karte sitzt
   // (UnitListCard: 12; Listen mit gap-Spacing: 0).
   bottomGap?: number;
+  // Bestätigungstext anpassbar (z. B. „Fährte" statt „Training").
+  confirmTitle?: string;
+  confirmMessage?: string;
 }) {
   const ref = useRef<SwipeableMethods>(null);
 
   const confirm = useCallback(() => {
     Alert.alert(
-      'Training löschen?',
-      'Möchtest du dieses Training wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmTitle,
+      confirmMessage,
       [
         { text: 'Abbrechen', style: 'cancel', onPress: () => ref.current?.close() },
         {
@@ -39,7 +44,7 @@ export function SwipeableTrainingItem({
         },
       ],
     );
-  }, [trainingId, onDelete]);
+  }, [trainingId, onDelete, confirmTitle, confirmMessage]);
 
   // Rote Lösch-Aktion (gleich für links & rechts).
   const renderAction = useCallback(() => (

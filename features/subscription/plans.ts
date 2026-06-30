@@ -19,9 +19,10 @@ export const TRAINER_CAPABILITIES: Capability[] = [
 
 // App-Store / RevenueCat Product-IDs (nur Monatsabos).
 export const PRODUCT_IDS = {
-  founderActiveMonthly: 'anyvo_founder_active_monthly_790',
-  activeMonthly:        'anyvo_active_monthly_990',
-  trainerMonthly:       'anyvo_trainer_monthly_2990',
+  // ID-Suffix _8.00 ist historisch; tatsächlicher Preis = CHF 4.00 (im Store gesetzt).
+  founderActiveMonthly: 'anyvo_founder_active_monthly_8.00',
+  activeMonthly:        'anyvo_active_monthly_10',
+  trainerMonthly:       'anyvo_trainer_monthly_30.00',
 } as const;
 
 export const TRIAL_DAYS = 7;
@@ -37,9 +38,9 @@ export interface PlanMeta {
 
 export const PLAN_META: Record<SubscriptionPlan, PlanMeta> = {
   beginner_trial: { id: 'beginner_trial', name: 'Beginner',       priceChf: null, priceLabel: '7 Tage gratis', productId: PRODUCT_IDS.activeMonthly,        trainer: false },
-  founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 7.9,  priceLabel: 'CHF 7.90/Mt.',  productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
-  active:         { id: 'active',         name: 'Active',         priceChf: 9.9,  priceLabel: 'CHF 9.90/Mt.',  productId: PRODUCT_IDS.activeMonthly,         trainer: false },
-  trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 29.9, priceLabel: 'CHF 29.90/Mt.', productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
+  founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 4,  priceLabel: 'CHF 4.00/Mt.',  productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
+  active:         { id: 'active',         name: 'Active',         priceChf: 10, priceLabel: 'CHF 10.00/Mt.', productId: PRODUCT_IDS.activeMonthly,         trainer: false },
+  trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 30, priceLabel: 'CHF 30.00/Mt.', productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
 };
 
 // Plan → Runtime-Capabilities (user_capabilities). Alle 4 Pläne sind „pro".

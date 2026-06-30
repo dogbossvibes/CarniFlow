@@ -10,6 +10,7 @@ export interface MarkerChoice { type: MarkerType; material?: MarkerMaterial; ang
 
 const MATERIALS: { material: MarkerMaterial; icon: IconName; label: string }[] = [
   { material: 'holz',     icon: 'leaf-outline',        label: 'Holz' },
+  { material: 'duebel',   icon: 'git-commit-outline',  label: 'Dübel' },
   { material: 'stoff',    icon: 'shirt-outline',       label: 'Stoff' },
   { material: 'leder',    icon: 'bag-outline',         label: 'Leder' },
   { material: 'plastik',  icon: 'cube-outline',        label: 'Plastik' },
@@ -19,10 +20,12 @@ const MATERIALS: { material: MarkerMaterial; icon: IconName; label: string }[] =
 ];
 
 const ANGLES: { kind: AngleKind; icon: IconName; label: string }[] = [
-  { kind: 'links',  icon: 'arrow-back',        label: 'Links' },
-  { kind: 'rechts', icon: 'arrow-forward',     label: 'Rechts' },
-  { kind: 'spitz',  icon: 'git-branch',        label: 'Spitz' },
-  { kind: 'absatz', icon: 'swap-horizontal',   label: 'Absatz' },
+  { kind: 'links',        icon: 'arrow-back',         label: 'Links' },
+  { kind: 'rechts',       icon: 'arrow-forward',      label: 'Rechts' },
+  { kind: 'spitz_links',  icon: 'return-up-back',     label: 'Spitz L' },
+  { kind: 'spitz_rechts', icon: 'return-up-forward',  label: 'Spitz R' },
+  { kind: 'absatz',       icon: 'swap-horizontal',    label: 'Absatz' },
+  { kind: 'abriss',       icon: 'cut',                label: 'Abriss' },
 ];
 
 const OTHERS: { type: MarkerType; icon: IconName; title: string; sub: string; color: string }[] = [

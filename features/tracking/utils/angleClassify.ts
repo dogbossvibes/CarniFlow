@@ -21,13 +21,17 @@ export function suggestAngleKind(points: Pick<LatLng, 'lat' | 'lng'>[]): AngleKi
 
   const mag = Math.abs(diff);
   if (mag < 25) return null;            // kein nennenswerter Knick
-  if (mag > 110) return 'spitz';        // deutlich spitzer als rechtwinklig
-  return diff > 0 ? 'rechts' : 'links'; // im Uhrzeigersinn = Rechtswinkel
+  const dir: AngleKind = diff > 0 ? 'rechts' : 'links'; // im Uhrzeigersinn = rechts
+  if (mag > 100) return dir === 'rechts' ? 'spitz_rechts' : 'spitz_links'; // spitzer als ~90°
+  return dir;                           // rechtwinkliger Winkel nach links/rechts
 }
 
 export const ANGLE_LABEL: Record<AngleKind, string> = {
-  links:  'Linkswinkel',
-  rechts: 'Rechtswinkel',
-  spitz:  'Spitzwinkel',
-  absatz: 'Absatz',
+  links:        'Linkswinkel',
+  rechts:       'Rechtswinkel',
+  spitz_links:  'Spitzwinkel links',
+  spitz_rechts: 'Spitzwinkel rechts',
+  spitz:        'Spitzwinkel',          // Legacy (Altdaten ohne Richtung)
+  absatz:       'Absatz',
+  abriss:       'Abriss',
 };

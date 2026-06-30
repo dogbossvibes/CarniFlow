@@ -1,4 +1,5 @@
-import { DogCard } from "@/components/dogs/DogCard";
+import { DogCompactCard } from "@/components/dogs/DogCompactCard";
+import { dogToIdentity } from "@/components/dogs/types";
 import { QuickAddSheet } from "@/components/QuickAddSheet";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { DogIcon } from "@/components/ui/DogIcon";
@@ -90,7 +91,15 @@ export default function HundeScreen() {
           {dogs.length > 0 ? (
             <View style={s.liste}>
               {dogs.map((hund) => (
-                <DogCard key={hund.id} dog={hund} />
+                <DogCompactCard
+                  key={hund.id}
+                  identity={dogToIdentity(hund)}
+                  lastTrainingLabel={null}
+                  onOpen={() => router.push(`/dog/${hund.id}` as never)}
+                  onTraining={() => router.push("/unit/start")}
+                  onFaehrte={() => router.push(`/track/legen?dogId=${hund.id}` as never)}
+                  onStats={() => router.push(`/dog/${hund.id}` as never)}
+                />
               ))}
             </View>
           ) : (

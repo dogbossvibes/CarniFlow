@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
 import { removeGpsJitter, smoothTrackPoints, type LatLng } from '@/features/tracking/utils/gpsFilter';
-import type { MarkerType } from '@/features/tracking/store/trackingStore';
+import type { MarkerType, AngleKind } from '@/features/tracking/store/trackingStore';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
@@ -15,7 +15,7 @@ const MARKER_COLOR: Record<MarkerType, string> = {
   sprachmarker: C.trackPurple,
 };
 
-export interface MapMarker { type: MarkerType; lat: number | null; lng: number | null }
+export interface MapMarker { type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null }
 
 interface Props {
   layPoints:        LatLng[];
@@ -140,9 +140,12 @@ export function TrackingMap({
           </Marker>
         )}
 
+        {/* Marker: Abriss als Kästchen (Abrissfeld), sonst runder Punkt. */}
         {markerList.map((m, i) => (
-          <Marker key={i} coordinate={{ latitude: m.lat as number, longitude: m.lng as number }} anchor={{ x: 0.5, y: 0.5 }}>
-            <View style={[s.markerDot, { backgroundColor: MARKER_COLOR[m.type] }]} />
+          <Marker key={i} coordinate={{ latitude: m.lat as number, longitude: m.lng as number }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            {m.type === 'winkel' && m.angleKind === 'abriss'
+              ? <View style={s.abrissBox} />
+              : <View style={[s.markerDot, { backgroundColor: MARKER_COLOR[m.type] }]} />}
           </Marker>
         ))}
 
@@ -193,6 +196,7 @@ const s = StyleSheet.create({
   fabActive:   { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary },
   startDot:    { width: 16, height: 16, borderRadius: 8, backgroundColor: C.trackPrimary, borderWidth: 3, borderColor: '#04110F' },
   markerDot:   { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#04110F' },
+  abrissBox:   { width: 17, height: 17, borderRadius: 3, borderWidth: 2.5, borderColor: C.trackWarning, backgroundColor: 'rgba(0,0,0,0.35)' },
   rejectDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,77,77,0.75)' },
   breakDot:    { width: 18, height: 18, borderRadius: 9, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#2a060a', alignItems: 'center', justifyContent: 'center' },
   posGlow:     { width: 40, height: 40, borderRadius: 20, backgroundColor: C.trackGlow, alignItems: 'center', justifyContent: 'center' },

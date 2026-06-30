@@ -26,7 +26,7 @@ import { startFaehrteActivity, updateFaehrteActivity, stopFaehrteActivity } from
 //   • Distanz-Gate ≥ 2 m + EMA-Glättung → ruhige, echte Linie ohne Zacken.
 //   • Eigener Sekunden-Timer (setInterval), unabhängig von GPS-Updates.
 //   • Winkel-Erkennung über die Heading-Differenz zweier Schenkel (ein-/auslaufend)
-//     mit Klassifikation rechts / links / spitz.
+//     mit Richtung (links/rechts) UND Schärfe (rechtwinklig vs. spitz).
 // ──────────────────────────────────────────────────────────────────────────
 
 // Filter-/Glättungs-Parameter.
@@ -38,8 +38,19 @@ const EMA_ALPHA      = 0.4;  // Glättung: Gewicht des neuen Fix (0 = träge, 1 
 // Winkel-Erkennung (zwei Schenkel).
 const LEG_MIN_M       = 5.0;  // Mindestlänge je Schenkel, damit Rauschen nicht triggert
 const ANGLE_MIN_DEG   = 35;   // ab dieser Richtungsänderung gilt es als Knick
-const ANGLE_SHARP_DEG = 110;  // deutlich spitzer als rechtwinklig → Spitzwinkel
+const ANGLE_SHARP_DEG = 100;  // > rechtwinklig (90°) → Spitzwinkel. Bewusst nahe 90°,
+                              // weil EMA-Glättung den Scheitel verrundet und einen echten
+                              // Spitzwinkel sonst als 90°-Winkel unterschätzt.
 const CORNER_GAP_M    = 6.0;  // Mindestabstand zwischen zwei erkannten Winkeln
+
+// Abriss-Erkennung über das Laufmuster: kurzer Halt am Abrissfeld, danach
+// GERADEAUS weiter (kein Winkel). Der ~1-Schritt-Versatz selbst liegt unter dem
+// GPS-Rauschen und wird NICHT gemessen — Auslöser ist allein das Halt-Muster.
+const ABRISS_DWELL_MS       = 4000;  // Mindest-Standzeit, die als Halt zählt
+const ABRISS_DWELL_RADIUS_M = 1.5;   // „steht", solange innerhalb dieses Radius
+const ABRISS_RESUME_M       = 4.0;   // so weit nach dem Halt laufen, bevor Richtung bewertet wird
+const ABRISS_MAX_TURN_DEG   = 25;    // mehr Richtungsänderung ⇒ Winkel, kein Abriss
+const ABRISS_AFTER_OBJECT_MS = 8000; // kein Abriss kurz nach manuellem Gegenstand (Fehlauslöser)
 
 const WATCH_OPTS: Location.LocationOptions = {
   accuracy:         Location.Accuracy.BestForNavigation,
@@ -58,6 +69,7 @@ function normalizeDeg(d: number): number {
 
 export interface TrackRecorderOptions {
   onAngle?: (kind: AngleKind) => void;   // UI: Haptik + Toast bei erkanntem Winkel
+  autoDetect?: boolean;                  // Winkel/Spitzwinkel/Abriss automatisch erkennen (Default: true)
 }
 
 export function useTrackRecorder(opts?: TrackRecorderOptions) {
@@ -75,8 +87,16 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const emaRef        = useRef<LatLng | null>(null);   // geglättete Live-Position
   const lastRawRef    = useRef<Raw | null>(null);      // letzter (akzeptierter) Rohfix
   const lastCornerAtRef = useRef<number>(-Infinity);   // cumDist des letzten Winkels
+  // Abriss-Erkennung: Halt-Anker, vorgemerkter Abriss, letzter Abriss + Gegenstand.
+  const lastAbrissAtRef  = useRef<number>(-Infinity);  // cumDist des letzten Abrisses
+  const dwellRef         = useRef<{ pos: LatLng; since: number; headingIn: number | null; cumDist: number } | null>(null);
+  const pendingAbrissRef = useRef<{ at: LatLng; headingIn: number; atCumDist: number } | null>(null);
+  const lastObjectAtRef  = useRef<number>(-Infinity);  // Zeit (ms) des letzten Gegenstand-Markers
   const onAngleRef    = useRef<TrackRecorderOptions['onAngle']>(opts?.onAngle);
   onAngleRef.current  = opts?.onAngle;
+  // Auto-Erkennung (Winkel/Spitzwinkel/Abriss) ein/aus — live umschaltbar via Ref.
+  const autoDetectRef = useRef<boolean>(opts?.autoDetect ?? true);
+  autoDetectRef.current = opts?.autoDetect ?? true;
   // Stabile Brücke vom globalen Hintergrund-Task zum jeweils aktuellen onFix.
   const onFixRef      = useRef<(loc: Location.LocationObject) => void>(() => {});
 
@@ -111,6 +131,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Marker im Store + lokal (SQLite) + Supabase ablegen (best-effort).
   const commitMarker = useCallback(async (marker: MarkerSample) => {
     const s = store.getState();
+    // Gegenstand-Halt merken → unterdrückt einen Abriss-Fehlauslöser direkt danach.
+    if (marker.type === 'gegenstand') lastObjectAtRef.current = marker.t;
     s.addMarker(marker);
     if (localSessionId.current) {
       try { await createLocalTrackMarker(localSessionId.current, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null }); }
@@ -144,8 +166,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     const mag = Math.abs(diff);
     if (mag < ANGLE_MIN_DEG) return;
 
-    const kind: AngleKind = mag > ANGLE_SHARP_DEG ? 'spitz' : diff > 0 ? 'rechts' : 'links';
+    // Richtung (links/rechts) und Schärfe (spitz/rechtwinklig) getrennt bestimmen.
+    const dir: 'links' | 'rechts' = diff > 0 ? 'rechts' : 'links';
+    const kind: AngleKind = mag > ANGLE_SHARP_DEG ? (dir === 'rechts' ? 'spitz_rechts' : 'spitz_links') : dir;
     lastCornerAtRef.current = B.cumDist;
+    pendingAbrissRef.current = null;   // echter Winkel hier ⇒ kein Abriss am selben Halt
 
     const now = Date.now();
     void commitMarker({
@@ -155,6 +180,32 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       note: null, audio_url: null, found: false, t: now,
     });
     onAngleRef.current?.(kind);
+  }, [commitMarker]);
+
+  // Abriss: ein zuvor erkannter Halt (pendingAbriss) wird zum Abriss, sobald nach
+  // dem Stopp GERADEAUS (kein Winkel) weitergelaufen wurde. Der Marker sitzt am Halt.
+  const detectAbriss = useCallback(() => {
+    const pending = pendingAbrissRef.current;
+    if (!pending) return;
+    const pts = pointsRef.current;
+    const C = pts[pts.length - 1];
+    if (!C) return;
+    if (C.cumDist - pending.atCumDist < ABRISS_RESUME_M) return;   // erst genug weiterlaufen
+
+    pendingAbrissRef.current = null;                               // Halt ist ausgewertet
+    const turn = Math.abs(normalizeDeg(calculateHeading(pending.at, C) - pending.headingIn));
+    if (turn > ABRISS_MAX_TURN_DEG) return;                       // war ein Winkel, kein Abriss
+    if (pending.atCumDist - lastAbrissAtRef.current < CORNER_GAP_M) return;
+
+    lastAbrissAtRef.current = C.cumDist;
+    const now = Date.now();
+    void commitMarker({
+      id: `abriss-${now}`, type: 'winkel', material: null, angleKind: 'abriss',
+      lat: pending.at.lat, lng: pending.at.lng, accuracy: null,
+      distance_from_start: Math.round(pending.atCumDist * 10) / 10,
+      note: null, audio_url: null, found: false, t: now,
+    });
+    onAngleRef.current?.('abriss');
   }, [commitMarker]);
 
   // EIN Fix-Handler für Warmup UND Aufnahme.
@@ -190,6 +241,24 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     }
     lastRawRef.current = raw;
 
+    // 2b) Abriss-Halt verfolgen (läuft auch ohne neuen Linienpunkt, also im Stand):
+    //     Bewegung > Radius ⇒ neuer Anker inkl. aktueller Laufrichtung. Sonst
+    //     Standzeit zählen; lang genug (und nicht direkt nach Gegenstand) ⇒ vormerken.
+    //     Nur bei aktiver Auto-Erkennung — manuell setzt der Nutzer alles selbst.
+    if (autoDetectRef.current) {
+      const dwell = dwellRef.current;
+      if (!dwell || calculateDistance(dwell.pos, ema) > ABRISS_DWELL_RADIUS_M) {
+        const lp = pointsRef.current;
+        const hIn = lp.length >= 2 ? calculateHeading(lp[lp.length - 2], lp[lp.length - 1]) : null;
+        dwellRef.current = { pos: { lat: ema.lat, lng: ema.lng }, since: raw.t, headingIn: hIn, cumDist: lp[lp.length - 1]?.cumDist ?? 0 };
+      } else if (
+        raw.t - dwell.since >= ABRISS_DWELL_MS && dwell.headingIn != null &&
+        !pendingAbrissRef.current && raw.t - lastObjectAtRef.current > ABRISS_AFTER_OBJECT_MS
+      ) {
+        pendingAbrissRef.current = { at: dwell.pos, headingIn: dwell.headingIn, atCumDist: dwell.cumDist };
+      }
+    }
+
     // 3) Distanz-Gate: erst ab MIN_STEP_M einen neuen Linienpunkt setzen.
     const pts = pointsRef.current;
     const last = pts[pts.length - 1];
@@ -214,9 +283,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     });
     if (ptBuffer.current.length >= 25) void flushPoints();
 
-    // 4) Winkel-Erkennung auf der frischen Linie.
-    detectCorner();
-  }, [store, flushPoints, detectCorner]);
+    // 4) Winkel- und Abriss-Erkennung auf der frischen Linie (nur wenn aktiviert).
+    if (autoDetectRef.current) {
+      detectCorner();
+      detectAbriss();
+    }
+  }, [store, flushPoints, detectCorner, detectAbriss]);
   onFixRef.current = onFix;
 
   // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
@@ -259,6 +331,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     emaRef.current = null;
     lastRawRef.current = null;
     lastCornerAtRef.current = -Infinity;
+    lastAbrissAtRef.current = -Infinity;
+    dwellRef.current = null;
+    pendingAbrissRef.current = null;
+    lastObjectAtRef.current = -Infinity;
     ptBuffer.current = [];
     localSessionId.current = null;
 

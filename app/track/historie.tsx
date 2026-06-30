@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -14,6 +14,9 @@ import { SwipeableTrainingItem } from '@/components/training/SwipeableTrainingIt
 import { useToast } from '@/components/ui/Toast';
 
 const FILTERS = ['Alle', 'Acker', 'Wiese', 'Wald'] as const;
+
+const DEL_TITLE = 'Fährte löschen?';
+const DEL_MSG   = 'Möchtest du diese Fährte wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.';
 
 export default function TrackHistorieScreen() {
   const router = useRouter();
@@ -34,6 +37,14 @@ export default function TrackHistorieScreen() {
     if (error) { setRows(prev); showToast('Training konnte nicht gelöscht werden.'); }
     else showToast('Training gelöscht');
   }, [rows, showToast]);
+
+  // Long-Press: erst bestätigen, dann löschen (Swipe löscht weiterhin direkt).
+  const confirmDelete = useCallback((id: string) => {
+    Alert.alert(DEL_TITLE, DEL_MSG, [
+      { text: 'Abbrechen', style: 'cancel' },
+      { text: 'Löschen', style: 'destructive', onPress: () => handleDelete(id) },
+    ]);
+  }, [handleDelete]);
 
   const activeDog = dogs.find(d => d.id === dogId) ?? dogs[0] ?? null;
   const effectiveDogId = activeDog?.id ?? null;
@@ -85,9 +96,10 @@ export default function TrackHistorieScreen() {
               const angles = r.corners_total ?? 0;
               const objects = r.articles_total ?? 0;
               return (
-                <SwipeableTrainingItem key={r.id} trainingId={r.id} onDelete={handleDelete} bottomGap={0}>
+                <SwipeableTrainingItem key={r.id} trainingId={r.id} onDelete={handleDelete} bottomGap={0} confirmTitle={DEL_TITLE} confirmMessage={DEL_MSG}>
                 <TouchableOpacity style={s.row} activeOpacity={0.85}
-                  onPress={() => router.push(`/track/${r.id}` as never)}>
+                  onPress={() => router.push(`/track/${r.id}` as never)}
+                  onLongPress={() => confirmDelete(r.id)} delayLongPress={350}>
                   <View style={s.sketch}>
                     <TrackSketch legs={angles} objects={objects} size={64} progress={1} />
                   </View>

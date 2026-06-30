@@ -8,6 +8,7 @@ import { TrackingMap, type MapMarker } from '@/features/tracking/components/Trac
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
 import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
+import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { startTrackRun, finishTrackRun, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 
@@ -49,6 +50,7 @@ export default function TrackRunScreen() {
   const s = useSearchRecorder({ laidPoints: snap.laidPoints, laidObjects: snap.laidObjects, level: snap.level });
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
+  const [voiceOn, setVoiceOn] = useState(true);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
   const startedRef = useRef(false);
@@ -69,8 +71,17 @@ export default function TrackRunScreen() {
   const breakPts  = useMemo(() => s.breaks.map(b => ({ lat: b.at.latitude, lng: b.at.longitude })), [s.breaks]);
   const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
-  const mapMarkers: MapMarker[] = snap.laidMarkers.map(m => ({ type: m.type, lat: m.lat, lng: m.lng }));
+  const mapMarkers: MapMarker[] = snap.laidMarkers.map(m => ({ type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind }));
   const winkel = snap.laidMarkers.filter(m => m.type === 'winkel').length;
+
+  // Sprachführung: gelegte Winkel/Spitzwinkel/Abriss „etwas voraus" ansagen.
+  const guidanceAngles = useMemo<GuidanceAngle[]>(
+    () => snap.laidMarkers
+      .filter(m => m.type === 'winkel' && m.lat != null && m.lng != null)
+      .map(m => ({ id: m.id, lat: m.lat as number, lng: m.lng as number, angleKind: m.angleKind })),
+    [snap.laidMarkers],
+  );
+  useTrackVoiceGuidance(curPos, guidanceAngles, voiceOn);
 
   const hasLaid = snap.laidPoints.length > 1;
   const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
@@ -125,6 +136,11 @@ export default function TrackRunScreen() {
             <Text className="text-[11px] font-extrabold tracking-[1.4px] text-[#ff8a94]">LIVE</Text>
           </View>
           <View className="flex-1" />
+          {/* Sprachausgabe an/aus */}
+          <Pressable onPress={() => setVoiceOn(v => !v)} hitSlop={8}
+            className={`w-9 h-9 rounded-[11px] items-center justify-center border ${voiceOn ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.4)]' : 'bg-white/5 border-ft-line-strong'}`}>
+            <Ionicons name={voiceOn ? 'volume-high' : 'volume-mute'} size={17} color={voiceOn ? FT.acc : FT.muted} />
+          </Pressable>
           {/* Live-Score */}
           <View className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-ft-acc-dim border border-[rgba(21,230,195,0.4)]">
             <Ionicons name="trophy" size={12} color={FT.acc} />

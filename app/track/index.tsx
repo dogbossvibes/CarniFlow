@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,13 +7,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
-import { getTrackSessionById, getUserTrackSessions } from '@/features/tracking/services/trackService';
+import { getTrackSessionById, getUserTrackSessions, deleteTrackSession } from '@/features/tracking/services/trackService';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import {
   FaehrtenHeader, SectionLabel, StatTriple, TrackRow, fmtAge, relDate, type TrackRowData,
 } from '@/features/tracking/components/FaehrtenChrome';
 import { averageScore, dayStreak, trackScore } from '@/features/tracking/utils/trackScore';
+import { useToast } from '@/components/ui/Toast';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -40,6 +41,7 @@ export default function TrackOverviewScreen() {
   const [rows, setRows]     = useState<any[]>([]);
   const [hero, setHero]     = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const { showToast, toast } = useToast();
 
   const activeDog = dogs.find(d => d.id === dogId) ?? dogs[0] ?? null;
   const effectiveDogId = activeDog?.id ?? null;
@@ -61,6 +63,25 @@ export default function TrackOverviewScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // Fährte per Long-Press löschen: erst bestätigen, dann optimistisch entfernen.
+  const confirmDelete = useCallback((id: string) => {
+    Alert.alert('Fährte löschen?', 'Möchtest du diese Fährte wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', [
+      { text: 'Abbrechen', style: 'cancel' },
+      {
+        text: 'Löschen', style: 'destructive',
+        onPress: async () => {
+          const prev = rows;
+          const wasHero = hero?.id === id;
+          setRows(rs => rs.filter(r => r.id !== id));
+          const { error } = await deleteTrackSession(id);
+          if (error) { setRows(prev); showToast('Fährte konnte nicht gelöscht werden.'); return; }
+          showToast('Fährte gelöscht');
+          if (wasHero) load();
+        },
+      },
+    ]);
+  }, [rows, hero, showToast, load]);
+
   const history = useMemo(() => rows.map(toRow), [rows]);
   const stats = useMemo(() => ({
     total:  rows.length,
@@ -76,7 +97,7 @@ export default function TrackOverviewScreen() {
     if (!hero) return null;
     const lay: LatLng[]  = (hero.points ?? []).filter((p: any) => (p.point_type ?? 'lay') === 'lay').map((p: any) => ({ lat: p.latitude, lng: p.longitude }));
     const run: LatLng[]  = ((hero.runs ?? [])[0]?.run_points ?? []).map((p: any) => ({ lat: p.lat, lng: p.lng }));
-    const markers: MapMarker[] = (hero.markers ?? []).map((m: any) => ({ type: m.marker_type, lat: m.latitude, lng: m.longitude }));
+    const markers: MapMarker[] = (hero.markers ?? []).map((m: any) => ({ type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind }));
     const center = lay[Math.floor(lay.length / 2)] ?? null;
     return { lay, run, markers, center, hasGps: lay.length > 1 };
   }, [hero]);
@@ -167,13 +188,14 @@ export default function TrackOverviewScreen() {
         ) : (
           <View style={{ gap: 10 }}>
             {history.slice(0, 2).map(h => (
-              <TrackRow key={h.id} h={h} onPress={() => router.push(`/track/${h.id}` as never)} />
+              <TrackRow key={h.id} h={h} onPress={() => router.push(`/track/${h.id}` as never)} onLongPress={() => confirmDelete(h.id)} />
             ))}
           </View>
         )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      {toast}
     </SafeAreaView>
   );
 }

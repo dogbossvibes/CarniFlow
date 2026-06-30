@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -10,6 +10,9 @@ import { useDogs } from '@/hooks/useDogs';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { useTrackRecorder } from '@/features/tracking/hooks/useTrackRecorder';
+import { useAutoDetectSetting } from '@/hooks/useAutoDetectSetting';
+import { useVolumeKeyArticleSetting } from '@/hooks/useVolumeKeyArticleSetting';
+import { subscribeQuickAddArticle } from '@/features/tracking/quickAddArticleBus';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { createTrackSession } from '@/features/tracking/services/trackService';
 import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
@@ -22,6 +25,7 @@ type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
 const GEGENSTAND_MATERIALS: { material: MarkerMaterial; icon: MatIcon; label: string }[] = [
   { material: 'holz',     icon: 'leaf-outline',        label: 'Holz' },
+  { material: 'duebel',   icon: 'git-commit-outline',  label: 'Dübel' },
   { material: 'stoff',    icon: 'shirt-outline',       label: 'Stoff' },
   { material: 'leder',    icon: 'bag-outline',         label: 'Leder' },
   { material: 'plastik',  icon: 'cube-outline',        label: 'Plastik' },
@@ -67,6 +71,7 @@ export default function LegenScreen() {
   const { showToast, toast } = useToast();
 
   const [phase, setPhase] = useState<'warmup' | 'recording'>('warmup');
+  const phaseRef = useRef(phase); phaseRef.current = phase;   // Stale-Closure-Schutz für Trigger
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [surface, setSurface] = useState<string>('Acker');         // Untergrund
   const [condition, setCondition] = useState<string | null>(null); // Beschaffenheit
@@ -88,14 +93,56 @@ export default function LegenScreen() {
     showToast(`${ANGLE_LABEL[kind]} erkannt`);
   }, [showToast]);
 
-  const rec = useTrackRecorder({ onAngle });
+  const { autoDetect, setAutoDetect } = useAutoDetectSetting();
+  const { enabled: volumeKeyArticle } = useVolumeKeyArticleSetting();
+  const rec = useTrackRecorder({ onAngle, autoDetect });
+
+  // Zuletzt gewähltes Gegenstand-Material → Default für den Schnell-Gegenstand.
+  const lastMaterialRef = useRef<MarkerMaterial>('diverses');
 
   // Gegenstand mit gewähltem Material setzen.
   const placeGegenstand = useCallback((material: MarkerMaterial) => {
     setMaterialSheet(false);
+    lastMaterialRef.current = material;
     haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
     void rec.addMarker('gegenstand', { material });
   }, [rec]);
+
+  // Schnell-Gegenstand (Hardware-Taste / Kurzbefehl): ohne Material-Auswahl, am
+  // zuletzt gewählten Material. Nur während laufender Aufnahme.
+  const quickAddArticle = useCallback(() => {
+    if (phaseRef.current !== 'recording') return;
+    haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+    void rec.addMarker('gegenstand', { material: lastMaterialRef.current });
+    showToast('Gegenstand gesetzt');
+  }, [rec, showToast]);
+
+  // iOS-Kurzbefehl (Deep-Link) → Schnell-Gegenstand, solange aufgenommen wird.
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    return subscribeQuickAddArticle(quickAddArticle);
+  }, [phase, quickAddArticle]);
+
+  // Android: Lautstärke-Taste → Schnell-Gegenstand (nur wenn Setting an + Aufnahme).
+  useEffect(() => {
+    if (Platform.OS !== 'android' || phase !== 'recording' || !volumeKeyArticle) return;
+    let VolumeManager: typeof import('react-native-volume-manager').VolumeManager | null = null;
+    try { VolumeManager = require('react-native-volume-manager').VolumeManager; } catch { VolumeManager = null; }
+    if (!VolumeManager) return;
+
+    const BASELINE = 0.5;
+    let last = 0;
+    void VolumeManager.showNativeVolumeUI({ enabled: false });
+    void VolumeManager.setVolume(BASELINE, { showUI: false });
+    const sub = VolumeManager.addVolumeListener(() => {
+      const now = Date.now();
+      if (now - last < 600) return;           // Entprellung gegen Doppel-Trigger
+      last = now;
+      quickAddArticle();
+      void VolumeManager?.setVolume(BASELINE, { showUI: false });  // Baseline halten → beide Richtungen feuern
+    });
+    return () => { sub.remove(); void VolumeManager?.showNativeVolumeUI({ enabled: true }); };
+  }, [phase, volumeKeyArticle, quickAddArticle]);
 
   const activeDog = dogs.find(d => d.id === params.dogId) ?? dogs[0] ?? null;
 
@@ -167,7 +214,7 @@ export default function LegenScreen() {
 
   useEffect(() => () => { rec.stopAll(); }, [rec.stopAll]);
 
-  const mapMarkers: MapMarker[] = markers.map(mk => ({ type: mk.type, lat: mk.lat, lng: mk.lng }));
+  const mapMarkers: MapMarker[] = markers.map(mk => ({ type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind }));
   const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
   const winkel = markers.filter(mk => mk.type === 'winkel').length;
 
@@ -175,7 +222,7 @@ export default function LegenScreen() {
     const id = sessionIdRef.current;
     await rec.finish(id);   // toleriert null (offline → nur lokal gesichert)
     if (id) {
-      router.replace(`/track/run?id=${id}` as never);   // → Liegezeit / Ausarbeiten
+      router.replace(`/track/liegen?id=${id}` as never);   // → Wartephase (Liegezeit) → Ausarbeiten
     } else {
       showToast('Lokal gesichert — Auswertung nach Sync verfügbar.');
       router.canGoBack() ? router.back() : router.replace('/track' as never);
@@ -313,6 +360,27 @@ export default function LegenScreen() {
                       );
                     })}
                   </View>
+
+                  {/* Winkel-Erkennung: vollautomatisch vs. alles manuell.
+                      Gegenstände sind davon ausgenommen — die immer manuell. */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Winkel-Erkennung</Text>
+                  <View className="flex-row gap-2 self-stretch">
+                    {([['auto', 'Automatisch', 'flash'], ['manual', 'Manuell', 'hand-left']] as const).map(([val, label, icon]) => {
+                      const on = autoDetect === (val === 'auto');
+                      return (
+                        <Pressable key={val} onPress={() => void setAutoDetect(val === 'auto')}
+                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          <Ionicons name={icon} size={15} color={on ? FT.acc : FT.muted} />
+                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text className="text-[11px] text-ft-faint self-start mb-1">
+                    {autoDetect
+                      ? 'Winkel, Spitzwinkel & Abriss werden automatisch erkannt. Gegenstände setzt du selbst.'
+                      : 'Du setzt alle Winkel & Abrisse selbst. Gegenstände sind ohnehin manuell.'}
+                  </Text>
 
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Wetter</Text>

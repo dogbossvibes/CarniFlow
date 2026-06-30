@@ -12,7 +12,8 @@ const ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '';
 
 // Zwei Stufen: Pro und Trainer. Das Trainer-Abo enthält die Pro-Funktionen —
 // Entitlement-Namen müssen im RevenueCat-Dashboard so heißen.
-// Produkte: anyvo_pro_monthly (CHF 8.00) / anyvo_trainer_monthly (CHF 29.90).
+// Produkte: anyvo_active_monthly_10 (CHF 10) / anyvo_founder_active_monthly_8.00
+// (CHF 8) / anyvo_trainer_monthly_30.00 (CHF 30). IDs siehe features/subscription/plans.ts.
 export const ENTITLEMENTS = { pro: 'pro', trainer: 'trainer' } as const;
 export type Tier = 'pro' | 'trainer';
 

@@ -4,8 +4,19 @@ import { schedulePersist, clearPending } from '@/features/tracking/store/trackPe
 import { EMPTY_GPS_STATS, type GpsStats, type TrackPointStatus } from '@/features/tracking/engine/types';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
-export type MarkerMaterial = 'stoff' | 'holz' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
-export type AngleKind = 'links' | 'rechts' | 'spitz' | 'absatz';
+export type MarkerMaterial = 'stoff' | 'holz' | 'duebel' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
+// Winkel-/Figur-Typen einer Fährte. Schärfe (rechtwinklig/spitz) und Richtung
+// (links/rechts) sind getrennt: ein Spitzwinkel ist immer AUCH nach links oder
+// rechts. 'spitz' (ohne Richtung) bleibt nur für Altdaten erhalten.
+//   links | rechts        → rechtwinkliger (~90°) Winkel
+//   spitz_links | spitz_rechts → spitzer Winkel (<90°)
+//   absatz               → Start-/Endpunkt der Fährte
+//   abriss               → Abriss: Bereich, der diagonal 1 Schritt versetzt weitergeht
+export type AngleKind =
+  | 'links' | 'rechts'
+  | 'spitz_links' | 'spitz_rechts'
+  | 'spitz'
+  | 'absatz' | 'abriss';
 export type OrientationMode = 'north' | 'heading' | 'track';
 
 export interface TrackPointSample extends LatLng {
