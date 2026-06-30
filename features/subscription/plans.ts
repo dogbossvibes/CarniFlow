@@ -39,8 +39,8 @@ export interface PlanMeta {
 export const PLAN_META: Record<SubscriptionPlan, PlanMeta> = {
   beginner_trial: { id: 'beginner_trial', name: 'Beginner',       priceChf: null, priceLabel: '7 Tage gratis', productId: PRODUCT_IDS.activeMonthly,        trainer: false },
   founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 4,  priceLabel: 'CHF 4.00/Mt.',  productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
-  active:         { id: 'active',         name: 'Active',         priceChf: 10, priceLabel: 'CHF 10.00/Mt.', productId: PRODUCT_IDS.activeMonthly,         trainer: false },
-  trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 30, priceLabel: 'CHF 30.00/Mt.', productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
+  active:         { id: 'active',         name: 'Active',         priceChf: 6,  priceLabel: 'CHF 6.00/Mt.',  productId: PRODUCT_IDS.activeMonthly,         trainer: false },
+  trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 15, priceLabel: 'CHF 15.00/Mt.', productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
 };
 
 // Plan → Runtime-Capabilities (user_capabilities). Alle 4 Pläne sind „pro".
