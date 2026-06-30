@@ -81,6 +81,7 @@ export default function LegenScreen() {
   const [lastAngle, setLastAngle] = useState<AngleKind | null>(null);
   const [warmupElapsed, setWarmupElapsed] = useState(0);
   const [materialSheet, setMaterialSheet] = useState(false);   // Gegenstand-Material wählen
+  const [selectedDogId, setSelectedDogId] = useState<string | null>((params.dogId as string) ?? null);
   const beganRef = useRef(false);
   const warmupStartedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
@@ -144,7 +145,7 @@ export default function LegenScreen() {
     return () => { sub.remove(); void VolumeManager?.showNativeVolumeUI({ enabled: true }); };
   }, [phase, volumeKeyArticle, quickAddArticle]);
 
-  const activeDog = dogs.find(d => d.id === params.dogId) ?? dogs[0] ?? null;
+  const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
 
   const {
     trackPoints, markers, currentPosition, heading, gpsAccuracy,
@@ -242,27 +243,29 @@ export default function LegenScreen() {
     <View className="flex-1 bg-ft-bg">
       <SafeAreaView edges={['top']} className="flex-1">
         {/* Top-Bar: Zurück · LIVE · Karte/Skizze */}
-        <View className="flex-row items-center gap-3 px-[18px] pb-[10px]">
+        <View className="flex-row items-center gap-3 px-[18px] pt-2 pb-3">
           <Pressable
-            className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} hitSlop={8}
+            className="w-10 h-10 rounded-[12px] border border-ft-line-strong bg-white/10 items-center justify-center"
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} hitSlop={10}
           >
-            <Ionicons name="chevron-back" size={18} color={FT.text} />
+            <Ionicons name="chevron-back" size={20} color={FT.text} />
           </Pressable>
-          <View
-            className="flex-row items-center gap-[7px] px-3 py-1.5 rounded-full"
-            style={{ backgroundColor: 'rgba(255,93,108,0.14)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.3)' }}
-          >
-            <RecDot />
-            <Text className="text-[11px] font-extrabold tracking-[1.4px] text-[#ff8a94]">LIVE</Text>
-          </View>
+          {phase === 'recording' && (
+            <View
+              className="flex-row items-center gap-[7px] px-3 py-1.5 rounded-full"
+              style={{ backgroundColor: 'rgba(255,93,108,0.24)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.55)' }}
+            >
+              <RecDot />
+              <Text className="text-[12px] font-extrabold tracking-[1.4px] text-[#ff9aa2]">LIVE</Text>
+            </View>
+          )}
           <View className="flex-1" />
-          <View className="flex-row bg-white/5 rounded-[11px] p-[3px] gap-[2px]">
+          <View className="flex-row bg-white/10 rounded-[12px] p-[3px] gap-[2px]">
             {(['map', 'sketch'] as const).map(k => {
               const on = view === k;
               return (
-                <Pressable key={k} onPress={() => setView(k)} className={`px-[11px] py-1.5 rounded-lg ${on ? 'bg-ft-acc' : ''}`}>
-                  <Text className={`text-[11.5px] font-bold ${on ? 'text-ft-acc-text' : 'text-ft-muted'}`}>
+                <Pressable key={k} onPress={() => setView(k)} className={`px-[12px] py-1.5 rounded-lg ${on ? 'bg-ft-acc' : ''}`}>
+                  <Text className={`text-[12px] font-extrabold ${on ? 'text-ft-acc-text' : 'text-white/80'}`}>
                     {k === 'map' ? 'Karte' : 'Skizze'}
                   </Text>
                 </Pressable>
@@ -295,7 +298,7 @@ export default function LegenScreen() {
             <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">Laufzeit</Text>
           </View>
 
-          {/* Hunde-Pill (oben rechts) */}
+          {/* Hunde-Anzeige (oben rechts) — Auswahl erfolgt im Warmup-Setup */}
           {activeDog && (
             <View className="absolute top-[14px] right-[14px] flex-row items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 bg-ft-glass border border-ft-glass-line">
               <View className="w-[26px] h-[26px] rounded-full bg-ft-acc items-center justify-center">
@@ -332,6 +335,27 @@ export default function LegenScreen() {
                   <Text className="text-[14px] font-semibold mb-2" style={{ color: gpsReady ? FT.acc : FT.muted }}>
                     {gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : 'Suche Satelliten…'}
                   </Text>
+
+                  {/* Hund */}
+                  {dogs.length > 0 && (
+                    <>
+                      <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Hund</Text>
+                      <View className="flex-row flex-wrap gap-2 self-start mb-1">
+                        {dogs.map(d => {
+                          const on = d.id === activeDog?.id;
+                          return (
+                            <Pressable key={d.id} onPress={() => setSelectedDogId(d.id)}
+                              className={`flex-row items-center gap-1.5 pl-1.5 pr-[12px] py-1.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                              <View className="w-[22px] h-[22px] rounded-full bg-ft-acc items-center justify-center">
+                                <Text className="text-[10px] font-extrabold text-ft-acc-text">{(d.name?.[0] ?? '?').toUpperCase()}</Text>
+                              </View>
+                              <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{d.name}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
 
                   {/* Untergrund */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Untergrund</Text>
