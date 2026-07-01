@@ -18,6 +18,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { C } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { DateField } from '@/components/ui/DateField';
+import { toISODate } from '@/features/dogs/dateInput';
 import { addDog } from '@/services/dogs';
 import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
 import { uploadDogImage } from '@/services/storage';
@@ -32,7 +34,7 @@ export default function HundHinzufuegenScreen() {
   const [name,        setName]        = useState('');
   const [rasse,       setRasse]       = useState('');
   const [geschlecht,  setGeschlecht]  = useState<Geschlecht>(null);
-  const [geburtsDat,  setGeburtsDat]  = useState('');
+  const [birth,       setBirth]       = useState<Date | null>(null);
   const [gewichtKg,   setGewichtKg]   = useState('');
   const [titel,       setTitel]       = useState('');   // Leistungsabzeichen, kommagetrennt
   const [vater,       setVater]       = useState('');
@@ -103,7 +105,7 @@ export default function HundHinzufuegenScreen() {
       name:       name.trim(),
       breed:      rasse.trim() || null,
       gender:     geschlecht,
-      birth_date: geburtsDat.trim() || null,
+      birth_date: birth ? toISODate(birth) : null,
       weight_kg:  gewichtKg ? parseFloat(gewichtKg) : null,
       photo_url:  photoUrl,
       titles:     titlesArr,
@@ -250,12 +252,13 @@ export default function HundHinzufuegenScreen() {
               </View>
             </View>
 
-            <Input
+            <DateField
               label="Geburtsdatum"
-              placeholder="JJJJ-MM-TT"
-              value={geburtsDat}
-              onChangeText={setGeburtsDat}
-              keyboardType="numbers-and-punctuation"
+              value={birth}
+              onChange={setBirth}
+              onClear={() => setBirth(null)}
+              maximumDate={new Date()}
+              placeholder="Datum wählen"
             />
 
             <Input

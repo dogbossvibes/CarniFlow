@@ -55,3 +55,6 @@ google-play-service-account.json
 # Debug-Screenshots (lokal)
 fahertescreen.PNG
 faehrtenscreen2.PNG
+
+# Lokale Native-Modul-Build-Artefakte (Gradle)
+modules/*/android/build/

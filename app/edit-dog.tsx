@@ -19,6 +19,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { C } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { DateField } from '@/components/ui/DateField';
+import { toISODate } from '@/features/dogs/dateInput';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
@@ -28,13 +30,6 @@ import { useSession } from '@/hooks/useSession';
 import type { Dog } from '@/types';
 
 type Geschlecht = 'male' | 'female' | null;
-
-function isoZuCH(iso: string | null): string {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-');
-  if (!y || !m || !d) return '';
-  return `${d}.${m}.${y}`;
-}
 
 export default function HundBearbeitenScreen() {
   const router      = useRouter();
@@ -46,8 +41,7 @@ export default function HundBearbeitenScreen() {
   const [name,          setName]          = useState('');
   const [rasse,         setRasse]         = useState('');
   const [geschlecht,    setGeschlecht]    = useState<Geschlecht>(null);
-  const [geburtsDatCH,  setGeburtsDatCH]  = useState('');
-  const [geburtsDatISO, setGeburtsDatISO] = useState<string | null>(null);
+  const [birth, setBirth] = useState<Date | null>(null);
   const [gewicht,       setGewicht]       = useState('');
   const [titel,         setTitel]         = useState('');   // Leistungsabzeichen, kommagetrennt
   const [vater,         setVater]         = useState('');
@@ -82,8 +76,7 @@ export default function HundBearbeitenScreen() {
       setName(d.name);
       setRasse(d.breed ?? '');
       setGeschlecht(d.gender ?? null);
-      setGeburtsDatCH(isoZuCH(d.birth_date));
-      setGeburtsDatISO(d.birth_date);
+      setBirth(d.birth_date ? new Date(d.birth_date) : null);
       setGewicht(d.weight_kg != null ? String(d.weight_kg) : '');
       setTitel((d.titles ?? []).join(', '));
       setVater(d.sire ?? '');
@@ -100,19 +93,6 @@ export default function HundBearbeitenScreen() {
       setFutter(d.food ?? '');
     });
   }, [id]);
-
-  const handleGeburtsDatChange = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    let formatted = cleaned;
-    if (cleaned.length >= 2) formatted = cleaned.slice(0, 2) + '.' + cleaned.slice(2);
-    if (cleaned.length >= 4) formatted = cleaned.slice(0, 2) + '.' + cleaned.slice(2, 4) + '.' + cleaned.slice(4, 8);
-    setGeburtsDatCH(formatted);
-    if (cleaned.length === 8) {
-      setGeburtsDatISO(`${cleaned.slice(4, 8)}-${cleaned.slice(2, 4)}-${cleaned.slice(0, 2)}`);
-    } else {
-      setGeburtsDatISO(null);
-    }
-  };
 
   const bildAuswaehlen = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -166,7 +146,7 @@ export default function HundBearbeitenScreen() {
       name:       name.trim(),
       breed:      rasse.trim() || null,
       gender:     geschlecht,
-      birth_date: geburtsDatISO,
+      birth_date: birth ? toISODate(birth) : null,
       weight_kg:  gewicht ? parseFloat(gewicht.replace(',', '.')) : null,
       photo_url:  photoUrl,
       titles:     titlesArr,
@@ -337,13 +317,13 @@ export default function HundBearbeitenScreen() {
               </View>
             </View>
 
-            <Input
+            <DateField
               label="Geburtsdatum"
-              placeholder="TT.MM.JJJJ"
-              value={geburtsDatCH}
-              onChangeText={handleGeburtsDatChange}
-              keyboardType="numeric"
-              maxLength={10}
+              value={birth}
+              onChange={setBirth}
+              onClear={() => setBirth(null)}
+              maximumDate={new Date()}
+              placeholder="Datum wählen"
             />
 
             <Input

@@ -21,6 +21,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { DISCIPLINES, customToDiscipline, disciplineColor, type Discipline } from '@/constants/disciplines';
 import { createDocumentedUnit, updateDocumentedUnit, getTrainingUnitById } from '@/services/trainingUnitService';
+import { DateField } from '@/components/ui/DateField';
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
 import type { AudioNote } from '@/types';
@@ -32,16 +33,8 @@ const EMPTY_METRICS: TrainingMetrics = {
   ausdauer: null, trieblage: null, impulskontrolle: null,
 };
 
-function ymd(d: Date) { return d.toISOString().split('T')[0]; }
 
-function dateLabel(d: Date): string {
-  const today = ymd(new Date());
-  const y = new Date(); y.setDate(y.getDate() - 1);
-  if (ymd(d) === today)   return 'Heute';
-  if (ymd(d) === ymd(y))  return 'Gestern';
-  const [yy, mo, dd] = ymd(d).split('-');
-  return `${dd}.${mo}.${yy}`;
-}
+function ymd(d: Date) { return d.toISOString().split('T')[0]; }
 
 interface SelExercise { discipline: string; name: string }
 
@@ -98,6 +91,13 @@ export default function DocumentScreen() {
     })();
   }, [id]);
 
+  // Genau ein Hund → automatisch wählen, sobald die Hunde geladen sind.
+  // (useDogs lädt async; die useState-Initialisierung greift zu früh, wenn dogs
+  // noch leer ist → dogId bliebe sonst null und Speichern wäre nie möglich.)
+  useEffect(() => {
+    if (!editing && !dogId && dogs.length === 1) setDogId(dogs[0].id);
+  }, [dogs, editing, dogId]);
+
   const disc = disciplines.find(d => d.key === activeDisc) ?? disciplines[0];
   const isSelected = (label: string, name: string) =>
     selected.some(e => e.discipline === label && e.name === name);
@@ -121,13 +121,6 @@ export default function DocumentScreen() {
     setCustomDraft('');
   };
 
-  const shiftDate = (days: number) => {
-    setDate(d => {
-      const n = new Date(d);
-      n.setDate(n.getDate() + days);
-      return n > new Date() ? d : n;   // keine Zukunft
-    });
-  };
 
   const canSave = !!dogId && selected.length > 0;
 
@@ -259,15 +252,7 @@ export default function DocumentScreen() {
 
           {/* Datum + Dauer */}
           <Text style={s.label}>DATUM</Text>
-          <View style={[s.dateRow, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}
-            <TouchableOpacity style={s.dateBtn} onPress={() => { tapHaptic(); shiftDate(-1); }} activeOpacity={0.7}>
-              <Ionicons name="chevron-back" size={20} color={C.white} />
-            </TouchableOpacity>
-            <Text style={s.dateVal}>{dateLabel(date)}</Text>
-            <TouchableOpacity style={s.dateBtn} onPress={() => { tapHaptic(); shiftDate(1); }} activeOpacity={0.7}>
-              <Ionicons name="chevron-forward" size={20} color={C.white} />
-            </TouchableOpacity>
-          </View>
+          <DateField value={date} onChange={setDate} maximumDate={new Date()} />
 
           <Text style={s.label}>DAUER</Text>
           <DurationDrumPicker value={durationMin} onChange={setDurationMin} />
@@ -302,6 +287,11 @@ export default function DocumentScreen() {
           <AudioRecorder value={audio} onChange={setAudio} />
 
           {/* Speichern */}
+          {!canSave && (
+            <Text style={s.saveHint}>
+              {!dogId ? 'Wähle oben einen Hund, um zu speichern.' : 'Wähle mindestens eine Übung, um zu speichern.'}
+            </Text>
+          )}
           <AnimatedPressable style={[s.saveBtn, !canSave && { opacity: 0.4 }]} scale={0.97} disabled={!canSave || saving} onPress={speichern}>
             <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
@@ -344,11 +334,8 @@ const s = StyleSheet.create({
 
   textarea: { backgroundColor: C.input, borderRadius: 16, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 14, padding: 14, minHeight: 110, textAlignVertical: 'top' },
 
-  dateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 8 },
   cardGlass: { backgroundColor: 'transparent', overflow: 'hidden' },
   glassBg:   { ...StyleSheet.absoluteFillObject },
-  dateBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: C.cardAlt, alignItems: 'center', justifyContent: 'center' },
-  dateVal: { fontSize: 16, color: C.white, fontWeight: '800' },
 
   scoreRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   scoreCell:      { width: 44, height: 44, borderRadius: 12, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
@@ -356,6 +343,7 @@ const s = StyleSheet.create({
   scoreTxt:       { fontSize: 15, color: C.muted, fontWeight: '800' },
   scoreTxtActive: { color: C.accentText },
 
+  saveHint:{ fontSize: 12.5, color: C.muted, textAlign: 'center', marginTop: 26, marginBottom: -14, fontWeight: '600' },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 60, borderRadius: 20, overflow: 'hidden', marginTop: 32 },
   saveTxt: { fontSize: 16, color: C.accentText, fontWeight: '900', letterSpacing: 0.3 },
 });

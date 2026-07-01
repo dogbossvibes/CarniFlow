@@ -397,12 +397,6 @@ export default function ProfilScreen() {
           />
           <View style={s.trenner} />
           <EinstellungZeile
-            icon="shield-checkmark-outline"
-            label="Datenschutz"
-            onPress={() => router.push('/privacy')}
-          />
-          <View style={s.trenner} />
-          <EinstellungZeile
             icon="sync-outline"
             label="Sync-Center"
             onPress={() => router.push('/sync')}
@@ -605,12 +599,25 @@ export default function ProfilScreen() {
             onPress={() => router.push('/help')}
           />
           <View style={s.trenner} />
-          <EinstellungZeile icon="chatbubble-outline" label="Feedback senden" />
+          <EinstellungZeile
+            icon="chatbubble-outline"
+            label="Feedback senden"
+            onPress={() =>
+              Linking.openURL(`mailto:shadesofym@gmail.com?subject=${encodeURIComponent('ANYVO Feedback')}`)
+                .catch(() => Alert.alert('Kein E-Mail-Programm', 'Schreib uns gern direkt an shadesofym@gmail.com.'))
+            }
+          />
           <View style={s.trenner} />
           <EinstellungZeile
             icon="document-text-outline"
             label="Nutzungsbedingungen (AGB)"
             onPress={() => router.push('/terms')}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="shield-checkmark-outline"
+            label="Datenschutz"
+            onPress={() => router.push('/privacy')}
           />
         </View>
 

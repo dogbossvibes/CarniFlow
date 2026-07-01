@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -7,15 +7,14 @@ import { useSession } from '@/hooks/useSession';
 import { getMyClientConnections } from '@/services/connectionService';
 import { createUmfrage } from '@/services/umfrageService';
 import type { NeuerTermin } from '@/types/umfrage';
+import { DateField } from '@/components/ui/DateField';
+import { parseDeDate } from '@/features/dogs/dateInput';
+
+// Date → "TT.MM.JJJJ" (das gespeicherte Termin-Datumsformat bleibt erhalten).
+const chDate = (d: Date) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 
 const TRAINING_ARTEN = ['IGP', 'Unterordnung', 'Schutzdienst', 'Fährte', 'Obedience', 'Agility', 'Begleithund'];
 
-function fmtDate(t: string): string {
-  const c = t.replace(/\D/g, '');
-  if (c.length >= 4) return `${c.slice(0, 2)}.${c.slice(2, 4)}.${c.slice(4, 8)}`;
-  if (c.length >= 2) return `${c.slice(0, 2)}.${c.slice(2)}`;
-  return c;
-}
 function fmtTime(t: string): string {
   const c = t.replace(/\D/g, '');
   return c.length >= 2 ? `${c.slice(0, 2)}:${c.slice(2, 4)}` : c;
@@ -69,7 +68,14 @@ export default function UmfrageErstellenScreen() {
       <View style={S.topBar}>
         <TouchableOpacity onPress={() => router.back()} style={S.back} hitSlop={8}><Ionicons name="chevron-back" size={22} color="#E8E8F2" /></TouchableOpacity>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? undefined : 'height'}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={{ paddingBottom: 48 }}
+      >
         <View style={S.header}>
           <Text style={S.title}>Terminumfrage</Text>
           <Text style={S.sub}>Erstelle eine neue Umfrage</Text>
@@ -101,7 +107,7 @@ export default function UmfrageErstellenScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            <TextInput style={S.tInput} value={t.datum} onChangeText={v => updateTermin(i, 'datum', fmtDate(v))} placeholder="Datum (TT.MM.JJJJ)" placeholderTextColor="#525270" keyboardType="numeric" maxLength={10} />
+            <DateField value={parseDeDate(t.datum)} onChange={d => updateTermin(i, 'datum', chDate(d))} minimumDate={new Date()} placeholder="Datum wählen" style={{ marginBottom: 10 }} />
             <View style={S.timeRow}>
               <TextInput style={[S.tInput, { flex: 1 }]} value={t.von} onChangeText={v => updateTermin(i, 'von', fmtTime(v))} placeholder="Von 09:00" placeholderTextColor="#525270" keyboardType="numeric" maxLength={5} />
               <Text style={S.timeSep}>–</Text>
@@ -131,6 +137,7 @@ export default function UmfrageErstellenScreen() {
           <Text style={S.sendBtnTxt}>{loading ? 'Wird gesendet…' : 'Umfrage senden ✓'}</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

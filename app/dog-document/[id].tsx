@@ -9,7 +9,8 @@ import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { useToast } from '@/components/ui/Toast';
 import { addDogDocument } from '@/services/dogHub';
 import { uploadDogDocument } from '@/services/storage';
-import { parseDeDate, toISODate } from '@/features/dogs/dateInput';
+import { toISODate } from '@/features/dogs/dateInput';
+import { DateField } from '@/components/ui/DateField';
 
 const KINDS: { key: string; label: string }[] = [
   { key: 'impfpass',  label: 'Impfpass' },
@@ -30,7 +31,7 @@ export default function DogDocumentEditor() {
   const [kind, setKind]   = useState('impfpass');
   const [title, setTitle] = useState('');
   const [file, setFile]   = useState<PickedFile | null>(null);
-  const [issued, setIssued] = useState('');
+  const [issued, setIssued] = useState<Date | null>(null);
   const [note, setNote]   = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -45,8 +46,7 @@ export default function DogDocumentEditor() {
   const save = async () => {
     if (!dogId || saving) return;
     if (!file) { showToast('Bitte zuerst eine Datei auswählen.'); return; }
-    const issuedOn = issued.trim() ? parseDeDate(issued) : null;
-    if (issued.trim() && !issuedOn) { showToast('Datum als TT.MM.JJJJ.'); return; }
+    const issuedOn = issued;
 
     setSaving(true);
     try {
@@ -96,7 +96,7 @@ export default function DogDocumentEditor() {
           <TextInput value={title} onChangeText={setTitle} placeholder="optional" placeholderTextColor={C.trackTextMut} style={s.input} />
 
           <Text style={s.label}>Ausgestellt am (optional)</Text>
-          <TextInput value={issued} onChangeText={setIssued} placeholder="TT.MM.JJJJ" placeholderTextColor={C.trackTextMut} style={s.input} />
+          <DateField value={issued} onChange={setIssued} onClear={() => setIssued(null)} placeholder="Kein Datum" maximumDate={new Date()} />
 
           <Text style={s.label}>Notiz</Text>
           <TextInput value={note} onChangeText={setNote} placeholder="optional" placeholderTextColor={C.trackTextMut} multiline style={[s.input, s.multiline]} />

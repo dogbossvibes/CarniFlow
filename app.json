@@ -13,7 +13,7 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "23",
+      "buildNumber": "24",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {
@@ -38,7 +38,7 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 23,
+      "versionCode": 24,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCriuMb0ZKmtn52yNH7AjmfGWsaUEuNDdg"
@@ -118,7 +118,8 @@
         }
       ],
       "expo-sqlite",
-      "expo-live-activity"
+      "expo-live-activity",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

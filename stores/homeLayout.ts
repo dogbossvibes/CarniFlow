@@ -10,7 +10,6 @@ export interface HomeLayout {
   hauptaktionen:   boolean;  // Training starten / Dokumentieren
   letzteEinheiten: boolean;  // Letzte Einheiten
   hunde:           boolean;  // Meine Hunde
-  schnellzugriff:  boolean;  // Schnellzugriff
 }
 
 export const HOME_SECTIONS: { key: keyof HomeLayout; label: string; beschreibung: string }[] = [
@@ -18,7 +17,6 @@ export const HOME_SECTIONS: { key: keyof HomeLayout; label: string; beschreibung
   { key: 'hauptaktionen',   label: 'Hauptaktionen',     beschreibung: 'Training starten & Dokumentieren' },
   { key: 'letzteEinheiten', label: 'Letzte Einheiten',  beschreibung: 'Deine zuletzt erfassten Einheiten' },
   { key: 'hunde',           label: 'Meine Hunde',       beschreibung: 'Übersicht deiner Hunde' },
-  { key: 'schnellzugriff',  label: 'Schnellzugriff',    beschreibung: 'Direktlinks zu häufigen Aktionen' },
 ];
 
 const DEFAULT: HomeLayout = {
@@ -26,7 +24,6 @@ const DEFAULT: HomeLayout = {
   hauptaktionen:   true,
   letzteEinheiten: true,
   hunde:           true,
-  schnellzugriff:  true,
 };
 
 const STORAGE_KEY = 'home_layout';

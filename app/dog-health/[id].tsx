@@ -7,7 +7,7 @@ import { C } from '@/constants/colors';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { useToast } from '@/components/ui/Toast';
 import { addDogHealthEntry, addDogVetAppointment } from '@/services/dogHub';
-import { parseDeDate, toISODate } from '@/features/dogs/dateInput';
+import { DateField } from '@/components/ui/DateField';
 
 type Load = 'leicht' | 'mittel' | 'hoch';
 const LOADS: Load[] = ['leicht', 'mittel', 'hoch'];
@@ -24,7 +24,7 @@ export default function DogHealthEditor() {
   const [rest, setRest]     = useState(false);
   const [intense, setInt]   = useState(false);
   const [note, setNote]     = useState('');
-  const [vetDate, setVetDate] = useState('');
+  const [vetDate, setVetDate] = useState<Date | null>(null);
   const [vetReason, setVetReason] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -32,8 +32,7 @@ export default function DogHealthEditor() {
     if (!dogId || saving) return;
     const weightNum = weight.trim() ? Number(weight.replace(',', '.')) : null;
     if (weightNum != null && Number.isNaN(weightNum)) { showToast('Gewicht ist keine Zahl.'); return; }
-    const vet = vetDate.trim() ? parseDeDate(vetDate) : null;
-    if (vetDate.trim() && !vet) { showToast('Tierarzttermin: Datum als TT.MM.JJJJ.'); return; }
+    const vet = vetDate;
 
     setSaving(true);
     const { error } = await addDogHealthEntry(dogId, {
@@ -77,7 +76,7 @@ export default function DogHealthEditor() {
           <TextInput value={note} onChangeText={setNote} placeholder="optional" placeholderTextColor={C.trackTextMut} multiline style={[s.input, s.multiline]} />
 
           <Text style={s.label}>Nächster Tierarzttermin (optional)</Text>
-          <TextInput value={vetDate} onChangeText={setVetDate} placeholder="TT.MM.JJJJ" placeholderTextColor={C.trackTextMut} style={s.input} />
+          <DateField value={vetDate} onChange={setVetDate} onClear={() => setVetDate(null)} placeholder="Kein Termin" minimumDate={new Date()} style={{ marginBottom: 8 }} />
           <TextInput value={vetReason} onChangeText={setVetReason} placeholder="Grund (optional)" placeholderTextColor={C.trackTextMut} style={s.input} />
 
           <View style={{ height: 16 }} />

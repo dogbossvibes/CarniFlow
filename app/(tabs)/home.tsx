@@ -2,7 +2,6 @@ import { DogCard } from "@/components/dogs/DogCard";
 import { QuickAddSheet } from "@/components/QuickAddSheet";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
-import { ApportIcon } from "@/components/ui/ApportIcon";
 import { UnitListCard } from "@/components/training/UnitListCard";
 import { SwipeableTrainingItem } from "@/components/training/SwipeableTrainingItem";
 import { C } from "@/constants/colors";
@@ -72,29 +71,6 @@ function hatEinheitAnTag(
   d.setDate(heute.getDate() - (heuteIdx - offset));
   const key = d.toISOString().split("T")[0];
   return sessions.some((s) => s.session_date === key);
-}
-
-function SchnellAktion({
-  icon,
-  label,
-  farbe,
-  onPress,
-  customIcon,
-}: {
-  icon?: IconName;
-  label: string;
-  farbe: string;
-  onPress?: () => void;
-  customIcon?: React.ReactNode;
-}) {
-  return (
-    <AnimatedPressable style={s.aktion} onPress={onPress}>
-      <View style={[s.aktionIcon, { backgroundColor: `${farbe}12` }]}>
-        {customIcon ?? <Ionicons name={icon!} size={22} color={farbe} />}
-      </View>
-      <Text style={s.aktionLabel}>{label}</Text>
-    </AnimatedPressable>
-  );
 }
 
 export default function HomeScreen() {
@@ -331,40 +307,7 @@ export default function HomeScreen() {
         </View>
         )}
 
-        {/* ── SCHNELLZUGRIFF ── */}
-        {layout.schnellzugriff && (
-        <View style={[s.sektion, { marginBottom: 120 }]}>
-          <Text style={s.sektionTitel}>Schnellzugriff</Text>
-          <View style={s.aktionen}>
-            <SchnellAktion
-              icon="add-circle-outline"
-              label="Hund"
-              farbe="#ff5f00"
-              onPress={() => router.push("/add-dog")}
-            />
-            <SchnellAktion
-              label="Training"
-              farbe="#b34300"
-              onPress={() => router.push("/unit/timer")}
-              customIcon={<ApportIcon color="#b34300" size={22} />}
-            />
-            <SchnellAktion
-              icon="map-outline"
-              label="Fährte"
-              farbe="#ffaf80"
-              onPress={() => router.push("/track/legen" as never)}
-            />
-            <SchnellAktion
-              icon="stats-chart-outline"
-              label="Fortschritt"
-              farbe="#ffd7bf"
-              onPress={() => router.push("/(tabs)/analytics")}
-            />
-          </View>
-        </View>
-        )}
-
-        {!layout.schnellzugriff && <View style={{ height: 120 }} />}
+        <View style={{ height: 120 }} />
       </ScrollView>
       <QuickAddSheet />
       {toast}

@@ -16,6 +16,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
+import { DateField } from '@/components/ui/DateField';
+import { toISODate } from '@/features/dogs/dateInput';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
 import {
@@ -64,13 +66,6 @@ function snapToStep(min: number): number {
   return STEPS.reduce((prev, curr) =>
     Math.abs(curr - min) < Math.abs(prev - min) ? curr : prev
   );
-}
-
-function isoZuCH(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-');
-  if (!y || !m || !d) return '';
-  return `${d}.${m}.${y}`;
 }
 
 // ─── Unter-Komponenten ────────────────────────────────────────────────────────
@@ -126,8 +121,7 @@ export default function TrainingDetailScreen() {
   const [dauer,         setDauer]         = useState<number>(20);
   const [trainingsTyp,  setTrainingsTyp]  = useState<TrainingType>('privat');
   const [trainerName,   setTrainerName]   = useState('');
-  const [datumISO,      setDatumISO]      = useState('');
-  const [datumCH,       setDatumCH]       = useState('');
+  const [datum, setDatum] = useState<Date | null>(null);
   const [performance,     setPerformance]     = useState(0);
   const [kategorie,     setKategorie]     = useState<TrainingCategory | null>(null);
   const [videoUrl,      setVideoUrl]      = useState<string | null>(null);
@@ -152,8 +146,7 @@ export default function TrainingDetailScreen() {
     setDauer(snapToStep(d.duration_minutes ?? 20));
     setTrainingsTyp(d.training_type);
     setTrainerName(d.trainer_name ?? '');
-    setDatumISO(d.session_date);
-    setDatumCH(isoZuCH(d.session_date));
+    setDatum(d.session_date ? new Date(d.session_date) : null);
     setPerformance(d.rating ?? 0);
     setKategorie(d.category);
     setVideoUrl(d.video_url ?? null);
@@ -167,16 +160,6 @@ export default function TrainingDetailScreen() {
 
   useEffect(() => { einheitLaden(); }, [einheitLaden]);
 
-  const handleDatumChange = (text: string) => {
-    const cleaned = text.replace(/\D/g, '');
-    let formatted = cleaned;
-    if (cleaned.length >= 2) formatted = cleaned.slice(0, 2) + '.' + cleaned.slice(2);
-    if (cleaned.length >= 4) formatted = cleaned.slice(0, 2) + '.' + cleaned.slice(2, 4) + '.' + cleaned.slice(4, 8);
-    setDatumCH(formatted);
-    if (cleaned.length === 8) {
-      setDatumISO(`${cleaned.slice(4, 8)}-${cleaned.slice(2, 4)}-${cleaned.slice(0, 2)}`);
-    }
-  };
 
   const abbrechen = () => {
     if (einheit) felderSetzen(einheit);
@@ -192,7 +175,7 @@ export default function TrainingDetailScreen() {
       duration_minutes: dauer,
       training_type:    trainingsTyp,
       trainer_name:     trainingsTyp === 'trainer' ? trainerName.trim() || null : null,
-      session_date:     datumISO,
+      session_date:     datum ? toISODate(datum) : undefined,
       rating:           performance || null,
       category:         kategorie,
       video_url:        videoUrl,
@@ -531,20 +514,7 @@ export default function TrainingDetailScreen() {
 
           {/* DATUM */}
           <AbschnittLabel text="DATUM" />
-          <View style={s.eingabeBox}>
-            <Ionicons name="calendar-outline" size={16} color={C.muted} style={{ marginRight: 10 }} />
-            <TextInput
-              style={s.eingabe}
-              value={datumCH}
-              onChangeText={handleDatumChange}
-              placeholder="TT.MM.JJJJ"
-              placeholderTextColor={C.subtle}
-              selectionColor={C.accent}
-              keyboardType="numeric"
-              maxLength={10}
-              returnKeyType="done"
-            />
-          </View>
+          <DateField value={datum} onChange={setDatum} maximumDate={new Date()} />
 
           {/* DAUER */}
           <AbschnittLabel text="DAUER" />
