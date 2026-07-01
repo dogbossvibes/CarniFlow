@@ -20,6 +20,7 @@ import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { DISCIPLINES, customToDiscipline, disciplineColor, type Discipline } from '@/constants/disciplines';
+import { DEFAULT_SPARTEN } from '@/constants/sparten';
 import { createDocumentedUnit, updateDocumentedUnit, getTrainingUnitById } from '@/services/trainingUnitService';
 import { DateField } from '@/components/ui/DateField';
 import { queryClient } from '@/lib/queryClient';
@@ -49,11 +50,12 @@ export default function DocumentScreen() {
   const { profile } = useProfile();
   const { categories } = useCustomCategories();
 
-  // Feste Sparten nach den im Profil aktivierten filtern (Fallback: alle) —
-  // konsistent mit dem Sparten-Hub (app/unit/start.tsx).
-  const aktiveSparten = profile?.aktive_sparten ?? null;
+  // Feste Sparten nach den im Profil aktivierten filtern. Fallback = Standard-
+  // Sparten (nicht „alle"), konsistent mit dem Sparten-Hub (app/unit/start.tsx),
+  // damit Opt-in-Sparten wie Obedience nicht vorab erscheinen.
+  const aktiveSparten = profile?.aktive_sparten ?? DEFAULT_SPARTEN;
   const disciplines: Discipline[] = [
-    ...DISCIPLINES.filter(d => !d.custom && (!aktiveSparten || aktiveSparten.includes(d.label))),
+    ...DISCIPLINES.filter(d => !d.custom && aktiveSparten.includes(d.label)),
     ...categories.map(customToDiscipline),
   ];
 

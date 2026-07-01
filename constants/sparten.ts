@@ -17,7 +17,8 @@ export const ALLE_SPARTEN: Sparte[] = [
   { id: 'Rettungshund', label: 'Rettungshund', icon: '🚨' },
 ];
 
-// Standard, wenn der Nutzer noch nichts gewählt hat.
+// Standard, wenn der Nutzer noch nichts gewählt hat. Obedience ist bewusst NICHT
+// dabei — es ist opt-in und muss im Profil unter „Meine Sparten" aktiviert werden.
 export const DEFAULT_SPARTEN = [
-  'IGP', 'Unterordnung', 'Schutzdienst', 'Fährte', 'Obedience', 'Agility', 'Begleithund',
+  'IGP', 'Unterordnung', 'Schutzdienst', 'Fährte', 'Agility', 'Begleithund',
 ];

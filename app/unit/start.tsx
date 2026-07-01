@@ -9,6 +9,7 @@ import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { DISCIPLINES, customToDiscipline, type Discipline } from '@/constants/disciplines';
+import { DEFAULT_SPARTEN } from '@/constants/sparten';
 import { HeroImage } from '@/components/training/HeroImage';
 import { DisciplineCard } from '@/components/training/DisciplineCard';
 import { useActiveTraining, startUnit, addExercise } from '@/stores/activeTraining';
@@ -34,9 +35,11 @@ export default function UnitStartScreen() {
     addMode ? active.dogId : dogs.length === 1 ? dogs[0].id : null,
   );
 
-  // Feste Sparten nach den im Profil aktivierten filtern (Fallback: alle).
-  const aktiveSparten = profile?.aktive_sparten ?? null;
-  const fixed   = DISCIPLINES.filter(d => !d.custom && (!aktiveSparten || aktiveSparten.includes(d.label)));
+  // Feste Sparten nach den im Profil aktivierten filtern. Fallback = Standard-
+  // Sparten (nicht „alle"), damit Opt-in-Sparten wie Obedience für neue Nutzer
+  // ohne gesetzte aktive_sparten NICHT vorab erscheinen.
+  const aktiveSparten = profile?.aktive_sparten ?? DEFAULT_SPARTEN;
+  const fixed   = DISCIPLINES.filter(d => !d.custom && aktiveSparten.includes(d.label));
   const creator = DISCIPLINES.find(d => d.custom)!;
   const cards   = [...fixed, ...categories.map(customToDiscipline)];
 
