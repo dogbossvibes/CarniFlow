@@ -1,12 +1,16 @@
 import { supabase } from '@/lib/supabase';
 import type { UserCapabilities } from '@/types/capabilities';
 import { getActiveEntitlement, entitlementGrantsPro, entitlementGrantsTrainer } from '@/services/entitlementService';
+import { isTrialLapsed } from '@/features/subscription/plans';
 
 export async function getMyCapabilities(userId: string): Promise<UserCapabilities | null> {
-  // Abo-Capabilities UND Lifetime/manuelle Entitlements parallel laden.
-  const [{ data }, entitlement] = await Promise.all([
+  // Abo-Capabilities, Lifetime/manuelle Entitlements UND das Abo (für den
+  // Trial-Ablauf) parallel laden. Subscriptions-Query hier inline, um keinen
+  // Import-Zyklus mit subscriptionService (nutzt setCapabilities) zu erzeugen.
+  const [{ data }, entitlement, { data: sub }] = await Promise.all([
     supabase.from('user_capabilities').select('*').eq('user_id', userId).maybeSingle(),
     getActiveEntitlement(userId),
+    supabase.from('subscriptions').select('status, trial_ends_at').eq('user_id', userId).maybeSingle(),
   ]);
 
   let pro = false;
@@ -32,6 +36,11 @@ export async function getMyCapabilities(userId: string): Promise<UserCapabilitie
       have = true;
     }
   }
+
+  // Abgelaufener Trial (Enddatum vergangen) entzieht den Abo-Zugriff — für ALLE
+  // Trials, egal ob gekündigt. Ein Lifetime/manuelles Entitlement kann unten
+  // trotzdem wieder freischalten.
+  if (isTrialLapsed(sub)) { pro = false; trainer = false; }
 
   // Lifetime/manuelles Entitlement schaltet ZUSÄTZLICH frei (Trainer ⇒ Pro).
   if (entitlement) {

@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { getPackages, buyPackage, restorePurchases, purchasesReady, type PurchasePackage } from '@/lib/purchases';
 import {
-  activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription,
+  activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
 import { PLAN_META, type SubscriptionPlan } from '@/features/subscription/plans';
 import { useAccess } from '@/hooks/useAccess';
@@ -34,6 +34,9 @@ export default function PremiumScreen() {
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
   const [slots, setSlots] = useState<{ used: number; remaining: number }>({ used: 0, remaining: 77 });
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
+  const [subStatus, setSubStatus] = useState<string | null>(null);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const { access } = useAccess();
 
   useEffect(() => {
@@ -41,12 +44,35 @@ export default function PremiumScreen() {
       setPackages(await getPackages());
       setSlots(await getFounderSlots());
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) { const sub = await getPlanSubscription(user.id); setCurrentPlan(sub?.plan ?? null); }
+      if (user) {
+        const sub = await getPlanSubscription(user.id);
+        setCurrentPlan(sub?.plan ?? null);
+        setSubStatus(sub?.status ?? null);
+        setTrialEndsAt(sub?.trial_ends_at ?? null);
+        setCancelAtPeriodEnd(sub?.cancel_at_period_end === true);
+      }
     })();
   }, []);
 
   const iapReady = purchasesReady() && packages.length > 0;
   const founderAvailable = slots.remaining > 0 || currentPlan === 'founder_active';
+
+  // Trial-Status: Restlaufzeit + Enddatum für das Countdown-Banner. „trialing"
+  // meint den NOCH LAUFENDEN Trial (abgelaufene zählen nicht → normale Upgrade-Ansicht).
+  const trialEnd = trialEndsAt ? new Date(trialEndsAt) : null;
+  const trialing = subStatus === 'trialing' && (!trialEnd || trialEnd.getTime() > Date.now());
+  const trialDaysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : null;
+  const trialEndLabel = trialEnd
+    ? `${String(trialEnd.getDate()).padStart(2, '0')}.${String(trialEnd.getMonth() + 1).padStart(2, '0')}.${trialEnd.getFullYear()}`
+    : null;
+
+  // Empfohlener Plan zum Upgraden: Founder Active (bester Preis) solange Slots frei,
+  // sonst Active. Beginner-Trial-Karte nur zeigen, wenn noch nie abonniert wurde.
+  const recommendedPlan: SubscriptionPlan = founderAvailable ? 'founder_active' : 'active';
+  const visibleCards = CARDS.filter(c => c.plan !== 'beginner_trial' || !currentPlan);
+  // Preis-Anker für die Founder-Ersparnis: echter Active-Preis aus dem Store
+  // (gleiche Währung wie die angezeigten Preise), sonst Fallback auf die CHF-Angabe.
+  const activePriceStr = packages.find(p => p.productId === PLAN_META.active.productId)?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
 
   const finish = (plan: SubscriptionPlan) => {
     queryClient.invalidateQueries({ queryKey: ['capabilities'] });
@@ -94,6 +120,27 @@ export default function PremiumScreen() {
     }
   };
 
+  const handleCancelTrial = () => {
+    Alert.alert(
+      'Testabo kündigen?',
+      trialEndLabel
+        ? `Dein Zugriff bleibt bis zum ${trialEndLabel} bestehen und läuft danach automatisch aus. Es wird nichts abgebucht.`
+        : 'Dein Zugriff bleibt bis zum Ende der Testphase bestehen und läuft danach automatisch aus. Es wird nichts abgebucht.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Kündigen', style: 'destructive', onPress: async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const { error } = await cancelTrial(user.id);
+          if (error) { Alert.alert('Hinweis', 'Kündigung fehlgeschlagen. Bitte später erneut versuchen.'); return; }
+          setCancelAtPeriodEnd(true);
+          queryClient.invalidateQueries({ queryKey: ['capabilities'] });
+          queryClient.invalidateQueries({ queryKey: ['userAccess'] });
+        } },
+      ],
+    );
+  };
+
   const handleRestore = async () => {
     setLaden('active');
     const res = await restorePurchases();
@@ -119,11 +166,38 @@ export default function PremiumScreen() {
         <View style={S.header}>
           <View style={S.headerRing}>
             <LinearGradient colors={[`${C.accent}25`, `${C.accent}08`]} style={StyleSheet.absoluteFill} />
-            <Ionicons name="star" size={34} color={C.accent} />
+            <Ionicons name={trialing ? 'hourglass' : 'star'} size={34} color={C.accent} />
           </View>
-          <Text style={S.headerTitel}>ANYVO wählen</Text>
-          <Text style={S.headerSub}>Nur Monatsabos · jederzeit kündbar.</Text>
+          <Text style={S.headerTitel}>{trialing ? 'Vollen Zugriff sichern' : (currentPlan ? 'Dein Plan' : 'ANYVO wählen')}</Text>
+          <Text style={S.headerSub}>{trialing ? 'Wähle deinen Plan, bevor die Testphase endet.' : 'Nur Monatsabos · jederzeit kündbar.'}</Text>
         </View>
+
+        {/* Trial-Countdown: motiviert zum Wechsel Testversion → Active, bevor der
+            Zugriff endet. Nur während der laufenden Testphase (nicht bei Lifetime). */}
+        {trialing && !access.isLifetime && (
+          <View style={S.trialBanner}>
+            <View style={S.trialIcon}><Ionicons name="hourglass-outline" size={20} color={C.warning} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={S.trialTitle}>
+                {trialDaysLeft != null
+                  ? (trialDaysLeft === 0 ? 'Testphase endet heute' : `Noch ${trialDaysLeft} ${trialDaysLeft === 1 ? 'Tag' : 'Tage'} gratis`)
+                  : 'Testversion aktiv'}
+              </Text>
+              <Text style={S.trialSub}>
+                {cancelAtPeriodEnd
+                  ? (trialEndLabel
+                      ? `Gekündigt — dein Zugriff läuft am ${trialEndLabel} aus. Es wird nichts abgebucht.`
+                      : 'Gekündigt — dein Zugriff läuft am Ende der Testphase aus.')
+                  : (trialEndLabel
+                      ? `Deine Beginner-Testphase endet am ${trialEndLabel}. Sichere dir jetzt den vollen Zugriff — ohne Unterbruch.`
+                      : 'Sichere dir jetzt den vollen Zugriff — ohne Unterbruch.')}
+              </Text>
+              {!cancelAtPeriodEnd && (
+                <Text style={S.trialCancelLink} onPress={handleCancelTrial}>Testabo kündigen</Text>
+              )}
+            </View>
+          </View>
+        )}
 
         {access.isLifetime ? (
           <View style={[S.card, S.cardCurrent]}>
@@ -143,21 +217,33 @@ export default function PremiumScreen() {
             </View>
           </View>
         ) : (<>
-        {CARDS.map(card => {
+        {visibleCards.map(card => {
           const meta = PLAN_META[card.plan];
           const isCurrent = currentPlan === card.plan;
           const soldOut = card.founder && !founderAvailable;
           const busy = laden === card.plan;
           const pkgPrice = packages.find(p => p.productId === meta.productId)?.priceString;
+          const isRec = card.plan === recommendedPlan && !isCurrent && !soldOut;
+          const filled = card.founder || card.plan === 'trainer' || isRec;   // Gradient-CTA
           return (
-            <View key={card.plan} style={[S.card, card.founder && S.cardFounder, isCurrent && S.cardCurrent]}>
+            <View key={card.plan} style={[S.card, card.founder && S.cardFounder, isRec && !card.founder && S.cardRec, isCurrent && S.cardCurrent]}>
+              {isRec && (
+                <View style={S.recStrip}>
+                  <Ionicons name="star" size={11} color={C.accentText} />
+                  <Text style={S.recStripTxt}>{card.founder ? 'BESTER PREIS' : 'EMPFOHLEN'}</Text>
+                </View>
+              )}
               <View style={S.cardHead}>
                 <View style={{ flex: 1 }}>
                   <View style={S.nameRow}>
                     <Text style={S.cardName}>{meta.name}</Text>
                     {card.badge && <View style={[S.badge, card.founder && S.badgeFounder]}><Text style={[S.badgeTxt, card.founder && { color: '#04201b' }]}>{card.badge}</Text></View>}
                   </View>
-                  <Text style={S.cardPrice}>{card.plan === 'beginner_trial' ? '7 Tage gratis' : (pkgPrice ?? meta.priceLabel)}</Text>
+                  <View style={S.priceRow}>
+                    <Text style={S.cardPrice}>{card.plan === 'beginner_trial' ? '7 Tage gratis' : (pkgPrice ?? meta.priceLabel)}</Text>
+                    {/* Ersparnis ggü. Active hervorheben (Conversion-Anker für Trial-Nutzer). */}
+                    {card.founder && founderAvailable && <Text style={S.savings}>statt {activePriceStr}</Text>}
+                  </View>
                   {card.founder && <Text style={S.founderSlots}>{founderAvailable ? `Noch ${slots.remaining} von 77` : 'Ausverkauft'}</Text>}
                 </View>
               </View>
@@ -176,11 +262,11 @@ export default function PremiumScreen() {
               ) : soldOut ? (
                 <View style={S.soldOut}><Text style={S.soldOutTxt}>Ausverkauft</Text></View>
               ) : (
-                <AnimatedPressable style={[S.cta, !card.founder && card.plan !== 'trainer' && S.ctaAlt]} scale={0.97} onPress={() => choose(card.plan)} disabled={busy}>
-                  {(card.founder || card.plan === 'trainer') && <LinearGradient colors={['#00FFCC', '#00f0c8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
-                  {busy ? <ActivityIndicator color={card.founder || card.plan === 'trainer' ? C.accentText : C.white} /> : (
-                    <Text style={[S.ctaTxt, (card.founder || card.plan === 'trainer') ? { color: C.accentText } : { color: C.white }]}>
-                      {card.plan === 'beginner_trial' ? 'Gratis starten' : `${meta.name} wählen`}
+                <AnimatedPressable style={[S.cta, !filled && S.ctaAlt]} scale={0.97} onPress={() => choose(card.plan)} disabled={busy}>
+                  {filled && <LinearGradient colors={['#00FFCC', '#00f0c8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
+                  {busy ? <ActivityIndicator color={filled ? C.accentText : C.white} /> : (
+                    <Text style={[S.ctaTxt, filled ? { color: C.accentText } : { color: C.white }]}>
+                      {card.plan === 'beginner_trial' ? 'Gratis starten' : (trialing ? `Jetzt auf ${meta.name} wechseln` : `${meta.name} wählen`)}
                     </Text>
                   )}
                 </AnimatedPressable>
@@ -214,16 +300,27 @@ const S = StyleSheet.create({
   headerTitel:{ fontSize: 23, color: C.white, fontWeight: '900', letterSpacing: -0.5 },
   headerSub:  { fontSize: 13, color: C.muted, textAlign: 'center' },
 
+  trialBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.warningDim, borderWidth: 1, borderColor: 'rgba(255,184,0,0.35)', borderRadius: 16, padding: 14, marginBottom: 16 },
+  trialIcon:   { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,184,0,0.14)', alignItems: 'center', justifyContent: 'center' },
+  trialTitle:  { fontSize: 15, color: C.white, fontWeight: '900', letterSpacing: -0.2 },
+  trialSub:    { fontSize: 12, color: 'rgba(255,255,255,0.72)', marginTop: 2, lineHeight: 16 },
+  trialCancelLink: { fontSize: 12, color: C.warning, fontWeight: '800', marginTop: 8, textDecorationLine: 'underline' },
+
   card:        { backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 12 },
   cardFounder: { borderColor: C.accent, backgroundColor: 'rgba(0,245,212,0.06)' },
+  cardRec:     { borderColor: C.accent, backgroundColor: 'rgba(0,255,204,0.05)' },
   cardCurrent: { borderColor: C.accentMid },
+  recStrip:    { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: C.accent, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 10 },
+  recStripTxt: { fontSize: 10, color: C.accentText, fontWeight: '900', letterSpacing: 0.6 },
+  priceRow:    { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 4 },
+  savings:     { fontSize: 12, color: C.muted, fontWeight: '600', textDecorationLine: 'line-through' },
   cardHead:    { flexDirection: 'row', alignItems: 'flex-start' },
   nameRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardName:    { fontSize: 18, color: C.white, fontWeight: '900', letterSpacing: -0.3 },
   badge:       { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border },
   badgeFounder:{ backgroundColor: C.accent, borderColor: C.accent },
   badgeTxt:    { fontSize: 10, color: C.muted, fontWeight: '800', letterSpacing: 0.5 },
-  cardPrice:   { fontSize: 15, color: C.white, fontWeight: '700', marginTop: 4 },
+  cardPrice:   { fontSize: 15, color: C.white, fontWeight: '700' },
   founderSlots:{ fontSize: 12, color: C.accent, fontWeight: '700', marginTop: 3 },
 
   featureList: { marginTop: 12, gap: 7 },

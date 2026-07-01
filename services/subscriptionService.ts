@@ -46,15 +46,36 @@ export interface PlanSubscription {
   status:                 SubscriptionStatus | null;
   trial_ends_at:          string | null;
   current_period_ends_at: string | null;
+  cancel_at_period_end:   boolean | null;
 }
 
 // Aktuelles Abo (plan/status) lesen — Quelle für hasCapability.
+// Tolerant gegenüber noch nicht migrierter Spalte cancel_at_period_end: schlägt
+// der Select fehl (Spalte fehlt), ohne diese Spalte erneut lesen (Default false).
 export async function getPlanSubscription(userId: string): Promise<PlanSubscription | null> {
+  const full = await supabase
+    .from('subscriptions')
+    .select('plan, status, trial_ends_at, current_period_ends_at, cancel_at_period_end')
+    .eq('user_id', userId).maybeSingle();
+  if (!full.error) return (full.data as PlanSubscription) ?? null;
+
   const { data } = await supabase
     .from('subscriptions')
     .select('plan, status, trial_ends_at, current_period_ends_at')
     .eq('user_id', userId).maybeSingle();
-  return (data as PlanSubscription) ?? null;
+  return data ? ({ ...(data as PlanSubscription), cancel_at_period_end: false }) : null;
+}
+
+// Testabo kündigen: markiert das Abo als „zum Periodenende gekündigt". Der Status
+// bleibt 'trialing', d. h. der Zugriff läuft NORMAL bis trial_ends_at weiter und
+// endet dann automatisch (siehe isTrialLapsed im Gating). Da der Beginner-Trial
+// app-verwaltet ist (kein Apple-Kauf, keine Auto-Abbuchung), reicht dieser Marker.
+export async function cancelTrial(userId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('subscriptions')
+    .update({ cancel_at_period_end: true, updated_at: new Date().toISOString() })
+    .eq('user_id', userId);
+  return { error: error?.message ?? null };
 }
 
 // Plan aktivieren: subscriptions schreiben + user_capabilities daraus ableiten

@@ -64,6 +64,16 @@ export function isTrainerPlan(plan: SubscriptionPlan | null | undefined): boolea
   return plan === 'trainer';
 }
 
+// Ein Trial ist „abgelaufen", sobald sein Enddatum vergangen ist — unabhängig
+// davon, ob der Status in der DB noch 'trialing' steht (es gibt keinen Server-Job,
+// der ihn umschaltet). Zentrale Quelle für Gating & Anzeige: gilt für ALLE Trials.
+export function isTrialLapsed(
+  sub: { status?: SubscriptionStatus | null; trial_ends_at?: string | null } | null | undefined,
+): boolean {
+  return !!sub && sub.status === 'trialing' && !!sub.trial_ends_at
+    && new Date(sub.trial_ends_at).getTime() < Date.now();
+}
+
 // Product-ID → Plan (für Restore / Provider-Bestätigung).
 export function planOfProduct(productId: string | null | undefined): SubscriptionPlan {
   if (productId === PRODUCT_IDS.founderActiveMonthly) return 'founder_active';

@@ -2,7 +2,7 @@ import { getPlanSubscription } from '@/services/subscriptionService';
 import {
   getActiveEntitlement, entitlementGrantsPro, entitlementGrantsTrainer,
 } from '@/services/entitlementService';
-import { isTrainerPlan } from '@/features/subscription/plans';
+import { isTrainerPlan, isTrialLapsed } from '@/features/subscription/plans';
 
 // Vereinheitlichte Zugriffsauskunft: Apple/Google-Abo ODER manuelles/Lifetime-
 // Entitlement. Quelle für UI (Lifetime-Badge, Kauf-Buttons ausblenden).
@@ -23,8 +23,8 @@ export async function getUserAccess(userId: string): Promise<UserAccess> {
     getActiveEntitlement(userId),
   ]);
 
-  // 1) Aktives Store-Abo (Apple/Google).
-  const subActive  = !!sub?.plan && !!sub.status && STATUS_ACTIVE.includes(sub.status);
+  // 1) Aktives Store-Abo (Apple/Google). Abgelaufener Trial zählt NICHT als aktiv.
+  const subActive  = !!sub?.plan && !!sub.status && STATUS_ACTIVE.includes(sub.status) && !isTrialLapsed(sub);
   const subPro     = subActive;                          // alle Pläne sind „pro"
   const subTrainer = subActive && isTrainerPlan(sub!.plan);
 

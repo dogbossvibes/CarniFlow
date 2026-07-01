@@ -15,6 +15,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useSession } from "@/hooks/useSession";
 import { useTrainingSessions } from "@/hooks/useTrainingSessions";
 import { signOut, deleteAccount } from "@/services/auth";
+import { getPlanSubscription, cancelTrial } from "@/services/subscriptionService";
 import { setShareTrainingsDefault } from "@/services/profileService";
 import { getMyInvitations } from "@/services/umfrageService";
 import type { TrainerUmfrage } from "@/types/umfrage";
@@ -135,6 +136,39 @@ export default function ProfilScreen() {
   const { isPro, isTrainerModule, plan } = useCapabilities();
   const { access } = useAccess();
   const PLAN_LABEL = { free: 'Free', pro: 'Pro', trainer: 'Trainer' } as const;
+
+  // Trial-Status fürs Abo-Karten-UI (Kündigen / gekündigt-Hinweis).
+  const [trialSub, setTrialSub] = useState<{ status: string | null; trialEndsAt: string | null; cancelAtPeriodEnd: boolean } | null>(null);
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid) return;
+    getPlanSubscription(uid).then(s => { if (s) setTrialSub({ status: s.status, trialEndsAt: s.trial_ends_at, cancelAtPeriodEnd: s.cancel_at_period_end === true }); });
+  }, [user?.id]);
+
+  const trialEnd = trialSub?.trialEndsAt ? new Date(trialSub.trialEndsAt) : null;
+  const isActiveTrial = trialSub?.status === 'trialing' && (!trialEnd || trialEnd.getTime() > Date.now());
+  const trialEndLabel = trialEnd ? trialEnd.toLocaleDateString('de-CH') : null;
+  const trialCancelled = trialSub?.cancelAtPeriodEnd === true;
+
+  const handleCancelTrial = () => {
+    const uid = user?.id; if (!uid) return;
+    Alert.alert(
+      'Testabo kündigen?',
+      trialEndLabel
+        ? `Dein Zugriff bleibt bis zum ${trialEndLabel} bestehen und läuft danach automatisch aus. Es wird nichts abgebucht.`
+        : 'Dein Zugriff bleibt bis zum Ende der Testphase bestehen und läuft danach automatisch aus.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Kündigen', style: 'destructive', onPress: async () => {
+          const { error } = await cancelTrial(uid);
+          if (error) { Alert.alert('Hinweis', 'Kündigung fehlgeschlagen. Bitte später erneut versuchen.'); return; }
+          setTrialSub(t => t ? { ...t, cancelAtPeriodEnd: true } : t);
+          queryClient.invalidateQueries({ queryKey: ['capabilities'] });
+          queryClient.invalidateQueries({ queryKey: ['userAccess'] });
+        } },
+      ],
+    );
+  };
 
   const anzeigeName = user?.user_metadata?.full_name ?? "Hundesportler";
   const email = user?.email ?? "";
@@ -351,7 +385,7 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 0 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proAbzeichenText}>{access.isLifetime ? 'LIFETIME' : plan === 'trainer' ? 'TRAINER' : 'PRO'}</Text>
+                <Text style={s.proAbzeichenText}>{isActiveTrial ? 'TESTPHASE' : access.isLifetime ? 'LIFETIME' : plan === 'trainer' ? 'TRAINER' : 'PRO'}</Text>
               </View>
               <View style={s.premiumAktivBadge}>
                 <Ionicons name="checkmark-circle" size={13} color={C.success} />
@@ -359,17 +393,28 @@ export default function ProfilScreen() {
               </View>
             </View>
             <Text style={s.premiumTitel}>
-              {access.isLifetime
-                ? (access.hasTrainerAccess ? 'Lifetime Trainer Zugriff aktiv' : 'Lifetime Zugriff aktiv')
-                : (plan === 'trainer' ? 'Trainer aktiv' : 'Pro aktiv')}
+              {isActiveTrial
+                ? 'Testphase aktiv'
+                : access.isLifetime
+                  ? (access.hasTrainerAccess ? 'Lifetime Trainer Zugriff aktiv' : 'Lifetime Zugriff aktiv')
+                  : (plan === 'trainer' ? 'Trainer aktiv' : 'Pro aktiv')}
             </Text>
             <Text style={s.premiumSub}>
-              {access.isLifetime
-                ? 'Du hast lebenslangen Zugriff auf diese Funktionen.'
-                : expiresAt
-                  ? `Verlängert sich am ${expiresAt.toLocaleDateString("de-CH")}`
-                  : "Unbegrenzt aktiv"}
+              {isActiveTrial
+                ? (trialCancelled
+                    ? (trialEndLabel ? `Gekündigt — läuft am ${trialEndLabel} aus. Es wird nichts abgebucht.` : 'Gekündigt — läuft am Ende der Testphase aus.')
+                    : (trialEndLabel ? `Kostenlos testen bis ${trialEndLabel}` : 'Kostenlose Testphase aktiv'))
+                : access.isLifetime
+                  ? 'Du hast lebenslangen Zugriff auf diese Funktionen.'
+                  : expiresAt
+                    ? `Verlängert sich am ${expiresAt.toLocaleDateString("de-CH")}`
+                    : "Unbegrenzt aktiv"}
             </Text>
+            {isActiveTrial && !trialCancelled && (
+              <TouchableOpacity onPress={handleCancelTrial} activeOpacity={0.7} style={s.trialCancelBtn}>
+                <Text style={s.trialCancelTxt}>Testabo kündigen</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -886,4 +931,6 @@ const s = StyleSheet.create({
   premiumAktivText: { fontSize: 12, color: C.success, fontWeight: "700" },
   premiumTitel: { fontSize: 20, color: C.white, fontWeight: "900", letterSpacing: -0.3 },
   premiumSub:   { fontSize: 13, color: C.muted },
+  trialCancelBtn: { alignSelf: 'flex-start', marginTop: 12, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.cardAlt },
+  trialCancelTxt: { fontSize: 13, color: C.muted, fontWeight: '700' },
 });
