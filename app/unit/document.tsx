@@ -49,8 +49,11 @@ export default function DocumentScreen() {
   const { profile } = useProfile();
   const { categories } = useCustomCategories();
 
+  // Feste Sparten nach den im Profil aktivierten filtern (Fallback: alle) —
+  // konsistent mit dem Sparten-Hub (app/unit/start.tsx).
+  const aktiveSparten = profile?.aktive_sparten ?? null;
   const disciplines: Discipline[] = [
-    ...DISCIPLINES.filter(d => !d.custom),
+    ...DISCIPLINES.filter(d => !d.custom && (!aktiveSparten || aktiveSparten.includes(d.label))),
     ...categories.map(customToDiscipline),
   ];
 

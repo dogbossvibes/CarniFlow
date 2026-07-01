@@ -75,6 +75,27 @@ export const DISCIPLINES: Discipline[] = [
     ],
   },
   {
+    key:      'obedience',
+    label:    'Obedience',        // muss dem Sparten-Label entsprechen (Profil-Filter)
+    subtitle: 'Präzision & Freude an der Arbeit',
+    emoji:    '🎪',
+    icon:     'ribbon',
+    accent:   '#F472B6',         // Pink
+    hero:     false,
+    exercises: [
+      'Fußarbeit',
+      'Positionen aus der Bewegung',
+      'Abrufen mit Steh/Platz',
+      'Voraussenden in Viereck',
+      'Apport (Bringholz)',
+      'Apport über Hürde',
+      'Geruchsunterscheidung',
+      'Distanzkontrolle',
+      'Bleib-Übungen (Gruppe)',
+      'Eigene Übung',
+    ],
+  },
+  {
     key:      'eigene',
     label:    'Eigene Kategorie',
     subtitle: 'Individuelles Training',
