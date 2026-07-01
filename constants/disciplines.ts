@@ -44,7 +44,7 @@ export const DISCIPLINES: Discipline[] = [
     accent:   '#60A5FA',         // Blau
     hero:     false,
     exercises: [
-      'Fußarbeit',
+      'Fussarbeit',
       'Sitz',
       'Platz',
       'Steh',
@@ -83,7 +83,7 @@ export const DISCIPLINES: Discipline[] = [
     accent:   '#F472B6',         // Pink
     hero:     false,
     exercises: [
-      'Fußarbeit',
+      'Fussarbeit',
       'Positionen aus der Bewegung',
       'Abrufen mit Steh/Platz',
       'Voraussenden in Viereck',
@@ -91,7 +91,78 @@ export const DISCIPLINES: Discipline[] = [
       'Apport über Hürde',
       'Geruchsunterscheidung',
       'Distanzkontrolle',
+      'Gruppenarbeit',
       'Bleib-Übungen (Gruppe)',
+      'Eigene Übung',
+    ],
+  },
+  {
+    key:      'agility',
+    label:    'Agility',         // Sparten-Label (Profil-Filter)
+    subtitle: 'Tempo, Geschicklichkeit & Führung',
+    emoji:    '🏃',
+    icon:     'flash',
+    accent:   '#FBBF24',         // Amber
+    hero:     false,
+    exercises: [
+      'Hürde',
+      'Reifen',
+      'Weitsprung',
+      'Mauer',
+      'Tunnel',
+      'Slalom',
+      'A-Wand',
+      'Steg',
+      'Wippe',
+      'Parcours-Sequenz',
+      'Eigene Übung',
+    ],
+  },
+  {
+    key:      'rally',
+    label:    'Rally',           // Sparten-Label (Profil-Filter)
+    subtitle: 'Team-Parcours nach Schildern',
+    emoji:    '🚩',
+    icon:     'flag',
+    accent:   '#38BDF8',         // Sky
+    hero:     false,
+    exercises: [
+      'Fussarbeit',
+      'Sitz-Übungen',
+      'Platz-Übungen',
+      'Steh-Übungen',
+      'Drehungen & Wendungen',
+      'Kehrtwendungen',
+      'Slalom (Pylonen)',
+      'Rückwärtsgehen',
+      'Distanzkontrolle',
+      'Sprung',
+      'Tempowechsel',
+      'Eigene Übung',
+    ],
+  },
+  {
+    key:      'mondioring',
+    label:    'Mondioring',      // Sparten-Label (Profil-Filter)
+    subtitle: 'Gehorsam, Sprünge & Schutz',
+    emoji:    '🔵',
+    icon:     'shield-half',
+    accent:   '#FB7185',         // Rose
+    hero:     false,
+    exercises: [
+      'Fussfolge',
+      'Abrufen mit Störung',
+      'Positionen aus der Distanz',
+      'Voraussenden',
+      'Apportieren',
+      'Nahrungsverweigerung',
+      'Hochsprung (Palisade)',
+      'Weitsprung',
+      'Steilwand',
+      'Fluchtbiss',
+      'Angriff frontal',
+      'Verteidigung des Hundeführers',
+      'Bewachung',
       'Eigene Übung',
     ],
   },
