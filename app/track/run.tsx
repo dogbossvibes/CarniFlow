@@ -50,6 +50,7 @@ export default function TrackRunScreen() {
   const s = useSearchRecorder({ laidPoints: snap.laidPoints, laidObjects: snap.laidObjects, level: snap.level });
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
+  const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
   const [voiceOn, setVoiceOn] = useState(true);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
@@ -164,7 +165,11 @@ export default function TrackRunScreen() {
             <TrackingMap
               layPoints={snap.laidLatLng} dimLay
               runPoints={runPoints} markers={mapMarkers} breaks={breakPts}
-              currentPosition={curPos} follow hideControls
+              currentPosition={curPos}
+              follow={follow}
+              onToggleFollow={() => setFollow(f => !f)}
+              onUserPan={() => setFollow(false)}
+              controlsTop={64}
             />
           ) : (
             <View className="flex-1 bg-[#08100e]"><TrackSketch legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>

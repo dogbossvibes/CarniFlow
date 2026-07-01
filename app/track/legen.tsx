@@ -149,7 +149,7 @@ export default function LegenScreen() {
 
   const {
     trackPoints, markers, currentPosition, heading, gpsAccuracy,
-    distanceMeters, durationSeconds, isPaused, mapFollowMode,
+    distanceMeters, durationSeconds, isPaused, mapFollowMode, setMapFollowMode,
   } = useTrackingStore();
 
   // GPS wirklich bereit (gute Genauigkeit) vs. nur manuell freigegeben (nach 15 s).
@@ -283,8 +283,10 @@ export default function LegenScreen() {
               currentPosition={currentPosition}
               heading={heading}
               follow={mapFollowMode}
+              onToggleFollow={() => setMapFollowMode(!mapFollowMode)}
+              onUserPan={() => { if (mapFollowMode) setMapFollowMode(false); }}
+              controlsTop={64}
               mapType="hybrid"
-              hideControls
             />
           ) : (
             <View className="flex-1 bg-[#08100e]">

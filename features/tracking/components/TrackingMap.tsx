@@ -31,13 +31,15 @@ interface Props {
   mapType?:         MapType;
   onToggleFollow?:  () => void;
   onCompass?:       () => void;
+  onUserPan?:       () => void;   // Nutzer verschiebt die Karte selbst → Aufrufer schaltet Follow aus
   hideControls?:    boolean;   // FAB-Spalte ausblenden (z. B. für Live-Overlays)
+  controlsTop?:     number;    // Abstand der FAB-Spalte von oben (um Overlays wie die Hunde-Pille zu umgehen)
   style?:           StyleProp<ViewStyle>;
 }
 
 export function TrackingMap({
   layPoints, runPoints, rawPoints, rejectedPoints, markers = [], breaks, dimLay, currentPosition, heading,
-  follow, mapType = 'hybrid', onToggleFollow, onCompass, hideControls, style,
+  follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
 
@@ -47,7 +49,7 @@ export function TrackingMap({
     mapRef.current.animateToRegion({
       latitude: currentPosition.lat, longitude: currentPosition.lng,
       latitudeDelta: 0.0016, longitudeDelta: 0.0016,
-    }, 600);
+    }, 300);
   }, [currentPosition, follow]);
 
   // Koordinaten nur neu berechnen, wenn ein Punkt hinzukommt (Länge ändert sich),
@@ -107,6 +109,7 @@ export function TrackingMap({
         showsUserLocation
         showsCompass={false}
         showsMyLocationButton={false}
+        onPanDrag={follow && onUserPan ? () => onUserPan() : undefined}
         initialRegion={{
           latitude:  initial ? initial.lat : FALLBACK.latitude,
           longitude: initial ? initial.lng : FALLBACK.longitude,
@@ -120,7 +123,7 @@ export function TrackingMap({
         {/* Gelegte Fährte: beim Legen durchgezogen türkis; im Ausarbeiten gedimmt
             gestrichelt als Soll-Referenz (zur blauen Ist-Linie unterscheidbar). */}
         {layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={dimLay ? 'rgba(21,230,195,0.32)' : C.trackPrimary} strokeWidth={dimLay ? 3 : 4} lineDashPattern={dimLay ? [8, 8] : undefined} />
+          <Polyline coordinates={layCoords} strokeColor={dimLay ? 'rgba(21,230,195,0.55)' : C.trackPrimary} strokeWidth={dimLay ? 3.5 : 4} lineDashPattern={dimLay ? [8, 8] : undefined} />
         )}
         {/* Gelaufener Ablauf: blau, durchgezogen */}
         {runCoords.length > 1 && (
@@ -170,7 +173,7 @@ export function TrackingMap({
 
       {/* Floating Buttons rechts */}
       {!hideControls && (
-        <View style={s.fabCol}>
+        <View style={[s.fabCol, { top: controlsTop }]}>
           {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
           <Fab icon="locate" onPress={recenter} />
           {onToggleFollow && <Fab icon={follow ? 'lock-closed' : 'lock-open'} active={follow} onPress={onToggleFollow} />}

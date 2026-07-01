@@ -33,7 +33,9 @@ import { startFaehrteActivity, updateFaehrteActivity, stopFaehrteActivity } from
 const MAX_ACCURACY_M = 45;   // gröber → kein LINIEN-Punkt (Puck folgt trotzdem). Feld unter Bäumen ~30-45 m.
 const MAX_SPEED_MPS  = 12;   // ~43 km/h: schnellerer Sprung = unrealistisch → verwerfen
 const MIN_STEP_M     = 2.0;  // Distanz-Gate: erst ab 2 m neuen Linienpunkt setzen
-const EMA_ALPHA      = 0.4;  // Glättung: Gewicht des neuen Fix (0 = träge, 1 = roh)
+const EMA_ALPHA      = 0.4;  // Glättung der aufgezeichneten LINIE (ruhig, träge)
+const PUCK_ALPHA     = 0.6;  // Glättung des LIVE-Pucks separat → folgt flotter,
+                             // ohne die aufgezeichnete Linie unruhiger zu machen
 
 // Winkel-Erkennung (zwei Schenkel).
 const LEG_MIN_M       = 5.0;  // Mindestlänge je Schenkel, damit Rauschen nicht triggert
@@ -84,7 +86,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   // Track-Zustand in Refs → kein Stale-Closure im Fix-Handler.
   const pointsRef     = useRef<AcceptedPoint[]>([]);   // akzeptierte, geglättete Linie
-  const emaRef        = useRef<LatLng | null>(null);   // geglättete Live-Position
+  const emaRef        = useRef<LatLng | null>(null);   // geglättete Position für die LINIE
+  const puckRef       = useRef<LatLng | null>(null);   // schneller geglättete Position für den LIVE-Puck
   const lastRawRef    = useRef<Raw | null>(null);      // letzter (akzeptierter) Rohfix
   const lastCornerAtRef = useRef<number>(-Infinity);   // cumDist des letzten Winkels
   // Abriss-Erkennung: Halt-Anker, vorgemerkter Abriss, letzter Abriss + Gegenstand.
@@ -226,7 +229,16 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
       : { lat: raw.lat, lng: raw.lng };
     emaRef.current = ema;
-    s.setCurrentPosition(ema, raw.accuracy);
+
+    // Live-Puck getrennt und LEICHTER glätten (PUCK_ALPHA > EMA_ALPHA): er folgt
+    // der echten Position deutlich flotter (weniger „hinkt nach"), während die
+    // aufgezeichnete Linie unten weiter mit dem trägen EMA ruhig bleibt.
+    const prevPuck = puckRef.current;
+    const puck: LatLng = prevPuck
+      ? { lat: prevPuck.lat + (raw.lat - prevPuck.lat) * PUCK_ALPHA, lng: prevPuck.lng + (raw.lng - prevPuck.lng) * PUCK_ALPHA }
+      : { lat: raw.lat, lng: raw.lng };
+    puckRef.current = puck;
+    s.setCurrentPosition(puck, raw.accuracy);
 
     // Ab hier nur die aufgezeichnete LINIE.
     if (!recordingRef.current || s.isPaused) return;
@@ -329,6 +341,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // hier in die Linie, der Timer läuft sofort.
     pointsRef.current = [];
     emaRef.current = null;
+    puckRef.current = null;
     lastRawRef.current = null;
     lastCornerAtRef.current = -Infinity;
     lastAbrissAtRef.current = -Infinity;
