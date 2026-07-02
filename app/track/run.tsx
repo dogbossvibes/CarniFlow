@@ -12,6 +12,7 @@ import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSear
 import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { metersToSteps } from '@/features/tracking/utils/steps';
 import { startTrackRun, finishTrackRun, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 
 // Blinkender LIVE-Punkt.
@@ -128,7 +129,7 @@ export default function TrackRunScreen() {
   };
 
   const metrics: { value: string; label: string; warn?: boolean }[] = [
-    { value: `${Math.round(s.distanceM)} m`, label: 'Distanz' },
+    { value: `${Math.round(s.distanceM)} m`, label: `${metersToSteps(s.distanceM)} Schr.` },
     { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
     { value: devShown != null ? `${devOff ? '+' : ''}${devShown.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
     { value: s.accuracy != null ? `${Math.round(s.accuracy)} m` : '—', label: 'GPS' },
@@ -182,7 +183,7 @@ export default function TrackRunScreen() {
               controlsTop={64}
             />
           ) : (
-            <View className="flex-1 bg-[#08100e]"><TrackSketch legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
+            <View className="flex-1 bg-[#08100e]"><TrackSketch points={snap.laidLatLng} angleMarkers={guidanceAngles} objectMarkers={guidanceObjects} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
           )}
 
           {/* Timer (oben links) */}

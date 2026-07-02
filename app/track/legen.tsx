@@ -18,6 +18,7 @@ import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { createTrackSession } from '@/features/tracking/services/trackService';
 import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
 import { ANGLE_LABEL } from '@/features/tracking/utils/angleClassify';
+import { metersToSteps } from '@/features/tracking/utils/steps';
 import { useToast } from '@/components/ui/Toast';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import type { AngleKind, MarkerMaterial } from '@/features/tracking/store/trackingStore';
@@ -220,6 +221,9 @@ export default function LegenScreen() {
   const mapMarkers: MapMarker[] = markers.map(mk => ({ type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind }));
   const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
   const winkel = markers.filter(mk => mk.type === 'winkel').length;
+  // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
+  const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
+  const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
 
   const onStop = async () => {
     const id = sessionIdRef.current;
@@ -235,7 +239,7 @@ export default function LegenScreen() {
   // GPS ab >45 m warnen — dann landen keine Linienpunkte (Filter), Distanz bleibt 0.
   const gpsPoor = gpsAccuracy != null && gpsAccuracy > 45;
   const metrics: { value: string; label: string; warn?: boolean }[] = [
-    { value: `${Math.round(distanceMeters)} m`, label: 'Distanz' },
+    { value: `${Math.round(distanceMeters)} m`, label: `${metersToSteps(distanceMeters)} Schr.` },
     { value: String(gegenstaende), label: 'Gegenst.' },
     { value: String(winkel), label: 'Winkel' },
     { value: gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : '–', label: 'GPS', warn: gpsPoor },
@@ -292,7 +296,7 @@ export default function LegenScreen() {
             />
           ) : (
             <View className="flex-1 bg-[#08100e]">
-              <TrackSketch legs={winkel} objects={gegenstaende} w={340} h={520} progress={1} />
+              <TrackSketch points={trackPoints} angleMarkers={angleMarkers} objectMarkers={objectMarkers} legs={winkel} objects={gegenstaende} w={340} h={520} progress={1} />
             </View>
           )}
 
