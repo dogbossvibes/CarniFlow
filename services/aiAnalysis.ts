@@ -32,6 +32,14 @@ export async function generateAIAnalysis(
   const { data, error } = await supabase.functions.invoke('ai-analysis', {
     body: { sessions: sessions.slice(0, 15), dogName },
   });
-  if (error) throw new Error(error.message ?? 'KI-Analyse fehlgeschlagen');
+  if (error) {
+    // Die eigentliche Fehlermeldung steckt im Response-Body der Function.
+    let detail = error.message ?? 'KI-Analyse fehlgeschlagen';
+    try {
+      const body = await (error as any).context?.json?.();
+      if (body?.error) detail = body.error;
+    } catch { /* Fallback: generische Meldung */ }
+    throw new Error(detail);
+  }
   return data as AIResult;
 }
