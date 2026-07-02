@@ -43,6 +43,9 @@
   .pill{ display:inline-block; font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
     color:var(--acc); background:rgba(21,230,195,.1); border:1px solid rgba(21,230,195,.3);
     border-radius:999px; padding:6px 14px; margin-bottom:22px; }
+  .pills{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:640px; margin:0 auto 22px; }
+  .pills .pill{ margin-bottom:0; }
+  .pill.lead{ background:rgba(21,230,195,.22); border-color:rgba(21,230,195,.5); }
   h1{ font-size:clamp(40px,8vw,76px); line-height:1.02; font-weight:900; letter-spacing:-2px; margin:0 0 16px;
     background:linear-gradient(180deg,#fff,#bfeee7); -webkit-background-clip:text; background-clip:text; color:transparent; }
   .lead{ font-size:clamp(16px,2.5vw,20px); color:var(--muted); max-width:560px; margin:0 auto 34px; }
@@ -107,7 +110,21 @@
   </header>
 
   <section class="hero">
-    <span class="pill">Hundesport · IGP · Mondioring</span>
+    <div class="pills">
+      <span class="pill lead">Hundesport</span>
+      <span class="pill">IGP</span>
+      <span class="pill">Fährte</span>
+      <span class="pill">Unterordnung</span>
+      <span class="pill">Schutzdienst</span>
+      <span class="pill">Obedience</span>
+      <span class="pill">Agility</span>
+      <span class="pill">Rally</span>
+      <span class="pill">Mondioring</span>
+      <span class="pill">Mantrailing</span>
+      <span class="pill">Begleithund</span>
+      <span class="pill">IBGH</span>
+      <span class="pill">Rettungshund</span>
+    </div>
     <h1>Performance-Tracking<br>für Hundesportler</h1>
     <p class="lead">Dokumentiere jedes Training, zeichne Fährten präzise per GPS auf und behalte den Fortschritt deines Hundes im Blick – mit smarter Auswertung.</p>
     <div class="stores">
@@ -164,7 +181,7 @@
         <a href="/agb">AGB</a>
         <a href="mailto:shadesofym@gmail.com">Kontakt</a>
       </div>
-      <div class="copy">© 2026 ANYVO · Sandra Müller, Riedstätt (CH)</div>
+      <div class="copy">© 2026 ANYVO · dog.boss.vibes</div>
     </div>
   </footer>
 

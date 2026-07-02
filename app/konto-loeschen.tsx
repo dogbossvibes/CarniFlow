@@ -9,10 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const UPDATED = '2. Juli 2026';
 
-// Verantwortliche Stelle (identisch zu privacy.tsx).
-const CONTROLLER_NAME    = 'Sandra Müller (ANYVO)';
-const CONTROLLER_ADDRESS = 'Heid 196A, 3159 Riedstätt, Schweiz';
-const CONTACT_EMAIL      = 'shadesofym@gmail.com';
+const CONTACT_EMAIL = 'shadesofym@gmail.com';
 
 interface Section { title: string; body: string }
 
@@ -38,8 +35,8 @@ const SECTIONS: Section[] = [
     body:  `Wenn du dich nicht mehr anmelden kannst, sende uns eine E-Mail von deiner bei ANYVO registrierten Adresse an ${CONTACT_EMAIL} mit dem Betreff „Konto löschen". Nach Verifizierung löschen wir dein Konto und alle Daten innerhalb von 30 Tagen.`,
   },
   {
-    title: '6. Verantwortliche Stelle',
-    body:  `${CONTROLLER_NAME}\n${CONTROLLER_ADDRESS}\nE-Mail: ${CONTACT_EMAIL}`,
+    title: '6. Kontakt',
+    body:  `ANYVO · dog.boss.vibes\nE-Mail: ${CONTACT_EMAIL}`,
   },
 ];
 
