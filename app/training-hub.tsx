@@ -52,7 +52,7 @@ export default function TrainingHubScreen() {
   const onEventPress = (e: CalendarEvent) => {
     const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [];
     options.push({
-      text: 'Zum Geräte-Kalender',
+      text: 'In Apple/Google Kalender',
       onPress: async () => {
         const res = await addEventToDeviceCalendar(e);
         Alert.alert(res.ok ? 'Hinzugefügt' : 'Hinweis', res.ok ? 'Termin wurde in deinen Kalender übernommen.' : (res.error ?? 'Fehler'));

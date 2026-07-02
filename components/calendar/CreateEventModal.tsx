@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Alert, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { createOwnEvent } from '@/services/calendarService';
 import { scheduleEventReminders } from '@/lib/eventReminders';
+import { addEventToDeviceCalendar, DEVICE_CALENDAR_AVAILABLE } from '@/lib/deviceCalendar';
 import { AppointmentTypeGrid } from '@/components/calendar/AppointmentTypeGrid';
 import { DogSelectionCards } from '@/components/calendar/DogSelectionCards';
 import { LocationPickerCard } from '@/components/calendar/LocationPickerCard';
@@ -52,6 +53,7 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
   const [reminders, setReminders] = useState<number[]>([60]);
   const [pushOn, setPushOn] = useState(true);
   const [trainerId, setTrainerId] = useState<string | null>(null);
+  const [syncDevice, setSyncDevice] = useState(false);   // zusätzlich in Apple/Google-Kalender
   const [saving, setSaving] = useState(false);
 
   const toggle = <T,>(arr: T[], v: T) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
@@ -59,7 +61,7 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
   const reset = () => {
     setTypes(['training']); setTitle(''); setDate(''); setStart(''); setEnd('');
     setDogIds([]); setLocation(''); setNotes(''); setNotesOpen(false);
-    setReminders([60]); setPushOn(true); setTrainerId(null);
+    setReminders([60]); setPushOn(true); setTrainerId(null); setSyncDevice(false);
   };
 
   const save = async () => {
@@ -85,6 +87,12 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
     if (error || !data) { Alert.alert('Fehler', error?.message ?? 'Konnte nicht gespeichert werden.'); return; }
 
     scheduleEventReminders(data as CalendarEvent);
+    // Optional zusätzlich in den Geräte-Kalender (Apple/iCloud & verbundene Google-
+    // Kalender). Blockiert den Flow nicht — bei Fehler nur ein Hinweis.
+    if (syncDevice) {
+      const cal = await addEventToDeviceCalendar(data as CalendarEvent);
+      if (!cal.ok) Alert.alert('Kalender', cal.error ?? 'Konnte nicht in den Geräte-Kalender übernommen werden.');
+    }
     onCreated(data as CalendarEvent);
     reset();
     onClose();
@@ -143,6 +151,19 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
               <ReminderCard selected={reminders} onToggle={m => setReminders(p => toggle(p, m))} pushOn={pushOn} setPushOn={setPushOn} />
             </View>
 
+            {/* In Apple/Google-Kalender übernehmen (Geräte-Kalender). Nur wenn das
+                native Modul im Build vorhanden ist. */}
+            {DEVICE_CALENDAR_AVAILABLE && (
+              <View style={[s.notesHead, { marginTop: 18 }]}>
+                <Ionicons name="calendar-outline" size={18} color={ACCENT} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.notesHeadTxt}>In Apple/Google Kalender</Text>
+                  <Text style={s.syncSub}>Termin zusätzlich im Geräte-Kalender speichern</Text>
+                </View>
+                <Switch value={syncDevice} onValueChange={setSyncDevice} trackColor={{ false: C.cardAlt, true: ACCENT }} thumbColor={C.white} />
+              </View>
+            )}
+
             <View style={{ height: 20 }} />
           </ScrollView>
         </KeyboardAvoidingView>
@@ -176,4 +197,5 @@ const s = StyleSheet.create({
   glassInput: { color: C.white, fontSize: 15, fontWeight: '700', padding: 0 },
   notesHead:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16 },
   notesHeadTxt: { flex: 1, fontSize: 15, color: C.white, fontWeight: '600' },
+  syncSub:      { fontSize: 11.5, color: C.muted, marginTop: 2 },
 });
