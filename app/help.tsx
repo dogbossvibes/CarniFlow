@@ -50,8 +50,8 @@ const FAQS: Faq[] = [
     antwort: 'Unter Profil → Konto → „Benachrichtigungen" kannst du sie per Schalter aktivieren. Falls sie vom System blockiert sind, führt dich die App direkt in die Systemeinstellungen, um sie für ANYVO zu erlauben.',
   },
   {
-    frage:   'Was bringt mir Premium?',
-    antwort: 'Premium schaltet erweiterte Analysen, unbegrenzte Einheiten und den PDF-Export frei. Du kannst es im Profil mit dem 30-Tage-Gratis-Test aktivieren.',
+    frage:   'Was bringt mir Active?',
+    antwort: 'Active schaltet erweiterte Analysen, unbegrenzte Einheiten und den PDF-Export frei. Du kannst es im Profil mit dem 7-Tage-Gratis-Test starten.',
   },
   {
     frage:   'Wie werden meine Daten geschützt?',

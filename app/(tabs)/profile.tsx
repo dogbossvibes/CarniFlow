@@ -135,7 +135,7 @@ export default function ProfilScreen() {
   const { expiresAt } = usePlan();
   const { isPro, isTrainerModule, plan } = useCapabilities();
   const { access } = useAccess();
-  const PLAN_LABEL = { free: 'Free', pro: 'Pro', trainer: 'Trainer' } as const;
+  const PLAN_LABEL = { free: 'Free', pro: 'Active', trainer: 'Trainer' } as const;
 
   // Trial-Status fürs Abo-Karten-UI (Kündigen / gekündigt-Hinweis).
   const [trialSub, setTrialSub] = useState<{ status: string | null; trialEndsAt: string | null; cancelAtPeriodEnd: boolean } | null>(null);
@@ -289,7 +289,7 @@ export default function ProfilScreen() {
             color={isPro ? C.accent : C.muted}
           />
           <Text style={[s.planBtnText, isPro && s.planBtnTextAktiv]}>
-            {plan === 'trainer' ? 'Trainer aktiv' : plan === 'pro' ? 'Pro aktiv' : 'Upgrade auf Pro'}
+            {plan === 'trainer' ? 'Trainer aktiv' : plan === 'pro' ? 'Active aktiv' : 'Upgrade auf Active'}
           </Text>
           {!isPro && (
             <Ionicons name="chevron-forward" size={14} color={C.subtle} />
@@ -347,7 +347,7 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 0 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proAbzeichenText}>PRO</Text>
+                <Text style={s.proAbzeichenText}>ACTIVE</Text>
               </View>
               <Text style={s.proUeberschrift}>
                 Schalte dein{"\n"}volles Potenzial frei.
@@ -362,7 +362,7 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proBtnText}>30 Tage gratis testen</Text>
+                <Text style={s.proBtnText}>7 Tage gratis testen</Text>
               </AnimatedPressable>
             </View>
           </View>
@@ -385,7 +385,7 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 0 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proAbzeichenText}>{isActiveTrial ? 'TESTPHASE' : access.isLifetime ? 'LIFETIME' : plan === 'trainer' ? 'TRAINER' : 'PRO'}</Text>
+                <Text style={s.proAbzeichenText}>{isActiveTrial ? 'TESTPHASE' : access.isLifetime ? 'LIFETIME' : plan === 'trainer' ? 'TRAINER' : 'ACTIVE'}</Text>
               </View>
               <View style={s.premiumAktivBadge}>
                 <Ionicons name="checkmark-circle" size={13} color={C.success} />
@@ -397,7 +397,7 @@ export default function ProfilScreen() {
                 ? 'Testphase aktiv'
                 : access.isLifetime
                   ? (access.hasTrainerAccess ? 'Lifetime Trainer Zugriff aktiv' : 'Lifetime Zugriff aktiv')
-                  : (plan === 'trainer' ? 'Trainer aktiv' : 'Pro aktiv')}
+                  : (plan === 'trainer' ? 'Trainer aktiv' : 'Active aktiv')}
             </Text>
             <Text style={s.premiumSub}>
               {isActiveTrial
