@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyl
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
-import { removeGpsJitter, smoothTrackPoints, type LatLng } from '@/features/tracking/utils/gpsFilter';
+import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import type { MarkerType, AngleKind } from '@/features/tracking/store/trackingStore';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
@@ -56,14 +56,17 @@ export function TrackingMap({
   // nicht bei jedem Positions-Fix → flüssigere Karte, weniger Renderlast.
   // Hooks stehen bewusst VOR dem Fallback-Return (rules-of-hooks); die .length-Deps
   // sind ebenfalls Absicht (Re-Memo nur bei neuem Punkt, nicht bei Fix-Update).
-  // Rohe GPS-Punkte sind verrauscht → Ausreißer entfernen + glätten, damit die
-  // gezeichnete Linie dem echten Weg folgt (statt Zickzack). Recompute bei neuem Punkt.
+  // Die Punkte sind bereits im Recorder geglättet (EMA + Distanz-Gate) und die
+  // Winkel-Marker sitzen exakt auf diesen Punkten. Hier NICHT noch einmal glätten:
+  // ein gleitendes Mittel würde Ecken abrunden, sodass die Linie neben den
+  // Winkel-Markern verläuft. Nur grobe Ausreißer entfernen → Linie folgt dem
+  // echten Weg und trifft die Winkel.
   const layCoords = useMemo(
-    () => smoothTrackPoints(removeGpsJitter(layPoints)).map(p => ({ latitude: p.lat, longitude: p.lng })),
+    () => removeGpsJitter(layPoints).map(p => ({ latitude: p.lat, longitude: p.lng })),
     [layPoints],
   );
   const runCoords = useMemo(
-    () => smoothTrackPoints(removeGpsJitter(runPoints ?? [])).map(p => ({ latitude: p.lat, longitude: p.lng })),
+    () => removeGpsJitter(runPoints ?? []).map(p => ({ latitude: p.lat, longitude: p.lng })),
     [runPoints],
   );
   // Rohspur bewusst UNGEGLÄTTET (zeigt das echte GPS-Rauschen für die Analyse).
