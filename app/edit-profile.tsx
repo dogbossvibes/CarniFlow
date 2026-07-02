@@ -8,28 +8,66 @@ import { Input } from '@/components/ui/Input';
 import { useSession } from '@/hooks/useSession';
 import { queryClient } from '@/lib/queryClient';
 import { updateDisplayName } from '@/services/profileService';
+import { updateEmail, updatePassword } from '@/services/auth';
+
+const PROVIDER_LABEL: Record<string, string> = { apple: 'Apple', google: 'Google' };
+const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const { session } = useSession();
   const user = session?.user;
 
+  // Anmelde-Anbieter: E-Mail/Passwort vs. OAuth (Apple/Google).
+  const provider = (user?.app_metadata?.provider as string | undefined) ?? 'email';
+  const isPasswordAccount = provider === 'email';
+  const providerLabel = PROVIDER_LABEL[provider] ?? provider;
+
   const [name, setName] = useState<string>(user?.user_metadata?.full_name ?? '');
-  const [saving, setSaving] = useState(false);
+  const [email, setEmail] = useState<string>(user?.email ?? '');
+  const [pw1, setPw1] = useState('');
+  const [pw2, setPw2] = useState('');
 
-  const email = user?.email ?? '';
-  const initialen = (name.trim() || email)
-    .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  const [savingName, setSavingName] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingPw, setSavingPw] = useState(false);
 
-  const speichern = async () => {
+  const currentEmail = user?.email ?? '';
+  const initialen = (name.trim() || currentEmail).split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+  const speichernName = async () => {
     if (!user) return;
     if (!name.trim()) { Alert.alert('Name fehlt', 'Bitte gib einen Namen ein.'); return; }
-    setSaving(true);
+    setSavingName(true);
     const { error } = await updateDisplayName(user.id, name);
-    setSaving(false);
+    setSavingName(false);
     if (error) { Alert.alert('Fehler', 'Konnte nicht gespeichert werden. Bitte später erneut versuchen.'); return; }
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     router.back();
+  };
+
+  const emailAendern = async () => {
+    if (!emailValid(email)) { Alert.alert('E-Mail ungültig', 'Bitte gib eine gültige E-Mail-Adresse ein.'); return; }
+    if (email.trim().toLowerCase() === currentEmail.toLowerCase()) { Alert.alert('Hinweis', 'Das ist bereits deine aktuelle E-Mail-Adresse.'); return; }
+    setSavingEmail(true);
+    const { error } = await updateEmail(email);
+    setSavingEmail(false);
+    if (error) { Alert.alert('Fehler', error.message || 'E-Mail konnte nicht geändert werden.'); return; }
+    Alert.alert(
+      'Bestätigung gesendet',
+      `Wir haben eine Bestätigung an ${email.trim()} geschickt. Bitte öffne den Link in der E-Mail, um die Änderung abzuschließen.`,
+    );
+  };
+
+  const passwortAendern = async () => {
+    if (pw1.length < 8) { Alert.alert('Passwort zu kurz', 'Bitte mindestens 8 Zeichen verwenden.'); return; }
+    if (pw1 !== pw2) { Alert.alert('Passwörter ungleich', 'Die beiden Passwörter stimmen nicht überein.'); return; }
+    setSavingPw(true);
+    const { error } = await updatePassword(pw1);
+    setSavingPw(false);
+    if (error) { Alert.alert('Fehler', error.message || 'Passwort konnte nicht geändert werden.'); return; }
+    setPw1(''); setPw2('');
+    Alert.alert('Passwort geändert', 'Dein Passwort wurde aktualisiert.');
   };
 
   return (
@@ -42,8 +80,8 @@ export default function EditProfileScreen() {
           <Text style={s.headerSub}>KONTO</Text>
           <Text style={s.headerTitle}>Profil bearbeiten</Text>
         </View>
-        <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.5 }]} onPress={speichern} disabled={saving} activeOpacity={0.8}>
-          {saving ? <ActivityIndicator color={C.accentText} size="small" /> : <Text style={s.saveTxt}>Speichern</Text>}
+        <TouchableOpacity style={[s.saveBtn, savingName && { opacity: 0.5 }]} onPress={speichernName} disabled={savingName} activeOpacity={0.8}>
+          {savingName ? <ActivityIndicator color={C.accentText} size="small" /> : <Text style={s.saveTxt}>Speichern</Text>}
         </TouchableOpacity>
       </View>
 
@@ -54,12 +92,41 @@ export default function EditProfileScreen() {
 
         <Input label="Name" placeholder="Dein Name" value={name} onChangeText={setName} autoCapitalize="words" />
 
+        {/* E-Mail */}
         <Text style={s.label}>E-MAIL</Text>
-        <View style={s.readonly}>
-          <Text style={s.readonlyTxt}>{email || '—'}</Text>
-          <Ionicons name="lock-closed" size={14} color={C.subtle} />
-        </View>
-        <Text style={s.hint}>E-Mail und Passwort lassen sich hier (noch) nicht ändern. Bei Bedarf melde dich bei uns.</Text>
+        {isPasswordAccount ? (
+          <>
+            <Input placeholder="name@beispiel.ch" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+            <TouchableOpacity style={[s.actionBtn, savingEmail && { opacity: 0.5 }]} onPress={emailAendern} disabled={savingEmail} activeOpacity={0.8}>
+              {savingEmail ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.actionTxt}>E-Mail ändern</Text>}
+            </TouchableOpacity>
+            <Text style={s.hint}>Nach dem Ändern erhältst du eine Bestätigungs-E-Mail an die neue Adresse.</Text>
+          </>
+        ) : (
+          <>
+            <View style={s.readonly}>
+              <Text style={s.readonlyTxt}>{currentEmail || '—'}</Text>
+              <Ionicons name="lock-closed" size={14} color={C.subtle} />
+            </View>
+            <Text style={s.hint}>Du bist über {providerLabel} angemeldet — deine E-Mail wird dort verwaltet.</Text>
+          </>
+        )}
+
+        {/* Passwort */}
+        <Text style={s.label}>PASSWORT</Text>
+        {isPasswordAccount ? (
+          <>
+            <Input placeholder="Neues Passwort" value={pw1} onChangeText={setPw1} password autoCapitalize="none" />
+            <View style={{ height: 10 }} />
+            <Input placeholder="Neues Passwort bestätigen" value={pw2} onChangeText={setPw2} password autoCapitalize="none" />
+            <TouchableOpacity style={[s.actionBtn, savingPw && { opacity: 0.5 }]} onPress={passwortAendern} disabled={savingPw} activeOpacity={0.8}>
+              {savingPw ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.actionTxt}>Passwort ändern</Text>}
+            </TouchableOpacity>
+            <Text style={s.hint}>Mindestens 8 Zeichen.</Text>
+          </>
+        ) : (
+          <Text style={s.hint}>Anmeldung über {providerLabel} — es ist kein Passwort nötig.</Text>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -80,8 +147,10 @@ const s = StyleSheet.create({
   avatarKreis: { width: 84, height: 84, borderRadius: 42, backgroundColor: C.accentDim, borderWidth: 1, borderColor: C.accentMid, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 24 },
   avatarText:  { fontSize: 30, color: C.accent, fontWeight: '900' },
 
-  label:   { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginTop: 18, marginBottom: 10 },
+  label:   { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginTop: 22, marginBottom: 10 },
   readonly: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.cardAlt, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 13 },
   readonlyTxt: { fontSize: 15, color: C.muted },
+  actionBtn: { marginTop: 12, height: 46, borderRadius: 12, borderWidth: 1, borderColor: C.borderLight, backgroundColor: C.cardAlt, alignItems: 'center', justifyContent: 'center' },
+  actionTxt: { fontSize: 14, color: C.white, fontWeight: '800' },
   hint:    { fontSize: 12, color: C.subtle, marginTop: 8, lineHeight: 17 },
 });

@@ -30,6 +30,18 @@ export function signOut() {
   return supabase.auth.signOut();
 }
 
+// Passwort ändern (nur für E-Mail/Passwort-Konten sinnvoll).
+export function updatePassword(password: string) {
+  return supabase.auth.updateUser({ password });
+}
+
+// E-Mail-Adresse ändern. Supabase schickt eine Bestätigung an die NEUE Adresse
+// (und je nach Projekt-Setting an die alte). Erfordert einen konfigurierten
+// E-Mail-Versand (SMTP) im Supabase-Projekt.
+export function updateEmail(email: string) {
+  return supabase.auth.updateUser({ email: email.trim() });
+}
+
 // Sign in with Apple (iOS, nativ). Pflicht laut App-Store-Guideline 4.8, da
 // Google-Login angeboten wird. Erfordert in Supabase den aktivierten
 // Apple-Provider.
