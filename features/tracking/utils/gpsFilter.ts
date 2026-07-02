@@ -60,21 +60,33 @@ export function smoothTrackPoints(points: LatLng[], window = 2): LatLng[] {
   return out;
 }
 
-// Entfernt grobe Ausreißer (Punkt weicht stark von Nachbarn ab).
+// Entfernt grobe Ausreißer (Punkt weicht stark von Nachbarn ab) — inkl.
+// isolierter Anfangs-/Endpunkte (ein „Ausbruch", der nicht gelaufen wurde).
 export function removeGpsJitter(points: LatLng[], maxJumpM = 25): LatLng[] {
-  if (points.length < 3) return [...points];
-  const out: LatLng[] = [points[0]];
-  for (let i = 1; i < points.length - 1; i++) {
+  const n = points.length;
+  if (n < 3) return [...points];
+
+  // Isolierten Anfangs-/Endpunkt kappen: weit vom Nachbarn weg, während die
+  // dahinter liegenden Punkte konsistent sind (so bleibt ein echter Endpunkt erhalten).
+  let lo = 0, hi = n - 1;
+  if (distanceM(points[0], points[1]) > maxJumpM && distanceM(points[1], points[2]) <= maxJumpM) lo = 1;
+  if (distanceM(points[n - 1], points[n - 2]) > maxJumpM && distanceM(points[n - 2], points[n - 3]) <= maxJumpM) hi = n - 2;
+  const src = lo === 0 && hi === n - 1 ? points : points.slice(lo, hi + 1);
+  if (src.length < 3) return [...src];
+
+  // Zwischen-Spitzen (hin und zurück) entfernen.
+  const out: LatLng[] = [src[0]];
+  for (let i = 1; i < src.length - 1; i++) {
     const prev = out[out.length - 1];
-    const next = points[i + 1];
-    const d1 = distanceM(prev, points[i]);
-    const d2 = distanceM(points[i], next);
+    const next = src[i + 1];
+    const d1 = distanceM(prev, src[i]);
+    const d2 = distanceM(src[i], next);
     const dDirect = distanceM(prev, next);
     // Spitze: Umweg über den Punkt viel länger als Direktweg → Ausreißer.
     if (d1 > maxJumpM && d2 > maxJumpM && d1 + d2 > dDirect * 3) continue;
-    out.push(points[i]);
+    out.push(src[i]);
   }
-  out.push(points[points.length - 1]);
+  out.push(src[src.length - 1]);
   return out;
 }
 

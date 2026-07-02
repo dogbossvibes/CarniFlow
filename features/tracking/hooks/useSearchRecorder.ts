@@ -29,6 +29,8 @@ function distM(a: LatLng, b: LatLng): number {
 const MAX_FIX_ACCURACY = 20;     // m — schlechte Fixes verwerfen
 const MIN_SEGMENT = 1.5;         // m — Distanz-Gate
 const SMOOTH_ALPHA = 0.4;        // EMA
+const MAX_JUMP_M = 30;           // m — größerer Einzelsprung = GPS-Glitch → verwerfen
+const MAX_SPEED_MPS = 5;         // m/s (~18 km/h) — realistisch fürs Absuchen; darüber = Ausreißer
 const ON_TRACK_M = 3.0;          // m — innerhalb = "auf der Fährte"
 const BREAK_THRESHOLD_M = 6.0;   // m — darüber für BREAK_HOLD = Abriss
 const BREAK_HOLD_MS = 4000;      // ms — so lange muss die Abweichung halten
@@ -145,6 +147,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const pointsRef = useRef<LatLng[]>([]);
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
+  const lastFixTRef = useRef(0);      // Zeitstempel des letzten akzeptierten Fix (Ausreißer-Filter)
   const distRef = useRef(0);
   const devEmaRef = useRef(0);
   const devSumRef = useRef(0);
@@ -190,7 +193,18 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     setAccuracy(Math.round(acc));
 
     const raw: LatLng = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+    const tNow = loc.timestamp || Date.now();
     const prev = smoothRef.current;
+
+    // GPS-Ausreißer verwerfen: unrealistischer Sprung ggü. der letzten Position →
+    // sonst entsteht ein „Ausbruch" in der Laufspur, der nicht gelaufen wurde.
+    if (prev) {
+      const jump = distM(prev, raw);
+      const dt = lastFixTRef.current ? (tNow - lastFixTRef.current) / 1000 : 0;
+      if (jump > MAX_JUMP_M || (dt > 0 && jump / dt > MAX_SPEED_MPS)) return;
+    }
+    lastFixTRef.current = tNow;
+
     const sm: LatLng = prev
       ? { latitude: prev.latitude + SMOOTH_ALPHA * (raw.latitude - prev.latitude),
           longitude: prev.longitude + SMOOTH_ALPHA * (raw.longitude - prev.longitude) }
@@ -282,7 +296,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   // ── Steuerung ──
   const start = useCallback(() => {
     pointsRef.current = []; breaksRef.current = [];
-    smoothRef.current = null; distRef.current = 0;
+    smoothRef.current = null; lastFixTRef.current = 0; distRef.current = 0;
     devEmaRef.current = 0; devSumRef.current = 0; devCountRef.current = 0;
     offTrackSinceRef.current = null; inBreakRef.current = false;
     cursorMRef.current = 0; maxCursorMRef.current = 0;
