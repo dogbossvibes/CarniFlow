@@ -20,7 +20,7 @@ import { C } from '@/constants/colors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DateField } from '@/components/ui/DateField';
-import { toISODate } from '@/features/dogs/dateInput';
+import { toISODate, fromISODate } from '@/features/dogs/dateInput';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
@@ -76,7 +76,7 @@ export default function HundBearbeitenScreen() {
       setName(d.name);
       setRasse(d.breed ?? '');
       setGeschlecht(d.gender ?? null);
-      setBirth(d.birth_date ? new Date(d.birth_date) : null);
+      setBirth(fromISODate(d.birth_date));
       setGewicht(d.weight_kg != null ? String(d.weight_kg) : '');
       setTitel((d.titles ?? []).join(', '));
       setVater(d.sire ?? '');
