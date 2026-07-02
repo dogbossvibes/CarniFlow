@@ -66,6 +66,8 @@ export interface PrecisionDebugPanelProps {
 
   // GNSS / Provider.
   rawGnssAvailable?: boolean | null;
+  provider?:         string | null;    // z. B. 'gps' / 'expo-location' (Positionsquelle)
+  nativeAvailable?:  boolean | null;   // natives Precision-Modul im Build verfügbar
   gnss?:             GnssStatusAndroid | null;
   providerStatus?:   ProviderStatus | null;
 
@@ -118,7 +120,7 @@ export function PrecisionDebugPanel(props: PrecisionDebugPanelProps) {
     isNativePrecision, platform = Platform.OS as 'ios' | 'android' | 'web',
     phase, gpsQuality, lastRejectedReason, rawPointCount,
     speedMps, heading, headingAccuracy,
-    rawGnssAvailable, gnss, providerStatus,
+    rawGnssAvailable, provider, nativeAvailable, gnss, providerStatus,
     warmupMs, startAllowed,
     devMode = __DEV__, activeLayer, onSelectLayer, onExport,
   } = props;
@@ -175,6 +177,8 @@ export function PrecisionDebugPanel(props: PrecisionDebugPanelProps) {
 
         <SectionTitle>Engine</SectionTitle>
         <Row label="Engine" value={isNative ? 'Native Precision' : 'Expo Fallback'} color={isNative ? C.trackPrimary : C.trackWarning} />
+        <Row label="Provider" value={provider ?? '–'} />
+        <Row label="Native verfügbar" value={yesNo(nativeAvailable)} />
         <Row label="Plattform" value={platform === 'ios' ? 'iOS' : platform === 'android' ? 'Android' : 'Web'} />
 
         <SectionTitle>GPS</SectionTitle>

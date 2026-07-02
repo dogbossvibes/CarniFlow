@@ -19,6 +19,8 @@ import { createTrackSession } from '@/features/tracking/services/trackService';
 import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
 import { ANGLE_LABEL } from '@/features/tracking/utils/angleClassify';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
+import type { GpsStats } from '@/features/tracking/engine/types';
 import { useToast } from '@/components/ui/Toast';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import type { AngleKind, MarkerMaterial } from '@/features/tracking/store/trackingStore';
@@ -43,6 +45,9 @@ function clock(sec: number) {
 }
 
 const haptic = (fn: () => void) => { try { fn(); } catch { /* haptics optional */ } };
+
+// GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Aufnahme nicht).
+const SHOW_GPS_DEBUG = __DEV__;
 
 // Untergrund + Beschaffenheit (vor dem Legen wählbar, während GPS stabilisiert).
 const SURFACES = ['Acker', 'Wiese', 'Wald', 'Mischung'] as const;
@@ -244,6 +249,18 @@ export default function LegenScreen() {
     { value: String(winkel), label: 'Winkel' },
     { value: gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : '–', label: 'GPS', warn: gpsPoor },
   ];
+
+  // GPS-Debug (nur Dev): schlankes gpsDebug → GpsStats fürs PrecisionDebugPanel (nur lesend).
+  const dbg = rec.gpsDebug;
+  const rej = dbg?.rejectedCount ?? 0;
+  const gpsDebugStats: GpsStats = {
+    rawCount:      trackPoints.length + rej,
+    filteredCount: trackPoints.length,
+    rejectedCount: rej,
+    rejectionRate: (trackPoints.length + rej) > 0 ? rej / (trackPoints.length + rej) : 0,
+    lastAccuracy:  gpsAccuracy ?? null,
+    bestAccuracy:  null,
+  };
 
   return (
     <View className="flex-1 bg-ft-bg">
@@ -500,6 +517,21 @@ export default function LegenScreen() {
           ))}
         </View>
       </AnyvoBottomSheet>
+
+      {SHOW_GPS_DEBUG && (
+        <PrecisionDebugPanel
+          engineLabel={dbg?.source === 'native' ? 'native' : 'expo'}
+          stats={gpsDebugStats}
+          status={null}
+          phase={phase}
+          isNativePrecision={dbg?.source === 'native'}
+          provider={dbg?.provider ?? null}
+          nativeAvailable={dbg?.isNativeAvailable ?? null}
+          rawGnssAvailable={dbg?.rawGnssSupported ?? null}
+          rawPointCount={trackPoints.length}
+          devMode
+        />
+      )}
 
       {toast}
     </View>

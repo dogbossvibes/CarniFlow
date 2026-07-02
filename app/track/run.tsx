@@ -13,6 +13,11 @@ import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/h
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
+import type { GpsStats } from '@/features/tracking/engine/types';
+
+// GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Absuche nicht).
+const SHOW_GPS_DEBUG = __DEV__;
 import { startTrackRun, finishTrackRun, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 
 // Blinkender LIVE-Punkt.
@@ -135,6 +140,18 @@ export default function TrackRunScreen() {
     { value: s.accuracy != null ? `${Math.round(s.accuracy)} m` : '—', label: 'GPS' },
   ];
 
+  // GPS-Debug (nur Dev): schlankes gpsDebug → GpsStats fürs PrecisionDebugPanel (nur lesend).
+  const dbg = s.gpsDebug;
+  const rej = dbg?.rejectedCount ?? 0;
+  const gpsDebugStats: GpsStats = {
+    rawCount:      s.points.length + rej,
+    filteredCount: s.points.length,
+    rejectedCount: rej,
+    rejectionRate: (s.points.length + rej) > 0 ? rej / (s.points.length + rej) : 0,
+    lastAccuracy:  s.accuracy ?? null,
+    bestAccuracy:  null,
+  };
+
   return (
     <View className="flex-1 bg-ft-bg">
       <SafeAreaView edges={['top']} className="flex-1">
@@ -231,6 +248,21 @@ export default function TrackRunScreen() {
           </Pressable>
         </View>
       </SafeAreaView>
+
+      {SHOW_GPS_DEBUG && (
+        <PrecisionDebugPanel
+          engineLabel={dbg?.source === 'native' ? 'native' : 'expo'}
+          stats={gpsDebugStats}
+          status={null}
+          phase="recording"
+          isNativePrecision={dbg?.source === 'native'}
+          provider={dbg?.provider ?? null}
+          nativeAvailable={dbg?.isNativeAvailable ?? null}
+          rawGnssAvailable={dbg?.rawGnssSupported ?? null}
+          rawPointCount={s.points.length}
+          devMode
+        />
+      )}
     </View>
   );
 }
