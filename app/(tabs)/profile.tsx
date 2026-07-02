@@ -264,7 +264,7 @@ export default function ProfilScreen() {
             <Text style={s.anzeigeName}>{anzeigeName}</Text>
             <Text style={s.emailText}>{email}</Text>
           </View>
-          <TouchableOpacity style={s.bearbeitenBtn} activeOpacity={0.7}>
+          <TouchableOpacity style={s.bearbeitenBtn} activeOpacity={0.7} onPress={() => router.push('/edit-profile')}>
             <Ionicons name="create-outline" size={17} color={C.muted} />
           </TouchableOpacity>
         </View>

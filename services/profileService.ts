@@ -9,6 +9,16 @@ export function getProfile(userId: string) {
     .single<Profile>();
 }
 
+// Anzeigenamen ändern: Auth-Metadaten (Quelle für die Anzeige: user_metadata.full_name)
+// UND die profiles-Tabelle spiegeln, damit beide konsistent sind.
+export async function updateDisplayName(userId: string, fullName: string): Promise<{ error: string | null }> {
+  const name = fullName.trim();
+  const { error: authErr } = await supabase.auth.updateUser({ data: { full_name: name } });
+  if (authErr) return { error: authErr.message };
+  const { error: dbErr } = await supabase.from('profiles').update({ full_name: name }).eq('id', userId);
+  return { error: dbErr?.message ?? null };
+}
+
 export function upgradeToPremium(userId: string, expiresAt: string) {
   return supabase
     .from('profiles')
