@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { initMonitoring, captureError } from '@/lib/monitoring';
 import { SyncProvider } from '@/features/sync/components/SyncProvider';
+import { AppLockGate } from '@/components/AppLockGate';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
 void initMonitoring();
@@ -75,6 +76,7 @@ export default function RootLayout() {
         <Stack.Screen name="sync" />
         <Stack.Screen name="dev/offline-debug" />
       </Stack>
+      <AppLockGate />
     </SessionProvider>
     </QueryClientProvider>
     </GestureHandlerRootView>

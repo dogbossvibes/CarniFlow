@@ -8,6 +8,10 @@ import { useCapabilities } from "@/hooks/useCapabilities";
 import { useAccess } from "@/hooks/useAccess";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { useNotificationSetting } from "@/hooks/useNotificationSetting";
+import { useAppLockSetting } from "@/hooks/useAppLockSetting";
+// expo-local-authentication defensiv laden (nativ; ohne Modul kein Crash).
+const LocalAuth: typeof import("expo-local-authentication") | null =
+  (() => { try { return require("expo-local-authentication"); } catch { return null; } })();
 import { useAutoDetectSetting } from "@/hooks/useAutoDetectSetting";
 import { useVolumeKeyArticleSetting } from "@/hooks/useVolumeKeyArticleSetting";
 import { useCrashReporting } from "@/hooks/useCrashReporting";
@@ -130,6 +134,29 @@ export default function ProfilScreen() {
         ]
       );
     }
+  };
+
+  const appLock = useAppLockSetting();
+
+  // App-Sperre umschalten: beim Aktivieren prüfen, ob Biometrie/Geräte-Code
+  // eingerichtet ist — sonst Hinweis und nicht aktivieren.
+  const handleAppLock = async (value: boolean) => {
+    if (value) {
+      if (!LocalAuth) {
+        Alert.alert("Nicht verfügbar", "Die App-Sperre ist in diesem Build noch nicht verfügbar (benötigt einen neuen Build).");
+        return;
+      }
+      const hasHw = await LocalAuth.hasHardwareAsync().catch(() => false);
+      const enrolled = await LocalAuth.isEnrolledAsync().catch(() => false);
+      if (!hasHw || !enrolled) {
+        Alert.alert(
+          "Nicht eingerichtet",
+          "Richte zuerst Face ID / Touch ID / Fingerabdruck oder einen Geräte-Code in den Systemeinstellungen ein.",
+        );
+        return;
+      }
+    }
+    await appLock.setAppLock(value);
   };
 
   const { expiresAt } = usePlan();
@@ -430,6 +457,20 @@ export default function ProfilScreen() {
               value={benachrichtigungen.enabled}
               onValueChange={handleBenachrichtigungen}
               disabled={benachrichtigungen.busy || !benachrichtigungen.loaded}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+            />
+          </View>
+          <View style={s.trenner} />
+          <View style={s.zeile}>
+            <View style={s.zeileIcon}>
+              <Ionicons name="lock-closed-outline" size={17} color={C.muted} />
+            </View>
+            <Text style={[s.zeileLabel, { flex: 1 }]}>App-Sperre (Face ID / Fingerabdruck)</Text>
+            <Switch
+              value={appLock.enabled}
+              onValueChange={handleAppLock}
+              disabled={!appLock.loaded}
               trackColor={{ false: C.cardAlt, true: C.accent }}
               thumbColor={C.white}
             />
