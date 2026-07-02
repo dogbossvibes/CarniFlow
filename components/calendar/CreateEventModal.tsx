@@ -16,26 +16,14 @@ import { LocationPickerCard } from '@/components/calendar/LocationPickerCard';
 import { ReminderCard } from '@/components/calendar/ReminderCard';
 import { ConnectedTrainerSelector } from '@/components/calendar/ConnectedTrainerSelector';
 import { StickyCreateAppointmentButton } from '@/components/calendar/StickyCreateAppointmentButton';
+import { DateField } from '@/components/ui/DateField';
 import type { CalendarEvent, EventType } from '@/types/calendar';
 
 const ACCENT = '#00F5D4';
 
-function fmtDateInput(t: string): string {
-  const c = t.replace(/\D/g, '');
-  if (c.length >= 4) return `${c.slice(0, 2)}.${c.slice(2, 4)}.${c.slice(4, 8)}`;
-  if (c.length >= 2) return `${c.slice(0, 2)}.${c.slice(2)}`;
-  return c;
-}
-function fmtTimeInput(t: string): string {
-  const c = t.replace(/\D/g, '');
-  return c.length >= 2 ? `${c.slice(0, 2)}:${c.slice(2, 4)}` : c;
-}
-function toISO(dateCH: string, timeHM: string): string | null {
-  const dm = dateCH.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  const tm = timeHM.match(/^(\d{2}):(\d{2})$/);
-  if (!dm || !tm) return null;
-  const d = new Date(+dm[3], +dm[2] - 1, +dm[1], +tm[1], +tm[2]);
-  return isNaN(d.getTime()) ? null : d.toISOString();
+// Datum (nur Tag) + Zeit (nur Stunde/Minute) zu einem lokalen ISO-Zeitstempel.
+function combineISO(date: Date, time: Date): string {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), time.getHours(), time.getMinutes()).toISOString();
 }
 
 export function CreateEventModal({ visible, onClose, onCreated }: { visible: boolean; onClose: () => void; onCreated: (e: CalendarEvent) => void }) {
@@ -43,9 +31,9 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
 
   const [types, setTypes]   = useState<EventType[]>(['training']);
   const [title, setTitle]   = useState('');
-  const [date, setDate]     = useState('');
-  const [start, setStart]   = useState('');
-  const [end, setEnd]       = useState('');
+  const [date, setDate]         = useState<Date | null>(null);
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [endTime, setEndTime]     = useState<Date | null>(null);
   const [dogIds, setDogIds] = useState<string[]>([]);
   const [location, setLocation] = useState('');
   const [notes, setNotes]   = useState('');
@@ -59,7 +47,7 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
   const toggle = <T,>(arr: T[], v: T) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
 
   const reset = () => {
-    setTypes(['training']); setTitle(''); setDate(''); setStart(''); setEnd('');
+    setTypes(['training']); setTitle(''); setDate(null); setStartTime(null); setEndTime(null);
     setDogIds([]); setLocation(''); setNotes(''); setNotesOpen(false);
     setReminders([60]); setPushOn(true); setTrainerId(null); setSyncDevice(false);
   };
@@ -68,9 +56,9 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
     if (!session?.user.id) return;
     if (types.length === 0) { Alert.alert('Art wählen', 'Bitte wähle mindestens eine Termin-Art.'); return; }
     if (!title.trim())      { Alert.alert('Titel fehlt', 'Bitte gib dem Termin einen Titel.'); return; }
-    const startISO = toISO(date, start);
-    if (!startISO)          { Alert.alert('Datum/Zeit', 'Bitte Datum (TT.MM.JJJJ) und Startzeit (HH:MM) angeben.'); return; }
-    const endISO = end ? toISO(date, end) : null;
+    if (!date || !startTime) { Alert.alert('Datum/Zeit', 'Bitte Datum und Startzeit wählen.'); return; }
+    const startISO = combineISO(date, startTime);
+    const endISO = endTime ? combineISO(date, endTime) : null;
 
     setSaving(true);
     const { data, error } = await createOwnEvent(session.user.id, {
@@ -107,7 +95,7 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
         </View>
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={s.label}>ART  ·  Mehrfachauswahl</Text>
             <AppointmentTypeGrid selected={types} onToggle={t => setTypes(p => toggle(p, t))} />
 
@@ -121,10 +109,10 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
             <Text style={[s.label, { marginTop: 18 }]}>TITEL</Text>
             <TextInput style={s.input} value={title} onChangeText={setTitle} placeholder="z. B. Fährtentraining" placeholderTextColor={C.subtle} />
 
+            <DateField label="DATUM" mode="date" value={date} onChange={setDate} placeholder="TT.MM.JJJJ" style={{ marginTop: 18 }} />
             <View style={s.timeRow}>
-              <GlassField label="DATUM" flex={1.3}><TextInput style={s.glassInput} value={date} onChangeText={t => setDate(fmtDateInput(t))} placeholder="TT.MM.JJJJ" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={10} /></GlassField>
-              <GlassField label="START" flex={1}><TextInput style={s.glassInput} value={start} onChangeText={t => setStart(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></GlassField>
-              <GlassField label="ENDE" flex={1}><TextInput style={s.glassInput} value={end} onChangeText={t => setEnd(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></GlassField>
+              <DateField label="START" mode="time" value={startTime} onChange={setStartTime} placeholder="HH:MM" style={{ flex: 1 }} />
+              <DateField label="ENDE" mode="time" value={endTime} onChange={setEndTime} onClear={() => setEndTime(null)} placeholder="HH:MM" style={{ flex: 1 }} />
             </View>
 
             <Text style={[s.label, { marginTop: 18 }]}>HUND</Text>
@@ -166,20 +154,10 @@ export function CreateEventModal({ visible, onClose, onCreated }: { visible: boo
 
             <View style={{ height: 20 }} />
           </ScrollView>
+          <StickyCreateAppointmentButton onPress={save} loading={saving} />
         </KeyboardAvoidingView>
-
-        <StickyCreateAppointmentButton onPress={save} loading={saving} />
       </SafeAreaView>
     </Modal>
-  );
-}
-
-function GlassField({ label, children, flex }: { label: string; children: React.ReactNode; flex: number }) {
-  return (
-    <View style={[s.glassCard, { flex }]}>
-      <Text style={s.glassLabel}>{label}</Text>
-      {children}
-    </View>
   );
 }
 
@@ -191,10 +169,7 @@ const s = StyleSheet.create({
   body:   { paddingHorizontal: 20, paddingTop: 6 },
   label:  { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10 },
   input:  { backgroundColor: C.input, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 12, color: C.white, fontSize: 15 },
-  timeRow:{ flexDirection: 'row', gap: 10, marginTop: 18 },
-  glassCard:  { backgroundColor: 'rgba(20,20,20,0.6)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', padding: 12 },
-  glassLabel: { fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
-  glassInput: { color: C.white, fontSize: 15, fontWeight: '700', padding: 0 },
+  timeRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 18 },
   notesHead:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 16 },
   notesHeadTxt: { flex: 1, fontSize: 15, color: C.white, fontWeight: '600' },
   syncSub:      { fontSize: 11.5, color: C.muted, marginTop: 2 },
