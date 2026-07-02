@@ -8,10 +8,9 @@ import { Input } from '@/components/ui/Input';
 import { useSession } from '@/hooks/useSession';
 import { queryClient } from '@/lib/queryClient';
 import { updateDisplayName } from '@/services/profileService';
-import { updateEmail, updatePassword } from '@/services/auth';
+import { updatePassword } from '@/services/auth';
 
 const PROVIDER_LABEL: Record<string, string> = { apple: 'Apple', google: 'Google' };
-const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -24,12 +23,10 @@ export default function EditProfileScreen() {
   const providerLabel = PROVIDER_LABEL[provider] ?? provider;
 
   const [name, setName] = useState<string>(user?.user_metadata?.full_name ?? '');
-  const [email, setEmail] = useState<string>(user?.email ?? '');
   const [pw1, setPw1] = useState('');
   const [pw2, setPw2] = useState('');
 
   const [savingName, setSavingName] = useState(false);
-  const [savingEmail, setSavingEmail] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
 
   const currentEmail = user?.email ?? '';
@@ -44,19 +41,6 @@ export default function EditProfileScreen() {
     if (error) { Alert.alert('Fehler', 'Konnte nicht gespeichert werden. Bitte später erneut versuchen.'); return; }
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     router.back();
-  };
-
-  const emailAendern = async () => {
-    if (!emailValid(email)) { Alert.alert('E-Mail ungültig', 'Bitte gib eine gültige E-Mail-Adresse ein.'); return; }
-    if (email.trim().toLowerCase() === currentEmail.toLowerCase()) { Alert.alert('Hinweis', 'Das ist bereits deine aktuelle E-Mail-Adresse.'); return; }
-    setSavingEmail(true);
-    const { error } = await updateEmail(email);
-    setSavingEmail(false);
-    if (error) { Alert.alert('Fehler', error.message || 'E-Mail konnte nicht geändert werden.'); return; }
-    Alert.alert(
-      'Bestätigung gesendet',
-      `Wir haben eine Bestätigung an ${email.trim()} geschickt. Bitte öffne den Link in der E-Mail, um die Änderung abzuschließen.`,
-    );
   };
 
   const passwortAendern = async () => {
@@ -92,25 +76,17 @@ export default function EditProfileScreen() {
 
         <Input label="Name" placeholder="Dein Name" value={name} onChangeText={setName} autoCapitalize="words" />
 
-        {/* E-Mail */}
+        {/* E-Mail (nur Anzeige) */}
         <Text style={s.label}>E-MAIL</Text>
-        {isPasswordAccount ? (
-          <>
-            <Input placeholder="name@beispiel.ch" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-            <TouchableOpacity style={[s.actionBtn, savingEmail && { opacity: 0.5 }]} onPress={emailAendern} disabled={savingEmail} activeOpacity={0.8}>
-              {savingEmail ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.actionTxt}>E-Mail ändern</Text>}
-            </TouchableOpacity>
-            <Text style={s.hint}>Nach dem Ändern erhältst du eine Bestätigungs-E-Mail an die neue Adresse.</Text>
-          </>
-        ) : (
-          <>
-            <View style={s.readonly}>
-              <Text style={s.readonlyTxt}>{currentEmail || '—'}</Text>
-              <Ionicons name="lock-closed" size={14} color={C.subtle} />
-            </View>
-            <Text style={s.hint}>Du bist über {providerLabel} angemeldet — deine E-Mail wird dort verwaltet.</Text>
-          </>
-        )}
+        <View style={s.readonly}>
+          <Text style={s.readonlyTxt}>{currentEmail || '—'}</Text>
+          <Ionicons name="lock-closed" size={14} color={C.subtle} />
+        </View>
+        <Text style={s.hint}>
+          {isPasswordAccount
+            ? 'E-Mail-Änderung ist derzeit nicht verfügbar.'
+            : `Du bist über ${providerLabel} angemeldet — deine E-Mail wird dort verwaltet.`}
+        </Text>
 
         {/* Passwort */}
         <Text style={s.label}>PASSWORT</Text>
