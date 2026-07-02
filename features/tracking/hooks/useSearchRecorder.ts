@@ -10,6 +10,17 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Location from 'expo-location';
+import {
+  startPositionSource, sampleToLocationObject, type LocationSourceKind,
+} from '@/features/tracking/utils/positionSource';
+
+export interface GpsDebug {
+  source: LocationSourceKind | null;
+  provider: string | null;
+  isNativeAvailable: boolean;
+  rawGnssSupported: boolean;
+  rejectedCount: number;
+}
 
 export type LatLng = { latitude: number; longitude: number };
 export type SearchObject = { at: LatLng; index: number; material: string };
@@ -111,6 +122,7 @@ export interface SearchRecorder {
   elapsedS: number;
   score: number;
   accuracy: number | null;
+  gpsDebug: GpsDebug;
   start: () => void;
   stop: () => SearchResult;
   setPaused: (p: boolean) => void;
@@ -140,6 +152,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const [position, setPosition] = useState<LatLng | null>(null);
   const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, score: 0 });
   const [elapsedS, setElapsedS] = useState(0);
+  const [gpsDebug, setGpsDebug] = useState<GpsDebug>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
 
   // ── Refs (live im Callback) ──
   const recordingRef = useRef(false);
@@ -148,6 +161,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
   const lastFixTRef = useRef(0);      // Zeitstempel des letzten akzeptierten Fix (Ausreißer-Filter)
+  const rejectedRef = useRef(0);      // verworfene Fixes (Ausreißer/Genauigkeit) — Debug
   const distRef = useRef(0);
   const devEmaRef = useRef(0);
   const devSumRef = useRef(0);
@@ -201,7 +215,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     if (prev) {
       const jump = distM(prev, raw);
       const dt = lastFixTRef.current ? (tNow - lastFixTRef.current) / 1000 : 0;
-      if (jump > MAX_JUMP_M || (dt > 0 && jump / dt > MAX_SPEED_MPS)) return;
+      if (jump > MAX_JUMP_M || (dt > 0 && jump / dt > MAX_SPEED_MPS)) { rejectedRef.current++; return; }
     }
     lastFixTRef.current = tNow;
 
@@ -213,7 +227,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     setPosition(sm);
 
     if (!recordingRef.current || pausedRef.current) return;
-    if (acc > MAX_FIX_ACCURACY) return;
+    if (acc > MAX_FIX_ACCURACY) { rejectedRef.current++; return; }
 
     const pts = pointsRef.current;
     if (pts.length > 0) {
@@ -278,10 +292,17 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted' || !mounted) return;
       setReady(true);
-      watchRef.current = await Location.watchPositionAsync(
+      // Zentrale Positionsquelle: natives Precision-Modul bevorzugt, expo-Fallback.
+      const handle = await startPositionSource(
+        (s) => {
+          setGpsDebug(d => (d.source === s.source && d.provider === s.provider) ? d : { ...d, source: s.source, provider: s.provider });
+          onFix(sampleToLocationObject(s));
+        },
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 },
-        (loc) => onFix(loc),
       );
+      if (!mounted) { handle.stop(); return; }   // Unmount während des Starts → kein Leak
+      watchRef.current = { remove: handle.stop };
+      setGpsDebug(d => ({ ...d, isNativeAvailable: handle.info.isNativeAvailable, rawGnssSupported: handle.info.rawGnssSupported, source: d.source ?? handle.info.source }));
     })();
     return () => { mounted = false; watchRef.current?.remove(); };
   }, [onFix]);
@@ -289,14 +310,17 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   // ── Timer ──
   useEffect(() => {
     if (!recording || paused) return;
-    const id = setInterval(() => setElapsedS(Math.floor((Date.now() - startMsRef.current) / 1000)), 1000);
+    const id = setInterval(() => {
+      setElapsedS(Math.floor((Date.now() - startMsRef.current) / 1000));
+      setGpsDebug(d => d.rejectedCount === rejectedRef.current ? d : { ...d, rejectedCount: rejectedRef.current });
+    }, 1000);
     return () => clearInterval(id);
   }, [recording, paused]);
 
   // ── Steuerung ──
   const start = useCallback(() => {
     pointsRef.current = []; breaksRef.current = [];
-    smoothRef.current = null; lastFixTRef.current = 0; distRef.current = 0;
+    smoothRef.current = null; lastFixTRef.current = 0; rejectedRef.current = 0; distRef.current = 0;
     devEmaRef.current = 0; devSumRef.current = 0; devCountRef.current = 0;
     offTrackSinceRef.current = null; inBreakRef.current = false;
     cursorMRef.current = 0; maxCursorMRef.current = 0;
@@ -341,6 +365,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     points: snap.points, position, deviationM: snap.deviationM, onTrack: snap.onTrack,
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
     distanceM: snap.distanceM, elapsedS, score: snap.score, accuracy,
+    gpsDebug,
     start, stop, setPaused, markObject,
   };
 }

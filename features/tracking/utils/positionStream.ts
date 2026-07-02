@@ -8,6 +8,8 @@ export interface StreamSample extends GpsSample {
   altitude?: number | null;
   speed?:    number | null;
   course?:   number | null;   // Bewegungsrichtung (Telefon-GPS)
+  provider?: string | null;   // z. B. 'gps' / 'expo-location' (Debug)
+  source?:   'native' | 'expo' | 'external';   // woher der Fix stammt (Debug)
 }
 
 // Einheitliche Positions-Quelle für die Fährtenaufnahme:
@@ -26,7 +28,7 @@ export async function startPositionStream(
       const pts = getRecordedPoints();
       for (let i = lastIdx; i < pts.length; i++) {
         const p = pts[i];
-        onSample({ lat: p.lat, lng: p.lng, accuracy: p.accuracy_m, t: Date.parse(p.timestamp), altitude: p.altitude_m });
+        onSample({ lat: p.lat, lng: p.lng, accuracy: p.accuracy_m, t: Date.parse(p.timestamp), altitude: p.altitude_m, source: 'external', provider: 'external-ble' });
       }
       lastIdx = pts.length;
     });
@@ -42,6 +44,8 @@ export async function startPositionStream(
     altitude: loc.altitude ?? null,
     speed: loc.speed ?? null,
     course: loc.heading ?? loc.bearing ?? null,
+    provider: loc.provider ?? null,
+    source: client.isNativeAvailable() ? 'native' : 'expo',
   }));
   await client.start({
     intervalMs: opts.timeInterval ?? 1000,

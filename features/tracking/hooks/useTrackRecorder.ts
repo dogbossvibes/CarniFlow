@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
+import {
+  startPositionSource, sampleToLocationObject, type LocationSourceKind,
+} from '@/features/tracking/utils/positionSource';
 import {
   useTrackingStore,
   type MarkerType, type MarkerMaterial, type AngleKind, type TrackPointSample, type MarkerSample,
@@ -83,6 +86,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const startMs  = useRef<number>(0);
   const recordingRef = useRef(false);   // true ⇒ Fixes fließen in die Linie
   const bgActiveRef  = useRef(false);   // true ⇒ Hintergrund-Updates (Foreground-Service) laufen
+
+  // GPS-Quelle/Debug (zentrale positionSource: native bevorzugt, expo-Fallback).
+  const rejectedRef = useRef(0);        // verworfene Fixes (Genauigkeit/Speed)
+  const [gpsDebug, setGpsDebug] = useState<{
+    source: LocationSourceKind | null; provider: string | null;
+    isNativeAvailable: boolean; rawGnssSupported: boolean; rejectedCount: number;
+  }>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
 
   // Track-Zustand in Refs → kein Stale-Closure im Fix-Handler.
   const pointsRef     = useRef<AcceptedPoint[]>([]);   // akzeptierte, geglättete Linie
@@ -244,12 +254,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (!recordingRef.current || s.isPaused) return;
 
     // 1) Zu ungenauer / unrealistischer Fix → kein Linienpunkt (Puck steht schon).
-    if (raw.accuracy == null || raw.accuracy > MAX_ACCURACY_M) return;
+    if (raw.accuracy == null || raw.accuracy > MAX_ACCURACY_M) { rejectedRef.current++; return; }
     const prevRaw = lastRawRef.current;
     if (prevRaw) {
       const d = calculateDistance(prevRaw, raw);
       const dt = (raw.t - prevRaw.t) / 1000;
-      if (dt > 0 && d / dt > MAX_SPEED_MPS) return;   // unrealistischer Sprung
+      if (dt > 0 && d / dt > MAX_SPEED_MPS) { rejectedRef.current++; return; }   // unrealistischer Sprung
     }
     lastRawRef.current = raw;
 
@@ -313,7 +323,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // no-op ohne natives Modul oder wenn bereits präzise.
     precisionLocationClient.requestTemporaryFullAccuracy('TrackingDogSportPrecision').catch(() => {});
     try {
-      watchRef.current = await Location.watchPositionAsync(WATCH_OPTS, onFix);
+      // Zentrale Positionsquelle: natives Precision-Modul bevorzugt, expo-Fallback.
+      const handle = await startPositionSource((s) => {
+        // Debug (source/provider) nur bei Änderung setzen — kein Re-Render-Sturm.
+        setGpsDebug(d => (d.source === s.source && d.provider === s.provider) ? d : { ...d, source: s.source, provider: s.provider });
+        onFix(sampleToLocationObject(s));
+      }, WATCH_OPTS);
+      watchRef.current = { remove: handle.stop };
+      setGpsDebug(d => ({ ...d, isNativeAvailable: handle.info.isNativeAvailable, rawGnssSupported: handle.info.rawGnssSupported, source: d.source ?? handle.info.source }));
     } catch {
       return { error: 'GPS konnte nicht gestartet werden. Bitte kurz im Freien erneut versuchen.' };
     }
@@ -343,6 +360,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     emaRef.current = null;
     puckRef.current = null;
     lastRawRef.current = null;
+    rejectedRef.current = 0;
     lastCornerAtRef.current = -Infinity;
     lastAbrissAtRef.current = -Infinity;
     dwellRef.current = null;
@@ -358,6 +376,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       const sec = Math.floor((Date.now() - startMs.current) / 1000);
       const st = store.getState();
       st.setDuration(sec);
+      // Debug: verworfene Fixes gedrosselt (1 Hz) in den State spiegeln.
+      setGpsDebug(d => d.rejectedCount === rejectedRef.current ? d : { ...d, rejectedCount: rejectedRef.current });
       // Live Activity gedrosselt aktualisieren (alle 3 s, nicht im Sekundentakt).
       if (sec % 3 === 0) updateFaehrteActivity({ elapsedS: sec, distanceM: st.distanceMeters, paused: st.isPaused });
     }, 1000);
@@ -451,5 +471,5 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     return { error: res.error };
   }, [stopAll, store, flushPoints]);
 
-  return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll };
+  return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll, gpsDebug };
 }
