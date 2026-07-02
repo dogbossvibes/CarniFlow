@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useDogs } from '@/hooks/useDogs';
@@ -65,6 +66,7 @@ function RecDot() {
 // (rechts/links/spitz) werden automatisch erkannt, Haptik bei jeder Erkennung.
 export default function LegenScreen() {
   const router = useRouter();
+  useKeepAwake();   // Display während des Legens anlassen (Bildschirm nicht sperren)
   const params = useLocalSearchParams<{ dogId?: string }>();
   const { session } = useSession();
   const { dogs } = useDogs();

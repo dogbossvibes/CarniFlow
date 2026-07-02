@@ -3,12 +3,14 @@ import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
 import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
 import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
+import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { startTrackRun, finishTrackRun, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 
@@ -33,6 +35,7 @@ function RecDot() {
 export default function TrackRunScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  useKeepAwake();   // Display während der Absuche anlassen (Bildschirm nicht sperren)
 
   // Snapshot der gelegten Fährte EINMAL beim Betreten festhalten (stabil).
   const [snap] = useState(() => {
@@ -83,6 +86,13 @@ export default function TrackRunScreen() {
     [snap.laidMarkers],
   );
   useTrackVoiceGuidance(curPos, guidanceAngles, voiceOn);
+
+  // Haptische Führung: 1× Vibration bei Gegenstand-Nähe, 2× bei Winkel voraus.
+  const guidanceObjects = useMemo<GuidanceObject[]>(
+    () => snap.laidObjects.map(o => ({ id: `obj-${o.index}`, lat: o.at.latitude, lng: o.at.longitude })),
+    [snap.laidObjects],
+  );
+  useTrackHapticGuidance(curPos, guidanceAngles, guidanceObjects, true);
 
   const hasLaid = snap.laidPoints.length > 1;
   const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
