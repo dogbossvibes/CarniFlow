@@ -52,9 +52,15 @@ supabase/.temp/
 # Google Play Service Account (Secret – nicht committen)
 google-play-service-account.json
 
-# Debug-Screenshots (lokal)
+# Debug-Screenshots (lokal, nicht versionieren)
 fahertescreen.PNG
-faehrtenscreen2.PNG
+/screenshot*
+/screentrainer.png
+/faehrtenscreen*
+
+# Editor-Swap-Dateien (vim)
+*.swp
+*.swo
 
 # Lokale Native-Modul-Build-Artefakte (Gradle)
 modules/*/android/build/
