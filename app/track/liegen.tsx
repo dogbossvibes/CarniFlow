@@ -3,8 +3,10 @@ import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { loadPending } from '@/features/tracking/store/trackPersist';
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 
 // Liegezeit als h:mm:ss (ab 1 h) bzw. mm:ss — die Fährte kann Stunden reifen.
@@ -18,24 +20,50 @@ function fmtAge(sec: number) {
 // zählt die Liegezeit ab `layFinishedAt` hoch; der Nutzer startet die Absuche
 // per Knopf. Die gemessene Liegezeit (Minuten) wird auf der Session gespeichert.
 // Der Lege-Store bleibt unangetastet, damit die Absuche ihn snapshotten kann.
+// Kennzahlen der gelegten Fährte für die Zusammenfassung.
+function summarize(st: { distanceMeters: number; markers: { type: string }[] }) {
+  return {
+    distanceM: Math.round(st.distanceMeters),
+    winkel:    st.markers.filter(m => m.type === 'winkel').length,
+    objekte:   st.markers.filter(m => m.type === 'gegenstand').length,
+  };
+}
+
 export default function TrackLiegenScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  useKeepAwake();   // Timer/Anzeige während der Liegezeit anlassen (Bildschirm nicht sperren)
 
-  const [startMs] = useState(() => useTrackingStore.getState().layFinishedAt ?? Date.now());
+  // Store hat die gelegte Fährte noch → sofort nutzen. Sonst (App wurde in der
+  // Liegezeit gekillt) unten aus dem Offline-Puffer wiederherstellen.
+  const hasStore = useTrackingStore.getState().trackPoints.length > 0;
+  const [startMs, setStartMs] = useState<number | null>(() =>
+    hasStore ? (useTrackingStore.getState().layFinishedAt ?? Date.now()) : null);
   const [now, setNow] = useState(Date.now());
   const [dogName, setDogName] = useState('Hund');
   const [starting, setStarting] = useState(false);
+  const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(() =>
+    hasStore ? summarize(useTrackingStore.getState()) : null);
 
-  // Kennzahlen der gelegten Fährte für die Zusammenfassung (einmalig).
-  const [summary] = useState(() => {
-    const st = useTrackingStore.getState();
-    return {
-      distanceM: Math.round(st.distanceMeters),
-      winkel:    st.markers.filter(m => m.type === 'winkel').length,
-      objekte:   st.markers.filter(m => m.type === 'gegenstand').length,
-    };
-  });
+  // Wiederherstellung nach App-Kill in der Liegezeit: gelegte Fährte + Liegezeit-
+  // Start aus dem Offline-Puffer zurück in den Store spielen, damit die Absuche
+  // sie snapshotten kann und der Timer korrekt weiterläuft.
+  useEffect(() => {
+    if (startMs != null) return;   // Store hatte die Daten → nichts wiederherzustellen
+    let alive = true;
+    loadPending().then(p => {
+      if (!alive) return;
+      if (p && p.trackPoints.length > 0) {
+        useTrackingStore.getState().restorePending(p);
+        setStartMs(p.layFinishedAt ?? Date.now());
+        setSummary(summarize(p));
+      } else {
+        setStartMs(Date.now());   // nichts wiederherstellbar → Timer ab jetzt
+        setSummary({ distanceM: 0, winkel: 0, objekte: 0 });
+      }
+    });
+    return () => { alive = false; };
+  }, [startMs]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -44,10 +72,10 @@ export default function TrackLiegenScreen() {
 
   useEffect(() => { if (id) getTrackSessionDogName(id).then(r => { if (r.data) setDogName(r.data); }); }, [id]);
 
-  const elapsedS = Math.max(0, Math.floor((now - startMs) / 1000));
+  const elapsedS = startMs != null ? Math.max(0, Math.floor((now - startMs) / 1000)) : 0;
 
   const startSearch = async () => {
-    if (starting) return;
+    if (starting || startMs == null) return;   // erst starten, wenn Liegezeit-Start feststeht
     setStarting(true);
     const minutes = Math.max(0, Math.round((Date.now() - startMs) / 60000));
     if (id) await setTrackLyingTime(id, minutes).catch(() => {});
@@ -84,9 +112,9 @@ export default function TrackLiegenScreen() {
           {/* Kennzahlen der gelegten Fährte */}
           <View className="flex-row gap-2 mt-7">
             {[
-              { v: `${summary.distanceM} m`, l: 'Distanz' },
-              { v: String(summary.winkel),   l: 'Winkel' },
-              { v: String(summary.objekte),  l: 'Gegenst.' },
+              { v: `${summary?.distanceM ?? 0} m`, l: 'Distanz' },
+              { v: String(summary?.winkel ?? 0),   l: 'Winkel' },
+              { v: String(summary?.objekte ?? 0),  l: 'Gegenst.' },
             ].map((x, i) => (
               <View key={i} className="items-center px-5 py-3 rounded-[16px] bg-white/5 border border-ft-line">
                 <Text className="text-[17px] font-black text-ft-text" style={{ fontVariant: ['tabular-nums'] }}>{x.v}</Text>
@@ -100,8 +128,8 @@ export default function TrackLiegenScreen() {
         <View className="px-[18px] pt-[14px] pb-[26px]">
           <Pressable
             className="h-[60px] rounded-[18px] flex-row items-center justify-center gap-2 bg-ft-acc"
-            style={starting ? { opacity: 0.5 } : undefined}
-            onPress={startSearch} disabled={starting}
+            style={starting || startMs == null ? { opacity: 0.5 } : undefined}
+            onPress={startSearch} disabled={starting || startMs == null}
           >
             <Ionicons name="play" size={18} color={FT.accText} />
             <Text className="text-[14px] font-extrabold text-ft-acc-text">Absuche starten</Text>

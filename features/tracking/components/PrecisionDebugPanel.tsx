@@ -75,6 +75,12 @@ export interface PrecisionDebugPanelProps {
   warmupMs?:     number | null;
   startAllowed?: boolean | null;
 
+  // Start-Lock (Anti-Start-Drift).
+  startLockActive?:         boolean | null;
+  startAnchorSet?:          boolean | null;
+  startAnchorAccuracy?:     number | null;
+  startDriftRejectedCount?: number | null;
+
   // Sichtbarkeit / Interaktion.
   devMode?:       boolean;                     // Default __DEV__
   activeLayer?:   DebugLayer;
@@ -122,6 +128,7 @@ export function PrecisionDebugPanel(props: PrecisionDebugPanelProps) {
     speedMps, heading, headingAccuracy,
     rawGnssAvailable, provider, nativeAvailable, gnss, providerStatus,
     warmupMs, startAllowed,
+    startLockActive, startAnchorSet, startAnchorAccuracy, startDriftRejectedCount,
     devMode = __DEV__, activeLayer, onSelectLayer, onExport,
   } = props;
 
@@ -222,6 +229,12 @@ export function PrecisionDebugPanel(props: PrecisionDebugPanelProps) {
         <SectionTitle>Warmup</SectionTitle>
         <Row label="Warmup Dauer" value={warmupMs != null ? `${(warmupMs / 1000).toFixed(1)} s` : '–'} />
         <Row label="Start erlaubt" value={yesNo(startAllowed)} color={startAllowed ? C.trackPrimary : C.trackWarning} />
+
+        <SectionTitle>Start-Lock</SectionTitle>
+        <Row label="Start Lock" value={startLockActive == null ? '–' : startLockActive ? 'aktiv' : 'inaktiv'} color={startLockActive ? C.trackWarning : C.trackPrimary} />
+        <Row label="Anchor gesetzt" value={yesNo(startAnchorSet)} color={startAnchorSet ? C.trackPrimary : undefined} />
+        <Row label="Anchor Accuracy" value={fmtM(startAnchorAccuracy)} />
+        <Row label="Start-Drift verworfen" value={fmtNum(startDriftRejectedCount)} color={startDriftRejectedCount ? C.trackDanger : undefined} />
       </ScrollView>
 
       <View style={s.layerRow}>
@@ -280,6 +293,12 @@ export function buildDebugSnapshot(p: PrecisionDebugPanelProps) {
     } : null,
     warmupMs:     p.warmupMs ?? null,
     startAllowed: p.startAllowed ?? null,
+    startLock: {
+      active:            p.startLockActive ?? null,
+      anchorSet:         p.startAnchorSet ?? null,
+      anchorAccuracy:    p.startAnchorAccuracy ?? null,
+      driftRejectedCount: p.startDriftRejectedCount ?? null,
+    },
   };
 }
 

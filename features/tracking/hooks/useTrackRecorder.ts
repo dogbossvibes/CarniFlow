@@ -8,7 +8,7 @@ import {
   type MarkerType, type MarkerMaterial, type AngleKind, type TrackPointSample, type MarkerSample,
 } from '@/features/tracking/store/trackingStore';
 import {
-  calculateDistance, calculateHeading, calculateAverageAccuracy, type LatLng,
+  calculateDistance, calculateHeading, calculateAverageAccuracy, medianLatLng, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
 import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/services/trackService';
 import { supabase } from '@/lib/supabase';
@@ -56,6 +56,18 @@ const ABRISS_DWELL_RADIUS_M = 1.5;   // „steht", solange innerhalb dieses Radi
 const ABRISS_RESUME_M       = 4.0;   // so weit nach dem Halt laufen, bevor Richtung bewertet wird
 const ABRISS_MAX_TURN_DEG   = 25;    // mehr Richtungsänderung ⇒ Winkel, kein Abriss
 const ABRISS_AFTER_OBJECT_MS = 8000; // kein Abriss kurz nach manuellem Gegenstand (Fehlauslöser)
+
+// Start-Lock: Stabilisierungsphase direkt nach „Fährte legen". Verhindert, dass
+// GPS-Warmup-/Startdrift (auf iPhone real ~8 m, obwohl man steht) als echte
+// Trackstrecke gespeichert wird. Solange aktiv: KEINE Linie, KEINE Distanz,
+// KEINE Winkel/Abriss — nur gute Fixes für den Startanker sammeln.
+const START_LOCK_MIN_MS       = 5000;   // frühestens nach 5 s freigeben
+const START_LOCK_MAX_MS       = 12000;  // spätestens nach 12 s (Nutzer läuft evtl. schon) — nie ewig blockieren
+const START_ANCHOR_MIN_FIXES  = 4;      // so viele gute Fixes → Median-Anker
+const START_ANCHOR_MAX_ACC_M  = 20;     // nur Fixes ≤ 20 m fließen in den Anker
+const START_MOVE_MIN_M        = 3.5;    // so weit vom Anker weg = echte Bewegung
+const START_MOVE_MIN_SPEED    = 0.5;    // m/s: zusätzliche Bewegungsbestätigung
+const START_MOVE_CONFIRM_HITS = 2;      // so viele aufeinanderfolgende Bewegungs-Fixes (kein Einzelsprung)
 
 const WATCH_OPTS: Location.LocationOptions = {
   accuracy:         Location.Accuracy.BestForNavigation,
@@ -105,6 +117,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const dwellRef         = useRef<{ pos: LatLng; since: number; headingIn: number | null; cumDist: number } | null>(null);
   const pendingAbrissRef = useRef<{ at: LatLng; headingIn: number; atCumDist: number } | null>(null);
   const lastObjectAtRef  = useRef<number>(-Infinity);  // Zeit (ms) des letzten Gegenstand-Markers
+  // Start-Lock (Stabilisierungsphase): Anker + Bewegungserkennung + Drift-Zähler.
+  const startLockRef      = useRef<boolean>(false);              // true ⇒ Startphase aktiv
+  const startLockBeganRef = useRef<number>(0);                   // ms: Beginn der Startphase
+  const startFixesRef     = useRef<{ lat: number; lng: number; accuracy: number; t: number }[]>([]);
+  const startAnchorRef    = useRef<LatLng | null>(null);         // berechneter Startanker
+  const startAnchorAccRef = useRef<number | null>(null);         // Ø-Genauigkeit des Ankers
+  const startMoveHitsRef  = useRef<number>(0);                   // aufeinanderfolgende Bewegungs-Fixes
+  const startDriftRejRef  = useRef<number>(0);                   // in der Startphase verworfene Drift-Fixes
   const onAngleRef    = useRef<TrackRecorderOptions['onAngle']>(opts?.onAngle);
   onAngleRef.current  = opts?.onAngle;
   // Auto-Erkennung (Winkel/Spitzwinkel/Abriss) ein/aus — live umschaltbar via Ref.
@@ -127,6 +147,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   const stopAll = useCallback(() => {
     recordingRef.current = false;
+    startLockRef.current = false;
     watchRef.current?.remove(); watchRef.current = null;
     headRef.current?.remove();  headRef.current = null;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
@@ -136,6 +157,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       void stopBackgroundUpdates();
     }
     const st = store.getState();
+    if (st.startLockActive) st.setStartLockActive(false);
     stopFaehrteActivity({ elapsedS: st.durationSeconds, distanceM: st.distanceMeters });
   }, [store]);
 
@@ -154,34 +176,44 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker);
   }, [store]);
 
-  // Winkel über zwei Schenkel: vom neuesten Punkt LEG_MIN_M zurück = Scheitel B,
-  // davon nochmal LEG_MIN_M zurück = Anker A. Differenz der Bearings A→B / B→C.
-  // Der erkannte Winkel wird direkt am Scheitel B gesetzt.
+  // Winkel über zwei Schenkel (Einlauf A→Scheitel, Scheitel→Auslauf). Statt stur
+  // den Punkt „LEG_MIN_M zurück" als Scheitel zu nehmen (der oft NEBEN der Ecke
+  // liegt → Marker passte nicht), wird unter allen möglichen Scheiteln im frischen
+  // Fenster der mit der SCHÄRFSTEN Richtungsänderung gesucht = der echte
+  // Winkelpunkt. So sitzt der Marker exakt auf der Ecke und ein sauberer 90°-Knick
+  // wird als rechtwinklig (links/rechts) statt „verschmiert" erkannt.
   const detectCorner = useCallback(() => {
     const pts = pointsRef.current;
     const n = pts.length;
     if (n < 3) return;
     const C = pts[n - 1];
 
-    let bi = n - 1;
-    while (bi > 0 && C.cumDist - pts[bi].cumDist < LEG_MIN_M) bi--;
-    if (bi <= 0) return;
-    const B = pts[bi];
+    // Bester Scheitel-Kandidat: braucht je einen vollen Schenkel (≥ LEG_MIN_M)
+    // davor UND danach; unter diesen gewinnt die größte Richtungsänderung.
+    let best: { apex: AcceptedPoint; diff: number; mag: number } | null = null;
+    for (let k = n - 2; k > 0; k--) {
+      const apex = pts[k];
+      if (C.cumDist - apex.cumDist < LEG_MIN_M) continue;                 // Auslauf (Scheitel→C) noch zu kurz
+      if (apex.cumDist - lastCornerAtRef.current < CORNER_GAP_M) break;   // nur NACH dem letzten Winkel (cumDist fällt)
 
-    let ai = bi;
-    while (ai > 0 && B.cumDist - pts[ai].cumDist < LEG_MIN_M) ai--;
-    if (ai === bi) return;
-    const A = pts[ai];
+      // Anker A: LEG_MIN_M vor dem Scheitel; Auslauf-Endpunkt: LEG_MIN_M danach.
+      let ai = k;
+      while (ai > 0 && apex.cumDist - pts[ai].cumDist < LEG_MIN_M) ai--;
+      if (apex.cumDist - pts[ai].cumDist < LEG_MIN_M) continue;           // kein voller Einlauf-Schenkel
+      let ci = k;
+      while (ci < n - 1 && pts[ci].cumDist - apex.cumDist < LEG_MIN_M) ci++;
 
-    if (B.cumDist - lastCornerAtRef.current < CORNER_GAP_M) return;   // zu nah am letzten Winkel
+      const diff = normalizeDeg(calculateHeading(apex, pts[ci]) - calculateHeading(pts[ai], apex));
+      const mag = Math.abs(diff);
+      if (!best || mag > best.mag) best = { apex, diff, mag };
+    }
 
-    const diff = normalizeDeg(calculateHeading(B, C) - calculateHeading(A, B));
-    const mag = Math.abs(diff);
-    if (mag < ANGLE_MIN_DEG) return;
+    if (!best || best.mag < ANGLE_MIN_DEG) return;
 
+    const B = best.apex;
     // Richtung (links/rechts) und Schärfe (spitz/rechtwinklig) getrennt bestimmen.
-    const dir: 'links' | 'rechts' = diff > 0 ? 'rechts' : 'links';
-    const kind: AngleKind = mag > ANGLE_SHARP_DEG ? (dir === 'rechts' ? 'spitz_rechts' : 'spitz_links') : dir;
+    const dir: 'links' | 'rechts' = best.diff > 0 ? 'rechts' : 'links';
+    const kind: AngleKind = best.mag > ANGLE_SHARP_DEG ? (dir === 'rechts' ? 'spitz_rechts' : 'spitz_links') : dir;
     lastCornerAtRef.current = B.cumDist;
     pendingAbrissRef.current = null;   // echter Winkel hier ⇒ kein Abriss am selben Halt
 
@@ -221,6 +253,72 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     onAngleRef.current?.('abriss');
   }, [commitMarker]);
 
+  // Start-Lock verarbeiten. Gibt true zurück, sobald in DIESEM Fix freigegeben
+  // wurde (der Anker ist dann als erster Linienpunkt gesetzt → Fix läuft normal
+  // weiter). Solange false: Stabilisieren, KEINE Linie/Distanz.
+  const handleStartLock = useCallback((raw: Raw, ema: LatLng): boolean => {
+    const s = store.getState();
+    const now = raw.t;
+    const elapsed = now - startLockBeganRef.current;
+
+    // Gute Fixes für den Anker sammeln (nur akzeptable Genauigkeit).
+    if (raw.accuracy != null && raw.accuracy <= START_ANCHOR_MAX_ACC_M) {
+      startFixesRef.current.push({ lat: raw.lat, lng: raw.lng, accuracy: raw.accuracy, t: now });
+    }
+    // Anker = Median der guten Fixes, sobald genug beisammen sind.
+    if (!startAnchorRef.current && startFixesRef.current.length >= START_ANCHOR_MIN_FIXES) {
+      const m = medianLatLng(startFixesRef.current);
+      if (m) {
+        startAnchorRef.current = m;
+        startAnchorAccRef.current = calculateAverageAccuracy(startFixesRef.current.map(f => f.accuracy));
+        s.setStartAnchor({ lat: m.lat, lng: m.lng, accuracy: startAnchorAccRef.current, t: now });
+      }
+    }
+
+    // Echte Bewegung nur mit vorhandenem Anker prüfen.
+    const anchor = startAnchorRef.current;
+    let moved = false;
+    if (anchor) {
+      const dist = calculateDistance(anchor, ema);
+      const okAcc = raw.accuracy == null || raw.accuracy <= MAX_ACCURACY_M;
+      if (dist > START_MOVE_MIN_M && okAcc) {
+        startMoveHitsRef.current++;
+      } else {
+        // Jitter im Anker-Radius: hätte sonst (> MIN_STEP_M) eine Linie erzeugt → als Drift zählen.
+        if (dist > MIN_STEP_M) { startDriftRejRef.current++; s.setStartDriftRejectedCount(startDriftRejRef.current); }
+        startMoveHitsRef.current = 0;
+      }
+      const speedMove = raw.speed != null && raw.speed > START_MOVE_MIN_SPEED && dist > START_MOVE_MIN_M;
+      moved = elapsed >= START_LOCK_MIN_MS &&
+        (startMoveHitsRef.current >= START_MOVE_CONFIRM_HITS || speedMove);
+    }
+
+    const timedOut = elapsed >= START_LOCK_MAX_MS;
+    if (!moved && !timedOut) return false;   // noch am Stabilisieren
+
+    // Freigeben: Anker sicherstellen (Timeout ohne genug gute Fixes → besten nehmen).
+    let a = startAnchorRef.current;
+    if (!a) {
+      a = { lat: ema.lat, lng: ema.lng };
+      startAnchorRef.current = a;
+      startAnchorAccRef.current = calculateAverageAccuracy(startFixesRef.current.map(f => f.accuracy)) ?? raw.accuracy;
+      s.setStartAnchor({ lat: a.lat, lng: a.lng, accuracy: startAnchorAccRef.current, t: now });
+    }
+
+    // Start-Lock beenden und den Anker als ERSTEN Linienpunkt setzen.
+    startLockRef.current = false;
+    s.setStartLockActive(false);
+    const p0: AcceptedPoint = { lat: a.lat, lng: a.lng, t: now, accuracy: startAnchorAccRef.current, cumDist: 0 };
+    pointsRef.current = [p0];
+    lastRawRef.current = raw;
+    s.addTrackPoint({ lat: p0.lat, lng: p0.lng, accuracy: p0.accuracy, altitude: null, speed: null, heading: null, t: now });
+    ptBuffer.current.push({
+      latitude: p0.lat, longitude: p0.lng, accuracy: p0.accuracy ?? null,
+      altitude: null, speed: null, heading: null, timestamp: new Date(now).toISOString(),
+    });
+    return true;
+  }, [store]);
+
   // EIN Fix-Handler für Warmup UND Aufnahme.
   const onFix = useCallback((loc: Location.LocationObject) => {
     const c = loc.coords;
@@ -252,6 +350,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
     // Ab hier nur die aufgezeichnete LINIE.
     if (!recordingRef.current || s.isPaused) return;
+
+    // ── Start-Lock: bis echte Bewegung KEINE Linie/Distanz/Winkel. Verhindert,
+    //    dass Warmup-/Startdrift (auf iPhone real ~8 m im Stand) als Strecke landet.
+    //    Bei Freigabe ist der Anker als erster Linienpunkt gesetzt → Fix läuft weiter.
+    if (startLockRef.current) {
+      if (!handleStartLock(raw, ema)) return;   // noch am Stabilisieren
+    }
 
     // 1) Zu ungenauer / unrealistischer Fix → kein Linienpunkt (Puck steht schon).
     if (raw.accuracy == null || raw.accuracy > MAX_ACCURACY_M) { rejectedRef.current++; return; }
@@ -310,7 +415,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       detectCorner();
       detectAbriss();
     }
-  }, [store, flushPoints, detectCorner, detectAbriss]);
+  }, [store, flushPoints, detectCorner, detectAbriss, handleStartLock]);
   onFixRef.current = onFix;
 
   // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
@@ -368,8 +473,17 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     lastObjectAtRef.current = -Infinity;
     ptBuffer.current = [];
     localSessionId.current = null;
+    // Start-Lock scharf: Stabilisierungsphase beginnt jetzt (kein Warmup-Drift als Strecke).
+    startLockRef.current = true;
+    startLockBeganRef.current = Date.now();
+    startFixesRef.current = [];
+    startAnchorRef.current = null;
+    startAnchorAccRef.current = null;
+    startMoveHitsRef.current = 0;
+    startDriftRejRef.current = 0;
 
     store.getState().startRecording(sessionId);
+    store.getState().setStartLockActive(true);   // NACH startRecording (das setzt den Store zurück)
     startMs.current = Date.now();
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {

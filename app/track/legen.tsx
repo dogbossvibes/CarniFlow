@@ -109,18 +109,21 @@ export default function LegenScreen() {
   // Zuletzt gewähltes Gegenstand-Material → Default für den Schnell-Gegenstand.
   const lastMaterialRef = useRef<MarkerMaterial>('diverses');
 
-  // Gegenstand mit gewähltem Material setzen.
+  // Gegenstand mit gewähltem Material setzen. Erst, wenn der Startanker steht —
+  // sonst würde er im Warmup-Drift landen (kein Crash, nur Hinweis).
   const placeGegenstand = useCallback((material: MarkerMaterial) => {
     setMaterialSheet(false);
+    if (!useTrackingStore.getState().startAnchor) { showToast('Kurz warten – Startpunkt wird noch gesetzt.'); return; }
     lastMaterialRef.current = material;
     haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
     void rec.addMarker('gegenstand', { material });
-  }, [rec]);
+  }, [rec, showToast]);
 
   // Schnell-Gegenstand (Hardware-Taste / Kurzbefehl): ohne Material-Auswahl, am
   // zuletzt gewählten Material. Nur während laufender Aufnahme.
   const quickAddArticle = useCallback(() => {
     if (phaseRef.current !== 'recording') return;
+    if (!useTrackingStore.getState().startAnchor) { showToast('Kurz warten – Startpunkt wird noch gesetzt.'); return; }
     haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
     void rec.addMarker('gegenstand', { material: lastMaterialRef.current });
     showToast('Gegenstand gesetzt');
@@ -158,6 +161,7 @@ export default function LegenScreen() {
   const {
     trackPoints, markers, currentPosition, heading, gpsAccuracy,
     distanceMeters, durationSeconds, isPaused, mapFollowMode, setMapFollowMode,
+    startAnchor, startLockActive, startDriftRejectedCount,
   } = useTrackingStore();
 
   // GPS wirklich bereit (gute Genauigkeit) vs. nur manuell freigegeben (nach 15 s).
@@ -223,7 +227,7 @@ export default function LegenScreen() {
 
   useEffect(() => () => { rec.stopAll(); }, [rec.stopAll]);
 
-  const mapMarkers: MapMarker[] = markers.map(mk => ({ type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind }));
+  const mapMarkers: MapMarker[] = markers.map(mk => ({ type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind, material: mk.material }));
   const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
   const winkel = markers.filter(mk => mk.type === 'winkel').length;
   // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
@@ -303,6 +307,7 @@ export default function LegenScreen() {
             <TrackingMap
               layPoints={trackPoints}
               markers={mapMarkers}
+              startAnchor={startAnchor}
               currentPosition={currentPosition}
               heading={heading}
               follow={mapFollowMode}
@@ -342,6 +347,16 @@ export default function LegenScreen() {
               </View>
             ))}
           </View>
+
+          {/* Start-Lock: Hinweis während der Stabilisierungsphase (keine Linie/Distanz). */}
+          {phase === 'recording' && startLockActive && (
+            <View className="absolute top-[64px] left-0 right-0 items-center px-4" pointerEvents="none">
+              <View className="flex-row items-center gap-2 px-3 py-1.5 rounded-full bg-ft-glass border border-ft-glass-line">
+                <ActivityIndicator size="small" color={FT.acc} />
+                <Text className="text-[11px] font-bold text-ft-text">Startpunkt wird gesetzt … kurz stehen bleiben</Text>
+              </View>
+            </View>
+          )}
 
           {/* Warmup-Overlay: GPS-Status + Bedingungen wählen + Start */}
           {phase === 'warmup' && (
@@ -529,6 +544,10 @@ export default function LegenScreen() {
           nativeAvailable={dbg?.isNativeAvailable ?? null}
           rawGnssAvailable={dbg?.rawGnssSupported ?? null}
           rawPointCount={trackPoints.length}
+          startLockActive={startLockActive}
+          startAnchorSet={!!startAnchor}
+          startAnchorAccuracy={startAnchor?.accuracy ?? null}
+          startDriftRejectedCount={startDriftRejectedCount}
           devMode
         />
       )}

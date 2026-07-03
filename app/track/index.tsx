@@ -97,7 +97,7 @@ export default function TrackOverviewScreen() {
     if (!hero) return null;
     const lay: LatLng[]  = (hero.points ?? []).filter((p: any) => (p.point_type ?? 'lay') === 'lay').map((p: any) => ({ lat: p.latitude, lng: p.longitude }));
     const run: LatLng[]  = ((hero.runs ?? [])[0]?.run_points ?? []).map((p: any) => ({ lat: p.lat, lng: p.lng }));
-    const markers: MapMarker[] = (hero.markers ?? []).map((m: any) => ({ type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind }));
+    const markers: MapMarker[] = (hero.markers ?? []).map((m: any) => ({ type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind, material: m.material }));
     const center = lay[Math.floor(lay.length / 2)] ?? null;
     return { lay, run, markers, center, hasGps: lay.length > 1 };
   }, [hero]);

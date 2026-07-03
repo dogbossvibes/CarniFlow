@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
-import type { MarkerType, AngleKind } from '@/features/tracking/store/trackingStore';
+import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/store/trackingStore';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
@@ -15,7 +15,13 @@ const MARKER_COLOR: Record<MarkerType, string> = {
   sprachmarker: C.trackPurple,
 };
 
-export interface MapMarker { type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null }
+// Dübel-Gegenstände heben sich mit eigener (Holz-)Farbe von übrigen Gegenständen ab.
+function markerColor(m: MapMarker): string {
+  if (m.type === 'gegenstand' && m.material === 'duebel') return C.trackWood;
+  return MARKER_COLOR[m.type];
+}
+
+export interface MapMarker { type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null }
 
 interface Props {
   layPoints:        LatLng[];
@@ -25,6 +31,7 @@ interface Props {
   markers?:         MapMarker[];
   breaks?:          LatLng[];   // Abriss-Punkte (Ausarbeiten) — rote Marker
   dimLay?:          boolean;    // Soll-Fährte gedimmt zeichnen (Ausarbeiten)
+  startAnchor?:     LatLng | null;   // stabilisierter Startpunkt → Fähnchen (statt erstem Rohpunkt)
   currentPosition:  LatLng | null;
   heading?:         number | null;
   follow:           boolean;
@@ -38,7 +45,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], breaks, dimLay, currentPosition, heading,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], breaks, dimLay, startAnchor, currentPosition, heading,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
@@ -140,18 +147,26 @@ export function TrackingMap({
           </Marker>
         ))}
 
-        {start && (
+        {/* Startpunkt: stabilisierter Anker → Fähnchen; sonst (Auswertung/Legacy) der schlichte Punkt. */}
+        {startAnchor ? (
+          <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <View style={s.startFlagWrap}>
+              <View style={s.startFlag}><Ionicons name="flag" size={12} color="#04110F" /></View>
+              <Text style={s.startFlagLabel}>Start</Text>
+            </View>
+          </Marker>
+        ) : start ? (
           <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} anchor={{ x: 0.5, y: 0.5 }}>
             <View style={s.startDot} />
           </Marker>
-        )}
+        ) : null}
 
         {/* Marker: Abriss als Kästchen (Abrissfeld), sonst runder Punkt. */}
         {markerList.map((m, i) => (
           <Marker key={i} coordinate={{ latitude: m.lat as number, longitude: m.lng as number }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
             {m.type === 'winkel' && m.angleKind === 'abriss'
               ? <View style={s.abrissBox} />
-              : <View style={[s.markerDot, { backgroundColor: MARKER_COLOR[m.type] }]} />}
+              : <View style={[s.markerDot, { backgroundColor: markerColor(m) }]} />}
           </Marker>
         ))}
 
@@ -201,6 +216,9 @@ const s = StyleSheet.create({
   fab:         { width: 46, height: 46, borderRadius: 14, backgroundColor: 'rgba(13,13,13,0.9)', borderWidth: 1, borderColor: C.trackBorder, alignItems: 'center', justifyContent: 'center' },
   fabActive:   { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary },
   startDot:    { width: 16, height: 16, borderRadius: 8, backgroundColor: C.trackPrimary, borderWidth: 3, borderColor: '#04110F' },
+  startFlagWrap:  { alignItems: 'center' },
+  startFlag:      { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, borderWidth: 2, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
+  startFlagLabel: { marginTop: 2, fontSize: 9, fontWeight: '800', color: C.trackPrimary, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
   markerDot:   { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#04110F' },
   abrissBox:   { width: 17, height: 17, borderRadius: 3, borderWidth: 2.5, borderColor: C.trackWarning, backgroundColor: 'rgba(0,0,0,0.35)' },
   rejectDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,77,77,0.75)' },

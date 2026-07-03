@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '@/features/tracking/utils/gpsFilter';
-import { schedulePersist, clearPending } from '@/features/tracking/store/trackPersist';
+import { schedulePersist, clearPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import { EMPTY_GPS_STATS, type GpsStats, type TrackPointStatus } from '@/features/tracking/engine/types';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
@@ -25,6 +25,15 @@ export interface TrackPointSample extends LatLng {
   speed?:    number | null;
   heading?:  number | null;
   t:         number;            // ms
+}
+
+// Stabilisierter echter Startpunkt der Fährte (Median mehrerer guter Warmup-Fixes).
+// Verhindert, dass Start-/Warmup-Drift als Trackstrecke gespeichert wird.
+export interface StartAnchor {
+  lat:       number;
+  lng:       number;
+  accuracy:  number | null;
+  t:         number;
 }
 
 export interface MarkerSample {
@@ -63,6 +72,9 @@ interface TrackingState {
   searchDurationSeconds: number;
   articlesFound:       number;
   layFinishedAt:       number | null;   // ms: Zeitpunkt "Fertig gelegt" → Liegezeit-Timer
+  startAnchor:         StartAnchor | null;   // stabilisierter Startpunkt (kein Warmup-Drift)
+  startLockActive:     boolean;              // true = Startphase (keine Linie/Distanz/Winkel)
+  startDriftRejectedCount: number;           // in der Startphase verworfene Drift-Fixes
   mapFollowMode:       boolean;
   mapOrientationMode:  OrientationMode;
 
@@ -87,6 +99,10 @@ interface TrackingState {
   setDuration: (sec: number) => void;
   setSearchDuration: (sec: number) => void;
   setLayFinishedAt: (ms: number | null) => void;
+  setStartAnchor: (a: StartAnchor | null) => void;
+  setStartLockActive: (on: boolean) => void;
+  setStartDriftRejectedCount: (n: number) => void;
+  restorePending: (p: PendingTrack) => void;   // gelegte Fährte nach App-Kill in der Liegezeit wiederherstellen
   setMapFollowMode: (on: boolean) => void;
   setMapOrientationMode: (m: OrientationMode) => void;
   reset: () => void;
@@ -113,6 +129,9 @@ const INITIAL = {
   searchDurationSeconds: 0,
   articlesFound:         0,
   layFinishedAt:         null as number | null,
+  startAnchor:           null as StartAnchor | null,
+  startLockActive:       false,
+  startDriftRejectedCount: 0,
   mapFollowMode:         true,
   mapOrientationMode:    'north' as OrientationMode,
 };
@@ -124,7 +143,7 @@ function persist(get: () => TrackingState) {
     return {
       sessionId: s.currentSessionId, trackPoints: s.trackPoints, markers: s.markers,
       runPoints: s.runPoints, distanceMeters: s.distanceMeters, durationSeconds: s.durationSeconds,
-      savedAt: Date.now(),
+      layFinishedAt: s.layFinishedAt, startAnchor: s.startAnchor, savedAt: Date.now(),
     };
   });
 }
@@ -177,7 +196,23 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setHeading: (deg) => set({ heading: deg }),
   setDuration: (sec) => set({ durationSeconds: sec }),
   setSearchDuration: (sec) => set({ searchDurationSeconds: sec }),
-  setLayFinishedAt: (ms) => set({ layFinishedAt: ms }),
+  setLayFinishedAt: (ms) => { set({ layFinishedAt: ms }); persist(get); },
+  setStartAnchor: (a) => { set({ startAnchor: a }); persist(get); },
+  setStartLockActive: (on) => set({ startLockActive: on }),
+  setStartDriftRejectedCount: (n) => set({ startDriftRejectedCount: n }),
+  // Nach App-Kill in der Liegezeit: gelegte Fährte aus dem Offline-Puffer zurück in
+  // den Store spielen, damit die Absuche sie snapshotten kann. Setzt NICHT auf
+  // Aufnahme — nur die gelegten Daten + Liegezeit-Start.
+  restorePending: (p) => set({
+    currentSessionId: p.sessionId,
+    trackPoints:      p.trackPoints,
+    markers:          p.markers,
+    runPoints:        p.runPoints,
+    distanceMeters:   p.distanceMeters,
+    durationSeconds:  p.durationSeconds,
+    layFinishedAt:    p.layFinishedAt,
+    startAnchor:      p.startAnchor ?? null,
+  }),
   setMapFollowMode: (on) => set({ mapFollowMode: on }),
   setMapOrientationMode: (m) => set({ mapOrientationMode: m }),
   reset: () => { clearPending(); set({ ...INITIAL }); },

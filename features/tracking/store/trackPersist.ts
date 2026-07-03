@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
+import type { MarkerSample, TrackPointSample, StartAnchor } from '@/features/tracking/store/trackingStore';
 
 // Lokaler Puffer der laufenden Aufnahme — schützt vor Datenverlust bei
 // Crash/Verbindungsabbruch im Feld. Beim erfolgreichen Speichern geleert.
@@ -12,6 +12,8 @@ export interface PendingTrack {
   runPoints:       TrackPointSample[];
   distanceMeters:  number;
   durationSeconds: number;
+  layFinishedAt:   number | null;   // ms: „Fertig gelegt" → überlebt die Liegezeit, auch wenn die App gekillt wird
+  startAnchor:     StartAnchor | null;   // stabilisierter Startpunkt (lokale Metadaten, keine DB-Migration nötig)
   savedAt:         number;
 }
 

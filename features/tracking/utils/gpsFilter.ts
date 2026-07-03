@@ -119,6 +119,19 @@ export function calculateAverageAccuracy(values: (number | null | undefined)[]):
   return nums.reduce((s, v) => s + v, 0) / nums.length;
 }
 
+// Komponentenweiser Median einer kleinen Punktwolke — robust gegen einzelne
+// GPS-Ausreißer. Für den Startanker aus mehreren Warmup-Fixes (statt Mittelwert,
+// der von einem Drift-Sprung mitgezogen würde).
+export function medianLatLng(points: LatLng[]): LatLng | null {
+  if (!points.length) return null;
+  const mid = (arr: number[]) => {
+    const s = [...arr].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  };
+  return { lat: mid(points.map(p => p.lat)), lng: mid(points.map(p => p.lng)) };
+}
+
 export const GPS_QUALITY_LABEL: Record<GpsQuality, string> = {
   'sehr-gut': 'Sehr gut',
   'gut':      'Gut',

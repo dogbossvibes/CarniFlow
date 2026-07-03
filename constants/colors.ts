@@ -56,6 +56,7 @@ export const C = {
   trackDanger:    '#ff5d6c',                 // --bad
   trackBlue:      '#4DA3FF',
   trackPurple:    '#9B5CFF',
+  trackWood:      '#D9954A',                 // Dübel-Gegenstand (warmes Holz, hebt sich vom Mint ab)
 } as const;
 
 export type ColorKey = keyof typeof C;
