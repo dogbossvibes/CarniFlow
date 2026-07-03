@@ -56,4 +56,4 @@ export interface ExerciseIssue { exercise: string; count: number; avgScore: numb
 
 export interface SurfacePattern { surface: string; avgScore: number; count: number }
 
-export interface CoachRecommendation { title: string; message: string; cta?: InsightCta | null }
+export interface CoachRecommendation { title: string; message: string; cta?: InsightCta | null; discipline?: string | null }

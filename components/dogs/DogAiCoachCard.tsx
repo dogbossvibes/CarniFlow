@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { C } from '@/constants/colors';
@@ -7,12 +7,13 @@ import type { DogAiTip } from './types';
 // KI-Coach-Empfehlung (Heute/Morgen/Ruhetag). Nur sichtbar für Active/Premium
 // oder im Demo-Modus; sonst dezenter Upgrade-Hinweis.
 export function DogAiCoachCard({
-  tip, isUnlocked, onStart, onUpgrade,
+  tip, isUnlocked, onStart, onUpgrade, onLater,
 }: {
   tip: DogAiTip | null;
   isUnlocked: boolean;
   onStart: () => void;
   onUpgrade?: () => void;
+  onLater?: () => void;   // „Später" — Hinweis für jetzt ausblenden
 }) {
   if (!isUnlocked) {
     return (
@@ -52,7 +53,12 @@ export function DogAiCoachCard({
           ))}
         </View>
       ) : null}
-      <AnyvoButton label="Training starten" icon="play" onPress={onStart} />
+      <AnyvoButton label="Timer starten" icon="play" onPress={onStart} />
+      {onLater ? (
+        <TouchableOpacity onPress={onLater} style={s.later} hitSlop={6} activeOpacity={0.7}>
+          <Text style={s.laterTxt}>Später</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -67,6 +73,8 @@ const s = StyleSheet.create({
   chip:        { flexGrow: 1, minWidth: 96, backgroundColor: C.trackCard, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 11, paddingVertical: 9 },
   chipL:       { fontSize: 9.5, color: C.trackTextMut, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
   chipV:       { fontSize: 13, color: C.trackText, fontWeight: '700', marginTop: 2 },
+  later:       { alignSelf: 'center', paddingVertical: 4, paddingHorizontal: 12 },
+  laterTxt:    { fontSize: 13, color: C.trackTextSec, fontWeight: '700' },
   locked:      { borderRadius: 20, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, padding: 18, gap: 10, alignItems: 'flex-start' },
   lockedTitle: { fontSize: 16, color: C.trackText, fontWeight: '800' },
   lockedTxt:   { fontSize: 13.5, color: C.trackTextSec, fontWeight: '500', lineHeight: 19 },

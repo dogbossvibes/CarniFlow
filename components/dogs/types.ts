@@ -67,6 +67,7 @@ export interface DogAiTip {
   title:          string;
   hint:           string;
   recommendation: string | null;
+  discipline?:    string | null;   // vorgeschlagene Sparte (Label) → Timer/Doku-Prefill
   schedule?:      { today?: string; tomorrow?: string; rest?: string };
 }
 

@@ -43,7 +43,7 @@ export function useDogHubDynamic(dogId?: string): DogHubDynamic {
 
   const recs = coach.data.recommendations ?? [];
   const aiTip: DogAiTip | null = recs.length
-    ? { title: recs[0].title, hint: recs[0].message, recommendation: recs[1]?.message ?? null }
+    ? { title: recs[0].title, hint: recs[0].message, recommendation: recs[1]?.message ?? null, discipline: recs[0].discipline ?? null }
     : null;
 
   return { aiTip, todayRecommendation: recs[0]?.message ?? null, trainer };

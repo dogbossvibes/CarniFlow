@@ -61,9 +61,36 @@ export default function DogHubRoute() {
   const actions: DogHubActions = {
     onBack:             () => router.back(),
     onSettings:         () => dog && router.push({ pathname: '/edit-dog', params: { id: dog.id } }),
-    onStartTraining:    () => router.push('/unit/start'),
+    // KI-Hinweis: direkt in den Trainings-Timer (Hund + vorgeschlagene Sparte
+    // bereits bekannt) → danach Dokumentation. NICHT mehr über den alten Sparten-Screen.
+    // Ausnahme Fährte: die braucht den GPS-Fährtenflow, nicht den normalen Timer.
+    onStartTraining:    (discipline, note) => {
+      if (discipline === 'Fährte') { if (dog) router.push(`/track/legen?dogId=${dog.id}` as never); return; }
+      router.push({
+        pathname: '/unit/timer',
+        params: {
+          ...(dog ? { dogId: dog.id, dogName: dog.name } : {}),
+          ...(discipline ? { discipline } : {}),
+          ...(note ? { note } : {}),
+          source: 'ai_suggestion',
+        },
+      });
+    },
     onStartFaehrte:     () => dog && router.push(`/track/legen?dogId=${dog.id}` as never),
-    onQuickAction:      () => router.push('/unit/start'),
+    // Schnellstart-Kachel: konkreter Hund → Timer mit Sparte (Fährte weiter in den
+    // GPS-Flow). Sparten ohne Disziplin (Spiel/Custom) → allgemeines Training.
+    onQuickAction:      (k) => {
+      if (k === 'faehrte') { if (dog) router.push(`/track/legen?dogId=${dog.id}` as never); return; }
+      const label = k === 'unterordnung' ? 'Unterordnung' : k === 'schutzdienst' ? 'Schutzdienst' : null;
+      router.push({
+        pathname: '/unit/timer',
+        params: {
+          ...(dog ? { dogId: dog.id, dogName: dog.name } : {}),
+          ...(label ? { discipline: label } : {}),
+          source: 'dog_quickstart',
+        },
+      });
+    },
     onOpenTraining:     openTraining,
     onAddHealth:        () => dog && router.push(`/dog-health/${dog.id}` as never),
     onAddDoc:           () => dog && router.push(`/dog-document/${dog.id}` as never),

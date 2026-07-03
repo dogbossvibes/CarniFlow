@@ -96,7 +96,7 @@ export default function HundeScreen() {
                   identity={dogToIdentity(hund)}
                   lastTrainingLabel={null}
                   onOpen={() => router.push(`/dog/${hund.id}` as never)}
-                  onTraining={() => router.push("/unit/start")}
+                  onTraining={() => router.push({ pathname: '/unit/timer', params: { dogId: hund.id, dogName: hund.name, source: 'dog_quickstart' } })}
                   onFaehrte={() => router.push(`/track/legen?dogId=${hund.id}` as never)}
                   onStats={() => router.push(`/dog/${hund.id}` as never)}
                 />

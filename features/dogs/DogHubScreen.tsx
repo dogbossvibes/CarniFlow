@@ -18,7 +18,7 @@ import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } fr
 export interface DogHubActions {
   onBack:             () => void;
   onSettings:         () => void;
-  onStartTraining:    () => void;
+  onStartTraining:    (discipline?: string | null, note?: string | null) => void;
   onStartFaehrte:     () => void;
   onQuickAction:      (k: QuickActionKey) => void;
   onOpenTraining?:    (item: DogTrainingItem) => void;
@@ -43,6 +43,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export function DogHubScreen({ vm, actions, aiUnlocked }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean }) {
   const [tab, setTab] = useState<TabKey>('overview');
+  const [aiTipHidden, setAiTipHidden] = useState(false);   // „Später" blendet den KI-Hinweis für diese Sitzung aus
   const { width } = useWindowDimensions();
   const id = vm.identity;
   const meta = [id.breed, id.ageLabel, genderLabel(id.gender)].filter(Boolean).join(' · ');
@@ -107,7 +108,15 @@ export function DogHubScreen({ vm, actions, aiUnlocked }: { vm: DogHubVM; action
                       <Text style={s.noteTxt} numberOfLines={1}>Letztes Training: <Text style={s.noteStrong}>{vm.lastTrainingLabel}</Text></Text>
                     </View>
                   ) : null}
-                  <DogAiCoachCard tip={vm.aiTip} isUnlocked={aiUnlocked || !!vm.isDemo} onStart={actions.onStartTraining} onUpgrade={actions.onUpgrade} />
+                  {!aiTipHidden && (
+                    <DogAiCoachCard
+                      tip={vm.aiTip}
+                      isUnlocked={aiUnlocked || !!vm.isDemo}
+                      onStart={() => actions.onStartTraining(vm.aiTip?.discipline ?? null, vm.aiTip?.hint ?? null)}
+                      onUpgrade={actions.onUpgrade}
+                      onLater={() => setAiTipHidden(true)}
+                    />
+                  )}
                 </>
               )}
               {tab === 'training' && (

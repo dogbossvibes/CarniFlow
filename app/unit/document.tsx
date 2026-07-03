@@ -41,7 +41,8 @@ interface SelExercise { discipline: string; name: string }
 
 export default function DocumentScreen() {
   const router = useRouter();
-  const { id, duration } = useLocalSearchParams<{ id?: string; duration?: string }>();
+  const { id, duration, dogId: dogIdParam, discipline: discParam, note: noteParam } =
+    useLocalSearchParams<{ id?: string; duration?: string; dogId?: string; discipline?: string; note?: string }>();
   const editing = !!id;
   // Vom Timer mitgegebene Dauer (Sekunden) → Minuten vorbefüllen.
   const initialMin = duration ? Math.max(1, Math.round(Number(duration) / 60)) : 45;
@@ -59,11 +60,16 @@ export default function DocumentScreen() {
     ...categories.map(customToDiscipline),
   ];
 
-  const [dogId, setDogId] = useState<string | null>(dogs.length === 1 ? dogs[0].id : null);
-  const [activeDisc, setActiveDisc] = useState<string>(disciplines[0]?.key ?? 'faehrte');
+  // Vom KI-Hinweis/Timer vorgeschlagene Sparte (Label → Key), sofern aktiv.
+  const paramDiscKey = discParam ? DISCIPLINES.find(d => d.label === discParam)?.key : undefined;
+  const initialDisc = paramDiscKey && disciplines.some(d => d.key === paramDiscKey)
+    ? paramDiscKey : (disciplines[0]?.key ?? 'faehrte');
+
+  const [dogId, setDogId] = useState<string | null>(dogIdParam ?? (dogs.length === 1 ? dogs[0].id : null));
+  const [activeDisc, setActiveDisc] = useState<string>(initialDisc);
   const [selected, setSelected] = useState<SelExercise[]>([]);
   const [customDraft, setCustomDraft] = useState('');
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState(noteParam ?? '');
   const [score, setScore] = useState(0);
   const [date, setDate] = useState(new Date());
   const [durationMin, setDurationMin] = useState(initialMin);

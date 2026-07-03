@@ -184,7 +184,7 @@ export function getRecommendations(ds: CoachDataset, dogs: DogRef[]): CoachRecom
   const present = new Set(balance.map(b => b.category));
   if (balance.length && balance[0].pct >= 60) {
     for (const cat of ['Unterordnung', 'Schutzdienst', 'Fährte']) {
-      if (!present.has(cat)) { recs.push({ title: `${cat} einplanen`, message: `${cat} kam zuletzt kaum vor — nächste Woche ergänzen?`, cta: { kind: 'plan' } }); break; }
+      if (!present.has(cat)) { recs.push({ title: 'Trainingsfokus erkannt', message: `${cat} wurde zuletzt wenig trainiert. Möchtest du heute eine kurze Einheit einplanen?`, cta: { kind: 'plan' }, discipline: cat }); break; }
     }
   }
   for (const ex of getExerciseIssues(ds).slice(0, 1))

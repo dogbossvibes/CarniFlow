@@ -3,7 +3,7 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
@@ -33,6 +33,10 @@ export default function TimerScreen() {
   const router = useRouter();
   const { dogs } = useDogs();
   const { session } = useSession();
+  // Optionaler Kontext (z. B. aus dem KI-Hinweis / Schnellstart): Hund + Sparte
+  // sind dann schon bekannt und werden an die Dokumentation durchgereicht.
+  const { dogId, dogName, discipline, source, note } =
+    useLocalSearchParams<{ dogId?: string; dogName?: string; discipline?: string; source?: string; note?: string }>();
 
   const baseRef = useRef(0);              // Sekunden aus abgeschlossenen Lauf-Segmenten
   const segStartRef = useRef(Date.now()); // Start des aktuellen laufenden Segments
@@ -45,6 +49,7 @@ export default function TimerScreen() {
   }, []);
 
   const elapsed = Math.floor(running ? baseRef.current + (now - segStartRef.current) / 1000 : baseRef.current);
+  const contextLabel = [dogName, discipline].filter(Boolean).join(' · ');
 
   const togglePause = () => {
     tapHaptic();
@@ -82,6 +87,7 @@ export default function TimerScreen() {
   };
 
   const saveWithoutDoc = () => {
+    if (dogId) { void doSave(dogId); return; }   // Hund aus Kontext bekannt → direkt speichern
     if (dogs.length === 0) { Alert.alert('Kein Hund', 'Lege zuerst einen Hund an.'); return; }
     if (dogs.length === 1) { void doSave(dogs[0].id); return; }
     Alert.alert('Für welchen Hund?', undefined, [
@@ -90,11 +96,17 @@ export default function TimerScreen() {
     ]);
   };
 
-  // „Fertig" → Wahl: dokumentieren, ohne Doku speichern oder verwerfen.
+  // „Fertig" → Wahl: dokumentieren, ohne Doku speichern oder verwerfen. Der
+  // bekannte Kontext (Hund/Sparte/Notiz) wird an die Dokumentation weitergereicht.
   const finish = () => {
     tapHaptic();
     Alert.alert('Training beenden', `${formatTime(elapsed)} trainiert.`, [
-      { text: 'Dokumentieren', onPress: () => router.replace({ pathname: '/unit/document', params: { duration: String(elapsed) } }) },
+      { text: 'Dokumentieren', onPress: () => router.replace({ pathname: '/unit/document', params: {
+        duration: String(elapsed),
+        ...(dogId ? { dogId } : {}),
+        ...(discipline ? { discipline } : {}),
+        ...(note ? { note } : {}),
+      } }) },
       { text: 'Ohne Doku speichern', onPress: saveWithoutDoc },
       { text: 'Verwerfen', style: 'destructive', onPress: discard },
       { text: 'Abbrechen', style: 'cancel' },
@@ -118,9 +130,12 @@ export default function TimerScreen() {
         </TouchableOpacity>
 
         <View style={s.center}>
+          {contextLabel ? <Text style={s.context}>{contextLabel}</Text> : null}
           <Text style={s.label}>{running ? 'TRAINING LÄUFT' : 'PAUSIERT'}</Text>
           <Text style={s.timer}>{formatTime(elapsed)}</Text>
-          <Text style={s.hint}>Sparte & Übungen dokumentierst du am Ende.</Text>
+          <Text style={s.hint}>
+            {discipline ? 'Übungen & Bewertung dokumentierst du am Ende.' : 'Sparte & Übungen dokumentierst du am Ende.'}
+          </Text>
         </View>
 
         <View style={s.bar}>
@@ -147,6 +162,7 @@ const s = StyleSheet.create({
   cancelBtn: { position: 'absolute', top: 8, left: 16, zIndex: 10, width: 38, height: 38, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 24 },
+  context:{ fontSize: 15, color: C.white, fontWeight: '800', marginBottom: 2 },
   label:  { fontSize: 12, color: C.accent, fontWeight: '800', letterSpacing: 2 },
   timer:  { fontSize: 76, color: C.white, fontWeight: '900', letterSpacing: -2, fontVariant: ['tabular-nums'] },
   hint:   { fontSize: 13, color: C.muted, fontWeight: '500', textAlign: 'center', marginTop: 4 },
