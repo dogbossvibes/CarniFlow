@@ -33,13 +33,30 @@ export async function generateAIAnalysis(
     body: { sessions: sessions.slice(0, 15), dogName },
   });
   if (error) {
-    // Die eigentliche Fehlermeldung steckt im Response-Body der Function.
-    let detail = error.message ?? 'KI-Analyse fehlgeschlagen';
+    // Echten Fehler aus dem Function-Body ziehen (nur fürs Log), Nutzer bekommt
+    // eine freundliche Meldung.
+    let detail = error.message ?? '';
     try {
       const body = await (error as any).context?.json?.();
       if (body?.error) detail = body.error;
-    } catch { /* Fallback: generische Meldung */ }
-    throw new Error(detail);
+    } catch { /* egal */ }
+    console.warn('[ai-analysis]', detail);
+    throw new Error(friendlyAiError(detail));
   }
   return data as AIResult;
+}
+
+// Interne/technische Fehler → verständliche deutsche Nutzer-Meldung.
+function friendlyAiError(detail: string): string {
+  const d = detail.toLowerCase();
+  if (/credit|billing|balance|quota|insufficient/.test(d)) {
+    return 'Die KI-Analyse ist gerade nicht verfügbar. Wir kümmern uns darum — bitte versuch es später noch einmal.';
+  }
+  if (/rate|overloaded|too many|429|529/.test(d)) {
+    return 'Gerade ist viel los. Bitte versuch es in einem Moment noch einmal.';
+  }
+  if (/network|timeout|fetch|failed to/.test(d)) {
+    return 'Keine Verbindung zur KI. Prüfe deine Internetverbindung und versuch es erneut.';
+  }
+  return 'Die KI-Analyse hat gerade nicht geklappt. Bitte versuch es gleich noch einmal.';
 }
