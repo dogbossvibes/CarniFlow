@@ -21,6 +21,7 @@ export function AppLockGate() {
   const [locked, setLocked] = useState(false);
   const appState = useRef(AppState.currentState);
   const authingRef = useRef(false);
+  const promptedRef = useRef(false);   // pro Sperre genau einmal automatisch prompten
 
   const active = APP_LOCK_AVAILABLE && enabled && loaded && !!session;
 
@@ -40,24 +41,30 @@ export function AppLockGate() {
 
   // Kaltstart / neues Login: sperren, wenn aktiviert + eingeloggt + verfügbar.
   useEffect(() => {
-    if (active) setLocked(true);
+    if (active) { setLocked(true); promptedRef.current = false; }
   }, [active]);
 
-  // Aus dem Hintergrund zurück → erneut sperren.
+  // Nur bei ECHTEM Hintergrund→Vordergrund erneut sperren. WICHTIG: der Face-ID-
+  // Prompt setzt die App kurz auf 'inactive' (nicht 'background') — das darf NICHT
+  // erneut sperren/prompten, sonst Endlosschleife.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       const prev = appState.current;
       appState.current = next;
-      if (!active) return;
-      if (next === 'background') setLocked(true);
-      if (next === 'active' && prev !== 'active') void authenticate();
+      if (active && prev === 'background' && next === 'active') {
+        setLocked(true); promptedRef.current = false;
+      }
     });
     return () => sub.remove();
-  }, [active, authenticate]);
+  }, [active]);
 
-  // Sobald gesperrt und die App im Vordergrund ist → Prompt automatisch zeigen.
+  // Genau EINMAL automatisch prompten, sobald gesperrt + Vordergrund. Bei
+  // Abbruch/Fehlversuch bleibt es gesperrt; erneut nur über den „Entsperren"-Button.
   useEffect(() => {
-    if (locked && active && AppState.currentState === 'active') void authenticate();
+    if (locked && active && !promptedRef.current && AppState.currentState === 'active') {
+      promptedRef.current = true;
+      void authenticate();
+    }
   }, [locked, active, authenticate]);
 
   if (!active || !locked) return null;
