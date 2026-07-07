@@ -25,6 +25,7 @@ export interface DogHubActions {
   onAddHealth:        () => void;
   onAddDoc:           () => void;
   onOpenDocument?:    (doc: DogDocument) => void;
+  onDeleteDocument?:  (doc: DogDocument) => void;
   onEditGoal:         () => void;
   onChat:             () => void;
   onUpgrade?:         () => void;
@@ -130,7 +131,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked }: { vm: DogHubVM; action
               {tab === 'faehrte'  && <DogFaehrteSummary data={vm.faehrte} onStart={actions.onStartFaehrte} />}
               {tab === 'goals'    && <DogGoalsCard goal={vm.goal} onEdit={actions.onEditGoal} />}
               {tab === 'health'   && <DogHealthLoadCard health={vm.health} onAddEntry={actions.onAddHealth} />}
-              {tab === 'docs'     && <DogDocumentsCard documents={vm.documents} onAdd={actions.onAddDoc} onOpen={actions.onOpenDocument} />}
+              {tab === 'docs'     && <DogDocumentsCard documents={vm.documents} onAdd={actions.onAddDoc} onOpen={actions.onOpenDocument} onDelete={actions.onDeleteDocument} />}
               {tab === 'trainer'  && <DogTrainerCard trainer={vm.trainer} onChat={actions.onChat} />}
             </View>
           </View>

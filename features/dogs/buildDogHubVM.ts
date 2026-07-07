@@ -2,6 +2,7 @@ import type { Dog } from '@/types';
 import type { FeedItem } from '@/services/trainingFeed';
 import type { DogHubExtras } from '@/services/dogHub';
 import { dogToIdentity, type DogAiTip, type DogDocument, type DogHubVM, type DogGoal, type DogHealth, type DogTrainer, type DogTrainingItem } from '@/components/dogs/types';
+import { categoryLabel, fileTypeOf } from '@/features/dogs/documentCategories';
 
 // Dynamische Quellen (KI-Coach, Trainer) — im Route-Wrapper geladen und hier reingereicht.
 export interface DogHubDynamic { aiTip?: DogAiTip | null; todayRecommendation?: string | null; trainer?: DogTrainer | null }
@@ -10,13 +11,6 @@ export interface DogHubDynamic { aiTip?: DogAiTip | null; todayRecommendation?: 
 // Dog-Hub-Tabellen (Ziele/Gesundheit/Dokumente). Fehlt etwas → Fallback/„noch keine Daten".
 
 const DAY = 24 * 3600 * 1000;
-
-const DOC_KINDS: { key: string; label: string }[] = [
-  { key: 'impfpass', label: 'Impfpass' },
-  { key: 'stammbaum', label: 'Stammbaum' },
-  { key: 'hd_ed', label: 'HD/ED-Auswertung' },
-  { key: 'pruefung', label: 'Prüfungsergebnisse' },
-];
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -87,19 +81,17 @@ export function buildDogHubVM(dog: Dog, feed: FeedItem[], extras?: DogHubExtras,
     nextVetLabel: extras?.nextVet ? vetLabel(extras.nextVet.appointment_at, extras.nextVet.reason) : null,
   };
 
-  // ── Dokumente (echte Tabelle → present je Kategorie; sonst aus dog-Feldern abgeleitet) ──
-  const docRows = extras?.documents ?? [];
-  const documents: DogDocument[] = extras
-    ? DOC_KINDS.map(k => {
-        const row = docRows.find(d => d.kind === k.key);   // docRows: created_at desc → neuestes je Art
-        return { key: k.key, label: k.label, present: !!row, path: row?.file_url ?? null };
-      })
-    : [
-        { key: 'impfpass',  label: 'Impfpass',           present: !!dog.vaccination },
-        { key: 'stammbaum', label: 'Stammbaum',          present: !!(dog.sire || dog.dam || dog.kennel) },
-        { key: 'hd_ed',     label: 'HD/ED-Auswertung',   present: false },
-        { key: 'pruefung',  label: 'Prüfungsergebnisse', present: (dog.titles?.length ?? 0) > 0 },
-      ];
+  // ── Dokumente: echte hochgeladene Dateien (keine fixen „Fehlt"-Vorgaben mehr).
+  //    Reihenfolge = neueste zuerst (getDogDocuments sortiert nach created_at desc). ──
+  const documents: DogDocument[] = (extras?.documents ?? []).map(r => ({
+    id:        r.id,
+    title:     r.title?.trim() || categoryLabel(r.kind),
+    category:  r.kind,
+    fileUrl:   r.file_url,
+    fileType:  fileTypeOf(r.file_url),
+    issuedOn:  r.issued_on,
+    createdAt: r.created_at ?? null,
+  }));
 
   return {
     identity,

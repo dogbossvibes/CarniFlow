@@ -37,10 +37,8 @@ const MALU: DogHubVM = {
     note: 'Pfoten nach Asphalt-Fährte kontrollieren.', nextVetLabel: 'Impfung fällig in 3 Wochen',
   },
   documents: [
-    { key: 'impf', label: 'Impfpass', present: true },
-    { key: 'stamm', label: 'Stammbaum', present: true },
-    { key: 'hdred', label: 'HD/ED-Auswertung', present: false },
-    { key: 'pruef', label: 'Prüfungsergebnisse', present: true },
+    { id: 'demo-1', title: 'Impfpass 2026', category: 'gesundheit', fileUrl: null, fileType: 'pdf',   issuedOn: '2026-01-15', createdAt: '2026-01-15' },
+    { id: 'demo-2', title: 'Stammbaum Yam', category: 'zucht',      fileUrl: null, fileType: 'image', issuedOn: null,         createdAt: '2025-11-02' },
   ],
   trainer: { name: 'Sandra K.', plan: 'Aufbau Fährte – Phase 2', lastComment: 'Winkel sitzen, jetzt Tempo halten. 👍' },
   aiTip: {
@@ -74,12 +72,7 @@ const NERO: DogHubVM = {
   faehrte: { thisWeek: 0, avgLengthLabel: null, articles: null, angles: null, qualityPct: null, trend: [] },
   goal: { title: null, overallPct: null, parts: [] },
   health: { weightKg: 30, loadLabel: 'Hoch', restDays: 1, intenseSessions: 4, note: null, nextVetLabel: null },
-  documents: [
-    { key: 'impf', label: 'Impfpass', present: true },
-    { key: 'stamm', label: 'Stammbaum', present: true },
-    { key: 'hdred', label: 'HD/ED-Auswertung', present: false },
-    { key: 'pruef', label: 'Prüfungsergebnisse', present: false },
-  ],
+  documents: [],
   trainer: { name: 'Marco B.', plan: 'Mondioring Grundlagen', lastComment: 'Mehr Impulskontrolle in der Bewachung.' },
   aiTip: {
     title: 'Heute lieber Ruhe',
@@ -111,12 +104,7 @@ const INARI: DogHubVM = {
   faehrte: { thisWeek: 0, avgLengthLabel: null, articles: null, angles: null, qualityPct: null, trend: [] },
   goal: { title: null, overallPct: null, parts: [] },
   health: { weightKg: 19, loadLabel: 'Leicht', restDays: 3, intenseSessions: 0, note: 'Junghund – Belastung dosieren.', nextVetLabel: null },
-  documents: [
-    { key: 'impf', label: 'Impfpass', present: true },
-    { key: 'stamm', label: 'Stammbaum', present: true },
-    { key: 'hdred', label: 'HD/ED-Auswertung', present: false },
-    { key: 'pruef', label: 'Prüfungsergebnisse', present: false },
-  ],
+  documents: [],
   trainer: null,
   aiTip: {
     title: 'Fokus: Grundlagen',

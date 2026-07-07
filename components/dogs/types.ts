@@ -46,7 +46,16 @@ export interface DogGoal {
   parts:      { label: string; pct: number }[];
 }
 
-export interface DogDocument { key: string; label: string; present: boolean; path?: string | null }
+// Ein echtes hochgeladenes Dokument (aus dog_documents) — keine fixen Vorgaben mehr.
+export interface DogDocument {
+  id:        string;
+  title:     string;                        // Anzeigetitel (Fallback: Kategorie-Label)
+  category:  string;                        // kind-Key (Kategorie)
+  fileUrl:   string | null;                 // Storage-Objektpfad → Signed-URL zum Öffnen
+  fileType:  'pdf' | 'image' | 'file';
+  issuedOn:  string | null;                 // yyyy-mm-dd (optional)
+  createdAt: string | null;
+}
 
 export interface DogHealth {
   weightKg:        number | null;

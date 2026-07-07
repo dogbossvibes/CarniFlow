@@ -11,14 +11,7 @@ import { addDogDocument } from '@/services/dogHub';
 import { uploadDogDocument } from '@/services/storage';
 import { toISODate } from '@/features/dogs/dateInput';
 import { DateField } from '@/components/ui/DateField';
-
-const KINDS: { key: string; label: string }[] = [
-  { key: 'impfpass',  label: 'Impfpass' },
-  { key: 'stammbaum', label: 'Stammbaum' },
-  { key: 'hd_ed',     label: 'HD/ED' },
-  { key: 'pruefung',  label: 'Prüfung' },
-  { key: 'sonstiges', label: 'Sonstiges' },
-];
+import { DOC_CATEGORIES } from '@/features/dogs/documentCategories';
 
 type PickedFile = { uri: string; name: string; mime: string };
 
@@ -28,7 +21,7 @@ export default function DogDocumentEditor() {
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { showToast, toast } = useToast();
 
-  const [kind, setKind]   = useState('impfpass');
+  const [kind, setKind]   = useState('gesundheit');
   const [title, setTitle] = useState('');
   const [file, setFile]   = useState<PickedFile | null>(null);
   const [issued, setIssued] = useState<Date | null>(null);
@@ -74,9 +67,9 @@ export default function DogDocumentEditor() {
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>Art</Text>
+          <Text style={s.label}>Kategorie</Text>
           <View style={s.kinds}>
-            {KINDS.map(k => {
+            {DOC_CATEGORIES.map(k => {
               const on = kind === k.key;
               return (
                 <TouchableOpacity key={k.key} style={[s.kind, on && s.kindOn]} onPress={() => setKind(k.key)} activeOpacity={0.85}>

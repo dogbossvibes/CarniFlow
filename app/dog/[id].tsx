@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
 import { usePlan } from '@/hooks/usePlan';
 import { getDogById } from '@/services/dogs';
-import { getDogHubExtras, getDogDocumentUrl, type DogHubExtras } from '@/services/dogHub';
+import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtras } from '@/services/dogHub';
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
 import { useDogHubDynamic } from '@/features/dogs/useDogHubDynamic';
 import { DogHubScreen, type DogHubActions } from '@/features/dogs/DogHubScreen';
@@ -47,9 +47,19 @@ export default function DogHubRoute() {
   const vm = useMemo(() => (dog ? buildDogHubVM(dog, feed, extras ?? undefined, dynamic) : null), [dog, feed, extras, dynamic]);
 
   const openDocument = async (doc: DogDocument) => {
-    if (!doc.path) return;
-    const url = await getDogDocumentUrl(doc.path);
+    if (!doc.fileUrl) return;
+    const url = await getDogDocumentUrl(doc.fileUrl);
     if (url) Linking.openURL(url).catch(() => {});
+  };
+
+  const deleteDocument = (doc: DogDocument) => {
+    Alert.alert('Dokument löschen?', `„${doc.title}" wird dauerhaft entfernt.`, [
+      { text: 'Abbrechen', style: 'cancel' },
+      { text: 'Löschen', style: 'destructive', onPress: async () => {
+        await deleteDogDocument(doc.id, doc.fileUrl);
+        getDogHubExtras(id).then(setExtras).catch(() => {});   // Liste sofort aktualisieren
+      } },
+    ]);
   };
 
   const openTraining = (it: DogTrainingItem) => {
@@ -95,6 +105,7 @@ export default function DogHubRoute() {
     onAddHealth:        () => dog && router.push(`/dog-health/${dog.id}` as never),
     onAddDoc:           () => dog && router.push(`/dog-document/${dog.id}` as never),
     onOpenDocument:     openDocument,
+    onDeleteDocument:   deleteDocument,
     onEditGoal:         () => dog && router.push(`/dog-goal/${dog.id}` as never),
     onChat:             () => router.push('/chat' as never),
     onUpgrade:          () => router.push('/premium' as never),

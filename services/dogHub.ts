@@ -10,6 +10,7 @@ export interface DogGoalRow {
 export interface DogDocumentRow {
   id: string; dog_id: string; kind: string; title: string | null;
   file_url: string | null; issued_on: string | null; note: string | null;
+  created_at: string | null;
 }
 export interface DogHealthEntryRow {
   id: string; dog_id: string; entry_date: string; weight_kg: number | null;
@@ -92,6 +93,13 @@ export async function addDogVetAppointment(dogId: string, appointmentAt: string,
   const owner = await requireUid();
   return supabase.from('dog_vet_appointments')
     .insert({ owner_id: owner, dog_id: dogId, appointment_at: appointmentAt, reason }).select().single();
+}
+
+// Dokument löschen: erst die Datei aus dem privaten Bucket (best-effort), dann die
+// Zeile. RLS (dog_docs_delete + dog_documents-Policy) erlaubt nur eigene Hunde.
+export async function deleteDogDocument(id: string, path: string | null) {
+  if (path) { try { await supabase.storage.from('dog-documents').remove([path]); } catch { /* best-effort */ } }
+  return supabase.from('dog_documents').delete().eq('id', id);
 }
 
 export interface DogDocumentInput { kind: string; title: string | null; file_url: string | null; issued_on: string | null; note: string | null }
