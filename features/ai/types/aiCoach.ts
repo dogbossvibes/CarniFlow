@@ -8,13 +8,23 @@ export type AiInsightType =
   | 'score_drop'
   | 'score_improvement'
   | 'category_imbalance'
+  | 'category_focus'          // Sparte kaum trainiert → Fokus vorschlagen
   | 'weather_pattern'
   | 'surface_pattern'
   | 'exercise_issue'
   | 'coach_feedback_summary'
   | 'media_hint'
   | 'weekly_summary'
-  | 'recommendation';
+  | 'recommendation'
+  // Fährten-spezifisch (aus TrackSession-Daten)
+  | 'track_distance_up'
+  | 'track_corners_high'
+  | 'track_articles_focus'
+  | 'track_lying_time_up'
+  // Belastung / Erholung (aus Trainingseinheiten)
+  | 'workload_high'
+  | 'recovery_needed'
+  | 'return_after_break';
 
 export type InsightCta =
   | { kind: 'plan' }                 // Training planen
@@ -29,10 +39,11 @@ export interface AiInsight {
   severity:  AiInsightSeverity;
   title:     string;
   message:   string;
-  dogId?:    string | null;
-  dogName?:  string | null;
-  cta?:      InsightCta | null;
-  data?:     Record<string, any>;
+  dogId?:      string | null;
+  dogName?:    string | null;
+  discipline?: string | null;   // Sparten-Label → Timer/Fährten-Routing im DogHub
+  cta?:        InsightCta | null;
+  data?:       Record<string, any>;
 }
 
 export interface CoachSummary {

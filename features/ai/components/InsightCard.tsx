@@ -24,6 +24,14 @@ export const typeIcon: Record<AiInsightType, IconName> = {
   media_hint:             'videocam-outline',
   weekly_summary:         'calendar-outline',
   recommendation:         'sparkles-outline',
+  category_focus:         'locate-outline',
+  track_distance_up:      'trending-up-outline',
+  track_corners_high:     'git-branch-outline',
+  track_articles_focus:   'cube-outline',
+  track_lying_time_up:    'hourglass-outline',
+  workload_high:          'barbell-outline',
+  recovery_needed:        'bed-outline',
+  return_after_break:     'refresh-outline',
 };
 
 export function ctaLabel(cta: InsightCta): string {
