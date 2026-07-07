@@ -11,6 +11,7 @@ import { fmtClock } from '@/features/tracking/components/LiveChrome';
 import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
 import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
+import { hapticSuccess, hapticTap } from '@/features/tracking/utils/haptics';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
@@ -70,6 +71,7 @@ export default function TrackRunScreen() {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
+    hapticSuccess();   // Absuchen-Start sofort spürbar
     s.start();
     if (id) startTrackRun(id).then(({ data }) => { if (data) runIdRef.current = data.id; }).catch(() => {});
   }, [s, id]);
@@ -107,7 +109,7 @@ export default function TrackRunScreen() {
   const handleCancel = () => {
     Alert.alert('Ausarbeitung abbrechen?', 'Die Ausarbeitung wird nicht gespeichert. Die gelegte Fährte bleibt erhalten.', [
       { text: 'Weiter', style: 'cancel' },
-      { text: 'Abbrechen', style: 'destructive', onPress: () => { s.stop(); useTrackingStore.getState().reset(); router.replace('/track' as never); } },
+      { text: 'Abbrechen', style: 'destructive', onPress: () => { hapticTap(); s.stop(); useTrackingStore.getState().reset(); router.replace('/track' as never); } },
     ]);
   };
 
@@ -115,6 +117,7 @@ export default function TrackRunScreen() {
     Alert.alert('Suche beenden?', 'Die Ausarbeitung wird gespeichert — danach geht es zur Auswertung.', [
       { text: 'Weiter suchen', style: 'cancel' },
       { text: 'Beenden', style: 'destructive', onPress: async () => {
+        hapticSuccess();   // sofort beim Bestätigen, vor await
         setFinishing(true);
         const res = s.stop();   // ← Search-Recorder beenden
         const runId = runIdRef.current;
@@ -233,7 +236,7 @@ export default function TrackRunScreen() {
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
             style={s.foundObjects >= s.totalObjects ? { opacity: 0.45 } : undefined}
-            onPress={s.markObject} disabled={s.foundObjects >= s.totalObjects}
+            onPress={() => { hapticSuccess(); s.markObject(); }} disabled={s.foundObjects >= s.totalObjects}
           >
             <Ionicons name="flag" size={20} color={FT.text} />
             <Text className="text-[10.5px] font-extrabold text-ft-text">Gegenstand</Text>

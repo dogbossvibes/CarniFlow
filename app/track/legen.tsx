@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
@@ -44,7 +44,6 @@ function clock(sec: number) {
   return `${m}:${s}`;
 }
 
-const haptic = (fn: () => void) => { try { fn(); } catch { /* haptics optional */ } };
 
 // GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Aufnahme nicht).
 const SHOW_GPS_DEBUG = __DEV__;
@@ -98,7 +97,8 @@ export default function LegenScreen() {
   // Der Marker wird im Recorder direkt am Scheitel gesetzt.
   const onAngle = useCallback((kind: AngleKind) => {
     setLastAngle(kind);
-    haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+    // Automatisch erkannt → gedrosselt: Abriss als Warnung, sonst Winkel-Impuls.
+    if (kind === 'abriss') hapticWarning(); else hapticAngle();
     showToast(`${ANGLE_LABEL[kind]} erkannt`);
   }, [showToast]);
 
@@ -114,8 +114,8 @@ export default function LegenScreen() {
   const placeGegenstand = useCallback((material: MarkerMaterial) => {
     setMaterialSheet(false);
     if (!useTrackingStore.getState().startAnchor) { showToast('Kurz warten – Startpunkt wird noch gesetzt.'); return; }
+    hapticMarker();                 // sofort, VOR dem Speichern
     lastMaterialRef.current = material;
-    haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
     void rec.addMarker('gegenstand', { material });
   }, [rec, showToast]);
 
@@ -124,7 +124,7 @@ export default function LegenScreen() {
   const quickAddArticle = useCallback(() => {
     if (phaseRef.current !== 'recording') return;
     if (!useTrackingStore.getState().startAnchor) { showToast('Kurz warten – Startpunkt wird noch gesetzt.'); return; }
-    haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+    hapticMarker();                 // sofort, VOR dem Speichern
     void rec.addMarker('gegenstand', { material: lastMaterialRef.current });
     showToast('Gegenstand gesetzt');
   }, [rec, showToast]);
@@ -199,11 +199,11 @@ export default function LegenScreen() {
   const begin = useCallback(async () => {
     if (beganRef.current) return;
     beganRef.current = true;
+    hapticSuccess();   // SOFORT beim Start-Tap — vor jedem await/GPS/Netz
 
     const r = await rec.beginRecording(null);   // sofort scharf (recording=true, Timer)
     if (r.error) { beganRef.current = false; showToast(r.error); return; }
     setPhase('recording');
-    haptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
     showToast('Fährte läuft');
 
     // Remote-Session im Hintergrund (blockiert die Aufnahme nicht).
@@ -235,6 +235,7 @@ export default function LegenScreen() {
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
 
   const onStop = async () => {
+    hapticSuccess();   // SOFORT beim Stop-Tap, vor await finish
     const id = sessionIdRef.current;
     await rec.finish(id);   // toleriert null (offline → nur lokal gesichert)
     if (id) {
@@ -499,7 +500,7 @@ export default function LegenScreen() {
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            onPress={() => (isPaused ? rec.resume() : rec.pause())} disabled={phase !== 'recording'}
+            onPress={() => { hapticTap(); isPaused ? rec.resume() : rec.pause(); }} disabled={phase !== 'recording'}
           >
             <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color={FT.text} />
             <Text className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? 'Weiter' : 'Pause'}</Text>
