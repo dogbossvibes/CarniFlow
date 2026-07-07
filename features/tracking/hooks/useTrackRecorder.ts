@@ -41,13 +41,23 @@ const EMA_ALPHA      = 0.4;  // Glättung der aufgezeichneten LINIE (ruhig, trä
 const PUCK_ALPHA     = 0.6;  // Glättung des LIVE-Pucks separat → folgt flotter,
                              // ohne die aufgezeichnete Linie unruhiger zu machen
 
-// Winkel-Erkennung (zwei Schenkel).
-const LEG_MIN_M       = 5.0;  // Mindestlänge je Schenkel, damit Rauschen nicht triggert
-const ANGLE_MIN_DEG   = 35;   // ab dieser Richtungsänderung gilt es als Knick
-const ANGLE_SHARP_DEG = 100;  // > rechtwinklig (90°) → Spitzwinkel. Bewusst nahe 90°,
-                              // weil EMA-Glättung den Scheitel verrundet und einen echten
-                              // Spitzwinkel sonst als 90°-Winkel unterschätzt.
-const CORNER_GAP_M    = 6.0;  // Mindestabstand zwischen zwei erkannten Winkeln
+// Winkel-Erkennung (zwei Schenkel). Klassifikation über den INNENWINKEL des Wegs
+// (Referenz winkel.png: „30° ≤ spitzer Winkel ≤ 60°"). Innenwinkel = 180 − |Richtungs-
+// änderung am Scheitel|:
+//   Innenwinkel 30–60°  → Spitzwinkel (links/rechts)   → Richtungsänderung ~120–150°
+//   Innenwinkel 75–115° → rechtwinklig ~90°            → Richtungsänderung ~65–105°
+//   Innenwinkel 60–75° oder außerhalb → unklar → NICHT automatisch markieren
+const LEG_MIN_M           = 5.0;  // Mindestlänge je Schenkel, damit Rauschen nicht triggert
+const ACUTE_ANGLE_MIN_DEG = 30;   // Innenwinkel: ab hier Spitzwinkel
+const ACUTE_ANGLE_MAX_DEG = 60;   // Innenwinkel: bis hier Spitzwinkel
+const ANGLE_90_MIN_DEG    = 75;   // Innenwinkel: ab hier rechtwinklig (~90°)
+const ANGLE_90_MAX_DEG    = 115;  // Innenwinkel: bis hier rechtwinklig
+const CORNER_GAP_M        = 6.0;  // Mindestabstand zwischen zwei erkannten Winkeln
+// Klassifikation über den Innenwinkel (winkel.png-konform). Falls sich im Feld
+// zeigt, dass direkt die rohe Richtungsänderung gemeint ist → auf false setzen.
+const ANGLE_USE_INTERIOR  = true;
+// Links/Rechts leicht invertierbar, falls der Feldtest sie vertauscht zeigt.
+const ANGLE_INVERT_SIDE   = false;
 
 // Abriss-Erkennung über das Laufmuster: kurzer Halt am Abrissfeld, danach
 // GERADEAUS weiter (kein Winkel). Der ~1-Schritt-Versatz selbst liegt unter dem
@@ -209,12 +219,25 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (!best || mag > best.mag) best = { apex, diff, mag };
     }
 
-    if (!best || best.mag < ANGLE_MIN_DEG) return;
+    if (!best || best.mag < 15) return;   // praktisch keine Richtungsänderung → kein Winkel
 
     const B = best.apex;
-    // Richtung (links/rechts) und Schärfe (spitz/rechtwinklig) getrennt bestimmen.
-    const dir: 'links' | 'rechts' = best.diff > 0 ? 'rechts' : 'links';
-    const kind: AngleKind = best.mag > ANGLE_SHARP_DEG ? (dir === 'rechts' ? 'spitz_rechts' : 'spitz_links') : dir;
+    // Richtung: best.diff ist die VORZEICHENBEHAFTETE Richtungsänderung am Scheitel.
+    // Konvention: + = rechts (im Uhrzeigersinn), − = links. Über ANGLE_INVERT_SIDE
+    // im Feld umkehrbar, falls links/rechts vertauscht wirken.
+    let dir: 'links' | 'rechts' = best.diff > 0 ? 'rechts' : 'links';
+    if (ANGLE_INVERT_SIDE) dir = dir === 'rechts' ? 'links' : 'rechts';
+
+    // Klassifikation über den Innenwinkel des Wegs (= 180 − Richtungsänderung).
+    const angleDeg = ANGLE_USE_INTERIOR ? 180 - best.mag : best.mag;
+    let kind: AngleKind | null = null;
+    if (angleDeg >= ANGLE_90_MIN_DEG && angleDeg <= ANGLE_90_MAX_DEG) {
+      kind = dir;                                                        // ~90° links/rechts
+    } else if (angleDeg >= ACUTE_ANGLE_MIN_DEG && angleDeg <= ACUTE_ANGLE_MAX_DEG) {
+      kind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';         // Spitzwinkel
+    }
+    if (!kind) return;   // Innenwinkel 60–75° oder außerhalb → unklar, nicht markieren
+    if (__DEV__) console.log('[trackRecorder] Winkel', { kind, innenwinkel: Math.round(angleDeg), richtungsaenderung: Math.round(best.mag), richtung: dir });
     lastCornerAtRef.current = B.cumDist;
     pendingAbrissRef.current = null;   // echter Winkel hier ⇒ kein Abriss am selben Halt
 

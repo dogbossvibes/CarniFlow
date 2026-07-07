@@ -11,6 +11,9 @@ import { C } from '@/constants/colors';
 
 interface GeoPt { lat: number; lng: number }
 
+// Gegenstände bewusst neutral-hell (nicht Mint) → klar von den Mint-Winkeln unterscheidbar.
+const OBJECT_COLOR = '#EDEDED';
+
 // ── Abstrakter Fallback (Port aus design_handoff_faehrten/viz.jsx) ──
 const BASE: [number, number][] = [
   [0.14, 0.86], [0.31, 0.20], [0.67, 0.27], [0.81, 0.62], [0.53, 0.83], [0.28, 0.56],
@@ -131,10 +134,10 @@ export function TrackSketch({
               )}
             </G>
           ))}
-          {/* Gegenstände */}
+          {/* Gegenstände (neutral-hell, aufrechtes Quadrat → anders als Mint-Winkel) */}
           {real.objects.map(([x, y], i) => (
-            <G key={`o${i}`} transform={`translate(${x}, ${y}) rotate(45)`}>
-              <Rect x={-4.5} y={-4.5} width={9} height={9} rx={1.6} fill="none" stroke={accent} strokeWidth={1.6} />
+            <G key={`o${i}`}>
+              <Rect x={x - 4.5} y={y - 4.5} width={9} height={9} rx={1.6} fill="none" stroke={OBJECT_COLOR} strokeWidth={1.8} />
             </G>
           ))}
           {/* Start */}
@@ -166,8 +169,8 @@ export function TrackSketch({
             const o = pointAt(pts, t);
             const found = progress >= t;
             return (
-              <G key={`o${i}`} transform={`translate(${o[0]}, ${o[1]}) rotate(45)`}>
-                <Rect x={-4.5} y={-4.5} width={9} height={9} rx={1.6} fill={found ? accent : 'none'} stroke={accent} strokeWidth={1.6} fillOpacity={found ? 1 : 0} />
+              <G key={`o${i}`}>
+                <Rect x={o[0] - 4.5} y={o[1] - 4.5} width={9} height={9} rx={1.6} fill={found ? OBJECT_COLOR : 'none'} stroke={OBJECT_COLOR} strokeWidth={1.8} fillOpacity={found ? 1 : 0} />
               </G>
             );
           })}

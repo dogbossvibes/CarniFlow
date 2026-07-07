@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
+import { ANGLE_SHORT } from '@/features/tracking/utils/angleClassify';
 import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/store/trackingStore';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
@@ -88,6 +89,12 @@ export function TrackingMap({
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers.length]);
+  // Fortlaufende Nummer je Gegenstand (G1, G2, …) — nach Index in markerList.
+  const objectNo = useMemo(() => {
+    const map = new Map<number, number>(); let n = 0;
+    markerList.forEach((m, i) => { if (m.type === 'gegenstand') map.set(i, ++n); });
+    return map;
+  }, [markerList]);
 
   const recenter = () => {
     const p = currentPosition ?? layPoints[layPoints.length - 1] ?? null;
@@ -161,14 +168,39 @@ export function TrackingMap({
           </Marker>
         ) : null}
 
-        {/* Marker: Abriss als Kästchen (Abrissfeld), sonst runder Punkt. */}
-        {markerList.map((m, i) => (
-          <Marker key={i} coordinate={{ latitude: m.lat as number, longitude: m.lng as number }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-            {m.type === 'winkel' && m.angleKind === 'abriss'
-              ? <View style={s.abrissBox} />
-              : <View style={[s.markerDot, { backgroundColor: markerColor(m) }]} />}
-          </Marker>
-        ))}
+        {/* Marker: Winkel = mint Geometrie-Badge (90 L/R · SL/SR), Gegenstand =
+            neutrales Quadrat-Badge (G1, G2 …), Abriss = Kästchen. Klar getrennt. */}
+        {markerList.map((m, i) => {
+          let child;
+          if (m.type === 'winkel') {
+            if (m.angleKind === 'abriss') {
+              child = <View style={s.abrissBox} />;
+            } else {
+              const label = (m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠';
+              // 90° = volles Mint-Badge; Spitzwinkel = dünnere Umriss-Optik (andere Akzentwirkung).
+              const acute = m.angleKind === 'spitz_links' || m.angleKind === 'spitz_rechts' || m.angleKind === 'spitz';
+              child = (
+                <View style={[s.angleBadge, acute && s.angleBadgeAcute]}>
+                  <Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text>
+                </View>
+              );
+            }
+          } else if (m.type === 'gegenstand') {
+            const isDuebel = m.material === 'duebel';
+            child = (
+              <View style={[s.objectBadge, isDuebel && s.objectBadgeDuebel]}>
+                <Text style={[s.objectBadgeTxt, isDuebel && s.objectBadgeTxtDuebel]}>{`G${objectNo.get(i) ?? ''}`}</Text>
+              </View>
+            );
+          } else {
+            child = <View style={[s.markerDot, { backgroundColor: markerColor(m) }]} />;
+          }
+          return (
+            <Marker key={i} coordinate={{ latitude: m.lat as number, longitude: m.lng as number }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+              {child}
+            </Marker>
+          );
+        })}
 
         {/* Abriss-Marker (Ausarbeiten): rotes Kreuz-Symbol */}
         {(breaks ?? []).map((b, i) => (
@@ -220,6 +252,17 @@ const s = StyleSheet.create({
   startFlag:      { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, borderWidth: 2, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   startFlagLabel: { marginTop: 2, fontSize: 9, fontWeight: '800', color: C.trackPrimary, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
   markerDot:   { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#04110F' },
+  // Winkel: kompaktes, geometrisches Mint-Badge mit Kurzlabel (90 L/R, SL/SR).
+  angleBadge:    { minWidth: 20, height: 17, paddingHorizontal: 4, borderRadius: 4, backgroundColor: C.trackPrimary, borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
+  angleBadgeTxt: { fontSize: 8.5, fontWeight: '900', color: '#04110F', letterSpacing: 0.2 },
+  // Spitzwinkel: dünnere Umriss-Optik (dunkler Grund, Mint-Rand/-Text) → klar anders als 90°.
+  angleBadgeAcute:    { backgroundColor: 'rgba(4,17,15,0.82)', borderColor: C.trackPrimary, borderWidth: 1 },
+  angleBadgeTxtAcute: { color: C.trackPrimary },
+  // Gegenstand: neutrales, helles Quadrat-Badge mit „G{n}" — bewusst anders als Winkel.
+  objectBadge:      { width: 18, height: 18, borderRadius: 3, backgroundColor: '#EDEDED', borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
+  objectBadgeTxt:   { fontSize: 9, fontWeight: '900', color: '#101010' },
+  objectBadgeDuebel:    { backgroundColor: C.trackWood },
+  objectBadgeTxtDuebel: { color: '#04110F' },
   abrissBox:   { width: 17, height: 17, borderRadius: 3, borderWidth: 2.5, borderColor: C.trackWarning, backgroundColor: 'rgba(0,0,0,0.35)' },
   rejectDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,77,77,0.75)' },
   breakDot:    { width: 18, height: 18, borderRadius: 9, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#2a060a', alignItems: 'center', justifyContent: 'center' },
