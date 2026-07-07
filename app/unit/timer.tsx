@@ -150,6 +150,11 @@ export default function TimerScreen() {
             <Text style={s.endTxt}>Fertig</Text>
           </AnimatedPressable>
         </View>
+
+        {/* Klar beschriftetes Abbrechen (mit Sicherheitsabfrage ab ≥ 3 s). */}
+        <TouchableOpacity style={s.cancelLink} onPress={cancel} hitSlop={8} activeOpacity={0.7}>
+          <Text style={s.cancelLinkTxt}>Training abbrechen</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     </View>
   );
@@ -167,7 +172,9 @@ const s = StyleSheet.create({
   timer:  { fontSize: 76, color: C.white, fontWeight: '900', letterSpacing: -2, fontVariant: ['tabular-nums'] },
   hint:   { fontSize: 13, color: C.muted, fontWeight: '500', textAlign: 'center', marginTop: 4 },
 
-  bar:      { flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bg },
+  bar:      { flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bg },
+  cancelLink:    { alignItems: 'center', paddingTop: 4, paddingBottom: 26 },
+  cancelLinkTxt: { fontSize: 14, color: C.muted, fontWeight: '700' },
   pauseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: 120, height: 56, borderRadius: 18, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border },
   pauseTxt: { fontSize: 15, color: C.white, fontWeight: '700' },
   endBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 56, borderRadius: 18, overflow: 'hidden' },
