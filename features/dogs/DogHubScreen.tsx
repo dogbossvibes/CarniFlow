@@ -13,7 +13,12 @@ import { DogHealthLoadCard } from '@/components/dogs/DogHealthLoadCard';
 import { DogDocumentsCard } from '@/components/dogs/DogDocumentsCard';
 import { DogTrainerCard } from '@/components/dogs/DogTrainerCard';
 import { DogAiCoachCard } from '@/components/dogs/DogAiCoachCard';
+import { DogHeatCard } from '@/components/dogs/DogHeatCard';
+import type { HeatCycle, HeatPrediction } from '@/features/dogs/heatCycles';
 import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } from '@/components/dogs/types';
+
+// Läufigkeit (nur Hündinnen) — lokal geladen, als eigenständiger Prop reingereicht.
+export interface DogHeatProps { cycles: HeatCycle[]; prediction: HeatPrediction | null; onAdd: () => void; onDelete?: (c: HeatCycle) => void }
 
 export interface DogHubActions {
   onBack:             () => void;
@@ -31,18 +36,19 @@ export interface DogHubActions {
   onUpgrade?:         () => void;
 }
 
-type TabKey = 'overview' | 'training' | 'faehrte' | 'goals' | 'health' | 'docs' | 'trainer';
+type TabKey = 'overview' | 'training' | 'faehrte' | 'goals' | 'health' | 'heat' | 'docs' | 'trainer';
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview', label: 'Übersicht' },
   { key: 'training', label: 'Training' },
   { key: 'faehrte',  label: 'Fährte' },
   { key: 'goals',    label: 'Ziele' },
   { key: 'health',   label: 'Gesundheit' },
+  { key: 'heat',     label: 'Läufigkeit' },   // nur Hündinnen (unten gefiltert)
   { key: 'docs',     label: 'Dokumente' },
   { key: 'trainer',  label: 'Trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean }) {
+export function DogHubScreen({ vm, actions, aiUnlocked, heat }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps }) {
   const [tab, setTab] = useState<TabKey>('overview');
   const [aiTipHidden, setAiTipHidden] = useState(false);   // „Später" blendet den KI-Hinweis für diese Sitzung aus
   const { width } = useWindowDimensions();
@@ -88,7 +94,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked }: { vm: DogHubVM; action
 
             {/* Tab-Leiste */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabbar}>
-              {TABS.map(t => {
+              {TABS.filter(t => t.key !== 'heat' || id.gender === 'female').map(t => {
                 const on = t.key === tab;
                 return (
                   <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={[s.tab, on && s.tabOn]} activeOpacity={0.8}>
@@ -131,6 +137,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked }: { vm: DogHubVM; action
               {tab === 'faehrte'  && <DogFaehrteSummary data={vm.faehrte} onStart={actions.onStartFaehrte} />}
               {tab === 'goals'    && <DogGoalsCard goal={vm.goal} onEdit={actions.onEditGoal} />}
               {tab === 'health'   && <DogHealthLoadCard health={vm.health} onAddEntry={actions.onAddHealth} />}
+              {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onDelete={heat.onDelete} />}
               {tab === 'docs'     && <DogDocumentsCard documents={vm.documents} onAdd={actions.onAddDoc} onOpen={actions.onOpenDocument} onDelete={actions.onDeleteDocument} />}
               {tab === 'trainer'  && <DogTrainerCard trainer={vm.trainer} onChat={actions.onChat} />}
             </View>

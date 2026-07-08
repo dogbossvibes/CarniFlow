@@ -14,6 +14,7 @@ import { useHomeLayout } from "@/stores/homeLayout";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { HomeTimelineCard } from "@/components/calendar/HomeTimelineCard";
 import { AiCoachCard } from "@/features/ai/components/AiCoachCard";
+import { HomeHeatCard } from "@/components/dogs/HomeHeatCard";
 import { OfflineBanner } from "@/features/sync/components/OfflineBanner";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -224,6 +225,9 @@ export default function HomeScreen() {
         <View style={{ marginBottom: 24 }}>
           <AiCoachCard />
         </View>
+
+        {/* ── LÄUFIGKEIT IM BLICK (nur Hündinnen mit Prognose) ── */}
+        <HomeHeatCard onOpen={(dogId) => router.push(`/dog/${dogId}` as never)} />
 
         {/* ── HAUPTAKTIONEN ── */}
         {layout.hauptaktionen && (

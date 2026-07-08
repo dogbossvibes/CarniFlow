@@ -8,6 +8,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { getDogById } from '@/services/dogs';
 import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtras } from '@/services/dogHub';
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
+import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
 import { useDogHubDynamic } from '@/features/dogs/useDogHubDynamic';
 import { DogHubScreen, type DogHubActions } from '@/features/dogs/DogHubScreen';
 import type { DogDocument, DogTrainingItem } from '@/components/dogs/types';
@@ -27,6 +28,7 @@ export default function DogHubRoute() {
   const { feed } = useTrainingFeed(id);
   const dynamic = useDogHubDynamic(id);
   const [extras, setExtras] = useState<DogHubExtras | null>(null);
+  const [heatCycles, setHeatCycles] = useState<HeatCycle[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -42,9 +44,21 @@ export default function DogHubRoute() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     getDogHubExtras(id).then(setExtras).catch(() => setExtras(null));
+    getHeatCycles(id).then(setHeatCycles).catch(() => setHeatCycles([]));
   }, [id]));
 
   const vm = useMemo(() => (dog ? buildDogHubVM(dog, feed, extras ?? undefined, dynamic) : null), [dog, feed, extras, dynamic]);
+  const heatPrediction = useMemo(() => predictHeat(heatCycles), [heatCycles]);
+
+  const deleteHeat = (c: HeatCycle) => {
+    Alert.alert('Läufigkeit löschen?', 'Der Eintrag wird entfernt.', [
+      { text: 'Abbrechen', style: 'cancel' },
+      { text: 'Löschen', style: 'destructive', onPress: async () => {
+        await deleteHeatCycle(c.id);
+        getHeatCycles(id).then(setHeatCycles).catch(() => {});
+      } },
+    ]);
+  };
 
   const openDocument = async (doc: DogDocument) => {
     if (!doc.fileUrl) return;
@@ -125,7 +139,19 @@ export default function DogHubRoute() {
     );
   }
 
-  return <DogHubScreen vm={vm} actions={actions} aiUnlocked={isPremium} />;
+  return (
+    <DogHubScreen
+      vm={vm}
+      actions={actions}
+      aiUnlocked={isPremium}
+      heat={{
+        cycles: heatCycles,
+        prediction: heatPrediction,
+        onAdd: () => router.push(`/dog-heat/${id}` as never),
+        onDelete: deleteHeat,
+      }}
+    />
+  );
 }
 
 const s = StyleSheet.create({
