@@ -13,7 +13,7 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "28",
+      "buildNumber": "29",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {
@@ -45,7 +45,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 28,
+      "versionCode": 29,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCriuMb0ZKmtn52yNH7AjmfGWsaUEuNDdg"
