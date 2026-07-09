@@ -50,13 +50,13 @@ export async function generateAIAnalysis(
 function friendlyAiError(detail: string): string {
   const d = detail.toLowerCase();
   if (/credit|billing|balance|quota|insufficient/.test(d)) {
-    return 'Die KI-Analyse ist gerade nicht verfügbar. Wir kümmern uns darum — bitte versuch es später noch einmal.';
+    return 'Die Smart Analyse ist gerade nicht verfügbar. Wir kümmern uns darum — bitte versuch es später noch einmal.';
   }
   if (/rate|overloaded|too many|429|529/.test(d)) {
     return 'Gerade ist viel los. Bitte versuch es in einem Moment noch einmal.';
   }
   if (/network|timeout|fetch|failed to/.test(d)) {
-    return 'Keine Verbindung zur KI. Prüfe deine Internetverbindung und versuch es erneut.';
+    return 'Keine Verbindung. Prüfe deine Internetverbindung und versuch es erneut.';
   }
-  return 'Die KI-Analyse hat gerade nicht geklappt. Bitte versuch es gleich noch einmal.';
+  return 'Die Smart Analyse hat gerade nicht geklappt. Bitte versuch es gleich noch einmal.';
 }

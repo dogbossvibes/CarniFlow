@@ -22,7 +22,7 @@ interface CardDef { plan: SubscriptionPlan; badge?: string; features: string[]; 
 const CARDS: CardDef[] = [
   { plan: 'beginner_trial', badge: 'Start', features: ['7 Tage kostenlos', 'Alle Active-Funktionen', 'Danach Active CHF 6.00/Mt.', 'Kein Trainerzugang'] },
   { plan: 'founder_active', badge: 'Nur 77×', founder: true, features: ['Dauerhaft CHF 4.00/Mt.', 'Solange das Abo aktiv bleibt', 'Alle Active-Funktionen', 'Kein Trainerzugang'] },
-  { plan: 'active', features: ['Training, Hunde, Fortschritt', 'KI-Auswertung', 'Kalender & Sprachnotizen', 'Kein Trainerzugang'] },
+  { plan: 'active', features: ['Training, Hunde, Fortschritt', 'Smart Auswertung', 'Kalender & Sprachnotizen', 'Kein Trainerzugang'] },
   { plan: 'trainer', badge: 'Profi', features: ['Alles aus Active', 'Kundenverwaltung & Pläne', 'Umfragen & Feedback', 'Trainer-Dashboard'] },
 ];
 

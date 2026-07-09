@@ -32,7 +32,7 @@ export function SmartFeedbackSection({ dogId }: { dogId?: string | null }) {
       <View style={s.head}>
         <Text style={s.label}>Smart Feedback</Text>
         <TouchableOpacity style={s.link} onPress={() => router.push('/analyse/coach' as never)} activeOpacity={0.7}>
-          <Text style={s.linkTxt}>KI-Coach</Text>
+          <Text style={s.linkTxt}>Smart Coach</Text>
           <Ionicons name="chevron-forward" size={13} color={C.accent} />
         </TouchableOpacity>
       </View>

@@ -69,7 +69,7 @@ export default function DogHubPreviewScreen() {
           ))}
         </Section>
 
-        <Section title="Smart Card (mit / ohne KI-Daten)">
+        <Section title="Smart Card (mit / ohne Daten)">
           <DogSmartCard tip={malu.aiTip} onStart={noop} />
           <DogSmartCard tip={null} onStart={noop} />
         </Section>
@@ -111,7 +111,7 @@ export default function DogHubPreviewScreen() {
           <DogTrainerCard trainer={inari.trainer} onChat={noop} />
         </Section>
 
-        <Section title="KI-Coach (entsperrt / gesperrt)">
+        <Section title="Smart Coach (entsperrt / gesperrt)">
           <DogAiCoachCard tip={malu.aiTip} isUnlocked onStart={noop} onUpgrade={noop} />
           <DogAiCoachCard tip={malu.aiTip} isUnlocked={false} onStart={noop} onUpgrade={noop} />
         </Section>

@@ -44,8 +44,8 @@ export default function CoachScreen() {
           <Ionicons name="chevron-back" size={20} color={C.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>KI-Coach</Text>
-          <Text style={s.subtitle}>Smart Feedback für dein Training.</Text>
+          <Text style={s.title}>Smart Coach</Text>
+          <Text style={s.subtitle}>Anyvo analysiert deine Trainingsdaten und zeigt dir Trends, Hinweise und Empfehlungen.</Text>
         </View>
       </View>
 

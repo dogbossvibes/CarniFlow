@@ -18,7 +18,7 @@ export function CoachSummaryCard({
       <View style={s.head}>
         <View style={s.eyebrowRow}>
           <Ionicons name="sparkles" size={14} color={C.accent} />
-          <Text style={s.eyebrow}>Smart Summary · Diese Woche</Text>
+          <Text style={s.eyebrow}>Optionale KI-Zusammenfassung</Text>
         </View>
         <TouchableOpacity style={s.refresh} onPress={onRefresh} disabled={isLoading} activeOpacity={0.8}>
           {isLoading ? <ActivityIndicator size="small" color={C.accent} />
@@ -27,7 +27,7 @@ export function CoachSummaryCard({
       </View>
 
       {!hasRun ? (
-        <Text style={s.body}>Tippe auf „Aktualisieren“, um eine KI-Zusammenfassung deiner Trainingswoche zu erhalten.</Text>
+        <Text style={s.body}>Erstellt auf Wunsch eine zusätzliche Text-Zusammenfassung deiner Trainings. Tippe dazu auf „Aktualisieren“.</Text>
       ) : isLoading ? (
         <Text style={s.body}>Deine Trainingsdaten werden ausgewertet…</Text>
       ) : !summary?.available ? (

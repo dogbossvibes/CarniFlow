@@ -19,14 +19,14 @@ export function DogAiCoachCard({
     return (
       <View style={s.locked}>
         <View style={s.iconWrap}><Ionicons name="lock-closed" size={16} color={C.trackPrimary} /></View>
-        <Text style={s.lockedTitle}>KI-Coach</Text>
+        <Text style={s.lockedTitle}>Smart Coach</Text>
         <Text style={s.lockedTxt}>Personalisierte Trainingsempfehlungen mit Active oder Premium.</Text>
         {onUpgrade ? <AnyvoButton label="Mehr erfahren" variant="secondary" onPress={onUpgrade} /> : null}
       </View>
     );
   }
 
-  const t = tip ?? { title: 'KI-Coach', hint: 'Noch nicht genug Daten für eine Empfehlung.', recommendation: null };
+  const t = tip ?? { title: 'Smart Coach', hint: 'Noch nicht genug Daten für eine Empfehlung.', recommendation: null };
   const schedule = t.schedule;
   const chips = schedule
     ? [

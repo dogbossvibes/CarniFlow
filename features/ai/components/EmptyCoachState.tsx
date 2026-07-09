@@ -6,8 +6,8 @@ export function EmptyCoachState({ onStart }: { onStart?: () => void }) {
   return (
     <View style={s.wrap}>
       <View style={s.icon}><Ionicons name="sparkles-outline" size={30} color={C.accent} /></View>
-      <Text style={s.title}>Noch keine Insights</Text>
-      <Text style={s.txt}>Dokumentiere ein paar Trainings — der KI-Coach erkennt dann Muster, Fortschritte und Lücken.</Text>
+      <Text style={s.title}>Sammle Trainings und entdecke Muster</Text>
+      <Text style={s.txt}>Je mehr du dokumentierst, desto besser erkennt Anyvo Trends, Belastung, Trainingsbalance und Fortschritte.</Text>
       {onStart && (
         <TouchableOpacity style={s.btn} onPress={onStart} activeOpacity={0.85}>
           <Ionicons name="play" size={15} color={C.accentText} />

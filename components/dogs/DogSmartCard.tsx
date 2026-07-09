@@ -5,7 +5,7 @@ import { C } from '@/constants/colors';
 import type { DogAiTip } from './types';
 
 const FALLBACK: DogAiTip = {
-  title: 'Noch keine KI-Empfehlung',
+  title: 'Noch keine Smart-Empfehlung',
   hint: 'Sobald ein paar Trainings erfasst sind, schlägt dir Anyvo passende Einheiten vor.',
   recommendation: null,
 };
