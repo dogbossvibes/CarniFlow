@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 // KI-Trainingsanalyse für die Analyse-Ansicht. Erwartet { sessions, dogName } und
 // liefert das vom Client erwartete deutsche Schema (gesamtscore, zusammenfassung,
 // positives, schwaechen, empfehlungen, coach_message). Anthropic-Key liegt
-// ausschließlich serverseitig.
+// ausschliesslich serverseitig.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

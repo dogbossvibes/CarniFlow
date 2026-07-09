@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { useSession } from '@/hooks/useSession';
 import { useDogs } from '@/hooks/useDogs';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
@@ -71,6 +72,8 @@ function RecDot() {
 // (rechts/links/spitz) werden automatisch erkannt, Haptik bei jeder Erkennung.
 export default function LegenScreen() {
   const router = useRouter();
+  const { t } = useT();
+  const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
   useKeepAwake();   // Display während des Legens anlassen (Bildschirm nicht sperren)
   const params = useLocalSearchParams<{ dogId?: string }>();
   const { session } = useSession();
@@ -92,6 +95,7 @@ export default function LegenScreen() {
   const beganRef = useRef(false);
   const warmupStartedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
+  const stoppingRef = useRef(false);   // Doppelklick-Guard für „Stoppen"
 
   // Automatisch erkannter Winkel (rechts/links/spitz) → Haptik + Hinweis.
   // Der Marker wird im Recorder direkt am Scheitel gesetzt.
@@ -113,7 +117,7 @@ export default function LegenScreen() {
   // sonst würde er im Warmup-Drift landen (kein Crash, nur Hinweis).
   const placeGegenstand = useCallback((material: MarkerMaterial) => {
     setMaterialSheet(false);
-    if (!useTrackingStore.getState().startAnchor) { showToast('Kurz warten – Startpunkt wird noch gesetzt.'); return; }
+    if (!useTrackingStore.getState().startAnchor) { showToast(t('toast.startPointWait')); return; }
     hapticMarker();                 // sofort, VOR dem Speichern
     lastMaterialRef.current = material;
     void rec.addMarker('gegenstand', { material });
@@ -123,10 +127,10 @@ export default function LegenScreen() {
   // zuletzt gewählten Material. Nur während laufender Aufnahme.
   const quickAddArticle = useCallback(() => {
     if (phaseRef.current !== 'recording') return;
-    if (!useTrackingStore.getState().startAnchor) { showToast('Kurz warten – Startpunkt wird noch gesetzt.'); return; }
+    if (!useTrackingStore.getState().startAnchor) { showToast(t('toast.startPointWait')); return; }
     hapticMarker();                 // sofort, VOR dem Speichern
     void rec.addMarker('gegenstand', { material: lastMaterialRef.current });
-    showToast('Gegenstand gesetzt');
+    showToast(t('toast.objectSet'));
   }, [rec, showToast]);
 
   // iOS-Kurzbefehl (Deep-Link) → Schnell-Gegenstand, solange aufgenommen wird.
@@ -204,7 +208,7 @@ export default function LegenScreen() {
     const r = await rec.beginRecording(null);   // sofort scharf (recording=true, Timer)
     if (r.error) { beganRef.current = false; showToast(r.error); return; }
     setPhase('recording');
-    showToast('Fährte läuft');
+    showToast(t('toast.trackRunning'));
 
     // Remote-Session im Hintergrund (blockiert die Aufnahme nicht).
     const uid = session?.user.id;
@@ -220,28 +224,32 @@ export default function LegenScreen() {
         distraction: false,
       }).then(({ data, error }) => {
         if (!error && data) { sessionIdRef.current = data.id; useTrackingStore.getState().setCurrentSession(data.id); }
-        else showToast('Offline — wird später synchronisiert.');
-      }).catch(() => showToast('Offline — wird später synchronisiert.'));
+        else showToast(t('toast.offlineSync'));
+      }).catch(() => showToast(t('toast.offlineSync')));
     }
   }, [session, activeDog, rec, showToast, surface, condition, weather, currentPosition]);
 
   useEffect(() => () => { rec.stopAll(); }, [rec.stopAll]);
 
-  const mapMarkers: MapMarker[] = markers.map(mk => ({ type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind, material: mk.material }));
+  const mapMarkers: MapMarker[] = markers.map(mk => ({ id: mk.id, type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind, material: mk.material }));
   const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
   const winkel = markers.filter(mk => mk.type === 'winkel').length;
   // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
   const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
 
-  const onStop = async () => {
-    hapticSuccess();   // SOFORT beim Stop-Tap, vor await finish
+  const onStop = () => {
+    if (stoppingRef.current) return;   // Doppelklick abfangen
+    stoppingRef.current = true;
+    hapticSuccess();   // SOFORT beim Stop-Tap
     const id = sessionIdRef.current;
-    await rec.finish(id);   // toleriert null (offline → nur lokal gesichert)
+    // rec.finish stoppt synchron, startet die Liegezeit und speichert im
+    // HINTERGRUND (saveState). Wir navigieren SOFORT — kein await, keine 2–5 s.
+    rec.finish(id);   // toleriert null (offline → nur lokal gesichert)
     if (id) {
       router.replace(`/track/liegen?id=${id}` as never);   // → Wartephase (Liegezeit) → Ausarbeiten
     } else {
-      showToast('Lokal gesichert — Auswertung nach Sync verfügbar.');
+      showToast(t('toast.localSaved'));
       router.canGoBack() ? router.back() : router.replace('/track' as never);
     }
   };
@@ -269,9 +277,9 @@ export default function LegenScreen() {
 
   return (
     <View className="flex-1 bg-ft-bg">
-      <SafeAreaView edges={['top']} className="flex-1">
-        {/* Top-Bar: Zurück · LIVE · Karte/Skizze */}
-        <View className="flex-row items-center gap-3 px-[18px] pt-2 pb-3">
+      <SafeAreaView edges={['bottom']} className="flex-1">
+        {/* Top-Bar: Zurück · LIVE · Karte/Skizze — explizit unter Dynamic Island/Statusbar. */}
+        <View className="flex-row items-center gap-3 px-[18px] pb-3" style={{ paddingTop: insets.top + 8 }}>
           <Pressable
             className="w-10 h-10 rounded-[12px] border border-ft-line-strong bg-white/10 items-center justify-center"
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} hitSlop={10}
@@ -326,7 +334,7 @@ export default function LegenScreen() {
           {/* Timer (oben links) */}
           <View className="absolute top-[14px] left-[14px] rounded-[16px] px-4 py-[10px] bg-ft-glass border border-ft-glass-line">
             <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{clock(durationSeconds)}</Text>
-            <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">Laufzeit</Text>
+            <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{t('track.runtime')}</Text>
           </View>
 
           {/* Hunde-Anzeige (oben rechts) — Auswahl erfolgt im Warmup-Setup */}
@@ -380,7 +388,7 @@ export default function LegenScreen() {
                   {/* Hund */}
                   {dogs.length > 0 && (
                     <>
-                      <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Hund</Text>
+                      <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.dog')}</Text>
                       <View className="flex-row flex-wrap gap-2 self-start mb-1">
                         {dogs.map(d => {
                           const on = d.id === activeDog?.id;
@@ -399,7 +407,7 @@ export default function LegenScreen() {
                   )}
 
                   {/* Untergrund */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Untergrund</Text>
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.surface')}</Text>
                   <View className="flex-row flex-wrap gap-2 self-start mb-1">
                     {SURFACES.map(sfc => {
                       const on = surface === sfc;
@@ -413,7 +421,7 @@ export default function LegenScreen() {
                   </View>
 
                   {/* Beschaffenheit */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Beschaffenheit</Text>
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.condition')}</Text>
                   <View className="flex-row flex-wrap gap-2 self-start mb-1">
                     {CONDITIONS.map(c => {
                       const on = condition === c;
@@ -448,7 +456,7 @@ export default function LegenScreen() {
                   </Text>
 
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Wetter</Text>
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
                   <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
                     {weatherState === 'loading' ? (
                       <View className="flex-row items-center gap-2">
@@ -496,27 +504,27 @@ export default function LegenScreen() {
             onPress={() => setMaterialSheet(true)} disabled={phase !== 'recording'}
           >
             <Ionicons name="cube-outline" size={20} color={FT.text} />
-            <Text className="text-[10.5px] font-extrabold text-ft-text">Gegenstand</Text>
+            <Text className="text-[10.5px] font-extrabold text-ft-text">{t('track.object')}</Text>
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
             onPress={() => { hapticTap(); isPaused ? rec.resume() : rec.pause(); }} disabled={phase !== 'recording'}
           >
             <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color={FT.text} />
-            <Text className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? 'Weiter' : 'Pause'}</Text>
+            <Text className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>
           </Pressable>
           <Pressable
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
             style={{ flex: 1.3 }} onPress={onStop} disabled={phase !== 'recording'}
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
-            <Text className="text-[10.5px] font-extrabold text-[#2a060a]">Stop & Auswerten</Text>
+            <Text numberOfLines={1} adjustsFontSizeToFit className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.stop')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
 
       {/* Gegenstand: Material wählen */}
-      <AnyvoBottomSheet visible={materialSheet} onClose={() => setMaterialSheet(false)} title="Gegenstand-Material">
+      <AnyvoBottomSheet visible={materialSheet} onClose={() => setMaterialSheet(false)} title={t('track.objectMaterial')}>
         <View className="flex-row flex-wrap gap-[10px] pb-2">
           {GEGENSTAND_MATERIALS.map(m => (
             <Pressable
@@ -549,6 +557,12 @@ export default function LegenScreen() {
           startAnchorSet={!!startAnchor}
           startAnchorAccuracy={startAnchor?.accuracy ?? null}
           startDriftRejectedCount={startDriftRejectedCount}
+          angleMarkersCount={dbg?.angleCount ?? null}
+          acuteAngleMarkersCount={dbg?.acuteAngleCount ?? null}
+          lastAngleType={dbg?.lastAngleType ?? null}
+          lastAngleDegrees={dbg?.lastAngleDeg ?? null}
+          lastAngleDirection={dbg?.lastAngleDir ?? null}
+          lastAngleRejectedReason={dbg?.lastAngleReject ?? null}
           devMode
         />
       )}

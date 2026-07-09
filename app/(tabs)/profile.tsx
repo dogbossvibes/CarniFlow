@@ -26,6 +26,7 @@ import type { TrainerUmfrage } from "@/types/umfrage";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { ALLE_SPARTEN, DEFAULT_SPARTEN } from "@/constants/sparten";
+import { useT } from "@/i18n";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -92,6 +93,10 @@ export default function ProfilScreen() {
     await setShareTrainingsDefault(user.id, value);
     refreshProfile();
   };
+
+  const { t, locale } = useT();
+  const SPRACHE_KEY = { 'de-CH': 'language.optDeCH', 'gsw-CH': 'language.optGswCH', 'de-DE': 'language.optDeDE' } as const;
+  const spracheLabel = t(SPRACHE_KEY[locale]);
 
   const benachrichtigungen = useNotificationSetting(user?.id);
   const crashReporting = useCrashReporting();
@@ -269,7 +274,7 @@ export default function ProfilScreen() {
         {/* Kopfzeile */}
         <View style={s.kopf}>
           <Text style={s.augenbraue}>DEIN KONTO</Text>
-          <Text style={s.titel}>Profil</Text>
+          <Text style={s.titel}>{t('profile.title')}</Text>
         </View>
 
         {/* Identitätskarte */}
@@ -446,13 +451,13 @@ export default function ProfilScreen() {
         )}
 
         {/* Konto-Einstellungen */}
-        <Text style={s.abschnitt}>KONTO</Text>
+        <Text style={s.abschnitt}>{t('profile.secAccount')}</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
           <View style={s.zeile}>
             <View style={s.zeileIcon}>
               <Ionicons name="notifications-outline" size={17} color={C.muted} />
             </View>
-            <Text style={[s.zeileLabel, { flex: 1 }]}>Benachrichtigungen</Text>
+            <Text style={[s.zeileLabel, { flex: 1 }]}>{t('profile.notifications')}</Text>
             <Switch
               value={benachrichtigungen.enabled}
               onValueChange={handleBenachrichtigungen}
@@ -466,7 +471,7 @@ export default function ProfilScreen() {
             <View style={s.zeileIcon}>
               <Ionicons name="lock-closed-outline" size={17} color={C.muted} />
             </View>
-            <Text style={[s.zeileLabel, { flex: 1 }]}>App-Sperre (Face ID / Fingerabdruck)</Text>
+            <Text style={[s.zeileLabel, { flex: 1 }]}>{t('profile.appLock')}</Text>
             <Switch
               value={appLock.enabled}
               onValueChange={handleAppLock}
@@ -477,14 +482,21 @@ export default function ProfilScreen() {
           </View>
           <View style={s.trenner} />
           <EinstellungZeile
+            icon="language-outline"
+            label={t('profile.language')}
+            wert={spracheLabel}
+            onPress={() => router.push('/language')}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
             icon="home-outline"
-            label="Startbildschirm"
+            label={t('profile.homeScreen')}
             onPress={() => router.push('/home-customize')}
           />
           <View style={s.trenner} />
           <EinstellungZeile
             icon="sync-outline"
-            label="Sync-Center"
+            label={t('profile.syncCenter')}
             onPress={() => router.push('/sync')}
           />
           <View style={s.trenner} />
@@ -492,7 +504,7 @@ export default function ProfilScreen() {
             <View style={s.zeileIcon}>
               <Ionicons name="bug-outline" size={17} color={C.muted} />
             </View>
-            <Text style={[s.zeileLabel, { flex: 1 }]}>Absturzberichte senden</Text>
+            <Text style={[s.zeileLabel, { flex: 1 }]}>{t('profile.crashReports')}</Text>
             <Switch
               value={crashReporting.enabled}
               onValueChange={crashReporting.toggle}
@@ -503,14 +515,14 @@ export default function ProfilScreen() {
         </View>
 
         {/* Fährten-Einstellungen */}
-        <Text style={s.abschnitt}>FÄHRTEN</Text>
+        <Text style={s.abschnitt}>{t('profile.secTrack')}</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
           <View style={s.zeile}>
             <View style={s.zeileIcon}>
               <Ionicons name="git-branch-outline" size={17} color={C.muted} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.zeileLabel}>Winkel automatisch erkennen</Text>
+              <Text style={s.zeileLabel}>{t('profile.autoAngle')}</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                 Winkel, Spitzwinkel & Abriss. Gegenstände bleiben manuell.
               </Text>
@@ -531,7 +543,7 @@ export default function ProfilScreen() {
                 <Ionicons name="volume-high-outline" size={17} color={C.muted} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.zeileLabel}>Lautstärke-Taste = Gegenstand</Text>
+                <Text style={s.zeileLabel}>{t('profile.volumeKey')}</Text>
                 <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                   Während der Aufnahme setzt die Lautstärke-Taste einen Gegenstand.
                 </Text>
@@ -550,7 +562,7 @@ export default function ProfilScreen() {
                 <Ionicons name="flash-outline" size={17} color={C.muted} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.zeileLabel}>Gegenstand per Kurzbefehl</Text>
+                <Text style={s.zeileLabel}>{t('profile.shortcutObject')}</Text>
                 <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                   Schnell-Gegenstand auf Back-Tap / Action-Button legen.
                 </Text>
@@ -562,7 +574,7 @@ export default function ProfilScreen() {
 
         {__DEV__ && (
           <>
-            <Text style={s.abschnitt}>ENTWICKLUNG</Text>
+            <Text style={s.abschnitt}>{t('profile.secDev')}</Text>
             <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
               <TouchableOpacity style={s.zeile} onPress={() => router.push('/dev/dog-hub-preview' as never)} activeOpacity={0.7}>
                 <View style={s.zeileIcon}><Ionicons name="cube-outline" size={17} color={C.muted} /></View>
@@ -573,23 +585,23 @@ export default function ProfilScreen() {
           </>
         )}
 
-        <Text style={s.abschnitt}>TRAINER</Text>
+        <Text style={s.abschnitt}>{t('profile.secTrainer')}</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
           <EinstellungZeile
             icon="people-outline"
-            label="Meine Trainer"
+            label={t('profile.myTrainers')}
             onPress={() => router.push('/trainer')}
           />
           <View style={s.trenner} />
           <EinstellungZeile
             icon="clipboard-outline"
-            label="Meine Trainingspläne"
+            label={t('profile.myPlans')}
             onPress={() => router.push('/plaene')}
           />
           <View style={s.trenner} />
           <EinstellungZeile
             icon="chatbubbles-outline"
-            label="Nachrichten"
+            label={t('profile.messages')}
             onPress={() => router.push('/chat')}
           />
           <View style={s.trenner} />
@@ -603,7 +615,7 @@ export default function ProfilScreen() {
             <View style={s.zeileIcon}>
               <Ionicons name="share-social-outline" size={17} color={C.muted} />
             </View>
-            <Text style={[s.zeileLabel, { flex: 1 }]}>Neue Einheiten teilen</Text>
+            <Text style={[s.zeileLabel, { flex: 1 }]}>{t('profile.shareUnits')}</Text>
             <Switch
               value={profile?.share_trainings_default ?? false}
               onValueChange={toggleShare}
@@ -614,7 +626,7 @@ export default function ProfilScreen() {
         </View>
 
         {/* Trainer-Tools — nur mit Trainer-Modul */}
-        <Text style={s.abschnitt}>TRAINER-TOOLS</Text>
+        <Text style={s.abschnitt}>{t('profile.secTrainerTools')}</Text>
         {isTrainerModule ? (
           <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
             <EinstellungZeile icon="grid-outline" label="Trainer-Hub" onPress={() => router.push('/(tabs)/hub')} />
@@ -635,7 +647,7 @@ export default function ProfilScreen() {
 
         {einladungen.length > 0 && (
           <>
-            <Text style={s.abschnitt}>EINLADUNGEN</Text>
+            <Text style={s.abschnitt}>{t('profile.secInvites')}</Text>
             <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
               {einladungen.map((u, i) => (
                 <View key={u.id}>
@@ -652,7 +664,7 @@ export default function ProfilScreen() {
           </>
         )}
 
-        <Text style={s.abschnitt}>MEINE SPARTEN</Text>
+        <Text style={s.abschnitt}>{t('profile.secDisciplines')}</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
           <Text style={s.sparteHint}>Aktiviere die Sparten, die du trainierst. Sie erscheinen in der Trainingserfassung.</Text>
           {ALLE_SPARTEN.map((sp, i) => {
@@ -677,17 +689,17 @@ export default function ProfilScreen() {
           })}
         </View>
 
-        <Text style={s.abschnitt}>SUPPORT</Text>
+        <Text style={s.abschnitt}>{t('profile.secSupport')}</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
           <EinstellungZeile
             icon="help-circle-outline"
-            label="Hilfecenter"
+            label={t('profile.helpCenter')}
             onPress={() => router.push('/help')}
           />
           <View style={s.trenner} />
           <EinstellungZeile
             icon="chatbubble-outline"
-            label="Feedback senden"
+            label={t('profile.sendFeedback')}
             onPress={() =>
               Linking.openURL(`mailto:shadesofym@gmail.com?subject=${encodeURIComponent('ANYVO Feedback')}`)
                 .catch(() => Alert.alert('Kein E-Mail-Programm', 'Schreib uns gern direkt an shadesofym@gmail.com.'))
@@ -696,13 +708,13 @@ export default function ProfilScreen() {
           <View style={s.trenner} />
           <EinstellungZeile
             icon="document-text-outline"
-            label="Nutzungsbedingungen (AGB)"
+            label={t('profile.terms')}
             onPress={() => router.push('/terms')}
           />
           <View style={s.trenner} />
           <EinstellungZeile
             icon="shield-checkmark-outline"
-            label="Datenschutz"
+            label={t('profile.privacy')}
             onPress={() => router.push('/privacy')}
           />
         </View>
@@ -710,7 +722,7 @@ export default function ProfilScreen() {
         <View style={[s.karte, isGlass && s.glassTransparent, { marginBottom: 24 }]}>{isGlass && <Glass style={s.glassBg} />}
           <EinstellungZeile
             icon="log-out-outline"
-            label="Abmelden"
+            label={t('profile.logout')}
             gefahr
             onPress={handleAbmelden}
           />
@@ -719,7 +731,7 @@ export default function ProfilScreen() {
         <View style={[s.karte, isGlass && s.glassTransparent, { marginBottom: 0 }]}>{isGlass && <Glass style={s.glassBg} />}
           <EinstellungZeile
             icon="trash-outline"
-            label="Konto löschen"
+            label={t('profile.deleteAccount')}
             gefahr
             onPress={handleKontoLoeschen}
           />

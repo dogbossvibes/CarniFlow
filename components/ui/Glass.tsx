@@ -38,7 +38,7 @@ interface GlassIconButtonProps {
   fallbackStyle?: StyleProp<ViewStyle>;
 }
 
-// Schwebender Glas-Button (Zurück/Schließen …). Das Glas liegt als Hintergrund,
+// Schwebender Glas-Button (Zurück/Schliessen …). Das Glas liegt als Hintergrund,
 // der Inhalt (Icon) darüber; TouchableOpacity behält den Press.
 export function GlassIconButton({ onPress, children, size = 38, radius, tintColor, style, fallbackStyle }: GlassIconButtonProps) {
   const r = radius ?? size / 2;

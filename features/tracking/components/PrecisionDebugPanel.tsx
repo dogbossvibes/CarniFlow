@@ -81,6 +81,14 @@ export interface PrecisionDebugPanelProps {
   startAnchorAccuracy?:     number | null;
   startDriftRejectedCount?: number | null;
 
+  // Winkel-Debug.
+  angleMarkersCount?:      number | null;
+  acuteAngleMarkersCount?: number | null;
+  lastAngleType?:          string | null;
+  lastAngleDegrees?:       number | null;
+  lastAngleDirection?:     string | null;
+  lastAngleRejectedReason?: string | null;
+
   // Sichtbarkeit / Interaktion.
   devMode?:       boolean;                     // Default __DEV__
   activeLayer?:   DebugLayer;
@@ -129,6 +137,7 @@ export function PrecisionDebugPanel(props: PrecisionDebugPanelProps) {
     rawGnssAvailable, provider, nativeAvailable, gnss, providerStatus,
     warmupMs, startAllowed,
     startLockActive, startAnchorSet, startAnchorAccuracy, startDriftRejectedCount,
+    angleMarkersCount, acuteAngleMarkersCount, lastAngleType, lastAngleDegrees, lastAngleDirection, lastAngleRejectedReason,
     devMode = __DEV__, activeLayer, onSelectLayer, onExport,
   } = props;
 
@@ -235,6 +244,14 @@ export function PrecisionDebugPanel(props: PrecisionDebugPanelProps) {
         <Row label="Anchor gesetzt" value={yesNo(startAnchorSet)} color={startAnchorSet ? C.trackPrimary : undefined} />
         <Row label="Anchor Accuracy" value={fmtM(startAnchorAccuracy)} />
         <Row label="Start-Drift verworfen" value={fmtNum(startDriftRejectedCount)} color={startDriftRejectedCount ? C.trackDanger : undefined} />
+
+        <SectionTitle>Winkel</SectionTitle>
+        <Row label="Winkel gesamt" value={fmtNum(angleMarkersCount)} />
+        <Row label="davon Spitzwinkel" value={fmtNum(acuteAngleMarkersCount)} />
+        <Row label="Letzter Typ" value={lastAngleType ?? '–'} color={lastAngleType ? C.trackPrimary : undefined} />
+        <Row label="Letzter Winkel" value={lastAngleDegrees != null ? `${lastAngleDegrees}°` : '–'} />
+        <Row label="Richtung" value={lastAngleDirection ?? '–'} />
+        <Row label="Letzte Ablehnung" value={lastAngleRejectedReason ?? '–'} color={lastAngleRejectedReason ? C.trackWarning : undefined} />
       </ScrollView>
 
       <View style={s.layerRow}>

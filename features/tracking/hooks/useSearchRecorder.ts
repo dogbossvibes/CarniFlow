@@ -40,8 +40,8 @@ function distM(a: LatLng, b: LatLng): number {
 const MAX_FIX_ACCURACY = 20;     // m — schlechte Fixes verwerfen
 const MIN_SEGMENT = 1.5;         // m — Distanz-Gate
 const SMOOTH_ALPHA = 0.4;        // EMA
-const MAX_JUMP_M = 30;           // m — größerer Einzelsprung = GPS-Glitch → verwerfen
-const MAX_SPEED_MPS = 5;         // m/s (~18 km/h) — realistisch fürs Absuchen; darüber = Ausreißer
+const MAX_JUMP_M = 30;           // m — grösserer Einzelsprung = GPS-Glitch → verwerfen
+const MAX_SPEED_MPS = 5;         // m/s (~18 km/h) — realistisch fürs Absuchen; darüber = Ausreisser
 const ON_TRACK_M = 3.0;          // m — innerhalb = "auf der Fährte"
 const BREAK_THRESHOLD_M = 6.0;   // m — darüber für BREAK_HOLD = Abriss
 const BREAK_HOLD_MS = 4000;      // ms — so lange muss die Abweichung halten
@@ -93,7 +93,7 @@ function projectForward(
   let best = Infinity, bestAt = fromM;
   for (let i = 1; i < line.length; i++) {
     const segLo = cum[i - 1], segHi = cum[i];
-    if (segHi < lo || segLo > hi) continue;          // Segment außerhalb des Fensters
+    if (segHi < lo || segLo > hi) continue;          // Segment ausserhalb des Fensters
     const a = X(line[i - 1]), b = X(line[i]);
     const dx = b.x - a.x, dy = b.y - a.y;
     const len2 = dx * dx + dy * dy;
@@ -160,8 +160,8 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const pointsRef = useRef<LatLng[]>([]);
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
-  const lastFixTRef = useRef(0);      // Zeitstempel des letzten akzeptierten Fix (Ausreißer-Filter)
-  const rejectedRef = useRef(0);      // verworfene Fixes (Ausreißer/Genauigkeit) — Debug
+  const lastFixTRef = useRef(0);      // Zeitstempel des letzten akzeptierten Fix (Ausreisser-Filter)
+  const rejectedRef = useRef(0);      // verworfene Fixes (Ausreisser/Genauigkeit) — Debug
   const distRef = useRef(0);
   const devEmaRef = useRef(0);
   const devSumRef = useRef(0);
@@ -210,7 +210,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     const tNow = loc.timestamp || Date.now();
     const prev = smoothRef.current;
 
-    // GPS-Ausreißer verwerfen: unrealistischer Sprung ggü. der letzten Position →
+    // GPS-Ausreisser verwerfen: unrealistischer Sprung ggü. der letzten Position →
     // sonst entsteht ein „Ausbruch" in der Laufspur, der nicht gelaufen wurde.
     if (prev) {
       const jump = distM(prev, raw);

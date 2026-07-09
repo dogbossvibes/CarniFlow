@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { loadPending } from '@/features/tracking/store/trackPersist';
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
@@ -32,6 +33,7 @@ function summarize(st: { distanceMeters: number; markers: { type: string }[] }) 
 export default function TrackLiegenScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useT();
   useKeepAwake();   // Timer/Anzeige während der Liegezeit anlassen (Bildschirm nicht sperren)
 
   // Store hat die gelegte Fährte noch → sofort nutzen. Sonst (App wurde in der
@@ -42,6 +44,7 @@ export default function TrackLiegenScreen() {
   const [now, setNow] = useState(Date.now());
   const [dogName, setDogName] = useState('Hund');
   const [starting, setStarting] = useState(false);
+  const saveState = useTrackingStore(s => s.saveState);   // Hintergrund-Speicherung nach „Stoppen"
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(() =>
     hasStore ? summarize(useTrackingStore.getState()) : null);
 
@@ -95,7 +98,19 @@ export default function TrackLiegenScreen() {
           <Pressable className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center" onPress={cancel} hitSlop={8}>
             <Ionicons name="chevron-back" size={18} color={FT.text} />
           </Pressable>
-          <Text className="text-[15px] font-extrabold text-ft-text">Liegezeit</Text>
+          <Text className="text-[15px] font-extrabold text-ft-text">{t('track.lyingTime')}</Text>
+          {saveState === 'saving' && (
+            <View className="flex-row items-center gap-1.5 ml-auto px-2.5 py-1 rounded-full bg-white/5 border border-ft-line">
+              <Ionicons name="cloud-upload-outline" size={12} color={FT.muted} />
+              <Text className="text-[10px] font-bold text-ft-muted">{t('track.saving')}</Text>
+            </View>
+          )}
+          {saveState === 'error' && (
+            <View className="flex-row items-center gap-1.5 ml-auto px-2.5 py-1 rounded-full bg-ft-bad/15 border border-ft-bad/40">
+              <Ionicons name="warning-outline" size={12} color={FT.bad} />
+              <Text className="text-[10px] font-bold text-ft-bad">{t('track.saveError')}</Text>
+            </View>
+          )}
         </View>
 
         {/* Timer in der Mitte */}
@@ -103,18 +118,18 @@ export default function TrackLiegenScreen() {
           <View className="w-[150px] h-[150px] rounded-full items-center justify-center mb-7 border-2 border-[rgba(21,230,195,0.35)] bg-ft-acc-dim">
             <Ionicons name="hourglass-outline" size={30} color={FT.acc} />
           </View>
-          <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1.4px] uppercase mb-1">Fährte liegt seit</Text>
+          <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1.4px] uppercase mb-1">{t('track.laidSince')}</Text>
           <Text className="text-[58px] leading-[62px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{fmtAge(elapsedS)}</Text>
           <Text className="text-[13px] text-ft-muted font-semibold text-center mt-3 max-w-[280px]">
-            Lass die Fährte reifen. Starte die Absuche mit {dogName}, sobald du bereit bist.
+            {t('track.matureHint', { dog: dogName })}
           </Text>
 
           {/* Kennzahlen der gelegten Fährte */}
           <View className="flex-row gap-2 mt-7">
             {[
-              { v: `${summary?.distanceM ?? 0} m`, l: 'Distanz' },
-              { v: String(summary?.winkel ?? 0),   l: 'Winkel' },
-              { v: String(summary?.objekte ?? 0),  l: 'Gegenst.' },
+              { v: `${summary?.distanceM ?? 0} m`, l: t('track.distance') },
+              { v: String(summary?.winkel ?? 0),   l: t('track.angle') },
+              { v: String(summary?.objekte ?? 0),  l: t('track.objectsShort') },
             ].map((x, i) => (
               <View key={i} className="items-center px-5 py-3 rounded-[16px] bg-white/5 border border-ft-line">
                 <Text className="text-[17px] font-black text-ft-text" style={{ fontVariant: ['tabular-nums'] }}>{x.v}</Text>
@@ -132,7 +147,7 @@ export default function TrackLiegenScreen() {
             onPress={startSearch} disabled={starting || startMs == null}
           >
             <Ionicons name="play" size={18} color={FT.accText} />
-            <Text className="text-[14px] font-extrabold text-ft-acc-text">Absuche starten</Text>
+            <Text className="text-[14px] font-extrabold text-ft-acc-text">{t('track.search')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>

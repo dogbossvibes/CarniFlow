@@ -9,7 +9,7 @@ import Animated, {
 import { SignedImage } from '@/components/ui/SignedImage';
 
 // Zoombares Vollbild-Foto: Pinch zum Zoomen, Pan zum Verschieben (nur gezoomt),
-// Doppeltipp togglet 1×/2,5×, Einzeltipp schließt. Storage-URLs werden signiert.
+// Doppeltipp togglet 1×/2,5×, Einzeltipp schliesst. Storage-URLs werden signiert.
 export function ZoomableImage({ url, onClose }: { url: string; onClose: () => void }) {
   const scale      = useSharedValue(1);
   const savedScale = useSharedValue(1);

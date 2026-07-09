@@ -83,7 +83,7 @@ serve(async (req) => {
         tool_choice: { type: 'tool', name: 'coach_summary' },
         messages: [{
           role: 'user',
-          content: `Du bist ein sachlicher Hundetraining-Assistent. Formuliere ausschließlich als TRAININGSBEOBACHTUNG — keine medizinischen Diagnosen, keine harten Anweisungen. Antworte auf Deutsch und rufe das Tool coach_summary auf.\n\nTrainings der letzten ${periodDays} Tage:\n${JSON.stringify(minimal, null, 2)}`,
+          content: `Du bist ein sachlicher Hundetraining-Assistent. Formuliere ausschliesslich als TRAININGSBEOBACHTUNG — keine medizinischen Diagnosen, keine harten Anweisungen. Antworte auf Deutsch und rufe das Tool coach_summary auf.\n\nTrainings der letzten ${periodDays} Tage:\n${JSON.stringify(minimal, null, 2)}`,
         }],
       }),
     })

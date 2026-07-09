@@ -55,7 +55,7 @@ export async function unregisterFromPush(userId: string) {
   }
 }
 
-// Stößt die serverseitige Push-Zustellung an (Edge Function mit service_role,
+// Stösst die serverseitige Push-Zustellung an (Edge Function mit service_role,
 // die Empfänger + Token ermittelt). Best-effort.
 export async function notifyNewComment(unitId: string) {
   try {

@@ -21,7 +21,7 @@ import type {
 } from '@/features/tracking/native/types';
 
 // Vereinfachter, accuracy-gewichteter 1D-Kalman je Achse (lat/lng getrennt).
-// Gute Fixes (kleine accuracy → kleines R → großes K) werden stark übernommen,
+// Gute Fixes (kleine accuracy → kleines R → grosses K) werden stark übernommen,
 // schlechte kaum. Für Fährten-Distanzen ausreichend ruhig.
 // TODO(native): vollwertiges 2D-Kalman mit Geschwindigkeit.
 class GpsKalman {
@@ -297,7 +297,7 @@ export class TrackingSession {
       this.gpsAccuracy = fix.accuracy;
       this.gpsQuality = getGpsQuality(fix.accuracy);
 
-      // Außerhalb der Aufnahme nur Qualität aktualisieren (Warmup/Pause).
+      // Ausserhalb der Aufnahme nur Qualität aktualisieren (Warmup/Pause).
       if (this.phase !== 'recording') { this.emit(); return; }
 
       this.stationaryState = updateStationaryState(this.stationaryState, { lat: fix.lat, lng: fix.lng, t: fix.t });

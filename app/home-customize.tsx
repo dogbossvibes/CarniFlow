@@ -31,7 +31,7 @@ export default function HomeCustomizeScreen() {
       >
         <Text style={s.intro}>
           Wähle, welche Abschnitte auf deinem Startbildschirm angezeigt werden.
-          Die Begrüßung oben bleibt immer sichtbar.
+          Die Begrüssung oben bleibt immer sichtbar.
         </Text>
 
         <View style={s.karte}>

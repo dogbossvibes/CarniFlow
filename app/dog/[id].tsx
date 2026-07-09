@@ -9,6 +9,7 @@ import { getDogById } from '@/services/dogs';
 import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtras } from '@/services/dogHub';
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
 import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
+import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
 import { useDogHubDynamic } from '@/features/dogs/useDogHubDynamic';
 import { DogHubScreen, type DogHubActions } from '@/features/dogs/DogHubScreen';
 import type { DogDocument, DogTrainingItem } from '@/components/dogs/types';
@@ -29,6 +30,7 @@ export default function DogHubRoute() {
   const dynamic = useDogHubDynamic(id);
   const [extras, setExtras] = useState<DogHubExtras | null>(null);
   const [heatCycles, setHeatCycles] = useState<HeatCycle[]>([]);
+  const [commands, setCommands] = useState<DogCommand[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -45,6 +47,7 @@ export default function DogHubRoute() {
     if (!id) return;
     getDogHubExtras(id).then(setExtras).catch(() => setExtras(null));
     getHeatCycles(id).then(setHeatCycles).catch(() => setHeatCycles([]));
+    getCommands(id).then(setCommands).catch(() => setCommands([]));
   }, [id]));
 
   const vm = useMemo(() => (dog ? buildDogHubVM(dog, feed, extras ?? undefined, dynamic) : null), [dog, feed, extras, dynamic]);
@@ -59,6 +62,10 @@ export default function DogHubRoute() {
       } },
     ]);
   };
+
+  const reloadCommands = () => getCommands(id).then(setCommands).catch(() => {});
+  const toggleCmdFav = async (c: DogCommand) => { await toggleCommandFavorite(id, c.id); reloadCommands(); };
+  const seedCmds = async () => { await seedDemoCommands(id); reloadCommands(); };
 
   const openDocument = async (doc: DogDocument) => {
     if (!doc.fileUrl) return;
@@ -149,6 +156,13 @@ export default function DogHubRoute() {
         prediction: heatPrediction,
         onAdd: () => router.push(`/dog-heat/${id}` as never),
         onDelete: deleteHeat,
+      }}
+      commands={{
+        commands,
+        onAdd: () => router.push({ pathname: '/dog-command/add', params: { dogId: id } } as never),
+        onOpen: (c) => router.push({ pathname: '/dog-command/detail', params: { dogId: id, commandId: c.id } } as never),
+        onToggleFavorite: toggleCmdFav,
+        onSeedDemo: seedCmds,
       }}
     />
   );

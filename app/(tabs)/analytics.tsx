@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useSession } from '@/hooks/useSession';
@@ -31,6 +32,7 @@ const PERIODS = [
 ] as const;
 
 export default function AnalyticsScreen() {
+  const { t }                  = useT();
   const { session }            = useSession();
   const { dogs }               = useDogs();
   const [dogIdx,   setDogIdx]  = useState(0);
@@ -253,7 +255,7 @@ export default function AnalyticsScreen() {
             </View>
           </View>
 
-          {/* ── KI Analyse Button ── */}
+          {/* ── Smart Analyse Button (optionale serverseitige Anreicherung) ── */}
           {selectedDog && (
             <TouchableOpacity
               style={[s.aiBtn, aiLoading && s.aiBtnDis]}
@@ -270,29 +272,31 @@ export default function AnalyticsScreen() {
               {aiLoading ? (
                 <View style={s.aiBtnRow}>
                   <ActivityIndicator size="small" color={C.muted} />
-                  <Text style={[s.aiBtnTxt, { color: C.muted }]}>Claude analysiert…</Text>
+                  <Text style={[s.aiBtnTxt, { color: C.muted }]}>{t('analyse.running')}</Text>
                 </View>
               ) : (
                 <View style={s.aiBtnRow}>
                   <Text style={s.aiBtnIcon}>✦</Text>
                   <Text style={s.aiBtnTxt}>
-                    {coach ? 'KI Analyse aktualisieren' : 'KI Analyse starten'}
+                    {coach ? t('analyse.smartUpdate') : t('analyse.smartStart')}
                   </Text>
                 </View>
               )}
             </TouchableOpacity>
           )}
 
-          {/* ── KI Coach ── */}
+          {/* ── Analyse-Ergebnis (regelbasiert; optional serverseitig angereichert) ── */}
           {coach && <AICoachCard analysis={coach} />}
 
           {!coach && !loading && !aiLoading && (
             <View style={s.emptyCard}>
               <Ionicons name="analytics-outline" size={32} color={C.subtle} style={{ marginBottom: 10 }} />
-              <Text style={s.emptyTitle}>Sammle Trainings und entdecke dein Potenzial ✨</Text>
-              <Text style={s.emptyText}>
-                Tippe auf „KI Analyse starten“ — Claude wertet deine Trainings aus.
-              </Text>
+              <Text style={s.emptyTitle}>{t('analyse.emptyTitle')}</Text>
+              <Text style={s.emptyText}>{t('analyse.emptyText')}</Text>
+              <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/unit/document')} activeOpacity={0.8}>
+                <Ionicons name="create-outline" size={16} color={C.accentText} />
+                <Text style={s.emptyBtnTxt}>{t('analyse.capture')}</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -431,4 +435,6 @@ const s = StyleSheet.create({
   emptyCard:  { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 32, alignItems: 'center', marginBottom: 16 },
   emptyTitle: { fontSize: 15, color: C.white, fontWeight: '700', marginBottom: 8 },
   emptyText:  { fontSize: 13, color: C.muted, textAlign: 'center', lineHeight: 19 },
+  emptyBtn:   { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.accent, borderRadius: 13, paddingHorizontal: 16, paddingVertical: 10, marginTop: 16 },
+  emptyBtnTxt:{ fontSize: 14, fontWeight: '800', color: C.accentText },
 });

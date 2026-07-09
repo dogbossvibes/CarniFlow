@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { C } from '@/constants/colors';
 
-// Große, klare Zahl + Label (Stats-Panel).
+// Grosse, klare Zahl + Label (Stats-Panel).
 export function AnyvoStatCard({ value, label, accent, style }: { value: string; label: string; accent?: boolean; style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[s.wrap, style]}>

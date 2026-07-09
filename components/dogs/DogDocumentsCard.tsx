@@ -2,6 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { categoryLabel, categoryIcon, FILE_TYPE_LABEL } from '@/features/dogs/documentCategories';
 import type { DogDocument } from './types';
 
@@ -22,15 +23,16 @@ export function DogDocumentsCard({
   onOpen?: (doc: DogDocument) => void;
   onDelete?: (doc: DogDocument) => void;
 }) {
+  const { t } = useT();
   if (documents.length === 0) {
     return (
       <View style={s.empty}>
         <View style={s.emptyIcon}><Ionicons name="folder-open-outline" size={26} color={C.trackPrimary} /></View>
-        <Text style={s.emptyTitle}>Noch keine Dokumente</Text>
+        <Text style={s.emptyTitle}>{t('docs.emptyTitle')}</Text>
         <Text style={s.emptyTxt}>
           Lade wichtige Unterlagen deines Hundes hoch – zum Beispiel Impfpass, Stammbaum, Prüfungen oder Tierarztberichte.
         </Text>
-        <AnyvoButton label="Dokument hinzufügen" icon="add" onPress={onAdd} />
+        <AnyvoButton label={t('docs.add')} icon="add" onPress={onAdd} />
       </View>
     );
   }
@@ -57,7 +59,7 @@ export function DogDocumentsCard({
           </TouchableOpacity>
         );
       })}
-      <AnyvoButton label="Dokument hinzufügen" icon="add" variant="secondary" onPress={onAdd} />
+      <AnyvoButton label={t('docs.add')} icon="add" variant="secondary" onPress={onAdd} />
     </View>
   );
 }

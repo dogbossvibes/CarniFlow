@@ -170,7 +170,7 @@ export function useTrackRecording() {
       }
     } catch (e) { console.warn('[localTrack] start', e); }
 
-    // Ganz zum Schluss scharf schalten → ab jetzt fließen Fixes in die Linie.
+    // Ganz zum Schluss scharf schalten → ab jetzt fliessen Fixes in die Linie.
     recordingRef.current = true;
     return { error: null };
   }, [startWarmup, store]);

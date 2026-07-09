@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import type { CoachSummary } from '@/features/ai/types/aiCoach';
 
-// Große „Diese Woche"-Card mit LLM-Zusammenfassung. Bei fehlendem Key/Fehler
+// Grosse „Diese Woche"-Card mit LLM-Zusammenfassung. Bei fehlendem Key/Fehler
 // freundlicher Hinweis (regelbasierte Insights bleiben aktiv).
 export function CoachSummaryCard({
   summary, isLoading, hasRun, onRefresh,

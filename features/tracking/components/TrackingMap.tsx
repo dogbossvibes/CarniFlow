@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -22,7 +22,27 @@ function markerColor(m: MapMarker): string {
   return MARKER_COLOR[m.type];
 }
 
-export interface MapMarker { type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null }
+export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null }
+
+// Persistenter Marker: verhindert das „Verschwinden". react-native-maps verwirft
+// bei tracksViewChanges=false und häufigen Re-Renders/Region-Wechseln sonst das
+// gerenderte Marker-Bild. Kurz nach dem Mount wird der Snapshot eingefroren; memo +
+// stabile ID sorgen dafür, dass der Marker NICHT bei jedem GPS-Fix neu erzeugt wird
+// → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color }: {
+  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot';
+  label?: string; acute?: boolean; duebel?: boolean; color?: string;
+}) {
+  const [track, setTrack] = useState(true);
+  useEffect(() => { const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, []);
+  let child;
+  if (kind === 'abriss') child = <View style={s.abrissBox} />;
+  else if (kind === 'angle') child = <View style={[s.angleBadge, acute && s.angleBadgeAcute]}><Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text></View>;
+  else if (kind === 'object') child = <View style={[s.objectBadge, duebel && s.objectBadgeDuebel]}><Text style={[s.objectBadgeTxt, duebel && s.objectBadgeTxtDuebel]}>{label}</Text></View>;
+  else child = <View style={[s.markerDot, { backgroundColor: color }]} />;
+  return <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track}>{child}</Marker>;
+});
 
 interface Props {
   layPoints:        LatLng[];
@@ -67,7 +87,7 @@ export function TrackingMap({
   // Die Punkte sind bereits im Recorder geglättet (EMA + Distanz-Gate) und die
   // Winkel-Marker sitzen exakt auf diesen Punkten. Hier NICHT noch einmal glätten:
   // ein gleitendes Mittel würde Ecken abrunden, sodass die Linie neben den
-  // Winkel-Markern verläuft. Nur grobe Ausreißer entfernen → Linie folgt dem
+  // Winkel-Markern verläuft. Nur grobe Ausreisser entfernen → Linie folgt dem
   // echten Weg und trifft die Winkel.
   const layCoords = useMemo(
     () => removeGpsJitter(layPoints).map(p => ({ latitude: p.lat, longitude: p.lng })),
@@ -169,37 +189,21 @@ export function TrackingMap({
         ) : null}
 
         {/* Marker: Winkel = mint Geometrie-Badge (90 L/R · SL/SR), Gegenstand =
-            neutrales Quadrat-Badge (G1, G2 …), Abriss = Kästchen. Klar getrennt. */}
+            neutrales Quadrat-Badge (G1, G2 …), Abriss = Kästchen. Klar getrennt.
+            Über PinMarker (memo + stabile ID) bleiben sie dauerhaft sichtbar. */}
         {markerList.map((m, i) => {
-          let child;
+          const lat = m.lat as number, lng = m.lng as number;
+          const key = m.id ?? `mk-${i}`;
           if (m.type === 'winkel') {
-            if (m.angleKind === 'abriss') {
-              child = <View style={s.abrissBox} />;
-            } else {
-              const label = (m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠';
-              // 90° = volles Mint-Badge; Spitzwinkel = dünnere Umriss-Optik (andere Akzentwirkung).
-              const acute = m.angleKind === 'spitz_links' || m.angleKind === 'spitz_rechts' || m.angleKind === 'spitz';
-              child = (
-                <View style={[s.angleBadge, acute && s.angleBadgeAcute]}>
-                  <Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text>
-                </View>
-              );
-            }
-          } else if (m.type === 'gegenstand') {
-            const isDuebel = m.material === 'duebel';
-            child = (
-              <View style={[s.objectBadge, isDuebel && s.objectBadgeDuebel]}>
-                <Text style={[s.objectBadgeTxt, isDuebel && s.objectBadgeTxtDuebel]}>{`G${objectNo.get(i) ?? ''}`}</Text>
-              </View>
-            );
-          } else {
-            child = <View style={[s.markerDot, { backgroundColor: markerColor(m) }]} />;
+            if (m.angleKind === 'abriss') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="abriss" />;
+            const label = (m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠';
+            const acute = m.angleKind === 'spitz_links' || m.angleKind === 'spitz_rechts' || m.angleKind === 'spitz';
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} />;
           }
-          return (
-            <Marker key={i} coordinate={{ latitude: m.lat as number, longitude: m.lng as number }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-              {child}
-            </Marker>
-          );
+          if (m.type === 'gegenstand') {
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${objectNo.get(i) ?? ''}`} duebel={m.material === 'duebel'} />;
+          }
+          return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} />;
         })}
 
         {/* Abriss-Marker (Ausarbeiten): rotes Kreuz-Symbol */}

@@ -5,7 +5,7 @@ import { C } from '@/constants/colors';
 import { useVoiceRecorder } from '@/features/voice/hooks/useVoiceRecorder';
 import { formatDuration } from '@/features/voice/services/voiceRecordingService';
 
-// Aufnahme-Card im ANYVO-Design: großer Record-Button, Timer, Pause/Weiter,
+// Aufnahme-Card im ANYVO-Design: grosser Record-Button, Timer, Pause/Weiter,
 // Speichern/Abbrechen, Türkis-Glow + kleiner roter REC-Punkt.
 export function VoiceRecorderCard({
   onSave, onCancel,

@@ -22,7 +22,7 @@ export interface AiSessionInput {
 }
 
 // Ruft die Edge Function 'ai-analysis' auf. Der Anthropic-Key liegt
-// ausschließlich serverseitig — KEIN Key mehr im App-Bundle.
+// ausschliesslich serverseitig — KEIN Key mehr im App-Bundle.
 export async function generateAIAnalysis(
   sessions: AiSessionInput[],
   dogName: string,

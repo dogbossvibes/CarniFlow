@@ -73,7 +73,7 @@ export function updateFaehrteActivity(opts: { elapsedS: number; distanceM: numbe
   } catch (e) { console.warn('[liveActivity] update', e); }
 }
 
-/** Live Activity beim Beenden schließen. Idempotent. */
+/** Live Activity beim Beenden schliessen. Idempotent. */
 export function stopFaehrteActivity(opts?: { elapsedS: number; distanceM: number }): void {
   const la = getLib();
   if (!la || !activityId) return;

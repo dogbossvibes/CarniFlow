@@ -108,7 +108,7 @@ export async function markArticleFound(markerId: string): Promise<Result<null>> 
   } catch (e) { return fail('markArticleFound', e); }
 }
 
-// ── Aufnahme abschließen: Lay-Punkte bulk + Session-Summary ──
+// ── Aufnahme abschliessen: Lay-Punkte bulk + Session-Summary ──
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -172,8 +172,8 @@ export interface TrackEngineData {
   gpsStats:               unknown | null;
   objects:                unknown | null;
   filteredTrackPoints:    unknown | null;
-  rawTrackPoints:         unknown | null;    // groß → nur Dev/Debug
-  rejectedPoints:         unknown | null;    // groß → nur Dev/Debug
+  rawTrackPoints:         unknown | null;    // gross → nur Dev/Debug
+  rejectedPoints:         unknown | null;    // gross → nur Dev/Debug
   startedAt:              string | null;     // ISO
   endedAt:                string | null;     // ISO
 }
@@ -197,7 +197,7 @@ export async function saveTrackEngineData(
       gps_stats:                data.gpsStats ?? null,
       objects:                  data.objects ?? null,
       filtered_track_points:    data.filteredTrackPoints ?? null,
-      // große Blobs nicht unnötig speichern — nur im Dev/Debug-Mode.
+      // grosse Blobs nicht unnötig speichern — nur im Dev/Debug-Mode.
       raw_track_points:         heavy ? (data.rawTrackPoints ?? null) : null,
       rejected_points:          heavy ? (data.rejectedPoints ?? null) : null,
       started_at:               data.startedAt,

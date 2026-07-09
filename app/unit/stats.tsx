@@ -83,7 +83,7 @@ export default function StatsScreen() {
           <View style={s.empty}>
             <Ionicons name="stats-chart-outline" size={32} color={C.subtle} />
             <Text style={s.emptyTitle}>Noch keine Daten</Text>
-            <Text style={s.emptyTxt}>Schließe deine erste Einheit ab, um Statistiken zu sehen.</Text>
+            <Text style={s.emptyTxt}>Schliesse deine erste Einheit ab, um Statistiken zu sehen.</Text>
           </View>
         ) : (
           <>

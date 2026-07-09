@@ -346,7 +346,7 @@ describe('detectSharpTurn', () => {
 });
 
 describe('Fusion / Median', () => {
-  it('median ignoriert Ausreißer', () => {
+  it('median ignoriert Ausreisser', () => {
     expect(median([1, 2, 3, 4, 100])).toBe(3);
   });
   it('medianPoint berechnet Komponenten-Median', () => {
@@ -361,7 +361,7 @@ describe('Fusion / Median', () => {
 });
 
 describe('objectPlacement', () => {
-  it('platziert stabil trotz Ausreißer', () => {
+  it('platziert stabil trotz Ausreisser', () => {
     const good = [
       { lat: LAT, lng: LNG, accuracy: 4, t: 9000 },
       { lat: LAT + mNorth(0.5), lng: LNG, accuracy: 4, t: 9300 },
@@ -401,7 +401,7 @@ describe('placeTrackingObject', () => {
     expect(r!.object.label).toBe('Beute');
     expect(r!.object.trackPointIndex).toBe(12);
     expect(r!.object.quality).toBe('excellent');
-    expect(Math.abs(r!.object.latitude - LAT)).toBeLessThan(mNorth(2)); // Ausreißer ignoriert
+    expect(Math.abs(r!.object.latitude - LAT)).toBeLessThan(mNorth(2)); // Ausreisser ignoriert
     expect(r!.driftGuardUntil).toBe(13000);                              // now + 3 s
   });
 
@@ -417,7 +417,7 @@ describe('placeTrackingObject', () => {
       now: 10000,
     });
     expect(r!.object.source).toBe('last_good_point');
-    // = letzter guter Punkt (nicht der Rohausreißer).
+    // = letzter guter Punkt (nicht der Rohausreisser).
     expect(r!.object.latitude).toBeCloseTo(LAT + mNorth(0.4), 12);
   });
 

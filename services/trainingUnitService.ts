@@ -98,7 +98,7 @@ export async function createTrainingUnit(
     .single();
 }
 
-// Schließt die Einheit ab und persistiert alle Übungen.
+// Schliesst die Einheit ab und persistiert alle Übungen.
 export async function finishTrainingUnit(
   unitId:  string,
   updates: { duration_sec: number; rating: number | null; notes: string | null; shared_with_trainer?: boolean } & Partial<TrainingMetrics>,

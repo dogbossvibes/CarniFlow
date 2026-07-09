@@ -2,6 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import type { HeatCycle, HeatPrediction } from '@/features/dogs/heatCycles';
 
 // Dezenter Rosa/Pink-Akzent für Läufigkeit (Anyvo bleibt sonst Mint).
@@ -29,16 +30,17 @@ export function DogHeatCard({
   onAdd: () => void;
   onDelete?: (cycle: HeatCycle) => void;
 }) {
+  const { t } = useT();
   if (cycles.length === 0) {
     return (
       <View style={s.empty}>
         <View style={s.emptyIcon}><Ionicons name="heart-circle-outline" size={26} color={PINK} /></View>
-        <Text style={s.emptyTitle}>Noch keine Läufigkeit eingetragen</Text>
+        <Text style={s.emptyTitle}>{t('heat.emptyTitle')}</Text>
         <Text style={s.emptyTxt}>
           Trage die erste Läufigkeit ein, damit Anyvo den Zyklus deiner Hündin besser einschätzen kann.
         </Text>
-        <AnyvoButton label="Erste Läufigkeit eintragen" icon="add" onPress={onAdd} />
-        <Text style={s.disclaimer}>Die Prognose ist ungefähr und ersetzt keine tierärztliche Einschätzung.</Text>
+        <AnyvoButton label={t('heat.addFirst')} icon="add" onPress={onAdd} />
+        <Text style={s.disclaimer}>{t('heat.disclaimer')}</Text>
       </View>
     );
   }
@@ -59,7 +61,7 @@ export function DogHeatCard({
         <View style={s.pred}>
           <View style={s.predHead}>
             <View style={s.predIcon}><Ionicons name="heart" size={15} color={PINK} /></View>
-            <Text style={s.predEyebrow}>Nächste Läufigkeit</Text>
+            <Text style={s.predEyebrow}>{t('heat.next')}</Text>
           </View>
           <Text style={s.predBig}>{headline}</Text>
           {!p.active && <Text style={s.predSub}>Voraussichtlich {fmt(p.nextDate)}{p.estimate ? ' · grobe Schätzung' : ''}</Text>}
@@ -71,16 +73,16 @@ export function DogHeatCard({
             <View style={s.statDiv} />
             <View style={s.stat}>
               <Text style={s.statV}>{p.cycleDay} / {p.cycleLengthDays}</Text>
-              <Text style={s.statL}>Zyklustag</Text>
+              <Text style={s.statL}>{t('heat.cycleDay')}</Text>
             </View>
           </View>
         </View>
       ) : null}
 
-      <AnyvoButton label="Läufigkeit eintragen" icon="add" onPress={onAdd} />
+      <AnyvoButton label={t('heat.add')} icon="add" onPress={onAdd} />
 
       {/* Verlauf */}
-      <Text style={s.section}>Verlauf</Text>
+      <Text style={s.section}>{t('heat.history')}</Text>
       {cycles.map(c => {
         const dur = durationDays(c);
         const range = `${fmt(c.startDate)}${c.endDate ? ` – ${fmt(c.endDate)}` : ''}`;

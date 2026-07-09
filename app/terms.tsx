@@ -31,15 +31,15 @@ const SECTIONS: Section[] = [
   },
   {
     title: '4. Abonnements & Käufe',
-    body:  'Kostenpflichtige Funktionen werden als Abonnement oder Einmalkauf über den Apple App Store bzw. Google Play angeboten. Abrechnung, automatische Verlängerung und Kündigung erfolgen über dein Store-Konto gemäß dessen Bedingungen; die Kündigung ist dort jederzeit möglich. Es gelten die zum Kaufzeitpunkt angezeigten Preise. Für digitale Inhalte kann das gesetzliche Widerrufsrecht erlöschen, sobald die Leistung mit deiner Zustimmung beginnt.',
+    body:  'Kostenpflichtige Funktionen werden als Abonnement oder Einmalkauf über den Apple App Store bzw. Google Play angeboten. Abrechnung, automatische Verlängerung und Kündigung erfolgen über dein Store-Konto gemäss dessen Bedingungen; die Kündigung ist dort jederzeit möglich. Es gelten die zum Kaufzeitpunkt angezeigten Preise. Für digitale Inhalte kann das gesetzliche Widerrufsrecht erlöschen, sobald die Leistung mit deiner Zustimmung beginnt.',
   },
   {
     title: '5. Zulässige Nutzung',
-    body:  'Du verpflichtest dich, die App nicht missbräuchlich oder rechtswidrig zu nutzen, keine fremden Rechte zu verletzen und keine schädlichen Inhalte hochzuladen. Wir können Konten bei erheblichen Verstößen sperren.',
+    body:  'Du verpflichtest dich, die App nicht missbräuchlich oder rechtswidrig zu nutzen, keine fremden Rechte zu verletzen und keine schädlichen Inhalte hochzuladen. Wir können Konten bei erheblichen Verstössen sperren.',
   },
   {
     title: '6. Deine Inhalte',
-    body:  'Die Rechte an deinen Inhalten (Fotos, Videos, Notizen, Sprachnotizen, Trainingsdaten) verbleiben bei dir. Du räumst uns das einfache Recht ein, diese Inhalte ausschließlich zum Betrieb der App zu speichern und zu verarbeiten. Markierst du eine Einheit als „geteilt", machst du sie für deine verbundene Trainer:in zugänglich.',
+    body:  'Die Rechte an deinen Inhalten (Fotos, Videos, Notizen, Sprachnotizen, Trainingsdaten) verbleiben bei dir. Du räumst uns das einfache Recht ein, diese Inhalte ausschliesslich zum Betrieb der App zu speichern und zu verarbeiten. Markierst du eine Einheit als „geteilt", machst du sie für deine verbundene Trainer:in zugänglich.',
   },
   {
     title: '7. KI-Funktionen',

@@ -18,6 +18,7 @@ export type AngleKind =
   | 'spitz'
   | 'absatz' | 'abriss';
 export type OrientationMode = 'north' | 'heading' | 'track';
+export type TrackSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 export interface TrackPointSample extends LatLng {
   accuracy?: number | null;
@@ -75,6 +76,7 @@ interface TrackingState {
   startAnchor:         StartAnchor | null;   // stabilisierter Startpunkt (kein Warmup-Drift)
   startLockActive:     boolean;              // true = Startphase (keine Linie/Distanz/Winkel)
   startDriftRejectedCount: number;           // in der Startphase verworfene Drift-Fixes
+  saveState:           TrackSaveState;        // Hintergrund-Speicherstatus nach „Stoppen"
   mapFollowMode:       boolean;
   mapOrientationMode:  OrientationMode;
 
@@ -102,6 +104,7 @@ interface TrackingState {
   setStartAnchor: (a: StartAnchor | null) => void;
   setStartLockActive: (on: boolean) => void;
   setStartDriftRejectedCount: (n: number) => void;
+  setSaveState: (s: TrackSaveState) => void;
   restorePending: (p: PendingTrack) => void;   // gelegte Fährte nach App-Kill in der Liegezeit wiederherstellen
   setMapFollowMode: (on: boolean) => void;
   setMapOrientationMode: (m: OrientationMode) => void;
@@ -132,6 +135,7 @@ const INITIAL = {
   startAnchor:           null as StartAnchor | null,
   startLockActive:       false,
   startDriftRejectedCount: 0,
+  saveState:             'idle' as TrackSaveState,
   mapFollowMode:         true,
   mapOrientationMode:    'north' as OrientationMode,
 };
@@ -200,6 +204,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setStartAnchor: (a) => { set({ startAnchor: a }); persist(get); },
   setStartLockActive: (on) => set({ startLockActive: on }),
   setStartDriftRejectedCount: (n) => set({ startDriftRejectedCount: n }),
+  setSaveState: (st) => set({ saveState: st }),
   // Nach App-Kill in der Liegezeit: gelegte Fährte aus dem Offline-Puffer zurück in
   // den Store spielen, damit die Absuche sie snapshotten kann. Setzt NICHT auf
   // Aufnahme — nur die gelegten Daten + Liegezeit-Start.

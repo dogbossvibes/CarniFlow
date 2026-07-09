@@ -79,7 +79,7 @@ export default function DogHeatEditor() {
 
           <View style={{ height: 16 }} />
           <AnyvoButton label="Speichern" icon="checkmark" onPress={save} loading={saving} />
-          <Text style={s.disclaimer}>Alle Angaben sind optional außer dem Beginn. Die Prognose ist ungefähr und ersetzt keine tierärztliche Einschätzung.</Text>
+          <Text style={s.disclaimer}>Alle Angaben sind optional ausser dem Beginn. Die Prognose ist ungefähr und ersetzt keine tierärztliche Einschätzung.</Text>
         </ScrollView>
       </SafeAreaView>
     </View>

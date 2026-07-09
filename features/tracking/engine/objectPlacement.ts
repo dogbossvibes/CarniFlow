@@ -14,7 +14,7 @@ export function median(values: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-// Robuster Medianpunkt (Ausreißer-fest).
+// Robuster Medianpunkt (Ausreisser-fest).
 export function medianPoint(points: LatLng[]): LatLng | null {
   if (points.length === 0) return null;
   return { lat: median(points.map(p => p.lat)), lng: median(points.map(p => p.lng)) };
@@ -58,7 +58,7 @@ const OBJECT_MIN_GOOD        = 3;
 
 export type ObjectPlacementSource = 'median_stabilized' | 'last_good_point';
 
-// Punkt, wie er in den Verlauf einfließt: Position/Qualität + optionale Marker.
+// Punkt, wie er in den Verlauf einfliesst: Position/Qualität + optionale Marker.
 export interface ObjectGoodPoint {
   lat:       number;
   lng:       number;

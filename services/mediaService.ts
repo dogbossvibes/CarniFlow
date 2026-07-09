@@ -2,7 +2,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase';
 
-// Verbessertes Medien-System: Kompression, Bildgrößen, Thumbnails, eigene
+// Verbessertes Medien-System: Kompression, Bildgrössen, Thumbnails, eigene
 // Buckets (media-images/-videos/-audio), Upload-Fortschritt + Fehlerbehandlung.
 
 export type MediaBucket = 'media-images' | 'media-videos' | 'media-audio';

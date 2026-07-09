@@ -56,7 +56,7 @@ export default function TrackAuswertungScreen() {
     if (!data) return null;
     const lay: LatLng[] = (data.points ?? []).filter((p: any) => (p.point_type ?? 'lay') === 'lay').map((p: any) => ({ lat: p.latitude, lng: p.longitude }));
     const run: LatLng[] = ((data.runs ?? [])[0]?.run_points ?? []).map((p: any) => ({ lat: p.lat, lng: p.lng }));
-    const markers: MapMarker[] = (data.markers ?? []).map((m: any) => ({ type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind, material: m.material }));
+    const markers: MapMarker[] = (data.markers ?? []).map((m: any) => ({ id: m.id, type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind, material: m.material }));
     const center = lay[Math.floor(lay.length / 2)] ?? null;
     return { lay, run, markers, center, hasGps: lay.length > 1 };
   }, [data]);

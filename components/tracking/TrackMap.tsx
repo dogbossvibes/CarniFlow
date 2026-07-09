@@ -32,7 +32,7 @@ interface Props {
 // Standard-Region (Zürich), falls noch keine Position vorliegt.
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
-// Region, die alle Punkte einschließt (mit etwas Rand).
+// Region, die alle Punkte einschliesst (mit etwas Rand).
 function fitRegion(points: { lat: number; lng: number }[]) {
   const lats = points.map(p => p.lat);
   const lngs = points.map(p => p.lng);

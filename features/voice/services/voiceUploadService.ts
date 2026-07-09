@@ -94,7 +94,7 @@ export async function deleteVoiceNote(voiceNoteId: string): Promise<Result<null>
   } catch (e) { return fail('deleteVoiceNote', e); }
 }
 
-// Transkription anstoßen (Edge Function). Non-blocking nutzbar.
+// Transkription anstossen (Edge Function). Non-blocking nutzbar.
 export async function startTranscription(voiceNoteId: string): Promise<Result<{ status: TranscriptStatus; transcript?: string }>> {
   try {
     const { data, error } = await supabase.functions.invoke('transcribe-voice-note', { body: { voiceNoteId } });

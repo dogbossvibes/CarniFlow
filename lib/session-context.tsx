@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type Session, type User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { initLocaleSync, stopLocaleSync } from '@/services/localeSync';
 
 type SessionCtx = {
   session: Session | null;
@@ -19,11 +20,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
+      if (session?.user) initLocaleSync(session.user.id);   // Sprache aus Profil (falls Sync aktiv)
     });
 
     // Keep in sync with Supabase auth events (login, logout, token refresh).
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user) initLocaleSync(session.user.id); else stopLocaleSync();
     });
 
     return () => subscription.unsubscribe();

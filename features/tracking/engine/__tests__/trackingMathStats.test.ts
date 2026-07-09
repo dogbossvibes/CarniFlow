@@ -40,7 +40,7 @@ describe('trackingMath', () => {
   });
 
   describe('medianCoordinate', () => {
-    it('ignoriert Ausreißer (Komponenten-Median)', () => {
+    it('ignoriert Ausreisser (Komponenten-Median)', () => {
       expect(medianCoordinate([{ lat: 1, lng: 1 }, { lat: 2, lng: 2 }, { lat: 3, lng: 9 }]))
         .toEqual({ lat: 2, lng: 2 });
     });

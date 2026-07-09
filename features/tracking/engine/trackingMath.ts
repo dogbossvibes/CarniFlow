@@ -23,7 +23,7 @@ export function calculateBearingDegrees(a: LatLng, b: LatLng): number {
   return calculateHeading(a, b);
 }
 
-// Komponentenweiser Median (ausreißerfest). Leere Menge → null.
+// Komponentenweiser Median (ausreisserfest). Leere Menge → null.
 export function medianCoordinate(points: LatLng[]): LatLng | null {
   return medianPoint(points);
 }

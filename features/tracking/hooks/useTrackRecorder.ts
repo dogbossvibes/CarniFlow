@@ -46,13 +46,17 @@ const PUCK_ALPHA     = 0.6;  // Glättung des LIVE-Pucks separat → folgt flott
 // änderung am Scheitel|:
 //   Innenwinkel 30–60°  → Spitzwinkel (links/rechts)   → Richtungsänderung ~120–150°
 //   Innenwinkel 75–115° → rechtwinklig ~90°            → Richtungsänderung ~65–105°
-//   Innenwinkel 60–75° oder außerhalb → unklar → NICHT automatisch markieren
-const LEG_MIN_M           = 5.0;  // Mindestlänge je Schenkel, damit Rauschen nicht triggert
+//   Innenwinkel 60–75° oder ausserhalb → unklar → NICHT automatisch markieren
+const LEG_MIN_M           = 4.0;  // moderate Schenkellänge (3–5 m) — bewusst kurze Winkel bleiben erfassbar
 const ACUTE_ANGLE_MIN_DEG = 30;   // Innenwinkel: ab hier Spitzwinkel
 const ACUTE_ANGLE_MAX_DEG = 60;   // Innenwinkel: bis hier Spitzwinkel
 const ANGLE_90_MIN_DEG    = 75;   // Innenwinkel: ab hier rechtwinklig (~90°)
 const ANGLE_90_MAX_DEG    = 115;  // Innenwinkel: bis hier rechtwinklig
-const CORNER_GAP_M        = 6.0;  // Mindestabstand zwischen zwei erkannten Winkeln
+const MAX_ANGLE_ACCURACY_M = 20;  // Winkel nur bestätigen, wenn der Scheitel-Fix genau genug ist
+// KEIN pauschaler Mindestabstand (8–12 m). Nur EIN Schenkel als Abstand, damit der
+// nächste Scheitel saubere Schenkel hat — bewusst nahe beieinander gelegte Winkel
+// bleiben so erfassbar (echte kurze Winkel werden NICHT unterdrückt).
+const CORNER_GAP_M        = LEG_MIN_M;
 // Klassifikation über den Innenwinkel (winkel.png-konform). Falls sich im Feld
 // zeigt, dass direkt die rohe Richtungsänderung gemeint ist → auf false setzen.
 const ANGLE_USE_INTERIOR  = true;
@@ -75,7 +79,7 @@ const ABRISS_AFTER_OBJECT_MS = 8000; // kein Abriss kurz nach manuellem Gegensta
 const START_LOCK_MIN_MS       = 5000;   // frühestens nach 5 s freigeben
 const START_LOCK_MAX_MS       = 12000;  // spätestens nach 12 s (Nutzer läuft evtl. schon) — nie ewig blockieren
 const START_ANCHOR_MIN_FIXES  = 4;      // so viele gute Fixes → Median-Anker
-const START_ANCHOR_MAX_ACC_M  = 20;     // nur Fixes ≤ 20 m fließen in den Anker
+const START_ANCHOR_MAX_ACC_M  = 20;     // nur Fixes ≤ 20 m fliessen in den Anker
 const START_MOVE_MIN_M        = 3.5;    // so weit vom Anker weg = echte Bewegung
 const START_MOVE_MIN_SPEED    = 0.5;    // m/s: zusätzliche Bewegungsbestätigung
 const START_MOVE_CONFIRM_HITS = 2;      // so viele aufeinanderfolgende Bewegungs-Fixes (kein Einzelsprung)
@@ -107,7 +111,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const headRef  = useRef<Location.LocationSubscription | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startMs  = useRef<number>(0);
-  const recordingRef = useRef(false);   // true ⇒ Fixes fließen in die Linie
+  const recordingRef = useRef(false);   // true ⇒ Fixes fliessen in die Linie
   const bgActiveRef  = useRef(false);   // true ⇒ Hintergrund-Updates (Foreground-Service) laufen
 
   // GPS-Quelle/Debug (zentrale positionSource: native bevorzugt, expo-Fallback).
@@ -115,7 +119,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const [gpsDebug, setGpsDebug] = useState<{
     source: LocationSourceKind | null; provider: string | null;
     isNativeAvailable: boolean; rawGnssSupported: boolean; rejectedCount: number;
-  }>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
+    angleCount: number; acuteAngleCount: number;
+    lastAngleType: AngleKind | null; lastAngleDeg: number | null;
+    lastAngleDir: 'links' | 'rechts' | null; lastAngleReject: string | null;
+  }>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0,
+       angleCount: 0, acuteAngleCount: 0, lastAngleType: null, lastAngleDeg: null, lastAngleDir: null, lastAngleReject: null });
 
   // Track-Zustand in Refs → kein Stale-Closure im Fix-Handler.
   const pointsRef     = useRef<AcceptedPoint[]>([]);   // akzeptierte, geglättete Linie
@@ -136,6 +144,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const startAnchorAccRef = useRef<number | null>(null);         // Ø-Genauigkeit des Ankers
   const startMoveHitsRef  = useRef<number>(0);                   // aufeinanderfolgende Bewegungs-Fixes
   const startDriftRejRef  = useRef<number>(0);                   // in der Startphase verworfene Drift-Fixes
+  // Winkel-Debug (Teil E): Zähler + letzter Winkel + letzter Ablehnungsgrund.
+  const angleDbgRef = useRef<{ count: number; acuteCount: number; lastType: AngleKind | null; lastDeg: number | null; lastDir: 'links' | 'rechts' | null; lastReject: string | null }>(
+    { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null });
   const onAngleRef    = useRef<TrackRecorderOptions['onAngle']>(opts?.onAngle);
   onAngleRef.current  = opts?.onAngle;
   // Auto-Erkennung (Winkel/Spitzwinkel/Abriss) ein/aus — live umschaltbar via Ref.
@@ -200,17 +211,21 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     const C = pts[n - 1];
 
     // Bester Scheitel-Kandidat: braucht je einen vollen Schenkel (≥ LEG_MIN_M)
-    // davor UND danach; unter diesen gewinnt die größte Richtungsänderung.
+    // davor UND danach UND einen genauen Fix; unter diesen gewinnt die grösste
+    // Richtungsänderung. KEIN pauschaler Mindestabstand → nahe Winkel bleiben möglich.
+    const dbg = angleDbgRef.current;
     let best: { apex: AcceptedPoint; diff: number; mag: number } | null = null;
+    let sawLegShort = false, sawPoorAcc = false;
     for (let k = n - 2; k > 0; k--) {
       const apex = pts[k];
-      if (C.cumDist - apex.cumDist < LEG_MIN_M) continue;                 // Auslauf (Scheitel→C) noch zu kurz
-      if (apex.cumDist - lastCornerAtRef.current < CORNER_GAP_M) break;   // nur NACH dem letzten Winkel (cumDist fällt)
+      if (C.cumDist - apex.cumDist < LEG_MIN_M) { sawLegShort = true; continue; }      // Auslauf noch zu kurz
+      if (apex.cumDist - lastCornerAtRef.current < CORNER_GAP_M) break;                 // nur NACH dem letzten Winkel
+      if (apex.accuracy == null || apex.accuracy > MAX_ANGLE_ACCURACY_M) { sawPoorAcc = true; continue; }  // Fix zu ungenau
 
       // Anker A: LEG_MIN_M vor dem Scheitel; Auslauf-Endpunkt: LEG_MIN_M danach.
       let ai = k;
       while (ai > 0 && apex.cumDist - pts[ai].cumDist < LEG_MIN_M) ai--;
-      if (apex.cumDist - pts[ai].cumDist < LEG_MIN_M) continue;           // kein voller Einlauf-Schenkel
+      if (apex.cumDist - pts[ai].cumDist < LEG_MIN_M) { sawLegShort = true; continue; }  // kein voller Einlauf-Schenkel
       let ci = k;
       while (ci < n - 1 && pts[ci].cumDist - apex.cumDist < LEG_MIN_M) ci++;
 
@@ -219,7 +234,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (!best || mag > best.mag) best = { apex, diff, mag };
     }
 
-    if (!best || best.mag < 15) return;   // praktisch keine Richtungsänderung → kein Winkel
+    if (!best || best.mag < 15) {   // praktisch keine Richtungsänderung → kein Winkel
+      dbg.lastReject = best ? 'no_turn' : (sawPoorAcc ? 'poor_accuracy' : sawLegShort ? 'leg_too_short' : 'no_turn');
+      return;
+    }
 
     const B = best.apex;
     // Richtung: best.diff ist die VORZEICHENBEHAFTETE Richtungsänderung am Scheitel.
@@ -236,14 +254,20 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     } else if (angleDeg >= ACUTE_ANGLE_MIN_DEG && angleDeg <= ACUTE_ANGLE_MAX_DEG) {
       kind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';         // Spitzwinkel
     }
-    if (!kind) return;   // Innenwinkel 60–75° oder außerhalb → unklar, nicht markieren
+    if (!kind) { dbg.lastReject = 'angle_unclear'; return; }   // 60–75° oder ausserhalb → nicht markieren
+
+    // erkannt → Debug aktualisieren (Spitzwinkel zählen gleich wie 90°-Winkel).
+    dbg.count++;
+    if (kind === 'spitz_rechts' || kind === 'spitz_links') dbg.acuteCount++;
+    dbg.lastType = kind; dbg.lastDeg = Math.round(angleDeg); dbg.lastDir = dir; dbg.lastReject = null;
     if (__DEV__) console.log('[trackRecorder] Winkel', { kind, innenwinkel: Math.round(angleDeg), richtungsaenderung: Math.round(best.mag), richtung: dir });
+
     lastCornerAtRef.current = B.cumDist;
     pendingAbrissRef.current = null;   // echter Winkel hier ⇒ kein Abriss am selben Halt
 
     const now = Date.now();
     void commitMarker({
-      id: `winkel-${now}`, type: 'winkel', material: null, angleKind: kind,
+      id: `angle-${now}-${kind}`, type: 'winkel', material: null, angleKind: kind,   // stabile ID inkl. Typ
       lat: B.lat, lng: B.lng, accuracy: B.accuracy,
       distance_from_start: Math.round(B.cumDist * 10) / 10,
       note: null, audio_url: null, found: false, t: now,
@@ -354,7 +378,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (__DEV__) console.log('[trackRecorder] fix', { accuracy: raw.accuracy, recording: recordingRef.current });
 
     // EMA-Glättung der Position — IMMER (Warmup wie Aufnahme). So folgt der
-    // Live-Puck stets der echten Position und friert NIE ein, auch bei mäßigem
+    // Live-Puck stets der echten Position und friert NIE ein, auch bei mässigem
     // GPS. Der Genauigkeits-/Speed-Filter blockt nur das Setzen von LINIEN-Punkten.
     const prevEma = emaRef.current;
     const ema: LatLng = prevEma
@@ -379,7 +403,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     //    dass Warmup-/Startdrift (auf iPhone real ~8 m im Stand) als Strecke landet.
     //    Bei Freigabe ist der Anker als erster Linienpunkt gesetzt → Fix läuft weiter.
     if (startLockRef.current) {
-      if (!handleStartLock(raw, ema)) return;   // noch am Stabilisieren
+      if (!handleStartLock(raw, ema)) { angleDbgRef.current.lastReject = 'start_lock_active'; return; }   // noch am Stabilisieren
     }
 
     // 1) Zu ungenauer / unrealistischer Fix → kein Linienpunkt (Puck steht schon).
@@ -483,7 +507,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     }
 
     // ── SOFORT scharf schalten (synchron, VOR jedem await/Netz-Call) ──
-    // So hängt die Aufnahme nie an Login/Supabase/Heading. Fixes fließen ab
+    // So hängt die Aufnahme nie an Login/Supabase/Heading. Fixes fliessen ab
     // hier in die Linie, der Timer läuft sofort.
     pointsRef.current = [];
     emaRef.current = null;
@@ -492,6 +516,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     rejectedRef.current = 0;
     lastCornerAtRef.current = -Infinity;
     lastAbrissAtRef.current = -Infinity;
+    angleDbgRef.current = { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null };
     dwellRef.current = null;
     pendingAbrissRef.current = null;
     lastObjectAtRef.current = -Infinity;
@@ -515,7 +540,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       const st = store.getState();
       st.setDuration(sec);
       // Debug: verworfene Fixes gedrosselt (1 Hz) in den State spiegeln.
-      setGpsDebug(d => d.rejectedCount === rejectedRef.current ? d : { ...d, rejectedCount: rejectedRef.current });
+      const a = angleDbgRef.current;
+      setGpsDebug(d => ({ ...d, rejectedCount: rejectedRef.current,
+        angleCount: a.count, acuteAngleCount: a.acuteCount,
+        lastAngleType: a.lastType, lastAngleDeg: a.lastDeg, lastAngleDir: a.lastDir, lastAngleReject: a.lastReject }));
       // Live Activity gedrosselt aktualisieren (alle 3 s, nicht im Sekundentakt).
       if (sec % 3 === 0) updateFaehrteActivity({ elapsedS: sec, distanceM: st.distanceMeters, paused: st.isPaused });
     }, 1000);
@@ -606,28 +634,38 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   }, [store, commitMarker]);
 
   // Aufnahme beenden + Lay-Punkte/Summary persistieren.
-  const finish = useCallback(async (sessionId: string | null): Promise<{ error: string | null }> => {
+  // SOFORT stoppen (synchron) und die Liegezeit starten; das schwere Speichern
+  // (SQLite-Flush + Supabase) läuft im HINTERGRUND und blockiert NICHT die
+  // Navigation zur Liegezeit. saveState spiegelt den Fortschritt in die UI.
+  const finish = useCallback((sessionId: string | null): void => {
     stopAll();
     const s = store.getState();
     s.stopRecording();
-    s.setLayFinishedAt(Date.now());
-    await flushPoints();
-    // Ohne Remote-Session (offline) bleibt die Aufnahme lokal in SQLite und
-    // wird später synchronisiert — kein Remote-Update möglich.
-    if (!sessionId) return { error: null };
-    const accAvg = calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy));
-    const res = await finishTrackRecording(sessionId, s.trackPoints, {
-      layingDurationSeconds: s.durationSeconds,
-      distanceMeters:        s.distanceMeters,
-      gpsQualityAverage:     accAvg,
-      articlesTotal:         s.markers.filter(m => m.type === 'gegenstand').length,
-      cornersTotal:          s.markers.filter(m => m.type === 'winkel').length,
-      distractionsTotal:     s.markers.filter(m => m.type === 'verleitung').length,
-    });
-    if (localSessionId.current) {
-      try { await updateTrainingSyncStatus(localSessionId.current, res.error ? 'pending' : 'synced', res.error); } catch { /* best-effort */ }
-    }
-    return { error: res.error };
+    s.setLayFinishedAt(Date.now());   // ← Liegezeit-Start, sofort verfügbar
+    s.setSaveState('saving');
+
+    void (async () => {
+      try {
+        await flushPoints();
+        if (!sessionId) { store.getState().setSaveState('saved'); return; }   // offline → nur lokal
+        const accAvg = calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy));
+        const res = await finishTrackRecording(sessionId, s.trackPoints, {
+          layingDurationSeconds: s.durationSeconds,
+          distanceMeters:        s.distanceMeters,
+          gpsQualityAverage:     accAvg,
+          articlesTotal:         s.markers.filter(m => m.type === 'gegenstand').length,
+          cornersTotal:          s.markers.filter(m => m.type === 'winkel').length,
+          distractionsTotal:     s.markers.filter(m => m.type === 'verleitung').length,
+        });
+        if (localSessionId.current) {
+          try { await updateTrainingSyncStatus(localSessionId.current, res.error ? 'pending' : 'synced', res.error); } catch { /* best-effort */ }
+        }
+        store.getState().setSaveState(res.error ? 'error' : 'saved');
+      } catch (e) {
+        console.warn('[trackRecorder] finish save', e);
+        store.getState().setSaveState('error');
+      }
+    })();
   }, [stopAll, store, flushPoints]);
 
   return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll, gpsDebug };

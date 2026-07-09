@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
 import { useDogs } from '@/hooks/useDogs';
@@ -31,6 +32,7 @@ function formatTime(sec: number): string {
 // vorbefüllt ist und Sparte/Übungen/Bewertung erfasst werden.
 export default function TimerScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { dogs } = useDogs();
   const { session } = useSession();
   // Optionaler Kontext (z. B. aus dem KI-Hinweis / Schnellstart): Hund + Sparte
@@ -100,25 +102,25 @@ export default function TimerScreen() {
   // bekannte Kontext (Hund/Sparte/Notiz) wird an die Dokumentation weitergereicht.
   const finish = () => {
     tapHaptic();
-    Alert.alert('Training beenden', `${formatTime(elapsed)} trainiert.`, [
-      { text: 'Dokumentieren', onPress: () => router.replace({ pathname: '/unit/document', params: {
+    Alert.alert(t('timer.endTitle'), `${formatTime(elapsed)} trainiert.`, [
+      { text: t('timer.document'), onPress: () => router.replace({ pathname: '/unit/document', params: {
         duration: String(elapsed),
         ...(dogId ? { dogId } : {}),
         ...(discipline ? { discipline } : {}),
         ...(note ? { note } : {}),
       } }) },
-      { text: 'Ohne Doku speichern', onPress: saveWithoutDoc },
-      { text: 'Verwerfen', style: 'destructive', onPress: discard },
-      { text: 'Abbrechen', style: 'cancel' },
+      { text: t('timer.saveWithoutDoc'), onPress: saveWithoutDoc },
+      { text: t('timer.discard'), style: 'destructive', onPress: discard },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
   const cancel = () => {
     tapHaptic();
     if (elapsed < 3) { discard(); return; }
-    Alert.alert('Training verwerfen?', 'Der Timer wird verworfen und nicht gespeichert.', [
-      { text: 'Weiter', style: 'cancel' },
-      { text: 'Verwerfen', style: 'destructive', onPress: discard },
+    Alert.alert(t('timer.discardTitle'), t('timer.discardBody'), [
+      { text: t('common.next'), style: 'cancel' },
+      { text: t('timer.discard'), style: 'destructive', onPress: discard },
     ]);
   };
 
@@ -131,29 +133,29 @@ export default function TimerScreen() {
 
         <View style={s.center}>
           {contextLabel ? <Text style={s.context}>{contextLabel}</Text> : null}
-          <Text style={s.label}>{running ? 'TRAINING LÄUFT' : 'PAUSIERT'}</Text>
+          <Text style={s.label}>{running ? t('timer.running') : t('timer.paused')}</Text>
           <Text style={s.timer}>{formatTime(elapsed)}</Text>
           <Text style={s.hint}>
-            {discipline ? 'Übungen & Bewertung dokumentierst du am Ende.' : 'Sparte & Übungen dokumentierst du am Ende.'}
+            {discipline ? t('timer.hintDisc') : t('timer.hintNoDisc')}
           </Text>
         </View>
 
         <View style={s.bar}>
           <AnimatedPressable style={s.pauseBtn} scale={0.95} onPress={togglePause}>
             <Ionicons name={running ? 'pause' : 'play'} size={22} color={C.white} />
-            <Text style={s.pauseTxt}>{running ? 'Pause' : 'Weiter'}</Text>
+            <Text style={s.pauseTxt}>{running ? t('timer.pause') : t('timer.resume')}</Text>
           </AnimatedPressable>
 
           <AnimatedPressable style={s.endBtn} scale={0.97} onPress={finish}>
             <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="checkmark" size={20} color={C.accentText} />
-            <Text style={s.endTxt}>Fertig</Text>
+            <Text style={s.endTxt}>{t('timer.done')}</Text>
           </AnimatedPressable>
         </View>
 
         {/* Klar beschriftetes Abbrechen (mit Sicherheitsabfrage ab ≥ 3 s). */}
         <TouchableOpacity style={s.cancelLink} onPress={cancel} hitSlop={8} activeOpacity={0.7}>
-          <Text style={s.cancelLinkTxt}>Training abbrechen</Text>
+          <Text style={s.cancelLinkTxt}>{t('timer.cancel')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </View>

@@ -37,7 +37,7 @@ export function shouldAcceptTrackPoint(last: GpsSample | null, next: GpsSample):
   // 3) Mindestabstand (filtert Stand-Jitter).
   if (dist < MIN_STEP_M) return false;
 
-  // 3) Speed-Sanity: großer Sprung in kurzer Zeit → verwerfen.
+  // 3) Speed-Sanity: grosser Sprung in kurzer Zeit → verwerfen.
   if (last.t != null && next.t != null) {
     const dtSec = (next.t - last.t) / 1000;
     if (dtSec > 0 && dist / dtSec > MAX_SPEED_MPS) return false;
@@ -60,7 +60,7 @@ export function smoothTrackPoints(points: LatLng[], window = 2): LatLng[] {
   return out;
 }
 
-// Entfernt grobe Ausreißer (Punkt weicht stark von Nachbarn ab) — inkl.
+// Entfernt grobe Ausreisser (Punkt weicht stark von Nachbarn ab) — inkl.
 // isolierter Anfangs-/Endpunkte (ein „Ausbruch", der nicht gelaufen wurde).
 export function removeGpsJitter(points: LatLng[], maxJumpM = 25): LatLng[] {
   const n = points.length;
@@ -82,7 +82,7 @@ export function removeGpsJitter(points: LatLng[], maxJumpM = 25): LatLng[] {
     const d1 = distanceM(prev, src[i]);
     const d2 = distanceM(src[i], next);
     const dDirect = distanceM(prev, next);
-    // Spitze: Umweg über den Punkt viel länger als Direktweg → Ausreißer.
+    // Spitze: Umweg über den Punkt viel länger als Direktweg → Ausreisser.
     if (d1 > maxJumpM && d2 > maxJumpM && d1 + d2 > dDirect * 3) continue;
     out.push(src[i]);
   }
@@ -120,7 +120,7 @@ export function calculateAverageAccuracy(values: (number | null | undefined)[]):
 }
 
 // Komponentenweiser Median einer kleinen Punktwolke — robust gegen einzelne
-// GPS-Ausreißer. Für den Startanker aus mehreren Warmup-Fixes (statt Mittelwert,
+// GPS-Ausreisser. Für den Startanker aus mehreren Warmup-Fixes (statt Mittelwert,
 // der von einem Drift-Sprung mitgezogen würde).
 export function medianLatLng(points: LatLng[]): LatLng | null {
   if (!points.length) return null;

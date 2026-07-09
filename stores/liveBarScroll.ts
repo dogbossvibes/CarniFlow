@@ -16,7 +16,7 @@ export function reportScroll(y: number) {
   }
 }
 
-// Beim Verlassen/Schließen eines Screens zurücksetzen.
+// Beim Verlassen/Schliessen eines Screens zurücksetzen.
 export function resetScroll() {
   if (minimized) {
     minimized = false;

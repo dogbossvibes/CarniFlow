@@ -6,7 +6,7 @@ import { C } from '@/constants/colors';
 import { tapHaptic } from '@/lib/haptics';
 import type { Discipline } from '@/constants/disciplines';
 
-// Große Premium-Card für eine Sparte (Dashboard / Start-Screen).
+// Grosse Premium-Card für eine Sparte (Dashboard / Start-Screen).
 interface Props {
   discipline: Discipline;
   onPress:    () => void;

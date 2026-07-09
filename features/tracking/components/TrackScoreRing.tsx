@@ -4,7 +4,7 @@ import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { C } from '@/constants/colors';
 
 // Score-Ring — Port von design_handoff_faehrten/viz.jsx (ScoreRing).
-// Großer Wert in der Mitte, Gradient-Bogen (acc → acc-2), optionales Label/Sub.
+// Grosser Wert in der Mitte, Gradient-Bogen (acc → acc-2), optionales Label/Sub.
 
 interface Props {
   value:   number;        // 0..max

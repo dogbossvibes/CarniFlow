@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Crash-/Error-Reporting. Doppelt abgesichert:
 //  1) Ohne EXPO_PUBLIC_SENTRY_DSN ist alles ein No-op (kein Datenversand).
 //  2) Der Nutzer kann Absturzberichte im Profil deaktivieren (Opt-out). Die
-//     Präferenz wird lokal gespeichert; standardmäßig sind Berichte aktiv.
+//     Präferenz wird lokal gespeichert; standardmässig sind Berichte aktiv.
 const DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 const PREF_KEY = 'crash_reporting_enabled';
 let initialized = false;

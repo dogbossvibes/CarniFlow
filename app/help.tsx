@@ -39,7 +39,7 @@ const FAQS: Faq[] = [
   },
   {
     frage:   'Wie bewerte ich die Leistung meines Hundes?',
-    antwort: 'Pro Übung kannst du Metriken wie Motivation, Konzentration, Präzision, Ausdauer, Trieblage und Impulskontrolle bewerten. Diese fließen in deine Fortschrittsanalysen ein.',
+    antwort: 'Pro Übung kannst du Metriken wie Motivation, Konzentration, Präzision, Ausdauer, Trieblage und Impulskontrolle bewerten. Diese fliessen in deine Fortschrittsanalysen ein.',
   },
   {
     frage:   'Wie verbinde ich mich mit einem Trainer?',

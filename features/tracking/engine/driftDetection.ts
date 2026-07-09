@@ -84,7 +84,7 @@ export function detectDrift({
   const signals: Signal[] = [
     // Wir „stehen", aber die Position wandert → stärkstes Drift-Indiz.
     { hit: stationary && !!prev && dist > PRECISION.STATIONARY_RADIUS_M, weight: 0.35, reason: 'STATIONARY_BUT_MOVED' },
-    // Großer Sprung in sehr kurzer Zeit → Teleport.
+    // Grosser Sprung in sehr kurzer Zeit → Teleport.
     { hit: jumped && shortGap,                                          weight: 0.25, reason: 'GPS_TELEPORT' },
     // Unplausibles Tempo fürs Fährtenlegen.
     { hit: speed != null && speed > PRECISION.MAX_SPEED_MPS,            weight: 0.20, reason: 'SPEED_IMPLAUSIBLE' },

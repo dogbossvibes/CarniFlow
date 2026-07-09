@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensio
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT, type TranslationKey } from '@/i18n';
 import { DogAvatar } from '@/components/dogs/DogAvatar';
 import { DogHubStatsGrid } from '@/components/dogs/DogHubStatsGrid';
 import { DogQuickActions, type QuickActionKey } from '@/components/dogs/DogQuickActions';
@@ -14,11 +15,15 @@ import { DogDocumentsCard } from '@/components/dogs/DogDocumentsCard';
 import { DogTrainerCard } from '@/components/dogs/DogTrainerCard';
 import { DogAiCoachCard } from '@/components/dogs/DogAiCoachCard';
 import { DogHeatCard } from '@/components/dogs/DogHeatCard';
+import { DogCommandsCard } from '@/components/dogs/DogCommandsCard';
 import type { HeatCycle, HeatPrediction } from '@/features/dogs/heatCycles';
+import type { DogCommand } from '@/features/dogs/dogCommands';
 import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } from '@/components/dogs/types';
 
 // Läufigkeit (nur Hündinnen) — lokal geladen, als eigenständiger Prop reingereicht.
 export interface DogHeatProps { cycles: HeatCycle[]; prediction: HeatPrediction | null; onAdd: () => void; onDelete?: (c: HeatCycle) => void }
+// Kommandoliste — lokal geladen, als eigenständiger Prop reingereicht.
+export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void }
 
 export interface DogHubActions {
   onBack:             () => void;
@@ -36,19 +41,22 @@ export interface DogHubActions {
   onUpgrade?:         () => void;
 }
 
-type TabKey = 'overview' | 'training' | 'faehrte' | 'goals' | 'health' | 'heat' | 'docs' | 'trainer';
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'overview', label: 'Übersicht' },
-  { key: 'training', label: 'Training' },
-  { key: 'faehrte',  label: 'Fährte' },
-  { key: 'goals',    label: 'Ziele' },
-  { key: 'health',   label: 'Gesundheit' },
-  { key: 'heat',     label: 'Läufigkeit' },   // nur Hündinnen (unten gefiltert)
-  { key: 'docs',     label: 'Dokumente' },
-  { key: 'trainer',  label: 'Trainer' },
+type TabKey = 'overview' | 'training' | 'faehrte' | 'goals' | 'health' | 'heat' | 'commands' | 'docs' | 'trainer';
+// Labels über i18n (labelKey). Die technischen `key`s bleiben unverändert.
+const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
+  { key: 'overview', labelKey: 'doghub.tab.overview' },
+  { key: 'training', labelKey: 'doghub.tab.training' },
+  { key: 'faehrte',  labelKey: 'doghub.tab.faehrte' },
+  { key: 'goals',    labelKey: 'doghub.tab.goals' },
+  { key: 'health',   labelKey: 'doghub.tab.health' },
+  { key: 'heat',     labelKey: 'doghub.tab.heat' },   // nur Hündinnen (unten gefiltert)
+  { key: 'commands', labelKey: 'doghub.tab.commands' },
+  { key: 'docs',     labelKey: 'doghub.tab.docs' },
+  { key: 'trainer',  labelKey: 'doghub.tab.trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked, heat }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps }) {
+export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps }) {
+  const { t } = useT();
   const [tab, setTab] = useState<TabKey>('overview');
   const [aiTipHidden, setAiTipHidden] = useState(false);   // „Später" blendet den KI-Hinweis für diese Sitzung aus
   const { width } = useWindowDimensions();
@@ -94,11 +102,11 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat }: { vm: DogHubVM; 
 
             {/* Tab-Leiste */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabbar}>
-              {TABS.filter(t => t.key !== 'heat' || id.gender === 'female').map(t => {
-                const on = t.key === tab;
+              {TABS.filter(tb => tb.key !== 'heat' || id.gender === 'female').map(tb => {
+                const on = tb.key === tab;
                 return (
-                  <TouchableOpacity key={t.key} onPress={() => setTab(t.key)} style={[s.tab, on && s.tabOn]} activeOpacity={0.8}>
-                    <Text style={[s.tabTxt, on && s.tabTxtOn]}>{t.label}</Text>
+                  <TouchableOpacity key={tb.key} onPress={() => setTab(tb.key)} style={[s.tab, on && s.tabOn]} activeOpacity={0.8}>
+                    <Text style={[s.tabTxt, on && s.tabTxtOn]}>{t(tb.labelKey)}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -124,6 +132,17 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat }: { vm: DogHubVM; 
                       onLater={() => setAiTipHidden(true)}
                     />
                   )}
+                  {commands && commands.commands.length > 0 && (
+                    <TouchableOpacity style={s.cmdOverview} activeOpacity={0.85} onPress={() => setTab('commands')}>
+                      <View style={s.cmdIcon}><Ionicons name="megaphone" size={16} color={C.trackPrimary} /></View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.cmdTitle}>Kommandos</Text>
+                        <Text style={s.cmdSub}>{commands.commands.filter(c => c.category === 'sport').length} Sport · {commands.commands.filter(c => c.category === 'private').length} Alltag</Text>
+                      </View>
+                      <Text style={s.cmdLink}>Ansehen</Text>
+                      <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
+                    </TouchableOpacity>
+                  )}
                 </>
               )}
               {tab === 'training' && (
@@ -138,6 +157,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat }: { vm: DogHubVM; 
               {tab === 'goals'    && <DogGoalsCard goal={vm.goal} onEdit={actions.onEditGoal} />}
               {tab === 'health'   && <DogHealthLoadCard health={vm.health} onAddEntry={actions.onAddHealth} />}
               {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onDelete={heat.onDelete} />}
+              {tab === 'commands' && commands && <DogCommandsCard commands={commands.commands} onAdd={commands.onAdd} onOpen={commands.onOpen} onToggleFavorite={commands.onToggleFavorite} onSeedDemo={commands.onSeedDemo} />}
               {tab === 'docs'     && <DogDocumentsCard documents={vm.documents} onAdd={actions.onAddDoc} onOpen={actions.onOpenDocument} onDelete={actions.onDeleteDocument} />}
               {tab === 'trainer'  && <DogTrainerCard trainer={vm.trainer} onChat={actions.onChat} />}
             </View>
@@ -172,4 +192,9 @@ const s = StyleSheet.create({
   note:      { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, padding: 12 },
   noteTxt:   { flex: 1, fontSize: 13, color: C.trackTextSec, fontWeight: '500' },
   noteStrong:{ color: C.trackText, fontWeight: '700' },
+  cmdOverview:{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 14 },
+  cmdIcon:   { width: 34, height: 34, borderRadius: 11, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' },
+  cmdTitle:  { fontSize: 14.5, color: C.trackText, fontWeight: '800' },
+  cmdSub:    { fontSize: 12, color: C.trackTextSec, fontWeight: '600', marginTop: 2 },
+  cmdLink:   { fontSize: 13, color: C.trackPrimary, fontWeight: '800' },
 });

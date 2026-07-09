@@ -39,7 +39,7 @@ export function overallScore(legs: LegRow[]): number {
   return Math.round((sum / maxSum) * 100);
 }
 
-// Verbale Bewertung gemäß IGP-Notenstufen.
+// Verbale Bewertung gemäss IGP-Notenstufen.
 export function scoreVerdict(score: number): { headline: string; sub: string } {
   if (score >= 96) return { headline: 'VORZÜG-\nLICH.', sub: 'Vorzüglich' };
   if (score >= 90) return { headline: 'SEHR\nGUT.', sub: 'Sehr gut' };

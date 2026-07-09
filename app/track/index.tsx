@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { getTrackSessionById, getUserTrackSessions, deleteTrackSession } from '@/features/tracking/services/trackService';
@@ -34,6 +35,7 @@ function toRow(r: any): TrackRowData {
 
 export default function TrackOverviewScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const { dogs } = useDogs();
 
@@ -97,14 +99,14 @@ export default function TrackOverviewScreen() {
     if (!hero) return null;
     const lay: LatLng[]  = (hero.points ?? []).filter((p: any) => (p.point_type ?? 'lay') === 'lay').map((p: any) => ({ lat: p.latitude, lng: p.longitude }));
     const run: LatLng[]  = ((hero.runs ?? [])[0]?.run_points ?? []).map((p: any) => ({ lat: p.lat, lng: p.lng }));
-    const markers: MapMarker[] = (hero.markers ?? []).map((m: any) => ({ type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind, material: m.material }));
+    const markers: MapMarker[] = (hero.markers ?? []).map((m: any) => ({ id: m.id, type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind, material: m.material }));
     const center = lay[Math.floor(lay.length / 2)] ?? null;
     return { lay, run, markers, center, hasGps: lay.length > 1 };
   }, [hero]);
 
   const startHref = (effectiveDogId ? `/track/legen?dogId=${effectiveDogId}` : '/track/legen') as never;
   const actions: { icon: IconName; label: string; go: () => void; primary?: boolean }[] = [
-    { icon: 'play',          label: 'Fährte legen', go: () => router.push(startHref), primary: true },
+    { icon: 'play',          label: t('track.lay'), go: () => router.push(startHref), primary: true },
     { icon: 'stats-chart',   label: 'Auswertung',   go: () => router.push((last ? `/track/${last.id}` : startHref) as never) },
     { icon: 'layers',        label: 'Logbuch',      go: () => router.push('/track/historie' as never) },
     { icon: 'sparkles',      label: 'Insights',     go: () => router.push('/analyse/insights' as never) },
@@ -119,14 +121,14 @@ export default function TrackOverviewScreen() {
       />
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        {/* ── große Karten-Card (letzte Fährte) ── */}
+        {/* ── grosse Karten-Card (letzte Fährte) ── */}
         <View style={s.mapCard}>
           {loading ? (
             <View style={s.mapEmpty}><ActivityIndicator color={C.trackPrimary} /></View>
           ) : !last ? (
             <View style={s.mapEmpty}>
               <Ionicons name="git-branch-outline" size={30} color={C.trackTextMut} />
-              <Text style={s.mapEmptyTxt}>Noch keine Fährte — plane deine erste.</Text>
+              <Text style={s.mapEmptyTxt}>{t('empty.noTracks')}</Text>
             </View>
           ) : (
             <>

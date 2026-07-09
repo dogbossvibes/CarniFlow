@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { HeroImage } from '@/components/training/HeroImage';
 
@@ -11,6 +12,7 @@ import { HeroImage } from '@/components/training/HeroImage';
 // entfernt — Verlauf gibt es nur noch als Mini-Vorschau auf Home.
 export default function TrainingScreen() {
   const router = useRouter();
+  const { t } = useT();
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -18,7 +20,7 @@ export default function TrainingScreen() {
         <View style={s.header}>
           <View>
             <Text style={s.eyebrow}>TRAINING HUB</Text>
-            <Text style={s.title}>Training</Text>
+            <Text style={s.title}>{t('training.title')}</Text>
           </View>
           <TouchableOpacity style={s.iconBtn} onPress={() => router.push('/unit/stats')} activeOpacity={0.7}>
             <Ionicons name="stats-chart-outline" size={20} color={C.white} />
@@ -29,11 +31,11 @@ export default function TrainingScreen() {
         <AnimatedPressable style={s.heroWrap} scale={0.98} onPress={() => router.push('/unit/timer')}>
           <HeroImage height={200} rounded overlay={0.88}>
             <View style={s.heroInner}>
-              <Text style={s.heroEyebrow}>NEUE EINHEIT</Text>
-              <Text style={s.heroTitle}>Training starten</Text>
+              <Text style={s.heroEyebrow}>{t('training.newUnit')}</Text>
+              <Text style={s.heroTitle}>{t('training.start')}</Text>
               <View style={s.heroBtn}>
                 <Ionicons name="play" size={15} color={C.accentText} />
-                <Text style={s.heroBtnTxt}>Timer starten</Text>
+                <Text style={s.heroBtnTxt}>{t('training.startTimer')}</Text>
               </View>
             </View>
           </HeroImage>
@@ -43,8 +45,8 @@ export default function TrainingScreen() {
         <AnimatedPressable style={s.docBtn} scale={0.98} onPress={() => router.push('/unit/document')}>
           <Ionicons name="create-outline" size={20} color={C.accent} />
           <View style={s.flex}>
-            <Text style={s.docTitel}>Training dokumentieren</Text>
-            <Text style={s.docSub}>Nachträglich mit Fotos, Videos & Notizen</Text>
+            <Text style={s.docTitel}>{t('training.document')}</Text>
+            <Text style={s.docSub}>{t('training.documentSub')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </AnimatedPressable>
@@ -55,8 +57,8 @@ export default function TrainingScreen() {
             <Ionicons name="navigate" size={20} color={C.success} />
           </View>
           <View style={s.flex}>
-            <Text style={s.docTitel}>Fährte (GPS)</Text>
-            <Text style={s.docSub}>Live legen & ausarbeiten</Text>
+            <Text style={s.docTitel}>{t('training.faehrteGps')}</Text>
+            <Text style={s.docSub}>{t('training.faehrteSub')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </AnimatedPressable>

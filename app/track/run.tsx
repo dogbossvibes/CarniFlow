@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
@@ -42,7 +43,9 @@ function RecDot() {
 export default function TrackRunScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useT();
   useKeepAwake();   // Display während der Absuche anlassen (Bildschirm nicht sperren)
+  const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
 
   // Snapshot der gelegten Fährte EINMAL beim Betreten festhalten (stabil).
   const [snap] = useState(() => {
@@ -83,7 +86,7 @@ export default function TrackRunScreen() {
   const breakPts  = useMemo(() => s.breaks.map(b => ({ lat: b.at.latitude, lng: b.at.longitude })), [s.breaks]);
   const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
-  const mapMarkers: MapMarker[] = snap.laidMarkers.map(m => ({ type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind }));
+  const mapMarkers: MapMarker[] = snap.laidMarkers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind }));
   const winkel = snap.laidMarkers.filter(m => m.type === 'winkel').length;
 
   // Sprachführung: gelegte Winkel/Spitzwinkel/Abriss „etwas voraus" ansagen.
@@ -107,16 +110,16 @@ export default function TrackRunScreen() {
   const devOff = devShown != null && devShown > 8;
 
   const handleCancel = () => {
-    Alert.alert('Ausarbeitung abbrechen?', 'Die Ausarbeitung wird nicht gespeichert. Die gelegte Fährte bleibt erhalten.', [
-      { text: 'Weiter', style: 'cancel' },
-      { text: 'Abbrechen', style: 'destructive', onPress: () => { hapticTap(); s.stop(); useTrackingStore.getState().reset(); router.replace('/track' as never); } },
+    Alert.alert(t('track.abortTitle'), t('track.abortBody'), [
+      { text: t('common.next'), style: 'cancel' },
+      { text: t('common.cancel'), style: 'destructive', onPress: () => { hapticTap(); s.stop(); useTrackingStore.getState().reset(); router.replace('/track' as never); } },
     ]);
   };
 
   const handleFinish = () => {
-    Alert.alert('Suche beenden?', 'Die Ausarbeitung wird gespeichert — danach geht es zur Auswertung.', [
-      { text: 'Weiter suchen', style: 'cancel' },
-      { text: 'Beenden', style: 'destructive', onPress: async () => {
+    Alert.alert(t('track.finishTitle'), t('track.finishBody'), [
+      { text: t('track.keepSearching'), style: 'cancel' },
+      { text: t('common.finish'), style: 'destructive', onPress: async () => {
         hapticSuccess();   // sofort beim Bestätigen, vor await
         setFinishing(true);
         const res = s.stop();   // ← Search-Recorder beenden
@@ -157,9 +160,9 @@ export default function TrackRunScreen() {
 
   return (
     <View className="flex-1 bg-ft-bg">
-      <SafeAreaView edges={['top']} className="flex-1">
-        {/* Top-Bar */}
-        <View className="flex-row items-center gap-3 px-[18px] pb-[10px]">
+      <SafeAreaView edges={['bottom']} className="flex-1">
+        {/* Top-Bar — explizit unter Dynamic Island/Statusbar. */}
+        <View className="flex-row items-center gap-3 px-[18px] pb-[10px]" style={{ paddingTop: insets.top + 8 }}>
           <Pressable className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center" onPress={handleCancel} hitSlop={8}>
             <Ionicons name="chevron-back" size={18} color={FT.text} />
           </Pressable>
@@ -209,7 +212,7 @@ export default function TrackRunScreen() {
           {/* Timer (oben links) */}
           <View className="absolute top-[14px] left-[14px] rounded-[16px] px-4 py-[10px] bg-ft-glass border border-ft-glass-line">
             <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{fmtClock(s.elapsedS)}</Text>
-            <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">Suchdauer</Text>
+            <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{t('track.searchDuration')}</Text>
           </View>
 
           {/* Hunde-Pill (oben rechts) */}
@@ -239,7 +242,7 @@ export default function TrackRunScreen() {
             onPress={() => { hapticSuccess(); s.markObject(); }} disabled={s.foundObjects >= s.totalObjects}
           >
             <Ionicons name="flag" size={20} color={FT.text} />
-            <Text className="text-[10.5px] font-extrabold text-ft-text">Gegenstand</Text>
+            <Text className="text-[10.5px] font-extrabold text-ft-text">{t('track.object')}</Text>
           </Pressable>
           <Pressable
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
@@ -247,7 +250,7 @@ export default function TrackRunScreen() {
             onPress={handleFinish} disabled={finishing}
           >
             {finishing ? <ActivityIndicator color="#2a060a" /> : <Ionicons name="stop" size={20} color="#2a060a" />}
-            <Text className="text-[10.5px] font-extrabold text-[#2a060a]">Stop & Auswerten</Text>
+            <Text className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.evaluate')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>

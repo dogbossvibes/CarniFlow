@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Welche Abschnitte auf dem Startbildschirm sichtbar sind. Vom Nutzer im
 // Profil → „Startbildschirm" wählbar, persistiert über AsyncStorage.
-// Der Hero/Begrüßungs-Block bleibt immer sichtbar (Identität des Screens).
+// Der Hero/Begrüssungs-Block bleibt immer sichtbar (Identität des Screens).
 
 export interface HomeLayout {
   woche:           boolean;  // Wochenübersicht

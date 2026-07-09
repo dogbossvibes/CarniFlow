@@ -105,7 +105,7 @@ export function resumeUnit() {
   emit();
 }
 
-// Vergangene Trainingszeit in ms (Pausen herausgerechnet). `now` von außen,
+// Vergangene Trainingszeit in ms (Pausen herausgerechnet). `now` von aussen,
 // damit Komponenten im Sekundentakt aktualisieren können.
 export function elapsedMs(s: ActiveTrainingState, now: number): number {
   if (s.startedAt == null) return 0;

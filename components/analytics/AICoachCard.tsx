@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useT } from '@/i18n';
 import type { TrainingAnalysis } from '@/types/analytics';
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function AICoachCard({ analysis }: Props) {
+  const { t } = useT();
   return (
     <View style={s.wrap}>
       {/* Glow border */}
@@ -23,7 +25,7 @@ export function AICoachCard({ analysis }: Props) {
             <Text style={s.icon}>🧠</Text>
           </View>
           <View style={s.titleWrap}>
-            <Text style={s.title}>KI Coach</Text>
+            <Text style={s.title}>{t('analyse.cardTitle')}</Text>
             <Text style={s.sub}>Analyse & Empfehlung</Text>
           </View>
         </View>

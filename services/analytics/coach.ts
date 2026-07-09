@@ -48,7 +48,7 @@ export function generateAnalysis(input: AnalysisInput): Omit<TrainingAnalysis, '
 
   // ── Positives ──────────────────────────────────────────────
   const positives: string[] = [];
-  if (motivation >= 80)      positives.push(`${dogName} zeigte eine außergewöhnliche Motivation`);
+  if (motivation >= 80)      positives.push(`${dogName} zeigte eine aussergewöhnliche Motivation`);
   else if (motivation >= 65) positives.push(`Gute Arbeitsmotivation über die Einheit`);
   if (konzentration >= 75)   positives.push('Starke Fokussierung und Aufmerksamkeit');
   if (praezision >= 75)      positives.push(`Präzise Ausführung der Übungen`);
@@ -108,13 +108,13 @@ export function generateAnalysis(input: AnalysisInput): Omit<TrainingAnalysis, '
   } else if (trend7.direction === 'down') {
     coach_message = `Leichte Leistungsdelle erkannt. Checke Belastung und Regeneration — weniger kann mehr sein.`;
   } else if (weak && weak === 'Konzentration') {
-    coach_message = `Die Konzentration ist dein größter Hebel. Kürzere Sequenzen mit mehr Erfolgserlebnissen bringen mehr als lange Sessions.`;
+    coach_message = `Die Konzentration ist dein grösster Hebel. Kürzere Sequenzen mit mehr Erfolgserlebnissen bringen mehr als lange Sessions.`;
   } else if (weak && weak === 'Impulskontrolle') {
     coach_message = `Impulskontrolle unter Ablenkung ist das Herzstück. Baue gezielt Situationen ein, in denen ${dogName} Selbstkontrolle zeigen kann.`;
   } else if (motivation >= 80) {
     coach_message = `${dogName} ist im Flow — jetzt ist der ideale Moment, neue Anforderungen einzuführen.`;
   } else if (motivation > 0 && motivation < 50) {
-    coach_message = `Heute war nicht ${dogName}s bester Tag. Das ist normal — priorisiere Spaß und lockeres Training in der nächsten Session.`;
+    coach_message = `Heute war nicht ${dogName}s bester Tag. Das ist normal — priorisiere Spass und lockeres Training in der nächsten Session.`;
   } else if (gesamtscore >= 80) {
     coach_message = `Hervorragende Einheit. ${dogName} ist auf einem sehr guten Niveau — bleibe konsistent.`;
   } else {
