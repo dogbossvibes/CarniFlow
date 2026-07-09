@@ -58,7 +58,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   // training/faehrte/heat/commands/trainer bleiben wie de-CH (Fallback)
 
   // Hund
-  'dog.add': 'Hund hinzufüege',
+  'dog.add':    'Hund hinzufüege',
+  'dogs.title': 'Mini Hünd',
 
   // Training / Timer
   'training.start':       'Training starte',
@@ -202,4 +203,23 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'cmd.notFound':       'Kommando nöd gfunde.',
   'cmd.delete':         'Kommando lösche',
   'cmd.deleteConfirm':  'Kommando lösche?',
+
+  // Begrüssung (Startseite)
+  'greeting.morning': 'Guete Morge',
+  'greeting.day':     'Guete Tag',
+  'greeting.evening': 'Guete Abig',
+
+  // Terminkalender (Startseite)
+  'calendar.viewAll':         'Alli aaluege',
+  'calendar.nextAppointment': 'NÄCHSTE TERMIN',
+  'calendar.noAppointment':   'Kei Termin planet',
+  'calendar.noAppointmentSub':'Tipp uf „+“, zum din erste Termin erstelle.',
+
+  // Datums-Labels
+  'date.today':          'Hüt',
+  'date.tomorrow':       'Morn',
+  'date.yesterday':      'Geschter',
+  'date.todayUpper':     'HÜT',
+  'date.tomorrowUpper':  'MORN',
+  'date.yesterdayUpper': 'GESCHTER',
 };

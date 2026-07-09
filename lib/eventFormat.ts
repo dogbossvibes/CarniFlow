@@ -1,4 +1,5 @@
 // Anzeige-Helfer für Termine.
+import { translate } from '@/i18n';
 
 export function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -13,9 +14,9 @@ export function dayHeadingFromKey(key: string): string {
   const date = new Date(y, m - 1, d);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const diff = Math.round((date.getTime() - today.getTime()) / 86_400_000);
-  if (diff === 0)  return 'HEUTE';
-  if (diff === 1)  return 'MORGEN';
-  if (diff === -1) return 'GESTERN';
+  if (diff === 0)  return translate('date.todayUpper');
+  if (diff === 1)  return translate('date.tomorrowUpper');
+  if (diff === -1) return translate('date.yesterdayUpper');
   return `${WD[date.getDay()]}, ${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.`;
 }
 
@@ -24,7 +25,7 @@ export function relativeDayLabel(iso: string): string {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const that = new Date(d); that.setHours(0, 0, 0, 0);
   const diff = Math.round((that.getTime() - today.getTime()) / 86_400_000);
-  if (diff === 0) return 'Heute';
-  if (diff === 1) return 'Morgen';
+  if (diff === 0) return translate('date.today');
+  if (diff === 1) return translate('date.tomorrow');
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
 }

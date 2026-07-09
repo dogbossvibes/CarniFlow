@@ -2,19 +2,21 @@ import { StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { fmtTime, relativeDayLabel } from '@/lib/eventFormat';
 import { eventMeta, STATUS_LABEL, type CalendarEvent } from '@/types/calendar';
 
 const ACCENT = '#00F5D4';
 
 export function NextAppointmentCard({ event }: { event: CalendarEvent | null }) {
+  const { t } = useT();
   if (!event) {
     return (
       <View style={[s.card, s.empty]}>
         <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
         <Ionicons name="calendar-outline" size={26} color={C.muted} />
-        <Text style={s.emptyTxt}>Kein Termin geplant</Text>
-        <Text style={s.emptySub}>Tippe auf „+", um deinen ersten Termin zu erstellen.</Text>
+        <Text style={s.emptyTxt}>{t('calendar.noAppointment')}</Text>
+        <Text style={s.emptySub}>{t('calendar.noAppointmentSub')}</Text>
       </View>
     );
   }
@@ -24,7 +26,7 @@ export function NextAppointmentCard({ event }: { event: CalendarEvent | null }) 
       <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,245,212,0.06)' }]} />
 
-      <Text style={s.eyebrow}>NÄCHSTER TERMIN</Text>
+      <Text style={s.eyebrow}>{t('calendar.nextAppointment')}</Text>
       <View style={s.timeRow}>
         <Text style={s.day}>{relativeDayLabel(event.start_at)}</Text>
         <View style={s.dot} />

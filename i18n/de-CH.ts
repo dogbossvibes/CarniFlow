@@ -62,7 +62,8 @@ export const deCH = {
   'doghub.tab.trainer':  'Trainer',
 
   // Hund
-  'dog.add': 'Hund hinzufügen',
+  'dog.add':    'Hund hinzufügen',
+  'dogs.title': 'Meine Hunde',
 
   // Training / Timer
   'training.start':       'Training starten',
@@ -210,6 +211,25 @@ export const deCH = {
   'cmd.notFound':       'Kommando nicht gefunden.',
   'cmd.delete':         'Kommando löschen',
   'cmd.deleteConfirm':  'Kommando löschen?',
+
+  // Begrüssung (Startseite)
+  'greeting.morning': 'Guten Morgen',
+  'greeting.day':     'Guten Tag',
+  'greeting.evening': 'Guten Abend',
+
+  // Terminkalender (Startseite)
+  'calendar.viewAll':         'Alle ansehen',
+  'calendar.nextAppointment': 'NÄCHSTER TERMIN',
+  'calendar.noAppointment':   'Kein Termin geplant',
+  'calendar.noAppointmentSub':'Tippe auf „+“, um deinen ersten Termin zu erstellen.',
+
+  // Datums-Labels
+  'date.today':          'Heute',
+  'date.tomorrow':       'Morgen',
+  'date.yesterday':      'Gestern',
+  'date.todayUpper':     'HEUTE',
+  'date.tomorrowUpper':  'MORGEN',
+  'date.yesterdayUpper': 'GESTERN',
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

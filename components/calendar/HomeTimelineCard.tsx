@@ -2,6 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { NextAppointmentCard } from '@/components/calendar/NextAppointmentCard';
 import { useTrainingCalendar, nextEvent, eventsOnDay, localDayKey } from '@/hooks/useTrainingCalendar';
 import { eventMeta } from '@/types/calendar';
@@ -11,6 +12,7 @@ const ACCENT = '#00F5D4';
 
 export function HomeTimelineCard() {
   const router = useRouter();
+  const { t } = useT();
   const { events } = useTrainingCalendar();
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -29,7 +31,7 @@ export function HomeTimelineCard() {
       <View style={s.head}>
         <Text style={s.label}>SMART TRAINING TIMELINE</Text>
         <View style={s.allRow}>
-          <Text style={s.all}>Alle ansehen</Text>
+          <Text style={s.all}>{t('calendar.viewAll')}</Text>
           <Ionicons name="chevron-forward" size={13} color={ACCENT} />
         </View>
       </View>

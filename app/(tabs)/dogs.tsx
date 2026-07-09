@@ -5,6 +5,7 @@ import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { DogIcon } from "@/components/ui/DogIcon";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { C } from "@/constants/colors";
+import { useT } from "@/i18n";
 import { useDogs } from "@/hooks/useDogs";
 import { usePlan } from "@/hooks/usePlan";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HundeScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { dogs, loading, error, refresh } = useDogs();
   const { isPremium } = usePlan();
 
@@ -45,7 +47,7 @@ export default function HundeScreen() {
       <View style={s.kopf}>
         <View>
           <Text style={s.augenbraue}>DEINE HUNDE</Text>
-          <Text style={s.titel}>Meine Hunde</Text>
+          <Text style={s.titel}>{t('dogs.title')}</Text>
         </View>
         <AnimatedPressable style={s.hinzufuegenBtn} onPress={handleHinzufuegen}>
           <LinearGradient

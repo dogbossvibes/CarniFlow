@@ -5,6 +5,7 @@ import { Glass, isGlass } from "@/components/ui/Glass";
 import { UnitListCard } from "@/components/training/UnitListCard";
 import { SwipeableTrainingItem } from "@/components/training/SwipeableTrainingItem";
 import { C } from "@/constants/colors";
+import { useT, type TranslationKey } from "@/i18n";
 import { useDogs } from "@/hooks/useDogs";
 import { useSession } from "@/hooks/useSession";
 import { useTrainingFeed } from "@/hooks/useTrainingFeed";
@@ -50,11 +51,11 @@ function berechneSerie(sessions: { session_date: string }[]): string {
   return String(serie);
 }
 
-function begruessung(): string {
+function begruessungKey(): TranslationKey {
   const h = new Date().getHours();
-  if (h < 12) return "Guten Morgen";
-  if (h < 18) return "Guten Tag";
-  return "Guten Abend";
+  if (h < 12) return "greeting.morning";
+  if (h < 18) return "greeting.day";
+  return "greeting.evening";
 }
 
 function heutigenWochentag(): number {
@@ -76,6 +77,7 @@ function hatEinheitAnTag(
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { user } = useSession();
   const { dogs, loading: hundeLoading, refresh: refreshDogs } = useDogs();
   const { feed, loading: feedLoading, refresh: refreshFeed } = useTrainingFeed();
@@ -178,7 +180,7 @@ export default function HomeScreen() {
 
           <View style={s.heroKopf}>
             <View>
-              <Text style={s.heroBegruessung}>{begruessung()}</Text>
+              <Text style={s.heroBegruessung}>{t(begruessungKey())}</Text>
               <Text style={s.heroName}>{vorname}</Text>
             </View>
           </View>
@@ -274,7 +276,7 @@ export default function HomeScreen() {
         {layout.hunde && (
         <View style={s.sektion}>
           <View style={s.sektionKopf}>
-            <Text style={s.sektionTitel}>Meine Hunde</Text>
+            <Text style={s.sektionTitel}>{t('dogs.title')}</Text>
             <TouchableOpacity
               onPress={() => router.push("/(tabs)/dogs")}
               activeOpacity={0.7}
