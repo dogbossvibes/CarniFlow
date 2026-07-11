@@ -12,6 +12,7 @@ import { useDogs } from '@/hooks/useDogs';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { useTrackRecorder } from '@/features/tracking/hooks/useTrackRecorder';
+import { BackgroundLocationDisclosure } from '@/features/tracking/components/BackgroundLocationDisclosure';
 import { useAutoDetectSetting } from '@/hooks/useAutoDetectSetting';
 import { useVolumeKeyArticleSetting } from '@/hooks/useVolumeKeyArticleSetting';
 import { subscribeQuickAddArticle } from '@/features/tracking/quickAddArticleBus';
@@ -93,6 +94,8 @@ export default function LegenScreen() {
   const [materialSheet, setMaterialSheet] = useState(false);   // Gegenstand-Material wählen
   const [selectedDogId, setSelectedDogId] = useState<string | null>((params.dogId as string) ?? null);
   const beganRef = useRef(false);
+  const [showBgDisclosure, setShowBgDisclosure] = useState(false);   // Play-Disclosure VOR Aufnahmestart
+  const [startAfterClose, setStartAfterClose] = useState(false);     // begin() erst NACH Schliessen des Dialogs
   const warmupStartedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
   const stoppingRef = useRef(false);   // Doppelklick-Guard für „Stoppen"
@@ -197,9 +200,11 @@ export default function LegenScreen() {
     });
   }, [currentPosition]);
 
-  // Aufnahme scharf schalten — LOKAL ZUERST: die Aufnahme darf NIE an Login/Netz
-  // hängen. Erst sofort recorden (Timer + Linie laufen), dann die Remote-Session
-  // best-effort im Hintergrund anlegen und ihre ID nachreichen.
+  // Aufnahme scharf schalten — wird ERST nach Bestätigung der Hintergrundstandort-
+  // Disclosure („Weiter") aufgerufen. Vorher startet weder GPS-Aufnahme noch Timer.
+  // LOKAL ZUERST: die Aufnahme darf NIE an Login/Netz hängen. Erst sofort recorden
+  // (Timer + Linie laufen), dann die Remote-Session best-effort im Hintergrund
+  // anlegen und ihre ID nachreichen.
   const begin = useCallback(async () => {
     if (beganRef.current) return;
     beganRef.current = true;
@@ -228,6 +233,17 @@ export default function LegenScreen() {
       }).catch(() => showToast(t('toast.offlineSync')));
     }
   }, [session, activeDog, rec, showToast, surface, condition, weather, currentPosition]);
+
+  // Aufnahme erst starten, NACHDEM der Disclosure-Dialog geschlossen ist:
+  // „Weiter" setzt startAfterClose + schliesst den Dialog (showBgDisclosure=false).
+  // Dieser Effect feuert im Render NACH dem Schliessen → dann erst begin().
+  // Kein künstliches Delay; begin() awaitet intern die Berechtigung vor GPS/Timer.
+  useEffect(() => {
+    if (startAfterClose && !showBgDisclosure) {
+      setStartAfterClose(false);
+      void begin();
+    }
+  }, [startAfterClose, showBgDisclosure, begin]);
 
   useEffect(() => () => { rec.stopAll(); }, [rec.stopAll]);
 
@@ -483,7 +499,7 @@ export default function LegenScreen() {
                   {/* Start (frei ab GPS bereit; nach 15 s manuell trotz Ungenauigkeit) */}
                   <Pressable
                     className={`flex-row items-center justify-center gap-2 mt-4 rounded-[16px] px-[20px] py-3 self-stretch ${canStart ? 'bg-ft-acc' : 'bg-white/10'}`}
-                    onPress={() => { if (canStart) void begin(); }}
+                    onPress={() => { if (canStart) { hapticTap(); setShowBgDisclosure(true); } }}
                     disabled={!canStart}
                   >
                     <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
@@ -541,6 +557,14 @@ export default function LegenScreen() {
           ))}
         </View>
       </AnyvoBottomSheet>
+
+      {/* Play-Pflicht: Hintergrundstandort-Disclosure VOR Aufnahmestart.
+          „Weiter" → Aufnahme (Berechtigung → GPS → Timer). „Abbrechen" → nichts. */}
+      <BackgroundLocationDisclosure
+        visible={showBgDisclosure}
+        onCancel={() => setShowBgDisclosure(false)}
+        onContinue={() => { setStartAfterClose(true); setShowBgDisclosure(false); }}
+      />
 
       {SHOW_GPS_DEBUG && (
         <PrecisionDebugPanel

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert } from 'react-native';
 import * as Location from 'expo-location';
 import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind,
@@ -556,25 +555,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // kleine Status-Anzeige (Android-Notification / iOS blaue Pille). Best-effort:
     // ohne „Immer"-Berechtigung bleibt der Vordergrund-Watch als Fallback aktiv.
     try {
-      // Play-Policy: prominente In-App-Offenlegung ZWINGEND vor der Hintergrund-
-      // Standort-Anfrage. Nur zeigen, wenn noch nicht erteilt und erneut fragbar.
-      // Bei „Abbrechen" bleibt der Vordergrund-Watch als Fallback aktiv
-      // (Aufnahme-Logik selbst unverändert).
+      // Play-Policy: Die prominente In-App-Offenlegung (Disclosure) wird ZWINGEND
+      // VOR dem Aufnahmestart im UI gezeigt (BackgroundLocationDisclosure in
+      // app/track/legen.tsx). beginRecording läuft erst nach „Weiter". Hier wird
+      // die OS-Berechtigung nur noch angefragt, wenn bereits erteilt oder erneut
+      // fragbar. Ohne „Immer"-Berechtigung bleibt der Vordergrund-Watch als Fallback.
       const bgCurrent = await Location.getBackgroundPermissionsAsync();
-      let mayRequest = bgCurrent.status === 'granted';
-      if (!mayRequest && bgCurrent.canAskAgain) {
-        mayRequest = await new Promise<boolean>(resolve => {
-          Alert.alert(
-            'Standort im Hintergrund',
-            'Anyvo erfasst deinen Standort auch im Hintergrund, während eine Fährtenaufnahme läuft — auch bei gesperrtem Display oder wenn das Handy in der Tasche ist. So wird die Spur lückenlos aufgezeichnet. Die Erfassung erfolgt nur während einer aktiven Aufnahme.',
-            [
-              { text: 'Abbrechen', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'Weiter', onPress: () => resolve(true) },
-            ],
-            { cancelable: false },
-          );
-        });
-      }
+      const mayRequest = bgCurrent.status === 'granted' || bgCurrent.canAskAgain;
       if (mayRequest) {
         const bg = await Location.requestBackgroundPermissionsAsync();
         if (bg.status === 'granted') {

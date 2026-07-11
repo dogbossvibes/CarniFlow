@@ -3,7 +3,6 @@
 import 'react-native-get-random-values';       // patches crypto.getRandomValues
 import 'react-native-url-polyfill/auto';        // patches URL constructor
 import '@/lib/crypto-polyfill';                 // patches crypto.subtle.digest via expo-crypto
-import '@/lib/trackRecorder';                   // registriert den (Legacy-)Background-Location-Task beim Start
 import '@/features/tracking/native/backgroundLocationTask';  // registriert den Fährten-Hintergrund-Task
 import '../global.css';                         // NativeWind (Tailwind) — Theme/Tokens
 
