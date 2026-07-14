@@ -13,6 +13,9 @@ import * as Location from 'expo-location';
 import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind,
 } from '@/features/tracking/utils/positionSource';
+import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
+import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
+import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev } from '@/features/tracking/utils/searchFix';
 
 export interface GpsDebug {
   source: LocationSourceKind | null;
@@ -36,12 +39,20 @@ function distM(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+// DEV-Diagnose: klar begrenzt, im Release ein No-op (keine störenden Logs).
+function logSearchFix(d: SearchFixDecision): void {
+  if (!__DEV__) return;
+  console.log('[searchRecorder]', d.accepted ? 'ACCEPT' : 'REJECT',
+    { reason: d.reason, accuracy: d.accuracy, speed: d.speed, jumpM: d.jumpM == null ? null : Math.round(d.jumpM * 10) / 10 });
+}
+
 // ── Parameter ──
-const MAX_FIX_ACCURACY = 20;     // m — schlechte Fixes verwerfen
-const MIN_SEGMENT = 1.5;         // m — Distanz-Gate
+// Die Fix-Annahme (Genauigkeit ≤ 45 m, Speed ≤ 12 m/s, kein absoluter Jump-Filter)
+// liegt in utils/searchFix.ts (evaluateSearchFix, SEARCH_MAX_ACCURACY_M/…_SPEED_MPS)
+// — an den bewährten Lege-Recorder angeglichen (vorher 20 m / 5 m/s → zu streng, hat
+// unter realem GPS fast alle Suchfixes verworfen). useTrackRecorder bleibt unberührt.
+const MIN_SEGMENT = 1.5;         // m — Distanz-Gate (Liniendichte, unverändert)
 const SMOOTH_ALPHA = 0.4;        // EMA
-const MAX_JUMP_M = 30;           // m — grösserer Einzelsprung = GPS-Glitch → verwerfen
-const MAX_SPEED_MPS = 5;         // m/s (~18 km/h) — realistisch fürs Absuchen; darüber = Ausreisser
 const ON_TRACK_M = 3.0;          // m — innerhalb = "auf der Fährte"
 const BREAK_THRESHOLD_M = 6.0;   // m — darüber für BREAK_HOLD = Abriss
 const BREAK_HOLD_MS = 4000;      // ms — so lange muss die Abweichung halten
@@ -123,7 +134,9 @@ export interface SearchRecorder {
   score: number;
   accuracy: number | null;
   gpsDebug: GpsDebug;
-  start: () => void;
+  // Ohne Argument: frische Absuche (Reset). Mit `resume`: unterbrochene Absuche
+  // fortsetzen (P2) — Punkte/Distanz/Timer werden fortgeführt, keine neue Session.
+  start: (resume?: { points: LatLng[]; startedAtMs: number }) => void;
   stop: () => SearchResult;
   setPaused: (p: boolean) => void;
   markObject: () => void;
@@ -135,10 +148,14 @@ export type SearchResult = {
 
 export type { Level };
 
-export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: SearchObject[]; level: Level }): SearchRecorder {
+export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: SearchObject[]; level: Level; sessionId?: string | null }): SearchRecorder {
   const { laidPoints, laidObjects, level } = opts;
   const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
   const totalObjects = laidObjects.length || model.objects;
+
+  // Ziel-Session der lokalen Absuche-Persistenz (immer aktueller via Ref).
+  const sessionIdRef = useRef<string | null>(opts.sessionId ?? null);
+  sessionIdRef.current = opts.sessionId ?? null;
 
   // Bogenlängen der Soll-Fährte (stabil, da laidPoints aus dem Snapshot stammt).
   const arc = useMemo(() => buildArc(laidPoints), [laidPoints]);
@@ -160,6 +177,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const pointsRef = useRef<LatLng[]>([]);
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
+  const prevFixRef = useRef<SearchFixPrev | null>(null);   // letzter AKZEPTIERTER Rohfix (für das Speed-Gate)
   const lastFixTRef = useRef(0);      // Zeitstempel des letzten akzeptierten Fix (Ausreisser-Filter)
   const rejectedRef = useRef(0);      // verworfene Fixes (Ausreisser/Genauigkeit) — Debug
   const distRef = useRef(0);
@@ -203,22 +221,23 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
 
   // ── Kernlogik ──
   const onFix = useCallback((loc: Location.LocationObject) => {
-    const acc = loc.coords.accuracy ?? 99;
-    setAccuracy(Math.round(acc));
+    const accRaw = loc.coords.accuracy ?? null;
+    setAccuracy(accRaw != null ? Math.round(accRaw) : null);
 
     const raw: LatLng = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
     const tNow = loc.timestamp || Date.now();
+    const speed = loc.coords.speed ?? null;
     const prev = smoothRef.current;
 
-    // GPS-Ausreisser verwerfen: unrealistischer Sprung ggü. der letzten Position →
-    // sonst entsteht ein „Ausbruch" in der Laufspur, der nicht gelaufen wurde.
-    if (prev) {
-      const jump = distM(prev, raw);
-      const dt = lastFixTRef.current ? (tNow - lastFixTRef.current) / 1000 : 0;
-      if (jump > MAX_JUMP_M || (dt > 0 && jump / dt > MAX_SPEED_MPS)) { rejectedRef.current++; return; }
-    }
-    lastFixTRef.current = tNow;
+    // Fix-Annahme wie beim Legen (Genauigkeit ≤ 45 m, Speed ≤ 12 m/s), gegen den
+    // letzten AKZEPTIERTEN Rohfix. KEIN absoluter Jump-Filter mehr.
+    const decision = evaluateSearchFix(
+      prevFixRef.current,
+      { lat: raw.latitude, lng: raw.longitude, t: tNow, accuracy: accRaw, speed },
+    );
 
+    // Puck-Glättung IMMER (auch bei verworfenem Linienpunkt) → die Position folgt
+    // weiter, statt einzufrieren.
     const sm: LatLng = prev
       ? { latitude: prev.latitude + SMOOTH_ALPHA * (raw.latitude - prev.latitude),
           longitude: prev.longitude + SMOOTH_ALPHA * (raw.longitude - prev.longitude) }
@@ -227,15 +246,36 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     setPosition(sm);
 
     if (!recordingRef.current || pausedRef.current) return;
-    if (acc > MAX_FIX_ACCURACY) { rejectedRef.current++; return; }
+
+    if (!decision.accepted) { rejectedRef.current++; logSearchFix(decision); return; }
+
+    // Akzeptiert → als Referenz für das nächste Speed-Gate merken (wie Legen: auch
+    // bei anschliessendem Distanz-Gate).
+    prevFixRef.current = { lat: raw.latitude, lng: raw.longitude, t: tNow };
+    lastFixTRef.current = tNow;
 
     const pts = pointsRef.current;
     if (pts.length > 0) {
       const d = distM(pts[pts.length - 1], sm);
-      if (d < MIN_SEGMENT) return;
+      if (d < MIN_SEGMENT) return;   // Liniendichte-Gate: noch kein neuer Linienpunkt
       distRef.current += d;
     }
     pts.push(sm);
+    logSearchFix(decision);
+
+    // ── Trennung Legen/Suche: akzeptierten Suchpunkt SEPARAT führen. In den Store
+    //    (searchTrackPoints, NIE die gelegte `trackPoints`) spiegeln und inkrementell
+    //    lokal puffern (point_type='search'). Persistenzfehler stoppen die Aufnahme nicht.
+    const searchSample: TrackPointSample = {
+      lat: sm.latitude, lng: sm.longitude, accuracy: accRaw,
+      altitude: loc.coords.altitude ?? null, speed, heading: null, t: tNow,
+    };
+    useTrackingStore.getState().addSearchPoint(searchSample);
+    enqueueSearchPoint({
+      latitude: sm.latitude, longitude: sm.longitude, accuracy: accRaw,
+      altitude: loc.coords.altitude ?? null, speed, heading: null,
+      timestamp: new Date(tNow).toISOString(),
+    });
 
     // ── Abweichung von der Soll-Fährte (reihenfolge-bewusst) ──
     // Projektion nur auf das ERWARTETE Fenster ab dem aktuellen Fortschritt; der
@@ -318,22 +358,40 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   }, [recording, paused]);
 
   // ── Steuerung ──
-  const start = useCallback(() => {
-    pointsRef.current = []; breaksRef.current = [];
-    smoothRef.current = null; lastFixTRef.current = 0; rejectedRef.current = 0; distRef.current = 0;
+  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number }) => {
+    const resumePts = resume?.points ?? [];
+    // Fortsetzen: mit den wiederhergestellten Punkten seeden (Linie/Distanz laufen
+    // weiter); frisch: leer.
+    pointsRef.current = resumePts.slice();
+    breaksRef.current = [];
+    smoothRef.current = resumePts.length ? resumePts[resumePts.length - 1] : null;
+    prevFixRef.current = null;   // Zeitlücke → nächster Fix ist neuer Referenzpunkt (kein Speed-Gate gegen alten Fix)
+    lastFixTRef.current = 0; rejectedRef.current = 0;
+    let d = 0;
+    for (let i = 1; i < resumePts.length; i++) d += distM(resumePts[i - 1], resumePts[i]);
+    distRef.current = d;
     devEmaRef.current = 0; devSumRef.current = 0; devCountRef.current = 0;
     offTrackSinceRef.current = null; inBreakRef.current = false;
     cursorMRef.current = 0; maxCursorMRef.current = 0;
     foundRef.current = new Set();
-    startMsRef.current = Date.now(); setElapsedS(0);
+    startMsRef.current = resume ? resume.startedAtMs : Date.now();
+    setElapsedS(resume ? Math.max(0, Math.floor((Date.now() - resume.startedAtMs) / 1000)) : 0);
     pausedRef.current = false; setPausedState(false);
+    // Frisch: Store-Suchspur leeren. Fortsetzen: Store wurde extern (restoreSearchSession)
+    // mit den Punkten befüllt → NICHT leeren.
+    if (!resume) useTrackingStore.getState().resetSearchPoints();
+    // Puffer leeren, aber DIESELBE Session behalten → neue Fixes hängen an dieselbe
+    // SQLite-Gruppe an; bereits gespeicherte Punkte werden NICHT erneut geschrieben.
+    resetSearchBuffer(sessionIdRef.current ?? `local-search-${Date.now()}`);
     recordingRef.current = true; setRecording(true);
-    if (__DEV__) console.log('[searchRecorder] recording started');
+    if (__DEV__) console.log('[searchRecorder] recording started', { resume: !!resume, resumePts: resumePts.length });
     pushSnapshot();
   }, [pushSnapshot]);
 
   const stop = useCallback((): SearchResult => {
     recordingRef.current = false; setRecording(false);
+    // Letzten lokalen Persistenz-Puffer schreiben (best-effort, blockiert nicht).
+    void flushSearchPoints();
     const durationS = Math.floor((Date.now() - startMsRef.current) / 1000);
     return {
       points: pointsRef.current.slice(),

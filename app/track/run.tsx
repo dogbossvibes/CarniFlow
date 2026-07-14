@@ -13,7 +13,11 @@ import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSear
 import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { hapticSuccess, hapticTap } from '@/features/tracking/utils/haptics';
-import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
+import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
+import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
+import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
+import { getSearchPointsBySession, deleteSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import type { GpsStats } from '@/features/tracking/engine/types';
@@ -47,20 +51,28 @@ export default function TrackRunScreen() {
   useKeepAwake();   // Display während der Absuche anlassen (Bildschirm nicht sperren)
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
 
-  // Snapshot der gelegten Fährte EINMAL beim Betreten festhalten (stabil).
-  const [snap] = useState(() => {
+  // Snapshot der gelegten Fährte (aus dem Store — nach Recovery via restoreSearchSession
+  // befüllt). Wird nach der Recovery-Entscheidung EINMAL gesetzt und bleibt stabil.
+  const buildSnap = () => {
     const st = useTrackingStore.getState();
     const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
     return {
-      laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),                       // für die Karte
-      laidPoints: st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng })),             // für den Recorder
+      laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),
+      laidPoints: st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng })),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number }, index: i, material: m.material ?? '' })),
       laidMarkers: st.markers,
       level: 'training' as Level,
     };
-  });
+  };
+  type Snap = ReturnType<typeof buildSnap>;
 
-  const s = useSearchRecorder({ laidPoints: snap.laidPoints, laidObjects: snap.laidObjects, level: snap.level });
+  const [phase, setPhase] = useState<'checking' | 'ready'>('checking');
+  const [effectiveId, setEffectiveId] = useState<string | null>(id ?? null);
+  const [snap, setSnap] = useState<Snap | null>(null);
+  const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
+  const snapData: Snap = snap ?? { laidLatLng: [], laidPoints: [], laidObjects: [], laidMarkers: [], level: 'training' as Level };
+
+  const s = useSearchRecorder({ laidPoints: snapData.laidPoints, laidObjects: snapData.laidObjects, level: snapData.level, sessionId: effectiveId });
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
@@ -70,62 +82,170 @@ export default function TrackRunScreen() {
   const startedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
 
-  // Start GENAU EINMAL beim Betreten.
+  // 1) Beim Betreten entscheiden: frische Absuche oder unterbrochene fortsetzen (P2).
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-    hapticSuccess();   // Absuchen-Start sofort spürbar
-    s.start();
-    if (id) startTrackRun(id).then(({ data }) => { if (data) runIdRef.current = data.id; }).catch(() => {});
-  }, [s, id]);
+    let alive = true;
+    (async () => {
+      const pending = await loadPending();
+      if (!alive) return;
+      const decision = decideRecovery(pending);
+      if (decision.kind === 'recovery') {
+        useTrackingStore.getState().restoreSearchSession(decision.pending);   // laid + Metadaten in den (evtl. leeren) Store
+        setEffectiveId(decision.pending.sessionId ?? id ?? null);
+        runIdRef.current = decision.pending.runId ?? null;
+        setSnap(buildSnap());
+        setRecovery(decision.pending);   // → Dialog
+      } else {
+        setEffectiveId(id ?? null);
+        setSnap(buildSnap());
+      }
+      setPhase('ready');
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-  useEffect(() => { if (id) getTrackSessionDogName(id).then(r => { if (r.data) setDogName(r.data); }); }, [id]);
+  // 2) Frischer Start GENAU EINMAL — nur wenn KEIN Recovery-Dialog aussteht.
+  useEffect(() => {
+    if (phase !== 'ready' || startedRef.current || recovery || !snap) return;
+    startedRef.current = true;
+    hapticSuccess();
+    const startMs = Date.now();
+    s.start();
+    useTrackingStore.getState().startSearchSession(null, startMs);   // Status 'searching' sofort persistieren
+    if (effectiveId) {
+      startTrackRun(effectiveId).then(({ data }) => {
+        if (data) { runIdRef.current = data.id; useTrackingStore.getState().setSearchRunId(data.id); }
+      }).catch(() => {});
+    }
+  }, [phase, recovery, snap, s, effectiveId]);
+
+  useEffect(() => { if (effectiveId) getTrackSessionDogName(effectiveId).then(r => { if (r.data) setDogName(r.data); }); }, [effectiveId]);
+
+  // Bereits gespeicherte Suchpunkte laden (SQLite autoritativ, sonst Puffer-Fallback).
+  const loadSavedSearchPoints = async (pending: PendingTrack): Promise<TrackPointSample[]> => {
+    const sessId = pending.sessionId ?? effectiveId;
+    let saved: TrackPointSample[] = [];
+    if (sessId) {
+      const rows = await getSearchPointsBySession(sessId).catch(() => [] as any[]);
+      saved = rows.map(r => ({
+        lat: r.latitude, lng: r.longitude, accuracy: r.accuracy ?? null, altitude: r.altitude ?? null,
+        speed: r.speed ?? null, heading: null, t: Date.parse(r.timestamp) || Date.now(),
+      }));
+    }
+    if (saved.length === 0) saved = pending.searchPoints ?? [];
+    return dedupeSearchPoints(saved);
+  };
+
+  // 3) Recovery-Dialog: „Laufende Absuche fortsetzen?" (Fortsetzen/Beenden/Verwerfen).
+  const showRecoveryDialog = (pending: PendingTrack) => {
+    Alert.alert('Laufende Absuche fortsetzen?', 'Es wurde eine unterbrochene Absuche gefunden.', [
+      { text: 'Fortsetzen', onPress: () => void resumeSearch(pending) },
+      { text: 'Beenden',    onPress: () => void endSearch(pending) },
+      { text: 'Verwerfen', style: 'destructive', onPress: () => discardSearch(pending) },
+    ], { cancelable: false });
+  };
+  useEffect(() => { if (recovery) showRecoveryDialog(recovery); /* eslint-disable-next-line */ }, [recovery]);
+
+  // Fortsetzen: bestehenden Datensatz weiterverwenden (KEINE neue runId, keine Duplikate,
+  // Recorder genau einmal — resume seedet Punkte/Distanz/Timer).
+  const resumeSearch = async (pending: PendingTrack) => {
+    const saved = await loadSavedSearchPoints(pending);
+    useTrackingStore.getState().setSearchPoints(saved);
+    useTrackingStore.getState().setSessionStatus('searching');
+    runIdRef.current = pending.runId ?? null;
+    startedRef.current = true;   // verhindert den frischen Start-Effect
+    setRecovery(null);
+    hapticSuccess();
+    s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })), startedAtMs: pending.searchStartedAt ?? Date.now() });
+  };
+
+  // Beenden: vorhandene Suchpunkte speichern + Session sauber abschliessen.
+  const endSearch = async (pending: PendingTrack) => {
+    const saved = await loadSavedSearchPoints(pending);
+    await flushSearchPoints().catch(() => {});
+    const sessId = pending.sessionId ?? effectiveId;
+    const runId = pending.runId ?? runIdRef.current;
+    if (sessId && runId) {
+      await finishTrackRun(runId, sessId, {
+        durationSeconds: pending.searchStartedAt ? Math.max(0, Math.floor((Date.now() - pending.searchStartedAt) / 1000)) : 0,
+        distanceMeters: Math.round(pathDistanceM(saved)),
+        averageDeviationMeters: 0,
+        articlesFound: 0,
+        runPoints: saved.map(p => ({ lat: p.lat, lng: p.lng, t: p.t })),
+      }).catch(() => {});
+    }
+    startedRef.current = true;
+    setRecovery(null);
+    s.stop();
+    useTrackingStore.getState().setSessionStatus('completed');
+    useTrackingStore.getState().reset();
+    router.replace((sessId ? `/track/${sessId}` : '/track') as never);
+  };
+
+  // Verwerfen: NUR den Suchlauf löschen (gelegte Fährte bleibt), mit Bestätigung.
+  const discardSearch = (pending: PendingTrack) => {
+    Alert.alert('Absuche verwerfen?', 'Nur der Suchlauf wird gelöscht — die gelegte Fährte bleibt erhalten.', [
+      { text: 'Abbrechen', style: 'cancel', onPress: () => showRecoveryDialog(pending) },
+      { text: 'Verwerfen', style: 'destructive', onPress: async () => {
+        const sessId = pending.sessionId ?? effectiveId;
+        if (sessId) await deleteSearchPointsBySession(sessId).catch(() => {});
+        useTrackingStore.getState().resetSearchPoints();
+        useTrackingStore.getState().setSessionStatus('cancelled');
+        startedRef.current = false;   // erlaubt einen frischen Start (neue Absuche, neue runId)
+        setRecovery(null);
+      } },
+    ]);
+  };
 
   // Hundespur / Abriss / Position → Karten-Koordinaten ({lat,lng}).
   const runPoints = useMemo(() => s.points.map(p => ({ lat: p.latitude, lng: p.longitude })), [s.points]);
   const breakPts  = useMemo(() => s.breaks.map(b => ({ lat: b.at.latitude, lng: b.at.longitude })), [s.breaks]);
   const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
-  const mapMarkers: MapMarker[] = snap.laidMarkers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind }));
-  const winkel = snap.laidMarkers.filter(m => m.type === 'winkel').length;
+  const mapMarkers: MapMarker[] = snapData.laidMarkers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind }));
+  const winkel = snapData.laidMarkers.filter(m => m.type === 'winkel').length;
 
   // Sprachführung: gelegte Winkel/Spitzwinkel/Abriss „etwas voraus" ansagen.
   const guidanceAngles = useMemo<GuidanceAngle[]>(
-    () => snap.laidMarkers
+    () => snapData.laidMarkers
       .filter(m => m.type === 'winkel' && m.lat != null && m.lng != null)
       .map(m => ({ id: m.id, lat: m.lat as number, lng: m.lng as number, angleKind: m.angleKind })),
-    [snap.laidMarkers],
+    [snapData.laidMarkers],
   );
   useTrackVoiceGuidance(curPos, guidanceAngles, voiceOn);
 
   // Haptische Führung: 1× Vibration bei Gegenstand-Nähe, 2× bei Winkel voraus.
   const guidanceObjects = useMemo<GuidanceObject[]>(
-    () => snap.laidObjects.map(o => ({ id: `obj-${o.index}`, lat: o.at.latitude, lng: o.at.longitude })),
-    [snap.laidObjects],
+    () => snapData.laidObjects.map(o => ({ id: `obj-${o.index}`, lat: o.at.latitude, lng: o.at.longitude })),
+    [snapData.laidObjects],
   );
   useTrackHapticGuidance(curPos, guidanceAngles, guidanceObjects, true);
 
-  const hasLaid = snap.laidPoints.length > 1;
+  const hasLaid = snapData.laidPoints.length > 1;
   const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
   const devOff = devShown != null && devShown > 8;
 
   const handleCancel = () => {
     Alert.alert(t('track.abortTitle'), t('track.abortBody'), [
       { text: t('common.next'), style: 'cancel' },
-      { text: t('common.cancel'), style: 'destructive', onPress: () => { hapticTap(); s.stop(); useTrackingStore.getState().reset(); router.replace('/track' as never); } },
+      { text: t('common.cancel'), style: 'destructive', onPress: () => { hapticTap(); s.stop(); useTrackingStore.getState().setSessionStatus('cancelled'); useTrackingStore.getState().reset(); router.replace('/track' as never); } },
     ]);
   };
 
   const handleFinish = () => {
+    if (finishing) return;   // Doppelt-Tippen → keine doppelte Finalisierung
     Alert.alert(t('track.finishTitle'), t('track.finishBody'), [
       { text: t('track.keepSearching'), style: 'cancel' },
       { text: t('common.finish'), style: 'destructive', onPress: async () => {
         hapticSuccess();   // sofort beim Bestätigen, vor await
         setFinishing(true);
-        const res = s.stop();   // ← Search-Recorder beenden
+        const res = s.stop();   // ← Search-Recorder beenden (flusht letzten Puffer)
+        useTrackingStore.getState().setSessionStatus('completed');   // vor Navigation → kein Recovery mehr
         const runId = runIdRef.current;
-        if (id && runId) {
-          await finishTrackRun(runId, id, {
+        const sessId = effectiveId;
+        if (sessId && runId) {
+          await finishTrackRun(runId, sessId, {
             durationSeconds:        res.durationS,
             distanceMeters:         res.distanceM,
             averageDeviationMeters: res.deviationAvgM,
@@ -133,8 +253,9 @@ export default function TrackRunScreen() {
             runPoints:              res.points.map(p => ({ lat: p.latitude, lng: p.longitude, t: Date.now() })),
           }).catch(() => {});
         }
+        useTrackingStore.getState().reset();   // Pending leeren → Session gilt als abgeschlossen
         setFinishing(false);
-        router.replace((id ? `/track/${id}` : '/track') as never);
+        router.replace((sessId ? `/track/${sessId}` : '/track') as never);
       } },
     ]);
   };
@@ -197,7 +318,7 @@ export default function TrackRunScreen() {
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
           {view === 'map' ? (
             <TrackingMap
-              layPoints={snap.laidLatLng} dimLay
+              layPoints={snapData.laidLatLng} dimLay
               runPoints={runPoints} markers={mapMarkers} breaks={breakPts}
               currentPosition={curPos}
               follow={follow}
@@ -206,7 +327,7 @@ export default function TrackRunScreen() {
               controlsTop={64}
             />
           ) : (
-            <View className="flex-1 bg-[#08100e]"><TrackSketch points={snap.laidLatLng} angleMarkers={guidanceAngles} objectMarkers={guidanceObjects} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
+            <View className="flex-1 bg-[#08100e]"><TrackSketch points={snapData.laidLatLng} angleMarkers={guidanceAngles} objectMarkers={guidanceObjects} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
           )}
 
           {/* Timer (oben links) */}

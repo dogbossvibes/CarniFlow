@@ -25,6 +25,42 @@ export async function createLocalTrackPointsBatch(sessionLocalId: string, points
   });
 }
 
+// Absuche-Spur (P1) laufend als Batch persistieren. Nutzt DASSELBE Schema wie
+// die gelegte Spur, aber mit `point_type='search'` und gesetzter `session_remote_id`
+// (die Absuche läuft gegen die Remote-Session-ID). Die gelegte laid-Persistenz
+// (createLocalTrackPointsBatch) bleibt unangetastet. Keine DB-Migration.
+export async function createLocalSearchPointsBatch(sessionId: string, points: NewTrackPoint[]): Promise<void> {
+  if (points.length === 0) return;
+  const db = await getLocalDb();
+  const ts = nowIso();
+  await db.withTransactionAsync(async () => {
+    for (const p of points) {
+      await db.runAsync(
+        `insert into local_track_points (local_id, remote_id, session_local_id, session_remote_id, latitude, longitude, accuracy, altitude, speed, heading, timestamp, point_type, created_at, sync_status, payload_json)
+         values (?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'search', ?, 'pending', null)`,
+        newLocalId('pt'), sessionId, sessionId, p.latitude, p.longitude, p.accuracy ?? null, p.altitude ?? null,
+        p.speed ?? null, p.heading ?? null, p.timestamp ?? ts, ts,
+      );
+    }
+  });
+}
+
+// Absuche-Punkte einer Session laden (P2 nutzt das zum Wiederherstellen).
+export async function getSearchPointsBySession(sessionId: string): Promise<LocalTrackPoint[]> {
+  const db = await getLocalDb();
+  return db.getAllAsync<LocalTrackPoint>(
+    `select * from local_track_points where session_local_id=? and point_type='search' order by timestamp asc`,
+    sessionId,
+  );
+}
+
+// Nur die Absuche-Punkte einer Session löschen (P2 „Verwerfen"). Die gelegten
+// Punkte (point_type='lay') bleiben unberührt.
+export async function deleteSearchPointsBySession(sessionId: string): Promise<void> {
+  const db = await getLocalDb();
+  await db.runAsync(`delete from local_track_points where session_local_id=? and point_type='search'`, sessionId);
+}
+
 export interface NewTrackMarker {
   marker_type: string; material?: string | null; angle_kind?: string | null;
   latitude?: number | null; longitude?: number | null; accuracy?: number | null;
