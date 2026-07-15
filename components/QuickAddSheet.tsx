@@ -1,4 +1,5 @@
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -12,12 +13,13 @@ import { LiveTrainingBar } from '@/components/training/LiveTrainingBar';
 export function QuickAddSheet() {
   const router = useRouter();
   const active = useActiveTraining();
+  const insets = useSafeAreaInsets();
 
   if (active.unitId) return <LiveTrainingBar />;
 
   return (
     <TouchableOpacity
-      style={s.fab}
+      style={[s.fab, { bottom: 28 + (Platform.OS === 'android' ? insets.bottom : 0) }]}
       onPress={() => { tapHaptic(); router.push('/unit/start'); }}
       activeOpacity={0.85}
     >

@@ -1,4 +1,5 @@
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
@@ -62,6 +63,11 @@ export default function TabLayout() {
   const { isTrainerModule } = useCapabilities();
   const hubBadge = useHubBadge();
   const router = useRouter();
+  // System-Navigations-Inset (Gesten-Bar / 3-Button-Leiste). Bei aktivem
+  // Edge-to-Edge (Android 15) zeichnet die App hinter der Systemleiste — die
+  // Tab-Leiste muss ihre Höhe/Padding um dieses Inset erhöhen, damit Icons und
+  // Labels nicht verdeckt werden.
+  const insets = useSafeAreaInsets();
 
   // Push-Token registrieren, sobald eingeloggt (best-effort, nur Dev/Prod-Build).
   const uid = session?.user.id;
@@ -113,8 +119,8 @@ export default function TabLayout() {
           backgroundColor:   isGlass ? 'transparent' : 'rgba(10,10,10,0.80)',
           borderTopColor:    C.border,
           borderTopWidth:    isGlass ? 0 : 1,
-          height:            Platform.OS === 'ios' ? 88 : 66,
-          paddingBottom:     Platform.OS === 'ios' ? 28 : 10,
+          height:            Platform.OS === 'ios' ? 88 : 66 + insets.bottom,
+          paddingBottom:     Platform.OS === 'ios' ? 28 : 10 + insets.bottom,
           paddingTop:        10,
           paddingHorizontal: 8,
         },

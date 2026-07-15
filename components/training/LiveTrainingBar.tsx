@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -44,6 +45,7 @@ export function LiveTrainingBar() {
   const active = useActiveTraining();
   const { dogs } = useDogs();
   const minimized = useBarMinimized();
+  const insets = useSafeAreaInsets();
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -96,7 +98,7 @@ export function LiveTrainingBar() {
   const open = () => { tapHaptic(); router.push('/unit/live'); };
 
   return (
-    <View style={s.wrap} pointerEvents="box-none">
+    <View style={[s.wrap, { bottom: 28 + (Platform.OS === 'android' ? insets.bottom : 0) }]} pointerEvents="box-none">
       <Animated.View style={barStyle}>
         <Pressable onPress={open} style={({ pressed }) => [s.bar, { borderColor: `${farbe}40` }, pressed && { opacity: 0.9 }]}>
           <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />

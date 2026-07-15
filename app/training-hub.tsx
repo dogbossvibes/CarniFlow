@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -29,6 +29,7 @@ const ACCENT = '#00F5D4';
 
 export default function TrainingHubScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { session } = useSession();
   const uid = session?.user.id;
   const { events, loading, refresh } = useTrainingCalendar();
@@ -150,7 +151,7 @@ export default function TrainingHubScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <TouchableOpacity style={s.fab} onPress={() => setCreateOpen(true)} activeOpacity={0.9}>
+      <TouchableOpacity style={[s.fab, { bottom: 32 + (Platform.OS === 'android' ? insets.bottom : 0) }]} onPress={() => setCreateOpen(true)} activeOpacity={0.9}>
         <Ionicons name="add" size={30} color="#001210" />
       </TouchableOpacity>
 
