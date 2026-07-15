@@ -73,7 +73,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "ANYVO benötigt Zugriff auf deine Fotos, um Trainingsfotos und Hundefotos hinzuzufügen."
+          "photosPermission": "ANYVO benötigt Zugriff auf deine Fotos, um Trainingsfotos und Hundefotos hinzuzufügen.",
+          "cameraPermission": false
         }
       ],
       [
@@ -116,7 +117,14 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "ANYVO fügt deine Trainingstermine zu deinem Kalender hinzu."
+          "calendarPermission": "ANYVO fügt deine Trainingstermine zu deinem Kalender hinzu.",
+          "remindersPermission": false
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": false
         }
       ],
       [
@@ -132,7 +140,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "ANYVO nutzt Face ID, um die App zu entsperren."
+          "faceIDPermission": "Anyvo verwendet Face ID, um den Zugriff auf deine persönlichen Hunde- und Trainingsdaten zu schützen."
         }
       ],
       [
