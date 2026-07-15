@@ -3,7 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // RevenueCat-Webhook: macht Käufe SERVERSEITIG autoritativ.
 //  • Setzt Plan/Capabilities aus der Produkt-ID (kein Trust-the-Client mehr).
-//  • Founder: beansprucht den Slot atomar (max 77). Über-77-Kauf (Bypass der App)
+//  • Founder: beansprucht den Slot atomar via RPC claim_founder_slot (Limit =
+//    founder_slot_limit(), aktuell 11). Kauf über dem Limit (Bypass der App)
 //    → Downgrade auf „active". Slot wird bei EXPIRATION wieder freigegeben.
 // Auth: RevenueCat sendet einen frei konfigurierbaren Authorization-Header,
 //       der gegen RC_WEBHOOK_SECRET geprüft wird.

@@ -1,6 +1,6 @@
 -- ANYVO — Subscription V2 (4 Pläne + Founder). Idempotent, additiv.
 -- Pläne: beginner_trial | founder_active | active | trainer.
--- Founder Active ist ein EIGENER Plan (kein Rabatt), max. 77 Slots.
+-- Founder Active ist ein EIGENER Plan (kein Rabatt), max. 11 Slots (founder_slot_limit()).
 -- Runtime-Gating bleibt user_capabilities (pro_member/trainer_module); der Plan
 -- steuert diese (siehe features/subscription).
 
@@ -54,29 +54,37 @@ drop policy if exists "own founder slot" on public.founder_slots;
 create policy "own founder slot" on public.founder_slots for select to authenticated
   using (user_id = auth.uid());
 
--- ── Founder-Slot atomar beanspruchen (max 77) ───────────────
+-- ── Founder-Limit (EINZIGE Quelle der Wahrheit serverseitig) ─
+-- Ehemals 77, seit dem Founder-Relaunch auf 11 begrenzt. Bestehende Founder
+-- (Zeilen in founder_slots) bleiben unberührt; nur NEUE Claims werden begrenzt.
+-- Client (app/premium.tsx → FOUNDER_SLOT_LIMIT) muss denselben Wert spiegeln.
+create or replace function public.founder_slot_limit()
+returns int language sql immutable as $$ select 11 $$;
+
+-- ── Founder-Slot atomar beanspruchen (max = founder_slot_limit) ─
 create or replace function public.claim_founder_slot(p_user_id uuid)
 returns table(success boolean, slots_used int, slots_remaining int)
 language plpgsql security definer set search_path = public as $$
-declare v_count int; v_existing int;
+declare v_count int; v_existing int; v_limit int := founder_slot_limit();
 begin
-  -- Serialisiert konkurrierende Claims (verhindert >77 bei Race Conditions).
+  -- Serialisiert konkurrierende Claims (verhindert Überbuchung bei Race Conditions).
   perform pg_advisory_xact_lock(770077);
 
+  -- Bestehender Founder → behält seinen Slot, unabhängig vom aktuellen Limit.
   select count(*) into v_existing from founder_slots where user_id = p_user_id;
   if v_existing > 0 then
     select count(*) into v_count from founder_slots;
-    return query select true, v_count, greatest(0, 77 - v_count); return;
+    return query select true, v_count, greatest(0, v_limit - v_count); return;
   end if;
 
   select count(*) into v_count from founder_slots;
-  if v_count >= 77 then
+  if v_count >= v_limit then
     return query select false, v_count, 0; return;
   end if;
 
   insert into founder_slots(user_id) values (p_user_id);
   v_count := v_count + 1;
-  return query select true, v_count, greatest(0, 77 - v_count);
+  return query select true, v_count, greatest(0, v_limit - v_count);
 end; $$;
 grant execute on function public.claim_founder_slot(uuid) to authenticated;
 
@@ -84,6 +92,6 @@ grant execute on function public.claim_founder_slot(uuid) to authenticated;
 create or replace function public.founder_slots_status()
 returns table(slots_used int, slots_remaining int)
 language sql security definer set search_path = public stable as $$
-  select count(*)::int, greatest(0, 77 - count(*))::int from founder_slots;
+  select count(*)::int, greatest(0, founder_slot_limit() - count(*))::int from founder_slots;
 $$;
 grant execute on function public.founder_slots_status() to authenticated;

@@ -14,14 +14,17 @@ import { getPackages, buyPackage, restorePurchases, purchasesReady, type Purchas
 import {
   activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
-import { PLAN_META, type SubscriptionPlan } from '@/features/subscription/plans';
+import { PLAN_META, FOUNDER_SLOT_LIMIT, type SubscriptionPlan } from '@/features/subscription/plans';
+
+// Anzeige-Text, wenn das Founder-Kontingent erschöpft ist (Server = Quelle der Wahrheit).
+const FOUNDER_SOLD_OUT_MSG = 'Founder Edition ist leider ausverkauft.';
 import { useAccess } from '@/hooks/useAccess';
 
 interface CardDef { plan: SubscriptionPlan; badge?: string; features: string[]; founder?: boolean }
 
 const CARDS: CardDef[] = [
   { plan: 'beginner_trial', badge: 'Start', features: ['7 Tage kostenlos', 'Alle Active-Funktionen', 'Danach Active CHF 6.00/Mt.', 'Kein Trainerzugang'] },
-  { plan: 'founder_active', badge: 'Nur 77×', founder: true, features: ['Dauerhaft CHF 4.00/Mt.', 'Solange das Abo aktiv bleibt', 'Alle Active-Funktionen', 'Kein Trainerzugang'] },
+  { plan: 'founder_active', badge: `Nur ${FOUNDER_SLOT_LIMIT}×`, founder: true, features: ['Dauerhaft CHF 4.00/Mt.', 'Solange das Abo aktiv bleibt', 'Alle Active-Funktionen', 'Kein Trainerzugang'] },
   { plan: 'active', features: ['Training, Hunde, Fortschritt', 'Smart Auswertung', 'Kalender & Sprachnotizen', 'Kein Trainerzugang'] },
   { plan: 'trainer', badge: 'Profi', features: ['Alles aus Active', 'Kundenverwaltung & Pläne', 'Umfragen & Feedback', 'Trainer-Dashboard'] },
 ];
@@ -32,7 +35,7 @@ export default function PremiumScreen() {
   const router = useRouter();
   const [laden, setLaden] = useState<SubscriptionPlan | null>(null);
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
-  const [slots, setSlots] = useState<{ used: number; remaining: number }>({ used: 0, remaining: 77 });
+  const [slots, setSlots] = useState<{ used: number; remaining: number }>({ used: 0, remaining: FOUNDER_SLOT_LIMIT });
   const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
   const [subStatus, setSubStatus] = useState<string | null>(null);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
@@ -94,8 +97,8 @@ export default function PremiumScreen() {
       // Founder: zuerst Slot atomar beanspruchen.
       if (plan === 'founder_active') {
         const claim = await claimFounderSlot();
-        setSlots(s => ({ used: claim.remaining != null ? 77 - claim.remaining : s.used, remaining: claim.remaining }));
-        if (!claim.ok) { Alert.alert('Founder Active', claim.error === 'Founder offer sold out' ? 'Das Founder-Angebot ist leider ausverkauft.' : (claim.error ?? 'Nicht verfügbar.')); return; }
+        setSlots(s => ({ used: claim.remaining != null ? FOUNDER_SLOT_LIMIT - claim.remaining : s.used, remaining: claim.remaining }));
+        if (!claim.ok) { Alert.alert('Founder Active', claim.error === 'Founder offer sold out' ? FOUNDER_SOLD_OUT_MSG : (claim.error ?? 'Nicht verfügbar.')); return; }
       }
       const meta = PLAN_META[plan];
       if (iapReady) {
@@ -244,7 +247,7 @@ export default function PremiumScreen() {
                     {/* Ersparnis ggü. Active hervorheben (Conversion-Anker für Trial-Nutzer). */}
                     {card.founder && founderAvailable && <Text style={S.savings}>statt {activePriceStr}</Text>}
                   </View>
-                  {card.founder && <Text style={S.founderSlots}>{founderAvailable ? `Noch ${slots.remaining} von 77` : 'Ausverkauft'}</Text>}
+                  {card.founder && <Text style={S.founderSlots}>{founderAvailable ? `Noch ${slots.remaining} von ${FOUNDER_SLOT_LIMIT}` : 'Ausverkauft'}</Text>}
                 </View>
               </View>
 
@@ -260,7 +263,7 @@ export default function PremiumScreen() {
               {isCurrent ? (
                 <View style={S.currentTag}><Ionicons name="checkmark" size={15} color={C.accent} /><Text style={S.currentTxt}>Aktiv</Text></View>
               ) : soldOut ? (
-                <View style={S.soldOut}><Text style={S.soldOutTxt}>Ausverkauft</Text></View>
+                <View style={S.soldOut}><Text style={S.soldOutTxt}>{FOUNDER_SOLD_OUT_MSG}</Text></View>
               ) : (
                 <AnimatedPressable style={[S.cta, !filled && S.ctaAlt]} scale={0.97} onPress={() => choose(card.plan)} disabled={busy}>
                   {filled && <LinearGradient colors={['#00FFCC', '#00f0c8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}

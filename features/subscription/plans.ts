@@ -5,6 +5,12 @@
 export type SubscriptionPlan = 'beginner_trial' | 'founder_active' | 'active' | 'trainer';
 export type SubscriptionStatus = 'trialing' | 'active' | 'expired' | 'cancelled' | 'past_due';
 
+// Maximale Anzahl Founder-Active-Slots (Anzeige/Client). Ehemals 77, seit dem
+// Founder-Relaunch 11. Die AUTORITATIVE, race-sichere Prüfung erfolgt serverseitig
+// in der RPC public.claim_founder_slot() (Postgres, pg_advisory_xact_lock). Dieser
+// Wert MUSS mit public.founder_slot_limit() in SUBSCRIPTION_V2_SETUP.sql übereinstimmen.
+export const FOUNDER_SLOT_LIMIT = 11;
+
 export type Capability =
   | 'training.create' | 'training.analytics' | 'dogs.manage' | 'ai.feedback'
   | 'calendar.use' | 'voice.notes'

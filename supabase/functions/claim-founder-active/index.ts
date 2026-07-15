@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Beansprucht einen Founder-Slot für den eingeloggten User (max. 77, atomar via RPC).
+// Beansprucht einen Founder-Slot für den eingeloggten User (Limit = founder_slot_limit(),
+// aktuell 11; atomar & race-sicher via RPC claim_founder_slot).
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 

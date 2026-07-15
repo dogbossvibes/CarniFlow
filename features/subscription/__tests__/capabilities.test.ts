@@ -1,7 +1,7 @@
 // Tests für das Subscription-/Capability-Modell (jest-expo, `npm test`).
 import {
   hasCapability, planToCapabilities, isTrainerPlan, planOfProduct,
-  ACTIVE_CAPABILITIES, TRAINER_CAPABILITIES, PRODUCT_IDS,
+  ACTIVE_CAPABILITIES, TRAINER_CAPABILITIES, PRODUCT_IDS, FOUNDER_SLOT_LIMIT,
   type SubscriptionPlan,
 } from '@/features/subscription/plans';
 
@@ -59,9 +59,16 @@ describe('planOfProduct / isTrainerPlan', () => {
   });
 });
 
-// Hinweis Founder-Limit (77) + Founder→Trainer-Upgrade:
-// - Das 77er-Limit wird serverseitig in der RPC claim_founder_slot erzwungen
-//   (pg_advisory_xact_lock + count < 77). Der 78. Claim liefert success=false.
+// Hinweis Founder-Limit (11) + Founder→Trainer-Upgrade:
+// - Das Limit (FOUNDER_SLOT_LIMIT, aktuell 11) wird AUTORITATIV serverseitig in der
+//   RPC claim_founder_slot erzwungen (pg_advisory_xact_lock + count < founder_slot_limit()).
+//   Der (limit+1)-te Claim liefert success=false. Bestehende Founder behalten ihren Slot.
 // - Founder→Trainer: activatePlan('trainer') setzt trainer_module=true und den
 //   Trainer-Preis (Product anyvo_trainer_monthly_2990); der Founder-Slot bleibt
 //   bestehen, der Plan wechselt aber auf 'trainer'.
+
+describe('Founder-Limit', () => {
+  it('FOUNDER_SLOT_LIMIT ist 11 (Client-Spiegel des Server-Limits)', () => {
+    expect(FOUNDER_SLOT_LIMIT).toBe(11);
+  });
+});
