@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 
 // Wiederverwendbares Datums-/Zeitfeld: tippen öffnet den nativen Picker
-// (Android = Dialog, iOS = Inline). Kein manuelles Tippen. CH-Format.
+// (Android = Dialog, iOS = Spinner mit Tag·Monat·Jahr). Kein manuelles Tippen. CH-Format.
 function fmtDate(d: Date): string {
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
@@ -60,7 +60,7 @@ export function DateField({
       {Platform.OS === 'ios' && showIOS && (
         <View style={s.iosWrap}>
           <DateTimePicker
-            value={value ?? new Date()} mode={mode} display={isTime ? 'spinner' : 'inline'}
+            value={value ?? new Date()} mode={mode} display="spinner"
             is24Hour maximumDate={maximumDate} minimumDate={minimumDate} themeVariant="dark"
             onChange={(_e, d) => { if (d) onChange(d); }}
             style={{ alignSelf: 'stretch' }}
