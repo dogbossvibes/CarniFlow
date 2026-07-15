@@ -1,98 +1,119 @@
+import { useCallback } from 'react';
 import { useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { deCH, type TranslationKey } from './de-CH';
-import { deDE } from './de-DE';
-import { gswCH } from './gsw-CH';
+import i18n, {
+  type AppLocale,
+  APP_LOCALES,
+  normalizeLocale,
+  detectDeviceLocale,
+} from './config';
+import type { TranslationKey as BaseKey } from './de-CH';
 
-// ── Minimales, package-freies i18n für Anyvo ──
-// Reaktiver globaler Store (useSyncExternalStore), persistiert per AsyncStorage.
-// Kein neues Package. Muster analog stores/homeLayout.ts.
+// ── Öffentliche i18n-API für Anyvo (react-i18next-basiert) ──
+// Rückwärtskompatibel: useT()/translate()/getLocale() bleiben erhalten, damit
+// bestehende Consumer unverändert weiterlaufen.
 
-export type Locale = 'de-CH' | 'de-DE' | 'gsw-CH';
-export type { TranslationKey };
+export type { AppLocale };
+export { detectDeviceLocale, normalizeLocale } from './config';
+export type LanguagePreference = 'auto' | AppLocale;
 
-// Standard, wenn nichts gewählt ist.
-export const DEFAULT_LOCALE: Locale = 'de-CH';
+// Plural-Referenzkeys (nicht Teil des Basis-Dictionaries).
+export type PluralKey = 'trainingCount' | 'minuteCount' | 'articleCount';
+export type TranslationKey = BaseKey | PluralKey;
 
-// Auswahl-Metadaten für den Sprach-Screen (Reihenfolge = Anzeige-Reihenfolge).
-export const LOCALES: { code: Locale; label: string; hint: string }[] = [
-  { code: 'de-CH',  label: 'Deutsch Schweiz',     hint: 'Standard · ss-Schreibweise' },
-  { code: 'gsw-CH', label: 'Schweizerdeutsch',    hint: 'Mundart · neutral & app-tauglich' },
-  { code: 'de-DE',  label: 'Deutsch Deutschland', hint: 'ß-Schreibweise' },
-];
+// Kompat-Alias für Altimporte.
+export type Locale = AppLocale;
 
-const DICTS: Record<Locale, Partial<Record<TranslationKey, string>>> = {
-  'de-CH':  deCH,
-  'de-DE':  deDE,
-  'gsw-CH': gswCH,
-};
-
-// Fallback-Ketten. Reihenfolge gemäss Vorgabe: gsw-CH → de-CH → de-DE.
-// de-CH ist das vollständige Basis-Dictionary und deckt praktisch alles ab.
-const FALLBACK: Record<Locale, Locale[]> = {
-  'gsw-CH': ['gsw-CH', 'de-CH', 'de-DE'],
-  'de-CH':  ['de-CH', 'de-DE'],
-  'de-DE':  ['de-DE', 'de-CH'],
+// Native Sprachnamen (in ihrer eigenen Sprache dargestellt).
+export const NATIVE_NAME: Record<AppLocale, string> = {
+  de:  'Deutsch',
+  gsw: 'Schwiizerdütsch',
+  fr:  'Français',
 };
 
 const STORAGE_KEY = 'app_locale';
-const VALID: Locale[] = ['de-CH', 'de-DE', 'gsw-CH'];
 
-let current: Locale = DEFAULT_LOCALE;
+// ── Preference-Store (Quelle der Wahrheit für die Auswahl) ──
+let preference: LanguagePreference = 'auto';
 const listeners = new Set<() => void>();
 function emit() { for (const l of listeners) l(); }
+function subscribe(cb: () => void) { listeners.add(cb); return () => listeners.delete(cb); }
+function getPreferenceSnapshot() { return preference; }
 
-// Optionaler Remote-Persister (Profil-Sync). Wird von services/localeSync.ts
-// registriert — nur wenn LOCALE_SYNC_ENABLED aktiv ist. Bis dahin: kein Effekt.
-let remotePersist: ((l: Locale) => void) | null = null;
-export function setRemotePersist(fn: ((l: Locale) => void) | null) { remotePersist = fn; }
+// Optionaler Remote-Persister (Profil-Sync, via services/localeSync.ts).
+let remotePersist: ((l: AppLocale) => void) | null = null;
+export function setRemotePersist(fn: ((l: AppLocale) => void) | null) { remotePersist = fn; }
 
-// Einmaliges Hydrieren aus AsyncStorage beim ersten Import.
+function resolve(pref: LanguagePreference): AppLocale {
+  return pref === 'auto' ? detectDeviceLocale() : pref;
+}
+
+// Legacy-/neue Speicherwerte auf eine gültige Preference normalisieren.
+// 'auto' bleibt 'auto'; 'de-CH'/'de-DE'/'de' → 'de'; 'gsw-CH'/'gsw' → 'gsw'; 'fr*' → 'fr'.
+function parseStoredPreference(raw: string): LanguagePreference {
+  if (raw === 'auto') return 'auto';
+  return normalizeLocale(raw);
+}
+
+function applyPreference(pref: LanguagePreference, opts: { persist?: boolean; remote?: boolean } = {}) {
+  const { persist = true, remote = true } = opts;
+  preference = pref;
+  const resolved = resolve(pref);
+  if (i18n.language !== resolved) i18n.changeLanguage(resolved);
+  emit();
+  if (persist) AsyncStorage.setItem(STORAGE_KEY, pref).catch(() => { /* best-effort */ });
+  if (remote) remotePersist?.(resolved);
+}
+
+// Einmaliges Hydrieren aus AsyncStorage. Bis dahin gilt die Gerätesprache
+// (in config.ts als Startsprache gesetzt) — entspricht „Automatisch".
 AsyncStorage.getItem(STORAGE_KEY)
   .then(raw => {
-    if (raw && (VALID as string[]).includes(raw)) { current = raw as Locale; emit(); }
+    if (raw) applyPreference(parseStoredPreference(raw), { persist: false, remote: false });
   })
-  .catch(() => { /* Default behalten */ });
+  .catch(() => { /* Gerätesprache behalten */ });
 
-export function getLocale(): Locale { return current; }
+// ── Öffentliche Funktionen ──
 
-export function setLocale(locale: Locale) {
-  if (!VALID.includes(locale) || locale === current) return;
-  current = locale;
-  emit();
-  AsyncStorage.setItem(STORAGE_KEY, locale).catch(() => { /* best-effort */ });
-  remotePersist?.(locale);
+// Aktuell aufgelöste Sprache (für Nicht-React-Code).
+export function getLocale(): AppLocale { return i18n.language as AppLocale; }
+
+// Aktuelle Auswahl-Preference.
+export function getPreference(): LanguagePreference { return preference; }
+
+// Manuelle Auswahl (überschreibt Automatisch), persistiert lokal + remote.
+export function setPreference(pref: LanguagePreference) {
+  if (pref !== 'auto' && !APP_LOCALES.includes(pref)) return;
+  applyPreference(pref, { persist: true, remote: true });
 }
 
-// Sprache aus dem Profil übernehmen (Remote → App), OHNE erneut remote zu
-// schreiben (verhindert Sync-Loop). Nutzt localeSync beim Login.
-export function applyRemoteLocale(locale: Locale) {
-  if (!VALID.includes(locale) || locale === current) return;
-  current = locale;
-  emit();
-  AsyncStorage.setItem(STORAGE_KEY, locale).catch(() => { /* best-effort */ });
+// Aus dem Profil übernommene Sprache (Remote → App), OHNE Rück-Sync (kein Loop).
+export function applyRemoteLocale(raw: string) {
+  applyPreference(normalizeLocale(raw), { persist: true, remote: false });
 }
 
-// Kern-Übersetzung: erste Sprache der Fallback-Kette, die den Key kennt.
-// Ohne Treffer wird der Key selbst zurückgegeben (nie „leer" oder Absturz).
-// Optionale Platzhalter: t('x.y', { dog: 'Rex' }) ersetzt {dog} im Text.
-export function translate(key: TranslationKey, params?: Record<string, string | number>, locale: Locale = current): string {
-  let out = key as string;
-  for (const loc of FALLBACK[locale]) {
-    const val = DICTS[loc][key];
-    if (val != null) { out = val; break; }
-  }
-  if (params) for (const [k, v] of Object.entries(params)) out = out.replace(`{${k}}`, String(v));
-  return out;
+// Kern-Übersetzung ausserhalb von React. Fehlender Key → de-Fallback (nie leer/Key/Crash).
+export function translate(
+  key: TranslationKey,
+  params?: Record<string, string | number>,
+  locale?: AppLocale,
+): string {
+  return i18n.t(key, { lng: locale, ...(params ?? {}) }) as string;
 }
 
-function subscribe(cb: () => void) { listeners.add(cb); return () => listeners.delete(cb); }
-function getSnapshot() { return current; }
-
-// Reaktiver Hook: liefert `t` (an aktuelle Sprache gebunden) + aktuelle `locale`.
-// Komponenten re-rendern automatisch, wenn die Sprache gewechselt wird.
+// Reaktiver Hook: `t` (an aktuelle Sprache gebunden) + Locale + Preference.
 export function useT() {
-  const locale = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  const t = (key: TranslationKey, params?: Record<string, string | number>) => translate(key, params, locale);
-  return { t, locale, setLocale };
+  const { t: i18t } = useTranslation();
+  const pref = useSyncExternalStore(subscribe, getPreferenceSnapshot, getPreferenceSnapshot);
+  const t = useCallback(
+    (key: TranslationKey, params?: Record<string, string | number>) => i18t(key, params) as string,
+    [i18t],
+  );
+  return {
+    t,
+    locale: i18n.language as AppLocale,
+    preference: pref,
+    setPreference,
+  };
 }

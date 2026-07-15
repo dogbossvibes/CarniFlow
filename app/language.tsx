@@ -1,23 +1,34 @@
 import { C } from '@/constants/colors';
-import { LOCALES, useT, type Locale, type TranslationKey } from '@/i18n';
+import {
+  NATIVE_NAME, detectDeviceLocale, useT,
+  type AppLocale, type LanguagePreference,
+} from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Sprach-Name je Locale übersetzt anzeigen (z. B. „Schwiizerdütsch" im gsw-Modus).
-const NAME_KEY: Record<Locale, TranslationKey> = {
-  'de-CH':  'language.optDeCH',
-  'gsw-CH': 'language.optGswCH',
-  'de-DE':  'language.optDeDE',
+// „Automatisch"-Label je aktueller Sprache (proper nouns bleiben nativ).
+const AUTO_LABEL: Record<AppLocale, string> = {
+  de:  'Automatisch',
+  gsw: 'Automatisch',
+  fr:  'Automatique',
 };
 
-// Sprach-Auswahl. Der Screen selbst nutzt bereits i18n und aktualisiert sich
-// beim Umschalten sofort (reaktiver Store). Auswahl wird lokal (AsyncStorage)
-// gespeichert; Standard bleibt Deutsch Schweiz.
+// Sprach-Auswahl. Optionen: Automatisch, Deutsch, Schwiizerdütsch, Français.
+// Der Screen nutzt bereits i18n und aktualisiert sich beim Umschalten sofort.
+// Auswahl wird lokal (AsyncStorage) gespeichert + optional ins Profil gesynct.
 export default function LanguageScreen() {
   const router = useRouter();
-  const { t, locale, setLocale } = useT();
+  const { t, locale, preference, setPreference } = useT();
+
+  const detected = detectDeviceLocale();
+  const OPTIONS: { pref: LanguagePreference; label: string; hint: string }[] = [
+    { pref: 'auto', label: AUTO_LABEL[locale], hint: NATIVE_NAME[detected] },
+    { pref: 'de',   label: NATIVE_NAME.de,  hint: 'Standard' },
+    { pref: 'gsw',  label: NATIVE_NAME.gsw, hint: 'Mundart' },
+    { pref: 'fr',   label: NATIVE_NAME.fr,  hint: 'Suisse romande' },
+  ];
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -35,18 +46,19 @@ export default function LanguageScreen() {
         <Text style={s.intro}>{t('language.subtitle')}</Text>
 
         <View style={s.karte}>
-          {LOCALES.map((opt, i) => {
-            const active = opt.code === locale;
+          {OPTIONS.map((opt, i) => {
+            const active = opt.pref === preference;
+            const sub = opt.pref === 'auto' ? `${AUTO_LABEL[locale]} · ${NATIVE_NAME[detected]}` : opt.hint;
             return (
               <TouchableOpacity
-                key={opt.code}
-                style={[s.zeile, i < LOCALES.length - 1 && s.zeileTrenner]}
-                onPress={() => setLocale(opt.code)}
+                key={opt.pref}
+                style={[s.zeile, i < OPTIONS.length - 1 && s.zeileTrenner]}
+                onPress={() => setPreference(opt.pref)}
                 activeOpacity={0.7}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={s.zeileLabel}>{t(NAME_KEY[opt.code])}</Text>
-                  <Text style={s.zeileSub}>{opt.hint}</Text>
+                  <Text style={s.zeileLabel}>{opt.label}</Text>
+                  <Text style={s.zeileSub}>{active && opt.pref === 'auto' ? sub : opt.hint}</Text>
                 </View>
                 {active
                   ? <Ionicons name="checkmark-circle" size={22} color={C.accent} />

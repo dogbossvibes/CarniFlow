@@ -26,7 +26,7 @@ import type { TrainerUmfrage } from "@/types/umfrage";
 import { supabase } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { ALLE_SPARTEN, DEFAULT_SPARTEN } from "@/constants/sparten";
-import { useT } from "@/i18n";
+import { useT, NATIVE_NAME } from "@/i18n";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -95,8 +95,7 @@ export default function ProfilScreen() {
   };
 
   const { t, locale } = useT();
-  const SPRACHE_KEY = { 'de-CH': 'language.optDeCH', 'gsw-CH': 'language.optGswCH', 'de-DE': 'language.optDeDE' } as const;
-  const spracheLabel = t(SPRACHE_KEY[locale]);
+  const spracheLabel = NATIVE_NAME[locale];
 
   const benachrichtigungen = useNotificationSetting(user?.id);
   const crashReporting = useCrashReporting();
