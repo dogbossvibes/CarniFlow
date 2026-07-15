@@ -21,6 +21,9 @@ export interface PendingTrack {
   status?:           SessionStatus;        // Session-Status; fehlt bei Legacy → nicht 'searching'
   searchStartedAt?:  number | null;        // ms: Start der Absuche (Timer-Fortsetzung)
   searchUpdatedAt?:  number | null;        // ms: letzter akzeptierter Suchpunkt
+  // ── P3: Liegezeit (zeitstempelbasiert) ──
+  layStartedAt?:     number | null;        // ms: Start der Liegezeit (= Lege-Ende)
+  layUpdatedAt?:     number | null;        // ms: letzte relevante Aktualisierung
 }
 
 let timer: ReturnType<typeof setTimeout> | null = null;

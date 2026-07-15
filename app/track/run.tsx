@@ -18,6 +18,7 @@ import { loadPending, type PendingTrack } from '@/features/tracking/store/trackP
 import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
 import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
 import { getSearchPointsBySession, deleteSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
+import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import type { GpsStats } from '@/features/tracking/engine/types';
@@ -81,6 +82,9 @@ export default function TrackRunScreen() {
   const [finishing, setFinishing] = useState(false);
   const startedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
+
+  // P4: Beim Betreten der Absuche ist die Liegezeit vorbei → System-Anzeige entfernen.
+  useEffect(() => { void endLiegezeitNotification(); }, []);
 
   // 1) Beim Betreten entscheiden: frische Absuche oder unterbrochene fortsetzen (P2).
   useEffect(() => {

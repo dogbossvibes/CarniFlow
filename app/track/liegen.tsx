@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, AppState, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { loadPending } from '@/features/tracking/store/trackPersist';
+import { restingElapsedSeconds, isRestingRecovery } from '@/features/tracking/store/restingTime';
+import { startLiegezeitNotification, updateLiegezeitNotification, endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 
 // Liegezeit als h:mm:ss (ab 1 h) bzw. mm:ss — die Fährte kann Stunden reifen.
@@ -36,11 +38,15 @@ export default function TrackLiegenScreen() {
   const { t } = useT();
   useKeepAwake();   // Timer/Anzeige während der Liegezeit anlassen (Bildschirm nicht sperren)
 
-  // Store hat die gelegte Fährte noch → sofort nutzen. Sonst (App wurde in der
+  const navigation = useNavigation();
+  const allowLeaveRef = useRef(false);   // true ⇒ erlaubte Navigation (Absuche / bestätigt) — kein Abbruch-Dialog
+
+  // Store hat die gelegte Fährte noch → sofort die zeitstempelbasierte Liegezeit-
+  // Basis (layStartedAt, Fallback layFinishedAt) nutzen. Sonst (App wurde in der
   // Liegezeit gekillt) unten aus dem Offline-Puffer wiederherstellen.
-  const hasStore = useTrackingStore.getState().trackPoints.length > 0;
+  const hasStore = useTrackingStore.getState().trackPoints.length > 0 || useTrackingStore.getState().layStartedAt != null;
   const [startMs, setStartMs] = useState<number | null>(() =>
-    hasStore ? (useTrackingStore.getState().layFinishedAt ?? Date.now()) : null);
+    hasStore ? (useTrackingStore.getState().layStartedAt ?? useTrackingStore.getState().layFinishedAt ?? Date.now()) : null);
   const [now, setNow] = useState(Date.now());
   const [dogName, setDogName] = useState('Hund');
   const [starting, setStarting] = useState(false);
@@ -48,17 +54,17 @@ export default function TrackLiegenScreen() {
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(() =>
     hasStore ? summarize(useTrackingStore.getState()) : null);
 
-  // Wiederherstellung nach App-Kill in der Liegezeit: gelegte Fährte + Liegezeit-
-  // Start aus dem Offline-Puffer zurück in den Store spielen, damit die Absuche
-  // sie snapshotten kann und der Timer korrekt weiterläuft.
+  // Recovery nach App-Kill in der Liegezeit: nur bei status='resting' (bzw. Legacy
+  // mit gelegten Punkten) die gelegte Fährte + Liegezeit-Start OHNE neue Session/
+  // Timer zurückspielen. Zeit wird weiter aus Zeitstempeln berechnet.
   useEffect(() => {
     if (startMs != null) return;   // Store hatte die Daten → nichts wiederherzustellen
     let alive = true;
     loadPending().then(p => {
       if (!alive) return;
-      if (p && p.trackPoints.length > 0) {
-        useTrackingStore.getState().restorePending(p);
-        setStartMs(p.layFinishedAt ?? Date.now());
+      if (p && (isRestingRecovery(p) || p.trackPoints.length > 0)) {
+        useTrackingStore.getState().restorePending(p);   // KEINE neue sessionId, Status bleibt
+        setStartMs(p.layStartedAt ?? p.layFinishedAt ?? Date.now());
         setSummary(summarize(p));
       } else {
         setStartMs(Date.now());   // nichts wiederherstellbar → Timer ab jetzt
@@ -68,34 +74,85 @@ export default function TrackLiegenScreen() {
     return () => { alive = false; };
   }, [startMs]);
 
+  // EIN Interval nur für die Anzeige (keine Zähllogik). Zeit kommt aus Date.now().
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const iv = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(iv);
   }, []);
+
+  // AppState: bei Rückkehr in den Vordergrund SOFORT aus Date.now() neu berechnen
+  // (JS-Timer kann im Hintergrund pausiert haben) und die System-Anzeige auffrischen.
+  // Kein zweites Interval.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active') return;
+      setNow(Date.now());
+      if (startMs != null && useTrackingStore.getState().sessionStatus === 'resting') {
+        void updateLiegezeitNotification({ sessionId: id ?? useTrackingStore.getState().currentSessionId, dogName, startedAt: startMs });
+      }
+    });
+    return () => sub.remove();
+  }, [startMs, dogName, id]);
 
   useEffect(() => { if (id) getTrackSessionDogName(id).then(r => { if (r.data) setDogName(r.data); }); }, [id]);
 
-  const elapsedS = startMs != null ? Math.max(0, Math.floor((now - startMs) / 1000)) : 0;
+  // P4: systemnahe Liegezeit-Anzeige (Android-Notification / iOS Live Activity) starten,
+  // solange status='resting'. Kein GPS/Standort. Beendet wird sie bei Absuche/Abbruch.
+  const sessionStatus = useTrackingStore(s => s.sessionStatus);
+  useEffect(() => {
+    if (startMs == null || sessionStatus !== 'resting') return;
+    void startLiegezeitNotification({ sessionId: id ?? useTrackingStore.getState().currentSessionId, dogName, startedAt: startMs });
+  }, [startMs, sessionStatus, dogName, id]);
+
+  const elapsedS = restingElapsedSeconds(startMs, now);
 
   const startSearch = async () => {
     if (starting || startMs == null) return;   // erst starten, wenn Liegezeit-Start feststeht
     setStarting(true);
+    allowLeaveRef.current = true;   // beabsichtigte Navigation → kein Abbruch-Dialog
+    void endLiegezeitNotification();   // Liegezeit-Anzeige entfernen (Übergang → searching)
     const minutes = Math.max(0, Math.round((Date.now() - startMs) / 60000));
     if (id) await setTrackLyingTime(id, minutes).catch(() => {});
     router.replace((id ? `/track/run?id=${id}` : '/track') as never);
   };
 
-  const cancel = () => {
-    useTrackingStore.getState().reset();
-    router.replace('/track' as never);
+  // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
+  const confirmCancel = (action: unknown) => {
+    Alert.alert('Fährte abbrechen?', 'Die gelegte Fährte bleibt lokal gespeichert. Nur die Liegezeit wird beendet.', [
+      { text: 'Nein', style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
+      { text: 'Ja, abbrechen', style: 'destructive', onPress: () => {
+        useTrackingStore.getState().setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
+        void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
+        allowLeaveRef.current = true;
+        // @ts-expect-error react-navigation action aus dem beforeRemove-Event
+        navigation.dispatch(action);
+      } },
+    ]);
   };
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', (e: any) => {
+      if (allowLeaveRef.current) return;   // erlaubte Navigation → durchlassen
+      e.preventDefault();                   // Standard-Back/Swipe/Header-Back blocken
+      Alert.alert(
+        'Liegezeit läuft',
+        'Die Liegezeit läuft weiter, auch wenn du die App verlässt. Möchtest du zur App zurückkehren oder die Fährte wirklich abbrechen?',
+        [
+          { text: 'Zurück', style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
+          { text: 'Weiterlaufen lassen', onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },
+          { text: 'Fährte abbrechen', style: 'destructive', onPress: () => confirmCancel(e.data.action) },
+        ],
+      );
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation]);
 
   return (
     <View className="flex-1 bg-ft-bg">
       <SafeAreaView edges={['top']} className="flex-1">
         {/* Top-Bar */}
         <View className="flex-row items-center gap-3 px-[18px] pb-[10px]">
-          <Pressable className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center" onPress={cancel} hitSlop={8}>
+          <Pressable className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center" onPress={() => router.replace('/track' as never)} hitSlop={8}>
             <Ionicons name="chevron-back" size={18} color={FT.text} />
           </Pressable>
           <Text className="text-[15px] font-extrabold text-ft-text">{t('track.lyingTime')}</Text>

@@ -72,18 +72,25 @@ export default function TabLayout() {
     }
   }, [uid]);
 
-  // Push-Tap → in den passenden Bereich navigieren (data.type aus notify-Function).
+  // Push-/Notification-Tap → in den passenden Bereich navigieren (data.type).
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(resp => {
-      const data = resp.notification.request.content.data as { type?: string } | undefined;
+    const route = (data: { type?: string; sessionId?: string } | undefined) => {
       switch (data?.type) {
         case 'message':     router.push('/chat'); break;
         case 'plan':        router.push('/plaene'); break;
         case 'activity':    router.push('/(tabs)/activity'); break;
         case 'appointment': router.push('/training-hub'); break;
         case 'comment':     router.push('/(tabs)/training'); break;
+        // P4: Tap auf die Liegezeit-Notification → exakt diese Liegezeit-Session.
+        case 'liegezeit':   router.push((data.sessionId ? `/track/liegen?id=${data.sessionId}` : '/track/liegen') as never); break;
       }
-    });
+    };
+    const sub = Notifications.addNotificationResponseReceivedListener(resp =>
+      route(resp.notification.request.content.data as any));
+    // Cold Start: App wurde durch Tap auf die (Liegezeit-)Notification gestartet.
+    Notifications.getLastNotificationResponseAsync()
+      .then(resp => { if (resp) route(resp.notification.request.content.data as any); })
+      .catch(() => {});
     return () => sub.remove();
   }, [router]);
 

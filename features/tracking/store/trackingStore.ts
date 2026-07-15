@@ -76,6 +76,8 @@ interface TrackingState {
   sessionStatus:       SessionStatus;              // Session-Lebenszyklus (P2)
   searchStartedAt:     number | null;              // ms: Start der Absuche (Timer-Fortsetzung bei Recovery)
   searchUpdatedAt:     number | null;              // ms: letzter akzeptierter Suchpunkt
+  layStartedAt:        number | null;              // ms: Start der Liegezeit (= Lege-Ende) — P3, zeitstempelbasiert
+  layUpdatedAt:        number | null;              // ms: letzte relevante Liegezeit-Aktualisierung — P3
   distanceMeters:      number;
   durationSeconds:     number;
   searchDurationSeconds: number;
@@ -147,6 +149,8 @@ const INITIAL = {
   sessionStatus:         'laid' as SessionStatus,   // neutraler Default (nicht 'searching' → keine Recovery)
   searchStartedAt:       null as number | null,
   searchUpdatedAt:       null as number | null,
+  layStartedAt:          null as number | null,
+  layUpdatedAt:          null as number | null,
   distanceMeters:        0,
   durationSeconds:       0,
   searchDurationSeconds: 0,
@@ -170,6 +174,7 @@ function snapshot(s: TrackingState): PendingTrack {
     layFinishedAt: s.layFinishedAt, startAnchor: s.startAnchor, savedAt: Date.now(),
     searchPoints: s.searchTrackPoints, runId: s.searchRunId, status: s.sessionStatus,
     searchStartedAt: s.searchStartedAt, searchUpdatedAt: s.searchUpdatedAt,
+    layStartedAt: s.layStartedAt, layUpdatedAt: s.layUpdatedAt,
   };
 }
 function persist(get: () => TrackingState) { schedulePersist(() => snapshot(get())); }
@@ -256,7 +261,9 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setHeading: (deg) => set({ heading: deg }),
   setDuration: (sec) => set({ durationSeconds: sec }),
   setSearchDuration: (sec) => set({ searchDurationSeconds: sec }),
-  setLayFinishedAt: (ms) => { set({ layFinishedAt: ms, sessionStatus: 'resting' }); persist(get); },
+  // Übergang laid → resting (P3). Setzt die zeitstempelbasierte Liegezeit-Basis und
+  // persistiert SOFORT (kein Debounce), damit ein Kill direkt danach wiederherstellbar ist.
+  setLayFinishedAt: (ms) => { set({ layFinishedAt: ms, layStartedAt: ms, layUpdatedAt: ms, sessionStatus: 'resting' }); persistNow(get); },
   setStartAnchor: (a) => { set({ startAnchor: a }); persist(get); },
   setStartLockActive: (on) => set({ startLockActive: on }),
   setStartDriftRejectedCount: (n) => set({ startDriftRejectedCount: n }),
@@ -273,6 +280,11 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     durationSeconds:  p.durationSeconds,
     layFinishedAt:    p.layFinishedAt,
     startAnchor:      p.startAnchor ?? null,
+    // P3: Liegezeit-Metadaten + Status wiederherstellen (Legacy-sicher: Fallback
+    // layStartedAt ← layFinishedAt, Status ← 'resting', wenn nicht vorhanden).
+    layStartedAt:     p.layStartedAt ?? p.layFinishedAt ?? null,
+    layUpdatedAt:     p.layUpdatedAt ?? p.layFinishedAt ?? null,
+    sessionStatus:    p.status ?? 'resting',
   }),
   setMapFollowMode: (on) => set({ mapFollowMode: on }),
   setMapOrientationMode: (m) => set({ mapOrientationMode: m }),
