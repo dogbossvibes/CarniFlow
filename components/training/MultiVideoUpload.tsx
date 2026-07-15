@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,10 +33,13 @@ export function MultiVideoUpload({ value, onChange }: Props) {
   const [progress, setProgress]   = useState(0);
 
   const pick = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Zugriff verweigert', 'Bitte erlaube den Video-Zugriff in den Einstellungen.');
-      return;
+    // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
+    if (Platform.OS !== 'android') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Zugriff verweigert', 'Bitte erlaube den Video-Zugriff in den Einstellungen.');
+        return;
+      }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['videos'], allowsEditing: true, quality: 0.7, videoMaxDuration: 120,

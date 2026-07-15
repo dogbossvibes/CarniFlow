@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   useAudioRecorder, useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync, AudioModule, RecordingPresets,
 } from 'expo-audio';
@@ -105,8 +105,11 @@ export function CommentThread({ unitId }: { unitId: string }) {
   };
 
   const pickVideo = async () => {
-    const { status: st } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (st !== 'granted') { Alert.alert('Zugriff verweigert', 'Bitte Video-Zugriff erlauben.'); return; }
+    // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
+    if (Platform.OS !== 'android') {
+      const { status: st } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (st !== 'granted') { Alert.alert('Zugriff verweigert', 'Bitte Video-Zugriff erlauben.'); return; }
+    }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], quality: 0.7, videoMaxDuration: 120 });
     if (res.canceled) return;
     setBusy(true);

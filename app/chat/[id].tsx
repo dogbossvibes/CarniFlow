@@ -133,8 +133,11 @@ export default function ChatThreadScreen() {
   // ── Bild / Video ──
   const pickMedia = async (kind: 'image' | 'video') => {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) { Alert.alert('Zugriff nötig', 'Bitte Mediathek-Zugriff erlauben.'); return; }
+      // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
+      if (Platform.OS !== 'android') {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) { Alert.alert('Zugriff nötig', 'Bitte Mediathek-Zugriff erlauben.'); return; }
+      }
       const res = await ImagePicker.launchImageLibraryAsync(
         kind === 'image'
           ? { mediaTypes: ['images'], quality: 0.8 }

@@ -95,10 +95,13 @@ export default function HundBearbeitenScreen() {
   }, [id]);
 
   const bildAuswaehlen = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      setFehler('Fotos nicht zugänglich — Einstellungen → Expo Go → Fotos → aktivieren');
-      return;
+    // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
+    if (Platform.OS !== 'android') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setFehler('Fotos nicht zugänglich — Einstellungen → Expo Go → Fotos → aktivieren');
+        return;
+      }
     }
     setBildLaden(true);
     const result = await ImagePicker.launchImageLibraryAsync({

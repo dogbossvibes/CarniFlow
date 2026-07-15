@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -61,14 +62,17 @@ export function VideoUpload({ value, onChange }: Props) {
   const [uploading, setUploading] = useState(false);
 
   const pick = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Zugriff verweigert',
-        'Bitte erlaube Foto/Video-Zugriff:\n\nEinstellungen → Expo Go → Fotos → "Alle Fotos" auswählen',
-        [{ text: 'OK' }]
-      );
-      return;
+    // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
+    if (Platform.OS !== 'android') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Zugriff verweigert',
+          'Bitte erlaube Foto/Video-Zugriff:\n\nEinstellungen → Expo Go → Fotos → "Alle Fotos" auswählen',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,14 +31,17 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
       return;
     }
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Zugriff verweigert',
-        'Bitte erlaube den Foto-Zugriff:\n\nEinstellungen → Expo Go → Fotos → "Alle Fotos" auswählen',
-        [{ text: 'OK' }]
-      );
-      return;
+    // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
+    if (Platform.OS !== 'android') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Zugriff verweigert',
+          'Bitte erlaube den Foto-Zugriff:\n\nEinstellungen → Expo Go → Fotos → "Alle Fotos" auswählen',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
