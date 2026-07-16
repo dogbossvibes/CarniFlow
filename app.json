@@ -122,12 +122,6 @@
         }
       ],
       [
-        "expo-sensors",
-        {
-          "motionPermission": false
-        }
-      ],
-      [
         "expo-speech-recognition",
         {
           "speechRecognitionPermission": "ANYVO nutzt Spracherkennung für Sprachbefehle im Fährtenmodus.",
