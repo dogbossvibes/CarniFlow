@@ -1,10 +1,10 @@
-import { Platform, StyleSheet, TouchableOpacity } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, TouchableOpacity } from 'react-native';
+import { useFabBottom } from '@/hooks/useFabBottom';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
-import { tapHaptic } from '@/lib/haptics';
+import { haptic } from '@/lib/haptics';
 import { useActiveTraining } from '@/stores/activeTraining';
 import { LiveTrainingBar } from '@/components/training/LiveTrainingBar';
 
@@ -13,14 +13,14 @@ import { LiveTrainingBar } from '@/components/training/LiveTrainingBar';
 export function QuickAddSheet() {
   const router = useRouter();
   const active = useActiveTraining();
-  const insets = useSafeAreaInsets();
+  const fabBottom = useFabBottom();
 
   if (active.unitId) return <LiveTrainingBar />;
 
   return (
     <TouchableOpacity
-      style={[s.fab, { bottom: 28 + (Platform.OS === 'android' ? insets.bottom : 0) }]}
-      onPress={() => { tapHaptic(); router.push('/unit/start'); }}
+      style={[s.fab, { bottom: fabBottom }]}
+      onPress={() => { haptic.light(); router.push('/unit/start'); }}
       activeOpacity={0.85}
     >
       <LinearGradient

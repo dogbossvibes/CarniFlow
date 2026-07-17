@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFabBottom } from '@/hooks/useFabBottom';
+import { haptic } from '@/lib/haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
@@ -11,7 +13,7 @@ import type { TrainingPlan } from '@/types/trainingPlan';
 
 export default function TrainerPlaeneScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const fabBottom = useFabBottom();
   const { session } = useSession();
   const { isTrainerModule } = useCapabilities();
   const [plans, setPlans]   = useState<TrainingPlan[]>([]);
@@ -70,7 +72,7 @@ export default function TrainerPlaeneScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <TouchableOpacity style={[s.fab, { bottom: 30 + (Platform.OS === 'android' ? insets.bottom : 0) }]} onPress={() => router.push('/trainer/plan-neu')} activeOpacity={0.9}>
+      <TouchableOpacity style={[s.fab, { bottom: fabBottom }]} onPress={() => { haptic.light(); router.push('/trainer/plan-neu'); }} activeOpacity={0.9}>
         <Ionicons name="add" size={24} color={C.accentText} />
         <Text style={s.fabTxt}>Neuer Plan</Text>
       </TouchableOpacity>

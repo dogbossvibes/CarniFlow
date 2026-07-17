@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { fmtTime } from '@/lib/eventFormat';
@@ -63,20 +64,22 @@ export function RescheduleModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={onClose} />
       <View style={s.sheet}>
-        <View style={s.handle} />
-        <Text style={s.title}>Neue Zeit vorschlagen</Text>
-        <Text style={s.sub}>Die Kund:in muss die neue Zeit bestätigen.</Text>
+        <SafeAreaView edges={['bottom']}>
+          <View style={s.handle} />
+          <Text style={s.title}>Neue Zeit vorschlagen</Text>
+          <Text style={s.sub}>Die Kund:in muss die neue Zeit bestätigen.</Text>
 
-        <View style={s.row}>
-          <Field label="DATUM" flex={1.3}><TextInput style={s.input} value={date} onChangeText={t => setDate(fmtDateInput(t))} placeholder="TT.MM.JJJJ" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={10} /></Field>
-          <Field label="START" flex={1}><TextInput style={s.input} value={start} onChangeText={t => setStart(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
-          <Field label="ENDE" flex={1}><TextInput style={s.input} value={end} onChangeText={t => setEnd(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
-        </View>
+          <View style={s.row}>
+            <Field label="DATUM" flex={1.3}><TextInput style={s.input} value={date} onChangeText={t => setDate(fmtDateInput(t))} placeholder="TT.MM.JJJJ" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={10} /></Field>
+            <Field label="START" flex={1}><TextInput style={s.input} value={start} onChangeText={t => setStart(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
+            <Field label="ENDE" flex={1}><TextInput style={s.input} value={end} onChangeText={t => setEnd(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
+          </View>
 
-        <TouchableOpacity style={s.btn} onPress={submit} activeOpacity={0.9}>
-          <Ionicons name="paper-plane" size={18} color="#001210" />
-          <Text style={s.btnTxt}>Vorschlag senden</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={s.btn} onPress={submit} activeOpacity={0.9}>
+            <Ionicons name="paper-plane" size={18} color="#001210" />
+            <Text style={s.btnTxt}>Vorschlag senden</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
       </View>
     </Modal>
   );
@@ -88,7 +91,7 @@ function Field({ label, children, flex }: { label: string; children: React.React
 
 const s = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet:   { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 34 },
+  sheet:   { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 8 },
   handle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 16 },
   title:   { fontSize: 18, color: C.white, fontWeight: '800', textAlign: 'center' },
   sub:     { fontSize: 13, color: C.muted, textAlign: 'center', marginTop: 4, marginBottom: 18 },

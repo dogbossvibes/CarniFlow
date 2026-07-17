@@ -1,5 +1,6 @@
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFabBottom } from '@/hooks/useFabBottom';
 import { C } from '@/constants/colors';
 import { QUALITY_LABEL } from '@/features/tracking/engine/gpsQuality';
 import { GpsQualityBadge } from '@/features/tracking/components/GpsQualityBadge';
@@ -24,6 +25,7 @@ export function WarmupOverlay({
 }) {
   const { phase, accuracy, quality, canStart, warning, engineLabel } = state;
   const blocked = phase === 'denied' || phase === 'error';
+  const actionsBottom = useFabBottom(24);
 
   return (
     <View style={s.root}>
@@ -52,7 +54,7 @@ export function WarmupOverlay({
         {!blocked && <Text style={s.engine}>Engine: {engineLabel}</Text>}
       </View>
 
-      <View style={s.actions}>
+      <View style={[s.actions, { bottom: actionsBottom }]}>
         {canStart && !blocked && (
           <TouchableOpacity style={s.startBtn} onPress={onStart} activeOpacity={0.85}>
             <Ionicons name="play" size={18} color={C.accentText} />

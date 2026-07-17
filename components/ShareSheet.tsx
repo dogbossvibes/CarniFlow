@@ -4,6 +4,7 @@ import {
   Modal, ScrollView, Switch, Alert,
   ActivityIndicator, Share,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { Glass, isGlass } from '@/components/ui/Glass';
 import { createShareLink, deleteShareLink } from '@/services/shareService';
@@ -160,6 +161,7 @@ export function ShareSheet({ training, visible, onClose }: Props) {
             </TouchableOpacity>
           </ScrollView>
         )}
+        <SafeAreaView edges={['bottom']} />
       </View>
     </Modal>
   );
@@ -181,7 +183,7 @@ const S = StyleSheet.create({
     borderTopWidth:      1,
     borderColor:         '#1C1C2C',
     padding:             16,
-    paddingBottom:       40,
+    paddingBottom:       8,
     maxHeight:           '85%',
   },
   sheetGlass: { backgroundColor: 'transparent', overflow: 'hidden' },

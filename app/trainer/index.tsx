@@ -11,7 +11,7 @@ import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useSession } from '@/hooks/useSession';
 import { listConnections, redeemInvite, removeConnection } from '@/services/connectionService';
-import { tapHaptic, successHaptic } from '@/lib/haptics';
+import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import type { ConnectionStatus, ConnectionView } from '@/types/connection';
 
 const STATUS_META: Record<ConnectionStatus, { label: string; color: string }> = {
@@ -44,7 +44,7 @@ export default function MyTrainersScreen() {
     setRedeeming(true);
     const { error } = await redeemInvite(code);
     setRedeeming(false);
-    if (error) { Alert.alert('Hinweis', error); return; }
+    if (error) { haptic.error(); Alert.alert('Hinweis', error); return; }
     successHaptic();
     setSheet(false); setCode('');
     load();
@@ -116,25 +116,27 @@ export default function MyTrainersScreen() {
           <View style={s.backdrop} />
         </TouchableWithoutFeedback>
         <View style={s.sheet}>
-          <View style={s.griff} />
-          <Text style={s.sheetTitle}>Trainer-Code eingeben</Text>
-          <Text style={s.sheetSub}>Deine Trainer:in gibt dir einen Einladungscode.</Text>
-          <View style={s.searchRow}>
-            <TextInput
-              style={[s.input, s.flex]}
-              placeholder="z. B. ABC123"
-              placeholderTextColor={C.placeholder}
-              value={code}
-              onChangeText={setCode}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              onSubmitEditing={submitCode}
-              returnKeyType="go"
-            />
-            <TouchableOpacity style={s.searchBtn} onPress={submitCode} disabled={redeeming} activeOpacity={0.8}>
-              {redeeming ? <ActivityIndicator size="small" color={C.accentText} /> : <Ionicons name="arrow-forward" size={20} color={C.accentText} />}
-            </TouchableOpacity>
-          </View>
+          <SafeAreaView edges={['bottom']}>
+            <View style={s.griff} />
+            <Text style={s.sheetTitle}>Trainer-Code eingeben</Text>
+            <Text style={s.sheetSub}>Deine Trainer:in gibt dir einen Einladungscode.</Text>
+            <View style={s.searchRow}>
+              <TextInput
+                style={[s.input, s.flex]}
+                placeholder="z. B. ABC123"
+                placeholderTextColor={C.placeholder}
+                value={code}
+                onChangeText={setCode}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onSubmitEditing={submitCode}
+                returnKeyType="go"
+              />
+              <TouchableOpacity style={s.searchBtn} onPress={submitCode} disabled={redeeming} activeOpacity={0.8}>
+                {redeeming ? <ActivityIndicator size="small" color={C.accentText} /> : <Ionicons name="arrow-forward" size={20} color={C.accentText} />}
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -170,7 +172,7 @@ const s = StyleSheet.create({
   emptyTxt:   { fontSize: 13, color: C.subtle, textAlign: 'center' },
 
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingBottom: 40, paddingTop: 12 },
+  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingBottom: 8, paddingTop: 12 },
   griff: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 12 },
   sheetTitle: { fontSize: 18, color: C.white, fontWeight: '800', marginBottom: 4 },
   sheetSub: { fontSize: 13, color: C.muted, marginBottom: 14 },
