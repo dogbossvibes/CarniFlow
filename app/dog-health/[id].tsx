@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { useToast } from '@/components/ui/Toast';
 import { addDogHealthEntry, addDogVetAppointment } from '@/services/dogHub';
@@ -40,7 +41,8 @@ export default function DogHealthEditor() {
     });
     if (!error && vet) await addDogVetAppointment(dogId, vet.toISOString(), vetReason.trim() || null);
     setSaving(false);
-    if (error) { showToast('Konnte nicht gespeichert werden.'); return; }
+    if (error) { haptic.error(); showToast('Konnte nicht gespeichert werden.'); return; }
+    haptic.success();
     router.back();
   };
 

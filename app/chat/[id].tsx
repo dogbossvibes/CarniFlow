@@ -19,7 +19,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { uploadAudio, uploadVideo, uploadImage } from '@/services/mediaService';
 import { signMediaUrl } from '@/lib/mediaUrl';
 import { getMessages, getOrCreateChat, markRead, sendMessage, subscribeChat } from '@/services/chatService';
-import { tapHaptic } from '@/lib/haptics';
+import { tapHaptic, haptic } from '@/lib/haptics';
 import type { ChatMessage, ChatMessageType } from '@/types/chat';
 
 function fmtTime(iso: string): string {
@@ -91,13 +91,14 @@ export default function ChatThreadScreen() {
     setSending(true);
     const { data, error } = await sendMessage({ chatId, senderId: meId, recipientId: counterpartId, senderName, type, content });
     setSending(false);
-    if (error || !data) { Alert.alert('Fehler', error ?? 'Senden fehlgeschlagen.'); return; }
+    if (error || !data) { haptic.error(); Alert.alert('Fehler', error ?? 'Senden fehlgeschlagen.'); return; }
     push(data);
   };
 
   const sendText = async () => {
     const t = text.trim();
     if (!t) return;
+    haptic.light();   // Senden = leichtes Klickfeedback, kein Success pro Nachricht
     setText('');
     await doSend('text', t);
   };

@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
@@ -78,6 +79,7 @@ export default function PremiumScreen() {
   const activePriceStr = packages.find(p => p.productId === PLAN_META.active.productId)?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
 
   const finish = (plan: SubscriptionPlan) => {
+    haptic.success();   // Kauf/Aktivierung erfolgreich
     queryClient.invalidateQueries({ queryKey: ['capabilities'] });
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     Alert.alert(`${PLAN_META[plan].name} aktiv 🎉`, 'Deine Funktionen sind freigeschaltet.', [{ text: "Los geht's!", onPress: () => router.back() }]);
@@ -98,7 +100,7 @@ export default function PremiumScreen() {
       if (plan === 'founder_active') {
         const claim = await claimFounderSlot();
         setSlots(s => ({ used: claim.remaining != null ? FOUNDER_SLOT_LIMIT - claim.remaining : s.used, remaining: claim.remaining }));
-        if (!claim.ok) { Alert.alert('Founder Active', claim.error === 'Founder offer sold out' ? FOUNDER_SOLD_OUT_MSG : (claim.error ?? 'Nicht verfügbar.')); return; }
+        if (!claim.ok) { haptic.warning(); Alert.alert('Founder Active', claim.error === 'Founder offer sold out' ? FOUNDER_SOLD_OUT_MSG : (claim.error ?? 'Nicht verfügbar.')); return; }
       }
       const meta = PLAN_META[plan];
       if (iapReady) {
@@ -106,9 +108,9 @@ export default function PremiumScreen() {
         if (!pkg) { Alert.alert('Hinweis', 'Dieser Plan ist im Store gerade nicht verfügbar.'); return; }
         const res = await buyPackage(pkg);
         if (res.cancelled) return;
-        if (!res.ok) { Alert.alert('Hinweis', res.error ?? 'Kauf wurde nicht abgeschlossen.'); return; }
+        if (!res.ok) { haptic.error(); Alert.alert('Hinweis', res.error ?? 'Kauf wurde nicht abgeschlossen.'); return; }
         const { error } = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration, providerProductId: meta.productId });
-        if (error) { Alert.alert('Hinweis', 'Aktivierung fehlgeschlagen.'); return; }
+        if (error) { haptic.error(); Alert.alert('Hinweis', 'Aktivierung fehlgeschlagen.'); return; }
         finish(plan);
       } else if (__DEV__) {
         // Dev/Test ohne konfigurierten Store: direkt aktivieren.
@@ -153,8 +155,10 @@ export default function PremiumScreen() {
       // Entitlement → Plan (Founder bleibt erhalten, wenn Provider es bestätigt).
       const plan: SubscriptionPlan = res.tier === 'trainer' ? 'trainer' : (currentPlan === 'founder_active' ? 'founder_active' : 'active');
       await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration });
+      haptic.success();   // Restore erfolgreich
       Alert.alert('Wiederhergestellt', 'Dein Abo ist wieder aktiv.', [{ text: 'OK', onPress: () => router.back() }]);
     } else {
+      haptic.warning();   // nichts wiederherzustellen
       Alert.alert('Nichts gefunden', res.error ?? 'Keine aktiven Käufe gefunden.');
     }
   };

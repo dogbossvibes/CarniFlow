@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DateField } from '@/components/ui/DateField';
@@ -129,9 +130,11 @@ export default function HundHinzufuegenScreen() {
 
     setLaden(false);
     if (err) {
+      haptic.error();
       setFehler(`Noch nicht gespeichert — versuch es nochmal! (${err.message})`);
       return;
     }
+    haptic.success();
     router.back();
   };
 

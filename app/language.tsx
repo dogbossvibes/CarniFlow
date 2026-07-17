@@ -1,4 +1,5 @@
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 import {
   NATIVE_NAME, detectDeviceLocale, useT,
   type AppLocale, type LanguagePreference,
@@ -53,7 +54,7 @@ export default function LanguageScreen() {
               <TouchableOpacity
                 key={opt.pref}
                 style={[s.zeile, i < OPTIONS.length - 1 && s.zeileTrenner]}
-                onPress={() => setPreference(opt.pref)}
+                onPress={() => { haptic.selection(); setPreference(opt.pref); }}
                 activeOpacity={0.7}
               >
                 <View style={{ flex: 1 }}>

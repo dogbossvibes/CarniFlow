@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { tapHaptic, successHaptic } from '@/lib/haptics';
+import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { createDocumentedUnit } from '@/services/trainingUnitService';
@@ -81,7 +81,7 @@ export default function TimerScreen() {
       shared_with_trainer: false,
       ...EMPTY_METRICS,
     }, []);
-    if (error) { Alert.alert('Fehler', error.message ?? 'Konnte nicht gespeichert werden.'); return; }
+    if (error) { haptic.error(); Alert.alert('Fehler', error.message ?? 'Konnte nicht gespeichert werden.'); return; }
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });

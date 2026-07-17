@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
 import { isGlass } from '@/components/ui/Glass';
+import { HapticTab } from '@/components/haptic-tab';
 import { useEffect } from 'react';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { ApportierholzIcon } from '@/components/ui/ApportierholzIcon';
@@ -114,6 +115,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarButton: (props) => <HapticTab {...props} />,
         tabBarStyle: {
           position:          'absolute',
           backgroundColor:   isGlass ? 'transparent' : 'rgba(10,10,10,0.80)',

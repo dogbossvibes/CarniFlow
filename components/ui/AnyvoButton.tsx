@@ -2,6 +2,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View, type Style
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -18,11 +19,20 @@ export function AnyvoButton({
     variant === 'danger'  ? C.trackDanger :
     variant === 'secondary' ? C.trackText : C.trackTextSec;
 
+  // Zentrale Klick-Haptik (light). Kein Trigger, wenn disabled/loading — dann
+  // wird onPress ohnehin nicht ausgeführt. Danger nutzt weiterhin light beim
+  // Antippen; das Resultatfeedback (heavy/error) liegt beim jeweiligen Handler.
+  const handlePress = () => {
+    if (disabled || loading) return;
+    haptic.light();
+    onPress();
+  };
+
   return (
     <TouchableOpacity
       style={[s.base, big && s.big, variant === 'secondary' && s.secondary, variant === 'danger' && s.danger,
         variant === 'ghost' && s.ghost, (disabled || loading) && { opacity: 0.45 }, style]}
-      onPress={onPress} disabled={disabled || loading} activeOpacity={0.85}
+      onPress={handlePress} disabled={disabled || loading} activeOpacity={0.85}
     >
       {isPrimary && <LinearGradient colors={[C.trackPrimary, C.trackPrimaryDk]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
       {loading ? <ActivityIndicator color={txtColor} /> : (

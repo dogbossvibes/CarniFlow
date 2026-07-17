@@ -27,6 +27,7 @@ import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { getDogById, updateDog, deleteDogWithDependents } from '@/services/dogs';
 import { uploadDogImage } from '@/services/storage';
 import { useSession } from '@/hooks/useSession';
+import { haptic } from '@/lib/haptics';
 import type { Dog } from '@/types';
 
 type Geschlecht = 'male' | 'female' | null;
@@ -170,10 +171,12 @@ export default function HundBearbeitenScreen() {
     setSpeichern(false);
 
     if (err) {
+      haptic.error();
       setFehler(`Noch nicht gespeichert — versuch es nochmal!`);
       return;
     }
 
+    haptic.success();
     router.back();
   };
 
@@ -182,7 +185,7 @@ export default function HundBearbeitenScreen() {
     setLoeschen(true);
     const { error } = await deleteDogWithDependents(hund.id);
     setLoeschen(false);
-    if (error) { setLoeschOffen(false); setFehler('Löschen fehlgeschlagen — versuch es nochmal.'); return; }
+    if (error) { haptic.error(); setLoeschOffen(false); setFehler('Löschen fehlgeschlagen — versuch es nochmal.'); return; }
     setLoeschOffen(false);
     router.replace('/dogs' as never);
   };

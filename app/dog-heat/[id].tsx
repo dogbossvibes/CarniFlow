@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { DateField } from '@/components/ui/DateField';
 import { toISODate } from '@/features/dogs/dateInput';
@@ -33,9 +34,11 @@ export default function DogHeatEditor() {
         phase,
         notes:     notes.trim() || null,
       });
-      if (error) { Alert.alert('Fehler', 'Konnte nicht gespeichert werden. Ist die Tabelle „dog_heat_cycles" angelegt?'); return; }
+      if (error) { haptic.error(); Alert.alert('Fehler', 'Konnte nicht gespeichert werden. Ist die Tabelle „dog_heat_cycles" angelegt?'); return; }
+      haptic.success();
       router.back();
     } catch {
+      haptic.error();
       Alert.alert('Fehler', 'Konnte nicht gespeichert werden.');
     } finally {
       setSaving(false);

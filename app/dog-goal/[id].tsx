@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { useToast } from '@/components/ui/Toast';
 import { getActiveDogGoal, saveDogGoal } from '@/services/dogHub';
@@ -48,7 +49,8 @@ export default function DogGoalEditor() {
       parts: PART_LABELS.map(l => ({ label: l, pct: parts[l] })),
     });
     setSaving(false);
-    if (error) { showToast('Konnte nicht gespeichert werden.'); return; }
+    if (error) { haptic.error(); showToast('Konnte nicht gespeichert werden.'); return; }
+    haptic.success();
     router.back();
   };
 

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import {
@@ -64,6 +65,7 @@ export default function DogCommandEditor() {
     try {
       if (commandId) await updateCommand(dogId, commandId, payload);
       else await addCommand(dogId, payload);
+      haptic.success();
       router.back();
     } finally { setSaving(false); }
   };

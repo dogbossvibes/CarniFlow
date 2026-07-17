@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AnimatedPressable } from './AnimatedPressable';
 import { C } from '@/constants/colors';
+import { haptic } from '@/lib/haptics';
 
 type Variant = 'primary' | 'outline' | 'ghost' | 'danger';
 
@@ -18,13 +19,20 @@ type Props = {
 export function Button({ label, onPress, variant = 'primary', loading, disabled, style }: Props) {
   const isDisabled = disabled || loading;
 
+  // Zentrale Klick-Haptik (light); kein Trigger im disabled/loading-Zustand.
+  const handlePress = () => {
+    if (isDisabled) return;
+    haptic.light();
+    onPress();
+  };
+
   const indicatorColor =
     variant === 'primary' ? C.accentText :
     variant === 'danger'  ? C.danger     : C.accent;
 
   if (variant === 'primary') {
     return (
-      <AnimatedPressable onPress={onPress} disabled={isDisabled} style={[s.base, isDisabled && s.disabled, style]}>
+      <AnimatedPressable onPress={handlePress} disabled={isDisabled} style={[s.base, isDisabled && s.disabled, style]}>
         <LinearGradient
           colors={['#00FFCC', '#00FFCC', '#00f0c8']}
           start={{ x: 0, y: 0 }}
@@ -41,7 +49,7 @@ export function Button({ label, onPress, variant = 'primary', loading, disabled,
 
   return (
     <AnimatedPressable
-      onPress={onPress}
+      onPress={handlePress}
       disabled={isDisabled}
       style={[s.base, s[variant], isDisabled && s.disabled, style]}
     >
