@@ -13,7 +13,7 @@
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "33",
+      "buildNumber": "34",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {
@@ -47,7 +47,7 @@
         "android.permission.READ_MEDIA_VIDEO"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 33,
+      "versionCode": 34,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCriuMb0ZKmtn52yNH7AjmfGWsaUEuNDdg"
