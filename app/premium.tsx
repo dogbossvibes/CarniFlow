@@ -20,6 +20,7 @@ import { PLAN_META, FOUNDER_SLOT_LIMIT, type SubscriptionPlan } from '@/features
 // Anzeige-Text, wenn das Founder-Kontingent erschöpft ist (Server = Quelle der Wahrheit).
 const FOUNDER_SOLD_OUT_MSG = 'Founder Edition ist leider ausverkauft.';
 import { useAccess } from '@/hooks/useAccess';
+import { useInternalTester } from '@/hooks/useInternalTester';
 
 interface CardDef { plan: SubscriptionPlan; badge?: string; features: string[]; founder?: boolean }
 
@@ -42,6 +43,7 @@ export default function PremiumScreen() {
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const { access } = useAccess();
+  const { isInternalTester } = useInternalTester();
 
   useEffect(() => {
     (async () => {
@@ -86,6 +88,12 @@ export default function PremiumScreen() {
   };
 
   const choose = async (plan: SubscriptionPlan) => {
+    // Interner Tester: Premium ist bereits über die Berechtigungslogik
+    // freigeschaltet — keine echte Kaufabwicklung, RevenueCat wird nicht berührt.
+    if (isInternalTester) {
+      Alert.alert('Interner Tester', 'Interner Tester – Premium ist bereits freigeschaltet.');
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { Alert.alert('Hinweis', 'Bitte zuerst anmelden.'); return; }
     setLaden(plan);

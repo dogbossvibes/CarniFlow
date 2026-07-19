@@ -1,3 +1,5 @@
+import type { TesterLevel } from '@/features/subscription/internalTester';
+
 export type Plan = 'free' | 'premium';
 
 export type Profile = {
@@ -12,6 +14,10 @@ export type Profile = {
   trainer_name:            string | null;
   trainer_since:           string | null;
   aktive_sparten:          string[] | null;    // im Profil gewählte Sparten
+  // Interner Tester-Modus (nur via Supabase/service_role setzbar, siehe
+  // INTERNAL_TESTER_SETUP.sql). Schaltet vollen Zugriff ohne RevenueCat frei.
+  is_internal_tester?:     boolean | null;
+  tester_level?:           TesterLevel | null;
   created_at:              string;
 };
 
