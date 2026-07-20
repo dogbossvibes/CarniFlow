@@ -118,7 +118,7 @@
         "expo-calendar",
         {
           "calendarPermission": "ANYVO fügt deine Trainingstermine zu deinem Kalender hinzu.",
-          "remindersPermission": false
+          "remindersPermission": "ANYVO benötigt Zugriff, um Trainingserinnerungen zu verwalten."
         }
       ],
       [
