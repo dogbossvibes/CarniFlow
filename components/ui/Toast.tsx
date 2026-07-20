@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
 import { C } from '@/constants/colors';
+import { useFabBottom } from '@/hooks/useFabBottom';
 
 // Leichte, plattformneutrale Kurz-Bestätigung (iOS + Android). Kein globaler
 // Host nötig: `useToast()` liefert ein Element zum Einhängen + eine show-Funktion.
@@ -8,6 +9,8 @@ export function useToast() {
   const [message, setMessage] = useState<string | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Schwebt über Tab-Leiste bzw. System-Navigation (kein fester Wert mehr).
+  const bottom = useFabBottom(24);
 
   const showToast = useCallback((msg: string) => {
     setMessage(msg);
@@ -21,7 +24,7 @@ export function useToast() {
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const toast = message ? (
-    <Animated.View pointerEvents="none" style={[s.toast, { opacity }]}>
+    <Animated.View pointerEvents="none" style={[s.toast, { bottom, opacity }]}>
       <Text style={s.txt}>{message}</Text>
     </Animated.View>
   ) : null;
@@ -31,7 +34,7 @@ export function useToast() {
 
 const s = StyleSheet.create({
   toast: {
-    position: 'absolute', left: 24, right: 24, bottom: 96,
+    position: 'absolute', left: 24, right: 24,
     backgroundColor: 'rgba(20,22,25,0.96)', borderRadius: 14, borderWidth: 1, borderColor: C.border,
     paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center',
   },
