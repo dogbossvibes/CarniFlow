@@ -7,6 +7,7 @@ import { BlurView } from 'expo-blur';
 import { GlassView } from 'expo-glass-effect';
 import { isGlass } from '@/components/ui/Glass';
 import { HapticTab } from '@/components/haptic-tab';
+import { CONNECT_ENABLED } from '@/features/connect/constants/featureFlag';
 import { useEffect } from 'react';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { ApportierholzIcon } from '@/components/ui/ApportierholzIcon';
@@ -177,6 +178,16 @@ export default function TabLayout() {
       {/* In den Hub gefaltet — als Tab ausgeblendet, aber aus dem Hub erreichbar. */}
       <Tabs.Screen name="clients"  options={{ href: null }} />
       <Tabs.Screen name="activity" options={{ href: null }} />
+      {/* ANYVO CONNECT — nur sichtbar, wenn EXPO_PUBLIC_FEATURE_CONNECT_ENABLED=true.
+          href:null blendet den Tab komplett aus (kein Mount, keine CONNECT-Init). */}
+      <Tabs.Screen
+        name="connect"
+        options={{
+          title: 'Connect',
+          href: CONNECT_ENABLED ? undefined : null,
+          tabBarIcon: ({ focused, size }) => <TabIcon name="people" focused={focused} size={size} />,
+        }}
+      />
       <Tabs.Screen
         name="profile"
         options={{
