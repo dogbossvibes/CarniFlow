@@ -16,6 +16,8 @@ import { DogTrainerCard } from '@/components/dogs/DogTrainerCard';
 import { DogAiCoachCard } from '@/components/dogs/DogAiCoachCard';
 import { DogHeatCard } from '@/components/dogs/DogHeatCard';
 import { DogCommandsCard } from '@/components/dogs/DogCommandsCard';
+import { ActiveFaehrteCard } from '@/features/tracking/components/ActiveFaehrteCard';
+import type { ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
 import type { HeatCycle, HeatPrediction } from '@/features/dogs/heatCycles';
 import type { DogCommand } from '@/features/dogs/dogCommands';
 import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } from '@/components/dogs/types';
@@ -55,7 +57,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
   { key: 'trainer',  labelKey: 'doghub.tab.trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps }) {
+export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
   const { t } = useT();
   const [tab, setTab] = useState<TabKey>('overview');
   const [aiTipHidden, setAiTipHidden] = useState(false);   // „Später" blendet den KI-Hinweis für diese Sitzung aus
@@ -98,6 +100,24 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands }: { vm: 
               <View style={s.badgeRow}>
                 {badges.map(b => <View key={b} style={s.badge}><Text style={s.badgeTxt}>{b}</Text></View>)}
               </View>
+            ) : null}
+
+            {/* Oberste Karte: offene Fährte dieses Hundes (falls vorhanden). Bindet
+                die Fährte an den Hund — überlebt Navigation/Hundewechsel/Neustart. */}
+            {activeFaehrte && onOpenFaehrte ? (
+              <View style={{ marginBottom: 12 }}>
+                <ActiveFaehrteCard entry={activeFaehrte} dogName={id.name} onOpen={onOpenFaehrte} />
+              </View>
+            ) : lastFaehrteId && onOpenLastFaehrte ? (
+              // Keine aktive Fährte, aber es gibt eine abgeschlossene → Ansehen anbieten.
+              <TouchableOpacity style={s.lastFaehrte} onPress={onOpenLastFaehrte} activeOpacity={0.85} accessibilityRole="button">
+                <View style={s.lastIcon}><Ionicons name="footsteps" size={17} color={C.trackPrimary} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.lastTitle}>Letzte Fährte ansehen</Text>
+                  <Text style={s.lastSub}>Auswertung & Verlauf</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
+              </TouchableOpacity>
             ) : null}
 
             {/* Tab-Leiste */}
@@ -192,6 +212,10 @@ const s = StyleSheet.create({
   note:      { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, padding: 12 },
   noteTxt:   { flex: 1, fontSize: 13, color: C.trackTextSec, fontWeight: '500' },
   noteStrong:{ color: C.trackText, fontWeight: '700' },
+  lastFaehrte:{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 13, marginBottom: 12 },
+  lastIcon:  { width: 34, height: 34, borderRadius: 11, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' },
+  lastTitle: { fontSize: 14, color: C.trackText, fontWeight: '800' },
+  lastSub:   { fontSize: 11.5, color: C.trackTextMut, fontWeight: '600', marginTop: 1 },
   cmdOverview:{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 14 },
   cmdIcon:   { width: 34, height: 34, borderRadius: 11, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' },
   cmdTitle:  { fontSize: 14.5, color: C.trackText, fontWeight: '800' },

@@ -6,6 +6,8 @@ import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/Trac
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { ANGLE_SHORT } from '@/features/tracking/utils/angleClassify';
 import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/store/trackingStore';
+import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
+import { buildTrackSegmentPolylines } from '@/features/tracking/utils/trackSegments';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
@@ -50,6 +52,7 @@ interface Props {
   rawPoints?:       LatLng[];   // ungefilterte Rohspur (Debug) — grau, ungeglättet
   rejectedPoints?:  LatLng[];   // verworfene Punkte (Debug) — kleine rote Punkte
   markers?:         MapMarker[];
+  segments?:        TrackSegment[];
   breaks?:          LatLng[];   // Abriss-Punkte (Ausarbeiten) — rote Marker
   dimLay?:          boolean;    // Soll-Fährte gedimmt zeichnen (Ausarbeiten)
   startAnchor?:     LatLng | null;   // stabilisierter Startpunkt → Fähnchen (statt erstem Rohpunkt)
@@ -66,7 +69,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], breaks, dimLay, startAnchor, currentPosition, heading,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, dimLay, startAnchor, currentPosition, heading,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
@@ -92,6 +95,10 @@ export function TrackingMap({
   const layCoords = useMemo(
     () => removeGpsJitter(layPoints).map(p => ({ latitude: p.lat, longitude: p.lng })),
     [layPoints],
+  );
+  const laySegmentParts = useMemo(
+    () => buildTrackSegmentPolylines(layPoints.map(p => ({ ...p, t: 0 })), segments),
+    [layPoints, segments],
   );
   const runCoords = useMemo(
     () => removeGpsJitter(runPoints ?? []).map(p => ({ latitude: p.lat, longitude: p.lng })),
@@ -159,7 +166,18 @@ export function TrackingMap({
         )}
         {/* Gelegte Fährte: beim Legen durchgezogen türkis; im Ausarbeiten gedimmt
             gestrichelt als Soll-Referenz (zur blauen Ist-Linie unterscheidbar). */}
-        {layCoords.length > 1 && (
+        {laySegmentParts.length > 0 ? laySegmentParts.map(part => (
+          <Polyline
+            key={part.id}
+            coordinates={part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng }))}
+            strokeColor={dimLay && part.kind === 'normal' ? 'rgba(21,230,195,0.55)' : part.color}
+            strokeWidth={part.kind === 'segment' ? 6 : (dimLay ? 3.5 : 4)}
+            lineDashPattern={dimLay && part.kind === 'normal' ? [8, 8] : undefined}
+            lineCap="round"
+            lineJoin="round"
+            zIndex={part.kind === 'segment' ? 3 : 2}
+          />
+        )) : layCoords.length > 1 && (
           <Polyline coordinates={layCoords} strokeColor={dimLay ? 'rgba(21,230,195,0.55)' : C.trackPrimary} strokeWidth={dimLay ? 3.5 : 4} lineDashPattern={dimLay ? [8, 8] : undefined} />
         )}
         {/* Gelaufener Ablauf: blau, durchgezogen */}

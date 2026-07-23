@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "android": {
         "buildType": "apk"
       },
@@ -24,6 +25,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "true",
         "EXPO_PUBLIC_SENTRY_DSN": "https://054d4a80ebe200ea945b0969bfadd5b5@o4511622198984704.ingest.de.sentry.io/4511622205145168",
@@ -35,6 +37,7 @@
     },
     "production": {
       "autoIncrement": false,
+      "channel": "production",
       "env": {
         "SENTRY_DISABLE_AUTO_UPLOAD": "false",
         "SENTRY_ORG": "anyvo",

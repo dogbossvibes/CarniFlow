@@ -8,9 +8,9 @@ import {
 const sub = (plan: SubscriptionPlan | null, status: any = 'active') => ({ plan, status });
 
 describe('hasCapability', () => {
-  it('Beginner Trial: Active-Rechte ja, Trainer-Rechte nein', () => {
-    for (const c of ACTIVE_CAPABILITIES)  expect(hasCapability(sub('beginner_trial', 'trialing'), c)).toBe(true);
-    for (const c of TRAINER_CAPABILITIES) expect(hasCapability(sub('beginner_trial', 'trialing'), c)).toBe(false);
+  it('Newbie Trial: Active-Rechte ja, Trainer-Rechte nein', () => {
+    for (const c of ACTIVE_CAPABILITIES)  expect(hasCapability(sub('newbie', 'trialing'), c)).toBe(true);
+    for (const c of TRAINER_CAPABILITIES) expect(hasCapability(sub('newbie', 'trialing'), c)).toBe(false);
   });
 
   it('Founder Active: keine Trainerrechte', () => {
@@ -39,7 +39,7 @@ describe('hasCapability', () => {
 
 describe('planToCapabilities', () => {
   it('nur Trainer setzt trainer_module', () => {
-    expect(planToCapabilities('beginner_trial')).toEqual({ pro_member: true, trainer_module: false });
+    expect(planToCapabilities('newbie')).toEqual({ pro_member: true, trainer_module: false });
     expect(planToCapabilities('founder_active')).toEqual({ pro_member: true, trainer_module: false });
     expect(planToCapabilities('active')).toEqual({ pro_member: true, trainer_module: false });
     expect(planToCapabilities('trainer')).toEqual({ pro_member: true, trainer_module: true });

@@ -13,11 +13,28 @@ function genInviteCode(): string {
   return out;
 }
 
+export function isTrainerClientConnection(c: Pick<Connection, 'connection_type'>): boolean {
+  return c.connection_type === 'trainer_client';
+}
+
+export function isVisibleTrainerClientStatus(c: Pick<Connection, 'status'>): boolean {
+  return c.status === 'pending' || c.status === 'accepted';
+}
+
+export function isTrainerClientForTrainer(c: ConnectionView): boolean {
+  return c.myRole === 'connected' && isTrainerClientConnection(c) && isVisibleTrainerClientStatus(c);
+}
+
+export function isTrainerConnectionForClient(c: ConnectionView): boolean {
+  return c.myRole === 'owner' && isTrainerClientConnection(c) && isVisibleTrainerClientStatus(c);
+}
+
 // ── Verbindungen ─────────────────────────────────────────────
 export async function listConnections(userId: string): Promise<ConnectionView[]> {
   const { data } = await supabase
     .from('connections').select('*')
     .or(`owner_user_id.eq.${userId},connected_user_id.eq.${userId}`)
+    .eq('connection_type', 'trainer_client')
     .order('created_at', { ascending: false });
   const rows = (data as Connection[]) ?? [];
   if (!rows.length) return [];
@@ -122,7 +139,7 @@ export async function getAcceptedCounterparts(userId: string): Promise<{ connect
 // Trainer-Sicht: akzeptierte Kunden (ich bin connected_user_id).
 export async function getMyClientConnections(trainerId: string): Promise<ConnectionView[]> {
   const conns = await listConnections(trainerId);
-  return conns.filter(c => c.myRole === 'connected');
+  return conns.filter(isTrainerClientForTrainer);
 }
 
 // Offene Kundenanfragen an mich (für den Hub-Badge).
@@ -131,6 +148,7 @@ export async function getPendingClientCount(trainerId: string): Promise<number> 
     .from('connections')
     .select('id', { count: 'exact', head: true })
     .eq('connected_user_id', trainerId)
+    .eq('connection_type', 'trainer_client')
     .eq('status', 'pending');
   return count ?? 0;
 }
@@ -139,7 +157,7 @@ export async function getPendingClientCount(trainerId: string): Promise<number> 
 // Einheiten zurück, für die view_trainings gesetzt ist.
 export async function getConnectedActivity(trainerId: string): Promise<ActivityItem[]> {
   const accepted = (await listConnections(trainerId))
-    .filter(c => c.myRole === 'connected' && c.status === 'accepted');
+    .filter(c => isTrainerClientForTrainer(c) && c.status === 'accepted');
   const clientIds = accepted.map(c => c.counterpartId);
   if (!clientIds.length) return [];
 

@@ -32,6 +32,7 @@ export function purchasesReady(): boolean {
 
 export interface PurchasePackage {
   id:          string;
+  offeringId:  string;
   title:       string;
   priceString: string;       // lokalisierter Store-Preis
   packageType: string;
@@ -46,6 +47,10 @@ export interface EntitlementResult {
   expiration: string | null;
   error?:     string;
   cancelled?: boolean;
+}
+
+export function hasStorePackageForProduct(packages: PurchasePackage[], productId: string | null | undefined): boolean {
+  return !!productId && packages.some(p => p.productId === productId);
 }
 
 function fromInfo(info: any): EntitlementResult {
@@ -63,11 +68,13 @@ export async function getPackages(): Promise<PurchasePackage[]> {
   if (!purchasesReady()) return [];
   try {
     const offerings = await Purchases.getOfferings();
+    const offeringId = offerings.current?.identifier ?? '';
     const pkgs = offerings.current?.availablePackages ?? [];
     return pkgs.map((p: any) => {
       const productId = p.product?.identifier ?? p.identifier;
       return {
         id:          p.identifier,
+        offeringId,
         title:       p.product?.title ?? p.identifier,
         priceString: p.product?.priceString ?? '',
         packageType: p.packageType ?? '',
@@ -76,7 +83,16 @@ export async function getPackages(): Promise<PurchasePackage[]> {
         raw:         p,
       };
     });
-  } catch { return []; }
+  } catch (e: any) {
+    if (__DEV__) {
+      console.warn('[RevenueCat] getOfferings failed', {
+        platform: Platform.OS,
+        code: e?.code ?? null,
+        message: e?.message ?? null,
+      });
+    }
+    return [];
+  }
 }
 
 export async function buyPackage(pkg: PurchasePackage): Promise<EntitlementResult> {
@@ -86,6 +102,16 @@ export async function buyPackage(pkg: PurchasePackage): Promise<EntitlementResul
     return fromInfo(customerInfo);
   } catch (e: any) {
     if (e?.userCancelled) return { ok: false, tier: null, expiration: null, cancelled: true };
+    if (__DEV__) {
+      console.warn('[RevenueCat] purchase failed', {
+        platform: Platform.OS,
+        packageIdentifier: pkg.id,
+        offeringId: pkg.offeringId,
+        storeProductIdentifier: pkg.productId,
+        code: e?.code ?? null,
+        message: e?.message ?? null,
+      });
+    }
     return { ok: false, tier: null, expiration: null, error: e?.message ?? 'Kauf fehlgeschlagen' };
   }
 }

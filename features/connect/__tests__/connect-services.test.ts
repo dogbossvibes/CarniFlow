@@ -1,24 +1,24 @@
 // ANYVO CONNECT — Tests für Entitlement- und Privacy-Services (reine Funktionen).
 import {
-  connectEntitlements, effectiveConnectEntitlements, CONNECT_BEGINNER_MAX_FRIENDS,
+  connectEntitlements, effectiveConnectEntitlements, CONNECT_NEWBIE_MAX_FRIENDS,
 } from '@/features/connect/services/connect-entitlements';
 import {
   canSeePost, sanitizeTrainingForShare, hasSensitiveTrainingKeys, roundApproxCoord,
 } from '@/features/connect/services/connect-privacy';
 
 describe('connectEntitlements — Tier-Logik', () => {
-  const beginner = { isPro: false, isTrainerModule: false };
+  const newbie = { isPro: false, isTrainerModule: false };
   const active   = { isPro: true,  isTrainerModule: false };
   const trainer  = { isPro: true,  isTrainerModule: true };
 
-  it('Beginner: Feed lesen ja, Posten/Events/Suche nein, Freunde begrenzt', () => {
-    const e = connectEntitlements(beginner);
+  it('Newbie: Feed lesen ja, Posten/Events/Suche nein, Freunde begrenzt', () => {
+    const e = connectEntitlements(newbie);
     expect(e.canViewFeed).toBe(true);
     expect(e.canCreatePost).toBe(false);
     expect(e.canCreateEvent).toBe(false);
     expect(e.canSearchTrainingPartners).toBe(false);
     expect(e.canCreateGroup).toBe(false);
-    expect(e.maxFriends).toBe(CONNECT_BEGINNER_MAX_FRIENDS);
+    expect(e.maxFriends).toBe(CONNECT_NEWBIE_MAX_FRIENDS);
   });
 
   it('Active/Founder: Posten/Events/Suche ja, unbegrenzte Freunde, keine Gruppen', () => {
@@ -37,7 +37,7 @@ describe('connectEntitlements — Tier-Logik', () => {
   });
 
   it('MVP (enforce=false): voller Zugriff für alle', () => {
-    const e = effectiveConnectEntitlements(beginner, false);
+    const e = effectiveConnectEntitlements(newbie, false);
     expect(e.canCreatePost).toBe(true);
     expect(e.canCreateEvent).toBe(true);
     expect(e.maxFriends).toBeNull();

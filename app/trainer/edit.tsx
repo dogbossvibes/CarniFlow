@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Share,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -51,15 +51,18 @@ export default function TrainerEditScreen() {
       website:     website.trim() || null,
       specialties: specials.split(',').map(s => s.trim()).filter(Boolean),
     };
-    const { error } = existing
+    const wasExisting = !!existing;
+    const { data, error } = existing
       ? await updateTrainerProfile(session.user.id, payload)
       : await createTrainerProfile(session.user.id, payload);
     setSaving(false);
     if (error) { Alert.alert('Fehler', error.message ?? 'Konnte nicht gespeichert werden.'); return; }
+    if (data) setExisting(data as TrainerProfile);
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainerProfile'] });
     queryClient.invalidateQueries({ queryKey: ['profile'] });   // Rolle → Tab-Layout aktualisieren
-    router.back();
+    queryClient.invalidateQueries({ queryKey: ['connections'] });
+    if (wasExisting) router.back();
   };
 
   if (loading) return <View style={s.center}><ActivityIndicator color={C.accent} size="large" /></View>;
@@ -79,17 +82,28 @@ export default function TrainerEditScreen() {
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={s.flex} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {existing && (
-            <TouchableOpacity
-              style={s.codeCard}
-              onPress={() => { tapHaptic(); Clipboard.setStringAsync(existing.code); Alert.alert('Kopiert', `Trainer-Code ${existing.code} kopiert.`); }}
-              activeOpacity={0.8}
-            >
+            <View style={s.codeCard}>
               <View>
                 <Text style={s.codeLabel}>DEIN TRAINER-CODE</Text>
                 <Text style={s.codeVal}>{existing.code}</Text>
               </View>
-              <Ionicons name="copy-outline" size={20} color={C.accent} />
-            </TouchableOpacity>
+              <View style={s.codeActions}>
+                <TouchableOpacity
+                  style={s.iconBtn}
+                  onPress={() => { tapHaptic(); Clipboard.setStringAsync(existing.code); Alert.alert('Kopiert', `Trainer-Code ${existing.code} kopiert.`); }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="copy-outline" size={19} color={C.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.iconBtn}
+                  onPress={() => Share.share({ message: `Verbinde dich mit mir in ANYVO mit dem Trainer-Code: ${existing.code}` })}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="share-outline" size={19} color={C.accent} />
+                </TouchableOpacity>
+              </View>
+            </View>
           )}
 
           <Text style={s.label}>ÜBER DICH</Text>
@@ -130,6 +144,8 @@ const s = StyleSheet.create({
   codeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.accent, padding: 18, marginBottom: 8 },
   codeLabel:{ fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 2, marginBottom: 4 },
   codeVal:  { fontSize: 26, color: C.white, fontWeight: '900', letterSpacing: 4 },
+  codeActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
 
   label:   { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10, marginTop: 20 },
   input:   { backgroundColor: C.input, borderRadius: 14, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 15, paddingHorizontal: 14, paddingVertical: 13 },

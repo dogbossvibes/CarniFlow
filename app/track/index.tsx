@@ -15,6 +15,7 @@ import {
   FaehrtenHeader, SectionLabel, StatTriple, TrackRow, fmtAge, relDate, type TrackRowData,
 } from '@/features/tracking/components/FaehrtenChrome';
 import { averageScore, dayStreak, trackScore } from '@/features/tracking/utils/trackScore';
+import { GlobalActiveFaehrtenBar } from '@/features/tracking/components/GlobalActiveFaehrtenBar';
 import { useToast } from '@/components/ui/Toast';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
 
@@ -121,6 +122,9 @@ export default function TrackOverviewScreen() {
       />
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        {/* Globaler Status: offene Fährten (mehrere Hunde) → Logbuch-Liste */}
+        <GlobalActiveFaehrtenBar style={s.globalBar} />
+
         {/* ── grosse Karten-Card (letzte Fährte) ── */}
         <View style={s.mapCard}>
           {loading ? (
@@ -206,6 +210,7 @@ const s = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: C.trackBg },
   content: { paddingHorizontal: 18, paddingBottom: 16 },
 
+  globalBar:{ marginBottom: 14 },
   mapCard: { height: 248, borderRadius: 26, overflow: 'hidden', marginBottom: 14, backgroundColor: C.trackSurface, borderWidth: 1, borderColor: C.trackPrimaryDk + '2A' },
   mapInner:{ ...StyleSheet.absoluteFillObject },
   mapEmpty:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 30 },

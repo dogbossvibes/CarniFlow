@@ -12,6 +12,10 @@ import { FaehrtenHeader, fmtAge, relDate } from '@/features/tracking/components/
 import { trackScore } from '@/features/tracking/utils/trackScore';
 import { SwipeableTrainingItem } from '@/components/training/SwipeableTrainingItem';
 import { useToast } from '@/components/ui/Toast';
+import { ActiveFaehrteCard } from '@/features/tracking/components/ActiveFaehrteCard';
+import { useActiveFaehrtenList } from '@/features/tracking/hooks/useActiveFaehrte';
+import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
+import { coerceTrackSegments } from '@/features/tracking/utils/trackSegments';
 
 const FILTERS = ['Alle', 'Acker', 'Wiese', 'Wald'] as const;
 
@@ -66,11 +70,33 @@ export default function TrackHistorieScreen() {
     [rows, filter],
   );
 
+  // Aktive (offene) Fährten — eigene Sektion GANZ OBEN, nicht zwischen den
+  // abgeschlossenen Einträgen. Quelle ist die dog_id-basierte Registry.
+  const active = useActiveFaehrtenList();
+  const dogName = useCallback((dId: string) => dogs.find(d => d.id === dId)?.name, [dogs]);
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <FaehrtenHeader title="LOGBUCH" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} dog={activeDog} dogs={dogs} onDog={setDogId} />
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        {/* Aktive Fährten (eigene Sektion, ganz oben) */}
+        {active.length > 0 ? (
+          <View style={{ marginBottom: 18 }}>
+            <Text style={s.activeLabel}>AKTIVE FÄHRTEN</Text>
+            <View style={{ gap: 10 }}>
+              {active.map(e => (
+                <ActiveFaehrteCard
+                  key={e.dogId}
+                  entry={e}
+                  dogName={dogName(e.dogId)}
+                  onOpen={() => router.push(reopenTarget(e) as never)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <View style={s.filters}>
           {FILTERS.map(f => {
             const on = filter === f;
@@ -95,6 +121,7 @@ export default function TrackHistorieScreen() {
               const score = trackScore(r);
               const angles = r.corners_total ?? 0;
               const objects = r.articles_total ?? 0;
+              const segmentCount = coerceTrackSegments(r.track_data?.segments).filter(s => s.status === 'completed').length;
               return (
                 <SwipeableTrainingItem key={r.id} trainingId={r.id} onDelete={handleDelete} bottomGap={0} confirmTitle={DEL_TITLE} confirmMessage={DEL_MSG}>
                 <TouchableOpacity style={s.row} activeOpacity={0.85}
@@ -109,8 +136,21 @@ export default function TrackHistorieScreen() {
                       <Text style={s.date}> · {relDate(r.session_date ?? r.created_at)}</Text>
                     </View>
                     <Text style={s.meta} numberOfLines={1}>
-                      {r.distance_meters != null ? `${Math.round(r.distance_meters)} m` : '—'} · {angles} Winkel · {objects} Gegenst. · {fmtAge(r.lying_time_minutes)}
+                      {r.distance_meters != null ? `${Math.round(r.distance_meters)} m` : '—'} · {angles} Winkel · {objects} Gegenst. · Teilstrecken: {segmentCount} · {fmtAge(r.lying_time_minutes)}
                     </Text>
+                    {(() => {
+                      const w = [
+                        r.temperature != null ? `${Math.round(r.temperature)}°C` : null,
+                        r.wind_speed != null ? `Wind ${Math.round(r.wind_speed)} km/h` : null,
+                        r.wetter ?? null,
+                      ].filter(Boolean).join(' · ');
+                      return w ? (
+                        <View style={s.weatherRow}>
+                          <Ionicons name="partly-sunny-outline" size={11} color={C.trackTextMut} />
+                          <Text style={s.weatherTxt} numberOfLines={1}>{w}</Text>
+                        </View>
+                      ) : null;
+                    })()}
                     <View style={s.barTrack}>
                       <View style={[s.barFill, { width: `${score ?? 0}%`, backgroundColor: score != null && score >= 90 ? C.trackPrimary : '#7fe6b0' }]} />
                     </View>
@@ -136,6 +176,7 @@ const s = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: C.trackBg },
   content: { paddingHorizontal: 18, paddingBottom: 16 },
 
+  activeLabel: { fontSize: 10, color: C.trackTextSec, fontWeight: '800', letterSpacing: 1.4, marginBottom: 10 },
   filters: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   chip:    { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: C.trackCard, borderWidth: 1, borderColor: C.trackBorder },
   chipOn:  { backgroundColor: C.trackPrimaryDk + '22', borderColor: C.trackPrimary },
@@ -148,6 +189,8 @@ const s = StyleSheet.create({
   surface: { fontSize: 14.5, color: C.trackText, fontWeight: '800' },
   date:    { fontSize: 11, color: C.trackTextMut },
   meta:    { fontSize: 11.5, color: C.trackTextSec },
+  weatherRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  weatherTxt: { fontSize: 11, color: C.trackTextMut, fontWeight: '600', flexShrink: 1 },
   barTrack:{ marginTop: 7, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.07)', overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 3 },
   score:   { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },

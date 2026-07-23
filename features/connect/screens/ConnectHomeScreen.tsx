@@ -1,5 +1,6 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -23,6 +24,7 @@ const SECTIONS: { key: string; label: string; icon: IconName; hint: string }[] =
 ];
 
 export function ConnectHomeScreen() {
+  const router = useRouter();
   const { session } = useSession();
   const { profile } = useProfile();
   const { sender } = useConnectSender();
@@ -74,17 +76,37 @@ export function ConnectHomeScreen() {
           </Text>
         </View>
 
-        {/* Bereiche (Schritt 1: angeteasert, noch nicht aktiv) */}
+        {/* CONNECT-Profil einrichten/öffnen (aktiv) */}
+        <TouchableOpacity style={s.cta} onPress={() => router.push('/connect/profil')} activeOpacity={0.85} accessibilityRole="button">
+          <View style={s.tileIcon}><Ionicons name="person-circle-outline" size={22} color={C.accent} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.ctaTitle}>Mein CONNECT-Profil</Text>
+            <Text style={s.ctaHint}>Profil, Datenschutz & sichtbare Hunde verwalten</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={C.subtle} />
+        </TouchableOpacity>
+
+        {/* Bereiche (Schritt 1: Profil aktiv, übrige angeteasert) */}
         <Text style={s.sectionLbl}>BEREICHE</Text>
         <View style={s.grid}>
-          {SECTIONS.map(sec => (
-            <View key={sec.key} style={s.tile} accessible accessibilityLabel={`${sec.label} – bald verfügbar`}>
-              <View style={s.tileIcon}><Ionicons name={sec.icon} size={22} color={C.accent} /></View>
-              <Text style={s.tileLabel}>{sec.label}</Text>
-              <Text style={s.tileHint}>{sec.hint}</Text>
-              <View style={s.soon}><Text style={s.soonTxt}>bald</Text></View>
-            </View>
-          ))}
+          {SECTIONS.map(sec => {
+            const active = sec.key === 'profile';
+            const Tile: typeof TouchableOpacity | typeof View = active ? TouchableOpacity : View;
+            return (
+              <Tile
+                key={sec.key}
+                style={s.tile}
+                {...(active ? { onPress: () => router.push('/connect/profil'), activeOpacity: 0.85, accessibilityRole: 'button' as const } : { accessible: true, accessibilityLabel: `${sec.label} – bald verfügbar` })}
+              >
+                <View style={s.tileIcon}><Ionicons name={sec.icon} size={22} color={C.accent} /></View>
+                <Text style={s.tileLabel}>{sec.label}</Text>
+                <Text style={s.tileHint}>{sec.hint}</Text>
+                {active
+                  ? <View style={s.openBadge}><Text style={s.openTxt}>öffnen</Text></View>
+                  : <View style={s.soon}><Text style={s.soonTxt}>bald</Text></View>}
+              </Tile>
+            );
+          })}
         </View>
 
         <View style={{ height: 100 }} />
@@ -112,6 +134,12 @@ const s = StyleSheet.create({
   senderName: { fontSize: 16, color: C.white, fontWeight: '800', marginTop: 2 },
   senderMeta: { fontSize: 12, color: C.muted, marginTop: 1 },
   accountNote:{ fontSize: 12.5, color: C.subtle, lineHeight: 18 },
+
+  cta:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.accentMid, padding: 14, marginTop: 14 },
+  ctaTitle:{ fontSize: 15, color: C.white, fontWeight: '800' },
+  ctaHint: { fontSize: 12, color: C.muted, marginTop: 2 },
+  openBadge:{ position: 'absolute', top: 12, right: 12, backgroundColor: C.accentDim, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: C.accentMid },
+  openTxt: { fontSize: 9, color: C.accent, fontWeight: '800', letterSpacing: 0.5 },
 
   sectionLbl: { fontSize: 10, color: C.muted, fontWeight: '800', letterSpacing: 1.5, marginTop: 24, marginBottom: 10 },
   grid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

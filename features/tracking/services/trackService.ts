@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
+import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
 
 // Ergebnis-Typ: nie stille Fehler — error wird zurückgegeben UND geloggt.
 export interface Result<T> { data: T | null; error: string | null; }
@@ -125,7 +126,7 @@ export interface RecordingSummary {
 }
 
 export async function finishTrackRecording(
-  sessionId: string, points: TrackPointSample[], summary: RecordingSummary,
+  sessionId: string, points: TrackPointSample[], summary: RecordingSummary, segments: TrackSegment[] = [],
 ): Promise<Result<null>> {
   try {
     for (const part of chunk(points, 500)) {
@@ -143,6 +144,8 @@ export async function finishTrackRecording(
       const { error } = await supabase.from('track_points').insert(rows);
       if (error) return fail('finishTrackRecording.points', error);
     }
+    const { data: existing } = await supabase.from('training_sessions').select('track_data').eq('id', sessionId).maybeSingle();
+    const currentTrackData = ((existing as any)?.track_data && typeof (existing as any).track_data === 'object') ? (existing as any).track_data : {};
     const { error } = await supabase.from('training_sessions').update({
       laying_duration_seconds: summary.layingDurationSeconds,
       distance_meters:         Math.round(summary.distanceMeters * 10) / 10,
@@ -150,6 +153,7 @@ export async function finishTrackRecording(
       articles_total:          summary.articlesTotal,
       corners_total:           summary.cornersTotal,
       distractions_total:      summary.distractionsTotal,
+      track_data:              { ...currentTrackData, segments },
     }).eq('id', sessionId);
     if (error) return fail('finishTrackRecording.session', error);
     return { data: null, error: null };
@@ -283,10 +287,12 @@ export interface EvaluationInput {
 
 export async function saveTrackEvaluation(sessionId: string, input: EvaluationInput): Promise<Result<null>> {
   try {
+    const { data: existing } = await supabase.from('training_sessions').select('track_data').eq('id', sessionId).maybeSingle();
+    const currentTrackData = ((existing as any)?.track_data && typeof (existing as any).track_data === 'object') ? (existing as any).track_data : {};
     const { error } = await supabase.from('training_sessions').update({
       rating:     input.rating,
       notes:      input.notes,
-      track_data: { legs: input.legs, score: input.rating, evaluated_at: new Date().toISOString() },
+      track_data: { ...currentTrackData, legs: input.legs, score: input.rating, evaluated_at: new Date().toISOString() },
     }).eq('id', sessionId);
     if (error) return fail('saveTrackEvaluation', error);
     return { data: null, error: null };

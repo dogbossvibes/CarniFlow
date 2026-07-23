@@ -3,7 +3,7 @@
 // Capabilities (pro_member ⇒ isPro, trainer_module ⇒ isTrainerModule).
 //
 // Tiers (siehe Vorgabe):
-//   Beginner:            Profil, Feed lesen, begrenzte Freunde/Nachrichten.
+//   Newbie:            Profil, Feed lesen, begrenzte Freunde/Nachrichten.
 //   Active/Founder:      + Beiträge, Training teilen, Partner-Suche, Events.
 //   Trainer:             + Gruppen, Trainerprofil, Einladungen.
 //
@@ -23,7 +23,7 @@ export interface ConnectEntitlements {
   maxFriends: number | null;
 }
 
-export const CONNECT_BEGINNER_MAX_FRIENDS = 25;
+export const CONNECT_NEWBIE_MAX_FRIENDS = 25;
 
 export const CONNECT_ENFORCE_ENTITLEMENTS =
   process.env.EXPO_PUBLIC_CONNECT_ENFORCE_ENTITLEMENTS === 'true';
@@ -50,7 +50,7 @@ export function connectEntitlements(caps: { isPro: boolean; isTrainerModule: boo
     canSearchTrainingPartners: isPro,
     canCreateGroup: isTrainerModule,
     canManageTrainerProfile: isTrainerModule,
-    maxFriends: isPro ? null : CONNECT_BEGINNER_MAX_FRIENDS,
+    maxFriends: isPro ? null : CONNECT_NEWBIE_MAX_FRIENDS,
   };
 }
 

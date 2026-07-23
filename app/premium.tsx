@@ -11,7 +11,7 @@ import { haptic } from '@/lib/haptics';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, buyPackage, restorePurchases, purchasesReady, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, type PurchasePackage } from '@/lib/purchases';
 import {
   activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
@@ -25,13 +25,14 @@ import { useInternalTester } from '@/hooks/useInternalTester';
 interface CardDef { plan: SubscriptionPlan; badge?: string; features: string[]; founder?: boolean }
 
 const CARDS: CardDef[] = [
-  { plan: 'beginner_trial', badge: 'Start', features: ['7 Tage kostenlos', 'Alle Active-Funktionen', 'Danach Active CHF 6.00/Mt.', 'Kein Trainerzugang'] },
+  { plan: 'newbie', badge: 'Start', features: ['7 Tage kostenlos', 'Alle Active-Funktionen', 'Danach Active CHF 6.00/Mt.', 'Kein Trainerzugang'] },
   { plan: 'founder_active', badge: `Nur ${FOUNDER_SLOT_LIMIT}×`, founder: true, features: ['Dauerhaft CHF 4.00/Mt.', 'Solange das Abo aktiv bleibt', 'Alle Active-Funktionen', 'Kein Trainerzugang'] },
   { plan: 'active', features: ['Training, Hunde, Fortschritt', 'Smart Auswertung', 'Kalender & Sprachnotizen', 'Kein Trainerzugang'] },
   { plan: 'trainer', badge: 'Profi', features: ['Alles aus Active', 'Kundenverwaltung & Pläne', 'Umfragen & Feedback', 'Trainer-Dashboard'] },
 ];
 
 const MONTH_MS = 30 * 86400000;
+const STORE_PACKAGE_UNAVAILABLE_MSG = 'Das Trainer-Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.';
 
 export default function PremiumScreen() {
   const router = useRouter();
@@ -73,12 +74,16 @@ export default function PremiumScreen() {
     : null;
 
   // Empfohlener Plan zum Upgraden: Founder Active (bester Preis) solange Slots frei,
-  // sonst Active. Beginner-Trial-Karte nur zeigen, wenn noch nie abonniert wurde.
+  // sonst Active. Newbie-Trial-Karte nur zeigen, wenn noch nie abonniert wurde.
   const recommendedPlan: SubscriptionPlan = founderAvailable ? 'founder_active' : 'active';
-  const visibleCards = CARDS.filter(c => c.plan !== 'beginner_trial' || !currentPlan);
+  const visibleCards = CARDS.filter(c => c.plan !== 'newbie' || !currentPlan);
   // Preis-Anker für die Founder-Ersparnis: echter Active-Preis aus dem Store
   // (gleiche Währung wie die angezeigten Preise), sonst Fallback auf die CHF-Angabe.
   const activePriceStr = packages.find(p => p.productId === PLAN_META.active.productId)?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
+  const packageForPlan = (plan: SubscriptionPlan) => {
+    const productId = PLAN_META[plan].productId;
+    return productId ? packages.find(p => p.productId === productId) ?? null : null;
+  };
 
   const finish = (plan: SubscriptionPlan) => {
     haptic.success();   // Kauf/Aktivierung erfolgreich
@@ -98,11 +103,24 @@ export default function PremiumScreen() {
     if (!user) { Alert.alert('Hinweis', 'Bitte zuerst anmelden.'); return; }
     setLaden(plan);
     try {
-      // Beginner Trial: 7 Tage gratis, kein Kauf.
-      if (plan === 'beginner_trial') {
+      // Newbie Trial: 7 Tage gratis, kein Kauf.
+      if (plan === 'newbie') {
         const { error } = await activatePlan({ userId: user.id, plan, status: 'trialing', trialEndsAt: trialEndDate() });
         if (error) { Alert.alert('Hinweis', 'Trial konnte nicht aktiviert werden.'); return; }
         finish(plan); return;
+      }
+      const meta = PLAN_META[plan];
+      if (purchasesReady() && !hasStorePackageForProduct(packages, meta.productId)) {
+        if (__DEV__) {
+          console.warn('[RevenueCat] package missing for plan', {
+            plan,
+            expectedProductId: meta.productId,
+            loadedProductIds: packages.map(p => p.productId),
+            loadedPackageIds: packages.map(p => p.id),
+          });
+        }
+        Alert.alert('Hinweis', plan === 'trainer' ? STORE_PACKAGE_UNAVAILABLE_MSG : 'Dieses Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.');
+        return;
       }
       // Founder: zuerst Slot atomar beanspruchen.
       if (plan === 'founder_active') {
@@ -110,16 +128,17 @@ export default function PremiumScreen() {
         setSlots(s => ({ used: claim.remaining != null ? FOUNDER_SLOT_LIMIT - claim.remaining : s.used, remaining: claim.remaining }));
         if (!claim.ok) { haptic.warning(); Alert.alert('Founder Active', claim.error === 'Founder offer sold out' ? FOUNDER_SOLD_OUT_MSG : (claim.error ?? 'Nicht verfügbar.')); return; }
       }
-      const meta = PLAN_META[plan];
       if (iapReady) {
-        const pkg = packages.find(p => p.productId === meta.productId);
-        if (!pkg) { Alert.alert('Hinweis', 'Dieser Plan ist im Store gerade nicht verfügbar.'); return; }
+        const pkg = packageForPlan(plan);
+        if (!pkg) return;
         const res = await buyPackage(pkg);
         if (res.cancelled) return;
         if (!res.ok) { haptic.error(); Alert.alert('Hinweis', res.error ?? 'Kauf wurde nicht abgeschlossen.'); return; }
         const { error } = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration, providerProductId: meta.productId });
         if (error) { haptic.error(); Alert.alert('Hinweis', 'Aktivierung fehlgeschlagen.'); return; }
         finish(plan);
+      } else if (purchasesReady()) {
+        Alert.alert('Hinweis', plan === 'trainer' ? STORE_PACKAGE_UNAVAILABLE_MSG : 'Dieses Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.');
       } else if (__DEV__) {
         // Dev/Test ohne konfigurierten Store: direkt aktivieren.
         const { error } = await activatePlan({ userId: user.id, plan, periodEndsAt: new Date(Date.now() + MONTH_MS).toISOString(), providerProductId: meta.productId });
@@ -204,7 +223,7 @@ export default function PremiumScreen() {
                       ? `Gekündigt — dein Zugriff läuft am ${trialEndLabel} aus. Es wird nichts abgebucht.`
                       : 'Gekündigt — dein Zugriff läuft am Ende der Testphase aus.')
                   : (trialEndLabel
-                      ? `Deine Beginner-Testphase endet am ${trialEndLabel}. Sichere dir jetzt den vollen Zugriff — ohne Unterbruch.`
+                      ? `Deine Newbie-Testphase endet am ${trialEndLabel}. Sichere dir jetzt den vollen Zugriff — ohne Unterbruch.`
                       : 'Sichere dir jetzt den vollen Zugriff — ohne Unterbruch.')}
               </Text>
               {!cancelAtPeriodEnd && (
@@ -237,9 +256,11 @@ export default function PremiumScreen() {
           const isCurrent = currentPlan === card.plan;
           const soldOut = card.founder && !founderAvailable;
           const busy = laden === card.plan;
-          const pkgPrice = packages.find(p => p.productId === meta.productId)?.priceString;
+          const pkg = packageForPlan(card.plan);
+          const pkgPrice = pkg?.priceString;
           const isRec = card.plan === recommendedPlan && !isCurrent && !soldOut;
           const filled = card.founder || card.plan === 'trainer' || isRec;   // Gradient-CTA
+          const missingStorePackage = card.plan !== 'newbie' && purchasesReady() && !pkg;
           return (
             <View key={card.plan} style={[S.card, card.founder && S.cardFounder, isRec && !card.founder && S.cardRec, isCurrent && S.cardCurrent]}>
               {isRec && (
@@ -255,7 +276,7 @@ export default function PremiumScreen() {
                     {card.badge && <View style={[S.badge, card.founder && S.badgeFounder]}><Text style={[S.badgeTxt, card.founder && { color: '#04201b' }]}>{card.badge}</Text></View>}
                   </View>
                   <View style={S.priceRow}>
-                    <Text style={S.cardPrice}>{card.plan === 'beginner_trial' ? '7 Tage gratis' : (pkgPrice ?? meta.priceLabel)}</Text>
+                    <Text style={S.cardPrice}>{card.plan === 'newbie' ? '7 Tage gratis' : (pkgPrice ?? meta.priceLabel)}</Text>
                     {/* Ersparnis ggü. Active hervorheben (Conversion-Anker für Trial-Nutzer). */}
                     {card.founder && founderAvailable && <Text style={S.savings}>statt {activePriceStr}</Text>}
                   </View>
@@ -276,12 +297,16 @@ export default function PremiumScreen() {
                 <View style={S.currentTag}><Ionicons name="checkmark" size={15} color={C.accent} /><Text style={S.currentTxt}>Aktiv</Text></View>
               ) : soldOut ? (
                 <View style={S.soldOut}><Text style={S.soldOutTxt}>{FOUNDER_SOLD_OUT_MSG}</Text></View>
+              ) : missingStorePackage ? (
+                <TouchableOpacity style={S.soldOut} onPress={() => Alert.alert('Hinweis', card.plan === 'trainer' ? STORE_PACKAGE_UNAVAILABLE_MSG : 'Dieses Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.')} activeOpacity={0.75}>
+                  <Text style={S.soldOutTxt}>Abo momentan nicht geladen</Text>
+                </TouchableOpacity>
               ) : (
                 <AnimatedPressable style={[S.cta, !filled && S.ctaAlt]} scale={0.97} onPress={() => choose(card.plan)} disabled={busy}>
                   {filled && <LinearGradient colors={['#00FFCC', '#00f0c8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
                   {busy ? <ActivityIndicator color={filled ? C.accentText : C.white} /> : (
                     <Text style={[S.ctaTxt, filled ? { color: C.accentText } : { color: C.white }]}>
-                      {card.plan === 'beginner_trial' ? 'Gratis starten' : (trialing ? `Jetzt auf ${meta.name} wechseln` : `${meta.name} wählen`)}
+                      {card.plan === 'newbie' ? 'Gratis starten' : (trialing ? `Jetzt auf ${meta.name} wechseln` : `${meta.name} wählen`)}
                     </Text>
                   )}
                 </AnimatedPressable>

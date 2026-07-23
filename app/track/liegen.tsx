@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Pressable, Text, View } from 'react-native';
+import { Alert, AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
-import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { useTrackingStore, type MarkerMaterial } from '@/features/tracking/store/trackingStore';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { loadPending } from '@/features/tracking/store/trackPersist';
 import { restingElapsedSeconds, isRestingRecovery } from '@/features/tracking/store/restingTime';
 import { startLiegezeitNotification, updateLiegezeitNotification, endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
+import {
+  TRACK_SEGMENT_COLORS,
+  actualSegmentSteps,
+  segmentDisplayLabel,
+  type TrackSegment,
+} from '@/features/tracking/utils/trackSegments';
 
 // Liegezeit als h:mm:ss (ab 1 h) bzw. mm:ss — die Fährte kann Stunden reifen.
 function fmtAge(sec: number) {
@@ -23,17 +30,35 @@ function fmtAge(sec: number) {
 // zählt die Liegezeit ab `layFinishedAt` hoch; der Nutzer startet die Absuche
 // per Knopf. Die gemessene Liegezeit (Minuten) wird auf der Session gespeichert.
 // Der Lege-Store bleibt unangetastet, damit die Absuche ihn snapshotten kann.
+function materialLabel(material: MarkerMaterial | null | undefined): string {
+  switch (material) {
+    case 'holz':     return 'Holz';
+    case 'duebel':   return 'Dübel';
+    case 'stoff':    return 'Stoff';
+    case 'leder':    return 'Leder';
+    case 'plastik':  return 'Plastik';
+    case 'metall':   return 'Metall';
+    case 'teppich':  return 'Teppich';
+    case 'diverses': return 'Divers';
+    default:         return 'Ohne Material';
+  }
+}
+
 // Kennzahlen der gelegten Fährte für die Zusammenfassung.
-function summarize(st: { distanceMeters: number; markers: { type: string }[] }) {
+function summarize(st: { distanceMeters: number; markers: { type: string; material?: MarkerMaterial | null }[]; segments?: TrackSegment[] }) {
+  const objects = st.markers.filter(m => m.type === 'gegenstand');
+  const completedSegments = (st.segments ?? []).filter(s => s.status === 'completed').sort((a, b) => a.startStep - b.startStep);
   return {
     distanceM: Math.round(st.distanceMeters),
     winkel:    st.markers.filter(m => m.type === 'winkel').length,
-    objekte:   st.markers.filter(m => m.type === 'gegenstand').length,
+    objekte:   objects.length,
+    materials: objects.map((m, i) => ({ index: i + 1, label: materialLabel(m.material) })),
+    segments:  completedSegments,
   };
 }
 
 export default function TrackLiegenScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, dogId } = useLocalSearchParams<{ id: string; dogId?: string }>();
   const router = useRouter();
   const { t } = useT();
   useKeepAwake();   // Timer/Anzeige während der Liegezeit anlassen (Bildschirm nicht sperren)
@@ -44,35 +69,49 @@ export default function TrackLiegenScreen() {
   // Store hat die gelegte Fährte noch → sofort die zeitstempelbasierte Liegezeit-
   // Basis (layStartedAt, Fallback layFinishedAt) nutzen. Sonst (App wurde in der
   // Liegezeit gekillt) unten aus dem Offline-Puffer wiederherstellen.
+  // Registry-Eintrag dieses Hundes (falls die Fährte gezielt wiederöffnet wird):
+  // liefert die korrekte Liegezeit-Basis auch dann, wenn der Aufnahme-Store gerade
+  // einen ANDEREN Hund hält (mehrere gleichzeitig liegende Fährten).
+  const regEntry = dogId ? useActiveFaehrten.getState().get(dogId) : null;
   const hasStore = useTrackingStore.getState().trackPoints.length > 0 || useTrackingStore.getState().layStartedAt != null;
   const [startMs, setStartMs] = useState<number | null>(() =>
-    hasStore ? (useTrackingStore.getState().layStartedAt ?? useTrackingStore.getState().layFinishedAt ?? Date.now()) : null);
+    regEntry?.layStartedAt != null ? regEntry.layStartedAt
+    : hasStore ? (useTrackingStore.getState().layStartedAt ?? useTrackingStore.getState().layFinishedAt ?? Date.now())
+    : null);
   const [now, setNow] = useState(Date.now());
   const [dogName, setDogName] = useState('Hund');
   const [starting, setStarting] = useState(false);
   const saveState = useTrackingStore(s => s.saveState);   // Hintergrund-Speicherung nach „Stoppen"
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(() =>
-    hasStore ? summarize(useTrackingStore.getState()) : null);
+    hasStore ? summarize(useTrackingStore.getState())
+    : regEntry ? { distanceM: regEntry.distanceMeters, winkel: regEntry.winkelCount, objekte: regEntry.objektCount, materials: [], segments: [] }
+    : null);
 
-  // Recovery nach App-Kill in der Liegezeit: nur bei status='resting' (bzw. Legacy
-  // mit gelegten Punkten) die gelegte Fährte + Liegezeit-Start OHNE neue Session/
-  // Timer zurückspielen. Zeit wird weiter aus Zeitstempeln berechnet.
+  // Recovery / Wiederöffnen (EINMAL beim Betreten). Zwei Fälle:
+  //  a) Vorwärts-Flow: der Aufnahme-Store hält bereits DIESEN Hund → nichts laden.
+  //  b) Anderer Hund im Store ODER App-Kill (Store leer): die gelegte Fährte DIESES
+  //     Hundes aus seinem eigenen Puffer-Slot (dog_id) zurückspielen — sonst würde
+  //     die Absuche die falsche Spur verwenden. Zeit bleibt zeitstempelbasiert.
   useEffect(() => {
-    if (startMs != null) return;   // Store hatte die Daten → nichts wiederherzustellen
     let alive = true;
-    loadPending().then(p => {
+    const st = useTrackingStore.getState();
+    const storeHasThisDog = dogId ? st.dogId === dogId : (st.trackPoints.length > 0 || st.layStartedAt != null);
+    if (storeHasThisDog && (st.trackPoints.length > 0 || st.layStartedAt != null)) return;   // (a)
+    loadPending(dogId).then(p => {
       if (!alive) return;
       if (p && (isRestingRecovery(p) || p.trackPoints.length > 0)) {
-        useTrackingStore.getState().restorePending(p);   // KEINE neue sessionId, Status bleibt
+        useTrackingStore.getState().restorePending(p);   // KEINE neue sessionId, Status bleibt; setzt dogId
         setStartMs(p.layStartedAt ?? p.layFinishedAt ?? Date.now());
         setSummary(summarize(p));
-      } else {
+      } else if (startMs == null) {
         setStartMs(Date.now());   // nichts wiederherstellbar → Timer ab jetzt
-        setSummary({ distanceM: 0, winkel: 0, objekte: 0 });
+        setSummary({ distanceM: 0, winkel: 0, objekte: 0, materials: [], segments: [] });
       }
     });
     return () => { alive = false; };
-  }, [startMs]);
+    // Einmal beim Betreten (dogId ist pro Screen stabil).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dogId]);
 
   // EIN Interval nur für die Anzeige (keine Zähllogik). Zeit kommt aus Date.now().
   useEffect(() => {
@@ -110,10 +149,12 @@ export default function TrackLiegenScreen() {
     if (starting || startMs == null) return;   // erst starten, wenn Liegezeit-Start feststeht
     setStarting(true);
     allowLeaveRef.current = true;   // beabsichtigte Navigation → kein Abbruch-Dialog
-    void endLiegezeitNotification();   // Liegezeit-Anzeige entfernen (Übergang → searching)
+    void endLiegezeitNotification();   // Liegezeit-Anzeige entfernen (Übergang → Absuche)
     const minutes = Math.max(0, Math.round((Date.now() - startMs) / 60000));
     if (id) await setTrackLyingTime(id, minutes).catch(() => {});
-    router.replace((id ? `/track/run?id=${id}` : '/track') as never);
+    // Bewusst KEIN Statuswechsel auf 'searching' hier: die Suchzeit startet erst am
+    // Fährtenansatz (Arming im Run-Screen). Bis dahin bleibt die Fährte 'resting'.
+    router.replace((id ? `/track/run?id=${id}${dogId ? `&dogId=${dogId}` : ''}` : `/track/run${dogId ? `?dogId=${dogId}` : ''}`) as never);
   };
 
   // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
@@ -122,6 +163,7 @@ export default function TrackLiegenScreen() {
       { text: 'Nein', style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
       { text: 'Ja, abbrechen', style: 'destructive', onPress: () => {
         useTrackingStore.getState().setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
+        if (dogId) useActiveFaehrten.getState().remove(dogId);   // Registry: Fährte des Hundes entfernen
         void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
         allowLeaveRef.current = true;
         // @ts-expect-error react-navigation action aus dem beforeRemove-Event
@@ -194,6 +236,59 @@ export default function TrackLiegenScreen() {
               </View>
             ))}
           </View>
+
+          {(summary?.materials.length ?? 0) > 0 && (
+            <View className="mt-5 w-full max-w-[340px]">
+              <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1.4px] uppercase mb-2 text-center">Materialien</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }}
+              >
+                {summary!.materials.map(item => (
+                  <View key={item.index} className="min-w-[86px] px-3 py-2 rounded-[14px] bg-white/5 border border-ft-line">
+                    <Text className="text-[10px] font-black text-ft-acc tracking-[1px] uppercase text-center">{`G${item.index}`}</Text>
+                    <Text className="text-[12px] font-extrabold text-ft-text text-center mt-0.5" numberOfLines={1} adjustsFontSizeToFit>
+                      {item.label}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {(summary?.segments.length ?? 0) > 0 && (
+            <View className="mt-5 w-full max-w-[360px] rounded-[18px] p-4 bg-white/5 border border-ft-line">
+              <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1.4px] uppercase mb-3 text-center">Teilstrecken</Text>
+              <View className="gap-3">
+                {summary!.segments.map((segment, index) => (
+                  <View key={segment.id} className="flex-row items-start gap-3">
+                    <View className="w-6 h-6 rounded-full items-center justify-center" style={{ backgroundColor: TRACK_SEGMENT_COLORS[segment.type] }}>
+                      <Text className="text-[10px] font-black text-[#04110F]">{index + 1}</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[13px] font-extrabold text-ft-text">{segmentDisplayLabel(segment)}</Text>
+                      <Text className="text-[11px] font-semibold text-ft-muted">
+                        {actualSegmentSteps(segment)} Schritte · Beginn bei Schritt {segment.startStep}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+              <View className="flex-row flex-wrap gap-3 mt-4 pt-3 border-t border-ft-line">
+                <View className="flex-row items-center gap-1.5">
+                  <View className="w-3 h-1 rounded-full bg-ft-acc" />
+                  <Text className="text-[10.5px] font-semibold text-ft-muted">normale Fährte</Text>
+                </View>
+                {Array.from(new Set(summary!.segments.map(s => s.type))).map(type => (
+                  <View key={type} className="flex-row items-center gap-1.5">
+                    <View className="w-3 h-1 rounded-full" style={{ backgroundColor: TRACK_SEGMENT_COLORS[type] }} />
+                    <Text className="text-[10.5px] font-semibold text-ft-muted">{segmentDisplayLabel({ type })}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Absuche starten */}

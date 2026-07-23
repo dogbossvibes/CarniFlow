@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Tier } from '@/lib/purchases';
 import {
-  planToCapabilities, PLAN_META, TRIAL_DAYS,
+  planToCapabilities, PLAN_META, TRIAL_DAYS, normalizeSubscriptionPlan,
   type SubscriptionPlan, type SubscriptionStatus,
 } from '@/features/subscription/plans';
 import { setCapabilities } from '@/services/capabilityService';
@@ -53,22 +53,27 @@ export interface PlanSubscription {
 // Tolerant gegenüber noch nicht migrierter Spalte cancel_at_period_end: schlägt
 // der Select fehl (Spalte fehlt), ohne diese Spalte erneut lesen (Default false).
 export async function getPlanSubscription(userId: string): Promise<PlanSubscription | null> {
+  // Abwärtskompatibilität: Legacy-DB-Wert 'beginner_trial' wird beim LESEN auf
+  // 'newbie' normalisiert (siehe normalizeSubscriptionPlan). Nie neu gespeichert.
+  const norm = (d: PlanSubscription | null): PlanSubscription | null =>
+    d ? { ...d, plan: normalizeSubscriptionPlan(d.plan) } : null;
+
   const full = await supabase
     .from('subscriptions')
     .select('plan, status, trial_ends_at, current_period_ends_at, cancel_at_period_end')
     .eq('user_id', userId).maybeSingle();
-  if (!full.error) return (full.data as PlanSubscription) ?? null;
+  if (!full.error) return norm((full.data as PlanSubscription) ?? null);
 
   const { data } = await supabase
     .from('subscriptions')
     .select('plan, status, trial_ends_at, current_period_ends_at')
     .eq('user_id', userId).maybeSingle();
-  return data ? ({ ...(data as PlanSubscription), cancel_at_period_end: false }) : null;
+  return data ? norm({ ...(data as PlanSubscription), cancel_at_period_end: false }) : null;
 }
 
 // Testabo kündigen: markiert das Abo als „zum Periodenende gekündigt". Der Status
 // bleibt 'trialing', d. h. der Zugriff läuft NORMAL bis trial_ends_at weiter und
-// endet dann automatisch (siehe isTrialLapsed im Gating). Da der Beginner-Trial
+// endet dann automatisch (siehe isTrialLapsed im Gating). Da der Newbie-Trial
 // app-verwaltet ist (kein Apple-Kauf, keine Auto-Abbuchung), reicht dieser Marker.
 export async function cancelTrial(userId: string): Promise<{ error: string | null }> {
   const { error } = await supabase
@@ -90,7 +95,7 @@ export async function activatePlan(args: {
   providerSubscriptionId?: string | null;
 }): Promise<{ error: string | null }> {
   const meta = PLAN_META[args.plan];
-  const status: SubscriptionStatus = args.status ?? (args.plan === 'beginner_trial' ? 'trialing' : 'active');
+  const status: SubscriptionStatus = args.status ?? (args.plan === 'newbie' ? 'trialing' : 'active');
   const caps = planToCapabilities(args.plan);
   try {
     const { error } = await supabase.from('subscriptions').upsert({

@@ -1,6 +1,20 @@
 import { supabase } from '@/lib/supabase';
 import type { NewTrainerProfile, TrainerProfile, TrainerSearchResult } from '@/types/trainer';
 
+export type RedeemTrainerCodeStatus =
+  | 'success'
+  | 'invalid_code'
+  | 'inactive_trainer'
+  | 'already_connected'
+  | 'self_connection'
+  | 'forbidden'
+  | 'server_error';
+
+export interface RedeemTrainerCodeResult {
+  status: RedeemTrainerCodeStatus;
+  connectionId: string | null;
+}
+
 // Trainer-Code im Format CANIS-4827.
 function genCode(): string {
   return `CANIS-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -21,10 +35,19 @@ function sanitize(q: string): string {
 }
 
 export function getMyTrainerProfile(userId: string) {
-  return supabase.from('trainer_profiles').select('*').eq('user_id', userId).maybeSingle();
+  return supabase
+    .from('trainer_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
 }
 
 export async function createTrainerProfile(userId: string, data: NewTrainerProfile) {
+  const existing = await getMyTrainerProfile(userId);
+  if (existing.data) return { data: existing.data as TrainerProfile, error: null };
+
   for (let attempt = 0; attempt < 5; attempt++) {
     const { data: row, error } = await supabase
       .from('trainer_profiles')
@@ -35,7 +58,12 @@ export async function createTrainerProfile(userId: string, data: NewTrainerProfi
       await supabase.from('profiles').update({ role: 'trainer' }).eq('id', userId);
       return { data: row as TrainerProfile, error: null };
     }
-    if (error.code !== '23505') return { data: null, error }; // nur Code-Kollision wiederholen
+    if (error.code === '23505') {
+      const afterConflict = await getMyTrainerProfile(userId);
+      if (afterConflict.data) return { data: afterConflict.data as TrainerProfile, error: null };
+      continue; // Code-Kollision ohne eigenes Profil: neuen Code versuchen.
+    }
+    return { data: null, error };
   }
   return { data: null, error: { message: 'Code-Generierung fehlgeschlagen' } };
 }
@@ -82,4 +110,70 @@ export async function findTrainerByCode(code: string): Promise<TrainerSearchResu
   if (!data) return null;
   const [res] = await attachNames([data]);
   return res ?? null;
+}
+
+export function redeemTrainerCodeMessage(status: RedeemTrainerCodeStatus): string {
+  switch (status) {
+    case 'success': return 'Trainer verbunden.';
+    case 'invalid_code': return 'Code nicht gefunden.';
+    case 'inactive_trainer': return 'Dieses Trainerprofil ist momentan nicht aktiv.';
+    case 'already_connected': return 'Du bist bereits mit diesem Trainer verbunden.';
+    case 'self_connection': return 'Du kannst dich nicht mit dir selbst verbinden.';
+    case 'forbidden': return 'Diese Verbindung ist nicht erlaubt.';
+    default: return 'Verbindung konnte nicht erstellt werden. Bitte später erneut versuchen.';
+  }
+}
+
+export async function redeemTrainerCode(rawCode: string): Promise<RedeemTrainerCodeResult> {
+  const code = normalizeCode(rawCode);
+  if (!code) return { status: 'invalid_code', connectionId: null };
+
+  const rpc = await supabase.rpc('redeem_trainer_code', { p_code: code });
+  if (!rpc.error && Array.isArray(rpc.data) && rpc.data[0]?.status) {
+    const row = rpc.data[0] as { status: RedeemTrainerCodeStatus; connection_id?: string | null };
+    return { status: row.status, connectionId: row.connection_id ?? null };
+  }
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) return { status: 'forbidden', connectionId: null };
+
+  const trainer = await findTrainerByCode(code);
+  if (!trainer) return { status: 'invalid_code', connectionId: null };
+  if (trainer.trainerId === user.id) return { status: 'self_connection', connectionId: null };
+
+  const existing = await supabase
+    .from('connections')
+    .select('id,status')
+    .eq('owner_user_id', user.id)
+    .eq('connected_user_id', trainer.trainerId)
+    .eq('connection_type', 'trainer_client')
+    .limit(1)
+    .maybeSingle();
+
+  if (existing.error) return { status: 'server_error', connectionId: null };
+  if (existing.data) return { status: 'already_connected', connectionId: existing.data.id as string };
+
+  const inserted = await supabase
+    .from('connections')
+    .insert({
+      owner_user_id: user.id,
+      connected_user_id: trainer.trainerId,
+      status: 'accepted',
+      created_by: 'owner',
+      connection_type: 'trainer_client',
+    })
+    .select('id')
+    .single();
+
+  if (inserted.error) {
+    if (inserted.error.code === '23505') return { status: 'already_connected', connectionId: null };
+    if (inserted.error.code === '42501') return { status: 'forbidden', connectionId: null };
+    return { status: 'server_error', connectionId: null };
+  }
+
+  const connectionId = inserted.data.id as string;
+  const perms = await supabase.from('connection_permissions').insert({ connection_id: connectionId });
+  if (perms.error && perms.error.code === '42501') return { status: 'forbidden', connectionId };
+
+  return { status: 'success', connectionId };
 }

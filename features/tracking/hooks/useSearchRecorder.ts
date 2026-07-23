@@ -130,6 +130,7 @@ export interface SearchRecorder {
   foundObjects: number;
   totalObjects: number;
   distanceM: number;
+  progressM: number;
   elapsedS: number;
   score: number;
   accuracy: number | null;
@@ -167,7 +168,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const [paused, setPausedState] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [position, setPosition] = useState<LatLng | null>(null);
-  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, score: 0 });
+  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, progressM: 0, score: 0 });
   const [elapsedS, setElapsedS] = useState(0);
   const [gpsDebug, setGpsDebug] = useState<GpsDebug>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
 
@@ -215,6 +216,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
       deviationM: Math.round(devEmaRef.current * 10) / 10,
       onTrack: devEmaRef.current <= ON_TRACK_M,
       distanceM: distRef.current,
+      progressM: maxCursorMRef.current,
       score: computeScore(),
     });
   }, [computeScore]);
@@ -422,7 +424,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     ready, recording, paused,
     points: snap.points, position, deviationM: snap.deviationM, onTrack: snap.onTrack,
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
-    distanceM: snap.distanceM, elapsedS, score: snap.score, accuracy,
+    distanceM: snap.distanceM, progressM: snap.progressM, elapsedS, score: snap.score, accuracy,
     gpsDebug,
     start, stop, setPaused, markObject,
   };

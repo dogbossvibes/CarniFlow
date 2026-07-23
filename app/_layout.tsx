@@ -19,9 +19,14 @@ import { C } from '@/constants/colors';
 import { initMonitoring, captureError } from '@/lib/monitoring';
 import { SyncProvider } from '@/features/sync/components/SyncProvider';
 import { AppLockGate } from '@/components/AppLockGate';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
 void initMonitoring();
+
+// Aktive-Fährten-Registry aus dem lokalen Speicher laden (offene Fährten pro Hund
+// überleben App-Neustart). Einmalig, unabhängig vom Login — rein lokal, kein Netz.
+void useActiveFaehrten.getState().hydrate();
 
 // Globaler Fehler-Fallback: fängt Render-Fehler im gesamten Baum ab,
 // meldet sie und bietet einen Neustart-Button (statt Blank-Crash).
@@ -73,6 +78,15 @@ export default function RootLayout() {
         <Stack.Screen name="track/[id]" />
         <Stack.Screen name="track/legen"  options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="sync" />
+        {/* ANYVO CONNECT — Stack-Routen. Die Route-Dateien laden ihren Screen nur
+            bei aktivem Feature-Flag (sonst Redirect); reine Registrierung ist
+            boot-neutral und verursacht keine CONNECT-Abfrage. */}
+        <Stack.Screen name="connect/onboarding" />
+        <Stack.Screen name="connect/profil" />
+        <Stack.Screen name="connect/profil-bearbeiten" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="connect/datenschutz" />
+        <Stack.Screen name="connect/hunde" />
+        <Stack.Screen name="connect/vorschau" />
         <Stack.Screen name="dev/offline-debug" />
       </Stack>
       <AppLockGate />

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { schedulePersist, writePendingNow, clearPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import { EMPTY_GPS_STATS, type GpsStats, type TrackPointStatus } from '@/features/tracking/engine/types';
+import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
 export type MarkerMaterial = 'stoff' | 'holz' | 'duebel' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
@@ -57,6 +58,7 @@ export interface MarkerSample {
 
 interface TrackingState {
   currentSessionId:    string | null;
+  dogId:               string | null;   // Besitzer der aktiven Fährte (bestehende dogs.id) — Schlüssel des Puffers
   isRecording:         boolean;
   isPaused:            boolean;
   isRunningTrack:      boolean;
@@ -70,6 +72,7 @@ interface TrackingState {
   gpsStats:            GpsStats;              // Live-Qualität: raw/filtered/rejected/Rate
   motionStatus:        TrackPointStatus | null; // moving/slow/stationary/drift/sharp_turn
   markers:             MarkerSample[];
+  segments:            TrackSegment[];
   runPoints:           TrackPointSample[];         // Legacy (useTrackRun) — NICHT vom aktiven Absuche-Pfad genutzt
   searchTrackPoints:   TrackPointSample[];         // aktive Absuche-Spur (P1) — getrennt von der gelegten `trackPoints`
   searchRunId:         string | null;              // track_runs.id der aktiven Absuche (P2 Recovery/Finalisierung)
@@ -91,8 +94,9 @@ interface TrackingState {
   mapOrientationMode:  OrientationMode;
 
   // Actions
-  startRecording: (sessionId: string | null) => void;
+  startRecording: (sessionId: string | null, dogId?: string | null) => void;
   setCurrentSession: (sessionId: string) => void;   // Remote-Session-ID nachreichen
+  setDogId: (dogId: string | null) => void;         // Fährten-Besitzer setzen (Recovery/Reopen)
   pauseRecording: () => void;
   resumeRecording: () => void;
   stopRecording: () => void;
@@ -102,6 +106,8 @@ interface TrackingState {
   setGpsStats: (s: GpsStats) => void;
   setMotionStatus: (s: TrackPointStatus | null) => void;
   addMarker: (m: MarkerSample) => void;
+  addSegment: (segment: TrackSegment) => void;
+  updateSegment: (id: string, patch: Partial<TrackSegment>) => void;
   startRun: () => void;
   stopRun: () => void;
   addRunPoint: (p: TrackPointSample) => void;
@@ -130,6 +136,7 @@ interface TrackingState {
 
 const INITIAL = {
   currentSessionId:      null,
+  dogId:                 null as string | null,
   isRecording:           false,
   isPaused:              false,
   isRunningTrack:        false,
@@ -143,6 +150,7 @@ const INITIAL = {
   gpsStats:              EMPTY_GPS_STATS,
   motionStatus:          null as TrackPointStatus | null,
   markers:               [] as MarkerSample[],
+  segments:              [] as TrackSegment[],
   runPoints:             [] as TrackPointSample[],
   searchTrackPoints:     [] as TrackPointSample[],
   searchRunId:           null as string | null,
@@ -169,24 +177,30 @@ const INITIAL = {
 // autoritativ, `searchPoints` hier ist ein Fallback für die Wiederherstellung.
 function snapshot(s: TrackingState): PendingTrack {
   return {
-    sessionId: s.currentSessionId, trackPoints: s.trackPoints, markers: s.markers,
-    runPoints: s.runPoints, distanceMeters: s.distanceMeters, durationSeconds: s.durationSeconds,
+    sessionId: s.currentSessionId, dogId: s.dogId, trackPoints: s.trackPoints, markers: s.markers,
+    segments: s.segments, runPoints: s.runPoints, distanceMeters: s.distanceMeters, durationSeconds: s.durationSeconds,
     layFinishedAt: s.layFinishedAt, startAnchor: s.startAnchor, savedAt: Date.now(),
     searchPoints: s.searchTrackPoints, runId: s.searchRunId, status: s.sessionStatus,
     searchStartedAt: s.searchStartedAt, searchUpdatedAt: s.searchUpdatedAt,
     layStartedAt: s.layStartedAt, layUpdatedAt: s.layUpdatedAt,
   };
 }
-function persist(get: () => TrackingState) { schedulePersist(() => snapshot(get())); }
+// Puffer wird HUNDEBASIERT geschrieben (Schlüssel = dog_id). Ohne dog_id fällt
+// trackPersist auf den Legacy-Slot zurück (Altpfad/Tests).
+function persist(get: () => TrackingState) { schedulePersist(get().dogId, () => snapshot(get())); }
 // Sofortiges (nicht entprelltes) Schreiben für kritische Übergänge (Absuche-Start/
 // -Status), damit ein Kill unmittelbar danach trotzdem wiederherstellbar ist.
-function persistNow(get: () => TrackingState) { void writePendingNow(snapshot(get())); }
+function persistNow(get: () => TrackingState) { void writePendingNow(get().dogId, snapshot(get())); }
 
 export const useTrackingStore = create<TrackingState>((set, get) => ({
   ...INITIAL,
 
-  startRecording: (sessionId) => { clearPending(); set({ ...INITIAL, currentSessionId: sessionId, isRecording: true, sessionStatus: 'laying' }); },
+  // Frische Aufnahme: nur den Puffer DIESES Hundes leeren (fremde Hunde behalten
+  // ihre offene Fährte). dogId wird gesetzt, damit alle Persist-Aufrufe in den
+  // richtigen Slot schreiben.
+  startRecording: (sessionId, dogId = null) => { void clearPending(dogId); set({ ...INITIAL, currentSessionId: sessionId, dogId, isRecording: true, sessionStatus: 'laying' }); },
   setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
+  setDogId: (dogId) => set({ dogId }),
   pauseRecording: () => set({ isPaused: true }),
   resumeRecording: () => set({ isPaused: false }),
   stopRecording: () => set({ isRecording: false, isPaused: false }),
@@ -211,6 +225,11 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setMotionStatus: (st) => set({ motionStatus: st }),
 
   addMarker: (m) => { set(s => ({ markers: [...s.markers, m] })); persist(get); },
+  addSegment: (segment) => { set(s => ({ segments: [...s.segments, segment] })); persistNow(get); },
+  updateSegment: (id, patch) => {
+    set(s => ({ segments: s.segments.map(seg => seg.id === id ? { ...seg, ...patch, updatedAt: Date.now() } : seg) }));
+    persistNow(get);
+  },
 
   startRun: () => set({ isRunningTrack: true, runPoints: [], searchDurationSeconds: 0, articlesFound: 0 }),
   stopRun:  () => set({ isRunningTrack: false }),
@@ -240,8 +259,10 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // (nach App-Kill). Legacy-sicher (Felder optional). Setzt NICHT auf Aufnahme.
   restoreSearchSession: (p) => set({
     currentSessionId: p.sessionId,
+    dogId:            p.dogId ?? null,
     trackPoints:      p.trackPoints,
     markers:          p.markers,
+    segments:         p.segments ?? [],
     distanceMeters:   p.distanceMeters,
     durationSeconds:  p.durationSeconds,
     startAnchor:      p.startAnchor ?? null,
@@ -273,8 +294,10 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // Aufnahme — nur die gelegten Daten + Liegezeit-Start.
   restorePending: (p) => set({
     currentSessionId: p.sessionId,
+    dogId:            p.dogId ?? null,
     trackPoints:      p.trackPoints,
     markers:          p.markers,
+    segments:         p.segments ?? [],
     runPoints:        p.runPoints,
     distanceMeters:   p.distanceMeters,
     durationSeconds:  p.durationSeconds,
@@ -288,5 +311,5 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   }),
   setMapFollowMode: (on) => set({ mapFollowMode: on }),
   setMapOrientationMode: (m) => set({ mapOrientationMode: m }),
-  reset: () => { clearPending(); set({ ...INITIAL }); },
+  reset: () => { void clearPending(get().dogId); set({ ...INITIAL }); },
 }));

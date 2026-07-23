@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +14,14 @@ import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/h
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { hapticSuccess, hapticTap } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
+import { APPROACH_HINT } from '@/features/tracking/engine/startApproach';
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
+
+// expo-speech defensiv laden (nativ; kein Crash, wenn Modul fehlt).
+let Speech: typeof import('expo-speech') | null = null;
+try { Speech = require('expo-speech'); } catch { Speech = null; }
 import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
 import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
 import { getSearchPointsBySession, deleteSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
@@ -22,6 +29,11 @@ import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNo
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import type { GpsStats } from '@/features/tracking/engine/types';
+import {
+  searchSegmentAnnouncements,
+  segmentDisplayLabel,
+  type SearchSegmentAnnouncementState,
+} from '@/features/tracking/utils/trackSegments';
 
 // GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Absuche nicht).
 const SHOW_GPS_DEBUG = __DEV__;
@@ -46,10 +58,13 @@ function RecDot() {
 // useSearchRecorder startet genau einmal und liefert Spur, Abrisse, Abweichung,
 // Metriken und Live-Score. Stop → Auswertung via s.stop().
 export default function TrackRunScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, dogId } = useLocalSearchParams<{ id: string; dogId?: string }>();
   const router = useRouter();
   const { t } = useT();
   useKeepAwake();   // Display während der Absuche anlassen (Bildschirm nicht sperren)
+  // Registry aufräumen: eine abgeschlossene/abgebrochene Fährte gehört dem Hund
+  // nicht mehr als „offen". Ein no-op ohne dogId (Legacy-Deeplinks).
+  const clearRegistry = useCallback(() => { if (dogId) useActiveFaehrten.getState().remove(dogId); }, [dogId]);
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
 
   // Snapshot der gelegten Fährte (aus dem Store — nach Recovery via restoreSearchSession
@@ -62,6 +77,7 @@ export default function TrackRunScreen() {
       laidPoints: st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng })),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number }, index: i, material: m.material ?? '' })),
       laidMarkers: st.markers,
+      segments: st.segments,
       level: 'training' as Level,
     };
   };
@@ -71,7 +87,7 @@ export default function TrackRunScreen() {
   const [effectiveId, setEffectiveId] = useState<string | null>(id ?? null);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
-  const snapData: Snap = snap ?? { laidLatLng: [], laidPoints: [], laidObjects: [], laidMarkers: [], level: 'training' as Level };
+  const snapData: Snap = snap ?? { laidLatLng: [], laidPoints: [], laidObjects: [], laidMarkers: [], segments: [], level: 'training' as Level };
 
   const s = useSearchRecorder({ laidPoints: snapData.laidPoints, laidObjects: snapData.laidObjects, level: snapData.level, sessionId: effectiveId });
 
@@ -80,8 +96,14 @@ export default function TrackRunScreen() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
+  const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
   const startedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
+  const segmentAnnouncementRef = useRef<Record<string, SearchSegmentAnnouncementState>>({});
+
+  // Ursprünglicher Startpunkt (Fährtenansatz) = erster gelegter Punkt.
+  const startPoint = snap && snap.laidLatLng.length > 0 ? snap.laidLatLng[0] : null;
+  const approach = useStartPointApproach({ active: arming, start: startPoint });
 
   // P4: Beim Betreten der Absuche ist die Liegezeit vorbei → System-Anzeige entfernen.
   useEffect(() => { void endLiegezeitNotification(); }, []);
@@ -90,7 +112,7 @@ export default function TrackRunScreen() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const pending = await loadPending();
+      const pending = await loadPending(dogId);
       if (!alive) return;
       const decision = decideRecovery(pending);
       if (decision.kind === 'recovery') {
@@ -109,22 +131,52 @@ export default function TrackRunScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // 2) Frischer Start GENAU EINMAL — nur wenn KEIN Recovery-Dialog aussteht.
-  useEffect(() => {
-    if (phase !== 'ready' || startedRef.current || recovery || !snap) return;
+  // Absuche WIRKLICH starten: Recorder + Timer + Status 'searching'. Wird erst am
+  // Fährtenansatz (Arming) bzw. beim Fortsetzen aufgerufen — NICHT beim Betreten.
+  const beginSearchNow = useCallback(() => {
+    if (startedRef.current) return;
     startedRef.current = true;
-    hapticSuccess();
+    setArming(false);
+    hapticSuccess();   // haptisches Feedback beim Erreichen des Ansatzes
+    if (voiceOn && Speech) { try { Speech.speak('Suche läuft', { language: 'de-DE' }); } catch { /* best-effort */ } }
     const startMs = Date.now();
     s.start();
-    useTrackingStore.getState().startSearchSession(null, startMs);   // Status 'searching' sofort persistieren
+    useTrackingStore.getState().startSearchSession(null, startMs);   // Status 'searching' + Suchzeit-Start
+    if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
     if (effectiveId) {
       startTrackRun(effectiveId).then(({ data }) => {
         if (data) { runIdRef.current = data.id; useTrackingStore.getState().setSearchRunId(data.id); }
       }).catch(() => {});
     }
-  }, [phase, recovery, snap, s, effectiveId]);
+  }, [s, voiceOn, dogId, effectiveId]);
+
+  // 2) Beim Betreten NICHT sofort starten: erst zum Fährtenansatz navigieren
+  //    (Arming, Suchzeit läuft noch nicht). Ohne bekannten Startpunkt → Fallback:
+  //    sofort starten (Legacy/leer). Kein Start bei ausstehendem Recovery-Dialog.
+  useEffect(() => {
+    if (phase !== 'ready' || startedRef.current || arming || recovery || !snap) return;
+    if (startPoint) setArming(true);
+    else beginSearchNow();
+  }, [phase, recovery, snap, arming, startPoint, beginSearchNow]);
+
+  // 3) Auto-Start, sobald der Ansatz stabil im Radius erreicht ist (reduceApproach).
+  useEffect(() => {
+    if (arming && approach.armed && !startedRef.current) beginSearchNow();
+  }, [arming, approach.armed, beginSearchNow]);
 
   useEffect(() => { if (effectiveId) getTrackSessionDogName(effectiveId).then(r => { if (r.data) setDogName(r.data); }); }, [effectiveId]);
+
+  // GPS-Genauigkeit + Strecke der Absuche gedrosselt (4 s) in die Registry spiegeln,
+  // damit die Karten „Suche läuft" mit GPS-Qualität zeigen. Nur vorhandene Daten.
+  useEffect(() => {
+    if (!dogId || phase !== 'ready') return;
+    const iv = setInterval(() => {
+      useActiveFaehrten.getState().upsert(dogId, {
+        gpsAccuracy: s.accuracy ?? null, distanceMeters: Math.round(s.distanceM),
+      });
+    }, 4000);
+    return () => clearInterval(iv);
+  }, [dogId, phase, s.accuracy, s.distanceM]);
 
   // Bereits gespeicherte Suchpunkte laden (SQLite autoritativ, sonst Puffer-Fallback).
   const loadSavedSearchPoints = async (pending: PendingTrack): Promise<TrackPointSample[]> => {
@@ -184,6 +236,7 @@ export default function TrackRunScreen() {
     s.stop();
     useTrackingStore.getState().setSessionStatus('completed');
     useTrackingStore.getState().reset();
+    clearRegistry();
     router.replace((sessId ? `/track/${sessId}` : '/track') as never);
   };
 
@@ -196,6 +249,7 @@ export default function TrackRunScreen() {
         if (sessId) await deleteSearchPointsBySession(sessId).catch(() => {});
         useTrackingStore.getState().resetSearchPoints();
         useTrackingStore.getState().setSessionStatus('cancelled');
+        clearRegistry();
         startedRef.current = false;   // erlaubt einen frischen Start (neue Absuche, neue runId)
         setRecovery(null);
       } },
@@ -226,6 +280,26 @@ export default function TrackRunScreen() {
   );
   useTrackHapticGuidance(curPos, guidanceAngles, guidanceObjects, true);
 
+  useEffect(() => {
+    if (!voiceOn || arming || !s.recording || snapData.segments.length === 0) return;
+    const result = searchSegmentAnnouncements({
+      segments: snapData.segments,
+      currentStep: metersToSteps(s.progressM),
+      state: segmentAnnouncementRef.current,
+    });
+    segmentAnnouncementRef.current = result.state;
+    result.messages.forEach(message => {
+      if (Speech) {
+        try { Speech.speak(message, { language: 'de-CH', pitch: 1.0, rate: 0.95 }); } catch { /* best-effort */ }
+      }
+    });
+  }, [arming, s.progressM, s.recording, snapData.segments, voiceOn]);
+
+  const currentRunSegment = useMemo(() => {
+    const step = metersToSteps(s.progressM);
+    return snapData.segments.find(seg => seg.status === 'completed' && step >= seg.startStep && step < seg.endStep) ?? null;
+  }, [s.progressM, snapData.segments]);
+
   const hasLaid = snapData.laidPoints.length > 1;
   const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
   const devOff = devShown != null && devShown > 8;
@@ -233,7 +307,7 @@ export default function TrackRunScreen() {
   const handleCancel = () => {
     Alert.alert(t('track.abortTitle'), t('track.abortBody'), [
       { text: t('common.next'), style: 'cancel' },
-      { text: t('common.cancel'), style: 'destructive', onPress: () => { hapticTap(); s.stop(); useTrackingStore.getState().setSessionStatus('cancelled'); useTrackingStore.getState().reset(); router.replace('/track' as never); } },
+      { text: t('common.cancel'), style: 'destructive', onPress: () => { hapticTap(); s.stop(); useTrackingStore.getState().setSessionStatus('cancelled'); useTrackingStore.getState().reset(); clearRegistry(); router.replace('/track' as never); } },
     ]);
   };
 
@@ -258,6 +332,7 @@ export default function TrackRunScreen() {
           }).catch(() => {});
         }
         useTrackingStore.getState().reset();   // Pending leeren → Session gilt als abgeschlossen
+        clearRegistry();
         setFinishing(false);
         router.replace((sessId ? `/track/${sessId}` : '/track') as never);
       } },
@@ -288,13 +363,26 @@ export default function TrackRunScreen() {
       <SafeAreaView edges={['bottom']} className="flex-1">
         {/* Top-Bar — explizit unter Dynamic Island/Statusbar. */}
         <View className="flex-row items-center gap-3 px-[18px] pb-[10px]" style={{ paddingTop: insets.top + 8 }}>
-          <Pressable className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center" onPress={handleCancel} hitSlop={8}>
+          <Pressable
+            className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center"
+            onPress={arming
+              ? () => router.replace((effectiveId ? `/track/liegen?id=${effectiveId}${dogId ? `&dogId=${dogId}` : ''}` : dogId ? `/track/liegen?dogId=${dogId}` : '/track') as never)
+              : handleCancel}
+            hitSlop={8}
+          >
             <Ionicons name="chevron-back" size={18} color={FT.text} />
           </Pressable>
-          <View className="flex-row items-center gap-[7px] px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,93,108,0.14)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.3)' }}>
-            <RecDot />
-            <Text className="text-[11px] font-extrabold tracking-[1.4px] text-[#ff8a94]">LIVE</Text>
-          </View>
+          {arming ? (
+            <View className="flex-row items-center gap-[6px] px-3 py-1.5 rounded-full bg-ft-acc-dim border border-[rgba(21,230,195,0.4)]">
+              <Ionicons name="locate" size={12} color={FT.acc} />
+              <Text className="text-[11px] font-extrabold tracking-[1.4px] text-ft-acc">ANSATZ</Text>
+            </View>
+          ) : (
+            <View className="flex-row items-center gap-[7px] px-3 py-1.5 rounded-full" style={{ backgroundColor: 'rgba(255,93,108,0.14)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.3)' }}>
+              <RecDot />
+              <Text className="text-[11px] font-extrabold tracking-[1.4px] text-[#ff8a94]">LIVE</Text>
+            </View>
+          )}
           <View className="flex-1" />
           {/* Sprachausgabe an/aus */}
           <Pressable onPress={() => setVoiceOn(v => !v)} hitSlop={8}
@@ -323,8 +411,8 @@ export default function TrackRunScreen() {
           {view === 'map' ? (
             <TrackingMap
               layPoints={snapData.laidLatLng} dimLay
-              runPoints={runPoints} markers={mapMarkers} breaks={breakPts}
-              currentPosition={curPos}
+              runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
+              currentPosition={arming ? approach.position : curPos}
               follow={follow}
               onToggleFollow={() => setFollow(f => !f)}
               onUserPan={() => setFollow(false)}
@@ -339,6 +427,16 @@ export default function TrackRunScreen() {
             <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{fmtClock(s.elapsedS)}</Text>
             <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{t('track.searchDuration')}</Text>
           </View>
+
+          {!arming && currentRunSegment && (
+            <View className="absolute left-[14px] right-[14px] bottom-[88px] rounded-[16px] px-4 py-3 bg-ft-glass border border-ft-glass-line">
+              <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">Teilstrecke</Text>
+              <Text className="text-[14px] text-ft-text font-black mt-0.5">{segmentDisplayLabel(currentRunSegment)}</Text>
+              <Text className="text-[11px] text-ft-muted font-semibold mt-1">
+                Noch {Math.max(0, currentRunSegment.endStep - metersToSteps(s.progressM))} Schritte
+              </Text>
+            </View>
+          )}
 
           {/* Hunde-Pill (oben rechts) */}
           <View className="absolute top-[14px] right-[14px] flex-row items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 bg-ft-glass border border-ft-glass-line">
@@ -357,22 +455,54 @@ export default function TrackRunScreen() {
               </View>
             ))}
           </View>
+
+          {/* Arming-Overlay: Navigation zum Fährtenansatz. Suchzeit läuft NICHT
+              (Recorder ungestartet, Timer 00:00). Auto-Start bei stabilem Erreichen. */}
+          {arming && (
+            <View className="absolute inset-0 bg-black/55 items-center justify-center px-8">
+              <View className="items-center gap-2">
+                <View className="w-[62px] h-[62px] rounded-full items-center justify-center border-2 border-[rgba(21,230,195,0.4)] bg-ft-acc-dim mb-1">
+                  <Ionicons name="locate" size={26} color={FT.acc} />
+                </View>
+                <Text className="text-[13px] font-bold text-ft-text text-center leading-[19px] max-w-[280px]">{APPROACH_HINT}</Text>
+                <Text className="text-[48px] font-black text-ft-text mt-1" style={{ fontVariant: ['tabular-nums'] }}>
+                  {approach.distanceM != null ? `${approach.distanceM.toFixed(1)} m` : '– m'}
+                </Text>
+                <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase">Distanz zum Ansatz</Text>
+                <View className="flex-row items-center gap-2 mt-3 px-3 py-1.5 rounded-full bg-white/5 border border-ft-line">
+                  {approach.withinRadius ? (
+                    <>
+                      <ActivityIndicator size="small" color={FT.acc} />
+                      <Text className="text-[12px] font-bold text-ft-acc">Ansatz erreicht – kurz halten…</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="navigate" size={13} color={FT.muted} />
+                      <Text className="text-[12px] font-bold text-ft-muted">
+                        {approach.accuracy != null ? `GPS ±${Math.round(approach.accuracy)} m` : 'GPS wird gesucht…'}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Steuerung */}
         <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            style={s.foundObjects >= s.totalObjects ? { opacity: 0.45 } : undefined}
-            onPress={() => { hapticSuccess(); s.markObject(); }} disabled={s.foundObjects >= s.totalObjects}
+            style={(arming || s.foundObjects >= s.totalObjects) ? { opacity: 0.45 } : undefined}
+            onPress={() => { hapticSuccess(); s.markObject(); }} disabled={arming || s.foundObjects >= s.totalObjects}
           >
             <Ionicons name="flag" size={20} color={FT.text} />
             <Text className="text-[10.5px] font-extrabold text-ft-text">{t('track.object')}</Text>
           </Pressable>
           <Pressable
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-            style={[{ flex: 1.3 }, finishing ? { opacity: 0.45 } : null]}
-            onPress={handleFinish} disabled={finishing}
+            style={[{ flex: 1.3 }, (finishing || arming) ? { opacity: 0.45 } : null]}
+            onPress={handleFinish} disabled={finishing || arming}
           >
             {finishing ? <ActivityIndicator color="#2a060a" /> : <Ionicons name="stop" size={20} color="#2a060a" />}
             <Text className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.evaluate')}</Text>

@@ -17,8 +17,16 @@ import { getTrackSessionById, saveTrackEvaluation } from '@/features/tracking/se
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
+import {
+  TRACK_SEGMENT_COLORS,
+  actualSegmentSteps,
+  analyzeTrackSegments,
+  coerceTrackSegments,
+  segmentDisplayLabel,
+} from '@/features/tracking/utils/trackSegments';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -41,6 +49,8 @@ export default function TrackAuswertungScreen() {
       if (d) {
         setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0));
         setNotes(d.notes ?? '');
+        // Abschluss-Ansicht → die Fährte dieses Hundes ist nicht mehr „offen".
+        if (d.dog_id) useActiveFaehrten.getState().remove(d.dog_id);
       }
       setLoading(false);
     });
@@ -57,9 +67,21 @@ export default function TrackAuswertungScreen() {
     const lay: LatLng[] = (data.points ?? []).filter((p: any) => (p.point_type ?? 'lay') === 'lay').map((p: any) => ({ lat: p.latitude, lng: p.longitude }));
     const run: LatLng[] = ((data.runs ?? [])[0]?.run_points ?? []).map((p: any) => ({ lat: p.lat, lng: p.lng }));
     const markers: MapMarker[] = (data.markers ?? []).map((m: any) => ({ id: m.id, type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind, material: m.material }));
+    const segments = coerceTrackSegments(data.track_data?.segments);
     const center = lay[Math.floor(lay.length / 2)] ?? null;
-    return { lay, run, markers, center, hasGps: lay.length > 1 };
+    return { lay, run, markers, segments, center, hasGps: lay.length > 1 };
   }, [data]);
+  const segmentAnalysis = useMemo(() => analyzeTrackSegments({
+    segments: coerceTrackSegments(data?.track_data?.segments),
+    layPoints: (data?.points ?? []).map((p: any) => ({ lat: p.latitude, lng: p.longitude, accuracy: p.accuracy ?? null, t: Date.parse(p.timestamp) || 0 })),
+    runPoints: ((data?.runs ?? [])[0]?.run_points ?? []),
+    markers: (data?.markers ?? []).map((m: any) => ({
+      id: m.id, type: m.marker_type, material: m.material ?? null, angleKind: m.angle_kind ?? null,
+      lat: m.latitude, lng: m.longitude, accuracy: m.accuracy ?? null,
+      distance_from_start: m.distance_from_start ?? 0, note: m.note ?? null, audio_url: m.audio_url ?? null,
+      found: !!m.found, t: Date.parse(m.created_at) || 0,
+    })),
+  }), [data]);
 
   const onSave = async () => {
     if (!id) return;
@@ -90,7 +112,6 @@ export default function TrackAuswertungScreen() {
   const corners = data.corners_total ?? 0;
   const aFound = data.articles_found ?? 0;
   const aTotal = data.articles_total ?? 0;
-  const distractions = data.distractions_total ?? 0;
 
   // Bedingungen (echtes Wetter zur Startposition + Untergrund/Beschaffenheit).
   const weatherCond: string | null = data.weather_condition ?? data.wetter ?? null;
@@ -110,7 +131,7 @@ export default function TrackAuswertungScreen() {
   const highlights: { icon: IconName; value: string; label: string }[] = [
     { icon: 'flag',          value: `${aFound}/${aTotal}`, label: 'Gegenstände' },
     { icon: 'git-branch',    value: String(corners),       label: 'Winkel' },
-    { icon: 'shuffle',       value: distractions > 0 ? String(distractions) : '–', label: 'Verleitung' },
+    { icon: 'trail-sign',     value: String(segmentAnalysis.count), label: 'Teilstrecken' },
   ];
 
   return (
@@ -186,7 +207,7 @@ export default function TrackAuswertungScreen() {
           <View style={[s.card, s.mapCard]}>
             <View style={StyleSheet.absoluteFill}>
               {map?.hasGps ? (
-                <TrackingMap layPoints={map.lay} runPoints={map.run} markers={map.markers} currentPosition={map.center} follow={false} mapType="hybrid" />
+                <TrackingMap layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments} currentPosition={map.center} follow={false} mapType="hybrid" />
               ) : (
                 <TrackSketch legs={corners} objects={aTotal} w={320} h={190} progress={1} />
               )}
@@ -197,6 +218,33 @@ export default function TrackAuswertungScreen() {
               <Legend color={C.trackWarning} label="Korrektur" />
             </View>
           </View>
+
+          {segmentAnalysis.count > 0 && (
+            <>
+              <SectionLabel>Teilstrecken</SectionLabel>
+              <View style={[s.card, { padding: 16, marginBottom: 16, gap: 12 }]}>
+                {coerceTrackSegments(data.track_data?.segments).filter(seg => seg.status === 'completed').sort((a, b) => a.startStep - b.startStep).map((segment, index) => (
+                  <View key={segment.id} style={s.segmentRow}>
+                    <View style={[s.segmentBadge, { backgroundColor: TRACK_SEGMENT_COLORS[segment.type] }]}>
+                      <Text style={s.segmentNo}>{index + 1}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.segmentTitle}>{segmentDisplayLabel(segment)}</Text>
+                      <Text style={s.segmentMeta}>Geplant: {segment.plannedLengthSteps} Schritte · Tatsächlich: {actualSegmentSteps(segment)} Schritte</Text>
+                      <Text style={s.segmentMeta}>Beginn bei Schritt {segment.startStep} · Status: abgeschlossen</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              <SectionLabel>Smart Analyse</SectionLabel>
+              <View style={[s.card, { padding: 16, marginBottom: 16 }]}>
+                {segmentAnalysis.hints.map((hint, index) => (
+                  <Text key={index} style={s.smartHint}>{hint}</Text>
+                ))}
+              </View>
+            </>
+          )}
 
           {/* Notiz */}
           <SectionLabel>Notiz</SectionLabel>
@@ -283,6 +331,13 @@ const s = StyleSheet.create({
   legendTxt: { fontSize: 10, color: C.trackTextSec, fontWeight: '600' },
 
   notesInput:{ fontSize: 14, color: C.trackText, lineHeight: 21, minHeight: 70, textAlignVertical: 'top' },
+
+  segmentRow:   { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  segmentBadge: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  segmentNo:    { fontSize: 11, color: '#04110F', fontWeight: '900' },
+  segmentTitle: { fontSize: 14, color: C.trackText, fontWeight: '900' },
+  segmentMeta:  { fontSize: 11.5, color: C.trackTextSec, fontWeight: '600', marginTop: 2 },
+  smartHint:    { fontSize: 13, color: C.trackTextSec, lineHeight: 19, marginBottom: 8 },
 
   footer:  { flexDirection: 'row', gap: 10, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 26, borderTopWidth: 1, borderTopColor: C.trackBorder, backgroundColor: C.trackBg },
 });

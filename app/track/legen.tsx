@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
+import * as Speech from 'expo-speech';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useSession } from '@/hooks/useSession';
@@ -17,6 +18,9 @@ import { useAutoDetectSetting } from '@/hooks/useAutoDetectSetting';
 import { useVolumeKeyArticleSetting } from '@/hooks/useVolumeKeyArticleSetting';
 import { subscribeQuickAddArticle } from '@/features/tracking/quickAddArticleBus';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { reopenTarget, type ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
+import { clearPending } from '@/features/tracking/store/trackPersist';
 import { createTrackSession } from '@/features/tracking/services/trackService';
 import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
 import { ANGLE_LABEL } from '@/features/tracking/utils/angleClassify';
@@ -26,6 +30,21 @@ import type { GpsStats } from '@/features/tracking/engine/types';
 import { useToast } from '@/components/ui/Toast';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import type { AngleKind, MarkerMaterial } from '@/features/tracking/store/trackingStore';
+import type { TrackSegmentType } from '@/features/tracking/utils/trackSegments';
+import {
+  SEGMENT_DEFAULT_STEPS,
+  SEGMENT_PREANNOUNCE_STEPS,
+  TRACK_SEGMENT_LABELS,
+  TRACK_SEGMENT_TYPES,
+  activeOrPlannedSegment,
+  clampSegmentSteps,
+  createPlannedSegment,
+  normalizeCustomSegmentLabel,
+  plannedSegmentAnnouncement,
+  segmentDisplayLabel,
+  segmentEndAnnouncement,
+  segmentStartAnnouncement,
+} from '@/features/tracking/utils/trackSegments';
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
@@ -53,6 +72,21 @@ const SHOW_GPS_DEBUG = __DEV__;
 // Untergrund + Beschaffenheit (vor dem Legen wählbar, während GPS stabilisiert).
 const SURFACES = ['Acker', 'Wiese', 'Wald', 'Mischung'] as const;
 const CONDITIONS = ['Normal', 'Nass', 'Trocken', 'Schnee', 'Gefroren'] as const;
+const SEGMENT_ICONS: Record<TrackSegmentType, MatIcon> = {
+  no_food: 'remove-circle-outline',
+  low_food: 'leaf-outline',
+  intensive_food: 'nutrition-outline',
+  distraction: 'shuffle-outline',
+  surface_change: 'layers-outline',
+  custom: 'create-outline',
+};
+
+function speakTrackSegment(text: string) {
+  try {
+    Speech.stop();
+    Speech.speak(text, { language: 'de-CH', pitch: 1.0, rate: 0.95 });
+  } catch { /* best-effort */ }
+}
 
 // Blinkender LIVE-Punkt (anyvoRec).
 function RecDot() {
@@ -92,6 +126,11 @@ export default function LegenScreen() {
   const [lastAngle, setLastAngle] = useState<AngleKind | null>(null);
   const [warmupElapsed, setWarmupElapsed] = useState(0);
   const [materialSheet, setMaterialSheet] = useState(false);   // Gegenstand-Material wählen
+  const [segmentSheet, setSegmentSheet] = useState(false);
+  const [segmentType, setSegmentType] = useState<TrackSegmentType>('no_food');
+  const [segmentSteps, setSegmentSteps] = useState(SEGMENT_DEFAULT_STEPS);
+  const [segmentCustomLabel, setSegmentCustomLabel] = useState('');
+  const [segmentVoiceEnabled, setSegmentVoiceEnabled] = useState(true);
   const [selectedDogId, setSelectedDogId] = useState<string | null>((params.dogId as string) ?? null);
   const beganRef = useRef(false);
   const [showBgDisclosure, setShowBgDisclosure] = useState(false);   // Play-Disclosure VOR Aufnahmestart
@@ -136,6 +175,14 @@ export default function LegenScreen() {
     showToast(t('toast.objectSet'));
   }, [rec, showToast]);
 
+  const placeAbriss = useCallback(() => {
+    if (phaseRef.current !== 'recording') return;
+    if (!useTrackingStore.getState().startAnchor) { showToast(t('toast.startPointWait')); return; }
+    hapticWarning();
+    void rec.addMarker('winkel', { angleKind: 'abriss' });
+    showToast('Abriss gesetzt');
+  }, [rec, showToast, t]);
+
   // iOS-Kurzbefehl (Deep-Link) → Schnell-Gegenstand, solange aufgenommen wird.
   useEffect(() => {
     if (phase !== 'recording') return;
@@ -164,12 +211,57 @@ export default function LegenScreen() {
   }, [phase, volumeKeyArticle, quickAddArticle]);
 
   const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
+  const conflictShownRef = useRef(false);
+
+  // Regel 4: pro Hund max. EINE aktive Fährte. Der eigentliche Aufnahmestart
+  // (Disclosure → begin). Ausgelagert, da ihn sowohl der normale Pfad als auch
+  // „Fährte abbrechen" im Konflikt-Dialog aufrufen.
+  const proceedToStart = useCallback(() => { hapticTap(); setShowBgDisclosure(true); }, []);
+
+  // Konflikt-Dialog: eine aktive Fährte dieses Hundes existiert bereits.
+  const showConflict = useCallback((dId: string, entry: ActiveFaehrte) => {
+    Alert.alert(
+      'Aktive Fährte vorhanden',
+      'Für diesen Hund existiert bereits eine aktive Fährte. Was möchtest du tun?',
+      [
+        { text: 'Fährte fortsetzen', onPress: () => router.replace(reopenTarget(entry) as never) },
+        { text: 'Fährte abbrechen', style: 'destructive', onPress: () => {
+            // Bestehende Fährte DIESES Hundes verwerfen (keine Fremdfährte berühren).
+            useActiveFaehrten.getState().remove(dId);
+            void clearPending(dId);
+            if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');
+            proceedToStart();   // erst danach darf eine neue Fährte entstehen
+          } },
+        { text: 'Abbrechen', style: 'cancel' },
+      ],
+    );
+  }, [router, proceedToStart]);
+
+  // Start-Taste: erst prüfen, ob der gewählte Hund bereits eine aktive Fährte hat.
+  const handleStartPress = useCallback(() => {
+    const dId = activeDog?.id ?? null;
+    const entry = dId ? useActiveFaehrten.getState().get(dId) : null;
+    if (dId && entry) { showConflict(dId, entry); return; }   // KEINE zweite Fährte
+    proceedToStart();
+  }, [activeDog?.id, showConflict, proceedToStart]);
+
+  // Beim Betreten mit einem Hund, der bereits eine aktive Fährte hat, sofort den
+  // Dialog zeigen (einmalig) — statt still eine zweite Aufnahme vorzubereiten.
+  useEffect(() => {
+    const dId = (params.dogId as string) ?? null;
+    if (!dId || conflictShownRef.current) return;
+    const entry = useActiveFaehrten.getState().get(dId);
+    if (entry) { conflictShownRef.current = true; showConflict(dId, entry); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     trackPoints, markers, currentPosition, heading, gpsAccuracy,
     distanceMeters, durationSeconds, isPaused, mapFollowMode, setMapFollowMode,
-    startAnchor, startLockActive, startDriftRejectedCount,
+    startAnchor, startLockActive, startDriftRejectedCount, segments,
   } = useTrackingStore();
+  const activeSegment = activeOrPlannedSegment(segments);
+  const currentStep = metersToSteps(distanceMeters);
 
   // GPS wirklich bereit (gute Genauigkeit) vs. nur manuell freigegeben (nach 15 s).
   const gpsReady = gpsAccuracy != null && gpsAccuracy <= 15;
@@ -210,10 +302,23 @@ export default function LegenScreen() {
     beganRef.current = true;
     hapticSuccess();   // SOFORT beim Start-Tap — vor jedem await/GPS/Netz
 
-    const r = await rec.beginRecording(null);   // sofort scharf (recording=true, Timer)
+    const r = await rec.beginRecording(null, activeDog?.id ?? null);   // sofort scharf (recording=true, Timer); dogId → eigener Puffer-Slot
     if (r.error) { beganRef.current = false; showToast(r.error); return; }
     setPhase('recording');
     showToast(t('toast.trackRunning'));
+
+    // Registry: Fährte gehört ab jetzt dem Hund (dog_id) — bleibt bei Navigation/
+    // Hundewechsel erhalten. Sofort persistiert, damit ein Kill nichts verliert.
+    // Wetter-Snapshot + Start-Uhrzeit + GPS werden EINMALIG hier festgehalten.
+    if (activeDog) {
+      const snap = weather
+        ? { temperature: weather.temperature, windSpeed: weather.windSpeed, humidity: weather.humidity, condition: weather.weatherCondition }
+        : null;
+      useActiveFaehrten.getState().upsert(activeDog.id, {
+        status: 'laying', sessionId: null, startedAt: Date.now(),
+        gpsAccuracy: useTrackingStore.getState().gpsAccuracy, weather: snap,
+      });
+    }
 
     // Remote-Session im Hintergrund (blockiert die Aufnahme nicht).
     const uid = session?.user.id;
@@ -228,7 +333,11 @@ export default function LegenScreen() {
         latitude: currentPosition?.lat ?? null, longitude: currentPosition?.lng ?? null,
         distraction: false,
       }).then(({ data, error }) => {
-        if (!error && data) { sessionIdRef.current = data.id; useTrackingStore.getState().setCurrentSession(data.id); }
+        if (!error && data) {
+          sessionIdRef.current = data.id;
+          useTrackingStore.getState().setCurrentSession(data.id);
+          useActiveFaehrten.getState().upsert(activeDog.id, { sessionId: data.id });   // ID nachreichen
+        }
         else showToast(t('toast.offlineSync'));
       }).catch(() => showToast(t('toast.offlineSync')));
     }
@@ -247,12 +356,141 @@ export default function LegenScreen() {
 
   useEffect(() => () => { rec.stopAll(); }, [rec.stopAll]);
 
+  // Wetter-Snapshot nachreichen, falls er erst NACH dem Start eintrifft (einmalig
+  // je Aufnahme — Registry-Merge überschreibt nur das Wetterfeld).
+  useEffect(() => {
+    if (phase !== 'recording' || !activeDog || !weather) return;
+    useActiveFaehrten.getState().upsert(activeDog.id, {
+      weather: { temperature: weather.temperature, windSpeed: weather.windSpeed, humidity: weather.humidity, condition: weather.weatherCondition },
+    });
+  }, [phase, activeDog, weather]);
+
+  // GPS-Genauigkeit + Strecke gedrosselt (4 s) in die Registry spiegeln, damit die
+  // Dog-Hub-/Logbuch-Karte während der Aufnahme aktuelle Werte zeigt. Nur vorhandene
+  // Daten aus dem Store — keine neue GPS-Engine.
+  useEffect(() => {
+    if (phase !== 'recording' || !activeDog) return;
+    const iv = setInterval(() => {
+      const st = useTrackingStore.getState();
+      useActiveFaehrten.getState().upsert(activeDog.id, {
+        gpsAccuracy: st.gpsAccuracy, distanceMeters: Math.round(st.distanceMeters),
+      });
+    }, 4000);
+    return () => clearInterval(iv);
+  }, [phase, activeDog]);
+
   const mapMarkers: MapMarker[] = markers.map(mk => ({ id: mk.id, type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind, material: mk.material }));
   const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
   const winkel = markers.filter(mk => mk.type === 'winkel').length;
   // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
   const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
+
+  const openSegmentSheet = useCallback(() => {
+    if (phase !== 'recording') return;
+    const existing = activeOrPlannedSegment(useTrackingStore.getState().segments);
+    if (existing) {
+      Alert.alert(
+        'Aktive Teilstrecke',
+        'Es ist bereits eine Teilstrecke geplant oder aktiv.',
+        [
+          { text: 'Teilstrecke ansehen', onPress: () => undefined },
+          { text: 'Teilstrecke beenden', style: 'destructive', onPress: () => {
+            const st = useTrackingStore.getState();
+            st.updateSegment(existing.id, {
+              status: 'completed',
+              endStep: metersToSteps(st.distanceMeters),
+              endCoordinate: st.currentPosition,
+              endTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
+              completedAt: Date.now(),
+            });
+            hapticSuccess();
+            if (existing.voiceEnabled) speakTrackSegment(segmentEndAnnouncement());
+          } },
+          { text: 'Abbrechen', style: 'cancel' },
+        ],
+      );
+      return;
+    }
+    hapticTap();
+    setSegmentSheet(true);
+  }, [phase]);
+
+  const startSegmentPlan = useCallback(() => {
+    if (!activeDog) return;
+    const label = normalizeCustomSegmentLabel(segmentCustomLabel);
+    if (segmentType === 'custom' && !label) {
+      showToast('Bitte gib eine Bezeichnung ein.');
+      return;
+    }
+    const segment = createPlannedSegment({
+      dogId: activeDog.id,
+      trackSessionId: sessionIdRef.current,
+      type: segmentType,
+      customLabel: label,
+      currentStep: metersToSteps(useTrackingStore.getState().distanceMeters),
+      plannedLengthSteps: segmentSteps,
+      voiceEnabled: segmentVoiceEnabled,
+      preannounceSteps: SEGMENT_PREANNOUNCE_STEPS,
+    });
+    useTrackingStore.getState().addSegment(segment);
+    setSegmentSheet(false);
+    hapticSuccess();
+    if (segment.voiceEnabled) speakTrackSegment(plannedSegmentAnnouncement(segment));
+  }, [activeDog, segmentCustomLabel, segmentSteps, segmentType, segmentVoiceEnabled, showToast]);
+
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    const st = useTrackingStore.getState();
+    const segment = activeOrPlannedSegment(st.segments);
+    if (!segment) return;
+    const step = metersToSteps(st.distanceMeters);
+    if (segment.status === 'planned' && step >= segment.startStep) {
+      st.updateSegment(segment.id, {
+        status: 'active',
+        startCoordinate: st.currentPosition,
+        startTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
+        startedAt: Date.now(),
+      });
+      hapticSuccess();
+      if (segment.voiceEnabled) speakTrackSegment(segmentStartAnnouncement(segment));
+      return;
+    }
+    if (segment.status === 'active' && step >= segment.endStep) {
+      st.updateSegment(segment.id, {
+        status: 'completed',
+        endStep: step,
+        endCoordinate: st.currentPosition,
+        endTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
+        completedAt: Date.now(),
+      });
+      hapticSuccess();
+      if (segment.voiceEnabled) speakTrackSegment(segmentEndAnnouncement());
+    }
+  }, [currentStep, phase, trackPoints.length]);
+
+  const completeActiveSegmentNow = useCallback(() => {
+    const st = useTrackingStore.getState();
+    const segment = activeOrPlannedSegment(st.segments);
+    if (!segment) return;
+    st.updateSegment(segment.id, {
+      status: 'completed',
+      endStep: metersToSteps(st.distanceMeters),
+      endCoordinate: st.currentPosition,
+      endTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
+      completedAt: Date.now(),
+    });
+    hapticSuccess();
+    if (segment.voiceEnabled) speakTrackSegment(segmentEndAnnouncement());
+  }, []);
+
+  const cancelActiveSegment = useCallback(() => {
+    const st = useTrackingStore.getState();
+    const segment = activeOrPlannedSegment(st.segments);
+    if (!segment) return;
+    st.updateSegment(segment.id, { status: 'cancelled', completedAt: Date.now() });
+    hapticWarning();
+  }, []);
 
   const onStop = () => {
     if (stoppingRef.current) return;   // Doppelklick abfangen
@@ -262,11 +500,26 @@ export default function LegenScreen() {
     // rec.finish stoppt synchron, startet die Liegezeit und speichert im
     // HINTERGRUND (saveState). Wir navigieren SOFORT — kein await, keine 2–5 s.
     rec.finish(id);   // toleriert null (offline → nur lokal gesichert)
+
+    // Registry: Übergang laying → resting. Liegezeit-Start = jetzt (deckt sich mit
+    // dem Store-Übergang in setLayFinishedAt). Kennzahlen für die Karten mitgeben.
+    if (activeDog) {
+      useActiveFaehrten.getState().upsert(activeDog.id, {
+        status: 'resting', sessionId: id, layStartedAt: Date.now(),
+        distanceMeters: Math.round(distanceMeters), winkelCount: winkel, objektCount: gegenstaende,
+      });
+    }
+    const dq = activeDog ? `&dogId=${activeDog.id}` : '';
     if (id) {
-      router.replace(`/track/liegen?id=${id}` as never);   // → Wartephase (Liegezeit) → Ausarbeiten
+      router.replace(`/track/liegen?id=${id}${dq}` as never);   // → Wartephase (Liegezeit) → Ausarbeiten
     } else {
-      showToast(t('toast.localSaved'));
-      router.canGoBack() ? router.back() : router.replace('/track' as never);
+      // Offline: noch keine Session-ID, aber die Fährte gehört dem Hund → Liegen mit dogId.
+      if (activeDog) router.replace(`/track/liegen?dogId=${activeDog.id}` as never);
+      else {
+        showToast(t('toast.localSaved'));
+        if (router.canGoBack()) router.back();
+        else router.replace('/track' as never);
+      }
     }
   };
 
@@ -332,6 +585,7 @@ export default function LegenScreen() {
             <TrackingMap
               layPoints={trackPoints}
               markers={mapMarkers}
+              segments={segments}
               startAnchor={startAnchor}
               currentPosition={currentPosition}
               heading={heading}
@@ -379,6 +633,49 @@ export default function LegenScreen() {
               <View className="flex-row items-center gap-2 px-3 py-1.5 rounded-full bg-ft-glass border border-ft-glass-line">
                 <ActivityIndicator size="small" color={FT.acc} />
                 <Text className="text-[11px] font-bold text-ft-text">Startpunkt wird gesetzt … kurz stehen bleiben</Text>
+              </View>
+            </View>
+          )}
+
+          {phase === 'recording' && activeSegment && (
+            <View className="absolute left-[14px] right-[14px] bottom-[88px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
+              <View className="flex-row items-center justify-between gap-3">
+                <View className="flex-1">
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">
+                    {activeSegment.status === 'planned' ? 'Teilstrecke geplant' : 'Teilstrecke aktiv'}
+                  </Text>
+                  <Text className="text-[15px] text-ft-text font-black mt-0.5">{segmentDisplayLabel(activeSegment)}</Text>
+                  <Text className="text-[12px] text-ft-muted font-semibold mt-1">
+                    {activeSegment.status === 'planned'
+                      ? `In ${Math.max(0, activeSegment.startStep - currentStep)} Schritten`
+                      : `Noch ${Math.max(0, activeSegment.endStep - currentStep)} Schritte`}
+                  </Text>
+                </View>
+                <View className="items-end gap-2">
+                  <Text className="text-[12px] text-ft-acc font-extrabold" style={{ fontVariant: ['tabular-nums'] }}>
+                    {activeSegment.status === 'active'
+                      ? `${Math.max(0, activeSegment.endStep - currentStep)} / ${activeSegment.plannedLengthSteps}`
+                      : `${activeSegment.plannedLengthSteps} Schritte`}
+                  </Text>
+                  <View className="flex-row gap-2">
+                    <Pressable
+                      accessibilityLabel="Teilstrecke beenden"
+                      accessibilityHint="Beendet die geplante oder aktive Teilstrecke sofort."
+                      onPress={completeActiveSegmentNow}
+                      className="px-3 py-2 rounded-[10px] bg-ft-acc"
+                    >
+                      <Text className="text-[11px] font-black text-ft-acc-text">Beenden</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="Teilstrecke abbrechen"
+                      accessibilityHint="Bricht die Teilstrecke ab, ohne sie auszuwerten."
+                      onPress={cancelActiveSegment}
+                      className="px-3 py-2 rounded-[10px] bg-white/10 border border-ft-line"
+                    >
+                      <Text className="text-[11px] font-black text-ft-text">Abbrechen</Text>
+                    </Pressable>
+                  </View>
+                </View>
               </View>
             </View>
           )}
@@ -467,8 +764,8 @@ export default function LegenScreen() {
                   </View>
                   <Text className="text-[11px] text-ft-faint self-start mb-1">
                     {autoDetect
-                      ? 'Winkel, Spitzwinkel & Abriss werden automatisch erkannt. Gegenstände setzt du selbst.'
-                      : 'Du setzt alle Winkel & Abrisse selbst. Gegenstände sind ohnehin manuell.'}
+                      ? 'Winkel & Spitzwinkel werden automatisch erkannt. Abriss und Gegenstände setzt du selbst.'
+                      : 'Du setzt Winkel, Abriss und Gegenstände selbst.'}
                   </Text>
 
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
@@ -499,7 +796,7 @@ export default function LegenScreen() {
                   {/* Start (frei ab GPS bereit; nach 15 s manuell trotz Ungenauigkeit) */}
                   <Pressable
                     className={`flex-row items-center justify-center gap-2 mt-4 rounded-[16px] px-[20px] py-3 self-stretch ${canStart ? 'bg-ft-acc' : 'bg-white/10'}`}
-                    onPress={() => { if (canStart) { hapticTap(); setShowBgDisclosure(true); } }}
+                    onPress={() => { if (canStart) handleStartPress(); }}
                     disabled={!canStart}
                   >
                     <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
@@ -516,6 +813,15 @@ export default function LegenScreen() {
         {/* Steuerung */}
         <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
           <Pressable
+            accessibilityLabel="Teilstrecke hinzufügen"
+            accessibilityHint="Öffnet die Auswahl zum Planen einer Teilstrecke."
+            className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
+            onPress={openSegmentSheet} disabled={phase !== 'recording'}
+          >
+            <Ionicons name="trail-sign-outline" size={20} color={FT.text} />
+            <Text className="text-[10.5px] font-extrabold text-ft-text">Teilstrecke</Text>
+          </Pressable>
+          <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
             onPress={() => setMaterialSheet(true)} disabled={phase !== 'recording'}
           >
@@ -523,8 +829,17 @@ export default function LegenScreen() {
             <Text className="text-[10.5px] font-extrabold text-ft-text">{t('track.object')}</Text>
           </Pressable>
           <Pressable
+            accessibilityLabel="Abriss setzen"
+            accessibilityHint="Setzt an der aktuellen Position manuell einen Abriss-Marker."
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            onPress={() => { hapticTap(); isPaused ? rec.resume() : rec.pause(); }} disabled={phase !== 'recording'}
+            onPress={placeAbriss} disabled={phase !== 'recording'}
+          >
+            <Ionicons name="cut-outline" size={20} color={FT.warn} />
+            <Text className="text-[10.5px] font-extrabold text-ft-text">Abriss</Text>
+          </Pressable>
+          <Pressable
+            className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
+            onPress={() => { hapticTap(); if (isPaused) rec.resume(); else rec.pause(); }} disabled={phase !== 'recording'}
           >
             <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color={FT.text} />
             <Text className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>
@@ -555,6 +870,75 @@ export default function LegenScreen() {
               <Text className="text-[12.5px] font-bold text-ft-text">{m.label}</Text>
             </Pressable>
           ))}
+        </View>
+      </AnyvoBottomSheet>
+
+      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title="Teilstrecke hinzufügen">
+        <View className="gap-4 pb-2">
+          <View className="flex-row flex-wrap gap-[10px]">
+            {TRACK_SEGMENT_TYPES.map(type => {
+              const on = segmentType === type;
+              return (
+                <Pressable
+                  key={type}
+                  accessibilityLabel={`${TRACK_SEGMENT_LABELS[type]} auswählen`}
+                  onPress={() => setSegmentType(type)}
+                  style={{ width: '47%', flexGrow: 1 }}
+                  className={`flex-row items-center gap-2 px-3 py-3 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line-strong'}`}
+                >
+                  <Ionicons name={SEGMENT_ICONS[type]} size={18} color={on ? FT.acc : FT.muted} />
+                  <Text className={`text-[12.5px] font-bold ${on ? 'text-ft-acc' : 'text-ft-text'}`}>{TRACK_SEGMENT_LABELS[type]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {segmentType === 'custom' && (
+            <TextInput
+              accessibilityLabel="Bezeichnung der eigenen Teilstrecke"
+              accessibilityHint="Pflichtfeld für eine eigene Teilstrecke."
+              value={segmentCustomLabel}
+              onChangeText={setSegmentCustomLabel}
+              maxLength={40}
+              placeholder="Bezeichnung"
+              placeholderTextColor={FT.faint}
+              className="rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line-strong text-ft-text font-semibold"
+            />
+          )}
+
+          <View className="rounded-[16px] p-3 bg-white/5 border border-ft-line-strong">
+            <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase mb-2">Anzahl Schritte</Text>
+            <View className="flex-row items-center justify-between">
+              <Pressable accessibilityLabel="Schritte verringern" onPress={() => setSegmentSteps(s => clampSegmentSteps(s - 1))} className="w-11 h-11 rounded-[13px] bg-white/10 items-center justify-center">
+                <Ionicons name="remove" size={20} color={FT.text} />
+              </Pressable>
+              <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{segmentSteps}</Text>
+              <Pressable accessibilityLabel="Schritte erhöhen" onPress={() => setSegmentSteps(s => clampSegmentSteps(s + 1))} className="w-11 h-11 rounded-[13px] bg-white/10 items-center justify-center">
+                <Ionicons name="add" size={20} color={FT.text} />
+              </Pressable>
+            </View>
+          </View>
+
+          <Pressable
+            accessibilityLabel="Sprachansagen für Teilstrecken umschalten"
+            accessibilityHint="Aktiviert oder deaktiviert feste Ansagen für geplante und aktive Teilstrecken."
+            onPress={() => setSegmentVoiceEnabled(v => !v)}
+            className="flex-row items-center justify-between rounded-[16px] px-4 py-3 bg-white/5 border border-ft-line-strong"
+          >
+            <Text className="text-[13px] text-ft-text font-bold">Sprachansagen für Teilstrecken</Text>
+            <View className={`w-12 h-7 rounded-full p-1 ${segmentVoiceEnabled ? 'bg-ft-acc' : 'bg-white/15'}`}>
+              <View className={`w-5 h-5 rounded-full bg-[#04110F] ${segmentVoiceEnabled ? 'self-end' : 'self-start'}`} />
+            </View>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="Teilstrecke starten"
+            onPress={startSegmentPlan}
+            className="flex-row items-center justify-center gap-2 rounded-[16px] px-4 py-3 bg-ft-acc"
+          >
+            <Ionicons name="play" size={16} color={FT.accText} />
+            <Text className="text-[14px] font-black text-ft-acc-text">Teilstrecke starten</Text>
+          </Pressable>
         </View>
       </AnyvoBottomSheet>
 

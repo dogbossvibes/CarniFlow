@@ -1,9 +1,32 @@
 import { supabase } from '@/lib/supabase';
+import { CONNECT_ENABLED } from '@/features/connect/constants/featureFlag';
+import type { Dog } from '@/types';
 import type {
   ConnectProfile, ConnectDogProfile, ConnectPrivacySettings,
   ConnectFriendship, ConnectBlock, ConnectReport,
   ConnectFriendshipStatus, ConnectReportTarget, ConnectReportReason,
 } from '@/features/connect/types/connect.types';
+
+// Sicherheitsnetz: KEINE CONNECT-Abfrage bei deaktiviertem Feature-Flag. Screens
+// mounten ohnehin nur bei aktivem Flag; dieser Guard verhindert versehentliche
+// Aufrufe (z. B. aus Tests/Hintergrund) und hält die App boot-neutral.
+function assertConnectEnabled(): void {
+  if (!CONNECT_ENABLED) throw new Error('[connect] deaktiviert (Feature-Flag aus)');
+}
+
+// Fehlerübersetzung: DB-/Netzfehler → knappe, nutzbare Meldung (keine internen Details).
+export function connectErrorMessage(error: { message?: string; code?: string } | null | undefined): string | null {
+  if (!error) return null;
+  if (error.code === '23505') return 'Dieser Eintrag existiert bereits.';
+  if (error.code === '42P01') return 'CONNECT ist noch nicht eingerichtet.';   // Tabelle fehlt (Migration nicht eingespielt)
+  return 'Aktion fehlgeschlagen. Bitte später erneut versuchen.';
+}
+
+// Explizite Spaltenlisten (kein SELECT *).
+const PROFILE_COLS = 'id,user_id,display_name,username,bio,avatar_path,visibility,discoverable,allow_friend_requests,allow_messages_from,region_label,created_at,updated_at';
+const PRIVACY_COLS = 'user_id,profile_visibility,training_visibility_default,show_region,allow_message_requests,allow_training_requests,show_online_status,created_at,updated_at';
+const DOGPROFILE_COLS = 'id,dog_id,owner_user_id,is_visible,bio,activity_tags,experience_level,allow_training_partner_requests,created_at,updated_at';
+const DOG_COLS = 'id,owner_id,name,breed,birth_date,photo_url,is_favorite';
 
 // ANYVO CONNECT — Repository (Schritt 2: Fundament). Alle Selects limitiert,
 // keine unbegrenzten Abfragen. RLS erzwingt serverseitig die Sichtbarkeit;
@@ -148,4 +171,65 @@ export function createReport(
     })
     .select('*')
     .maybeSingle<ConnectReport>();
+}
+
+// ── Schritt 3: eigenes Profil / Datenschutz / Hund-Profile ──────────────────
+// Alle mit Flag-Guard, expliziten Spalten, limitierten Resultsets, ohne service_role.
+
+export function getMyConnectProfile(userId: string) {
+  assertConnectEnabled();
+  return supabase.from('connect_profiles').select(PROFILE_COLS).eq('user_id', userId).maybeSingle<ConnectProfile>();
+}
+
+export function createMyConnectProfile(userId: string, patch: Partial<ConnectProfile>) {
+  assertConnectEnabled();
+  return supabase.from('connect_profiles')
+    .insert({ ...patch, user_id: userId })
+    .select(PROFILE_COLS).maybeSingle<ConnectProfile>();
+}
+
+export function updateMyConnectProfile(userId: string, patch: Partial<ConnectProfile>) {
+  assertConnectEnabled();
+  return supabase.from('connect_profiles')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .select(PROFILE_COLS).maybeSingle<ConnectProfile>();
+}
+
+export function getMyConnectPrivacySettings(userId: string) {
+  assertConnectEnabled();
+  return supabase.from('connect_privacy_settings').select(PRIVACY_COLS).eq('user_id', userId).maybeSingle<ConnectPrivacySettings>();
+}
+
+export function updateMyConnectPrivacySettings(userId: string, patch: Partial<ConnectPrivacySettings>) {
+  assertConnectEnabled();
+  return supabase.from('connect_privacy_settings')
+    .upsert({ ...patch, user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    .select(PRIVACY_COLS).maybeSingle<ConnectPrivacySettings>();
+}
+
+// Berechtigte Hunde = eigene Hunde (owner_id). RLS bleibt endgültige Autorisierung.
+export function listMyEligibleDogs(userId: string, limit = 50) {
+  assertConnectEnabled();
+  return supabase.from('dogs').select(DOG_COLS).eq('owner_id', userId).order('is_favorite', { ascending: false }).limit(limit).returns<Pick<Dog, 'id' | 'owner_id' | 'name' | 'breed' | 'birth_date' | 'photo_url' | 'is_favorite'>[]>();
+}
+
+export function listMyConnectDogProfiles(userId: string, limit = 50) {
+  assertConnectEnabled();
+  return supabase.from('connect_dog_profiles').select(DOGPROFILE_COLS).eq('owner_user_id', userId).limit(limit).returns<ConnectDogProfile[]>();
+}
+
+export function upsertMyConnectDogProfile(dogId: string, ownerUserId: string, patch: Partial<ConnectDogProfile>) {
+  assertConnectEnabled();
+  return supabase.from('connect_dog_profiles')
+    .upsert({ ...patch, dog_id: dogId, owner_user_id: ownerUserId, updated_at: new Date().toISOString() }, { onConflict: 'dog_id' })
+    .select(DOGPROFILE_COLS).maybeSingle<ConnectDogProfile>();
+}
+
+export function disableMyConnectDogProfile(dogId: string) {
+  assertConnectEnabled();
+  return supabase.from('connect_dog_profiles')
+    .update({ is_visible: false, updated_at: new Date().toISOString() })
+    .eq('dog_id', dogId)
+    .select(DOGPROFILE_COLS).maybeSingle<ConnectDogProfile>();
 }

@@ -2,7 +2,9 @@
 // Founder Active ist ein EIGENER Plan (kein Rabatt). „Active"-Funktionen = pro_member,
 // „Trainer"-Funktionen = trainer_module. Der Plan steuert user_capabilities.
 
-export type SubscriptionPlan = 'beginner_trial' | 'founder_active' | 'active' | 'trainer';
+// Abo-Stufen: NEWBIE (Einstieg), ACTIVE, FOUNDER_ACTIVE, TRAINER.
+// (Die frühere Bezeichnung „Beginner" wird nicht mehr verwendet.)
+export type SubscriptionPlan = 'newbie' | 'founder_active' | 'active' | 'trainer';
 export type SubscriptionStatus = 'trialing' | 'active' | 'expired' | 'cancelled' | 'past_due';
 
 // Maximale Anzahl Founder-Active-Slots (Anzeige/Client). Ehemals 77, seit dem
@@ -25,6 +27,7 @@ export const TRAINER_CAPABILITIES: Capability[] = [
 
 // App-Store / RevenueCat Product-IDs (nur Monatsabos).
 export const PRODUCT_IDS = {
+  newbieMonthly:        'anyvo_newbie_monthly_0',
   // ID-Suffix _8.00 ist historisch; tatsächlicher Preis = CHF 4.00 (im Store gesetzt).
   founderActiveMonthly: 'anyvo_founder_active_monthly_8.00',
   activeMonthly:        'anyvo_active_monthly_10',
@@ -43,7 +46,7 @@ export interface PlanMeta {
 }
 
 export const PLAN_META: Record<SubscriptionPlan, PlanMeta> = {
-  beginner_trial: { id: 'beginner_trial', name: 'Beginner',       priceChf: null, priceLabel: '7 Tage gratis', productId: PRODUCT_IDS.activeMonthly,        trainer: false },
+  newbie:         { id: 'newbie',         name: 'Newbie',         priceChf: 0,  priceLabel: 'Gratis',        productId: PRODUCT_IDS.newbieMonthly,         trainer: false },
   founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 4,  priceLabel: 'CHF 4.00/Mt.',  productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
   active:         { id: 'active',         name: 'Active',         priceChf: 6,  priceLabel: 'CHF 6.00/Mt.',  productId: PRODUCT_IDS.activeMonthly,         trainer: false },
   trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 15, priceLabel: 'CHF 15.00/Mt.', productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
@@ -82,7 +85,20 @@ export function isTrialLapsed(
 
 // Product-ID → Plan (für Restore / Provider-Bestätigung).
 export function planOfProduct(productId: string | null | undefined): SubscriptionPlan {
+  if (productId === PRODUCT_IDS.newbieMonthly) return 'newbie';
   if (productId === PRODUCT_IDS.founderActiveMonthly) return 'founder_active';
   if (productId === PRODUCT_IDS.trainerMonthly) return 'trainer';
   return 'active';
+}
+
+// Abwärtskompatibilität (Übergangsphase bis zur Migration):
+// Der ALTE DB-Wert 'beginner_trial' wird beim LESEN auf 'newbie' normalisiert.
+// Er wird NIE neu gespeichert. Unbekannte Werte → null (defensiv, geloggt ohne
+// private Daten). So verliert kein Nutzer wegen eines Altwerts sein Abo.
+export function normalizeSubscriptionPlan(raw: string | null | undefined): SubscriptionPlan | null {
+  if (raw == null) return null;
+  if (raw === 'beginner_trial') return 'newbie';   // Legacy → newbie
+  if (raw === 'newbie' || raw === 'active' || raw === 'founder_active' || raw === 'trainer') return raw;
+  if (__DEV__) console.warn('[subscription] unbekannter Planwert — defensiv auf null gesetzt');
+  return null;
 }

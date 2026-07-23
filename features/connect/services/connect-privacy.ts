@@ -1,4 +1,16 @@
-import type { ConnectVisibility } from '@/features/connect/types/connect.types';
+import type { ConnectVisibility, ConnectPrivacySettings } from '@/features/connect/types/connect.types';
+
+// Datenschutzfreundliche Standardwerte: Profil NICHT automatisch öffentlich,
+// Trainings nur Freunde, Region + Online-Status standardmäßig AUS. Exakte
+// Standorte sind grundsätzlich ausgeschlossen (nicht Teil dieser Settings).
+export const DEFAULT_CONNECT_PRIVACY: Omit<ConnectPrivacySettings, 'user_id' | 'created_at' | 'updated_at'> = {
+  profile_visibility: 'friends',
+  training_visibility_default: 'friends',
+  show_region: false,
+  allow_message_requests: true,
+  allow_training_requests: true,
+  show_online_status: false,
+};
 
 // ANYVO CONNECT — Datenschutz-Logik (rein, testbar). Serverseitig gilt zusätzlich
 // die RLS; diese Funktionen sind für optimistische UI + sichere Share-Aufbereitung.

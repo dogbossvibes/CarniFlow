@@ -2,51 +2,48 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Share, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useSession } from '@/hooks/useSession';
-import {
-  getMyClientConnections, respondToConnection, removeConnection, createInvite, getMyInvites,
-} from '@/services/connectionService';
+import { getMyClientConnections, respondToConnection, removeConnection } from '@/services/connectionService';
+import { getMyTrainerProfile } from '@/services/trainerService';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
-import type { ConnectionInvite, ConnectionView } from '@/types/connection';
+import type { ConnectionView } from '@/types/connection';
+import type { TrainerProfile } from '@/types/trainer';
 
 function initial(name: string | null) { return (name?.trim()?.[0] ?? '?').toUpperCase(); }
 
 export default function ClientsScreen() {
+  const router = useRouter();
   const { session } = useSession();
   const meId = session?.user.id;
 
   const [clients, setClients] = useState<ConnectionView[]>([]);
-  const [invite, setInvite]   = useState<ConnectionInvite | null>(null);
+  const [trainerProfile, setTrainerProfile] = useState<TrainerProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy]       = useState(false);
 
   const load = useCallback(async () => {
     if (!meId) return;
     setLoading(true);
-    const [cs, invites] = await Promise.all([getMyClientConnections(meId), getMyInvites(meId)]);
+    const [cs, profileRes] = await Promise.all([getMyClientConnections(meId), getMyTrainerProfile(meId)]);
     setClients(cs);
-    const active = invites.find(i => !i.expires_at || new Date(i.expires_at) > new Date()) ?? invites[0] ?? null;
-    setInvite(active);
+    setTrainerProfile((profileRes.data as TrainerProfile) ?? null);
     setLoading(false);
   }, [meId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const makeCode = async () => {
-    if (!meId) return;
-    setBusy(true);
-    const { data, error } = await createInvite(meId);
-    setBusy(false);
-    if (error || !data) { Alert.alert('Fehler', error ?? 'Code konnte nicht erstellt werden.'); return; }
+  const copyCode = async () => {
+    if (!trainerProfile?.code) return;
+    await Clipboard.setStringAsync(trainerProfile.code);
     successHaptic();
-    setInvite(data);
+    Alert.alert('Kopiert', `Trainer-Code ${trainerProfile.code} kopiert.`);
   };
 
   const shareCode = async () => {
-    if (!invite) return;
-    await Share.share({ message: `Verbinde dich mit mir in ANYVO mit dem Code: ${invite.code}` });
+    if (!trainerProfile?.code) return;
+    await Share.share({ message: `Verbinde dich mit mir in ANYVO mit dem Trainer-Code: ${trainerProfile.code}` });
   };
 
   const accept = async (c: ConnectionView) => { tapHaptic(); await respondToConnection(c.id, 'accepted'); successHaptic(); load(); };
@@ -71,24 +68,24 @@ export default function ClientsScreen() {
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {/* Einladungscode */}
         <View style={s.inviteCard}>
-          <Text style={s.inviteLabel}>DEIN EINLADUNGSCODE</Text>
-          {invite ? (
+          <Text style={s.inviteLabel}>DEIN TRAINER-CODE</Text>
+          {trainerProfile?.code ? (
             <>
-              <Text style={s.inviteCode}>{invite.code}</Text>
+              <Text style={s.inviteCode}>{trainerProfile.code}</Text>
               <View style={s.inviteBtns}>
                 <TouchableOpacity style={s.inviteBtn} onPress={shareCode} activeOpacity={0.85}>
                   <Ionicons name="share-outline" size={16} color={C.accentText} />
                   <Text style={s.inviteBtnTxt}>Teilen</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={s.inviteBtnAlt} onPress={makeCode} disabled={busy} activeOpacity={0.85}>
-                  <Text style={s.inviteBtnAltTxt}>Neuer Code</Text>
+                <TouchableOpacity style={s.inviteBtnAlt} onPress={copyCode} activeOpacity={0.85}>
+                  <Text style={s.inviteBtnAltTxt}>Kopieren</Text>
                 </TouchableOpacity>
               </View>
             </>
           ) : (
-            <TouchableOpacity style={s.inviteBtn} onPress={makeCode} disabled={busy} activeOpacity={0.85}>
-              {busy ? <ActivityIndicator size="small" color={C.accentText} />
-                : <><Ionicons name="add" size={16} color={C.accentText} /><Text style={s.inviteBtnTxt}>Code erstellen</Text></>}
+            <TouchableOpacity style={s.inviteBtn} onPress={() => router.push('/trainer/edit' as never)} activeOpacity={0.85}>
+              <Ionicons name="person-add-outline" size={16} color={C.accentText} />
+              <Text style={s.inviteBtnTxt}>Trainerprofil erstellen</Text>
             </TouchableOpacity>
           )}
         </View>

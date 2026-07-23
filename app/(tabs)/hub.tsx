@@ -12,6 +12,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 interface Module { icon: IconName; color: string; title: string; sub: string; route: string; badge?: boolean }
 
 const MODULES: Module[] = [
+  { icon: 'ribbon',        color: '#00F5D4', title: 'Trainerprofil',  sub: 'Profil & Code',          route: '/trainer/edit' },
   { icon: 'people',        color: '#60A5FA', title: 'Kunden',         sub: 'Anfragen & Verwaltung',  route: '/(tabs)/clients', badge: true },
   { icon: 'clipboard',     color: '#00F5D4', title: 'Trainingspläne', sub: 'Erstellen & teilen',     route: '/trainer/plaene' },
   { icon: 'megaphone',     color: '#A78BFA', title: 'Umfragen',       sub: 'Termine & Ergebnisse',   route: '/umfrage/meine' },

@@ -10,7 +10,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useSession } from '@/hooks/useSession';
-import { listConnections, redeemInvite, removeConnection } from '@/services/connectionService';
+import { isTrainerConnectionForClient, listConnections, removeConnection } from '@/services/connectionService';
+import { redeemTrainerCode, redeemTrainerCodeMessage } from '@/services/trainerService';
+import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import type { ConnectionStatus, ConnectionView } from '@/types/connection';
 
@@ -35,18 +37,25 @@ export default function MyTrainersScreen() {
   const load = useCallback(() => {
     if (!meId) return;
     setLoading(true);
-    listConnections(meId).then(cs => { setTrainers(cs.filter(c => c.myRole === 'owner')); setLoading(false); });
+    listConnections(meId).then(cs => { setTrainers(cs.filter(isTrainerConnectionForClient)); setLoading(false); });
   }, [meId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const submitCode = async () => {
     if (!code.trim()) return;
     setRedeeming(true);
-    const { error } = await redeemInvite(code);
+    const res = await redeemTrainerCode(code);
     setRedeeming(false);
-    if (error) { haptic.error(); Alert.alert('Hinweis', error); return; }
+    if (res.status !== 'success' && res.status !== 'already_connected') {
+      haptic.error();
+      Alert.alert('Hinweis', redeemTrainerCodeMessage(res.status));
+      return;
+    }
     successHaptic();
     setSheet(false); setCode('');
+    queryClient.invalidateQueries({ queryKey: ['connections'] });
+    queryClient.invalidateQueries({ queryKey: ['hubBadge'] });
+    queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     load();
   };
 
@@ -119,11 +128,11 @@ export default function MyTrainersScreen() {
           <SafeAreaView edges={['bottom']}>
             <View style={s.griff} />
             <Text style={s.sheetTitle}>Trainer-Code eingeben</Text>
-            <Text style={s.sheetSub}>Deine Trainer:in gibt dir einen Einladungscode.</Text>
+            <Text style={s.sheetSub}>Deine Trainer:in gibt dir den Code aus dem Trainerprofil.</Text>
             <View style={s.searchRow}>
               <TextInput
                 style={[s.input, s.flex]}
-                placeholder="z. B. ABC123"
+                placeholder="z. B. CANIS-4827"
                 placeholderTextColor={C.placeholder}
                 value={code}
                 onChangeText={setCode}

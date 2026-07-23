@@ -12,6 +12,8 @@ import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/f
 import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
 import { useDogHubDynamic } from '@/features/dogs/useDogHubDynamic';
 import { DogHubScreen, type DogHubActions } from '@/features/dogs/DogHubScreen';
+import { useDogActiveFaehrte } from '@/features/tracking/hooks/useActiveFaehrte';
+import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
 import type { DogDocument, DogTrainingItem } from '@/components/dogs/types';
 import type { Dog } from '@/types';
 
@@ -28,6 +30,8 @@ export default function DogHubRoute() {
 
   const { feed } = useTrainingFeed(id);
   const dynamic = useDogHubDynamic(id);
+  const activeFaehrte = useDogActiveFaehrte(id);   // offene Fährte dieses Hundes (reaktiv)
+  const lastFaehrteId = useMemo(() => feed.find(it => it.source === 'track')?.id ?? null, [feed]);   // letzte abgeschlossene Fährte
   const [extras, setExtras] = useState<DogHubExtras | null>(null);
   const [heatCycles, setHeatCycles] = useState<HeatCycle[]>([]);
   const [commands, setCommands] = useState<DogCommand[]>([]);
@@ -164,6 +168,10 @@ export default function DogHubRoute() {
         onToggleFavorite: toggleCmdFav,
         onSeedDemo: seedCmds,
       }}
+      activeFaehrte={activeFaehrte}
+      onOpenFaehrte={activeFaehrte ? () => router.push(reopenTarget(activeFaehrte) as never) : undefined}
+      lastFaehrteId={lastFaehrteId}
+      onOpenLastFaehrte={lastFaehrteId ? () => router.push(`/track/${lastFaehrteId}` as never) : undefined}
     />
   );
 }
