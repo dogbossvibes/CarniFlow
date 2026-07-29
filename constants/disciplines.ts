@@ -41,7 +41,7 @@ export const DISCIPLINES: Discipline[] = [
     subtitle: 'Präzision & Teamarbeit',
     emoji:    '🎯',
     icon:     'locate',
-    accent:   '#60A5FA',         // Blau
+    accent:   C.sparteUnterordnung,   // Gold (gedämpft)
     hero:     false,
     exercises: [
       'Fussarbeit',
@@ -61,7 +61,7 @@ export const DISCIPLINES: Discipline[] = [
     subtitle: 'Mut, Kontrolle & Belastbarkeit',
     emoji:    '🛡',
     icon:     'shield',
-    accent:   '#FF8A3D',         // Orange
+    accent:   C.sparteSchutzdienst,   // Salbei / Jade (kein Orange)
     hero:     false,
     exercises: [
       'Revieren',
@@ -80,7 +80,7 @@ export const DISCIPLINES: Discipline[] = [
     subtitle: 'Präzision & Freude an der Arbeit',
     emoji:    '🎪',
     icon:     'ribbon',
-    accent:   '#F472B6',         // Pink
+    accent:   C.sparteObedience,   // Lavendel / Violett (kein Pink)
     hero:     false,
     exercises: [
       'Fussarbeit',

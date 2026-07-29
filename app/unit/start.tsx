@@ -12,7 +12,7 @@ import { DISCIPLINES, customToDiscipline, type Discipline } from '@/constants/di
 import { DEFAULT_SPARTEN } from '@/constants/sparten';
 import { HelpButton } from '@/components/help/HelpButton';
 import { HeroImage } from '@/components/training/HeroImage';
-import { DisciplineCard } from '@/components/training/DisciplineCard';
+import { DisciplineGridCard } from '@/components/training/DisciplineGridCard';
 import { useActiveTraining, startUnit, addExercise } from '@/stores/activeTraining';
 import { createTrainingUnit } from '@/services/trainingUnitService';
 import { DogIcon } from '@/components/ui/DogIcon';
@@ -35,14 +35,15 @@ export default function UnitStartScreen() {
   const [selectedDogId, setSelectedDogId] = useState<string | null>(
     addMode ? active.dogId : dogs.length === 1 ? dogs[0].id : null,
   );
+  const [dogPickerOpen, setDogPickerOpen] = useState(false);   // nur UI-Disclosure; Auswahllogik unverändert
 
   // Feste Sparten nach den im Profil aktivierten filtern. Fallback = Standard-
   // Sparten (nicht „alle"), damit Opt-in-Sparten wie Obedience für neue Nutzer
   // ohne gesetzte aktive_sparten NICHT vorab erscheinen.
   const aktiveSparten = profile?.aktive_sparten ?? DEFAULT_SPARTEN;
   const fixed   = DISCIPLINES.filter(d => !d.custom && aktiveSparten.includes(d.label));
-  const creator = DISCIPLINES.find(d => d.custom)!;
   const cards   = [...fixed, ...categories.map(customToDiscipline)];
+  const selectedDogName = dogs.find(d => d.id === selectedDogId)?.name ?? null;
 
   // Standard-Sparten (Fährte, Unterordnung, Schutzdienst) direkt ohne
   // Übungs-/Unterkategorie-Auswahl ins Live-Tracking starten.
@@ -118,7 +119,7 @@ export default function UnitStartScreen() {
       </HeroImage>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        {/* Hundauswahl bzw. fixierter Hund */}
+        {/* Hundauswahl: kompakter Selector (bestehende Auswahllogik/IDs) */}
         {addMode ? (
           <View style={s.lockedDog}>
             <DogIcon size={14} color={C.accent} />
@@ -130,33 +131,54 @@ export default function UnitStartScreen() {
             {dogs.length === 0 ? (
               <View style={s.emptyBox}><Text style={s.emptyTxt}>Zuerst einen Hund anlegen</Text></View>
             ) : (
-              <View style={s.dogRow}>
-                {dogs.map(d => {
-                  const aktiv = selectedDogId === d.id;
-                  return (
-                    <TouchableOpacity
-                      key={d.id}
-                      style={[s.dogChip, aktiv && s.dogChipActive]}
-                      onPress={() => { tapHaptic(); setSelectedDogId(d.id); }}
-                      activeOpacity={0.8}
-                    >
-                      {aktiv && <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />}
-                      <DogIcon size={13} color={aktiv ? C.accentText : C.muted} />
-                      <Text style={[s.dogChipTxt, aktiv && s.dogChipTxtActive]}>{d.name}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <>
+                <TouchableOpacity
+                  style={s.dogSelector}
+                  activeOpacity={0.85}
+                  onPress={() => { tapHaptic(); if (dogs.length > 1) setDogPickerOpen(o => !o); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Hund wählen: ${selectedDogName ?? 'kein Hund gewählt'}`}
+                >
+                  <View style={s.dogAvatar}><DogIcon size={18} color={C.accent} /></View>
+                  <Text style={s.dogSelectorName} numberOfLines={1}>
+                    {selectedDogName ?? 'Hund wählen'}
+                  </Text>
+                  {dogs.length > 1 && (
+                    <Ionicons name={dogPickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color={C.muted} />
+                  )}
+                </TouchableOpacity>
+
+                {dogPickerOpen && dogs.length > 1 && (
+                  <View style={s.dogRow}>
+                    {dogs.map(d => {
+                      const aktiv = selectedDogId === d.id;
+                      return (
+                        <TouchableOpacity
+                          key={d.id}
+                          style={[s.dogChip, aktiv && s.dogChipActive]}
+                          onPress={() => { tapHaptic(); setSelectedDogId(d.id); setDogPickerOpen(false); }}
+                          activeOpacity={0.8}
+                        >
+                          {aktiv && <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />}
+                          <DogIcon size={13} color={aktiv ? C.accentText : C.muted} />
+                          <Text style={[s.dogChipTxt, aktiv && s.dogChipTxtActive]}>{d.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </>
             )}
           </>
         )}
 
         <Text style={s.label}>SPARTE</Text>
-        <View style={s.cards}>
+        {/* 2-Spalten-Raster (2x2 im Standardfall) — Auswahl folgt aktive_sparten */}
+        <View style={s.grid}>
           {cards.map(d => {
             const customId = d.key.startsWith('custom:') ? d.key.slice('custom:'.length) : null;
             return (
-              <DisciplineCard
+              <DisciplineGridCard
                 key={d.key}
                 discipline={d}
                 onPress={() => handleDiscipline(d)}
@@ -164,11 +186,21 @@ export default function UnitStartScreen() {
               />
             );
           })}
-          {/* Eigene Kategorie anlegen */}
-          {!addMode && (
-            <DisciplineCard discipline={creator} onPress={() => router.push('/unit/new-category')} />
-          )}
         </View>
+
+        {/* Eigene Kategorie — separate Outline-Aktion (keine 5. gleichwertige Karte) */}
+        {!addMode && (
+          <TouchableOpacity
+            style={s.createBtn}
+            activeOpacity={0.85}
+            onPress={() => { tapHaptic(); router.push('/unit/new-category'); }}
+            accessibilityRole="button"
+            accessibilityLabel="Eigene Kategorie erstellen"
+          >
+            <Ionicons name="add" size={20} color={C.accent} />
+            <Text style={s.createBtnTxt}>Eigene Kategorie erstellen</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -197,11 +229,21 @@ const s = StyleSheet.create({
   emptyBox: { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, alignItems: 'center' },
   emptyTxt: { fontSize: 13, color: C.subtle },
 
-  dogRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // Kompakter Hund-Selector
+  dogSelector:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 12 },
+  dogAvatar:       { width: 34, height: 34, borderRadius: 10, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' },
+  dogSelectorName: { flex: 1, fontSize: 15, color: C.white, fontWeight: '700' },
+
+  dogRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   dogChip:  { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 9, overflow: 'hidden' },
   dogChipActive:    { borderColor: C.accent },
   dogChipTxt:       { fontSize: 13, color: C.muted, fontWeight: '600' },
   dogChipTxtActive: { color: C.accentText, fontWeight: '700' },
 
-  cards: { gap: 12 },
+  // 2-Spalten-Sparten-Raster (robust: Breite je Karte + space-between)
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
+
+  // Eigene Kategorie — Outline-Aktion, volle Breite, Mint
+  createBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: C.accent, borderStyle: 'dashed', backgroundColor: C.accentDim },
+  createBtnTxt: { fontSize: 15, color: C.accent, fontWeight: '800' },
 });

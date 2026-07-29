@@ -38,6 +38,13 @@ export const C = {
   danger:     '#FF3B30',
   dangerDim:  'rgba(255,59,48,0.10)',
 
+  // Sparten-Akzente (Premium Dark, ruhig — KEINE Orange-/Rot-Töne). Zentral
+  // definiert, damit Sparten überall denselben Ton tragen (nicht mehrfach hardcoden).
+  // Fährte nutzt weiterhin C.accent (Mint/Türkis).
+  sparteUnterordnung: '#D9B65C',   // gedämpftes Premium-Gold (kein grelles Gelb)
+  sparteSchutzdienst: '#6FB49B',   // Salbei / Jade (ruhig, kühl, nicht neon)
+  sparteObedience:    '#B3A4E6',   // Lavendel / Violett (ruhig, nicht pink)
+
   // Fährtenmodul-Palette — auf anyvo-Tokens (design_handoff_faehrten/anyvo.css)
   // angeglichen, damit alle Fährten-Screens denselben Mint-Look haben wie der
   // neue Legen/Ausarbeiten-Flow (FT). Eigene Tokens, brechen bestehende C.* nicht.
