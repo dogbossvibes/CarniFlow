@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleProp, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, ViewStyle, type AccessibilityRole } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -12,11 +12,13 @@ interface Props {
   style?: StyleProp<ViewStyle>;
   scale?: number;
   disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityRole?: AccessibilityRole;
 }
 
 const AnimatedPressable2 = Animated.createAnimatedComponent(Pressable);
 
-export function AnimatedPressable({ children, onPress, style, scale = 0.96, disabled }: Props) {
+export function AnimatedPressable({ children, onPress, style, scale = 0.96, disabled, accessibilityLabel, accessibilityRole }: Props) {
   const pressed = useSharedValue(false);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -30,6 +32,8 @@ export function AnimatedPressable({ children, onPress, style, scale = 0.96, disa
       onPressOut={() => { pressed.value = false; }}
       onPress={onPress}
       disabled={disabled}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
     >
       {children}
     </AnimatedPressable2>

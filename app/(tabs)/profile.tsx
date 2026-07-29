@@ -14,6 +14,7 @@ const LocalAuth: typeof import("expo-local-authentication") | null =
   (() => { try { return require("expo-local-authentication"); } catch { return null; } })();
 import { useAutoDetectSetting } from "@/hooks/useAutoDetectSetting";
 import { useVolumeKeyArticleSetting } from "@/hooks/useVolumeKeyArticleSetting";
+import { useStepLengthSetting } from "@/hooks/useStepLengthSetting";
 import { useCrashReporting } from "@/hooks/useCrashReporting";
 import { useProfile } from "@/hooks/useProfile";
 import { useSession } from "@/hooks/useSession";
@@ -141,6 +142,7 @@ export default function ProfilScreen() {
   };
 
   const appLock = useAppLockSetting();
+  const stepLength = useStepLengthSetting();
 
   // App-Sperre umschalten: beim Aktivieren prüfen, ob Biometrie/Geräte-Code
   // eingerichtet ist — sonst Hinweis und nicht aktivieren.
@@ -569,6 +571,14 @@ export default function ProfilScreen() {
               <Ionicons name="chevron-forward" size={18} color={C.muted} />
             </TouchableOpacity>
           )}
+
+          <View style={s.trenner} />
+          <EinstellungZeile
+            icon="footsteps-outline"
+            label="Schrittlänge"
+            wert={stepLength.stepLengthM != null ? `Persönlich: ${Math.round(stepLength.stepLengthM * 100)} cm` : 'Standard: 75 cm'}
+            onPress={() => router.push('/track/kalibrierung' as never)}
+          />
         </View>
 
         {__DEV__ && (
@@ -690,6 +700,12 @@ export default function ProfilScreen() {
 
         <Text style={s.abschnitt}>{t('profile.secSupport')}</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+          <EinstellungZeile
+            icon="compass-outline"
+            label="Hilfe & ANYVO kennenlernen"
+            onPress={() => router.push('/help-center' as never)}
+          />
+          <View style={s.trenner} />
           <EinstellungZeile
             icon="help-circle-outline"
             label={t('profile.helpCenter')}

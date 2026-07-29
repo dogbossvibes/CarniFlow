@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
+import { HelpButton } from '@/components/help/HelpButton';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -34,6 +35,7 @@ export default function InsightsScreen() {
           <Text style={s.title}>Insights</Text>
           <Text style={s.subtitle}>Geführte Auswertungen deiner Trainings.</Text>
         </View>
+        <HelpButton topicId="smart_analysis" autoShow tint={C.white} />
       </View>
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>

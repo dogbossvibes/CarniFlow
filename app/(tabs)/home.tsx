@@ -11,7 +11,9 @@ import { useSession } from "@/hooks/useSession";
 import { useTrainingFeed } from "@/hooks/useTrainingFeed";
 import { useFeedDelete } from "@/hooks/useFeedDelete";
 import type { FeedItem } from "@/services/trainingFeed";
-import { useHomeLayout } from "@/stores/homeLayout";
+import { useHomeScreenConfig, visibleWidgets, type HomeWidgetId } from "@/stores/homeScreenConfig";
+import { QuickActionsWidget } from "@/components/home/QuickActionsWidget";
+import { HelpButton } from "@/components/help/HelpButton";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { HomeTimelineCard } from "@/components/calendar/HomeTimelineCard";
 import { AiCoachCard } from "@/features/ai/components/AiCoachCard";
@@ -82,7 +84,7 @@ export default function HomeScreen() {
   const { dogs, loading: hundeLoading, refresh: refreshDogs } = useDogs();
   const { feed, loading: feedLoading, refresh: refreshFeed } = useTrainingFeed();
   const { onDelete: deleteItem, toast } = useFeedDelete();
-  const layout = useHomeLayout();
+  const config = useHomeScreenConfig(user?.id);
 
   useFocusEffect(
     useCallback(() => {
@@ -104,6 +106,87 @@ export default function HomeScreen() {
   const letzteHunde = dogs.slice(0, 3);
   // Vereinheitlichte Zeitleiste (alt + neu) als Aktivitätsbasis.
   const serie = berechneSerie(feed);
+
+  // Widget-Renderer: bildet eine Widget-ID auf die bestehende Komponente ab.
+  // Zentrale Zuordnung statt duplizierter Switch-Blöcke; nur Darstellung.
+  const renderWidget = (id: HomeWidgetId) => {
+    switch (id) {
+      case "week":
+        return (
+          <View key={id} style={{ marginBottom: 24 }}>
+            <HomeTimelineCard />
+          </View>
+        );
+      case "smart_analysis":
+        return (
+          <View key={id} style={{ marginBottom: 24 }}>
+            <AiCoachCard />
+          </View>
+        );
+      case "quick_actions":
+        return (
+          <QuickActionsWidget
+            key={id}
+            actions={config.quickActions}
+            layout={config.layout}
+          />
+        );
+      case "recent_sessions":
+        if (feed.length === 0) return null;
+        return (
+          <View key={id} style={s.sektion}>
+            <View style={s.sektionKopf}>
+              <Text style={s.sektionTitel}>Letzte Einheiten</Text>
+            </View>
+            {feed.slice(0, 3).map((item) => (
+              <SwipeableTrainingItem
+                key={`${item.source}-${item.id}`}
+                trainingId={item.id}
+                onDelete={() => deleteItem(item)}
+              >
+                <UnitListCard unit={item} onPress={() => openFeedItem(item)} />
+              </SwipeableTrainingItem>
+            ))}
+          </View>
+        );
+      case "dogs":
+        return (
+          <View key={id} style={s.sektion}>
+            <View style={s.sektionKopf}>
+              <Text style={s.sektionTitel}>{t("dogs.title")}</Text>
+              <TouchableOpacity
+                onPress={() => router.push("/(tabs)/dogs")}
+                activeOpacity={0.7}
+              >
+                <Text style={s.sektionLink}>Alle sehen</Text>
+              </TouchableOpacity>
+            </View>
+
+            {hundeLoading ? (
+              <ActivityIndicator color={C.accent} style={{ marginVertical: 20 }} />
+            ) : letzteHunde.length > 0 ? (
+              <View style={s.hundeListe}>
+                {letzteHunde.map((hund) => (
+                  <DogCard key={hund.id} dog={hund} />
+                ))}
+              </View>
+            ) : (
+              <AnimatedPressable style={s.leerKarte} onPress={() => router.push("/add-dog")}>
+                <View style={s.leerIcon}>
+                  <Ionicons name="add" size={24} color={C.accent} />
+                </View>
+                <View>
+                  <Text style={s.leerTitel}>Ersten Hund hinzufügen</Text>
+                  <Text style={s.leerUnter}>Tippe hier, um loszulegen</Text>
+                </View>
+              </AnimatedPressable>
+            )}
+          </View>
+        );
+      default:
+        return null; // unbekannte/veraltete Widget-ID → still überspringen
+    }
+  };
 
   return (
     <SafeAreaView style={s.safe} edges={["top"]}>
@@ -183,6 +266,20 @@ export default function HomeScreen() {
               <Text style={s.heroBegruessung}>{t(begruessungKey())}</Text>
               <Text style={s.heroName}>{vorname}</Text>
             </View>
+            {/* Dezenter Anpassen-Button + Hilfe (Coachmark „home") */}
+            <View style={s.heroBtnReihe}>
+              <HelpButton topicId="home" autoShow tint={C.white} style={s.heroIconBtn} />
+              <TouchableOpacity
+                style={s.anpassenBtn}
+                onPress={() => router.push("/home-customize")}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Startbildschirm anpassen"
+              >
+                <Ionicons name="options-outline" size={20} color={C.white} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={s.heroStats}>
@@ -216,102 +313,11 @@ export default function HomeScreen() {
 
         <OfflineBanner />
 
-        {/* ── SMART TRAINING TIMELINE ── */}
-        {layout.woche && (
-          <View style={{ marginBottom: 24 }}>
-            <HomeTimelineCard />
-          </View>
-        )}
-
-        {/* ── KI-COACH (kompakt) ── */}
-        <View style={{ marginBottom: 24 }}>
-          <AiCoachCard />
-        </View>
-
-        {/* ── LÄUFIGKEIT IM BLICK (nur Hündinnen mit Prognose) ── */}
+        {/* ── LÄUFIGKEIT IM BLICK (kontextueller Hinweis, immer sichtbar) ── */}
         <HomeHeatCard onOpen={(dogId) => router.push(`/dog/${dogId}` as never)} />
 
-        {/* ── HAUPTAKTIONEN ── */}
-        {layout.hauptaktionen && (
-        <View style={s.mainActions}>
-          <AnimatedPressable style={s.mainCard} scale={0.96} onPress={() => router.push("/unit/timer")}>
-            <LinearGradient
-              colors={["#00FFCC", "#00FFCC"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <Ionicons name="play-circle" size={26} color={C.accentText} />
-            <Text style={s.mainTitelDark}>Training starten</Text>
-            <Text style={s.mainSubDark}>Timer · danach dokumentieren</Text>
-          </AnimatedPressable>
-
-          <AnimatedPressable style={[s.mainCard, s.mainCardAlt]} scale={0.96} onPress={() => router.push("/unit/document")}>
-            <Ionicons name="create" size={24} color={C.accent} />
-            <Text style={s.mainTitel}>Dokumentieren</Text>
-            <Text style={s.mainSub}>Nachträglich erfassen</Text>
-          </AnimatedPressable>
-        </View>
-        )}
-
-        {/* ── LETZTE EINHEITEN ── */}
-        {layout.letzteEinheiten && feed.length > 0 && (
-          <View style={s.sektion}>
-            <View style={s.sektionKopf}>
-              <Text style={s.sektionTitel}>Letzte Einheiten</Text>
-            </View>
-            {feed.slice(0, 3).map((item) => (
-              <SwipeableTrainingItem
-                key={`${item.source}-${item.id}`}
-                trainingId={item.id}
-                onDelete={() => deleteItem(item)}
-              >
-                <UnitListCard unit={item} onPress={() => openFeedItem(item)} />
-              </SwipeableTrainingItem>
-            ))}
-          </View>
-        )}
-
-        {/* ── MEINE HUNDE ── */}
-        {layout.hunde && (
-        <View style={s.sektion}>
-          <View style={s.sektionKopf}>
-            <Text style={s.sektionTitel}>{t('dogs.title')}</Text>
-            <TouchableOpacity
-              onPress={() => router.push("/(tabs)/dogs")}
-              activeOpacity={0.7}
-            >
-              <Text style={s.sektionLink}>Alle sehen</Text>
-            </TouchableOpacity>
-          </View>
-
-          {hundeLoading ? (
-            <ActivityIndicator
-              color={C.accent}
-              style={{ marginVertical: 20 }}
-            />
-          ) : letzteHunde.length > 0 ? (
-            <View style={s.hundeListe}>
-              {letzteHunde.map((hund) => (
-                <DogCard key={hund.id} dog={hund} />
-              ))}
-            </View>
-          ) : (
-            <AnimatedPressable
-              style={s.leerKarte}
-              onPress={() => router.push("/add-dog")}
-            >
-              <View style={s.leerIcon}>
-                <Ionicons name="add" size={24} color={C.accent} />
-              </View>
-              <View>
-                <Text style={s.leerTitel}>Ersten Hund hinzufügen</Text>
-                <Text style={s.leerUnter}>Tippe hier, um loszulegen</Text>
-              </View>
-            </AnimatedPressable>
-          )}
-        </View>
-        )}
+        {/* ── KONFIGURIERBARE WIDGETS (Reihenfolge/Sichtbarkeit aus der Config) ── */}
+        {visibleWidgets(config).map(renderWidget)}
 
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -416,6 +422,25 @@ const s = StyleSheet.create({
     color: C.white,
     fontWeight: "900",
     letterSpacing: -0.5,
+  },
+  heroBtnReihe: { flexDirection: "row", alignItems: "center", gap: 6 },
+  heroIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  anpassenBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   benachrichtigungBtn: {
     width: 42,

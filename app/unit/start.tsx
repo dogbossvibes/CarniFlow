@@ -10,6 +10,7 @@ import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { DISCIPLINES, customToDiscipline, type Discipline } from '@/constants/disciplines';
 import { DEFAULT_SPARTEN } from '@/constants/sparten';
+import { HelpButton } from '@/components/help/HelpButton';
 import { HeroImage } from '@/components/training/HeroImage';
 import { DisciplineCard } from '@/components/training/DisciplineCard';
 import { useActiveTraining, startUnit, addExercise } from '@/stores/activeTraining';
@@ -103,6 +104,8 @@ export default function UnitStartScreen() {
             <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
               <Ionicons name="chevron-back" size={22} color={C.white} />
             </TouchableOpacity>
+            <View style={{ flex: 1 }} />
+            <HelpButton topicId="start_training" autoShow tint={C.white} />
           </View>
           <View style={s.heroText}>
             <Text style={s.eyebrow}>ANYVO</Text>

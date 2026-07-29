@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
+import { HelpButton } from '@/components/help/HelpButton';
 import { Glass, isGlass } from '@/components/ui/Glass';
 import { PhotoPicker } from '@/components/ui/PhotoPicker';
 import { AudioRecorder } from '@/components/ui/AudioRecorder';
@@ -181,6 +182,8 @@ export default function DocumentScreen() {
           <Text style={s.eyebrow}>TRAININGSTAGEBUCH</Text>
           <Text style={s.title}>{editing ? 'Training bearbeiten' : 'Training dokumentieren'}</Text>
         </View>
+        <View style={{ flex: 1 }} />
+        <HelpButton topicId="document_training" autoShow tint={C.white} />
       </View>
 
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
