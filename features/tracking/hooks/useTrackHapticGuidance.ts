@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { distanceM, type LatLng } from '@/lib/trackGuidance';
+import { forwardDistanceFromDog } from '@/features/tracking/utils/searchGeometry';
 import type { GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 
 // expo-haptics defensiv laden (nativ; kein Crash, wenn das Modul fehlt).
 let Haptics: typeof import('expo-haptics') | null = null;
 try { Haptics = require('expo-haptics'); } catch { Haptics = null; }
 
-export interface GuidanceObject { id: string; lat: number; lng: number }
+// arcM = Bogenlänge des Gegenstands entlang der Fährte (= marker.distance_from_start).
+// material optional (nur für die Voice-Ansage „Dübel"/„Gegenstand"; Haptik ignoriert es).
+export interface GuidanceObject { id: string; arcM: number; material?: string | null }
 
 const ANGLE_AHEAD_M  = 6;    // Winkel etwas voraus (~8 Schritte)
 const OBJECT_AHEAD_M = 4;    // Gegenstände etwas enger
@@ -26,7 +28,7 @@ async function buzz(n: number) {
 // 2× vibrieren, wenn ein Winkel voraus liegt — jeden Punkt genau einmal. Läuft
 // unabhängig von der Sprachausgabe.
 export function useTrackHapticGuidance(
-  position: LatLng | null,
+  dogProgressM: number | null,
   angles: GuidanceAngle[],
   objects: GuidanceObject[],
   enabled: boolean,
@@ -38,27 +40,27 @@ export function useTrackHapticGuidance(
   useEffect(() => { firedRef.current = new Set(); }, [angles, objects]);
 
   useEffect(() => {
-    if (!enabled || !position || !Haptics) return;
+    if (!enabled || dogProgressM == null || !Haptics) return;
     const now = Date.now();
     if (now - lastRef.current < GAP_MS) return;
 
-    // Nächsten noch nicht ausgelösten Punkt in Reichweite suchen (Winkel = 2×,
-    // Gegenstand = 1×). Bei Gleichstand gewinnt der nähere.
+    // Nächsten noch nicht ausgelösten Punkt VOR dem Hund in Reichweite suchen
+    // (Winkel = 2×, Gegenstand = 1×) — dieselbe Bogenlängendistanz wie die Voice.
     let bestId: string | null = null, bestD = Infinity, pulses = 0;
     for (const a of angles) {
       if (firedRef.current.has(a.id)) continue;
-      const d = distanceM(position, { lat: a.lat, lng: a.lng });
-      if (d <= ANGLE_AHEAD_M && d < bestD) { bestD = d; bestId = a.id; pulses = 2; }
+      const d = forwardDistanceFromDog(a.arcM, dogProgressM);
+      if (d != null && d <= ANGLE_AHEAD_M && d < bestD) { bestD = d; bestId = a.id; pulses = 2; }
     }
     for (const o of objects) {
       if (firedRef.current.has(o.id)) continue;
-      const d = distanceM(position, { lat: o.lat, lng: o.lng });
-      if (d <= OBJECT_AHEAD_M && d < bestD) { bestD = d; bestId = o.id; pulses = 1; }
+      const d = forwardDistanceFromDog(o.arcM, dogProgressM);
+      if (d != null && d <= OBJECT_AHEAD_M && d < bestD) { bestD = d; bestId = o.id; pulses = 1; }
     }
     if (bestId) {
       firedRef.current.add(bestId);
       lastRef.current = now;
       void buzz(pulses);
     }
-  }, [position, angles, objects, enabled]);
+  }, [dogProgressM, angles, objects, enabled]);
 }

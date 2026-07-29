@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MarkerSample, TrackPointSample, StartAnchor, SessionStatus } from '@/features/tracking/store/trackingStore';
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
+import type { SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 
 // Lokaler Puffer der laufenden Aufnahme — schützt vor Datenverlust bei
 // Crash/Verbindungsabbruch im Feld. HUNDEBASIERT: jede dog_id hat ihren eigenen
@@ -38,6 +39,7 @@ export interface PendingTrack {
   status?:           SessionStatus;        // Session-Status; fehlt bei Legacy → nicht 'searching'
   searchStartedAt?:  number | null;        // ms: Start der Absuche (Timer-Fortsetzung)
   searchUpdatedAt?:  number | null;        // ms: letzter akzeptierter Suchpunkt
+  searchHandlerDistanceM?: SearchHandlerDistanceM;   // 5/10-m-Auswahl (Recovery; optional → Legacy)
   // ── P3: Liegezeit (zeitstempelbasiert) ──
   layStartedAt?:     number | null;        // ms: Start der Liegezeit (= Lege-Ende)
   layUpdatedAt?:     number | null;        // ms: letzte relevante Aktualisierung

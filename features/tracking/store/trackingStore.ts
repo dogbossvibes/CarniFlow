@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { schedulePersist, writePendingNow, clearPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import { EMPTY_GPS_STATS, type GpsStats, type TrackPointStatus } from '@/features/tracking/engine/types';
-import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
+import { sanitizeRestoredSegments, type TrackSegment } from '@/features/tracking/utils/trackSegments';
+import { DEFAULT_HANDLER_DISTANCE_M, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
 export type MarkerMaterial = 'stoff' | 'holz' | 'duebel' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
@@ -13,11 +14,13 @@ export type MarkerMaterial = 'stoff' | 'holz' | 'duebel' | 'leder' | 'plastik' |
 //   spitz_links | spitz_rechts → spitzer Winkel (<90°)
 //   absatz               → Start-/Endpunkt der Fährte
 //   abriss               → Abriss: Bereich, der diagonal 1 Schritt versetzt weitergeht
+//   gw | ow | bw         → manuell gesetzte Fachwinkel: Geschlossener/Offener/Bodenwinkel
 export type AngleKind =
   | 'links' | 'rechts'
   | 'spitz_links' | 'spitz_rechts'
   | 'spitz'
-  | 'absatz' | 'abriss';
+  | 'absatz' | 'abriss'
+  | 'gw' | 'ow' | 'bw';
 export type OrientationMode = 'north' | 'heading' | 'track';
 export type TrackSaveState = 'idle' | 'saving' | 'saved' | 'error';
 // Lebenszyklus einer Fährten-Session (P2). Nur 'searching' löst Recovery aus.
@@ -77,6 +80,7 @@ interface TrackingState {
   searchTrackPoints:   TrackPointSample[];         // aktive Absuche-Spur (P1) — getrennt von der gelegten `trackPoints`
   searchRunId:         string | null;              // track_runs.id der aktiven Absuche (P2 Recovery/Finalisierung)
   sessionStatus:       SessionStatus;              // Session-Lebenszyklus (P2)
+  searchHandlerDistanceM: SearchHandlerDistanceM;  // Absuche: gewählter Abstand Hundeführer↔Hund (5/10 m)
   searchStartedAt:     number | null;              // ms: Start der Absuche (Timer-Fortsetzung bei Recovery)
   searchUpdatedAt:     number | null;              // ms: letzter akzeptierter Suchpunkt
   layStartedAt:        number | null;              // ms: Start der Liegezeit (= Lege-Ende) — P3, zeitstempelbasiert
@@ -116,6 +120,7 @@ interface TrackingState {
   setSearchPoints: (pts: TrackPointSample[]) => void;  // Recovery: Suchspur exakt setzen (SQLite autoritativ)
   startSearchSession: (runId: string | null, startedAtMs: number) => void;  // frische Absuche: Status/Metadaten setzen (P2)
   setSearchRunId: (runId: string | null) => void;  // runId nachreichen (startTrackRun ist async)
+  setSearchHandlerDistanceM: (v: SearchHandlerDistanceM) => void;  // 5/10-m-Auswahl (vor Absuche)
   setSessionStatus: (status: SessionStatus) => void;
   restoreSearchSession: (p: PendingTrack) => void; // Recovery: Absuche-Metadaten + Punkte aus dem Puffer zurückspielen (P2)
   markArticleFound: (markerId: string) => void;
@@ -155,6 +160,7 @@ const INITIAL = {
   searchTrackPoints:     [] as TrackPointSample[],
   searchRunId:           null as string | null,
   sessionStatus:         'laid' as SessionStatus,   // neutraler Default (nicht 'searching' → keine Recovery)
+  searchHandlerDistanceM: DEFAULT_HANDLER_DISTANCE_M as SearchHandlerDistanceM,   // Fallback 5 m
   searchStartedAt:       null as number | null,
   searchUpdatedAt:       null as number | null,
   layStartedAt:          null as number | null,
@@ -183,6 +189,7 @@ function snapshot(s: TrackingState): PendingTrack {
     searchPoints: s.searchTrackPoints, runId: s.searchRunId, status: s.sessionStatus,
     searchStartedAt: s.searchStartedAt, searchUpdatedAt: s.searchUpdatedAt,
     layStartedAt: s.layStartedAt, layUpdatedAt: s.layUpdatedAt,
+    searchHandlerDistanceM: s.searchHandlerDistanceM,
   };
 }
 // Puffer wird HUNDEBASIERT geschrieben (Schlüssel = dog_id). Ohne dog_id fällt
@@ -254,6 +261,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     persistNow(get);
   },
   setSearchRunId: (runId) => { set({ searchRunId: runId }); persistNow(get); },
+  setSearchHandlerDistanceM: (v) => { set({ searchHandlerDistanceM: v }); persistNow(get); },
   setSessionStatus: (status) => { set({ sessionStatus: status }); persistNow(get); },
   // Recovery (P2): Absuche-Metadaten + Punkte aus dem Puffer in den Store spielen
   // (nach App-Kill). Legacy-sicher (Felder optional). Setzt NICHT auf Aufnahme.
@@ -271,6 +279,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     sessionStatus:     p.status ?? 'searching',
     searchStartedAt:   p.searchStartedAt ?? null,
     searchUpdatedAt:   p.searchUpdatedAt ?? null,
+    searchHandlerDistanceM: p.searchHandlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M,   // Recovery: 5-m-Fallback
   }),
 
   markArticleFound: (markerId) => set(s => ({
@@ -297,7 +306,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     dogId:            p.dogId ?? null,
     trackPoints:      p.trackPoints,
     markers:          p.markers,
-    segments:         p.segments ?? [],
+    segments:         sanitizeRestoredSegments(p.segments ?? []),   // Recovery: max. 1 gültige aktive TS
     runPoints:        p.runPoints,
     distanceMeters:   p.distanceMeters,
     durationSeconds:  p.durationSeconds,
@@ -308,6 +317,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     layStartedAt:     p.layStartedAt ?? p.layFinishedAt ?? null,
     layUpdatedAt:     p.layUpdatedAt ?? p.layFinishedAt ?? null,
     sessionStatus:    p.status ?? 'resting',
+    searchHandlerDistanceM: p.searchHandlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M,   // Recovery: 5-m-Fallback
   }),
   setMapFollowMode: (on) => set({ mapFollowMode: on }),
   setMapOrientationMode: (m) => set({ mapOrientationMode: m }),

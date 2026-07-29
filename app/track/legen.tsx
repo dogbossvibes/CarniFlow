@@ -15,6 +15,7 @@ import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { useTrackRecorder } from '@/features/tracking/hooks/useTrackRecorder';
 import { BackgroundLocationDisclosure } from '@/features/tracking/components/BackgroundLocationDisclosure';
 import { useAutoDetectSetting } from '@/hooks/useAutoDetectSetting';
+import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
 import { useVolumeKeyArticleSetting } from '@/hooks/useVolumeKeyArticleSetting';
 import { subscribeQuickAddArticle } from '@/features/tracking/quickAddArticleBus';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
@@ -29,21 +30,18 @@ import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDeb
 import type { GpsStats } from '@/features/tracking/engine/types';
 import { useToast } from '@/components/ui/Toast';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
+import { HelpButton } from '@/components/help/HelpButton';
 import type { AngleKind, MarkerMaterial } from '@/features/tracking/store/trackingStore';
 import type { TrackSegmentType } from '@/features/tracking/utils/trackSegments';
 import {
-  SEGMENT_DEFAULT_STEPS,
-  SEGMENT_PREANNOUNCE_STEPS,
   TRACK_SEGMENT_LABELS,
   TRACK_SEGMENT_TYPES,
   activeOrPlannedSegment,
-  clampSegmentSteps,
-  createPlannedSegment,
+  createActiveSegment,
+  finalizeSegment,
   normalizeCustomSegmentLabel,
-  plannedSegmentAnnouncement,
   segmentDisplayLabel,
   segmentEndAnnouncement,
-  segmentStartAnnouncement,
 } from '@/features/tracking/utils/trackSegments';
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
@@ -125,10 +123,10 @@ export default function LegenScreen() {
   const weatherFetchedRef = useRef(false);
   const [lastAngle, setLastAngle] = useState<AngleKind | null>(null);
   const [warmupElapsed, setWarmupElapsed] = useState(0);
-  const [materialSheet, setMaterialSheet] = useState(false);   // Gegenstand-Material wählen
+  const [gsPicker, setGsPicker] = useState(false);   // Gegenstand-Schnellauswahl (Inline, kein Sheet)
+  const [winkelSheet, setWinkelSheet] = useState(false);       // Winkeltyp wählen (GW/OW/BW/Abriss)
   const [segmentSheet, setSegmentSheet] = useState(false);
   const [segmentType, setSegmentType] = useState<TrackSegmentType>('no_food');
-  const [segmentSteps, setSegmentSteps] = useState(SEGMENT_DEFAULT_STEPS);
   const [segmentCustomLabel, setSegmentCustomLabel] = useState('');
   const [segmentVoiceEnabled, setSegmentVoiceEnabled] = useState(true);
   const [selectedDogId, setSelectedDogId] = useState<string | null>((params.dogId as string) ?? null);
@@ -149,6 +147,7 @@ export default function LegenScreen() {
   }, [showToast]);
 
   const { autoDetect, setAutoDetect } = useAutoDetectSetting();
+  const { stepLengthM } = useStepLengthSetting();   // optionale persönliche Schrittlänge (Default 0,75 m)
   const { enabled: volumeKeyArticle } = useVolumeKeyArticleSetting();
   const rec = useTrackRecorder({ onAngle, autoDetect });
 
@@ -158,12 +157,14 @@ export default function LegenScreen() {
   // Gegenstand mit gewähltem Material setzen. Erst, wenn der Startanker steht —
   // sonst würde er im Warmup-Drift landen (kein Crash, nur Hinweis).
   const placeGegenstand = useCallback((material: MarkerMaterial) => {
-    setMaterialSheet(false);
-    if (!useTrackingStore.getState().startAnchor) { showToast(t('toast.startPointWait')); return; }
+    setGsPicker(false);
+    const st = useTrackingStore.getState();
+    // Ohne Startanker UND valide aktuelle Position kein (koordinatenloser) Gegenstand.
+    if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
     hapticMarker();                 // sofort, VOR dem Speichern
     lastMaterialRef.current = material;
     void rec.addMarker('gegenstand', { material });
-  }, [rec, showToast]);
+  }, [rec, showToast, t]);
 
   // Schnell-Gegenstand (Hardware-Taste / Kurzbefehl): ohne Material-Auswahl, am
   // zuletzt gewählten Material. Nur während laufender Aufnahme.
@@ -175,12 +176,20 @@ export default function LegenScreen() {
     showToast(t('toast.objectSet'));
   }, [rec, showToast]);
 
-  const placeAbriss = useCallback(() => {
+  // Manuell einen Fachwinkel (GW/OW/BW) ODER Abriss an der aktuellen Position setzen.
+  // Nutzt dieselbe currentPosition/positionSource wie die Aufnahme (keine extra GPS-Abfrage).
+  const placeWinkel = useCallback((angleKind: AngleKind) => {
     if (phaseRef.current !== 'recording') return;
-    if (!useTrackingStore.getState().startAnchor) { showToast(t('toast.startPointWait')); return; }
-    hapticWarning();
-    void rec.addMarker('winkel', { angleKind: 'abriss' });
-    showToast('Abriss gesetzt');
+    const st = useTrackingStore.getState();
+    // Fachliche Annahme ZUERST: ohne Startanker UND ohne valide aktuelle Position
+    // wird KEIN (koordinatenloser) Marker gesetzt und KEIN Erfolg gemeldet.
+    if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
+    // addMarker fügt den Marker (mit currentPosition) SYNCHRON in den Store ein
+    // (commitMarker → s.addMarker vor dem ersten await) → Karte reagiert sofort.
+    void rec.addMarker('winkel', { angleKind });
+    if (angleKind === 'abriss') hapticWarning(); else hapticAngle();   // Feedback nach der Annahme
+    showToast(`${ANGLE_LABEL[angleKind]} gesetzt`);
+    setWinkelSheet(false);
   }, [rec, showToast, t]);
 
   // iOS-Kurzbefehl (Deep-Link) → Schnell-Gegenstand, solange aufgenommen wird.
@@ -261,7 +270,7 @@ export default function LegenScreen() {
     startAnchor, startLockActive, startDriftRejectedCount, segments,
   } = useTrackingStore();
   const activeSegment = activeOrPlannedSegment(segments);
-  const currentStep = metersToSteps(distanceMeters);
+  const currentStep = metersToSteps(distanceMeters, stepLengthM);
 
   // GPS wirklich bereit (gute Genauigkeit) vs. nur manuell freigegeben (nach 15 s).
   const gpsReady = gpsAccuracy != null && gpsAccuracy <= 15;
@@ -386,103 +395,55 @@ export default function LegenScreen() {
   const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
 
-  const openSegmentSheet = useCallback(() => {
-    if (phase !== 'recording') return;
-    const existing = activeOrPlannedSegment(useTrackingStore.getState().segments);
-    if (existing) {
-      Alert.alert(
-        'Aktive Teilstrecke',
-        'Es ist bereits eine Teilstrecke geplant oder aktiv.',
-        [
-          { text: 'Teilstrecke ansehen', onPress: () => undefined },
-          { text: 'Teilstrecke beenden', style: 'destructive', onPress: () => {
-            const st = useTrackingStore.getState();
-            st.updateSegment(existing.id, {
-              status: 'completed',
-              endStep: metersToSteps(st.distanceMeters),
-              endCoordinate: st.currentPosition,
-              endTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
-              completedAt: Date.now(),
-            });
-            hapticSuccess();
-            if (existing.voiceEnabled) speakTrackSegment(segmentEndAnnouncement());
-          } },
-          { text: 'Abbrechen', style: 'cancel' },
-        ],
-      );
-      return;
-    }
-    hapticTap();
-    setSegmentSheet(true);
-  }, [phase]);
-
-  const startSegmentPlan = useCallback(() => {
-    if (!activeDog) return;
+  // TS starten: SOFORT scharf am aktuellen TrackPoint (keine Vorab-Schrittzahl).
+  const startTrackSegment = useCallback(() => {
+    if (phaseRef.current !== 'recording' || !activeDog) return;
+    const st = useTrackingStore.getState();
+    if (activeOrPlannedSegment(st.segments)) return;   // nur EINE aktive Teilstrecke
     const label = normalizeCustomSegmentLabel(segmentCustomLabel);
-    if (segmentType === 'custom' && !label) {
-      showToast('Bitte gib eine Bezeichnung ein.');
-      return;
-    }
-    const segment = createPlannedSegment({
+    if (segmentType === 'custom' && !label) { showToast('Bitte gib eine Bezeichnung ein.'); return; }
+    const idx = st.trackPoints.length - 1;
+    // Kein gültiger TrackPoint / keine Position → kein Segment, kein Erfolgsfeedback.
+    if (idx < 0 || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
+    const segment = createActiveSegment({
       dogId: activeDog.id,
       trackSessionId: sessionIdRef.current,
       type: segmentType,
       customLabel: label,
-      currentStep: metersToSteps(useTrackingStore.getState().distanceMeters),
-      plannedLengthSteps: segmentSteps,
+      currentStep: metersToSteps(st.distanceMeters, stepLengthM),   // abgeleitet aus realer Distanz
+      startTrackPointIndex: idx,
+      startCoordinate: st.currentPosition,
       voiceEnabled: segmentVoiceEnabled,
-      preannounceSteps: SEGMENT_PREANNOUNCE_STEPS,
     });
-    useTrackingStore.getState().addSegment(segment);
+    st.addSegment(segment);
     setSegmentSheet(false);
     hapticSuccess();
-    if (segment.voiceEnabled) speakTrackSegment(plannedSegmentAnnouncement(segment));
-  }, [activeDog, segmentCustomLabel, segmentSteps, segmentType, segmentVoiceEnabled, showToast]);
+    if (segment.voiceEnabled) speakTrackSegment('Teilstrecke gestartet');
+  }, [activeDog, segmentCustomLabel, segmentType, segmentVoiceEnabled, showToast, t, stepLengthM]);
 
-  useEffect(() => {
-    if (phase !== 'recording') return;
+  // TS stoppen: aktuellen TrackPoint als Ende; plannedLengthSteps = tatsächliche Länge.
+  const stopTrackSegment = useCallback(() => {
     const st = useTrackingStore.getState();
     const segment = activeOrPlannedSegment(st.segments);
-    if (!segment) return;
-    const step = metersToSteps(st.distanceMeters);
-    if (segment.status === 'planned' && step >= segment.startStep) {
-      st.updateSegment(segment.id, {
-        status: 'active',
-        startCoordinate: st.currentPosition,
-        startTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
-        startedAt: Date.now(),
-      });
-      hapticSuccess();
-      if (segment.voiceEnabled) speakTrackSegment(segmentStartAnnouncement(segment));
-      return;
-    }
-    if (segment.status === 'active' && step >= segment.endStep) {
-      st.updateSegment(segment.id, {
-        status: 'completed',
-        endStep: step,
-        endCoordinate: st.currentPosition,
-        endTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
-        completedAt: Date.now(),
-      });
-      hapticSuccess();
-      if (segment.voiceEnabled) speakTrackSegment(segmentEndAnnouncement());
-    }
-  }, [currentStep, phase, trackPoints.length]);
-
-  const completeActiveSegmentNow = useCallback(() => {
-    const st = useTrackingStore.getState();
-    const segment = activeOrPlannedSegment(st.segments);
-    if (!segment) return;
-    st.updateSegment(segment.id, {
-      status: 'completed',
-      endStep: metersToSteps(st.distanceMeters),
-      endCoordinate: st.currentPosition,
+    if (!segment) return;   // keine aktive Teilstrecke → kein Erfolgsfeedback
+    const done = finalizeSegment(segment, {
+      currentStep: metersToSteps(st.distanceMeters, stepLengthM),
       endTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
-      completedAt: Date.now(),
+      endCoordinate: st.currentPosition,
     });
+    st.updateSegment(segment.id, done);
     hapticSuccess();
-    if (segment.voiceEnabled) speakTrackSegment(segmentEndAnnouncement());
-  }, []);
+    if (segment.voiceEnabled) speakTrackSegment(segmentEndAnnouncement());   // „Teilstrecke beendet."
+  }, [stepLengthM]);
+
+  // TS-Button = Start/Stop-Toggle. Ohne aktive TS → schlankes Sheet (Typ/Voice) → Start;
+  // mit aktiver TS stoppt der Tap sofort.
+  const handleTsToggle = useCallback(() => {
+    if (phaseRef.current !== 'recording') return;
+    if (activeOrPlannedSegment(useTrackingStore.getState().segments)) { stopTrackSegment(); return; }
+    hapticTap();
+    setSegmentSheet(true);
+  }, [stopTrackSegment]);
 
   const cancelActiveSegment = useCallback(() => {
     const st = useTrackingStore.getState();
@@ -495,6 +456,19 @@ export default function LegenScreen() {
   const onStop = () => {
     if (stoppingRef.current) return;   // Doppelklick abfangen
     stoppingRef.current = true;
+    // Phase 12.12: eine noch aktive Teilstrecke am letzten gültigen TrackPoint
+    // sauber abschliessen — kein offenes active-Segment in einer fertigen Fährte.
+    {
+      const st = useTrackingStore.getState();
+      const active = activeOrPlannedSegment(st.segments);
+      if (active) {
+        st.updateSegment(active.id, finalizeSegment(active, {
+          currentStep: metersToSteps(st.distanceMeters, stepLengthM),
+          endTrackPointIndex: Math.max(0, st.trackPoints.length - 1),
+          endCoordinate: st.currentPosition,
+        }));
+      }
+    }
     hapticSuccess();   // SOFORT beim Stop-Tap
     const id = sessionIdRef.current;
     // rec.finish stoppt synchron, startet die Liegezeit und speichert im
@@ -526,7 +500,7 @@ export default function LegenScreen() {
   // GPS ab >45 m warnen — dann landen keine Linienpunkte (Filter), Distanz bleibt 0.
   const gpsPoor = gpsAccuracy != null && gpsAccuracy > 45;
   const metrics: { value: string; label: string; warn?: boolean }[] = [
-    { value: `${Math.round(distanceMeters)} m`, label: `${metersToSteps(distanceMeters)} Schr.` },
+    { value: `${Math.round(distanceMeters)} m`, label: `≈ ${metersToSteps(distanceMeters, stepLengthM)} Schr.` },
     { value: String(gegenstaende), label: 'Gegenst.' },
     { value: String(winkel), label: 'Winkel' },
     { value: gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : '–', label: 'GPS', warn: gpsPoor },
@@ -565,6 +539,7 @@ export default function LegenScreen() {
             </View>
           )}
           <View className="flex-1" />
+          <HelpButton topicId="track_laying" autoShow tint={FT.text} />
           <View className="flex-row bg-white/10 rounded-[12px] p-[3px] gap-[2px]">
             {(['map', 'sketch'] as const).map(k => {
               const on = view === k;
@@ -641,30 +616,24 @@ export default function LegenScreen() {
             <View className="absolute left-[14px] right-[14px] bottom-[88px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
               <View className="flex-row items-center justify-between gap-3">
                 <View className="flex-1">
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">
-                    {activeSegment.status === 'planned' ? 'Teilstrecke geplant' : 'Teilstrecke aktiv'}
-                  </Text>
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">Teilstrecke aktiv</Text>
                   <Text className="text-[15px] text-ft-text font-black mt-0.5">{segmentDisplayLabel(activeSegment)}</Text>
                   <Text className="text-[12px] text-ft-muted font-semibold mt-1">
-                    {activeSegment.status === 'planned'
-                      ? `In ${Math.max(0, activeSegment.startStep - currentStep)} Schritten`
-                      : `Noch ${Math.max(0, activeSegment.endStep - currentStep)} Schritte`}
+                    seit ca. {Math.max(0, currentStep - activeSegment.startStep)} Schritten
                   </Text>
                 </View>
                 <View className="items-end gap-2">
                   <Text className="text-[12px] text-ft-acc font-extrabold" style={{ fontVariant: ['tabular-nums'] }}>
-                    {activeSegment.status === 'active'
-                      ? `${Math.max(0, activeSegment.endStep - currentStep)} / ${activeSegment.plannedLengthSteps}`
-                      : `${activeSegment.plannedLengthSteps} Schritte`}
+≈ +{Math.max(0, currentStep - activeSegment.startStep)} Schr.
                   </Text>
                   <View className="flex-row gap-2">
                     <Pressable
-                      accessibilityLabel="Teilstrecke beenden"
-                      accessibilityHint="Beendet die geplante oder aktive Teilstrecke sofort."
-                      onPress={completeActiveSegmentNow}
+                      accessibilityLabel="Teilstrecke stoppen"
+                      accessibilityHint="Beendet die aktive Teilstrecke am aktuellen Punkt."
+                      onPress={stopTrackSegment}
                       className="px-3 py-2 rounded-[10px] bg-ft-acc"
                     >
-                      <Text className="text-[11px] font-black text-ft-acc-text">Beenden</Text>
+                      <Text className="text-[11px] font-black text-ft-acc-text">Stoppen</Text>
                     </Pressable>
                     <Pressable
                       accessibilityLabel="Teilstrecke abbrechen"
@@ -810,70 +779,114 @@ export default function LegenScreen() {
           )}
         </View>
 
+        {/* Gegenstand-Schnellauswahl: Inline-Popover über der Steuerleiste (kein
+            Sheet). Tap auf Typ setzt sofort + schliesst; Backdrop-Tap schliesst
+            ohne Marker. Dübel als roter Mini-Zylinder erkennbar. */}
+        {gsPicker && phase === 'recording' && (
+          <>
+            <Pressable accessibilityLabel="Gegenstand-Auswahl schliessen" className="absolute inset-0" onPress={() => setGsPicker(false)} />
+            <View className="absolute left-[14px] right-[14px] bottom-[100px] flex-row flex-wrap gap-2 justify-center" pointerEvents="box-none">
+              {GEGENSTAND_MATERIALS.map(m => (
+                <Pressable
+                  key={m.material}
+                  accessibilityLabel={`${m.label} setzen`}
+                  onPress={() => placeGegenstand(m.material)}
+                  style={{ width: '23%', flexGrow: 1 }}
+                  className="h-[58px] rounded-[14px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
+                >
+                  {m.material === 'duebel' ? (
+                    <View style={{ width: 12, height: 17, borderRadius: 4, backgroundColor: FT.bad, borderWidth: 1, borderColor: '#3a0000', alignItems: 'center' }}>
+                      <View style={{ width: 12, height: 5, borderRadius: 3, backgroundColor: '#ff8a94', borderWidth: 1, borderColor: '#3a0000', marginTop: -1 }} />
+                    </View>
+                  ) : (
+                    <Ionicons name={m.icon} size={20} color={FT.acc} />
+                  )}
+                  <Text numberOfLines={1} className="text-[10px] font-extrabold text-ft-text">{m.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Winkel-Schnellwahl: Inline-Popover direkt über dem Winkel-Button — KEIN
+            BottomSheet. Tap auf GW/OW/BW/Abriss setzt sofort + schliesst; Tap
+            außerhalb (Backdrop) schliesst ohne Marker. */}
+        {winkelSheet && phase === 'recording' && (
+          <>
+            <Pressable
+              accessibilityLabel="Winkel-Auswahl schliessen"
+              className="absolute inset-0"
+              onPress={() => setWinkelSheet(false)}
+            />
+            <View className="absolute left-[14px] right-[14px] bottom-[100px] flex-row gap-2" pointerEvents="box-none">
+              {([
+                { kind: 'gw',     short: 'GW',     icon: 'square-outline'   },
+                { kind: 'ow',     short: 'OW',     icon: 'triangle-outline' },
+                { kind: 'bw',     short: 'BW',     icon: 'ellipse-outline'  },
+                { kind: 'abriss', short: 'Abriss', icon: 'close'            },
+              ] as const).map(o => (
+                <Pressable
+                  key={o.kind}
+                  accessibilityLabel={`${ANGLE_LABEL[o.kind]} setzen`}
+                  onPress={() => placeWinkel(o.kind)}
+                  className="flex-1 h-[64px] rounded-[16px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
+                >
+                  <Ionicons name={o.icon} size={22} color={o.kind === 'abriss' ? FT.warn : FT.acc} />
+                  <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{o.short}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
+
         {/* Steuerung */}
         <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
           <Pressable
-            accessibilityLabel="Teilstrecke hinzufügen"
-            accessibilityHint="Öffnet die Auswahl zum Planen einer Teilstrecke."
-            className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            onPress={openSegmentSheet} disabled={phase !== 'recording'}
+            accessibilityLabel={activeSegment ? 'Teilstrecke stoppen' : 'Teilstrecke starten'}
+            accessibilityHint="Startet bzw. stoppt eine Teilstrecke am aktuellen Punkt."
+            className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${activeSegment ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line-strong'}`}
+            onPress={handleTsToggle} disabled={phase !== 'recording'}
           >
-            <Ionicons name="trail-sign-outline" size={20} color={FT.text} />
-            <Text className="text-[10.5px] font-extrabold text-ft-text">Teilstrecke</Text>
+            <Ionicons name={activeSegment ? 'stop-circle-outline' : 'trail-sign-outline'} size={20} color={activeSegment ? FT.acc : FT.text} />
+            <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${activeSegment ? 'text-ft-acc' : 'text-ft-text'}`}>TS</Text>
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            onPress={() => setMaterialSheet(true)} disabled={phase !== 'recording'}
+            accessibilityLabel="Gegenstand setzen"
+            onPress={() => { hapticTap(); setWinkelSheet(false); setGsPicker(v => !v); }} disabled={phase !== 'recording'}
           >
-            <Ionicons name="cube-outline" size={20} color={FT.text} />
-            <Text className="text-[10.5px] font-extrabold text-ft-text">{t('track.object')}</Text>
+            <Ionicons name="cube-outline" size={20} color={gsPicker ? FT.acc : FT.text} />
+            <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${gsPicker ? 'text-ft-acc' : 'text-ft-text'}`}>GS</Text>
           </Pressable>
           <Pressable
-            accessibilityLabel="Abriss setzen"
-            accessibilityHint="Setzt an der aktuellen Position manuell einen Abriss-Marker."
+            accessibilityLabel="Winkel setzen"
+            accessibilityHint="Öffnet die Auswahl: Geschlossener/Offener/Bodenwinkel oder Abriss an der aktuellen Position."
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            onPress={placeAbriss} disabled={phase !== 'recording'}
+            onPress={() => { hapticTap(); setGsPicker(false); setWinkelSheet(v => !v); }} disabled={phase !== 'recording'}
           >
-            <Ionicons name="cut-outline" size={20} color={FT.warn} />
-            <Text className="text-[10.5px] font-extrabold text-ft-text">Abriss</Text>
+            <Ionicons name="git-branch-outline" size={20} color={winkelSheet ? FT.acc : FT.text} />
+            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">Winkel</Text>
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
             onPress={() => { hapticTap(); if (isPaused) rec.resume(); else rec.pause(); }} disabled={phase !== 'recording'}
           >
             <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color={FT.text} />
-            <Text className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>
+            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>
           </Pressable>
           <Pressable
+            accessibilityLabel="Stoppen"
+            accessibilityHint="Beendet das Legen der Fährte und startet die Liegezeit."
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
             style={{ flex: 1.3 }} onPress={onStop} disabled={phase !== 'recording'}
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
-            <Text numberOfLines={1} adjustsFontSizeToFit className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.stop')}</Text>
+            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">Stoppen</Text>
           </Pressable>
         </View>
       </SafeAreaView>
 
-      {/* Gegenstand: Material wählen */}
-      <AnyvoBottomSheet visible={materialSheet} onClose={() => setMaterialSheet(false)} title={t('track.objectMaterial')}>
-        <View className="flex-row flex-wrap gap-[10px] pb-2">
-          {GEGENSTAND_MATERIALS.map(m => (
-            <Pressable
-              key={m.material}
-              onPress={() => placeGegenstand(m.material)}
-              style={{ width: '30.5%', flexGrow: 1 }}
-              className="items-center gap-[7px] py-[14px] rounded-[16px] bg-white/5 border border-ft-line-strong"
-            >
-              <View className="w-[42px] h-[42px] rounded-[13px] items-center justify-center bg-ft-acc-dim">
-                <Ionicons name={m.icon} size={20} color={FT.acc} />
-              </View>
-              <Text className="text-[12.5px] font-bold text-ft-text">{m.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </AnyvoBottomSheet>
-
-      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title="Teilstrecke hinzufügen">
+      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title="Teilstrecke starten">
         <View className="gap-4 pb-2">
           <View className="flex-row flex-wrap gap-[10px]">
             {TRACK_SEGMENT_TYPES.map(type => {
@@ -906,19 +919,6 @@ export default function LegenScreen() {
             />
           )}
 
-          <View className="rounded-[16px] p-3 bg-white/5 border border-ft-line-strong">
-            <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase mb-2">Anzahl Schritte</Text>
-            <View className="flex-row items-center justify-between">
-              <Pressable accessibilityLabel="Schritte verringern" onPress={() => setSegmentSteps(s => clampSegmentSteps(s - 1))} className="w-11 h-11 rounded-[13px] bg-white/10 items-center justify-center">
-                <Ionicons name="remove" size={20} color={FT.text} />
-              </Pressable>
-              <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{segmentSteps}</Text>
-              <Pressable accessibilityLabel="Schritte erhöhen" onPress={() => setSegmentSteps(s => clampSegmentSteps(s + 1))} className="w-11 h-11 rounded-[13px] bg-white/10 items-center justify-center">
-                <Ionicons name="add" size={20} color={FT.text} />
-              </Pressable>
-            </View>
-          </View>
-
           <Pressable
             accessibilityLabel="Sprachansagen für Teilstrecken umschalten"
             accessibilityHint="Aktiviert oder deaktiviert feste Ansagen für geplante und aktive Teilstrecken."
@@ -932,12 +932,12 @@ export default function LegenScreen() {
           </Pressable>
 
           <Pressable
-            accessibilityLabel="Teilstrecke starten"
-            onPress={startSegmentPlan}
+            accessibilityLabel="Teilstrecke jetzt starten"
+            onPress={startTrackSegment}
             className="flex-row items-center justify-center gap-2 rounded-[16px] px-4 py-3 bg-ft-acc"
           >
             <Ionicons name="play" size={16} color={FT.accText} />
-            <Text className="text-[14px] font-black text-ft-acc-text">Teilstrecke starten</Text>
+            <Text className="text-[14px] font-black text-ft-acc-text">Jetzt starten</Text>
           </Pressable>
         </View>
       </AnyvoBottomSheet>

@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
-import { ANGLE_SHORT } from '@/features/tracking/utils/angleClassify';
+import { ANGLE_SHORT, angleMarkerKind } from '@/features/tracking/utils/angleClassify';
+import { objectNumbers } from '@/features/tracking/utils/objectMarkers';
 import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/store/trackingStore';
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
 import { buildTrackSegmentPolylines } from '@/features/tracking/utils/trackSegments';
@@ -33,15 +34,35 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color }: {
-  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot';
+  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder';
   label?: string; acute?: boolean; duebel?: boolean; color?: string;
 }) {
   const [track, setTrack] = useState(true);
   useEffect(() => { const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, []);
   let child;
-  if (kind === 'abriss') child = <View style={s.abrissBox} />;
+  // Abriss: bordertes Kästchen MIT Symbol — eine inhaltsleere Custom-Marker-View
+  // wird von react-native-maps (v. a. Android, nach tracksViewChanges=false) nicht
+  // zuverlässig gezeichnet. Das Kreuz-Symbol gibt messbaren Inhalt (wie der
+  // Ausarbeiten-Abriss) und hält die bestehende Abriss-Optik.
+  if (kind === 'abriss') child = <View style={s.abrissBox}><Ionicons name="close" size={11} color={C.trackWarning} /></View>;
+  // GW = Rechteck mit „GW", BW = Kreis mit „BW", OW = eigenes Badge mit „OW".
+  // Alle mit messbarem TEXT-Inhalt (Android-tauglich, kein leerer Marker).
+  else if (kind === 'gw') child = <View style={s.gwBox}><Text style={s.figTxt}>GW</Text></View>;
+  else if (kind === 'bw') child = <View style={s.bwCircle}><Text style={s.figTxt}>BW</Text></View>;
+  // OW = Dreieck mit „OW": gefüllter Ionicons-Triangle-Glyph (messbarer Inhalt,
+  // Android-tauglich — kein leeres CSS-Border-Dreieck) + Text darüber.
+  else if (kind === 'ow') child = (
+    <View style={s.owTri}>
+      <Ionicons name="triangle" size={26} color={C.trackWarning} />
+      <Text style={s.owTriTxt}>OW</Text>
+    </View>
+  );
   else if (kind === 'angle') child = <View style={[s.angleBadge, acute && s.angleBadgeAcute]}><Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text></View>;
   else if (kind === 'object') child = <View style={[s.objectBadge, duebel && s.objectBadgeDuebel]}><Text style={[s.objectBadgeTxt, duebel && s.objectBadgeTxtDuebel]}>{label}</Text></View>;
+  // Dübel = ROTER ZYLINDER (keine G-Nummer): solid gefüllter Körper + Deckel-Ellipse.
+  // Solide Füllflächen werden von react-native-maps zuverlässig gezeichnet (kein
+  // leeres Border-View wie beim Abriss-Bug).
+  else if (kind === 'cylinder') child = <View style={s.cylBody}><View style={s.cylTop} /></View>;
   else child = <View style={[s.markerDot, { backgroundColor: color }]} />;
   return <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track}>{child}</Marker>;
 });
@@ -117,11 +138,8 @@ export function TrackingMap({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers.length]);
   // Fortlaufende Nummer je Gegenstand (G1, G2, …) — nach Index in markerList.
-  const objectNo = useMemo(() => {
-    const map = new Map<number, number>(); let n = 0;
-    markerList.forEach((m, i) => { if (m.type === 'gegenstand') map.set(i, ++n); });
-    return map;
-  }, [markerList]);
+  // Dübel bekommt KEINE G-Nummer (roter Zylinder) → zählt nicht mit (objectNumbers).
+  const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
 
   const recenter = () => {
     const p = currentPosition ?? layPoints[layPoints.length - 1] ?? null;
@@ -213,13 +231,16 @@ export function TrackingMap({
           const lat = m.lat as number, lng = m.lng as number;
           const key = m.id ?? `mk-${i}`;
           if (m.type === 'winkel') {
-            if (m.angleKind === 'abriss') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="abriss" />;
+            // Abriss / GW / OW / BW haben eigene Darstellungen; sonst normaler Winkel.
+            const ak = angleMarkerKind(m.angleKind);
+            if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak} />;
             const label = (m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠';
             const acute = m.angleKind === 'spitz_links' || m.angleKind === 'spitz_rechts' || m.angleKind === 'spitz';
             return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} />;
           }
           if (m.type === 'gegenstand') {
-            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${objectNo.get(i) ?? ''}`} duebel={m.material === 'duebel'} />;
+            if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" />;
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${objectNo.get(i) ?? ''}`} />;
           }
           return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} />;
         })}
@@ -285,7 +306,16 @@ const s = StyleSheet.create({
   objectBadgeTxt:   { fontSize: 9, fontWeight: '900', color: '#101010' },
   objectBadgeDuebel:    { backgroundColor: C.trackWood },
   objectBadgeTxtDuebel: { color: '#04110F' },
-  abrissBox:   { width: 17, height: 17, borderRadius: 3, borderWidth: 2.5, borderColor: C.trackWarning, backgroundColor: 'rgba(0,0,0,0.35)' },
+  abrissBox:   { width: 17, height: 17, borderRadius: 3, borderWidth: 2.5, borderColor: C.trackWarning, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  // Fachwinkel-Marker (messbarer Text-Inhalt, Android-tauglich):
+  gwBox:       { minWidth: 22, height: 18, paddingHorizontal: 3, borderRadius: 3, backgroundColor: C.trackBlue, borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },   // Rechteck
+  bwCircle:    { width: 20, height: 20, borderRadius: 10, backgroundColor: C.trackPurple, borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },                          // Kreis
+  owTri:       { width: 26, height: 24, alignItems: 'center', justifyContent: 'center' },   // Dreieck (Glyph)
+  owTriTxt:    { position: 'absolute', bottom: 2, fontSize: 7, fontWeight: '900', color: '#04110F', letterSpacing: 0.2 },
+  figTxt:      { fontSize: 8.5, fontWeight: '900', color: '#04110F', letterSpacing: 0.2 },
+  // Dübel = roter Zylinder (solide Füllung, gut sichtbar auf Satellit/hell/dunkel):
+  cylBody:     { width: 14, height: 20, borderRadius: 5, backgroundColor: C.trackDanger, borderWidth: 1.5, borderColor: '#3a0000' },
+  cylTop:      { position: 'absolute', top: -3, left: -0.75, width: 14, height: 6, borderRadius: 3, backgroundColor: '#ff8a94', borderWidth: 1, borderColor: '#3a0000' },
   rejectDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,77,77,0.75)' },
   breakDot:    { width: 18, height: 18, borderRadius: 9, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#2a060a', alignItems: 'center', justifyContent: 'center' },
   posGlow:     { width: 40, height: 40, borderRadius: 20, backgroundColor: C.trackGlow, alignItems: 'center', justifyContent: 'center' },

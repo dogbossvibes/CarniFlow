@@ -104,7 +104,9 @@ describe('trackSegments', () => {
     expect(analysis.count).toBe(1);
     expect(analysis.plannedSteps).toBe(10);
     expect(analysis.actualSteps).toBe(7);
-    expect(analysis.hints.join(' ')).toContain('nach 7 statt 10 Schritten beendet');
+    // Start/Stop-Modell: tatsächlich dokumentierte Länge, KEINE „geplant/statt"-Formulierung.
+    expect(analysis.hints.join(' ')).toContain('7 Schritte dokumentiert');
+    expect(analysis.hints.join(' ')).not.toMatch(/geplant|statt/i);
     expect(analysis.hints.join(' ')).not.toMatch(/\b(KI|AI|künstliche Intelligenz)\b/i);
   });
 });

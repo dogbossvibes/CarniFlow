@@ -13,6 +13,7 @@ import * as Location from 'expo-location';
 import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind,
 } from '@/features/tracking/utils/positionSource';
+import { DEFAULT_HANDLER_DISTANCE_M, estimateDogProgressM, pointAtDistance } from '@/features/tracking/utils/searchGeometry';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev } from '@/features/tracking/utils/searchFix';
@@ -130,7 +131,10 @@ export interface SearchRecorder {
   foundObjects: number;
   totalObjects: number;
   distanceM: number;
-  progressM: number;
+  progressM: number;              // Handler-Fortschritt (Bogenlänge) — unverändert
+  dogProgressM: number;           // virtueller Hundefortschritt = progressM + Abstand (geklemmt)
+  trackLengthM: number;           // Gesamtlänge der gelegten Fährte (arc.total)
+  estimatedDogPosition: LatLng | null;   // Runtime-Ableitung (KEIN GPS-Rohpunkt)
   elapsedS: number;
   score: number;
   accuracy: number | null;
@@ -149,8 +153,9 @@ export type SearchResult = {
 
 export type { Level };
 
-export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: SearchObject[]; level: Level; sessionId?: string | null }): SearchRecorder {
+export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: SearchObject[]; level: Level; sessionId?: string | null; handlerDistanceM?: number }): SearchRecorder {
   const { laidPoints, laidObjects, level } = opts;
+  const handlerDistanceM = opts.handlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M;
   const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
   const totalObjects = laidObjects.length || model.objects;
 
@@ -420,11 +425,18 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     if (bestI >= 0) { foundRef.current.add(bestI); pushSnapshot(); }
   }, [laidObjects, pushSnapshot]);
 
+  // Virtueller Hundefortschritt (Bogenlänge) + geschätzte Hundeposition — reine
+  // Runtime-Ableitung aus dem bestehenden progressM (Handler). Kein GPS-Rohpunkt.
+  const dogProgressM = estimateDogProgressM(snap.progressM, handlerDistanceM, arc.total);
+  const estimatedDogPosition = pointAtDistance(laidPoints, arc.cum, dogProgressM);
+
   return {
     ready, recording, paused,
     points: snap.points, position, deviationM: snap.deviationM, onTrack: snap.onTrack,
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
-    distanceM: snap.distanceM, progressM: snap.progressM, elapsedS, score: snap.score, accuracy,
+    distanceM: snap.distanceM, progressM: snap.progressM,
+    dogProgressM, trackLengthM: arc.total, estimatedDogPosition,
+    elapsedS, score: snap.score, accuracy,
     gpsDebug,
     start, stop, setPaused, markObject,
   };

@@ -34,6 +34,9 @@ export const ANGLE_LABEL: Record<AngleKind, string> = {
   spitz:        'Spitzwinkel',          // Legacy (Altdaten ohne Richtung)
   absatz:       'Absatz',
   abriss:       'Abriss',
+  gw:           'Geschlossener Winkel',
+  ow:           'Offener Winkel',
+  bw:           'Bodenwinkel',
 };
 
 // Kompaktes Karten-Badge je Winkeltyp (geometrisch, klar unterscheidbar):
@@ -46,4 +49,21 @@ export const ANGLE_SHORT: Record<AngleKind, string> = {
   spitz:        'S',
   absatz:       'A',
   abriss:       '',
+  gw:           'GW',
+  ow:           'OW',
+  bw:           'BW',
 };
+
+// Karten-Darstellungsart je Winkeltyp (Dispatch für den Renderer). Abriss bleibt
+// ein eigener Zustand; GW=Rechteck, OW=eigenes Badge, BW=Kreis; sonst normaler
+// Winkel. Reine Funktion → testbar.
+export type AngleMarkerKind = 'abriss' | 'gw' | 'ow' | 'bw' | 'angle';
+export function angleMarkerKind(k: AngleKind | null | undefined): AngleMarkerKind {
+  switch (k) {
+    case 'abriss': return 'abriss';
+    case 'gw':     return 'gw';
+    case 'ow':     return 'ow';
+    case 'bw':     return 'bw';
+    default:       return 'angle';
+  }
+}

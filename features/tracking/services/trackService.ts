@@ -243,6 +243,7 @@ export interface RunSummary {
   averageDeviationMeters: number | null;
   articlesFound:          number;
   runPoints:              { lat: number; lng: number; t: number }[];
+  searchHandlerDistanceM?: number;   // 5/10 — deterministischer Kontext (Smart Analyse); additiv in track_data
 }
 
 export async function finishTrackRun(runId: string, sessionId: string, summary: RunSummary): Promise<Result<null>> {
@@ -257,12 +258,22 @@ export async function finishTrackRun(runId: string, sessionId: string, summary: 
     }).eq('id', runId);
     if (rErr) return fail('finishTrackRun.run', rErr);
 
+    // Abstand als additiven JSON-Kontext in track_data mergen (keine DB-Migration,
+    // bestehende Felder — u. a. segments — bleiben erhalten).
+    let trackDataPatch: Record<string, unknown> | undefined;
+    if (summary.searchHandlerDistanceM != null) {
+      const { data: existing } = await supabase.from('training_sessions').select('track_data').eq('id', sessionId).maybeSingle();
+      const current = ((existing as any)?.track_data && typeof (existing as any).track_data === 'object') ? (existing as any).track_data : {};
+      trackDataPatch = { ...current, searchHandlerDistanceM: summary.searchHandlerDistanceM };
+    }
+
     const { error: sErr } = await supabase.from('training_sessions').update({
       status:                   'completed',
       ended_at:                 new Date().toISOString(),
       search_duration_seconds:  summary.durationSeconds,
       average_deviation_meters: summary.averageDeviationMeters,
       articles_found:           summary.articlesFound,
+      ...(trackDataPatch ? { track_data: trackDataPatch } : {}),
     }).eq('id', sessionId);
     if (sErr) return fail('finishTrackRun.session', sErr);
     return { data: null, error: null };

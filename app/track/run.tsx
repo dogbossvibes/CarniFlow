@@ -6,17 +6,21 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { HelpButton } from '@/components/help/HelpButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
 import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
 import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
+import { DEFAULT_HANDLER_DISTANCE_M, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { hapticSuccess, hapticTap } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
-import { APPROACH_HINT } from '@/features/tracking/engine/startApproach';
+import {
+  APPROACH_HINT, DEFAULT_APPROACH_CONFIG, classifyManualStart, type StartMode,
+} from '@/features/tracking/engine/startApproach';
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 
 // expo-speech defensiv laden (nativ; kein Crash, wenn Modul fehlt).
@@ -27,6 +31,7 @@ import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
 import { getSearchPointsBySession, deleteSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
 import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import type { GpsStats } from '@/features/tracking/engine/types';
 import {
@@ -89,7 +94,12 @@ export default function TrackRunScreen() {
   const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
   const snapData: Snap = snap ?? { laidLatLng: [], laidPoints: [], laidObjects: [], laidMarkers: [], segments: [], level: 'training' as Level };
 
-  const s = useSearchRecorder({ laidPoints: snapData.laidPoints, laidObjects: snapData.laidObjects, level: snapData.level, sessionId: effectiveId });
+  // Gewählter Abstand Hundeführer↔Hund (5/10 m) — vor Absuchestart gesetzt,
+  // persistiert (Store/PendingTrack) und bei Recovery wiederhergestellt (Default 5).
+  const [searchHandlerDistanceM, setSearchHandlerDistanceM] = useState<SearchHandlerDistanceM>(DEFAULT_HANDLER_DISTANCE_M);
+  const { stepLengthM } = useStepLengthSetting();   // optionale persönliche Schrittlänge (Default 0,75 m)
+
+  const s = useSearchRecorder({ laidPoints: snapData.laidPoints, laidObjects: snapData.laidObjects, level: snapData.level, sessionId: effectiveId, handlerDistanceM: searchHandlerDistanceM });
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
@@ -97,12 +107,19 @@ export default function TrackRunScreen() {
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
+  // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
+  const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
+  const [noStartHandled, setNoStartHandled] = useState(false);   // kontrolliertes „kein Startpunkt" nur einmal
+  const startModeRef = useRef<StartMode>('automatic');   // wie der Start bestätigt wurde (Runtime-Info)
   const startedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
   const segmentAnnouncementRef = useRef<Record<string, SearchSegmentAnnouncementState>>({});
 
-  // Ursprünglicher Startpunkt (Fährtenansatz) = erster gelegter Punkt.
-  const startPoint = snap && snap.laidLatLng.length > 0 ? snap.laidLatLng[0] : null;
+  // Ursprünglicher Startpunkt (Fährtenansatz):
+  //   1) gültiger Runtime-Startpunkt (erster gelegter Punkt = StartAnchor),
+  //   2) persistierter startAnchor als Fallback (nach App-Neustart),
+  //   3) sonst null → kontrollierte Recovery (kein stiller Sofortstart).
+  const startPoint = (snap && snap.laidLatLng.length > 0 ? snap.laidLatLng[0] : null) ?? anchorFallback;
   const approach = useStartPointApproach({ active: arming, start: startPoint });
 
   // P4: Beim Betreten der Absuche ist die Liegezeit vorbei → System-Anzeige entfernen.
@@ -114,6 +131,12 @@ export default function TrackRunScreen() {
     (async () => {
       const pending = await loadPending(dogId);
       if (!alive) return;
+      // Persistierten Startanker als Fallback merken (RC-4): überlebt App-Neustart.
+      if (pending?.startAnchor) setAnchorFallback({ lat: pending.startAnchor.lat, lng: pending.startAnchor.lng });
+      // Recovery: gewählten 5/10-m-Abstand wiederherstellen (nicht erneut fragen).
+      if (pending?.searchHandlerDistanceM === 5 || pending?.searchHandlerDistanceM === 10) {
+        setSearchHandlerDistanceM(pending.searchHandlerDistanceM);
+      }
       const decision = decideRecovery(pending);
       if (decision.kind === 'recovery') {
         useTrackingStore.getState().restoreSearchSession(decision.pending);   // laid + Metadaten in den (evtl. leeren) Store
@@ -133,13 +156,16 @@ export default function TrackRunScreen() {
 
   // Absuche WIRKLICH starten: Recorder + Timer + Status 'searching'. Wird erst am
   // Fährtenansatz (Arming) bzw. beim Fortsetzen aufgerufen — NICHT beim Betreten.
-  const beginSearchNow = useCallback(() => {
+  const beginSearchNow = useCallback((mode: StartMode = 'automatic') => {
     if (startedRef.current) return;
     startedRef.current = true;
+    startModeRef.current = mode;   // Runtime-Info (automatic | manual-at-start | manual-override)
     setArming(false);
     hapticSuccess();   // haptisches Feedback beim Erreichen des Ansatzes
     if (voiceOn && Speech) { try { Speech.speak('Suche läuft', { language: 'de-DE' }); } catch { /* best-effort */ } }
     const startMs = Date.now();
+    // Gewählten Abstand in den Store spiegeln → landet im PendingTrack-Snapshot (Recovery).
+    useTrackingStore.getState().setSearchHandlerDistanceM(searchHandlerDistanceM);
     s.start();
     useTrackingStore.getState().startSearchSession(null, startMs);   // Status 'searching' + Suchzeit-Start
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
@@ -148,20 +174,52 @@ export default function TrackRunScreen() {
         if (data) { runIdRef.current = data.id; useTrackingStore.getState().setSearchRunId(data.id); }
       }).catch(() => {});
     }
-  }, [s, voiceOn, dogId, effectiveId]);
+  }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM]);
+
+  // Manueller „Jetzt starten": innerhalb des dynamischen Radius → sofort; sonst
+  // bewusste Bestätigung (Override). Der Override tut NICHT so, als sei der
+  // GPS-Startpunkt bestätigt (startMode = 'manual-override').
+  const handleManualStart = useCallback(() => {
+    if (startedRef.current) return;
+    hapticTap();
+    const decision = classifyManualStart(approach.distanceM, approach.accuracy, DEFAULT_APPROACH_CONFIG);
+    if (decision === 'at-start') { beginSearchNow('manual-at-start'); return; }
+    const distTxt = approach.distanceM != null ? `ca. ${Math.round(approach.distanceM)} m` : 'unbekannt weit';
+    Alert.alert(
+      'Noch nicht am Startpunkt',
+      `Du bist noch ${distTxt} vom Fährtenansatz entfernt. Trotzdem jetzt starten?`,
+      [
+        { text: 'Zurück', style: 'cancel' },
+        { text: 'Trotzdem starten', style: 'destructive', onPress: () => beginSearchNow('manual-override') },
+      ],
+    );
+  }, [approach.distanceM, approach.accuracy, beginSearchNow]);
 
   // 2) Beim Betreten NICHT sofort starten: erst zum Fährtenansatz navigieren
   //    (Arming, Suchzeit läuft noch nicht). Ohne bekannten Startpunkt → Fallback:
   //    sofort starten (Legacy/leer). Kein Start bei ausstehendem Recovery-Dialog.
   useEffect(() => {
     if (phase !== 'ready' || startedRef.current || arming || recovery || !snap) return;
-    if (startPoint) setArming(true);
-    else beginSearchNow();
-  }, [phase, recovery, snap, arming, startPoint, beginSearchNow]);
+    if (startPoint) { setArming(true); return; }
+    // RC-4: Kein Startpunkt (Runtime leer UND kein persistierter Anker) → NICHT
+    // stillschweigend sofort starten. Kontrollierte Recovery-Auswahl anbieten.
+    if (noStartHandled) return;
+    setNoStartHandled(true);
+    Alert.alert(
+      'Startpunkt nicht gefunden',
+      'Der gespeicherte Fährtenansatz ist nicht verfügbar (z. B. nach App-Neustart). Du kannst zurückgehen oder die Absuche ohne Startpunkt-Prüfung beginnen.',
+      [
+        { text: 'Zurück', style: 'cancel', onPress: () => router.replace((dogId ? `/track/liegen?dogId=${dogId}` : '/track') as never) },
+        { text: 'Trotzdem starten', style: 'destructive', onPress: () => beginSearchNow('manual-override') },
+      ],
+      { cancelable: false },
+    );
+  }, [phase, recovery, snap, arming, startPoint, beginSearchNow, noStartHandled, dogId, router]);
 
-  // 3) Auto-Start, sobald der Ansatz stabil im Radius erreicht ist (reduceApproach).
+  // 3) Auto-Start, sobald der Ansatz stabil im Radius erreicht ist (mehrere gültige
+  //    Fixes, dynamischer Radius, Stale-/Ausreißerfilter — reduceApproach).
   useEffect(() => {
-    if (arming && approach.armed && !startedRef.current) beginSearchNow();
+    if (arming && approach.armed && !startedRef.current) beginSearchNow('automatic');
   }, [arming, approach.armed, beginSearchNow]);
 
   useEffect(() => { if (effectiveId) getTrackSessionDogName(effectiveId).then(r => { if (r.data) setDogName(r.data); }); }, [effectiveId]);
@@ -228,6 +286,7 @@ export default function TrackRunScreen() {
         distanceMeters: Math.round(pathDistanceM(saved)),
         averageDeviationMeters: 0,
         articlesFound: 0,
+        searchHandlerDistanceM: pending.searchHandlerDistanceM,
         runPoints: saved.map(p => ({ lat: p.lat, lng: p.lng, t: p.t })),
       }).catch(() => {});
     }
@@ -264,27 +323,44 @@ export default function TrackRunScreen() {
   const mapMarkers: MapMarker[] = snapData.laidMarkers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind }));
   const winkel = snapData.laidMarkers.filter(m => m.type === 'winkel').length;
 
-  // Sprachführung: gelegte Winkel/Spitzwinkel/Abriss „etwas voraus" ansagen.
+  // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
+  // Bogenlänge). Ereignis-Bogenlänge = marker.distance_from_start (bei Platzierung
+  // aufgezeichnet → order-korrekt, immun gegen Selbstkreuzung).
   const guidanceAngles = useMemo<GuidanceAngle[]>(
     () => snapData.laidMarkers
-      .filter(m => m.type === 'winkel' && m.lat != null && m.lng != null)
-      .map(m => ({ id: m.id, lat: m.lat as number, lng: m.lng as number, angleKind: m.angleKind })),
+      .filter(m => m.type === 'winkel')
+      .map(m => ({ id: m.id, arcM: m.distance_from_start, angleKind: m.angleKind })),
     [snapData.laidMarkers],
   );
-  useTrackVoiceGuidance(curPos, guidanceAngles, voiceOn);
-
-  // Haptische Führung: 1× Vibration bei Gegenstand-Nähe, 2× bei Winkel voraus.
+  // Gegenstände (inkl. material für die Voice-Ansage „Dübel"/„Gegenstand").
   const guidanceObjects = useMemo<GuidanceObject[]>(
-    () => snapData.laidObjects.map(o => ({ id: `obj-${o.index}`, lat: o.at.latitude, lng: o.at.longitude })),
-    [snapData.laidObjects],
+    () => snapData.laidMarkers
+      .filter(m => m.type === 'gegenstand')
+      .map(m => ({ id: m.id, arcM: m.distance_from_start, material: m.material })),
+    [snapData.laidMarkers],
   );
-  useTrackHapticGuidance(curPos, guidanceAngles, guidanceObjects, true);
+  useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects);
+
+  // Haptische Führung: 1× bei Gegenstand voraus, 2× bei Winkel voraus — dieselbe
+  // Bogenlängendistanz (dogProgressM) wie die Sprachführung.
+  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, true);
+
+  // Karten-/Skizzen-Marker (Koordinaten) — getrennt von den Bogenlängen-basierten
+  // Guidance-Listen (die tragen arcM statt lat/lng).
+  const sketchAngleMarkers = useMemo(
+    () => snapData.laidMarkers.filter(m => m.type === 'winkel' && m.lat != null && m.lng != null).map(m => ({ lat: m.lat as number, lng: m.lng as number })),
+    [snapData.laidMarkers],
+  );
+  const sketchObjectMarkers = useMemo(
+    () => snapData.laidMarkers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null).map(m => ({ lat: m.lat as number, lng: m.lng as number })),
+    [snapData.laidMarkers],
+  );
 
   useEffect(() => {
     if (!voiceOn || arming || !s.recording || snapData.segments.length === 0) return;
     const result = searchSegmentAnnouncements({
       segments: snapData.segments,
-      currentStep: metersToSteps(s.progressM),
+      currentStep: metersToSteps(s.dogProgressM, stepLengthM),   // hundebezogen (5/10-m-Versatz entlang der Fährte)
       state: segmentAnnouncementRef.current,
     });
     segmentAnnouncementRef.current = result.state;
@@ -293,12 +369,12 @@ export default function TrackRunScreen() {
         try { Speech.speak(message, { language: 'de-CH', pitch: 1.0, rate: 0.95 }); } catch { /* best-effort */ }
       }
     });
-  }, [arming, s.progressM, s.recording, snapData.segments, voiceOn]);
+  }, [arming, s.dogProgressM, s.recording, snapData.segments, voiceOn, stepLengthM]);
 
   const currentRunSegment = useMemo(() => {
-    const step = metersToSteps(s.progressM);
+    const step = metersToSteps(s.dogProgressM, stepLengthM);
     return snapData.segments.find(seg => seg.status === 'completed' && step >= seg.startStep && step < seg.endStep) ?? null;
-  }, [s.progressM, snapData.segments]);
+  }, [s.dogProgressM, snapData.segments, stepLengthM]);
 
   const hasLaid = snapData.laidPoints.length > 1;
   const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
@@ -328,6 +404,7 @@ export default function TrackRunScreen() {
             distanceMeters:         res.distanceM,
             averageDeviationMeters: res.deviationAvgM,
             articlesFound:          res.foundObjects,
+            searchHandlerDistanceM: searchHandlerDistanceM,   // deterministischer Kontext → track_data
             runPoints:              res.points.map(p => ({ lat: p.latitude, lng: p.longitude, t: Date.now() })),
           }).catch(() => {});
         }
@@ -340,7 +417,7 @@ export default function TrackRunScreen() {
   };
 
   const metrics: { value: string; label: string; warn?: boolean }[] = [
-    { value: `${Math.round(s.distanceM)} m`, label: `${metersToSteps(s.distanceM)} Schr.` },
+    { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
     { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
     { value: devShown != null ? `${devOff ? '+' : ''}${devShown.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
     { value: s.accuracy != null ? `${Math.round(s.accuracy)} m` : '—', label: 'GPS' },
@@ -384,6 +461,7 @@ export default function TrackRunScreen() {
             </View>
           )}
           <View className="flex-1" />
+          <HelpButton topicId="track_search" autoShow tint={FT.text} size={18} />
           {/* Sprachausgabe an/aus */}
           <Pressable onPress={() => setVoiceOn(v => !v)} hitSlop={8}
             className={`w-9 h-9 rounded-[11px] items-center justify-center border ${voiceOn ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.4)]' : 'bg-white/5 border-ft-line-strong'}`}>
@@ -419,7 +497,7 @@ export default function TrackRunScreen() {
               controlsTop={64}
             />
           ) : (
-            <View className="flex-1 bg-[#08100e]"><TrackSketch points={snapData.laidLatLng} angleMarkers={guidanceAngles} objectMarkers={guidanceObjects} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
+            <View className="flex-1 bg-[#08100e]"><TrackSketch points={snapData.laidLatLng} angleMarkers={sketchAngleMarkers} objectMarkers={sketchObjectMarkers} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
           )}
 
           {/* Timer (oben links) */}
@@ -433,7 +511,7 @@ export default function TrackRunScreen() {
               <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">Teilstrecke</Text>
               <Text className="text-[14px] text-ft-text font-black mt-0.5">{segmentDisplayLabel(currentRunSegment)}</Text>
               <Text className="text-[11px] text-ft-muted font-semibold mt-1">
-                Noch {Math.max(0, currentRunSegment.endStep - metersToSteps(s.progressM))} Schritte
+                Noch ca. {Math.max(0, currentRunSegment.endStep - metersToSteps(s.dogProgressM, stepLengthM))} Schritte
               </Text>
             </View>
           )}
@@ -469,21 +547,64 @@ export default function TrackRunScreen() {
                   {approach.distanceM != null ? `${approach.distanceM.toFixed(1)} m` : '– m'}
                 </Text>
                 <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase">Distanz zum Ansatz</Text>
+                {/* Status: Distanz + gemeldete GPS-Genauigkeit (keine falsche cm-Präzision). */}
                 <View className="flex-row items-center gap-2 mt-3 px-3 py-1.5 rounded-full bg-white/5 border border-ft-line">
                   {approach.withinRadius ? (
                     <>
                       <ActivityIndicator size="small" color={FT.acc} />
-                      <Text className="text-[12px] font-bold text-ft-acc">Ansatz erreicht – kurz halten…</Text>
+                      <Text className="text-[12px] font-bold text-ft-acc">
+                        Ansatz erreicht – kurz halten… {approach.fixesRemaining > 0 ? `(${approach.fixesRemaining})` : ''}
+                      </Text>
+                    </>
+                  ) : approach.accuracy == null ? (
+                    <>
+                      <Ionicons name="navigate" size={13} color={FT.muted} />
+                      <Text className="text-[12px] font-bold text-ft-muted">GPS wird gesucht…</Text>
+                    </>
+                  ) : approach.accuracy > DEFAULT_APPROACH_CONFIG.maxAccuracyM ? (
+                    <>
+                      <Ionicons name="warning-outline" size={13} color={FT.warn} />
+                      <Text className="text-[12px] font-bold text-ft-warn">
+                        GPS wird stabilisiert … ±{Math.round(approach.accuracy)} m
+                      </Text>
                     </>
                   ) : (
                     <>
                       <Ionicons name="navigate" size={13} color={FT.muted} />
                       <Text className="text-[12px] font-bold text-ft-muted">
-                        {approach.accuracy != null ? `GPS ±${Math.round(approach.accuracy)} m` : 'GPS wird gesucht…'}
+                        {approach.distanceM != null ? `Startpunkt ${Math.round(approach.distanceM)} m entfernt · ` : ''}GPS ±{Math.round(approach.accuracy)} m
                       </Text>
                     </>
                   )}
                 </View>
+                {/* Abstand Hundeführer ↔ Hund: bestimmt die virtuelle Hundeposition
+                    (5/10 m entlang der Fährte) für hundebezogene Ansagen. Default 5 m. */}
+                <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase mt-4">Abstand zum Hund</Text>
+                <View className="flex-row gap-2 mt-1.5">
+                  {([5, 10] as const).map(d => {
+                    const on = searchHandlerDistanceM === d;
+                    return (
+                      <Pressable
+                        key={d}
+                        accessibilityLabel={`Abstand ${d} Meter`}
+                        onPress={() => { setSearchHandlerDistanceM(d); useTrackingStore.getState().setSearchHandlerDistanceM(d); }}
+                        className={`px-6 py-2.5 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}
+                      >
+                        <Text className={`text-[14px] font-black ${on ? 'text-ft-acc' : 'text-ft-text'}`}>{d} m</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {/* Manueller Sofortstart (RC-2): immer verfügbar, wenn noch nicht gestartet. */}
+                <Pressable
+                  accessibilityLabel="Jetzt starten"
+                  accessibilityHint="Startet die Absuche sofort. Außerhalb des Startbereichs wird eine Bestätigung verlangt."
+                  onPress={handleManualStart}
+                  className="flex-row items-center justify-center gap-2 mt-4 px-6 py-3 rounded-[16px] bg-ft-acc"
+                >
+                  <Ionicons name="play" size={16} color={FT.accText} />
+                  <Text className="text-[14px] font-black text-ft-acc-text">Jetzt starten</Text>
+                </Pressable>
               </View>
             </View>
           )}

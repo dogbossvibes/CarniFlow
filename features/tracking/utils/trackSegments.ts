@@ -1,6 +1,6 @@
 import { C } from '@/constants/colors';
 import { calculateDistance, type LatLng } from '@/features/tracking/utils/gpsFilter';
-import { STEP_LENGTH_M } from '@/features/tracking/utils/steps';
+import { DEFAULT_STEP_LENGTH_M } from '@/features/tracking/utils/steps';
 import type { MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
 
 export type TrackSegmentType =
@@ -183,6 +183,80 @@ export function actualSegmentSteps(segment: TrackSegment): number {
   return Math.max(0, segment.endStep - segment.startStep);
 }
 
+// ── Start/Stop-Modell (ersetzt die schrittzahlbasierte Vorabplanung) ──────────
+// Eine Teilstrecke wird beim Tippen SOFORT scharf geschaltet (status='active')
+// und am aktuellen TrackPoint verankert. Keine Vorab-Schrittzahl.
+export function createActiveSegment(input: {
+  dogId: string;
+  trackSessionId: string | null;
+  type: TrackSegmentType;
+  customLabel?: string | null;
+  currentStep: number;            // aus metersToSteps(distanceMeters) — abgeleitet, keine Eingabe
+  startTrackPointIndex: number;   // aktueller letzter TrackPoint
+  startCoordinate: LatLng | null; // aktuelle Position
+  voiceEnabled: boolean;
+}): TrackSegment {
+  const now = Date.now();
+  const startStep = Math.max(0, Math.round(input.currentStep));
+  return {
+    id: makeId(),
+    dogId: input.dogId,
+    trackSessionId: input.trackSessionId,
+    type: input.type,
+    customLabel: input.type === 'custom' ? normalizeCustomSegmentLabel(input.customLabel ?? '') : null,
+    plannedLengthSteps: 0,          // keine Planung; wird beim Stop = tatsächliche Länge
+    startStep,
+    endStep: startStep,             // vorläufig; beim Stop gesetzt
+    startCoordinate: input.startCoordinate,
+    endCoordinate: null,
+    startTrackPointIndex: input.startTrackPointIndex,
+    endTrackPointIndex: null,
+    startedAt: now,
+    completedAt: null,
+    status: 'active',
+    voiceEnabled: input.voiceEnabled,
+    createdAt: now,
+    updatedAt: now,
+    notes: null,
+    colorToken: input.type,
+  };
+}
+
+// Aktive Teilstrecke abschließen (Stop-Tap ODER Fährtenende): endet am aktuellen
+// TrackPoint. plannedLengthSteps wird kompatibel = tatsächliche Länge gesetzt.
+export function finalizeSegment(segment: TrackSegment, input: {
+  currentStep: number;
+  endTrackPointIndex: number;
+  endCoordinate: LatLng | null;
+}): TrackSegment {
+  const endStep = Math.max(segment.startStep, Math.round(input.currentStep));
+  return {
+    ...segment,
+    status: 'completed',
+    endStep,
+    endCoordinate: input.endCoordinate,
+    endTrackPointIndex: input.endTrackPointIndex,
+    completedAt: Date.now(),
+    updatedAt: Date.now(),
+    plannedLengthSteps: Math.max(0, endStep - segment.startStep),
+  };
+}
+
+// Recovery: höchstens EINE gültige aktive Teilstrecke behalten. Eine aktive TS
+// ohne gültigen startTrackPointIndex (beschädigt) oder eine zweite aktive TS
+// wird kontrolliert auf 'cancelled' zurückgesetzt (kein stilles Verwenden).
+export function sanitizeRestoredSegments(segments: TrackSegment[]): TrackSegment[] {
+  let keptActive = false;
+  return segments.map(s => {
+    if (s.status !== 'active') return s;
+    const idx = s.startTrackPointIndex;
+    const validStart = typeof idx === 'number' && Number.isFinite(idx) && idx >= 0;
+    if (!keptActive && validStart) { keptActive = true; return s; }
+    if (__DEV__) console.warn('[trackSegments] aktive Teilstrecke bei Recovery entschärft (ungültig/mehrfach) → cancelled:', s.id);
+    return { ...s, status: 'cancelled' as TrackSegmentStatus, completedAt: s.completedAt ?? Date.now(), updatedAt: Date.now() };
+  });
+}
+
 export function coerceTrackSegments(value: unknown): TrackSegment[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -240,11 +314,14 @@ export interface TrackPolylinePart {
 export function buildTrackSegmentPolylines(points: TrackPointSample[], segments: TrackSegment[]): TrackPolylinePart[] {
   const coords = points.map(p => ({ lat: p.lat, lng: p.lng }));
   if (coords.length < 2) return [];
+  // Completed-Segmente über ihre Indizes; die AKTIVE Teilstrecke live von ihrem
+  // Start bis zum aktuellen letzten TrackPoint (keine Geometrie-Duplizierung —
+  // beide slicen dieselbe coords-Spur).
   const completed = segments
-    .filter(s => s.status === 'completed')
+    .filter(s => s.status === 'completed' || s.status === 'active')
     .map(s => {
       const start = indexForSegmentBoundary(points, s, 'start');
-      const end = indexForSegmentBoundary(points, s, 'end');
+      const end = s.status === 'active' ? coords.length - 1 : indexForSegmentBoundary(points, s, 'end');
       if (start == null || end == null) return null;
       return { segment: s, start: Math.min(start, end), end: Math.max(start, end) };
     })
@@ -331,12 +408,10 @@ export function analyzeTrackSegments(input: {
   completed.forEach(segment => {
     const actual = actualSegmentSteps(segment);
     const label = segmentDisplayLabel(segment);
-    if (Math.abs(actual - segment.plannedLengthSteps) <= SEGMENT_COMPLETION_TOLERANCE_STEPS) {
-      hints.push(`Die geplanten ${segment.plannedLengthSteps} Schritte wurden vollständig dokumentiert.`);
-    } else if (actual < segment.plannedLengthSteps) {
-      hints.push(`Die Teilstrecke ${label} wurde nach ${actual} statt ${segment.plannedLengthSteps} Schritten beendet.`);
-    }
-    const markersInside = (input.markers ?? []).filter(m => m.type === 'gegenstand' && m.distance_from_start >= segment.startStep * STEP_LENGTH_M && m.distance_from_start <= segment.endStep * STEP_LENGTH_M);
+    // Start/Stop-Modell: keine Vorabplanung mehr → tatsächlich dokumentierte
+    // Länge ausweisen (keine „geplant X Schritte"-Formulierung).
+    hints.push(`Teilstrecke ${label}: ${actual} Schritte dokumentiert.`);
+    const markersInside = (input.markers ?? []).filter(m => m.type === 'gegenstand' && m.distance_from_start >= segment.startStep * DEFAULT_STEP_LENGTH_M && m.distance_from_start <= segment.endStep * DEFAULT_STEP_LENGTH_M);
     if (markersInside.length > 0) {
       hints.push(`${markersInside.length} Gegenstand${markersInside.length === 1 ? '' : 'e'} lagen innerhalb der Teilstrecke ${label}.`);
     }
