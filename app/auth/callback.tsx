@@ -4,9 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 
 export default function AuthCallback() {
   const router = useRouter();
+  const { t } = useT();
   const { code, error: oauthError } = useLocalSearchParams<{
     code?: string;
     error?: string;
@@ -79,12 +81,12 @@ export default function AuthCallback() {
             <Ionicons name="alert-circle-outline" size={28} color={C.danger} />
           </View>
           <Text style={s.errText}>{errMsg}</Text>
-          <Text style={s.hint}>Redirecting…</Text>
+          <Text style={s.hint}>{t('auth.redirecting')}</Text>
         </>
       ) : (
         <>
           <ActivityIndicator size="large" color={C.accent} />
-          <Text style={s.hint}>Signing you in…</Text>
+          <Text style={s.hint}>{t('auth.signingIn')}</Text>
         </>
       )}
     </View>

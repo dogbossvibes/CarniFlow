@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
+import { RECOVERY_DEEP_LINK } from '@/features/auth/accountSecurity';
 
 // Required to complete OAuth sessions on web (no-op on native)
 WebBrowser.maybeCompleteAuthSession();
@@ -30,9 +31,30 @@ export function signOut() {
   return supabase.auth.signOut();
 }
 
+export function getPasswordRecoveryRedirectTo() {
+  return makeRedirectUri({
+    scheme: 'anyvo',
+    path:   'auth/recovery',
+    native: RECOVERY_DEEP_LINK,
+  });
+}
+
+export function resetPasswordForEmail(email: string) {
+  return supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: getPasswordRecoveryRedirectTo(),
+  });
+}
+
+export function requestPasswordReauthentication() {
+  return supabase.auth.reauthenticate();
+}
+
 // Passwort ändern (nur für E-Mail/Passwort-Konten sinnvoll).
-export function updatePassword(password: string) {
-  return supabase.auth.updateUser({ password });
+export function updatePassword(password: string, nonce?: string) {
+  return supabase.auth.updateUser({
+    password,
+    ...(nonce?.trim() ? { nonce: nonce.trim() } : {}),
+  });
 }
 
 // E-Mail-Adresse ändern. Supabase schickt eine Bestätigung an die NEUE Adresse
@@ -84,11 +106,16 @@ export async function signInWithGoogle(): Promise<{ error: Error | null; cancell
     native: 'anyvo://auth/callback',
   });
 
+  // Kontoauswahl erzwingen: ohne `prompt=select_account` übernimmt Google bei
+  // bestehender Google-Session stillschweigend das zuletzt verwendete Konto.
+  // Gleicher OAuth-Parameter für Web, iOS und Android (Provider-seitig).
+  const queryParams = { prompt: 'select_account' } as const;
+
   if (Platform.OS === 'web') {
     // On web: let Supabase redirect the browser window directly
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options:  { redirectTo },
+      options:  { redirectTo, queryParams },
     });
     return { error: error ?? null };
   }
@@ -96,7 +123,7 @@ export async function signInWithGoogle(): Promise<{ error: Error | null; cancell
   // Native (iOS / Android): use in-app WebBrowser session
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options:  { redirectTo, skipBrowserRedirect: true },
+    options:  { redirectTo, skipBrowserRedirect: true, queryParams },
   });
 
   if (error) return { error };

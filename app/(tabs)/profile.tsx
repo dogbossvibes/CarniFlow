@@ -483,6 +483,12 @@ export default function ProfilScreen() {
           </View>
           <View style={s.trenner} />
           <EinstellungZeile
+            icon="shield-checkmark-outline"
+            label={t('profile.accountSecurity')}
+            onPress={() => router.push('/account-security' as never)}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
             icon="language-outline"
             label={t('profile.language')}
             wert={spracheLabel}

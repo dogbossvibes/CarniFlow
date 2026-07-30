@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react';
 import {
-  Dimensions,
   Image,
+  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
+  type TextInputProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -26,18 +28,24 @@ import Animated, {
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { C } from '@/constants/colors';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
-import { DogIcon } from '@/components/ui/DogIcon';
 import { signIn, signUp, signInWithGoogle, signInWithApple, isAppleAuthAvailable } from '@/services/auth';
-
-const { height: SCREEN_H } = Dimensions.get('window');
+import { useT, type TranslationKey } from '@/i18n';
 
 type Tab = 'anmelden' | 'registrieren';
 
+const BG_ASPECT_RATIO = 7008 / 4672;
+
+type AuthFieldProps = TextInputProps & {
+  label: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  password?: boolean;
+};
+
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useT();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
 
   const [tab,       setTab]       = useState<Tab>('anmelden');
   const [vollName,  setVollName]  = useState('');
@@ -48,6 +56,17 @@ export default function LoginScreen() {
   const [laden,     setLaden]     = useState(false);
   const [oauthLaden,setOauthLaden]= useState(false);
   const [erfolg,    setErfolg]    = useState(false);
+  const isBusy = laden || oauthLaden;
+  const isCompactHeight = viewportHeight < 2800 || viewportWidth < 1600;
+  const isShortHeight = viewportHeight < 2880;
+  const showTrust = tab === 'anmelden' && viewportHeight >= 2600;
+  const bgWidth = viewportWidth * 1.25;
+  const bgFocusStyle = {
+    width:  bgWidth,
+    height: bgWidth / BG_ASPECT_RATIO,
+    left:   (viewportWidth - bgWidth) / 2,
+    top:    -viewportHeight * 0.025,
+  };
   // Apple-Button nur zeigen, wenn nativ verfügbar (NICHT in Expo Go → sonst Crash).
   const [appleReady, setAppleReady] = useState(false);
   useEffect(() => {
@@ -68,7 +87,7 @@ export default function LoginScreen() {
     brandY.value  = withDelay(300, withSpring(0, { damping: 20, stiffness: 100 }));
     formOp.value  = withDelay(550, withTiming(1, { duration: 700 }));
     formY.value   = withDelay(550, withSpring(0, { damping: 18, stiffness: 90 }));
-  }, []);
+  }, [brandOp, brandY, formOp, formY, heroOp, heroS]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
@@ -85,7 +104,7 @@ export default function LoginScreen() {
 
   const handleAbsenden = async () => {
     if (!email.trim() || !passwort) {
-      setFehler('Bitte E-Mail und Passwort eingeben');
+      setFehler(t('auth.errorMissingCredentials'));
       return;
     }
     setLaden(true); setFehler(null); setErfolg(false);
@@ -93,17 +112,17 @@ export default function LoginScreen() {
     if (tab === 'anmelden') {
       const { error: err } = await signIn(email.trim(), passwort);
       setLaden(false);
-      if (err) { setFehler(uebersetzeFehler(err.message)); return; }
+      if (err) { setFehler(uebersetzeFehler(err.message, t)); return; }
       router.replace('/(tabs)/home');
     } else {
       if (passwort.length < 6) {
         setLaden(false);
-        setFehler('Passwort: mindestens 6 Zeichen');
+        setFehler(t('auth.errorPasswordMin6'));
         return;
       }
       const { data, error: err } = await signUp(email.trim(), passwort, vollName.trim() || undefined, rolle);
       setLaden(false);
-      if (err) { setFehler(uebersetzeFehler(err.message)); return; }
+      if (err) { setFehler(uebersetzeFehler(err.message, t)); return; }
       if (data.session) router.replace('/(tabs)/home');
       else setErfolg(true);
     }
@@ -117,7 +136,7 @@ export default function LoginScreen() {
       if (cancelled) return;
       router.replace('/(tabs)/home');
     } catch (err: unknown) {
-      setFehler(err instanceof Error ? uebersetzeFehler(err.message) : 'Google-Anmeldung noch nicht geklappt — versuch es nochmal!');
+      setFehler(err instanceof Error ? uebersetzeFehler(err.message, t) : t('auth.errorGoogle'));
     } finally { setOauthLaden(false); }
   };
 
@@ -128,7 +147,7 @@ export default function LoginScreen() {
       if (error) throw error;
       router.replace('/(tabs)/home');
     } catch (err: unknown) {
-      setFehler(err instanceof Error ? uebersetzeFehler(err.message) : 'Apple-Anmeldung noch nicht geklappt — versuch es nochmal!');
+      setFehler(err instanceof Error ? uebersetzeFehler(err.message, t) : t('auth.errorApple'));
     } finally { setOauthLaden(false); }
   };
 
@@ -141,14 +160,14 @@ export default function LoginScreen() {
             <View style={s.erfolgIcon}>
               <Ionicons name="mail-outline" size={40} color={C.accent} />
             </View>
-            <Text style={s.erfolgTitel}>Postfach prüfen</Text>
+            <Text style={s.erfolgTitel}>{t('auth.confirmInboxTitle')}</Text>
             <Text style={s.erfolgText}>
-              {'Wir haben einen Bestätigungslink an '}
+              {t('auth.confirmInboxPrefix')}
               <Text style={{ color: C.white }}>{email}</Text>
-              {' gesendet. Tippe drauf, um dein Konto zu aktivieren.'}
+              {t('auth.confirmInboxSuffix')}
             </Text>
             <TouchableOpacity style={s.zurueckBtn} onPress={() => wechsleTab('anmelden')}>
-              <Text style={s.zurueckBtnText}>Zurück zur Anmeldung</Text>
+              <Text style={s.zurueckBtnText}>{t('auth.backToLogin')}</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -158,77 +177,77 @@ export default function LoginScreen() {
 
   return (
     <View style={s.safe}>
-      {/* ── Hintergrundbild ── */}
-      <Animated.View style={[StyleSheet.absoluteFill, heroStyle]}>
-        <Image
-          source={require('@/assets/images/yam20.jpg')}
-          style={StyleSheet.absoluteFill}
+      <Animated.View style={[s.bgImageFrame, bgFocusStyle, heroStyle]} pointerEvents="none">
+        <ImageBackground
+          source={require('@/assets/images/bgyam-login.jpg')}
+          style={s.bgImage}
+          imageStyle={s.bgImageContent}
           resizeMode="cover"
         />
       </Animated.View>
-
       <LinearGradient
-        colors={['rgba(5,5,5,0.55)', 'transparent']}
-        style={s.vignetteOben}
+        colors={['rgba(5,5,5,0.48)', 'rgba(5,5,5,0.16)', 'rgba(5,5,5,0.62)', '#050505']}
+        locations={[0, 0.32, 0.62, 1]}
+        style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
       <LinearGradient
-        colors={['transparent', 'rgba(5,5,5,0.65)', 'rgba(5,5,5,0.92)', '#050505']}
-        locations={[0, 0.35, 0.65, 1]}
-        style={s.gradUnten}
-        pointerEvents="none"
-      />
-      <LinearGradient
-        colors={['rgba(5,5,5,0.5)', 'transparent', 'rgba(5,5,5,0.5)']}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
+        colors={['rgba(0,255,204,0.08)', 'transparent', 'rgba(5,5,5,0.34)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.9 }}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
 
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={s.safeArea}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={s.scroll}
+            contentContainerStyle={[s.scroll, isCompactHeight && s.scrollCompact]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
             showsVerticalScrollIndicator={false}
           >
-            {/* ── Branding ── */}
-            <Animated.View style={[s.brandBlock, brandStyle]}>
+            <Animated.View style={[
+              s.brandBlock,
+              isShortHeight && s.brandBlockShort,
+              isCompactHeight && s.brandBlockCompact,
+              brandStyle,
+            ]}>
               <View style={s.logoRow}>
-                <View style={s.logoPill}>
-                  <LinearGradient
-                    colors={['#00FFCC', '#00FFCC']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <DogIcon size={15} color={C.accentText} />
-                </View>
-                <Text style={s.logoPillText}>ANYVO</Text>
+                <Image
+                  source={require('@/assets/images/icon.png')}
+                  style={[s.logoImg, isCompactHeight && s.logoImgCompact]}
+                  resizeMode="contain"
+                  accessibilityIgnoresInvertColors
+                />
+                <Text style={s.logoText}>ANYVO</Text>
               </View>
-              <Text style={s.heroHeadline}>Trainiere{'\n'}Smarter.</Text>
-              <Text style={s.heroSub}>Performance-Tracking für Hundesportler.</Text>
+              <Text style={[s.heroHeadline, isCompactHeight && s.heroHeadlineCompact]}>
+                {t('auth.heroTitle')}
+              </Text>
+              <Text style={s.heroSub}>
+                {t('auth.heroSubPrefix')}{'\n'}
+                <Text style={s.heroSubAccent}>{t('auth.heroSubAccent')}</Text>
+              </Text>
             </Animated.View>
 
-            <View style={{ height: SCREEN_H * 0.06 }} />
-
-            {/* ── Auth-Panel ── */}
-            <Animated.View style={[s.authPanel, formStyle]}>
-              <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
+            <Animated.View style={[s.authPanel, isCompactHeight && s.authPanelCompact, formStyle]}>
               <View style={s.authPanelBorder} />
 
-              {/* Tab-Wechsler */}
-              <View style={s.tabRow}>
-                {(['anmelden', 'registrieren'] as Tab[]).map((t) => (
+              <View style={[s.tabRow, isCompactHeight && s.tabRowCompact]}>
+                {(['anmelden', 'registrieren'] as Tab[]).map((tabId) => (
                   <TouchableOpacity
-                    key={t}
-                    style={[s.tabBtn, tab === t && s.tabBtnActive]}
-                    onPress={() => wechsleTab(t)}
+                    key={tabId}
+                    style={[s.tabBtn, isCompactHeight && s.tabBtnCompact, tab === tabId && s.tabBtnActive]}
+                    onPress={() => wechsleTab(tabId)}
                     activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: tab === tabId }}
+                    accessibilityLabel={tabId === 'anmelden' ? t('auth.selectLogin') : t('auth.selectRegister')}
                   >
-                    {tab === t && (
+                    {tab === tabId && (
                       <LinearGradient
                         colors={['#00FFCC', '#00FFCC']}
                         start={{ x: 0, y: 0 }}
@@ -236,48 +255,61 @@ export default function LoginScreen() {
                         style={[StyleSheet.absoluteFill, { borderRadius: 10 }]}
                       />
                     )}
-                    <Text style={[s.tabLabel, tab === t && s.tabLabelActive]}>
-                      {t === 'anmelden' ? 'Anmelden' : 'Registrieren'}
+                    <Text style={[s.tabLabel, tab === tabId && s.tabLabelActive]}>
+                      {tabId === 'anmelden' ? t('auth.loginUpper') : t('auth.registerUpper')}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              {/* Formular */}
-              <View style={s.form}>
+              <View style={[s.form, tab === 'registrieren' && s.formRegister]}>
                 {tab === 'registrieren' && (
-                  <Input
-                    label="Vollständiger Name"
-                    placeholder="Alex Müller"
+                  <AuthField
+                    label={t('auth.fullName')}
+                    icon="person-outline"
+                    placeholder={t('auth.nameExample')}
                     value={vollName}
                     onChangeText={setVollName}
                     textContentType="name"
                     autoCapitalize="words"
                   />
                 )}
-                <Input
-                  label="E-Mail"
-                  placeholder="du@beispiel.de"
+                <AuthField
+                  label={t('auth.email')}
+                  icon="mail-outline"
+                  placeholder={t('auth.emailPlaceholder')}
                   value={email}
                   onChangeText={(t) => { setEmail(t); setFehler(null); }}
                   keyboardType="email-address"
                   textContentType="emailAddress"
+                  autoCapitalize="none"
+                  autoCorrect={false}
                 />
-                <Input
-                  label="Passwort"
-                  placeholder={tab === 'registrieren' ? 'Mind. 6 Zeichen' : '••••••••'}
+                <AuthField
+                  label={t('auth.password')}
+                  icon="lock-closed-outline"
+                  placeholder={tab === 'registrieren' ? t('auth.passwordMin') : '••••••••'}
                   value={passwort}
                   onChangeText={(t) => { setPasswort(t); setFehler(null); }}
                   password
                   textContentType={tab === 'anmelden' ? 'password' : 'newPassword'}
                 />
+                {tab === 'anmelden' && (
+                  <TouchableOpacity
+                    style={s.forgotBtn}
+                    onPress={() => router.push('/auth/forgot-password' as never)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={s.forgotText}>{t('auth.forgotPassword')}</Text>
+                  </TouchableOpacity>
+                )}
                 {tab === 'registrieren' && (
                   <View>
-                    <Text style={s.rolleLabel}>ICH BIN</Text>
+                    <Text style={s.rolleLabel}>{t('auth.roleLabel')}</Text>
                     <View style={s.rolleRow}>
                       {([
-                        { id: 'user',    label: 'Hundeführer:in', icon: 'paw' },
-                        { id: 'trainer', label: 'Trainer:in',     icon: 'ribbon' },
+                        { id: 'user',    label: t('auth.roleHandler'), icon: 'paw' },
+                        { id: 'trainer', label: t('auth.roleTrainer'), icon: 'ribbon' },
                       ] as const).map((r) => {
                         const aktiv = rolle === r.id;
                         return (
@@ -304,50 +336,88 @@ export default function LoginScreen() {
                 </View>
               ) : null}
 
-              <Button
-                label={tab === 'anmelden' ? 'Anmelden' : 'Konto erstellen'}
+              <TouchableOpacity
+                style={[s.primaryBtn, isCompactHeight && s.primaryBtnCompact, isBusy && s.disabled]}
                 onPress={handleAbsenden}
-                loading={laden}
-              />
+                disabled={isBusy}
+                activeOpacity={0.86}
+                accessibilityRole="button"
+                accessibilityLabel={tab === 'anmelden' ? t('auth.login') : t('auth.register')}
+                accessibilityState={{ disabled: isBusy, busy: laden }}
+              >
+                {laden ? (
+                  <Text style={s.primaryText}>{t('auth.wait')}</Text>
+                ) : (
+                  <Text style={s.primaryText}>{tab === 'anmelden' ? t('auth.loginUpper') : t('auth.registerUpper')}</Text>
+                )}
+              </TouchableOpacity>
 
-              <View style={s.trennRow}>
+              <View style={[s.trennRow, isCompactHeight && s.trennRowCompact]}>
                 <View style={s.trennLinie} />
-                <Text style={s.trennText}>oder</Text>
+                <Text style={s.trennText}>{t('common.or')}</Text>
                 <View style={s.trennLinie} />
               </View>
 
               <AnimatedPressable
                 onPress={handleGoogle}
-                disabled={oauthLaden}
-                style={[s.googleBtn, oauthLaden && { opacity: 0.5 }]}
+                disabled={isBusy}
+                style={[s.socialBtn, isCompactHeight && s.socialBtnCompact, isBusy && { opacity: 0.5 }]}
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.googleLogin')}
               >
                 {oauthLaden ? (
-                  <Text style={s.googleText}>Verbinde…</Text>
+                  <Text style={s.socialText}>{t('auth.connecting')}</Text>
                 ) : (
                   <>
                     <Ionicons name="logo-google" size={17} color={C.white} />
-                    <Text style={s.googleText}>Mit Google fortfahren</Text>
+                    <Text style={s.socialText}>{t('auth.googleLogin')}</Text>
                   </>
                 )}
               </AnimatedPressable>
 
               {appleReady && (
-                <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-                  cornerRadius={14}
-                  style={s.appleBtn}
-                  onPress={handleApple}
-                />
+                <View style={[isBusy && { opacity: 0.5 }]} pointerEvents={isBusy ? 'none' : 'auto'}>
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                    cornerRadius={16}
+                    style={[s.appleBtn, isCompactHeight && s.appleBtnCompact]}
+                    onPress={handleApple}
+                    accessibilityLabel={t('auth.appleLogin')}
+                  />
+                </View>
               )}
+
+              <View style={s.modeSwitchRow}>
+                <Text style={s.modeSwitchText}>
+                  {tab === 'anmelden' ? t('auth.noAccount') : t('auth.hasAccount')}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => wechsleTab(tab === 'anmelden' ? 'registrieren' : 'anmelden')}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={tab === 'anmelden' ? t('auth.switchToRegister') : t('auth.switchToLogin')}
+                >
+                  <Text style={s.modeSwitchLink}>{tab === 'anmelden' ? t('auth.register') : t('auth.login')}</Text>
+                </TouchableOpacity>
+              </View>
             </Animated.View>
 
-            <Text style={s.rechtlich}>
-              Mit der Nutzung stimmst du unseren{' '}
-              <Text style={s.rechtlichLink} onPress={() => router.push('/terms')}>AGB</Text>
+            {showTrust && (
+              <View style={s.trustRow}>
+                <TrustItem title={t('auth.trustSecureTitle')} text={t('auth.trustSecureText')} />
+                <TrustItem title={t('auth.trustSportTitle')} text={t('auth.trustSportText')} />
+                <TrustItem title={t('auth.trustProgressTitle')} text={t('auth.trustProgressText')} />
+                <TrustItem title={t('auth.trustTeamTitle')} text={t('auth.trustTeamText')} />
+              </View>
+            )}
+
+            <Text style={[s.rechtlich, isCompactHeight && s.rechtlichCompact]}>
+              {t('auth.legalPrefix')}
+              <Text style={s.rechtlichLink} onPress={() => router.push('/terms')}>{t('auth.legalTerms')}</Text>
               {' & '}
-              <Text style={s.rechtlichLink} onPress={() => router.push('/privacy')}>Datenschutzrichtlinien</Text>
-              {' '}zu.
+              <Text style={s.rechtlichLink} onPress={() => router.push('/privacy')}>{t('auth.legalPrivacy')}</Text>
+              {t('auth.legalSuffix')}
             </Text>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -356,113 +426,175 @@ export default function LoginScreen() {
   );
 }
 
-function uebersetzeFehler(msg: string): string {
-  if (msg.includes('Invalid login credentials')) return 'E-Mail oder Passwort nicht korrekt — nochmal versuchen?';
-  if (msg.includes('Email not confirmed'))       return 'Fast da! Bitte bestätige zuerst deine E-Mail.';
-  if (msg.includes('User already registered'))   return 'Diese E-Mail ist bereits dabei — einfach anmelden!';
-  if (msg.includes('Password should be'))        return 'Passwort: mindestens 6 Zeichen';
-  if (msg.includes('rate limit'))                return 'Kurze Pause — bitte einen Moment warten';
-  if (msg.includes('network'))                   return 'Keine Verbindung — kurz Internet prüfen';
+function AuthField({ label, icon, password, style, ...rest }: AuthFieldProps) {
+  const { t } = useT();
+  const [show, setShow] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const secure = Boolean(password && !show);
+
+  return (
+    <View style={s.fieldWrap}>
+      <Text style={s.fieldLabel}>{label}</Text>
+      <View style={[s.inputRow, focused && s.inputRowFocus]}>
+        <Ionicons name={icon} size={18} color={focused ? C.accent : C.muted} />
+        <TextInput
+          style={[s.input, style]}
+          placeholderTextColor="rgba(255,255,255,0.34)"
+          selectionColor={C.accent}
+          secureTextEntry={secure}
+          autoCapitalize="none"
+          autoCorrect={false}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          accessibilityLabel={label}
+          {...rest}
+        />
+        {password && (
+          <TouchableOpacity
+            style={s.eyeBtn}
+            onPress={() => setShow((v) => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={show ? t('auth.hidePassword') : t('auth.showPassword')}
+          >
+            <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={20} color={C.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function TrustItem({ title, text }: { title: string; text: string }) {
+  return (
+    <View style={s.trustItem}>
+      <Text style={s.trustTitle}>{title}</Text>
+      <Text style={s.trustText}>{text}</Text>
+    </View>
+  );
+}
+
+function uebersetzeFehler(msg: string, t: (key: TranslationKey) => string): string {
+  if (msg.includes('Invalid login credentials')) return t('auth.errorInvalidCredentials');
+  if (msg.includes('Email not confirmed'))       return t('auth.errorEmailUnconfirmed');
+  if (msg.includes('User already registered'))   return t('auth.errorAlreadyRegistered');
+  if (msg.includes('Password should be'))        return t('auth.errorPasswordMin6');
+  if (msg.includes('rate limit'))                return t('auth.errorRateLimit');
+  if (msg.includes('network'))                   return t('auth.errorNetwork');
   return msg;
 }
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#050505' },
-
-  vignetteOben: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    height: SCREEN_H * 0.28,
-  },
-  gradUnten: {
-    position: 'absolute',
-    top:   SCREEN_H * 0.28,
-    left: 0, right: 0,
-    height: SCREEN_H * 0.72,
-  },
+  bgImageFrame: { position: 'absolute' },
+  bgImage: { width: '100%', height: '100%' },
+  bgImageContent: { width: '100%', height: '100%' },
+  safeArea: { flex: 1 },
 
   scroll: {
     flexGrow:          1,
-    paddingHorizontal: 22,
-    paddingBottom:     36,
-    justifyContent:    'flex-end',
+    paddingHorizontal: 20,
+    paddingTop:        16,
+    paddingBottom:     Platform.OS === 'android' ? 92 : 72,
+    justifyContent:    'flex-start',
+    gap:               14,
   },
+  scrollCompact: { paddingTop: 6, paddingBottom: Platform.OS === 'android' ? 96 : 76, gap: 8 },
 
   brandBlock: {
-    paddingTop:    SCREEN_H * 0.12,
-    paddingBottom: 8,
+    minHeight:     112,
+    justifyContent: 'flex-start',
+    paddingTop:    2,
   },
+  brandBlockShort: { minHeight: 132, paddingTop: 8 },
+  brandBlockCompact: { minHeight: 112, paddingTop: 2 },
   logoRow: {
     flexDirection:  'row',
     alignItems:     'center',
-    gap:            8,
-    marginBottom:   28,
+    gap:            12,
+    marginBottom:   14,
   },
-  logoPill: {
-    width:        28,
-    height:       28,
-    borderRadius: 8,
-    alignItems:   'center',
-    justifyContent: 'center',
-    overflow:     'hidden',
-  },
-  logoPillText: {
-    fontSize:      13,
-    color:         C.white,
-    fontWeight:    '900',
-    letterSpacing: 3,
-  },
+  logoImg: { width: 34, height: 34 },
+  logoImgCompact: { width: 34, height: 34 },
+  logoText: { fontSize: 18, color: C.accent, fontWeight: '900', letterSpacing: 4 },
   heroHeadline: {
-    fontSize:    58,
-    color:       C.white,
-    fontWeight:  '900',
-    letterSpacing: -2,
-    lineHeight:  58,
-    marginBottom: 14,
+    fontSize:   26,
+    color:      C.white,
+    fontWeight: '900',
+    letterSpacing: 0,
+    lineHeight: 28,
+    marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowRadius: 18,
   },
+  heroHeadlineCompact: { fontSize: 26, lineHeight: 28, marginBottom: 4 },
   heroSub: {
-    fontSize:   15,
-    color:      'rgba(255,255,255,0.65)',
-    fontWeight: '500',
-    lineHeight: 22,
-    maxWidth:   280,
+    fontSize:   13,
+    color:      'rgba(255,255,255,0.82)',
+    fontWeight: '600',
+    lineHeight: 18,
+    maxWidth:   320,
   },
+  heroSubAccent: { color: C.accent, fontWeight: '900' },
 
   authPanel: {
-    borderRadius:    24,
+    borderRadius:    28,
     overflow:        'hidden',
-    padding:         20,
+    padding:         16,
     borderWidth:     1,
-    borderColor:     'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(10,10,10,0.6)',
+    borderColor:     'rgba(0,255,204,0.16)',
+    backgroundColor: 'rgba(5,7,8,0.78)',
   },
+  authPanelCompact: { padding: 12, borderRadius: 24, marginTop: 64 },
   authPanelBorder: {
     position:    'absolute',
     inset:       0,
-    borderRadius: 24,
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: 'rgba(0,255,204,0.08)',
+    borderColor: 'rgba(255,255,255,0.06)',
   },
 
   tabRow: {
     flexDirection:   'row',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius:    14,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius:    16,
     padding:         4,
-    marginBottom:    20,
+    marginBottom:    14,
   },
+  tabRowCompact: { marginBottom: 10 },
   tabBtn: {
     flex:            1,
-    paddingVertical: 10,
-    borderRadius:    10,
+    minHeight:       46,
+    borderRadius:    12,
     alignItems:      'center',
+    justifyContent:  'center',
     overflow:        'hidden',
   },
+  tabBtnCompact: { minHeight: 40 },
   tabBtnActive:   {},
-  tabLabel:       { fontSize: 14, color: 'rgba(255,255,255,0.45)', fontWeight: '600', zIndex: 1 },
-  tabLabelActive: { color: C.accentText, fontWeight: '800', zIndex: 1 },
+  tabLabel:       { fontSize: 13, color: 'rgba(255,255,255,0.58)', fontWeight: '800', letterSpacing: 0.8, zIndex: 1 },
+  tabLabelActive: { color: C.accentText, fontWeight: '900', zIndex: 1 },
 
-  form: { gap: 12, marginBottom: 16 },
+  form: { gap: 10, marginBottom: 12 },
+  formRegister: { gap: 9, marginBottom: 10 },
+  fieldWrap: { gap: 6 },
+  fieldLabel: { fontSize: 10, color: 'rgba(255,255,255,0.66)', fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    paddingHorizontal: 15,
+    gap: 10,
+  },
+  inputRowFocus: { borderColor: 'rgba(0,255,204,0.72)', backgroundColor: 'rgba(0,255,204,0.08)' },
+  input: { flex: 1, minHeight: 38, color: C.white, fontSize: 15, fontWeight: '600' },
+  eyeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -10 },
+  forgotBtn: { alignSelf: 'flex-end', paddingVertical: 2 },
+  forgotText: { fontSize: 13, color: C.accent, fontWeight: '700' },
 
   fehlerBox: {
     flexDirection:   'row',
@@ -473,47 +605,70 @@ const s = StyleSheet.create({
     borderWidth:     1,
     borderColor:     `${C.danger}30`,
     padding:         12,
-    marginBottom:    14,
+    marginBottom:    12,
   },
   fehlerText: { flex: 1, fontSize: 13, color: C.danger },
+  primaryBtn: {
+    minHeight: 46,
+    borderRadius: 18,
+    backgroundColor: C.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  primaryBtnCompact: { minHeight: 42, borderRadius: 16 },
+  disabled: { opacity: 0.55 },
+  primaryText: { fontSize: 15, color: C.accentText, fontWeight: '900', letterSpacing: 1.1 },
 
   trennRow: {
     flexDirection:  'row',
     alignItems:     'center',
     gap:            12,
-    marginVertical: 16,
+    marginVertical: 12,
   },
+  trennRowCompact: { marginVertical: 10 },
   trennLinie: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
   trennText:  { fontSize: 12, color: C.subtle, fontWeight: '500' },
 
-  googleBtn: {
+  socialBtn: {
     flexDirection:   'row',
     alignItems:      'center',
     justifyContent:  'center',
     gap:             10,
-    height:          52,
-    borderRadius:    14,
+    minHeight:       42,
+    borderRadius:    16,
     borderWidth:     1,
-    borderColor:     'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor:     'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  googleText: { fontSize: 15, color: C.white, fontWeight: '600' },
-  appleBtn:   { height: 52, marginTop: 12 },
+  socialBtnCompact: { minHeight: 40, borderRadius: 14 },
+  socialText: { fontSize: 15, color: C.white, fontWeight: '700' },
+  appleBtn:   { height: 42, marginTop: 6, width: '100%' },
+  appleBtnCompact: { height: 40, marginTop: 5 },
 
   rolleLabel:    { fontSize: 11, color: C.muted, fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
   rolleRow:      { flexDirection: 'row', gap: 10 },
-  rolleChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.05)' },
+  rolleChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.05)' },
   rolleChipActive:    { borderColor: C.accent, backgroundColor: C.accentDim },
   rolleChipTxt:       { fontSize: 14, color: C.muted, fontWeight: '600' },
   rolleChipTxtActive: { color: C.white, fontWeight: '700' },
+  modeSwitchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 12, flexWrap: 'wrap' },
+  modeSwitchText: { fontSize: 13, color: 'rgba(255,255,255,0.62)', fontWeight: '600' },
+  modeSwitchLink: { fontSize: 13, color: C.accent, fontWeight: '900' },
+  trustRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
+  trustItem: { flexBasis: '48%', flexGrow: 1, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(5,5,5,0.32)', padding: 12 },
+  trustTitle: { fontSize: 12, color: C.white, fontWeight: '900', marginBottom: 3 },
+  trustText: { fontSize: 11, color: 'rgba(255,255,255,0.58)', lineHeight: 15 },
 
   rechtlich: {
     textAlign:  'center',
     fontSize:   11,
     color:      C.subtle,
-    marginTop:  20,
+    marginTop:  12,
     lineHeight: 16,
   },
+  rechtlichCompact: { marginTop: 8 },
   rechtlichLink: { color: C.accent, fontWeight: '700' },
 
   erfolgSafe: { flex: 1, alignItems: 'center', justifyContent: 'center' },

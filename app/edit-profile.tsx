@@ -8,13 +8,14 @@ import { Input } from '@/components/ui/Input';
 import { useSession } from '@/hooks/useSession';
 import { queryClient } from '@/lib/queryClient';
 import { updateDisplayName } from '@/services/profileService';
-import { updatePassword } from '@/services/auth';
+import { useT } from '@/i18n';
 
 const PROVIDER_LABEL: Record<string, string> = { apple: 'Apple', google: 'Google' };
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const { session } = useSession();
+  const { t } = useT();
   const user = session?.user;
 
   // Anmelde-Anbieter: E-Mail/Passwort vs. OAuth (Apple/Google).
@@ -23,35 +24,20 @@ export default function EditProfileScreen() {
   const providerLabel = PROVIDER_LABEL[provider] ?? provider;
 
   const [name, setName] = useState<string>(user?.user_metadata?.full_name ?? '');
-  const [pw1, setPw1] = useState('');
-  const [pw2, setPw2] = useState('');
-
   const [savingName, setSavingName] = useState(false);
-  const [savingPw, setSavingPw] = useState(false);
 
   const currentEmail = user?.email ?? '';
   const initialen = (name.trim() || currentEmail).split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
   const speichernName = async () => {
     if (!user) return;
-    if (!name.trim()) { Alert.alert('Name fehlt', 'Bitte gib einen Namen ein.'); return; }
+    if (!name.trim()) { Alert.alert(t('profile.nameMissingTitle'), t('profile.nameMissingBody')); return; }
     setSavingName(true);
     const { error } = await updateDisplayName(user.id, name);
     setSavingName(false);
-    if (error) { Alert.alert('Fehler', 'Konnte nicht gespeichert werden. Bitte später erneut versuchen.'); return; }
+    if (error) { Alert.alert(t('common.error'), t('profile.saveFailed')); return; }
     queryClient.invalidateQueries({ queryKey: ['profile'] });
     router.back();
-  };
-
-  const passwortAendern = async () => {
-    if (pw1.length < 8) { Alert.alert('Passwort zu kurz', 'Bitte mindestens 8 Zeichen verwenden.'); return; }
-    if (pw1 !== pw2) { Alert.alert('Passwörter ungleich', 'Die beiden Passwörter stimmen nicht überein.'); return; }
-    setSavingPw(true);
-    const { error } = await updatePassword(pw1);
-    setSavingPw(false);
-    if (error) { Alert.alert('Fehler', error.message || 'Passwort konnte nicht geändert werden.'); return; }
-    setPw1(''); setPw2('');
-    Alert.alert('Passwort geändert', 'Dein Passwort wurde aktualisiert.');
   };
 
   return (
@@ -61,11 +47,11 @@ export default function EditProfileScreen() {
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerSub}>KONTO</Text>
-          <Text style={s.headerTitle}>Profil bearbeiten</Text>
+          <Text style={s.headerSub}>{t('profile.secAccount')}</Text>
+          <Text style={s.headerTitle}>{t('profile.editProfile')}</Text>
         </View>
         <TouchableOpacity style={[s.saveBtn, savingName && { opacity: 0.5 }]} onPress={speichernName} disabled={savingName} activeOpacity={0.8}>
-          {savingName ? <ActivityIndicator color={C.accentText} size="small" /> : <Text style={s.saveTxt}>Speichern</Text>}
+          {savingName ? <ActivityIndicator color={C.accentText} size="small" /> : <Text style={s.saveTxt}>{t('common.save')}</Text>}
         </TouchableOpacity>
       </View>
 
@@ -74,35 +60,23 @@ export default function EditProfileScreen() {
           <Text style={s.avatarText}>{initialen || '?'}</Text>
         </View>
 
-        <Input label="Name" placeholder="Dein Name" value={name} onChangeText={setName} autoCapitalize="words" />
+        <Input label={t('profile.name')} placeholder={t('profile.namePlaceholder')} value={name} onChangeText={setName} autoCapitalize="words" />
 
         {/* E-Mail (nur Anzeige) */}
-        <Text style={s.label}>E-MAIL</Text>
+        <Text style={s.label}>{t('auth.email').toUpperCase()}</Text>
         <View style={s.readonly}>
           <Text style={s.readonlyTxt}>{currentEmail || '—'}</Text>
           <Ionicons name="lock-closed" size={14} color={C.subtle} />
         </View>
         <Text style={s.hint}>
           {isPasswordAccount
-            ? 'E-Mail-Änderung ist derzeit nicht verfügbar.'
-            : `Du bist über ${providerLabel} angemeldet — deine E-Mail wird dort verwaltet.`}
+            ? t('profile.emailPasswordHint')
+            : t('profile.oauthEmailHint', { provider: providerLabel })}
         </Text>
 
-        {/* Passwort */}
-        <Text style={s.label}>PASSWORT</Text>
-        {isPasswordAccount ? (
-          <>
-            <Input placeholder="Neues Passwort" value={pw1} onChangeText={setPw1} password autoCapitalize="none" />
-            <View style={{ height: 10 }} />
-            <Input placeholder="Neues Passwort bestätigen" value={pw2} onChangeText={setPw2} password autoCapitalize="none" />
-            <TouchableOpacity style={[s.actionBtn, savingPw && { opacity: 0.5 }]} onPress={passwortAendern} disabled={savingPw} activeOpacity={0.8}>
-              {savingPw ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.actionTxt}>Passwort ändern</Text>}
-            </TouchableOpacity>
-            <Text style={s.hint}>Mindestens 8 Zeichen.</Text>
-          </>
-        ) : (
-          <Text style={s.hint}>Anmeldung über {providerLabel} — es ist kein Passwort nötig.</Text>
-        )}
+        <TouchableOpacity style={s.actionBtn} onPress={() => router.push('/account-security' as never)} activeOpacity={0.8}>
+          <Text style={s.actionTxt}>{t('profile.accountSecurity')}</Text>
+        </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>

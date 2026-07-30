@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type Session, type User } from '@supabase/supabase-js';
+import { router } from 'expo-router';
 import { supabase } from './supabase';
 import { initLocaleSync, stopLocaleSync } from '@/services/localeSync';
 
@@ -7,13 +8,15 @@ type SessionCtx = {
   session: Session | null;
   user:    User    | null;
   loading: boolean;
+  recoveryMode: boolean;
 };
 
-const Ctx = createContext<SessionCtx>({ session: null, user: null, loading: true });
+const Ctx = createContext<SessionCtx>({ session: null, user: null, loading: true, recoveryMode: false });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   useEffect(() => {
     // Bootstrap-Abschluss GARANTIEREN: `loading` darf niemals dauerhaft true
@@ -42,9 +45,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     // Keep in sync with Supabase auth events (login, logout, token refresh).
     // Das erste INITIAL_SESSION-Event schließt den Bootstrap ebenfalls ab.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setLoading(false);
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true);
+        router.replace('/auth/recovery' as never);
+      } else if (event === 'SIGNED_OUT') {
+        setRecoveryMode(false);
+      }
       if (session?.user) initLocaleSync(session.user.id); else stopLocaleSync();
     });
 
@@ -52,7 +61,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ session, user: session?.user ?? null, loading }}>
+    <Ctx.Provider value={{ session, user: session?.user ?? null, loading, recoveryMode }}>
       {children}
     </Ctx.Provider>
   );
