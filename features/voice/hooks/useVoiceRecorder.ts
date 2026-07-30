@@ -5,9 +5,11 @@ import { useVoiceStore } from '@/features/voice/store/voiceStore';
 import {
   requestMicrophonePermission, enableRecordingMode, disableRecordingMode, deleteLocalRecording,
 } from '@/features/voice/services/voiceRecordingService';
+import { useT } from '@/i18n';
 
 // Aufnahme-Steuerung (expo-audio). Schreibt State in den voiceStore; die UI liest dort.
 export function useVoiceRecorder() {
+  const { t } = useT();
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const { isRecording, isPaused, durationSeconds } = useVoiceStore();
   const store = useVoiceStore;
@@ -19,7 +21,7 @@ export function useVoiceRecorder() {
 
   const start = async (): Promise<boolean> => {
     const ok = await requestMicrophonePermission();
-    if (!ok) { Alert.alert('Mikrofon nötig', 'Bitte erlaube den Mikrofonzugriff, um Sprachmemos aufzunehmen.'); return false; }
+    if (!ok) { Alert.alert(t('comments.microphoneRequired'), t('voice.microphonePermission')); return false; }
     try {
       await enableRecordingMode();
       await recorder.prepareToRecordAsync();
@@ -29,7 +31,7 @@ export function useVoiceRecorder() {
       return true;
     } catch (e) {
       console.warn('[useVoiceRecorder] start', e);
-      Alert.alert('Aufnahme', 'Die Aufnahme konnte nicht gestartet werden. Bitte erneut versuchen.');
+      Alert.alert(t('voice.recordingTitle'), t('voice.recordingStartFailed'));
       return false;
     }
   };

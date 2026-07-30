@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useVoiceRecorder } from '@/features/voice/hooks/useVoiceRecorder';
 import { formatDuration } from '@/features/voice/services/voiceRecordingService';
+import { useT } from '@/i18n';
 
 // Aufnahme-Card im ANYVO-Design: grosser Record-Button, Timer, Pause/Weiter,
 // Speichern/Abbrechen, Türkis-Glow + kleiner roter REC-Punkt.
@@ -13,6 +14,7 @@ export function VoiceRecorderCard({
   onSave: (uri: string, durationSeconds: number) => void;
   onCancel?: () => void;
 }) {
+  const { t } = useT();
   const rec = useVoiceRecorder();
   const glow = useRef(new Animated.Value(0)).current;
 
@@ -47,7 +49,7 @@ export function VoiceRecorderCard({
         {rec.isRecording && !rec.isPaused && <View style={s.recDot} />}
         <Text style={s.timer}>{formatDuration(rec.seconds)}</Text>
       </View>
-      <Text style={s.hint}>{idle ? 'Tippe zum Aufnehmen' : rec.isPaused ? 'Pausiert' : 'Aufnahme läuft…'}</Text>
+      <Text style={s.hint}>{idle ? t('audio.tapToRecord') : rec.isPaused ? t('audio.paused') : t('audio.recordingRunning')}</Text>
 
       <View style={s.mainWrap}>
         <Animated.View style={[s.glow, { opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }) }]} />
@@ -59,11 +61,11 @@ export function VoiceRecorderCard({
       <View style={s.actions}>
         <TouchableOpacity style={s.ghost} onPress={() => { rec.cancel(); onCancel?.(); }} activeOpacity={0.8}>
           <Ionicons name="close" size={18} color={C.muted} />
-          <Text style={s.ghostTxt}>Abbrechen</Text>
+          <Text style={s.ghostTxt}>{t('common.cancel')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[s.save, (idle || rec.seconds < 1) && { opacity: 0.4 }]} onPress={save} disabled={idle || rec.seconds < 1} activeOpacity={0.85}>
           <Ionicons name="checkmark" size={18} color={C.accentText} />
-          <Text style={s.saveTxt}>Speichern</Text>
+          <Text style={s.saveTxt}>{t('common.save')}</Text>
         </TouchableOpacity>
       </View>
     </View>

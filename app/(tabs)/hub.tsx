@@ -6,23 +6,25 @@ import { C } from '@/constants/colors';
 import { Glass, isGlass } from '@/components/ui/Glass';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useHubBadge } from '@/hooks/useHubBadge';
+import { useT, type TranslationKey } from '@/i18n';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-interface Module { icon: IconName; color: string; title: string; sub: string; route: string; badge?: boolean }
+interface Module { icon: IconName; color: string; titleKey: TranslationKey; subKey: TranslationKey; route: string; badge?: boolean }
 
 const MODULES: Module[] = [
-  { icon: 'ribbon',        color: '#00F5D4', title: 'Trainerprofil',  sub: 'Profil & Code',          route: '/trainer/edit' },
-  { icon: 'people',        color: '#60A5FA', title: 'Kunden',         sub: 'Anfragen & Verwaltung',  route: '/(tabs)/clients', badge: true },
-  { icon: 'clipboard',     color: '#00F5D4', title: 'Trainingspläne', sub: 'Erstellen & teilen',     route: '/trainer/plaene' },
-  { icon: 'megaphone',     color: '#A78BFA', title: 'Umfragen',       sub: 'Termine & Ergebnisse',   route: '/umfrage/meine' },
-  { icon: 'chatbubbles',   color: '#F472B6', title: 'Nachrichten',    sub: 'Chat & Feedback',        route: '/chat' },
-  { icon: 'stats-chart',   color: '#FF8A3D', title: 'Statistiken',    sub: 'Kundenfortschritt',      route: '/(tabs)/activity' },
-  { icon: 'people-circle', color: '#34D399', title: 'Trainer',        sub: 'Meine Verbindungen',     route: '/trainer' },
+  { icon: 'ribbon',        color: '#00F5D4', titleKey: 'trainer.profile',   subKey: 'trainer.profileSub',    route: '/trainer/edit' },
+  { icon: 'people',        color: '#60A5FA', titleKey: 'trainer.clients',   subKey: 'trainer.clientsHubSub', route: '/(tabs)/clients', badge: true },
+  { icon: 'clipboard',     color: '#00F5D4', titleKey: 'trainer.plans',     subKey: 'trainer.plansHubSub',   route: '/trainer/plaene' },
+  { icon: 'megaphone',     color: '#A78BFA', titleKey: 'trainer.surveys',   subKey: 'trainer.surveysHubSub', route: '/umfrage/meine' },
+  { icon: 'chatbubbles',   color: '#F472B6', titleKey: 'profile.messages',  subKey: 'trainer.messagesHubSub', route: '/chat' },
+  { icon: 'stats-chart',   color: '#FF8A3D', titleKey: 'trainer.stats',     subKey: 'trainer.statsSub',      route: '/(tabs)/activity' },
+  { icon: 'people-circle', color: '#34D399', titleKey: 'trainer.eyebrow',   subKey: 'trainer.connectionsSub', route: '/trainer' },
 ];
 
 export default function HubScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { isTrainerModule } = useCapabilities();
   const hubBadge = useHubBadge();
 
@@ -32,9 +34,9 @@ export default function HubScreen() {
         <View style={s.header}><Text style={s.title}>Hub</Text></View>
         <View style={s.locked}>
           <Ionicons name="lock-closed" size={32} color={C.muted} />
-          <Text style={s.lockedTxt}>Trainer-Modul erforderlich</Text>
+          <Text style={s.lockedTxt}>{t('trainer.moduleRequired')}</Text>
           <TouchableOpacity style={s.upgrade} onPress={() => router.push('/premium')} activeOpacity={0.85}>
-            <Text style={s.upgradeTxt}>Trainer freischalten</Text>
+            <Text style={s.upgradeTxt}>{t('trainer.unlock')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -44,7 +46,7 @@ export default function HubScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <Text style={s.eyebrow}>TRAINER</Text>
+        <Text style={s.eyebrow}>{t('trainer.eyebrow')}</Text>
         <Text style={s.title}>Hub</Text>
       </View>
 
@@ -52,7 +54,7 @@ export default function HubScreen() {
         <View style={s.grid}>
           {MODULES.map(m => (
             <TouchableOpacity
-              key={m.title}
+              key={m.route}
               style={[s.card, isGlass && s.cardGlass]}
               onPress={() => router.push(m.route as never)}
               activeOpacity={0.85}
@@ -66,8 +68,8 @@ export default function HubScreen() {
                   <View style={s.badge}><Text style={s.badgeTxt}>{hubBadge}</Text></View>
                 )}
               </View>
-              <Text style={s.cardTitle} numberOfLines={1}>{m.title}</Text>
-              <Text style={s.cardSub} numberOfLines={2}>{m.sub}</Text>
+              <Text style={s.cardTitle} numberOfLines={1}>{t(m.titleKey)}</Text>
+              <Text style={s.cardSub} numberOfLines={2}>{t(m.subKey)}</Text>
             </TouchableOpacity>
           ))}
         </View>

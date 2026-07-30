@@ -46,7 +46,7 @@ export default function HundeScreen() {
     <SafeAreaView style={s.safe} edges={["top"]}>
       <View style={s.kopf}>
         <View>
-          <Text style={s.augenbraue}>DEINE HUNDE</Text>
+          <Text style={s.augenbraue}>{t('dogs.yourDogs')}</Text>
           <Text style={s.titel}>{t('dogs.title')}</Text>
         </View>
         <AnimatedPressable style={s.hinzufuegenBtn} onPress={handleHinzufuegen}>
@@ -69,10 +69,10 @@ export default function HundeScreen() {
           <View style={s.fehlerIcon}>
             <Ionicons name="cloud-offline-outline" size={28} color={C.muted} />
           </View>
-          <Text style={s.fehlerTitel}>Hunde konnten nicht geladen werden</Text>
+          <Text style={s.fehlerTitel}>{t('dogs.loadError')}</Text>
           <Text style={s.fehlerUnter}>{error}</Text>
           <AnimatedPressable style={s.wiederholBtn} onPress={refresh}>
-            <Text style={s.wiederholText}>Erneut versuchen</Text>
+            <Text style={s.wiederholText}>{t('connect.retry')}</Text>
           </AnimatedPressable>
         </View>
       ) : (
@@ -112,11 +112,10 @@ export default function HundeScreen() {
                 </View>
               </View>
               <Text style={s.leerTitel}>
-                Füge deinen ersten Vierbeiner hinzu! 🐾
+                {t('dogs.addFirstTitle')}
               </Text>
               <Text style={s.leerText}>
-                Registriere deinen Hund und fange an, Trainings und Fortschritte
-                zu tracken.
+                {t('dogs.addFirstBody')}
               </Text>
               <AnimatedPressable style={s.leerBtn} onPress={handleHinzufuegen}>
                 <LinearGradient
@@ -126,7 +125,7 @@ export default function HundeScreen() {
                   style={StyleSheet.absoluteFill}
                 />
                 <Ionicons name="add" size={18} color={C.accentText} />
-                <Text style={s.leerBtnText}>Hund hinzufügen</Text>
+                <Text style={s.leerBtnText}>{t('dog.add')}</Text>
               </AnimatedPressable>
             </View>
           )}

@@ -3,6 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 
 // Wiederverwendbarer Swipe-zum-Löschen-Wrapper für Trainingslisten.
 // Swipe nach links ODER rechts zeigt eine rote „Löschen"-Aktion; nach
@@ -15,8 +16,8 @@ export function SwipeableTrainingItem({
   children,
   enabled = true,
   bottomGap = 12,
-  confirmTitle = 'Training löschen?',
-  confirmMessage = 'Möchtest du dieses Training wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+  confirmTitle,
+  confirmMessage,
 }: {
   trainingId: string;
   onDelete: (id: string) => void;
@@ -29,22 +30,25 @@ export function SwipeableTrainingItem({
   confirmTitle?: string;
   confirmMessage?: string;
 }) {
+  const { t } = useT();
   const ref = useRef<SwipeableMethods>(null);
+  const title = confirmTitle ?? t('training.deleteTitle');
+  const message = confirmMessage ?? t('training.deleteConfirm');
 
   const confirm = useCallback(() => {
     Alert.alert(
-      confirmTitle,
-      confirmMessage,
+      title,
+      message,
       [
-        { text: 'Abbrechen', style: 'cancel', onPress: () => ref.current?.close() },
+        { text: t('common.cancel'), style: 'cancel', onPress: () => ref.current?.close() },
         {
-          text: 'Löschen',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => { ref.current?.close(); onDelete(trainingId); },
         },
       ],
     );
-  }, [trainingId, onDelete, confirmTitle, confirmMessage]);
+  }, [trainingId, onDelete, title, message, t]);
 
   // Rote Lösch-Aktion (gleich für links & rechts).
   const renderAction = useCallback(() => (
@@ -52,12 +56,12 @@ export function SwipeableTrainingItem({
       style={[s.action, { marginBottom: bottomGap }]}
       onPress={confirm}
       accessibilityRole="button"
-      accessibilityLabel="Training löschen"
+      accessibilityLabel={t('training.deleteA11y')}
     >
       <Ionicons name="trash-outline" size={22} color="#fff" />
-      <Text style={s.actionTxt}>Löschen</Text>
+      <Text style={s.actionTxt}>{t('training.delete')}</Text>
     </Pressable>
-  ), [confirm, bottomGap]);
+  ), [confirm, bottomGap, t]);
 
   if (!enabled) return <View>{children}</View>;
 

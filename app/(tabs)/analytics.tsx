@@ -55,10 +55,10 @@ export default function AnalyticsScreen() {
     setAiLoading(true);
     try {
       const { data, error } = await getTrainingUnits(session.user.id, selectedDog.id);
-      if (error) { Alert.alert('Fehler beim Laden', error.message); return; }
+      if (error) { Alert.alert(t('analyse.loadError'), error.message); return; }
       const units = (data as TrainingUnit[]) ?? [];
       if (!units.length) {
-        Alert.alert('Keine Trainings', `Für ${selectedDog.name} wurden noch keine Einheiten erfasst.`);
+        Alert.alert(t('analyse.noTrainingTitle'), t('analyse.noTrainingForDog', { dog: selectedDog.name }));
         return;
       }
       // Einheiten → AI-Input (1 Einheit = 1 "Session")
@@ -84,7 +84,7 @@ export default function AnalyticsScreen() {
         created_at: new Date().toISOString(), ...result,
       });
     } catch (e: any) {
-      Alert.alert('Ups, kurze Pause 🐾', e?.message ?? 'Analyse noch nicht fertig — versuch es nochmal!');
+      Alert.alert(t('share.notReadyTitle'), e?.message ?? t('analyse.notReady'));
     } finally {
       setAiLoading(false);
     }
@@ -121,7 +121,7 @@ export default function AnalyticsScreen() {
         />
         <View style={s.header}>
           <View>
-            <Text style={s.headerSub}>ANALYSE</Text>
+            <Text style={s.headerSub}>{t('analyse.title').toUpperCase()}</Text>
             <Text style={s.headerTitle}>
               {selectedDog ? selectedDog.name : 'Training'}
             </Text>
@@ -194,8 +194,8 @@ export default function AnalyticsScreen() {
               <Ionicons name="sparkles" size={19} color={C.accent} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, color: C.white, fontWeight: '700' }}>Smart Search</Text>
-              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Trainings nach Bedeutung durchsuchen</Text>
+              <Text style={{ fontSize: 15, color: C.white, fontWeight: '700' }}>{t('analyse.smartSearch')}</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{t('analyse.smartSearchSub')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={C.muted} />
           </TouchableOpacity>
@@ -211,7 +211,7 @@ export default function AnalyticsScreen() {
                 <ScoreRing
                   score={latestScore?.gesamtscore ?? 0}
                   size={150}
-                  label={latestScore ? scoreLabel(latestScore.gesamtscore) : 'Keine Daten'}
+                  label={latestScore ? scoreLabel(latestScore.gesamtscore) : t('training.noData')}
                 />
               </View>
 
@@ -224,7 +224,7 @@ export default function AnalyticsScreen() {
                       {activeTrend.deltaPct > 0 ? `+${activeTrend.deltaPct}%` : `${activeTrend.deltaPct}%`}
                     </Text>
                   </View>
-                  <Text style={s.statLabel}>Trend</Text>
+                  <Text style={s.statLabel}>{t('analyse.trend')}</Text>
                 </View>
 
                 <View style={s.statDivider} />
@@ -232,7 +232,7 @@ export default function AnalyticsScreen() {
                 {/* Stabilität */}
                 <View style={s.statItem}>
                   <Text style={s.statValue}>{activeTrend.stabilität}%</Text>
-                  <Text style={s.statLabel}>Stabilität</Text>
+                  <Text style={s.statLabel}>{t('analyse.stability')}</Text>
                 </View>
 
                 <View style={s.statDivider} />
@@ -240,7 +240,7 @@ export default function AnalyticsScreen() {
                 {/* Sessions */}
                 <View style={s.statItem}>
                   <Text style={s.statValue}>{activeTrend.sessions}</Text>
-                  <Text style={s.statLabel}>Einheiten</Text>
+                  <Text style={s.statLabel}>{t('analyse.units')}</Text>
                 </View>
               </View>
 
@@ -248,7 +248,7 @@ export default function AnalyticsScreen() {
               {activeTrend.durchschnitt > 0 && (
                 <View style={s.avgBadge}>
                   <Text style={s.avgBadgeTxt}>
-                    Ø {activeTrend.durchschnitt} Punkte im Zeitraum
+                    {t('analyse.avgPointsPeriod', { points: activeTrend.durchschnitt })}
                   </Text>
                 </View>
               )}
@@ -303,7 +303,7 @@ export default function AnalyticsScreen() {
           {/* ── Radar Chart ── */}
           {latestScore && latestScore.gesamtscore > 0 && (
             <View style={s.card}>
-              <Text style={s.cardTitle}>LEISTUNGSPROFIL</Text>
+              <Text style={s.cardTitle}>{t('analyse.performanceProfile')}</Text>
               <View style={s.radarWrap}>
                 <RadarChart scores={latestScore} size={Math.min(width - 64, 280)} />
               </View>
@@ -313,7 +313,7 @@ export default function AnalyticsScreen() {
           {/* ── Metriken ── */}
           {metricEntries.length > 0 && (
             <View style={s.card}>
-              <Text style={s.cardTitle}>METRIKEN — LETZTE EINHEIT</Text>
+              <Text style={s.cardTitle}>{t('analyse.metricsLastUnit')}</Text>
               {metricEntries.map(e => (
                 <MetricRow key={e.key} label={e.label} value={e.value} delay={e.delay} />
               ))}
@@ -323,7 +323,7 @@ export default function AnalyticsScreen() {
           {/* ── Trend Chart ── */}
           {trendPoints.length > 1 && (
             <View style={s.card}>
-              <Text style={s.cardTitle}>PERFORMANCE VERLAUF</Text>
+              <Text style={s.cardTitle}>{t('analyse.performanceTrend')}</Text>
               <View style={s.chartWrap}>
                 <TrendLine
                   points={trendPoints}
@@ -337,7 +337,7 @@ export default function AnalyticsScreen() {
           {/* ── Empfehlungen ── */}
           {recommendations.length > 0 && (
             <View style={s.section}>
-              <Text style={s.sectionTitle}>EMPFEHLUNGEN</Text>
+              <Text style={s.sectionTitle}>{t('analyse.recommendationsUpper')}</Text>
               {recommendations.map(r => (
                 <RecommendationCard key={r.id} item={r} />
               ))}
@@ -346,7 +346,7 @@ export default function AnalyticsScreen() {
 
           {latestAnalysis?.empfehlungen && latestAnalysis.empfehlungen.length > 0 && (
             <View style={s.section}>
-              <Text style={s.sectionTitle}>TRAININGSHINWEISE</Text>
+              <Text style={s.sectionTitle}>{t('analyse.trainingHints')}</Text>
               {latestAnalysis.empfehlungen.map((e, i) => (
                 <View key={i} style={s.hintRow}>
                   <View style={s.hintDot} />

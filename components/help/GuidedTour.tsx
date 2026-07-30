@@ -1,5 +1,6 @@
 import { C } from '@/constants/colors';
-import { GUIDED_TOUR } from '@/features/help/helpRegistry';
+import { GUIDED_TOUR_KEY } from '@/features/help/helpRegistry';
+import { useT } from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -8,9 +9,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // „ANYVO kennenlernen" — kurzer geführter Rundgang aus der Help-Registry.
 // Startet KEIN echtes Training; reines Info-Overlay mit Zurück/Weiter/Fertig.
 export function GuidedTour({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { t } = useT();
   const [step, setStep] = useState(0);
-  const total = GUIDED_TOUR.length;
-  const current = GUIDED_TOUR[step];
+  const total = GUIDED_TOUR_KEY.length;
+  const current = GUIDED_TOUR_KEY[step];
   const isLast = step === total - 1;
 
   const finish = () => { setStep(0); onClose(); };
@@ -23,20 +25,20 @@ export function GuidedTour({ visible, onClose }: { visible: boolean; onClose: ()
     <Modal visible={visible} transparent animationType="fade" onRequestClose={finish}>
       <View style={s.backdrop}>
         <SafeAreaView edges={['bottom']} style={s.safe}>
-          <View style={s.card} accessibilityViewIsModal accessibilityLabel={`ANYVO kennenlernen, Schritt ${step + 1} von ${total}`}>
+          <View style={s.card} accessibilityViewIsModal accessibilityLabel={t('help.tourA11y', { step: step + 1, total })}>
             <View style={s.kopf}>
               <Text style={s.counter}>{step + 1} / {total}</Text>
-              <TouchableOpacity onPress={finish} hitSlop={10} accessibilityRole="button" accessibilityLabel="Rundgang schliessen">
+              <TouchableOpacity onPress={finish} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('help.tourClose')}>
                 <Ionicons name="close" size={22} color={C.muted} />
               </TouchableOpacity>
             </View>
 
-            <Text style={s.title}>{current.title}</Text>
-            <Text style={s.text}>{current.text}</Text>
+            <Text style={s.title}>{t(current.titleKey)}</Text>
+            <Text style={s.text}>{t(current.textKey)}</Text>
 
             {/* Fortschritts-Punkte */}
             <View style={s.dots}>
-              {GUIDED_TOUR.map((_, i) => (
+              {GUIDED_TOUR_KEY.map((_, i) => (
                 <View key={i} style={[s.dot, i === step && s.dotActive]} />
               ))}
             </View>
@@ -48,18 +50,18 @@ export function GuidedTour({ visible, onClose }: { visible: boolean; onClose: ()
                 disabled={step === 0}
                 activeOpacity={0.8}
                 accessibilityRole="button"
-                accessibilityLabel="Zurück"
+                accessibilityLabel={t('common.back')}
               >
-                <Text style={[s.secondaryText, step === 0 && s.textDisabled]}>Zurück</Text>
+                <Text style={[s.secondaryText, step === 0 && s.textDisabled]}>{t('common.back')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.primaryBtn}
                 onPress={next}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel={isLast ? 'Fertig' : 'Weiter'}
+                accessibilityLabel={isLast ? t('common.done') : t('common.next')}
               >
-                <Text style={s.primaryText}>{isLast ? 'Fertig' : 'Weiter'}</Text>
+                <Text style={s.primaryText}>{isLast ? t('common.done') : t('common.next')}</Text>
               </TouchableOpacity>
             </View>
           </View>

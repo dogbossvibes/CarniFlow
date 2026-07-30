@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { fmtTime, relativeDayLabel } from '@/lib/eventFormat';
 import { TrainerStatusBadge } from '@/components/calendar/TrainerStatusBadge';
 import { eventMeta, type CalendarEvent } from '@/types/calendar';
@@ -13,6 +14,7 @@ export function TrainerAppointmentRequest({
   onDecline: () => void;
   onSuggest?: () => void;
 }) {
+  const { t } = useT();
   const m = eventMeta(event.type);
   return (
     <View style={s.card}>
@@ -32,18 +34,18 @@ export function TrainerAppointmentRequest({
       <View style={s.btnRow}>
         <TouchableOpacity style={s.declineBtn} onPress={onDecline} activeOpacity={0.8}>
           <Ionicons name="close" size={16} color={C.danger} />
-          <Text style={s.declineTxt}>Ablehnen</Text>
+          <Text style={s.declineTxt}>{t('calendar.decline')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.acceptBtn} onPress={onAccept} activeOpacity={0.85}>
           <Ionicons name="checkmark" size={16} color="#001210" />
-          <Text style={s.acceptTxt}>Annehmen</Text>
+          <Text style={s.acceptTxt}>{t('calendar.accept')}</Text>
         </TouchableOpacity>
       </View>
 
       {onSuggest && (
         <TouchableOpacity style={s.suggest} onPress={onSuggest} activeOpacity={0.7}>
           <Ionicons name="time-outline" size={15} color={C.muted} />
-          <Text style={s.suggestTxt}>Andere Zeit vorschlagen</Text>
+          <Text style={s.suggestTxt}>{t('calendar.suggestOtherTime')}</Text>
         </TouchableOpacity>
       )}
     </View>

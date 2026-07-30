@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { fmtTime } from '@/lib/eventFormat';
+import { useT } from '@/i18n';
 import type { CalendarEvent } from '@/types/calendar';
 
 const ACCENT = '#00F5D4';
@@ -41,6 +42,7 @@ export function RescheduleModal({
   onClose: () => void;
   onSubmit: (startISO: string, endISO: string | null) => void;
 }) {
+  const { t } = useT();
   const [date, setDate] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -55,7 +57,7 @@ export function RescheduleModal({
 
   const submit = () => {
     const startISO = toISO(date, start);
-    if (!startISO) { Alert.alert('Datum/Zeit', 'Bitte Datum (TT.MM.JJJJ) und Startzeit (HH:MM) angeben.'); return; }
+    if (!startISO) { Alert.alert(t('calendar.dateTimeTitle'), t('calendar.dateStartFormatBody')); return; }
     const endISO = end ? toISO(date, end) : null;
     onSubmit(startISO, endISO);
   };
@@ -66,18 +68,18 @@ export function RescheduleModal({
       <View style={s.sheet}>
         <SafeAreaView edges={['bottom']}>
           <View style={s.handle} />
-          <Text style={s.title}>Neue Zeit vorschlagen</Text>
-          <Text style={s.sub}>Die Kund:in muss die neue Zeit bestätigen.</Text>
+          <Text style={s.title}>{t('calendar.suggestNewTime')}</Text>
+          <Text style={s.sub}>{t('calendar.customerMustConfirm')}</Text>
 
           <View style={s.row}>
-            <Field label="DATUM" flex={1.3}><TextInput style={s.input} value={date} onChangeText={t => setDate(fmtDateInput(t))} placeholder="TT.MM.JJJJ" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={10} /></Field>
-            <Field label="START" flex={1}><TextInput style={s.input} value={start} onChangeText={t => setStart(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
-            <Field label="ENDE" flex={1}><TextInput style={s.input} value={end} onChangeText={t => setEnd(fmtTimeInput(t))} placeholder="HH:MM" placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
+            <Field label={t('calendar.dateUpper')} flex={1.3}><TextInput style={s.input} value={date} onChangeText={value => setDate(fmtDateInput(value))} placeholder={t('calendar.datePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={10} /></Field>
+            <Field label={t('calendar.startUpper')} flex={1}><TextInput style={s.input} value={start} onChangeText={value => setStart(fmtTimeInput(value))} placeholder={t('calendar.timePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
+            <Field label={t('calendar.endUpper')} flex={1}><TextInput style={s.input} value={end} onChangeText={value => setEnd(fmtTimeInput(value))} placeholder={t('calendar.timePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
           </View>
 
           <TouchableOpacity style={s.btn} onPress={submit} activeOpacity={0.9}>
             <Ionicons name="paper-plane" size={18} color="#001210" />
-            <Text style={s.btnTxt}>Vorschlag senden</Text>
+            <Text style={s.btnTxt}>{t('calendar.sendSuggestion')}</Text>
           </TouchableOpacity>
         </SafeAreaView>
       </View>

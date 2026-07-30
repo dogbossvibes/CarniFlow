@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useT } from "@/i18n";
 
 const BG = "#0F1115";
 const CARD = "#13161C";
@@ -10,16 +11,17 @@ const WHITE = "#FFFFFF";
 const MUTED = "#6B7280";
 
 export default function ModalScreen() {
+  const { t } = useT();
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.handle} />
       <View style={styles.container}>
-        <Text style={styles.title}>Modal</Text>
-        <Text style={styles.body}>This is a modal screen.</Text>
+        <Text style={styles.title}>{t("common.modal")}</Text>
+        <Text style={styles.body}>{t("common.modalBody")}</Text>
         <Link href="/(tabs)/home" dismissTo asChild>
           <TouchableOpacity style={styles.btn} activeOpacity={0.7}>
             <Ionicons name="close" size={18} color={WHITE} />
-            <Text style={styles.btnText}>Dismiss</Text>
+            <Text style={styles.btnText}>{t("common.dismiss")}</Text>
           </TouchableOpacity>
         </Link>
       </View>

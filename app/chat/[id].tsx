@@ -16,6 +16,7 @@ import { C } from '@/constants/colors';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
+import { useT } from '@/i18n';
 import { uploadAudio, uploadVideo, uploadImage } from '@/services/mediaService';
 import { signMediaUrl } from '@/lib/mediaUrl';
 import { getMessages, getOrCreateChat, markRead, sendMessage, subscribeChat } from '@/services/chatService';
@@ -32,6 +33,7 @@ export default function ChatThreadScreen() {
   const router = useRouter();
   const { session } = useSession();
   const { profile } = useProfile();
+  const { t } = useT();
   const meId = session?.user.id;
   const connectionId = id;
 
@@ -47,7 +49,7 @@ export default function ChatThreadScreen() {
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const recorder  = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
-  const senderName = profile?.trainer_name ?? profile?.full_name ?? 'Jemand';
+  const senderName = profile?.trainer_name ?? profile?.full_name ?? t('chat.someoneFallback');
 
   // Connection laden (Gegenüber bestimmen) + Chat holen/anlegen + Nachrichten.
   useEffect(() => {
@@ -91,29 +93,29 @@ export default function ChatThreadScreen() {
     setSending(true);
     const { data, error } = await sendMessage({ chatId, senderId: meId, recipientId: counterpartId, senderName, type, content });
     setSending(false);
-    if (error || !data) { haptic.error(); Alert.alert('Fehler', error ?? 'Senden fehlgeschlagen.'); return; }
+    if (error || !data) { haptic.error(); Alert.alert(t('common.error'), error ?? t('comments.sendFailed')); return; }
     push(data);
   };
 
   const sendText = async () => {
-    const t = text.trim();
-    if (!t) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
     haptic.light();   // Senden = leichtes Klickfeedback, kein Success pro Nachricht
     setText('');
-    await doSend('text', t);
+    await doSend('text', trimmed);
   };
 
   // ── Sprachnachricht ──
   const startRec = async () => {
     try {
       const { granted } = await AudioModule.requestRecordingPermissionsAsync();
-      if (!granted) { Alert.alert('Mikrofon nötig 🎙️', 'Bitte Mikrofon-Zugriff erlauben.'); return; }
+      if (!granted) { Alert.alert(t('comments.microphoneRequired'), t('comments.microphonePermission')); return; }
       await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
       setRecording(true); setSeconds(0);
       timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
-    } catch { Alert.alert('Ups', 'Aufnahme konnte nicht gestartet werden.'); }
+    } catch { Alert.alert(t('share.notReadyTitle'), t('comments.recordingStartFailed')); }
   };
   const stopRec = async () => {
     if (!recording) return;
@@ -127,7 +129,7 @@ export default function ChatThreadScreen() {
       setSending(true);
       const { url } = await uploadAudio(uri);
       await doSend('voice', url);
-    } catch { Alert.alert('Ups', 'Sprachnachricht konnte nicht gesendet werden.'); }
+    } catch { Alert.alert(t('share.notReadyTitle'), t('comments.voiceSendFailed')); }
     finally { setSending(false); }
   };
 
@@ -137,7 +139,7 @@ export default function ChatThreadScreen() {
       // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
       if (Platform.OS !== 'android') {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) { Alert.alert('Zugriff nötig', 'Bitte Mediathek-Zugriff erlauben.'); return; }
+        if (!perm.granted) { Alert.alert(t('media.permissionRequired'), t('media.libraryPermission')); return; }
       }
       const res = await ImagePicker.launchImageLibraryAsync(
         kind === 'image'
@@ -148,7 +150,7 @@ export default function ChatThreadScreen() {
       setSending(true);
       const { url } = kind === 'image' ? await uploadImage(res.assets[0].uri) : await uploadVideo(res.assets[0].uri);
       await doSend(kind, url);
-    } catch { Alert.alert('Ups', 'Medium konnte nicht gesendet werden.'); }
+    } catch { Alert.alert(t('share.notReadyTitle'), t('media.sendFailed')); }
     finally { setSending(false); }
   };
 
@@ -156,7 +158,7 @@ export default function ChatThreadScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
         <TouchableOpacity style={s.back} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={22} color={C.white} /></TouchableOpacity>
-        <Text style={s.headerName} numberOfLines={1}>{name || 'Chat'}</Text>
+        <Text style={s.headerName} numberOfLines={1}>{name || t('chat.title')}</Text>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
@@ -169,7 +171,7 @@ export default function ChatThreadScreen() {
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           >
-            {messages.length === 0 && <Text style={s.emptyTxt}>Noch keine Nachrichten. Schreib die erste!</Text>}
+            {messages.length === 0 && <Text style={s.emptyTxt}>{t('chat.noMessagesFirst')}</Text>}
             {messages.map(m => <Bubble key={m.id} m={m} mine={m.sender_id === meId} />)}
           </ScrollView>
         )}
@@ -178,10 +180,10 @@ export default function ChatThreadScreen() {
           {recording ? (
             <View style={s.recRow}>
               <View style={s.recDot} />
-              <Text style={s.recTxt}>Aufnahme… {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</Text>
+              <Text style={s.recTxt}>{t('comments.recording', { duration: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` })}</Text>
               <TouchableOpacity style={s.recStop} onPress={stopRec} activeOpacity={0.85}>
                 <Ionicons name="stop" size={18} color={C.accentText} />
-                <Text style={s.recStopTxt}>Senden</Text>
+                <Text style={s.recStopTxt}>{t('chat.send')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -197,7 +199,7 @@ export default function ChatThreadScreen() {
               </TouchableOpacity>
               <TextInput
                 style={s.input} value={text} onChangeText={setText}
-                placeholder="Nachricht…" placeholderTextColor={C.subtle} multiline
+                placeholder={t('chat.messagePlaceholder')} placeholderTextColor={C.subtle} multiline
               />
               <TouchableOpacity style={[s.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]} onPress={sendText} disabled={!text.trim() || sending}>
                 {sending ? <ActivityIndicator color={C.accentText} size="small" /> : <Ionicons name="arrow-up" size={20} color={C.accentText} />}
@@ -226,6 +228,7 @@ function Bubble({ m, mine }: { m: ChatMessage; mine: boolean }) {
 }
 
 function AudioBubble({ url, mine }: { url: string; mine: boolean }) {
+  const { t } = useT();
   const player = useAudioPlayer(null);
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -246,7 +249,7 @@ function AudioBubble({ url, mine }: { url: string; mine: boolean }) {
       }
       player.play();
       setPlaying(true);
-    } catch { Alert.alert('Ups', 'Abspielen fehlgeschlagen.'); }
+    } catch { Alert.alert(t('share.notReadyTitle'), t('media.playbackFailed')); }
     finally { setBusy(false); }
   };
 
@@ -257,7 +260,7 @@ function AudioBubble({ url, mine }: { url: string; mine: boolean }) {
           : <Ionicons name={playing ? 'pause' : 'play'} size={16} color={mine ? C.accentText : C.accent} />}
       </View>
       <Ionicons name="mic" size={15} color={mine ? C.accentText : C.muted} />
-      <Text style={[s.audioTxt, mine && { color: C.accentText }]}>Sprachnachricht</Text>
+      <Text style={[s.audioTxt, mine && { color: C.accentText }]}>{t('comments.voiceMessage')}</Text>
     </TouchableOpacity>
   );
 }

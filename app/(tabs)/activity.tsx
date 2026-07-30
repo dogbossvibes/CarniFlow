@@ -8,9 +8,11 @@ import { UnitListCard } from '@/components/training/UnitListCard';
 import { useSession } from '@/hooks/useSession';
 import { getConnectedActivity } from '@/services/connectionService';
 import type { ActivityItem } from '@/types/trainer';
+import { useT } from '@/i18n';
 
 export default function ActivityScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,8 +25,8 @@ export default function ActivityScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <Text style={s.eyebrow}>TRAINER</Text>
-        <Text style={s.title}>Aktivität</Text>
+        <Text style={s.eyebrow}>{t('trainer.eyebrow')}</Text>
+        <Text style={s.title}>{t('trainer.activity')}</Text>
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
@@ -33,8 +35,8 @@ export default function ActivityScreen() {
         ) : activity.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="newspaper-outline" size={32} color={C.subtle} />
-            <Text style={s.emptyTitle}>Noch keine geteilten Einheiten</Text>
-            <Text style={s.emptyTxt}>Sobald Kund:innen Trainings mit dir teilen, erscheinen sie hier.</Text>
+            <Text style={s.emptyTitle}>{t('trainer.noSharedUnits')}</Text>
+            <Text style={s.emptyTxt}>{t('trainer.noSharedUnitsSub')}</Text>
           </View>
         ) : (
           // Tippen öffnet die read-only Trainer-Detailansicht der Kunden-Einheit.

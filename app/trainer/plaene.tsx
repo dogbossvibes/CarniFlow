@@ -10,9 +10,11 @@ import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { getMyPlans } from '@/services/trainingPlanService';
 import type { TrainingPlan } from '@/types/trainingPlan';
+import { useT } from '@/i18n';
 
 export default function TrainerPlaeneScreen() {
   const router = useRouter();
+  const { t } = useT();
   const fabBottom = useFabBottom();
   const { session } = useSession();
   const { isTrainerModule } = useCapabilities();
@@ -33,9 +35,9 @@ export default function TrainerPlaeneScreen() {
         <Header onBack={() => router.back()} />
         <View style={s.locked}>
           <Ionicons name="lock-closed" size={32} color={C.muted} />
-          <Text style={s.lockedTxt}>Trainer-Modul erforderlich</Text>
+          <Text style={s.lockedTxt}>{t('trainer.moduleRequired')}</Text>
           <TouchableOpacity style={s.upgrade} onPress={() => router.push('/premium')} activeOpacity={0.85}>
-            <Text style={s.upgradeTxt}>Trainer freischalten</Text>
+            <Text style={s.upgradeTxt}>{t('trainer.unlock')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -52,8 +54,8 @@ export default function TrainerPlaeneScreen() {
         ) : plans.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="clipboard-outline" size={32} color={C.subtle} />
-            <Text style={s.emptyTitle}>Noch keine Pläne</Text>
-            <Text style={s.emptyTxt}>Erstelle einen Trainingsplan und teile ihn mit deinen Kund:innen.</Text>
+            <Text style={s.emptyTitle}>{t('trainer.noPlans')}</Text>
+            <Text style={s.emptyTxt}>{t('trainer.noPlansSub')}</Text>
           </View>
         ) : (
           plans.map(p => (
@@ -62,7 +64,7 @@ export default function TrainerPlaeneScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.cardTitle}>{p.title}</Text>
                 <Text style={s.cardSub}>
-                  {p.discipline ? `${p.discipline} · ` : ''}{p.steps.length} Schritte · {p.shared_with.length} geteilt
+                  {p.discipline ? `${p.discipline} · ` : ''}{t('trainer.stepsShared', { steps: p.steps.length, shared: p.shared_with.length })}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={C.subtle} />
@@ -74,19 +76,20 @@ export default function TrainerPlaeneScreen() {
 
       <TouchableOpacity style={[s.fab, { bottom: fabBottom }]} onPress={() => { haptic.light(); router.push('/trainer/plan-neu'); }} activeOpacity={0.9}>
         <Ionicons name="add" size={24} color={C.accentText} />
-        <Text style={s.fabTxt}>Neuer Plan</Text>
+        <Text style={s.fabTxt}>{t('trainer.newPlan')}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
 }
 
 function Header({ onBack }: { onBack: () => void }) {
+  const { t } = useT();
   return (
     <View style={s.header}>
       <TouchableOpacity style={s.back} onPress={onBack} hitSlop={8}><Ionicons name="chevron-back" size={22} color={C.white} /></TouchableOpacity>
       <View style={{ flex: 1 }}>
-        <Text style={s.eyebrow}>TRAINER</Text>
-        <Text style={s.title}>Trainingspläne</Text>
+        <Text style={s.eyebrow}>{t('trainer.eyebrow')}</Text>
+        <Text style={s.title}>{t('trainer.plans')}</Text>
       </View>
     </View>
   );

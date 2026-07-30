@@ -2,6 +2,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import type { DogAiTip } from './types';
 
 // KI-Coach-Empfehlung (Heute/Morgen/Ruhetag). Nur sichtbar für Active/Premium
@@ -15,19 +16,20 @@ export function DogAiCoachCard({
   onUpgrade?: () => void;
   onLater?: () => void;   // „Später" — Hinweis für jetzt ausblenden
 }) {
+  const { t } = useT();
   if (!isUnlocked) {
     return (
       <View style={s.locked}>
         <View style={s.iconWrap}><Ionicons name="lock-closed" size={16} color={C.trackPrimary} /></View>
         <Text style={s.lockedTitle}>Smart Coach</Text>
-        <Text style={s.lockedTxt}>Personalisierte Trainingsempfehlungen mit Active oder Premium.</Text>
-        {onUpgrade ? <AnyvoButton label="Mehr erfahren" variant="secondary" onPress={onUpgrade} /> : null}
+        <Text style={s.lockedTxt}>{t('dog.smartCoachLocked')}</Text>
+        {onUpgrade ? <AnyvoButton label={t('help.more')} variant="secondary" onPress={onUpgrade} /> : null}
       </View>
     );
   }
 
-  const t = tip ?? { title: 'Smart Coach', hint: 'Noch nicht genug Daten für eine Empfehlung.', recommendation: null };
-  const schedule = t.schedule;
+  const coachTip = tip ?? { title: 'Smart Coach', hint: t('dog.smartCoachNoData'), recommendation: null };
+  const schedule = coachTip.schedule;
   const chips = schedule
     ? [
         schedule.today ? { l: 'Heute', v: schedule.today } : null,
@@ -40,9 +42,9 @@ export function DogAiCoachCard({
     <View style={s.card}>
       <View style={s.head}>
         <View style={s.iconWrap}><Ionicons name="sparkles" size={16} color={C.trackPrimary} /></View>
-        <Text style={s.title} numberOfLines={2}>{t.title}</Text>
+        <Text style={s.title} numberOfLines={2}>{coachTip.title}</Text>
       </View>
-      <Text style={s.hint}>{t.hint}</Text>
+      <Text style={s.hint}>{coachTip.hint}</Text>
       {chips.length > 0 ? (
         <View style={s.chips}>
           {chips.map(c => (
@@ -53,10 +55,10 @@ export function DogAiCoachCard({
           ))}
         </View>
       ) : null}
-      <AnyvoButton label="Timer starten" icon="play" onPress={onStart} />
+      <AnyvoButton label={t('home.actionStartTimer')} icon="play" onPress={onStart} />
       {onLater ? (
         <TouchableOpacity onPress={onLater} style={s.later} hitSlop={6} activeOpacity={0.7}>
-          <Text style={s.laterTxt}>Später</Text>
+          <Text style={s.laterTxt}>{t('common.later')}</Text>
         </TouchableOpacity>
       ) : null}
     </View>

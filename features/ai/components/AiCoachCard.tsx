@@ -3,29 +3,31 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useAiCoach } from '@/features/ai/hooks/useAiCoach';
+import { useT } from '@/i18n';
 
 // Kompakte Dashboard-Card — nicht dominant. Zeigt den wichtigsten Hinweis oder
 // die Wochenstatistik und führt zum Smart Coach (regelbasiert).
 export function AiCoachCard() {
   const router = useRouter();
+  const { t } = useT();
   const { data, isLoading } = useAiCoach();
 
   const important = data.insights.filter(i => i.severity === 'warning' || i.severity === 'critical');
   const headline = important.length > 0
-    ? `${important.length} wichtige${important.length === 1 ? 'r' : ''} Hinweis${important.length === 1 ? '' : 'e'}`
+    ? t('analyse.importantHints', { count: important.length, suffixImportant: important.length === 1 ? 'r' : '', suffixHint: important.length === 1 ? '' : 'e' })
     : data.weekly.sessions > 0
-      ? `Diese Woche: ${data.weekly.sessions} Training${data.weekly.sessions === 1 ? '' : 's'}${data.weekly.avgScore != null ? `, Ø ${data.weekly.avgScore}` : ''}`
-      : 'Erkennt Muster, Fortschritt und Trainingsbalance.';
+      ? t('analyse.thisWeekTrainings', { count: data.weekly.sessions, plural: data.weekly.sessions === 1 ? '' : 's', score: data.weekly.avgScore != null ? `, Ø ${data.weekly.avgScore}` : '' })
+      : t('analyse.detectsPatterns');
 
   return (
     <TouchableOpacity style={s.card} onPress={() => router.push('/analyse/coach' as never)} activeOpacity={0.85}>
       <View style={s.icon}><Ionicons name="sparkles" size={19} color={C.accent} /></View>
       <View style={{ flex: 1 }}>
         <Text style={s.label}>SMART COACH</Text>
-        <Text style={s.headline} numberOfLines={1}>{isLoading ? 'Wird ausgewertet…' : headline}</Text>
+        <Text style={s.headline} numberOfLines={1}>{isLoading ? t('analyse.summaryRunning') : headline}</Text>
       </View>
       {important.length > 0 && <View style={s.dot} />}
-      <Text style={s.cta}>Ansehen</Text>
+      <Text style={s.cta}>{t('analyse.view')}</Text>
       <Ionicons name="chevron-forward" size={18} color={C.muted} />
     </TouchableOpacity>
   );

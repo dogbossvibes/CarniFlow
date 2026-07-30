@@ -6,8 +6,17 @@ import { useT } from '@/i18n';
 import { NextAppointmentCard } from '@/components/calendar/NextAppointmentCard';
 import { useTrainingCalendar, nextEvent, eventsOnDay, localDayKey } from '@/hooks/useTrainingCalendar';
 import { eventMeta } from '@/types/calendar';
+import type { TranslationKey } from '@/i18n';
 
-const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+const WD_KEYS: TranslationKey[] = [
+  'calendar.weekdayMo',
+  'calendar.weekdayTu',
+  'calendar.weekdayWe',
+  'calendar.weekdayTh',
+  'calendar.weekdayFr',
+  'calendar.weekdaySa',
+  'calendar.weekdaySu',
+];
 const ACCENT = '#00F5D4';
 
 export function HomeTimelineCard() {
@@ -23,13 +32,13 @@ export function HomeTimelineCard() {
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday); d.setDate(monday.getDate() + i);
     const key = localDayKey(d.toISOString());
-    return { key, label: WD[i], events: eventsOnDay(events, key) };
+    return { key, label: t(WD_KEYS[i]), events: eventsOnDay(events, key) };
   });
 
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/training-hub')}>
       <View style={s.head}>
-        <Text style={s.label}>SMART TRAINING TIMELINE</Text>
+        <Text style={s.label}>{t('calendar.timeline')}</Text>
         <View style={s.allRow}>
           <Text style={s.all}>{t('calendar.viewAll')}</Text>
           <Ionicons name="chevron-forward" size={13} color={ACCENT} />

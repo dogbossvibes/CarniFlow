@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { C } from '@/constants/colors';
 import { DogEventCard } from '@/components/calendar/DogEventCard';
 import { eventsOnDay, localDayKey } from '@/hooks/useTrainingCalendar';
+import { useT } from '@/i18n';
 import { eventMeta, type CalendarEvent } from '@/types/calendar';
 
 const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -15,6 +16,7 @@ function mondayOf(base: Date): Date {
 }
 
 export function WeekView({ events, onEventPress }: { events: CalendarEvent[]; onEventPress: (e: CalendarEvent) => void }) {
+  const { t } = useT();
   const [weekOffset, setWeekOffset] = useState(0);
   const [selected, setSelected] = useState(localDayKey(new Date().toISOString()));
 
@@ -35,7 +37,7 @@ export function WeekView({ events, onEventPress }: { events: CalendarEvent[]; on
       <View style={s.nav}>
         <TouchableOpacity onPress={() => setWeekOffset(w => w - 1)} hitSlop={10}><Text style={s.navBtn}>‹</Text></TouchableOpacity>
         <Text style={s.navLabel}>
-          {weekOffset === 0 ? 'Diese Woche' : `${start.getDate()}.${start.getMonth() + 1}. – ${days[6].d.getDate()}.${days[6].d.getMonth() + 1}.`}
+          {weekOffset === 0 ? t('calendar.thisWeek') : `${start.getDate()}.${start.getMonth() + 1}. – ${days[6].d.getDate()}.${days[6].d.getMonth() + 1}.`}
         </Text>
         <TouchableOpacity onPress={() => setWeekOffset(w => w + 1)} hitSlop={10}><Text style={s.navBtn}>›</Text></TouchableOpacity>
       </View>
@@ -61,7 +63,7 @@ export function WeekView({ events, onEventPress }: { events: CalendarEvent[]; on
 
       <View style={{ gap: 10 }}>
         {selEvents.length === 0 ? (
-          <Text style={s.none}>Keine Termine an diesem Tag.</Text>
+          <Text style={s.none}>{t('calendar.noEventsThisDay')}</Text>
         ) : (
           selEvents.map(e => <DogEventCard key={e.id} event={e} onPress={() => onEventPress(e)} />)
         )}

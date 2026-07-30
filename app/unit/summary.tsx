@@ -15,6 +15,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useActiveTraining, resetUnit } from '@/stores/activeTraining';
 import { useProfile } from '@/hooks/useProfile';
 import { successHaptic, tapHaptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 function formatDur(sec: number): string {
   const m = Math.round(sec / 60);
@@ -25,6 +26,7 @@ function formatDur(sec: number): string {
 
 export default function SummaryScreen() {
   const router = useRouter();
+  const { t } = useT();
   const active = useActiveTraining();
   const { profile } = useProfile();
   const { duration } = useLocalSearchParams<{ duration: string }>();
@@ -60,7 +62,7 @@ export default function SummaryScreen() {
     setSaving(false);
 
     if (error) {
-      Alert.alert('Fehler', error.message ?? 'Einheit konnte nicht gespeichert werden.');
+      Alert.alert(t('common.error'), error.message ?? t('training.saveError'));
       return;
     }
     successHaptic();
@@ -78,8 +80,8 @@ export default function SummaryScreen() {
               <View style={s.trophy}>
                 <Ionicons name="trophy" size={26} color={C.accentText} />
               </View>
-              <Text style={s.heroTitle}>Starke Einheit</Text>
-              <Text style={s.heroSub}>{active.dogName ?? 'Dein Hund'} hat trainiert</Text>
+              <Text style={s.heroTitle}>{t('training.strongUnit')}</Text>
+              <Text style={s.heroSub}>{t('training.dogTrained', { dog: active.dogName ?? t('training.yourDog') })}</Text>
             </View>
           </SafeAreaView>
         </HeroImage>
@@ -89,20 +91,20 @@ export default function SummaryScreen() {
           <View style={s.statsRow}>
             <View style={s.statCard}>
               <Text style={s.statVal}>{formatDur(durationSec)}</Text>
-              <Text style={s.statLabel}>DAUER</Text>
+              <Text style={s.statLabel}>{t('training.durationLabel')}</Text>
             </View>
             <View style={s.statCard}>
               <Text style={s.statVal}>{active.exercises.length}</Text>
-              <Text style={s.statLabel}>ÜBUNGEN</Text>
+              <Text style={s.statLabel}>{t('training.exercisesLabel')}</Text>
             </View>
             <View style={s.statCard}>
               <Text style={s.statVal}>{avg != null ? avg.toFixed(1) : '—'}</Text>
-              <Text style={s.statLabel}>Ø BEWERTUNG</Text>
+              <Text style={s.statLabel}>{t('training.avgRating')}</Text>
             </View>
           </View>
 
           {/* Übungsliste */}
-          <Text style={s.label}>ÜBUNGEN</Text>
+          <Text style={s.label}>{t('training.exercisesLabel')}</Text>
           {active.exercises.map((ex, i) => (
             <View key={`${ex.exercise_name}-${i}`} style={s.exRow}>
               <View style={[s.exDot, { backgroundColor: disciplineColor(ex.discipline) }]} />
@@ -118,7 +120,7 @@ export default function SummaryScreen() {
           ))}
 
           {/* Gesamtbewertung */}
-          <Text style={s.label}>GESAMTBEWERTUNG</Text>
+          <Text style={s.label}>{t('training.ratingLabel')}</Text>
           <View style={s.bigStars}>
             {[1, 2, 3, 4, 5].map(n => (
               <TouchableOpacity key={n} onPress={() => { tapHaptic(); setRating(n); }} hitSlop={6}>
@@ -132,23 +134,23 @@ export default function SummaryScreen() {
           </View>
 
           {/* Notizen */}
-          <Text style={s.label}>NOTIZEN</Text>
+          <Text style={s.label}>{t('common.notes').toUpperCase()}</Text>
           <TextInput
             style={s.notes}
-            placeholder="Wie lief die Einheit?"
+            placeholder={t('training.howWasIt')}
             placeholderTextColor={C.placeholder}
             value={notes}
             onChangeText={setNotes}
             multiline
           />
 
-          <Text style={s.label}>METRIKEN (OPTIONAL)</Text>
+          <Text style={s.label}>{t('training.metricsLabel')}</Text>
           <MetricsInput value={metrics} onChange={setMetrics} />
 
           <AnimatedPressable style={[s.saveBtn, saving && { opacity: 0.5 }]} scale={0.97} disabled={saving} onPress={speichern}>
             <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
-            <Text style={s.saveTxt}>{saving ? 'Speichert…' : 'Einheit speichern'}</Text>
+            <Text style={s.saveTxt}>{saving ? t('common.saving') : t('training.saveUnit')}</Text>
           </AnimatedPressable>
 
           <View style={{ height: 40 }} />

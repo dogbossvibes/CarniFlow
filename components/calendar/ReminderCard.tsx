@@ -3,6 +3,7 @@ import { LayoutAnimation, Platform, StyleSheet, Switch, Text, TouchableOpacity, 
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { tapHaptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -19,16 +20,17 @@ export function ReminderCard({
 }: {
   selected: number[]; onToggle: (m: number) => void; pushOn: boolean; setPushOn: (b: boolean) => void;
 }) {
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   const toggleOpen = () => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setOpen(o => !o); };
 
-  const summary = selected.length === 0 ? 'Aus' : `${selected.length} aktiv`;
+  const summary = selected.length === 0 ? t('calendar.off') : t('calendar.activeCount', { count: selected.length });
 
   return (
     <View style={s.card}>
       <TouchableOpacity style={s.head} onPress={toggleOpen} activeOpacity={0.7}>
         <Ionicons name="notifications-outline" size={18} color={ACCENT} />
-        <Text style={s.headTxt}>Erinnerung</Text>
+        <Text style={s.headTxt}>{t('calendar.reminder')}</Text>
         <Text style={s.summary}>{summary}</Text>
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={C.muted} />
       </TouchableOpacity>
@@ -46,7 +48,7 @@ export function ReminderCard({
             })}
           </View>
           <View style={s.pushRow}>
-            <Text style={s.pushTxt}>Push-Benachrichtigung</Text>
+            <Text style={s.pushTxt}>{t('calendar.pushNotification')}</Text>
             <Switch value={pushOn} onValueChange={setPushOn} trackColor={{ false: C.cardAlt, true: ACCENT }} thumbColor={C.white} />
           </View>
         </View>

@@ -6,6 +6,7 @@ import { Glass, isGlass } from '@/components/ui/Glass';
 import { C } from '@/constants/colors';
 import { disciplineColor } from '@/constants/disciplines';
 import type { TrainingUnit } from '@/types/trainingUnit';
+import { useT } from '@/i18n';
 
 function formatDate(d: string): string {
   const [y, mo, day] = d.split('-');
@@ -20,6 +21,7 @@ function formatDur(sec: number | null): string {
 
 // Einheit-Card für Verlauf, Dashboard und (mit clientName) den Trainer-Feed.
 export function UnitListCard({ unit, onPress, clientName }: { unit: TrainingUnit; onPress: () => void; clientName?: string | null }) {
+  const { t } = useT();
   const exercises = unit.exercises ?? [];
   const disciplines = Array.from(new Set(exercises.map(e => e.discipline)));
 
@@ -66,7 +68,7 @@ export function UnitListCard({ unit, onPress, clientName }: { unit: TrainingUnit
         </View>
         <View style={s.meta}>
           <Ionicons name="barbell-outline" size={14} color={C.muted} />
-          <Text style={s.metaTxt}>{exercises.length} Übungen</Text>
+          <Text style={s.metaTxt}>{t('training.exerciseCountShort', { count: exercises.length })}</Text>
         </View>
       </View>
     </AnimatedPressable>

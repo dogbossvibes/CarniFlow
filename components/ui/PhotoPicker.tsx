@@ -13,6 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { SignedImage } from '@/components/ui/SignedImage';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { uploadImage } from '@/services/mediaService';
 
 interface Props {
@@ -22,12 +23,13 @@ interface Props {
 }
 
 export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
+  const { t } = useT();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);   // 0..1 (gesamt über alle Bilder)
 
   const pick = async () => {
     if (value.length >= maxPhotos) {
-      Alert.alert('Maximum erreicht', `Du kannst maximal ${maxPhotos} Fotos hinzufügen.`);
+      Alert.alert(t('media.maxReached'), t('media.maxPhotos', { count: maxPhotos }));
       return;
     }
 
@@ -36,9 +38,9 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Zugriff verweigert',
-          'Bitte erlaube den Foto-Zugriff:\n\nEinstellungen → Expo Go → Fotos → "Alle Fotos" auswählen',
-          [{ text: 'OK' }]
+          t('media.permissionDenied'),
+          t('media.photoPermission'),
+          [{ text: t('common.ok') }]
         );
         return;
       }
@@ -64,7 +66,7 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
       }
       onChange([...value, ...newUrls]);
     } catch (e: any) {
-      Alert.alert('Upload fehlgeschlagen', e?.message ?? 'Bitte versuch es erneut.');
+      Alert.alert(t('media.uploadFailed'), e?.message ?? t('media.retry'));
     } finally {
       setUploading(false);
       setProgress(0);
@@ -79,10 +81,10 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
   );
 
   const del = (idx: number) => {
-    Alert.alert('Foto entfernen', 'Möchtest du dieses Foto entfernen?', [
-      { text: 'Zurück', style: 'cancel' },
+    Alert.alert(t('media.removePhotoTitle'), t('media.removePhotoBody'), [
+      { text: t('common.back'), style: 'cancel' },
       {
-        text: 'Entfernen',
+        text: t('media.remove'),
         style: 'destructive',
         onPress: () => onChange(value.filter((_, i) => i !== idx)),
       },
@@ -104,8 +106,8 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
             <View style={S.iconBox}>
               <Ionicons name="camera-outline" size={22} color={C.muted} />
             </View>
-            <Text style={S.emptyTxt}>Fotos hinzufügen</Text>
-            <Text style={S.emptySub}>Bis zu {maxPhotos} Bilder · JPG, PNG</Text>
+            <Text style={S.emptyTxt}>{t('media.addPhotos')}</Text>
+            <Text style={S.emptySub}>{t('media.photoHint', { count: maxPhotos })}</Text>
           </>
         )}
       </TouchableOpacity>
@@ -148,7 +150,7 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
           ) : (
             <>
               <Ionicons name="add" size={22} color={C.muted} />
-              <Text style={S.addTxt}>Hinzu{'\n'}fügen</Text>
+              <Text style={S.addTxt}>{t('media.addSplit')}</Text>
             </>
           )}
         </TouchableOpacity>

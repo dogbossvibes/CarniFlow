@@ -4,11 +4,12 @@ import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { C } from '@/constants/colors';
 import { bearingToCardinal } from '@/features/tracking/utils/gpsFilter';
 import type { OrientationMode } from '@/features/tracking/store/trackingStore';
+import { useT, type TranslationKey } from '@/i18n';
 
-const MODES: { key: OrientationMode; label: string }[] = [
-  { key: 'north',   label: 'Norden oben' },
-  { key: 'heading', label: 'Bewegung oben' },
-  { key: 'track',   label: 'Fährte oben' },
+const MODES: { key: OrientationMode; labelKey: TranslationKey }[] = [
+  { key: 'north',   labelKey: 'track.orientationNorth' },
+  { key: 'heading', labelKey: 'track.orientationHeading' },
+  { key: 'track',   labelKey: 'track.orientationTrack' },
 ];
 
 export function CompassBottomSheet({
@@ -17,9 +18,10 @@ export function CompassBottomSheet({
   visible: boolean; onClose: () => void; heading: number | null;
   mode: OrientationMode; onChangeMode: (m: OrientationMode) => void;
 }) {
+  const { t } = useT();
   const deg = heading != null ? Math.round(heading) : null;
   return (
-    <AnyvoBottomSheet visible={visible} onClose={onClose} title="Ausrichtung kalibrieren">
+    <AnyvoBottomSheet visible={visible} onClose={onClose} title={t('track.calibrateOrientation')}>
       <View style={s.compassWrap}>
         <View style={s.dial}>
           <Text style={[s.cardN, { top: 6 }]}>N</Text>
@@ -32,21 +34,21 @@ export function CompassBottomSheet({
         <Text style={s.degTxt}>{deg != null ? `${deg}°` : '—'} <Text style={s.cardTxt}>{deg != null ? bearingToCardinal(deg) : ''}</Text></Text>
       </View>
 
-      <Text style={s.hint}>Drehe dich langsam, bis Pfeil und Fährtenrichtung übereinstimmen.</Text>
+      <Text style={s.hint}>{t('track.orientationHint')}</Text>
 
       <View style={s.modeRow}>
         {MODES.map(m => {
           const on = mode === m.key;
           return (
             <TouchableOpacity key={m.key} style={[s.mode, on && s.modeOn]} onPress={() => onChangeMode(m.key)} activeOpacity={0.85}>
-              <Text style={[s.modeTxt, on && s.modeTxtOn]}>{m.label}</Text>
+              <Text style={[s.modeTxt, on && s.modeTxtOn]}>{t(m.labelKey)}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
       <TouchableOpacity style={s.save} onPress={onClose} activeOpacity={0.85}>
-        <Text style={s.saveTxt}>Ausrichtung speichern</Text>
+        <Text style={s.saveTxt}>{t('track.saveOrientation')}</Text>
       </TouchableOpacity>
       <View style={{ height: 8 }} />
     </AnyvoBottomSheet>

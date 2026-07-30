@@ -14,6 +14,7 @@ import { useDogHubDynamic } from '@/features/dogs/useDogHubDynamic';
 import { DogHubScreen, type DogHubActions } from '@/features/dogs/DogHubScreen';
 import { useDogActiveFaehrte } from '@/features/tracking/hooks/useActiveFaehrte';
 import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
+import { useT } from '@/i18n';
 import type { DogDocument, DogTrainingItem } from '@/components/dogs/types';
 import type { Dog } from '@/types';
 
@@ -21,6 +22,7 @@ import type { Dog } from '@/types';
 // DogHubScreen. Route/Params/Deep-Links bleiben unverändert (`/dog/[id]`).
 export default function DogHubRoute() {
   const router = useRouter();
+  const { t } = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isPremium } = usePlan();
 
@@ -58,9 +60,9 @@ export default function DogHubRoute() {
   const heatPrediction = useMemo(() => predictHeat(heatCycles), [heatCycles]);
 
   const deleteHeat = (c: HeatCycle) => {
-    Alert.alert('Läufigkeit löschen?', 'Der Eintrag wird entfernt.', [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Löschen', style: 'destructive', onPress: async () => {
+    Alert.alert(t('dog.deleteHeatTitle'), t('dog.deleteEntryBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => {
         await deleteHeatCycle(c.id);
         getHeatCycles(id).then(setHeatCycles).catch(() => {});
       } },
@@ -78,9 +80,9 @@ export default function DogHubRoute() {
   };
 
   const deleteDocument = (doc: DogDocument) => {
-    Alert.alert('Dokument löschen?', `„${doc.title}" wird dauerhaft entfernt.`, [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Löschen', style: 'destructive', onPress: async () => {
+    Alert.alert(t('dog.deleteDocumentTitle'), t('dog.deleteDocumentBody', { title: doc.title }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => {
         await deleteDogDocument(doc.id, doc.fileUrl);
         getDogHubExtras(id).then(setExtras).catch(() => {});   // Liste sofort aktualisieren
       } },

@@ -12,11 +12,13 @@ import { getMyTrainerProfile } from '@/services/trainerService';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
 import type { ConnectionView } from '@/types/connection';
 import type { TrainerProfile } from '@/types/trainer';
+import { useT } from '@/i18n';
 
 function initial(name: string | null) { return (name?.trim()?.[0] ?? '?').toUpperCase(); }
 
 export default function ClientsScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const meId = session?.user.id;
 
@@ -38,20 +40,20 @@ export default function ClientsScreen() {
     if (!trainerProfile?.code) return;
     await Clipboard.setStringAsync(trainerProfile.code);
     successHaptic();
-    Alert.alert('Kopiert', `Trainer-Code ${trainerProfile.code} kopiert.`);
+    Alert.alert(t('trainer.copiedTitle'), t('trainer.copiedBody', { code: trainerProfile.code }));
   };
 
   const shareCode = async () => {
     if (!trainerProfile?.code) return;
-    await Share.share({ message: `Verbinde dich mit mir in ANYVO mit dem Trainer-Code: ${trainerProfile.code}` });
+    await Share.share({ message: t('trainer.shareCodeMessage', { code: trainerProfile.code }) });
   };
 
   const accept = async (c: ConnectionView) => { tapHaptic(); await respondToConnection(c.id, 'accepted'); successHaptic(); load(); };
   const decline = async (c: ConnectionView) => { tapHaptic(); await respondToConnection(c.id, 'declined'); load(); };
   const remove  = (c: ConnectionView) => {
-    Alert.alert('Verbindung trennen?', `${c.counterpartName ?? 'Kunde'} wird entfernt.`, [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Trennen', style: 'destructive', onPress: async () => { await removeConnection(c.id); load(); } },
+    Alert.alert(t('trainer.disconnectClientTitle'), t('trainer.disconnectClientBody', { name: c.counterpartName ?? t('trainer.clientFallback') }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('trainer.disconnect'), style: 'destructive', onPress: async () => { await removeConnection(c.id); load(); } },
     ]);
   };
 
@@ -61,31 +63,31 @@ export default function ClientsScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <Text style={s.eyebrow}>TRAINER</Text>
-        <Text style={s.title}>Kunden</Text>
+        <Text style={s.eyebrow}>{t('trainer.eyebrow')}</Text>
+        <Text style={s.title}>{t('trainer.clients')}</Text>
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {/* Einladungscode */}
         <View style={s.inviteCard}>
-          <Text style={s.inviteLabel}>DEIN TRAINER-CODE</Text>
+          <Text style={s.inviteLabel}>{t('trainer.yourCode')}</Text>
           {trainerProfile?.code ? (
             <>
               <Text style={s.inviteCode}>{trainerProfile.code}</Text>
               <View style={s.inviteBtns}>
                 <TouchableOpacity style={s.inviteBtn} onPress={shareCode} activeOpacity={0.85}>
                   <Ionicons name="share-outline" size={16} color={C.accentText} />
-                  <Text style={s.inviteBtnTxt}>Teilen</Text>
+                  <Text style={s.inviteBtnTxt}>{t('share.share')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.inviteBtnAlt} onPress={copyCode} activeOpacity={0.85}>
-                  <Text style={s.inviteBtnAltTxt}>Kopieren</Text>
+                  <Text style={s.inviteBtnAltTxt}>{t('share.copy')}</Text>
                 </TouchableOpacity>
               </View>
             </>
           ) : (
             <TouchableOpacity style={s.inviteBtn} onPress={() => router.push('/trainer/edit' as never)} activeOpacity={0.85}>
               <Ionicons name="person-add-outline" size={16} color={C.accentText} />
-              <Text style={s.inviteBtnTxt}>Trainerprofil erstellen</Text>
+              <Text style={s.inviteBtnTxt}>{t('trainer.createProfile')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -95,22 +97,22 @@ export default function ClientsScreen() {
         ) : clients.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="people-outline" size={32} color={C.subtle} />
-            <Text style={s.emptyTitle}>Noch keine Kunden</Text>
-            <Text style={s.emptyTxt}>Teile deinen Code, damit sich Kund:innen verbinden.</Text>
+            <Text style={s.emptyTitle}>{t('trainer.noClients')}</Text>
+            <Text style={s.emptyTxt}>{t('trainer.noClientsSub')}</Text>
           </View>
         ) : (
           <>
             {pending.length > 0 && (
               <>
-                <Text style={s.section}>OFFENE ANFRAGEN</Text>
+                <Text style={s.section}>{t('trainer.pendingRequests')}</Text>
                 {pending.map(c => (
                   <View key={c.id} style={s.card}>
                     <View style={[s.avatar, { backgroundColor: `${C.warning}1A` }]}>
                       <Text style={[s.avatarTxt, { color: C.warning }]}>{initial(c.counterpartName)}</Text>
                     </View>
                     <View style={s.flex}>
-                      <Text style={s.name}>{c.counterpartName ?? 'Neue Anfrage'}</Text>
-                      <Text style={s.sub}>möchte sich verbinden</Text>
+                      <Text style={s.name}>{c.counterpartName ?? t('trainer.newRequest')}</Text>
+                      <Text style={s.sub}>{t('trainer.wantsToConnect')}</Text>
                     </View>
                     <TouchableOpacity style={s.rejectBtn} onPress={() => decline(c)} activeOpacity={0.8}>
                       <Ionicons name="close" size={18} color={C.danger} />
@@ -125,13 +127,13 @@ export default function ClientsScreen() {
 
             {active.length > 0 && (
               <>
-                <Text style={s.section}>VERBUNDEN ({active.length})</Text>
+                <Text style={s.section}>{t('trainer.connectedCount', { count: active.length })}</Text>
                 {active.map(c => (
                   <View key={c.id} style={s.card}>
                     <View style={s.avatar}><Text style={s.avatarTxt}>{initial(c.counterpartName)}</Text></View>
                     <View style={s.flex}>
-                      <Text style={s.name}>{c.counterpartName ?? 'Kunde'}</Text>
-                      <Text style={s.sub}>Verbunden</Text>
+                      <Text style={s.name}>{c.counterpartName ?? t('trainer.clientFallback')}</Text>
+                      <Text style={s.sub}>{t('trainer.connected')}</Text>
                     </View>
                     <AnimatedPressable style={s.unlinkBtn} scale={0.9} onPress={() => remove(c)}>
                       <Ionicons name="link-outline" size={16} color={C.muted} />

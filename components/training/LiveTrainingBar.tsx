@@ -23,6 +23,7 @@ import {
 } from '@/stores/activeTraining';
 import { useBarMinimized } from '@/stores/liveBarScroll';
 import { tapHaptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 const LIVE   = '#00F5D4';
 const PAUSE  = '#FF9A3D';
@@ -42,6 +43,7 @@ function fmt(totalSec: number): string {
 
 export function LiveTrainingBar() {
   const router = useRouter();
+  const { t } = useT();
   const active = useActiveTraining();
   const { dogs } = useDogs();
   const minimized = useBarMinimized();
@@ -130,10 +132,10 @@ export function LiveTrainingBar() {
           <View style={s.center}>
             <View style={s.liveRow}>
               <Animated.View style={[s.dot, { backgroundColor: farbe }, dotStyle]} />
-              <Text style={[s.liveTxt, { color: farbe }]}>{active.paused ? 'PAUSED' : erreicht ? 'ZIEL ✓' : 'LIVE'}</Text>
+              <Text style={[s.liveTxt, { color: farbe }]}>{active.paused ? t('training.pausedShort') : erreicht ? t('training.goalReached') : t('track.liveLive')}</Text>
             </View>
             <Animated.View style={[s.nameWrap, collapseStyle]}>
-              <Text style={s.name} numberOfLines={1}>{active.dogName ?? 'Hund'}</Text>
+              <Text style={s.name} numberOfLines={1}>{active.dogName ?? t('dogs.dogFallback')}</Text>
               {disziplin ? <Text style={s.disc} numberOfLines={1}>{disziplin}</Text> : null}
             </Animated.View>
           </View>

@@ -1,17 +1,19 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 
 export function EmptyCoachState({ onStart }: { onStart?: () => void }) {
+  const { t } = useT();
   return (
     <View style={s.wrap}>
       <View style={s.icon}><Ionicons name="sparkles-outline" size={30} color={C.accent} /></View>
-      <Text style={s.title}>Sammle Trainings und entdecke Muster</Text>
-      <Text style={s.txt}>Je mehr du dokumentierst, desto besser erkennt Anyvo Trends, Belastung, Trainingsbalance und Fortschritte.</Text>
+      <Text style={s.title}>{t('analyse.emptyTitle')}</Text>
+      <Text style={s.txt}>{t('analyse.emptyCoachText')}</Text>
       {onStart && (
         <TouchableOpacity style={s.btn} onPress={onStart} activeOpacity={0.85}>
           <Ionicons name="play" size={15} color={C.accentText} />
-          <Text style={s.btnTxt}>Training starten</Text>
+          <Text style={s.btnTxt}>{t('training.start')}</Text>
         </TouchableOpacity>
       )}
     </View>

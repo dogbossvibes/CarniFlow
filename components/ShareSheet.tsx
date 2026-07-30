@@ -9,6 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Glass, isGlass } from '@/components/ui/Glass';
 import { createShareLink, deleteShareLink } from '@/services/shareService';
 import type { TrainingSession } from '@/types';
+import { useT } from '@/i18n';
 
 interface Props {
   training: TrainingSession;
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function ShareSheet({ training, visible, onClose }: Props) {
+  const { t } = useT();
   const [step,     setStep]     = useState<'options' | 'link'>('options');
   const [loading,  setLoading]  = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -38,7 +40,7 @@ export function ShareSheet({ training, visible, onClose }: Props) {
       setShareUrl(url);
       setStep('link');
     } catch {
-      Alert.alert('Ups, kurze Pause 🐾', 'Link noch nicht bereit — versuch es nochmal!');
+      Alert.alert(t('share.notReadyTitle'), t('share.notReadyBody'));
     } finally {
       setLoading(false);
     }
@@ -52,19 +54,19 @@ export function ShareSheet({ training, visible, onClose }: Props) {
 
   const handleShare = async () => {
     await Share.share({
-      message: `Schau dir mein Training an: ${shareUrl}`,
+      message: t('share.message', { url: shareUrl }),
       url: shareUrl,
     });
   };
 
   const handleDelete = async () => {
     Alert.alert(
-      'Link deaktivieren',
-      'Möchtest du den Teilen-Link wirklich deaktivieren?',
+      t('share.deactivateTitle'),
+      t('share.deactivateBody'),
       [
-        { text: 'Zurück', style: 'cancel' },
+        { text: t('common.back'), style: 'cancel' },
         {
-          text: 'Deaktivieren',
+          text: t('share.deactivate'),
           style: 'destructive',
           onPress: async () => {
             await deleteShareLink(training.id);
@@ -93,16 +95,16 @@ export function ShareSheet({ training, visible, onClose }: Props) {
 
         {step === 'options' ? (
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={S.title}>Training teilen</Text>
+            <Text style={S.title}>{t('share.trainingTitle')}</Text>
             <Text style={S.sub}>{displayTitle}</Text>
 
-            <Text style={S.label}>INHALTE AUSWÄHLEN</Text>
+            <Text style={S.label}>{t('share.chooseContent')}</Text>
             <View style={S.card}>
               {([
-                { key: 'includeNotes', label: 'Notizen'          },
-                { key: 'includeVideo', label: 'Video'             },
-                { key: 'includeAudio', label: 'Sprachnotizen'     },
-                { key: 'includeScore', label: 'Score & Statistik' },
+                { key: 'includeNotes', label: t('share.notes')      },
+                { key: 'includeVideo', label: t('share.video')      },
+                { key: 'includeAudio', label: t('share.audioNotes') },
+                { key: 'includeScore', label: t('share.scoreStats') },
               ] as { key: keyof typeof opts; label: string }[]).map(({ key, label }, i) => (
                 <View key={key} style={[S.row, i > 0 && S.rowBorder]}>
                   <Text style={S.rowTxt}>{label}</Text>
@@ -116,11 +118,11 @@ export function ShareSheet({ training, visible, onClose }: Props) {
               ))}
             </View>
 
-            <Text style={S.label}>LINK-GÜLTIGKEIT</Text>
+            <Text style={S.label}>{t('share.validity')}</Text>
             <View style={S.card}>
               <View style={S.row}>
-                <Text style={S.rowTxt}>Ablauf</Text>
-                <Text style={S.rowVal}>30 Tage</Text>
+                <Text style={S.rowTxt}>{t('share.expiry')}</Text>
+                <Text style={S.rowVal}>{t('share.days30')}</Text>
               </View>
             </View>
 
@@ -132,7 +134,7 @@ export function ShareSheet({ training, visible, onClose }: Props) {
             >
               {loading
                 ? <ActivityIndicator color="#000" />
-                : <Text style={S.btnTxt}>Link erstellen & teilen</Text>
+                : <Text style={S.btnTxt}>{t('share.create')}</Text>
               }
             </TouchableOpacity>
           </ScrollView>
@@ -141,23 +143,23 @@ export function ShareSheet({ training, visible, onClose }: Props) {
             <View style={S.successIcon}>
               <Text style={{ fontSize: 32 }}>✅</Text>
             </View>
-            <Text style={S.title}>Link erstellt!</Text>
-            <Text style={S.sub}>Gültig für 30 Tage</Text>
+            <Text style={S.title}>{t('share.created')}</Text>
+            <Text style={S.sub}>{t('share.validFor30')}</Text>
 
-            <Text style={S.label}>DEIN LINK</Text>
+            <Text style={S.label}>{t('share.yourLink')}</Text>
             <View style={S.linkBox}>
               <Text style={S.linkTxt} numberOfLines={1}>{shareUrl}</Text>
               <TouchableOpacity style={S.copyBtn} onPress={handleCopy} activeOpacity={0.7}>
-                <Text style={S.copyTxt}>{copied ? '✓ Kopiert' : 'Kopieren'}</Text>
+                <Text style={S.copyTxt}>{copied ? t('share.copied') : t('share.copy')}</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={S.btn} onPress={handleShare} activeOpacity={0.85}>
-              <Text style={S.btnTxt}>Teilen via...</Text>
+              <Text style={S.btnTxt}>{t('share.shareVia')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={S.btnDanger} onPress={handleDelete} activeOpacity={0.85}>
-              <Text style={S.btnDangerTxt}>Link deaktivieren</Text>
+              <Text style={S.btnDangerTxt}>{t('share.deactivateTitle')}</Text>
             </TouchableOpacity>
           </ScrollView>
         )}

@@ -28,6 +28,7 @@ import { getDogById, updateDog, deleteDogWithDependents } from '@/services/dogs'
 import { uploadDogImage } from '@/services/storage';
 import { useSession } from '@/hooks/useSession';
 import { haptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 import type { Dog } from '@/types';
 
 type Geschlecht = 'male' | 'female' | null;
@@ -36,6 +37,7 @@ export default function HundBearbeitenScreen() {
   const router      = useRouter();
   const { session } = useSession();
   const { id }      = useLocalSearchParams<{ id: string }>();
+  const { t }       = useT();
 
   const [hund,          setHund]          = useState<Dog | null>(null);
   const [laden,         setLaden]         = useState(true);
@@ -71,7 +73,7 @@ export default function HundBearbeitenScreen() {
     if (!id) return;
     getDogById(id).then(({ data, error }) => {
       setLaden(false);
-      if (error || !data) { setFehler('Hund konnte nicht geladen werden.'); return; }
+      if (error || !data) { setFehler(t('dog.loadError')); return; }
       const d = data as Dog;
       setHund(d);
       setName(d.name);
@@ -100,7 +102,7 @@ export default function HundBearbeitenScreen() {
     if (Platform.OS !== 'android') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        setFehler('Fotos nicht zugänglich — Einstellungen → Expo Go → Fotos → aktivieren');
+        setFehler(t('dog.photoPermissionError'));
         return;
       }
     }
@@ -119,7 +121,7 @@ export default function HundBearbeitenScreen() {
   };
 
   const handleSpeichern = async () => {
-    if (!name.trim()) { setFehler('Bitte gib deinem Hund einen Namen 🐾'); return; }
+    if (!name.trim()) { setFehler(t('dog.nameRequired')); return; }
     if (!session?.user.id || !hund) return;
 
     setSpeichern(true);
@@ -134,8 +136,8 @@ export default function HundBearbeitenScreen() {
         setSpeichern(false);
         setFehler(
           uploadErr instanceof Error
-            ? `Foto noch nicht hochgeladen — versuch es nochmal!`
-            : 'Foto noch nicht hochgeladen — versuch es nochmal!'
+            ? t('dog.photoUploadError')
+            : t('dog.photoUploadError')
         );
         return;
       }
@@ -172,7 +174,7 @@ export default function HundBearbeitenScreen() {
 
     if (err) {
       haptic.error();
-      setFehler(`Noch nicht gespeichert — versuch es nochmal!`);
+      setFehler(t('dog.saveErrorPlain'));
       return;
     }
 
@@ -185,7 +187,7 @@ export default function HundBearbeitenScreen() {
     setLoeschen(true);
     const { error } = await deleteDogWithDependents(hund.id);
     setLoeschen(false);
-    if (error) { haptic.error(); setLoeschOffen(false); setFehler('Löschen fehlgeschlagen — versuch es nochmal.'); return; }
+    if (error) { haptic.error(); setLoeschOffen(false); setFehler(t('dog.deleteError')); return; }
     setLoeschOffen(false);
     router.replace('/dogs' as never);
   };
@@ -209,8 +211,8 @@ export default function HundBearbeitenScreen() {
 
       <View style={s.kopf}>
         <View>
-          <Text style={s.augenbraue}>PROFIL BEARBEITEN</Text>
-          <Text style={s.titel}>{hund?.name ?? 'Hund bearbeiten'}</Text>
+          <Text style={s.augenbraue}>{t('dog.editProfileUpper')}</Text>
+          <Text style={s.titel}>{hund?.name ?? t('dog.editTitle')}</Text>
         </View>
         <TouchableOpacity style={s.schliessenBtn} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="close" size={18} color={C.white} />
@@ -240,7 +242,7 @@ export default function HundBearbeitenScreen() {
                   ) : (
                     <>
                       <Ionicons name="camera" size={14} color={C.white} />
-                      <Text style={s.bildAendernText}>Foto ändern</Text>
+                      <Text style={s.bildAendernText}>{t('dog.photoChangeFull')}</Text>
                     </>
                   )}
                 </View>
@@ -262,8 +264,8 @@ export default function HundBearbeitenScreen() {
                           <Ionicons name="camera-outline" size={30} color={C.accent} />
                         </View>
                       </View>
-                      <Text style={s.bildPlaceholderTitel}>Foto hinzufügen</Text>
-                      <Text style={s.bildPlaceholderUnter}>Wähle ein Bild aus deiner Galerie</Text>
+                      <Text style={s.bildPlaceholderTitel}>{t('dog.photoAdd')}</Text>
+                      <Text style={s.bildPlaceholderUnter}>{t('dog.photoHint')}</Text>
                     </>
                   )}
                 </View>
@@ -274,23 +276,23 @@ export default function HundBearbeitenScreen() {
 
           <View style={s.felder}>
             <Input
-              label="Name *"
-              placeholder="z. B. Rex"
+              label={t('dog.name')}
+              placeholder={t('dog.namePlaceholder')}
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
             />
 
             <Input
-              label="Rasse"
-              placeholder="z. B. Malinois"
+              label={t('dog.breed')}
+              placeholder={t('dog.breedPlaceholder')}
               value={rasse}
               onChangeText={setRasse}
               autoCapitalize="words"
             />
 
             <View>
-              <Text style={s.feldLabel}>GESCHLECHT</Text>
+              <Text style={s.feldLabel}>{t('dog.gender')}</Text>
               <View style={s.geschlechtReihe}>
                 {(['male', 'female'] as const).map((g) => {
                   const aktiv = geschlecht === g;
@@ -315,7 +317,7 @@ export default function HundBearbeitenScreen() {
                         color={aktiv ? C.accentText : C.muted}
                       />
                       <Text style={[s.geschlechtText, aktiv && s.geschlechtTextAktiv]}>
-                        {g === 'male' ? 'Rüde' : 'Hündin'}
+                        {g === 'male' ? t('dog.male') : t('dog.female')}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -324,71 +326,71 @@ export default function HundBearbeitenScreen() {
             </View>
 
             <DateField
-              label="Geburtsdatum"
+              label={t('dog.birthDate')}
               value={birth}
               onChange={setBirth}
               onClear={() => setBirth(null)}
               maximumDate={new Date()}
-              placeholder="Datum wählen"
+              placeholder={t('dog.datePlaceholder')}
             />
 
             <Input
-              label="Gewicht (kg)"
-              placeholder="z. B. 28.5"
+              label={t('dog.weight')}
+              placeholder={t('dog.weightPlaceholder')}
               value={gewicht}
               onChangeText={setGewicht}
               keyboardType="decimal-pad"
             />
 
             <Input
-              label="Leistungsabzeichen"
-              placeholder="z. B. IGP 3, IBGH 3, Obedience"
+              label={t('dog.titles')}
+              placeholder={t('dog.titlesPlaceholder')}
               value={titel}
               onChangeText={setTitel}
               autoCapitalize="characters"
             />
           </View>
 
-          <Text style={s.gruppeLabel}>ABSTAMMUNG</Text>
+          <Text style={s.gruppeLabel}>{t('dog.lineage')}</Text>
           <View style={s.felder}>
             <Input
-              label="Vater"
-              placeholder="Name des Vaters"
+              label={t('dog.sire')}
+              placeholder={t('dog.sirePlaceholder')}
               value={vater}
               onChangeText={setVater}
               autoCapitalize="words"
             />
             <Input
-              label="Mutter"
-              placeholder="Name der Mutter"
+              label={t('dog.dam')}
+              placeholder={t('dog.damPlaceholder')}
               value={mutter}
               onChangeText={setMutter}
               autoCapitalize="words"
             />
             <Input
-              label="Zuchtstätte / Zwinger"
-              placeholder="z. B. vom Haus Milinski"
+              label={t('dog.kennel')}
+              placeholder={t('dog.kennelPlaceholder')}
               value={zwinger}
               onChangeText={setZwinger}
               autoCapitalize="words"
             />
           </View>
 
-          <Text style={s.gruppeLabel}>SPORT</Text>
+          <Text style={s.gruppeLabel}>{t('dog.sport')}</Text>
           <View style={s.felder}>
-            <ChipSelect label="SPARTE" options={DOG_DISCIPLINES} value={sparte} onChange={setSparte} />
-            <ChipSelect label="STUFE" options={DOG_LEVELS} value={stufe} onChange={setStufe} />
-            <Input label="Bestwert" placeholder="z. B. 98 / 96 / 97" value={bestwert} onChangeText={setBestwert} />
+            <ChipSelect label={t('dog.discipline')} options={DOG_DISCIPLINES} value={sparte} onChange={setSparte} />
+            <ChipSelect label={t('dog.level')} options={DOG_LEVELS} value={stufe} onChange={setStufe} />
+            <Input label={t('dog.bestScore')} placeholder={t('dog.bestScorePlaceholder')} value={bestwert} onChangeText={setBestwert} />
           </View>
 
-          <Text style={s.gruppeLabel}>IDENTITÄT</Text>
+          <Text style={s.gruppeLabel}>{t('dog.identity')}</Text>
           <View style={s.felder}>
-            <Input label="Farbe" placeholder="z. B. schwarz-marken" value={farbe} onChangeText={setFarbe} autoCapitalize="words" />
-            <Input label="Mikrochip-Nr." placeholder="15-stellige Chipnummer" value={mikrochip} onChangeText={setMikrochip} keyboardType="numbers-and-punctuation" />
+            <Input label={t('dog.color')} placeholder={t('dog.colorPlaceholder')} value={farbe} onChangeText={setFarbe} autoCapitalize="words" />
+            <Input label={t('dog.microchip')} placeholder={t('dog.microchipPlaceholder')} value={mikrochip} onChangeText={setMikrochip} keyboardType="numbers-and-punctuation" />
             <TouchableOpacity style={[s.tassoRow, tasso && s.tassoRowAktiv]} onPress={() => setTasso(t => !t)} activeOpacity={0.85}>
               <View style={{ flex: 1 }}>
-                <Text style={s.tassoTitel}>Bei Tasso registriert</Text>
-                <Text style={s.tassoUnter}>Haustier-Zentralregister</Text>
+                <Text style={s.tassoTitel}>{t('dog.tassoTitle')}</Text>
+                <Text style={s.tassoUnter}>{t('dog.tassoSub')}</Text>
               </View>
               <View style={[s.switch, tasso && s.switchOn]}>
                 <View style={[s.knob, tasso && s.knobOn]} />
@@ -396,11 +398,11 @@ export default function HundBearbeitenScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={s.gruppeLabel}>GESUNDHEIT</Text>
+          <Text style={s.gruppeLabel}>{t('dog.health')}</Text>
           <View style={s.felder}>
-            <Input label="Tierarzt" placeholder="Praxis / Name" value={tierarzt} onChangeText={setTierarzt} autoCapitalize="words" />
-            <Input label="Impfung" placeholder="z. B. Tollwut 03/2026" value={impfung} onChangeText={setImpfung} />
-            <Input label="Futter" placeholder="z. B. Royal Canin" value={futter} onChangeText={setFutter} autoCapitalize="words" />
+            <Input label={t('dog.vet')} placeholder={t('dog.vetPlaceholder')} value={tierarzt} onChangeText={setTierarzt} autoCapitalize="words" />
+            <Input label={t('dog.vaccination')} placeholder={t('dog.vaccinationPlaceholder')} value={impfung} onChangeText={setImpfung} />
+            <Input label={t('dog.food')} placeholder={t('dog.foodPlaceholder')} value={futter} onChangeText={setFutter} autoCapitalize="words" />
           </View>
 
           {fehler ? (
@@ -410,26 +412,26 @@ export default function HundBearbeitenScreen() {
             </View>
           ) : null}
 
-          <Button label="Änderungen speichern" onPress={handleSpeichern} loading={speichern} />
+          <Button label={t('dog.saveChanges')} onPress={handleSpeichern} loading={speichern} />
 
           <TouchableOpacity style={s.loeschBtn} onPress={() => setLoeschOffen(true)} activeOpacity={0.8}>
             <Ionicons name="trash-outline" size={16} color={C.danger} />
-            <Text style={s.loeschText}>Hund löschen</Text>
+            <Text style={s.loeschText}>{t('dog.deleteDog')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
 
       {/* Bestätigungs-Sheet: Hund + abhängige Daten löschen */}
-      <AnyvoBottomSheet visible={loeschOffen} onClose={() => { if (!loeschen) setLoeschOffen(false); }} title="Hund löschen?">
+      <AnyvoBottomSheet visible={loeschOffen} onClose={() => { if (!loeschen) setLoeschOffen(false); }} title={t('dog.deleteDogQuestion')}>
         <Text style={s.loeschHinweis}>
-          {hund?.name ? `„${hund.name}"` : 'Dieser Hund'} und alle zugehörigen Trainings, Fährten und Auswertungen werden dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden.
+          {t('dog.deleteDogBody', { dog: hund?.name ? `„${hund.name}"` : t('dog.thisDog') })}
         </Text>
         <View style={s.loeschAktionen}>
           <TouchableOpacity style={s.abbrechenBtn} onPress={() => setLoeschOffen(false)} disabled={loeschen} activeOpacity={0.8}>
-            <Text style={s.abbrechenText}>Abbrechen</Text>
+            <Text style={s.abbrechenText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.endgueltigBtn} onPress={handleLoeschen} disabled={loeschen} activeOpacity={0.85}>
-            {loeschen ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.endgueltigText}>Endgültig löschen</Text>}
+            {loeschen ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.endgueltigText}>{t('dog.deletePermanently')}</Text>}
           </TouchableOpacity>
         </View>
       </AnyvoBottomSheet>

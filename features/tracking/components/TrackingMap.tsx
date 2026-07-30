@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { ANGLE_SHORT, angleMarkerKind } from '@/features/tracking/utils/angleClassify';
@@ -94,6 +95,7 @@ export function TrackingMap({
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
+  const { t } = useT();
 
   // Live-Zentrierung: bei jedem Positionswechsel sanft nachführen (wenn follow).
   useEffect(() => {
@@ -152,7 +154,7 @@ export function TrackingMap({
     return (
       <View style={[s.fallback, style]}>
         <Ionicons name="map-outline" size={30} color={C.trackTextMut} />
-        <Text style={s.fallbackTxt}>Karte nur im Dev-/Store-Build verfügbar</Text>
+        <Text style={s.fallbackTxt}>{t('track.mapUnavailable')}</Text>
       </View>
     );
   }
@@ -215,7 +217,7 @@ export function TrackingMap({
           <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
             <View style={s.startFlagWrap}>
               <View style={s.startFlag}><Ionicons name="flag" size={12} color="#04110F" /></View>
-              <Text style={s.startFlagLabel}>Start</Text>
+              <Text style={s.startFlagLabel}>{t('track.startFlag')}</Text>
             </View>
           </Marker>
         ) : start ? (

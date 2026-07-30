@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop, Line, Text as SvgText, Circle } from 'react-native-svg';
 import type { TrendPoint } from '@/types/analytics';
+import { useT } from '@/i18n';
 
 interface Props {
   points: TrendPoint[];
@@ -22,6 +23,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 }
 
 export function TrendLine({ points, width = 320, height = 110 }: Props) {
+  const { t } = useT();
   const pad = { top: 12, right: 16, bottom: 28, left: 32 };
   const W   = width  - pad.left - pad.right;
   const H   = height - pad.top  - pad.bottom;
@@ -29,7 +31,7 @@ export function TrendLine({ points, width = 320, height = 110 }: Props) {
   if (!points.length) {
     return (
       <View style={[st.empty, { width, height }]}>
-        <Text style={st.emptyTxt}>Sammle mehr Trainings für deinen Verlauf 📈</Text>
+        <Text style={st.emptyTxt}>{t('analyse.moreTrainingForTrend')}</Text>
       </View>
     );
   }

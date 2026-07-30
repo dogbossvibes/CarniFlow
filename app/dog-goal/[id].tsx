@@ -8,6 +8,7 @@ import { haptic } from '@/lib/haptics';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { useToast } from '@/components/ui/Toast';
 import { getActiveDogGoal, saveDogGoal } from '@/services/dogHub';
+import { useT } from '@/i18n';
 
 const PART_LABELS = ['Unterordnung', 'Fährte', 'Schutzdienst'] as const;
 type PartKey = (typeof PART_LABELS)[number];
@@ -18,6 +19,7 @@ export default function DogGoalEditor() {
   const router = useRouter();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { showToast, toast } = useToast();
+  const { t } = useT();
 
   const [goalId, setGoalId] = useState<string | null>(null);
   const [title, setTitle]   = useState('');
@@ -44,12 +46,12 @@ export default function DogGoalEditor() {
     if (!dogId || saving) return;
     setSaving(true);
     const { error } = await saveDogGoal(dogId, goalId, {
-      title: title.trim() || 'Ziel',
+      title: title.trim() || t('dog.goalFallback'),
       overall_pct: overall,
       parts: PART_LABELS.map(l => ({ label: l, pct: parts[l] })),
     });
     setSaving(false);
-    if (error) { haptic.error(); showToast('Konnte nicht gespeichert werden.'); return; }
+    if (error) { haptic.error(); showToast(t('calendar.saveFailed')); return; }
     haptic.success();
     router.back();
   };
@@ -59,18 +61,18 @@ export default function DogGoalEditor() {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={s.bar}>
           <TouchableOpacity style={s.iconBtn} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={20} color={C.trackText} /></TouchableOpacity>
-          <Text style={s.barTitle}>{goalId ? 'Ziel bearbeiten' : 'Ziel hinzufügen'}</Text>
+          <Text style={s.barTitle}>{goalId ? t('dog.editGoal') : t('dog.addGoal')}</Text>
           <View style={{ width: 38 }} />
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>Ziel</Text>
-          <TextInput value={title} onChangeText={setTitle} placeholder="z. B. IGP 1" placeholderTextColor={C.trackTextMut} style={s.input} />
+          <Text style={s.label}>{t('dog.goalFallback')}</Text>
+          <TextInput value={title} onChangeText={setTitle} placeholder={t('dog.goalPlaceholder')} placeholderTextColor={C.trackTextMut} style={s.input} />
 
-          <Text style={s.label}>Gesamtfortschritt</Text>
-          <View style={s.overallBox}><Text style={s.overallTxt}>{overall} %</Text><Text style={s.overallHint}>Durchschnitt der Teilbereiche</Text></View>
+          <Text style={s.label}>{t('dog.overallProgress')}</Text>
+          <View style={s.overallBox}><Text style={s.overallTxt}>{overall} %</Text><Text style={s.overallHint}>{t('dog.partsAverage')}</Text></View>
 
-          <Text style={s.label}>Teilbereiche</Text>
+          <Text style={s.label}>{t('dog.parts')}</Text>
           {PART_LABELS.map(l => (
             <View key={l} style={s.stepRow}>
               <Text style={s.stepLabel}>{l}</Text>
@@ -83,7 +85,7 @@ export default function DogGoalEditor() {
           ))}
 
           <View style={{ height: 16 }} />
-          <AnyvoButton label="Speichern" icon="checkmark" onPress={save} loading={saving} />
+          <AnyvoButton label={t('common.save')} icon="checkmark" onPress={save} loading={saving} />
         </ScrollView>
       </SafeAreaView>
       {toast}

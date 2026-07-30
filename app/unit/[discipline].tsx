@@ -13,11 +13,13 @@ import { HeroImage } from '@/components/training/HeroImage';
 import { ExerciseCard } from '@/components/training/ExerciseCard';
 import { createTrainingUnit } from '@/services/trainingUnitService';
 import { useActiveTraining, startUnit, addExercise } from '@/stores/activeTraining';
+import { useT } from '@/i18n';
 
 const HERO_H = 260;
 
 export default function DisciplineScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const active = useActiveTraining();
   const params = useLocalSearchParams<{
@@ -33,7 +35,7 @@ export default function DisciplineScreen() {
       ? {
           key:       discipline ?? '',
           label:     params.label,
-          subtitle:  'Individuelles Training',
+          subtitle:  t('training.individualTraining'),
           emoji:     '⭐',
           icon:      (params.icon || 'ellipse-outline') as Discipline['icon'],
           accent:    params.accent || '#A78BFA',
@@ -55,14 +57,14 @@ export default function DisciplineScreen() {
 
   if (!disc) {
     return (
-      <SafeAreaView style={s.fallback}><Text style={s.fallbackTxt}>Unbekannte Sparte</Text></SafeAreaView>
+      <SafeAreaView style={s.fallback}><Text style={s.fallbackTxt}>{t('training.unknownDiscipline')}</Text></SafeAreaView>
     );
   }
 
   const handleChoose = async (name: string) => {
     const ownerId = session?.user.id;
     if (!ownerId || !dogId) {
-      Alert.alert('Fehler', 'Sitzung oder Hund fehlt.');
+      Alert.alert(t('common.error'), t('training.sessionOrDogMissing'));
       return;
     }
 
@@ -73,7 +75,7 @@ export default function DisciplineScreen() {
       const { data, error } = await createTrainingUnit(ownerId, dogId);
       creating.current = false;
       if (error || !data) {
-        Alert.alert('Fehler', error?.message ?? 'Einheit konnte nicht gestartet werden.');
+        Alert.alert(t('common.error'), error?.message ?? t('training.startError'));
         return;
       }
       startUnit({ unitId: data.id, dogId, dogName: dogName || null });
@@ -105,7 +107,7 @@ export default function DisciplineScreen() {
         </Animated.View>
 
         <View style={s.body}>
-          <Text style={s.label}>WÄHLE DEINE ÜBUNG</Text>
+          <Text style={s.label}>{t('training.chooseExercise')}</Text>
           <View style={s.grid}>
             {disc.exercises.map(ex => (
               <ExerciseCard key={ex} name={ex} accent={disc.accent} icon={disc.icon} onPress={() => handleChoose(ex)} />

@@ -4,6 +4,7 @@ import { useFabBottom } from '@/hooks/useFabBottom';
 import { C } from '@/constants/colors';
 import { QUALITY_LABEL } from '@/features/tracking/engine/gpsQuality';
 import { GpsQualityBadge } from '@/features/tracking/components/GpsQualityBadge';
+import { useT } from '@/i18n';
 import type { WarmupState } from '@/features/tracking/hooks/useGpsWarmup';
 
 const TITLE: Record<WarmupState['phase'], string> = {
@@ -23,6 +24,7 @@ export function WarmupOverlay({
   onStart: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useT();
   const { phase, accuracy, quality, canStart, warning, engineLabel } = state;
   const blocked = phase === 'denied' || phase === 'error';
   const actionsBottom = useFabBottom(24);
@@ -38,13 +40,13 @@ export function WarmupOverlay({
         {phase === 'ready' && <Ionicons name="checkmark-circle" size={56} color={C.trackPrimary} />}
         {blocked && <Ionicons name="warning" size={52} color={C.trackWarning} />}
 
-        <Text style={s.title}>{TITLE[phase]}</Text>
+        <Text style={s.title}>{t(`track.warmup.${phase}` as never)}</Text>
 
         {!blocked && (
           <>
             <GpsQualityBadge accuracy={accuracy} showMessage={false} />
             <Text style={s.sub}>
-              {quality ? QUALITY_LABEL[quality] : 'Suche Satelliten…'}
+              {quality ? QUALITY_LABEL[quality] : t('track.searchSatellites')}
               {accuracy != null ? `  ·  ±${accuracy.toFixed(0)} m` : ''}
             </Text>
           </>
@@ -58,11 +60,11 @@ export function WarmupOverlay({
         {canStart && !blocked && (
           <TouchableOpacity style={s.startBtn} onPress={onStart} activeOpacity={0.85}>
             <Ionicons name="play" size={18} color={C.accentText} />
-            <Text style={s.startTxt}>{phase === 'imprecise' ? 'Trotzdem starten' : 'Aufnahme starten'}</Text>
+            <Text style={s.startTxt}>{phase === 'imprecise' ? t('track.startAnyway') : t('track.startRecording')}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity style={s.cancelBtn} onPress={onCancel} activeOpacity={0.85}>
-          <Text style={s.cancelTxt}>Abbrechen</Text>
+          <Text style={s.cancelTxt}>{t('common.cancel')}</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -25,12 +25,14 @@ import { addDog } from '@/services/dogs';
 import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
 import { uploadDogImage } from '@/services/storage';
 import { useSession } from '@/hooks/useSession';
+import { useT } from '@/i18n';
 
 type Geschlecht = 'male' | 'female' | null;
 
 export default function HundHinzufuegenScreen() {
   const router      = useRouter();
   const { session } = useSession();
+  const { t } = useT();
 
   const [name,        setName]        = useState('');
   const [rasse,       setRasse]       = useState('');
@@ -60,7 +62,7 @@ export default function HundHinzufuegenScreen() {
     if (Platform.OS !== 'android') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        setFehler('Fotos nicht zugänglich — Einstellungen → Expo Go → Fotos → aktivieren');
+        setFehler(t('dog.photoPermissionError'));
         return;
       }
     }
@@ -81,7 +83,7 @@ export default function HundHinzufuegenScreen() {
   };
 
   const handleSpeichern = async () => {
-    if (!name.trim()) { setFehler('Bitte gib deinem Hund einen Namen 🐾'); return; }
+    if (!name.trim()) { setFehler(t('dog.nameRequired')); return; }
     if (!session?.user.id) return;
 
     setLaden(true);
@@ -96,8 +98,8 @@ export default function HundHinzufuegenScreen() {
         setLaden(false);
         setFehler(
           uploadErr instanceof Error
-            ? `Foto noch nicht hochgeladen — versuch es nochmal! (${uploadErr.message})`
-            : 'Foto noch nicht hochgeladen — versuch es nochmal!'
+            ? t('dog.photoUploadErrorWithMessage', { message: uploadErr.message })
+            : t('dog.photoUploadError')
         );
         return;
       }
@@ -131,7 +133,7 @@ export default function HundHinzufuegenScreen() {
     setLaden(false);
     if (err) {
       haptic.error();
-      setFehler(`Noch nicht gespeichert — versuch es nochmal! (${err.message})`);
+      setFehler(t('dog.saveError', { message: err.message }));
       return;
     }
     haptic.success();
@@ -144,8 +146,8 @@ export default function HundHinzufuegenScreen() {
 
       <View style={s.kopf}>
         <View>
-          <Text style={s.augenbraue}>NEUES PROFIL</Text>
-          <Text style={s.titel}>Hund hinzufügen</Text>
+          <Text style={s.augenbraue}>{t('dog.newProfile')}</Text>
+          <Text style={s.titel}>{t('dog.add')}</Text>
         </View>
         <TouchableOpacity style={s.schliessenBtn} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="close" size={18} color={C.white} />
@@ -175,7 +177,7 @@ export default function HundHinzufuegenScreen() {
                   ) : (
                     <>
                       <Ionicons name="camera" size={14} color={C.white} />
-                      <Text style={s.bildAendernText}>Ändern</Text>
+                      <Text style={s.bildAendernText}>{t('dog.photoChange')}</Text>
                     </>
                   )}
                 </View>
@@ -197,8 +199,8 @@ export default function HundHinzufuegenScreen() {
                           <Ionicons name="camera-outline" size={30} color={C.accent} />
                         </View>
                       </View>
-                      <Text style={s.bildPlaceholderTitel}>Foto hinzufügen</Text>
-                      <Text style={s.bildPlaceholderUnter}>Wähle ein Bild aus deiner Galerie</Text>
+                      <Text style={s.bildPlaceholderTitel}>{t('dog.photoAdd')}</Text>
+                      <Text style={s.bildPlaceholderUnter}>{t('dog.photoHint')}</Text>
                     </>
                   )}
                 </View>
@@ -209,23 +211,23 @@ export default function HundHinzufuegenScreen() {
 
           <View style={s.felder}>
             <Input
-              label="Name *"
-              placeholder="z. B. Rex"
+              label={t('dog.name')}
+              placeholder={t('dog.namePlaceholder')}
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
             />
 
             <Input
-              label="Rasse"
-              placeholder="z. B. Malinois"
+              label={t('dog.breed')}
+              placeholder={t('dog.breedPlaceholder')}
               value={rasse}
               onChangeText={setRasse}
               autoCapitalize="words"
             />
 
             <View>
-              <Text style={s.feldLabel}>GESCHLECHT</Text>
+              <Text style={s.feldLabel}>{t('dog.gender')}</Text>
               <View style={s.geschlechtReihe}>
                 {(['male', 'female'] as const).map((g) => {
                   const aktiv = geschlecht === g;
@@ -250,7 +252,7 @@ export default function HundHinzufuegenScreen() {
                         color={aktiv ? C.accentText : C.muted}
                       />
                       <Text style={[s.geschlechtText, aktiv && s.geschlechtTextAktiv]}>
-                        {g === 'male' ? 'Rüde' : 'Hündin'}
+                        {g === 'male' ? t('dog.male') : t('dog.female')}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -259,71 +261,71 @@ export default function HundHinzufuegenScreen() {
             </View>
 
             <DateField
-              label="Geburtsdatum"
+              label={t('dog.birthDate')}
               value={birth}
               onChange={setBirth}
               onClear={() => setBirth(null)}
               maximumDate={new Date()}
-              placeholder="Datum wählen"
+              placeholder={t('dog.datePlaceholder')}
             />
 
             <Input
-              label="Gewicht (kg)"
-              placeholder="z. B. 28,5"
+              label={t('dog.weight')}
+              placeholder={t('dog.weightPlaceholder')}
               value={gewichtKg}
               onChangeText={setGewichtKg}
               keyboardType="decimal-pad"
             />
 
             <Input
-              label="Leistungsabzeichen"
-              placeholder="z. B. IGP 3, IBGH 3, Obedience"
+              label={t('dog.titles')}
+              placeholder={t('dog.titlesPlaceholder')}
               value={titel}
               onChangeText={setTitel}
               autoCapitalize="characters"
             />
           </View>
 
-          <Text style={s.gruppeLabel}>ABSTAMMUNG</Text>
+          <Text style={s.gruppeLabel}>{t('dog.lineage')}</Text>
           <View style={s.felder}>
             <Input
-              label="Vater"
-              placeholder="Name des Vaters"
+              label={t('dog.sire')}
+              placeholder={t('dog.sirePlaceholder')}
               value={vater}
               onChangeText={setVater}
               autoCapitalize="words"
             />
             <Input
-              label="Mutter"
-              placeholder="Name der Mutter"
+              label={t('dog.dam')}
+              placeholder={t('dog.damPlaceholder')}
               value={mutter}
               onChangeText={setMutter}
               autoCapitalize="words"
             />
             <Input
-              label="Zuchtstätte / Zwinger"
-              placeholder="z. B. vom Haus Milinski"
+              label={t('dog.kennel')}
+              placeholder={t('dog.kennelPlaceholder')}
               value={zwinger}
               onChangeText={setZwinger}
               autoCapitalize="words"
             />
           </View>
 
-          <Text style={s.gruppeLabel}>SPORT</Text>
+          <Text style={s.gruppeLabel}>{t('dog.sport')}</Text>
           <View style={s.felder}>
-            <ChipSelect label="SPARTE" options={DOG_DISCIPLINES} value={sparte} onChange={setSparte} />
-            <ChipSelect label="STUFE" options={DOG_LEVELS} value={stufe} onChange={setStufe} />
-            <Input label="Bestwert" placeholder="z. B. 98 / 96 / 97" value={bestwert} onChangeText={setBestwert} />
+            <ChipSelect label={t('dog.discipline')} options={DOG_DISCIPLINES} value={sparte} onChange={setSparte} />
+            <ChipSelect label={t('dog.level')} options={DOG_LEVELS} value={stufe} onChange={setStufe} />
+            <Input label={t('dog.bestScore')} placeholder={t('dog.bestScorePlaceholder')} value={bestwert} onChangeText={setBestwert} />
           </View>
 
-          <Text style={s.gruppeLabel}>IDENTITÄT</Text>
+          <Text style={s.gruppeLabel}>{t('dog.identity')}</Text>
           <View style={s.felder}>
-            <Input label="Farbe" placeholder="z. B. schwarz-marken" value={farbe} onChangeText={setFarbe} autoCapitalize="words" />
-            <Input label="Mikrochip-Nr." placeholder="15-stellige Chipnummer" value={mikrochip} onChangeText={setMikrochip} keyboardType="numbers-and-punctuation" />
+            <Input label={t('dog.color')} placeholder={t('dog.colorPlaceholder')} value={farbe} onChangeText={setFarbe} autoCapitalize="words" />
+            <Input label={t('dog.microchip')} placeholder={t('dog.microchipPlaceholder')} value={mikrochip} onChangeText={setMikrochip} keyboardType="numbers-and-punctuation" />
             <TouchableOpacity style={[s.tassoRow, tasso && s.tassoRowAktiv]} onPress={() => setTasso(t => !t)} activeOpacity={0.85}>
               <View style={{ flex: 1 }}>
-                <Text style={s.tassoTitel}>Bei Tasso registriert</Text>
-                <Text style={s.tassoUnter}>Haustier-Zentralregister</Text>
+                <Text style={s.tassoTitel}>{t('dog.tassoTitle')}</Text>
+                <Text style={s.tassoUnter}>{t('dog.tassoSub')}</Text>
               </View>
               <View style={[s.switch, tasso && s.switchOn]}>
                 <View style={[s.knob, tasso && s.knobOn]} />
@@ -331,11 +333,11 @@ export default function HundHinzufuegenScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={s.gruppeLabel}>GESUNDHEIT</Text>
+          <Text style={s.gruppeLabel}>{t('dog.health')}</Text>
           <View style={s.felder}>
-            <Input label="Tierarzt" placeholder="Praxis / Name" value={tierarzt} onChangeText={setTierarzt} autoCapitalize="words" />
-            <Input label="Impfung" placeholder="z. B. Tollwut 03/2026" value={impfung} onChangeText={setImpfung} />
-            <Input label="Futter" placeholder="z. B. Royal Canin" value={futter} onChangeText={setFutter} autoCapitalize="words" />
+            <Input label={t('dog.vet')} placeholder={t('dog.vetPlaceholder')} value={tierarzt} onChangeText={setTierarzt} autoCapitalize="words" />
+            <Input label={t('dog.vaccination')} placeholder={t('dog.vaccinationPlaceholder')} value={impfung} onChangeText={setImpfung} />
+            <Input label={t('dog.food')} placeholder={t('dog.foodPlaceholder')} value={futter} onChangeText={setFutter} autoCapitalize="words" />
           </View>
 
           {fehler ? (
@@ -345,7 +347,7 @@ export default function HundHinzufuegenScreen() {
             </View>
           ) : null}
 
-          <Button label="Hund speichern" onPress={handleSpeichern} loading={laden} />
+          <Button label={t('dog.save')} onPress={handleSpeichern} loading={laden} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

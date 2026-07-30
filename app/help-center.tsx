@@ -2,11 +2,13 @@ import { GuidedTour } from '@/components/help/GuidedTour';
 import { HelpSheet } from '@/components/help/HelpSheet';
 import { C } from '@/constants/colors';
 import {
-  HELP_CATEGORY_LABEL,
+  HELP_CATEGORY_LABEL_KEY,
   HELP_CATEGORY_ORDER,
+  HELP_TOPIC_TITLE_KEY,
   topicsByCategory,
   type HelpTopic,
 } from '@/features/help/helpRegistry';
+import { useT } from '@/i18n';
 import { resetHelpSeen } from '@/stores/helpSeen';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -22,16 +24,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // jeder Eintrag öffnet eine kompakte Anleitung.
 export default function HelpCenterScreen() {
   const router = useRouter();
+  const { t } = useT();
   const [topic, setTopic] = useState<HelpTopic | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
 
   const onReset = () => {
     Alert.alert(
-      'Alle Hinweise erneut anzeigen',
-      'Möchtest du alle Einführungshinweise zurücksetzen?',
+      t('help.resetAll'),
+      t('help.resetAllBody'),
       [
-        { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Zurücksetzen', style: 'destructive', onPress: () => resetHelpSeen() },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('home.resetConfirm'), style: 'destructive', onPress: () => resetHelpSeen() },
       ],
     );
   };
@@ -44,13 +47,13 @@ export default function HelpCenterScreen() {
           onPress={() => router.back()}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Zurück"
+          accessibilityLabel={t('common.back')}
         >
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerSub}>HILFE</Text>
-          <Text style={s.headerTitle}>Hilfe & ANYVO kennenlernen</Text>
+          <Text style={s.headerSub}>{t('help.centerEyebrow')}</Text>
+          <Text style={s.headerTitle}>{t('help.centerTitle')}</Text>
         </View>
       </View>
 
@@ -61,14 +64,14 @@ export default function HelpCenterScreen() {
           onPress={() => setTourOpen(true)}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel="ANYVO kennenlernen, geführter Rundgang"
+          accessibilityLabel={t('help.tourTitle')}
         >
           <View style={s.tourIcon}>
             <Ionicons name="compass-outline" size={22} color={C.accentText} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.tourTitle}>ANYVO kennenlernen</Text>
-            <Text style={s.tourSub}>Kurzer geführter Rundgang in 6 Schritten</Text>
+            <Text style={s.tourTitle}>{t('help.tourTitle')}</Text>
+            <Text style={s.tourSub}>{t('help.tourSub')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={C.accentText} />
         </TouchableOpacity>
@@ -79,7 +82,7 @@ export default function HelpCenterScreen() {
           if (topics.length === 0) return null;
           return (
             <View key={cat}>
-              <Text style={s.abschnitt}>{HELP_CATEGORY_LABEL[cat].toUpperCase()}</Text>
+              <Text style={s.abschnitt}>{t(HELP_CATEGORY_LABEL_KEY[cat]).toUpperCase()}</Text>
               <View style={s.karte}>
                 {topics.map((tp, i) => (
                   <TouchableOpacity
@@ -88,9 +91,9 @@ export default function HelpCenterScreen() {
                     onPress={() => setTopic(tp)}
                     activeOpacity={0.7}
                     accessibilityRole="button"
-                    accessibilityLabel={tp.title}
+                    accessibilityLabel={t(HELP_TOPIC_TITLE_KEY[tp.id])}
                   >
-                    <Text style={s.zeileLabel}>{tp.title}</Text>
+                    <Text style={s.zeileLabel}>{t(HELP_TOPIC_TITLE_KEY[tp.id])}</Text>
                     <Ionicons name="chevron-forward" size={16} color={C.subtle} />
                   </TouchableOpacity>
                 ))}
@@ -100,16 +103,16 @@ export default function HelpCenterScreen() {
         })}
 
         {/* ── HÄUFIGE FRAGEN (bestehende FAQ) ── */}
-        <Text style={s.abschnitt}>MEHR</Text>
+        <Text style={s.abschnitt}>{t('help.moreSection')}</Text>
         <View style={s.karte}>
           <TouchableOpacity
             style={s.zeile}
             onPress={() => router.push('/help')}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="Häufige Fragen"
+            accessibilityLabel={t('help.faq')}
           >
-            <Text style={s.zeileLabel}>Häufige Fragen & Support</Text>
+            <Text style={s.zeileLabel}>{t('help.faqSupport')}</Text>
             <Ionicons name="chevron-forward" size={16} color={C.subtle} />
           </TouchableOpacity>
         </View>
@@ -120,10 +123,10 @@ export default function HelpCenterScreen() {
           onPress={onReset}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Alle Hinweise erneut anzeigen"
+          accessibilityLabel={t('help.resetAll')}
         >
           <Ionicons name="refresh-outline" size={18} color={C.accent} />
-          <Text style={s.resetText}>Alle Hinweise erneut anzeigen</Text>
+          <Text style={s.resetText}>{t('help.resetAll')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 60 }} />

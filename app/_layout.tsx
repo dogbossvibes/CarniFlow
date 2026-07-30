@@ -20,6 +20,7 @@ import { initMonitoring, captureError } from '@/lib/monitoring';
 import { SyncProvider } from '@/features/sync/components/SyncProvider';
 import { AppLockGate } from '@/components/AppLockGate';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { useT } from '@/i18n';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
 void initMonitoring();
@@ -31,14 +32,15 @@ void useActiveFaehrten.getState().hydrate();
 // Globaler Fehler-Fallback: fängt Render-Fehler im gesamten Baum ab,
 // meldet sie und bietet einen Neustart-Button (statt Blank-Crash).
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const { t } = useT();
   useEffect(() => { captureError(error); }, [error]);
   return (
     <View style={eb.wrap}>
       <View style={eb.icon}><Ionicons name="alert-circle-outline" size={40} color={C.accent} /></View>
-      <Text style={eb.title}>Etwas ist schiefgelaufen</Text>
-      <Text style={eb.text}>Die App hatte einen kurzen Aussetzer. Versuch es nochmal.</Text>
+      <Text style={eb.title}>{t('common.appErrorTitle')}</Text>
+      <Text style={eb.text}>{t('common.appErrorBody')}</Text>
       <TouchableOpacity style={eb.btn} onPress={retry} activeOpacity={0.85}>
-        <Text style={eb.btnText}>Erneut versuchen</Text>
+        <Text style={eb.btnText}>{t('connect.retry')}</Text>
       </TouchableOpacity>
     </View>
   );

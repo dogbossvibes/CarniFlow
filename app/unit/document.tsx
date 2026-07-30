@@ -29,6 +29,7 @@ import { tapHaptic, successHaptic } from '@/lib/haptics';
 import type { AudioNote } from '@/types';
 import type { TrainingMetrics } from '@/types/analytics';
 import type { TrainingUnit } from '@/types/trainingUnit';
+import { useT } from '@/i18n';
 
 const EMPTY_METRICS: TrainingMetrics = {
   motivation: null, konzentration: null, praezision: null,
@@ -42,6 +43,7 @@ interface SelExercise { discipline: string; name: string }
 
 export default function DocumentScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { id, duration, dogId: dogIdParam, discipline: discParam, note: noteParam } =
     useLocalSearchParams<{ id?: string; duration?: string; dogId?: string; discipline?: string; note?: string }>();
   const editing = !!id;
@@ -164,7 +166,7 @@ export default function DocumentScreen() {
       ? await updateDocumentedUnit(id!, payload, exercises)
       : (await createDocumentedUnit(session.user.id, payload, exercises));
     setSaving(false);
-    if (error) { Alert.alert('Fehler', error.message ?? 'Konnte nicht gespeichert werden.'); return; }
+    if (error) { Alert.alert(t('common.error'), error.message ?? t('training.saveError')); return; }
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
@@ -179,8 +181,8 @@ export default function DocumentScreen() {
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View>
-          <Text style={s.eyebrow}>TRAININGSTAGEBUCH</Text>
-          <Text style={s.title}>{editing ? 'Training bearbeiten' : 'Training dokumentieren'}</Text>
+          <Text style={s.eyebrow}>{t('training.diary')}</Text>
+          <Text style={s.title}>{editing ? t('training.editTraining') : t('training.documentTraining')}</Text>
         </View>
         <View style={{ flex: 1 }} />
         <HelpButton topicId="document_training" autoShow tint={C.white} />
@@ -191,7 +193,7 @@ export default function DocumentScreen() {
           {/* Hund */}
           {dogs.length > 1 && (
             <>
-              <Text style={s.label}>HUND</Text>
+              <Text style={s.label}>{t('training.dogLabel')}</Text>
               <View style={s.chipRow}>
                 {dogs.map(d => {
                   const aktiv = dogId === d.id;
@@ -207,7 +209,7 @@ export default function DocumentScreen() {
           )}
 
           {/* Sparte */}
-          <Text style={s.label}>SPARTE</Text>
+          <Text style={s.label}>{t('training.disciplineLabel')}</Text>
           <View style={s.chipRow}>
             {disciplines.map(d => {
               const aktiv = activeDisc === d.key;
@@ -223,7 +225,7 @@ export default function DocumentScreen() {
           {/* Übungen (Mehrfachauswahl) */}
           {disc && (
             <>
-              <Text style={s.label}>ÜBUNGEN · {disc.label.toUpperCase()}</Text>
+              <Text style={s.label}>{t('training.exercisesFor', { discipline: disc.label.toUpperCase() })}</Text>
               <View style={s.chipRow}>
                 {disc.exercises.filter(e => e !== 'Eigene Übung').map(ex => {
                   const aktiv = isSelected(disc.label, ex);
@@ -236,7 +238,7 @@ export default function DocumentScreen() {
               </View>
               {/* Eigene Übung */}
               <View style={s.customRow}>
-                <TextInput style={[s.input, s.flex]} placeholder="Eigene Übung…" placeholderTextColor={C.placeholder} value={customDraft} onChangeText={setCustomDraft} onSubmitEditing={addCustom} returnKeyType="done" />
+                <TextInput style={[s.input, s.flex]} placeholder={t('training.customExercisePlaceholder')} placeholderTextColor={C.placeholder} value={customDraft} onChangeText={setCustomDraft} onSubmitEditing={addCustom} returnKeyType="done" />
                 <TouchableOpacity style={[s.addBtn, { backgroundColor: disc.accent }]} onPress={addCustom} activeOpacity={0.8}>
                   <Ionicons name="add" size={22} color="#000" />
                 </TouchableOpacity>
@@ -247,7 +249,7 @@ export default function DocumentScreen() {
           {/* Ausgewählte Übungen */}
           {selected.length > 0 && (
             <>
-              <Text style={s.label}>AUSGEWÄHLT ({selected.length})</Text>
+              <Text style={s.label}>{t('training.selectedCount', { count: selected.length })}</Text>
               <View style={s.chipRow}>
                 {selected.map((e, i) => (
                   <TouchableOpacity key={`${e.discipline}-${e.name}`} style={s.selChip} onPress={() => { tapHaptic(); setSelected(prev => prev.filter((_, idx) => idx !== i)); }} activeOpacity={0.8}>
@@ -261,18 +263,18 @@ export default function DocumentScreen() {
           )}
 
           {/* Beschreibung */}
-          <Text style={s.label}>WAS WURDE TRAINIERT?</Text>
-          <TextInput style={s.textarea} placeholder="Beschreibe die Einheit…" placeholderTextColor={C.placeholder} value={description} onChangeText={setDescription} multiline />
+          <Text style={s.label}>{t('training.descriptionLabel')}</Text>
+          <TextInput style={s.textarea} placeholder={t('training.descriptionPlaceholder')} placeholderTextColor={C.placeholder} value={description} onChangeText={setDescription} multiline />
 
           {/* Datum + Dauer */}
-          <Text style={s.label}>DATUM</Text>
+          <Text style={s.label}>{t('training.dateLabel')}</Text>
           <DateField value={date} onChange={setDate} maximumDate={new Date()} />
 
-          <Text style={s.label}>DAUER</Text>
+          <Text style={s.label}>{t('training.durationLabel')}</Text>
           <DurationDrumPicker value={durationMin} onChange={setDurationMin} />
 
           {/* Bewertung 1–10 */}
-          <Text style={[s.label, { marginTop: 22 }]}>GESAMTBEWERTUNG</Text>
+          <Text style={[s.label, { marginTop: 22 }]}>{t('training.ratingLabel')}</Text>
           <View style={s.scoreRow}>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => {
               const aktiv = score >= n;
@@ -285,31 +287,31 @@ export default function DocumentScreen() {
           </View>
 
           {/* Fotos */}
-          <Text style={[s.label, { marginTop: 22 }]}>FOTOS</Text>
+          <Text style={[s.label, { marginTop: 22 }]}>{t('training.photosLabel')}</Text>
           <PhotoPicker value={photos} onChange={setPhotos} />
 
           {/* Videos */}
-          <Text style={[s.label, { marginTop: 22 }]}>VIDEOS</Text>
+          <Text style={[s.label, { marginTop: 22 }]}>{t('training.videosLabel')}</Text>
           <MultiVideoUpload value={videos} onChange={setVideos} />
 
           {/* Metriken (optional, Basis für KI-Auswertung) */}
-          <Text style={[s.label, { marginTop: 22 }]}>METRIKEN (OPTIONAL)</Text>
+          <Text style={[s.label, { marginTop: 22 }]}>{t('training.metricsLabel')}</Text>
           <MetricsInput value={metrics} onChange={setMetrics} />
 
           {/* Sprachaufnahmen */}
-          <Text style={[s.label, { marginTop: 22 }]}>SPRACHAUFNAHMEN</Text>
+          <Text style={[s.label, { marginTop: 22 }]}>{t('training.voiceRecordingsLabel')}</Text>
           <AudioRecorder value={audio} onChange={setAudio} />
 
           {/* Speichern */}
           {!canSave && (
             <Text style={s.saveHint}>
-              {!dogId ? 'Wähle oben einen Hund, um zu speichern.' : 'Wähle mindestens eine Übung, um zu speichern.'}
+              {!dogId ? t('training.chooseDogSaveHint') : t('training.chooseExerciseSaveHint')}
             </Text>
           )}
           <AnimatedPressable style={[s.saveBtn, !canSave && { opacity: 0.4 }]} scale={0.97} disabled={!canSave || saving} onPress={speichern}>
             <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
-            <Text style={s.saveTxt}>{saving ? 'Speichert…' : editing ? 'Änderungen speichern' : 'Einheit speichern'}</Text>
+            <Text style={s.saveTxt}>{saving ? t('common.saving') : editing ? t('training.saveChanges') : t('training.saveUnit')}</Text>
           </AnimatedPressable>
 
           <View style={{ height: 60 }} />

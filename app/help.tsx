@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useT } from '@/i18n';
 
 const SUPPORT_EMAIL = 'shadesofym@gmail.com';
 
@@ -23,49 +24,20 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-interface Faq {
-  frage:   string;
-  antwort: string;
-}
-
-const FAQS: Faq[] = [
-  {
-    frage:   'Wie lege ich einen Hund an?',
-    antwort: 'Tippe auf der Startseite oder im Hunde-Bereich auf „+" und fülle Name, Rasse, Geburtsdatum und optional ein Foto aus. Du kannst die Angaben später jederzeit über „Bearbeiten" anpassen.',
-  },
-  {
-    frage:   'Wie erfasse ich eine Trainingseinheit?',
-    antwort: 'Über den „+"-Button startest du eine neue Einheit. Wähle den Hund, die Kategorie und füge deine Übungen mit Bewertung, Dauer und Notizen hinzu. Fotos, Videos und Sprachnotizen kannst du direkt anhängen.',
-  },
-  {
-    frage:   'Wie bewerte ich die Leistung meines Hundes?',
-    antwort: 'Pro Übung kannst du Metriken wie Motivation, Konzentration, Präzision, Ausdauer, Trieblage und Impulskontrolle bewerten. Diese fliessen in deine Fortschrittsanalysen ein.',
-  },
-  {
-    frage:   'Wie verbinde ich mich mit einem Trainer?',
-    antwort: 'Unter Profil → Trainer → „Meine Trainer" kannst du eine Verbindung herstellen. Markierst du eine Einheit als „geteilt", sieht deine Trainer:in sie inklusive Übungen, Notizen und Medien und kann sie kommentieren. Du kannst das pro Einheit widerrufen oder die Verbindung jederzeit trennen.',
-  },
-  {
-    frage:   'Wie aktiviere ich Benachrichtigungen?',
-    antwort: 'Unter Profil → Konto → „Benachrichtigungen" kannst du sie per Schalter aktivieren. Falls sie vom System blockiert sind, führt dich die App direkt in die Systemeinstellungen, um sie für ANYVO zu erlauben.',
-  },
-  {
-    frage:   'Was bringt mir Active?',
-    antwort: 'Active schaltet erweiterte Analysen, unbegrenzte Einheiten und den PDF-Export frei. Du kannst es im Profil mit dem 7-Tage-Gratis-Test starten.',
-  },
-  {
-    frage:   'Wie werden meine Daten geschützt?',
-    antwort: 'Alle Verbindungen sind TLS-verschlüsselt und der Zugriff ist über Row-Level Security auf dein Konto beschränkt. Details findest du in der Datenschutzerklärung unter Profil → Datenschutz.',
-  },
-  {
-    frage:   'Wie lösche ich mein Konto?',
-    antwort: 'Unter Profil → „Konto löschen" entfernst du dein Konto und alle zugehörigen Daten (Hunde, Einheiten, Notizen, Medien) unwiderruflich. Diese Aktion lässt sich nicht rückgängig machen.',
-  },
-];
-
 export default function HelpScreen() {
   const router = useRouter();
+  const { t } = useT();
   const [offen, setOffen] = useState<number | null>(null);
+  const faqs = [
+    { frage: t('help.faqDogQuestion'), antwort: t('help.faqDogAnswer') },
+    { frage: t('help.faqTrainingQuestion'), antwort: t('help.faqTrainingAnswer') },
+    { frage: t('help.faqRatingQuestion'), antwort: t('help.faqRatingAnswer') },
+    { frage: t('help.faqTrainerQuestion'), antwort: t('help.faqTrainerAnswer') },
+    { frage: t('help.faqNotificationsQuestion'), antwort: t('help.faqNotificationsAnswer') },
+    { frage: t('help.faqActiveQuestion'), antwort: t('help.faqActiveAnswer') },
+    { frage: t('help.faqDataQuestion'), antwort: t('help.faqDataAnswer') },
+    { frage: t('help.faqDeleteQuestion'), antwort: t('help.faqDeleteAnswer') },
+  ];
 
   const toggle = (i: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -78,7 +50,7 @@ export default function HelpScreen() {
     if (ok) {
       Linking.openURL(url);
     } else {
-      Alert.alert('Kontakt', `Schreib uns eine E-Mail an:\n${SUPPORT_EMAIL}`);
+      Alert.alert(t('help.contact'), t('help.mailFallback', { email: SUPPORT_EMAIL }));
     }
   };
 
@@ -89,8 +61,8 @@ export default function HelpScreen() {
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerSub}>SUPPORT</Text>
-          <Text style={s.headerTitle}>Hilfecenter</Text>
+          <Text style={s.headerSub}>{t('profile.secSupport')}</Text>
+          <Text style={s.headerTitle}>{t('help.faqSupport')}</Text>
         </View>
       </View>
 
@@ -100,16 +72,15 @@ export default function HelpScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={s.intro}>
-          Häufige Fragen rund um ANYVO. Findest du keine Antwort, melde dich
-          gerne direkt bei uns.
+          {t('help.intro')}
         </Text>
 
-        <Text style={s.abschnitt}>HÄUFIGE FRAGEN</Text>
+        <Text style={s.abschnitt}>{t('help.faqUpper')}</Text>
         <View style={s.faqWrap}>
-          {FAQS.map((f, i) => {
+          {faqs.map((f, i) => {
             const aktiv = offen === i;
             return (
-              <View key={f.frage} style={[s.faqItem, i < FAQS.length - 1 && s.faqTrenner]}>
+              <View key={f.frage} style={[s.faqItem, i < faqs.length - 1 && s.faqTrenner]}>
                 <TouchableOpacity
                   style={s.faqKopf}
                   onPress={() => toggle(i)}
@@ -128,13 +99,13 @@ export default function HelpScreen() {
           })}
         </View>
 
-        <Text style={s.abschnitt}>NOCH FRAGEN?</Text>
+        <Text style={s.abschnitt}>{t('help.moreQuestionsUpper')}</Text>
         <TouchableOpacity style={s.kontaktKarte} onPress={handleKontakt} activeOpacity={0.8}>
           <View style={s.kontaktIcon}>
             <Ionicons name="mail-outline" size={20} color={C.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.kontaktTitel}>Support kontaktieren</Text>
+            <Text style={s.kontaktTitel}>{t('help.contactSupport')}</Text>
             <Text style={s.kontaktSub}>{SUPPORT_EMAIL}</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={C.subtle} />

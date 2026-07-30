@@ -26,7 +26,7 @@ export function AICoachCard({ analysis }: Props) {
           </View>
           <View style={s.titleWrap}>
             <Text style={s.title}>{t('analyse.cardTitle')}</Text>
-            <Text style={s.sub}>Analyse & Empfehlung</Text>
+            <Text style={s.sub}>{t('analyse.cardSub')}</Text>
           </View>
         </View>
 

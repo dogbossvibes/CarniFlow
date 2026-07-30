@@ -3,18 +3,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { ProgressRing } from '@/components/ui/ProgressRing';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import type { DogGoal } from './types';
 
 // Ziel + Gesamtfortschritt + Teilfortschritte (Unterordnung/Fährte/Schutz).
 export function DogGoalsCard({ goal, onEdit }: { goal: DogGoal; onEdit: () => void }) {
+  const { t } = useT();
   if (!goal.title && goal.overallPct == null && goal.parts.length === 0) {
     return (
       <View style={s.wrap}>
         <View style={s.empty}>
           <Ionicons name="flag-outline" size={22} color={C.trackTextMut} />
-          <Text style={s.emptyTxt}>Noch kein Ziel gesetzt.</Text>
+          <Text style={s.emptyTxt}>{t('dog.noGoal')}</Text>
         </View>
-        <AnyvoButton label="Ziel hinzufügen" icon="add" variant="secondary" onPress={onEdit} />
+        <AnyvoButton label={t('dog.addGoal')} icon="add" variant="secondary" onPress={onEdit} />
       </View>
     );
   }
@@ -22,7 +24,7 @@ export function DogGoalsCard({ goal, onEdit }: { goal: DogGoal; onEdit: () => vo
     <View style={s.wrap}>
       <View style={s.card}>
         <View style={s.head}>
-          <ProgressRing progress={(goal.overallPct ?? 0) / 100} color={C.trackPrimary} label={goal.title ?? 'Ziel'} size={92} />
+          <ProgressRing progress={(goal.overallPct ?? 0) / 100} color={C.trackPrimary} label={goal.title ?? t('dog.goalFallback')} size={92} />
           <View style={s.parts}>
             {goal.parts.map(p => (
               <View key={p.label} style={s.partRow}>
@@ -34,7 +36,7 @@ export function DogGoalsCard({ goal, onEdit }: { goal: DogGoal; onEdit: () => vo
           </View>
         </View>
       </View>
-      <AnyvoButton label="Ziel bearbeiten" icon="create-outline" variant="secondary" onPress={onEdit} />
+      <AnyvoButton label={t('dog.editGoal')} icon="create-outline" variant="secondary" onPress={onEdit} />
     </View>
   );
 }

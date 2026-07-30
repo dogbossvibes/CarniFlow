@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import type { ScoreTrend } from '@/features/ai/types/aiCoach';
+import { useT } from '@/i18n';
 
 const DIR = {
   up:   { icon: 'trending-up' as const,   color: C.success },
@@ -11,10 +12,11 @@ const DIR = {
 
 // Score-Trends pro Sparte (letzte 3 vs. davor).
 export function ScoreTrendCard({ trends }: { trends: ScoreTrend[] }) {
+  const { t } = useT();
   if (trends.length === 0) return null;
   return (
     <View style={s.card}>
-      <Text style={s.eyebrow}>Score-Trends</Text>
+      <Text style={s.eyebrow}>{t('analyse.scoreTrends')}</Text>
       <View style={{ marginTop: 12 }}>
         {trends.map((t, i) => {
           const d = DIR[t.direction];

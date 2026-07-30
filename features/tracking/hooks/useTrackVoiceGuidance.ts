@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
 import { forwardDistanceFromDog } from '@/features/tracking/utils/searchGeometry';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import i18n, { type AppLocale } from '@/i18n/config';
+import type { TranslationKey } from '@/i18n/de-CH';
 
 // expo-speech defensiv laden (nativ; kein Crash, wenn das Modul fehlt).
 let Speech: typeof import('expo-speech') | null = null;
@@ -14,30 +16,50 @@ const SPEAK_GAP_MS     = 3500;   // Entprellung zwischen zwei Ansagen
 // arcM = Bogenlänge des Winkels entlang der gelegten Fährte (= marker.distance_from_start).
 export interface GuidanceAngle { id: string; arcM: number; angleKind: AngleKind | null }
 
-function say(msg: string) { try { Speech?.stop(); Speech?.speak(msg, { language: 'de-DE', rate: 1.0 }); } catch { /* ignore */ } }
+function speechLanguage(locale: AppLocale) {
+  if (locale === 'fr') return 'fr-FR';
+  return 'de-CH';
+}
+
+function getCurrentLocale(): AppLocale {
+  return (i18n.language as AppLocale) || 'de';
+}
+
+function translateKey(key: TranslationKey, params: Record<string, string | number>, locale: AppLocale) {
+  return i18n.t(key, { lng: locale, ...params }) as string;
+}
+
+function say(msg: string, locale: AppLocale = getCurrentLocale()) {
+  try { Speech?.stop(); Speech?.speak(msg, { language: speechLanguage(locale), rate: 1.0 }); } catch { /* ignore */ }
+}
+
+function inStepsText(steps: number, locale: AppLocale) {
+  return translateKey('track.voiceInSteps', { steps, plural: steps === 1 ? '' : 'en' }, locale);
+}
 
 // Sprechtext: Winkel/Spitzwinkel/Abriss inkl. Richtung, Distanz in GESCHÄTZTEN
 // Schritten („ca.", da aus GPS-Distanz abgeleitet — kein echter Pedometer).
-function phraseFor(kind: AngleKind | null, steps: number): string {
-  const inSteps = `in ca. ${steps} Schritt${steps === 1 ? '' : 'en'}`;
+function phraseFor(kind: AngleKind | null, steps: number, locale: AppLocale = getCurrentLocale()): string {
+  const inSteps = inStepsText(steps, locale);
+  const keyFor = (key: TranslationKey) => translateKey(key, { inSteps }, locale);
   switch (kind) {
-    case 'links':        return `Linkswinkel ${inSteps}.`;
-    case 'rechts':       return `Rechtswinkel ${inSteps}.`;
-    case 'spitz_links':  return `Spitzwinkel nach links ${inSteps}.`;
-    case 'spitz_rechts': return `Spitzwinkel nach rechts ${inSteps}.`;
-    case 'spitz':        return `Spitzwinkel ${inSteps}.`;
-    case 'abriss':       return `Abriss ${inSteps}.`;
-    case 'gw':           return `Geschlossener Winkel ${inSteps}.`;
-    case 'ow':           return `Offener Winkel ${inSteps}.`;
-    case 'bw':           return `Bodenwinkel ${inSteps}.`;
-    default:             return `Winkel ${inSteps}.`;
+    case 'links':        return keyFor('track.voiceLeft');
+    case 'rechts':       return keyFor('track.voiceRight');
+    case 'spitz_links':  return keyFor('track.voiceAcuteLeft');
+    case 'spitz_rechts': return keyFor('track.voiceAcuteRight');
+    case 'spitz':        return keyFor('track.voiceAcute');
+    case 'abriss':       return keyFor('track.voiceBreak');
+    case 'gw':           return keyFor('track.voiceGw');
+    case 'ow':           return keyFor('track.voiceOw');
+    case 'bw':           return keyFor('track.voiceBw');
+    default:             return keyFor('track.voiceAngle');
   }
 }
 
 // Gegenstand-Ansage (dog-basiert). Dübel wird namentlich angesagt, sonst „Gegenstand".
-export function objectPhrase(material: string | null | undefined, steps: number): string {
-  const inSteps = `in ca. ${steps} Schritt${steps === 1 ? '' : 'en'}`;
-  return material === 'duebel' ? `Dübel ${inSteps}.` : `Gegenstand ${inSteps}.`;
+export function objectPhrase(material: string | null | undefined, steps: number, locale: AppLocale = getCurrentLocale()): string {
+  const inSteps = inStepsText(steps, locale);
+  return translateKey(material === 'duebel' ? 'track.voiceDowel' : 'track.voiceObject', { inSteps }, locale);
 }
 
 // Ereignis-Kandidat für die Ansage (Winkel ODER Gegenstand), Distanz entlang der Bogenlänge.
@@ -77,11 +99,12 @@ export function useTrackVoiceGuidance(
       if (d != null && d < bestD) { bestD = d; best = c; }
     }
     if (best && bestD <= ANNOUNCE_AHEAD_M) {
+      const locale = getCurrentLocale();
       spokenRef.current.add(best.id);
       lastSpeakRef.current = now;
       // Distanz → geschätzte Schritte über die zentrale Utility (persönliche Schrittlänge optional).
       const steps = Math.max(1, metersToSteps(bestD, stepLengthM));
-      say(best.kind === 'angle' ? phraseFor(best.angleKind, steps) : objectPhrase(best.material, steps));
+      say(best.kind === 'angle' ? phraseFor(best.angleKind, steps, locale) : objectPhrase(best.material, steps, locale), locale);
     }
   }, [dogProgressM, angles, objects, voiceOn, stepLengthM]);
 

@@ -1,5 +1,11 @@
 import { C } from '@/constants/colors';
-import type { HelpTopic } from '@/features/help/helpRegistry';
+import {
+  HELP_TOPIC_BODY_KEYS,
+  HELP_TOPIC_SHORT_KEY,
+  HELP_TOPIC_TITLE_KEY,
+  type HelpTopic,
+} from '@/features/help/helpRegistry';
+import { useT } from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import {
   Modal, ScrollView, StyleSheet, Text,
@@ -15,7 +21,7 @@ export function HelpSheet({
   topic,
   onClose,
   onMore,
-  primaryLabel = 'Verstanden',
+  primaryLabel,
   showDetails = false,
 }: {
   visible: boolean;
@@ -25,28 +31,32 @@ export function HelpSheet({
   primaryLabel?: string;
   showDetails?: boolean;
 }) {
+  const { t } = useT();
   if (!topic) return null;
+  const title = t(HELP_TOPIC_TITLE_KEY[topic.id]);
+  const bodyKeys = HELP_TOPIC_BODY_KEYS[topic.id] ?? [];
+  const primaryText = primaryLabel ?? t('help.understood');
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose} accessibilityLabel="Hilfe schliessen">
+      <TouchableWithoutFeedback onPress={onClose} accessibilityLabel={t('help.close')}>
         <View style={s.backdrop} />
       </TouchableWithoutFeedback>
 
       <View style={s.wrap} pointerEvents="box-none">
         <SafeAreaView edges={['bottom']} style={s.safe}>
-          <View style={s.card} accessibilityViewIsModal accessibilityLabel={`Hilfe: ${topic.title}`}>
+          <View style={s.card} accessibilityViewIsModal accessibilityLabel={t('help.titleA11y', { title })}>
             <View style={s.kopf}>
               <View style={s.badge}>
                 <Ionicons name="help-circle" size={18} color={C.accent} />
               </View>
-              <Text style={s.title}>{topic.title}</Text>
+              <Text style={s.title}>{title}</Text>
             </View>
 
             <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 4 }} showsVerticalScrollIndicator={false}>
-              <Text style={s.text}>{topic.shortDescription}</Text>
-              {showDetails && topic.body?.map((p, i) => (
-                <Text key={i} style={s.detail}>{p}</Text>
+              <Text style={s.text}>{t(HELP_TOPIC_SHORT_KEY[topic.id])}</Text>
+              {showDetails && bodyKeys.map((key) => (
+                <Text key={key} style={s.detail}>{t(key)}</Text>
               ))}
             </ScrollView>
 
@@ -57,9 +67,9 @@ export function HelpSheet({
                   onPress={onMore}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityLabel="Mehr erfahren"
+                  accessibilityLabel={t('help.more')}
                 >
-                  <Text style={s.secondaryText}>Mehr erfahren</Text>
+                  <Text style={s.secondaryText}>{t('help.more')}</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -67,9 +77,9 @@ export function HelpSheet({
                 onPress={onClose}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel={primaryLabel}
+                accessibilityLabel={primaryText}
               >
-                <Text style={s.primaryText}>{primaryLabel}</Text>
+                <Text style={s.primaryText}>{primaryText}</Text>
               </TouchableOpacity>
             </View>
           </View>

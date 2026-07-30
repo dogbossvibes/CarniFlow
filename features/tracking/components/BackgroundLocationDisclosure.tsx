@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FT } from '@/constants/colors';
+import { useT } from '@/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Prominente In-App-Offenlegung (Google-Play-Pflicht) für den Hintergrund-
@@ -17,6 +18,7 @@ import { FT } from '@/constants/colors';
 export function BackgroundLocationDisclosure({
   visible, onCancel, onContinue,
 }: { visible: boolean; onCancel: () => void; onContinue: () => void }) {
+  const { t } = useT();
   return (
     <Modal
       visible={visible}
@@ -40,18 +42,16 @@ export function BackgroundLocationDisclosure({
               <Ionicons name="paw" size={26} color={FT.acc} />
             </View>
 
-            <Text style={s.title} accessibilityRole="header">Standort im Hintergrund</Text>
+            <Text style={s.title} accessibilityRole="header">{t('track.backgroundTitle')}</Text>
 
             <Text style={s.body}>
-              Während einer aktiven Fährtenaufnahme zeichnet Anyvo deinen Standort auch bei
-              gesperrtem Display oder wenn sich die App im Hintergrund befindet auf.
+              {t('track.backgroundBody1')}
             </Text>
             <Text style={s.body}>
-              Dadurch wird die Fährte vollständig und lückenlos aufgezeichnet.
+              {t('track.backgroundBody2')}
             </Text>
             <Text style={s.body}>
-              Der Standort wird ausschliesslich während einer aktiv gestarteten
-              Fährtenaufnahme verwendet.
+              {t('track.backgroundBody3')}
             </Text>
           </ScrollView>
 
@@ -61,18 +61,18 @@ export function BackgroundLocationDisclosure({
               onPress={onCancel}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel="Abbrechen"
+              accessibilityLabel={t('common.cancel')}
             >
-              <Text style={s.btnGhostText}>Abbrechen</Text>
+              <Text style={s.btnGhostText}>{t('common.cancel')}</Text>
             </Pressable>
             <Pressable
               style={[s.btn, s.btnPrimary]}
               onPress={onContinue}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel="Weiter"
+              accessibilityLabel={t('common.next')}
             >
-              <Text style={s.btnPrimaryText}>Weiter</Text>
+              <Text style={s.btnPrimaryText}>{t('common.next')}</Text>
             </Pressable>
           </View>
         </View>

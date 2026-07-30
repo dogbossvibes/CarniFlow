@@ -12,9 +12,11 @@ import { useProfile } from '@/hooks/useProfile';
 import { getMyClientConnections } from '@/services/connectionService';
 import { createPlan } from '@/services/trainingPlanService';
 import { successHaptic, tapHaptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 export default function PlanNeuScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const { profile } = useProfile();
 
@@ -37,12 +39,12 @@ export default function PlanNeuScreen() {
 
   const save = async () => {
     if (!session?.user.id) return;
-    if (!title.trim()) { Alert.alert('Titel fehlt', 'Bitte gib dem Plan einen Titel.'); return; }
+    if (!title.trim()) { Alert.alert(t('trainer.titleMissing'), t('trainer.titleMissingBody')); return; }
     const steps = stepsText.split('\n').map(s => s.trim()).filter(Boolean);
-    if (!steps.length) { Alert.alert('Schritte fehlen', 'Bitte trage mindestens einen Schritt ein (eine Zeile pro Schritt).'); return; }
+    if (!steps.length) { Alert.alert(t('trainer.stepsMissing'), t('trainer.stepsMissingBody')); return; }
 
     setSaving(true);
-    const { error } = await createPlan(session.user.id, profile?.trainer_name ?? profile?.full_name ?? 'Trainer', {
+    const { error } = await createPlan(session.user.id, profile?.trainer_name ?? profile?.full_name ?? t('trainer.planFallbackOwner'), {
       title:       title.trim(),
       discipline:  discipline.trim() || null,
       notes:       notes.trim() || null,
@@ -50,7 +52,7 @@ export default function PlanNeuScreen() {
       shared_with: shared,
     });
     setSaving(false);
-    if (error) { Alert.alert('Fehler', error); return; }
+    if (error) { Alert.alert(t('common.error'), error); return; }
     successHaptic();
     router.back();
   };
@@ -60,44 +62,44 @@ export default function PlanNeuScreen() {
       <View style={s.header}>
         <TouchableOpacity style={s.back} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={22} color={C.white} /></TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.eyebrow}>TRAINER</Text>
-          <Text style={s.title}>Neuer Plan</Text>
+          <Text style={s.eyebrow}>{t('trainer.eyebrow')}</Text>
+          <Text style={s.title}>{t('trainer.newPlan')}</Text>
         </View>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={s.label}>TITEL</Text>
-          <TextInput style={s.input} value={title} onChangeText={setTitle} placeholder="z. B. Aufbau Fährte 6 Wochen" placeholderTextColor={C.subtle} />
+          <Text style={s.label}>{t('trainer.planTitle')}</Text>
+          <TextInput style={s.input} value={title} onChangeText={setTitle} placeholder={t('trainer.planTitlePlaceholder')} placeholderTextColor={C.subtle} />
 
-          <Text style={[s.label, { marginTop: 18 }]}>DISZIPLIN  ·  optional</Text>
-          <TextInput style={s.input} value={discipline} onChangeText={setDiscipline} placeholder="z. B. Fährte" placeholderTextColor={C.subtle} />
+          <Text style={[s.label, { marginTop: 18 }]}>{t('trainer.disciplineOptional')}</Text>
+          <TextInput style={s.input} value={discipline} onChangeText={setDiscipline} placeholder={t('trainer.disciplinePlaceholder')} placeholderTextColor={C.subtle} />
 
-          <Text style={[s.label, { marginTop: 18 }]}>SCHRITTE  ·  eine Zeile pro Schritt</Text>
+          <Text style={[s.label, { marginTop: 18 }]}>{t('trainer.stepsLabel')}</Text>
           <TextInput
             style={[s.input, { minHeight: 140, textAlignVertical: 'top' }]}
             value={stepsText} onChangeText={setStepsText} multiline
-            placeholder={'Woche 1: Geruchsdifferenzierung\nWoche 2: Winkel üben\n…'}
+            placeholder={t('trainer.stepsPlaceholder')}
             placeholderTextColor={C.subtle}
           />
 
-          <Text style={[s.label, { marginTop: 18 }]}>NOTIZEN  ·  optional</Text>
+          <Text style={[s.label, { marginTop: 18 }]}>{t('trainer.notesOptional')}</Text>
           <TextInput
             style={[s.input, { minHeight: 80, textAlignVertical: 'top' }]}
             value={notes} onChangeText={setNotes} multiline
-            placeholder="Hinweise für die Kund:in…" placeholderTextColor={C.subtle}
+            placeholder={t('trainer.notesPlaceholder')} placeholderTextColor={C.subtle}
           />
 
-          <Text style={[s.label, { marginTop: 18 }]}>TEILEN MIT</Text>
+          <Text style={[s.label, { marginTop: 18 }]}>{t('trainer.shareWith')}</Text>
           {active.length === 0 ? (
-            <Text style={s.noClients}>Noch keine verbundenen Kund:innen.</Text>
+            <Text style={s.noClients}>{t('trainer.noConnectedClients')}</Text>
           ) : (
             active.map(c => {
               const on = shared.includes(c.id);
               return (
                 <TouchableOpacity key={c.id} style={[s.clientRow, on && s.clientRowOn]} onPress={() => { tapHaptic(); toggleShare(c.id); }} activeOpacity={0.8}>
                   <View style={[s.checkbox, on && s.checkboxOn]}>{on && <Ionicons name="checkmark" size={14} color={C.accentText} />}</View>
-                  <Text style={s.clientName}>{c.name ?? 'Kunde'}</Text>
+                  <Text style={s.clientName}>{c.name ?? t('trainer.clientFallback')}</Text>
                 </TouchableOpacity>
               );
             })
@@ -108,7 +110,7 @@ export default function PlanNeuScreen() {
       </KeyboardAvoidingView>
 
       <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving} activeOpacity={0.9}>
-        {saving ? <ActivityIndicator color={C.accentText} /> : <Text style={s.saveTxt}>Plan speichern</Text>}
+        {saving ? <ActivityIndicator color={C.accentText} /> : <Text style={s.saveTxt}>{t('trainer.savePlan')}</Text>}
       </TouchableOpacity>
     </SafeAreaView>
   );

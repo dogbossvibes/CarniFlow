@@ -69,7 +69,7 @@ export default function TimerScreen() {
   // Minimal speichern: nur Dauer + Datum + Hund, ohne Sparte/Übungen/Notizen.
   const doSave = async (dogId: string) => {
     const ownerId = session?.user.id;
-    if (!ownerId) { Alert.alert('Fehler', 'Sitzung fehlt.'); return; }
+    if (!ownerId) { Alert.alert(t('common.error'), t('training.sessionMissing')); return; }
     const ended = new Date();
     const { error } = await createDocumentedUnit(ownerId, {
       dog_id:       dogId,
@@ -81,7 +81,7 @@ export default function TimerScreen() {
       shared_with_trainer: false,
       ...EMPTY_METRICS,
     }, []);
-    if (error) { haptic.error(); Alert.alert('Fehler', error.message ?? 'Konnte nicht gespeichert werden.'); return; }
+    if (error) { haptic.error(); Alert.alert(t('common.error'), error.message ?? t('training.saveError')); return; }
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
@@ -90,11 +90,11 @@ export default function TimerScreen() {
 
   const saveWithoutDoc = () => {
     if (dogId) { void doSave(dogId); return; }   // Hund aus Kontext bekannt → direkt speichern
-    if (dogs.length === 0) { Alert.alert('Kein Hund', 'Lege zuerst einen Hund an.'); return; }
+    if (dogs.length === 0) { Alert.alert(t('training.noDogTitle'), t('training.noDogBody')); return; }
     if (dogs.length === 1) { void doSave(dogs[0].id); return; }
-    Alert.alert('Für welchen Hund?', undefined, [
+    Alert.alert(t('training.chooseDogTitle'), undefined, [
       ...dogs.map(d => ({ text: d.name, onPress: () => void doSave(d.id) })),
-      { text: 'Abbrechen', style: 'cancel' as const },
+      { text: t('common.cancel'), style: 'cancel' as const },
     ]);
   };
 
@@ -102,7 +102,7 @@ export default function TimerScreen() {
   // bekannte Kontext (Hund/Sparte/Notiz) wird an die Dokumentation weitergereicht.
   const finish = () => {
     tapHaptic();
-    Alert.alert(t('timer.endTitle'), `${formatTime(elapsed)} trainiert.`, [
+    Alert.alert(t('timer.endTitle'), t('timer.trainedDuration', { duration: formatTime(elapsed) }), [
       { text: t('timer.document'), onPress: () => router.replace({ pathname: '/unit/document', params: {
         duration: String(elapsed),
         ...(dogId ? { dogId } : {}),

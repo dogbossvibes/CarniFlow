@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { fmtTime, relativeDayLabel } from '@/lib/eventFormat';
 import { eventMeta, type CalendarEvent } from '@/types/calendar';
 
@@ -11,6 +12,7 @@ export function TrainerAppointmentCard({
   onAccept: () => void;
   onDecline: () => void;
 }) {
+  const { t } = useT();
   const m = eventMeta(event.type);
   return (
     <View style={s.card}>
@@ -31,11 +33,11 @@ export function TrainerAppointmentCard({
       <View style={s.btnRow}>
         <TouchableOpacity style={s.declineBtn} onPress={onDecline} activeOpacity={0.8}>
           <Ionicons name="close" size={16} color={C.danger} />
-          <Text style={s.declineTxt}>Ablehnen</Text>
+          <Text style={s.declineTxt}>{t('calendar.decline')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.acceptBtn} onPress={onAccept} activeOpacity={0.85}>
           <Ionicons name="checkmark" size={16} color={C.accentText} />
-          <Text style={s.acceptTxt}>Annehmen</Text>
+          <Text style={s.acceptTxt}>{t('calendar.accept')}</Text>
         </TouchableOpacity>
       </View>
     </View>

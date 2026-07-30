@@ -6,17 +6,19 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { useSession } from '@/hooks/useSession';
+import { useT, type TranslationKey } from '@/i18n';
 
-const FEATURES: [string, string][] = [
-  ['📅', 'Terminumfragen erstellen'],
-  ['👥', 'Kunden verwalten'],
-  ['📊', 'Abstimmungs-Ergebnisse sehen'],
-  ['🔔', 'Kunden benachrichtigen'],
-  ['📋', 'Trainingsberichte teilen'],
+const FEATURES: [string, TranslationKey][] = [
+  ['📅', 'trainer.featurePolls'],
+  ['👥', 'trainer.featureClients'],
+  ['📊', 'trainer.featureResults'],
+  ['🔔', 'trainer.featureNotify'],
+  ['📋', 'trainer.featureReports'],
 ];
 
 export default function TrainerRegistrierenScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,7 @@ export default function TrainerRegistrierenScreen() {
   }, [session]);
 
   const handleRegister = async () => {
-    if (!name.trim()) { Alert.alert('Ups 🐾', 'Bitte Trainername eingeben.'); return; }
+    if (!name.trim()) { Alert.alert('Ups 🐾', t('trainer.nameRequired')); return; }
     if (!session?.user.id) return;
     setLoading(true);
     const { error } = await supabase
@@ -37,7 +39,7 @@ export default function TrainerRegistrierenScreen() {
     setLoading(false);
     if (error) { Alert.alert('Ups 🐾', error.message); return; }
     queryClient.invalidateQueries({ queryKey: ['profile'] });
-    Alert.alert('Willkommen! 🎉', 'Du bist jetzt als Trainer registriert.', [{ text: "Los geht's!", onPress: () => router.back() }]);
+    Alert.alert(t('trainer.welcomeTitle'), t('trainer.welcomeBody'), [{ text: t('trainer.letsGo'), onPress: () => router.back() }]);
   };
 
   return (
@@ -47,26 +49,26 @@ export default function TrainerRegistrierenScreen() {
       </View>
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={S.header}>
-          <Text style={S.title}>Als Trainer registrieren</Text>
-          <Text style={S.sub}>Einmalige Einrichtung deines Trainer-Profils</Text>
+          <Text style={S.title}>{t('trainer.registerTitle')}</Text>
+          <Text style={S.sub}>{t('trainer.registerSub')}</Text>
         </View>
 
         <View style={S.featCard}>
-          <Text style={S.featTitle}>TRAINER-FEATURES</Text>
-          {FEATURES.map(([icon, text]) => (
-            <View key={text} style={S.featRow}>
+          <Text style={S.featTitle}>{t('trainer.features')}</Text>
+          {FEATURES.map(([icon, key]) => (
+            <View key={key} style={S.featRow}>
               <Text style={{ fontSize: 16 }}>{icon}</Text>
-              <Text style={S.featTxt}>{text}</Text>
+              <Text style={S.featTxt}>{t(key)}</Text>
             </View>
           ))}
         </View>
 
-        <Text style={S.lbl}>Dein Trainer-Name</Text>
-        <TextInput style={S.input} value={name} onChangeText={setName} placeholder="z. B. Max Müller" placeholderTextColor="#525270" />
-        <Text style={S.hint}>Dieser Name wird deinen Kunden angezeigt.</Text>
+        <Text style={S.lbl}>{t('trainer.nameLabel')}</Text>
+        <TextInput style={S.input} value={name} onChangeText={setName} placeholder={t('trainer.namePlaceholder')} placeholderTextColor="#525270" />
+        <Text style={S.hint}>{t('trainer.nameHint')}</Text>
 
         <TouchableOpacity style={[S.btn, loading && { opacity: 0.6 }]} onPress={handleRegister} disabled={loading}>
-          <Text style={S.btnTxt}>{loading ? 'Wird registriert…' : 'Als Trainer registrieren ✓'}</Text>
+          <Text style={S.btnTxt}>{loading ? t('trainer.registering') : t('trainer.registerCta')}</Text>
         </TouchableOpacity>
         <View style={{ height: 30 }} />
       </ScrollView>

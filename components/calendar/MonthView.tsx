@@ -3,12 +3,14 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { C } from '@/constants/colors';
 import { DogEventCard } from '@/components/calendar/DogEventCard';
 import { eventsOnDay, localDayKey } from '@/hooks/useTrainingCalendar';
+import { useT } from '@/i18n';
 import { eventMeta, type CalendarEvent } from '@/types/calendar';
 
 const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
 export function MonthView({ events, onEventPress }: { events: CalendarEvent[]; onEventPress: (e: CalendarEvent) => void }) {
+  const { t } = useT();
   const [cursor, setCursor] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [selected, setSelected] = useState(localDayKey(new Date().toISOString()));
 
@@ -60,7 +62,7 @@ export function MonthView({ events, onEventPress }: { events: CalendarEvent[]; o
 
       <View style={{ gap: 10, marginTop: 4 }}>
         {selEvents.length === 0
-          ? <Text style={s.none}>Keine Termine an diesem Tag.</Text>
+          ? <Text style={s.none}>{t('calendar.noEventsThisDay')}</Text>
           : selEvents.map(e => <DogEventCard key={e.id} event={e} onPress={() => onEventPress(e)} />)}
       </View>
     </View>

@@ -9,6 +9,7 @@ import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { useToast } from '@/components/ui/Toast';
 import { addDogHealthEntry, addDogVetAppointment } from '@/services/dogHub';
 import { DateField } from '@/components/ui/DateField';
+import { useT } from '@/i18n';
 
 type Load = 'leicht' | 'mittel' | 'hoch';
 const LOADS: Load[] = ['leicht', 'mittel', 'hoch'];
@@ -19,6 +20,7 @@ export default function DogHealthEditor() {
   const router = useRouter();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { showToast, toast } = useToast();
+  const { t } = useT();
 
   const [weight, setWeight] = useState('');
   const [load, setLoad]     = useState<Load | null>(null);
@@ -32,7 +34,7 @@ export default function DogHealthEditor() {
   const save = async () => {
     if (!dogId || saving) return;
     const weightNum = weight.trim() ? Number(weight.replace(',', '.')) : null;
-    if (weightNum != null && Number.isNaN(weightNum)) { showToast('Gewicht ist keine Zahl.'); return; }
+    if (weightNum != null && Number.isNaN(weightNum)) { showToast(t('dog.weightNotNumber')); return; }
     const vet = vetDate;
 
     setSaving(true);
@@ -41,7 +43,7 @@ export default function DogHealthEditor() {
     });
     if (!error && vet) await addDogVetAppointment(dogId, vet.toISOString(), vetReason.trim() || null);
     setSaving(false);
-    if (error) { haptic.error(); showToast('Konnte nicht gespeichert werden.'); return; }
+    if (error) { haptic.error(); showToast(t('calendar.saveFailed')); return; }
     haptic.success();
     router.back();
   };
@@ -51,15 +53,15 @@ export default function DogHealthEditor() {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={s.bar}>
           <TouchableOpacity style={s.iconBtn} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={20} color={C.trackText} /></TouchableOpacity>
-          <Text style={s.barTitle}>Eintrag hinzufügen</Text>
+          <Text style={s.barTitle}>{t('dog.addEntry')}</Text>
           <View style={{ width: 38 }} />
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>Gewicht (kg)</Text>
-          <TextInput value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="z. B. 28.5" placeholderTextColor={C.trackTextMut} style={s.input} />
+          <Text style={s.label}>{t('dog.weight')}</Text>
+          <TextInput value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder={t('dog.weightPlaceholder')} placeholderTextColor={C.trackTextMut} style={s.input} />
 
-          <Text style={s.label}>Belastung</Text>
+          <Text style={s.label}>{t('dog.load')}</Text>
           <View style={s.seg}>
             {LOADS.map(l => {
               const on = load === l;
@@ -71,18 +73,18 @@ export default function DogHealthEditor() {
             })}
           </View>
 
-          <View style={s.toggleRow}><Text style={s.toggleLabel}>Ruhetag</Text><Switch value={rest} onValueChange={setRest} trackColor={{ false: C.trackCardAlt, true: C.trackPrimary }} thumbColor="#fff" /></View>
-          <View style={s.toggleRow}><Text style={s.toggleLabel}>Intensive Einheit</Text><Switch value={intense} onValueChange={setInt} trackColor={{ false: C.trackCardAlt, true: C.trackPrimary }} thumbColor="#fff" /></View>
+          <View style={s.toggleRow}><Text style={s.toggleLabel}>{t('dog.restDay')}</Text><Switch value={rest} onValueChange={setRest} trackColor={{ false: C.trackCardAlt, true: C.trackPrimary }} thumbColor="#fff" /></View>
+          <View style={s.toggleRow}><Text style={s.toggleLabel}>{t('dog.intenseUnit')}</Text><Switch value={intense} onValueChange={setInt} trackColor={{ false: C.trackCardAlt, true: C.trackPrimary }} thumbColor="#fff" /></View>
 
-          <Text style={s.label}>Notiz</Text>
-          <TextInput value={note} onChangeText={setNote} placeholder="optional" placeholderTextColor={C.trackTextMut} multiline style={[s.input, s.multiline]} />
+          <Text style={s.label}>{t('common.notes')}</Text>
+          <TextInput value={note} onChangeText={setNote} placeholder={t('common.optional')} placeholderTextColor={C.trackTextMut} multiline style={[s.input, s.multiline]} />
 
-          <Text style={s.label}>Nächster Tierarzttermin (optional)</Text>
-          <DateField value={vetDate} onChange={setVetDate} onClear={() => setVetDate(null)} placeholder="Kein Termin" minimumDate={new Date()} style={{ marginBottom: 8 }} />
-          <TextInput value={vetReason} onChangeText={setVetReason} placeholder="Grund (optional)" placeholderTextColor={C.trackTextMut} style={s.input} />
+          <Text style={s.label}>{t('dog.nextVetOptional')}</Text>
+          <DateField value={vetDate} onChange={setVetDate} onClear={() => setVetDate(null)} placeholder={t('dog.noAppointment')} minimumDate={new Date()} style={{ marginBottom: 8 }} />
+          <TextInput value={vetReason} onChangeText={setVetReason} placeholder={t('dog.reasonOptional')} placeholderTextColor={C.trackTextMut} style={s.input} />
 
           <View style={{ height: 16 }} />
-          <AnyvoButton label="Speichern" icon="checkmark" onPress={save} loading={saving} />
+          <AnyvoButton label={t('common.save')} icon="checkmark" onPress={save} loading={saving} />
         </ScrollView>
       </SafeAreaView>
       {toast}

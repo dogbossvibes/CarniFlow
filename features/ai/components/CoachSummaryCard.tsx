@@ -2,6 +2,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import type { CoachSummary } from '@/features/ai/types/aiCoach';
+import { useT } from '@/i18n';
 
 // Grosse „Diese Woche"-Card mit LLM-Zusammenfassung. Bei fehlendem Key/Fehler
 // freundlicher Hinweis (regelbasierte Insights bleiben aktiv).
@@ -13,31 +14,32 @@ export function CoachSummaryCard({
   hasRun: boolean;
   onRefresh: () => void;
 }) {
+  const { t } = useT();
   return (
     <View style={s.card}>
       <View style={s.head}>
         <View style={s.eyebrowRow}>
           <Ionicons name="sparkles" size={14} color={C.accent} />
-          <Text style={s.eyebrow}>Optionale KI-Zusammenfassung</Text>
+          <Text style={s.eyebrow}>{t('analyse.optionalSummary')}</Text>
         </View>
         <TouchableOpacity style={s.refresh} onPress={onRefresh} disabled={isLoading} activeOpacity={0.8}>
           {isLoading ? <ActivityIndicator size="small" color={C.accent} />
-            : <><Ionicons name="refresh" size={13} color={C.accent} /><Text style={s.refreshTxt}>{hasRun ? 'Neu' : 'Aktualisieren'}</Text></>}
+            : <><Ionicons name="refresh" size={13} color={C.accent} /><Text style={s.refreshTxt}>{hasRun ? t('common.new') : t('common.update')}</Text></>}
         </TouchableOpacity>
       </View>
 
       {!hasRun ? (
-        <Text style={s.body}>Erstellt auf Wunsch eine zusätzliche Text-Zusammenfassung deiner Trainings. Tippe dazu auf „Aktualisieren“.</Text>
+        <Text style={s.body}>{t('analyse.summaryIntro')}</Text>
       ) : isLoading ? (
-        <Text style={s.body}>Deine Trainingsdaten werden ausgewertet…</Text>
+        <Text style={s.body}>{t('analyse.summaryRunning')}</Text>
       ) : !summary?.available ? (
         <Text style={s.body}>{summary?.summary}</Text>
       ) : (
         <>
           <Text style={s.summary}>{summary.summary}</Text>
-          {summary.highlights.length > 0 && <Block icon="checkmark-circle" color={C.success} label="Positiv" items={summary.highlights} />}
-          {summary.risks.length > 0 && <Block icon="alert-circle" color={C.warning} label="Auffällig" items={summary.risks} />}
-          {summary.recommendations.length > 0 && <Block icon="bulb" color={C.accent} label="Empfehlung" items={summary.recommendations} />}
+          {summary.highlights.length > 0 && <Block icon="checkmark-circle" color={C.success} label={t('analyse.positive')} items={summary.highlights} />}
+          {summary.risks.length > 0 && <Block icon="alert-circle" color={C.warning} label={t('analyse.noticeable')} items={summary.risks} />}
+          {summary.recommendations.length > 0 && <Block icon="bulb" color={C.accent} label={t('analyse.recommendation')} items={summary.recommendations} />}
         </>
       )}
     </View>

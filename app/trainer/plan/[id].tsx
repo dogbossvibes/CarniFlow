@@ -9,10 +9,12 @@ import { getMyClientConnections } from '@/services/connectionService';
 import { deletePlan, getPlan, updateShared } from '@/services/trainingPlanService';
 import { successHaptic, tapHaptic } from '@/lib/haptics';
 import type { TrainingPlan } from '@/types/trainingPlan';
+import { useT } from '@/i18n';
 
 export default function PlanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const [active, setActive] = useState<{ id: string; name: string | null }[]>([]);
 
@@ -43,16 +45,16 @@ export default function PlanDetailScreen() {
       : [...plan.shared_with, clientId];
     setPlan({ ...plan, shared_with: next });
     const { error } = await updateShared(plan.id, next);
-    if (error) { Alert.alert('Fehler', error); load(); }
+    if (error) { Alert.alert(t('common.error'), error); load(); }
   };
 
   const onDelete = () => {
     if (!plan) return;
-    Alert.alert('Plan löschen?', 'Dieser Trainingsplan wird unwiderruflich entfernt.', [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Löschen', style: 'destructive', onPress: async () => {
+    Alert.alert(t('trainer.deletePlanTitle'), t('trainer.deletePlanBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => {
         const { error } = await deletePlan(plan.id);
-        if (error) { Alert.alert('Fehler', error); return; }
+        if (error) { Alert.alert(t('common.error'), error); return; }
         successHaptic();
         router.back();
       } },
@@ -63,7 +65,7 @@ export default function PlanDetailScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
         <TouchableOpacity style={s.back} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={22} color={C.white} /></TouchableOpacity>
-        <Text style={s.headerTitle} numberOfLines={1}>{plan?.title ?? 'Plan'}</Text>
+        <Text style={s.headerTitle} numberOfLines={1}>{plan?.title ?? t('trainer.planFallback')}</Text>
         {isOwner && (
           <TouchableOpacity style={s.delBtn} onPress={onDelete} hitSlop={8}><Ionicons name="trash-outline" size={18} color={C.danger} /></TouchableOpacity>
         )}
@@ -72,7 +74,7 @@ export default function PlanDetailScreen() {
       {loading ? (
         <ActivityIndicator color={C.accent} style={{ marginTop: 40 }} />
       ) : !plan ? (
-        <View style={s.empty}><Text style={s.emptyTxt}>Plan nicht gefunden.</Text></View>
+        <View style={s.empty}><Text style={s.emptyTxt}>{t('trainer.planNotFound')}</Text></View>
       ) : (
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
           <Text style={s.planTitle}>{plan.title}</Text>
@@ -84,7 +86,7 @@ export default function PlanDetailScreen() {
             </View>
           ) : null}
 
-          <Text style={s.section}>SCHRITTE</Text>
+          <Text style={s.section}>{t('trainer.stepsSection')}</Text>
           {plan.steps.map((step, i) => (
             <View key={i} style={s.stepRow}>
               <View style={s.stepNum}><Text style={s.stepNumTxt}>{i + 1}</Text></View>
@@ -94,16 +96,16 @@ export default function PlanDetailScreen() {
 
           {isOwner && (
             <>
-              <Text style={[s.section, { marginTop: 24 }]}>GETEILT MIT</Text>
+              <Text style={[s.section, { marginTop: 24 }]}>{t('trainer.sharedWith')}</Text>
               {active.length === 0 ? (
-                <Text style={s.noClients}>Noch keine verbundenen Kund:innen.</Text>
+                <Text style={s.noClients}>{t('trainer.noConnectedClients')}</Text>
               ) : (
                 active.map(c => {
                   const on = plan.shared_with.includes(c.id);
                   return (
                     <TouchableOpacity key={c.id} style={[s.clientRow, on && s.clientRowOn]} onPress={() => toggleShare(c.id)} activeOpacity={0.8}>
                       <View style={[s.checkbox, on && s.checkboxOn]}>{on && <Ionicons name="checkmark" size={14} color={C.accentText} />}</View>
-                      <Text style={s.clientName}>{c.name ?? 'Kunde'}</Text>
+                      <Text style={s.clientName}>{c.name ?? t('trainer.clientFallback')}</Text>
                     </TouchableOpacity>
                   );
                 })

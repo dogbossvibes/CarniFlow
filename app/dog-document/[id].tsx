@@ -12,6 +12,7 @@ import { uploadDogDocument } from '@/services/storage';
 import { toISODate } from '@/features/dogs/dateInput';
 import { DateField } from '@/components/ui/DateField';
 import { DOC_CATEGORIES } from '@/features/dogs/documentCategories';
+import { useT } from '@/i18n';
 
 type PickedFile = { uri: string; name: string; mime: string };
 
@@ -20,6 +21,7 @@ export default function DogDocumentEditor() {
   const router = useRouter();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { showToast, toast } = useToast();
+  const { t } = useT();
 
   const [kind, setKind]   = useState('gesundheit');
   const [title, setTitle] = useState('');
@@ -38,7 +40,7 @@ export default function DogDocumentEditor() {
 
   const save = async () => {
     if (!dogId || saving) return;
-    if (!file) { showToast('Bitte zuerst eine Datei auswählen.'); return; }
+    if (!file) { showToast(t('dog.selectFileFirst')); return; }
     const issuedOn = issued;
 
     setSaving(true);
@@ -51,7 +53,7 @@ export default function DogDocumentEditor() {
       if (error) throw error;
       router.back();
     } catch {
-      showToast('Upload fehlgeschlagen.');
+      showToast(t('media.uploadFailed'));
     } finally {
       setSaving(false);
     }
@@ -62,12 +64,12 @@ export default function DogDocumentEditor() {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={s.bar}>
           <TouchableOpacity style={s.iconBtn} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={20} color={C.trackText} /></TouchableOpacity>
-          <Text style={s.barTitle}>Dokument hinzufügen</Text>
+          <Text style={s.barTitle}>{t('dog.addDocument')}</Text>
           <View style={{ width: 38 }} />
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>Kategorie</Text>
+          <Text style={s.label}>{t('dog.category')}</Text>
           <View style={s.kinds}>
             {DOC_CATEGORIES.map(k => {
               const on = kind === k.key;
@@ -79,23 +81,23 @@ export default function DogDocumentEditor() {
             })}
           </View>
 
-          <Text style={s.label}>Datei</Text>
+          <Text style={s.label}>{t('dog.file')}</Text>
           <TouchableOpacity style={s.fileBtn} onPress={pick} activeOpacity={0.85}>
             <Ionicons name={file ? 'document-text' : 'cloud-upload-outline'} size={18} color={C.trackPrimary} />
-            <Text style={s.fileTxt} numberOfLines={1}>{file ? file.name : 'PDF oder Bild auswählen'}</Text>
+            <Text style={s.fileTxt} numberOfLines={1}>{file ? file.name : t('dog.selectPdfOrImage')}</Text>
           </TouchableOpacity>
 
-          <Text style={s.label}>Titel</Text>
-          <TextInput value={title} onChangeText={setTitle} placeholder="optional" placeholderTextColor={C.trackTextMut} style={s.input} />
+          <Text style={s.label}>{t('dog.title')}</Text>
+          <TextInput value={title} onChangeText={setTitle} placeholder={t('common.optional')} placeholderTextColor={C.trackTextMut} style={s.input} />
 
-          <Text style={s.label}>Ausgestellt am (optional)</Text>
-          <DateField value={issued} onChange={setIssued} onClear={() => setIssued(null)} placeholder="Kein Datum" maximumDate={new Date()} />
+          <Text style={s.label}>{t('dog.issuedOnOptional')}</Text>
+          <DateField value={issued} onChange={setIssued} onClear={() => setIssued(null)} placeholder={t('dog.noDate')} maximumDate={new Date()} />
 
-          <Text style={s.label}>Notiz</Text>
-          <TextInput value={note} onChangeText={setNote} placeholder="optional" placeholderTextColor={C.trackTextMut} multiline style={[s.input, s.multiline]} />
+          <Text style={s.label}>{t('common.notes')}</Text>
+          <TextInput value={note} onChangeText={setNote} placeholder={t('common.optional')} placeholderTextColor={C.trackTextMut} multiline style={[s.input, s.multiline]} />
 
           <View style={{ height: 16 }} />
-          <AnyvoButton label="Hochladen & speichern" icon="cloud-upload" onPress={save} loading={saving} />
+          <AnyvoButton label={t('dog.uploadAndSave')} icon="cloud-upload" onPress={save} loading={saving} />
         </ScrollView>
       </SafeAreaView>
       {toast}

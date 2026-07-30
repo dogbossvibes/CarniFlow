@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import type { DogTrainingItem } from './types';
 
 // Liste der letzten Trainings. Leerzustand bei fehlenden Daten.
@@ -10,10 +11,11 @@ export function DogTrainingList({
   items: DogTrainingItem[];
   onOpen?: (item: DogTrainingItem) => void;
 }) {
+  const { t } = useT();
   return (
     <View style={s.wrap}>
       {items.length === 0 ? (
-        <View style={s.empty}><Text style={s.emptyTxt}>Noch kein Training erfasst.</Text></View>
+        <View style={s.empty}><Text style={s.emptyTxt}>{t('dog.noTraining')}</Text></View>
       ) : (
         <View style={s.card}>
           {items.map((it, i) => (
@@ -29,7 +31,7 @@ export function DogTrainingList({
                 <Text style={s.date} numberOfLines={1}>{it.dateLabel}</Text>
               </View>
               {it.points != null ? (
-                <View style={s.pill}><Text style={s.pillTxt}>{it.points} Pkt</Text></View>
+                <View style={s.pill}><Text style={s.pillTxt}>{t('dog.pointsShort', { points: it.points })}</Text></View>
               ) : (
                 <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
               )}

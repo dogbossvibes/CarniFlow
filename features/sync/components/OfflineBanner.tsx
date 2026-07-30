@@ -2,17 +2,19 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useSyncStore } from '@/features/sync/store/syncStore';
+import { useT } from '@/i18n';
 
 // Nur sichtbar, wenn offline. Dezenter Premium-Hinweis.
 export function OfflineBanner() {
   const isOnline = useSyncStore(s => s.isOnline);
+  const { t } = useT();
   if (isOnline) return null;
   return (
     <View style={s.banner}>
       <Ionicons name="cloud-offline-outline" size={16} color={C.muted} />
       <View style={{ flex: 1 }}>
-        <Text style={s.title}>Offline-Modus aktiv</Text>
-        <Text style={s.sub}>Deine Daten werden lokal gespeichert und später synchronisiert.</Text>
+        <Text style={s.title}>{t('sync.offlineTitle')}</Text>
+        <Text style={s.sub}>{t('sync.offlineSub')}</Text>
       </View>
     </View>
   );

@@ -7,6 +7,7 @@ import { C } from '@/constants/colors';
 import { uploadVideo } from '@/services/mediaService';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { tapHaptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 interface Props {
   value:    string[];
@@ -29,6 +30,7 @@ function VideoCell({ uri, onRemove }: { uri: string; onRemove: () => void }) {
 
 // Mehrere Videos: Upload nach Supabase Storage (training-videos) + Player je Video.
 export function MultiVideoUpload({ value, onChange }: Props) {
+  const { t } = useT();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress]   = useState(0);
 
@@ -37,7 +39,7 @@ export function MultiVideoUpload({ value, onChange }: Props) {
     if (Platform.OS !== 'android') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Zugriff verweigert', 'Bitte erlaube den Video-Zugriff in den Einstellungen.');
+        Alert.alert(t('media.permissionDenied'), t('media.videoPermission'));
         return;
       }
     }
@@ -53,7 +55,7 @@ export function MultiVideoUpload({ value, onChange }: Props) {
       tapHaptic();
       onChange([...value, url]);
     } catch (e: any) {
-      Alert.alert('Upload fehlgeschlagen', e?.message ?? 'Bitte erneut versuchen.');
+      Alert.alert(t('media.uploadFailed'), e?.message ?? t('media.retry'));
     } finally {
       setUploading(false);
       setProgress(0);
@@ -74,8 +76,8 @@ export function MultiVideoUpload({ value, onChange }: Props) {
         ) : (
           <>
             <Ionicons name="videocam-outline" size={22} color={C.muted} />
-            <Text style={s.addTxt}>Video hinzufügen</Text>
-            <Text style={s.addSub}>MP4, MOV · max. 2 Min.</Text>
+            <Text style={s.addTxt}>{t('media.addVideo')}</Text>
+            <Text style={s.addSub}>{t('media.videoHint')}</Text>
           </>
         )}
       </TouchableOpacity>

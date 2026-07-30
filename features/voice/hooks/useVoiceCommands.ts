@@ -3,11 +3,13 @@ import { Alert } from 'react-native';
 import { SpeechModule, useSpeechRecognitionEvent, SPEECH_RECOGNITION_AVAILABLE } from '@/features/voice/services/speechRecognition';
 import { useVoiceStore } from '@/features/voice/store/voiceStore';
 import { parseVoiceCommand, type VoiceCommand } from '@/features/voice/services/voiceCommandParser';
+import { useT } from '@/i18n';
 
 // Live-Sprachsteuerung (expo-speech-recognition) für den Fährtenmodus. Erkennt
 // kurze Befehle, parst sie und führt onCommand aus. Continuous: startet nach
 // jedem Erkennungs-Ende neu, solange aktiviert.
 export function useVoiceCommands(onCommand: (cmd: VoiceCommand) => void) {
+  const { t } = useT();
   const { voiceCommandEnabled, isListening, lastRecognizedCommand } = useVoiceStore();
   const store = useVoiceStore;
   const onCmdRef = useRef(onCommand);
@@ -35,12 +37,12 @@ export function useVoiceCommands(onCommand: (cmd: VoiceCommand) => void) {
 
   const enable = useCallback(async () => {
     if (!SPEECH_RECOGNITION_AVAILABLE || !SpeechModule) {
-      Alert.alert('Sprachsteuerung', 'Spracherkennung ist in dieser App-Version nicht verfügbar (neuer Build nötig).');
+      Alert.alert(t('voice.commandsTitle'), t('voice.commandsUnavailable'));
       return;
     }
     try {
       const perm = await SpeechModule.requestPermissionsAsync();
-      if (!perm.granted) { Alert.alert('Spracherkennung', 'Bitte erlaube Mikrofon & Spracherkennung in den Einstellungen.'); return; }
+      if (!perm.granted) { Alert.alert(t('voice.recognitionTitle'), t('voice.recognitionPermission')); return; }
       store.getState().setVoiceCommandEnabled(true);
       begin();
     } catch (e) { console.warn('[useVoiceCommands] enable', e); }

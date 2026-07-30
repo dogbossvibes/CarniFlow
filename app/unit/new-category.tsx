@@ -17,6 +17,7 @@ import {
 import type { CustomCategory } from '@/types/customCategory';
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -32,6 +33,7 @@ const COLORS = [
 
 export default function NewCategoryScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const editing = !!id;
@@ -68,7 +70,7 @@ export default function NewCategoryScreen() {
 
   const speichern = async () => {
     const trimmed = name.trim();
-    if (!trimmed) { Alert.alert('Name fehlt', 'Bitte gib der Kategorie einen Namen.'); return; }
+    if (!trimmed) { Alert.alert(t('training.categoryNameMissing'), t('training.categoryNameMissingBody')); return; }
     const ownerId = session?.user.id;
     if (!ownerId) return;
 
@@ -78,7 +80,7 @@ export default function NewCategoryScreen() {
       ? await updateCustomCategory(id!, payload)
       : await createCustomCategory(ownerId, payload);
     setSaving(false);
-    if (error) { Alert.alert('Fehler', error.message); return; }
+    if (error) { Alert.alert(t('common.error'), error.message); return; }
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['customCategories'] });
     router.back();
@@ -86,14 +88,14 @@ export default function NewCategoryScreen() {
 
   const loeschen = () => {
     tapHaptic();
-    Alert.alert('Kategorie löschen?', 'Bestehende Einheiten bleiben erhalten.', [
-      { text: 'Abbrechen', style: 'cancel' },
+    Alert.alert(t('training.deleteCategoryTitle'), t('training.deleteCategoryBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Löschen', style: 'destructive',
+        text: t('common.delete'), style: 'destructive',
         onPress: async () => {
           if (!id) return;
           const { error } = await deleteCustomCategory(id);
-          if (error) { Alert.alert('Fehler', error.message); return; }
+          if (error) { Alert.alert(t('common.error'), error.message); return; }
           queryClient.invalidateQueries({ queryKey: ['customCategories'] });
           router.back();
         },
@@ -108,8 +110,8 @@ export default function NewCategoryScreen() {
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View>
-          <Text style={s.eyebrow}>{editing ? 'SPARTE BEARBEITEN' : 'NEUE SPARTE'}</Text>
-          <Text style={s.title}>{editing ? 'Kategorie bearbeiten' : 'Eigene Kategorie'}</Text>
+          <Text style={s.eyebrow}>{editing ? t('training.editDisciplineUpper') : t('training.newDisciplineUpper')}</Text>
+          <Text style={s.title}>{editing ? t('training.editCategory') : t('training.customCategory')}</Text>
         </View>
       </View>
 
@@ -122,22 +124,22 @@ export default function NewCategoryScreen() {
               <Ionicons name={icon} size={26} color={color} />
             </View>
             <View style={s.flex}>
-              <Text style={s.previewName}>{name.trim() || 'Kategoriename'}</Text>
-              <Text style={s.previewSub}>Individuelles Training</Text>
+              <Text style={s.previewName}>{name.trim() || t('training.categoryNameFallback')}</Text>
+              <Text style={s.previewSub}>{t('training.individualTraining')}</Text>
             </View>
           </View>
 
-          <Text style={s.label}>NAME</Text>
+          <Text style={s.label}>{t('dog.name').toUpperCase()}</Text>
           <TextInput
             style={s.input}
-            placeholder="z.B. Fitness, Tricktraining"
+            placeholder={t('training.categoryNamePlaceholder')}
             placeholderTextColor={C.placeholder}
             value={name}
             onChangeText={setName}
             maxLength={40}
           />
 
-          <Text style={s.label}>ICON</Text>
+          <Text style={s.label}>{t('training.iconLabel')}</Text>
           <View style={s.iconWrap}>
             {ICONS.map(ic => {
               const aktiv = ic === icon;
@@ -154,7 +156,7 @@ export default function NewCategoryScreen() {
             })}
           </View>
 
-          <Text style={s.label}>FARBE</Text>
+          <Text style={s.label}>{t('dog.color').toUpperCase()}</Text>
           <View style={s.colorWrap}>
             {COLORS.map(col => (
               <TouchableOpacity
@@ -168,11 +170,11 @@ export default function NewCategoryScreen() {
             ))}
           </View>
 
-          <Text style={s.label}>ÜBUNGEN</Text>
+          <Text style={s.label}>{t('training.exercisesLabel')}</Text>
           <View style={s.exInputRow}>
             <TextInput
               style={[s.input, s.flex]}
-              placeholder="Übung hinzufügen"
+              placeholder={t('training.addExercise')}
               placeholderTextColor={C.placeholder}
               value={draft}
               onChangeText={setDraft}
@@ -203,13 +205,13 @@ export default function NewCategoryScreen() {
           <AnimatedPressable style={[s.saveBtn, saving && { opacity: 0.5 }]} scale={0.97} disabled={saving} onPress={speichern}>
             <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
-            <Text style={s.saveTxt}>{saving ? 'Speichert…' : editing ? 'Aktualisieren' : 'Kategorie speichern'}</Text>
+            <Text style={s.saveTxt}>{saving ? t('common.saving') : editing ? t('common.update') : t('training.saveCategory')}</Text>
           </AnimatedPressable>
 
           {editing && (
             <TouchableOpacity style={s.deleteBtn} onPress={loeschen} activeOpacity={0.8}>
               <Ionicons name="trash-outline" size={18} color={C.danger} />
-              <Text style={s.deleteTxt}>Kategorie löschen</Text>
+              <Text style={s.deleteTxt}>{t('training.deleteCategory')}</Text>
             </TouchableOpacity>
           )}
 

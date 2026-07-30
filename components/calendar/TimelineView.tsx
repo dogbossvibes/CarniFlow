@@ -4,9 +4,11 @@ import { C } from '@/constants/colors';
 import { DogEventCard } from '@/components/calendar/DogEventCard';
 import { dayHeadingFromKey } from '@/lib/eventFormat';
 import { localDayKey } from '@/hooks/useTrainingCalendar';
+import { useT } from '@/i18n';
 import type { CalendarEvent } from '@/types/calendar';
 
 export function TimelineView({ events, onEventPress }: { events: CalendarEvent[]; onEventPress: (e: CalendarEvent) => void }) {
+  const { t } = useT();
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcoming = events
     .filter(e => new Date(e.start_at).getTime() >= today.getTime())
@@ -16,8 +18,8 @@ export function TimelineView({ events, onEventPress }: { events: CalendarEvent[]
     return (
       <View style={s.empty}>
         <Ionicons name="calendar-outline" size={32} color={C.subtle} />
-        <Text style={s.emptyTxt}>Keine anstehenden Termine</Text>
-        <Text style={s.emptySub}>Erstelle deinen ersten Termin mit dem „+"-Button.</Text>
+        <Text style={s.emptyTxt}>{t('calendar.noUpcoming')}</Text>
+        <Text style={s.emptySub}>{t('calendar.createFirstWithPlus')}</Text>
       </View>
     );
   }

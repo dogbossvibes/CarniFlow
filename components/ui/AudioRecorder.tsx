@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { uploadAudio } from '@/services/mediaService';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import { signMediaUrl } from '@/lib/mediaUrl';
 import type { AudioNote } from '@/types';
 
@@ -29,6 +30,7 @@ interface Props {
 }
 
 export function AudioRecorder({ value, onChange }: Props) {
+  const { t } = useT();
   const [isRecording, setIsRecording] = useState(false);
   const [uploading,   setUploading]   = useState(false);
   const [seconds,     setSeconds]     = useState(0);
@@ -62,9 +64,9 @@ export function AudioRecorder({ value, onChange }: Props) {
       const { granted } = await AudioModule.requestRecordingPermissionsAsync();
       if (!granted) {
         Alert.alert(
-          'Mikrofon-Zugriff nötig 🎙️',
-          'Einstellungen → Expo Go → Mikrofon → aktivieren',
-          [{ text: 'OK' }]
+          t('comments.microphoneRequired'),
+          t('audio.microphoneSettings'),
+          [{ text: t('common.ok') }]
         );
         return;
       }
@@ -81,7 +83,7 @@ export function AudioRecorder({ value, onChange }: Props) {
       timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
     } catch (e) {
       console.error('[Recording Start]', e);
-      Alert.alert('Ups, kurze Pause 🐾', 'Aufnahme noch nicht gestartet — Mikrofon-Berechtigung prüfen');
+      Alert.alert(t('share.notReadyTitle'), t('audio.recordingStartFailed'));
     }
   };
 
@@ -110,7 +112,7 @@ export function AudioRecorder({ value, onChange }: Props) {
       onChange([...value, { url, duration: dur, createdAt: `Heute ${zeit}` }]);
     } catch (e: any) {
       console.error('[Recording Stop]', e);
-      Alert.alert('Ups, kurze Pause 🐾', 'Aufnahme noch nicht gespeichert — versuch es nochmal!');
+      Alert.alert(t('share.notReadyTitle'), t('audio.recordingSaveFailed'));
     } finally {
       setUploading(false);
     }
@@ -146,7 +148,7 @@ export function AudioRecorder({ value, onChange }: Props) {
       const localUri  = FileSystem.cacheDirectory + `audio_${idx}_${Date.now()}.mp4`;
       const result    = await FileSystem.downloadAsync(remoteUrl, localUri);
 
-      if (result.status !== 200) throw new Error('Download fehlgeschlagen: ' + result.status);
+      if (result.status !== 200) throw new Error(`Download failed: ${result.status}`);
 
       localUriRef.current = localUri;
       player.replace({ uri: result.uri });
@@ -155,17 +157,17 @@ export function AudioRecorder({ value, onChange }: Props) {
       console.error('[Audio Playback Error]', e);
       setPlayingIdx(null);
       Alert.alert(
-        'Ups, kurze Pause 🐾',
-        'Abspielen braucht einen Moment: ' + (e?.message || 'Bitte nochmal versuchen')
+        t('share.notReadyTitle'),
+        t('audio.playbackNeedsMoment', { message: e?.message || t('media.retry') })
       );
     }
   };
 
   const del = (idx: number) => {
-    Alert.alert('Aufnahme löschen', 'Möchtest du diese Sprachnotiz löschen?', [
-      { text: 'Zurück', style: 'cancel' },
+    Alert.alert(t('audio.deleteTitle'), t('audio.deleteBody'), [
+      { text: t('common.back'), style: 'cancel' },
       {
-        text: 'Entfernen',
+        text: t('media.remove'),
         style: 'destructive',
         onPress: () => onChange(value.filter((_, i) => i !== idx)),
       },
@@ -209,10 +211,10 @@ export function AudioRecorder({ value, onChange }: Props) {
 
         <Text style={S.hinweis}>
           {uploading
-            ? 'Wird hochgeladen…'
+            ? t('media.uploading')
             : isRecording
-              ? 'Tippen zum Stoppen'
-              : 'Tippen zum Aufnehmen'}
+              ? t('audio.tapToStop')
+              : t('audio.tapToRecord')}
         </Text>
       </View>
 
@@ -234,7 +236,7 @@ export function AudioRecorder({ value, onChange }: Props) {
           </TouchableOpacity>
 
           <View style={S.info}>
-            <Text style={S.itemTitel}>Notiz {i + 1}</Text>
+            <Text style={S.itemTitel}>{t('audio.note', { number: i + 1 })}</Text>
             <Text style={S.itemMeta}>{note.duration} · {note.createdAt}</Text>
           </View>
 

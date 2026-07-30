@@ -7,9 +7,11 @@ import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { getSharedPlans } from '@/services/trainingPlanService';
 import type { TrainingPlan } from '@/types/trainingPlan';
+import { useT } from '@/i18n';
 
 export default function MeinePlaeneScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const [plans, setPlans]   = useState<TrainingPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,8 +28,8 @@ export default function MeinePlaeneScreen() {
       <View style={s.header}>
         <TouchableOpacity style={s.back} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={22} color={C.white} /></TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.eyebrow}>VON DEINEM TRAINER</Text>
-          <Text style={s.title}>Trainingspläne</Text>
+          <Text style={s.eyebrow}>{t('trainer.fromTrainer')}</Text>
+          <Text style={s.title}>{t('trainer.plans')}</Text>
         </View>
       </View>
 
@@ -37,8 +39,8 @@ export default function MeinePlaeneScreen() {
         ) : plans.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="clipboard-outline" size={32} color={C.subtle} />
-            <Text style={s.emptyTitle}>Noch keine Pläne</Text>
-            <Text style={s.emptyTxt}>Sobald deine Trainer:in einen Plan mit dir teilt, erscheint er hier.</Text>
+            <Text style={s.emptyTitle}>{t('trainer.noPlans')}</Text>
+            <Text style={s.emptyTxt}>{t('trainer.noSharedPlansSub')}</Text>
           </View>
         ) : (
           plans.map(p => (
@@ -46,7 +48,7 @@ export default function MeinePlaeneScreen() {
               <View style={s.cardIcon}><Ionicons name="clipboard" size={20} color={C.accent} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={s.cardTitle}>{p.title}</Text>
-                <Text style={s.cardSub}>{p.discipline ? `${p.discipline} · ` : ''}{p.steps.length} Schritte</Text>
+                <Text style={s.cardSub}>{p.discipline ? `${p.discipline} · ` : ''}{t('trainer.stepsCount', { steps: p.steps.length })}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={C.subtle} />
             </TouchableOpacity>

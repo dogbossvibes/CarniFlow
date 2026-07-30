@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewS
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 
 // Wiederverwendbares Datums-/Zeitfeld: tippen öffnet den nativen Picker
 // (Android = Dialog, iOS = Spinner mit Tag·Monat·Jahr). Kein manuelles Tippen. CH-Format.
@@ -26,10 +27,11 @@ export function DateField({
   style?: StyleProp<ViewStyle>;
   mode?: 'date' | 'time';
 }) {
+  const { t } = useT();
   const [showIOS, setShowIOS] = useState(false);
   const isTime = mode === 'time';
   const format = isTime ? fmtTime : fmtDate;
-  const ph = placeholder ?? (isTime ? 'Zeit wählen' : 'Datum wählen');
+  const ph = placeholder ?? (isTime ? t('date.chooseTime') : t('date.chooseDate'));
   const icon = isTime ? 'time-outline' : 'calendar-outline';
 
   const open = () => {
@@ -66,7 +68,7 @@ export function DateField({
             style={{ alignSelf: 'stretch' }}
           />
           <Pressable style={s.done} onPress={() => setShowIOS(false)}>
-            <Text style={s.doneTxt}>Fertig</Text>
+            <Text style={s.doneTxt}>{t('common.done')}</Text>
           </Pressable>
         </View>
       )}

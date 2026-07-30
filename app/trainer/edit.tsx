@@ -15,9 +15,11 @@ import { getMyTrainerProfile, createTrainerProfile, updateTrainerProfile } from 
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
 import type { TrainerProfile } from '@/types/trainer';
+import { useT } from '@/i18n';
 
 export default function TrainerEditScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
 
   const [existing, setExisting] = useState<TrainerProfile | null>(null);
@@ -56,7 +58,7 @@ export default function TrainerEditScreen() {
       ? await updateTrainerProfile(session.user.id, payload)
       : await createTrainerProfile(session.user.id, payload);
     setSaving(false);
-    if (error) { Alert.alert('Fehler', error.message ?? 'Konnte nicht gespeichert werden.'); return; }
+    if (error) { Alert.alert(t('common.error'), error.message ?? t('trainer.saveError')); return; }
     if (data) setExisting(data as TrainerProfile);
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainerProfile'] });
@@ -74,8 +76,8 @@ export default function TrainerEditScreen() {
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View>
-          <Text style={s.eyebrow}>{existing ? 'TRAINER-PROFIL' : 'TRAINER WERDEN'}</Text>
-          <Text style={s.title}>{existing ? 'Profil bearbeiten' : 'Trainer-Profil anlegen'}</Text>
+          <Text style={s.eyebrow}>{existing ? t('trainer.profileEyebrow') : t('trainer.becomeEyebrow')}</Text>
+          <Text style={s.title}>{existing ? t('trainer.editProfile') : t('trainer.createProfile')}</Text>
         </View>
       </View>
 
@@ -84,20 +86,20 @@ export default function TrainerEditScreen() {
           {existing && (
             <View style={s.codeCard}>
               <View>
-                <Text style={s.codeLabel}>DEIN TRAINER-CODE</Text>
+                <Text style={s.codeLabel}>{t('trainer.yourCode')}</Text>
                 <Text style={s.codeVal}>{existing.code}</Text>
               </View>
               <View style={s.codeActions}>
                 <TouchableOpacity
                   style={s.iconBtn}
-                  onPress={() => { tapHaptic(); Clipboard.setStringAsync(existing.code); Alert.alert('Kopiert', `Trainer-Code ${existing.code} kopiert.`); }}
+                  onPress={() => { tapHaptic(); Clipboard.setStringAsync(existing.code); Alert.alert(t('trainer.copiedTitle'), t('trainer.copiedBody', { code: existing.code })); }}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="copy-outline" size={19} color={C.accent} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={s.iconBtn}
-                  onPress={() => Share.share({ message: `Verbinde dich mit mir in ANYVO mit dem Trainer-Code: ${existing.code}` })}
+                  onPress={() => Share.share({ message: t('trainer.shareCodeMessage', { code: existing.code }) })}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="share-outline" size={19} color={C.accent} />
@@ -106,22 +108,22 @@ export default function TrainerEditScreen() {
             </View>
           )}
 
-          <Text style={s.label}>ÜBER DICH</Text>
-          <TextInput style={s.textarea} placeholder="Kurze Bio…" placeholderTextColor={C.placeholder} value={bio} onChangeText={setBio} multiline />
+          <Text style={s.label}>{t('trainer.aboutYou')}</Text>
+          <TextInput style={s.textarea} placeholder={t('trainer.bioPlaceholder')} placeholderTextColor={C.placeholder} value={bio} onChangeText={setBio} multiline />
 
-          <Text style={s.label}>SPEZIALGEBIETE (KOMMAGETRENNT)</Text>
-          <TextInput style={s.input} placeholder="IGP, Fährte, Junghunde" placeholderTextColor={C.placeholder} value={specials} onChangeText={setSpecials} />
+          <Text style={s.label}>{t('trainer.specialties')}</Text>
+          <TextInput style={s.input} placeholder={t('trainer.specialtiesPlaceholder')} placeholderTextColor={C.placeholder} value={specials} onChangeText={setSpecials} />
 
-          <Text style={s.label}>ORT</Text>
-          <TextInput style={s.input} placeholder="Stadt / Region" placeholderTextColor={C.placeholder} value={location} onChangeText={setLocation} />
+          <Text style={s.label}>{t('trainer.location')}</Text>
+          <TextInput style={s.input} placeholder={t('trainer.locationPlaceholder')} placeholderTextColor={C.placeholder} value={location} onChangeText={setLocation} />
 
-          <Text style={s.label}>WEBSITE</Text>
+          <Text style={s.label}>{t('trainer.website')}</Text>
           <TextInput style={s.input} placeholder="https://…" placeholderTextColor={C.placeholder} value={website} onChangeText={setWebsite} autoCapitalize="none" keyboardType="url" />
 
           <AnimatedPressable style={[s.saveBtn, saving && { opacity: 0.5 }]} scale={0.97} disabled={saving} onPress={speichern}>
             <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
-            <Text style={s.saveTxt}>{saving ? 'Speichert…' : existing ? 'Speichern' : 'Trainer werden'}</Text>
+            <Text style={s.saveTxt}>{saving ? t('trainer.saving') : existing ? t('common.save') : t('trainer.becomeTrainer')}</Text>
           </AnimatedPressable>
           <View style={{ height: 40 }} />
         </ScrollView>

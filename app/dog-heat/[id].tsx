@@ -9,6 +9,7 @@ import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { DateField } from '@/components/ui/DateField';
 import { toISODate } from '@/features/dogs/dateInput';
 import { addHeatCycle } from '@/features/dogs/heatCycles';
+import { useT } from '@/i18n';
 
 const PINK = '#F472B6';
 const PHASES = ['Proöstrus', 'Östrus', 'Diöstrus', 'Anöstrus'];
@@ -17,6 +18,7 @@ const PHASES = ['Proöstrus', 'Östrus', 'Diöstrus', 'Anöstrus'];
 export default function DogHeatEditor() {
   const router = useRouter();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
+  const { t } = useT();
 
   const [start, setStart] = useState<Date | null>(new Date());
   const [end, setEnd]     = useState<Date | null>(null);
@@ -34,12 +36,12 @@ export default function DogHeatEditor() {
         phase,
         notes:     notes.trim() || null,
       });
-      if (error) { haptic.error(); Alert.alert('Fehler', 'Konnte nicht gespeichert werden. Ist die Tabelle „dog_heat_cycles" angelegt?'); return; }
+      if (error) { haptic.error(); Alert.alert(t('common.error'), t('dog.heatSaveFailedTable')); return; }
       haptic.success();
       router.back();
     } catch {
       haptic.error();
-      Alert.alert('Fehler', 'Konnte nicht gespeichert werden.');
+      Alert.alert(t('common.error'), t('calendar.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -50,18 +52,18 @@ export default function DogHeatEditor() {
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <View style={s.bar}>
           <TouchableOpacity style={s.iconBtn} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={20} color={C.trackText} /></TouchableOpacity>
-          <Text style={s.barTitle}>Läufigkeit eintragen</Text>
+          <Text style={s.barTitle}>{t('dog.addHeat')}</Text>
           <View style={{ width: 38 }} />
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>Beginn</Text>
+          <Text style={s.label}>{t('dog.heatStart')}</Text>
           <DateField value={start} onChange={setStart} maximumDate={new Date()} />
 
-          <Text style={s.label}>Ende (optional)</Text>
-          <DateField value={end} onChange={setEnd} onClear={() => setEnd(null)} placeholder="Noch offen" maximumDate={new Date()} />
+          <Text style={s.label}>{t('dog.heatEndOptional')}</Text>
+          <DateField value={end} onChange={setEnd} onClear={() => setEnd(null)} placeholder={t('dog.stillOpen')} maximumDate={new Date()} />
 
-          <Text style={s.label}>Phase (optional)</Text>
+          <Text style={s.label}>{t('dog.heatPhaseOptional')}</Text>
           <View style={s.chips}>
             {PHASES.map(ph => {
               const on = phase === ph;
@@ -73,16 +75,16 @@ export default function DogHeatEditor() {
             })}
           </View>
 
-          <Text style={s.label}>Beobachtungen / Notiz (optional)</Text>
+          <Text style={s.label}>{t('dog.observationsOptional')}</Text>
           <TextInput
             value={notes} onChangeText={setNotes} multiline
-            placeholder="z. B. Verhalten, Appetit, Blutung, Stimmung"
+            placeholder={t('dog.heatNotesPlaceholder')}
             placeholderTextColor={C.trackTextMut} style={[s.input, s.multiline]}
           />
 
           <View style={{ height: 16 }} />
-          <AnyvoButton label="Speichern" icon="checkmark" onPress={save} loading={saving} />
-          <Text style={s.disclaimer}>Alle Angaben sind optional ausser dem Beginn. Die Prognose ist ungefähr und ersetzt keine tierärztliche Einschätzung.</Text>
+          <AnyvoButton label={t('common.save')} icon="checkmark" onPress={save} loading={saving} />
+          <Text style={s.disclaimer}>{t('dog.heatDisclaimer')}</Text>
         </ScrollView>
       </SafeAreaView>
     </View>

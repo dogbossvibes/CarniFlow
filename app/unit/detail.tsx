@@ -24,6 +24,7 @@ import { getTrainingUnitById, deleteTrainingUnit } from '@/services/trainingUnit
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic } from '@/lib/haptics';
 import type { TrainingUnit, AudioFile } from '@/types/trainingUnit';
+import { useT } from '@/i18n';
 
 function DetailVideo({ uri }: { uri: string }) {
   const signed = useSignedUrl(uri);
@@ -35,6 +36,7 @@ function DetailVideo({ uri }: { uri: string }) {
 // Read-only Audio-Wiedergabe. Datei wird lokal geladen (Supabase-CDN ohne
 // Range-Support), dann via expo-audio abgespielt — gleiches Muster wie AudioRecorder.
 function AudioMemos({ files }: { files: AudioFile[] }) {
+  const { t } = useT();
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
@@ -62,7 +64,7 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
       player.play();
     } catch (e: any) {
       setPlayingIdx(null);
-      Alert.alert('Fehler', 'Abspielen nicht möglich: ' + (e?.message ?? ''));
+      Alert.alert(t('common.error'), t('training.playbackError', { message: e?.message ?? '' }));
     }
   };
 
@@ -74,7 +76,7 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
             <Ionicons name={playingIdx === i ? 'pause' : 'play'} size={16} color={C.accent} />
           </TouchableOpacity>
           <View style={s.flex}>
-            <Text style={s.audioTitle}>Sprachnotiz {i + 1}</Text>
+            <Text style={s.audioTitle}>{t('training.voiceMemoNumber', { number: i + 1 })}</Text>
             {a.transcript ? <Text style={s.audioTranscript}>{a.transcript}</Text> : null}
           </View>
           <Text style={s.audioDur}>{a.duration}</Text>
@@ -96,6 +98,7 @@ function formatDur(sec: number | null): string {
 
 export default function UnitDetailScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { id, readonly, clientName } = useLocalSearchParams<{ id: string; readonly?: string; clientName?: string }>();
   const isReadOnly = readonly === '1';   // Trainer-Sicht auf eine Kunden-Einheit
   const [unit, setUnit]       = useState<TrainingUnit | null>(null);
@@ -115,14 +118,14 @@ export default function UnitDetailScreen() {
 
   const handleDelete = () => {
     tapHaptic();
-    Alert.alert('Einheit löschen?', 'Diese Aktion kann nicht rückgängig gemacht werden.', [
-      { text: 'Abbrechen', style: 'cancel' },
+    Alert.alert(t('training.deleteUnitTitle'), t('training.deleteUnitBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Löschen', style: 'destructive',
+        text: t('common.delete'), style: 'destructive',
         onPress: async () => {
           if (!id) return;
           const { error } = await deleteTrainingUnit(id);
-          if (error) { Alert.alert('Fehler', error.message); return; }
+          if (error) { Alert.alert(t('common.error'), error.message); return; }
           queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
           router.back();
         },
@@ -136,8 +139,8 @@ export default function UnitDetailScreen() {
   if (!unit) {
     return (
       <SafeAreaView style={s.center}>
-        <Text style={s.missing}>Einheit nicht gefunden</Text>
-        <TouchableOpacity onPress={() => router.back()}><Text style={s.link}>Zurück</Text></TouchableOpacity>
+        <Text style={s.missing}>{t('training.notFound')}</Text>
+        <TouchableOpacity onPress={() => router.back()}><Text style={s.link}>{t('common.back')}</Text></TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -150,8 +153,8 @@ export default function UnitDetailScreen() {
         <HeroImage height={260} overlay={0.96} contentPosition="top">
           <SafeAreaView edges={['top']} style={s.heroSafe}>
             <View style={s.heroText}>
-              <Text style={s.eyebrow}>{isReadOnly ? `GETEILTE EINHEIT · ${formatDate(unit.session_date)}` : formatDate(unit.session_date)}</Text>
-              <Text style={s.heroTitle}>{unit.dog?.name ?? 'Einheit'}</Text>
+              <Text style={s.eyebrow}>{isReadOnly ? t('training.sharedUnitDate', { date: formatDate(unit.session_date) }) : formatDate(unit.session_date)}</Text>
+              <Text style={s.heroTitle}>{unit.dog?.name ?? t('training.unitFallback')}</Text>
               {isReadOnly && clientName ? <Text style={s.heroClient}>👤 {clientName}</Text> : null}
             </View>
           </SafeAreaView>
@@ -161,17 +164,17 @@ export default function UnitDetailScreen() {
           <View style={s.statsRow}>
             <View style={[s.statCard, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}
               <Text style={s.statVal}>{formatDur(unit.duration_sec)}</Text>
-              <Text style={s.statLabel}>DAUER</Text>
+              <Text style={s.statLabel}>{t('training.durationLabel')}</Text>
             </View>
             <View style={[s.statCard, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}
               <Text style={s.statVal}>{exercises.length}</Text>
-              <Text style={s.statLabel}>ÜBUNGEN</Text>
+              <Text style={s.statLabel}>{t('training.exercisesLabel')}</Text>
             </View>
             <View style={[s.statCard, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}
               <Text style={s.statVal}>
                 {unit.score != null ? `${unit.score}/10` : unit.rating != null ? `${unit.rating}/5` : '—'}
               </Text>
-              <Text style={s.statLabel}>BEWERTUNG</Text>
+              <Text style={s.statLabel}>{t('training.ratingLabel')}</Text>
             </View>
           </View>
 
@@ -182,14 +185,14 @@ export default function UnitDetailScreen() {
             {isGlass && <Glass style={s.glassBg} />}
             <Ionicons name="shield-checkmark-outline" size={18} color={C.muted} />
             <View style={s.flex}>
-              <Text style={s.shareTitle}>Wer sieht das?</Text>
-              <Text style={s.shareSub}>Sichtbarkeit pro Trainer unter „Meine Trainer“ festlegen</Text>
+              <Text style={s.shareTitle}>{t('training.shareVisibilityTitle')}</Text>
+              <Text style={s.shareSub}>{t('training.shareVisibilitySub')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={C.subtle} />
           </TouchableOpacity>
           )}
 
-          <Text style={s.label}>ÜBUNGEN</Text>
+          <Text style={s.label}>{t('training.exercisesLabel')}</Text>
           {exercises.map((ex, i) => (
             <View key={ex.id ?? i} style={[s.exRow, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}
               <View style={[s.exDot, { backgroundColor: disciplineColor(ex.discipline) }]} />
@@ -208,7 +211,7 @@ export default function UnitDetailScreen() {
 
           {unit.notes ? (
             <>
-              <Text style={s.label}>NOTIZEN</Text>
+              <Text style={s.label}>{t('common.notes').toUpperCase()}</Text>
               <View style={[s.notesBox, isGlass && s.cardGlass]}>{isGlass && <Glass style={s.glassBg} />}<Text style={s.notesTxt}>{unit.notes}</Text></View>
             </>
           ) : null}
@@ -216,7 +219,7 @@ export default function UnitDetailScreen() {
           {/* Fotos */}
           {unit.photos?.length > 0 && (
             <>
-              <Text style={s.label}>FOTOS</Text>
+              <Text style={s.label}>{t('training.photosLabel')}</Text>
               <View style={s.photoGrid}>
                 {unit.photos.map(url => (
                   <TouchableOpacity key={url} onPress={() => { tapHaptic(); setPreview(url); }} activeOpacity={0.85}>
@@ -230,7 +233,7 @@ export default function UnitDetailScreen() {
           {/* Videos */}
           {unit.videos?.length > 0 && (
             <>
-              <Text style={s.label}>VIDEOS</Text>
+              <Text style={s.label}>{t('training.videosLabel')}</Text>
               <View style={{ gap: 10 }}>
                 {unit.videos.map(url => <DetailVideo key={url} uri={url} />)}
               </View>
@@ -240,7 +243,7 @@ export default function UnitDetailScreen() {
           {/* Sprachmemos */}
           {unit.audio_files?.length > 0 && (
             <>
-              <Text style={s.label}>SPRACHMEMOS</Text>
+              <Text style={s.label}>{t('training.voiceMemos').toUpperCase()}</Text>
               <AudioMemos files={unit.audio_files} />
             </>
           )}
@@ -248,11 +251,11 @@ export default function UnitDetailScreen() {
           {/* Sprachmemos */}
           <View style={{ marginTop: 8 }}>
             <View style={s.voiceHead}>
-              <Text style={s.sectionLabel}>Sprachmemos</Text>
+              <Text style={s.sectionLabel}>{t('training.voiceMemos')}</Text>
               {!isReadOnly && (
                 <TouchableOpacity style={s.voiceAdd} onPress={() => setVoiceSheet(true)} activeOpacity={0.8}>
                   <Ionicons name="mic" size={14} color={C.accent} />
-                  <Text style={s.voiceAddTxt}>Hinzufügen</Text>
+                  <Text style={s.voiceAddTxt}>{t('common.add')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -269,11 +272,11 @@ export default function UnitDetailScreen() {
             <>
               <TouchableOpacity style={s.editBtn} onPress={() => { tapHaptic(); router.push({ pathname: '/unit/document', params: { id: id! } }); }} activeOpacity={0.8}>
                 <Ionicons name="create-outline" size={18} color={C.accentText} />
-                <Text style={s.editTxt}>Bearbeiten</Text>
+                <Text style={s.editTxt}>{t('common.edit')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.deleteBtn} onPress={handleDelete} activeOpacity={0.8}>
                 <Ionicons name="trash-outline" size={18} color={C.danger} />
-                <Text style={s.deleteTxt}>Einheit löschen</Text>
+                <Text style={s.deleteTxt}>{t('training.deleteUnitTitle')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -305,7 +308,7 @@ export default function UnitDetailScreen() {
         <View style={s.sheetBackdrop}>
           <View style={s.sheet}>
             <View style={s.sheetHandle} />
-            <Text style={s.sheetTitle}>Sprachmemo</Text>
+            <Text style={s.sheetTitle}>{t('training.voiceMemo')}</Text>
             <VoiceRecorderCard
               onCancel={() => setVoiceSheet(false)}
               onSave={async (uri, duration) => {

@@ -18,6 +18,7 @@ import { signMediaUrl } from '@/lib/mediaUrl';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { tapHaptic } from '@/lib/haptics';
 import type { NewComment, TrainingComment } from '@/types/comment';
+import { useT } from '@/i18n';
 
 const fmt =(s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const time = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
@@ -31,6 +32,7 @@ function VideoBubble({ uri }: { uri: string }) {
 
 // Messenger-artiger Kommentar-Thread an einer Trainingseinheit (Trainer ↔ Kunde).
 export function CommentThread({ unitId }: { unitId: string }) {
+  const { t } = useT();
   const { session } = useSession();
   const uid = session?.user.id;
   const { comments, loading } = useComments(unitId);
@@ -61,7 +63,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
     setBusy(true);
     const { error } = await addComment(unitId, uid, c);
     setBusy(false);
-    if (error) { Alert.alert('Fehler', error.message ?? 'Senden fehlgeschlagen.'); return; }
+    if (error) { Alert.alert(t('common.error'), error.message ?? t('comments.sendFailed')); return; }
     invalidate();
     notifyNewComment(unitId);   // best-effort Push an die Gegenseite
   };
@@ -76,7 +78,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
   const startRec = async () => {
     try {
       const { granted } = await AudioModule.requestRecordingPermissionsAsync();
-      if (!granted) { Alert.alert('Mikrofon nötig', 'Bitte Mikrofon-Zugriff erlauben.'); return; }
+      if (!granted) { Alert.alert(t('comments.microphoneRequired'), t('comments.microphonePermission')); return; }
       if (player.playing) player.pause();
       await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       await recorder.prepareToRecordAsync();
@@ -84,7 +86,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
       setIsRec(true); setRecSecs(0);
       recTimer.current = setInterval(() => setRecSecs(x => x + 1), 1000);
       tapHaptic();
-    } catch { Alert.alert('Fehler', 'Aufnahme nicht gestartet.'); }
+    } catch { Alert.alert(t('common.error'), t('comments.recordingStartFailed')); }
   };
 
   const stopRecAndSend = async () => {
@@ -101,14 +103,14 @@ export function CommentThread({ unitId }: { unitId: string }) {
       const url = await uploadTrainingAudio(uri);
       setBusy(false);
       await send({ kind: 'voice', body: null, media_url: url, duration: dur });
-    } catch { setBusy(false); Alert.alert('Fehler', 'Sprachnachricht nicht gesendet.'); }
+    } catch { setBusy(false); Alert.alert(t('common.error'), t('comments.voiceSendFailed')); }
   };
 
   const pickVideo = async () => {
     // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
     if (Platform.OS !== 'android') {
       const { status: st } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (st !== 'granted') { Alert.alert('Zugriff verweigert', 'Bitte Video-Zugriff erlauben.'); return; }
+      if (st !== 'granted') { Alert.alert(t('media.permissionDenied'), t('comments.videoPermission')); return; }
     }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['videos'], quality: 0.7, videoMaxDuration: 120 });
     if (res.canceled) return;
@@ -116,7 +118,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
     try {
       const url = await uploadTrainingVideo(res.assets[0].uri);
       await send({ kind: 'video', body: null, media_url: url, duration: null });
-    } catch { Alert.alert('Fehler', 'Video nicht gesendet.'); }
+    } catch { Alert.alert(t('common.error'), t('comments.videoSendFailed')); }
     finally { setBusy(false); }
   };
 
@@ -138,12 +140,12 @@ export function CommentThread({ unitId }: { unitId: string }) {
 
   return (
     <View>
-      <Text style={s.label}>NACHRICHTEN ({comments.length})</Text>
+      <Text style={s.label}>{t('comments.messagesCount', { count: comments.length })}</Text>
 
       {loading ? (
         <ActivityIndicator color={C.accent} style={{ marginVertical: 16 }} />
       ) : comments.length === 0 ? (
-        <Text style={s.empty}>Noch keine Nachrichten. Schreib etwas zur Einheit.</Text>
+        <Text style={s.empty}>{t('comments.empty')}</Text>
       ) : (
         comments.map(c => {
           const mine = c.author_id === uid;
@@ -156,7 +158,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
                 {c.kind === 'voice' && (
                   <TouchableOpacity style={s.voice} onPress={() => togglePlay(c)} activeOpacity={0.8}>
                     <Ionicons name={playingId === c.id ? 'pause-circle' : 'play-circle'} size={28} color={mine ? C.accentText : C.accent} />
-                    <Text style={[s.voiceDur, mine && s.textMine]}>{c.duration ?? 'Sprachnachricht'}</Text>
+                    <Text style={[s.voiceDur, mine && s.textMine]}>{c.duration ?? t('comments.voiceMessage')}</Text>
                   </TouchableOpacity>
                 )}
                 {c.kind === 'video' && c.media_url && <VideoBubble uri={c.media_url} />}
@@ -172,7 +174,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
         {isRec ? (
           <View style={s.recRow}>
             <View style={s.recDot} />
-            <Text style={s.recTxt}>Aufnahme … {fmt(recSecs)}</Text>
+            <Text style={s.recTxt}>{t('comments.recording', { duration: fmt(recSecs) })}</Text>
             <TouchableOpacity style={s.sendBtn} onPress={stopRecAndSend} activeOpacity={0.8}>
               <Ionicons name="send" size={18} color={C.accentText} />
             </TouchableOpacity>
@@ -181,7 +183,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
           <>
             <TextInput
               style={s.input}
-              placeholder="Nachricht schreiben…"
+              placeholder={t('comments.writeMessage')}
               placeholderTextColor={C.placeholder}
               value={text}
               onChangeText={setText}

@@ -18,9 +18,11 @@ import { createTrainingUnit } from '@/services/trainingUnitService';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { tapHaptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 export default function UnitStartScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { dogs } = useDogs();
   const { session } = useSession();
   const { profile } = useProfile();
@@ -49,7 +51,7 @@ export default function UnitStartScreen() {
   // Übungs-/Unterkategorie-Auswahl ins Live-Tracking starten.
   const startDirect = async (disc: Discipline, dogId: string, dogName: string | null) => {
     const ownerId = session?.user.id;
-    if (!ownerId) { Alert.alert('Fehler', 'Sitzung fehlt.'); return; }
+    if (!ownerId) { Alert.alert(t('common.error'), t('training.sessionMissing')); return; }
 
     if (!active.unitId) {
       if (creating.current) return;
@@ -57,7 +59,7 @@ export default function UnitStartScreen() {
       const { data, error } = await createTrainingUnit(ownerId, dogId);
       creating.current = false;
       if (error || !data) {
-        Alert.alert('Fehler', error?.message ?? 'Einheit konnte nicht gestartet werden.');
+        Alert.alert(t('common.error'), error?.message ?? t('training.startError'));
         return;
       }
       startUnit({ unitId: data.id, dogId, dogName: dogName || null });
@@ -71,7 +73,7 @@ export default function UnitStartScreen() {
     const dogId   = addMode ? active.dogId : selectedDogId;
     const dogName = addMode ? active.dogName : dogs.find(d => d.id === dogId)?.name ?? null;
     if (!dogId) {
-      Alert.alert('Hund wählen', 'Bitte wähle zuerst einen Hund für diese Einheit.');
+      Alert.alert(t('training.chooseDogFirstTitle'), t('training.chooseDogFirstBody'));
       return;
     }
 
@@ -84,7 +86,7 @@ export default function UnitStartScreen() {
     }
 
     if (disc.exercises.length === 0) {
-      Alert.alert('Keine Übungen', 'Diese Kategorie hat noch keine Übungen.');
+      Alert.alert(t('training.noExercisesTitle'), t('training.noExercisesBody'));
       return;
     }
     router.push({
@@ -110,9 +112,9 @@ export default function UnitStartScreen() {
           </View>
           <View style={s.heroText}>
             <Text style={s.eyebrow}>ANYVO</Text>
-            <Text style={s.heroTitle}>{addMode ? 'Übung hinzufügen' : 'Heute trainieren'}</Text>
+            <Text style={s.heroTitle}>{addMode ? t('training.addExercise') : t('training.trainToday')}</Text>
             <Text style={s.heroSub}>
-              {addMode ? 'Wähle eine weitere Sparte für die laufende Einheit.' : 'Wähle eine Sparte und leg los.'}
+              {addMode ? t('training.addDisciplineHint') : t('training.chooseDisciplineHint')}
             </Text>
           </View>
         </SafeAreaView>
@@ -123,13 +125,13 @@ export default function UnitStartScreen() {
         {addMode ? (
           <View style={s.lockedDog}>
             <DogIcon size={14} color={C.accent} />
-            <Text style={s.lockedDogTxt}>{active.dogName ?? 'Hund'}</Text>
+            <Text style={s.lockedDogTxt}>{active.dogName ?? t('dogs.dogFallback')}</Text>
           </View>
         ) : (
           <>
-            <Text style={s.label}>HUND</Text>
+            <Text style={s.label}>{t('training.dogLabel')}</Text>
             {dogs.length === 0 ? (
-              <View style={s.emptyBox}><Text style={s.emptyTxt}>Zuerst einen Hund anlegen</Text></View>
+              <View style={s.emptyBox}><Text style={s.emptyTxt}>{t('training.addFirstDog')}</Text></View>
             ) : (
               <>
                 <TouchableOpacity
@@ -137,11 +139,11 @@ export default function UnitStartScreen() {
                   activeOpacity={0.85}
                   onPress={() => { tapHaptic(); if (dogs.length > 1) setDogPickerOpen(o => !o); }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Hund wählen: ${selectedDogName ?? 'kein Hund gewählt'}`}
+                  accessibilityLabel={t('training.chooseDogA11y', { dog: selectedDogName ?? t('training.noDogSelected') })}
                 >
                   <View style={s.dogAvatar}><DogIcon size={18} color={C.accent} /></View>
                   <Text style={s.dogSelectorName} numberOfLines={1}>
-                    {selectedDogName ?? 'Hund wählen'}
+                    {selectedDogName ?? t('training.chooseDogTitle')}
                   </Text>
                   {dogs.length > 1 && (
                     <Ionicons name={dogPickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color={C.muted} />
@@ -172,7 +174,7 @@ export default function UnitStartScreen() {
           </>
         )}
 
-        <Text style={s.label}>SPARTE</Text>
+        <Text style={s.label}>{t('training.disciplineLabel')}</Text>
         {/* 2-Spalten-Raster (2x2 im Standardfall) — Auswahl folgt aktive_sparten */}
         <View style={s.grid}>
           {cards.map(d => {
@@ -195,10 +197,10 @@ export default function UnitStartScreen() {
             activeOpacity={0.85}
             onPress={() => { tapHaptic(); router.push('/unit/new-category'); }}
             accessibilityRole="button"
-            accessibilityLabel="Eigene Kategorie erstellen"
+            accessibilityLabel={t('training.createCategory')}
           >
             <Ionicons name="add" size={20} color={C.accent} />
-            <Text style={s.createBtnTxt}>Eigene Kategorie erstellen</Text>
+            <Text style={s.createBtnTxt}>{t('training.createCategory')}</Text>
           </TouchableOpacity>
         )}
 

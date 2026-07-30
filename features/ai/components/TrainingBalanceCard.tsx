@@ -1,16 +1,18 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { C } from '@/constants/colors';
 import type { TrainingBalance } from '@/features/ai/types/aiCoach';
+import { useT } from '@/i18n';
 
 const COLORS = [C.accent, C.trackBlue, C.trackPurple, C.warning, '#7fe6b0'];
 
 // Trainingsbalance der letzten 30 Tage als Balken pro Sparte.
 export function TrainingBalanceCard({ balance }: { balance: TrainingBalance[] }) {
+  const { t } = useT();
   if (balance.length === 0) return null;
   const max = Math.max(...balance.map(b => b.pct), 1);
   return (
     <View style={s.card}>
-      <Text style={s.eyebrow}>Trainingsbalance · 30 Tage</Text>
+      <Text style={s.eyebrow}>{t('analyse.trainingBalance30')}</Text>
       <View style={{ gap: 12, marginTop: 14 }}>
         {balance.map((b, i) => {
           const col = COLORS[i % COLORS.length];

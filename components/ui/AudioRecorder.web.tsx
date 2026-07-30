@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import type { AudioNote } from '@/types';
 
 // Web stub: recording requires the Expo Go mobile app.
@@ -19,11 +20,12 @@ interface Props {
 }
 
 export function AudioRecorder({ value, onChange }: Props) {
+  const { t } = useT();
   const del = (idx: number) => {
-    Alert.alert('Aufnahme löschen', 'Möchtest du diese Sprachnotiz löschen?', [
-      { text: 'Zurück', style: 'cancel' },
+    Alert.alert(t('audio.deleteTitle'), t('audio.deleteBody'), [
+      { text: t('common.back'), style: 'cancel' },
       {
-        text: 'Entfernen',
+        text: t('media.remove'),
         style: 'destructive',
         onPress: () => onChange(value.filter((_, i) => i !== idx)),
       },
@@ -38,8 +40,8 @@ export function AudioRecorder({ value, onChange }: Props) {
           <Ionicons name="mic-off-outline" size={20} color={C.subtle} />
         </View>
         <View style={S.disabledInfo}>
-          <Text style={S.disabledTitle}>Aufnahme nicht verfügbar</Text>
-          <Text style={S.disabledSub}>Sprachnotizen sind in der Mobilapp verfügbar.</Text>
+          <Text style={S.disabledTitle}>{t('audio.notAvailable')}</Text>
+          <Text style={S.disabledSub}>{t('audio.mobileOnly')}</Text>
         </View>
       </View>
 
@@ -50,7 +52,7 @@ export function AudioRecorder({ value, onChange }: Props) {
             <Ionicons name="mic-outline" size={15} color={C.muted} />
           </View>
           <View style={S.info}>
-            <Text style={S.itemTitel}>Notiz {i + 1}</Text>
+            <Text style={S.itemTitel}>{t('audio.note', { number: i + 1 })}</Text>
             <Text style={S.itemMeta}>{note.duration} · {note.createdAt}</Text>
           </View>
           <TouchableOpacity style={S.delBtn} onPress={() => del(i)} activeOpacity={0.7}>

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -35,6 +36,7 @@ export function LiveTopBar({
   view?: LiveView;
   onView?: (v: LiveView) => void;
 }) {
+  const { t } = useT();
   return (
     <View style={s.topBar}>
       <TouchableOpacity style={s.backBtn} onPress={onBack} hitSlop={8} activeOpacity={0.8}>
@@ -43,18 +45,18 @@ export function LiveTopBar({
       {resting ? (
         <View style={s.restPill}>
           <Ionicons name="time-outline" size={13} color={C.trackPrimary} />
-          <Text style={s.restTxt}>LIEGT</Text>
+          <Text style={s.restTxt}>{t('track.liveResting')}</Text>
         </View>
       ) : (
         <View style={[s.livePill, paused && s.livePillPaused]}>
           {paused ? <View style={[s.recDot, { opacity: 0.5 }]} /> : <RecDot />}
-          <Text style={[s.liveTxt, paused && { color: C.trackTextSec }]}>{paused ? 'PAUSE' : 'LIVE'}</Text>
+          <Text style={[s.liveTxt, paused && { color: C.trackTextSec }]}>{paused ? t('track.livePaused') : t('track.liveLive')}</Text>
         </View>
       )}
       <View style={{ flex: 1 }} />
       {view && onView && (
         <View style={s.segment}>
-          {([['map', 'Karte'], ['sketch', 'Skizze']] as [LiveView, string][]).map(([k, l]) => {
+          {([['map', t('track.viewMap')], ['sketch', t('track.viewSketch')]] as [LiveView, string][]).map(([k, l]) => {
             const on = view === k;
             return (
               <TouchableOpacity key={k} onPress={() => onView(k)} activeOpacity={0.85}
@@ -69,11 +71,12 @@ export function LiveTopBar({
   );
 }
 
-export function LiveTimer({ seconds, label = 'Laufzeit' }: { seconds: number; label?: string }) {
+export function LiveTimer({ seconds, label }: { seconds: number; label?: string }) {
+  const { t } = useT();
   return (
     <View style={[s.glass, s.timer]}>
       <Text style={s.timerVal}>{fmtClock(seconds)}</Text>
-      <Text style={s.cap}>{label}</Text>
+      <Text style={s.cap}>{label ?? t('track.runtime')}</Text>
     </View>
   );
 }

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/constants/colors';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
+import { useT } from '@/i18n';
 
 interface Props {
   value?:   string | null;
@@ -25,6 +26,7 @@ function VideoPlayer({ uri, onReplace, onDelete }: {
   onReplace: () => void;
   onDelete:  () => void;
 }) {
+  const { t } = useT();
   const signed = useSignedUrl(uri);
   const player = useVideoPlayer(signed, p => {
     p.loop  = false;
@@ -47,11 +49,11 @@ function VideoPlayer({ uri, onReplace, onDelete }: {
       <View style={S.previewActions}>
         <TouchableOpacity style={S.btnReplace} onPress={onReplace} activeOpacity={0.7}>
           <Ionicons name="refresh-outline" size={14} color={C.muted} />
-          <Text style={S.btnReplaceTxt}>Ersetzen</Text>
+          <Text style={S.btnReplaceTxt}>{t('media.replace')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={S.btnDel} onPress={onDelete} activeOpacity={0.7}>
           <Ionicons name="trash-outline" size={14} color={C.danger} />
-          <Text style={S.btnDelTxt}>Entfernen</Text>
+          <Text style={S.btnDelTxt}>{t('media.remove')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -59,6 +61,7 @@ function VideoPlayer({ uri, onReplace, onDelete }: {
 }
 
 export function VideoUpload({ value, onChange }: Props) {
+  const { t } = useT();
   const [uploading, setUploading] = useState(false);
 
   const pick = async () => {
@@ -67,9 +70,9 @@ export function VideoUpload({ value, onChange }: Props) {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Zugriff verweigert',
-          'Bitte erlaube Foto/Video-Zugriff:\n\nEinstellungen → Expo Go → Fotos → "Alle Fotos" auswählen',
-          [{ text: 'OK' }]
+          t('media.permissionDenied'),
+          t('media.photoVideoPermission'),
+          [{ text: t('common.ok') }]
         );
         return;
       }
@@ -106,8 +109,8 @@ export function VideoUpload({ value, onChange }: Props) {
       onChange(urlData.publicUrl);
     } catch (e: any) {
       Alert.alert(
-        'Upload braucht einen Moment',
-        'Noch nicht hochgeladen — versuch es nochmal!\n' + (e?.message || JSON.stringify(e))
+        t('media.uploadNeedsMoment'),
+        t('media.uploadRetryWithMessage', { message: e?.message || JSON.stringify(e) })
       );
     } finally {
       setUploading(false);
@@ -115,9 +118,9 @@ export function VideoUpload({ value, onChange }: Props) {
   };
 
   const del = () => {
-    Alert.alert('Video löschen', 'Möchtest du das Video wirklich löschen?', [
-      { text: 'Zurück', style: 'cancel' },
-      { text: 'Entfernen', style: 'destructive', onPress: () => onChange(null) },
+    Alert.alert(t('media.deleteVideoTitle'), t('media.deleteVideoBody'), [
+      { text: t('common.back'), style: 'cancel' },
+      { text: t('media.remove'), style: 'destructive', onPress: () => onChange(null) },
     ]);
   };
 
@@ -139,8 +142,8 @@ export function VideoUpload({ value, onChange }: Props) {
           <View style={S.iconBox}>
             <Ionicons name="videocam-outline" size={22} color={C.muted} />
           </View>
-          <Text style={S.emptyTxt}>Video hinzufügen</Text>
-          <Text style={S.emptySub}>MP4, MOV · max. 2 Min.</Text>
+          <Text style={S.emptyTxt}>{t('media.addVideo')}</Text>
+          <Text style={S.emptySub}>{t('media.videoHint')}</Text>
         </>
       )}
     </TouchableOpacity>
