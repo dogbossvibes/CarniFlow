@@ -1,4 +1,6 @@
 // ──────────────────────────────────────────────────────────────────────────
+
+import type { TranslationKey } from '@/i18n';
 // Zentrale, datengetriebene Help-Registry — Single Source of Truth für
 // Coachmarks, „?"-Hilfe im Screen, Help-Center und „ANYVO kennenlernen".
 // Keine Hilfetexte über die Screens verteilt. KEINE KI (Smart Analyse =
@@ -9,6 +11,7 @@ export type HelpCategory = 'start' | 'training' | 'tracking' | 'analysis';
 
 export type HelpTopicId =
   | 'home'
+  | 'account_security'
   | 'add_dog'
   | 'start_timer'
   | 'document_training'
@@ -41,6 +44,59 @@ export const HELP_CATEGORY_LABEL: Record<HelpCategory, string> = {
 };
 export const HELP_CATEGORY_ORDER: HelpCategory[] = ['start', 'tracking', 'training', 'analysis'];
 
+export const HELP_CATEGORY_LABEL_KEY: Record<HelpCategory, TranslationKey> = {
+  start: 'help.categoryStart',
+  tracking: 'help.categoryTracking',
+  training: 'help.categoryTraining',
+  analysis: 'help.categoryAnalysis',
+};
+
+export const HELP_TOPIC_TITLE_KEY: Record<HelpTopicId, TranslationKey> = {
+  home: 'help.homeTitle',
+  account_security: 'profile.accountSecurity',
+  add_dog: 'dog.add',
+  start_timer: 'training.startTimer',
+  document_training: 'training.document',
+  start_training: 'training.start',
+  track_laying: 'track.lay',
+  track_segments: 'help.trackSegmentsTitle',
+  track_objects: 'help.trackObjectsTitle',
+  track_angles: 'help.trackAnglesTitle',
+  track_gps: 'help.trackGpsTitle',
+  track_search: 'track.search',
+  track_handler_distance: 'help.trackHandlerDistanceTitle',
+  track_step_calibration: 'help.trackStepCalibrationTitle',
+  smart_analysis: 'analyse.cardTitle',
+  recent_sessions: 'help.recentSessionsTitle',
+};
+
+export const HELP_TOPIC_SHORT_KEY: Record<HelpTopicId, TranslationKey> = {
+  home: 'help.homeShort',
+  account_security: 'help.accountSecurityShort',
+  add_dog: 'help.addDogShort',
+  start_timer: 'help.startTimerShort',
+  document_training: 'help.documentTrainingShort',
+  start_training: 'help.startTrainingShort',
+  track_laying: 'help.trackLayingShort',
+  track_segments: 'help.trackSegmentsShort',
+  track_objects: 'help.trackObjectsShort',
+  track_angles: 'help.trackAnglesShort',
+  track_gps: 'help.trackGpsShort',
+  track_search: 'help.trackSearchShort',
+  track_handler_distance: 'help.trackHandlerDistanceShort',
+  track_step_calibration: 'help.trackStepCalibrationShort',
+  smart_analysis: 'help.smartAnalysisShort',
+  recent_sessions: 'help.recentSessionsShort',
+};
+
+export const HELP_TOPIC_BODY_KEYS: Partial<Record<HelpTopicId, TranslationKey[]>> = {
+  home: ['help.homeBody1', 'help.homeBody2'],
+  account_security: ['help.accountSecurityBody1', 'help.accountSecurityBody2'],
+  track_laying: ['help.trackLayingBody1', 'help.trackLayingBody2'],
+  track_angles: ['help.trackAnglesBody1'],
+  track_step_calibration: ['help.trackStepCalibrationBody1'],
+};
+
 export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
   home: {
     id: 'home',
@@ -50,6 +106,17 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     body: [
       'Wähle zwischen Raster, Liste und Kompakt.',
       'Alles wird pro Konto gespeichert und lässt sich jederzeit zurücksetzen.',
+    ],
+    category: 'start',
+  },
+  account_security: {
+    id: 'account_security',
+    title: 'Konto & Sicherheit',
+    shortDescription:
+      'Hier siehst du, ob du dich per E-Mail, Google oder Apple anmeldest. E-Mail-Konten können Passwort und E-Mail-Adresse über Supabase Auth ändern.',
+    body: [
+      'Google- und Apple-Konten verwalten E-Mail und Passwort beim jeweiligen Anbieter.',
+      'Beim Zurücksetzen oder Ändern können Bestätigungsmails erforderlich sein.',
     ],
     category: 'start',
   },
@@ -166,6 +233,14 @@ export function topicsByCategory(cat: HelpCategory): HelpTopic[] {
 
 // „ANYVO kennenlernen" — kurzer geführter Rundgang (kein echtes Training).
 export interface TourStep { title: string; text: string }
+export const GUIDED_TOUR_KEY: { titleKey: TranslationKey; textKey: TranslationKey }[] = [
+  { titleKey: 'help.tourHomeTitle', textKey: 'help.tourHomeText' },
+  { titleKey: 'help.tourDogTitle', textKey: 'help.tourDogText' },
+  { titleKey: 'help.tourTrainingTitle', textKey: 'help.tourTrainingText' },
+  { titleKey: 'help.tourTrackTitle', textKey: 'help.tourTrackText' },
+  { titleKey: 'help.tourSearchTitle', textKey: 'help.tourSearchText' },
+  { titleKey: 'help.tourAnalysisTitle', textKey: 'help.tourAnalysisText' },
+];
 export const GUIDED_TOUR: TourStep[] = [
   { title: 'Startbildschirm', text: 'Passe deinen Start so an, wie du ANYVO nutzt.' },
   { title: 'Hund',            text: 'Lege zuerst deinen Hund an.' },
