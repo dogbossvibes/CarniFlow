@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { createRevenueCatWebhookHandler } from '../_shared/revenuecat-webhook.ts'
 
 serve(createRevenueCatWebhookHandler({
-  expectedStore: 'app_store',
+  expectedStore: 'play_store',
   env: Deno.env,
   createAdmin: (supabaseUrl, serviceRoleKey) => createClient(supabaseUrl, serviceRoleKey),
 }))
