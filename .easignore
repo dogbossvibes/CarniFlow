@@ -1,0 +1,127 @@
+# Base rules copied from .gitignore because .easignore takes precedence.
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+# generated native folders
+/ios
+/android
+
+# Supabase CLI temp
+supabase/.temp/
+
+# Claude Code transiente Dateien
+.claude/scheduled_tasks.lock
+
+# Google Play Service Account (Secret - nicht committen)
+google-play-service-account.json
+
+# Debug-Screenshots (lokal, nicht versionieren)
+fahertescreen.PNG
+/screenshot*
+/screentrainer.png
+/faehrtenscreen*
+
+# Editor-Swap-Dateien (vim)
+*.swp
+*.swo
+
+# Lokale Native-Modul-Build-Artefakte (Gradle)
+modules/*/android/build/
+
+# Local release/build artifacts
+/ANYVO-current-repository.zip
+*.zip
+/dist-*/
+/artifacts/
+/appstore-screenshots/
+/coverage/
+/test-results/
+/reports/
+*.log
+
+# Local screenshots and design/reference exports
+/after_*.png
+/screen*.jpg
+/Bildschirmfoto*
+/design_handoff_faehrten/
+/faehrten 6/design_handoff_faehrten/
+/winkel.png
+/assets/images/bgyam.jpg
+
+# Local Supabase deployment, smoke, dump and restore artifacts
+/*.sql
+/supabase/*.sql
+/supabase/migrations/
+/supabase/production_public_schema_snapshot.sql
+/supabase/staging_public_schema_restore.sql
+/supabase/staging_p0_smoke_verify.sql
+/STAGING_DEPLOY_RUN.sql
+/FOUNDER_SLOT_LIFECYCLE_SETUP.sql
+/SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql
+/SUBSCRIPTION_P0_DB_DEPLOYMENT.md
+*dump*.sql
+*backup*.sql
+*restore*.sql
+*smoke*.sql
+
+# Local agent/workspace files not needed by EAS Build
+/.claude/
+/.codex/
+/docs/
+*.code-workspace
+
+# Local analysis/report docs not needed by EAS Build
+/docs/architecture/*_REPORT.md
+/docs/architecture/*_ANALYSIS.md
+/docs/architecture/CODEX_*.md
+/docs/architecture/P0-*.md
+/docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
+
+# Legacy AI/voice server docs and deleted Edge Functions are not needed by the app build.
+/AI_*.md
+/VOICE_README.md
+/AI_HANDOFF.md
+/supabase/functions/ai-analysis/
+/supabase/functions/analyze-training/
+/supabase/functions/generate-coach-summary/
+/supabase/functions/generate-training-embedding/
+/supabase/functions/recommend/
+/supabase/functions/search-training-memory/
+/supabase/functions/transcribe-voice-note/
+/supabase/functions/_shared/embedding.ts
