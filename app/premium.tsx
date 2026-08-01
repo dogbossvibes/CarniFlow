@@ -11,31 +11,30 @@ import { haptic } from '@/lib/haptics';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, type PurchasePackage } from '@/lib/purchases';
 import {
   activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
 import { PLAN_META, FOUNDER_SLOT_LIMIT, type SubscriptionPlan } from '@/features/subscription/plans';
+import { useT } from '@/i18n';
+import type { TranslationKey } from '@/i18n/de-CH';
 
-// Anzeige-Text, wenn das Founder-Kontingent erschöpft ist (Server = Quelle der Wahrheit).
-const FOUNDER_SOLD_OUT_MSG = 'Founder Edition ist leider ausverkauft.';
 import { useAccess } from '@/hooks/useAccess';
 import { useInternalTester } from '@/hooks/useInternalTester';
 
-interface CardDef { plan: SubscriptionPlan; badge?: string; features: string[]; founder?: boolean }
+interface CardDef { plan: SubscriptionPlan; badgeKey?: TranslationKey; features: TranslationKey[]; founder?: boolean }
 
 const CARDS: CardDef[] = [
-  { plan: 'newbie', badge: 'Start', features: ['7 Tage kostenlos', 'Alle Active-Funktionen', 'Danach Active CHF 6.00/Mt.', 'Kein Trainerzugang'] },
-  { plan: 'founder_active', badge: `Nur ${FOUNDER_SLOT_LIMIT}×`, founder: true, features: ['Dauerhaft CHF 4.00/Mt.', 'Solange das Abo aktiv bleibt', 'Alle Active-Funktionen', 'Kein Trainerzugang'] },
-  { plan: 'active', features: ['Training, Hunde, Fortschritt', 'Smart Auswertung', 'Kalender & Sprachnotizen', 'Kein Trainerzugang'] },
-  { plan: 'trainer', badge: 'Profi', features: ['Alles aus Active', 'Kundenverwaltung & Pläne', 'Umfragen & Feedback', 'Trainer-Dashboard'] },
+  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.feature7Days', 'premium.featureActive', 'premium.featureThenActive', 'premium.featureNoTrainer'] },
+  { plan: 'founder_active', badgeKey: 'premium.badgeFounderSlots', founder: true, features: ['premium.featureFounderPrice', 'premium.featureWhileActive', 'premium.featureActive', 'premium.featureNoTrainer'] },
+  { plan: 'active', features: ['premium.featureTrainingProgress', 'premium.featureSmartAnalysis', 'premium.featureCalendarVoice', 'premium.featureNoTrainer'] },
+  { plan: 'trainer', badgeKey: 'premium.badgePro', features: ['premium.featureAllActive', 'premium.featureClientPlans', 'premium.featurePollsFeedback', 'premium.featureTrainerDashboard'] },
 ];
 
 const MONTH_MS = 30 * 86400000;
-const STORE_PACKAGE_UNAVAILABLE_MSG = 'Das Trainer-Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.';
-
 export default function PremiumScreen() {
   const router = useRouter();
+  const { t } = useT();
   const [laden, setLaden] = useState<SubscriptionPlan | null>(null);
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
   const [slots, setSlots] = useState<{ used: number; remaining: number }>({ used: 0, remaining: FOUNDER_SLOT_LIMIT });
@@ -89,24 +88,24 @@ export default function PremiumScreen() {
     haptic.success();   // Kauf/Aktivierung erfolgreich
     queryClient.invalidateQueries({ queryKey: ['capabilities'] });
     queryClient.invalidateQueries({ queryKey: ['profile'] });
-    Alert.alert(`${PLAN_META[plan].name} aktiv 🎉`, 'Deine Funktionen sind freigeschaltet.', [{ text: "Los geht's!", onPress: () => router.back() }]);
+    Alert.alert(t('premium.activeTitle', { plan: PLAN_META[plan].name }), t('premium.unlocked'), [{ text: t('trainer.letsGo'), onPress: () => router.back() }]);
   };
 
   const choose = async (plan: SubscriptionPlan) => {
     // Interner Tester: Premium ist bereits über die Berechtigungslogik
     // freigeschaltet — keine echte Kaufabwicklung, RevenueCat wird nicht berührt.
     if (isInternalTester) {
-      Alert.alert('Interner Tester', 'Interner Tester – Premium ist bereits freigeschaltet.');
+      Alert.alert(t('premium.internalTester'), t('premium.internalTesterBody'));
       return;
     }
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { Alert.alert('Hinweis', 'Bitte zuerst anmelden.'); return; }
+    if (!user) { Alert.alert(t('trainer.connectHintTitle'), t('premium.loginRequired')); return; }
     setLaden(plan);
     try {
       // Newbie Trial: 7 Tage gratis, kein Kauf.
       if (plan === 'newbie') {
         const { error } = await activatePlan({ userId: user.id, plan, status: 'trialing', trialEndsAt: trialEndDate() });
-        if (error) { Alert.alert('Hinweis', 'Trial konnte nicht aktiviert werden.'); return; }
+        if (error) { Alert.alert(t('trainer.connectHintTitle'), t('premium.trialError')); return; }
         finish(plan); return;
       }
       const meta = PLAN_META[plan];
@@ -119,33 +118,33 @@ export default function PremiumScreen() {
             loadedPackageIds: packages.map(p => p.id),
           });
         }
-        Alert.alert('Hinweis', plan === 'trainer' ? STORE_PACKAGE_UNAVAILABLE_MSG : 'Dieses Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.');
+        Alert.alert(t('trainer.connectHintTitle'), plan === 'trainer' ? t('premium.trainerPackageUnavailable') : t('premium.packageUnavailable'));
         return;
       }
       // Founder: zuerst Slot atomar beanspruchen.
       if (plan === 'founder_active') {
         const claim = await claimFounderSlot();
         setSlots(s => ({ used: claim.remaining != null ? FOUNDER_SLOT_LIMIT - claim.remaining : s.used, remaining: claim.remaining }));
-        if (!claim.ok) { haptic.warning(); Alert.alert('Founder Active', claim.error === 'Founder offer sold out' ? FOUNDER_SOLD_OUT_MSG : (claim.error ?? 'Nicht verfügbar.')); return; }
+        if (!claim.ok) { haptic.warning(); Alert.alert('Founder Active', claim.error === 'Founder offer sold out' ? t('premium.founderSoldOut') : (claim.error ?? t('premium.notAvailable'))); return; }
       }
       if (iapReady) {
         const pkg = packageForPlan(plan);
         if (!pkg) return;
         const res = await buyPackage(pkg);
         if (res.cancelled) return;
-        if (!res.ok) { haptic.error(); Alert.alert('Hinweis', res.error ?? 'Kauf wurde nicht abgeschlossen.'); return; }
+        if (!res.ok) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), res.error ?? t('premium.purchaseIncomplete')); return; }
         const { error } = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration, providerProductId: meta.productId });
-        if (error) { haptic.error(); Alert.alert('Hinweis', 'Aktivierung fehlgeschlagen.'); return; }
+        if (error) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), t('premium.activationFailed')); return; }
         finish(plan);
       } else if (purchasesReady()) {
-        Alert.alert('Hinweis', plan === 'trainer' ? STORE_PACKAGE_UNAVAILABLE_MSG : 'Dieses Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.');
+        Alert.alert(t('trainer.connectHintTitle'), plan === 'trainer' ? t('premium.trainerPackageUnavailable') : t('premium.packageUnavailable'));
       } else if (__DEV__) {
         // Dev/Test ohne konfigurierten Store: direkt aktivieren.
         const { error } = await activatePlan({ userId: user.id, plan, periodEndsAt: new Date(Date.now() + MONTH_MS).toISOString(), providerProductId: meta.productId });
-        if (error) { Alert.alert('Hinweis', 'Aktivierung fehlgeschlagen.'); return; }
+        if (error) { Alert.alert(t('trainer.connectHintTitle'), t('premium.activationFailed')); return; }
         finish(plan);
       } else {
-        Alert.alert('Bald verfügbar', 'Käufe sind gerade nicht verfügbar. Bitte später erneut versuchen.');
+        Alert.alert(t('premium.comingSoon'), t('premium.purchaseUnavailable'));
       }
     } finally {
       setLaden(null);
@@ -154,17 +153,17 @@ export default function PremiumScreen() {
 
   const handleCancelTrial = () => {
     Alert.alert(
-      'Testabo kündigen?',
+      t('premium.cancelTrialTitle'),
       trialEndLabel
-        ? `Dein Zugriff bleibt bis zum ${trialEndLabel} bestehen und läuft danach automatisch aus. Es wird nichts abgebucht.`
-        : 'Dein Zugriff bleibt bis zum Ende der Testphase bestehen und läuft danach automatisch aus. Es wird nichts abgebucht.',
+        ? t('premium.cancelTrialBodyDate', { date: trialEndLabel })
+        : t('premium.cancelTrialBody'),
       [
-        { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Kündigen', style: 'destructive', onPress: async () => {
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('premium.cancel'), style: 'destructive', onPress: async () => {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
           const { error } = await cancelTrial(user.id);
-          if (error) { Alert.alert('Hinweis', 'Kündigung fehlgeschlagen. Bitte später erneut versuchen.'); return; }
+          if (error) { Alert.alert(t('trainer.connectHintTitle'), t('premium.cancelError')); return; }
           setCancelAtPeriodEnd(true);
           queryClient.invalidateQueries({ queryKey: ['capabilities'] });
           queryClient.invalidateQueries({ queryKey: ['userAccess'] });
@@ -178,15 +177,15 @@ export default function PremiumScreen() {
     const res = await restorePurchases();
     setLaden(null);
     const { data: { user } } = await supabase.auth.getUser();
-    if (res.tier && user) {
-      // Entitlement → Plan (Founder bleibt erhalten, wenn Provider es bestätigt).
-      const plan: SubscriptionPlan = res.tier === 'trainer' ? 'trainer' : (currentPlan === 'founder_active' ? 'founder_active' : 'active');
+    const restoredPlan = restorePlanFromResult(res, currentPlan);
+    if (restoredPlan && user) {
+      const plan: SubscriptionPlan = restoredPlan;
       await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration });
       haptic.success();   // Restore erfolgreich
-      Alert.alert('Wiederhergestellt', 'Dein Abo ist wieder aktiv.', [{ text: 'OK', onPress: () => router.back() }]);
+      Alert.alert(t('premium.restored'), t('premium.restoredBody'), [{ text: 'OK', onPress: () => router.back() }]);
     } else {
       haptic.warning();   // nichts wiederherzustellen
-      Alert.alert('Nichts gefunden', res.error ?? 'Keine aktiven Käufe gefunden.');
+      Alert.alert(t('premium.noneFound'), res.error ?? t('premium.noneFoundBody'));
     }
   };
 
@@ -202,8 +201,8 @@ export default function PremiumScreen() {
             <LinearGradient colors={[`${C.accent}25`, `${C.accent}08`]} style={StyleSheet.absoluteFill} />
             <Ionicons name={trialing ? 'hourglass' : 'star'} size={34} color={C.accent} />
           </View>
-          <Text style={S.headerTitel}>{trialing ? 'Vollen Zugriff sichern' : (currentPlan ? 'Dein Plan' : 'ANYVO wählen')}</Text>
-          <Text style={S.headerSub}>{trialing ? 'Wähle deinen Plan, bevor die Testphase endet.' : 'Nur Monatsabos · jederzeit kündbar.'}</Text>
+          <Text style={S.headerTitel}>{trialing ? t('premium.secureAccess') : (currentPlan ? t('premium.yourPlan') : t('premium.chooseAnyvo'))}</Text>
+          <Text style={S.headerSub}>{trialing ? t('premium.chooseBeforeTrialEnds') : t('premium.monthlyCancelable')}</Text>
         </View>
 
         {/* Trial-Countdown: motiviert zum Wechsel Testversion → Active, bevor der
@@ -214,20 +213,20 @@ export default function PremiumScreen() {
             <View style={{ flex: 1 }}>
               <Text style={S.trialTitle}>
                 {trialDaysLeft != null
-                  ? (trialDaysLeft === 0 ? 'Testphase endet heute' : `Noch ${trialDaysLeft} ${trialDaysLeft === 1 ? 'Tag' : 'Tage'} gratis`)
-                  : 'Testversion aktiv'}
+                  ? (trialDaysLeft === 0 ? t('premium.trialEndsToday') : t('premium.trialDaysLeft', { days: trialDaysLeft, unit: trialDaysLeft === 1 ? t('premium.day') : t('premium.days') }))
+                  : t('premium.trialActive')}
               </Text>
               <Text style={S.trialSub}>
                 {cancelAtPeriodEnd
                   ? (trialEndLabel
-                      ? `Gekündigt — dein Zugriff läuft am ${trialEndLabel} aus. Es wird nichts abgebucht.`
-                      : 'Gekündigt — dein Zugriff läuft am Ende der Testphase aus.')
+                      ? t('premium.cancelledAccessEndsDate', { date: trialEndLabel })
+                      : t('premium.cancelledAccessEnds'))
                   : (trialEndLabel
-                      ? `Deine Newbie-Testphase endet am ${trialEndLabel}. Sichere dir jetzt den vollen Zugriff — ohne Unterbruch.`
-                      : 'Sichere dir jetzt den vollen Zugriff — ohne Unterbruch.')}
+                      ? t('premium.trialEndsDate', { date: trialEndLabel })
+                      : t('premium.secureFullAccess'))}
               </Text>
               {!cancelAtPeriodEnd && (
-                <Text style={S.trialCancelLink} onPress={handleCancelTrial}>Testabo kündigen</Text>
+                <Text style={S.trialCancelLink} onPress={handleCancelTrial}>{t('premium.cancelTrialLink')}</Text>
               )}
             </View>
           </View>
@@ -238,7 +237,7 @@ export default function PremiumScreen() {
             <View style={S.cardHead}>
               <View style={{ flex: 1 }}>
                 <View style={S.nameRow}>
-                  <Text style={S.cardName}>{access.hasTrainerAccess ? 'Lifetime Trainer Zugriff aktiv' : 'Lifetime Zugriff aktiv'}</Text>
+                  <Text style={S.cardName}>{access.hasTrainerAccess ? t('premium.lifetimeTrainerActive') : t('premium.lifetimeActive')}</Text>
                   <View style={S.badge}><Text style={S.badgeTxt}>LIFETIME</Text></View>
                 </View>
               </View>
@@ -246,7 +245,7 @@ export default function PremiumScreen() {
             <View style={S.featureList}>
               <View style={S.featureRow}>
                 <Ionicons name="checkmark-circle" size={15} color={C.accent} />
-                <Text style={S.featureTxt}>Du hast lebenslangen Zugriff auf diese Funktionen.</Text>
+                <Text style={S.featureTxt}>{t('premium.lifetimeFeature')}</Text>
               </View>
             </View>
           </View>
@@ -266,21 +265,21 @@ export default function PremiumScreen() {
               {isRec && (
                 <View style={S.recStrip}>
                   <Ionicons name="star" size={11} color={C.accentText} />
-                  <Text style={S.recStripTxt}>{card.founder ? 'BESTER PREIS' : 'EMPFOHLEN'}</Text>
+                  <Text style={S.recStripTxt}>{card.founder ? t('premium.bestPrice') : t('premium.recommended')}</Text>
                 </View>
               )}
               <View style={S.cardHead}>
                 <View style={{ flex: 1 }}>
                   <View style={S.nameRow}>
                     <Text style={S.cardName}>{meta.name}</Text>
-                    {card.badge && <View style={[S.badge, card.founder && S.badgeFounder]}><Text style={[S.badgeTxt, card.founder && { color: '#04201b' }]}>{card.badge}</Text></View>}
+                    {card.badgeKey && <View style={[S.badge, card.founder && S.badgeFounder]}><Text style={[S.badgeTxt, card.founder && { color: '#04201b' }]}>{t(card.badgeKey, { limit: FOUNDER_SLOT_LIMIT })}</Text></View>}
                   </View>
                   <View style={S.priceRow}>
-                    <Text style={S.cardPrice}>{card.plan === 'newbie' ? '7 Tage gratis' : (pkgPrice ?? meta.priceLabel)}</Text>
+                    <Text style={S.cardPrice}>{card.plan === 'newbie' ? t('premium.free7Days') : (pkgPrice ?? meta.priceLabel)}</Text>
                     {/* Ersparnis ggü. Active hervorheben (Conversion-Anker für Trial-Nutzer). */}
-                    {card.founder && founderAvailable && <Text style={S.savings}>statt {activePriceStr}</Text>}
+                    {card.founder && founderAvailable && <Text style={S.savings}>{t('premium.instead', { price: activePriceStr })}</Text>}
                   </View>
-                  {card.founder && <Text style={S.founderSlots}>{founderAvailable ? `Noch ${slots.remaining} von ${FOUNDER_SLOT_LIMIT}` : 'Ausverkauft'}</Text>}
+                  {card.founder && <Text style={S.founderSlots}>{founderAvailable ? t('premium.slotsLeft', { remaining: slots.remaining, limit: FOUNDER_SLOT_LIMIT }) : t('premium.soldOut')}</Text>}
                 </View>
               </View>
 
@@ -288,25 +287,25 @@ export default function PremiumScreen() {
                 {card.features.map(f => (
                   <View key={f} style={S.featureRow}>
                     <Ionicons name="checkmark-circle" size={15} color={C.accent} />
-                    <Text style={S.featureTxt}>{f}</Text>
+                    <Text style={S.featureTxt}>{t(f)}</Text>
                   </View>
                 ))}
               </View>
 
               {isCurrent ? (
-                <View style={S.currentTag}><Ionicons name="checkmark" size={15} color={C.accent} /><Text style={S.currentTxt}>Aktiv</Text></View>
+                <View style={S.currentTag}><Ionicons name="checkmark" size={15} color={C.accent} /><Text style={S.currentTxt}>{t('premium.current')}</Text></View>
               ) : soldOut ? (
-                <View style={S.soldOut}><Text style={S.soldOutTxt}>{FOUNDER_SOLD_OUT_MSG}</Text></View>
+                <View style={S.soldOut}><Text style={S.soldOutTxt}>{t('premium.founderSoldOut')}</Text></View>
               ) : missingStorePackage ? (
-                <TouchableOpacity style={S.soldOut} onPress={() => Alert.alert('Hinweis', card.plan === 'trainer' ? STORE_PACKAGE_UNAVAILABLE_MSG : 'Dieses Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.')} activeOpacity={0.75}>
-                  <Text style={S.soldOutTxt}>Abo momentan nicht geladen</Text>
+                <TouchableOpacity style={S.soldOut} onPress={() => Alert.alert(t('trainer.connectHintTitle'), card.plan === 'trainer' ? t('premium.trainerPackageUnavailable') : t('premium.packageUnavailable'))} activeOpacity={0.75}>
+                  <Text style={S.soldOutTxt}>{t('premium.notLoaded')}</Text>
                 </TouchableOpacity>
               ) : (
                 <AnimatedPressable style={[S.cta, !filled && S.ctaAlt]} scale={0.97} onPress={() => choose(card.plan)} disabled={busy}>
                   {filled && <LinearGradient colors={['#00FFCC', '#00f0c8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
                   {busy ? <ActivityIndicator color={filled ? C.accentText : C.white} /> : (
                     <Text style={[S.ctaTxt, filled ? { color: C.accentText } : { color: C.white }]}>
-                      {card.plan === 'newbie' ? 'Gratis starten' : (trialing ? `Jetzt auf ${meta.name} wechseln` : `${meta.name} wählen`)}
+                      {card.plan === 'newbie' ? t('premium.startFree') : (trialing ? t('premium.switchToPlan', { plan: meta.name }) : t('premium.choosePlan', { plan: meta.name }))}
                     </Text>
                   )}
                 </AnimatedPressable>
@@ -316,14 +315,14 @@ export default function PremiumScreen() {
         })}
 
         <TouchableOpacity onPress={handleRestore} style={S.restoreBtn} activeOpacity={0.7}>
-          <Text style={S.restoreTxt}>Käufe wiederherstellen</Text>
+          <Text style={S.restoreTxt}>{t('premium.restore')}</Text>
         </TouchableOpacity>
         </>)}
-        {!access.isLifetime && <Text style={S.legal}>Zahlung über deinen App-Store-Account · jederzeit kündbar.</Text>}
+        {!access.isLifetime && <Text style={S.legal}>{t('premium.legal')}</Text>}
         <View style={S.linksRow}>
-          <Text style={S.link} onPress={() => router.push('/terms')}>Nutzungsbedingungen</Text>
+          <Text style={S.link} onPress={() => router.push('/terms')}>{t('premium.terms')}</Text>
           <Text style={S.legal}>·</Text>
-          <Text style={S.link} onPress={() => router.push('/privacy')}>Datenschutz</Text>
+          <Text style={S.link} onPress={() => router.push('/privacy')}>{t('premium.privacy')}</Text>
         </View>
         <View style={{ height: 30 }} />
       </ScrollView>

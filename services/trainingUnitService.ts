@@ -1,7 +1,18 @@
+import * as Crypto from 'expo-crypto';
 import { supabase } from '@/lib/supabase';
 import type { TrainingUnit, TrainingExercise, AudioFile } from '@/types/trainingUnit';
 import type { TrainingMetrics } from '@/types/analytics';
 import { createEmbeddingForTrainingSession, createEmbeddingForExerciseNote } from '@/features/ai/services/trainingEmbeddingService';
+import { claimNewbieQuota, quotaBlock, type QuotaBlock } from '@/services/quotaService';
+
+// Zentraler NEWBIE-Quota-Gate für NEUE Trainingsdokumentationen (2/Kalendermonat).
+// Serverautoritativ + idempotent auf der stabilen Unit-ID → Retry/Resume derselben
+// ID verbraucht KEIN zweites Kontingent. Premium wird serverseitig durchgelassen.
+// Production ist fail-closed (siehe quotaService). Läuft auf ALLEN Save-Pfaden,
+// damit alternative Navigationswege das Limit nicht umgehen.
+async function guardNewTrainingQuota(unitId: string): Promise<QuotaBlock | null> {
+  return quotaBlock((await claimNewbieQuota('training', unitId)).status);
+}
 
 // Embeddings für die semantische Suche erzeugen — NON-BLOCKING (fire-and-forget,
 // schluckt Fehler intern). Darf das Speichern der Einheit nie aufhalten.
@@ -104,6 +115,11 @@ export async function finishTrainingUnit(
   updates: { duration_sec: number; rating: number | null; notes: string | null; shared_with_trainer?: boolean } & Partial<TrainingMetrics>,
   exercises: Omit<TrainingExercise, 'id' | 'unit_id' | 'created_at'>[],
 ) {
+  // NEWBIE-Quota beim Abschluss (nicht beim Start): idempotent auf der stabilen
+  // unitId → Resume/Retry desselben Trainings verbraucht kein zweites Kontingent.
+  const block = await guardNewTrainingQuota(unitId);
+  if (block) return { error: block };
+
   const { error: unitErr } = await supabase
     .from('training_units')
     .update({ ...updates, ended_at: new Date().toISOString(), status: 'completed' })
@@ -130,10 +146,16 @@ export async function createDocumentedUnit(
   ownerId:   string,
   unit:      DocumentedUnitInput,
   exercises: Omit<TrainingExercise, 'id' | 'unit_id' | 'created_at'>[],
+  unitId?:   string,
 ) {
+  // Stabile ID: vom Aufrufer (idempotent über Retries) ODER hier erzeugt.
+  const id = unitId ?? Crypto.randomUUID();
+  const block = await guardNewTrainingQuota(id);
+  if (block) return { error: block, data: null };
+
   const { data, error } = await supabase
     .from('training_units')
-    .insert({ ...unit, owner_id: ownerId, status: 'completed' })
+    .upsert({ ...unit, id, owner_id: ownerId, status: 'completed' }, { onConflict: 'id' })
     .select('*')
     .single();
   if (error || !data) return { error, data: null };

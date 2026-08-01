@@ -49,7 +49,8 @@ describe('Plan-Oberfläche enthält kein „beginner" mehr', () => {
   });
   it('keine Product-ID heißt „beginner"', () => {
     for (const id of Object.values(PRODUCT_IDS)) expect(id).not.toMatch(/beginner/i);
-    expect(PRODUCT_IDS.newbieMonthly).toBe('anyvo_newbie_monthly_0');
+    expect('newbieMonthly' in PRODUCT_IDS).toBe(false);
+    expect(PLAN_META.newbie.productId).toBeNull();
   });
   it('Normalisierung: Altwert lesbar, aber auf newbie abgebildet', () => {
     const plans: SubscriptionPlan[] = ['newbie', 'active', 'founder_active', 'trainer'];

@@ -21,9 +21,10 @@ const dog = (id: string, owner = 'U1', extra: Record<string, unknown> = {}) => (
 const user = { userId: 'U1', displayName: 'Sandra', avatarUrl: null };
 
 describe('Abo-Korrektur: NEWBIE statt Beginner', () => {
-  it('NEWBIE-Produkt-ID ist anyvo_newbie_monthly_0', () => {
-    expect(PRODUCT_IDS.newbieMonthly).toBe('anyvo_newbie_monthly_0');
+  it('NEWBIE ist kein kaufbares Produkt, Legacy-ID bleibt lesbar', () => {
+    expect('newbieMonthly' in PRODUCT_IDS).toBe(false);
     expect(PLAN_META.newbie.name).toBe('Newbie');
+    expect(PLAN_META.newbie.productId).toBeNull();
     expect(planOfProduct('anyvo_newbie_monthly_0')).toBe('newbie');
   });
   it('Beginner ist keine gültige Abo-Stufe mehr', () => {
@@ -33,11 +34,12 @@ describe('Abo-Korrektur: NEWBIE statt Beginner', () => {
     const invalid: SubscriptionPlan = 'beginner_trial';
     expect(invalid).toBeDefined();
   });
-  it('ACTIVE, FOUNDER_ACTIVE, TRAINER werden korrekt erkannt', () => {
+  it('ACTIVE, FOUNDER_ACTIVE, TRAINER werden korrekt erkannt; NEWBIE ist NICHT pro', () => {
     expect(planToCapabilities('active')).toEqual({ pro_member: true, trainer_module: false });
     expect(planToCapabilities('founder_active')).toEqual({ pro_member: true, trainer_module: false });
     expect(planToCapabilities('trainer')).toEqual({ pro_member: true, trainer_module: true });
-    expect(planToCapabilities('newbie')).toEqual({ pro_member: true, trainer_module: false });
+    // NEWBIE = kostenloses Standard-Tier → pro_member MUSS false sein.
+    expect(planToCapabilities('newbie')).toEqual({ pro_member: false, trainer_module: false });
   });
 });
 
@@ -62,7 +64,7 @@ describe('normalizeSubscriptionPlan (Abwärtskompatibilität DB-Werte)', () => {
     expect(normalizeSubscriptionPlan('')).toBeNull();
   });
   it('Produkt-IDs bleiben separat korrekt zugeordnet', () => {
-    expect(planOfProduct(PRODUCT_IDS.newbieMonthly)).toBe('newbie');
+    expect(planOfProduct('anyvo_newbie_monthly_0')).toBe('newbie');
     expect(planOfProduct(PRODUCT_IDS.trainerMonthly)).toBe('trainer');
   });
 });
