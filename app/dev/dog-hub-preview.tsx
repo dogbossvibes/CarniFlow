@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Redirect } from 'expo-router';
 import { C } from '@/constants/colors';
 import { DogHeroCard } from '@/components/dogs/DogHeroCard';
 import { DogCompactCard } from '@/components/dogs/DogCompactCard';
@@ -32,16 +33,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function DogHubPreviewScreen() {
+  if (!__DEV__) {
+    return <Redirect href="/(tabs)/home" />;
+  }
+
+  return <DogHubPreviewContent />;
+}
+
+function DogHubPreviewContent() {
   const [hub, setHub] = useState<DogHubVM | null>(null);
   const [malu, nero, inari] = DEMO_DOGS;
-
-  if (!__DEV__) {
-    return (
-      <SafeAreaView style={s.safe}><View style={s.center}>
-        <Text style={s.muted}>Nur im Entwicklungsmodus verfügbar.</Text>
-      </View></SafeAreaView>
-    );
-  }
 
   if (hub) {
     const actions: DogHubActions = {

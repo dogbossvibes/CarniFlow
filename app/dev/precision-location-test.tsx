@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { C } from '@/constants/colors';
@@ -20,6 +20,14 @@ const IS_ANDROID = Platform.OS === 'android';
 const IS_IOS = Platform.OS === 'ios';
 
 export default function PrecisionLocationTestScreen() {
+  if (!__DEV__) {
+    return <Redirect href="/(tabs)/home" />;
+  }
+
+  return <PrecisionLocationTestContent />;
+}
+
+function PrecisionLocationTestContent() {
   const router = useRouter();
   const [perm, setPerm] = useState<string>('unbekannt');
   const [status, setStatus] = useState<ProviderStatus | null>(null);
@@ -47,7 +55,6 @@ export default function PrecisionLocationTestScreen() {
   useEffect(() => {
     getProviderStatus().then(setStatus).catch(() => {});
     return () => { void stopAll(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const requestPermission = async () => {
@@ -157,7 +164,7 @@ export default function PrecisionLocationTestScreen() {
               <Row label="Quelle" value={last.source} />
             </>
           ) : (
-            <Text style={s.note}>Noch keine Position. „Start" drücken.</Text>
+            <Text style={s.note}>Noch keine Position. {'"Start"'} drücken.</Text>
           )}
         </Section>
 

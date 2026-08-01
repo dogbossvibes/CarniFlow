@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useSyncStore } from '@/features/sync/store/syncStore';
@@ -13,6 +13,14 @@ import { syncNow, retryFailedSync, updateSyncCounts } from '@/features/sync/serv
 
 // Dev-Hilfsscreen (nur Development): Offline-Speichern + Sync demonstrieren/prüfen.
 export default function OfflineDebugScreen() {
+  if (!__DEV__) {
+    return <Redirect href="/(tabs)/home" />;
+  }
+
+  return <OfflineDebugContent />;
+}
+
+function OfflineDebugContent() {
   const router = useRouter();
   const { session } = useSession();
   const { isOnline, isSyncing, pendingCount, failedCount, conflictCount, lastError, lastSyncAt } = useSyncStore();
@@ -24,10 +32,6 @@ export default function OfflineDebugScreen() {
     localCounts().then(setCounts).catch(() => {});
   }, []);
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
-
-  if (!__DEV__) {
-    return <SafeAreaView style={s.safe}><Text style={s.msg}>Nur im Development verfügbar.</Text></SafeAreaView>;
-  }
 
   const createOffline = async () => {
     const uid = session?.user.id;
