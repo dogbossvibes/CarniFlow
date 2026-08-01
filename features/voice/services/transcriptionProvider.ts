@@ -13,18 +13,9 @@ export interface TranscriptionProvider {
 export class OpenAITranscriptionProvider implements TranscriptionProvider {
   readonly id = 'openai';
   constructor(private apiKey: string, private model = 'whisper-1') {}
-  async transcribeAudio({ audioUrl, language = 'de' }: { audioUrl: string; language?: string }): Promise<TranscriptionResult> {
-    const audio = await fetch(audioUrl).then(r => r.blob());
-    const form = new FormData();
-    form.append('file', audio, 'audio.m4a');
-    form.append('model', this.model);
-    form.append('language', language);
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST', headers: { Authorization: `Bearer ${this.apiKey}` }, body: form,
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error?.message ?? `OpenAI ${res.status}`);
-    return { transcript: data.text ?? '' };
+  // KI-ENTFERNUNG: deaktiviert — keine externe Transkription mehr (kein Runtime-Pfad).
+  async transcribeAudio(_params: { audioUrl: string; language?: string }): Promise<TranscriptionResult> {
+    throw new Error('Externe Transkription ist deaktiviert (KI entfernt).');
   }
 }
 

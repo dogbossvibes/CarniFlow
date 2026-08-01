@@ -1,4 +1,3 @@
-import { supabase } from '@/lib/supabase';
 import type { TrainingAnalysis } from '@/types/analytics';
 
 type AIResult = Omit<TrainingAnalysis, 'id' | 'session_id' | 'user_id' | 'dog_id' | 'created_at'>;
@@ -21,42 +20,51 @@ export interface AiSessionInput {
   belastung:        number | null;
 }
 
-// Ruft die Edge Function 'ai-analysis' auf. Der Anthropic-Key liegt
-// ausschliesslich serverseitig — KEIN Key mehr im App-Bundle.
+const METRIC_KEYS = ['motivation', 'konzentration', 'praezision', 'ausdauer', 'trieblage', 'impulskontrolle'] as const;
+const METRIC_LABEL: Record<(typeof METRIC_KEYS)[number], string> = {
+  motivation: 'Motivation', konzentration: 'Konzentration', praezision: 'Präzision',
+  ausdauer: 'Ausdauer', trieblage: 'Trieblage', impulskontrolle: 'Impulskontrolle',
+};
+const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
+// KI-ENTFERNUNG: KEIN externer Anbieter (Anthropic) mehr. Deterministische,
+// regelbasierte Trainingsauswertung ausschliesslich aus den vorhandenen
+// Bewertungsfeldern. Kein LLM-Text, keine Diagnose-/Gesundheitsaussagen.
 export async function generateAIAnalysis(
   sessions: AiSessionInput[],
   dogName: string,
 ): Promise<AIResult> {
   if (!sessions.length) throw new Error('Keine Trainings vorhanden');
 
-  const { data, error } = await supabase.functions.invoke('ai-analysis', {
-    body: { sessions: sessions.slice(0, 15), dogName },
-  });
-  if (error) {
-    // Echten Fehler aus dem Function-Body ziehen (nur fürs Log), Nutzer bekommt
-    // eine freundliche Meldung.
-    let detail = error.message ?? '';
-    try {
-      const body = await (error as any).context?.json?.();
-      if (body?.error) detail = body.error;
-    } catch { /* egal */ }
-    console.warn('[ai-analysis]', detail);
-    throw new Error(friendlyAiError(detail));
+  // Metriken (1–5) → 0–100 skaliert, nur vorhandene Werte gemittelt.
+  const scaled: Record<string, number> = {};
+  for (const k of METRIC_KEYS) {
+    const vals = sessions.map(s => s[k]).filter((v): v is number => typeof v === 'number');
+    scaled[k] = vals.length ? Math.round(mean(vals) * 20) : 0;
   }
-  return data as AIResult;
-}
+  const ratings = sessions.map(s => s.rating).filter((v): v is number => typeof v === 'number');
+  const metricAvg = mean(METRIC_KEYS.map(k => scaled[k]).filter(v => v > 0));
+  const gesamtscore = ratings.length ? Math.round(mean(ratings) * 20) : Math.round(metricAvg);
 
-// Interne/technische Fehler → verständliche deutsche Nutzer-Meldung.
-function friendlyAiError(detail: string): string {
-  const d = detail.toLowerCase();
-  if (/credit|billing|balance|quota|insufficient/.test(d)) {
-    return 'Die Smart Analyse ist gerade nicht verfügbar. Wir kümmern uns darum — bitte versuch es später noch einmal.';
-  }
-  if (/rate|overloaded|too many|429|529/.test(d)) {
-    return 'Gerade ist viel los. Bitte versuch es in einem Moment noch einmal.';
-  }
-  if (/network|timeout|fetch|failed to/.test(d)) {
-    return 'Keine Verbindung. Prüfe deine Internetverbindung und versuch es erneut.';
-  }
-  return 'Die Smart Analyse hat gerade nicht geklappt. Bitte versuch es gleich noch einmal.';
+  const labeled = METRIC_KEYS.map(k => ({ k, v: scaled[k] })).filter(x => x.v > 0);
+  const strong = labeled.filter(x => x.v >= 70).sort((a, b) => b.v - a.v);
+  const weak   = labeled.filter(x => x.v < 55).sort((a, b) => a.v - b.v);
+
+  const catCount: Record<string, number> = {};
+  for (const s of sessions) catCount[s.category] = (catCount[s.category] ?? 0) + 1;
+  const topCat = Object.entries(catCount).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  const empfehlungen: string[] = [];
+  if (weak[0]) empfehlungen.push(`Kürzere, fokussierte Einheiten auf ${METRIC_LABEL[weak[0].k]} einplanen.`);
+  if (topCat) empfehlungen.push(`Ergänze zu „${topCat}" eine zweite Disziplin für mehr Ausgleich.`);
+  if (!empfehlungen.length) empfehlungen.push('Dokumentiere weiter regelmässig, damit Trends sichtbar werden.');
+
+  return {
+    gesamtscore,
+    zusammenfassung: `Auswertung von ${sessions.length} ${sessions.length === 1 ? 'Einheit' : 'Einheiten'} für ${dogName}. Durchschnittlicher Gesamtscore: ${gesamtscore}/100.`,
+    positives: strong.slice(0, 3).map(x => `${METRIC_LABEL[x.k]} stark (${x.v}/100)`),
+    schwaechen: weak.slice(0, 3).map(x => `${METRIC_LABEL[x.k]} ausbaufähig (${x.v}/100)`),
+    empfehlungen,
+    coach_message: 'Regelbasierte Trainingsauswertung aus deinen Bewertungen — keine automatische Interpretation.',
+  };
 }

@@ -3,11 +3,36 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useAiCoach } from '@/features/ai/hooks/useAiCoach';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useT } from '@/i18n';
 
 // Kompakte Dashboard-Card — nicht dominant. Zeigt den wichtigsten Hinweis oder
 // die Wochenstatistik und führt zum Smart Coach (regelbasiert).
+// Gating: Smart Coach ist eine Premium-Funktion. NEWBIE (isPro=false) sieht nur
+// einen Upgrade-Hinweis, KEINE Coach-Auswertung (kein Datenabruf für NEWBIE).
 export function AiCoachCard() {
+  const router = useRouter();
+  const { t } = useT();
+  const { isPro } = useCapabilities();
+
+  if (!isPro) {
+    return (
+      <TouchableOpacity style={s.card} onPress={() => router.push('/premium' as never)} activeOpacity={0.85}>
+        <View style={s.icon}><Ionicons name="lock-closed" size={18} color={C.accent} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.label}>SMART COACH</Text>
+          <Text style={s.headline} numberOfLines={1}>{t('premium.upgradeActive')}</Text>
+        </View>
+        <Text style={s.cta}>{t('premium.activeShort')}</Text>
+        <Ionicons name="chevron-forward" size={18} color={C.muted} />
+      </TouchableOpacity>
+    );
+  }
+
+  return <AiCoachCardContent />;
+}
+
+function AiCoachCardContent() {
   const router = useRouter();
   const { t } = useT();
   const { data, isLoading } = useAiCoach();

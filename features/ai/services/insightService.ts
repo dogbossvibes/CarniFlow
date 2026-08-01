@@ -335,27 +335,44 @@ export async function fetchInsights(uid: string, dogs: DogRef[], dogId?: string 
   return all.filter(i => !dismissed.has(i.key));
 }
 
-// ── LLM-Zusammenfassung (Edge Function, mit Fallback) ────────
+// ── Regelbasierte Zusammenfassung (KEIN LLM, keine externe API) ──
+// Deterministisch aus den lokalen Trainingsdaten abgeleitet — dieselben Regeln
+// wie die Insights (keine zweite Engine). Klar als Auswertung/Trend formuliert.
 export async function refreshCoachSummary(periodDays = 7, dogId?: string | null): Promise<CoachSummary> {
   try {
-    const { data, error } = await supabase.functions.invoke('generate-coach-summary', { body: { dogId, periodDays } });
-    if (error) throw error;
-    if (!data || data.available === false) return UNAVAILABLE_SUMMARY;
+    const { data: { user } } = await supabase.auth.getUser();
+    const uid = user?.id;
+    if (!uid) return UNAVAILABLE_SUMMARY;
+
+    const ds = await loadCoachDataset(uid, dogId);
+    const weekly = getWeeklyTrainingStats(ds);
+    const balance = getCategoryBalance(ds, periodDays);
+    const insights = generateLocalInsights(ds, []);
+    const recs = getRecommendations(ds, []);
+    const warnings = insights.filter(i => i.severity === 'warning' || i.severity === 'critical');
+    const positives = insights.filter(i => i.severity === 'success');
+
+    const parts: string[] = [];
+    parts.push(weekly.sessions > 0
+      ? `In den letzten 7 Tagen wurden ${weekly.sessions} ${weekly.sessions === 1 ? 'Einheit' : 'Einheiten'} dokumentiert${weekly.avgScore != null ? ` (Ø ${weekly.avgScore}/10)` : ''}.`
+      : 'In den letzten 7 Tagen wurde keine Einheit dokumentiert.');
+    if (balance[0]) parts.push(`Schwerpunkt: ${balance[0].category} (${balance[0].pct} %).`);
+
     return {
       available: true,
-      summary: data.summary ?? '',
-      highlights: data.highlights ?? [],
-      risks: data.risks ?? [],
-      recommendations: data.recommendations ?? [],
+      summary: parts.join(' '),
+      highlights: positives.slice(0, 3).map(i => i.title),
+      risks: warnings.slice(0, 3).map(i => i.title),
+      recommendations: recs.slice(0, 3).map(r => r.title),
     };
   } catch (e) {
-    console.warn('[insightService] coach summary', e);
+    console.warn('[insightService] coach summary (regelbasiert)', e);
     return UNAVAILABLE_SUMMARY;
   }
 }
 
 export const UNAVAILABLE_SUMMARY: CoachSummary = {
   available: false,
-  summary: 'Smart Summary ist aktuell nicht verfügbar. Deine regelbasierten Insights funktionieren weiterhin.',
+  summary: 'Die Auswertung ist aktuell nicht verfügbar. Deine regelbasierten Insights funktionieren weiterhin.',
   highlights: [], risks: [], recommendations: [],
 };

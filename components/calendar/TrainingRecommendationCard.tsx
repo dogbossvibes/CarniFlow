@@ -1,32 +1,13 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
-import { supabase } from '@/lib/supabase';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
-import { buildRecommendations, type Recommendation } from '@/lib/recommendations';
+import { buildRecommendations } from '@/lib/recommendations';
 import type { CalendarEvent } from '@/types/calendar';
 
 export function TrainingRecommendationCard({ events }: { events: CalendarEvent[] }) {
   const { feed } = useTrainingFeed();
-  const heuristic = buildRecommendations(feed, events);
-
-  // Echte KI-Empfehlungen über die Edge-Function (falls deployt); sonst Fallback.
-  const ai = useQuery({
-    queryKey: ['airecs', feed.length, events.length],
-    enabled:  feed.length > 0 || events.length > 0,
-    staleTime: 30 * 60 * 1000,
-    queryFn: async (): Promise<string[]> => {
-      const feedSummary  = feed.slice(0, 10).map(f => `${f.session_date}:${(f.exercises ?? []).map(e => e.discipline).join('/')}`).join('; ');
-      const eventSummary = events.slice(0, 10).map(e => `${e.start_at.slice(0, 10)}:${e.type}:${e.status}`).join('; ');
-      const { data, error } = await supabase.functions.invoke('recommend', { body: { feedSummary, eventSummary } });
-      if (error) return [];
-      return (data?.recommendations ?? []) as string[];
-    },
-  });
-
-  const aiRecs: Recommendation[] = (ai.data ?? []).map((text, i) => ({ id: `ai${i}`, icon: 'sparkles', color: '#00F5D4', text }));
-  const recs = aiRecs.length ? aiRecs : heuristic;
+  const recs = buildRecommendations(feed, events);
   if (recs.length === 0) return null;
 
   return (

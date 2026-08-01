@@ -94,11 +94,9 @@ export async function deleteVoiceNote(voiceNoteId: string): Promise<Result<null>
   } catch (e) { return fail('deleteVoiceNote', e); }
 }
 
-// Transkription anstossen (Edge Function). Non-blocking nutzbar.
-export async function startTranscription(voiceNoteId: string): Promise<Result<{ status: TranscriptStatus; transcript?: string }>> {
-  try {
-    const { data, error } = await supabase.functions.invoke('transcribe-voice-note', { body: { voiceNoteId } });
-    if (error) return fail('transcribe', error);
-    return { data, error: null };
-  } catch (e) { return fail('startTranscription', e); }
+// KI-ENTFERNUNG: keine externe Transkription (OpenAI) mehr. Die Sprachnotiz bleibt
+// als Audio erhalten; die automatische Transkription ist deaktiviert. Status
+// 'disabled' → UI (VoiceNotePlayer) zeigt „Transkription nicht aktiv".
+export async function startTranscription(_voiceNoteId: string): Promise<Result<{ status: TranscriptStatus; transcript?: string }>> {
+  return { data: { status: 'disabled' }, error: null };
 }

@@ -17,15 +17,9 @@ export interface EmbeddingProvider {
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   readonly dimensions = 1536;
   constructor(private apiKey: string, private model = 'text-embedding-3-small') {}
-  async generateEmbedding(input: string): Promise<number[]> {
-    const res = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.apiKey}` },
-      body: JSON.stringify({ model: this.model, input }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error?.message ?? `OpenAI ${res.status}`);
-    return data.data[0].embedding as number[];
+  // KI-ENTFERNUNG: deaktiviert — kein externer OpenAI-Aufruf mehr (kein Runtime-Pfad).
+  async generateEmbedding(_input: string): Promise<number[]> {
+    throw new Error('Embeddings sind deaktiviert (KI entfernt).');
   }
 }
 

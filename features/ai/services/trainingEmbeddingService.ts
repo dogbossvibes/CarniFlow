@@ -1,10 +1,10 @@
-import { supabase } from '@/lib/supabase';
 import type { EmbeddingSourceType } from './semanticSearchService';
 
-// Erstellt Embeddings nach dem Speichern von Trainingsinhalten — über die Edge
-// Function 'generate-training-embedding'. ALLE Funktionen sind NON-BLOCKING:
-// Sie werfen nie, sondern loggen Fehler und liefern { ok:false }. Das Speichern
-// einer Trainingseinheit darf dadurch niemals scheitern.
+// KI-ENTFERNUNG: Es werden KEINE Embeddings mehr erzeugt. Kein Aufruf externer
+// APIs (OpenAI/Edge Function) und KEINE Übertragung von Trainings-/Notizdaten.
+// Alle Funktionen bleiben als No-op erhalten (Aufrufer/Interfaces unverändert),
+// damit das Speichern einer Einheit nie scheitert. DB-Objekte bleiben bestehen;
+// ein späteres Backend-Cleanup erfolgt separat.
 
 export interface EmbeddingInput {
   trainingSessionId?: string;
@@ -16,31 +16,9 @@ export interface EmbeddingInput {
 
 export interface EmbeddingResult { ok: boolean; id?: string; error?: string; skipped?: boolean }
 
-const MIN_LENGTH = 10;
-
-async function generate(sourceType: EmbeddingSourceType, input: EmbeddingInput): Promise<EmbeddingResult> {
-  try {
-    if (!input.content || input.content.trim().length < MIN_LENGTH) {
-      return { ok: false, skipped: true };   // zu kurz → still überspringen
-    }
-    const { data, error } = await supabase.functions.invoke('generate-training-embedding', {
-      body: {
-        sourceType,
-        trainingSessionId: input.trainingSessionId,
-        sourceId: input.sourceId,
-        content: input.content,
-        contentSummary: input.contentSummary,
-        metadata: input.metadata ?? {},
-      },
-    });
-    if (error) throw error;
-    if (data?.skipped) return { ok: false, skipped: true };
-    return { ok: true, id: data?.id };
-  } catch (e: any) {
-    // Bewusst nur loggen — Retry kann später ergänzt werden (z. B. Queue-Tabelle).
-    console.warn(`[trainingEmbeddingService:${sourceType}]`, e?.message ?? e);
-    return { ok: false, error: e?.message ?? 'Embedding fehlgeschlagen' };
-  }
+async function generate(_sourceType: EmbeddingSourceType, _input: EmbeddingInput): Promise<EmbeddingResult> {
+  // Deaktiviert: keine Embedding-Erzeugung, kein externer API-Aufruf.
+  return { ok: false, skipped: true };
 }
 
 export const createEmbeddingForTrainingSession = (i: EmbeddingInput) => generate('training_notes', i);
