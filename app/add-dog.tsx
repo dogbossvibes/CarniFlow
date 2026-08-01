@@ -25,6 +25,9 @@ import { addDog } from '@/services/dogs';
 import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
 import { uploadDogImage } from '@/services/storage';
 import { useSession } from '@/hooks/useSession';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { useDogs } from '@/hooks/useDogs';
+import { quotaAllowsNew } from '@/features/subscription/plans';
 import { useT } from '@/i18n';
 
 type Geschlecht = 'male' | 'female' | null;
@@ -32,6 +35,8 @@ type Geschlecht = 'male' | 'female' | null;
 export default function HundHinzufuegenScreen() {
   const router      = useRouter();
   const { session } = useSession();
+  const { isPro }   = useCapabilities();
+  const { dogs }    = useDogs();
   const { t } = useT();
 
   const [name,        setName]        = useState('');
@@ -85,6 +90,14 @@ export default function HundHinzufuegenScreen() {
   const handleSpeichern = async () => {
     if (!name.trim()) { setFehler(t('dog.nameRequired')); return; }
     if (!session?.user.id) return;
+
+    // NEWBIE-Quota: max. 1 Hund. Bestehende Hunde bleiben sichtbar/bearbeitbar;
+    // nur das NEUE Anlegen wird gesperrt → Paywall. (Server bleibt autoritativ.)
+    if (!quotaAllowsNew(isPro, 'dog', dogs.length)) {
+      haptic.warning();
+      router.push('/premium' as never);
+      return;
+    }
 
     setLaden(true);
     setFehler(null);

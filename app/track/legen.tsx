@@ -7,9 +7,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { FT } from '@/constants/colors';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/hooks/useSession';
 import { useDogs } from '@/hooks/useDogs';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { useTrackRecorder } from '@/features/tracking/hooks/useTrackRecorder';
@@ -23,6 +24,9 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { reopenTarget, type ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
 import { clearPending } from '@/features/tracking/store/trackPersist';
 import { createTrackSession } from '@/features/tracking/services/trackService';
+import * as Crypto from 'expo-crypto';
+import { claimNewbieQuota, quotaBlock } from '@/services/quotaService';
+import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
 import { ANGLE_LABEL } from '@/features/tracking/utils/angleClassify';
 import { metersToSteps } from '@/features/tracking/utils/steps';
@@ -34,14 +38,12 @@ import { HelpButton } from '@/components/help/HelpButton';
 import type { AngleKind, MarkerMaterial } from '@/features/tracking/store/trackingStore';
 import type { TrackSegmentType } from '@/features/tracking/utils/trackSegments';
 import {
-  TRACK_SEGMENT_LABELS,
   TRACK_SEGMENT_TYPES,
   activeOrPlannedSegment,
   createActiveSegment,
   finalizeSegment,
   normalizeCustomSegmentLabel,
   segmentDisplayLabel,
-  segmentEndAnnouncement,
 } from '@/features/tracking/utils/trackSegments';
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
@@ -86,6 +88,17 @@ function speakTrackSegment(text: string) {
   } catch { /* best-effort */ }
 }
 
+function localizedSegmentLabel(type: TrackSegmentType, t: (key: TranslationKey) => string): string {
+  switch (type) {
+    case 'no_food': return t('track.segmentNoFood');
+    case 'low_food': return t('track.segmentLowFood');
+    case 'intensive_food': return t('track.segmentIntensiveFood');
+    case 'distraction': return t('track.segmentDistraction');
+    case 'surface_change': return t('track.segmentSurfaceChange');
+    case 'custom': return t('track.segmentCustom');
+  }
+}
+
 // Blinkender LIVE-Punkt (anyvoRec).
 function RecDot() {
   const op = useRef(new Animated.Value(1)).current;
@@ -111,6 +124,7 @@ export default function LegenScreen() {
   const params = useLocalSearchParams<{ dogId?: string }>();
   const { session } = useSession();
   const { dogs } = useDogs();
+  const { isPro } = useCapabilities();
   const { showToast, toast } = useToast();
 
   const [phase, setPhase] = useState<'warmup' | 'recording'>('warmup');
@@ -128,9 +142,11 @@ export default function LegenScreen() {
   const [segmentSheet, setSegmentSheet] = useState(false);
   const [segmentType, setSegmentType] = useState<TrackSegmentType>('no_food');
   const [segmentCustomLabel, setSegmentCustomLabel] = useState('');
+  const segmentLabel = useCallback((type: TrackSegmentType) => localizedSegmentLabel(type, t), [t]);
   const [segmentVoiceEnabled, setSegmentVoiceEnabled] = useState(true);
   const [selectedDogId, setSelectedDogId] = useState<string | null>((params.dogId as string) ?? null);
   const beganRef = useRef(false);
+  const trackClaimRef = useRef<string | null>(null);   // stabile Fährten-ID für den idempotenten NEWBIE-Quota-Claim
   const [showBgDisclosure, setShowBgDisclosure] = useState(false);   // Play-Disclosure VOR Aufnahmestart
   const [startAfterClose, setStartAfterClose] = useState(false);     // begin() erst NACH Schliessen des Dialogs
   const warmupStartedRef = useRef(false);
@@ -174,7 +190,7 @@ export default function LegenScreen() {
     hapticMarker();                 // sofort, VOR dem Speichern
     void rec.addMarker('gegenstand', { material: lastMaterialRef.current });
     showToast(t('toast.objectSet'));
-  }, [rec, showToast]);
+  }, [rec, showToast, t]);
 
   // Manuell einen Fachwinkel (GW/OW/BW) ODER Abriss an der aktuellen Position setzen.
   // Nutzt dieselbe currentPosition/positionSource wie die Aufnahme (keine extra GPS-Abfrage).
@@ -311,6 +327,21 @@ export default function LegenScreen() {
     beganRef.current = true;
     hapticSuccess();   // SOFORT beim Start-Tap — vor jedem await/GPS/Netz
 
+    // NEWBIE-Quota: max. 1 neue Fährte/Kalendermonat. Claim VOR dem Recorder-Start.
+    // Idempotent auf trackClaimRef → ein Retry nach Fehler (beganRef zurückgesetzt)
+    // verbraucht KEIN zweites Kontingent; der erlaubte Start darf die Fährte komplett
+    // abschließen (kein zweiter Check im weiteren Verlauf). Premium überspringt.
+    if (!isPro) {
+      if (!trackClaimRef.current) trackClaimRef.current = Crypto.randomUUID();
+      const block = quotaBlock((await claimNewbieQuota('track', trackClaimRef.current)).status);
+      if (block) {
+        beganRef.current = false;
+        hapticWarning();
+        handleQuotaBlock(block, 'track', t, () => router.push('/premium' as never));
+        return;
+      }
+    }
+
     const r = await rec.beginRecording(null, activeDog?.id ?? null);   // sofort scharf (recording=true, Timer); dogId → eigener Puffer-Slot
     if (r.error) { beganRef.current = false; showToast(r.error); return; }
     setPhase('recording');
@@ -350,7 +381,7 @@ export default function LegenScreen() {
         else showToast(t('toast.offlineSync'));
       }).catch(() => showToast(t('toast.offlineSync')));
     }
-  }, [session, activeDog, rec, showToast, surface, condition, weather, currentPosition]);
+  }, [session, activeDog, rec, showToast, t, surface, condition, weather, currentPosition, isPro, router]);
 
   // Aufnahme erst starten, NACHDEM der Disclosure-Dialog geschlossen ist:
   // „Weiter" setzt startAfterClose + schliesst den Dialog (showBgDisclosure=false).
@@ -401,7 +432,7 @@ export default function LegenScreen() {
     const st = useTrackingStore.getState();
     if (activeOrPlannedSegment(st.segments)) return;   // nur EINE aktive Teilstrecke
     const label = normalizeCustomSegmentLabel(segmentCustomLabel);
-    if (segmentType === 'custom' && !label) { showToast('Bitte gib eine Bezeichnung ein.'); return; }
+    if (segmentType === 'custom' && !label) { showToast(t('track.segmentCustomRequired')); return; }
     const idx = st.trackPoints.length - 1;
     // Kein gültiger TrackPoint / keine Position → kein Segment, kein Erfolgsfeedback.
     if (idx < 0 || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
@@ -418,7 +449,7 @@ export default function LegenScreen() {
     st.addSegment(segment);
     setSegmentSheet(false);
     hapticSuccess();
-    if (segment.voiceEnabled) speakTrackSegment('Teilstrecke gestartet');
+    if (segment.voiceEnabled) speakTrackSegment(t('track.segmentStarted'));
   }, [activeDog, segmentCustomLabel, segmentType, segmentVoiceEnabled, showToast, t, stepLengthM]);
 
   // TS stoppen: aktuellen TrackPoint als Ende; plannedLengthSteps = tatsächliche Länge.
@@ -433,8 +464,8 @@ export default function LegenScreen() {
     });
     st.updateSegment(segment.id, done);
     hapticSuccess();
-    if (segment.voiceEnabled) speakTrackSegment(segmentEndAnnouncement());   // „Teilstrecke beendet."
-  }, [stepLengthM]);
+    if (segment.voiceEnabled) speakTrackSegment(t('track.segmentEnded'));
+  }, [stepLengthM, t]);
 
   // TS-Button = Start/Stop-Toggle. Ohne aktive TS → schlankes Sheet (Typ/Voice) → Start;
   // mit aktiver TS stoppt der Tap sofort.
@@ -500,9 +531,9 @@ export default function LegenScreen() {
   // GPS ab >45 m warnen — dann landen keine Linienpunkte (Filter), Distanz bleibt 0.
   const gpsPoor = gpsAccuracy != null && gpsAccuracy > 45;
   const metrics: { value: string; label: string; warn?: boolean }[] = [
-    { value: `${Math.round(distanceMeters)} m`, label: `≈ ${metersToSteps(distanceMeters, stepLengthM)} Schr.` },
-    { value: String(gegenstaende), label: 'Gegenst.' },
-    { value: String(winkel), label: 'Winkel' },
+    { value: `${Math.round(distanceMeters)} m`, label: `≈ ${metersToSteps(distanceMeters, stepLengthM)} ${t('track.stepsShort')}` },
+    { value: String(gegenstaende), label: t('track.objectsShort') },
+    { value: String(winkel), label: t('track.angle') },
     { value: gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : '–', label: 'GPS', warn: gpsPoor },
   ];
 
@@ -535,7 +566,7 @@ export default function LegenScreen() {
               style={{ backgroundColor: 'rgba(255,93,108,0.24)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.55)' }}
             >
               <RecDot />
-              <Text className="text-[12px] font-extrabold tracking-[1.4px] text-[#ff9aa2]">LIVE</Text>
+              <Text className="text-[12px] font-extrabold tracking-[1.4px] text-[#ff9aa2]">{t('track.liveLive')}</Text>
             </View>
           )}
           <View className="flex-1" />
@@ -546,7 +577,7 @@ export default function LegenScreen() {
               return (
                 <Pressable key={k} onPress={() => setView(k)} className={`px-[12px] py-1.5 rounded-lg ${on ? 'bg-ft-acc' : ''}`}>
                   <Text className={`text-[12px] font-extrabold ${on ? 'text-ft-acc-text' : 'text-white/80'}`}>
-                    {k === 'map' ? 'Karte' : 'Skizze'}
+                    {k === 'map' ? t('track.viewMap') : t('track.viewSketch')}
                   </Text>
                 </Pressable>
               );
@@ -607,7 +638,7 @@ export default function LegenScreen() {
             <View className="absolute top-[64px] left-0 right-0 items-center px-4" pointerEvents="none">
               <View className="flex-row items-center gap-2 px-3 py-1.5 rounded-full bg-ft-glass border border-ft-glass-line">
                 <ActivityIndicator size="small" color={FT.acc} />
-                <Text className="text-[11px] font-bold text-ft-text">Startpunkt wird gesetzt … kurz stehen bleiben</Text>
+                <Text className="text-[11px] font-bold text-ft-text">{t('track.startPointSetting')}</Text>
               </View>
             </View>
           )}
@@ -616,32 +647,32 @@ export default function LegenScreen() {
             <View className="absolute left-[14px] right-[14px] bottom-[88px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
               <View className="flex-row items-center justify-between gap-3">
                 <View className="flex-1">
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">Teilstrecke aktiv</Text>
-                  <Text className="text-[15px] text-ft-text font-black mt-0.5">{segmentDisplayLabel(activeSegment)}</Text>
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">{t('track.segmentActive')}</Text>
+                  <Text className="text-[15px] text-ft-text font-black mt-0.5">{activeSegment.type === 'custom' ? segmentDisplayLabel(activeSegment) : segmentLabel(activeSegment.type)}</Text>
                   <Text className="text-[12px] text-ft-muted font-semibold mt-1">
-                    seit ca. {Math.max(0, currentStep - activeSegment.startStep)} Schritten
+                    {t('track.segmentSince', { steps: Math.max(0, currentStep - activeSegment.startStep) })}
                   </Text>
                 </View>
                 <View className="items-end gap-2">
                   <Text className="text-[12px] text-ft-acc font-extrabold" style={{ fontVariant: ['tabular-nums'] }}>
-≈ +{Math.max(0, currentStep - activeSegment.startStep)} Schr.
+≈ +{Math.max(0, currentStep - activeSegment.startStep)} {t('track.stepsShort')}
                   </Text>
                   <View className="flex-row gap-2">
                     <Pressable
-                      accessibilityLabel="Teilstrecke stoppen"
-                      accessibilityHint="Beendet die aktive Teilstrecke am aktuellen Punkt."
+                      accessibilityLabel={t('track.segmentStop')}
+                      accessibilityHint={t('track.segmentStopHint')}
                       onPress={stopTrackSegment}
                       className="px-3 py-2 rounded-[10px] bg-ft-acc"
                     >
-                      <Text className="text-[11px] font-black text-ft-acc-text">Stoppen</Text>
+                      <Text className="text-[11px] font-black text-ft-acc-text">{t('common.stop')}</Text>
                     </Pressable>
                     <Pressable
-                      accessibilityLabel="Teilstrecke abbrechen"
-                      accessibilityHint="Bricht die Teilstrecke ab, ohne sie auszuwerten."
+                      accessibilityLabel={t('track.segmentCancel')}
+                      accessibilityHint={t('track.segmentCancelHint')}
                       onPress={cancelActiveSegment}
                       className="px-3 py-2 rounded-[10px] bg-white/10 border border-ft-line"
                     >
-                      <Text className="text-[11px] font-black text-ft-text">Abbrechen</Text>
+                      <Text className="text-[11px] font-black text-ft-text">{t('common.cancel')}</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -661,10 +692,10 @@ export default function LegenScreen() {
                     ? <Ionicons name="checkmark-circle" size={40} color={FT.acc} />
                     : <ActivityIndicator size="large" color={FT.acc} />}
                   <Text className="text-[18px] text-ft-text font-extrabold mt-1.5">
-                    {gpsReady ? 'GPS bereit' : 'GPS wird stabilisiert'}
+                    {gpsReady ? t('track.gpsReady') : t('track.gpsStabilizing')}
                   </Text>
                   <Text className="text-[14px] font-semibold mb-2" style={{ color: gpsReady ? FT.acc : FT.muted }}>
-                    {gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : 'Suche Satelliten…'}
+                    {gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : t('track.searchSatellites')}
                   </Text>
 
                   {/* Hund */}
@@ -718,9 +749,9 @@ export default function LegenScreen() {
 
                   {/* Winkel-Erkennung: vollautomatisch vs. alles manuell.
                       Gegenstände sind davon ausgenommen — die immer manuell. */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">Winkel-Erkennung</Text>
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.angleDetection')}</Text>
                   <View className="flex-row gap-2 self-stretch">
-                    {([['auto', 'Automatisch', 'flash'], ['manual', 'Manuell', 'hand-left']] as const).map(([val, label, icon]) => {
+                    {([['auto', t('track.auto'), 'flash'], ['manual', t('track.manual'), 'hand-left']] as const).map(([val, label, icon]) => {
                       const on = autoDetect === (val === 'auto');
                       return (
                         <Pressable key={val} onPress={() => void setAutoDetect(val === 'auto')}
@@ -733,8 +764,8 @@ export default function LegenScreen() {
                   </View>
                   <Text className="text-[11px] text-ft-faint self-start mb-1">
                     {autoDetect
-                      ? 'Winkel & Spitzwinkel werden automatisch erkannt. Abriss und Gegenstände setzt du selbst.'
-                      : 'Du setzt Winkel, Abriss und Gegenstände selbst.'}
+                      ? t('track.autoHint')
+                      : t('track.manualHint')}
                   </Text>
 
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
@@ -743,7 +774,7 @@ export default function LegenScreen() {
                     {weatherState === 'loading' ? (
                       <View className="flex-row items-center gap-2">
                         <ActivityIndicator size="small" color={FT.muted} />
-                        <Text className="text-[13px] font-semibold text-ft-muted">Wetter wird geladen…</Text>
+                        <Text className="text-[13px] font-semibold text-ft-muted">{t('track.weatherLoading')}</Text>
                       </View>
                     ) : weather ? (
                       <>
@@ -758,7 +789,7 @@ export default function LegenScreen() {
                         </View>
                       </>
                     ) : (
-                      <Text className="text-[13px] font-semibold text-ft-muted">Wetter nicht verfügbar (kein Netz)</Text>
+                      <Text className="text-[13px] font-semibold text-ft-muted">{t('track.weatherUnavailable')}</Text>
                     )}
                   </View>
 
@@ -770,7 +801,7 @@ export default function LegenScreen() {
                   >
                     <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
                     <Text className={`text-[14px] font-extrabold ${canStart ? 'text-ft-acc-text' : 'text-ft-muted'}`}>
-                      {canStart ? 'Fährte legen' : 'Warte auf GPS…'}
+                      {canStart ? t('track.lay') : t('track.waitingGps')}
                     </Text>
                   </Pressable>
                 </View>
@@ -784,12 +815,12 @@ export default function LegenScreen() {
             ohne Marker. Dübel als roter Mini-Zylinder erkennbar. */}
         {gsPicker && phase === 'recording' && (
           <>
-            <Pressable accessibilityLabel="Gegenstand-Auswahl schliessen" className="absolute inset-0" onPress={() => setGsPicker(false)} />
+            <Pressable accessibilityLabel={t('track.closeObjectPicker')} className="absolute inset-0" onPress={() => setGsPicker(false)} />
             <View className="absolute left-[14px] right-[14px] bottom-[100px] flex-row flex-wrap gap-2 justify-center" pointerEvents="box-none">
               {GEGENSTAND_MATERIALS.map(m => (
                 <Pressable
                   key={m.material}
-                  accessibilityLabel={`${m.label} setzen`}
+                  accessibilityLabel={t('track.setObject', { label: m.label })}
                   onPress={() => placeGegenstand(m.material)}
                   style={{ width: '23%', flexGrow: 1 }}
                   className="h-[58px] rounded-[14px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
@@ -814,7 +845,7 @@ export default function LegenScreen() {
         {winkelSheet && phase === 'recording' && (
           <>
             <Pressable
-              accessibilityLabel="Winkel-Auswahl schliessen"
+              accessibilityLabel={t('track.closeAnglePicker')}
               className="absolute inset-0"
               onPress={() => setWinkelSheet(false)}
             />
@@ -827,7 +858,7 @@ export default function LegenScreen() {
               ] as const).map(o => (
                 <Pressable
                   key={o.kind}
-                  accessibilityLabel={`${ANGLE_LABEL[o.kind]} setzen`}
+                  accessibilityLabel={t('track.setAngle', { label: ANGLE_LABEL[o.kind] })}
                   onPress={() => placeWinkel(o.kind)}
                   className="flex-1 h-[64px] rounded-[16px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
                 >
@@ -842,8 +873,8 @@ export default function LegenScreen() {
         {/* Steuerung */}
         <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
           <Pressable
-            accessibilityLabel={activeSegment ? 'Teilstrecke stoppen' : 'Teilstrecke starten'}
-            accessibilityHint="Startet bzw. stoppt eine Teilstrecke am aktuellen Punkt."
+            accessibilityLabel={activeSegment ? t('track.segmentStop') : t('track.segmentStart')}
+            accessibilityHint={t('track.segmentStopHint')}
             className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${activeSegment ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line-strong'}`}
             onPress={handleTsToggle} disabled={phase !== 'recording'}
           >
@@ -852,20 +883,20 @@ export default function LegenScreen() {
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            accessibilityLabel="Gegenstand setzen"
+            accessibilityLabel={t('track.setObjectButton')}
             onPress={() => { hapticTap(); setWinkelSheet(false); setGsPicker(v => !v); }} disabled={phase !== 'recording'}
           >
             <Ionicons name="cube-outline" size={20} color={gsPicker ? FT.acc : FT.text} />
             <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${gsPicker ? 'text-ft-acc' : 'text-ft-text'}`}>GS</Text>
           </Pressable>
           <Pressable
-            accessibilityLabel="Winkel setzen"
-            accessibilityHint="Öffnet die Auswahl: Geschlossener/Offener/Bodenwinkel oder Abriss an der aktuellen Position."
+            accessibilityLabel={t('track.setAngleButton')}
+            accessibilityHint={t('track.setAngleHint')}
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
             onPress={() => { hapticTap(); setGsPicker(false); setWinkelSheet(v => !v); }} disabled={phase !== 'recording'}
           >
             <Ionicons name="git-branch-outline" size={20} color={winkelSheet ? FT.acc : FT.text} />
-            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">Winkel</Text>
+            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{t('track.angle')}</Text>
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
@@ -875,18 +906,18 @@ export default function LegenScreen() {
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>
           </Pressable>
           <Pressable
-            accessibilityLabel="Stoppen"
-            accessibilityHint="Beendet das Legen der Fährte und startet die Liegezeit."
+            accessibilityLabel={t('common.stop')}
+            accessibilityHint={t('track.stopLayingHint')}
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
             style={{ flex: 1.3 }} onPress={onStop} disabled={phase !== 'recording'}
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
-            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">Stoppen</Text>
+            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">{t('common.stop')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
 
-      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title="Teilstrecke starten">
+      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')}>
         <View className="gap-4 pb-2">
           <View className="flex-row flex-wrap gap-[10px]">
             {TRACK_SEGMENT_TYPES.map(type => {
@@ -894,13 +925,13 @@ export default function LegenScreen() {
               return (
                 <Pressable
                   key={type}
-                  accessibilityLabel={`${TRACK_SEGMENT_LABELS[type]} auswählen`}
+                  accessibilityLabel={`${segmentLabel(type)} ${t('common.select').toLowerCase()}`}
                   onPress={() => setSegmentType(type)}
                   style={{ width: '47%', flexGrow: 1 }}
                   className={`flex-row items-center gap-2 px-3 py-3 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line-strong'}`}
                 >
                   <Ionicons name={SEGMENT_ICONS[type]} size={18} color={on ? FT.acc : FT.muted} />
-                  <Text className={`text-[12.5px] font-bold ${on ? 'text-ft-acc' : 'text-ft-text'}`}>{TRACK_SEGMENT_LABELS[type]}</Text>
+                  <Text className={`text-[12.5px] font-bold ${on ? 'text-ft-acc' : 'text-ft-text'}`}>{segmentLabel(type)}</Text>
                 </Pressable>
               );
             })}
@@ -908,36 +939,36 @@ export default function LegenScreen() {
 
           {segmentType === 'custom' && (
             <TextInput
-              accessibilityLabel="Bezeichnung der eigenen Teilstrecke"
-              accessibilityHint="Pflichtfeld für eine eigene Teilstrecke."
+              accessibilityLabel={t('track.segmentCustomLabel')}
+              accessibilityHint={t('track.segmentCustomHint')}
               value={segmentCustomLabel}
               onChangeText={setSegmentCustomLabel}
               maxLength={40}
-              placeholder="Bezeichnung"
+              placeholder={t('track.segmentLabel')}
               placeholderTextColor={FT.faint}
               className="rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line-strong text-ft-text font-semibold"
             />
           )}
 
           <Pressable
-            accessibilityLabel="Sprachansagen für Teilstrecken umschalten"
-            accessibilityHint="Aktiviert oder deaktiviert feste Ansagen für geplante und aktive Teilstrecken."
+            accessibilityLabel={t('track.segmentVoiceToggleLabel')}
+            accessibilityHint={t('track.segmentVoiceToggleHint')}
             onPress={() => setSegmentVoiceEnabled(v => !v)}
             className="flex-row items-center justify-between rounded-[16px] px-4 py-3 bg-white/5 border border-ft-line-strong"
           >
-            <Text className="text-[13px] text-ft-text font-bold">Sprachansagen für Teilstrecken</Text>
+            <Text className="text-[13px] text-ft-text font-bold">{t('track.segmentVoiceToggle')}</Text>
             <View className={`w-12 h-7 rounded-full p-1 ${segmentVoiceEnabled ? 'bg-ft-acc' : 'bg-white/15'}`}>
               <View className={`w-5 h-5 rounded-full bg-[#04110F] ${segmentVoiceEnabled ? 'self-end' : 'self-start'}`} />
             </View>
           </Pressable>
 
           <Pressable
-            accessibilityLabel="Teilstrecke jetzt starten"
+            accessibilityLabel={t('track.segmentStartNow')}
             onPress={startTrackSegment}
             className="flex-row items-center justify-center gap-2 rounded-[16px] px-4 py-3 bg-ft-acc"
           >
             <Ionicons name="play" size={16} color={FT.accText} />
-            <Text className="text-[14px] font-black text-ft-acc-text">Jetzt starten</Text>
+            <Text className="text-[14px] font-black text-ft-acc-text">{t('track.segmentStartNow')}</Text>
           </Pressable>
         </View>
       </AnyvoBottomSheet>

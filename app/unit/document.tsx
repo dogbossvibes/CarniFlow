@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import * as Crypto from 'expo-crypto';
 import {
   Alert, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -23,6 +24,7 @@ import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { DISCIPLINES, customToDiscipline, disciplineColor, type Discipline } from '@/constants/disciplines';
 import { DEFAULT_SPARTEN } from '@/constants/sparten';
 import { createDocumentedUnit, updateDocumentedUnit, getTrainingUnitById } from '@/services/trainingUnitService';
+import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { DateField } from '@/components/ui/DateField';
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
@@ -138,6 +140,9 @@ export default function DocumentScreen() {
 
   const canSave = !!dogId && selected.length > 0;
 
+  // Stabile ID pro Doku-Versuch → idempotenter Quota-Claim über Retries hinweg.
+  const unitIdRef = useRef(Crypto.randomUUID());
+
   const speichern = async () => {
     if (!canSave || !session?.user.id) return;
     setSaving(true);
@@ -164,9 +169,13 @@ export default function DocumentScreen() {
 
     const { error } = editing
       ? await updateDocumentedUnit(id!, payload, exercises)
-      : (await createDocumentedUnit(session.user.id, payload, exercises));
+      : (await createDocumentedUnit(session.user.id, payload, exercises, unitIdRef.current));
     setSaving(false);
-    if (error) { Alert.alert(t('common.error'), error.message ?? t('training.saveError')); return; }
+    if (error) {
+      // NEWBIE-Quota (nur bei NEUER Doku): Upgrade- bzw. Retry-UX, sonst generisch.
+      if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
+      Alert.alert(t('common.error'), error.message ?? t('training.saveError')); return;
+    }
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });

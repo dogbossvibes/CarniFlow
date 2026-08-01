@@ -10,6 +10,7 @@ import { HeroImage } from '@/components/training/HeroImage';
 import { MetricsInput } from '@/components/training/MetricsInput';
 import { disciplineColor } from '@/constants/disciplines';
 import { finishTrainingUnit } from '@/services/trainingUnitService';
+import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import type { TrainingMetrics } from '@/types/analytics';
 import { queryClient } from '@/lib/queryClient';
 import { useActiveTraining, resetUnit } from '@/stores/activeTraining';
@@ -62,6 +63,7 @@ export default function SummaryScreen() {
     setSaving(false);
 
     if (error) {
+      if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
       Alert.alert(t('common.error'), error.message ?? t('training.saveError'));
       return;
     }

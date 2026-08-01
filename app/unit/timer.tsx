@@ -10,7 +10,9 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
+import * as Crypto from 'expo-crypto';
 import { createDocumentedUnit } from '@/services/trainingUnitService';
+import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { queryClient } from '@/lib/queryClient';
 import type { TrainingMetrics } from '@/types/analytics';
 
@@ -40,6 +42,7 @@ export default function TimerScreen() {
   const { dogId, dogName, discipline, source, note } =
     useLocalSearchParams<{ dogId?: string; dogName?: string; discipline?: string; source?: string; note?: string }>();
 
+  const unitIdRef = useRef(Crypto.randomUUID());   // stabile ID → idempotenter Quota-Claim
   const baseRef = useRef(0);              // Sekunden aus abgeschlossenen Lauf-Segmenten
   const segStartRef = useRef(Date.now()); // Start des aktuellen laufenden Segments
   const [running, setRunning] = useState(true);
@@ -80,8 +83,11 @@ export default function TimerScreen() {
       score: null, notes: null, photos: [], videos: [], audio_files: [],
       shared_with_trainer: false,
       ...EMPTY_METRICS,
-    }, []);
-    if (error) { haptic.error(); Alert.alert(t('common.error'), error.message ?? t('training.saveError')); return; }
+    }, [], unitIdRef.current);
+    if (error) {
+      if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
+      haptic.error(); Alert.alert(t('common.error'), error.message ?? t('training.saveError')); return;
+    }
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });

@@ -1,9 +1,10 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAiCoach } from '@/features/ai/hooks/useAiCoach';
 import { useCoachSummary } from '@/features/ai/hooks/useCoachSummary';
 import { InsightCard } from '@/features/ai/components/InsightCard';
@@ -18,10 +19,17 @@ const SEV_RANK = { critical: 0, warning: 1, info: 2, success: 3 } as const;
 
 export default function CoachScreen() {
   const router = useRouter();
+  // Smart Coach ist Premium. NEWBIE (isPro=false) wird auf die Paywall geleitet,
+  // bevor KI-/Coach-Daten geladen werden.
+  const { isPro, loading: capLoading } = useCapabilities();
   const { data, isLoading, refetch, dismiss } = useAiCoach();
   const summary = useCoachSummary();
 
-  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
+
+  useFocusEffect(useCallback(() => { if (isPro) refetch(); }, [isPro, refetch]));
 
   const runCta = (cta?: InsightCta | null) => {
     if (!cta) return;
