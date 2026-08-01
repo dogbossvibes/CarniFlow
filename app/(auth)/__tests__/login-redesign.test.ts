@@ -26,7 +26,7 @@ describe('Login redesign', () => {
   it('6/7. Login und Registrierung verwenden weiter die bestehenden Auth-Handler', () => {
     const src = loginSource();
     expect(src).toContain('await signIn(email.trim(), passwort)');
-    expect(src).toContain('await signUp(email.trim(), passwort, vollName.trim() || undefined, rolle)');
+    expect(src).toContain('await signUp(email.trim(), passwort, vollName.trim() || undefined)');
   });
 
   it('8. Passwort vergessen öffnet den bestehenden Recovery-Flow', () => {

@@ -49,7 +49,6 @@ export default function LoginScreen() {
 
   const [tab,       setTab]       = useState<Tab>('anmelden');
   const [vollName,  setVollName]  = useState('');
-  const [rolle,     setRolle]     = useState<'user' | 'trainer'>('user');
   const [email,     setEmail]     = useState('');
   const [passwort,  setPasswort]  = useState('');
   const [fehler,    setFehler]    = useState<string | null>(null);
@@ -120,7 +119,7 @@ export default function LoginScreen() {
         setFehler(t('auth.errorPasswordMin6'));
         return;
       }
-      const { data, error: err } = await signUp(email.trim(), passwort, vollName.trim() || undefined, rolle);
+      const { data, error: err } = await signUp(email.trim(), passwort, vollName.trim() || undefined);
       setLaden(false);
       if (err) { setFehler(uebersetzeFehler(err.message, t)); return; }
       if (data.session) router.replace('/(tabs)/home');
@@ -302,30 +301,6 @@ export default function LoginScreen() {
                   >
                     <Text style={s.forgotText}>{t('auth.forgotPassword')}</Text>
                   </TouchableOpacity>
-                )}
-                {tab === 'registrieren' && (
-                  <View>
-                    <Text style={s.rolleLabel}>{t('auth.roleLabel')}</Text>
-                    <View style={s.rolleRow}>
-                      {([
-                        { id: 'user',    label: t('auth.roleHandler'), icon: 'paw' },
-                        { id: 'trainer', label: t('auth.roleTrainer'), icon: 'ribbon' },
-                      ] as const).map((r) => {
-                        const aktiv = rolle === r.id;
-                        return (
-                          <TouchableOpacity
-                            key={r.id}
-                            style={[s.rolleChip, aktiv && s.rolleChipActive]}
-                            onPress={() => setRolle(r.id)}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons name={r.icon} size={16} color={aktiv ? C.accent : C.muted} />
-                            <Text style={[s.rolleChipTxt, aktiv && s.rolleChipTxtActive]}>{r.label}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
                 )}
               </View>
 
@@ -647,12 +622,6 @@ const s = StyleSheet.create({
   appleBtn:   { height: 42, marginTop: 6, width: '100%' },
   appleBtnCompact: { height: 40, marginTop: 5 },
 
-  rolleLabel:    { fontSize: 11, color: C.muted, fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
-  rolleRow:      { flexDirection: 'row', gap: 10 },
-  rolleChip:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.05)' },
-  rolleChipActive:    { borderColor: C.accent, backgroundColor: C.accentDim },
-  rolleChipTxt:       { fontSize: 14, color: C.muted, fontWeight: '600' },
-  rolleChipTxtActive: { color: C.white, fontWeight: '700' },
   modeSwitchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 12, flexWrap: 'wrap' },
   modeSwitchText: { fontSize: 13, color: 'rgba(255,255,255,0.62)', fontWeight: '600' },
   modeSwitchLink: { fontSize: 13, color: C.accent, fontWeight: '900' },
