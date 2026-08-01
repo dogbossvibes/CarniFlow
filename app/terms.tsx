@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Nutzungsbedingungen / AGB für ANYVO. Vorlage nach Code-Faktenlage (Schweizer
 // Recht, App-Store-Abos). HINWEIS: vor Veröffentlichung anwaltlich prüfen lassen.
-const UPDATED = '24. Juni 2026';
+const UPDATED = '1. August 2026';
 
 const PROVIDER = 'Sandra Müller (ANYVO), Heid 196A, 3159 Riedstätt, Schweiz';
 const CONTACT  = 'shadesofym@gmail.com';
@@ -23,7 +23,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: '2. Leistung',
-    body:  'ANYVO ist eine App zur Dokumentation und Auswertung von Hundetraining (u. a. Trainingseinheiten, Fährten-/Streckenaufnahme per GPS, Medien, Notizen) sowie optionale KI-gestützte Auswertung. Funktionsumfang und Verfügbarkeit können sich weiterentwickeln. Die App ersetzt keine tierärztliche oder professionelle Beratung.',
+    body:  'ANYVO ist eine App zur Dokumentation und Auswertung von Hundetraining (u. a. Trainingseinheiten, Fährten-/Streckenaufnahme per GPS, Medien, Notizen) sowie regel- und statistikbasierte Trainingsauswertungen (Smart Coach / Smart Analyse). Funktionsumfang und Verfügbarkeit können sich weiterentwickeln. Die App ersetzt keine tierärztliche oder professionelle Beratung.',
   },
   {
     title: '3. Konto',
@@ -42,8 +42,8 @@ const SECTIONS: Section[] = [
     body:  'Die Rechte an deinen Inhalten (Fotos, Videos, Notizen, Sprachnotizen, Trainingsdaten) verbleiben bei dir. Du räumst uns das einfache Recht ein, diese Inhalte ausschliesslich zum Betrieb der App zu speichern und zu verarbeiten. Markierst du eine Einheit als „geteilt", machst du sie für deine verbundene Trainer:in zugänglich.',
   },
   {
-    title: '7. KI-Funktionen',
-    body:  'KI-gestützte Auswertungen und die Transkription von Sprachnotizen werden über externe Dienste erbracht und können fehlerhaft oder unvollständig sein. Sie stellen keine fachliche Empfehlung dar; Entscheidungen zum Training oder zur Gesundheit deines Hundes triffst du eigenverantwortlich.',
+    title: '7. Smart Coach / Smart Analyse',
+    body:  'Smart Coach und Smart Analyse sind regel- und statistikbasierte Trainingsauswertungen. Die Hinweise basieren ausschließlich auf den von dir dokumentierten Trainingsdaten; es werden keine externen KI-/LLM-Dienste eingesetzt und keine Daten an externe KI-Anbieter übermittelt. Sprachnotizen bleiben als Audio möglich, eine automatische externe Transkription findet nicht statt. Die Auswertungen können unvollständig sein und ersetzen keine professionelle, medizinische oder tierärztliche Beratung; Entscheidungen zum Training oder zur Gesundheit deines Hundes triffst du eigenverantwortlich.',
   },
   {
     title: '8. Haftung',

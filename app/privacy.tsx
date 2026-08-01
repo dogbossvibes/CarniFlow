@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const UPDATED = '24. Juni 2026';
+const UPDATED = '1. August 2026';
 
 // Verantwortliche Stelle (revDSG: Identität der verantwortlichen Person).
 const CONTROLLER_NAME    = 'Sandra Müller (ANYVO)';
@@ -30,15 +30,15 @@ const SECTIONS: Section[] = [
   },
   {
     title: '3. Zwecke und Rechtsgrundlagen',
-    body:  '• Bereitstellung der App- und Tracking-Funktionen — zur Vertragserfüllung\n• Standorterfassung, Mitteilungen, Mikrofon/Sprachnotizen, geteilte Einheiten — auf Grundlage deiner Einwilligung (jederzeit widerrufbar)\n• KI-gestützte Analyse/Coaching und Sprachnotiz-Transkription — zur Vertragserfüllung bzw. auf deine Veranlassung\n• Stabilität und Sicherheit (Absturzberichte) — berechtigtes Interesse\n• Trainer-Betreuung: Markierst du eine Einheit als „geteilt", kann deine verbundene Trainer:in sie inkl. Übungen, Notizen, Medien und Hundenamen einsehen und kommentieren. Pro Einheit widerrufbar; Verbindung jederzeit trennbar.',
+    body:  '• Bereitstellung der App- und Tracking-Funktionen — zur Vertragserfüllung\n• Standorterfassung, Mitteilungen, Mikrofon/Sprachnotizen, geteilte Einheiten — auf Grundlage deiner Einwilligung (jederzeit widerrufbar)\n• Smart Coach / Smart Analyse — regel- und statistikbasierte Auswertung deiner dokumentierten Trainingsdaten (u. a. Trainingshäufigkeit, Dauer, Disziplinverteilung, Bewertungen, Trends, Pausen); es werden hierfür keine Daten an externe KI-/LLM-Anbieter übermittelt — zur Vertragserfüllung\n• Audio-/Sprachnotizen — Speicherung über Supabase Storage; eine automatische externe Transkription findet nicht statt (keine Übermittlung an OpenAI oder andere Transkriptionsanbieter) — auf Grundlage deiner Einwilligung\n• Stabilität und Sicherheit (Absturzberichte) — berechtigtes Interesse\n• Trainer-Betreuung: Markierst du eine Einheit als „geteilt", kann deine verbundene Trainer:in sie inkl. Übungen, Notizen, Medien und Hundenamen einsehen und kommentieren. Pro Einheit widerrufbar; Verbindung jederzeit trennbar.',
   },
   {
     title: '4. Drittanbieter / Auftragsbearbeiter',
-    body:  '• Supabase (Supabase Inc., USA) — Authentifizierung, Datenbank, Dateispeicher (Fotos, Videos, Sprachnotizen). Übertragung verschlüsselt; Speicherung in der EU (Region Irland).\n• Anthropic (USA) — KI-Coaching/-Analyse. Übermittelt werden Trainingsdaten (Metriken, Bewertungen, Dauer, Notizen, Übungstitel, Hundename), keine E-Mail-Adresse.\n• OpenAI (USA) — Transkription von Sprachnotizen (das Audio wird zur Umwandlung in Text übermittelt). Über die API werden die Inhalte nicht zum Training der Modelle verwendet.\n• Open-Meteo (Deutschland/EU) — Wetterdienst ohne API-Schlüssel; übermittelt werden nur GPS-Koordinaten.\n• RevenueCat (USA) — Abwicklung/Verwaltung von Abos und Käufen.\n• Sentry (Functional Software Inc., USA; Datenspeicherung in der EU/Deutschland) — Absturz-/Fehlerdiagnose; in der App deaktivierbar.\n• Apple — Anmeldung mit Apple, Push (APNs), Kaufabwicklung im App Store. Google (FCM) für Push auf Android.\n• Expo (USA) — Zustellung von Push-Mitteilungen (Push-Token).',
+    body:  '• Supabase (Supabase Inc., USA) — Authentifizierung, Datenbank, Dateispeicher (Fotos, Videos, Sprachnotizen). Übertragung verschlüsselt; Speicherung in der EU (Region Irland).\n• Open-Meteo (Deutschland/EU) — Wetterdienst ohne API-Schlüssel; übermittelt werden nur GPS-Koordinaten.\n• RevenueCat (USA) — Abwicklung/Verwaltung von Abos und Käufen.\n• Sentry (Functional Software Inc., USA; Datenspeicherung in der EU/Deutschland) — Absturz-/Fehlerdiagnose; in der App deaktivierbar.\n• Apple — Anmeldung mit Apple, Push (APNs), Kaufabwicklung im App Store. Google (FCM) für Push auf Android.\n• Expo (USA) — Zustellung von Push-Mitteilungen (Push-Token).',
   },
   {
     title: '5. Bekanntgabe ins Ausland',
-    body:  'Einige Anbieter (u. a. Supabase, Anthropic, OpenAI, RevenueCat, Apple) sind in den USA ansässig oder können Daten dort verarbeiten (Sentry verarbeitet die Diagnosedaten in der EU/Deutschland, das Unternehmen sitzt jedoch in den USA). Die Übermittlung erfolgt auf Basis geeigneter Garantien (EU-Standardvertragsklauseln bzw. Swiss-/EU-US Data Privacy Framework). Auf Wunsch stellen wir Informationen zu den Garantien bereit.',
+    body:  'Einige Anbieter (u. a. Supabase, RevenueCat, Apple) sind in den USA ansässig oder können Daten dort verarbeiten (Sentry verarbeitet die Diagnosedaten in der EU/Deutschland, das Unternehmen sitzt jedoch in den USA). Die Übermittlung erfolgt auf Basis geeigneter Garantien (EU-Standardvertragsklauseln bzw. Swiss-/EU-US Data Privacy Framework). Auf Wunsch stellen wir Informationen zu den Garantien bereit.',
   },
   {
     title: '6. Standort & Fährten',
