@@ -107,6 +107,13 @@ describe('Founder 11 JEMALS — FOUNDER_SLOT_LIFECYCLE_SETUP.sql', () => {
     expect(sql).toMatch(/pg_advisory_xact_lock/);
     expect(sql).toMatch(/restore_founder_slot/);
   });
+  it('härtet claimed_at auf Default now() und NOT NULL ohne stille Datenkorrektur', () => {
+    expect(sql).toMatch(/claimed_at timestamptz not null default now\(\)/);
+    expect(sql).toMatch(/alter column claimed_at set default now\(\)/);
+    expect(sql).toMatch(/where claimed_at is null/);
+    expect(sql).toMatch(/raise exception/);
+    expect(sql).toMatch(/alter column claimed_at set not null/);
+  });
 });
 
 describe('RevenueCat-Webhook — Legacy-NEWBIE erzeugt kein pro_member', () => {

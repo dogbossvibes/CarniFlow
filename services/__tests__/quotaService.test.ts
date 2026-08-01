@@ -106,4 +106,15 @@ describe('SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql — Struktur', () => {
   it('Premium wird durchgelassen (is_pro_member)', () => {
     expect(sql).toMatch(/is_pro_member/);
   });
+  it('versioniert den finalen subscriptions.plan-Constraint inklusive newbie und Legacy-Wert', () => {
+    expect(sql).toMatch(/drop constraint if exists subscriptions_plan_check/);
+    expect(sql).toMatch(/add constraint subscriptions_plan_check/);
+    expect(sql).toMatch(/plan is null/);
+    for (const plan of ['beginner_trial', 'newbie', 'founder_active', 'active', 'trainer']) {
+      expect(sql).toContain(`'${plan}'`);
+    }
+  });
+  it('schreibt keine bestehenden Subscription-Planwerte um', () => {
+    expect(sql).not.toMatch(/update\s+public\.subscriptions\s+set\s+plan/);
+  });
 });
