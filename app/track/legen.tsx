@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
@@ -45,6 +45,7 @@ import {
   normalizeCustomSegmentLabel,
   segmentDisplayLabel,
 } from '@/features/tracking/utils/trackSegments';
+import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPickerLayout';
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
@@ -120,6 +121,7 @@ export default function LegenScreen() {
   const router = useRouter();
   const { t } = useT();
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
+  const { height: windowHeight } = useWindowDimensions();
   useKeepAwake();   // Display während des Legens anlassen (Bildschirm nicht sperren)
   const params = useLocalSearchParams<{ dogId?: string }>();
   const { session } = useSession();
@@ -237,6 +239,11 @@ export default function LegenScreen() {
 
   const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
   const conflictShownRef = useRef(false);
+  const quickPickerLayout = getTrackQuickPickerLayout({
+    windowHeight,
+    safeAreaTop: insets.top,
+    safeAreaBottom: insets.bottom,
+  });
 
   // Regel 4: pro Hund max. EINE aktive Fährte. Der eigentliche Aufnahmestart
   // (Disclosure → begin). Ausgelagert, da ihn sowohl der normale Pfad als auch
@@ -816,7 +823,17 @@ export default function LegenScreen() {
         {gsPicker && phase === 'recording' && (
           <>
             <Pressable accessibilityLabel={t('track.closeObjectPicker')} className="absolute inset-0" onPress={() => setGsPicker(false)} />
-            <View className="absolute left-[14px] right-[14px] bottom-[100px] flex-row flex-wrap gap-2 justify-center" pointerEvents="box-none">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{
+                position: 'absolute',
+                left: 14,
+                right: 14,
+                bottom: quickPickerLayout.bottomOffset,
+                maxHeight: quickPickerLayout.maxHeight,
+              }}
+              contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}
+            >
               {GEGENSTAND_MATERIALS.map(m => (
                 <Pressable
                   key={m.material}
@@ -835,7 +852,7 @@ export default function LegenScreen() {
                   <Text numberOfLines={1} className="text-[10px] font-extrabold text-ft-text">{m.label}</Text>
                 </Pressable>
               ))}
-            </View>
+            </ScrollView>
           </>
         )}
 
@@ -849,7 +866,11 @@ export default function LegenScreen() {
               className="absolute inset-0"
               onPress={() => setWinkelSheet(false)}
             />
-            <View className="absolute left-[14px] right-[14px] bottom-[100px] flex-row gap-2" pointerEvents="box-none">
+            <View
+              className="absolute left-[14px] right-[14px] flex-row gap-2"
+              pointerEvents="box-none"
+              style={{ bottom: quickPickerLayout.bottomOffset, maxHeight: quickPickerLayout.maxHeight }}
+            >
               {([
                 { kind: 'gw',     short: 'GW',     icon: 'square-outline'   },
                 { kind: 'ow',     short: 'OW',     icon: 'triangle-outline' },

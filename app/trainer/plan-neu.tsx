@@ -107,11 +107,11 @@ export default function PlanNeuScreen() {
 
           <View style={{ height: 20 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
 
-      <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving} activeOpacity={0.9}>
-        {saving ? <ActivityIndicator color={C.accentText} /> : <Text style={s.saveTxt}>{t('trainer.savePlan')}</Text>}
-      </TouchableOpacity>
+        <TouchableOpacity style={[s.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving} activeOpacity={0.9}>
+          {saving ? <ActivityIndicator color={C.accentText} /> : <Text style={s.saveTxt}>{t('trainer.savePlan')}</Text>}
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

@@ -79,7 +79,7 @@ describe('startApproach — reduceApproach (mehrere gültige Fixes)', () => {
     expect(st.consecutive).toBe(1);
     expect(st.armed).toBe(false);
   });
-  it('7) drei aufeinanderfolgende gültige Fixes → Auto-Start', () => {
+  it('7) drei aufeinanderfolgende gültige Fixes → startbereit', () => {
     const st = feed(3, fix({ accuracy: 2, distanceM: 1 }));
     expect(st.armed).toBe(true);
   });

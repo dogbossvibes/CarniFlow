@@ -99,7 +99,29 @@ export async function deleteAccount(): Promise<{ error: Error | null }> {
   return { error: null };
 }
 
-export async function signInWithGoogle(): Promise<{ error: Error | null; cancelled?: boolean }> {
+export type GoogleOAuthResult = { error: Error | null; cancelled?: boolean };
+
+let googleOAuthInFlight: Promise<GoogleOAuthResult> | null = null;
+
+export function parseOAuthCallbackUrl(url: string): { code: string | null; error: string | null } {
+  const [beforeHash, rawHash = ''] = url.split('#');
+  const queryString = beforeHash.split('?')[1] ?? '';
+  const normalizedHash = rawHash.replace(/^\/?/, '').replace(/^\?/, '');
+  const hashString = normalizedHash.includes('?') ? normalizedHash.split('?')[1] : normalizedHash;
+  const queryParams = new URLSearchParams(queryString);
+  const hashParams = new URLSearchParams(hashString);
+
+  return {
+    code: queryParams.get('code') ?? hashParams.get('code'),
+    error:
+      queryParams.get('error_description')
+      ?? hashParams.get('error_description')
+      ?? queryParams.get('error')
+      ?? hashParams.get('error'),
+  };
+}
+
+async function runGoogleOAuth(): Promise<GoogleOAuthResult> {
   const redirectTo = makeRedirectUri({
     scheme: 'anyvo',
     path:   'auth/callback',
@@ -137,14 +159,21 @@ export async function signInWithGoogle(): Promise<{ error: Error | null; cancell
   // Pull the PKCE authorization code out of the redirect URL.
   // exchangeCodeForSession expects ONLY the code string, not the whole URL —
   // passing the full URL sends it verbatim as auth_code and always fails.
-  const queryString = result.url.split('?')[1] ?? '';
-  const params      = new URLSearchParams(queryString);
-  const code        = params.get('code');
-  const oauthErr    = params.get('error_description') ?? params.get('error');
+  const { code, error: oauthErr } = parseOAuthCallbackUrl(result.url);
 
   if (oauthErr) return { error: new Error(oauthErr) };
   if (!code)    return { error: new Error('Kein Anmelde-Code von Google erhalten.') };
 
   const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
   return { error: exchErr ?? null };
+}
+
+export async function signInWithGoogle(): Promise<GoogleOAuthResult> {
+  if (googleOAuthInFlight) return googleOAuthInFlight;
+
+  googleOAuthInFlight = runGoogleOAuth().finally(() => {
+    googleOAuthInFlight = null;
+  });
+
+  return googleOAuthInFlight;
 }

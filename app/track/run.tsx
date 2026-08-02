@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -110,7 +110,7 @@ export default function TrackRunScreen() {
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
   const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
   const [noStartHandled, setNoStartHandled] = useState(false);   // kontrolliertes „kein Startpunkt" nur einmal
-  const startModeRef = useRef<StartMode>('automatic');   // wie der Start bestätigt wurde (Runtime-Info)
+  const startModeRef = useRef<StartMode>('manual-at-start');   // wie der Start bestätigt wurde (Runtime-Info)
   const startedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
   const segmentAnnouncementRef = useRef<Record<string, SearchSegmentAnnouncementState>>({});
@@ -156,10 +156,10 @@ export default function TrackRunScreen() {
 
   // Absuche WIRKLICH starten: Recorder + Timer + Status 'searching'. Wird erst am
   // Fährtenansatz (Arming) bzw. beim Fortsetzen aufgerufen — NICHT beim Betreten.
-  const beginSearchNow = useCallback((mode: StartMode = 'automatic') => {
+  const beginSearchNow = useCallback((mode: StartMode = 'manual-at-start') => {
     if (startedRef.current) return;
     startedRef.current = true;
-    startModeRef.current = mode;   // Runtime-Info (automatic | manual-at-start | manual-override)
+    startModeRef.current = mode;   // Runtime-Info (manual-at-start | manual-override)
     setArming(false);
     hapticSuccess();   // haptisches Feedback beim Erreichen des Ansatzes
     if (voiceOn && Speech) { try { Speech.speak('Suche läuft', { language: 'de-DE' }); } catch { /* best-effort */ } }
@@ -215,12 +215,6 @@ export default function TrackRunScreen() {
       { cancelable: false },
     );
   }, [phase, recovery, snap, arming, startPoint, beginSearchNow, noStartHandled, dogId, router]);
-
-  // 3) Auto-Start, sobald der Ansatz stabil im Radius erreicht ist (mehrere gültige
-  //    Fixes, dynamischer Radius, Stale-/Ausreißerfilter — reduceApproach).
-  useEffect(() => {
-    if (arming && approach.armed && !startedRef.current) beginSearchNow('automatic');
-  }, [arming, approach.armed, beginSearchNow]);
 
   useEffect(() => { if (effectiveId) getTrackSessionDogName(effectiveId).then(r => { if (r.data) setDogName(r.data); }); }, [effectiveId]);
 
@@ -535,9 +529,13 @@ export default function TrackRunScreen() {
           </View>
 
           {/* Arming-Overlay: Navigation zum Fährtenansatz. Suchzeit läuft NICHT
-              (Recorder ungestartet, Timer 00:00). Auto-Start bei stabilem Erreichen. */}
+              (Recorder ungestartet, Timer 00:00). Start erst per Bestätigung. */}
           {arming && (
-            <View className="absolute inset-0 bg-black/55 items-center justify-center px-8">
+            <View className="absolute inset-0 bg-black/55">
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 24 }}
+              >
               <View className="items-center gap-2">
                 <View className="w-[62px] h-[62px] rounded-full items-center justify-center border-2 border-[rgba(21,230,195,0.4)] bg-ft-acc-dim mb-1">
                   <Ionicons name="locate" size={26} color={FT.acc} />
@@ -606,6 +604,7 @@ export default function TrackRunScreen() {
                   <Text className="text-[14px] font-black text-ft-acc-text">Jetzt starten</Text>
                 </Pressable>
               </View>
+              </ScrollView>
             </View>
           )}
         </View>

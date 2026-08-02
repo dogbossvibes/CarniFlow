@@ -450,6 +450,7 @@ function TrustItem({ title, text }: { title: string; text: string }) {
 }
 
 function uebersetzeFehler(msg: string, t: (key: TranslationKey) => string): string {
+  if (msg.toLowerCase().includes('invalid flow state')) return t('auth.errorGoogle');
   if (msg.includes('Invalid login credentials')) return t('auth.errorInvalidCredentials');
   if (msg.includes('Email not confirmed'))       return t('auth.errorEmailUnconfirmed');
   if (msg.includes('User already registered'))   return t('auth.errorAlreadyRegistered');

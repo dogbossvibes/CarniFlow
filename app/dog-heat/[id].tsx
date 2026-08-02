@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -19,6 +19,7 @@ export default function DogHeatEditor() {
   const router = useRouter();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { t } = useT();
+  const insets = useSafeAreaInsets();
 
   const [start, setStart] = useState<Date | null>(new Date());
   const [end, setEnd]     = useState<Date | null>(null);
@@ -56,36 +57,43 @@ export default function DogHeatEditor() {
           <View style={{ width: 38 }} />
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>{t('dog.heatStart')}</Text>
-          <DateField value={start} onChange={setStart} maximumDate={new Date()} />
+        <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView
+            contentContainerStyle={[s.scroll, { paddingBottom: 32 + insets.bottom }]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={s.label}>{t('dog.heatStart')}</Text>
+            <DateField value={start} onChange={setStart} maximumDate={new Date()} />
 
-          <Text style={s.label}>{t('dog.heatEndOptional')}</Text>
-          <DateField value={end} onChange={setEnd} onClear={() => setEnd(null)} placeholder={t('dog.stillOpen')} maximumDate={new Date()} />
+            <Text style={s.label}>{t('dog.heatEndOptional')}</Text>
+            <DateField value={end} onChange={setEnd} onClear={() => setEnd(null)} placeholder={t('dog.stillOpen')} maximumDate={new Date()} />
 
-          <Text style={s.label}>{t('dog.heatPhaseOptional')}</Text>
-          <View style={s.chips}>
-            {PHASES.map(ph => {
-              const on = phase === ph;
-              return (
-                <TouchableOpacity key={ph} style={[s.chip, on && s.chipOn]} onPress={() => setPhase(on ? null : ph)} activeOpacity={0.85}>
-                  <Text style={[s.chipTxt, on && s.chipTxtOn]}>{ph}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+            <Text style={s.label}>{t('dog.heatPhaseOptional')}</Text>
+            <View style={s.chips}>
+              {PHASES.map(ph => {
+                const on = phase === ph;
+                return (
+                  <TouchableOpacity key={ph} style={[s.chip, on && s.chipOn]} onPress={() => setPhase(on ? null : ph)} activeOpacity={0.85}>
+                    <Text style={[s.chipTxt, on && s.chipTxtOn]}>{ph}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-          <Text style={s.label}>{t('dog.observationsOptional')}</Text>
-          <TextInput
-            value={notes} onChangeText={setNotes} multiline
-            placeholder={t('dog.heatNotesPlaceholder')}
-            placeholderTextColor={C.trackTextMut} style={[s.input, s.multiline]}
-          />
+            <Text style={s.label}>{t('dog.observationsOptional')}</Text>
+            <TextInput
+              value={notes} onChangeText={setNotes} multiline
+              placeholder={t('dog.heatNotesPlaceholder')}
+              placeholderTextColor={C.trackTextMut} style={[s.input, s.multiline]}
+            />
 
-          <View style={{ height: 16 }} />
-          <AnyvoButton label={t('common.save')} icon="checkmark" onPress={save} loading={saving} />
-          <Text style={s.disclaimer}>{t('dog.heatDisclaimer')}</Text>
-        </ScrollView>
+            <View style={{ height: 16 }} />
+            <AnyvoButton label={t('common.save')} icon="checkmark" onPress={save} loading={saving} />
+            <Text style={s.disclaimer}>{t('dog.heatDisclaimer')}</Text>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -93,6 +101,7 @@ export default function DogHeatEditor() {
 
 const s = StyleSheet.create({
   root:      { flex: 1, backgroundColor: C.trackBg },
+  flex:      { flex: 1 },
   bar:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 },
   iconBtn:   { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' },
   barTitle:  { flex: 1, fontSize: 16, color: C.trackText, fontWeight: '800', textAlign: 'center' },

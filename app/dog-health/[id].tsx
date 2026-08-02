@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -21,6 +21,7 @@ export default function DogHealthEditor() {
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { showToast, toast } = useToast();
   const { t } = useT();
+  const insets = useSafeAreaInsets();
 
   const [weight, setWeight] = useState('');
   const [load, setLoad]     = useState<Load | null>(null);
@@ -57,35 +58,42 @@ export default function DogHealthEditor() {
           <View style={{ width: 38 }} />
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>{t('dog.weight')}</Text>
-          <TextInput value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder={t('dog.weightPlaceholder')} placeholderTextColor={C.trackTextMut} style={s.input} />
+        <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView
+            contentContainerStyle={[s.scroll, { paddingBottom: 32 + insets.bottom }]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={s.label}>{t('dog.weight')}</Text>
+            <TextInput value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder={t('dog.weightPlaceholder')} placeholderTextColor={C.trackTextMut} style={s.input} />
 
-          <Text style={s.label}>{t('dog.load')}</Text>
-          <View style={s.seg}>
-            {LOADS.map(l => {
-              const on = load === l;
-              return (
-                <TouchableOpacity key={l} style={[s.segItem, on && s.segOn]} onPress={() => setLoad(on ? null : l)} activeOpacity={0.85}>
-                  <Text style={[s.segTxt, on && s.segTxtOn]}>{l.charAt(0).toUpperCase() + l.slice(1)}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+            <Text style={s.label}>{t('dog.load')}</Text>
+            <View style={s.seg}>
+              {LOADS.map(l => {
+                const on = load === l;
+                return (
+                  <TouchableOpacity key={l} style={[s.segItem, on && s.segOn]} onPress={() => setLoad(on ? null : l)} activeOpacity={0.85}>
+                    <Text style={[s.segTxt, on && s.segTxtOn]}>{l.charAt(0).toUpperCase() + l.slice(1)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-          <View style={s.toggleRow}><Text style={s.toggleLabel}>{t('dog.restDay')}</Text><Switch value={rest} onValueChange={setRest} trackColor={{ false: C.trackCardAlt, true: C.trackPrimary }} thumbColor="#fff" /></View>
-          <View style={s.toggleRow}><Text style={s.toggleLabel}>{t('dog.intenseUnit')}</Text><Switch value={intense} onValueChange={setInt} trackColor={{ false: C.trackCardAlt, true: C.trackPrimary }} thumbColor="#fff" /></View>
+            <View style={s.toggleRow}><Text style={s.toggleLabel}>{t('dog.restDay')}</Text><Switch value={rest} onValueChange={setRest} trackColor={{ false: C.trackCardAlt, true: C.trackPrimary }} thumbColor="#fff" /></View>
+            <View style={s.toggleRow}><Text style={s.toggleLabel}>{t('dog.intenseUnit')}</Text><Switch value={intense} onValueChange={setInt} trackColor={{ false: C.trackCardAlt, true: C.trackPrimary }} thumbColor="#fff" /></View>
 
-          <Text style={s.label}>{t('common.notes')}</Text>
-          <TextInput value={note} onChangeText={setNote} placeholder={t('common.optional')} placeholderTextColor={C.trackTextMut} multiline style={[s.input, s.multiline]} />
+            <Text style={s.label}>{t('common.notes')}</Text>
+            <TextInput value={note} onChangeText={setNote} placeholder={t('common.optional')} placeholderTextColor={C.trackTextMut} multiline style={[s.input, s.multiline]} />
 
-          <Text style={s.label}>{t('dog.nextVetOptional')}</Text>
-          <DateField value={vetDate} onChange={setVetDate} onClear={() => setVetDate(null)} placeholder={t('dog.noAppointment')} minimumDate={new Date()} style={{ marginBottom: 8 }} />
-          <TextInput value={vetReason} onChangeText={setVetReason} placeholder={t('dog.reasonOptional')} placeholderTextColor={C.trackTextMut} style={s.input} />
+            <Text style={s.label}>{t('dog.nextVetOptional')}</Text>
+            <DateField value={vetDate} onChange={setVetDate} onClear={() => setVetDate(null)} placeholder={t('dog.noAppointment')} minimumDate={new Date()} style={{ marginBottom: 8 }} />
+            <TextInput value={vetReason} onChangeText={setVetReason} placeholder={t('dog.reasonOptional')} placeholderTextColor={C.trackTextMut} style={s.input} />
 
-          <View style={{ height: 16 }} />
-          <AnyvoButton label={t('common.save')} icon="checkmark" onPress={save} loading={saving} />
-        </ScrollView>
+            <View style={{ height: 16 }} />
+            <AnyvoButton label={t('common.save')} icon="checkmark" onPress={save} loading={saving} />
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
       {toast}
     </View>
@@ -94,6 +102,7 @@ export default function DogHealthEditor() {
 
 const s = StyleSheet.create({
   root:       { flex: 1, backgroundColor: C.trackBg },
+  flex:       { flex: 1 },
   bar:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 },
   iconBtn:    { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' },
   barTitle:   { flex: 1, fontSize: 16, color: C.trackText, fontWeight: '800', textAlign: 'center' },

@@ -175,9 +175,9 @@ export default function TrackAuswertungScreen() {
                     {condStats.map((cnd, i) => (
                       <View key={i} style={s.condItem}>
                         <View style={s.condIcon}><Ionicons name={cnd.icon} size={17} color={C.trackPrimary} /></View>
-                        <View>
-                          <Text style={s.condLabel}>{cnd.label}</Text>
-                          <Text style={s.condValue}>{cnd.value}</Text>
+                        <View style={s.condText}>
+                          <Text style={s.condLabel} numberOfLines={1}>{cnd.label}</Text>
+                          <Text style={s.condValue} numberOfLines={2} ellipsizeMode="tail">{cnd.value}</Text>
                         </View>
                       </View>
                     ))}
@@ -319,10 +319,11 @@ const s = StyleSheet.create({
   totalMax:  { fontSize: 14, color: C.trackTextMut, fontWeight: '700' },
 
   condGrid:  { flexDirection: 'row', flexWrap: 'wrap', rowGap: 16, columnGap: 12 },
-  condItem:  { width: '46%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  condItem:  { width: '46%', flexGrow: 1, flexShrink: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
   condIcon:  { width: 38, height: 38, borderRadius: 12, backgroundColor: C.trackPrimaryDk + '24', alignItems: 'center', justifyContent: 'center' },
+  condText:  { flex: 1, minWidth: 0 },
   condLabel: { fontSize: 9, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
-  condValue: { fontSize: 15, color: C.trackText, fontWeight: '800', marginTop: 1 },
+  condValue: { fontSize: 15, lineHeight: 18, color: C.trackText, fontWeight: '800', marginTop: 1, flexShrink: 1 },
 
   mapCard: { height: 190, overflow: 'hidden', marginBottom: 16, padding: 0 },
   legend:  { position: 'absolute', left: 14, bottom: 12, flexDirection: 'row', gap: 14 },

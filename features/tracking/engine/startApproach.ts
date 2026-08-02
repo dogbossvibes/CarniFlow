@@ -19,7 +19,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 // Wie der Startpunkt bestätigt wurde (Runtime-Info; keine DB-Persistenz nötig).
-export type StartMode = 'automatic' | 'manual-at-start' | 'manual-override';
+export type StartMode = 'manual-at-start' | 'manual-override';
 
 export interface ApproachConfig {
   /** Untergrenze des dynamischen Startradius (m). */
@@ -100,7 +100,7 @@ export function isEligible(sample: ApproachSample, cfg: ApproachConfig): boolean
 
 export interface ApproachState {
   consecutive: number;   // aufeinanderfolgende gültige Fixes im Radius
-  armed:       boolean;  // Startpunkt erreicht + stabil → Absuche darf beginnen
+  armed:       boolean;  // Startpunkt erreicht + stabil → manueller Start ist möglich
 }
 
 export const INITIAL_APPROACH: ApproachState = { consecutive: 0, armed: false };
@@ -138,4 +138,4 @@ export function classifyManualStart(
   return distanceM <= r ? 'at-start' : 'override-needed';
 }
 
-export const APPROACH_HINT = 'Bitte zum Fährtenansatz gehen. Die Suchzeit startet automatisch.';
+export const APPROACH_HINT = 'Bitte zum Fährtenansatz gehen. Wähle den Abstand und starte bewusst.';
