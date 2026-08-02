@@ -15,7 +15,7 @@ export interface StartApproach {
   radiusM:        number | null;   // aktueller DYNAMISCHER Startradius (m)
   withinRadius:   boolean;         // aktuell im dynamischen Zielradius
   armed:          boolean;         // Startpunkt erreicht + stabil → Absuche darf starten
-  fixesRemaining: number;          // verbleibende gültige Fixes bis Auto-Start (Anzeige)
+  fixesRemaining: number;          // verbleibende gültige Fixes bis zur stabilen Startbereitschaft
 }
 
 const IDLE: StartApproach = {
@@ -29,7 +29,7 @@ const IDLE: StartApproach = {
 // KEIN eigener zweiter GPS-Pfad mehr. Die Bewertung (dynamischer Radius,
 // mehrere gültige Fixes, Stale-/Ausreißerfilter) läuft über die reine
 // reduceApproach-Logik. Der Absuche-Recorder bleibt ungestartet (Suchzeit läuft
-// erst ab dem Erreichen des Ansatzes).
+// erst nach bewusstem Tippen auf „Jetzt starten").
 export function useStartPointApproach(
   { active, start, config = DEFAULT_APPROACH_CONFIG }:
   { active: boolean; start: LatLng | null; config?: ApproachConfig },

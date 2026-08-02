@@ -19,7 +19,7 @@ import { useTrackingStore, type TrackPointSample } from '@/features/tracking/sto
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
 import {
-  APPROACH_HINT, DEFAULT_APPROACH_CONFIG, classifyManualStart, type StartMode,
+  DEFAULT_APPROACH_CONFIG, classifyManualStart, type StartMode,
 } from '@/features/tracking/engine/startApproach';
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 
@@ -176,7 +176,7 @@ export default function TrackRunScreen() {
     }
   }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM]);
 
-  // Manueller „Jetzt starten": innerhalb des dynamischen Radius → sofort; sonst
+  // Manueller „Jetzt starten": innerhalb des dynamischen Radius → direkt nach Tippen; sonst
   // bewusste Bestätigung (Override). Der Override tut NICHT so, als sei der
   // GPS-Startpunkt bestätigt (startMode = 'manual-override').
   const handleManualStart = useCallback(() => {
@@ -195,14 +195,14 @@ export default function TrackRunScreen() {
     );
   }, [approach.distanceM, approach.accuracy, beginSearchNow]);
 
-  // 2) Beim Betreten NICHT sofort starten: erst zum Fährtenansatz navigieren
+  // 2) Beim Betreten NICHT direkt starten: erst zum Fährtenansatz navigieren
   //    (Arming, Suchzeit läuft noch nicht). Ohne bekannten Startpunkt → Fallback:
-  //    sofort starten (Legacy/leer). Kein Start bei ausstehendem Recovery-Dialog.
+  //    kontrollierter Bestätigungsdialog. Kein Start bei ausstehendem Recovery-Dialog.
   useEffect(() => {
     if (phase !== 'ready' || startedRef.current || arming || recovery || !snap) return;
     if (startPoint) { setArming(true); return; }
     // RC-4: Kein Startpunkt (Runtime leer UND kein persistierter Anker) → NICHT
-    // stillschweigend sofort starten. Kontrollierte Recovery-Auswahl anbieten.
+    // stillschweigend direkt starten. Kontrollierte Recovery-Auswahl anbieten.
     if (noStartHandled) return;
     setNoStartHandled(true);
     Alert.alert(
@@ -540,18 +540,23 @@ export default function TrackRunScreen() {
                 <View className="w-[62px] h-[62px] rounded-full items-center justify-center border-2 border-[rgba(21,230,195,0.4)] bg-ft-acc-dim mb-1">
                   <Ionicons name="locate" size={26} color={FT.acc} />
                 </View>
-                <Text className="text-[13px] font-bold text-ft-text text-center leading-[19px] max-w-[280px]">{APPROACH_HINT}</Text>
+                <Text className="text-[13px] font-bold text-ft-text text-center leading-[19px] max-w-[280px]">{t('track.searchApproachHint')}</Text>
                 <Text className="text-[48px] font-black text-ft-text mt-1" style={{ fontVariant: ['tabular-nums'] }}>
                   {approach.distanceM != null ? `${approach.distanceM.toFixed(1)} m` : '– m'}
                 </Text>
                 <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase">Distanz zum Ansatz</Text>
                 {/* Status: Distanz + gemeldete GPS-Genauigkeit (keine falsche cm-Präzision). */}
                 <View className="flex-row items-center gap-2 mt-3 px-3 py-1.5 rounded-full bg-white/5 border border-ft-line">
-                  {approach.withinRadius ? (
+                  {approach.armed ? (
                     <>
-                      <ActivityIndicator size="small" color={FT.acc} />
+                      <Ionicons name="checkmark-circle" size={13} color={FT.acc} />
+                      <Text className="text-[12px] font-bold text-ft-acc">{t('track.searchApproachReached')}</Text>
+                    </>
+                  ) : approach.withinRadius ? (
+                    <>
+                      <Ionicons name="ellipse-outline" size={13} color={FT.acc} />
                       <Text className="text-[12px] font-bold text-ft-acc">
-                        Ansatz erreicht – kurz halten… {approach.fixesRemaining > 0 ? `(${approach.fixesRemaining})` : ''}
+                        {approach.accuracy != null ? `${t('track.gpsStabilizing')} … ±${Math.round(approach.accuracy)} m` : t('track.gpsStabilizing')}
                       </Text>
                     </>
                   ) : approach.accuracy == null ? (
@@ -577,14 +582,14 @@ export default function TrackRunScreen() {
                 </View>
                 {/* Abstand Hundeführer ↔ Hund: bestimmt die virtuelle Hundeposition
                     (5/10 m entlang der Fährte) für hundebezogene Ansagen. Default 5 m. */}
-                <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase mt-4">Abstand zum Hund</Text>
+                <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase mt-4">{t('track.searchHandlerDistanceLabel')}</Text>
                 <View className="flex-row gap-2 mt-1.5">
                   {([5, 10] as const).map(d => {
                     const on = searchHandlerDistanceM === d;
                     return (
                       <Pressable
                         key={d}
-                        accessibilityLabel={`Abstand ${d} Meter`}
+                        accessibilityLabel={t('track.searchHandlerDistanceOption', { meters: String(d) })}
                         onPress={() => { setSearchHandlerDistanceM(d); useTrackingStore.getState().setSearchHandlerDistanceM(d); }}
                         className={`px-6 py-2.5 rounded-[14px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}
                       >
@@ -593,15 +598,15 @@ export default function TrackRunScreen() {
                     );
                   })}
                 </View>
-                {/* Manueller Sofortstart (RC-2): immer verfügbar, wenn noch nicht gestartet. */}
+                {/* Manueller Start (RC-2): immer verfügbar, wenn noch nicht gestartet. */}
                 <Pressable
-                  accessibilityLabel="Jetzt starten"
-                  accessibilityHint="Startet die Absuche sofort. Außerhalb des Startbereichs wird eine Bestätigung verlangt."
+                  accessibilityLabel={t('track.searchStartNow')}
+                  accessibilityHint={t('track.searchStartHint')}
                   onPress={handleManualStart}
                   className="flex-row items-center justify-center gap-2 mt-4 px-6 py-3 rounded-[16px] bg-ft-acc"
                 >
                   <Ionicons name="play" size={16} color={FT.accText} />
-                  <Text className="text-[14px] font-black text-ft-acc-text">Jetzt starten</Text>
+                  <Text className="text-[14px] font-black text-ft-acc-text">{t('track.searchStartNow')}</Text>
                 </Pressable>
               </View>
               </ScrollView>

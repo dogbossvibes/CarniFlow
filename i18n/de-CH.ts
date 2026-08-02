@@ -239,6 +239,12 @@ export const deCH = {
   // Absuche (run)
   'track.searchDuration': 'Suchdauer',
   'track.evaluate':       'Stop & Auswerten',
+  'track.searchApproachHint': 'Bitte zum Fährtenansatz gehen. Wähle den Abstand zum Hund und tippe auf Jetzt starten.',
+  'track.searchApproachReached': 'Ansatz erreicht',
+  'track.searchHandlerDistanceLabel': 'Abstand zum Hund',
+  'track.searchHandlerDistanceOption': 'Abstand {meters} Meter',
+  'track.searchStartNow': 'Jetzt starten',
+  'track.searchStartHint': 'Startet die Absuche erst nach deinem Tippen. Ausserhalb des Startbereichs wird eine Bestätigung verlangt.',
   'track.abortTitle':     'Ausarbeitung abbrechen?',
   'track.abortBody':      'Die Ausarbeitung wird nicht gespeichert. Die gelegte Fährte bleibt erhalten.',
   'track.finishTitle':    'Suche beenden?',

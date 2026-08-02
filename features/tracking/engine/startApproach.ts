@@ -9,8 +9,8 @@
 //  • KEIN fixer 1,5-m-Radius / 3-m-Accuracy-Zwang mehr (im Feld unerfüllbar).
 //  • DYNAMISCHER Startradius, gekoppelt an die real gemeldete horizontale
 //    Genauigkeit: effectiveRadius = clamp(acc·FACTOR, MIN, MAX).
-//  • Auto-Start erst nach mehreren AUFEINANDERFOLGENDEN gültigen Fixes
-//    (kein Start durch einen einzelnen GPS-Ausreißer).
+//  • Startbereitschaft erst nach mehreren AUFEINANDERFOLGENDEN gültigen Fixes
+//    (kein Freigeben durch einen einzelnen GPS-Ausreißer).
 //  • Stale-/Ausreißer-Absicherung (Alter, Sprunggeschwindigkeit, Accuracy-Cap).
 //
 // 20 cm Genauigkeit sind mit reinem Smartphone-GPS NICHT garantierbar — die
@@ -28,9 +28,9 @@ export interface ApproachConfig {
   maxRadiusM:           number;
   /** Faktor: Radius = Accuracy · Faktor (dann auf [min,max] geklemmt). */
   accuracyRadiusFactor: number;
-  /** Schlechtere gemeldete Genauigkeit als dies → Fix NICHT für Auto-Start. */
+  /** Schlechtere gemeldete Genauigkeit als dies → Fix NICHT für Startbereitschaft. */
   maxAccuracyM:         number;
-  /** So viele aufeinanderfolgende gültige Fixes → armed (Auto-Start). */
+  /** So viele aufeinanderfolgende gültige Fixes → armed (manueller Start möglich). */
   requiredFixes:        number;
   /** Fixes älter als dies gelten als stale und werden verworfen (ms). */
   maxLocationAgeMs:     number;
@@ -42,7 +42,7 @@ export interface ApproachConfig {
 export const MIN_START_RADIUS_M      = 3;
 export const MAX_START_RADIUS_M      = 12;
 export const ACCURACY_RADIUS_FACTOR  = 1.5;
-export const MAX_APPROACH_ACCURACY_M = 12;   // acc > 12 m ⇒ nicht automatisch starten (z. B. 15 m)
+export const MAX_APPROACH_ACCURACY_M = 12;   // acc > 12 m ⇒ noch nicht startbereit (z. B. 15 m)
 export const REQUIRED_CONSECUTIVE_FIXES = 3;
 export const MAX_LOCATION_AGE_MS     = 5000;
 export const MAX_JUMP_SPEED_MPS      = 12;   // ~43 km/h — konsistent mit gpsFilter.MAX_SPEED_MPS
@@ -85,7 +85,7 @@ export function isPlausibleSpeed(jumpSpeedMps: number | null | undefined, cfg: A
   return jumpSpeedMps <= cfg.maxJumpSpeedMps;
 }
 
-// Ein Fix ist für den AUTOMATISCHEN Start gültig, wenn er
+// Ein Fix ist für die manuelle Startfreigabe gültig, wenn er
 //   • eine Genauigkeit hat und diese ≤ maxAccuracyM ist,
 //   • frisch (nicht stale) und plausibel (keine unmögliche Sprungdistanz) ist,
 //   • innerhalb des DYNAMISCHEN Radius liegt.
@@ -118,13 +118,13 @@ export function reduceApproach(state: ApproachState, sample: ApproachSample, cfg
   return { consecutive: 0, armed: false };
 }
 
-// Verbleibende gültige Fixes bis zum Auto-Start (nur Anzeige).
+// Verbleibende gültige Fixes bis zur stabilen Startbereitschaft.
 export function fixesRemaining(state: ApproachState, cfg: ApproachConfig): number {
   return Math.max(0, cfg.requiredFixes - state.consecutive);
 }
 
 // Entscheidung für den MANUELLEN „Jetzt starten"-Button:
-//   • 'at-start'        → Nutzer ist innerhalb des dynamischen Radius → sofort starten
+//   • 'at-start'        → Nutzer ist innerhalb des dynamischen Radius → Start nach Tippen
 //   • 'override-needed' → außerhalb / Position unbekannt → bewusste Bestätigung nötig
 export type ManualStartDecision = 'at-start' | 'override-needed';
 export function classifyManualStart(
@@ -138,4 +138,4 @@ export function classifyManualStart(
   return distanceM <= r ? 'at-start' : 'override-needed';
 }
 
-export const APPROACH_HINT = 'Bitte zum Fährtenansatz gehen. Wähle den Abstand und starte bewusst.';
+export const APPROACH_HINT = 'Bitte zum Fährtenansatz gehen. Wähle den Abstand zum Hund und tippe auf Jetzt starten.';

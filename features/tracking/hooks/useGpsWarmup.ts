@@ -7,7 +7,7 @@ import type { TrackPointQuality } from '@/features/tracking/engine/types';
 // Phase des GPS-Warmups vor der Fährtenaufnahme.
 export type WarmupPhase =
   | 'stabilizing'   // GPS sammelt sich noch
-  | 'ready'         // accuracy ≤ 15 m → Aufnahme freigegeben (Auto-Start)
+  | 'ready'         // accuracy ≤ 15 m → Aufnahme freigegeben
   | 'imprecise'     // > 15 s ohne Stabilisierung → manueller Start + Warnung
   | 'denied'        // Standortberechtigung verweigert
   | 'error';        // GPS konnte nicht gestartet werden

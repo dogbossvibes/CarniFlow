@@ -47,7 +47,7 @@ describe('startApproach — isEligible (dynamischer Radius + Filter)', () => {
   it('3) accuracy 4 m, distance 8 m → not eligible', () => {
     expect(isEligible(fix({ accuracy: 4, distanceM: 8 }), cfg)).toBe(false);
   });
-  it('4) accuracy 15 m → not eligible (Auto-Start abgelehnt)', () => {
+  it('4) accuracy 15 m → not eligible (noch nicht startbereit)', () => {
     expect(isEligible(fix({ accuracy: 15, distanceM: 1 }), cfg)).toBe(false);
   });
   it('null-Werte → not eligible', () => {
@@ -97,7 +97,7 @@ describe('startApproach — reduceApproach (mehrere gültige Fixes)', () => {
     const st = reduceApproach(armed, fix({ accuracy: 2, distanceM: 999, t: 9999 }), cfg);
     expect(st.armed).toBe(true);
   });
-  it('fixesRemaining zählt herunter', () => {
+  it('fixesRemaining zählt nur die GPS-Stabilität bis zur manuellen Startbereitschaft', () => {
     expect(fixesRemaining(INITIAL_APPROACH, cfg)).toBe(3);
     expect(fixesRemaining({ consecutive: 2, armed: false }, cfg)).toBe(1);
     expect(fixesRemaining({ consecutive: 3, armed: true }, cfg)).toBe(0);

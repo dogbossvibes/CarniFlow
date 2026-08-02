@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
@@ -59,6 +59,16 @@ const GEGENSTAND_MATERIALS: { material: MarkerMaterial; icon: MatIcon; label: st
   { material: 'teppich',  icon: 'grid-outline',        label: 'Teppich' },
   { material: 'diverses', icon: 'ellipsis-horizontal', label: 'Divers' },
 ];
+
+const QUICK_PICKER_PANEL_STYLE = {
+  backgroundColor: FT.surface2,
+  borderColor:     FT.lineStrong,
+  borderWidth:     1,
+  borderRadius:    18,
+  padding:         10,
+  zIndex:          20,
+  elevation:       8,
+} satisfies ViewStyle;
 
 function clock(sec: number) {
   const m = String(Math.floor(sec / 60)).padStart(2, '0');
@@ -823,36 +833,40 @@ export default function LegenScreen() {
         {gsPicker && phase === 'recording' && (
           <>
             <Pressable accessibilityLabel={t('track.closeObjectPicker')} className="absolute inset-0" onPress={() => setGsPicker(false)} />
-            <ScrollView
-              showsVerticalScrollIndicator={false}
+            <View
               style={{
+                ...QUICK_PICKER_PANEL_STYLE,
                 position: 'absolute',
                 left: 14,
                 right: 14,
                 bottom: quickPickerLayout.bottomOffset,
                 maxHeight: quickPickerLayout.maxHeight,
               }}
-              contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}
             >
-              {GEGENSTAND_MATERIALS.map(m => (
-                <Pressable
-                  key={m.material}
-                  accessibilityLabel={t('track.setObject', { label: m.label })}
-                  onPress={() => placeGegenstand(m.material)}
-                  style={{ width: '23%', flexGrow: 1 }}
-                  className="h-[58px] rounded-[14px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
-                >
-                  {m.material === 'duebel' ? (
-                    <View style={{ width: 12, height: 17, borderRadius: 4, backgroundColor: FT.bad, borderWidth: 1, borderColor: '#3a0000', alignItems: 'center' }}>
-                      <View style={{ width: 12, height: 5, borderRadius: 3, backgroundColor: '#ff8a94', borderWidth: 1, borderColor: '#3a0000', marginTop: -1 }} />
-                    </View>
-                  ) : (
-                    <Ionicons name={m.icon} size={20} color={FT.acc} />
-                  )}
-                  <Text numberOfLines={1} className="text-[10px] font-extrabold text-ft-text">{m.label}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}
+              >
+                {GEGENSTAND_MATERIALS.map(m => (
+                  <Pressable
+                    key={m.material}
+                    accessibilityLabel={t('track.setObject', { label: m.label })}
+                    onPress={() => placeGegenstand(m.material)}
+                    style={{ width: '23%', flexGrow: 1 }}
+                    className="h-[58px] rounded-[14px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
+                  >
+                    {m.material === 'duebel' ? (
+                      <View style={{ width: 12, height: 17, borderRadius: 4, backgroundColor: FT.bad, borderWidth: 1, borderColor: '#3a0000', alignItems: 'center' }}>
+                        <View style={{ width: 12, height: 5, borderRadius: 3, backgroundColor: '#ff8a94', borderWidth: 1, borderColor: '#3a0000', marginTop: -1 }} />
+                      </View>
+                    ) : (
+                      <Ionicons name={m.icon} size={20} color={FT.acc} />
+                    )}
+                    <Text numberOfLines={1} className="text-[10px] font-extrabold text-ft-text">{m.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
           </>
         )}
 
@@ -867,26 +881,33 @@ export default function LegenScreen() {
               onPress={() => setWinkelSheet(false)}
             />
             <View
-              className="absolute left-[14px] right-[14px] flex-row gap-2"
-              pointerEvents="box-none"
-              style={{ bottom: quickPickerLayout.bottomOffset, maxHeight: quickPickerLayout.maxHeight }}
+              style={{
+                ...QUICK_PICKER_PANEL_STYLE,
+                position: 'absolute',
+                left: 14,
+                right: 14,
+                bottom: quickPickerLayout.bottomOffset,
+                maxHeight: quickPickerLayout.maxHeight,
+              }}
             >
-              {([
-                { kind: 'gw',     short: 'GW',     icon: 'square-outline'   },
-                { kind: 'ow',     short: 'OW',     icon: 'triangle-outline' },
-                { kind: 'bw',     short: 'BW',     icon: 'ellipse-outline'  },
-                { kind: 'abriss', short: 'Abriss', icon: 'close'            },
-              ] as const).map(o => (
-                <Pressable
-                  key={o.kind}
-                  accessibilityLabel={t('track.setAngle', { label: ANGLE_LABEL[o.kind] })}
-                  onPress={() => placeWinkel(o.kind)}
-                  className="flex-1 h-[64px] rounded-[16px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
-                >
-                  <Ionicons name={o.icon} size={22} color={o.kind === 'abriss' ? FT.warn : FT.acc} />
-                  <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{o.short}</Text>
-                </Pressable>
-              ))}
+              <View className="flex-row gap-2">
+                {([
+                  { kind: 'gw',     short: 'GW',     icon: 'square-outline'   },
+                  { kind: 'ow',     short: 'OW',     icon: 'triangle-outline' },
+                  { kind: 'bw',     short: 'BW',     icon: 'ellipse-outline'  },
+                  { kind: 'abriss', short: 'Abriss', icon: 'close'            },
+                ] as const).map(o => (
+                  <Pressable
+                    key={o.kind}
+                    accessibilityLabel={t('track.setAngle', { label: ANGLE_LABEL[o.kind] })}
+                    onPress={() => placeWinkel(o.kind)}
+                    className="flex-1 h-[64px] rounded-[16px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
+                  >
+                    <Ionicons name={o.icon} size={22} color={o.kind === 'abriss' ? FT.warn : FT.acc} />
+                    <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{o.short}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           </>
         )}

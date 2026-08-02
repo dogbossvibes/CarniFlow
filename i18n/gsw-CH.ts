@@ -239,6 +239,12 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   // Absuche (run)
   'track.searchDuration': 'Suechdüür',
   'track.evaluate':       'Stop & Uswerte',
+  'track.searchApproachHint': 'Gang zum Fährteasatz. Wähl de Abstand zum Hund und tipp uf Jetzt starte.',
+  'track.searchApproachReached': 'Asatz erreicht',
+  'track.searchHandlerDistanceLabel': 'Abstand zum Hund',
+  'track.searchHandlerDistanceOption': 'Abstand {meters} Meter',
+  'track.searchStartNow': 'Jetzt starte',
+  'track.searchStartHint': 'Startet d Absuechi erst nach dim Tippe. Usserhalb vom Startbereich wird e Bestätigung verlangt.',
   'track.abortTitle':     'Usschaffe abbräche?',
   'track.abortBody':      'D Usschaffig wird nöd gspeicheret. D gleit Fährte bliibt erhalte.',
   'track.finishTitle':    'Suechi beände?',

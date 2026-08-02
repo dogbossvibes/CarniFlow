@@ -5,7 +5,7 @@ import type { TrackPointQuality } from '@/features/tracking/engine/types';
 
 export const PRECISION = {
   // Warmup / Gating
-  WARMUP_MIN_MS:        5_000,    // mind. so lange sammeln, bevor Auto-Start möglich
+  WARMUP_MIN_MS:        5_000,    // mind. so lange sammeln, bevor die Aufnahme freigegeben wird
   WARMUP_MAX_MS:        10_000,
   WARMUP_MANUAL_MS:     15_000,   // danach manueller Start trotz schlechtem GPS erlaubt
   READY_ACCURACY_M:     15,       // ≤ 15 m → Aufnahme freigeben
@@ -70,7 +70,7 @@ export function getGpsQualityMessage(quality: GpsQuality): string {
   return QUALITY_MESSAGE[quality];
 }
 
-// Auto-Start erlaubt, sobald die Genauigkeit ≤ 15 m ist.
+// Aufnahmefreigabe, sobald die Genauigkeit ≤ 15 m ist.
 export function canStartRecording(accuracy?: number | null): boolean {
   return accuracy != null && accuracy <= PRECISION.READY_ACCURACY_M;
 }
