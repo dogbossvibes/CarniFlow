@@ -10,7 +10,7 @@
 
 <!-- AUTO-GENERATED:START -->
 
-Generated: 2026-08-02T18:33:18.831Z
+Generated: 2026-08-02T19:49:49.241Z
 Agent: codex
 Branch: feat/track-module-rewrite
 
@@ -37,9 +37,6 @@ M AI_HANDOFF.md
  M components/home/QuickActionsWidget.tsx
  M components/tracking/GpsSourcePicker.tsx
  M docs/adr/ADR-001_Domain_Model.md
- M docs/agent/SESSION_HANDOFF.md
- M docs/agent/TASKS.md
- M docs/agent/WORK_LOG.md
  M features/connect/components/ConnectIdentitySelector.tsx
  M features/connect/components/ConnectStates.tsx
  M features/connect/screens/ConnectHomeScreen.tsx
@@ -54,7 +51,6 @@ M AI_HANDOFF.md
  M i18n/gsw-CH.ts
  M i18n/locales/fr.ts
  M legal-web/index.html
- M scripts/agent-start.mjs
  M stores/homeScreenConfig.ts
 ?? .claude/development.code-workspace
 ?? ANYVO-current-repository.zip
@@ -64,7 +60,6 @@ M AI_HANDOFF.md
 ?? after_bottomnav_galaxyS23_gesture.png
 ?? after_bottomnav_tablet_3button.png
 ?? after_bottomnav_tablet_gesture.png
-?? app/dog-backpack/
 ?? app/training-journal.tsx
 ?? artifacts/
 ?? assets/images/11GSLOGODSC4449.jpg
@@ -72,11 +67,10 @@ M AI_HANDOFF.md
 ?? assets/images/bazooka.jpg
 ?? canisflow.code-workspace
 ?? components/dogs/DogAppointmentsCard.tsx
-?? components/dogs/DogBackpackCard.tsx
 ?? components/dogs/DogRecentCard.tsx
 ?? components/dogs/DogStatusTiles.tsx
 ?? components/dogs/DogTodayCard.tsx
-?? components/dogs/__tests__/
+?? components/dogs/__tests__/DogQuickActions.test.ts
 ?? design_handoff_faehrten/screen3.jpg
 ?? dist-auth-android/
 ?? dist-auth-ios/
@@ -118,12 +112,10 @@ M AI_HANDOFF.md
 ?? docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
 ?? docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
 ?? "faehrten 6/design_handoff_faehrten/abriss.png"
-?? features/dogs/__tests__/
-?? features/dogs/backpack.ts
+?? features/dogs/__tests__/dashboard.test.ts
 ?? features/dogs/dashboard.ts
 ?? features/training/__tests__/
 ?? features/training/journal.ts
-?? i18n/__tests__/backpack-i18n.test.ts
 ?? i18n/__tests__/dashboard-i18n.test.ts
 ?? i18n/__tests__/journal-i18n.test.ts
 ?? legal-web/assets/
@@ -143,7 +135,7 @@ AI_HANDOFF.md                                      |   6 +
  app/(tabs)/analytics.tsx                           |  19 +
  app/(tabs)/home.tsx                                |  12 +-
  app/(tabs)/profile.tsx                             | 116 +++---
- app/dog/[id].tsx                                   |  37 +-
+ app/dog/[id].tsx                                   |  14 +
  app/home-customize.tsx                             | 111 +++--
  app/index.tsx                                      |   8 +-
  app/sync.tsx                                       |  38 +-
@@ -160,26 +152,22 @@ AI_HANDOFF.md                                      |   6 +
  components/home/QuickActionsWidget.tsx             |  24 +-
  components/tracking/GpsSourcePicker.tsx            |  22 +-
  docs/adr/ADR-001_Domain_Model.md                   | 416 +++++++++++++++++++
- docs/agent/SESSION_HANDOFF.md                      |  14 +
- docs/agent/TASKS.md                                |  14 +-
- docs/agent/WORK_LOG.md                             |  12 +
  .../connect/components/ConnectIdentitySelector.tsx |  11 +-
  features/connect/components/ConnectStates.tsx      |   6 +-
  features/connect/screens/ConnectHomeScreen.tsx     |   2 +-
  features/connect/services/connect-entitlements.ts  |   6 +-
- features/dogs/DogHubScreen.tsx                     | 116 +++++-
+ features/dogs/DogHubScreen.tsx                     | 104 ++++-
  features/dogs/buildDogHubVM.ts                     |   3 +
  features/dogs/demoDogs.ts                          |   6 +
  features/tracking/components/ActiveFaehrteCard.tsx |  48 ++-
  features/tracking/components/MarkerBottomSheet.tsx |  59 +--
  features/tracking/components/TrackStatsPanel.tsx   |  10 +-
- i18n/de-CH.ts                                      | 110 +++++
- i18n/gsw-CH.ts                                     | 110 +++++
- i18n/locales/fr.ts                                 | 110 +++++
+ i18n/de-CH.ts                                      |  61 +++
+ i18n/gsw-CH.ts                                     |  61 +++
+ i18n/locales/fr.ts                                 |  60 +++
  legal-web/index.html                               | 454 ++++++++++++---------
- scripts/agent-start.mjs                            |  12 +-
  stores/homeScreenConfig.ts                         |   5 +-
- 40 files changed, 1735 insertions(+), 532 deletions(-)
+ 36 files changed, 1504 insertions(+), 528 deletions(-)
 ```
 
 ### Modified files
@@ -205,9 +193,6 @@ components/dogs/types.ts
 components/home/QuickActionsWidget.tsx
 components/tracking/GpsSourcePicker.tsx
 docs/adr/ADR-001_Domain_Model.md
-docs/agent/SESSION_HANDOFF.md
-docs/agent/TASKS.md
-docs/agent/WORK_LOG.md
 features/connect/components/ConnectIdentitySelector.tsx
 features/connect/components/ConnectStates.tsx
 features/connect/screens/ConnectHomeScreen.tsx
@@ -222,7 +207,6 @@ i18n/de-CH.ts
 i18n/gsw-CH.ts
 i18n/locales/fr.ts
 legal-web/index.html
-scripts/agent-start.mjs
 stores/homeScreenConfig.ts
 ```
 
@@ -236,7 +220,6 @@ after_bottomnav_galaxyS23_3button.png
 after_bottomnav_galaxyS23_gesture.png
 after_bottomnav_tablet_3button.png
 after_bottomnav_tablet_gesture.png
-app/dog-backpack/[id].tsx
 app/training-journal.tsx
 artifacts/faehrten-teilstrecken/ios/01_boot_home.png
 artifacts/faehrten-teilstrecken/ios/02_faehrten_index.png
@@ -246,11 +229,9 @@ assets/images/Malu13.jpg
 assets/images/bazooka.jpg
 canisflow.code-workspace
 components/dogs/DogAppointmentsCard.tsx
-components/dogs/DogBackpackCard.tsx
 components/dogs/DogRecentCard.tsx
 components/dogs/DogStatusTiles.tsx
 components/dogs/DogTodayCard.tsx
-components/dogs/__tests__/DogBackpackCard.test.tsx
 components/dogs/__tests__/DogQuickActions.test.ts
 design_handoff_faehrten/screen3.jpg
 dist-auth-android/_expo/static/js/android/entry-9a4f5220dacd2f2900cbac6f8f9490c4.hbc
@@ -485,15 +466,11 @@ docs/architecture/P0-06_OFFLINE_TRUTH_REPORT.md
 docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
 docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
 faehrten 6/design_handoff_faehrten/abriss.png
-features/dogs/__tests__/backpack.test.ts
-features/dogs/__tests__/backpackSuggestions.test.ts
 features/dogs/__tests__/dashboard.test.ts
-features/dogs/backpack.ts
 features/dogs/dashboard.ts
 features/training/__tests__/journal-sources.test.ts
 features/training/__tests__/journal.test.ts
 features/training/journal.ts
-i18n/__tests__/backpack-i18n.test.ts
 i18n/__tests__/dashboard-i18n.test.ts
 i18n/__tests__/journal-i18n.test.ts
 legal-web/assets/images/11GSLOGODSC4449.jpg
@@ -520,11 +497,11 @@ winkel.png
 
 ### Recent commits
 ```
+5c7bc51 chore(agent): record backpack decoupling and task state
+0434182 feat(dogs): add local backpack checklist
+8ef90fe chore(agent): align start output with task protocol
 17b05eb chore(agent): add Claude-Codex handoff infrastructure
 d4501a7 fix(tracking): finalize quick pickers and manual search start
-cf2399f fix(release): stabilize tracking forms and Google sign-in
-f29717d chore(db): version final subscription P0 schema
-74ea2d0 fix(help): align registry consumers and guided help
 ```
 
 ### Runtime
