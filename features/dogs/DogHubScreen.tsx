@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
 import { DogAvatar } from '@/components/dogs/DogAvatar';
-import { DogHubStatsGrid } from '@/components/dogs/DogHubStatsGrid';
 import { DogQuickActions, type QuickActionKey } from '@/components/dogs/DogQuickActions';
 import { DogTrainingList } from '@/components/dogs/DogTrainingList';
 import { DogFaehrteSummary } from '@/components/dogs/DogFaehrteSummary';
@@ -17,6 +16,11 @@ import { DogAiCoachCard } from '@/components/dogs/DogAiCoachCard';
 import { DogHeatCard } from '@/components/dogs/DogHeatCard';
 import { DogCommandsCard } from '@/components/dogs/DogCommandsCard';
 import { DogBackpackCard } from '@/components/dogs/DogBackpackCard';
+import { DogTodayCard } from '@/components/dogs/DogTodayCard';
+import { DogAppointmentsCard } from '@/components/dogs/DogAppointmentsCard';
+import { DogRecentCard } from '@/components/dogs/DogRecentCard';
+import { DogStatusTiles } from '@/components/dogs/DogStatusTiles';
+import { buildTodayHints, type DogAppointment } from '@/features/dogs/dashboard';
 import { ActiveFaehrteCard } from '@/features/tracking/components/ActiveFaehrteCard';
 import type { ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
 import type { HeatCycle, HeatPrediction } from '@/features/dogs/heatCycles';
@@ -29,6 +33,8 @@ export interface DogHeatProps { cycles: HeatCycle[]; prediction: HeatPrediction 
 export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void }
 // Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
 export interface DogBackpackProps { dogName: string; total: number; active: number; packed: number; onOpen: () => void }
+// Dashboard-Termine (bereits gefiltert/sortiert im Route-Wrapper) + Kalender-Öffnen.
+export interface DogAppointmentsProps { items: DogAppointment[]; onOpenCalendar: () => void }
 
 export interface DogHubActions {
   onBack:             () => void;
@@ -44,6 +50,7 @@ export interface DogHubActions {
   onEditGoal:         () => void;
   onChat:             () => void;
   onUpgrade?:         () => void;
+  onOpenJournal?:     () => void;   // „Alle Trainings anzeigen" → Trainingstagebuch (vorgefiltert)
 }
 
 type TabKey = 'overview' | 'training' | 'faehrte' | 'goals' | 'health' | 'heat' | 'commands' | 'docs' | 'trainer';
@@ -60,11 +67,11 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
   { key: 'trainer',  labelKey: 'doghub.tab.trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
-  const { t } = useT();
+export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
+  const { t, locale } = useT();
+  const intlLocale = locale === 'fr' ? 'fr-CH' : 'de-CH';
   const [tab, setTab] = useState<TabKey>('overview');
   const [aiTipHidden, setAiTipHidden] = useState(false);   // „Später" blendet den KI-Hinweis für diese Sitzung aus
-  const { width } = useWindowDimensions();
   const id = vm.identity;
   const meta = [id.breed, id.ageLabel, genderLabel(id.gender)].filter(Boolean).join(' · ');
   const badges = [
@@ -72,7 +79,17 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
     id.weightKg != null ? `${id.weightKg} kg` : null,
     id.shoulderHeightCm != null ? `${id.shoulderHeightCm} cm` : null,
   ].filter((b): b is string => !!b);
-  const cols = width >= 600 ? 2 : 2;
+  // „Heute mit {Hund}": deterministische Hinweise aus bereits geladenen Daten.
+  const isFemale = id.gender === 'female';
+  const heatPred = isFemale ? (heat?.prediction ?? null) : null;
+  const todayHints = buildTodayHints({
+    appointments: appointments?.items ?? [],
+    heat: heatPred ? { daysUntil: heatPred.daysUntil, active: heatPred.active } : null,
+    goalTitle: vm.goal.title,
+    backpackActive: backpack?.active ?? 0,
+    backpackPacked: backpack?.packed ?? 0,
+    lastTrainingLabel: vm.lastTrainingLabel,
+  });
 
   return (
     <View style={s.root}>
@@ -139,13 +156,41 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
             <View style={s.content}>
               {tab === 'overview' && (
                 <>
-                  <DogHubStatsGrid stats={vm.stats} columns={cols} />
-                  {vm.lastTrainingLabel ? (
-                    <View style={s.note}>
-                      <Ionicons name="time-outline" size={15} color={C.trackTextMut} />
-                      <Text style={s.noteTxt} numberOfLines={1}>Letztes Training: <Text style={s.noteStrong}>{vm.lastTrainingLabel}</Text></Text>
-                    </View>
-                  ) : null}
+                  {/* 1) Heute mit {Hund} */}
+                  <DogTodayCard
+                    dogName={id.name}
+                    hints={todayHints}
+                    heatDaysUntil={heatPred?.daysUntil}
+                    heatActive={heatPred?.active}
+                    goalTitle={vm.goal.title}
+                    backpackActive={backpack?.active ?? 0}
+                    backpackPacked={backpack?.packed ?? 0}
+                    lastTrainingLabel={vm.lastTrainingLabel}
+                    localeTag={intlLocale}
+                  />
+
+                  {/* 2) Nächste Termine */}
+                  {appointments && (
+                    <DogAppointmentsCard
+                      appointments={appointments.items}
+                      localeTag={intlLocale}
+                      onOpenCalendar={appointments.onOpenCalendar}
+                    />
+                  )}
+
+                  {/* 3) Läufigkeit — nur Hündinnen */}
+                  {isFemale && heat && (
+                    <>
+                      <Text style={s.sectionLabel}>{t('dash.heat')}</Text>
+                      <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} />
+                    </>
+                  )}
+
+                  {/* 4) Aktuelles Ziel */}
+                  <Text style={s.sectionLabel}>{t('dash.currentGoal')}</Text>
+                  <DogGoalsCard goal={vm.goal} onEdit={actions.onEditGoal} />
+
+                  {/* 5) Backpack */}
                   {backpack && (
                     <DogBackpackCard
                       dogName={backpack.dogName}
@@ -155,6 +200,27 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                       onOpen={backpack.onOpen}
                     />
                   )}
+
+                  {/* 6) Journal / Zuletzt */}
+                  {actions.onOpenJournal && (
+                    <DogRecentCard
+                      lastTrainingLabel={vm.lastTrainingLabel}
+                      lastFaehrteLabel={vm.lastFaehrteLabel}
+                      onOpenJournal={actions.onOpenJournal}
+                    />
+                  )}
+
+                  {/* 7) Trainingsstatus */}
+                  <Text style={s.sectionLabel}>{t('dash.status')}</Text>
+                  <DogStatusTiles
+                    trainingsThisWeek={vm.trainingsThisWeek}
+                    lastTrainingLabel={vm.lastTrainingLabel}
+                    lastFaehrteLabel={vm.lastFaehrteLabel}
+                    goalTitle={vm.goal.title}
+                    goalPct={vm.goal.overallPct}
+                  />
+
+                  {/* 8) Smart Analyse (deterministisch, Premium-Gate unverändert) */}
                   {!aiTipHidden && (
                     <DogAiCoachCard
                       tip={vm.aiTip}
@@ -164,6 +230,8 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                       onLater={() => setAiTipHidden(true)}
                     />
                   )}
+
+                  {/* Zusatz: Kommando-Kürzel (bestehend, additiv am Ende) */}
                   {commands && commands.commands.length > 0 && (
                     <TouchableOpacity style={s.cmdOverview} activeOpacity={0.85} onPress={() => setTab('commands')}>
                       <View style={s.cmdIcon}><Ionicons name="megaphone" size={16} color={C.trackPrimary} /></View>
@@ -183,6 +251,14 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                   <DogQuickActions onSelect={actions.onQuickAction} />
                   <Text style={s.sectionLabel}>Letzte Trainings</Text>
                   <DogTrainingList items={vm.recentTrainings} onOpen={actions.onOpenTraining} />
+                  {actions.onOpenJournal && (
+                    <TouchableOpacity style={s.journalLink} onPress={actions.onOpenJournal} activeOpacity={0.85}
+                      accessibilityRole="button" accessibilityLabel={t('journal.allTrainings')}>
+                      <Ionicons name="book-outline" size={16} color={C.trackPrimary} />
+                      <Text style={s.journalLinkTxt}>{t('journal.allTrainings')}</Text>
+                      <Ionicons name="chevron-forward" size={15} color={C.trackTextMut} />
+                    </TouchableOpacity>
+                  )}
                 </>
               )}
               {tab === 'faehrte'  && <DogFaehrteSummary data={vm.faehrte} onStart={actions.onStartFaehrte} />}
@@ -233,4 +309,6 @@ const s = StyleSheet.create({
   cmdTitle:  { fontSize: 14.5, color: C.trackText, fontWeight: '800' },
   cmdSub:    { fontSize: 12, color: C.trackTextSec, fontWeight: '600', marginTop: 2 },
   cmdLink:   { fontSize: 13, color: C.trackPrimary, fontWeight: '800' },
+  journalLink:{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 14, paddingVertical: 13, marginTop: 4 },
+  journalLinkTxt:{ flex: 1, fontSize: 14, color: C.trackText, fontWeight: '700' },
 });

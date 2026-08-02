@@ -11,6 +11,9 @@ import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
 import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
 import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
 import { getBackpack } from '@/features/dogs/backpack';
+import { getCalendarEvents } from '@/services/calendarService';
+import { toDogAppointments, type DogAppointment } from '@/features/dogs/dashboard';
+import type { CalendarEvent } from '@/types/calendar';
 import { useSession } from '@/lib/session-context';
 import { useDogHubDynamic } from '@/features/dogs/useDogHubDynamic';
 import { DogHubScreen, type DogHubActions } from '@/features/dogs/DogHubScreen';
@@ -42,6 +45,7 @@ export default function DogHubRoute() {
   const [heatCycles, setHeatCycles] = useState<HeatCycle[]>([]);
   const [commands, setCommands] = useState<DogCommand[]>([]);
   const [backpackCounts, setBackpackCounts] = useState({ total: 0, active: 0, packed: 0 });
+  const [appointments, setAppointments] = useState<DogAppointment[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -67,6 +71,11 @@ export default function DogHubRoute() {
           packed: list.filter(i => i.isActive && i.isPacked).length,
         }))
         .catch(() => setBackpackCounts({ total: 0, active: 0, packed: 0 }));
+      // Termine (hundegefiltert, sortiert) — Dashboard „Nächste Termine" + „Heute".
+      getCalendarEvents(userId).then(
+        ({ data }) => setAppointments(toDogAppointments((data ?? []) as CalendarEvent[], id)),
+        () => setAppointments([]),
+      );
     }
   }, [id, userId]));
 
@@ -150,6 +159,7 @@ export default function DogHubRoute() {
     onEditGoal:         () => dog && router.push(`/dog-goal/${dog.id}` as never),
     onChat:             () => router.push('/chat' as never),
     onUpgrade:          () => router.push('/premium' as never),
+    onOpenJournal:      () => router.push({ pathname: '/training-journal', params: { dogId: id } } as never),
   };
 
   if (loading) {
@@ -190,6 +200,10 @@ export default function DogHubRoute() {
         active: backpackCounts.active,
         packed: backpackCounts.packed,
         onOpen: () => router.push({ pathname: '/dog-backpack/[id]', params: { id, name: dog?.name ?? '' } } as never),
+      }}
+      appointments={{
+        items: appointments,
+        onOpenCalendar: () => router.push('/plaene' as never),
       }}
       activeFaehrte={activeFaehrte}
       onOpenFaehrte={activeFaehrte ? () => router.push(reopenTarget(activeFaehrte) as never) : undefined}

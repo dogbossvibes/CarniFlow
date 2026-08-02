@@ -1423,6 +1423,30 @@ export const deCH = {
   'journal.hoursShort':       '{count} h',
   'journal.media':            'Medien',
   'home.actionTrainingJournal':'Journal',
+
+  // Persönliches Hunde-Dashboard (Overview-Tab)
+  'dash.todayWith':          'Heute mit {name}',
+  'dash.nothingToday':       'Für heute ist nichts geplant.',
+  'dash.appointments':       'Nächste Termine',
+  'dash.noAppointments':     'Keine offenen Termine',
+  'dash.overdue':            'Überfällig',
+  'dash.today':              'Heute',
+  'dash.tomorrow':           'Morgen',
+  'dash.viewAll':            'Alle anzeigen',
+  'dash.createAppointment':  'Termin erstellen',
+  'dash.currentGoal':        'Aktuelles Ziel',
+  'dash.recent':             'Zuletzt',
+  'dash.lastTraining':       'Letztes Training',
+  'dash.lastFaehrte':        'Letzte Fährte',
+  'dash.allInJournal':       'Alle Trainings im Journal',
+  'dash.status':             'Trainingsstatus',
+  'dash.trainingsThisWeek':  'Trainings diese Woche',
+  'dash.noTraining':         'Noch kein Training',
+  'dash.noFaehrte':          'Noch keine Fährte',
+  'dash.noGoalShort':        'Kein Ziel',
+  'dash.heat':               'Läufigkeit',
+  'dash.heatInDays':         'In ca. {count} Tagen',
+  'dash.heatActive':         'Aktuell läufig',
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

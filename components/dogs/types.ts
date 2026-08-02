@@ -83,7 +83,9 @@ export interface DogAiTip {
 export interface DogHubVM {
   identity:            DogIdentity;
   stats:               DogStat[];
+  trainingsThisWeek:   number;         // Dashboard-Statuskachel
   lastTrainingLabel:   string | null;
+  lastFaehrteLabel:    string | null;  // Dashboard: letzte Fährte (relativ)
   todayRecommendation: string | null;
   recentTrainings:     DogTrainingItem[];
   faehrte:             DogFaehrteSummary;

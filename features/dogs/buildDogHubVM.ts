@@ -56,6 +56,7 @@ export function buildDogHubVM(dog: Dog, feed: FeedItem[], extras?: DogHubExtras,
 
   // Fährten (source === 'track').
   const tracks = feed.filter(it => it.source === 'track');
+  const lastFaehrteLabel = tracks[0] ? relativeDate(tracks[0].session_date) : null;
   const trackRatings = tracks.map(t => t.rating).filter((r): r is number => r != null);
   const qualityPct = trackRatings.length
     ? Math.round((trackRatings.reduce((a, b) => a + b, 0) / trackRatings.length) * 20)
@@ -101,7 +102,9 @@ export function buildDogHubVM(dog: Dog, feed: FeedItem[], extras?: DogHubExtras,
       { key: 'bel',  value: loadLabel ?? '—', label: 'Belastung', accent: loadLabel != null },
       { key: 'goal', value: goal.overallPct != null ? `${goal.overallPct} %` : '—', label: goal.title ? `Ziel ${goal.title}` : 'Ziel' },
     ],
+    trainingsThisWeek,
     lastTrainingLabel,
+    lastFaehrteLabel,
     todayRecommendation: dynamic?.todayRecommendation ?? null,
     recentTrainings,
     faehrte: {

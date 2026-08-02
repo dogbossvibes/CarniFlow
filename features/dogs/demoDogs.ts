@@ -17,7 +17,9 @@ const MALU: DogHubVM = {
     { key: 'bel', value: 'Mittel', label: 'Belastung' },
     { key: 'goal', value: '62 %', label: 'Ziel IGP 1' },
   ],
+  trainingsThisWeek: 3,
   lastTrainingLabel: 'Fährte · gestern',
+  lastFaehrteLabel: 'gestern',
   todayRecommendation: 'Winkelarbeit – saubere 90°-Winkel mit ruhigem Tempo.',
   recentTrainings: [
     { id: 'd1', source: 'track',   discipline: 'Fährte',       dateLabel: 'gestern',    points: 87 },
@@ -63,7 +65,9 @@ const NERO: DogHubVM = {
     { key: 'bel', value: 'Hoch', label: 'Belastung', accent: true },
     { key: 'goal', value: '—', label: 'Ziel' },
   ],
+  trainingsThisWeek: 2,
   lastTrainingLabel: 'Unterordnung · vor 2 Tagen',
+  lastFaehrteLabel: 'vor 4 Tagen',
   todayRecommendation: 'Lockerer Spiel- und Motivationstag empfohlen.',
   recentTrainings: [
     { id: 'n1', source: 'session', discipline: 'Unterordnung', dateLabel: 'vor 2 Tagen', points: 84 },
@@ -96,7 +100,9 @@ const INARI: DogHubVM = {
     { key: 'bel', value: 'Leicht', label: 'Belastung' },
     { key: 'goal', value: '—', label: 'Ziel' },
   ],
+  trainingsThisWeek: 4,
   lastTrainingLabel: 'Spiel & Motivation · heute',
+  lastFaehrteLabel: null,
   todayRecommendation: 'Grundlagen & Bindung – kurze, positive Einheiten.',
   recentTrainings: [
     { id: 'i1', source: 'session', discipline: 'Spiel & Motivation', dateLabel: 'heute', points: null },
