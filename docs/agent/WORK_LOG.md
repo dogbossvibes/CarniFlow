@@ -3,6 +3,18 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-08-02 — Codex (T-32 Backpack-Entkopplung)
+
+Branch: `feat/track-module-rewrite`. Commit `0434182`; kein Push.
+- **T-32:** `backpackStatus` aus `features/dogs/dashboard.ts` nach `features/dogs/backpack.ts` verschoben.
+- `components/dogs/DogBackpackCard.tsx` importiert die Statuslogik jetzt direkt aus dem Backpack-Modul.
+- `features/dogs/dashboard.ts` re-exportiert `backpackStatus`/`BackpackStatus` fuer bestehende Dashboard-Aufrufer
+  und Tests; keine Logik-, UI- oder Textänderung.
+- `features/dogs/__tests__/backpackSuggestions.test.ts` deckt die unveränderten Status-Grenzfälle nun im
+  Backpack-Scope ab.
+- Isolierter Backpack-Commit erstellt: `0434182 feat(dogs): add local backpack checklist`.
+Tests: fokussierte Backpack-Jest-Suites PASS (4 Suites / 44 Tests), `npx tsc --noEmit` PASS, `git diff --check` PASS.
+
 ## 2026-08-02 — Codex (T-31 Agent-Infrastruktur)
 
 Branch: `feat/track-module-rewrite`. Kein Commit/Push.

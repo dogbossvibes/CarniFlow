@@ -540,13 +540,18 @@ Package manager: npm
 > Stand der manuellen Sektionen: 2026-08-02.
 
 ## Current task
+**T-32 abgeschlossen (committed `0434182`):** Backpack vom Hunde-Dashboard entkoppelt.
+`backpackStatus` liegt jetzt in `features/dogs/backpack.ts`; `DogBackpackCard.tsx` importiert direkt aus dem
+Backpack-Modul. `features/dogs/dashboard.ts` re-exportiert die Funktion nur noch fuer bestehende Dashboard-Aufrufer.
+Keine Journal-/Dashboard-Feature-/Tracking-/Connect-/Website-/SQL-Arbeit.
+
 **T-31 abgeschlossen (uncommittet):** `npm run agent:start` an das verbindliche Startprotokoll angepasst.
 `TASKS.md` wird in der Ausgabe ausdrücklich als Aufgabenquelle genannt; `SESSION_HANDOFF.md` als letzte Übergabe.
 Keine App-/Feature-/Website-/SQL-/Build-Dateien geändert.
 
-**T-25…T-29 abgeschlossen (uncommittet):** Backpack (Datenschicht + UI), Journal (spartenübergreifende
-Historie), Produktnamen-Rename (Journal/Backpack) und persönliches Hunde-Dashboard (Phase C).
-Alles rein additiv, verifiziert, **lokal uncommittet**. Kein Commit/Push/Build/Submit, keine DB-Migration.
+**T-25/T-26 Backpack abgeschlossen und committed (`0434182`); T-27…T-29 weiterhin uncommittet:** Journal
+(spartenübergreifende Historie), Produktnamen-Rename (Journal/Backpack) und persönliches Hunde-Dashboard (Phase C)
+bleiben lokal uncommittet. Kein Push/Build/Submit, keine DB-Migration.
 
 ## Goal
 Hundeprofil-Erlebnis ausbauen: lokale Backpack-Packliste, ein zentrales „Journal" (Trainingshistorie über
@@ -577,6 +582,10 @@ alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zwei
   `DECISIONS.md` und `git status`. `TASKS.md` wird als verbindliche Aufgabenquelle beschrieben,
   `SESSION_HANDOFF.md` als letzte Übergabe. Keine automatische Task-Ermittlung aus `TASKS.md`, weil die
   aktuelle Markdown-Struktur nicht robust maschinenlesbar ist.
+- **T-32 Backpack-Entkopplung:** `backpackStatus`/`BackpackStatus` aus `features/dogs/dashboard.ts` nach
+  `features/dogs/backpack.ts` verschoben. `DogBackpackCard.tsx` hängt damit nicht mehr am Dashboard-Modul.
+  Dashboard importiert und re-exportiert die Funktion fuer bestehende Aufrufer/Tests; Statuslogik unverändert.
+  Isolierter Backpack-Commit: `0434182 feat(dogs): add local backpack checklist`.
 
 ## Tests / verification (Verified, Hauptrepo)
 - `npx tsc --noEmit`: **PASS** (0 Errors).
@@ -586,12 +595,16 @@ alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zwei
 - **Fehlgeschlagene Tests:** keine. (Hinweis: `connect-step3` zeigte im parallelen Vollrun einmalig „FAIL" durch
   Worker-Teardown-Flake; isoliert 16/16 grün — kein echter Fehler.)
 - T-31: `npm run agent:start` PASS, `npm run agent:status` PASS, `git diff --check` PASS.
+- T-32: fokussierte Backpack-Jest-Suites PASS (4 Suites / 44 Tests), `npx tsc --noEmit` PASS,
+  `git diff --check` PASS.
 
 ## Known issues / offene Punkte
-- **Nur lokal, uncommittet** — kein Commit/Push erfolgt.
+- Backpack ist committed (`0434182`); Journal, Dashboard, Agent-Doku und weiterer WIP bleiben lokal uncommittet.
+  Kein Push erfolgt.
 - Gerätesichtung der Features steht aus (DE/gsw/FR, iPhone klein/gross, Galaxy S23, Hündin/Rüde, mit/ohne Termine/Ziel/Historie).
 - `agent:start` liest die aktuelle Aufgabe weiterhin aus `SESSION_HANDOFF.md`; `TASKS.md` bleibt verpflichtende
   menschengepflegte Aufgabenquelle und wird nicht automatisch geparst.
+- Agent-Dokumentation fuer T-32 ist separater Commit-Scope und gehoert nicht automatisch in einen Backpack-Feature-Commit.
 - Bewusst zurückgestellt (Phase-C-Report §X): „Heute mitnehmen"-Filter, VM-Datumslabels nicht i18n, Heat-Kompaktvariante,
   Fährten-Distanz nicht im vereinheitlichten Feed, Termine clientseitig gefiltert (Service lädt alle Nutzer-Events).
 - Vorbestehender dirty Tree (fremder WIP + Artefakte) besteht unverändert weiter (siehe T-18-Audit / „Do not touch").
@@ -614,10 +627,11 @@ alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zwei
 - `ANYVO-current-repository.zip` (potenziell sensibel), `dist-*/`, `*.sql`/Dumps, `supabase/*schema*.sql`, lose Bilder.
 
 ## Next recommended step
-1. **Gerätetest T-25…T-29** (Backpack/Journal/Dashboard) auf iOS + Android, alle 3 Sprachen; danach ggf. Feinschliff.
-2. Erst nach Freigabe: saubere Scope-Commits (getrennt je Feature: `feat(backpack)`, `feat(journal)`, `feat(dog-dashboard)`),
+1. Erst nach Freigabe: Agent-Doku fuer T-31/T-32 separat committen.
+2. **Gerätetest T-25…T-29** (Backpack/Journal/Dashboard) auf iOS + Android, alle 3 Sprachen; danach ggf. Feinschliff.
+3. Danach weitere saubere Scope-Commits (`feat(journal)`, `feat(dog-dashboard)`),
    **ohne** die fremden WIP-Dateien einzuschliessen (keine `git add .`).
-3. Parallel weiterhin offen: **T-20** Testerfeedback/Build-38-Triage, **T-21** Dirty-Tree-Aufräumen.
+4. Parallel weiterhin offen: **T-20** Testerfeedback/Build-38-Triage, **T-21** Dirty-Tree-Aufräumen.
 
 ## Relevant files (diese Session)
 - Neu: `features/dogs/backpack.ts`, `features/dogs/dashboard.ts`, `features/training/journal.ts`,
@@ -631,6 +645,9 @@ alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zwei
 - Geändert (GEMISCHT mit fremdem WIP): `app/home-customize.tsx`, `components/home/QuickActionsWidget.tsx`.
 - T-31: `scripts/agent-start.mjs`, `docs/agent/TASKS.md`, `docs/agent/WORK_LOG.md`,
   `docs/agent/SESSION_HANDOFF.md`.
+- T-32: `features/dogs/backpack.ts`, `features/dogs/dashboard.ts`, `components/dogs/DogBackpackCard.tsx`,
+  `features/dogs/__tests__/backpackSuggestions.test.ts`, `docs/agent/TASKS.md`,
+  `docs/agent/WORK_LOG.md`, `docs/agent/SESSION_HANDOFF.md`.
 
 ## Open questions
 - Sollen die Feature-Commits (Backpack/Journal/Dashboard) jetzt erstellt/gepusht werden — und wie mit den beiden

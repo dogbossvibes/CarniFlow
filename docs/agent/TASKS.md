@@ -44,10 +44,10 @@
 ## Diese Session — Feature-Arbeit (verifiziert, UNCOMMITTET)
 > Rein additiv. Keine DB-Migration, keine bestehende Trainings-/Fährten-/Kalender-/Zyklus-/Abo-Logik verändert.
 > Alles lokal uncommittet (kein Commit/Push).
-- **T-25 — Backpack Phase A (Datenschicht)** · DONE (uncommittet)
+- **T-25 — Backpack Phase A (Datenschicht)** · DONE(committed `0434182`)
   `features/dogs/backpack.ts`: per-user/per-dog AsyncStorage (`dog_backpack:<userId>:<dogId>`), Sanitizer, CRUD,
   aktiv/inaktiv, gepackt, ↑/↓-Reorder, Reset-nur-Häkchen, Vorschläge (nie auto-persistiert). Keine DB-Migration.
-- **T-26 — Backpack Phase B (UI)** · DONE (uncommittet)
+- **T-26 — Backpack Phase B (UI)** · DONE(committed `0434182`)
   Overview-Card + Verwaltungsscreen `app/dog-backpack/[id].tsx` (Add/Edit/Delete, aktiv/inaktiv, gepackt, Reorder,
   Reset, Vorschläge mit Duplikatschutz), i18n de/gsw/fr, verdrahtet in `DogHubScreen`/`app/dog/[id].tsx`.
 - **T-27 — Journal (spartenübergreifende Trainingshistorie)** · DONE (uncommittet)
@@ -68,6 +68,10 @@
   `TASKS.md` wird ausdrücklich als verbindliche Aufgabenquelle genannt; `SESSION_HANDOFF.md` als letzte Übergabe.
   Keine robuste automatische TASKS.md-Task-Ermittlung eingeführt, weil die Markdown-Struktur weiterhin primär
   menschlich gepflegt ist.
+- **T-32 — Backpack von Hunde-Dashboard entkoppeln** · DONE(committed `0434182`)
+  Reine Statuslogik `backpackStatus` aus `features/dogs/dashboard.ts` nach `features/dogs/backpack.ts` verschoben.
+  `components/dogs/DogBackpackCard.tsx` importiert die Funktion jetzt direkt aus dem Backpack-Modul; Dashboard behält
+  einen Re-Export fuer bestehende Dashboard-Aufrufer/Tests. Keine UI-/Text-/Journal-/Tracking-/SQL-Arbeit.
 
 ## Offen / Blocker
 - **T-20 — Testerfeedback und Build-38-Hotfix-Triage** · OPEN
@@ -88,8 +92,8 @@
 
 ## ► TASK-ID-Stand
 - **T-30 ist reserviert** für den manuellen Gerätetest T-25…T-29.
-- **Nächste freie allgemeine TASK-ID:** **T-32**
-- Letzte bearbeitete TASK-ID: **T-31** (agent:start Startprotokoll, uncommittet).
+- **Nächste freie allgemeine TASK-ID:** **T-33**
+- Letzte bearbeitete TASK-ID: **T-32** (Backpack-Dashboard-Entkopplung, committed `0434182`).
 Empfohlene nächste Arbeit (Codex):
 1. **Gerätetest T-25…T-29** (Backpack/Journal/Dashboard) — DE/gsw/FR, iPhone klein/gross + Galaxy S23,
    Hündin/Rüde, mit/ohne Termine/Ziel/Historie. Danach ggf. Feinschliff.
