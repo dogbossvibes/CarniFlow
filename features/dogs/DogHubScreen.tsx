@@ -16,6 +16,7 @@ import { DogTrainerCard } from '@/components/dogs/DogTrainerCard';
 import { DogAiCoachCard } from '@/components/dogs/DogAiCoachCard';
 import { DogHeatCard } from '@/components/dogs/DogHeatCard';
 import { DogCommandsCard } from '@/components/dogs/DogCommandsCard';
+import { DogBackpackCard } from '@/components/dogs/DogBackpackCard';
 import { ActiveFaehrteCard } from '@/features/tracking/components/ActiveFaehrteCard';
 import type { ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
 import type { HeatCycle, HeatPrediction } from '@/features/dogs/heatCycles';
@@ -26,6 +27,8 @@ import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } fr
 export interface DogHeatProps { cycles: HeatCycle[]; prediction: HeatPrediction | null; onAdd: () => void; onDelete?: (c: HeatCycle) => void }
 // Kommandoliste — lokal geladen, als eigenständiger Prop reingereicht.
 export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void }
+// Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
+export interface DogBackpackProps { dogName: string; total: number; active: number; packed: number; onOpen: () => void }
 
 export interface DogHubActions {
   onBack:             () => void;
@@ -57,7 +60,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
   { key: 'trainer',  labelKey: 'doghub.tab.trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
+export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
   const { t } = useT();
   const [tab, setTab] = useState<TabKey>('overview');
   const [aiTipHidden, setAiTipHidden] = useState(false);   // „Später" blendet den KI-Hinweis für diese Sitzung aus
@@ -143,6 +146,15 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, activeFa
                       <Text style={s.noteTxt} numberOfLines={1}>Letztes Training: <Text style={s.noteStrong}>{vm.lastTrainingLabel}</Text></Text>
                     </View>
                   ) : null}
+                  {backpack && (
+                    <DogBackpackCard
+                      dogName={backpack.dogName}
+                      total={backpack.total}
+                      active={backpack.active}
+                      packed={backpack.packed}
+                      onOpen={backpack.onOpen}
+                    />
+                  )}
                   {!aiTipHidden && (
                     <DogAiCoachCard
                       tip={vm.aiTip}

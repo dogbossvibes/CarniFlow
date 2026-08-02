@@ -10,6 +10,8 @@ import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtra
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
 import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
 import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
+import { getBackpack } from '@/features/dogs/backpack';
+import { useSession } from '@/lib/session-context';
 import { useDogHubDynamic } from '@/features/dogs/useDogHubDynamic';
 import { DogHubScreen, type DogHubActions } from '@/features/dogs/DogHubScreen';
 import { useDogActiveFaehrte } from '@/features/tracking/hooks/useActiveFaehrte';
@@ -25,6 +27,8 @@ export default function DogHubRoute() {
   const { t } = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isPremium } = usePlan();
+  const { user } = useSession();
+  const userId = user?.id ?? '';
 
   const [dog, setDog]     = useState<Dog | null>(null);
   const [loading, setLoad] = useState(true);
@@ -37,6 +41,7 @@ export default function DogHubRoute() {
   const [extras, setExtras] = useState<DogHubExtras | null>(null);
   const [heatCycles, setHeatCycles] = useState<HeatCycle[]>([]);
   const [commands, setCommands] = useState<DogCommand[]>([]);
+  const [backpackCounts, setBackpackCounts] = useState({ total: 0, active: 0, packed: 0 });
 
   useEffect(() => {
     if (!id) return;
@@ -54,7 +59,16 @@ export default function DogHubRoute() {
     getDogHubExtras(id).then(setExtras).catch(() => setExtras(null));
     getHeatCycles(id).then(setHeatCycles).catch(() => setHeatCycles([]));
     getCommands(id).then(setCommands).catch(() => setCommands([]));
-  }, [id]));
+    if (userId) {
+      getBackpack(userId, id)
+        .then(list => setBackpackCounts({
+          total: list.length,
+          active: list.filter(i => i.isActive).length,
+          packed: list.filter(i => i.isActive && i.isPacked).length,
+        }))
+        .catch(() => setBackpackCounts({ total: 0, active: 0, packed: 0 }));
+    }
+  }, [id, userId]));
 
   const vm = useMemo(() => (dog ? buildDogHubVM(dog, feed, extras ?? undefined, dynamic) : null), [dog, feed, extras, dynamic]);
   const heatPrediction = useMemo(() => predictHeat(heatCycles), [heatCycles]);
@@ -169,6 +183,13 @@ export default function DogHubRoute() {
         onOpen: (c) => router.push({ pathname: '/dog-command/detail', params: { dogId: id, commandId: c.id } } as never),
         onToggleFavorite: toggleCmdFav,
         onSeedDemo: seedCmds,
+      }}
+      backpack={{
+        dogName: dog?.name ?? '',
+        total: backpackCounts.total,
+        active: backpackCounts.active,
+        packed: backpackCounts.packed,
+        onOpen: () => router.push({ pathname: '/dog-backpack/[id]', params: { id, name: dog?.name ?? '' } } as never),
       }}
       activeFaehrte={activeFaehrte}
       onOpenFaehrte={activeFaehrte ? () => router.push(reopenTarget(activeFaehrte) as never) : undefined}
