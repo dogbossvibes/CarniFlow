@@ -200,6 +200,25 @@ export default function AnalyticsScreen() {
             <Ionicons name="chevron-forward" size={18} color={C.muted} />
           </TouchableOpacity>
 
+          {/* ── Trainingstagebuch (spartenübergreifende Historie) ── */}
+          <TouchableOpacity
+            onPress={() => router.push('/training-journal' as never)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={t('journal.title')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 15, paddingVertical: 14,
+              borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, marginBottom: 16 }}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="book" size={18} color={C.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, color: C.white, fontWeight: '700' }}>{t('journal.title')}</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{t('journal.subtitle')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.muted} />
+          </TouchableOpacity>
+
           {/* ── Hero Score Card ── */}
           <View style={s.heroCard}>
             <LinearGradient

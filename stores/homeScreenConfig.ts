@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type HomeLayoutMode   = 'grid' | 'list' | 'compact';
 export type HomeWidgetId      = 'week' | 'smart_analysis' | 'quick_actions' | 'recent_sessions' | 'dogs';
-export type HomeQuickActionId = 'add_dog' | 'start_timer' | 'track_gps' | 'lay_track' | 'document_training' | 'start_obedience' | 'show_analysis';
+export type HomeQuickActionId = 'add_dog' | 'start_timer' | 'track_gps' | 'lay_track' | 'document_training' | 'start_obedience' | 'show_analysis' | 'training_journal';
 
 export interface HomeScreenConfig {
   layout:        HomeLayoutMode;
@@ -21,7 +21,7 @@ export interface HomeScreenConfig {
 
 export const HOME_LAYOUT_MODES: HomeLayoutMode[]   = ['grid', 'list', 'compact'];
 export const ALL_HOME_WIDGETS: HomeWidgetId[]       = ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs'];
-export const ALL_QUICK_ACTIONS: HomeQuickActionId[] = ['add_dog', 'start_timer', 'track_gps', 'lay_track', 'document_training', 'start_obedience', 'show_analysis'];
+export const ALL_QUICK_ACTIONS: HomeQuickActionId[] = ['add_dog', 'start_timer', 'track_gps', 'lay_track', 'document_training', 'start_obedience', 'show_analysis', 'training_journal'];
 export const MAX_QUICK_ACTIONS = 6;
 
 // Metadaten-Registry (Label/Icon/Route) — eine Quelle, keine duplizierten switches.
@@ -35,6 +35,7 @@ export const HOME_QUICK_ACTIONS_META: Record<HomeQuickActionId, { label: string;
   document_training: { label: 'Dokumentieren',   icon: 'create-outline',      route: '/unit/document' },
   start_obedience:   { label: 'Unterordnung',    icon: 'ribbon-outline',      route: '/unit/start' },
   show_analysis:     { label: 'Analyse',         icon: 'sparkles-outline',    route: '/analyse/insights' },
+  training_journal:  { label: 'Journal',         icon: 'book-outline',        route: '/training-journal' },
 };
 
 export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: string; description: string }> = {
