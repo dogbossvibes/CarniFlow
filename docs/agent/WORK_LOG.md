@@ -3,6 +3,18 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-08-02 — Codex (T-31 Agent-Infrastruktur)
+
+Branch: `feat/track-module-rewrite`. Kein Commit/Push.
+- **T-31:** `npm run agent:start` an das verbindliche Startprotokoll angepasst.
+- Ausgabe nennt jetzt explizit `AGENTS.md`, `CLAUDE.md`, `docs/agent/TASKS.md`,
+  `CURRENT_STATE.md`, `SESSION_HANDOFF.md`, `DECISIONS.md` und `git status`.
+- `TASKS.md` wird als verbindliche Aufgabenquelle beschrieben; `SESSION_HANDOFF.md`
+  als letzte Übergabe; Repository-/Git-Status bleibt Vorrang bei Widersprüchen.
+- Keine automatische nächste-Task-Ermittlung aus `TASKS.md` implementiert: Die Datei ist
+  bewusst menschenlesbares Markdown und nicht robust genug als Maschinenformat.
+Tests: `npm run agent:start` PASS, `npm run agent:status` PASS, `git diff --check` PASS.
+
 ## 2026-08-02 — Claude Code (Feature-Arbeit: Backpack / Journal / Dashboard)
 
 Branch: `feat/track-module-rewrite`. Rein additiv, **kein Commit/Push/Build/Submit**, **keine DB-Migration**.

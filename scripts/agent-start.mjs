@@ -32,5 +32,15 @@ console.log(gitModified().slice(0, 15).map(f => '  • ' + f).join('\n') || '  (
 console.log('Warnings          :');
 console.log(warnings.length ? warnings.map(w => '  ⚠ ' + w).join('\n') : '  (keine)');
 console.log('');
-console.log('Erst prüfen (Reihenfolge): docs/agent/CURRENT_STATE.md → SESSION_HANDOFF.md → git status.');
+console.log('Verbindliches Startprotokoll:');
+console.log('  1. AGENTS.md');
+console.log('  2. CLAUDE.md');
+console.log('  3. docs/agent/TASKS.md — verbindliche Aufgabenquelle');
+console.log('  4. docs/agent/CURRENT_STATE.md');
+console.log('  5. docs/agent/SESSION_HANDOFF.md — letzte Übergabe');
+console.log('  6. docs/agent/DECISIONS.md');
+console.log('  7. git status');
+console.log('');
+console.log('TASKS.md ist maßgeblich für Task-IDs, Status und nächste TASK-ID.');
+console.log('SESSION_HANDOFF.md beschreibt die letzte Übergabe und kann veraltet sein.');
 console.log('Priorität: Repository state > Git state > Handoff documentation > Agent assumptions.');

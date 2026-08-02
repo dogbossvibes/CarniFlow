@@ -10,15 +10,13 @@
 
 <!-- AUTO-GENERATED:START -->
 
-Generated: 2026-08-02T17:57:20.217Z
-Agent: claude
+Generated: 2026-08-02T18:33:18.831Z
+Agent: codex
 Branch: feat/track-module-rewrite
 
 ### Git status
 ```
-M AGENTS.md
- M AI_HANDOFF.md
- M CLAUDE.md
+M AI_HANDOFF.md
  M app/(tabs)/analytics.tsx
  M app/(tabs)/home.tsx
  M app/(tabs)/profile.tsx
@@ -39,6 +37,9 @@ M AGENTS.md
  M components/home/QuickActionsWidget.tsx
  M components/tracking/GpsSourcePicker.tsx
  M docs/adr/ADR-001_Domain_Model.md
+ M docs/agent/SESSION_HANDOFF.md
+ M docs/agent/TASKS.md
+ M docs/agent/WORK_LOG.md
  M features/connect/components/ConnectIdentitySelector.tsx
  M features/connect/components/ConnectStates.tsx
  M features/connect/screens/ConnectHomeScreen.tsx
@@ -53,9 +54,8 @@ M AGENTS.md
  M i18n/gsw-CH.ts
  M i18n/locales/fr.ts
  M legal-web/index.html
- M package.json
+ M scripts/agent-start.mjs
  M stores/homeScreenConfig.ts
-?? .claude/commands/
 ?? .claude/development.code-workspace
 ?? ANYVO-current-repository.zip
 ?? STAGING_DEPLOY_RUN.sql
@@ -93,7 +93,6 @@ M AGENTS.md
 ?? "docs/adr/ADR-010  UI & Navigation"
 ?? "docs/adr/ADR-011  Testing Strategy"
 ?? "docs/adr/ADR-012  Release & Deployment"
-?? docs/agent/
 ?? docs/architecture/CODEX_P0_FIX_01_REVIEW.md
 ?? docs/architecture/CODEX_P0_REVIEW.md
 ?? docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md
@@ -131,10 +130,6 @@ M AGENTS.md
 ?? legal-web/funktionen.html
 ?? legal-web/funktionen/
 ?? screen20.jpg
-?? scripts/agent-handoff.mjs
-?? scripts/agent-lib.mjs
-?? scripts/agent-start.mjs
-?? scripts/agent-status.mjs
 ?? supabase/migrations/
 ?? supabase/production_public_schema_snapshot.sql
 ?? supabase/staging_p0_smoke_verify.sql
@@ -144,9 +139,7 @@ M AGENTS.md
 
 ### Diff stat
 ```
-AGENTS.md                                          |  53 +++
- AI_HANDOFF.md                                      |   6 +
- CLAUDE.md                                          |  34 ++
+AI_HANDOFF.md                                      |   6 +
  app/(tabs)/analytics.tsx                           |  19 +
  app/(tabs)/home.tsx                                |  12 +-
  app/(tabs)/profile.tsx                             | 116 +++---
@@ -167,6 +160,9 @@ AGENTS.md                                          |  53 +++
  components/home/QuickActionsWidget.tsx             |  24 +-
  components/tracking/GpsSourcePicker.tsx            |  22 +-
  docs/adr/ADR-001_Domain_Model.md                   | 416 +++++++++++++++++++
+ docs/agent/SESSION_HANDOFF.md                      |  14 +
+ docs/agent/TASKS.md                                |  14 +-
+ docs/agent/WORK_LOG.md                             |  12 +
  .../connect/components/ConnectIdentitySelector.tsx |  11 +-
  features/connect/components/ConnectStates.tsx      |   6 +-
  features/connect/screens/ConnectHomeScreen.tsx     |   2 +-
@@ -181,16 +177,14 @@ AGENTS.md                                          |  53 +++
  i18n/gsw-CH.ts                                     | 110 +++++
  i18n/locales/fr.ts                                 | 110 +++++
  legal-web/index.html                               | 454 ++++++++++++---------
- package.json                                       |   3 +
+ scripts/agent-start.mjs                            |  12 +-
  stores/homeScreenConfig.ts                         |   5 +-
- 39 files changed, 1776 insertions(+), 529 deletions(-)
+ 40 files changed, 1735 insertions(+), 532 deletions(-)
 ```
 
 ### Modified files
 ```
-AGENTS.md
 AI_HANDOFF.md
-CLAUDE.md
 app/(tabs)/analytics.tsx
 app/(tabs)/home.tsx
 app/(tabs)/profile.tsx
@@ -211,6 +205,9 @@ components/dogs/types.ts
 components/home/QuickActionsWidget.tsx
 components/tracking/GpsSourcePicker.tsx
 docs/adr/ADR-001_Domain_Model.md
+docs/agent/SESSION_HANDOFF.md
+docs/agent/TASKS.md
+docs/agent/WORK_LOG.md
 features/connect/components/ConnectIdentitySelector.tsx
 features/connect/components/ConnectStates.tsx
 features/connect/screens/ConnectHomeScreen.tsx
@@ -225,13 +222,12 @@ i18n/de-CH.ts
 i18n/gsw-CH.ts
 i18n/locales/fr.ts
 legal-web/index.html
-package.json
+scripts/agent-start.mjs
 stores/homeScreenConfig.ts
 ```
 
 ### Untracked files
 ```
-.claude/commands/handoff.md
 .claude/development.code-workspace
 ANYVO-current-repository.zip
 STAGING_DEPLOY_RUN.sql
@@ -464,12 +460,6 @@ docs/adr/ADR-009  Connect Architecture
 docs/adr/ADR-010  UI & Navigation
 docs/adr/ADR-011  Testing Strategy
 docs/adr/ADR-012  Release & Deployment
-docs/agent/CURRENT_STATE.md
-docs/agent/DECISIONS.md
-docs/agent/README.md
-docs/agent/SESSION_HANDOFF.md
-docs/agent/TASKS.md
-docs/agent/WORK_LOG.md
 docs/architecture/CODEX_P0_FIX_01_REVIEW.md
 docs/architecture/CODEX_P0_REVIEW.md
 docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md
@@ -521,10 +511,6 @@ legal-web/assets/site.js
 legal-web/funktionen.html
 legal-web/funktionen/index.html
 screen20.jpg
-scripts/agent-handoff.mjs
-scripts/agent-lib.mjs
-scripts/agent-start.mjs
-scripts/agent-status.mjs
 supabase/migrations/README.md
 supabase/production_public_schema_snapshot.sql
 supabase/staging_p0_smoke_verify.sql
@@ -534,11 +520,11 @@ winkel.png
 
 ### Recent commits
 ```
+17b05eb chore(agent): add Claude-Codex handoff infrastructure
 d4501a7 fix(tracking): finalize quick pickers and manual search start
 cf2399f fix(release): stabilize tracking forms and Google sign-in
 f29717d chore(db): version final subscription P0 schema
 74ea2d0 fix(help): align registry consumers and guided help
-7da956e fix(auth): remove trainer self-selection from signup
 ```
 
 ### Runtime
@@ -554,6 +540,10 @@ Package manager: npm
 > Stand der manuellen Sektionen: 2026-08-02.
 
 ## Current task
+**T-31 abgeschlossen (uncommittet):** `npm run agent:start` an das verbindliche Startprotokoll angepasst.
+`TASKS.md` wird in der Ausgabe ausdrücklich als Aufgabenquelle genannt; `SESSION_HANDOFF.md` als letzte Übergabe.
+Keine App-/Feature-/Website-/SQL-/Build-Dateien geändert.
+
 **T-25…T-29 abgeschlossen (uncommittet):** Backpack (Datenschicht + UI), Journal (spartenübergreifende
 Historie), Produktnamen-Rename (Journal/Backpack) und persönliches Hunde-Dashboard (Phase C).
 Alles rein additiv, verifiziert, **lokal uncommittet**. Kein Commit/Push/Build/Submit, keine DB-Migration.
@@ -582,6 +572,11 @@ alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zwei
   (`buildDogHubVM.ts`, `components/dogs/types.ts`, `demoDogs.ts`). Termine via bestehendem `getCalendarEvents`.
   Wiederverwendung `DogHeatCard`/`DogGoalsCard`/`DogAiCoachCard`. **Kein Wetter, keine neue KI.**
   Reports: `docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md`, `docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md`.
+- **T-31 Agent-Infrastruktur:** `scripts/agent-start.mjs` zeigt jetzt das verbindliche Startprotokoll inkl.
+  `AGENTS.md`, `CLAUDE.md`, `docs/agent/TASKS.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md`,
+  `DECISIONS.md` und `git status`. `TASKS.md` wird als verbindliche Aufgabenquelle beschrieben,
+  `SESSION_HANDOFF.md` als letzte Übergabe. Keine automatische Task-Ermittlung aus `TASKS.md`, weil die
+  aktuelle Markdown-Struktur nicht robust maschinenlesbar ist.
 
 ## Tests / verification (Verified, Hauptrepo)
 - `npx tsc --noEmit`: **PASS** (0 Errors).
@@ -590,10 +585,13 @@ alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zwei
 - `npx expo export --platform ios` **und** `--platform android`: **erfolgreich** (Bundle baut, Routen/Imports lösen auf).
 - **Fehlgeschlagene Tests:** keine. (Hinweis: `connect-step3` zeigte im parallelen Vollrun einmalig „FAIL" durch
   Worker-Teardown-Flake; isoliert 16/16 grün — kein echter Fehler.)
+- T-31: `npm run agent:start` PASS, `npm run agent:status` PASS, `git diff --check` PASS.
 
 ## Known issues / offene Punkte
 - **Nur lokal, uncommittet** — kein Commit/Push erfolgt.
 - Gerätesichtung der Features steht aus (DE/gsw/FR, iPhone klein/gross, Galaxy S23, Hündin/Rüde, mit/ohne Termine/Ziel/Historie).
+- `agent:start` liest die aktuelle Aufgabe weiterhin aus `SESSION_HANDOFF.md`; `TASKS.md` bleibt verpflichtende
+  menschengepflegte Aufgabenquelle und wird nicht automatisch geparst.
 - Bewusst zurückgestellt (Phase-C-Report §X): „Heute mitnehmen"-Filter, VM-Datumslabels nicht i18n, Heat-Kompaktvariante,
   Fährten-Distanz nicht im vereinheitlichten Feed, Termine clientseitig gefiltert (Service lädt alle Nutzer-Events).
 - Vorbestehender dirty Tree (fremder WIP + Artefakte) besteht unverändert weiter (siehe T-18-Audit / „Do not touch").
@@ -631,6 +629,8 @@ alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zwei
   `components/dogs/types.ts`, `app/dog/[id].tsx`, `app/(tabs)/analytics.tsx`, `stores/homeScreenConfig.ts`,
   `i18n/de-CH.ts`, `i18n/gsw-CH.ts`, `i18n/locales/fr.ts`.
 - Geändert (GEMISCHT mit fremdem WIP): `app/home-customize.tsx`, `components/home/QuickActionsWidget.tsx`.
+- T-31: `scripts/agent-start.mjs`, `docs/agent/TASKS.md`, `docs/agent/WORK_LOG.md`,
+  `docs/agent/SESSION_HANDOFF.md`.
 
 ## Open questions
 - Sollen die Feature-Commits (Backpack/Journal/Dashboard) jetzt erstellt/gepusht werden — und wie mit den beiden

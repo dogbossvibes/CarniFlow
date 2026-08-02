@@ -61,6 +61,14 @@
   `features/dogs/dashboard.ts` + 4 Karten; Termine via bestehendem `getCalendarEvents`. Kein Wetter, keine neue KI,
   keine Migration. Report `docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md`.
 
+## Diese Session — Agent-Infrastruktur
+- **T-31 — agent:start Startprotokoll mit TASKS.md abgleichen** · DONE (uncommittet)
+  `scripts/agent-start.mjs` zeigt jetzt das verbindliche Startprotokoll inkl. `AGENTS.md`, `CLAUDE.md`,
+  `docs/agent/TASKS.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md`, `DECISIONS.md` und `git status`.
+  `TASKS.md` wird ausdrücklich als verbindliche Aufgabenquelle genannt; `SESSION_HANDOFF.md` als letzte Übergabe.
+  Keine robuste automatische TASKS.md-Task-Ermittlung eingeführt, weil die Markdown-Struktur weiterhin primär
+  menschlich gepflegt ist.
+
 ## Offen / Blocker
 - **T-20 — Testerfeedback und Build-38-Hotfix-Triage** · OPEN
   Release-Fokus liegt jetzt auf TestFlight-/Google-Play-Testerfeedback, echter Geraetepruefung und gezielten
@@ -78,8 +86,10 @@
   Auf echten Geräten prüfen, ob EAS Updates ankommen: GS/Winkel-Panels, Absuche nur manuell, 5/10 m,
   Tracking-UI, Google Login, Keyboard-Formulare, Auswertungslayout.
 
-## ► NÄCHSTE FREIE TASK-ID: **T-30**
-Letzte bearbeitete TASK-ID: **T-29** (Hunde-Dashboard Phase C, uncommittet).
+## ► TASK-ID-Stand
+- **T-30 ist reserviert** für den manuellen Gerätetest T-25…T-29.
+- **Nächste freie allgemeine TASK-ID:** **T-32**
+- Letzte bearbeitete TASK-ID: **T-31** (agent:start Startprotokoll, uncommittet).
 Empfohlene nächste Arbeit (Codex):
 1. **Gerätetest T-25…T-29** (Backpack/Journal/Dashboard) — DE/gsw/FR, iPhone klein/gross + Galaxy S23,
    Hündin/Rüde, mit/ohne Termine/Ziel/Historie. Danach ggf. Feinschliff.
