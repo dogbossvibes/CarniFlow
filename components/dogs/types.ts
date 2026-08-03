@@ -111,9 +111,7 @@ export function genderLabel(g: DogGender): string | null {
 
 // DB-`Dog` → Identität (nur Basisfelder, sonst null).
 export function dogToIdentity(dog: Dog): DogIdentity {
-  const status = dog.discipline
-    ? (dog.level ? `${dog.discipline} · ${dog.level}` : dog.discipline)
-    : null;
+  const status = dog.discipline;
   return {
     id:               dog.id,
     name:             dog.name,

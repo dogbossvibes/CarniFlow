@@ -79,7 +79,7 @@ export type NewDog = Pick<Dog,
   | 'sire' | 'dam' | 'kennel' | 'is_favorite'
   | 'color' | 'microchip_number' | 'tasso_registered'
   | 'registry_country_code' | 'registry_type' | 'registry_name' | 'registry_number'
-  | 'discipline' | 'level' | 'best_score'
+  | 'discipline'
   | 'vet' | 'vaccination' | 'food'
 >;
 

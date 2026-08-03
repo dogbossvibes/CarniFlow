@@ -66,6 +66,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   // Hund
   "dog.add":    "Ajouter un chien",
   "dogs.title": "Mes chiens",
+  "dog.customDiscipline": "Sparte personnalisée",
+  "dog.customDisciplinePlaceholder": "p. ex. Hoopers, Rally Obedience, Flyball, Frisbee, Mantrailing …",
 
   // Training / Timer
   "training.start":       "Démarrer l'entraînement",

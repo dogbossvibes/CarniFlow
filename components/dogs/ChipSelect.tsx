@@ -3,17 +3,25 @@ import { C } from '@/constants/colors';
 
 // Auswahllisten für den Hunde-Sport.
 export const DOG_DISCIPLINES = ['IGP', 'IBGH', 'Mondioring', 'Obedience', 'Fährte', 'Rettung', 'Agility'] as const;
-export const DOG_LEVELS      = ['BH', '1', '2', '3'] as const;
+// Sentinel für die optionale „Eigene Sparte"-Auswahl (Label kommt aus i18n).
+export const DOG_CUSTOM_DISCIPLINE = '__eigene_sparte__' as const;
+
+// Speicherwert aus der Sparten-Auswahl ableiten: '' / Sentinel (gewählt, aber leer) → null.
+export function disciplineToStored(value: string): string | null {
+  return value && value !== DOG_CUSTOM_DISCIPLINE ? value.trim() : null;
+}
 
 // Einfache Einfach-Auswahl als Chips (Pillen). Nochmaliges Tippen auf den
 // aktiven Chip hebt die Auswahl wieder auf ('' = nichts gewählt).
+// `labels` erlaubt lokalisierte Anzeige-Texte für Options-Sentinels.
 export function ChipSelect({
-  label, options, value, onChange,
+  label, options, value, onChange, labels,
 }: {
   label: string;
   options: readonly string[];
   value: string;
   onChange: (v: string) => void;
+  labels?: Readonly<Record<string, string>>;
 }) {
   return (
     <View>
@@ -28,7 +36,7 @@ export function ChipSelect({
               onPress={() => onChange(aktiv ? '' : opt)}
               activeOpacity={0.8}
             >
-              <Text style={[s.chipText, aktiv && s.chipTextAktiv]}>{opt}</Text>
+              <Text style={[s.chipText, aktiv && s.chipTextAktiv]}>{labels?.[opt] ?? opt}</Text>
             </TouchableOpacity>
           );
         })}

@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/Input';
 import { DateField } from '@/components/ui/DateField';
 import { toISODate, fromISODate } from '@/features/dogs/dateInput';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
-import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
+import { DisciplinePicker, disciplineToStored } from '@/components/dogs/DisciplinePicker';
 import { OfficialRegistrySection } from '@/components/dogs/OfficialRegistrySection';
 import { draftFromDog, draftToColumns, validateRegistry, EMPTY_REGISTRY_DRAFT, type RegistryDraft } from '@/features/dogs/registry';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
@@ -54,8 +54,6 @@ export default function HundBearbeitenScreen() {
   const [zwinger,       setZwinger]       = useState('');
   // Sport
   const [sparte,        setSparte]        = useState('');
-  const [stufe,         setStufe]         = useState('');
-  const [bestwert,      setBestwert]      = useState('');
   // Identität
   const [farbe,         setFarbe]         = useState('');
   const [mikrochip,     setMikrochip]     = useState('');
@@ -88,8 +86,6 @@ export default function HundBearbeitenScreen() {
       setMutter(d.dam ?? '');
       setZwinger(d.kennel ?? '');
       setSparte(d.discipline ?? '');
-      setStufe(d.level ?? '');
-      setBestwert(d.best_score ?? '');
       setFarbe(d.color ?? '');
       setMikrochip(d.microchip_number ?? '');
       setRegistry(draftFromDog(d));
@@ -163,9 +159,7 @@ export default function HundBearbeitenScreen() {
       sire:       vater.trim()   || null,
       dam:        mutter.trim()  || null,
       kennel:     zwinger.trim() || null,
-      discipline:       sparte.trim()    || null,
-      level:            stufe.trim()     || null,
-      best_score:       bestwert.trim()  || null,
+      discipline:       disciplineToStored(sparte),
       color:            farbe.trim()     || null,
       microchip_number: mikrochip.trim() || null,
       // tasso_registered bleibt als Legacy-Spalte erhalten, wird aber nicht mehr
@@ -384,9 +378,7 @@ export default function HundBearbeitenScreen() {
 
           <Text style={s.gruppeLabel}>{t('dog.sport')}</Text>
           <View style={s.felder}>
-            <ChipSelect label={t('dog.discipline')} options={DOG_DISCIPLINES} value={sparte} onChange={setSparte} />
-            <ChipSelect label={t('dog.level')} options={DOG_LEVELS} value={stufe} onChange={setStufe} />
-            <Input label={t('dog.bestScore')} placeholder={t('dog.bestScorePlaceholder')} value={bestwert} onChangeText={setBestwert} />
+            <DisciplinePicker value={sparte} onChange={setSparte} />
           </View>
 
           <Text style={s.gruppeLabel}>{t('dog.identity')}</Text>

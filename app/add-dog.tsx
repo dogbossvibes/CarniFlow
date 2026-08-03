@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/Input';
 import { DateField } from '@/components/ui/DateField';
 import { toISODate } from '@/features/dogs/dateInput';
 import { addDog } from '@/services/dogs';
-import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
+import { DisciplinePicker, disciplineToStored } from '@/components/dogs/DisciplinePicker';
 import { OfficialRegistrySection } from '@/components/dogs/OfficialRegistrySection';
 import { draftToColumns, validateRegistry, EMPTY_REGISTRY_DRAFT, type RegistryDraft } from '@/features/dogs/registry';
 import { uploadDogImage } from '@/services/storage';
@@ -51,8 +51,6 @@ export default function HundHinzufuegenScreen() {
   const [mutter,      setMutter]      = useState('');
   const [zwinger,     setZwinger]     = useState('');
   const [sparte,      setSparte]      = useState('');
-  const [stufe,       setStufe]       = useState('');
-  const [bestwert,    setBestwert]    = useState('');
   const [farbe,       setFarbe]       = useState('');
   const [mikrochip,   setMikrochip]   = useState('');
   const [registry,    setRegistry]    = useState<RegistryDraft>(EMPTY_REGISTRY_DRAFT);
@@ -135,9 +133,7 @@ export default function HundHinzufuegenScreen() {
       sire:       vater.trim()   || null,
       dam:        mutter.trim()  || null,
       kennel:     zwinger.trim() || null,
-      discipline:       sparte.trim()    || null,
-      level:            stufe.trim()     || null,
-      best_score:       bestwert.trim()  || null,
+      discipline:       disciplineToStored(sparte),
       color:            farbe.trim()     || null,
       microchip_number: mikrochip.trim() || null,
       tasso_registered: false,   // Legacy-Spalte: bei neuen Hunden nicht mehr aktiv genutzt
@@ -331,9 +327,7 @@ export default function HundHinzufuegenScreen() {
 
           <Text style={s.gruppeLabel}>{t('dog.sport')}</Text>
           <View style={s.felder}>
-            <ChipSelect label={t('dog.discipline')} options={DOG_DISCIPLINES} value={sparte} onChange={setSparte} />
-            <ChipSelect label={t('dog.level')} options={DOG_LEVELS} value={stufe} onChange={setStufe} />
-            <Input label={t('dog.bestScore')} placeholder={t('dog.bestScorePlaceholder')} value={bestwert} onChangeText={setBestwert} />
+            <DisciplinePicker value={sparte} onChange={setSparte} />
           </View>
 
           <Text style={s.gruppeLabel}>{t('dog.identity')}</Text>
