@@ -83,7 +83,7 @@ export default function DogBackpackScreen() {
   };
   const onDelete = (it: DogBackpackItem) => {
     setActionItem(null);
-    Alert.alert(t('backpack.deleteTitle'), t('backpack.deleteBody', { label: it.label }), [
+    Alert.alert(t('backpack.deleteTitle'), t('backpack.deleteConfirmBody', { label: it.label }), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('backpack.delete'), style: 'destructive', onPress: async () => {
         if (!userId || !dogId) return;
@@ -227,7 +227,7 @@ export default function DogBackpackScreen() {
           {/* INAKTIV */}
           {inactive.length > 0 ? (
             <>
-              <Text style={s.section}>{t('backpack.inactive')}</Text>
+              <Text style={s.section}>{t('backpack.previous')}</Text>
               {inactive.map((it, i) => renderRow(it, i, inactive))}
             </>
           ) : null}
@@ -284,7 +284,7 @@ export default function DogBackpackScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={s.action} onPress={() => onToggleActive(actionItem)} activeOpacity={0.85} accessibilityRole="button">
               <Ionicons name={actionItem.isActive ? 'archive-outline' : 'arrow-up-circle-outline'} size={19} color={C.trackText} />
-              <Text style={s.actionTxt}>{t(actionItem.isActive ? 'backpack.deactivate' : 'backpack.activate')}</Text>
+              <Text style={s.actionTxt}>{t(actionItem.isActive ? 'backpack.deactivate' : 'backpack.reactivate')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.action} onPress={() => onDelete(actionItem)} activeOpacity={0.85} accessibilityRole="button">
               <Ionicons name="trash-outline" size={19} color={C.trackDanger} />
@@ -297,6 +297,7 @@ export default function DogBackpackScreen() {
       {/* Vorschläge-Sheet */}
       <AnyvoBottomSheet visible={sugOpen} onClose={() => setSugOpen(false)} title={t('backpack.suggestions')}>
         <Text style={s.sugHint}>{t('backpack.suggestionsHint')}</Text>
+        <Text style={s.sheetSection}>{t('backpack.suggestions')}</Text>
         <View style={s.groupTabs}>
           {SUGGESTION_GROUPS.map(g => {
             const on = sugGroup === g.discipline;
@@ -308,6 +309,19 @@ export default function DogBackpackScreen() {
             );
           })}
         </View>
+        {inactive.length > 0 ? (
+          <View style={s.previousBlock}>
+            <Text style={s.sheetSection}>{t('backpack.previous')}</Text>
+            {inactive.map(it => (
+              <TouchableOpacity key={it.id} style={s.previousRow} onPress={() => onToggleActive(it)} accessibilityRole="button">
+                <Text style={s.previousLabel}>{it.label}</Text>
+                <Text style={s.reactivateText}>{t('backpack.reactivate')}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
+        <Text style={s.sheetSection}>{t('backpack.ownItem')}</Text>
+        <AnyvoButton label={t('backpack.addItem')} icon="add" variant="secondary" onPress={() => { setSugOpen(false); openAdd(); }} />
         <View style={s.chips}>
           {getSuggestions(sugGroup).map(sug => {
             const key = `${sugGroup}:${sug.label}`;
@@ -345,6 +359,11 @@ const s = StyleSheet.create({
   resetTxt:  { fontSize: 12.5, color: C.trackPrimary, fontWeight: '800' },
 
   section:   { fontSize: 11, color: C.trackTextMut, fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 8, marginBottom: 2 },
+  sheetSection: { fontSize: 11, color: C.trackTextMut, fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase', marginTop: 12, marginBottom: 8 },
+  previousBlock: { marginTop: 4 },
+  previousRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.trackBorder },
+  previousLabel: { color: C.trackText, fontSize: 14, fontWeight: '700' },
+  reactivateText: { color: C.trackPrimary, fontSize: 12, fontWeight: '800' },
   row:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 12, paddingVertical: 11 },
   check:     { width: 26, height: 26, borderRadius: 8, borderWidth: 1.5, borderColor: C.trackBorder, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   checkOn:   { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary },

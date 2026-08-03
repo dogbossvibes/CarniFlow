@@ -13,6 +13,7 @@ import { useFeedDelete } from "@/hooks/useFeedDelete";
 import type { FeedItem } from "@/services/trainingFeed";
 import { useHomeScreenConfig, visibleWidgets, type HomeWidgetId } from "@/stores/homeScreenConfig";
 import { QuickActionsWidget } from "@/components/home/QuickActionsWidget";
+import { DogBackpackWidget } from "@/components/home/DogBackpackWidget";
 import { HelpButton } from "@/components/help/HelpButton";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { HomeTimelineCard } from "@/components/calendar/HomeTimelineCard";
@@ -129,6 +130,7 @@ export default function HomeScreen() {
             key={id}
             actions={config.quickActions}
             layout={config.layout}
+            dogs={dogs}
           />
         );
       case "recent_sessions":
@@ -183,6 +185,24 @@ export default function HomeScreen() {
             )}
           </View>
         );
+      case "dog_backpack": {
+        const widgetConfig = config.widgetConfigs?.find(item => item.widgetId === 'dog_backpack');
+        const dog = widgetConfig?.dogId ? dogs.find(item => item.id === widgetConfig.dogId) : undefined;
+        return (
+          <DogBackpackWidget
+            key={id}
+            userId={user?.id}
+            dogId={widgetConfig?.dogId}
+            dogName={dog?.name}
+            layout={config.layout}
+            onConfigure={() => router.push('/home-customize')}
+            onOpen={() => {
+              if (!dog) return;
+              router.push({ pathname: '/dog-backpack/[id]', params: { id: dog.id, name: dog.name } } as never);
+            }}
+          />
+        );
+      }
       default:
         return null; // unbekannte/veraltete Widget-ID → still überspringen
     }

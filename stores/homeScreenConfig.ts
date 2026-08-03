@@ -9,19 +9,34 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ──────────────────────────────────────────────────────────────────────────
 
 export type HomeLayoutMode   = 'grid' | 'list' | 'compact';
-export type HomeWidgetId      = 'week' | 'smart_analysis' | 'quick_actions' | 'recent_sessions' | 'dogs';
-export type HomeQuickActionId = 'add_dog' | 'start_timer' | 'track_gps' | 'lay_track' | 'document_training' | 'start_obedience' | 'show_analysis' | 'training_journal';
+export type HomeWidgetId      = 'week' | 'smart_analysis' | 'quick_actions' | 'recent_sessions' | 'dogs' | 'dog_backpack';
+export type HomeQuickActionId = 'add_dog' | 'start_timer' | 'track_gps' | 'lay_track' | 'document_training' | 'start_obedience' | 'show_analysis' | 'training_journal' | 'dog_backpack';
+
+export type HomeQuickActionConfig = {
+  instanceId: string;
+  actionId: HomeQuickActionId;
+  dogId?: string;
+};
+
+export type HomeQuickActionEntry = HomeQuickActionId | HomeQuickActionConfig;
+
+export type HomeWidgetConfig = {
+  instanceId: string;
+  widgetId: HomeWidgetId;
+  dogId?: string;
+};
 
 export interface HomeScreenConfig {
   layout:        HomeLayoutMode;
-  quickActions:  HomeQuickActionId[];   // sichtbar auf dem Startscreen (Reihenfolge = Anzeige)
+  quickActions:  HomeQuickActionEntry[]; // sichtbar; Strings bleiben legacy-kompatibel
   widgetOrder:   HomeWidgetId[];        // Reihenfolge aller Widgets
   hiddenWidgets: HomeWidgetId[];        // ausgeblendete Widgets
+  widgetConfigs?: HomeWidgetConfig[];   // optionale Parameter für instanzierte Widgets
 }
 
 export const HOME_LAYOUT_MODES: HomeLayoutMode[]   = ['grid', 'list', 'compact'];
-export const ALL_HOME_WIDGETS: HomeWidgetId[]       = ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs'];
-export const ALL_QUICK_ACTIONS: HomeQuickActionId[] = ['add_dog', 'start_timer', 'track_gps', 'lay_track', 'document_training', 'start_obedience', 'show_analysis', 'training_journal'];
+export const ALL_HOME_WIDGETS: HomeWidgetId[]       = ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs', 'dog_backpack'];
+export const ALL_QUICK_ACTIONS: HomeQuickActionId[] = ['add_dog', 'start_timer', 'track_gps', 'lay_track', 'document_training', 'start_obedience', 'show_analysis', 'training_journal', 'dog_backpack'];
 export const MAX_QUICK_ACTIONS = 6;
 
 // Metadaten-Registry (Label/Icon/Route) — eine Quelle, keine duplizierten switches.
@@ -36,6 +51,7 @@ export const HOME_QUICK_ACTIONS_META: Record<HomeQuickActionId, { label: string;
   start_obedience:   { label: 'Unterordnung',    icon: 'ribbon-outline',      route: '/unit/start' },
   show_analysis:     { label: 'Analyse',         icon: 'sparkles-outline',    route: '/analyse/insights' },
   training_journal:  { label: 'Journal',         icon: 'book-outline',        route: '/training-journal' },
+  dog_backpack:     { label: 'Backpack',         icon: 'bag-handle-outline',   route: '/dog-backpack/[id]' },
 };
 
 export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: string; description: string }> = {
@@ -44,6 +60,7 @@ export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: stri
   quick_actions:   { label: 'Schnell starten',  icon: 'flash-outline',    description: 'Deine Schnellzugriffe' },
   recent_sessions: { label: 'Letzte Einheiten', icon: 'time-outline',     description: 'Zuletzt erfasste Einheiten' },
   dogs:            { label: 'Meine Hunde',       icon: 'paw-outline',      description: 'Übersicht deiner Hunde' },
+  dog_backpack:    { label: 'Backpack',           icon: 'bag-handle-outline', description: 'Rucksack eines Hundes' },
 };
 
 // Default: sinnvoll ohne Benutzeraktion. Schnellzugriffe = 6 (ohne „Analyse";
@@ -51,8 +68,9 @@ export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: stri
 export const DEFAULT_HOME_CONFIG: HomeScreenConfig = {
   layout:        'grid',
   quickActions:  ['add_dog', 'start_timer', 'track_gps', 'document_training', 'lay_track', 'start_obedience'],
-  widgetOrder:   ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs'],
+  widgetOrder:   ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs', 'dog_backpack'],
   hiddenWidgets: [],
+  widgetConfigs: [],
 };
 
 // ── Reine Helfer (testbar) ──────────────────────────────────────────────────
@@ -70,16 +88,61 @@ export function sanitizeHomeScreenConfig(raw: unknown): HomeScreenConfig {
     return out;
   };
 
-  let quickActions = dedupeValid<HomeQuickActionId>(r.quickActions, ALL_QUICK_ACTIONS);
+  let quickActions: HomeQuickActionEntry[] = [];
+  const usedActionIds = new Set<HomeQuickActionId>();
+  const usedInstanceIds = new Set<string>();
+  if (Array.isArray(r.quickActions)) {
+    for (const entry of r.quickActions) {
+      if (typeof entry === 'string') {
+        if (!ALL_QUICK_ACTIONS.includes(entry as HomeQuickActionId) || entry === 'dog_backpack' || usedActionIds.has(entry as HomeQuickActionId)) continue;
+        usedActionIds.add(entry as HomeQuickActionId);
+        quickActions.push(entry as HomeQuickActionId);
+        continue;
+      }
+      if (!entry || typeof entry !== 'object') continue;
+      const candidate = entry as Partial<HomeQuickActionConfig>;
+      const actionId = candidate.actionId;
+      if (!ALL_QUICK_ACTIONS.includes(actionId as HomeQuickActionId)) continue;
+      if (actionId === 'dog_backpack' && (typeof candidate.dogId !== 'string' || !candidate.dogId.trim())) continue;
+      if (actionId !== 'dog_backpack' && usedActionIds.has(actionId as HomeQuickActionId)) continue;
+      const base = typeof candidate.instanceId === 'string' && candidate.instanceId.trim()
+        ? candidate.instanceId.trim() : `${actionId}-${quickActions.length + 1}`;
+      let instanceId = base;
+      let suffix = 2;
+      while (usedInstanceIds.has(instanceId)) instanceId = `${base}-${suffix++}`;
+      usedInstanceIds.add(instanceId);
+      usedActionIds.add(actionId as HomeQuickActionId);
+      quickActions.push({ instanceId, actionId: actionId as HomeQuickActionId, dogId: candidate.dogId?.trim() });
+    }
+  }
   if (quickActions.length === 0) quickActions = [...DEFAULT_HOME_CONFIG.quickActions];
-  quickActions = quickActions.slice(0, MAX_QUICK_ACTIONS);
+  const limitedQuickActions = quickActions.slice(0, MAX_QUICK_ACTIONS);
 
   const widgetOrder = dedupeValid<HomeWidgetId>(r.widgetOrder, ALL_HOME_WIDGETS);
   for (const w of ALL_HOME_WIDGETS) if (!widgetOrder.includes(w)) widgetOrder.push(w);   // neue Widgets ergänzen
 
   const hiddenWidgets = dedupeValid<HomeWidgetId>(r.hiddenWidgets, ALL_HOME_WIDGETS);
 
-  return { layout, quickActions, widgetOrder, hiddenWidgets };
+  const widgetConfigs: HomeWidgetConfig[] = [];
+  const rawWidgetConfigs = (r as Partial<HomeScreenConfig>).widgetConfigs;
+  if (Array.isArray(rawWidgetConfigs)) {
+    const usedWidgetInstances = new Set<string>();
+    for (const rawConfig of rawWidgetConfigs) {
+      if (!rawConfig || typeof rawConfig !== 'object') continue;
+      const candidate = rawConfig as Partial<HomeWidgetConfig>;
+      if (!ALL_HOME_WIDGETS.includes(candidate.widgetId as HomeWidgetId)) continue;
+      if (candidate.widgetId === 'dog_backpack' && (typeof candidate.dogId !== 'string' || !candidate.dogId.trim())) continue;
+      const base = typeof candidate.instanceId === 'string' && candidate.instanceId.trim()
+        ? candidate.instanceId.trim() : `${candidate.widgetId}-${widgetConfigs.length + 1}`;
+      let instanceId = base;
+      let suffix = 2;
+      while (usedWidgetInstances.has(instanceId)) instanceId = `${base}-${suffix++}`;
+      usedWidgetInstances.add(instanceId);
+      widgetConfigs.push({ instanceId, widgetId: candidate.widgetId as HomeWidgetId, dogId: candidate.dogId?.trim() });
+    }
+  }
+
+  return { layout, quickActions: limitedQuickActions, widgetOrder, hiddenWidgets, widgetConfigs };
 }
 
 // Element in einem Array verschieben (dir: -1 hoch, +1 runter). Reiner Helfer.
@@ -92,10 +155,30 @@ export function moveInArray<T>(arr: T[], index: number, dir: -1 | 1): T[] {
 }
 
 // Schnellaktion an-/abwählen (max. MAX_QUICK_ACTIONS aktiv).
+export function actionIdOf(entry: HomeQuickActionEntry): HomeQuickActionId {
+  return typeof entry === 'string' ? entry : entry.actionId;
+}
+
 export function toggleQuickAction(cfg: HomeScreenConfig, id: HomeQuickActionId): HomeScreenConfig {
-  if (cfg.quickActions.includes(id)) return { ...cfg, quickActions: cfg.quickActions.filter(a => a !== id) };
+  if (cfg.quickActions.some(a => actionIdOf(a) === id)) return { ...cfg, quickActions: cfg.quickActions.filter(a => actionIdOf(a) !== id) };
   if (cfg.quickActions.length >= MAX_QUICK_ACTIONS) return cfg;   // blockiert bei 6
   return { ...cfg, quickActions: [...cfg.quickActions, id] };
+}
+
+export function addDogBackpackQuickAction(cfg: HomeScreenConfig, dogId: string): HomeScreenConfig {
+  const normalizedDogId = dogId.trim();
+  if (!normalizedDogId || cfg.quickActions.length >= MAX_QUICK_ACTIONS) return cfg;
+  const instanceId = `dog_backpack-${normalizedDogId}-${Date.now()}`;
+  return {
+    ...cfg,
+    quickActions: [...cfg.quickActions, { instanceId, actionId: 'dog_backpack', dogId: normalizedDogId }],
+  };
+}
+
+export function updateWidgetConfig(cfg: HomeScreenConfig, next: HomeWidgetConfig): HomeScreenConfig {
+  const current = cfg.widgetConfigs ?? [];
+  const filtered = current.filter(item => item.instanceId !== next.instanceId);
+  return { ...cfg, widgetConfigs: [...filtered, next] };
 }
 
 // Widget ein-/ausblenden.

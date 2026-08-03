@@ -4,6 +4,8 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 import {
   ALL_HOME_WIDGETS,
   ALL_QUICK_ACTIONS,
+  addDogBackpackQuickAction,
+  actionIdOf,
   DEFAULT_HOME_CONFIG,
   HOME_LAYOUT_MODES,
   MAX_QUICK_ACTIONS,
@@ -119,5 +121,51 @@ describe('homeScreenConfig — Startbildschirm-Konfiguration', () => {
   // 7) Reset entspricht Default (idempotent über Sanitizer)
   it('7) sanitize(DEFAULT) bleibt Default (Reset-Grundlage)', () => {
     expect(sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG })).toEqual(DEFAULT_HOME_CONFIG);
+  });
+
+  it('22) Backpack-Schnellaktion speichert die dogs.id', () => {
+    const out = addDogBackpackQuickAction({ ...DEFAULT_HOME_CONFIG, quickActions: DEFAULT_HOME_CONFIG.quickActions.slice(0, 5) }, 'dog-sam');
+    expect(out.quickActions).toHaveLength(6);
+    const entry = out.quickActions.find(item => actionIdOf(item) === 'dog_backpack');
+    expect(entry).toMatchObject({ actionId: 'dog_backpack', dogId: 'dog-sam' });
+  });
+
+  it('23) Backpack-Instanzen bleiben für mehrere Hunde getrennt', () => {
+    const raw = {
+      ...DEFAULT_HOME_CONFIG,
+      quickActions: [
+        { instanceId: 'sam', actionId: 'dog_backpack', dogId: 'sam-id' },
+        { instanceId: 'malu', actionId: 'dog_backpack', dogId: 'malu-id' },
+      ],
+      widgetConfigs: [{ instanceId: 'backpack-widget', widgetId: 'dog_backpack', dogId: 'sam-id' }],
+    };
+    const out = sanitizeHomeScreenConfig(raw);
+    expect(out.quickActions).toEqual([
+      { instanceId: 'sam', actionId: 'dog_backpack', dogId: 'sam-id' },
+      { instanceId: 'malu', actionId: 'dog_backpack', dogId: 'malu-id' },
+    ]);
+    expect(out.widgetConfigs).toEqual(raw.widgetConfigs);
+  });
+
+  it('24) ungültige Backpack-Config wird ohne Hund-ID verworfen', () => {
+    const out = sanitizeHomeScreenConfig({
+      ...DEFAULT_HOME_CONFIG,
+      quickActions: [{ instanceId: 'broken', actionId: 'dog_backpack' }],
+      widgetConfigs: [{ instanceId: 'broken-widget', widgetId: 'dog_backpack' }],
+    });
+    expect(out.quickActions).not.toContainEqual(expect.objectContaining({ actionId: 'dog_backpack' }));
+    expect(out.widgetConfigs).toEqual([]);
+  });
+
+  it('25) doppelte Instanz-IDs werden repariert', () => {
+    const out = sanitizeHomeScreenConfig({
+      ...DEFAULT_HOME_CONFIG,
+      quickActions: [
+        { instanceId: 'same', actionId: 'dog_backpack', dogId: 'sam-id' },
+        { instanceId: 'same', actionId: 'dog_backpack', dogId: 'malu-id' },
+      ],
+    });
+    const entries = out.quickActions.filter(item => typeof item !== 'string');
+    expect(new Set(entries.map(item => typeof item === 'string' ? item : item.instanceId)).size).toBe(2);
   });
 });

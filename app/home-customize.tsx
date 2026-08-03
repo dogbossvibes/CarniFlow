@@ -7,19 +7,25 @@ import {
   HOME_WIDGETS_META,
   ALL_QUICK_ACTIONS,
   MAX_QUICK_ACTIONS,
+  actionIdOf,
+  addDogBackpackQuickAction,
   moveInArray,
   resetHomeScreenConfig,
   setHomeScreenConfig,
   setWidgetVisible,
   toggleQuickAction,
+  updateWidgetConfig,
   useHomeScreenConfig,
   visibleWidgets,
   type HomeLayoutMode,
   type HomeQuickActionId,
+  type HomeScreenConfig,
   type HomeWidgetId,
 } from '@/stores/homeScreenConfig';
+import { useDogs } from '@/hooks/useDogs';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useT, type TranslationKey } from '@/i18n';
 import {
   Alert, ScrollView, StyleSheet, Switch, Text,
   TouchableOpacity, View,
@@ -28,13 +34,51 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
+const LAYOUT_LABEL_KEY: Record<HomeLayoutMode, TranslationKey> = {
+  grid: 'home.layoutGrid',
+  list: 'home.layoutList',
+  compact: 'home.layoutCompact',
+};
+
+const QUICK_ACTION_LABEL_KEY: Record<HomeQuickActionId, TranslationKey> = {
+  add_dog: 'home.actionAddDog',
+  start_timer: 'home.actionStartTimer',
+  track_gps: 'home.actionTrackGps',
+  lay_track: 'home.actionLayTrack',
+  document_training: 'home.actionDocumentTraining',
+  start_obedience: 'home.actionStartObedience',
+  show_analysis: 'home.actionShowAnalysis',
+  training_journal: 'home.actionTrainingJournal',
+  dog_backpack: 'home.actionDogBackpack',
+};
+
+const WIDGET_LABEL_KEY: Record<HomeWidgetId, TranslationKey> = {
+  week: 'home.widgetWeek',
+  smart_analysis: 'home.widgetSmartAnalysis',
+  quick_actions: 'home.widgetQuickActions',
+  recent_sessions: 'home.widgetRecentSessions',
+  dogs: 'home.widgetDogs',
+  dog_backpack: 'home.widgetDogBackpack',
+};
+
+const WIDGET_DESC_KEY: Record<HomeWidgetId, TranslationKey> = {
+  week: 'home.widgetWeekDesc',
+  smart_analysis: 'home.widgetSmartAnalysisDesc',
+  quick_actions: 'home.widgetQuickActionsDesc',
+  recent_sessions: 'home.widgetRecentSessionsDesc',
+  dogs: 'home.widgetDogsDesc',
+  dog_backpack: 'home.widgetDogBackpackDesc',
+};
+
 export default function HomeCustomizeScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { user } = useSession();
+  const { dogs } = useDogs();
   const config = useHomeScreenConfig(user?.id);
 
   const activeActions = config.quickActions;
-  const inactiveActions = ALL_QUICK_ACTIONS.filter((a) => !activeActions.includes(a));
+  const inactiveActions = ALL_QUICK_ACTIONS.filter((a) => a !== 'dog_backpack' && !activeActions.some(entry => actionIdOf(entry) === a));
   const atMax = activeActions.length >= MAX_QUICK_ACTIONS;
 
   // ── Aktionen ──
@@ -47,11 +91,21 @@ export default function HomeCustomizeScreen() {
   const toggleWidget = (id: HomeWidgetId, visible: boolean) =>
     setHomeScreenConfig(setWidgetVisible(config, id, visible));
 
-  const moveAction = (id: HomeQuickActionId, dir: -1 | 1) => {
-    const idx = config.quickActions.indexOf(id);
+  const moveAction = (entry: HomeScreenConfig['quickActions'][number], dir: -1 | 1) => {
+    const idx = config.quickActions.indexOf(entry);
     setHomeScreenConfig({ ...config, quickActions: moveInArray(config.quickActions, idx, dir) });
   };
-  const toggleAction = (id: HomeQuickActionId) => setHomeScreenConfig(toggleQuickAction(config, id));
+  const toggleAction = (entry: HomeScreenConfig['quickActions'][number]) => {
+    if (typeof entry !== 'string') {
+      setHomeScreenConfig({ ...config, quickActions: config.quickActions.filter(item => typeof item === 'string' || item.instanceId !== entry.instanceId) });
+      return;
+    }
+    setHomeScreenConfig(toggleQuickAction(config, entry));
+  };
+  const addDogBackpack = (dogId: string) => setHomeScreenConfig(addDogBackpackQuickAction(config, dogId));
+  const setBackpackWidgetDog = (dogId: string) => setHomeScreenConfig(updateWidgetConfig(config, {
+    instanceId: 'dog_backpack-widget', widgetId: 'dog_backpack', dogId,
+  }));
 
   const onReset = () => {
     Alert.alert(
@@ -153,6 +207,26 @@ export default function HomeCustomizeScreen() {
                   thumbColor={C.white}
                   accessibilityLabel={`Widget ${meta.label}`}
                 />
+                {id === 'dog_backpack' && (
+                  <View style={s.dogSelector}>
+                    <Text style={s.zeileSub}>{t('home.selectDog')}</Text>
+                    {dogs.map(dog => {
+                      const selected = config.widgetConfigs?.some(item => item.widgetId === 'dog_backpack' && item.dogId === dog.id);
+                      return (
+                        <TouchableOpacity
+                          key={dog.id}
+                          style={[s.dogOption, selected && s.dogOptionActive]}
+                          onPress={() => setBackpackWidgetDog(dog.id)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected }}
+                        >
+                          <Text style={s.dogOptionText}>{dog.name}</Text>
+                          {selected && <Ionicons name="checkmark" size={16} color={C.accent} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             );
           })}
@@ -166,13 +240,17 @@ export default function HomeCustomizeScreen() {
 
         {/* Aktive (mit Reihenfolge) */}
         <View style={s.karte}>
-          {activeActions.map((id, i) => {
+          {activeActions.map((entry, i) => {
+            const id = actionIdOf(entry);
             const meta = HOME_QUICK_ACTIONS_META[id];
+            const dog = typeof entry !== 'string' && entry.dogId ? dogs.find(item => item.id === entry.dogId) : undefined;
+            const label = id === 'dog_backpack' ? (dog ? t('backpack.ownTitle', { name: dog.name }) : t('home.dogUnavailable')) : t(QUICK_ACTION_LABEL_KEY[id]);
+            const entryKey = typeof entry === 'string' ? entry : entry.instanceId;
             return (
-              <View key={id} style={[s.zeile, i < activeActions.length - 1 && s.zeileTrenner]}>
+              <View key={entryKey} style={[s.zeile, i < activeActions.length - 1 && s.zeileTrenner]}>
                 <View style={s.reorder}>
                   <TouchableOpacity
-                    onPress={() => moveAction(id, -1)}
+                    onPress={() => moveAction(entry, -1)}
                     disabled={i === 0}
                     hitSlop={8}
                     accessibilityRole="button"
@@ -181,7 +259,7 @@ export default function HomeCustomizeScreen() {
                     <Ionicons name="chevron-up" size={18} color={i === 0 ? C.border : C.muted} />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => moveAction(id, 1)}
+                    onPress={() => moveAction(entry, 1)}
                     disabled={i === activeActions.length - 1}
                     hitSlop={8}
                     accessibilityRole="button"
@@ -196,10 +274,10 @@ export default function HomeCustomizeScreen() {
                 <Text style={[s.zeileLabel, { flex: 1 }]}>{meta.label}</Text>
                 <Switch
                   value
-                  onValueChange={() => toggleAction(id)}
+                  onValueChange={() => toggleAction(entry)}
                   trackColor={{ false: C.cardAlt, true: C.accent }}
                   thumbColor={C.white}
-                  accessibilityLabel={`Schnellzugriff ${meta.label}`}
+                  accessibilityLabel={t('home.quickActionLabel', { label })}
                 />
               </View>
             );
@@ -258,6 +336,7 @@ export default function HomeCustomizeScreen() {
 // Kompakte Live-Vorschau: zeigt sichtbare Widgets in Reihenfolge; das Widget
 // „Schnell starten" zeigt die aktiven Aktionen im gewählten Layout an.
 function HomePreview({ config }: { config: ReturnType<typeof useHomeScreenConfig> }) {
+  const { t } = useT();
   const widgets = visibleWidgets(config);
   return (
     <View style={s.preview}>
@@ -272,21 +351,21 @@ function HomePreview({ config }: { config: ReturnType<typeof useHomeScreenConfig
           if (id === 'quick_actions') {
             return (
               <View key={id} style={s.previewBlock}>
-                <Text style={s.previewLabel}>Schnell starten</Text>
+                <Text style={s.previewLabel}>{t('home.quickStart')}</Text>
                 <View style={config.layout === 'list' ? s.previewList : s.previewGrid}>
                   {config.quickActions.map((a) => (
                     <View
-                      key={a}
+                      key={typeof a === 'string' ? a : a.instanceId}
                       style={[
                         s.previewChip,
                         config.layout === 'list' && s.previewChipList,
                         config.layout === 'compact' && s.previewChipCompact,
                       ]}
                     >
-                      <Ionicons name={HOME_QUICK_ACTIONS_META[a].icon as IconName} size={12} color={C.accent} />
+                      <Ionicons name={HOME_QUICK_ACTIONS_META[actionIdOf(a)].icon as IconName} size={12} color={C.accent} />
                       {config.layout === 'list' && (
                         <Text style={s.previewChipText} numberOfLines={1}>
-                          {HOME_QUICK_ACTIONS_META[a].label}
+                          {t(QUICK_ACTION_LABEL_KEY[actionIdOf(a)])}
                         </Text>
                       )}
                     </View>
@@ -388,4 +467,9 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: C.danger,
   },
   resetText: { fontSize: 15, color: C.danger, fontWeight: '700' },
+  dogSelector: { width: '100%', marginTop: 10, gap: 6 },
+  dogOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: C.cardAlt },
+  dogOptionActive: { borderWidth: 1, borderColor: C.accent },
+  dogOptionText: { color: C.white, fontSize: 13, fontWeight: '700' },
+  dogActionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
 });

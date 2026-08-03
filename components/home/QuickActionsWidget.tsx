@@ -2,14 +2,29 @@ import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { C } from '@/constants/colors';
 import {
   HOME_QUICK_ACTIONS_META,
+  actionIdOf,
   type HomeLayoutMode,
+  type HomeQuickActionEntry,
   type HomeQuickActionId,
 } from '@/stores/homeScreenConfig';
+import { useT, type TranslationKey } from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+const QUICK_ACTION_LABEL_KEY: Record<HomeQuickActionId, TranslationKey> = {
+  add_dog: 'home.actionAddDog',
+  start_timer: 'home.actionStartTimer',
+  track_gps: 'home.actionTrackGps',
+  lay_track: 'home.actionLayTrack',
+  document_training: 'home.actionDocumentTraining',
+  start_obedience: 'home.actionStartObedience',
+  show_analysis: 'home.actionShowAnalysis',
+  training_journal: 'home.actionTrainingJournal',
+  dog_backpack: 'home.actionDogBackpack',
+};
 
 // Schnellzugriffe-Widget: rendert die konfigurierten Aktionen aus der zentralen
 // Registry in einem der drei Layouts. Reine Darstellung — jede Aktion nutzt die
@@ -17,11 +32,14 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 export function QuickActionsWidget({
   actions,
   layout,
+  dogs,
 }: {
-  actions: HomeQuickActionId[];
+  actions: HomeQuickActionEntry[];
   layout: HomeLayoutMode;
+  dogs: { id: string; name: string }[];
 }) {
   const router = useRouter();
+  const { t } = useT();
   if (actions.length === 0) return null;
 
   const go = (route: string) => router.push(route as never);
@@ -33,24 +51,27 @@ export function QuickActionsWidget({
       </View>
 
       <View style={layout === 'list' ? s.listWrap : s.gridWrap}>
-        {actions.map((id) => {
+        {actions.map((entry) => {
+          const id = actionIdOf(entry);
           const meta = HOME_QUICK_ACTIONS_META[id];
           if (!meta) return null; // unbekannte/veraltete ID → still überspringen (kein Crash)
+          const label = t(QUICK_ACTION_LABEL_KEY[id]);
+          const instanceId = typeof entry === 'string' ? entry : entry.instanceId;
 
           if (layout === 'list') {
             return (
               <AnimatedPressable
-                key={id}
+                key={instanceId}
                 style={s.listRow}
                 scale={0.98}
-                onPress={() => go(meta.route)}
+                onPress={() => go(entry)}
                 accessibilityRole="button"
-                accessibilityLabel={meta.label}
+                accessibilityLabel={label}
               >
                 <View style={s.listIcon}>
                   <Ionicons name={meta.icon as IconName} size={22} color={C.accent} />
                 </View>
-                <Text style={s.listLabel} numberOfLines={1}>{meta.label}</Text>
+                <Text style={s.listLabel} numberOfLines={1}>{label}</Text>
                 <Ionicons name="chevron-forward" size={18} color={C.muted} />
               </AnimatedPressable>
             );
@@ -60,19 +81,19 @@ export function QuickActionsWidget({
           const compact = layout === 'compact';
           return (
             <AnimatedPressable
-              key={id}
+              key={instanceId}
               style={[s.tile, compact ? s.tileCompact : s.tileGrid]}
               scale={0.96}
-              onPress={() => go(meta.route)}
+              onPress={() => go(entry)}
               accessibilityRole="button"
-              accessibilityLabel={meta.label}
+              accessibilityLabel={label}
             >
               <Ionicons name={meta.icon as IconName} size={compact ? 20 : 24} color={C.accent} />
               <Text
                 style={[s.tileLabel, compact && s.tileLabelCompact]}
                 numberOfLines={2}
               >
-                {meta.label}
+                {label}
               </Text>
             </AnimatedPressable>
           );
