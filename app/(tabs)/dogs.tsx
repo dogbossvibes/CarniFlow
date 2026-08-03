@@ -7,7 +7,8 @@ import { reportScroll } from "@/stores/liveBarScroll";
 import { C } from "@/constants/colors";
 import { useT } from "@/i18n";
 import { useDogs } from "@/hooks/useDogs";
-import { usePlan } from "@/hooks/usePlan";
+import { useCapabilities } from "@/hooks/useCapabilities";
+import { quotaAllowsNew } from "@/features/subscription/plans";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -26,10 +27,15 @@ export default function HundeScreen() {
   const router = useRouter();
   const { t } = useT();
   const { dogs, loading, error, refresh } = useDogs();
-  const { isPremium } = usePlan();
+  const { isPro, loading: capLoading } = useCapabilities();
 
   const handleHinzufuegen = () => {
-    if (!isPremium && dogs.length >= 1) {
+    // Autoritatives Gate wie in /add-dog: useCapabilities().isPro (inkl. Lifetime)
+    // + zentrale Quota-Regel. Nur bei tatsächlich erreichtem Hundelimit den
+    // bestehenden Upgrade-Flow zeigen; sonst direkt zum Anlege-Flow. Solange die
+    // Capabilities noch laden, nicht vorschnell blocken — /add-dog + Server gaten
+    // ohnehin autoritativ.
+    if (!capLoading && !quotaAllowsNew(isPro, "dog", dogs.length)) {
       router.push("/premium");
       return;
     }
