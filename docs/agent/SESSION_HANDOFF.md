@@ -10,17 +10,15 @@
 
 <!-- AUTO-GENERATED:START -->
 
-Generated: 2026-08-02T19:52:17.610Z
-Agent: unknown
+Generated: 2026-08-03T12:54:21.445Z
+Agent: claude
 Branch: feat/track-module-rewrite
 
 ### Git status
 ```
 M AI_HANDOFF.md
- M app/(tabs)/analytics.tsx
  M app/(tabs)/home.tsx
  M app/(tabs)/profile.tsx
- M app/dog/[id].tsx
  M app/home-customize.tsx
  M app/index.tsx
  M app/sync.tsx
@@ -33,17 +31,18 @@ M AI_HANDOFF.md
  M components/AppLockGate.tsx
  M components/dogs/DogHeatCard.tsx
  M components/dogs/DogQuickActions.tsx
- M components/dogs/types.ts
  M components/home/QuickActionsWidget.tsx
  M components/tracking/GpsSourcePicker.tsx
  M docs/adr/ADR-001_Domain_Model.md
+ M docs/agent/CURRENT_STATE.md
+ M docs/agent/DECISIONS.md
+ M docs/agent/SESSION_HANDOFF.md
+ M docs/agent/TASKS.md
+ M docs/agent/WORK_LOG.md
  M features/connect/components/ConnectIdentitySelector.tsx
  M features/connect/components/ConnectStates.tsx
  M features/connect/screens/ConnectHomeScreen.tsx
  M features/connect/services/connect-entitlements.ts
- M features/dogs/DogHubScreen.tsx
- M features/dogs/buildDogHubVM.ts
- M features/dogs/demoDogs.ts
  M features/tracking/components/ActiveFaehrteCard.tsx
  M features/tracking/components/MarkerBottomSheet.tsx
  M features/tracking/components/TrackStatsPanel.tsx
@@ -51,7 +50,6 @@ M AI_HANDOFF.md
  M i18n/gsw-CH.ts
  M i18n/locales/fr.ts
  M legal-web/index.html
- M stores/homeScreenConfig.ts
 ?? .claude/development.code-workspace
 ?? ANYVO-current-repository.zip
 ?? STAGING_DEPLOY_RUN.sql
@@ -60,17 +58,13 @@ M AI_HANDOFF.md
 ?? after_bottomnav_galaxyS23_gesture.png
 ?? after_bottomnav_tablet_3button.png
 ?? after_bottomnav_tablet_gesture.png
-?? app/training-journal.tsx
 ?? artifacts/
 ?? assets/images/11GSLOGODSC4449.jpg
 ?? assets/images/Malu13.jpg
 ?? assets/images/bazooka.jpg
 ?? canisflow.code-workspace
-?? components/dogs/DogAppointmentsCard.tsx
-?? components/dogs/DogRecentCard.tsx
-?? components/dogs/DogStatusTiles.tsx
-?? components/dogs/DogTodayCard.tsx
 ?? components/dogs/__tests__/DogQuickActions.test.ts
+?? components/home/__tests__/
 ?? design_handoff_faehrten/screen3.jpg
 ?? dist-auth-android/
 ?? dist-auth-ios/
@@ -112,17 +106,11 @@ M AI_HANDOFF.md
 ?? docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
 ?? docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
 ?? "faehrten 6/design_handoff_faehrten/abriss.png"
-?? features/dogs/__tests__/dashboard.test.ts
-?? features/dogs/dashboard.ts
-?? features/training/__tests__/
-?? features/training/journal.ts
-?? i18n/__tests__/dashboard-i18n.test.ts
-?? i18n/__tests__/journal-i18n.test.ts
 ?? legal-web/assets/
 ?? legal-web/funktionen.html
 ?? legal-web/funktionen/
 ?? screen20.jpg
-?? supabase/migrations/
+?? supabase/migrations/README.md
 ?? supabase/production_public_schema_snapshot.sql
 ?? supabase/staging_p0_smoke_verify.sql
 ?? supabase/staging_public_schema_restore.sql
@@ -132,11 +120,9 @@ M AI_HANDOFF.md
 ### Diff stat
 ```
 AI_HANDOFF.md                                      |   6 +
- app/(tabs)/analytics.tsx                           |  19 +
  app/(tabs)/home.tsx                                |  12 +-
  app/(tabs)/profile.tsx                             | 116 +++---
- app/dog/[id].tsx                                   |  14 +
- app/home-customize.tsx                             | 111 +++--
+ app/home-customize.tsx                             |  88 ++--
  app/index.tsx                                      |   8 +-
  app/sync.tsx                                       |  38 +-
  app/track/kalibrierung.tsx                         |  62 +--
@@ -148,35 +134,33 @@ AI_HANDOFF.md                                      |   6 +
  components/AppLockGate.tsx                         |  14 +-
  components/dogs/DogHeatCard.tsx                    |  44 +-
  components/dogs/DogQuickActions.tsx                |  68 ++-
- components/dogs/types.ts                           |   2 +
- components/home/QuickActionsWidget.tsx             |  24 +-
+ components/home/QuickActionsWidget.tsx             |  18 +-
  components/tracking/GpsSourcePicker.tsx            |  22 +-
  docs/adr/ADR-001_Domain_Model.md                   | 416 +++++++++++++++++++
+ docs/agent/CURRENT_STATE.md                        |  35 +-
+ docs/agent/DECISIONS.md                            |  25 ++
+ docs/agent/SESSION_HANDOFF.md                      | 308 +++++++-------
+ docs/agent/TASKS.md                                |  41 +-
+ docs/agent/WORK_LOG.md                             |  69 ++++
  .../connect/components/ConnectIdentitySelector.tsx |  11 +-
  features/connect/components/ConnectStates.tsx      |   6 +-
  features/connect/screens/ConnectHomeScreen.tsx     |   2 +-
  features/connect/services/connect-entitlements.ts  |   6 +-
- features/dogs/DogHubScreen.tsx                     | 104 ++++-
- features/dogs/buildDogHubVM.ts                     |   3 +
- features/dogs/demoDogs.ts                          |   6 +
  features/tracking/components/ActiveFaehrteCard.tsx |  48 ++-
  features/tracking/components/MarkerBottomSheet.tsx |  59 +--
  features/tracking/components/TrackStatsPanel.tsx   |  10 +-
- i18n/de-CH.ts                                      |  61 +++
- i18n/gsw-CH.ts                                     |  61 +++
- i18n/locales/fr.ts                                 |  60 +++
+ i18n/de-CH.ts                                      |   5 +-
+ i18n/gsw-CH.ts                                     |   7 +-
+ i18n/locales/fr.ts                                 |   2 +
  legal-web/index.html                               | 454 ++++++++++++---------
- stores/homeScreenConfig.ts                         |   5 +-
- 36 files changed, 1504 insertions(+), 528 deletions(-)
+ 34 files changed, 1484 insertions(+), 676 deletions(-)
 ```
 
 ### Modified files
 ```
 AI_HANDOFF.md
-app/(tabs)/analytics.tsx
 app/(tabs)/home.tsx
 app/(tabs)/profile.tsx
-app/dog/[id].tsx
 app/home-customize.tsx
 app/index.tsx
 app/sync.tsx
@@ -189,17 +173,18 @@ app/unit/stats.tsx
 components/AppLockGate.tsx
 components/dogs/DogHeatCard.tsx
 components/dogs/DogQuickActions.tsx
-components/dogs/types.ts
 components/home/QuickActionsWidget.tsx
 components/tracking/GpsSourcePicker.tsx
 docs/adr/ADR-001_Domain_Model.md
+docs/agent/CURRENT_STATE.md
+docs/agent/DECISIONS.md
+docs/agent/SESSION_HANDOFF.md
+docs/agent/TASKS.md
+docs/agent/WORK_LOG.md
 features/connect/components/ConnectIdentitySelector.tsx
 features/connect/components/ConnectStates.tsx
 features/connect/screens/ConnectHomeScreen.tsx
 features/connect/services/connect-entitlements.ts
-features/dogs/DogHubScreen.tsx
-features/dogs/buildDogHubVM.ts
-features/dogs/demoDogs.ts
 features/tracking/components/ActiveFaehrteCard.tsx
 features/tracking/components/MarkerBottomSheet.tsx
 features/tracking/components/TrackStatsPanel.tsx
@@ -207,7 +192,6 @@ i18n/de-CH.ts
 i18n/gsw-CH.ts
 i18n/locales/fr.ts
 legal-web/index.html
-stores/homeScreenConfig.ts
 ```
 
 ### Untracked files
@@ -220,7 +204,6 @@ after_bottomnav_galaxyS23_3button.png
 after_bottomnav_galaxyS23_gesture.png
 after_bottomnav_tablet_3button.png
 after_bottomnav_tablet_gesture.png
-app/training-journal.tsx
 artifacts/faehrten-teilstrecken/ios/01_boot_home.png
 artifacts/faehrten-teilstrecken/ios/02_faehrten_index.png
 artifacts/faehrten-teilstrecken/ios/03_legen_teilstrecke_abriss_buttons.png
@@ -228,11 +211,8 @@ assets/images/11GSLOGODSC4449.jpg
 assets/images/Malu13.jpg
 assets/images/bazooka.jpg
 canisflow.code-workspace
-components/dogs/DogAppointmentsCard.tsx
-components/dogs/DogRecentCard.tsx
-components/dogs/DogStatusTiles.tsx
-components/dogs/DogTodayCard.tsx
 components/dogs/__tests__/DogQuickActions.test.ts
+components/home/__tests__/DogBackpackWidget.test.ts
 design_handoff_faehrten/screen3.jpg
 dist-auth-android/_expo/static/js/android/entry-9a4f5220dacd2f2900cbac6f8f9490c4.hbc
 dist-auth-android/assets/017bc6ba3fc25503e5eb5e53826d48a8
@@ -466,13 +446,6 @@ docs/architecture/P0-06_OFFLINE_TRUTH_REPORT.md
 docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
 docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
 faehrten 6/design_handoff_faehrten/abriss.png
-features/dogs/__tests__/dashboard.test.ts
-features/dogs/dashboard.ts
-features/training/__tests__/journal-sources.test.ts
-features/training/__tests__/journal.test.ts
-features/training/journal.ts
-i18n/__tests__/dashboard-i18n.test.ts
-i18n/__tests__/journal-i18n.test.ts
 legal-web/assets/images/11GSLOGODSC4449.jpg
 legal-web/assets/images/Malu13.jpg
 legal-web/assets/images/anyvologo.png
@@ -497,11 +470,11 @@ winkel.png
 
 ### Recent commits
 ```
-5f77cb4 chore(agent): refresh session handoff
-5c7bc51 chore(agent): record backpack decoupling and task state
-0434182 feat(dogs): add local backpack checklist
-8ef90fe chore(agent): align start output with task protocol
-17b05eb chore(agent): add Claude-Codex handoff infrastructure
+50ccfd2 feat(entitlements): add server-backed lifetime entitlement system
+e447cd2 feat: add dog backpack home shortcuts
+0061fed feat(dogs): add personal dashboard overview
+2a85fbc feat(training): add training journal
+92c4b97 chore(agent): refresh session handoff
 ```
 
 ### Runtime
@@ -514,85 +487,94 @@ Package manager: npm
 
 > Hinweis: Der AUTO-GENERATED-Block oben wird beim Handoff-Script aktualisiert.
 > Maßgeblich bei Widerspruch bleibt der tatsächliche Repository-Zustand.
-> Stand der manuellen Sektionen: 2026-08-02.
+> Stand der manuellen Sektionen: 2026-08-03.
 
 ## Current task
-**T-32 abgeschlossen (committed `0434182`):** Backpack vom Hunde-Dashboard entkoppelt.
-`backpackStatus` liegt jetzt in `features/dogs/backpack.ts`; `DogBackpackCard.tsx` importiert direkt aus dem
-Backpack-Modul. `features/dogs/dashboard.ts` re-exportiert die Funktion nur noch fuer bestehende Dashboard-Aufrufer.
-Keine Journal-/Dashboard-Feature-/Tracking-/Connect-/Website-/SQL-Arbeit.
+**T-34 abgeschlossen und isoliert committed (`50ccfd2`):** Server-seitig abgesichertes Entitlement-System fuer
+Sonderrechte. `lifetime` als administrativ vergebenes Produktzugriffsrecht, ohne Store-/RevenueCat-Fake, ohne Client-
+Schreibrechte und ohne parallele Abo-Architektur. Claude hat den T-34-Diff read-only reviewt und ausschliesslich die
+13 T-34-Dateien (Code + 2 Migrationen + 3 Tests + 2 Docs) gestaged/committed; kein fremder WIP mitgestaged.
 
-**T-31 abgeschlossen (uncommittet):** `npm run agent:start` an das verbindliche Startprotokoll angepasst.
-`TASKS.md` wird in der Ausgabe ausdrücklich als Aufgabenquelle genannt; `SESSION_HANDOFF.md` als letzte Übergabe.
-Keine App-/Feature-/Website-/SQL-/Build-Dateien geändert.
+**T-30 bleibt OPEN/MANUAL reserviert** fuer den manuellen Realgeräte-Abnahmetest T-25…T-29.
 
-**T-25/T-26 Backpack abgeschlossen und committed (`0434182`); T-27…T-29 weiterhin uncommittet:** Journal
-(spartenübergreifende Historie), Produktnamen-Rename (Journal/Backpack) und persönliches Hunde-Dashboard (Phase C)
-bleiben lokal uncommittet. Kein Push/Build/Submit, keine DB-Migration.
+Aktueller Commit-Stand:
+- Backpack: `0434182 feat(dogs): add local backpack checklist`
+- Journal: `2a85fbc feat(training): add training journal`
+- Dashboard: `0061fed feat(dogs): add personal dashboard overview`
+- Home-Backpack: `e447cd2 feat: add dog backpack home shortcuts`
+- Entitlement-System (T-34): `50ccfd2 feat(entitlements): add server-backed lifetime entitlement system`
+- Status: alle fünf Feature-Commits sind in HEAD committed, aber noch nicht gepusht.
+- Die beiden Entitlement-Migrationen sind committed, aber NICHT remote angewendet.
 
 ## Goal
-Hundeprofil-Erlebnis ausbauen: lokale Backpack-Packliste, ein zentrales „Journal" (Trainingshistorie über
-alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zweite Datenarchitektur und **ohne**
-Änderung bestehender Trainings-/Fährten-/Kalender-/Zyklus-/Abo-Logik.
+Sonderrechte aus Supabase additiv mit dem bestehenden Subscription-/Capability-System zusammenführen.
+`lifetime` soll alle regulären Premium-/Trainer-Produktfähigkeiten freischalten, aber keine Admin-/Debug-/
+Supportrechte und keinen Zugriff auf fremde Daten geben.
 
-## Work completed — Claude 2026-08-02 (Feature-Arbeit, verifiziert)
-- **T-25 Backpack Phase A:** `features/dogs/backpack.ts` — per-user/per-dog AsyncStorage (`dog_backpack:<userId>:<dogId>`),
-  Sanitizer/Fallback, CRUD, aktiv/inaktiv, gepackt, ↑/↓-Reorder, Reset-nur-Häkchen, Standardvorschläge (nie auto-persistiert).
-  Tests `features/dogs/__tests__/backpack.test.ts` (23).
-- **T-26 Backpack Phase B (UI):** `components/dogs/DogBackpackCard.tsx` + Verwaltungsscreen `app/dog-backpack/[id].tsx`
-  (Add/Edit/Delete, aktiv/inaktiv, gepackt, Reorder, Reset, Vorschläge mit Duplikatschutz). i18n de/gsw/fr.
-  Verdrahtet in `features/dogs/DogHubScreen.tsx` + `app/dog/[id].tsx`. Tests: `backpackSuggestions.test.ts`,
-  `components/dogs/__tests__/DogBackpackCard.test.tsx`, `i18n/__tests__/backpack-i18n.test.ts`.
-- **T-27 Journal:** `app/training-journal.tsx` + reine Logik `features/training/journal.ts` (Filter/Suche/Gruppierung/
-  Pagination) auf **bestehendem** `useTrainingFeed`/`services/trainingFeed.ts` (Single Source of Truth). Einstiege:
-  Home-Schnellaktion, Hundeprofil „Alle Trainings", Analyse-Karte. Tests `features/training/__tests__/*`, `i18n/__tests__/journal-i18n.test.ts`.
-- **T-28 Rename:** sichtbar „Trainingstagebuch"→**Journal**, „Rucksack"→**Backpack** (feste Produktnamen, NICHT lokalisiert).
-  Nur i18n-Werte + Registry-Fallback-Label; technische Keys/AsyncStorage/Typen/Dateinamen unverändert.
-- **T-29 Dashboard Phase C:** Overview-Tab in `features/dogs/DogHubScreen.tsx` neu (Heute/Termine/Läufigkeit/Ziel/
-  Backpack/Zuletzt/Status/Smart Analyse). Reine Logik `features/dogs/dashboard.ts` + Karten `DogTodayCard`,
-  `DogAppointmentsCard`, `DogRecentCard`, `DogStatusTiles`. VM additiv: `trainingsThisWeek`, `lastFaehrteLabel`
-  (`buildDogHubVM.ts`, `components/dogs/types.ts`, `demoDogs.ts`). Termine via bestehendem `getCalendarEvents`.
-  Wiederverwendung `DogHeatCard`/`DogGoalsCard`/`DogAiCoachCard`. **Kein Wetter, keine neue KI.**
-  Reports: `docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md`, `docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md`.
-- **T-31 Agent-Infrastruktur:** `scripts/agent-start.mjs` zeigt jetzt das verbindliche Startprotokoll inkl.
-  `AGENTS.md`, `CLAUDE.md`, `docs/agent/TASKS.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md`,
-  `DECISIONS.md` und `git status`. `TASKS.md` wird als verbindliche Aufgabenquelle beschrieben,
-  `SESSION_HANDOFF.md` als letzte Übergabe. Keine automatische Task-Ermittlung aus `TASKS.md`, weil die
-  aktuelle Markdown-Struktur nicht robust maschinenlesbar ist.
-- **T-32 Backpack-Entkopplung:** `backpackStatus`/`BackpackStatus` aus `features/dogs/dashboard.ts` nach
-  `features/dogs/backpack.ts` verschoben. `DogBackpackCard.tsx` hängt damit nicht mehr am Dashboard-Modul.
-  Dashboard importiert und re-exportiert die Funktion fuer bestehende Aufrufer/Tests; Statuslogik unverändert.
-  Isolierter Backpack-Commit: `0434182 feat(dogs): add local backpack checklist`.
+## Work completed — Claude 2026-08-03
+- **Übernahme read-only:** vollständiger Takeover-Bericht erstellt (Branch/HEAD, dirty state, T-34/T-30, Blocker,
+  Tests, nächster Schritt, Widersprüche). Repository-Stand deckt sich mit der Handoff-Doku; keine harten Konflikte.
+- **T-34 read-only Review:** Diffs von `plans.ts`, `entitlementService.ts`, `capabilityService.ts`,
+  `getUserAccess.ts`, `useCapabilities.ts`, `types/capabilities.ts` + beide Migrationen geprüft — in sich geschlossen,
+  keine fremden WIP-Hunks.
+- **Verifikation:** `npx tsc --noEmit` = 0 Errors; fokussierte Jest-Suites `entitlements`/`entitlementService`/
+  `lifetime-quota-migration` = 3 Suites / 19 Tests PASS; `git diff --cached --check` sauber.
+- **T-34 isoliert committed (`50ccfd2`):** exakt 13 Dateien (Code, `supabase/migrations/2026080210*.sql` +
+  `2026080211*.sql`, 3 Tests, `docs/architecture/ENTITLEMENT_SYSTEM.md`, `docs/lifetime-access.md`). Kein fremder WIP,
+  kein Push, kein Build, keine Remote-Migration.
+- **Bewusst NICHT mit-committed:** `supabase/migrations/README.md` (gehört zu P0-FIX-01 Baseline), P0-Reports, ADRs,
+  Home/Profile/Connect/Tracking/legal-web-WIP, Dumps, Artefakte, Bilder.
+- **Agent-Doku:** TASKS.md (T-34 → committed `50ccfd2`, nächste ID T-36), WORK_LOG.md und dieser Handoff aktualisiert.
+
+## Work completed — Codex 2026-08-02
+- **Analyse:** vorhandene Pfade geprüft: `features/subscription/plans.ts`, `services/capabilityService.ts`,
+  `services/entitlementService.ts`, `lib/entitlements/getUserAccess.ts`, `hooks/useCapabilities.ts`,
+  `hooks/useAccess.ts`, RevenueCat-Webhooks, Supabase-Snapshots und bestehende Subscription-Tests.
+- **Zentrale Logik:** `UserEntitlement`, aktive Entitlement-Prüfung, `resolveEffectiveCapabilities()` und
+  `hasEffectiveCapability()` in der bestehenden Subscription-/Capability-Schicht ergänzt.
+- **Service-Integration:** bestehender `entitlementService` auf neues Schema gemappt (`entitlement`, `granted_at`,
+  `expires_at`, `revoked_at`, `notes`), unbekannte Werte werden ignoriert, Fehler geben keine Rechte frei.
+- **Capability-Pfad:** `getMyCapabilities()` kombiniert bestehende `user_capabilities`/`subscriptions` additiv mit
+  Entitlements; Internal-Tester-Union bleibt danach bestehen. `useCapabilities()` gibt `hasLifetimeAccess` und
+  aktive Entitlements zusätzlich aus.
+- **Access-Anzeige:** `getUserAccess()` nutzt die neue Entitlement-Liste; Lifetime bleibt Anzeige-/Kaufbutton-Signal.
+- **Datenbank:** neue Migration `supabase/migrations/20260802100000_user_entitlements.sql` erstellt. Keine Remote-
+  Migration ausgeführt.
+- **Serverseitige Quotas:** additive Migration `supabase/migrations/20260802110000_lifetime_quota_access.sql`
+  erweitert `is_pro_member(uuid)` um aktive `lifetime`-Entitlements. Es gibt keine Spiegelung nach
+  `user_capabilities`; normale Clients können den Helper nicht mehr direkt ausführen, die Quota-RPCs bleiben die
+  öffentliche Schnittstelle.
+- **Dokumentation:** `docs/architecture/ENTITLEMENT_SYSTEM.md` erstellt; `docs/lifetime-access.md` auf neue Quelle
+  reduziert; Agent-Dokumente aktualisiert.
+- **Home-Backpack-Commit:** `e447cd2` ergänzt hundespezifische Schnellaktionen und ein konfigurierbares Widget.
+  Die Konfiguration unterstützt `dogId`, Instanzen, Sanitizing und alte einfache Home-Aktionen.
 
 ## Tests / verification (Verified, Hauptrepo)
 - `npx tsc --noEmit`: **PASS** (0 Errors).
-- `npx jest`: **PASS — 69 Suites / 671 Tests** (davon neu: Backpack 42, Journal 32, Dashboard 19 inkl. i18n-Paritäts- und Guard-Tests).
-- ESLint der neuen/geänderten Dateien: **0 Errors** (nur bekannte Test-Mock-Warnings: `require`-Mock + Import-Order).
-- `npx expo export --platform ios` **und** `--platform android`: **erfolgreich** (Bundle baut, Routen/Imports lösen auf).
-- **Fehlgeschlagene Tests:** keine. (Hinweis: `connect-step3` zeigte im parallelen Vollrun einmalig „FAIL" durch
-  Worker-Teardown-Flake; isoliert 16/16 grün — kein echter Fehler.)
-- T-31: `npm run agent:start` PASS, `npm run agent:status` PASS, `git diff --check` PASS.
-- T-32: fokussierte Backpack-Jest-Suites PASS (4 Suites / 44 Tests), `npx tsc --noEmit` PASS,
-  `git diff --check` PASS.
+- `npx jest features/subscription/__tests__/entitlements.test.ts features/subscription/__tests__/capabilities.test.ts features/subscription/__tests__/internalTester.test.ts services/__tests__/entitlementService.test.ts services/__tests__/quotaService.test.ts lib/__tests__/purchases.test.ts supabase/functions/__tests__/revenuecat-webhook.test.ts --runInBand`: **PASS** (7 Suites / 95 Tests).
+- `git diff --check`: **PASS**.
+- ESLint der berührten TS-Dateien: **PASS**.
+- `npm run agent:start`: **PASS**.
+- `npm run agent:status`: **PASS**.
+- Home-Backpack: `npx tsc --noEmit` **PASS**, fokussierte Backpack/Home-Suites **PASS** (6 Suites / 64 Tests),
+  `git diff --cached --check` **PASS**. Die vollständige Jest-Suite sowie iOS-/Android-Exports waren zuvor erfolgreich.
 
 ## Known issues / offene Punkte
-- Backpack ist committed (`0434182`); Journal, Dashboard, Agent-Doku und weiterer WIP bleiben lokal uncommittet.
-  Kein Push erfolgt.
-- Gerätesichtung der Features steht aus (DE/gsw/FR, iPhone klein/gross, Galaxy S23, Hündin/Rüde, mit/ohne Termine/Ziel/Historie).
-- `agent:start` liest die aktuelle Aufgabe weiterhin aus `SESSION_HANDOFF.md`; `TASKS.md` bleibt verpflichtende
-  menschengepflegte Aufgabenquelle und wird nicht automatisch geparst.
-- Agent-Dokumentation fuer T-32 ist separater Commit-Scope und gehoert nicht automatisch in einen Backpack-Feature-Commit.
-- Bewusst zurückgestellt (Phase-C-Report §X): „Heute mitnehmen"-Filter, VM-Datumslabels nicht i18n, Heat-Kompaktvariante,
-  Fährten-Distanz nicht im vereinheitlichten Feed, Termine clientseitig gefiltert (Service lädt alle Nutzer-Events).
-- Vorbestehender dirty Tree (fremder WIP + Artefakte) besteht unverändert weiter (siehe T-18-Audit / „Do not touch").
+- Remote-Existenz/DDL von `user_entitlements` wurde nicht live geprüft und die neue Migration wurde nicht angewendet.
+- `USER_ENTITLEMENTS_SETUP.sql` im Repo bleibt ein historisches ad-hoc SQL-Artefakt mit altem Schema; maßgeblich ist
+  die neue versionierte Migration plus `docs/architecture/ENTITLEMENT_SYSTEM.md`.
+- Die additive Folge-Migration erweitert `is_pro_member(uuid)` serverseitig um aktive `lifetime`-Entitlements.
+  `user_entitlements` bleibt die alleinige Quelle für administrative Sonderrechte; es wird nichts nach
+  `user_capabilities` synchronisiert.
+- Vorbestehender dirty Tree mit Dashboard-/Home-i18n-/Tracking-/Connect-/Website-/Artefakt-WIP besteht weiter.
+- Android-Simulator-QA für den Home-Backpack-Flow konnte wegen fehlender Java-Runtime keinen Debug-Build installieren;
+  iOS wurde nur teilweise visuell geprüft. Kein Build 39, kein EAS Update und kein Store-Upload durchgeführt.
 
 ## Important context
-- **Single Source of Truth Training:** `services/trainingFeed.ts` (`buildFeed`) + `hooks/useTrainingFeed.ts` vereinen
-  `training_units` + `training_sessions` + GPS-Fährten. Journal & Dashboard bauen NUR darauf — keine zweite DB.
-- **Backpack = lokal:** AsyncStorage, keine Supabase-Tabelle, keine Migration.
-- **Produktnamen** „Journal"/„Backpack" bleiben unlokalisiert; i18n-Keys stabil (`journal.*`, `backpack.*`, `dash.*`).
-- **Gemischte Dateien:** `app/home-customize.tsx` und `components/home/QuickActionsWidget.tsx` enthalten FREMDEN WIP
-  (T-18-Gruppe B) PLUS je eine von mir ergänzte Zeile (`training_journal`-Label). Diff nicht pauschal als „meins" behandeln.
+- RevenueCat/Store-Abos wurden nicht verändert. `lifetime` wird nicht als RevenueCat-Paket modelliert.
+- Normale Benutzer haben keine Client-Schreibpolicy auf Entitlements; Service-Role/Admin-SQL ist der aktuelle sichere
+  Vergabeweg.
+- Die bestehende Profil-/Premium-UI nutzt bereits `useAccess()` und zeigt Lifetime-Signale an.
 - Repository state gewinnt über diese Doku. `git status --short` ist maßgeblich.
 
 ## Do not touch
@@ -602,32 +584,39 @@ alle Sparten) und ein handlungsorientiertes Overview-Dashboard — **ohne** zwei
   `app/track/kalibrierung.tsx`, `app/trainer/*`, `app/unit/{live,stats}.tsx`, `components/{AppLockGate,tracking/GpsSourcePicker,dogs/DogQuickActions}.tsx`,
   `features/connect/*`, `features/tracking/components/*`, `legal-web/*`, `package.json`, `AGENTS.md`/`CLAUDE.md`/`AI_HANDOFF.md`.
 - `ANYVO-current-repository.zip` (potenziell sensibel), `dist-*/`, `*.sql`/Dumps, `supabase/*schema*.sql`, lose Bilder.
+- Neue Home-Backpack-Dateien nicht erneut pauschal stagen; überlappende Home-/Locale-Dateien enthalten weiterhin fremde WIP-Hunks.
 
 ## Next recommended step
-1. Erst nach Freigabe: Agent-Doku fuer T-31/T-32 separat committen.
-2. **Gerätetest T-25…T-29** (Backpack/Journal/Dashboard) auf iOS + Android, alle 3 Sprachen; danach ggf. Feinschliff.
-3. Danach weitere saubere Scope-Commits (`feat(journal)`, `feat(dog-dashboard)`),
-   **ohne** die fremden WIP-Dateien einzuschliessen (keine `git add .`).
-4. Parallel weiterhin offen: **T-20** Testerfeedback/Build-38-Triage, **T-21** Dirty-Tree-Aufräumen.
+1. **T-34 ist committed (`50ccfd2`)** — erledigt. Vor produktiver Nutzung beide Entitlement-Migrationen kontrolliert
+   über den Supabase-Migrationsworkflow anwenden (nicht aus der App); danach SQL-Smoke-Tests inkl. Lifetime-/Ablauf-/
+   Widerrufsfällen ausführen.
+2. **T-30** als manuellen Realgeräte-Abnahmetest für Backpack, Journal, Dashboard und Home-Backpack durchführen.
+3. **T-21** Dirty-Tree aufräumen / Release-Branch-Strategie klären; P0-FIX-01 Migrations-Baseline (`supabase/migrations/
+   README.md`) und P0-Reports sind ein eigener, noch offener Arbeitsstrang und wurden bewusst nicht mit T-34 vermischt.
 
 ## Relevant files (diese Session)
-- Neu: `features/dogs/backpack.ts`, `features/dogs/dashboard.ts`, `features/training/journal.ts`,
-  `app/dog-backpack/[id].tsx`, `app/training-journal.tsx`,
-  `components/dogs/{DogBackpackCard,DogTodayCard,DogAppointmentsCard,DogRecentCard,DogStatusTiles}.tsx`,
-  Tests unter `features/dogs/__tests__/`, `features/training/__tests__/`, `components/dogs/__tests__/`, `i18n/__tests__/`,
-  Reports unter `docs/architecture/`.
-- Geändert (meins): `features/dogs/DogHubScreen.tsx`, `features/dogs/buildDogHubVM.ts`, `features/dogs/demoDogs.ts`,
-  `components/dogs/types.ts`, `app/dog/[id].tsx`, `app/(tabs)/analytics.tsx`, `stores/homeScreenConfig.ts`,
-  `i18n/de-CH.ts`, `i18n/gsw-CH.ts`, `i18n/locales/fr.ts`.
-- Geändert (GEMISCHT mit fremdem WIP): `app/home-customize.tsx`, `components/home/QuickActionsWidget.tsx`.
-- T-31: `scripts/agent-start.mjs`, `docs/agent/TASKS.md`, `docs/agent/WORK_LOG.md`,
-  `docs/agent/SESSION_HANDOFF.md`.
-- T-32: `features/dogs/backpack.ts`, `features/dogs/dashboard.ts`, `components/dogs/DogBackpackCard.tsx`,
-  `features/dogs/__tests__/backpackSuggestions.test.ts`, `docs/agent/TASKS.md`,
-  `docs/agent/WORK_LOG.md`, `docs/agent/SESSION_HANDOFF.md`.
+- `features/subscription/plans.ts`
+- `types/capabilities.ts`
+- `services/entitlementService.ts`
+- `services/capabilityService.ts`
+- `hooks/useCapabilities.ts`
+- `lib/entitlements/getUserAccess.ts`
+- `features/subscription/__tests__/entitlements.test.ts`
+- `services/__tests__/entitlementService.test.ts`
+- `supabase/migrations/20260802100000_user_entitlements.sql`
+- `supabase/migrations/20260802110000_lifetime_quota_access.sql`
+- `supabase/__tests__/lifetime-quota-migration.test.ts`
+- `docs/architecture/ENTITLEMENT_SYSTEM.md`
+- `docs/lifetime-access.md`
+- `stores/homeScreenConfig.ts`
+- `app/(tabs)/home.tsx`
+- `app/home-customize.tsx`
+- `components/home/QuickActionsWidget.tsx`
+- `components/home/DogBackpackWidget.tsx`
+- `app/dog-backpack/[id].tsx`
+- `docs/agent/{TASKS.md,WORK_LOG.md,DECISIONS.md,SESSION_HANDOFF.md}`
 
 ## Open questions
-- Sollen die Feature-Commits (Backpack/Journal/Dashboard) jetzt erstellt/gepusht werden — und wie mit den beiden
-  gemischten Dateien (`home-customize.tsx`, `QuickActionsWidget.tsx`) umgehen?
-- Sind die zurückgestellten Phase-C-Punkte (§X) gewünscht (v. a. „Heute mitnehmen"-Filter)?
-- Bleibt der Fokus sonst auf Release/Testerfeedback (T-20) und Dirty-Tree-Aufräumen (T-21)?
+- ~~Ist T-34 als eigener Commit freigabefähig?~~ Erledigt: read-only reviewt und isoliert committed (`50ccfd2`).
+- Wann werden die beiden Entitlement-Migrationen kontrolliert remote angewendet (Supabase-Migrationsworkflow)?
+- Wann kann T-30 auf echten iOS- und Android-Geräten vollständig abgenommen werden?

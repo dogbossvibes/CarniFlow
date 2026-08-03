@@ -41,28 +41,28 @@
   Mehrere Hotfixes nach Build 38 umgesetzt/veroeffentlicht: GS-/Winkel-Picker, manueller Start der Absuche
   mit 5-/10-m-Auswahl, Tracking-UI, Keyboard-Fixes, Google-Login und Auswertungslayout.
 
-## Diese Session — Feature-Arbeit (verifiziert, UNCOMMITTET)
+## Feature-Arbeit — committed, nicht gepusht
 > Rein additiv. Keine DB-Migration, keine bestehende Trainings-/Fährten-/Kalender-/Zyklus-/Abo-Logik verändert.
-> Alles lokal uncommittet (kein Commit/Push).
+> Die drei Feature-Commits sind in HEAD enthalten, aber noch nicht gepusht.
 - **T-25 — Backpack Phase A (Datenschicht)** · DONE(committed `0434182`)
   `features/dogs/backpack.ts`: per-user/per-dog AsyncStorage (`dog_backpack:<userId>:<dogId>`), Sanitizer, CRUD,
   aktiv/inaktiv, gepackt, ↑/↓-Reorder, Reset-nur-Häkchen, Vorschläge (nie auto-persistiert). Keine DB-Migration.
 - **T-26 — Backpack Phase B (UI)** · DONE(committed `0434182`)
   Overview-Card + Verwaltungsscreen `app/dog-backpack/[id].tsx` (Add/Edit/Delete, aktiv/inaktiv, gepackt, Reorder,
   Reset, Vorschläge mit Duplikatschutz), i18n de/gsw/fr, verdrahtet in `DogHubScreen`/`app/dog/[id].tsx`.
-- **T-27 — Journal (spartenübergreifende Trainingshistorie)** · DONE (uncommittet)
+- **T-27 — Journal (spartenübergreifende Trainingshistorie)** · DONE(committed `2a85fbc`)
   Route `app/training-journal.tsx` auf bestehendem `useTrainingFeed` (Single Source of Truth), `features/training/journal.ts`
   (Filter/Suche/Gruppierung/Pagination), Einstiege Home-Schnellaktion/Hundeprofil/Analyse. Keine zweite DB.
-- **T-28 — Produktnamen-Rename** · DONE (uncommittet)
+- **T-28 — Produktnamen-Rename** · DONE(committed `0434182`, `2a85fbc`)
   „Trainingstagebuch"→**Journal**, „Rucksack"→**Backpack** (feste Produktnamen, nicht lokalisiert); nur sichtbare
   i18n-Werte + Registry-Fallback, technische Keys/AsyncStorage/Typen/Dateien unverändert.
-- **T-29 — Persönliches Hunde-Dashboard (Phase C)** · DONE (uncommittet)
+- **T-29 — Persönliches Hunde-Dashboard (Phase C)** · DONE(committed `0061fed`)
   Overview-Tab als Dashboard (Heute/Termine/Läufigkeit/Ziel/Backpack/Zuletzt/Status/Smart Analyse). Neue reine Logik
   `features/dogs/dashboard.ts` + 4 Karten; Termine via bestehendem `getCalendarEvents`. Kein Wetter, keine neue KI,
   keine Migration. Report `docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md`.
 
-## Diese Session — Agent-Infrastruktur
-- **T-31 — agent:start Startprotokoll mit TASKS.md abgleichen** · DONE (uncommittet)
+## Agent-Infrastruktur
+- **T-31 — agent:start Startprotokoll mit TASKS.md abgleichen** · DONE(committed `8ef90fe`)
   `scripts/agent-start.mjs` zeigt jetzt das verbindliche Startprotokoll inkl. `AGENTS.md`, `CLAUDE.md`,
   `docs/agent/TASKS.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md`, `DECISIONS.md` und `git status`.
   `TASKS.md` wird ausdrücklich als verbindliche Aufgabenquelle genannt; `SESSION_HANDOFF.md` als letzte Übergabe.
@@ -72,6 +72,19 @@
   Reine Statuslogik `backpackStatus` aus `features/dogs/dashboard.ts` nach `features/dogs/backpack.ts` verschoben.
   `components/dogs/DogBackpackCard.tsx` importiert die Funktion jetzt direkt aus dem Backpack-Modul; Dashboard behält
   einen Re-Export fuer bestehende Dashboard-Aufrufer/Tests. Keine UI-/Text-/Journal-/Tracking-/SQL-Arbeit.
+- **T-33 — Dashboard isoliert vorbereiten und committen** · DONE(committed `0061fed`)
+  Hunde-Dashboard Phase C vollständig isoliert staged, index-isoliert getestet und als
+  `feat(dogs): add personal dashboard overview` committed. Backpack (`0434182`) und Journal (`2a85fbc`) waren in HEAD.
+- **T-34 — Server-seitiges Entitlement-System** · DONE(committed `50ccfd2`)
+  Neue kontrollierte Entitlement-Werte (`lifetime`, `beta_tester`, `ambassador`, `staff`), zentrale effektive
+  Capability-Auflösung, Supabase-Migration `user_entitlements` mit RLS, Service-/Hook-Integration und technische
+  Dokumentation. Nachbesserung: `is_pro_member()` berücksichtigt aktives `lifetime` serverseitig für NEWBIE-Quotas;
+  keine Spiegelung nach `user_capabilities`. Von Claude read-only reviewt und isoliert committed (13 Dateien, kein
+  fremder WIP). Migrationen committed, aber NICHT remote angewendet. Kein Push, kein Build.
+
+- **T-35 — Personalisierte Home-Backpack-Integration** · DONE(committed `e447cd2`)
+  Hundespezifische Backpack-Schnellaktionen und Backpack-Widget mit `dogId`, instanzierter Home-Konfiguration,
+  Sanitizing, DE/gsw/FR und bestehender `/dog-backpack/[id]`-Route. Keine DB-Migration, keine neue Hundestruktur.
 
 ## Offen / Blocker
 - **T-20 — Testerfeedback und Build-38-Hotfix-Triage** · OPEN
@@ -91,13 +104,15 @@
   Tracking-UI, Google Login, Keyboard-Formulare, Auswertungslayout.
 
 ## ► TASK-ID-Stand
-- **T-30 ist reserviert** für den manuellen Gerätetest T-25…T-29.
-- **Nächste freie allgemeine TASK-ID:** **T-33**
-- Letzte bearbeitete TASK-ID: **T-32** (Backpack-Dashboard-Entkopplung, committed `0434182`).
+- **T-30 ist OPEN/MANUAL reserviert** für den manuellen Realgeräte-Abnahmetest von T-25…T-29.
+- **Nächste freie allgemeine TASK-ID:** **T-36**
+- Letzte bearbeitete TASK-ID: **T-34** (Entitlement-System von Claude read-only reviewt und isoliert committed `50ccfd2`).
 Empfohlene nächste Arbeit (Codex):
-1. **Gerätetest T-25…T-29** (Backpack/Journal/Dashboard) — DE/gsw/FR, iPhone klein/gross + Galaxy S23,
-   Hündin/Rüde, mit/ohne Termine/Ziel/Historie. Danach ggf. Feinschliff.
-2. Weiterhin offen (Release): **T-20** Testerfeedback/Build-38-Hotfix-Triage, **T-21** Dirty-Tree-Aufräumen.
+1. **Entitlement-Migrationen kontrolliert remote anwenden** (Supabase-Migrationsworkflow, nicht aus der App), danach
+   SQL-Smoke-Tests inkl. Lifetime-/Ablauf-/Widerrufsfällen. `50ccfd2` ist committed, aber nicht gepusht.
+2. **T-30: Realgeräte-Abnahmetest** für Backpack/Journal/Dashboard und Home-Backpack-Integration — DE/gsw/FR, iPhone klein/gross + Galaxy S23.
+3. Weiterhin offen (Release): **T-20** Testerfeedback/Build-38-Hotfix-Triage, **T-21** Dirty-Tree-Aufräumen
+   (inkl. P0-FIX-01 Migrations-Baseline `supabase/migrations/README.md` + P0-Reports als eigener Strang).
 Kein Commit/Push ohne ausdrückliche Freigabe.
 
 ## Später / nicht blockierend
