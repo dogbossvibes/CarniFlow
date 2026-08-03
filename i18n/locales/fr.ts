@@ -358,6 +358,27 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "dash.heatInDays":         "Dans ~{count} jours",
   "dash.heatActive":         "Actuellement en chaleurs",
 
+  // Enregistrement officiel (spécifique au pays)
+  "officialRegistration.title": "ENREGISTREMENT OFFICIEL",
+  "officialRegistration.country": "PAYS",
+  "officialRegistration.registry": "REGISTRE",
+  "officialRegistration.registrationNumber": "Numéro d'enregistrement",
+  "officialRegistration.registryName": "Nom du registre",
+  "officialRegistration.openRegistry": "Ouvrir le registre",
+  "officialRegistration.disclaimer": "Ces informations servent à ta documentation personnelle. ANYVO ne transmet aucune donnée au registre.",
+  "officialRegistration.countries.CH": "Suisse",
+  "officialRegistration.countries.DE": "Allemagne",
+  "officialRegistration.countries.AT": "Autriche",
+  "officialRegistration.countries.other": "Autre pays",
+  "officialRegistration.types.amicus": "AMICUS",
+  "officialRegistration.types.tasso": "TASSO",
+  "officialRegistration.types.findefix": "FINDEFIX",
+  "officialRegistration.types.officialDogRegister": "Registre canin officiel",
+  "officialRegistration.types.austriaPetDatabase": "Base de données des animaux (AT)",
+  "officialRegistration.types.other": "Autre",
+  "officialRegistration.errors.registryNameRequired": "Veuillez saisir le nom du registre.",
+  "officialRegistration.errors.linkUnavailable": "Le lien n'a pas pu être ouvert.",
+
   // Plural-Referenzkeys (fr: 0 & 1 = one, ≥2 = other)
   "trainingCount_one":   "{count} entraînement",
   "trainingCount_other": "{count} entraînements",

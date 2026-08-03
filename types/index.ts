@@ -21,6 +21,23 @@ export type Profile = {
   created_at:              string;
 };
 
+// Landesspezifische offizielle Registrierung (persönliche Dokumentation, keine
+// API-Anbindung). Ein Eintrag pro Hund; spätere Mehrfachverwaltung bleibt möglich.
+export type DogRegistryType =
+  | 'amicus'
+  | 'tasso'
+  | 'findefix'
+  | 'official_dog_register'
+  | 'austria_pet_database'
+  | 'other';
+
+export interface DogRegistryRecord {
+  countryCode:         string;
+  registryType:        DogRegistryType;
+  registryName?:       string;
+  registrationNumber?: string;
+}
+
 export type Dog = {
   id:         string;
   owner_id:   string;
@@ -40,7 +57,12 @@ export type Dog = {
   // Identität
   color:            string | null;   // Farbe
   microchip_number: string | null;   // Mikrochip-Nr.
-  tasso_registered: boolean | null;  // bei Tasso registriert
+  tasso_registered: boolean | null;  // LEGACY: alter Tasso-Schalter, abgelöst durch registry_* (nur noch gelesen)
+  // Offizielle Registrierung (additiv, landesspezifisch)
+  registry_country_code: string | null;         // z. B. 'CH' | 'DE' | 'AT' | 'OTHER'
+  registry_type:         DogRegistryType | null; // Registertyp (amicus, tasso, …)
+  registry_name:         string | null;         // freier/behördlicher Registername (nur bei other/official_dog_register)
+  registry_number:       string | null;         // Registrierungsnummer (optional)
   // Sport
   discipline: string | null;   // Sparte (IGP, Mondioring …)
   level:      string | null;   // Stufe
@@ -56,6 +78,7 @@ export type NewDog = Pick<Dog,
   | 'name' | 'breed' | 'birth_date' | 'weight_kg' | 'gender' | 'photo_url' | 'titles'
   | 'sire' | 'dam' | 'kennel' | 'is_favorite'
   | 'color' | 'microchip_number' | 'tasso_registered'
+  | 'registry_country_code' | 'registry_type' | 'registry_name' | 'registry_number'
   | 'discipline' | 'level' | 'best_score'
   | 'vet' | 'vaccination' | 'food'
 >;

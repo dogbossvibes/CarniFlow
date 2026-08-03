@@ -23,12 +23,14 @@ import { DateField } from '@/components/ui/DateField';
 import { toISODate, fromISODate } from '@/features/dogs/dateInput';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
+import { OfficialRegistrySection } from '@/components/dogs/OfficialRegistrySection';
+import { draftFromDog, draftToColumns, validateRegistry, EMPTY_REGISTRY_DRAFT, type RegistryDraft } from '@/features/dogs/registry';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { getDogById, updateDog, deleteDogWithDependents } from '@/services/dogs';
 import { uploadDogImage } from '@/services/storage';
 import { useSession } from '@/hooks/useSession';
 import { haptic } from '@/lib/haptics';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 import type { Dog } from '@/types';
 
 type Geschlecht = 'male' | 'female' | null;
@@ -57,7 +59,7 @@ export default function HundBearbeitenScreen() {
   // Identität
   const [farbe,         setFarbe]         = useState('');
   const [mikrochip,     setMikrochip]     = useState('');
-  const [tasso,         setTasso]         = useState(false);
+  const [registry,      setRegistry]      = useState<RegistryDraft>(EMPTY_REGISTRY_DRAFT);
   // Gesundheit
   const [tierarzt,      setTierarzt]      = useState('');
   const [impfung,       setImpfung]       = useState('');
@@ -90,7 +92,7 @@ export default function HundBearbeitenScreen() {
       setBestwert(d.best_score ?? '');
       setFarbe(d.color ?? '');
       setMikrochip(d.microchip_number ?? '');
-      setTasso(!!d.tasso_registered);
+      setRegistry(draftFromDog(d));
       setTierarzt(d.vet ?? '');
       setImpfung(d.vaccination ?? '');
       setFutter(d.food ?? '');
@@ -122,6 +124,8 @@ export default function HundBearbeitenScreen() {
 
   const handleSpeichern = async () => {
     if (!name.trim()) { setFehler(t('dog.nameRequired')); return; }
+    const registryError = validateRegistry(registry);
+    if (registryError) { setFehler(t(registryError as TranslationKey)); return; }
     if (!session?.user.id || !hund) return;
 
     setSpeichern(true);
@@ -164,7 +168,9 @@ export default function HundBearbeitenScreen() {
       best_score:       bestwert.trim()  || null,
       color:            farbe.trim()     || null,
       microchip_number: mikrochip.trim() || null,
-      tasso_registered: tasso,
+      // tasso_registered bleibt als Legacy-Spalte erhalten, wird aber nicht mehr
+      // aktiv geschrieben (durch die offizielle Registrierung abgelöst).
+      ...draftToColumns(registry),
       vet:              tierarzt.trim()  || null,
       vaccination:      impfung.trim()   || null,
       food:             futter.trim()    || null,
@@ -387,16 +393,9 @@ export default function HundBearbeitenScreen() {
           <View style={s.felder}>
             <Input label={t('dog.color')} placeholder={t('dog.colorPlaceholder')} value={farbe} onChangeText={setFarbe} autoCapitalize="words" />
             <Input label={t('dog.microchip')} placeholder={t('dog.microchipPlaceholder')} value={mikrochip} onChangeText={setMikrochip} keyboardType="numbers-and-punctuation" />
-            <TouchableOpacity style={[s.tassoRow, tasso && s.tassoRowAktiv]} onPress={() => setTasso(t => !t)} activeOpacity={0.85}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.tassoTitel}>{t('dog.tassoTitle')}</Text>
-                <Text style={s.tassoUnter}>{t('dog.tassoSub')}</Text>
-              </View>
-              <View style={[s.switch, tasso && s.switchOn]}>
-                <View style={[s.knob, tasso && s.knobOn]} />
-              </View>
-            </TouchableOpacity>
           </View>
+
+          <OfficialRegistrySection value={registry} onChange={setRegistry} />
 
           <Text style={s.gruppeLabel}>{t('dog.health')}</Text>
           <View style={s.felder}>

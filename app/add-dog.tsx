@@ -23,12 +23,14 @@ import { DateField } from '@/components/ui/DateField';
 import { toISODate } from '@/features/dogs/dateInput';
 import { addDog } from '@/services/dogs';
 import { ChipSelect, DOG_DISCIPLINES, DOG_LEVELS } from '@/components/dogs/ChipSelect';
+import { OfficialRegistrySection } from '@/components/dogs/OfficialRegistrySection';
+import { draftToColumns, validateRegistry, EMPTY_REGISTRY_DRAFT, type RegistryDraft } from '@/features/dogs/registry';
 import { uploadDogImage } from '@/services/storage';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useDogs } from '@/hooks/useDogs';
 import { quotaAllowsNew } from '@/features/subscription/plans';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 
 type Geschlecht = 'male' | 'female' | null;
 
@@ -53,7 +55,7 @@ export default function HundHinzufuegenScreen() {
   const [bestwert,    setBestwert]    = useState('');
   const [farbe,       setFarbe]       = useState('');
   const [mikrochip,   setMikrochip]   = useState('');
-  const [tasso,       setTasso]       = useState(false);
+  const [registry,    setRegistry]    = useState<RegistryDraft>(EMPTY_REGISTRY_DRAFT);
   const [tierarzt,    setTierarzt]    = useState('');
   const [impfung,     setImpfung]     = useState('');
   const [futter,      setFutter]      = useState('');
@@ -89,6 +91,8 @@ export default function HundHinzufuegenScreen() {
 
   const handleSpeichern = async () => {
     if (!name.trim()) { setFehler(t('dog.nameRequired')); return; }
+    const registryError = validateRegistry(registry);
+    if (registryError) { setFehler(t(registryError as TranslationKey)); return; }
     if (!session?.user.id) return;
 
     // NEWBIE-Quota: max. 1 Hund. Bestehende Hunde bleiben sichtbar/bearbeitbar;
@@ -136,7 +140,8 @@ export default function HundHinzufuegenScreen() {
       best_score:       bestwert.trim()  || null,
       color:            farbe.trim()     || null,
       microchip_number: mikrochip.trim() || null,
-      tasso_registered: tasso,
+      tasso_registered: null,   // Legacy-Spalte: bei neuen Hunden nicht mehr aktiv genutzt
+      ...draftToColumns(registry),
       vet:              tierarzt.trim()  || null,
       vaccination:      impfung.trim()   || null,
       food:             futter.trim()    || null,
@@ -335,16 +340,9 @@ export default function HundHinzufuegenScreen() {
           <View style={s.felder}>
             <Input label={t('dog.color')} placeholder={t('dog.colorPlaceholder')} value={farbe} onChangeText={setFarbe} autoCapitalize="words" />
             <Input label={t('dog.microchip')} placeholder={t('dog.microchipPlaceholder')} value={mikrochip} onChangeText={setMikrochip} keyboardType="numbers-and-punctuation" />
-            <TouchableOpacity style={[s.tassoRow, tasso && s.tassoRowAktiv]} onPress={() => setTasso(t => !t)} activeOpacity={0.85}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.tassoTitel}>{t('dog.tassoTitle')}</Text>
-                <Text style={s.tassoUnter}>{t('dog.tassoSub')}</Text>
-              </View>
-              <View style={[s.switch, tasso && s.switchOn]}>
-                <View style={[s.knob, tasso && s.knobOn]} />
-              </View>
-            </TouchableOpacity>
           </View>
+
+          <OfficialRegistrySection value={registry} onChange={setRegistry} />
 
           <Text style={s.gruppeLabel}>{t('dog.health')}</Text>
           <View style={s.felder}>
