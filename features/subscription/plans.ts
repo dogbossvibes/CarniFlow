@@ -33,6 +33,45 @@ export const TRAINER_CAPABILITIES: Capability[] = [
   'trainer.dashboard', 'trainer.clients', 'trainer.surveys', 'trainer.comments', 'trainer.plans',
 ];
 
+export type UserEntitlement =
+  | 'lifetime'
+  | 'beta_tester'
+  | 'ambassador'
+  | 'staff';
+
+export interface UserEntitlementRecord {
+  id: string;
+  userId: string;
+  entitlement: UserEntitlement;
+  grantedAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  notes?: string | null;
+}
+
+export interface RuntimeCapabilities {
+  pro_member: boolean;
+  trainer_module: boolean;
+}
+
+export interface EffectiveCapabilities extends RuntimeCapabilities {
+  capabilities: Capability[];
+  hasLifetimeAccess: boolean;
+  activeEntitlements: UserEntitlement[];
+}
+
+export interface EffectiveAccessInput {
+  subscription: (SubscriptionLike & { trial_ends_at?: string | null }) | null | undefined;
+  subscriptionCapabilities?: RuntimeCapabilities | null;
+  entitlements: UserEntitlementRecord[];
+}
+
+export const USER_ENTITLEMENTS: UserEntitlement[] = ['lifetime', 'beta_tester', 'ambassador', 'staff'];
+export const REGULAR_PRODUCT_CAPABILITIES: Capability[] = [
+  ...ACTIVE_CAPABILITIES,
+  ...TRAINER_CAPABILITIES,
+];
+
 // App-Store / RevenueCat Product-IDs (nur Monatsabos).
 export const PRODUCT_IDS = {
   // ID-Suffix _8.00 ist historisch; tatsächlicher Preis = CHF 4.00 (im Store gesetzt).
@@ -107,6 +146,86 @@ export function hasCapability(sub: SubscriptionLike | null | undefined, capabili
   if (PREMIUM_CAPABILITIES.includes(capability)) return isPremiumPlan(sub.plan); // nicht NEWBIE
   if (BASE_CAPABILITIES.includes(capability))    return true;                    // inkl. NEWBIE
   return false;
+}
+
+export function isKnownUserEntitlement(value: string | null | undefined): value is UserEntitlement {
+  return USER_ENTITLEMENTS.includes(value as UserEntitlement);
+}
+
+export function isActiveUserEntitlement(
+  entitlement: Pick<UserEntitlementRecord, 'expiresAt' | 'revokedAt'> | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!entitlement || entitlement.revokedAt != null) return false;
+  if (entitlement.expiresAt && new Date(entitlement.expiresAt).getTime() <= now.getTime()) return false;
+  return true;
+}
+
+export function hasActiveUserEntitlement(
+  entitlements: UserEntitlementRecord[],
+  entitlement: UserEntitlement,
+  now: Date = new Date(),
+): boolean {
+  return entitlements.some((item) =>
+    item.entitlement === entitlement && isActiveUserEntitlement(item, now));
+}
+
+function capabilitiesFromRuntime(runtime: RuntimeCapabilities): Capability[] {
+  if (runtime.trainer_module) return REGULAR_PRODUCT_CAPABILITIES;
+  if (runtime.pro_member) return ACTIVE_CAPABILITIES;
+  return [];
+}
+
+export function resolveEffectiveCapabilities(
+  input: EffectiveAccessInput,
+  now: Date = new Date(),
+): EffectiveCapabilities {
+  const subscriptionActive = !!input.subscription?.plan
+    && !!input.subscription.status
+    && STATUS_ACTIVE.includes(input.subscription.status)
+    && !isTrialLapsed(input.subscription);
+  const subscriptionRuntime = input.subscriptionCapabilities
+    ?? (subscriptionActive && input.subscription?.plan ? planToCapabilities(input.subscription.plan) : null);
+
+  let pro = subscriptionRuntime?.pro_member === true;
+  let trainer = subscriptionRuntime?.trainer_module === true;
+  const capabilities = new Set<Capability>();
+
+  if (subscriptionActive && input.subscription) {
+    for (const capability of REGULAR_PRODUCT_CAPABILITIES) {
+      if (hasCapability(input.subscription, capability)) capabilities.add(capability);
+    }
+  }
+  for (const capability of capabilitiesFromRuntime({ pro_member: pro, trainer_module: trainer })) {
+    capabilities.add(capability);
+  }
+
+  const activeEntitlements = input.entitlements
+    .filter((item) => isActiveUserEntitlement(item, now))
+    .map((item) => item.entitlement);
+  const hasLifetimeAccess = activeEntitlements.includes('lifetime');
+
+  if (hasLifetimeAccess) {
+    pro = true;
+    trainer = true;
+    for (const capability of REGULAR_PRODUCT_CAPABILITIES) capabilities.add(capability);
+  }
+
+  return {
+    pro_member: pro,
+    trainer_module: trainer,
+    capabilities: REGULAR_PRODUCT_CAPABILITIES.filter((capability) => capabilities.has(capability)),
+    hasLifetimeAccess,
+    activeEntitlements,
+  };
+}
+
+export function hasEffectiveCapability(
+  effective: Pick<EffectiveCapabilities, 'capabilities'> | null | undefined,
+  capability: string,
+): capability is Capability {
+  return REGULAR_PRODUCT_CAPABILITIES.includes(capability as Capability)
+    && (effective?.capabilities ?? []).includes(capability as Capability);
 }
 
 export function isTrainerPlan(plan: SubscriptionPlan | null | undefined): boolean {

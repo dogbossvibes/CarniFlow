@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { UserCapabilities } from '@/types/capabilities';
-import { getActiveEntitlement, entitlementGrantsPro, entitlementGrantsTrainer } from '@/services/entitlementService';
-import { isTrialLapsed } from '@/features/subscription/plans';
+import { getActiveEntitlements } from '@/services/entitlementService';
+import { isTrialLapsed, resolveEffectiveCapabilities, type SubscriptionLike } from '@/features/subscription/plans';
 import { applyInternalTesterEntitlements, internalTesterStatusFromProfile } from '@/features/subscription/internalTester';
 
 export async function getMyCapabilities(userId: string): Promise<UserCapabilities | null> {
@@ -12,10 +12,10 @@ export async function getMyCapabilities(userId: string): Promise<UserCapabilitie
   // Die Tester-Spalten separat + resilient laden: Ist INTERNAL_TESTER_SETUP.sql
   // noch nicht ausgeführt, existieren die Spalten nicht → der Select liefert
   // einen Fehler (data: null), ohne die restliche Berechtigungslogik zu stören.
-  const [{ data }, entitlement, { data: sub }, { data: testerRow }] = await Promise.all([
+  const [{ data }, entitlements, { data: sub }, { data: testerRow }] = await Promise.all([
     supabase.from('user_capabilities').select('*').eq('user_id', userId).maybeSingle(),
-    getActiveEntitlement(userId),
-    supabase.from('subscriptions').select('status, trial_ends_at').eq('user_id', userId).maybeSingle(),
+    getActiveEntitlements(userId),
+    supabase.from('subscriptions').select('plan, status, trial_ends_at').eq('user_id', userId).maybeSingle(),
     supabase.from('profiles').select('is_internal_tester, tester_level').eq('id', userId).maybeSingle(),
   ]);
 
@@ -48,10 +48,14 @@ export async function getMyCapabilities(userId: string): Promise<UserCapabilitie
   // trotzdem wieder freischalten.
   if (isTrialLapsed(sub)) { pro = false; trainer = false; }
 
-  // Lifetime/manuelles Entitlement schaltet ZUSÄTZLICH frei (Trainer ⇒ Pro).
-  if (entitlement) {
-    if (entitlementGrantsPro(entitlement)) pro = true;
-    if (entitlementGrantsTrainer(entitlement)) { trainer = true; pro = true; }
+  const effective = resolveEffectiveCapabilities({
+    subscription: sub as (SubscriptionLike & { trial_ends_at?: string | null }) | null,
+    subscriptionCapabilities: have ? { pro_member: pro, trainer_module: trainer } : null,
+    entitlements,
+  });
+  pro = effective.pro_member;
+  trainer = effective.trainer_module;
+  if (effective.capabilities.length > 0 || effective.hasLifetimeAccess || effective.activeEntitlements.length > 0) {
     have = true;
   }
 
@@ -67,7 +71,13 @@ export async function getMyCapabilities(userId: string): Promise<UserCapabilitie
   }
 
   if (!have) return null;
-  return { user_id: userId, pro_member: pro, trainer_module: trainer };
+  return {
+    user_id: userId,
+    pro_member: pro,
+    trainer_module: trainer,
+    hasLifetimeAccess: effective.hasLifetimeAccess,
+    entitlements: effective.activeEntitlements,
+  };
 }
 
 // Upsert der Capabilities (z. B. nach erfolgreichem Kauf).

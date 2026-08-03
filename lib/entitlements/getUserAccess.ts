@@ -1,8 +1,10 @@
 import { getPlanSubscription } from '@/services/subscriptionService';
+import { getActiveEntitlements } from '@/services/entitlementService';
 import {
-  getActiveEntitlement, entitlementGrantsPro, entitlementGrantsTrainer,
-} from '@/services/entitlementService';
-import { isTrainerPlan, isTrialLapsed } from '@/features/subscription/plans';
+  isTrainerPlan,
+  isTrialLapsed,
+  resolveEffectiveCapabilities,
+} from '@/features/subscription/plans';
 
 // Vereinheitlichte Zugriffsauskunft: Apple/Google-Abo ODER manuelles/Lifetime-
 // Entitlement. Quelle für UI (Lifetime-Badge, Kauf-Buttons ausblenden).
@@ -20,7 +22,7 @@ const STATUS_ACTIVE = ['active', 'trialing'];
 export async function getUserAccess(userId: string): Promise<UserAccess> {
   const [sub, ent] = await Promise.all([
     getPlanSubscription(userId),
-    getActiveEntitlement(userId),
+    getActiveEntitlements(userId),
   ]);
 
   // 1) Aktives Store-Abo (Apple/Google). Abgelaufener Trial zählt NICHT als aktiv.
@@ -28,9 +30,12 @@ export async function getUserAccess(userId: string): Promise<UserAccess> {
   const subPro     = subActive;                          // alle Pläne sind „pro"
   const subTrainer = subActive && isTrainerPlan(sub!.plan);
 
-  // 2) Manuelles/Lifetime-Entitlement (getActiveEntitlement liefert nur gültige).
-  const entPro     = !!ent && entitlementGrantsPro(ent);
-  const entTrainer = !!ent && entitlementGrantsTrainer(ent);
+  const effective = resolveEffectiveCapabilities({
+    subscription: sub,
+    entitlements: ent,
+  });
+  const entPro     = effective.hasLifetimeAccess;
+  const entTrainer = effective.hasLifetimeAccess;
 
   const hasActiveAccess  = subPro || entPro;
   const hasTrainerAccess = subTrainer || entTrainer;
@@ -43,10 +48,10 @@ export async function getUserAccess(userId: string): Promise<UserAccess> {
   let expiresAt: string | null = null;
 
   if (entPro || entTrainer) {
-    source = ent!.source;
-    planType = ent!.plan_type;
-    isLifetime = ent!.is_lifetime === true;
-    expiresAt = ent!.expires_at;
+    source = 'admin';
+    planType = 'lifetime';
+    isLifetime = true;
+    expiresAt = ent.find((item) => item.entitlement === 'lifetime')?.expiresAt ?? null;
   } else if (subActive) {
     source = 'apple';   // Store-Abo (RevenueCat/App Store); Google analog erweiterbar
     planType = sub!.plan;

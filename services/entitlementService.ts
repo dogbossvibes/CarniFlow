@@ -1,54 +1,68 @@
 import { supabase } from '@/lib/supabase';
+import {
+  hasActiveUserEntitlement,
+  isActiveUserEntitlement,
+  isKnownUserEntitlement,
+  type UserEntitlement,
+  type UserEntitlementRecord,
+} from '@/features/subscription/plans';
 
-// Manuelle/Lifetime-Entitlements (Tabelle user_entitlements). Zusätzlich zur
-// Apple/Google-Abo-Logik. User dürfen nur eigene Zeilen lesen (RLS).
-export type EntitlementPlanType = 'free' | 'active' | 'trainer' | 'lifetime_active' | 'lifetime_trainer';
-export type EntitlementSource   = 'apple' | 'google' | 'manual' | 'founder' | 'admin';
+export type { UserEntitlement, UserEntitlementRecord };
 
-export interface UserEntitlement {
-  id:             string;
-  user_id:        string;
-  plan_type:      EntitlementPlanType;
-  source:         EntitlementSource;
-  is_lifetime:    boolean;
-  active:         boolean;
-  expires_at:     string | null;
-  granted_by:     string | null;
-  granted_reason: string | null;
-  created_at:     string;
-  updated_at:     string;
+type UserEntitlementRow = {
+  id: string;
+  user_id: string;
+  entitlement: string;
+  granted_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  notes: string | null;
+};
+
+function mapUserEntitlement(row: UserEntitlementRow): UserEntitlementRecord | null {
+  if (!isKnownUserEntitlement(row.entitlement)) {
+    if (__DEV__) console.warn('[entitlements] unbekannter Entitlement-Wert ignoriert');
+    return null;
+  }
+  return {
+    id: row.id,
+    userId: row.user_id,
+    entitlement: row.entitlement,
+    grantedAt: row.granted_at,
+    expiresAt: row.expires_at,
+    revokedAt: row.revoked_at,
+    notes: row.notes,
+  };
 }
 
-const PRO_PLANS:     EntitlementPlanType[] = ['active', 'trainer', 'lifetime_active', 'lifetime_trainer'];
-const TRAINER_PLANS: EntitlementPlanType[] = ['trainer', 'lifetime_trainer'];
-
-export function entitlementGrantsPro(e: UserEntitlement): boolean {
-  return PRO_PLANS.includes(e.plan_type);
-}
-export function entitlementGrantsTrainer(e: UserEntitlement): boolean {
-  return TRAINER_PLANS.includes(e.plan_type);
+export function entitlementGrantsPro(e: UserEntitlementRecord): boolean {
+  return hasActiveUserEntitlement([e], 'lifetime');
 }
 
-// Gültig = active && (kein Ablauf ODER in der Zukunft).
-function isValid(e: UserEntitlement): boolean {
-  if (!e.active) return false;
-  if (e.expires_at && new Date(e.expires_at).getTime() <= Date.now()) return false;
-  return true;
+export function entitlementGrantsTrainer(e: UserEntitlementRecord): boolean {
+  return hasActiveUserEntitlement([e], 'lifetime');
 }
 
-// Höchstwertiges gültiges Entitlement (Trainer vor Active, Lifetime bevorzugt).
-export async function getActiveEntitlement(userId: string): Promise<UserEntitlement | null> {
+export function isEntitlementActive(e: UserEntitlementRecord, now?: Date): boolean {
+  return isActiveUserEntitlement(e, now);
+}
+
+export async function getActiveEntitlements(userId: string): Promise<UserEntitlementRecord[]> {
+  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('user_entitlements')
-    .select('*')
+    .select('id,user_id,entitlement,granted_at,expires_at,revoked_at,notes')
     .eq('user_id', userId)
-    .eq('active', true);
-  if (error || !data?.length) return null;
+    .is('revoked_at', null)
+    .or(`expires_at.is.null,expires_at.gt.${now}`);
+  if (error || !data?.length) return [];
 
-  const valid = (data as UserEntitlement[]).filter(isValid);
-  if (!valid.length) return null;
+  return (data as UserEntitlementRow[])
+    .map(mapUserEntitlement)
+    .filter((item): item is UserEntitlementRecord => !!item && isEntitlementActive(item));
+}
 
-  const rank = (e: UserEntitlement) =>
-    (entitlementGrantsTrainer(e) ? 2 : entitlementGrantsPro(e) ? 1 : 0) + (e.is_lifetime ? 0.5 : 0);
-  return valid.sort((a, b) => rank(b) - rank(a))[0];
+export async function getActiveEntitlement(userId: string): Promise<UserEntitlementRecord | null> {
+  const entitlements = await getActiveEntitlements(userId);
+  return entitlements.find((item) => item.entitlement === 'lifetime') ?? entitlements[0] ?? null;
 }

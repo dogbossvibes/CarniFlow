@@ -1,7 +1,11 @@
+import type { UserEntitlement } from '@/features/subscription/plans';
+
 export interface UserCapabilities {
   user_id:        string;
   pro_member:     boolean;
   trainer_module: boolean;
+  hasLifetimeAccess?: boolean;
+  entitlements?: UserEntitlement[];
   updated_at?:    string;
 }
 

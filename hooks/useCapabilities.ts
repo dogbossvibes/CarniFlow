@@ -19,11 +19,15 @@ export function useCapabilities() {
   const isTrainerModule = cap?.trainer_module === true;
   const isPro           = cap?.pro_member === true || isTrainerModule;
   const plan: PlanLevel = planLevelOf(cap);
+  const hasLifetimeAccess = cap?.hasLifetimeAccess === true;
+  const entitlements = cap?.entitlements ?? [];
 
   return {
     capabilities:    cap,
     isPro,
     isTrainerModule,
+    hasLifetimeAccess,
+    entitlements,
     plan,
     loading:         uid ? query.isPending : false,
     refresh:         query.refetch,
