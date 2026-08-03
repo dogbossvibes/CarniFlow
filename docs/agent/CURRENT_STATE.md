@@ -10,7 +10,10 @@
 - **Native:** Continuous Native Generation — `ios/` und `android/` existieren lokal/git-ignored; native Builds verändern den versionierten Tree nicht direkt.
 - **Release-Worktree:** lokaler Release-Worktree ist sauber und steht auf Branch `release/build38-hotfix`, HEAD `f7a5997`.
 - **Build 38 Config im Release-Worktree:** App-Version `1.0.1`, iOS buildNumber `38`, Android versionCode `38`, `runtimeVersion` policy `appVersion`, `updates.url` gesetzt, production channel vorhanden.
-- **Hauptrepo HEAD:** `d4501a7 fix(tracking): finalize quick pickers and manual search start` auf Branch `feat/track-module-rewrite`.
+- **Hauptrepo HEAD:** `ba273f5 chore(agent): record T-34 entitlement commit in handoff docs` auf Branch `feat/track-module-rewrite`.
+- **Feature-Commits in HEAD:** Backpack `0434182`, Journal `2a85fbc`, Dashboard `0061fed`, Home-Backpack-Integration `e447cd2`,
+  Entitlement-System (T-34) `50ccfd2`, Agent-Doku-Update `ba273f5`.
+  Diese Commits sind noch nicht gepusht.
 - **Build-38-Hotfix 2:** EAS Updates veröffentlicht auf Channel/Branch `production`, Runtime `1.0.1`:
   - iOS group `ed746533-d71f-4102-a2b8-a03e59293d97`, update `019fc012-76cc-7bfe-bcad-d1c99453ee3c`
   - Android group `f8c4461c-513c-4039-9369-5eb1c6a956f3`, update `019fc014-3873-7a8b-9a4d-af2eba66de05`
@@ -32,25 +35,56 @@
 - **Remote KI Cleanup:** die sieben verwaisten KI-Edge-Functions wurden in Production gelöscht; `ANTHROPIC_API_KEY` blieb laut späterer Freigabe unangetastet.
 - **Subscription P0:** Production-P0-DB-Änderungen wurden mit Freigabe ausgeführt und finaler Schema-Stand versioniert (`f29717d`).
 
-## Verified (diese Session — Feature-Arbeit Backpack/Journal/Dashboard, UNCOMMITTET)
-- **Backpack (T-25/T-26):** `features/dogs/backpack.ts` = per-user/per-dog AsyncStorage-Checkliste
+## Verified (Backpack/Journal/Dashboard — committed, nicht gepusht)
+- **Backpack (T-25/T-26, `0434182`):** `features/dogs/backpack.ts` = per-user/per-dog AsyncStorage-Checkliste
   (Key `dog_backpack:<userId>:<dogId>`), CRUD/aktiv/gepackt/Reorder/Reset/Vorschläge; UI `app/dog-backpack/[id].tsx`
   + `components/dogs/DogBackpackCard.tsx`; verdrahtet in `features/dogs/DogHubScreen.tsx` + `app/dog/[id].tsx`. **Keine DB-Tabelle/-Migration.**
-- **Journal (T-27):** `app/training-journal.tsx` + `features/training/journal.ts` auf bestehendem `useTrainingFeed`
+- **Journal (T-27, `2a85fbc`):** `app/training-journal.tsx` + `features/training/journal.ts` auf bestehendem `useTrainingFeed`
   (`services/trainingFeed.ts` = Single Source of Truth: `training_units` + `training_sessions` + GPS-Fährten). Keine zweite Historie/DB.
 - **Produktnamen (T-28):** sichtbar „Journal" und „Backpack" (feste Produktnamen, NICHT lokalisiert); technische i18n-Keys stabil.
-- **Dashboard Phase C (T-29):** Overview-Tab in `DogHubScreen.tsx` als Dashboard; reine Logik `features/dogs/dashboard.ts`;
+- **Dashboard Phase C (T-29, `0061fed`):** Overview-Tab in `DogHubScreen.tsx` als Dashboard; reine Logik `features/dogs/dashboard.ts`;
   Karten `DogTodayCard`/`DogAppointmentsCard`/`DogRecentCard`/`DogStatusTiles`; Termine via `getCalendarEvents` (bestehend).
   VM additiv erweitert (`trainingsThisWeek`, `lastFaehrteLabel`). Kein Wetter, keine neue KI, keine Migration.
-- **Tests dieser Session (Verified):** `npx tsc --noEmit` = 0 Errors; `npx jest` = **69 Suites / 671 Tests grün**;
+- **Tests dieser Feature-Commits (Verified):** isolierte Backpack-/Journal-/Dashboard-Index-Prüfungen bestanden;
+  `npx tsc --noEmit` = 0 Errors; fokussierte Jest-Suites grün; `git diff --check` sauber.
   ESLint der neuen/geänderten Dateien = 0 Errors (nur bekannte Test-Mock-Warnings); `expo export` iOS + Android erfolgreich.
 - **Reports:** `docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md`, `docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md`.
 
+## Verified (Home-Backpack-Integration — committed, nicht gepusht)
+- **Commit `e447cd2`:** personalisierte Home-Schnellaktionen und ein konfigurierbares Backpack-Widget pro `dogs.id`.
+- **Konfiguration:** `stores/homeScreenConfig.ts` unterstützt instanzierte Aktionen/Widgets mit `dogId`, Sanitizing
+  und Rückwärtskompatibilität für bestehende einfache Home-Konfigurationen.
+- **UI/Routing:** Home, Anpassungsansicht, QuickActionsWidget, DogBackpackWidget und `/dog-backpack/[id]` verwenden
+  die bestehende Backpack-Domäne ohne DB-Migration oder neue Hundestruktur.
+- **Status:** DE/gsw/FR-Backpack-Keys sowie frühere Einträge, Reaktivierung und dauerhafte Löschbestätigung enthalten.
+- **Tests:** TypeScript und 6 fokussierte Suites / 64 Tests bestanden; vollständige Jest-Suite und iOS-/Android-Exports
+  waren zuvor ebenfalls erfolgreich. iOS wurde teilweise visuell geprüft; Android blieb wegen fehlender Java-Runtime ungetestet.
+
+## Verified (Entitlement-System T-34 — committed, nicht gepusht)
+- **Commit `50ccfd2`:** serverseitig abgesichertes Entitlement-System. Kontrollierte Werte `lifetime`, `beta_tester`,
+  `ambassador`, `staff`; `lifetime` schaltet alle regulären Produkt-Capabilities frei, keine Admin-/Debug-/Supportrechte.
+- **Code:** zentrale Auflösung `resolveEffectiveCapabilities()`/`hasEffectiveCapability()` in `features/subscription/plans.ts`;
+  `services/entitlementService.ts` liest nur eigene aktive Entitlements (RLS); `services/capabilityService.ts`,
+  `lib/entitlements/getUserAccess.ts`, `hooks/useCapabilities.ts`, `types/capabilities.ts` additiv erweitert.
+- **Migrationen (committed, NICHT remote angewendet):** `supabase/migrations/20260802100000_user_entitlements.sql`
+  (Tabelle + CHECK-Constraint + RLS „read own active only", keine Client-Schreibpolicy) und
+  `20260802110000_lifetime_quota_access.sql` (`is_pro_member(uuid)` berücksichtigt aktives `lifetime`; interner
+  SECURITY-DEFINER-Helfer, direkte Client-Ausführung entzogen; keine Spiegelung nach `user_capabilities`).
+- **Tests:** `npx tsc --noEmit` = 0 Errors; fokussierte Suites `entitlements`/`entitlementService`/`lifetime-quota-migration`
+  = 3 Suites / 19 Tests grün; `git diff --cached --check` sauber.
+- **Doku:** `docs/architecture/ENTITLEMENT_SYSTEM.md`; `docs/lifetime-access.md` auf Verweis reduziert.
+- **Isoliert committed:** genau 13 Dateien, kein fremder WIP; Review + Commit durch Claude (2026-08-03).
+
 ## Current Dirty State (Verified via `git status --short`)
-- Das Hauptrepo ist weiterhin dirty mit vielen vorbestehenden/WIP-Dateien ausserhalb des Build-38-Hotfixes.
-- **Neu (diese Session, UNCOMMITTET):** Backpack/Journal/Dashboard-Feature-Dateien (siehe Block oben) — additiv, verifiziert.
+- Das Hauptrepo ist weiterhin dirty mit vielen vorbestehenden/WIP-Dateien ausserhalb der Feature-Commits.
+- Backpack/Journal/Dashboard/Home-Backpack und das Entitlement-System (T-34) sind nicht mehr dirty, sondern in HEAD
+  committed; sie wurden nicht gepusht.
 - Hotfix 2 selbst ist committed (`d4501a7`); die verbleibenden dirty Dateien sind nicht Teil dieses Hotfixes.
-- Wichtige dirty/untracked Bereiche: Home/Profile/Connect/Tracking-Komponenten, `legal-web/index.html`, `legal-web/funktionen.html`, `legal-web/assets/`, lokale SQL-/Dump-/Screenshot-/dist-Artefakte, Agent-/Workspace-Dateien.
+- Wichtige dirty/untracked Bereiche: Heat- und Home-i18n-Änderungen, Home/Profile/Tracking/Connect-Komponenten,
+  Website-Dateien, Architektur-/Agent-Dokumentation, P0-FIX-01 Migrations-Baseline (`supabase/migrations/README.md`) und
+  P0-Reports, lokale SQL-/Dump-/Screenshot-/dist-Artefakte. (Die Entitlement-Codedateien sind jetzt committed.)
+- Mehrere Dateien aus dem Home-Backpack-Commit sind weiterhin dirty und enthalten dort fremde bzw. nachgelagerte Hunks;
+  insbesondere Home-/Locale-Dateien müssen bei späterem Staging hunk-genau behandelt werden.
 
 ## Assumed
 - EAS Updates erreichen installierte Build-38-Binaries mit Runtime `1.0.1` auf production channel; reale Geräteprüfung steht noch aus.
@@ -63,3 +97,4 @@
 - Ob Store-/RevenueCat-Dashboard-Konfiguration vollständig finalisiert ist.
 - Ob die Website-Startseite/Funktionsseite releasefähig ist; sie ist lokal WIP und nicht deployed.
 - Vollständigkeit/Aktualität der ADR-/Architektur-Docs gegenüber dem aktuellen Code.
+- Ob der Home-Backpack-Flow auf Android und auf echten Geräten vollständig abgenommen ist.
