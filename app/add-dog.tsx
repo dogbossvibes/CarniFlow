@@ -140,7 +140,7 @@ export default function HundHinzufuegenScreen() {
       best_score:       bestwert.trim()  || null,
       color:            farbe.trim()     || null,
       microchip_number: mikrochip.trim() || null,
-      tasso_registered: null,   // Legacy-Spalte: bei neuen Hunden nicht mehr aktiv genutzt
+      tasso_registered: false,   // Legacy-Spalte: bei neuen Hunden nicht mehr aktiv genutzt
       ...draftToColumns(registry),
       vet:              tierarzt.trim()  || null,
       vaccination:      impfung.trim()   || null,
