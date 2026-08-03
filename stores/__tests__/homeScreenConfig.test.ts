@@ -1,9 +1,15 @@
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createElement } from 'react';
+import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
+import { Text } from 'react-native';
 import {
   ALL_HOME_WIDGETS,
   ALL_QUICK_ACTIONS,
+  ALL_FAB_ACTIONS,
+  DEFAULT_FAB_ACTION,
   addDogBackpackQuickAction,
   actionIdOf,
   DEFAULT_HOME_CONFIG,
@@ -12,11 +18,24 @@ import {
   keyForUser,
   moveInArray,
   sanitizeHomeScreenConfig,
+  setHomeScreenConfig,
   setWidgetVisible,
   toggleQuickAction,
+  useHomeScreenConfig,
   visibleWidgets,
   type HomeScreenConfig,
 } from '@/stores/homeScreenConfig';
+
+function FabHost({ userId }: { userId: string | null }) {
+  const cfg = useHomeScreenConfig(userId);
+  return createElement(Text, null, cfg.fabActionId);
+}
+
+function fabTexts(node: ReactTestRenderer): string[] {
+  return (node.root as unknown as { findAllByType: (t: unknown) => { props: { children: unknown } }[] })
+    .findAllByType(Text)
+    .map((t) => String(t.props.children));
+}
 
 describe('homeScreenConfig — Startbildschirm-Konfiguration', () => {
   // 1) Default-Config ist gültig & sofort nutzbar
@@ -167,5 +186,55 @@ describe('homeScreenConfig — Startbildschirm-Konfiguration', () => {
     });
     const entries = out.quickActions.filter(item => typeof item !== 'string');
     expect(new Set(entries.map(item => typeof item === 'string' ? item : item.instanceId)).size).toBe(2);
+  });
+
+  // ── FAB (personalisierbarer Schnellbutton) ──────────────────────────────
+
+  it('26) FAB-Standard = Termin erstellen (neue Nutzer + fehlender Wert)', () => {
+    expect(DEFAULT_FAB_ACTION).toBe('create_appointment');
+    expect(DEFAULT_HOME_CONFIG.fabActionId).toBe('create_appointment');
+    expect(DEFAULT_HOME_CONFIG.fabVisible).toBe(true);
+    expect(sanitizeHomeScreenConfig(null).fabActionId).toBe('create_appointment');
+    expect(sanitizeHomeScreenConfig(undefined).fabActionId).toBe('create_appointment');
+    expect(sanitizeHomeScreenConfig({} as unknown).fabActionId).toBe('create_appointment');
+    expect(sanitizeHomeScreenConfig(null).fabVisible).toBe(true);
+  });
+
+  it('27) gespeicherte FAB-Auswahl bleibt erhalten (kein Zurücksetzen)', () => {
+    const out = sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG, fabActionId: 'start_track', fabVisible: false });
+    expect(out.fabActionId).toBe('start_track');
+    expect(out.fabVisible).toBe(false);
+  });
+
+  it('28) ungültige/alte Action-ID fällt auf create_appointment zurück', () => {
+    expect(sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG, fabActionId: 'ghost_action' } as unknown).fabActionId).toBe(DEFAULT_FAB_ACTION);
+    expect(sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG, fabActionId: '' } as unknown).fabActionId).toBe(DEFAULT_FAB_ACTION);
+  });
+
+  it('29) hidden-Aktion wird als ID akzeptiert (Alt-Configs)', () => {
+    expect(ALL_FAB_ACTIONS).toContain('hidden');
+    expect(sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG, fabActionId: 'hidden' }).fabActionId).toBe('hidden');
+  });
+
+  it('30) fabVisible: Standard true, nur explizit false bleibt false', () => {
+    expect(sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG, fabVisible: 'nope' } as unknown).fabVisible).toBe(true);
+    expect(sanitizeHomeScreenConfig({ ...DEFAULT_HOME_CONFIG, fabVisible: false }).fabVisible).toBe(false);
+  });
+
+  it('31) Auswahl wird gespeichert (setHomeScreenConfig → AsyncStorage)', async () => {
+    setHomeScreenConfig({ ...DEFAULT_HOME_CONFIG, fabActionId: 'start_training' });
+    const raw = await AsyncStorage.getItem(keyForUser(null));
+    const stored = JSON.parse(raw ?? '{}');
+    expect(stored.fabActionId).toBe('start_training');
+  });
+
+  it('32) App-Neustart behält die FAB-Auswahl (hydrate aus AsyncStorage)', async () => {
+    await AsyncStorage.setItem(keyForUser('u1'), JSON.stringify({ ...DEFAULT_HOME_CONFIG, fabActionId: 'start_track', fabVisible: false }));
+    let node!: ReactTestRenderer;
+    await act(async () => {
+      node = TestRenderer.create(createElement(FabHost, { userId: 'u1' }));
+    });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(fabTexts(node)).toContain('start_track');
   });
 });

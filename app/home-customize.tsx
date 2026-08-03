@@ -17,15 +17,21 @@ import {
   updateWidgetConfig,
   useHomeScreenConfig,
   visibleWidgets,
+  ALL_FAB_ACTIONS,
+  HOME_FAB_ACTIONS_META,
+  type HomeFabActionId,
   type HomeLayoutMode,
   type HomeQuickActionId,
   type HomeScreenConfig,
   type HomeWidgetId,
 } from '@/stores/homeScreenConfig';
+import { ActionListModal } from '@/components/home/ActionListModal';
+import { FAB_ACTION_LABEL_KEY } from '@/components/QuickAddSheet';
 import { useDogs } from '@/hooks/useDogs';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useT, type TranslationKey } from '@/i18n';
+import { useState } from 'react';
 import {
   Alert, ScrollView, StyleSheet, Switch, Text,
   TouchableOpacity, View,
@@ -76,6 +82,7 @@ export default function HomeCustomizeScreen() {
   const { user } = useSession();
   const { dogs } = useDogs();
   const config = useHomeScreenConfig(user?.id);
+  const [fabPickerOpen, setFabPickerOpen] = useState(false);
 
   const activeActions = config.quickActions;
   const inactiveActions = ALL_QUICK_ACTIONS.filter((a) => a !== 'dog_backpack' && !activeActions.some(entry => actionIdOf(entry) === a));
@@ -314,6 +321,61 @@ export default function HomeCustomizeScreen() {
             </View>
           </>
         )}
+
+        {/* ── SCHNELLBUTTON (FAB) ── */}
+        <Text style={s.sectionLabel}>{t('fab.title')}</Text>
+        <View style={s.karte}>
+          <TouchableOpacity
+            style={s.zeile}
+            onPress={() => setFabPickerOpen(true)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('fab.selectTitle')}
+          >
+            <View style={s.zeileIcon}>
+              {config.fabActionId === 'hidden' || !HOME_FAB_ACTIONS_META[config.fabActionId] ? (
+                <Ionicons name="eye-off-outline" size={18} color={C.accent} />
+              ) : (
+                <Ionicons name={(HOME_FAB_ACTIONS_META[config.fabActionId]?.icon ?? 'add') as IconName} size={18} color={C.accent} />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.zeileLabel}>
+                {config.fabActionId === 'hidden' || !HOME_FAB_ACTIONS_META[config.fabActionId]
+                  ? t('fab.hide')
+                  : t(FAB_ACTION_LABEL_KEY[config.fabActionId])}
+              </Text>
+              <Text style={s.zeileSub}>{t('fab.selectTitle')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.muted} />
+          </TouchableOpacity>
+          <View style={[s.zeile, s.zeileTrenner]}>
+            <Text style={[s.zeileLabel, { flex: 1, marginBottom: 0 }]}>{t('fab.visible')}</Text>
+            <Switch
+              value={config.fabVisible !== false}
+              onValueChange={(v) => setHomeScreenConfig({ ...config, fabVisible: v })}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+              accessibilityLabel={t('fab.visible')}
+            />
+          </View>
+        </View>
+
+        <ActionListModal
+          visible={fabPickerOpen}
+          onClose={() => setFabPickerOpen(false)}
+          title={t('fab.selectTitle')}
+          items={ALL_FAB_ACTIONS.filter((id) => id !== 'hidden').map((id) => ({
+            key: id,
+            icon: HOME_FAB_ACTIONS_META[id]?.icon as IconName | undefined,
+            label: t(FAB_ACTION_LABEL_KEY[id]),
+            selected: id === config.fabActionId,
+          }))}
+          onSelect={(key) => {
+            setHomeScreenConfig({ ...config, fabActionId: key as HomeFabActionId });
+            setFabPickerOpen(false);
+          }}
+        />
 
         {/* ── RESET ── */}
         <TouchableOpacity

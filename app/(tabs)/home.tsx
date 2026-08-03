@@ -341,7 +341,7 @@ export default function HomeScreen() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
-      <QuickAddSheet />
+      <QuickAddSheet personalized />
       {toast}
     </SafeAreaView>
   );

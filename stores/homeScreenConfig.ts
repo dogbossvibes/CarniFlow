@@ -11,6 +11,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type HomeLayoutMode   = 'grid' | 'list' | 'compact';
 export type HomeWidgetId      = 'week' | 'smart_analysis' | 'quick_actions' | 'recent_sessions' | 'dogs' | 'dog_backpack';
 export type HomeQuickActionId = 'add_dog' | 'start_timer' | 'track_gps' | 'lay_track' | 'document_training' | 'start_obedience' | 'show_analysis' | 'training_journal' | 'dog_backpack';
+// Personalisierbarer Startseiten-FAB: eine der Aktionen ODER 'hidden' (Button
+// ausblenden — von älteren Configs akzeptiert; renderseitig wie fabVisible=false).
+export type HomeFabActionId   = 'start_training' | 'document_training' | 'training_journal' | 'start_track' | 'create_appointment' | 'add_dog' | 'open_backpack' | 'hidden';
 
 export type HomeQuickActionConfig = {
   instanceId: string;
@@ -32,12 +35,23 @@ export interface HomeScreenConfig {
   widgetOrder:   HomeWidgetId[];        // Reihenfolge aller Widgets
   hiddenWidgets: HomeWidgetId[];        // ausgeblendete Widgets
   widgetConfigs?: HomeWidgetConfig[];   // optionale Parameter für instanzierte Widgets
+  fabActionId:   HomeFabActionId;       // Aktion des Startseiten-FAB (Standard: Termin erstellen)
+  fabVisible:    boolean;               // FAB sichtbar (false = ausblenden, kein Platzhalter)
 }
 
 export const HOME_LAYOUT_MODES: HomeLayoutMode[]   = ['grid', 'list', 'compact'];
 export const ALL_HOME_WIDGETS: HomeWidgetId[]       = ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs', 'dog_backpack'];
 export const ALL_QUICK_ACTIONS: HomeQuickActionId[] = ['add_dog', 'start_timer', 'track_gps', 'lay_track', 'document_training', 'start_obedience', 'show_analysis', 'training_journal', 'dog_backpack'];
 export const MAX_QUICK_ACTIONS = 6;
+
+// Alle wählbaren FAB-Aktionen inkl. 'hidden' (Sanitize-Akzeptanz). Reihenfolge
+// = Reihenfolge im Auswahl-Dialog.
+export const ALL_FAB_ACTIONS: HomeFabActionId[] = [
+  'start_training', 'document_training', 'training_journal', 'start_track',
+  'create_appointment', 'add_dog', 'open_backpack', 'hidden',
+];
+// Standard für neue Nutzer UND Fallback bei ungültiger/veralteter Action-ID.
+export const DEFAULT_FAB_ACTION: HomeFabActionId = 'create_appointment';
 
 // Metadaten-Registry (Label/Icon/Route) — eine Quelle, keine duplizierten switches.
 export const HOME_LAYOUT_LABEL: Record<HomeLayoutMode, string> = { grid: 'Raster', list: 'Liste', compact: 'Kompakt' };
@@ -54,6 +68,20 @@ export const HOME_QUICK_ACTIONS_META: Record<HomeQuickActionId, { label: string;
   dog_backpack:     { label: 'Backpack',         icon: 'bag-handle-outline',   route: '/dog-backpack/[id]' },
 };
 
+// FAB-Registry: Icon je Aktion. Route nur für die einfachen Routen-Aktionen;
+// add_dog/open_backpack haben eigene Logik (Quota-Gate bzw. Hund-Kontext) im
+// FAB-Renderer — eine Quelle, keine duplizierten Switches.
+export const HOME_FAB_ACTIONS_META: Partial<Record<HomeFabActionId, { icon: string; route?: string }>> = {
+  start_training:       { icon: 'play',              route: '/unit/start' },
+  document_training:    { icon: 'create-outline',    route: '/unit/document' },
+  training_journal:     { icon: 'book-outline',      route: '/training-journal' },
+  start_track:          { icon: 'navigate-outline',  route: '/track' },
+  create_appointment:   { icon: 'calendar',          route: '/training-hub' },
+  add_dog:              { icon: 'paw' },
+  open_backpack:        { icon: 'bag-handle-outline' },
+  // 'hidden' hat kein Icon — renderseitig wird der Button ausgeblendet.
+};
+
 export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: string; description: string }> = {
   week:            { label: 'Wochenübersicht',  icon: 'calendar-outline', description: 'Trainingstage dieser Woche' },
   smart_analysis:  { label: 'Smart Analyse',    icon: 'sparkles-outline', description: 'Coach & deterministische Hinweise' },
@@ -64,13 +92,15 @@ export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: stri
 };
 
 // Default: sinnvoll ohne Benutzeraktion. Schnellzugriffe = 6 (ohne „Analyse";
-// Schutzdienst wird bewusst nicht angeboten).
+// Schutzdienst wird bewusst nicht angeboten). FAB-Standard = Termin erstellen.
 export const DEFAULT_HOME_CONFIG: HomeScreenConfig = {
   layout:        'grid',
   quickActions:  ['add_dog', 'start_timer', 'track_gps', 'document_training', 'lay_track', 'start_obedience'],
   widgetOrder:   ['week', 'smart_analysis', 'quick_actions', 'recent_sessions', 'dogs', 'dog_backpack'],
   hiddenWidgets: [],
   widgetConfigs: [],
+  fabActionId:   DEFAULT_FAB_ACTION,
+  fabVisible:    true,
 };
 
 // ── Reine Helfer (testbar) ──────────────────────────────────────────────────
@@ -142,7 +172,16 @@ export function sanitizeHomeScreenConfig(raw: unknown): HomeScreenConfig {
     }
   }
 
-  return { layout, quickActions: limitedQuickActions, widgetOrder, hiddenWidgets, widgetConfigs };
+  // FAB-Aktion: gültige ID behalten, sonst sicher auf Standard zurückfallen.
+  // Fehlender Wert (bestehende Nutzer/Alt-Configs) → Standard. Keine bestehende
+  // Konfiguration wird zurückgesetzt; die neuen Felder werden nur ergänzt.
+  const fabActionId: HomeFabActionId = ALL_FAB_ACTIONS.includes(r.fabActionId as HomeFabActionId)
+    ? (r.fabActionId as HomeFabActionId)
+    : DEFAULT_FAB_ACTION;
+  // fabVisible: nur explizit false bleibt false; alles andere (fehlend/gültig) → true.
+  const fabVisible = r.fabVisible === false ? false : true;
+
+  return { layout, quickActions: limitedQuickActions, widgetOrder, hiddenWidgets, widgetConfigs, fabActionId, fabVisible };
 }
 
 // Element in einem Array verschieben (dir: -1 hoch, +1 runter). Reiner Helfer.
