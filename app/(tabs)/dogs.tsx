@@ -1,6 +1,5 @@
 import { DogCompactCard } from "@/components/dogs/DogCompactCard";
 import { dogToIdentity } from "@/components/dogs/types";
-import { QuickAddSheet } from "@/components/QuickAddSheet";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { DogIcon } from "@/components/ui/DogIcon";
 import { reportScroll } from "@/stores/liveBarScroll";
@@ -137,7 +136,6 @@ export default function HundeScreen() {
           )}
         </ScrollView>
       )}
-      <QuickAddSheet />
     </SafeAreaView>
   );
 }
