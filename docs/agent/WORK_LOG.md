@@ -3,6 +3,33 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-08-04 — opencode (Build-39-Release-Readiness-Audit + Handoff-Doku)
+
+Branch: `feat/track-module-rewrite`, HEAD `c268eee` (42 Commits vor `origin`). Read-only-Audit; danach
+ausschliesslich Agent-Doku aktualisiert. Kein `git add`, kein Commit, kein Push, kein Build, keine
+Remote-Migration, keine History-Reparatur, keine Release-Nummern geändert.
+- **Clean-HEAD-Verifikation** (detachierter Worktree auf `c268eee`, danach entfernt): `npm ci` OK;
+  `tsc --noEmit` 0 Errors; Jest **77 Suites / 856 Tests PASS**; `expo export` iOS + Android beide OK;
+  `git diff --check HEAD^ HEAD` sauber. Vorbestehend: 1 Lint-Error `app/dog-command/detail.tsx:69:110`
+  (seit `ab602c0`), 77 Warnungen.
+- **Arbeitender Tree:** `tsc --noEmit` 0 Errors; Jest **84 Suites / 910 Tests PASS**.
+- **Klassifikation der uncommitteten Änderungen:** T-39 (Journal-Karte), T-40 (Distanz+Dedup), **T-44**
+  (neu vergeben; Trainer-Hub-Redesign, Profil-Duplikat-Einträge, Umfrage-/Summary-Back-Fallback) + Build-39-Fixes
+  (DateField-Android-Spinner, ShareLink-Robustheit, T-43-`@username`-Hunks) als Build-39 zu committen;
+  fremde WIP (ANYVO-ID-Umbennung, i18n-Hardcode-Migration, Connect/Tracking) ausgeschlossen.
+- **Statuskorrektur in Doku:** T-42/T-42D (`7490969`/`e8f57be`/`c268eee`) und T-43 (`7517e1d`, inkl. Migration)
+  sind bereits **committed** — TASKS.md/CURRENT_STATE/SESSION_HANDOFF behaupteten „uncommittet" (veraltet).
+- **Datenbank (verified):** remote fehlen `20260803120000_fix_shared_trainings_fk.sql` (untracked) und
+  `20260803140000_profiles_username.sql` (committed) — kein `supabase db push`, nur kontrollierter Workflow.
+- **Release-Konfiguration (verified):** `app.json` version `1.0.1`, iOS `buildNumber "38"`, Android
+  `versionCode 37` (→ 39); `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` nirgends gesetzt (nur iOS-Key) → Android-IAP
+  sonst inaktiv.
+- **Gate:** Build 39 = **NOT READY** (uncommittete Build-39-Features, fehlende Remote-Migrationen,
+  Release-Config-Lücken). Nächste freie TASK-ID jetzt **T-45**.
+- Doku: `TASKS.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md` (manuelle Sektionen; AUTO-GENERATED-Block bewusst
+  nicht regeneriert, da `agent:handoff` nicht ausgeführt), `WORK_LOG.md`.
+- Prüfungen: `npm run agent:status`, `npm run agent:start`, `git diff --check` — PASS.
+
 ## 2026-08-03 — Claude Code (T-34 Übernahme + isolierter Commit)
 
 Branch: `feat/track-module-rewrite`. Übernahme von Codex; read-only Takeover-Bericht erstellt.
