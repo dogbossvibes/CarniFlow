@@ -14,8 +14,6 @@ import { DogIcon } from '@/components/ui/DogIcon';
 import { ApportierholzIcon } from '@/components/ui/ApportierholzIcon';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
-import { useCapabilities } from '@/hooks/useCapabilities';
-import { useHubBadge } from '@/hooks/useHubBadge';
 import { registerForPush } from '@/lib/push';
 import { configurePurchases } from '@/lib/purchases';
 import { QuickAddSheet } from '@/components/QuickAddSheet';
@@ -64,8 +62,6 @@ function TabBarBackground() {
 
 export default function TabLayout() {
   const { session, loading } = useSession();
-  const { isTrainerModule } = useCapabilities();
-  const hubBadge = useHubBadge();
   const router = useRouter();
   // System-Navigations-Inset (Gesten-Bar / 3-Button-Leiste). Bei aktivem
   // Edge-to-Edge (Android 15) zeichnet die App hinter der Systemleiste — die
@@ -166,22 +162,15 @@ export default function TabLayout() {
           }}
         />
         {/* Fährten: kein eigener Tab — Einstieg über Training → „Fährte (GPS)". */}
-        {/* Slot 4: Hub (Trainer) ODER Analyse (Kunde) — gegenseitig exklusiv. */}
-        <Tabs.Screen
-          name="hub"
-          options={{
-            title: 'Hub',
-            href: isTrainerModule ? undefined : null,
-            tabBarBadge: hubBadge > 0 ? hubBadge : undefined,
-            tabBarBadgeStyle: { backgroundColor: C.accent, color: C.accentText, fontSize: 10, fontWeight: '800' },
-            tabBarIcon: ({ focused, size }) => <TabIcon name="grid" focused={focused} size={size} />,
-          }}
-        />
+        {/* Analyse ist für ALLE Pläne (NEWBIE/ACTIVE/Lifetime/TRAINER) ein fester
+            Kern-Tab in Slot 4 — er wird nie ersetzt, ausgeblendet oder umbenannt.
+            Der Trainer-Hub ist KEIN Tab, sondern ein Fullscreen-Modal (Root-Route
+            /trainer-hub), additiv über Profil → „Trainer-Tools" erreichbar und auf
+            die echte Trainer-Capability gegated. */}
         <Tabs.Screen
           name="analytics"
           options={{
             title: 'Analyse',
-            href: isTrainerModule ? null : undefined,
             tabBarIcon: ({ focused, size }) => <TabIcon name="bar-chart" focused={focused} size={size} />,
           }}
         />

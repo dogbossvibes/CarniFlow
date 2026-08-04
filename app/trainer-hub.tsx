@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { Glass, isGlass } from '@/components/ui/Glass';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -12,6 +12,8 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 interface Module { icon: IconName; color: string; titleKey: TranslationKey; subKey: TranslationKey; route: string; badge?: boolean }
 
+// Inhalte des Trainer-Hubs unverändert (nur Präsentation als Fullscreen-Modal +
+// sichere Rücknavigation geändert).
 const MODULES: Module[] = [
   { icon: 'ribbon',        color: '#00F5D4', titleKey: 'trainer.profile',   subKey: 'trainer.profileSub',    route: '/trainer/edit' },
   { icon: 'people',        color: '#60A5FA', titleKey: 'trainer.clients',   subKey: 'trainer.clientsHubSub', route: '/(tabs)/clients', badge: true },
@@ -22,29 +24,44 @@ const MODULES: Module[] = [
   { icon: 'people-circle', color: '#34D399', titleKey: 'trainer.eyebrow',   subKey: 'trainer.connectionsSub', route: '/trainer' },
 ];
 
-export default function HubScreen() {
+// Trainer-Hub als Fullscreen-Modal (im Root-Stack registriert). Öffnen via
+// router.push('/trainer-hub') aus dem Profil → der Herkunfts-Screen bleibt in der
+// History, Schließen kehrt exakt dorthin zurück. Zugang nur mit echter
+// Trainer-Capability (useCapabilities); direkter Aufruf ohne Berechtigung leitet
+// sicher auf den Analyse-Tab um, ohne Hub-Inhalte anzuzeigen.
+export default function TrainerHubScreen() {
   const router = useRouter();
   const { t } = useT();
-  const { isTrainerModule } = useCapabilities();
+  const { isTrainerModule, loading } = useCapabilities();
   const hubBadge = useHubBadge();
 
-  if (!isTrainerModule) {
-    return (
-      <SafeAreaView style={s.safe} edges={['top']}>
-        <View style={s.header}><Text style={s.title}>Hub</Text></View>
-        <View style={s.locked}>
-          <Ionicons name="lock-closed" size={32} color={C.muted} />
-          <Text style={s.lockedTxt}>{t('trainer.moduleRequired')}</Text>
-          <TouchableOpacity style={s.upgrade} onPress={() => router.push('/premium')} activeOpacity={0.85}>
-            <Text style={s.upgradeTxt}>{t('trainer.unlock')}</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // Schließen: zurück auf den Herkunfts-Screen; ohne History (Deep-Link) sicher
+  // auf den Analyse-Tab. Funktioniert identisch auf iOS und Android; der
+  // Hardware-Back auf Android schließt das native Modal ohnehin.
+  const close = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/analytics');
+  };
+
+  // Capabilities laden noch → nichts rendern (kein Content-Flash, kein verfrühtes Redirect).
+  if (loading) return <View style={s.safe} />;
+  // Keine Trainer-Berechtigung → sicher auf Analyse umleiten, kein Hub-Inhalt.
+  if (!isTrainerModule) return <Redirect href="/(tabs)/analytics" />;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
+      <View style={s.topBar}>
+        <TouchableOpacity
+          onPress={close}
+          hitSlop={10}
+          style={s.closeBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
+          testID="trainer-hub-close"
+        >
+          <Ionicons name="chevron-back" size={24} color={C.white} />
+        </TouchableOpacity>
+      </View>
       <View style={s.header}>
         <Text style={s.eyebrow}>{t('trainer.eyebrow')}</Text>
         <Text style={s.title}>Hub</Text>
@@ -81,7 +98,9 @@ export default function HubScreen() {
 
 const s = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: C.bg },
-  header:  { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
+  topBar:  { paddingHorizontal: 12, paddingTop: 4 },
+  closeBtn:{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  header:  { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 14 },
   eyebrow: { fontSize: 9, color: '#00F5D4', fontWeight: '800', letterSpacing: 2, marginBottom: 2 },
   title:   { fontSize: 26, color: C.white, fontWeight: '900', letterSpacing: -0.5 },
   content: { paddingHorizontal: 20, paddingTop: 4 },
@@ -96,9 +115,4 @@ const s = StyleSheet.create({
   badgeTxt:{ fontSize: 12, color: C.accentText, fontWeight: '800' },
   cardTitle: { fontSize: 16, color: C.white, fontWeight: '800' },
   cardSub:   { fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 16 },
-
-  locked:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 32 },
-  lockedTxt: { fontSize: 16, color: C.white, fontWeight: '700' },
-  upgrade:  { backgroundColor: C.accent, borderRadius: 14, paddingHorizontal: 22, paddingVertical: 13 },
-  upgradeTxt: { fontSize: 15, color: C.accentText, fontWeight: '800' },
 });

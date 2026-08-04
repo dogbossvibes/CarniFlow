@@ -644,7 +644,7 @@ export default function ProfilScreen() {
         <Text style={s.abschnitt}>{t('profile.secTrainerTools')}</Text>
         {isTrainerModule ? (
           <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
-            <EinstellungZeile icon="grid-outline" label="Trainer-Hub" onPress={() => router.push('/(tabs)/hub')} />
+            <EinstellungZeile icon="grid-outline" label={t('profile.trainerHub')} onPress={() => router.push('/trainer-hub')} />
             <View style={s.trenner} />
             <EinstellungZeile icon="megaphone-outline" label="Terminumfrage erstellen" onPress={() => router.push('/umfrage')} />
             <View style={s.trenner} />
