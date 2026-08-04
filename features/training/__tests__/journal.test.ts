@@ -157,3 +157,47 @@ describe('Card-Ableitungen', () => {
     expect(itemNotePreview(mk({}))).toBeNull();
   });
 });
+
+describe('GPS-Fährten im Journal (T-40)', () => {
+  const trackFeed: FeedItem[] = [
+    mk({ id: 'tr-malu', source: 'track', discipline: 'Fährte', dogName: 'Malu', dog_id: 'dogA', session_date: '2026-08-02', duration_sec: 1800 }),
+    mk({ id: 'tr-yam',  source: 'track', discipline: 'Fährte', dogName: 'Yam',  dog_id: 'dogB', session_date: '2026-08-01', duration_sec: 2400 }),
+    mk({ id: 'ob',      source: 'session', discipline: 'Obedience', dogName: 'Malu', dog_id: 'dogA', session_date: '2026-07-30' }),
+  ];
+
+  it('ohne GPS-Fährten: Feed enthält keine track-Einträge', () => {
+    const feed = [mk({ id: 'x', discipline: 'Obedience' })];
+    expect(feed.filter(i => i.source === 'track')).toHaveLength(0);
+  });
+
+  it('mit einer GPS-Fährte: track-Eintrag mit Sparte „Fährte"', () => {
+    const feed = [mk({ id: 'tr1', source: 'track', discipline: 'Fährte' })];
+    expect(feed.filter(i => i.source === 'track' && itemDiscipline(i) === 'Fährte')).toHaveLength(1);
+  });
+
+  it('mehrere GPS-Fährten: alle enthalten', () => {
+    expect(trackFeed.filter(i => i.source === 'track')).toHaveLength(2);
+  });
+
+  it('GPS-Fährte mit Hund Malu und mit Hund Yam per Hundfilter', () => {
+    expect(filterFeed(trackFeed, { dogId: 'dogA' }, NOW).map(i => i.id)).toEqual(['tr-malu', 'ob']);
+    expect(filterFeed(trackFeed, { dogId: 'dogB' }, NOW).map(i => i.id)).toEqual(['tr-yam']);
+  });
+
+  it('Filter „Fährte" zeigt alle GPS-Fährten, aber keine andere Sparte', () => {
+    expect(filterFeed(trackFeed, { discipline: 'Fährte' }, NOW).map(i => i.id).sort()).toEqual(['tr-malu', 'tr-yam']);
+  });
+
+  it('„Alle Sparten" (kein Filter) enthält alle Einträge', () => {
+    expect(filterFeed(trackFeed, {}, NOW)).toHaveLength(3);
+  });
+
+  it('Zeitraumfilter 7d enthält alle Einträge im Zeitfenster', () => {
+    expect(filterFeed(trackFeed, { period: '7d' }, NOW).map(i => i.id)).toEqual(['tr-malu', 'tr-yam', 'ob']);
+  });
+
+  it('keine Duplikate in der gruppierten Zeitleiste', () => {
+    const ids = groupFeed(trackFeed, NOW).flatMap(g => g.items.map(i => i.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

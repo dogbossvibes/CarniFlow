@@ -73,6 +73,17 @@ export default function SummaryScreen() {
     router.replace('/(tabs)/home');
   };
 
+  const dirty = rating != null || notes.trim() !== '' || Object.values(metrics).some(v => v != null);
+
+  const zurueck = () => {
+    tapHaptic();
+    if (!dirty) { router.back(); return; }
+    Alert.alert(t('training.leaveTrainingTitle'), t('training.leaveTrainingBody'), [
+      { text: t('training.continueEditing'), style: 'cancel' },
+      { text: t('training.backToTraining'), onPress: () => router.back() },
+    ]);
+  };
+
   return (
     <View style={s.root}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -158,6 +169,12 @@ export default function SummaryScreen() {
           <View style={{ height: 40 }} />
         </View>
       </ScrollView>
+
+      <SafeAreaView edges={['top']} style={s.backWrap} pointerEvents="box-none">
+        <TouchableOpacity style={s.backBtn} onPress={zurueck} activeOpacity={0.7} hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color={C.white} />
+        </TouchableOpacity>
+      </SafeAreaView>
     </View>
   );
 }
@@ -165,6 +182,9 @@ export default function SummaryScreen() {
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: 0 },
+
+  backWrap: { position: 'absolute', top: 0, left: 20, right: 20 },
+  backBtn:  { width: 38, height: 38, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
 
   heroSafe:  { flex: 1, justifyContent: 'flex-end', paddingHorizontal: 20, paddingBottom: 24 },
   celebrate: { gap: 8 },

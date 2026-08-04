@@ -9,6 +9,8 @@ import type { TrainingSession } from '@/types';
 export type FeedSource = 'unit' | 'session' | 'track';
 export interface FeedItem extends TrainingUnit {
   source: FeedSource;
+  /** Nur GPS-Fährten: Länge der gelegten Fährte in Metern (sonst undefined). */
+  distance_meters?: number | null;
 }
 
 export function sessionToFeedItem(s: TrainingSession): FeedItem {
@@ -91,6 +93,7 @@ export function trackRowToFeedItem(t: any): FeedItem {
     dog:          t.dog,
     exercises:    [exercise],
     source:       'track',
+    distance_meters: t.distance_meters ?? null,
   };
 }
 
@@ -101,7 +104,10 @@ export function buildFeed(
 ): FeedItem[] {
   const items = [
     ...units.map(unitToFeedItem),
-    ...sessions.map(sessionToFeedItem),
+    // GPS-Fährten liegen als training_sessions(type='track') UND als tracks vor.
+    // type='track' aus den Sessions herausfiltern, damit jede Fährte genau einmal
+    // (als track, Sparte „Fährte") im vereinheitlichten Feed erscheint.
+    ...sessions.filter((s) => (s as { type?: string }).type !== 'track').map(sessionToFeedItem),
     ...tracks.map(trackRowToFeedItem),
   ];
   return items.sort((a, b) => {

@@ -51,6 +51,18 @@ export default function TrainingScreen() {
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </AnimatedPressable>
 
+        {/* Trainingstagebuch */}
+        <AnimatedPressable style={[s.faehrteCard, { marginBottom: 12 }]} scale={0.98} onPress={() => router.push('/training-journal')}>
+          <View style={[s.actionIcon, { backgroundColor: `${C.accent}1A` }]}>
+            <Ionicons name="book-outline" size={20} color={C.accent} />
+          </View>
+          <View style={s.flex}>
+            <Text style={s.docTitel}>{t('training.journal')}</Text>
+            <Text style={s.docSub}>{t('training.journalSub')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={C.muted} />
+        </AnimatedPressable>
+
         {/* Fährten-Tool */}
         <AnimatedPressable style={s.faehrteCard} scale={0.98} onPress={() => router.push('/track' as never)}>
           <View style={[s.actionIcon, { backgroundColor: `${C.success}1A` }]}>

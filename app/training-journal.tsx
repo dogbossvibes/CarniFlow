@@ -282,9 +282,10 @@ function JournalCard({
   const note = itemNotePreview(item);
   const media = itemHasMedia(item);
   const durationMin = item.duration_sec != null ? Math.round(item.duration_sec / 60) : null;
+  const distance = item.distance_meters != null ? `${Math.round(item.distance_meters)} m` : null;
   const time = new Date(item.session_date).toLocaleDateString(localeTag, { day: '2-digit', month: 'short' });
 
-  const meta = [dogName || null, durationMin != null ? minutesLabel(durationMin) : null, time].filter(Boolean).join(' · ');
+  const meta = [dogName || null, durationMin != null ? minutesLabel(durationMin) : null, distance, time].filter(Boolean).join(' · ');
   const a11y = `${discipline}. ${meta}${item.rating != null ? `. ${pointsLabel(item.rating)}` : ''}${media ? `. ${mediaLabel}` : ''}`;
 
   return (
