@@ -35,7 +35,16 @@ export async function createShareLink(
     .select('token')
     .single();
 
-  if (error) throw error;
+  // Echte Ursache in DEV sichtbar machen (RLS 401/403, FK-Verletzung 23503, …),
+  // statt sie im aufrufenden catch pauschal zu verschlucken.
+  if (error) {
+    if (__DEV__) console.error('[share] createShareLink insert failed', error);
+    throw error;
+  }
+  if (!data?.token) {
+    if (__DEV__) console.error('[share] createShareLink returned no token', data);
+    throw new Error('share_link_no_token');
+  }
   return `https://anyvo.app/share/${data.token}`;
 }
 
