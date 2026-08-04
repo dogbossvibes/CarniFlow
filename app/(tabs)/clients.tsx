@@ -112,6 +112,7 @@ export default function ClientsScreen() {
                     </View>
                     <View style={s.flex}>
                       <Text style={s.name}>{c.counterpartName ?? t('trainer.newRequest')}</Text>
+                      {c.counterpartUsername ? <Text style={s.usernameTxt}>@{c.counterpartUsername}</Text> : null}
                       <Text style={s.sub}>{t('trainer.wantsToConnect')}</Text>
                     </View>
                     <TouchableOpacity style={s.rejectBtn} onPress={() => decline(c)} activeOpacity={0.8}>
@@ -133,6 +134,7 @@ export default function ClientsScreen() {
                     <View style={s.avatar}><Text style={s.avatarTxt}>{initial(c.counterpartName)}</Text></View>
                     <View style={s.flex}>
                       <Text style={s.name}>{c.counterpartName ?? t('trainer.clientFallback')}</Text>
+                      {c.counterpartUsername ? <Text style={s.usernameTxt}>@{c.counterpartUsername}</Text> : null}
                       <Text style={s.sub}>{t('trainer.connected')}</Text>
                     </View>
                     <AnimatedPressable style={s.unlinkBtn} scale={0.9} onPress={() => remove(c)}>
@@ -174,6 +176,7 @@ const s = StyleSheet.create({
   avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.cardAlt, alignItems: 'center', justifyContent: 'center' },
   avatarTxt: { fontSize: 18, color: C.white, fontWeight: '800' },
   name:   { fontSize: 15, color: C.white, fontWeight: '700' },
+  usernameTxt: { fontSize: 11, color: C.accent, fontWeight: '600', marginTop: 2 },
   sub:    { fontSize: 13, color: C.muted, fontWeight: '500', marginTop: 2 },
 
   acceptBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },

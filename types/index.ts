@@ -5,6 +5,7 @@ export type Plan = 'free' | 'premium';
 export type Profile = {
   id:                      string;
   full_name:               string | null;
+  username:                string | null;   // öffentlicher @-Name (ohne @, klein), siehe T-43
   plan:                    Plan;
   plan_expires_at:         string | null;
   trial_used:              boolean;

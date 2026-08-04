@@ -59,6 +59,17 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'profile.saveFailed': 'Het nöd chönne gspeicheret werde. Bitte spöter nomal versueche.',
   'profile.emailPasswordHint': 'E-Mail-Änderig und Passwort findsch unter Konto & Sicherheit.',
   'profile.oauthEmailHint': 'Du bisch über {provider} amäldet — dini E-Mail wird det verwaltet.',
+  'profile.username': 'Benutzername',
+  'profile.usernamePlaceholder': '@name (optional)',
+  'profile.usernameHelp': 'Dine öffentlichi @-Name, z. B. @max.muster. Nur Chliibuechstabe a–z, Zahle, _ und . — ohni Leerzeiche. Wird i dim Profil und für Trainer sichtbar.',
+  'profile.usernameAvailable': 'Verfüegbar',
+  'profile.usernameTaken': 'Dä Name isch scho vergeh.',
+  'profile.usernameCheckFailed': 'Verfüegbarkeit het nöd chönne prüeft werde. Bitte spöter nomal versueche.',
+  'profile.usernameInvalid': 'Nur Chliibuechstabe a–z, Zahle, _ und . sind erlaubt.',
+  'profile.usernameTooShort': 'Mindeschtens 3 Zeiche.',
+  'profile.usernameTooLong': 'Höchschtens 24 Zeiche.',
+  'profile.usernameReserved': 'Dä Name isch reserviert.',
+  'profile.usernameSaved': 'Benutzername gspeicheret.',
 
   // Sprach-Auswahl-Screen
   'language.title':    'Sprach',

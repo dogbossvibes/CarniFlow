@@ -40,8 +40,9 @@ export async function listConnections(userId: string): Promise<ConnectionView[]>
   if (!rows.length) return [];
 
   const counterpartIds = rows.map(r => r.owner_user_id === userId ? r.connected_user_id : r.owner_user_id);
-  const { data: profs } = await supabase.from('profiles').select('id,full_name').in('id', counterpartIds);
+  const { data: profs } = await supabase.from('profiles').select('id,full_name,username').in('id', counterpartIds);
   const nameById = new Map((profs ?? []).map(p => [p.id, p.full_name as string | null]));
+  const usernameById = new Map((profs ?? []).map(p => [p.id, p.username as string | null]));
 
   return rows.map(r => {
     const myRole = r.owner_user_id === userId ? 'owner' : 'connected';
@@ -51,6 +52,7 @@ export async function listConnections(userId: string): Promise<ConnectionView[]>
       myRole,
       counterpartId,
       counterpartName: r.connection_name ?? nameById.get(counterpartId) ?? null,
+      counterpartUsername: usernameById.get(counterpartId) ?? null,
     };
   });
 }

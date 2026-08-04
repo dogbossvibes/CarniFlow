@@ -7,6 +7,7 @@ import { C } from "@/constants/colors";
 import { useT, type TranslationKey } from "@/i18n";
 import { useDogs } from "@/hooks/useDogs";
 import { useSession } from "@/hooks/useSession";
+import { useProfile } from "@/hooks/useProfile";
 import { useTrainingFeed } from "@/hooks/useTrainingFeed";
 import { useFeedDelete } from "@/hooks/useFeedDelete";
 import type { FeedItem } from "@/services/trainingFeed";
@@ -81,6 +82,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { t } = useT();
   const { user } = useSession();
+  const { profile: homeProfile } = useProfile();
   const { dogs, loading: hundeLoading, refresh: refreshDogs } = useDogs();
   const { feed, loading: feedLoading, refresh: refreshFeed } = useTrainingFeed();
   const { onDelete: deleteItem, toast } = useFeedDelete();
@@ -303,6 +305,7 @@ export default function HomeScreen() {
             <View>
               <Text style={s.heroBegruessung}>{t(begruessungKey())}</Text>
               <Text style={s.heroName}>{vorname}</Text>
+              {homeProfile?.username ? <Text style={s.heroUsername}>@{homeProfile.username}</Text> : null}
             </View>
             {/* Dezenter Anpassen-Button + Hilfe (Coachmark „home") */}
             <View style={s.heroBtnReihe}>
@@ -459,6 +462,12 @@ const s = StyleSheet.create({
     color: C.white,
     fontWeight: "900",
     letterSpacing: -0.5,
+  },
+  heroUsername: {
+    fontSize: 13,
+    color: C.accent,
+    fontWeight: "700",
+    marginTop: 2,
   },
   heroBtnReihe: { flexDirection: "row", alignItems: "center", gap: 6 },
   heroIconBtn: {

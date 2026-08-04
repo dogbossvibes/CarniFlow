@@ -59,6 +59,17 @@ export const deCH = {
   'profile.saveFailed': 'Konnte nicht gespeichert werden. Bitte später erneut versuchen.',
   'profile.emailPasswordHint': 'E-Mail-Änderung und Passwort findest du unter Konto & Sicherheit.',
   'profile.oauthEmailHint': 'Du bist über {provider} angemeldet — deine E-Mail wird dort verwaltet.',
+  'profile.username': 'Benutzername',
+  'profile.usernamePlaceholder': '@name (optional)',
+  'profile.usernameHelp': 'Dein öffentlicher @-Name, z. B. @max.muster. Nur Kleinbuchstaben a–z, Zahlen, _ und . — ohne Leerzeichen. Wird in deinem Profil und für Trainer sichtbar.',
+  'profile.usernameAvailable': 'Verfügbar',
+  'profile.usernameTaken': 'Dieser Name ist bereits vergeben.',
+  'profile.usernameCheckFailed': 'Verfügbarkeit konnte nicht geprüft werden. Bitte versuche es später erneut.',
+  'profile.usernameInvalid': 'Nur Kleinbuchstaben a–z, Zahlen, _ und . sind erlaubt.',
+  'profile.usernameTooShort': 'Mindestens 3 Zeichen.',
+  'profile.usernameTooLong': 'Höchstens 24 Zeichen.',
+  'profile.usernameReserved': 'Dieser Name ist reserviert.',
+  'profile.usernameSaved': 'Benutzername gespeichert.',
 
   // Sprach-Auswahl-Screen
   'language.title':    'Sprache',

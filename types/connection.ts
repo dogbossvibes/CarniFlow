@@ -15,9 +15,10 @@ export interface Connection {
 
 // Connection angereichert um den Namen des Gegenübers + meine Rolle darin.
 export interface ConnectionView extends Connection {
-  myRole:           ConnectionSide;   // bin ich owner (Kunde) oder connected (Trainer)?
-  counterpartId:    string;
-  counterpartName:  string | null;
+  myRole:               ConnectionSide;   // bin ich owner (Kunde) oder connected (Trainer)?
+  counterpartId:        string;
+  counterpartName:      string | null;
+  counterpartUsername?: string | null;    // @-Name des Gegenübers (T-43, sofern gesetzt)
 }
 
 export interface ConnectionPermissions {

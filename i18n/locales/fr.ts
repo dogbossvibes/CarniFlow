@@ -34,6 +34,17 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "profile.changePassword": "Changer le mot de passe",
   "profile.deleteAccount":  "Supprimer le compte",
   "profile.logout":         "Se déconnecter",
+  "profile.username":       "Nom d'utilisateur",
+  "profile.usernamePlaceholder": "@nom (facultatif)",
+  "profile.usernameHelp":   "Ton @-nom public, p. ex. @max.muster. Uniquement lettres minuscules a–z, chiffres, _ et . — sans espaces. Visible dans ton profil et pour les entraîneurs.",
+  "profile.usernameAvailable": "Disponible",
+  "profile.usernameTaken":  "Ce nom est déjà pris.",
+  "profile.usernameCheckFailed": "La disponibilité n'a pas pu être vérifiée. Veuillez réessayer plus tard.",
+  "profile.usernameInvalid": "Seuls les caractères a–z, 0–9, _ et . sont autorisés.",
+  "profile.usernameTooShort": "3 caractères minimum.",
+  "profile.usernameTooLong":  "24 caractères maximum.",
+  "profile.usernameReserved": "Ce nom est réservé.",
+  "profile.usernameSaved":  "Nom d'utilisateur enregistré.",
 
   // Sprach-Auswahl-Screen
   "language.title":    "Langue",
