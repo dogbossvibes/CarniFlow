@@ -39,6 +39,12 @@ export function DateField({
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
         value: base, mode, is24Hour: true, maximumDate, minimumDate,
+        // Datum als Walzen-Picker (Tag·Monat·Jahr) statt großem Monatskalender:
+        // das Jahr ist damit direkt wähl-/scrollbar wie auf iOS — ältere Jahrgänge
+        // (z. B. 2010/2015) ohne Monat-für-Monat-Zurücktippen. Zeit bleibt beim
+        // nativen Default (Uhr). maximumDate verhindert weiterhin Zukunftsdaten,
+        // fehlendes minimumDate lässt beliebig weit zurückliegende Jahre zu.
+        display: isTime ? 'default' : 'spinner',
         onChange: (e, d) => { if (e.type === 'set' && d) onChange(d); },
       });
     } else {
@@ -49,7 +55,7 @@ export function DateField({
   return (
     <View style={style}>
       {label ? <Text style={s.label}>{label}</Text> : null}
-      <Pressable style={s.field} onPress={open}>
+      <Pressable style={s.field} onPress={open} testID="date-field">
         <Ionicons name={icon} size={18} color={C.accent} />
         <Text style={[s.value, !value && s.placeholder]} numberOfLines={1}>{value ? format(value) : ph}</Text>
         {value && onClear ? (
