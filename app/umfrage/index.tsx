@@ -34,6 +34,13 @@ function parseHM(s: string): Date | null {
 export default function UmfrageErstellenScreen() {
   const router = useRouter();
   const { t } = useT();
+
+  // Zurück: mit History → router.back(); ohne History (Deep-Link/Dev-Reload)
+  // sicher in den Trainer-Hub wechseln — kein unbehandeltes GO_BACK, kein Crash.
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/trainer-hub');
+  };
   const { session } = useSession();
   const [clients, setClients] = useState<{ id: string; name: string | null }[]>([]);
   useEffect(() => {
@@ -72,13 +79,13 @@ export default function UmfrageErstellenScreen() {
     });
     setLoading(false);
     if (error) { alert2(t('common.error'), error); return; }
-    alert2(t('poll.sentTitle'), t('poll.sentBody'), () => router.back());
+    alert2(t('poll.sentTitle'), t('poll.sentBody'), handleBack);
   };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.topBar}>
-        <TouchableOpacity onPress={() => router.back()} style={s.back} hitSlop={8}>
+        <TouchableOpacity onPress={handleBack} style={s.back} hitSlop={8}>
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
       </View>

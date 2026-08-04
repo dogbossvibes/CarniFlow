@@ -65,10 +65,28 @@ describe('Trainer-Hub als Fullscreen-Modal mit sicherer Rücknavigation', () => 
     expect(rootLayoutSrc).toMatch(/name="trainer-hub"[\s\S]*?presentation:\s*'fullScreenModal'/);
   });
 
-  it('gated auf echte Trainer-Capability (Redirect statt Inhalt) ohne Content-Flash beim Laden', () => {
+  it('gated auf echte Trainer-Capability (Redirect statt Inhalt), Loading zeigt nur den Rahmen', () => {
     expect(hubModalSrc).toContain('useCapabilities');
-    expect(hubModalSrc).toMatch(/if\s*\(\s*loading\s*\)\s*return/);
+    expect(hubModalSrc).toMatch(/loading\s*\?\s*null\s*:/);
     expect(hubModalSrc).toMatch(/!isTrainerModule[\s\S]*?<Redirect\s+href="\/\(tabs\)\/analytics"/);
+  });
+
+  it('rendert den Zurück-Button immer, auch während Capabilities laden (kein Festsitzen)', () => {
+    // Der Close-Button steht im JSX VOR dem Loading-/Capability-Gate, wird also
+    // unbedingt gerendert — sonst bliebe man im Fullscreen-Modal ohne Rückweg.
+    const closeIdx = hubModalSrc.indexOf('testID="trainer-hub-close"');
+    const loadingGateIdx = hubModalSrc.indexOf('loading ?');
+    expect(closeIdx).toBeGreaterThanOrEqual(0);
+    expect(loadingGateIdx).toBeGreaterThan(closeIdx);
+  });
+
+  it('platziert den Header explizit unter der Safe Area (insets.top statt SafeAreaView)', () => {
+    // Gleiches Muster wie die übrigen Fullscreen-Modal-Screens (track/legen.tsx):
+    // eigener Header mit paddingTop = insets.top + 8 — nie über Uhr/Statusleiste.
+    expect(hubModalSrc).toContain('useSafeAreaInsets');
+    expect(hubModalSrc).toMatch(/paddingTop:\s*insets\.top\s*\+\s*8/);
+    expect(hubModalSrc).not.toContain('<SafeAreaView');
+    expect(hubModalSrc).toMatch(/borderRadius:\s*22/);
   });
 
   it('schließt sicher: back mit History, sonst Fallback auf Analyse', () => {

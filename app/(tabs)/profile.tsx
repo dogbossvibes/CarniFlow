@@ -1,4 +1,3 @@
-import { QuickAddSheet } from "@/components/QuickAddSheet";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
 import { C } from "@/constants/colors";
@@ -103,15 +102,7 @@ export default function ProfilScreen() {
   const winkelErkennung = useAutoDetectSetting();
   const volumeKeyArticle = useVolumeKeyArticleSetting();
 
-  const showShortcutHelp = () => Alert.alert(
-    'Gegenstand per Kurzbefehl',
-    'So legst du dir einen Schnell-Gegenstand auf eine Taste:\n\n' +
-    '1. App „Kurzbefehle" öffnen → neuen Kurzbefehl erstellen.\n' +
-    '2. Aktion „URL öffnen" hinzufügen, URL: anyvo://track/quick-add-article\n' +
-    '3. Den Kurzbefehl unter Einstellungen → Bedienungshilfen → Tippen → Auf Rückseite tippen ' +
-    '(oder auf den Action-Button) zuweisen.\n\n' +
-    'Während einer laufenden Fährtenaufnahme setzt das Auslösen einen Gegenstand.',
-  );
+  const showShortcutHelp = () => Alert.alert(t('profile.shortcutObject'), t('profile.shortcutHelp'));
 
   const [einladungen, setEinladungen] = useState<TrainerUmfrage[]>([]);
   useEffect(() => { if (user?.id) getMyInvitations(user.id).then(setEinladungen); }, [user?.id]);
@@ -130,14 +121,10 @@ export default function ProfilScreen() {
   const handleBenachrichtigungen = async (value: boolean) => {
     const { blocked } = await benachrichtigungen.toggle(value);
     if (blocked) {
-      Alert.alert(
-        "Benachrichtigungen blockiert",
-        "Aktiviere Benachrichtigungen für ANYVO in den Systemeinstellungen, um Erinnerungen und Kommentare zu erhalten.",
-        [
-          { text: "Später", style: "cancel" },
-          { text: "Einstellungen öffnen", onPress: benachrichtigungen.openSystemSettings },
-        ]
-      );
+      Alert.alert(t('profile.notificationsBlocked'), t('profile.notificationsBlockedBody'), [
+        { text: t('common.later'), style: 'cancel' },
+        { text: t('profile.openSettings'), onPress: benachrichtigungen.openSystemSettings },
+      ]);
     }
   };
 
@@ -149,15 +136,15 @@ export default function ProfilScreen() {
   const handleAppLock = async (value: boolean) => {
     if (value) {
       if (!LocalAuth) {
-        Alert.alert("Nicht verfügbar", "Die App-Sperre ist in diesem Build noch nicht verfügbar (benötigt einen neuen Build).");
+        Alert.alert(t('premium.notAvailable'), t('profile.appLockUnavailable'));
         return;
       }
       const hasHw = await LocalAuth.hasHardwareAsync().catch(() => false);
       const enrolled = await LocalAuth.isEnrolledAsync().catch(() => false);
       if (!hasHw || !enrolled) {
         Alert.alert(
-          "Nicht eingerichtet",
-          "Richte zuerst Face ID / Touch ID / Fingerabdruck oder einen Geräte-Code in den Systemeinstellungen ein.",
+          t('profile.appLockNotConfigured'),
+          t('profile.appLockNotConfiguredBody'),
         );
         return;
       }
@@ -186,15 +173,15 @@ export default function ProfilScreen() {
   const handleCancelTrial = () => {
     const uid = user?.id; if (!uid) return;
     Alert.alert(
-      'Testabo kündigen?',
+      t('premium.cancelTrialTitle'),
       trialEndLabel
-        ? `Dein Zugriff bleibt bis zum ${trialEndLabel} bestehen und läuft danach automatisch aus. Es wird nichts abgebucht.`
-        : 'Dein Zugriff bleibt bis zum Ende der Testphase bestehen und läuft danach automatisch aus.',
+        ? t('premium.cancelTrialBodyDate', { date: trialEndLabel })
+        : t('premium.cancelTrialBody'),
       [
-        { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Kündigen', style: 'destructive', onPress: async () => {
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('premium.cancel'), style: 'destructive', onPress: async () => {
           const { error } = await cancelTrial(uid);
-          if (error) { Alert.alert('Hinweis', 'Kündigung fehlgeschlagen. Bitte später erneut versuchen.'); return; }
+          if (error) { Alert.alert(t('common.notice'), t('premium.cancelError')); return; }
           setTrialSub(t => t ? { ...t, cancelAtPeriodEnd: true } : t);
           queryClient.invalidateQueries({ queryKey: ['capabilities'] });
           queryClient.invalidateQueries({ queryKey: ['userAccess'] });
@@ -203,7 +190,7 @@ export default function ProfilScreen() {
     );
   };
 
-  const anzeigeName = user?.user_metadata?.full_name ?? "Hundesportler";
+  const anzeigeName = user?.user_metadata?.full_name ?? t('profile.defaultName');
   const email = user?.email ?? "";
   const initialen = anzeigeName
     .split(" ")
@@ -213,10 +200,10 @@ export default function ProfilScreen() {
     .slice(0, 2);
 
   const handleAbmelden = () => {
-    Alert.alert("Abmelden", "Möchtest du dich wirklich abmelden?", [
-      { text: "Zurück", style: "cancel" },
+    Alert.alert(t('profile.logout'), t('profile.logoutConfirm'), [
+      { text: t('common.back'), style: 'cancel' },
       {
-        text: "Abmelden",
+        text: t('profile.logout'),
         style: "destructive",
         onPress: async () => {
           await signOut();
@@ -274,7 +261,7 @@ export default function ProfilScreen() {
       >
         {/* Kopfzeile */}
         <View style={s.kopf}>
-          <Text style={s.augenbraue}>DEIN KONTO</Text>
+          <Text style={s.augenbraue}>{t('profile.yourAccountUpper')}</Text>
           <Text style={s.titel}>{t('profile.title')}</Text>
         </View>
 
@@ -295,6 +282,7 @@ export default function ProfilScreen() {
           </View>
           <View style={s.identitaetInfo}>
             <Text style={s.anzeigeName}>{anzeigeName}</Text>
+            {profile?.username ? <Text style={s.usernameText}>@{profile.username}</Text> : null}
             <Text style={s.emailText}>{email}</Text>
           </View>
           <TouchableOpacity style={s.bearbeitenBtn} activeOpacity={0.7} onPress={() => router.push('/edit-profile')}>
@@ -322,7 +310,7 @@ export default function ProfilScreen() {
             color={isPro ? C.accent : C.muted}
           />
           <Text style={[s.planBtnText, isPro && s.planBtnTextAktiv]}>
-            {plan === 'trainer' ? 'Trainer aktiv' : plan === 'pro' ? 'Active aktiv' : 'Upgrade auf Active'}
+            {plan === 'trainer' ? t('premium.trainerActiveShort') : plan === 'pro' ? t('premium.activeShort') : t('premium.upgradeActive')}
           </Text>
           {!isPro && (
             <Ionicons name="chevron-forward" size={14} color={C.subtle} />
@@ -332,9 +320,9 @@ export default function ProfilScreen() {
         {/* Statistiken */}
         <View style={[s.statsReihe, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
           {[
-            { label: "HUNDE", wert: String(dogs.length) },
-            { label: "EINHEITEN", wert: String(sessions.length) },
-            { label: "SERIE", wert: "—" },
+            { label: t('profile.dogsUpper'), wert: String(dogs.length) },
+            { label: t('analyse.units').toUpperCase(), wert: String(sessions.length) },
+            { label: t('profile.streakUpper'), wert: "—" },
           ].map(({ label, wert }, i, arr) => (
             <View
               key={label}
@@ -383,10 +371,10 @@ export default function ProfilScreen() {
                 <Text style={s.proAbzeichenText}>ACTIVE</Text>
               </View>
               <Text style={s.proUeberschrift}>
-                Schalte dein{"\n"}volles Potenzial frei.
+                {t('premium.unlockPotential')}
               </Text>
               <Text style={s.proUntertitel}>
-                Erweiterte Analysen, unbegrenzte Einheiten, PDF-Export.
+                {t('premium.profileBannerSub')}
               </Text>
               <AnimatedPressable style={s.proBtn} onPress={() => router.push('/premium')} scale={0.97}>
                 <LinearGradient
@@ -395,7 +383,7 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proBtnText}>7 Tage gratis testen</Text>
+                <Text style={s.proBtnText}>{t('premium.try7Days')}</Text>
               </AnimatedPressable>
             </View>
           </View>
@@ -422,30 +410,30 @@ export default function ProfilScreen() {
               </View>
               <View style={s.premiumAktivBadge}>
                 <Ionicons name="checkmark-circle" size={13} color={C.success} />
-                <Text style={s.premiumAktivText}>Aktiv</Text>
+                <Text style={s.premiumAktivText}>{t('premium.current')}</Text>
               </View>
             </View>
             <Text style={s.premiumTitel}>
               {isActiveTrial
-                ? 'Testphase aktiv'
+                ? t('premium.trialActive')
                 : access.isLifetime
-                  ? (access.hasTrainerAccess ? 'Lifetime Trainer Zugriff aktiv' : 'Lifetime Zugriff aktiv')
-                  : (plan === 'trainer' ? 'Trainer aktiv' : 'Active aktiv')}
+                  ? (access.hasTrainerAccess ? t('premium.lifetimeTrainerActive') : t('premium.lifetimeActive'))
+                  : (plan === 'trainer' ? t('premium.trainerActiveShort') : t('premium.activeShort'))}
             </Text>
             <Text style={s.premiumSub}>
               {isActiveTrial
                 ? (trialCancelled
-                    ? (trialEndLabel ? `Gekündigt — läuft am ${trialEndLabel} aus. Es wird nichts abgebucht.` : 'Gekündigt — läuft am Ende der Testphase aus.')
-                    : (trialEndLabel ? `Kostenlos testen bis ${trialEndLabel}` : 'Kostenlose Testphase aktiv'))
+                    ? (trialEndLabel ? t('premium.cancelledAccessEndsDate', { date: trialEndLabel }) : t('premium.cancelledAccessEnds'))
+                    : (trialEndLabel ? t('premium.freeTrialUntil', { date: trialEndLabel }) : t('premium.trialActive')))
                 : access.isLifetime
-                  ? 'Du hast lebenslangen Zugriff auf diese Funktionen.'
+                  ? t('premium.lifetimeFeature')
                   : expiresAt
-                    ? `Verlängert sich am ${expiresAt.toLocaleDateString("de-CH")}`
-                    : "Unbegrenzt aktiv"}
+                    ? t('premium.renewsAt', { date: expiresAt.toLocaleDateString("de-CH") })
+                    : t('premium.unlimitedActive')}
             </Text>
             {isActiveTrial && !trialCancelled && (
               <TouchableOpacity onPress={handleCancelTrial} activeOpacity={0.7} style={s.trialCancelBtn}>
-                <Text style={s.trialCancelTxt}>Testabo kündigen</Text>
+                <Text style={s.trialCancelTxt}>{t('premium.cancelTrialLink')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -531,7 +519,7 @@ export default function ProfilScreen() {
             <View style={{ flex: 1 }}>
               <Text style={s.zeileLabel}>{t('profile.autoAngle')}</Text>
               <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                Winkel, Spitzwinkel & Abriss. Gegenstände bleiben manuell.
+                {t('profile.autoAngleSub')}
               </Text>
             </View>
             <Switch
@@ -552,7 +540,7 @@ export default function ProfilScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.zeileLabel}>{t('profile.volumeKey')}</Text>
                 <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                  Während der Aufnahme setzt die Lautstärke-Taste einen Gegenstand.
+                  {t('profile.volumeKeySub')}
                 </Text>
               </View>
               <Switch
@@ -571,7 +559,7 @@ export default function ProfilScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.zeileLabel}>{t('profile.shortcutObject')}</Text>
                 <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                  Schnell-Gegenstand auf Back-Tap / Action-Button legen.
+                  {t('profile.shortcutObjectSub')}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={C.muted} />
@@ -581,8 +569,8 @@ export default function ProfilScreen() {
           <View style={s.trenner} />
           <EinstellungZeile
             icon="footsteps-outline"
-            label="Schrittlänge"
-            wert={stepLength.stepLengthM != null ? `Persönlich: ${Math.round(stepLength.stepLengthM * 100)} cm` : 'Standard: 75 cm'}
+            label={t('profile.stepLength')}
+            wert={stepLength.stepLengthM != null ? t('profile.stepLengthPersonal', { cm: Math.round(stepLength.stepLengthM * 100) }) : t('profile.stepLengthDefault')}
             onPress={() => router.push('/track/kalibrierung' as never)}
           />
         </View>
@@ -622,7 +610,7 @@ export default function ProfilScreen() {
           <View style={s.trenner} />
           <EinstellungZeile
             icon="ribbon-outline"
-            label={isTrainerModule ? 'Mein Trainer-Profil' : 'Trainer werden'}
+            label={isTrainerModule ? t('profile.myTrainerProfile') : t('profile.becomeTrainer')}
             onPress={() => router.push('/trainer/edit')}
           />
           <View style={s.trenner} />
@@ -645,17 +633,13 @@ export default function ProfilScreen() {
         {isTrainerModule ? (
           <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
             <EinstellungZeile icon="grid-outline" label={t('profile.trainerHub')} onPress={() => router.push('/trainer-hub')} />
-            <View style={s.trenner} />
-            <EinstellungZeile icon="megaphone-outline" label="Terminumfrage erstellen" onPress={() => router.push('/umfrage')} />
-            <View style={s.trenner} />
-            <EinstellungZeile icon="stats-chart-outline" label="Meine Umfragen" onPress={() => router.push('/umfrage/meine')} />
           </View>
         ) : (
           <View style={s.gateCard}>
-            <Text style={s.gateTitle}>Trainer-Modul freischalten</Text>
-            <Text style={s.gateSub}>Verwalte Kunden, Trainingspläne, Umfragen und Chats — mit dem Trainer-Plan.</Text>
+            <Text style={s.gateTitle}>{t('profile.unlockTrainerModule')}</Text>
+            <Text style={s.gateSub}>{t('profile.trainerModuleSub')}</Text>
             <TouchableOpacity style={s.upgradeBtn} onPress={() => router.push('/premium')} activeOpacity={0.85}>
-              <Text style={s.upgradeBtnTxt}>{isPro ? 'Trainer freischalten →' : '🔒 Trainer-Plan ansehen'}</Text>
+              <Text style={s.upgradeBtnTxt}>{isPro ? t('profile.unlockTrainer') : t('profile.viewTrainerPlan')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -668,7 +652,7 @@ export default function ProfilScreen() {
                 <View key={u.id}>
                   <EinstellungZeile
                     icon="megaphone-outline"
-                    label={`Umfrage von ${u.trainer_name}`}
+                    label={t('profile.pollFrom', { trainer: u.trainer_name })}
                     wert={u.training_arten.join(', ') || undefined}
                     onPress={() => router.push(`/umfrage/${u.id}`)}
                   />
@@ -681,7 +665,7 @@ export default function ProfilScreen() {
 
         <Text style={s.abschnitt}>{t('profile.secDisciplines')}</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
-          <Text style={s.sparteHint}>Aktiviere die Sparten, die du trainierst. Sie erscheinen in der Trainingserfassung.</Text>
+          <Text style={s.sparteHint}>{t('profile.disciplinesHint')}</Text>
           {ALLE_SPARTEN.map((sp, i) => {
             const aktiv = aktiveSparten.includes(sp.id);
             return (
@@ -708,7 +692,7 @@ export default function ProfilScreen() {
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
           <EinstellungZeile
             icon="compass-outline"
-            label="Hilfe & ANYVO kennenlernen"
+            label={t('help.centerTitle')}
             onPress={() => router.push('/help-center' as never)}
           />
           <View style={s.trenner} />
@@ -723,7 +707,7 @@ export default function ProfilScreen() {
             label={t('profile.sendFeedback')}
             onPress={() =>
               Linking.openURL(`mailto:shadesofym@gmail.com?subject=${encodeURIComponent('ANYVO Feedback')}`)
-                .catch(() => Alert.alert('Kein E-Mail-Programm', 'Schreib uns gern direkt an shadesofym@gmail.com.'))
+                .catch(() => Alert.alert(t('profile.noMailApp'), t('profile.mailFallback')))
             }
           />
           <View style={s.trenner} />
@@ -760,7 +744,6 @@ export default function ProfilScreen() {
 
         <Text style={s.version}>ANYVO v1.0.0</Text>
       </ScrollView>
-      <QuickAddSheet />
     </SafeAreaView>
   );
 }
@@ -814,6 +797,7 @@ const s = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 3,
   },
+  usernameText: { fontSize: 13, color: C.accent, fontWeight: "600", marginBottom: 3 },
   emailText: { fontSize: 13, color: C.muted },
   bearbeitenBtn: {
     width: 36,
