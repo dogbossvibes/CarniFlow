@@ -8,20 +8,32 @@ import { getMyClientConnections } from '@/services/connectionService';
 import { createUmfrage } from '@/services/umfrageService';
 import type { NeuerTermin } from '@/types/umfrage';
 import { DateField } from '@/components/ui/DateField';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 import { parseDeDate } from '@/features/dogs/dateInput';
+import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 
-// Date → "TT.MM.JJJJ" (das gespeicherte Termin-Datumsformat bleibt erhalten).
-const chDate = (d: Date) => `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-
+// Trainingsarten sind feste Fachbegriffe (Eigennamen) — bewusst nicht lokalisiert.
 const TRAINING_ARTEN = ['IGP', 'Unterordnung', 'Schutzdienst', 'Fährte', 'Obedience', 'Agility', 'Begleithund'];
 
-function fmtTime(t: string): string {
-  const c = t.replace(/\D/g, '');
-  return c.length >= 2 ? `${c.slice(0, 2)}:${c.slice(2, 4)}` : c;
+// Das gespeicherte Datums-/Zeitformat bleibt erhalten (TT.MM.JJJJ bzw. HH:MM).
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const chDate = (d: Date) => `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`;
+const fmtHM = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+// "HH:MM" → Date (Datumsteil irrelevant, nur Uhrzeit) bzw. null für leer/ungültig.
+function parseHM(s: string): Date | null {
+  const m = s.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return new Date(2000, 0, 1, h, min);
 }
 
 export default function UmfrageErstellenScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const [clients, setClients] = useState<{ id: string; name: string | null }[]>([]);
   useEffect(() => {
@@ -45,12 +57,12 @@ export default function UmfrageErstellenScreen() {
 
   const toggle = <T,>(a: T[], v: T) => a.includes(v) ? a.filter(x => x !== v) : [...a, v];
   const updateTermin = (i: number, field: keyof NeuerTermin, value: string) =>
-    setTermine(p => p.map((t, idx) => idx === i ? { ...t, [field]: value } : t));
+    setTermine(p => p.map((tm, idx) => idx === i ? { ...tm, [field]: value } : tm));
 
   const handleSend = async () => {
-    if (!trainerName.trim()) { Alert.alert('Ups 🐾', 'Bitte Trainername eingeben.'); return; }
-    if (arten.length === 0)  { Alert.alert('Ups 🐾', 'Bitte Training-Art wählen.'); return; }
-    if (termine.some(t => !t.datum || !t.von)) { Alert.alert('Ups 🐾', 'Bitte alle Termine ausfüllen (Datum + Von).'); return; }
+    if (!trainerName.trim()) { alert2(t('poll.validationTitle'), t('poll.errName')); return; }
+    if (arten.length === 0)  { alert2(t('poll.validationTitle'), t('poll.errType')); return; }
+    if (termine.some(tm => !tm.datum || !tm.von)) { alert2(t('poll.validationTitle'), t('poll.errDates')); return; }
     if (!session?.user.id) return;
 
     setLoading(true);
@@ -59,113 +71,159 @@ export default function UmfrageErstellenScreen() {
       arten, notiz, termine, kundenIds: kunden,
     });
     setLoading(false);
-    if (error) { Alert.alert('Ups 🐾', error); return; }
-    Alert.alert('Super! 🎉', 'Umfrage wurde gesendet!', [{ text: 'OK', onPress: () => router.back() }]);
+    if (error) { alert2(t('common.error'), error); return; }
+    alert2(t('poll.sentTitle'), t('poll.sentBody'), () => router.back());
   };
 
   return (
-    <SafeAreaView style={S.container} edges={['top']}>
-      <View style={S.topBar}>
-        <TouchableOpacity onPress={() => router.back()} style={S.back} hitSlop={8}><Ionicons name="chevron-back" size={22} color="#E8E8F2" /></TouchableOpacity>
+    <SafeAreaView style={s.container} edges={['top']}>
+      <View style={s.topBar}>
+        <TouchableOpacity onPress={() => router.back()} style={s.back} hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color={C.white} />
+        </TouchableOpacity>
       </View>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? undefined : 'height'}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={{ paddingBottom: 48 }}
-      >
-        <View style={S.header}>
-          <Text style={S.title}>Terminumfrage</Text>
-          <Text style={S.sub}>Erstelle eine neue Umfrage</Text>
-        </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={s.content}
+        >
+          <View style={s.header}>
+            <Text style={s.title}>{t('poll.title')}</Text>
+            <Text style={s.sub}>{t('poll.subtitle')}</Text>
+          </View>
 
-        <Text style={S.lbl}>Trainer Name</Text>
-        <TextInput style={S.input} value={trainerName} onChangeText={setTrainerName} placeholder="Dein Name" placeholderTextColor="#525270" />
+          <Input
+            label={t('poll.trainerName')}
+            placeholder={t('poll.trainerNamePlaceholder')}
+            value={trainerName}
+            onChangeText={setTrainerName}
+            autoCapitalize="words"
+          />
 
-        <Text style={S.lbl}>Training-Art (Mehrfach)</Text>
-        <View style={S.chipRow}>
-          {TRAINING_ARTEN.map(art => (
-            <TouchableOpacity key={art} style={[S.chip, arten.includes(art) && S.chipOn]} onPress={() => setArten(p => toggle(p, art))}>
-              <Text style={[S.chipTxt, arten.includes(art) && S.chipTxtOn]}>{art}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={S.lbl}>Notiz an Kunden</Text>
-        <TextInput style={[S.input, S.textarea]} value={notiz} onChangeText={setNotiz} placeholder="z. B. Apportierholz mitbringen…" placeholderTextColor="#525270" multiline />
-
-        <Text style={S.lbl}>Terminvorschläge</Text>
-        {termine.map((t, i) => (
-          <View key={i} style={S.terminCard}>
-            <View style={S.terminHeader}>
-              <Text style={S.terminNr}>Termin {i + 1}</Text>
-              {termine.length > 1 && (
-                <TouchableOpacity onPress={() => setTermine(p => p.filter((_, idx) => idx !== i))}>
-                  <Text style={{ color: '#E04040', fontSize: 12 }}>Entfernen</Text>
+          <Text style={s.lbl}>{t('poll.types')}</Text>
+          <View style={s.chipRow}>
+            {TRAINING_ARTEN.map(art => {
+              const on = arten.includes(art);
+              return (
+                <TouchableOpacity key={art} style={[s.chip, on && s.chipOn]} onPress={() => setArten(p => toggle(p, art))}>
+                  <Text style={[s.chipTxt, on && s.chipTxtOn]}>{art}</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-            <DateField value={parseDeDate(t.datum)} onChange={d => updateTermin(i, 'datum', chDate(d))} minimumDate={new Date()} placeholder="Datum wählen" style={{ marginBottom: 10 }} />
-            <View style={S.timeRow}>
-              <TextInput style={[S.tInput, { flex: 1 }]} value={t.von} onChangeText={v => updateTermin(i, 'von', fmtTime(v))} placeholder="Von 09:00" placeholderTextColor="#525270" keyboardType="numeric" maxLength={5} />
-              <Text style={S.timeSep}>–</Text>
-              <TextInput style={[S.tInput, { flex: 1 }]} value={t.bis} onChangeText={v => updateTermin(i, 'bis', fmtTime(v))} placeholder="Bis 11:00" placeholderTextColor="#525270" keyboardType="numeric" maxLength={5} />
-            </View>
-            <TextInput style={S.tInput} value={t.ort} onChangeText={v => updateTermin(i, 'ort', v)} placeholder="Ort (optional)" placeholderTextColor="#525270" />
+              );
+            })}
           </View>
-        ))}
-        <TouchableOpacity style={S.addTerminBtn} onPress={() => setTermine(p => [...p, { datum: '', von: '', bis: '', ort: '' }])}>
-          <Text style={S.addTerminTxt}>+ Termin hinzufügen</Text>
-        </TouchableOpacity>
 
-        <Text style={S.lbl}>Kunden einladen</Text>
-        {clients.length === 0 ? (
-          <Text style={S.empty}>Noch keine verbundenen Kunden.</Text>
-        ) : (
-          <View style={S.chipRow}>
-            {clients.map(k => (
-              <TouchableOpacity key={k.id} style={[S.chip, kunden.includes(k.id) && S.chipOn]} onPress={() => setKunden(p => toggle(p, k.id))}>
-                <Text style={[S.chipTxt, kunden.includes(k.id) && S.chipTxtOn]}>{k.name ?? 'Unbekannt'}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+          <Text style={s.lbl}>{t('poll.note')}</Text>
+          <TextInput
+            style={s.textarea}
+            value={notiz}
+            onChangeText={setNotiz}
+            placeholder={t('poll.notePlaceholder')}
+            placeholderTextColor={C.subtle}
+            selectionColor={C.accent}
+            multiline
+          />
 
-        <TouchableOpacity style={[S.sendBtn, loading && { opacity: 0.6 }]} onPress={handleSend} disabled={loading}>
-          <Text style={S.sendBtnTxt}>{loading ? 'Wird gesendet…' : 'Umfrage senden ✓'}</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <Text style={s.lbl}>{t('poll.dates')}</Text>
+          {termine.map((tm, i) => (
+            <View key={i} style={s.terminCard}>
+              <View style={s.terminHeader}>
+                <Text style={s.terminNr}>{t('poll.dateNr', { nr: i + 1 })}</Text>
+                {termine.length > 1 && (
+                  <TouchableOpacity onPress={() => setTermine(p => p.filter((_, idx) => idx !== i))} hitSlop={8}>
+                    <Text style={s.removeTxt}>{t('poll.remove')}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <DateField
+                value={parseDeDate(tm.datum)}
+                onChange={d => updateTermin(i, 'datum', chDate(d))}
+                minimumDate={new Date()}
+                style={{ marginBottom: 12 }}
+              />
+              <View style={s.timeRow}>
+                <DateField
+                  mode="time"
+                  label={t('poll.from')}
+                  value={parseHM(tm.von)}
+                  onChange={d => updateTermin(i, 'von', fmtHM(d))}
+                  style={{ flex: 1 }}
+                />
+                <DateField
+                  mode="time"
+                  label={t('poll.to')}
+                  value={parseHM(tm.bis)}
+                  onChange={d => updateTermin(i, 'bis', fmtHM(d))}
+                  style={{ flex: 1 }}
+                />
+              </View>
+              <Input
+                placeholder={t('poll.location')}
+                value={tm.ort}
+                onChangeText={v => updateTermin(i, 'ort', v)}
+                autoCapitalize="sentences"
+                style={{ marginTop: 4 }}
+              />
+            </View>
+          ))}
+          <Button
+            label={t('poll.addDate')}
+            variant="outline"
+            onPress={() => setTermine(p => [...p, { datum: '', von: '', bis: '', ort: '' }])}
+            style={s.addBtn}
+          />
+
+          <Text style={s.lbl}>{t('poll.inviteClients')}</Text>
+          {clients.length === 0 ? (
+            <Text style={s.empty}>{t('poll.noClients')}</Text>
+          ) : (
+            <View style={s.chipRow}>
+              {clients.map(k => {
+                const on = kunden.includes(k.id);
+                return (
+                  <TouchableOpacity key={k.id} style={[s.chip, on && s.chipOn]} onPress={() => setKunden(p => toggle(p, k.id))}>
+                    <Text style={[s.chipTxt, on && s.chipTxtOn]}>{k.name ?? t('poll.unknownClient')}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          <Button label={t('poll.send')} onPress={handleSend} loading={loading} style={s.sendBtn} />
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const S = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090F' },
+// Kleine Alert-Hülle (Titel + Text + optionaler OK-Callback) — hält handleSend schlank.
+function alert2(title: string, message: string, onOk?: () => void) {
+  Alert.alert(title, message, onOk ? [{ text: 'OK', onPress: onOk }] : undefined);
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
   topBar:  { paddingHorizontal: 12, paddingTop: 4 },
   back:    { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  header:  { padding: 20, paddingBottom: 8 },
-  title:   { color: '#E8E8F2', fontSize: 26, fontWeight: '800' },
-  sub:     { color: '#525270', fontSize: 13, marginTop: 4 },
-  lbl:     { color: '#525270', fontSize: 10, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginHorizontal: 16, marginBottom: 8, marginTop: 18 },
-  input:   { backgroundColor: '#0A1A18', borderRadius: 10, borderWidth: 1, borderColor: '#1A3A30', padding: 12, color: '#E8E8F2', fontSize: 14, marginHorizontal: 16, marginBottom: 8 },
-  tInput:  { backgroundColor: '#0A1A18', borderRadius: 10, borderWidth: 1, borderColor: '#1A3A30', padding: 12, color: '#E8E8F2', fontSize: 14, marginBottom: 8 },
-  textarea:{ minHeight: 80, textAlignVertical: 'top' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingHorizontal: 16, marginBottom: 4 },
-  chip:    { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#1A3A30', backgroundColor: '#0A1A18' },
-  chipOn:  { borderColor: '#00FFCC60', backgroundColor: 'rgba(0,255,204,0.1)' },
-  chipTxt: { color: '#7A8A86', fontSize: 12, fontWeight: '600' },
-  chipTxtOn:{ color: '#00FFCC' },
-  empty:   { color: '#525270', fontSize: 13, marginHorizontal: 16 },
-  terminCard: { backgroundColor: '#0A1A18', borderRadius: 14, borderWidth: 1, borderColor: '#1A3A30', padding: 12, marginHorizontal: 16, marginBottom: 10 },
-  terminHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  terminNr: { color: '#00FFCC', fontSize: 12, fontWeight: '700' },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeSep: { color: '#525270', fontSize: 16, marginBottom: 8 },
-  addTerminBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#1A3A30', borderRadius: 12, padding: 13, marginHorizontal: 16, alignItems: 'center', marginBottom: 4 },
-  addTerminTxt: { color: '#7A8A86', fontSize: 13, fontWeight: '600' },
-  sendBtn:  { backgroundColor: '#00FFCC', borderRadius: 14, padding: 16, marginHorizontal: 16, alignItems: 'center', marginTop: 18, marginBottom: 40 },
-  sendBtnTxt: { color: '#001210', fontSize: 15, fontWeight: '800' },
+  content: { paddingHorizontal: 16, paddingBottom: 48, gap: 4 },
+  header:  { paddingVertical: 8, paddingBottom: 4 },
+  title:   { color: C.white, fontSize: 26, fontWeight: '800' },
+  sub:     { color: C.muted, fontSize: 13, marginTop: 4 },
+  lbl:     { color: C.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 18, marginBottom: 8 },
+  textarea:{ minHeight: 90, backgroundColor: C.input, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 14, color: C.white, fontSize: 15, textAlignVertical: 'top' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:    { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: C.border, backgroundColor: C.card },
+  chipOn:  { borderColor: C.accent, backgroundColor: 'rgba(0,255,204,0.10)' },
+  chipTxt: { color: C.muted, fontSize: 12, fontWeight: '600' },
+  chipTxtOn:{ color: C.accent },
+  empty:   { color: C.muted, fontSize: 13 },
+  terminCard: { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 10 },
+  terminHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  terminNr: { color: C.accent, fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  removeTxt: { color: C.danger, fontSize: 12, fontWeight: '600' },
+  timeRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginBottom: 4 },
+  addBtn:  { marginTop: 4 },
+  sendBtn: { marginTop: 24 },
 });
