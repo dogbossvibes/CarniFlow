@@ -1,7 +1,6 @@
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import {
-  HOME_LAYOUT_LABEL,
   HOME_LAYOUT_MODES,
   HOME_QUICK_ACTIONS_META,
   HOME_WIDGETS_META,
@@ -9,26 +8,36 @@ import {
   MAX_QUICK_ACTIONS,
   actionIdOf,
   addDogBackpackQuickAction,
+  backpackWidgetDogIds,
   moveInArray,
   resetHomeScreenConfig,
   setHomeScreenConfig,
   setWidgetVisible,
+  toggleBackpackWidgetDog,
   toggleQuickAction,
-  updateWidgetConfig,
   useHomeScreenConfig,
   visibleWidgets,
-  ALL_FAB_ACTIONS,
-  HOME_FAB_ACTIONS_META,
-  type HomeFabActionId,
+  MAX_QUICK_BUTTON_ACTIONS,
+  QUICK_BUTTON_ACTIONS_META,
+  QUICK_BUTTON_FIXED_ACTIONS,
+  addQuickButtonAction,
+  dogBackpackActionId,
+  dogOpenActionId,
+  moveQuickButtonAction,
+  parseQuickActionId,
+  quickButtonActionIdsOf,
+  removeQuickButtonAction,
   type HomeLayoutMode,
   type HomeQuickActionId,
   type HomeScreenConfig,
   type HomeWidgetId,
+  type QuickActionId,
 } from '@/stores/homeScreenConfig';
 import { ActionListModal } from '@/components/home/ActionListModal';
-import { FAB_ACTION_LABEL_KEY } from '@/components/QuickAddSheet';
+import { DogAvatar } from '@/components/dogs/DogAvatar';
 import { useDogs } from '@/hooks/useDogs';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useT, type TranslationKey } from '@/i18n';
 import { useState } from 'react';
@@ -82,11 +91,15 @@ export default function HomeCustomizeScreen() {
   const { user } = useSession();
   const { dogs } = useDogs();
   const config = useHomeScreenConfig(user?.id);
-  const [fabPickerOpen, setFabPickerOpen] = useState(false);
+  const [quickPickerOpen, setQuickPickerOpen] = useState(false);
 
   const activeActions = config.quickActions;
   const inactiveActions = ALL_QUICK_ACTIONS.filter((a) => a !== 'dog_backpack' && !activeActions.some(entry => actionIdOf(entry) === a));
   const atMax = activeActions.length >= MAX_QUICK_ACTIONS;
+
+  // Schnellbutton (global): aktivierte Aktionen in Nutzer-Reihenfolge.
+  const quickActions = quickButtonActionIdsOf(config, dogs);
+  const atQuickMax = quickActions.length >= MAX_QUICK_BUTTON_ACTIONS;
 
   // ── Aktionen ──
   const setLayout = (layout: HomeLayoutMode) => setHomeScreenConfig({ ...config, layout });
@@ -109,18 +122,32 @@ export default function HomeCustomizeScreen() {
     }
     setHomeScreenConfig(toggleQuickAction(config, entry));
   };
+
+  // Schnellbutton (global): Aktion an-/abwählen (max. MAX_QUICK_BUTTON_ACTIONS).
+  const toggleQuick = (id: QuickActionId) => {
+    if (quickActions.includes(id)) {
+      setHomeScreenConfig(removeQuickButtonAction(config, id));
+      return;
+    }
+    if (quickActions.length >= MAX_QUICK_BUTTON_ACTIONS) {
+      Alert.alert(t('quickButton.errors.maxActions', { max: MAX_QUICK_BUTTON_ACTIONS }));
+      return;
+    }
+    setHomeScreenConfig(addQuickButtonAction(config, id));
+  };
+  const toggleDogQuick = (dog: { id: string }, kind: 'open' | 'backpack') => {
+    toggleQuick(kind === 'open' ? dogOpenActionId(dog.id) : dogBackpackActionId(dog.id));
+  };
   const addDogBackpack = (dogId: string) => setHomeScreenConfig(addDogBackpackQuickAction(config, dogId));
-  const setBackpackWidgetDog = (dogId: string) => setHomeScreenConfig(updateWidgetConfig(config, {
-    instanceId: 'dog_backpack-widget', widgetId: 'dog_backpack', dogId,
-  }));
+  const toggleBackpackWidget = (dogId: string) => setHomeScreenConfig(toggleBackpackWidgetDog(config, dogId));
 
   const onReset = () => {
     Alert.alert(
-      'Auf Standard zurücksetzen',
-      'Layout, Widgets und Schnellzugriffe werden auf die Standardeinstellungen zurückgesetzt. Andere Einstellungen bleiben unverändert.',
+      t('home.reset'),
+      t('home.resetBody'),
       [
-        { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Zurücksetzen', style: 'destructive', onPress: () => resetHomeScreenConfig() },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('home.resetConfirm'), style: 'destructive', onPress: () => resetHomeScreenConfig() },
       ],
     );
   };
@@ -133,23 +160,23 @@ export default function HomeCustomizeScreen() {
           onPress={() => router.back()}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Zurück"
+          accessibilityLabel={t('common.back')}
         >
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.headerSub}>ERSCHEINUNGSBILD</Text>
-          <Text style={s.headerTitle}>Startbildschirm anpassen</Text>
+          <Text style={s.headerSub}>{t('home.customizeEyebrow')}</Text>
+          <Text style={s.headerTitle}>{t('home.customizeTitle')}</Text>
         </View>
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {/* ── LIVE-VORSCHAU ── */}
-        <Text style={s.sectionLabel}>VORSCHAU</Text>
+        <Text style={s.sectionLabel}>{t('home.preview')}</Text>
         <HomePreview config={config} />
 
         {/* ── LAYOUT ── */}
-        <Text style={s.sectionLabel}>LAYOUT</Text>
+        <Text style={s.sectionLabel}>{t('home.layout')}</Text>
         <View style={s.segment}>
           {HOME_LAYOUT_MODES.map((mode) => {
             const active = config.layout === mode;
@@ -161,10 +188,10 @@ export default function HomeCustomizeScreen() {
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                accessibilityLabel={`Layout ${HOME_LAYOUT_LABEL[mode]}`}
+                accessibilityLabel={`Layout ${t(LAYOUT_LABEL_KEY[mode])}`}
               >
                 <Text style={[s.segmentText, active && s.segmentTextActive]}>
-                  {HOME_LAYOUT_LABEL[mode]}
+                  {t(LAYOUT_LABEL_KEY[mode])}
                 </Text>
               </TouchableOpacity>
             );
@@ -172,11 +199,13 @@ export default function HomeCustomizeScreen() {
         </View>
 
         {/* ── WIDGETS ── */}
-        <Text style={s.sectionLabel}>WIDGETS</Text>
-        <Text style={s.hint}>Ein-/ausblenden und Reihenfolge festlegen.</Text>
+        <Text style={s.sectionLabel}>{t('home.widgets')}</Text>
+        <Text style={s.hint}>{t('home.widgetsHint')}</Text>
         <View style={s.karte}>
           {config.widgetOrder.map((id, i) => {
             const meta = HOME_WIDGETS_META[id];
+            const label = t(WIDGET_LABEL_KEY[id]);
+            const description = t(WIDGET_DESC_KEY[id]);
             const visible = !config.hiddenWidgets.includes(id);
             return (
               <View key={id} style={[s.zeile, i < config.widgetOrder.length - 1 && s.zeileTrenner]}>
@@ -186,7 +215,7 @@ export default function HomeCustomizeScreen() {
                     disabled={i === 0}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel={`${meta.label} nach oben`}
+                    accessibilityLabel={t('home.moveUp', { label })}
                   >
                     <Ionicons name="chevron-up" size={18} color={i === 0 ? C.border : C.muted} />
                   </TouchableOpacity>
@@ -195,7 +224,7 @@ export default function HomeCustomizeScreen() {
                     disabled={i === config.widgetOrder.length - 1}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel={`${meta.label} nach unten`}
+                    accessibilityLabel={t('home.moveDown', { label })}
                   >
                     <Ionicons name="chevron-down" size={18} color={i === config.widgetOrder.length - 1 ? C.border : C.muted} />
                   </TouchableOpacity>
@@ -204,45 +233,55 @@ export default function HomeCustomizeScreen() {
                   <Ionicons name={meta.icon as IconName} size={18} color={C.accent} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.zeileLabel}>{meta.label}</Text>
-                  <Text style={s.zeileSub} numberOfLines={1}>{meta.description}</Text>
+                  <Text style={s.zeileLabel}>{label}</Text>
+                  <Text style={s.zeileSub} numberOfLines={1}>{description}</Text>
                 </View>
                 <Switch
                   value={visible}
                   onValueChange={(v) => toggleWidget(id, v)}
                   trackColor={{ false: C.cardAlt, true: C.accent }}
                   thumbColor={C.white}
-                  accessibilityLabel={`Widget ${meta.label}`}
+                  accessibilityLabel={t('home.widgetLabel', { label })}
                 />
-                {id === 'dog_backpack' && (
-                  <View style={s.dogSelector}>
-                    <Text style={s.zeileSub}>{t('home.selectDog')}</Text>
-                    {dogs.map(dog => {
-                      const selected = config.widgetConfigs?.some(item => item.widgetId === 'dog_backpack' && item.dogId === dog.id);
-                      return (
-                        <TouchableOpacity
-                          key={dog.id}
-                          style={[s.dogOption, selected && s.dogOptionActive]}
-                          onPress={() => setBackpackWidgetDog(dog.id)}
-                          accessibilityRole="radio"
-                          accessibilityState={{ selected }}
-                        >
-                          <Text style={s.dogOptionText}>{dog.name}</Text>
-                          {selected && <Ionicons name="checkmark" size={16} color={C.accent} />}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
               </View>
             );
           })}
         </View>
 
+        {/* ── BACKPACK-WIDGETS ── */}
+        <Text style={s.sectionLabel}>{t('home.backpackWidgets')}</Text>
+        <Text style={s.hint}>{t('home.backpackWidgetsHint')}</Text>
+        <View style={s.karte}>
+          {dogs.length === 0 ? (
+            <Text style={[s.zeileSub, { padding: 14 }]}>{t('home.noDogsForBackpack')}</Text>
+          ) : dogs.map((dog, i) => {
+            const selected = backpackWidgetDogIds(config).includes(dog.id);
+            return (
+              <TouchableOpacity
+                key={dog.id}
+                style={[s.zeile, i < dogs.length - 1 && s.zeileTrenner]}
+                onPress={() => toggleBackpackWidget(dog.id)}
+                activeOpacity={0.7}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={t('home.backpackWidgetToggle', { name: dog.name })}
+              >
+                <View style={s.zeileIcon}>
+                  <Ionicons name="bag-handle-outline" size={18} color={selected ? C.accent : C.muted} />
+                </View>
+                <Text style={[s.zeileLabel, { flex: 1, marginBottom: 0 }]}>{dog.name}</Text>
+                <View style={[s.checkBox, selected && s.checkBoxOn]}>
+                  {selected && <Ionicons name="checkmark" size={14} color={C.accentText} />}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         {/* ── SCHNELLZUGRIFFE ── */}
-        <Text style={s.sectionLabel}>SCHNELLZUGRIFFE</Text>
+        <Text style={s.sectionLabel}>{t('home.quickActions')}</Text>
         <Text style={s.hint}>
-          {activeActions.length}/{MAX_QUICK_ACTIONS} aktiv. Aktive Aktionen erscheinen im Widget „Schnell starten“.
+          {t('home.quickActionsHint', { active: activeActions.length, max: MAX_QUICK_ACTIONS })}
         </Text>
 
         {/* Aktive (mit Reihenfolge) */}
@@ -261,7 +300,7 @@ export default function HomeCustomizeScreen() {
                     disabled={i === 0}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel={`${meta.label} nach oben`}
+                    accessibilityLabel={t('home.moveUp', { label })}
                   >
                     <Ionicons name="chevron-up" size={18} color={i === 0 ? C.border : C.muted} />
                   </TouchableOpacity>
@@ -270,7 +309,7 @@ export default function HomeCustomizeScreen() {
                     disabled={i === activeActions.length - 1}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel={`${meta.label} nach unten`}
+                    accessibilityLabel={t('home.moveDown', { label })}
                   >
                     <Ionicons name="chevron-down" size={18} color={i === activeActions.length - 1 ? C.border : C.muted} />
                   </TouchableOpacity>
@@ -278,7 +317,7 @@ export default function HomeCustomizeScreen() {
                 <View style={s.zeileIcon}>
                   <Ionicons name={meta.icon as IconName} size={18} color={C.accent} />
                 </View>
-                <Text style={[s.zeileLabel, { flex: 1 }]}>{meta.label}</Text>
+                <Text style={[s.zeileLabel, { flex: 1 }]}>{label}</Text>
                 <Switch
                   value
                   onValueChange={() => toggleAction(entry)}
@@ -291,21 +330,42 @@ export default function HomeCustomizeScreen() {
           })}
         </View>
 
+        <Text style={[s.hint, { marginTop: 16 }]}>{t('home.actionDogBackpack')}</Text>
+        <View style={s.karte}>
+          {dogs.length === 0 ? (
+            <Text style={s.zeileSub}>{t('home.noDogsForBackpack')}</Text>
+          ) : dogs.map(dog => (
+            <TouchableOpacity
+              key={dog.id}
+              style={s.dogActionRow}
+              onPress={() => addDogBackpack(dog.id)}
+              disabled={atMax}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.addBackpackAction', { name: dog.name })}
+            >
+              <Ionicons name="bag-handle-outline" size={18} color={atMax ? C.muted : C.accent} />
+              <Text style={[s.zeileLabel, { flex: 1 }, atMax && { color: C.muted }]}>{t('backpack.ownTitle', { name: dog.name })}</Text>
+              <Ionicons name="add-circle-outline" size={20} color={atMax ? C.muted : C.accent} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {/* Verfügbar (inaktiv) */}
         {inactiveActions.length > 0 && (
           <>
-            <Text style={[s.hint, { marginTop: 16 }]}>Verfügbar</Text>
+            <Text style={[s.hint, { marginTop: 16 }]}>{t('home.available')}</Text>
             <View style={s.karte}>
               {inactiveActions.map((id, i) => {
                 const meta = HOME_QUICK_ACTIONS_META[id];
+                const label = t(QUICK_ACTION_LABEL_KEY[id]);
                 return (
                   <View key={id} style={[s.zeile, i < inactiveActions.length - 1 && s.zeileTrenner]}>
                     <View style={s.zeileIcon}>
                       <Ionicons name={meta.icon as IconName} size={18} color={atMax ? C.muted : C.accent} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.zeileLabel, atMax && { color: C.muted }]}>{meta.label}</Text>
-                      {atMax && <Text style={s.zeileSub}>Maximal {MAX_QUICK_ACTIONS} aktiv</Text>}
+                      <Text style={[s.zeileLabel, atMax && { color: C.muted }]}>{label}</Text>
+                      {atMax && <Text style={s.zeileSub}>{t('home.maxActive', { max: MAX_QUICK_ACTIONS })}</Text>}
                     </View>
                     <Switch
                       value={false}
@@ -313,7 +373,7 @@ export default function HomeCustomizeScreen() {
                       disabled={atMax}
                       trackColor={{ false: C.cardAlt, true: C.accent }}
                       thumbColor={C.white}
-                      accessibilityLabel={`Schnellzugriff ${meta.label} hinzufügen`}
+                      accessibilityLabel={t('home.quickActionAddLabel', { label })}
                     />
                   </View>
                 );
@@ -322,59 +382,166 @@ export default function HomeCustomizeScreen() {
           </>
         )}
 
-        {/* ── SCHNELLBUTTON (FAB) ── */}
-        <Text style={s.sectionLabel}>{t('fab.title')}</Text>
+        {/* ── SCHNELLBUTTON (global, alle Hauptseiten) ── */}
+        <Text style={s.sectionLabel}>{t('quickButton.title')}</Text>
+        <Text style={s.hint}>{t('quickButton.description')}</Text>
         <View style={s.karte}>
-          <TouchableOpacity
-            style={s.zeile}
-            onPress={() => setFabPickerOpen(true)}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('fab.selectTitle')}
-          >
-            <View style={s.zeileIcon}>
-              {config.fabActionId === 'hidden' || !HOME_FAB_ACTIONS_META[config.fabActionId] ? (
-                <Ionicons name="eye-off-outline" size={18} color={C.accent} />
-              ) : (
-                <Ionicons name={(HOME_FAB_ACTIONS_META[config.fabActionId]?.icon ?? 'add') as IconName} size={18} color={C.accent} />
-              )}
+          {/* Vorschau: grüner runder Button, immer das ANYVO-Logo (nie Kalender/Plus). */}
+          <View style={s.zeile}>
+            <View style={s.previewFab}>
+              <Image source={require('@/assets/images/anyvologo.png')} style={s.previewFabImg} contentFit="contain" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.zeileLabel}>
-                {config.fabActionId === 'hidden' || !HOME_FAB_ACTIONS_META[config.fabActionId]
-                  ? t('fab.hide')
-                  : t(FAB_ACTION_LABEL_KEY[config.fabActionId])}
+              <Text style={s.zeileLabel}>{t('quickButton.preview')}</Text>
+              <Text style={s.zeileSub}>{t('quickButton.shortPressHint')}</Text>
+            </View>
+          </View>
+
+          <View style={[s.zeile, s.zeileTrenner]}>
+            <Text style={[s.zeileLabel, { flex: 1, marginBottom: 0 }]}>{t('quickButton.show')}</Text>
+            <Switch
+              value={config.quickButtonVisible !== false}
+              onValueChange={(v) => setHomeScreenConfig({ ...config, quickButtonVisible: v })}
+              trackColor={{ false: C.cardAlt, true: C.accent }}
+              thumbColor={C.white}
+              accessibilityLabel={t('quickButton.show')}
+            />
+          </View>
+
+          {/* Aktive Aktionen: Reihenfolge + Entfernen. */}
+          <View style={[s.zeile, s.zeileTrenner]}>
+            <Text style={[s.zeileLabel, { flex: 1, marginBottom: 0 }]}>
+              {t('quickButton.selectedCount', { count: quickActions.length, max: MAX_QUICK_BUTTON_ACTIONS })}
+            </Text>
+            <Text style={s.zeileSub}>{t('quickButton.reorder')}</Text>
+          </View>
+
+          {quickActions.length === 0 && (
+            <Text style={[s.zeileSub, s.zeileTrenner, { paddingVertical: 12 }]}>{t('quickButton.noActions')}</Text>
+          )}
+
+          {quickActions.map((id, idx) => {
+            const p = parseQuickActionId(id);
+            const isDog = p.kind === 'dog' || p.kind === 'dog_backpack';
+            const dog = isDog ? dogs.find((d) => d.id === p.dogId) : undefined;
+            const meta = !isDog ? QUICK_BUTTON_ACTIONS_META[id] : undefined;
+            const name = dog?.name ?? '';
+            const label = isDog
+              ? (p.kind === 'dog' ? t('quickButton.dogOpen', { name }) : t('quickButton.dogBackpack', { name }))
+              : t(meta?.labelKey ?? 'quickButton.chooseAction');
+            return (
+              <View key={id} style={[s.zeile, s.zeileTrenner, { gap: 10 }]}>
+                <View style={s.zeileIcon}>
+                  {isDog ? (
+                    <DogAvatar photoUrl={dog?.photo_url ?? null} size={30} radius={15} />
+                  ) : (
+                    <Ionicons name={(meta?.icon ?? 'ellipse-outline') as IconName} size={18} color={C.accent} />
+                  )}
+                </View>
+                <Text style={[s.zeileLabel, { flex: 1, marginBottom: 0 }]}>{label}</Text>
+                <TouchableOpacity
+                  onPress={() => setHomeScreenConfig(moveQuickButtonAction(config, id, -1))}
+                  disabled={idx === 0}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('quickButton.reorder')}
+                  accessibilityState={{ disabled: idx === 0 }}
+                >
+                  <Ionicons name="chevron-up" size={20} color={idx === 0 ? C.muted : C.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setHomeScreenConfig(moveQuickButtonAction(config, id, 1))}
+                  disabled={idx === quickActions.length - 1}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('quickButton.reorder')}
+                  accessibilityState={{ disabled: idx === quickActions.length - 1 }}
+                >
+                  <Ionicons name="chevron-down" size={20} color={idx === quickActions.length - 1 ? C.muted : C.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => toggleQuick(id)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.delete')}
+                >
+                  <Ionicons name="close" size={20} color={C.danger} />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+
+          {/* Hinzufügen (mehrfach möglich, max. 8). */}
+          <TouchableOpacity
+            style={[s.zeile, s.zeileTrenner]}
+            onPress={() => setQuickPickerOpen(true)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('quickButton.chooseActions')}
+          >
+            <View style={s.zeileIcon}>
+              <Ionicons name="add" size={18} color={C.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.zeileLabel}>{t('quickButton.chooseActions')}</Text>
+              <Text style={s.zeileSub}>
+                {atQuickMax
+                  ? t('quickButton.maxActions', { max: MAX_QUICK_BUTTON_ACTIONS })
+                  : t('quickButton.longPressHint')}
               </Text>
-              <Text style={s.zeileSub}>{t('fab.selectTitle')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={C.muted} />
           </TouchableOpacity>
-          <View style={[s.zeile, s.zeileTrenner]}>
-            <Text style={[s.zeileLabel, { flex: 1, marginBottom: 0 }]}>{t('fab.visible')}</Text>
-            <Switch
-              value={config.fabVisible !== false}
-              onValueChange={(v) => setHomeScreenConfig({ ...config, fabVisible: v })}
-              trackColor={{ false: C.cardAlt, true: C.accent }}
-              thumbColor={C.white}
-              accessibilityLabel={t('fab.visible')}
-            />
+
+          {/* Eigene Hunde: „Hund öffnen" / „Backpack öffnen" pro Hund einzeln. */}
+          <View style={[s.zeile, s.zeileTrenner, s.quickDogColumn]}>
+            <Text style={[s.zeileLabel, { marginBottom: 0 }]}>{t('quickButton.ownDogs')}</Text>
+            {dogs.length === 0 ? (
+              <Text style={s.zeileSub}>{t('quickButton.noDogs')}</Text>
+            ) : dogs.map((dog) => {
+              const openOn = quickActions.includes(dogOpenActionId(dog.id));
+              const packOn = quickActions.includes(dogBackpackActionId(dog.id));
+              return (
+                <View key={dog.id} style={[s.dogActionRow, s.dogQuickCard]}>
+                  <DogAvatar photoUrl={dog.photo_url} size={34} radius={17} />
+                  <Text style={[s.zeileLabel, { flex: 1, marginBottom: 0 }]}>{dog.name}</Text>
+                  <TouchableOpacity
+                    style={[s.dogQuickChip, openOn && s.dogQuickChipOn]}
+                    onPress={() => toggleDogQuick(dog, 'open')}
+                    activeOpacity={0.7}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: openOn }}
+                    accessibilityLabel={t('quickButton.dogOpen', { name: dog.name })}
+                  >
+                    <Text style={[s.dogQuickChipText, openOn && s.dogQuickChipTextOn]}>{t('quickButton.actions.openDog')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.dogQuickChip, packOn && s.dogQuickChipOn]}
+                    onPress={() => toggleDogQuick(dog, 'backpack')}
+                    activeOpacity={0.7}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: packOn }}
+                    accessibilityLabel={t('quickButton.dogBackpack', { name: dog.name })}
+                  >
+                    <Text style={[s.dogQuickChipText, packOn && s.dogQuickChipTextOn]}>{t('quickButton.actions.openBackpack')}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </View>
         </View>
 
         <ActionListModal
-          visible={fabPickerOpen}
-          onClose={() => setFabPickerOpen(false)}
-          title={t('fab.selectTitle')}
-          items={ALL_FAB_ACTIONS.filter((id) => id !== 'hidden').map((id) => ({
+          visible={quickPickerOpen}
+          onClose={() => setQuickPickerOpen(false)}
+          title={t('quickButton.chooseActions')}
+          items={QUICK_BUTTON_FIXED_ACTIONS.map((id) => ({
             key: id,
-            icon: HOME_FAB_ACTIONS_META[id]?.icon as IconName | undefined,
-            label: t(FAB_ACTION_LABEL_KEY[id]),
-            selected: id === config.fabActionId,
+            icon: QUICK_BUTTON_ACTIONS_META[id]?.icon as IconName | undefined,
+            label: t(QUICK_BUTTON_ACTIONS_META[id]?.labelKey ?? 'quickButton.chooseAction'),
+            selected: quickActions.includes(id),
           }))}
-          onSelect={(key) => {
-            setHomeScreenConfig({ ...config, fabActionId: key as HomeFabActionId });
-            setFabPickerOpen(false);
-          }}
+          onSelect={(key) => toggleQuick(key as QuickActionId)}
         />
 
         {/* ── RESET ── */}
@@ -383,10 +550,10 @@ export default function HomeCustomizeScreen() {
           onPress={onReset}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Auf Standard zurücksetzen"
+          accessibilityLabel={t('home.reset')}
         >
           <Ionicons name="refresh-outline" size={18} color={C.danger} />
-          <Text style={s.resetText}>Auf Standard zurücksetzen</Text>
+          <Text style={s.resetText}>{t('home.reset')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 60 }} />
@@ -403,11 +570,11 @@ function HomePreview({ config }: { config: ReturnType<typeof useHomeScreenConfig
   return (
     <View style={s.preview}>
       <View style={s.previewHero}>
-        <Text style={s.previewHeroText}>Guten Tag</Text>
+        <Text style={s.previewHeroText}>{t('greeting.day')}</Text>
         <Ionicons name="options-outline" size={14} color="rgba(255,255,255,0.6)" />
       </View>
       {widgets.length === 0 ? (
-        <Text style={s.previewEmpty}>Keine Widgets sichtbar</Text>
+        <Text style={s.previewEmpty}>{t('home.widgetVisibleNone')}</Text>
       ) : (
         widgets.map((id) => {
           if (id === 'quick_actions') {
@@ -438,7 +605,7 @@ function HomePreview({ config }: { config: ReturnType<typeof useHomeScreenConfig
           }
           return (
             <View key={id} style={s.previewBlock}>
-              <Text style={s.previewLabel}>{HOME_WIDGETS_META[id].label}</Text>
+              <Text style={s.previewLabel}>{t(WIDGET_LABEL_KEY[id])}</Text>
               <View style={s.previewBar} />
             </View>
           );
@@ -529,9 +696,30 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: C.danger,
   },
   resetText: { fontSize: 15, color: C.danger, fontWeight: '700' },
-  dogSelector: { width: '100%', marginTop: 10, gap: 6 },
-  dogOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: C.cardAlt },
-  dogOptionActive: { borderWidth: 1, borderColor: C.accent },
-  dogOptionText: { color: C.white, fontSize: 13, fontWeight: '700' },
+  checkBox: {
+    width: 24, height: 24, borderRadius: 8,
+    borderWidth: 1.5, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.cardAlt,
+  },
+  checkBoxOn: { borderColor: C.accent, backgroundColor: C.accent },
   dogActionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
+  dogQuickCard: { borderWidth: 1, borderColor: C.border, borderRadius: 12, marginTop: 8 },
+  dogQuickChip: {
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
+    borderWidth: 1, borderColor: C.border, backgroundColor: C.cardAlt,
+  },
+  dogQuickChipOn: { borderColor: C.accent, backgroundColor: C.accent },
+  dogQuickChipText: { fontSize: 11, fontWeight: '700', color: C.muted },
+  dogQuickChipTextOn: { color: C.accentText },
+
+  // Schnellbutton-Vorschau (anyvologo auf grünem/tealem runden Kreis wie der echte Button).
+  previewFab: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: C.accent,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#00FFCC', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+  },
+  previewFabImg: { width: 26, height: 26 },
+  quickDogColumn: { flexDirection: 'column', alignItems: 'stretch', gap: 2 },
 });

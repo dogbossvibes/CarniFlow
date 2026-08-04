@@ -1,5 +1,4 @@
 import { DogCard } from "@/components/dogs/DogCard";
-import { QuickAddSheet } from "@/components/QuickAddSheet";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
 import { UnitListCard } from "@/components/training/UnitListCard";
@@ -11,7 +10,7 @@ import { useSession } from "@/hooks/useSession";
 import { useTrainingFeed } from "@/hooks/useTrainingFeed";
 import { useFeedDelete } from "@/hooks/useFeedDelete";
 import type { FeedItem } from "@/services/trainingFeed";
-import { useHomeScreenConfig, visibleWidgets, type HomeWidgetId } from "@/stores/homeScreenConfig";
+import { useHomeScreenConfig, visibleWidgets, backpackWidgetDogIds, type HomeWidgetId } from "@/stores/homeScreenConfig";
 import { QuickActionsWidget } from "@/components/home/QuickActionsWidget";
 import { DogBackpackWidget } from "@/components/home/DogBackpackWidget";
 import { HelpButton } from "@/components/help/HelpButton";
@@ -138,7 +137,7 @@ export default function HomeScreen() {
         return (
           <View key={id} style={s.sektion}>
             <View style={s.sektionKopf}>
-              <Text style={s.sektionTitel}>Letzte Einheiten</Text>
+              <Text style={s.sektionTitel}>{t("home.recentSessions")}</Text>
             </View>
             {feed.slice(0, 3).map((item) => (
               <SwipeableTrainingItem
@@ -160,7 +159,7 @@ export default function HomeScreen() {
                 onPress={() => router.push("/(tabs)/dogs")}
                 activeOpacity={0.7}
               >
-                <Text style={s.sektionLink}>Alle sehen</Text>
+                <Text style={s.sektionLink}>{t("home.viewAllDogs")}</Text>
               </TouchableOpacity>
             </View>
 
@@ -178,29 +177,48 @@ export default function HomeScreen() {
                   <Ionicons name="add" size={24} color={C.accent} />
                 </View>
                 <View>
-                  <Text style={s.leerTitel}>Ersten Hund hinzufügen</Text>
-                  <Text style={s.leerUnter}>Tippe hier, um loszulegen</Text>
+                  <Text style={s.leerTitel}>{t("home.addFirstDog")}</Text>
+                  <Text style={s.leerUnter}>{t("home.tapToStart")}</Text>
                 </View>
               </AnimatedPressable>
             )}
           </View>
         );
       case "dog_backpack": {
-        const widgetConfig = config.widgetConfigs?.find(item => item.widgetId === 'dog_backpack');
-        const dog = widgetConfig?.dogId ? dogs.find(item => item.id === widgetConfig.dogId) : undefined;
+        const selectedDogIds = backpackWidgetDogIds(config);
+        if (selectedDogIds.length === 0) {
+          return (
+            <DogBackpackWidget
+              key={id}
+              userId={user?.id}
+              dogId={undefined}
+              dogName={undefined}
+              layout={config.layout}
+              onConfigure={() => router.push('/home-customize')}
+              onOpen={() => {}}
+            />
+          );
+        }
         return (
-          <DogBackpackWidget
-            key={id}
-            userId={user?.id}
-            dogId={widgetConfig?.dogId}
-            dogName={dog?.name}
-            layout={config.layout}
-            onConfigure={() => router.push('/home-customize')}
-            onOpen={() => {
-              if (!dog) return;
-              router.push({ pathname: '/dog-backpack/[id]', params: { id: dog.id, name: dog.name } } as never);
-            }}
-          />
+          <View key={id}>
+            {selectedDogIds.map(dogId => {
+              const dog = dogs.find(item => item.id === dogId);
+              return (
+                <DogBackpackWidget
+                  key={dogId}
+                  userId={user?.id}
+                  dogId={dogId}
+                  dogName={dog?.name}
+                  layout={config.layout}
+                  onConfigure={() => router.push('/home-customize')}
+                  onOpen={() => {
+                    if (!dog) return;
+                    router.push({ pathname: '/dog-backpack/[id]', params: { id: dog.id, name: dog.name } } as never);
+                  }}
+                />
+              );
+            })}
+          </View>
         );
       }
       default:
@@ -221,7 +239,7 @@ export default function HomeScreen() {
         <View style={s.header}>
           <View style={s.logoReihe}>
             <Image
-              source={require("@/assets/images/icon.png")}
+              source={require("@/assets/images/anyvologo.png")}
               style={s.logoIcon}
               contentFit="contain"
             />
@@ -295,7 +313,7 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityRole="button"
-                accessibilityLabel="Startbildschirm anpassen"
+                accessibilityLabel={t("home.customizeTitle")}
               >
                 <Ionicons name="options-outline" size={20} color={C.white} />
               </TouchableOpacity>
@@ -341,7 +359,6 @@ export default function HomeScreen() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
-      <QuickAddSheet personalized />
       {toast}
     </SafeAreaView>
   );

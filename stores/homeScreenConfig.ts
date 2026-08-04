@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { TranslationKey } from '@/i18n';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Personalisierbarer Startbildschirm — zentrale Konfiguration (pro Benutzer).
@@ -13,7 +14,23 @@ export type HomeWidgetId      = 'week' | 'smart_analysis' | 'quick_actions' | 'r
 export type HomeQuickActionId = 'add_dog' | 'start_timer' | 'track_gps' | 'lay_track' | 'document_training' | 'start_obedience' | 'show_analysis' | 'training_journal' | 'dog_backpack';
 // Personalisierbarer Startseiten-FAB: eine der Aktionen ODER 'hidden' (Button
 // ausblenden — von älteren Configs akzeptiert; renderseitig wie fabVisible=false).
-export type HomeFabActionId   = 'start_training' | 'document_training' | 'training_journal' | 'start_track' | 'create_appointment' | 'add_dog' | 'open_backpack' | 'hidden';
+export type HomeFabActionId   = 'start_training' | 'document_training' | 'training_journal' | 'start_track' | 'create_appointment' | 'add_dog' | 'open_dog' | 'open_backpack' | 'hidden';
+
+// Aktionen des globalen ANYVO-Schnellbuttons (alle 5 Haupt-Tabseiten, max. 8).
+// Fixe Routen-Aktionen + 'hide_button' (Button ausblenden) sowie dynamische,
+// hundspezifische Aktionen. Dog-IDs sind OHNE Hundenamen stabil — der Name wird
+// beim Öffnen frisch aus useDogs() aufgelöst (Umbenennung → kein Problem).
+export type QuickRouteActionId = 'start_training' | 'document_training' | 'training_journal' | 'start_track' | 'create_appointment' | 'add_dog';
+export type QuickActionId = QuickRouteActionId | 'hide_button' | `open-dog:${string}` | `open-backpack:${string}`;
+
+// Aufgelöstes Ziel einer Schnellbutton-Aktion (ein Ort für die Auflösung).
+//   • route        → Navigation ohne Hund-Kontext
+//   • dog          → Hundeprofil des gewählten Hundes
+//   • dog_backpack → Backpack des gewählten Hundes
+export type QuickActionTarget =
+  | { type: 'route'; route: string }
+  | { type: 'dog'; dogId: string }
+  | { type: 'dog_backpack'; dogId: string };
 
 export type HomeQuickActionConfig = {
   instanceId: string;
@@ -22,6 +39,16 @@ export type HomeQuickActionConfig = {
 };
 
 export type HomeQuickActionEntry = HomeQuickActionId | HomeQuickActionConfig;
+
+// Position des globalen ANYVO-Schnellbuttons (frei verschiebbar). Relativ statt
+// absolut: side (linke/rechte Bildschirmkante, Snap) + yRatio (0..1 vertikale
+// Position im erlaubten Band zwischen Statusbar und Tab-Leiste). So bleibt die
+// Position auf unterschiedlichen Displays/bei Rotation stabil.
+export type QuickButtonSide = 'left' | 'right';
+export interface QuickButtonPosition {
+  side: QuickButtonSide;
+  yRatio: number; // 0 = oben, 1 = unten (Default, entspricht der klassischen Position)
+}
 
 export type HomeWidgetConfig = {
   instanceId: string;
@@ -37,6 +64,17 @@ export interface HomeScreenConfig {
   widgetConfigs?: HomeWidgetConfig[];   // optionale Parameter für instanzierte Widgets
   fabActionId:   HomeFabActionId;       // Aktion des Startseiten-FAB (Standard: Termin erstellen)
   fabVisible:    boolean;               // FAB sichtbar (false = ausblenden, kein Platzhalter)
+  // Globaler ANYVO-Schnellbutton (alle 5 Haupt-Tabseiten, max. 8 Aktionen):
+  // quickButtonActions = aktivierte Aktionen in Nutzer-Reihenfolge. Fixe IDs
+  // (QUICK_BUTTON_ROUTE_ACTIONS + 'hide_button') plus dynamische Hund-Aktionen
+  // 'open-dog:<dogId>' / 'open-backpack:<dogId>'. Legacy fabActionId/fabVisible
+  // (T-41) und quickButtonActionId/quickButtonDogId (T-42 v1) werden beim
+  // Sanitize migriert, damit bestehende Konfigurationen weiter funktionieren.
+  quickButtonActions:  string[];
+  quickButtonVisible:  boolean;
+  // Frei wählbare Position (verschiebbarer Schnellbutton). Fehlt → klassische
+  // Standardposition (rechts unten). Wird beim Sanitize validiert (Side + 0..1).
+  quickButtonPosition?: QuickButtonPosition;
 }
 
 export const HOME_LAYOUT_MODES: HomeLayoutMode[]   = ['grid', 'list', 'compact'];
@@ -48,10 +86,26 @@ export const MAX_QUICK_ACTIONS = 6;
 // = Reihenfolge im Auswahl-Dialog.
 export const ALL_FAB_ACTIONS: HomeFabActionId[] = [
   'start_training', 'document_training', 'training_journal', 'start_track',
-  'create_appointment', 'add_dog', 'open_backpack', 'hidden',
+  'create_appointment', 'add_dog', 'open_dog', 'open_backpack', 'hidden',
 ];
 // Standard für neue Nutzer UND Fallback bei ungültiger/veralteter Action-ID.
 export const DEFAULT_FAB_ACTION: HomeFabActionId = 'create_appointment';
+
+// ── Globaler Schnellbutton (max. 8 Aktionen) ────────────────────────────────
+export const MAX_QUICK_BUTTON_ACTIONS = 8;
+export const QUICK_BUTTON_ROUTE_ACTIONS: QuickRouteActionId[] = [
+  'start_training', 'document_training', 'training_journal', 'start_track',
+  'create_appointment', 'add_dog',
+];
+// Alle fix (nicht hundspezifisch) wählbaren Aktionen inkl. 'hide_button'.
+export const QUICK_BUTTON_FIXED_ACTIONS: QuickActionId[] = [...QUICK_BUTTON_ROUTE_ACTIONS, 'hide_button'];
+// Standard für neue Nutzer: eine Aktion (Termin erstellen) → kurzer Tipp führt direkt aus.
+export const DEFAULT_QUICK_BUTTON_ACTIONS: QuickActionId[] = ['create_appointment'];
+// Standard-FAB-Position: rechts unten (yRatio 1 = untere Kante).
+export const DEFAULT_QUICK_BUTTON_POSITION: QuickButtonPosition = { side: 'right', yRatio: 1 };
+// Dog-spezifische Action-IDs (stabil, ohne Hundenamen).
+export const dogOpenActionId = (dogId: string): QuickActionId => `open-dog:${dogId}`;
+export const dogBackpackActionId = (dogId: string): QuickActionId => `open-backpack:${dogId}`;
 
 // Metadaten-Registry (Label/Icon/Route) — eine Quelle, keine duplizierten switches.
 export const HOME_LAYOUT_LABEL: Record<HomeLayoutMode, string> = { grid: 'Raster', list: 'Liste', compact: 'Kompakt' };
@@ -78,8 +132,22 @@ export const HOME_FAB_ACTIONS_META: Partial<Record<HomeFabActionId, { icon: stri
   start_track:          { icon: 'navigate-outline',  route: '/track' },
   create_appointment:   { icon: 'calendar',          route: '/training-hub' },
   add_dog:              { icon: 'paw' },
+  open_dog:             { icon: 'paw-outline',      route: '/dog/[id]' },
   open_backpack:        { icon: 'bag-handle-outline' },
   // 'hidden' hat kein Icon — renderseitig wird der Button ausgeblendet.
+};
+
+// Schnellbutton-Registry: Label (i18n-Key) + Icon je fixer Aktion; Route nur
+// für die einfachen Routen-Aktionen (add_dog hat das Quota-Gate renderseitig,
+// hide_button blendet den Button aus). Hund-Aktionen nutzen das Profilbild.
+export const QUICK_BUTTON_ACTIONS_META: Partial<Record<QuickActionId, { icon: string; route?: string; labelKey: TranslationKey }>> = {
+  start_training:       { icon: 'play',             route: '/unit/start',       labelKey: 'quickButton.actions.startTraining' },
+  document_training:    { icon: 'create-outline',   route: '/unit/document',    labelKey: 'quickButton.actions.documentTraining' },
+  training_journal:     { icon: 'book-outline',     route: '/training-journal', labelKey: 'quickButton.actions.trainingJournal' },
+  start_track:          { icon: 'navigate-outline', route: '/track',            labelKey: 'quickButton.actions.startTrack' },
+  create_appointment:   { icon: 'calendar',         route: '/training-hub',     labelKey: 'quickButton.actions.createAppointment' },
+  add_dog:              { icon: 'paw',              route: '/add-dog',          labelKey: 'quickButton.actions.addDog' },
+  hide_button:          { icon: 'eye-off-outline',                              labelKey: 'quickButton.actions.hideButton' },
 };
 
 export const HOME_WIDGETS_META: Record<HomeWidgetId, { label: string; icon: string; description: string }> = {
@@ -101,9 +169,26 @@ export const DEFAULT_HOME_CONFIG: HomeScreenConfig = {
   widgetConfigs: [],
   fabActionId:   DEFAULT_FAB_ACTION,
   fabVisible:    true,
+  quickButtonActions: [...DEFAULT_QUICK_BUTTON_ACTIONS],
+  quickButtonVisible:  true,
 };
 
 // ── Reine Helfer (testbar) ──────────────────────────────────────────────────
+
+// Position des Schnellbuttons validieren: side links/rechts, yRatio auf 0..1
+// geklemmt. Fehlende/ungültige Werte → Standard (rechts unten), nie ein Crash.
+export function sanitizeQuickButtonPosition(raw: unknown): QuickButtonPosition | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'object') return { ...DEFAULT_QUICK_BUTTON_POSITION };
+  const r = raw as Partial<QuickButtonPosition>;
+  const side = r.side === 'left' || r.side === 'right'
+    ? r.side
+    : DEFAULT_QUICK_BUTTON_POSITION.side;
+  const yRatio = typeof r.yRatio === 'number' && Number.isFinite(r.yRatio)
+    ? Math.min(1, Math.max(0, r.yRatio))
+    : DEFAULT_QUICK_BUTTON_POSITION.yRatio;
+  return { side, yRatio };
+}
 
 // Robuste Bereinigung: ungültige/veraltete IDs raus, fehlende (neue) Widgets
 // hinten ergänzt, Dedupe, max. Schnellaktionen, gültiges Layout. Nie crashen.
@@ -181,7 +266,57 @@ export function sanitizeHomeScreenConfig(raw: unknown): HomeScreenConfig {
   // fabVisible: nur explizit false bleibt false; alles andere (fehlend/gültig) → true.
   const fabVisible = r.fabVisible === false ? false : true;
 
-  return { layout, quickActions: limitedQuickActions, widgetOrder, hiddenWidgets, widgetConfigs, fabActionId, fabVisible };
+  // Schnellbutton (global, max. 8): quickButtonActions bevorzugt. Fehlt der neue
+  // Wert, wird aus den Legacy-Feldern migriert: quickButtonActionId/quickButtonDogId
+  // (T-42 v1) vorrangig, sonst fabActionId/fabVisible (T-41). Komplett neue Nutzer
+  // (kein einziges Schnellbutton-Feld) erhalten den Standard. Ungültige IDs werden
+  // rausgefiltert, Duplikate entfernt und auf MAX_QUICK_BUTTON_ACTIONS gekappt.
+  const legacyAction = (r as { quickButtonActionId?: unknown }).quickButtonActionId;
+  const legacyDogRaw = (r as { quickButtonDogId?: unknown }).quickButtonDogId;
+  const legacyDogId = typeof legacyDogRaw === 'string' && legacyDogRaw.trim() ? legacyDogRaw.trim() : null;
+  const hasQuickActions = Array.isArray(r.quickButtonActions);
+  const hasAnyQuickButtonSource = hasQuickActions
+    || legacyAction !== undefined
+    || legacyDogRaw !== undefined
+    || r.fabActionId !== undefined
+    || r.fabVisible !== undefined;
+
+  let quickButtonActions: string[] = [];
+  if (hasQuickActions) {
+    quickButtonActions = sanitizeQuickButtonActions(r.quickButtonActions);
+  } else if (legacyAction === 'hidden') {
+    quickButtonActions = [];
+  } else if (legacyAction === 'open_dog' && legacyDogId) {
+    quickButtonActions = [dogOpenActionId(legacyDogId)];
+  } else if (legacyAction === 'open_backpack' && legacyDogId) {
+    quickButtonActions = [dogBackpackActionId(legacyDogId)];
+  } else if (typeof legacyAction === 'string' && (QUICK_BUTTON_ROUTE_ACTIONS as readonly string[]).includes(legacyAction)) {
+    quickButtonActions = [legacyAction];
+  } else if (r.fabActionId === 'hidden') {
+    quickButtonActions = [];
+  } else if (r.fabActionId === 'open_dog' && legacyDogId) {
+    quickButtonActions = [dogOpenActionId(legacyDogId)];
+  } else if (r.fabActionId === 'open_backpack' && legacyDogId) {
+    quickButtonActions = [dogBackpackActionId(legacyDogId)];
+  } else if (typeof r.fabActionId === 'string' && (QUICK_BUTTON_ROUTE_ACTIONS as readonly string[]).includes(r.fabActionId)) {
+    quickButtonActions = [r.fabActionId];
+  }
+  if (quickButtonActions.length === 0 && !hasAnyQuickButtonSource) {
+    quickButtonActions = [...DEFAULT_QUICK_BUTTON_ACTIONS];
+  }
+
+  // quickButtonVisible: nur explizit false bleibt false; explizit true → true;
+  // fehlend → Legacy fabVisible (false bleibt false), sonst true.
+  const quickButtonVisible = r.quickButtonVisible === false ? false
+    : (r.quickButtonVisible === true ? true : (r.fabVisible === false ? false : true));
+
+  // Position: ungültig → Standard; fehlt → undefined (klassische Position).
+  const quickButtonPosition = sanitizeQuickButtonPosition((r as { quickButtonPosition?: unknown }).quickButtonPosition);
+
+  return {
+    layout, quickActions: limitedQuickActions, widgetOrder, hiddenWidgets, widgetConfigs,
+    fabActionId, fabVisible, quickButtonActions, quickButtonVisible, quickButtonPosition,
+  };
 }
 
 // Element in einem Array verschieben (dir: -1 hoch, +1 runter). Reiner Helfer.
@@ -218,6 +353,127 @@ export function updateWidgetConfig(cfg: HomeScreenConfig, next: HomeWidgetConfig
   const current = cfg.widgetConfigs ?? [];
   const filtered = current.filter(item => item.instanceId !== next.instanceId);
   return { ...cfg, widgetConfigs: [...filtered, next] };
+}
+
+// Backpack-Widget: einen Hund an-/abwählen (mehrere Hunde gleichzeitig möglich).
+// Instanz-ID pro Hund stabil → Auswahl übersteht Sanitize + App-Neustart.
+export function toggleBackpackWidgetDog(cfg: HomeScreenConfig, dogId: string): HomeScreenConfig {
+  const id = dogId.trim();
+  if (!id) return cfg;
+  const current = cfg.widgetConfigs ?? [];
+  const exists = current.some(item => item.widgetId === 'dog_backpack' && item.dogId === id);
+  if (exists) {
+    return { ...cfg, widgetConfigs: current.filter(item => !(item.widgetId === 'dog_backpack' && item.dogId === id)) };
+  }
+  return {
+    ...cfg,
+    widgetConfigs: [...current, { instanceId: `dog_backpack-widget-${id}`, widgetId: 'dog_backpack', dogId: id }],
+  };
+}
+
+// Ausgewählte Hund-IDs für das Backpack-Widget (Reihenfolge der Config).
+export function backpackWidgetDogIds(cfg: HomeScreenConfig): string[] {
+  return (cfg.widgetConfigs ?? [])
+    .filter(item => item.widgetId === 'dog_backpack' && typeof item.dogId === 'string' && item.dogId.trim().length > 0)
+    .map(item => item.dogId as string);
+}
+
+// ── Schnellbutton (global) ──────────────────────────────────────────────────
+
+// Parsen einer gespeicherten Aktion in eine stabile Form. Hund-Aktionen
+// ('open-dog:<dogId>' / 'open-backpack:<dogId>') sind ohne Hundenamen stabil —
+// der Name wird beim Öffnen frisch aus useDogs() aufgelöst (Umbenennung ok).
+export type QuickActionParse =
+  | { kind: 'route'; id: QuickRouteActionId }
+  | { kind: 'dog'; dogId: string }
+  | { kind: 'dog_backpack'; dogId: string }
+  | { kind: 'hide' }
+  | { kind: 'invalid' };
+
+export function parseQuickActionId(value: unknown): QuickActionParse {
+  if (typeof value !== 'string' || !value.trim()) return { kind: 'invalid' };
+  const id = value.trim();
+  if (id === 'hide_button') return { kind: 'hide' };
+  if ((QUICK_BUTTON_ROUTE_ACTIONS as readonly string[]).includes(id)) return { kind: 'route', id: id as QuickRouteActionId };
+  const dog = id.match(/^open-dog:(.+)$/);
+  if (dog?.[1]?.trim()) return { kind: 'dog', dogId: dog[1].trim() };
+  const backpack = id.match(/^open-backpack:(.+)$/);
+  if (backpack?.[1]?.trim()) return { kind: 'dog_backpack', dogId: backpack[1].trim() };
+  return { kind: 'invalid' };
+}
+
+// Kanonische Key-Form einer Aktion (normiert), null bei ungültig.
+export function quickButtonActionKey(value: unknown): string | null {
+  const p = parseQuickActionId(value);
+  switch (p.kind) {
+    case 'route':     return p.id;
+    case 'dog':       return dogOpenActionId(p.dogId);
+    case 'dog_backpack': return dogBackpackActionId(p.dogId);
+    case 'hide':      return 'hide_button';
+    default:          return null;
+  }
+}
+
+// Gespeicherte Liste bereinigen: nur gültige Aktionen, dedupliziert, max. 8.
+export function sanitizeQuickButtonActions(raw: unknown): string[] {
+  const out: string[] = [];
+  if (!Array.isArray(raw)) return out;
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    const key = quickButtonActionKey(entry);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+    if (out.length >= MAX_QUICK_BUTTON_ACTIONS) break;
+  }
+  return out;
+}
+
+// Aktivierte Aktionen in Nutzer-Reihenfolge. Hund-Aktionen, deren Hund nicht
+// (mehr) existiert, werden gefiltert (gelöschter Hund → sicher weg, nie Crash).
+// Nie mehr als MAX_QUICK_BUTTON_ACTIONS (Sanitize garantiert es schon beim
+// Speichern; diese Grenze schützt zusätzlich vor handgebauten Configs).
+export function quickButtonActionIdsOf(cfg: HomeScreenConfig, dogs: { id: string }[]): QuickActionId[] {
+  const dogIds = new Set(dogs.map((d) => d.id));
+  const out: QuickActionId[] = [];
+  for (const raw of cfg.quickButtonActions ?? []) {
+    const p = parseQuickActionId(raw);
+    if (p.kind === 'invalid') continue;
+    if ((p.kind === 'dog' || p.kind === 'dog_backpack') && !dogIds.has(p.dogId)) continue;
+    const key = quickButtonActionKey(raw);
+    if (key) out.push(key as QuickActionId);
+    if (out.length >= MAX_QUICK_BUTTON_ACTIONS) break;
+  }
+  return out;
+}
+
+// Reine Auflösung einer Schnellbutton-Aktion in ein Ziel. Hund-Aktionen nur,
+// wenn der Hund noch existiert; 'hide_button'/unbekannt → null (renderseitig
+// kein Navigations-Ziel — hide blendet den Button aus).
+export function resolveQuickAction(id: string, dogs: { id: string }[]): QuickActionTarget | null {
+  const p = parseQuickActionId(id);
+  if (p.kind === 'route') return { type: 'route', route: QUICK_BUTTON_ACTIONS_META[p.id]?.route ?? '' };
+  if (p.kind === 'dog' && dogs.some((d) => d.id === p.dogId)) return { type: 'dog', dogId: p.dogId };
+  if (p.kind === 'dog_backpack' && dogs.some((d) => d.id === p.dogId)) return { type: 'dog_backpack', dogId: p.dogId };
+  return null;
+}
+
+// Aktion hinzufügen (max. MAX_QUICK_BUTTON_ACTIONS, keine Duplikate).
+export function addQuickButtonAction(cfg: HomeScreenConfig, id: string): HomeScreenConfig {
+  if (!quickButtonActionKey(id) || cfg.quickButtonActions.includes(id)) return cfg;
+  if (cfg.quickButtonActions.length >= MAX_QUICK_BUTTON_ACTIONS) return cfg;
+  return { ...cfg, quickButtonActions: [...cfg.quickButtonActions, id] };
+}
+
+// Aktion entfernen.
+export function removeQuickButtonAction(cfg: HomeScreenConfig, id: string): HomeScreenConfig {
+  return { ...cfg, quickButtonActions: cfg.quickButtonActions.filter((a) => a !== id) };
+}
+
+// Aktion in der Reihenfolge verschieben (dir: -1 hoch, +1 runter).
+export function moveQuickButtonAction(cfg: HomeScreenConfig, id: string, dir: -1 | 1): HomeScreenConfig {
+  const idx = cfg.quickButtonActions.indexOf(id);
+  return { ...cfg, quickButtonActions: moveInArray(cfg.quickButtonActions, idx, dir) };
 }
 
 // Widget ein-/ausblenden.

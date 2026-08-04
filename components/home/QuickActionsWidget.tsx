@@ -42,12 +42,26 @@ export function QuickActionsWidget({
   const { t } = useT();
   if (actions.length === 0) return null;
 
-  const go = (route: string) => router.push(route as never);
+  const go = (entry: HomeQuickActionEntry) => {
+    const actionId = actionIdOf(entry);
+    const meta = HOME_QUICK_ACTIONS_META[actionId];
+    if (actionId !== 'dog_backpack') {
+      router.push(meta.route as never);
+      return;
+    }
+    const dogId = typeof entry === 'string' ? undefined : entry.dogId;
+    const dog = dogId ? dogs.find(item => item.id === dogId) : undefined;
+    if (!dog) {
+      Alert.alert(t('home.dogUnavailable'), t('home.removeUnavailableAction'));
+      return;
+    }
+    router.push({ pathname: '/dog-backpack/[id]', params: { id: dog.id, name: dog.name } } as never);
+  };
 
   return (
     <View style={s.wrap}>
       <View style={s.kopf}>
-        <Text style={s.titel}>Schnell starten</Text>
+        <Text style={s.titel}>{t('home.quickStart')}</Text>
       </View>
 
       <View style={layout === 'list' ? s.listWrap : s.gridWrap}>

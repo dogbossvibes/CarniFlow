@@ -1,5 +1,6 @@
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
@@ -17,6 +18,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useHubBadge } from '@/hooks/useHubBadge';
 import { registerForPush } from '@/lib/push';
 import { configurePurchases } from '@/lib/purchases';
+import { QuickAddSheet } from '@/components/QuickAddSheet';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -112,90 +114,103 @@ export default function TabLayout() {
 
   if (!session) return <Redirect href="/(auth)/login" />;
 
+  // Exakte Tab-Bar-Höhe (siehe tabBarStyle unten). useFabBottom() liest den
+  // BottomTabBarHeightContext, der vom Tab-Navigator nur FÜR dessen Screens
+  // gesetzt wird. Der globale Schnellbutton liegt aber als Geschwister NEBEN
+  // <Tabs> — deshalb versorgen wir ihn hier mit demselben Wert, damit seine
+  // Position exakt über der Tab-Leiste landet (nie zwei Quellen der Wahrheit).
+  const tabBarHeight = Platform.OS === 'ios' ? 88 : 66 + insets.bottom;
+
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarButton: (props) => <HapticTab {...props} />,
-        tabBarStyle: {
-          position:          'absolute',
-          backgroundColor:   isGlass ? 'transparent' : 'rgba(10,10,10,0.80)',
-          borderTopColor:    C.border,
-          borderTopWidth:    isGlass ? 0 : 1,
-          height:            Platform.OS === 'ios' ? 88 : 66 + insets.bottom,
-          paddingBottom:     Platform.OS === 'ios' ? 28 : 10 + insets.bottom,
-          paddingTop:        10,
-          paddingHorizontal: 8,
-        },
-        tabBarBackground: () => <TabBarBackground />,
-        tabBarActiveTintColor:   C.accent,
-        tabBarInactiveTintColor: C.muted,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
-        sceneStyle: { backgroundColor: C.bg },
-      }}
-    >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Start',
-          tabBarIcon: ({ focused, size }) => <TabIcon name="home"    focused={focused} size={size} />,
+    <BottomTabBarHeightContext.Provider value={tabBarHeight}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarButton: (props) => <HapticTab {...props} />,
+          tabBarStyle: {
+            position:          'absolute',
+            backgroundColor:   isGlass ? 'transparent' : 'rgba(10,10,10,0.80)',
+            borderTopColor:    C.border,
+            borderTopWidth:    isGlass ? 0 : 1,
+            height:            tabBarHeight,
+            paddingBottom:     Platform.OS === 'ios' ? 28 : 10 + insets.bottom,
+            paddingTop:        10,
+            paddingHorizontal: 8,
+          },
+          tabBarBackground: () => <TabBarBackground />,
+          tabBarActiveTintColor:   C.accent,
+          tabBarInactiveTintColor: C.muted,
+          tabBarLabelStyle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
+          sceneStyle: { backgroundColor: C.bg },
         }}
-      />
-      <Tabs.Screen
-        name="dogs"
-        options={{
-          title: 'Hunde',
-          tabBarIcon: ({ focused, size }) => <DogTabIcon focused={focused} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="training"
-        options={{
-          title: 'Training',
-          tabBarIcon: ({ focused, size }) => <TrainingTabIcon focused={focused} size={size} />,
-        }}
-      />
-      {/* Fährten: kein eigener Tab — Einstieg über Training → „Fährte (GPS)". */}
-      {/* Slot 4: Hub (Trainer) ODER Analyse (Kunde) — gegenseitig exklusiv. */}
-      <Tabs.Screen
-        name="hub"
-        options={{
-          title: 'Hub',
-          href: isTrainerModule ? undefined : null,
-          tabBarBadge: hubBadge > 0 ? hubBadge : undefined,
-          tabBarBadgeStyle: { backgroundColor: C.accent, color: C.accentText, fontSize: 10, fontWeight: '800' },
-          tabBarIcon: ({ focused, size }) => <TabIcon name="grid" focused={focused} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="analytics"
-        options={{
-          title: 'Analyse',
-          href: isTrainerModule ? null : undefined,
-          tabBarIcon: ({ focused, size }) => <TabIcon name="bar-chart" focused={focused} size={size} />,
-        }}
-      />
-      {/* In den Hub gefaltet — als Tab ausgeblendet, aber aus dem Hub erreichbar. */}
-      <Tabs.Screen name="clients"  options={{ href: null }} />
-      <Tabs.Screen name="activity" options={{ href: null }} />
-      {/* ANYVO CONNECT — nur sichtbar, wenn EXPO_PUBLIC_FEATURE_CONNECT_ENABLED=true.
-          href:null blendet den Tab komplett aus (kein Mount, keine CONNECT-Init). */}
-      <Tabs.Screen
-        name="connect"
-        options={{
-          title: 'Connect',
-          href: CONNECT_ENABLED ? undefined : null,
-          tabBarIcon: ({ focused, size }) => <TabIcon name="people" focused={focused} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profil',
-          tabBarIcon: ({ focused, size }) => <TabIcon name="person"  focused={focused} size={size} />,
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: 'Start',
+            tabBarIcon: ({ focused, size }) => <TabIcon name="home"    focused={focused} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="dogs"
+          options={{
+            title: 'Hunde',
+            tabBarIcon: ({ focused, size }) => <DogTabIcon focused={focused} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="training"
+          options={{
+            title: 'Training',
+            tabBarIcon: ({ focused, size }) => <TrainingTabIcon focused={focused} size={size} />,
+          }}
+        />
+        {/* Fährten: kein eigener Tab — Einstieg über Training → „Fährte (GPS)". */}
+        {/* Slot 4: Hub (Trainer) ODER Analyse (Kunde) — gegenseitig exklusiv. */}
+        <Tabs.Screen
+          name="hub"
+          options={{
+            title: 'Hub',
+            href: isTrainerModule ? undefined : null,
+            tabBarBadge: hubBadge > 0 ? hubBadge : undefined,
+            tabBarBadgeStyle: { backgroundColor: C.accent, color: C.accentText, fontSize: 10, fontWeight: '800' },
+            tabBarIcon: ({ focused, size }) => <TabIcon name="grid" focused={focused} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="analytics"
+          options={{
+            title: 'Analyse',
+            href: isTrainerModule ? null : undefined,
+            tabBarIcon: ({ focused, size }) => <TabIcon name="bar-chart" focused={focused} size={size} />,
+          }}
+        />
+        {/* In den Hub gefaltet — als Tab ausgeblendet, aber aus dem Hub erreichbar. */}
+        <Tabs.Screen name="clients"  options={{ href: null }} />
+        <Tabs.Screen name="activity" options={{ href: null }} />
+        {/* ANYVO CONNECT — nur sichtbar, wenn EXPO_PUBLIC_FEATURE_CONNECT_ENABLED=true.
+            href:null blendet den Tab komplett aus (kein Mount, keine CONNECT-Init). */}
+        <Tabs.Screen
+          name="connect"
+          options={{
+            title: 'Connect',
+            href: CONNECT_ENABLED ? undefined : null,
+            tabBarIcon: ({ focused, size }) => <TabIcon name="people" focused={focused} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profil',
+            tabBarIcon: ({ focused, size }) => <TabIcon name="person"  focused={focused} size={size} />,
+          }}
+        />
+      </Tabs>
+      {/* Globaler ANYVO-Schnellbutton: erscheint auf allen Tab-Routen. Bei aktivem
+          Training oder offener GPS-Fährte rendert die Komponente stattdessen die
+          jeweilige Live-Leiste (Priorität Live > Button, nie beides). */}
+      <QuickAddSheet />
+    </BottomTabBarHeightContext.Provider>
   );
 }
 
