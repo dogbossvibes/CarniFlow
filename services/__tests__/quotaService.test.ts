@@ -118,3 +118,34 @@ describe('SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql — Struktur', () => {
     expect(sql).not.toMatch(/update\s+public\.subscriptions\s+set\s+plan/);
   });
 });
+
+describe('Migration 20260808120000_newbie_training_quota_one.sql — Struktur', () => {
+  const mig = readFileSync('supabase/migrations/20260808120000_newbie_training_quota_one.sql', 'utf8').toLowerCase();
+  it('ersetzt ausschliesslich newbie_quota_limit (CREATE OR REPLACE)', () => {
+    expect(mig).toMatch(/create or replace function public\.newbie_quota_limit/);
+  });
+  it('finale Server-Limits: dog=1, training=1, track=0', () => {
+    expect(mig).toMatch(/'dog' then 1/);
+    expect(mig).toMatch(/'training' then 1/);
+    expect(mig).toMatch(/'track' then 0/);
+  });
+  it('Signatur/Attribute erhalten: language sql immutable (kein security definer/search_path)', () => {
+    expect(mig).toMatch(/language sql immutable/);
+    expect(mig).not.toMatch(/security definer/);
+  });
+  it('additiv & nicht-destruktiv: kein DROP/DELETE, keine RLS-/Policy-/Grant-Änderung', () => {
+    expect(mig).not.toMatch(/drop\s+table/);
+    expect(mig).not.toMatch(/drop\s+function/);
+    expect(mig).not.toMatch(/\bdelete\s+from\b/);
+    expect(mig).not.toMatch(/enable row level security/);
+    expect(mig).not.toMatch(/create\s+policy/);
+    expect(mig).not.toMatch(/drop\s+policy/);
+    expect(mig).not.toMatch(/\brevoke\b/);
+    expect(mig).not.toMatch(/create\s+table/);
+  });
+  it('ändert keine anderen RPCs (nur newbie_quota_limit)', () => {
+    expect(mig).not.toMatch(/function public\.claim_newbie_quota/);
+    expect(mig).not.toMatch(/function public\.newbie_quota_status/);
+    expect(mig).not.toMatch(/function public\.is_pro_member/);
+  });
+});
