@@ -8,6 +8,9 @@
     "scheme": "anyvo",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://u.expo.dev/e6475526-66fa-42fa-b2a4-e11afc349e7a"
+    },
     "ios": {
       "icon": "./assets/images/icon.png",
       "supportsTablet": false,
