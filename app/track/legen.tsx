@@ -136,8 +136,14 @@ export default function LegenScreen() {
   const params = useLocalSearchParams<{ dogId?: string }>();
   const { session } = useSession();
   const { dogs } = useDogs();
-  const { isPro } = useCapabilities();
+  const { isPro, loading: capLoading } = useCapabilities();
   const { showToast, toast } = useToast();
+
+  // NEWBIE (Nicht-Pro) hat keine Fährtenfunktion mehr: Aufnahme-Screen sperren und
+  // auf die bestehende Upgrade-Ansicht (Active) leiten. Nutzt das bestehende isPro-Gate.
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
 
   const [phase, setPhase] = useState<'warmup' | 'recording'>('warmup');
   const phaseRef = useRef(phase); phaseRef.current = phase;   // Stale-Closure-Schutz für Trigger
@@ -565,6 +571,9 @@ export default function LegenScreen() {
     lastAccuracy:  gpsAccuracy ?? null,
     bestAccuracy:  null,
   };
+
+  // Fährtenaufnahme ist Pro-only — Nicht-Pro sieht die Aufnahme-UI nie (Redirect oben).
+  if (!capLoading && !isPro) return null;
 
   return (
     <View className="flex-1 bg-ft-bg">

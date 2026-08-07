@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTrackingStore, type MarkerMaterial } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { loadPending } from '@/features/tracking/store/trackPersist';
@@ -62,6 +63,13 @@ export default function TrackLiegenScreen() {
   const router = useRouter();
   const { t } = useT();
   useKeepAwake();   // Timer/Anzeige während der Liegezeit anlassen (Bildschirm nicht sperren)
+  const { isPro, loading: capLoading } = useCapabilities();
+
+  // NEWBIE (Nicht-Pro) darf keine laufende Fährte fortsetzen: Resume-Screen sperren und
+  // auf die bestehende Upgrade-Ansicht (Active) leiten. Nutzt das bestehende isPro-Gate.
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
 
   const navigation = useNavigation();
   const allowLeaveRef = useRef(false);   // true ⇒ erlaubte Navigation (Absuche / bestätigt) — kein Abbruch-Dialog
@@ -188,6 +196,9 @@ export default function TrackLiegenScreen() {
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
+
+  // Fährten-Resume ist Pro-only — Nicht-Pro sieht die Liegezeit-/Resume-UI nie (Redirect oben).
+  if (!capLoading && !isPro) return null;
 
   return (
     <View className="flex-1 bg-ft-bg">

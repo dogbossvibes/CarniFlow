@@ -3,11 +3,12 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacit
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { getTrackSessionById, getUserTrackSessions, deleteTrackSession } from '@/features/tracking/services/trackService';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
@@ -39,6 +40,7 @@ export default function TrackOverviewScreen() {
   const { t } = useT();
   const { session } = useSession();
   const { dogs } = useDogs();
+  const { isPro, loading: capLoading } = useCapabilities();
 
   const [dogId, setDogId]   = useState<string | null>(null);
   const [rows, setRows]     = useState<any[]>([]);
@@ -112,6 +114,10 @@ export default function TrackOverviewScreen() {
     { icon: 'layers',        label: 'Logbuch',      go: () => router.push('/track/historie' as never) },
     { icon: 'sparkles',      label: 'Insights',     go: () => router.push('/analyse/insights' as never) },
   ];
+
+  // NEWBIE (Nicht-Pro) hat keine Fährtenfunktion mehr: Fährten-Tab sperren und auf
+  // die bestehende Upgrade-Ansicht (Active) leiten. Nutzt das bestehende isPro-Gate.
+  if (!capLoading && !isPro) return <Redirect href={'/premium' as never} />;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

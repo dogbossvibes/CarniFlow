@@ -119,9 +119,10 @@ export function planToCapabilities(plan: SubscriptionPlan): { pro_member: boolea
 // SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql); der Client spiegelt die Limits nur für UX.
 export type QuotaKind = 'dog' | 'training' | 'track';
 
-// Max. NEUE Objekte im Zählzeitraum: Hund = insgesamt (all-time), Training/Fährte
-// = pro Kalendermonat (UTC). Premium (ACTIVE/FOUNDER/TRAINER) = unbegrenzt.
-export const NEWBIE_QUOTA: Record<QuotaKind, number> = { dog: 1, training: 2, track: 1 };
+// Max. NEUE Objekte im Zählzeitraum: Hund = insgesamt (all-time), Training = pro
+// Kalendermonat (UTC). Fährte = 0: NEWBIE hat KEINE Fährtenfunktion (Pro-only-Feature),
+// daher keine monatliche Fährten-Quota. Premium (ACTIVE/FOUNDER/TRAINER) = unbegrenzt.
+export const NEWBIE_QUOTA: Record<QuotaKind, number> = { dog: 1, training: 2, track: 0 };
 
 export function quotaLimit(isPro: boolean, kind: QuotaKind): number {
   return isPro ? Infinity : NEWBIE_QUOTA[kind];

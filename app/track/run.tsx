@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { HelpButton } from '@/components/help/HelpButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
@@ -67,6 +68,13 @@ export default function TrackRunScreen() {
   const router = useRouter();
   const { t } = useT();
   useKeepAwake();   // Display während der Absuche anlassen (Bildschirm nicht sperren)
+  const { isPro, loading: capLoading } = useCapabilities();
+
+  // NEWBIE (Nicht-Pro) darf keine laufende Fährte fortsetzen: Absuche/Resume sperren und
+  // auf die bestehende Upgrade-Ansicht (Active) leiten. Nutzt das bestehende isPro-Gate.
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
   // Registry aufräumen: eine abgeschlossene/abgebrochene Fährte gehört dem Hund
   // nicht mehr als „offen". Ein no-op ohne dogId (Legacy-Deeplinks).
   const clearRegistry = useCallback(() => { if (dogId) useActiveFaehrten.getState().remove(dogId); }, [dogId]);
@@ -428,6 +436,9 @@ export default function TrackRunScreen() {
     lastAccuracy:  s.accuracy ?? null,
     bestAccuracy:  null,
   };
+
+  // Fährten-Absuche ist Pro-only — Nicht-Pro sieht die Absuche-/Resume-UI nie (Redirect oben).
+  if (!capLoading && !isPro) return null;
 
   return (
     <View className="flex-1 bg-ft-bg">
