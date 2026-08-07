@@ -86,9 +86,9 @@ describe('handleQuotaBlock — UX', () => {
 
 describe('SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql — Struktur', () => {
   const sql = readFileSync('SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql', 'utf8').toLowerCase();
-  it('Limits: dog=1, training=2, track=0 (NEWBIE hat keine Fährtenfunktion)', () => {
+  it('Limits: dog=1, training=1, track=0 (NEWBIE: 1 Training/Monat, keine Fährte)', () => {
     expect(sql).toMatch(/'dog' then 1/);
-    expect(sql).toMatch(/'training' then 2/);
+    expect(sql).toMatch(/'training' then 1/);
     expect(sql).toMatch(/'track' then 0/);
   });
   it('atomar (advisory lock) + idempotent (ref_id primary key)', () => {

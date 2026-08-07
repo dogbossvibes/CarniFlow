@@ -57,7 +57,7 @@ create policy "own quota claims" on public.newbie_quota_claims
 -- Defense-in-Depth erhalten und verweigert NEWBIE jede Fährte serverseitig (used >= 0).
 create or replace function public.newbie_quota_limit(p_kind text)
 returns int language sql immutable as $$
-  select case p_kind when 'dog' then 1 when 'training' then 2 when 'track' then 0 else 0 end
+  select case p_kind when 'dog' then 1 when 'training' then 1 when 'track' then 0 else 0 end
 $$;
 
 -- Premium-Erkennung (ACTIVE/FOUNDER/TRAINER). Setzt CAPABILITY_MODEL_SETUP.sql voraus.

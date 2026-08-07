@@ -9,6 +9,7 @@ import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { useToast } from '@/components/ui/Toast';
 import { getActiveDogGoal, saveDogGoal } from '@/services/dogHub';
 import { useT } from '@/i18n';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 const PART_LABELS = ['Unterordnung', 'Fährte', 'Schutzdienst'] as const;
 type PartKey = (typeof PART_LABELS)[number];
@@ -17,9 +18,16 @@ const clamp = (n: number) => Math.max(0, Math.min(100, n));
 // Editor: Ziel + Teil-Fortschritte (dog_goals). Lädt das aktive Ziel zum Bearbeiten.
 export default function DogGoalEditor() {
   const router = useRouter();
+  const { isPro, loading: capLoading } = useCapabilities();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { showToast, toast } = useToast();
   const { t } = useT();
+
+  // NEWBIE (Nicht-Pro) hat kein persönliches Trainingsziel: auf die bestehende
+  // Upgrade-Ansicht (Active) leiten. Nutzt das bestehende zentrale isPro-Gate.
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
 
   const [goalId, setGoalId] = useState<string | null>(null);
   const [title, setTitle]   = useState('');
@@ -55,6 +63,8 @@ export default function DogGoalEditor() {
     haptic.success();
     router.back();
   };
+
+  if (!capLoading && !isPro) return null;
 
   return (
     <View style={s.root}>

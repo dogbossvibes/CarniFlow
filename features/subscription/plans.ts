@@ -16,6 +16,7 @@ export const FOUNDER_SLOT_LIMIT = 11;
 export type Capability =
   | 'training.create' | 'training.analytics' | 'dogs.manage' | 'ai.feedback'
   | 'calendar.use' | 'voice.notes'
+  | 'dogs.backpack' | 'dogs.heat' | 'dogs.commands' | 'dogs.goal'
   | 'trainer.dashboard' | 'trainer.clients' | 'trainer.surveys' | 'trainer.comments' | 'trainer.plans';
 
 // Funktions-Capabilities, die auch NEWBIE (kostenlos) hat. Die ANZAHL neuer
@@ -23,9 +24,15 @@ export type Capability =
 export const BASE_CAPABILITIES: Capability[] = [
   'training.create', 'dogs.manage', 'calendar.use', 'voice.notes',
 ];
-// Premium-only: Smart Coach + erweiterte Analysen. NEWBIE erhält KEINE davon.
+// Premium-only. NEWBIE erhält KEINE davon: Smart Coach/Analyse (training.analytics,
+// ai.feedback) sowie die Hunde-Zusatzfunktionen Backpack, Läufigkeit/Heat-Tracking
+// (dogs.heat), Kommandoerfassung und persönliches Trainingsziel. Allgemeine
+// Gesundheitsdaten sind NICHT premium (NEWBIE erlaubt) — bewusst KEINE dogs.health-
+// Capability, damit Gesundheit nicht mit der Läufigkeit gekoppelt/mitgesperrt wird.
+// ACTIVE/FOUNDER/TRAINER (und Lifetime) erhalten alle Premium-Capabilities.
 export const PREMIUM_CAPABILITIES: Capability[] = [
   'training.analytics', 'ai.feedback',
+  'dogs.backpack', 'dogs.heat', 'dogs.commands', 'dogs.goal',
 ];
 // ACTIVE = BASE + PREMIUM (Kompat-Export für Anzeige/Übersicht).
 export const ACTIVE_CAPABILITIES: Capability[] = [...BASE_CAPABILITIES, ...PREMIUM_CAPABILITIES];
@@ -119,10 +126,10 @@ export function planToCapabilities(plan: SubscriptionPlan): { pro_member: boolea
 // SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql); der Client spiegelt die Limits nur für UX.
 export type QuotaKind = 'dog' | 'training' | 'track';
 
-// Max. NEUE Objekte im Zählzeitraum: Hund = insgesamt (all-time), Training = pro
+// Max. NEUE Objekte im Zählzeitraum: Hund = 1 (all-time), Training = 1 pro
 // Kalendermonat (UTC). Fährte = 0: NEWBIE hat KEINE Fährtenfunktion (Pro-only-Feature),
 // daher keine monatliche Fährten-Quota. Premium (ACTIVE/FOUNDER/TRAINER) = unbegrenzt.
-export const NEWBIE_QUOTA: Record<QuotaKind, number> = { dog: 1, training: 2, track: 0 };
+export const NEWBIE_QUOTA: Record<QuotaKind, number> = { dog: 1, training: 1, track: 0 };
 
 export function quotaLimit(isPro: boolean, kind: QuotaKind): number {
   return isPro ? Infinity : NEWBIE_QUOTA[kind];

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { haptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useSession } from '@/lib/session-context';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
@@ -19,8 +20,15 @@ import {
 // Keine direkte AsyncStorage-Nutzung — alle Daten laufen über features/dogs/backpack.
 export default function DogBackpackScreen() {
   const router = useRouter();
+  const { isPro, loading: capLoading } = useCapabilities();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+
+  // NEWBIE (Nicht-Pro) hat kein Backpack: auf die bestehende Upgrade-Ansicht (Active)
+  // leiten. Nutzt das bestehende zentrale isPro-Gate (kein neues Capability-System).
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
   const { user } = useSession();
   const { id: dogId, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const userId = user?.id ?? '';
@@ -178,6 +186,8 @@ export default function DogBackpackScreen() {
       </SafeAreaView>
     );
   }
+
+  if (!capLoading && !isPro) return null;
 
   return (
     <View style={s.root}>

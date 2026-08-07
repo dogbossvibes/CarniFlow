@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { HelpButton } from '@/components/help/HelpButton';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -21,9 +23,18 @@ const INSIGHTS: Insight[] = [
 
 export default function InsightsScreen() {
   const router = useRouter();
+  const { isPro, loading: capLoading } = useCapabilities();
+
+  // NEWBIE (Nicht-Pro) hat keine Smart Analyse: auf die bestehende Upgrade-Ansicht
+  // (Active) leiten. Nutzt das bestehende zentrale isPro-Gate (wie analyse/coach).
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
 
   const open = (i: Insight) =>
     router.push({ pathname: '/analyse/smart-search', params: { q: i.query, category: i.category ?? '' } } as never);
+
+  if (!capLoading && !isPro) return null;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

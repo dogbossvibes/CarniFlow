@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { DateField } from '@/components/ui/DateField';
 import { toISODate } from '@/features/dogs/dateInput';
 import { addHeatCycle } from '@/features/dogs/heatCycles';
 import { useT } from '@/i18n';
+import { useCapabilities } from '@/hooks/useCapabilities';
 
 const PINK = '#F472B6';
 const PHASES = ['Proöstrus', 'Östrus', 'Diöstrus', 'Anöstrus'];
@@ -17,9 +18,16 @@ const PHASES = ['Proöstrus', 'Östrus', 'Diöstrus', 'Anöstrus'];
 // Editor: Läufigkeit eintragen (lokal, AsyncStorage über addHeatCycle).
 export default function DogHeatEditor() {
   const router = useRouter();
+  const { isPro, loading: capLoading } = useCapabilities();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+
+  // NEWBIE (Nicht-Pro) hat kein Läufigkeits-/Heat-Tracking (Premium): auf die bestehende
+  // Upgrade-Ansicht (Active) leiten. Allgemeine Gesundheit (dog-health) bleibt erlaubt.
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
 
   const [start, setStart] = useState<Date | null>(new Date());
   const [end, setEnd]     = useState<Date | null>(null);
@@ -47,6 +55,8 @@ export default function DogHeatEditor() {
       setSaving(false);
     }
   };
+
+  if (!capLoading && !isPro) return null;
 
   return (
     <View style={s.root}>

@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { haptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import {
   addCommand, updateCommand, getCommand, COMMAND_AREAS,
@@ -24,8 +25,15 @@ const toLines = (s: string) => s.split('\n').map(t => t.trim()).filter(Boolean);
 // Editor: Kommando anlegen/bearbeiten (lokal via dogCommands).
 export default function DogCommandEditor() {
   const router = useRouter();
+  const { isPro, loading: capLoading } = useCapabilities();
   const { t } = useT();
   const { dogId, commandId } = useLocalSearchParams<{ dogId: string; commandId?: string }>();
+
+  // NEWBIE (Nicht-Pro) hat keine Kommandoerfassung: auf die bestehende Upgrade-Ansicht
+  // (Active) leiten. Nutzt das bestehende zentrale isPro-Gate.
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
 
   const [name, setName]         = useState('');
   const [category, setCategory] = useState<CommandCategory>('sport');
@@ -69,6 +77,8 @@ export default function DogCommandEditor() {
       router.back();
     } finally { setSaving(false); }
   };
+
+  if (!capLoading && !isPro) return null;
 
   return (
     <View style={s.root}>

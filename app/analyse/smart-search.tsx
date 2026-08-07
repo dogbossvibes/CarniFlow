@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useDogs } from '@/hooks/useDogs';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useSemanticTrainingSearch } from '@/features/ai/hooks/useSemanticTrainingSearch';
 import type { SemanticSearchResult, EmbeddingSourceType } from '@/features/ai/services/semanticSearchService';
 
@@ -33,8 +34,15 @@ const EXAMPLES = [
 
 export default function SmartSearchScreen() {
   const router = useRouter();
+  const { isPro, loading: capLoading } = useCapabilities();
   const params = useLocalSearchParams<{ q?: string; category?: string }>();
   const { dogs } = useDogs();
+
+  // NEWBIE (Nicht-Pro) hat keine Smart Analyse: auf die bestehende Upgrade-Ansicht
+  // (Active) leiten. Nutzt das bestehende zentrale isPro-Gate (wie analyse/coach).
+  useEffect(() => {
+    if (!capLoading && !isPro) router.replace('/premium' as never);
+  }, [capLoading, isPro, router]);
 
   const [input, setInput]       = useState(params.q ?? '');
   const [submitted, setSubmitted] = useState(params.q ?? '');
@@ -67,6 +75,8 @@ export default function SmartSearchScreen() {
     if (r.trainingSessionId) router.push(`/track/${r.trainingSessionId}` as never);
     else if (unitId) router.push({ pathname: '/unit/detail', params: { id: unitId } } as never);
   };
+
+  if (!capLoading && !isPro) return null;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

@@ -4,7 +4,8 @@ import {
   hasCapability, planToCapabilities, isTrainerPlan, planOfProduct, isPremiumPlan,
   ACTIVE_CAPABILITIES, BASE_CAPABILITIES, PREMIUM_CAPABILITIES, TRAINER_CAPABILITIES,
   PRODUCT_IDS, FOUNDER_SLOT_LIMIT, NEWBIE_QUOTA, quotaLimit, quotaAllowsNew,
-  type SubscriptionPlan,
+  resolveEffectiveCapabilities,
+  type SubscriptionPlan, type Capability,
 } from '@/features/subscription/plans';
 
 const sub = (plan: SubscriptionPlan | null, status: any = 'active') => ({ plan, status });
@@ -67,17 +68,16 @@ describe('FOUNDER_ACTIVE ≡ ACTIVE (keine Sonder-Feature-Matrix)', () => {
 });
 
 describe('NEWBIE-Quotas (reine Entscheidung)', () => {
-  it('Limits: 1 Hund, 2 Trainings/Monat, 0 Fährten (Pro-only)', () => {
-    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 0 });
+  it('Limits: 1 Hund, 1 Training/Monat, 0 Fährten (Pro-only)', () => {
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 1, track: 0 });
   });
   it('Hund: 1. erlaubt, 2. blockiert', () => {
     expect(quotaAllowsNew(false, 'dog', 0)).toBe(true);
     expect(quotaAllowsNew(false, 'dog', 1)).toBe(false);
   });
-  it('Training: 1+2 erlaubt, 3 blockiert', () => {
+  it('Training: 1. erlaubt, 2. blockiert', () => {
     expect(quotaAllowsNew(false, 'training', 0)).toBe(true);
-    expect(quotaAllowsNew(false, 'training', 1)).toBe(true);
-    expect(quotaAllowsNew(false, 'training', 2)).toBe(false);
+    expect(quotaAllowsNew(false, 'training', 1)).toBe(false);
   });
   it('Fährte: NEWBIE hat keine Fährtenfunktion → nie erlaubt', () => {
     expect(quotaLimit(false, 'track')).toBe(0);
@@ -88,6 +88,64 @@ describe('NEWBIE-Quotas (reine Entscheidung)', () => {
     expect(quotaLimit(true, 'dog')).toBe(Infinity);
     expect(quotaAllowsNew(true, 'training', 999)).toBe(true);
     expect(quotaAllowsNew(true, 'track', 999)).toBe(true);
+  });
+});
+
+describe('NEWBIE finale Produktdefinition — Feature-Locks (Premium-only)', () => {
+  // Backpack, Gesundheit, Kommandoerfassung, persönliches Ziel + Smart Analyse.
+  const FEATURE_LOCKS: Capability[] = [
+    'dogs.backpack', 'dogs.heat', 'dogs.commands', 'dogs.goal',
+    'training.analytics', 'ai.feedback',
+  ];
+  it('NEWBIE: alle Feature-Locks + Trainer gesperrt', () => {
+    for (const c of FEATURE_LOCKS) expect(hasCapability(sub('newbie', 'trialing'), c)).toBe(false);
+    for (const c of TRAINER_CAPABILITIES) expect(hasCapability(sub('newbie', 'trialing'), c)).toBe(false);
+  });
+  it('ACTIVE + FOUNDER: alle Feature-Locks freigeschaltet', () => {
+    for (const c of FEATURE_LOCKS) {
+      expect(hasCapability(sub('active'), c)).toBe(true);
+      expect(hasCapability(sub('founder_active'), c)).toBe(true);
+    }
+  });
+  it('TRAINER: Feature-Locks + Trainerrechte', () => {
+    for (const c of [...FEATURE_LOCKS, ...TRAINER_CAPABILITIES]) {
+      expect(hasCapability(sub('trainer'), c)).toBe(true);
+    }
+  });
+  it('serverseitige Sonderrechte (Lifetime): Feature-Locks freigeschaltet', () => {
+    const eff = resolveEffectiveCapabilities({
+      subscription: null,
+      entitlements: [{
+        id: 'e1', userId: 'u1', entitlement: 'lifetime',
+        grantedAt: '2026-01-01T00:00:00Z', expiresAt: null, revokedAt: null,
+      }],
+    });
+    expect(eff.pro_member).toBe(true);
+    for (const c of FEATURE_LOCKS) expect(eff.capabilities).toContain(c);
+  });
+});
+
+describe('NEWBIE Gesundheit erlaubt, Läufigkeit (Heat) gesperrt', () => {
+  it('Läufigkeit ist premium (dogs.heat), allgemeine Gesundheit NICHT gekoppelt', () => {
+    expect(PREMIUM_CAPABILITIES).toContain('dogs.heat');
+    // Es gibt bewusst keine dogs.health-Capability (Gesundheit ist für NEWBIE erlaubt).
+    expect(PREMIUM_CAPABILITIES as readonly string[]).not.toContain('dogs.health');
+    expect(BASE_CAPABILITIES as readonly string[]).not.toContain('dogs.health');
+  });
+  it('dogs.heat: NEWBIE gesperrt, ACTIVE/FOUNDER/TRAINER erlaubt', () => {
+    expect(hasCapability(sub('newbie', 'trialing'), 'dogs.heat')).toBe(false);
+    expect(hasCapability(sub('active'), 'dogs.heat')).toBe(true);
+    expect(hasCapability(sub('founder_active'), 'dogs.heat')).toBe(true);
+    expect(hasCapability(sub('trainer'), 'dogs.heat')).toBe(true);
+  });
+  it('dog-health-Screen: KEIN Premium-Redirect (NEWBIE-Gesundheit erlaubt)', () => {
+    const src = readFileSync('app/dog-health/[id].tsx', 'utf8');
+    expect(src).not.toMatch(/router\.replace\('\/premium'/);
+    expect(src).not.toMatch(/useCapabilities/);
+  });
+  it('dog-heat-Screen: Premium-Redirect vorhanden (Läufigkeit gesperrt)', () => {
+    const src = readFileSync('app/dog-heat/[id].tsx', 'utf8');
+    expect(src).toMatch(/router\.replace\('\/premium'/);
   });
 });
 
