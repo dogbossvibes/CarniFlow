@@ -155,6 +155,14 @@ export default function ProfilScreen() {
   const { expiresAt } = usePlan();
   const { isPro, isTrainerModule, plan } = useCapabilities();
   const { access } = useAccess();
+  // Sichtbares Plan-Label für die Mitgliedschafts-Row. „Lifetime"/Sonderrechte
+  // werden NIE als solche benannt → neutral „Dauerhaft freigeschaltet".
+  const membershipLabel =
+    access.planType === 'trainer'        ? t('membership.trainer')
+    : access.planType === 'founder_active' ? t('membership.founder')
+    : access.planType === 'active'         ? t('membership.active')
+    : access.isLifetime                    ? t('membership.permanentAccess')
+    : t('membership.free');
   const PLAN_LABEL = { free: 'Free', pro: 'Active', trainer: 'Trainer' } as const;
 
   // Trial-Status fürs Abo-Karten-UI (Kündigen / gekündigt-Hinweis).
@@ -290,10 +298,10 @@ export default function ProfilScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Mitgliedschaft-Button unter der Identitätskarte */}
+        {/* Mitgliedschaft-Row → Membership-Seite (immer sichtbar, zeigt aktuellen Plan) */}
         <TouchableOpacity
           style={[s.planBtn, isPro && s.planBtnAktiv]}
-          onPress={() => router.push('/premium')}
+          onPress={() => router.push('/membership')}
           activeOpacity={0.8}
         >
           {isPro && (
@@ -310,11 +318,9 @@ export default function ProfilScreen() {
             color={isPro ? C.accent : C.muted}
           />
           <Text style={[s.planBtnText, isPro && s.planBtnTextAktiv]}>
-            {plan === 'trainer' ? t('premium.trainerActiveShort') : plan === 'pro' ? t('premium.activeShort') : t('premium.upgradeActive')}
+            {t('membership.membershipRow')} · {membershipLabel}
           </Text>
-          {!isPro && (
-            <Ionicons name="chevron-forward" size={14} color={C.subtle} />
-          )}
+          <Ionicons name="chevron-forward" size={14} color={C.subtle} />
         </TouchableOpacity>
 
         {/* Statistiken */}
@@ -406,7 +412,7 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 0 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proAbzeichenText}>{isActiveTrial ? 'TESTPHASE' : access.isLifetime ? 'LIFETIME' : plan === 'trainer' ? 'TRAINER' : 'ACTIVE'}</Text>
+                <Text style={s.proAbzeichenText}>{isActiveTrial ? 'TESTPHASE' : plan === 'trainer' ? 'TRAINER' : 'ACTIVE'}</Text>
               </View>
               <View style={s.premiumAktivBadge}>
                 <Ionicons name="checkmark-circle" size={13} color={C.success} />
@@ -416,20 +422,16 @@ export default function ProfilScreen() {
             <Text style={s.premiumTitel}>
               {isActiveTrial
                 ? t('premium.trialActive')
-                : access.isLifetime
-                  ? (access.hasTrainerAccess ? t('premium.lifetimeTrainerActive') : t('premium.lifetimeActive'))
-                  : (plan === 'trainer' ? t('premium.trainerActiveShort') : t('premium.activeShort'))}
+                : (plan === 'trainer' ? t('premium.trainerActiveShort') : t('premium.activeShort'))}
             </Text>
             <Text style={s.premiumSub}>
               {isActiveTrial
                 ? (trialCancelled
                     ? (trialEndLabel ? t('premium.cancelledAccessEndsDate', { date: trialEndLabel }) : t('premium.cancelledAccessEnds'))
                     : (trialEndLabel ? t('premium.freeTrialUntil', { date: trialEndLabel }) : t('premium.trialActive')))
-                : access.isLifetime
-                  ? t('premium.lifetimeFeature')
-                  : expiresAt
-                    ? t('premium.renewsAt', { date: expiresAt.toLocaleDateString("de-CH") })
-                    : t('premium.unlimitedActive')}
+                : expiresAt
+                  ? t('premium.renewsAt', { date: expiresAt.toLocaleDateString("de-CH") })
+                  : t('premium.unlimitedActive')}
             </Text>
             {isActiveTrial && !trialCancelled && (
               <TouchableOpacity onPress={handleCancelTrial} activeOpacity={0.7} style={s.trialCancelBtn}>

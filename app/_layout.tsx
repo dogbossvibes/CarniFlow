@@ -71,6 +71,7 @@ export default function RootLayout() {
         {/* Trainer-Hub: Fullscreen-Modal über dem aktuellen Screen (kein Tab).
             Zugang nur mit Trainer-Capability (Gate + Redirect im Screen selbst). */}
         <Stack.Screen name="trainer-hub" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+        <Stack.Screen name="membership" options={{ headerShown: false }} />
         <Stack.Screen name="modal"    options={{ presentation: 'modal' }} />
         <Stack.Screen name="add-dog"  options={{ presentation: 'modal' }} />
         <Stack.Screen name="edit-dog"      options={{ presentation: 'modal' }} />
