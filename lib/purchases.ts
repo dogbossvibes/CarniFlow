@@ -160,10 +160,56 @@ export async function getPackages(): Promise<PurchasePackage[]> {
   }
 }
 
-export async function buyPackage(pkg: PurchasePackage): Promise<EntitlementResult> {
+// Google-Play-Wechselmodus für Upgrades: Wechsel wirkt sofort, die verbleibende
+// Zeit wird anteilig gutgeschrieben (RC-Standard für Upgrades). Der Wert ist der
+// String-Enum-Wert von STORE_REPLACEMENT_MODE (react-native-purchases 10.x) und
+// wird 1:1 an die native SDK übergeben. Nur für Android relevant.
+export const ANDROID_UPGRADE_REPLACEMENT_MODE = 'WITH_TIME_PRORATION' as const;
+
+export interface AndroidProductChange {
+  oldProductIdentifier: string;
+  replacementMode: typeof ANDROID_UPGRADE_REPLACEMENT_MODE;
+}
+
+// Baut die Android-Product-Change-Info für einen Abo-Wechsel. NUR auf Android und
+// NUR wenn ein alter Produkt-Identifier vorliegt → sonst null (Neukauf oder iOS,
+// wo StoreKit den Wechsel über die Subscription-Group regelt). Rein, testbar.
+export function buildAndroidChangeInfo(
+  platform: string,
+  oldProductIdentifier: string | null | undefined,
+): AndroidProductChange | null {
+  if (platform !== 'android' || !oldProductIdentifier) return null;
+  return { oldProductIdentifier, replacementMode: ANDROID_UPGRADE_REPLACEMENT_MODE };
+}
+
+// Aktuell aktives Store-Abo-Produkt (für Android-Product-Change als
+// oldProductIdentifier). Quelle: CustomerInfo.activeSubscriptions; bevorzugt ein
+// bekanntes ANYVO-Produkt, sonst das erste aktive Abo. Wirft nie; null wenn IAP
+// nicht bereit ist oder kein aktives Abo besteht.
+export async function getActiveStoreProductId(): Promise<string | null> {
+  if (!purchasesReady()) return null;
+  try {
+    const info = await Purchases.getCustomerInfo();
+    const subs: string[] = info?.activeSubscriptions ?? [];
+    return subs.find(id => rankIdentifier(id) !== null) ?? subs[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function buyPackage(
+  pkg: PurchasePackage,
+  opts?: { oldProductIdentifier?: string | null },
+): Promise<EntitlementResult> {
   if (!Purchases) return { ok: false, tier: null, plan: null, expiration: null, error: 'IAP nicht verfügbar' };
   try {
-    const { customerInfo } = await Purchases.purchasePackage(pkg.raw);
+    // Android-Wechsel eines bestehenden Abos: alten Produkt-Identifier + Upgrade-
+    // Modus übergeben → echter Subscription-Wechsel statt zweitem parallelem Abo.
+    // iOS/Neukauf: change === null → unveränderter Standard-Kaufaufruf.
+    const change = buildAndroidChangeInfo(Platform.OS, opts?.oldProductIdentifier);
+    const { customerInfo } = change
+      ? await Purchases.purchasePackage(pkg.raw, null, change)
+      : await Purchases.purchasePackage(pkg.raw);
     return fromInfo(customerInfo);
   } catch (e: any) {
     if (e?.userCancelled) return { ok: false, tier: null, plan: null, expiration: null, cancelled: true };
@@ -187,5 +233,19 @@ export async function restorePurchases(): Promise<EntitlementResult> {
     return fromInfo(await Purchases.restorePurchases());
   } catch (e: any) {
     return { ok: false, tier: null, plan: null, expiration: null, error: e?.message ?? 'Wiederherstellen fehlgeschlagen' };
+  }
+}
+
+// Store-Abo-Verwaltung: RevenueCat liefert die korrekte, plattformspezifische
+// Management-URL (App Store bzw. Google Play) für das aktuelle Konto. null, wenn
+// IAP nicht bereit ist, kein aktives Abo besteht oder der Store sie nicht liefert
+// → der Aufrufer nutzt dann einen Store-Fallback. Wirft nie.
+export async function getManagementURL(): Promise<string | null> {
+  if (!purchasesReady()) return null;
+  try {
+    const info = await Purchases.getCustomerInfo();
+    return info?.managementURL ?? null;
+  } catch {
+    return null;
   }
 }

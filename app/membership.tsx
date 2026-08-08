@@ -3,16 +3,16 @@ import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Te
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, restorePurchases, restorePlanFromResult, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, restorePurchases, restorePlanFromResult, getManagementURL, type PurchasePackage } from '@/lib/purchases';
 import { getPlanSubscription, getFounderSlots, activatePlan } from '@/services/subscriptionService';
 import { newbieQuotaStatus } from '@/services/quotaService';
-import { PLAN_META, FOUNDER_SLOT_LIMIT, type SubscriptionPlan } from '@/features/subscription/plans';
+import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -97,17 +97,19 @@ export default function MembershipScreen() {
     : 'newbie';
   const isNewbie = visiblePlan === 'newbie';
 
-  useEffect(() => {
-    (async () => {
-      // Offerings defensiv laden — getPackages() wirft nie, liefert [] bei Fehler.
-      setPackages(await getPackages());
-      setSlots(await getFounderSlots());
-      if (uid) {
-        const sub = await getPlanSubscription(uid);
-        setDbPlan(sub?.plan ?? null);
-      }
-    })();
+  // Offerings/Slots/Plan defensiv laden — getPackages() wirft nie, liefert [] bei Fehler.
+  const loadPlanState = useCallback(async () => {
+    setPackages(await getPackages());
+    setSlots(await getFounderSlots());
+    if (uid) {
+      const sub = await getPlanSubscription(uid);
+      setDbPlan(sub?.plan ?? null);
+    }
   }, [uid]);
+
+  // Bei jedem Fokus neu laden → nach einem Wechsel auf /premium spiegelt die Seite
+  // den neuen Plan sofort wider (Kauf/Upgrade aktualisiert CustomerInfo + DB).
+  useFocusEffect(useCallback(() => { void loadPlanState(); }, [loadPlanState]));
 
   // NEWBIE-Nutzung nur laden, wenn Newbie (bestehende Quota-Status-RPC, keine lokalen Zähler).
   useEffect(() => {
@@ -142,14 +144,22 @@ export default function MembershipScreen() {
     }
   };
 
-  // „Abo verwalten" → native Store-Abo-Verwaltung (kein neuer Flow).
-  const handleManage = () => {
-    const url = Platform.OS === 'ios'
+  // „Abo verwalten" → bevorzugt die RevenueCat-Management-URL (korrekte Store-Abo-
+  // Seite für iOS/Android), sonst plattformspezifischer Store-Fallback. Crash-safe.
+  const handleManage = async () => {
+    const rcUrl = await getManagementURL();
+    const fallback = Platform.OS === 'ios'
       ? 'itms-apps://apps.apple.com/account/subscriptions'
       : 'https://play.google.com/store/account/subscriptions';
-    Linking.openURL(url).catch(() => Alert.alert(t('common.notice'), t('membership.manageUnavailable')));
+    try {
+      await Linking.openURL(rcUrl ?? fallback);
+    } catch {
+      // z. B. iOS-Simulator (kein App Store installiert) → klaren Hinweis statt generisch.
+      Alert.alert(t('common.notice'), Platform.OS === 'ios' ? t('membership.manageSimulator') : t('membership.manageUnavailable'));
+    }
   };
 
+  // Wechsel/Upgrade läuft über die bestehende Paywall /premium (kein zweiter Kauf-Flow).
   const goUpgrade = () => router.push('/premium');
 
   const compareCards: { plan: SubscriptionPlan; nameKey: TranslationKey; price: string; show: boolean }[] = [
@@ -264,13 +274,35 @@ export default function MembershipScreen() {
         <Text style={[s.sectionTitle, { paddingHorizontal: 4, marginTop: 8 }]}>{t('membership.compare')}</Text>
         <View style={s.compareWrap}>
           {compareCards.filter(c => c.show).map(c => {
-            const current = c.plan === visiblePlan || (visiblePlan === 'permanent' && c.plan === 'trainer' && false);
+            const current = c.plan === visiblePlan;
+            // Wechselquelle: 'permanent' (Lifetime) hat bereits alles → keine Wechsel.
+            const src: SubscriptionPlan | null = visiblePlan === 'permanent' ? null : visiblePlan;
+            const canSwitch = !current && visiblePlan !== 'permanent'
+              && canSwitchPlanInApp(src, c.plan, { founderAvailable });
+            // Nur bei bezahlten Plänen auf einen nicht-erlaubten Wechsel hinweisen
+            // (Downgrade/Kündigung → Store). Newbie/permanent brauchen keinen Hinweis.
+            const storeHint = !current && !canSwitch
+              && (visiblePlan === 'active' || visiblePlan === 'founder_active' || visiblePlan === 'trainer');
+            const CardTag = canSwitch ? TouchableOpacity : View;
             return (
-              <View key={c.plan} style={[s.compareCard, current && s.compareCardCurrent]}>
+              <CardTag
+                key={c.plan}
+                style={[s.compareCard, current && s.compareCardCurrent, canSwitch && s.compareCardSwitch, storeHint && s.compareCardDisabled]}
+                {...(canSwitch ? { onPress: goUpgrade, activeOpacity: 0.85, accessibilityRole: 'button' as const } : {})}
+              >
                 <Text style={s.compareName}>{t(c.nameKey)}</Text>
                 <Text style={s.comparePrice}>{c.price}</Text>
-                {current && <Text style={s.compareCurrent}>{t('premium.current')}</Text>}
-              </View>
+                {current ? (
+                  <Text style={s.compareCurrent}>{t('premium.current')}</Text>
+                ) : canSwitch ? (
+                  <View style={s.compareCta}>
+                    <Text style={s.compareCtaTxt}>{t('membership.selectPlan')}</Text>
+                    <Ionicons name="chevron-forward" size={13} color={C.accent} />
+                  </View>
+                ) : storeHint ? (
+                  <Text style={s.compareHint}>{t('membership.switchViaStore')}</Text>
+                ) : null}
+              </CardTag>
             );
           })}
         </View>
@@ -326,9 +358,14 @@ const s = StyleSheet.create({
   compareWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
   compareCard: { flexGrow: 1, minWidth: '46%', borderRadius: 18, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, padding: 14, gap: 4 },
   compareCardCurrent: { borderColor: C.accentMid, backgroundColor: C.accentDim },
+  compareCardSwitch: { borderColor: C.accentMid },
+  compareCardDisabled: { opacity: 0.55 },
   compareName: { fontSize: 14, color: C.white, fontWeight: '800' },
   comparePrice:{ fontSize: 13, color: C.muted, fontWeight: '600' },
   compareCurrent: { fontSize: 11, color: C.accent, fontWeight: '800', marginTop: 2 },
+  compareCta:  { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
+  compareCtaTxt: { fontSize: 11, color: C.accent, fontWeight: '800' },
+  compareHint: { fontSize: 10.5, color: C.muted, fontWeight: '600', marginTop: 2 },
 
   legal:     { fontSize: 12, color: C.subtle, textAlign: 'center', marginTop: 8 },
 });

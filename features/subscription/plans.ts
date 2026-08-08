@@ -114,6 +114,34 @@ export function isPremiumPlan(plan: SubscriptionPlan | null | undefined): boolea
   return plan === 'active' || plan === 'founder_active' || plan === 'trainer';
 }
 
+// In-App erlaubte Plan-Wechsel = NUR store-sichere Upgrades. Kündigung und jeder
+// Downgrade/Wechsel auf einen günstigeren bezahlten Plan laufen ausschliesslich
+// über die Store-Abo-Verwaltung („Abo verwalten"), da Apple/Google das
+// programmatisch nicht zulassen. Founder Active ist ein limitiertes Gründer-
+// Angebot (FOUNDER_SLOT_LIMIT, einmalig) und NUR aus dem kostenlosen Tier
+// erreichbar — bestehende Zahler können nicht in Founder wechseln.
+// Erlaubt: Newbie→Active/Trainer/Founder(nur wenn frei), Active→Trainer,
+// Founder→Trainer. Alles andere: false.
+export function canSwitchPlanInApp(
+  current: SubscriptionPlan | null | undefined,
+  target: SubscriptionPlan,
+  opts: { founderAvailable: boolean },
+): boolean {
+  const from: SubscriptionPlan = current ?? 'newbie';   // kein Abo == Gratis/Newbie
+  if (target === from) return false;
+  switch (target) {
+    case 'trainer':
+      // Upgrade aus jedem niedrigeren bezahlten Plan bzw. aus Gratis.
+      return from === 'newbie' || from === 'active' || from === 'founder_active';
+    case 'active':
+      return from === 'newbie';                          // nur Neueinstieg, kein Downgrade
+    case 'founder_active':
+      return from === 'newbie' && opts.founderAvailable; // limitiert, nur aus Gratis
+    default:
+      return false;                                      // newbie/unbekannt: kein Kauf
+  }
+}
+
 // Plan → Runtime-Capabilities (user_capabilities).
 // NEWBIE ist das kostenlose Standard-Tier → NICHT pro_member. ACTIVE/FOUNDER = pro,
 // TRAINER = pro + trainer_module. FOUNDER_ACTIVE ≡ ACTIVE (keine Sonder-Matrix).

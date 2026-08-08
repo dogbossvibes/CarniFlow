@@ -1,6 +1,10 @@
 import {
   fromCustomerInfo,
   restorePlanFromResult,
+  getManagementURL,
+  getActiveStoreProductId,
+  buildAndroidChangeInfo,
+  ANDROID_UPGRADE_REPLACEMENT_MODE,
   type EntitlementResult,
 } from '@/lib/purchases';
 
@@ -78,5 +82,39 @@ describe('RevenueCat restore mapping', () => {
     expect(restorePlanFromResult(legacyPro, 'founder_active')).toBe('founder_active');
     expect(restorePlanFromResult(legacyPro, null)).toBe('active');
     expect(restorePlanFromResult(legacyTrainer, null)).toBe('trainer');
+  });
+});
+
+describe('getManagementURL', () => {
+  it('liefert null, wenn IAP nicht bereit/konfiguriert ist (kein Crash)', async () => {
+    // In der Testumgebung ist react-native-purchases nicht konfiguriert →
+    // purchasesReady() ist false → sicherer null-Rückgabewert (Store-Fallback).
+    await expect(getManagementURL()).resolves.toBeNull();
+  });
+});
+
+describe('buildAndroidChangeInfo — Android Product-Change', () => {
+  it('Android + alter Produkt-Identifier → Change-Info mit Upgrade-Modus', () => {
+    expect(buildAndroidChangeInfo('android', 'anyvo_active_monthly_10')).toEqual({
+      oldProductIdentifier: 'anyvo_active_monthly_10',
+      replacementMode: ANDROID_UPGRADE_REPLACEMENT_MODE,
+    });
+    expect(ANDROID_UPGRADE_REPLACEMENT_MODE).toBe('WITH_TIME_PRORATION');
+  });
+
+  it('iOS → immer null (StoreKit regelt Wechsel über Subscription-Group)', () => {
+    expect(buildAndroidChangeInfo('ios', 'anyvo_active_monthly_10')).toBeNull();
+  });
+
+  it('Android ohne alten Identifier (Neukauf/Newbie) → null', () => {
+    expect(buildAndroidChangeInfo('android', null)).toBeNull();
+    expect(buildAndroidChangeInfo('android', undefined)).toBeNull();
+    expect(buildAndroidChangeInfo('android', '')).toBeNull();
+  });
+});
+
+describe('getActiveStoreProductId', () => {
+  it('liefert null, wenn IAP nicht bereit ist (kein Crash)', async () => {
+    await expect(getActiveStoreProductId()).resolves.toBeNull();
   });
 });

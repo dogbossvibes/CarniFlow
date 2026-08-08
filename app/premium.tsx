@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,11 +11,11 @@ import { haptic } from '@/lib/haptics';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, type PurchasePackage } from '@/lib/purchases';
 import {
   activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
-import { PLAN_META, FOUNDER_SLOT_LIMIT, type SubscriptionPlan } from '@/features/subscription/plans';
+import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
 import { useT } from '@/i18n';
 import type { TranslationKey } from '@/i18n/de-CH';
 
@@ -83,7 +83,14 @@ export default function PremiumScreen() {
   // Empfohlener Plan zum Upgraden: Founder Active (bester Preis) solange Slots frei,
   // sonst Active. Newbie-Trial-Karte nur zeigen, wenn noch nie abonniert wurde.
   const recommendedPlan: SubscriptionPlan = founderAvailable ? 'founder_active' : 'active';
-  const visibleCards = CARDS.filter(c => c.plan !== 'newbie' || !currentPlan);
+  // Newbie-Trial-Karte nur ohne bestehendes Abo. Founder ist ein limitiertes
+  // Gründer-Angebot NUR für Neu-Mitglieder aus Gratis (oder wer bereits Founder ist)
+  // → bestehenden Active-/Trainer-Zahlern nicht als Wechselziel anbieten.
+  const visibleCards = CARDS.filter(c => {
+    if (c.plan === 'newbie') return !currentPlan;
+    if (c.plan === 'founder_active') return currentPlan === 'founder_active' || !currentPlan;
+    return true;
+  });
   // Preis-Anker für die Founder-Ersparnis: echter Active-Preis aus dem Store
   // (gleiche Währung wie die angezeigten Preise), sonst Fallback auf die CHF-Angabe.
   const activePriceStr = packages.find(p => p.productId === PLAN_META.active.productId)?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
@@ -108,6 +115,12 @@ export default function PremiumScreen() {
     }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { Alert.alert(t('trainer.connectHintTitle'), t('premium.loginRequired')); return; }
+    // In-App nur erlaubte Upgrades. Downgrades/gesperrte Wechsel (inkl. Founder für
+    // bestehende Zahler) laufen ausschliesslich über die Store-Abo-Verwaltung.
+    if (plan !== 'newbie' && currentPlan && !canSwitchPlanInApp(currentPlan, plan, { founderAvailable })) {
+      Alert.alert(t('common.notice'), t('membership.switchViaStore'));
+      return;
+    }
     setLaden(plan);
     try {
       // Newbie Trial: 7 Tage gratis, kein Kauf.
@@ -138,7 +151,20 @@ export default function PremiumScreen() {
       if (iapReady) {
         const pkg = packageForPlan(plan);
         if (!pkg) return;
-        const res = await buyPackage(pkg);
+        // Android: bei einem Wechsel eines bestehenden bezahlten Abos den aktiven
+        // Store-Produkt-Identifier bestimmen und übergeben → echter Upgrade statt
+        // zweitem parallelem Abo. Fehlt er, würde Google doppelt abrechnen → dann
+        // auf die Store-Abo-Verwaltung verweisen. iOS bleibt unverändert (Group).
+        let oldProductIdentifier: string | null = null;
+        if (Platform.OS === 'android' && currentPlan && currentPlan !== 'newbie' && plan !== currentPlan) {
+          oldProductIdentifier = await getActiveStoreProductId();
+          if (!oldProductIdentifier) {
+            haptic.warning();
+            Alert.alert(t('common.notice'), t('membership.switchViaStore'));
+            return;
+          }
+        }
+        const res = await buyPackage(pkg, { oldProductIdentifier });
         if (res.cancelled) return;
         if (!res.ok) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), res.error ?? t('premium.purchaseIncomplete')); return; }
         const { error } = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration, providerProductId: meta.productId });
@@ -268,6 +294,9 @@ export default function PremiumScreen() {
           const isRec = card.plan === recommendedPlan && !isCurrent && !soldOut;
           const filled = card.founder || card.plan === 'trainer' || isRec;   // Gradient-CTA
           const missingStorePackage = card.plan !== 'newbie' && purchasesReady() && !pkg;
+          // Gesperrter Wechsel (Downgrade / nicht erlaubt) → nicht kaufbar, Hinweis auf Store.
+          const blockedSwitch = card.plan !== 'newbie' && !isCurrent && !soldOut
+            && !canSwitchPlanInApp(currentPlan, card.plan, { founderAvailable });
           return (
             <View key={card.plan} style={[S.card, card.founder && S.cardFounder, isRec && !card.founder && S.cardRec, isCurrent && S.cardCurrent]}>
               {isRec && (
@@ -304,6 +333,8 @@ export default function PremiumScreen() {
                 <View style={S.currentTag}><Ionicons name="checkmark" size={15} color={C.accent} /><Text style={S.currentTxt}>{t('premium.current')}</Text></View>
               ) : soldOut ? (
                 <View style={S.soldOut}><Text style={S.soldOutTxt}>{t('premium.founderSoldOut')}</Text></View>
+              ) : blockedSwitch ? (
+                <View style={S.soldOut}><Text style={S.soldOutTxt}>{t('membership.switchViaStore')}</Text></View>
               ) : missingStorePackage ? (
                 <TouchableOpacity style={S.soldOut} onPress={() => Alert.alert(t('trainer.connectHintTitle'), card.plan === 'trainer' ? t('premium.trainerPackageUnavailable') : t('premium.packageUnavailable'))} activeOpacity={0.75}>
                   <Text style={S.soldOutTxt}>{t('premium.notLoaded')}</Text>
