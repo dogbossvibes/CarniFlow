@@ -190,6 +190,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'auth.newPasswordTitle':         'Neus Passwort',
   'auth.recoveryInvalidLink':      'De Link isch ungültig oder abgloffe. Bitte forder en neue Link aa.',
   'auth.recoveryOpenViaMail':      'Öffne dä Screen über de Link us de Reset-Mail.',
+  'auth.recoverySameDevice':       'Bitte öffne de Reset-Link ufem gliiche Gerät, wo du „Passwort vergässe" aagfrogt häsch — oder forder en neue Link aa.',
   'auth.recoveryChecking':         'Link wird prüeft…',
   'auth.recoveryRequestNew':       'Neue Link aafordere',
   'auth.passwordCheckTitle':       'Passwort prüefe',

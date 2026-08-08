@@ -190,6 +190,7 @@ export const deCH = {
   'auth.newPasswordTitle':         'Neues Passwort',
   'auth.recoveryInvalidLink':      'Der Link ist ungültig oder abgelaufen. Bitte fordere einen neuen Link an.',
   'auth.recoveryOpenViaMail':      'Öffne diesen Screen über den Link aus der Reset-Mail.',
+  'auth.recoverySameDevice':       'Bitte öffne den Reset-Link auf demselben Gerät, auf dem du „Passwort vergessen" angefordert hast — oder fordere einen neuen Link an.',
   'auth.recoveryChecking':         'Link wird geprüft…',
   'auth.recoveryRequestNew':       'Neuen Link anfordern',
   'auth.passwordCheckTitle':       'Passwort prüfen',
