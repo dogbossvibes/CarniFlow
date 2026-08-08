@@ -1427,6 +1427,7 @@ export const deCH = {
   'premium.choosePlan': '{plan} wählen',
   'premium.restore': 'Käufe wiederherstellen',
   'premium.legal': 'Zahlung über deinen App-Store-Account · jederzeit kündbar.',
+  'premium.autoRenewNotice': 'Das Abonnement verlängert sich automatisch, sofern es nicht mindestens 24 Stunden vor Ablauf des aktuellen Abrechnungszeitraums gekündigt wird. Verwaltung und Kündigung erfolgen über dein Store-Konto.',
   'premium.terms': 'Nutzungsbedingungen',
   'premium.privacy': 'Datenschutz',
 

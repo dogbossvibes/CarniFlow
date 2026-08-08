@@ -525,4 +525,9 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "membership.benefit.goal": "Objectif d'entraînement personnel",
   "membership.benefit.smartAnalysis": "Smart Analyse",
   "membership.benefit.trainerModule": "Fonctions Trainer",
+
+  // Paywall-Legal-Links (Apple 3.1.2)
+  "premium.terms": "Conditions d'utilisation",
+  "premium.privacy": "Protection des données",
+  "premium.autoRenewNotice": "L'abonnement se renouvelle automatiquement s'il n'est pas résilié au moins 24 heures avant la fin de la période de facturation en cours. La gestion et la résiliation se font via ton compte Store.",
 };

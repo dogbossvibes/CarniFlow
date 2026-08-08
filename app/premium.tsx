@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,6 +21,14 @@ import type { TranslationKey } from '@/i18n/de-CH';
 
 import { useAccess } from '@/hooks/useAccess';
 import { useInternalTester } from '@/hooks/useInternalTester';
+
+// Apple 3.1.2 (Auto-Renewable Subscriptions): funktionierende Links zu den
+// Nutzungsbedingungen (Apple Standard-EULA) und zum Datenschutz direkt auf der
+// Paywall. Extern via Linking geöffnet (iOS + Android; https wird ohne
+// canOpenURL-Check unterstützt); Fehler crashen die App nicht.
+const EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+const PRIVACY_URL = 'https://www.anyvo.app/datenschutz';
+const openLegalLink = (url: string) => { Linking.openURL(url).catch(() => { /* no-op: kein Crash */ }); };
 
 interface CardDef { plan: SubscriptionPlan; badgeKey?: TranslationKey; features: TranslationKey[]; founder?: boolean }
 
@@ -318,11 +326,12 @@ export default function PremiumScreen() {
           <Text style={S.restoreTxt}>{t('premium.restore')}</Text>
         </TouchableOpacity>
         </>)}
+        {!access.isLifetime && <Text style={S.legal}>{t('premium.autoRenewNotice')}</Text>}
         {!access.isLifetime && <Text style={S.legal}>{t('premium.legal')}</Text>}
         <View style={S.linksRow}>
-          <Text style={S.link} onPress={() => router.push('/terms')}>{t('premium.terms')}</Text>
+          <Text style={S.link} accessibilityRole="link" onPress={() => openLegalLink(EULA_URL)}>{t('premium.terms')}</Text>
           <Text style={S.legal}>·</Text>
-          <Text style={S.link} onPress={() => router.push('/privacy')}>{t('premium.privacy')}</Text>
+          <Text style={S.link} accessibilityRole="link" onPress={() => openLegalLink(PRIVACY_URL)}>{t('premium.privacy')}</Text>
         </View>
         <View style={{ height: 30 }} />
       </ScrollView>

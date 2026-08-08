@@ -1427,6 +1427,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'premium.choosePlan': '{plan} wähle',
   'premium.restore': 'Chäuf widerherstelle',
   'premium.legal': 'Zahlig über din App-Store-Account · jederzeit kündbar.',
+  'premium.autoRenewNotice': 'S Abo verlängeret sich automatisch, wenn s nöd mindestens 24 Stund vor Ablauf vom aktuelle Abrechnigszitruum kündiget wird. Verwalte und kündige chasch über dis Store-Konto.',
   'premium.terms': 'Nutzigsbedingige',
   'premium.privacy': 'Dateschutz',
 
