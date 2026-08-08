@@ -14,51 +14,29 @@ import { useT } from '@/i18n';
 export default function PasswordRecoveryScreen() {
   const router = useRouter();
   const { t } = useT();
-  const params = useLocalSearchParams<{
-    code?: string; token_hash?: string; type?: string;
-    access_token?: string; error?: string; error_description?: string;
-  }>();
+  const params = useLocalSearchParams<{ code?: string; error?: string; error_description?: string }>();
   const exchanged = useRef(false);
   const [ready, setReady] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [pw1, setPw1] = useState('');
   const [pw2, setPw2] = useState('');
   const [saving, setSaving] = useState(false);
-  // Temporäre, sichere Recovery-Diagnose — nur bei Fehlschlag sichtbar. Enthält
-  // NIE Code/Token/Verifier, sondern nur Vorhandensein/Länge/Fehler-Meta.
-  const [diag, setDiag] = useState<{
-    hasCode: boolean; codeLength: number; hasTokenHash: boolean; hasError: boolean;
-    errorCode: string | null; errorName?: string | null; errorStatus?: number | null; errorMessage?: string | null;
-  } | null>(null);
 
   useEffect(() => {
     if (exchanged.current) return;
 
     const code = typeof params.code === 'string' ? params.code : undefined;
-    const tokenHash = typeof params.token_hash === 'string' ? params.token_hash : undefined;
     const hasErr = Boolean(params.error || params.error_description);
 
-    // Sichere Diagnose-Basis (KEINE Secrets: nur Vorhandensein/Länge/Fehler-Meta).
-    const baseDiag = {
-      hasCode: !!code, codeLength: code?.length ?? 0,
-      hasTokenHash: !!tokenHash, hasError: hasErr,
-      errorCode: typeof params.error === 'string' ? params.error : null,
-    };
-    if (__DEV__) console.log('[recovery] deep-link params', { ...baseDiag, type: typeof params.type === 'string' ? params.type : null });
-
-    if (hasErr) { setDiag(baseDiag); setLinkError(t('auth.recoveryInvalidLink')); return; }
+    if (hasErr) { setLinkError(t('auth.recoveryInvalidLink')); return; }
 
     if (code) {
       exchanged.current = true;
       supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
         if (error) {
-          const e = error as { name?: string; status?: number; message?: string };
-          const msg = (e.message ?? '').slice(0, 120);   // gekürzt, keine Tokens
-          if (__DEV__) console.log('[recovery] exchange failed', { name: e.name ?? null, status: e.status ?? null, message: msg });
-          setDiag({ ...baseDiag, errorName: e.name ?? null, errorStatus: e.status ?? null, errorMessage: msg || null });
           // PKCE-Flow-State-/Verifier-Fehler = Link auf anderem Gerät geöffnet bzw.
           // Verifier verloren → geräte-spezifischer Hinweis statt generisch „ungültig".
-          const isFlowState = /flow state|verifier|code challenge|code_verifier/i.test(e.message ?? '');
+          const isFlowState = /flow state|verifier|code challenge|code_verifier/i.test(error.message ?? '');
           setLinkError(isFlowState ? t('auth.recoverySameDevice') : t('auth.recoveryInvalidLink'));
           return;
         }
@@ -67,12 +45,12 @@ export default function PasswordRecoveryScreen() {
       return;
     }
 
-    // Kein `code` (z. B. token_hash-/Fragment-Format oder bereits gültige Session).
+    // Kein `code` (Fragment-Format oder bereits gültige Session).
     supabase.auth.getSession().then(({ data: { session } }) => {
       setReady(Boolean(session));
-      if (!session) { setDiag(baseDiag); setLinkError(t('auth.recoveryOpenViaMail')); }
+      if (!session) setLinkError(t('auth.recoveryOpenViaMail'));
     });
-  }, [params.code, params.token_hash, params.type, params.access_token, params.error, params.error_description, t]);
+  }, [params.code, params.error, params.error_description, t]);
 
   const savePassword = async () => {
     const validation = validateNewPassword(pw1, pw2);
@@ -125,17 +103,6 @@ export default function PasswordRecoveryScreen() {
             <Ionicons name="alert-circle-outline" size={22} color={C.danger} />
             <Text style={s.noticeText}>{linkError}</Text>
             <Button label={t('auth.recoveryRequestNew')} variant="outline" onPress={() => router.replace('/auth/forgot-password' as never)} />
-            {diag && (
-              <View style={s.diag}>
-                <Text style={s.diagTitle}>Recovery Diagnose</Text>
-                <Text style={s.diagLine}>hasCode: {String(diag.hasCode)} · codeLength: {diag.codeLength}</Text>
-                <Text style={s.diagLine}>hasTokenHash: {String(diag.hasTokenHash)} · hasError: {String(diag.hasError)}</Text>
-                {diag.errorCode != null && <Text style={s.diagLine}>errorCode: {diag.errorCode}</Text>}
-                {diag.errorName != null && <Text style={s.diagLine}>errorName: {diag.errorName}</Text>}
-                {diag.errorStatus != null && <Text style={s.diagLine}>errorStatus: {String(diag.errorStatus)}</Text>}
-                {diag.errorMessage != null && <Text style={s.diagLine}>errorMessage: {diag.errorMessage}</Text>}
-              </View>
-            )}
           </View>
         ) : (
           <>
@@ -180,7 +147,4 @@ const s = StyleSheet.create({
   hint: { fontSize: 13, color: C.muted },
   notice: { gap: 16, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: C.border, backgroundColor: C.card },
   noticeText: { fontSize: 14, color: C.white, lineHeight: 20 },
-  diag: { gap: 3, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.cardAlt },
-  diagTitle: { fontSize: 10, color: C.muted, fontWeight: '800', letterSpacing: 1, marginBottom: 3 },
-  diagLine: { fontSize: 12, color: C.subtle },
 });
