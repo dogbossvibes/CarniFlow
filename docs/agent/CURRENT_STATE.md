@@ -1,20 +1,67 @@
 # ANYVO — Current State
 
-> Länger gültiger, technischer Projektzustand für Agenten (Claude Code & Codex).
+> Länger gültiger, technischer Projektzustand für Agenten (OpenCode & OpenAI Codex).
 > **Kein Session-Log** (dafür `SESSION_HANDOFF.md` / `WORK_LOG.md`).
 > Jede Aussage ist als **Verified / Assumed / Unknown** markiert.
 > **Repository state > Git state > Handoff documentation > Agent assumptions.**
+
+## Aktueller Stand — 2026-08-10 (autoritativ, verifiziert via git)
+
+> Ergänzt von Claude Code. Spiegelt den REAL gepushten Stand nach P1–P8 + Security + Branding +
+> Dog/Home-UI. Ältere Sektionen unten bleiben Historie; bei Widerspruch gilt diese Sektion + echter git-Stand.
+
+### REPO
+- Branch `feat/track-module-rewrite`, **HEAD `69d7b72`**, **synchron mit origin** (0 ahead / 0 behind).
+- Working Tree weiterhin **absichtlich dirty** (fremde WIP-Cluster: opencode-Agent-Handoff inkl. T-45
+  Winkel/`autoCornerDetection`, ADR/Architecture-Docs, Artefakte/Rauschen) — NICHT Teil dieser Commits.
+
+### RELEASE
+- ANYVO **1.0.1**, iOS **Build 40**, Android **Build 40**, `runtimeVersion` policy `appVersion` (→ 1.0.1).
+- Production-OTA vorhanden (`updates.url` gesetzt, channel `production`); mehrere OTAs (Recovery/Subscription)
+  bereits veröffentlicht (Runtime 1.0.1).
+
+### ABGESCHLOSSEN / AUF ORIGIN (verifiziert gepusht)
+- **P1** Recovery-Route — `a40a68c` · **P2** NEWBIE-Copy — `3c3c17e` · **P3** FR Recovery-Parität — `9b578b3`
+- **P4** ANYVO ID — `06e5aaf` · **P5** 1-m Search-Distance — `a13f412` · **P6** Off-Track-Utilities — `2dc0398`
+- **P7** Tracking-Design-Tokens (accText) — `2468ebe` · **P8** Localization-Sweep — `60be031`
+- **CONNECT** Entitlement fail-closed — `19a2bf1` · **Branding** ConnectHomeScreen ANYVO-Logo — `f1d7abe`
+- **Dog/Home-UI:** Quick Actions `d1f240d` · Heat-Card `ba6ce75` · Active-Fährte-Card + GPS `9e74454` ·
+  ShareSheet-Härtung `82d01d7` · Home-Widget/i18n-Testabdeckung `69d7b72`
+
+### AUTH
+- Passwort-Recovery auf echtem Gerät **erfolgreich**. PKCE, Deep-Link `anyvo://auth/recovery` (Datei-Route +
+  `_layout`-Registrierung). Temporärer Diagnose-Code **vollständig entfernt** (netto keine Diagnose am HEAD).
+  Same-Device-Hinweis bleibt.
+
+### CONNECT
+- ANYVO ID. Production-Entitlement-Enforcement **fail-closed** (`__DEV__===false` erzwingt Tier-Logik; fehlendes
+  Env-Flag gewährt KEIN ALL_ACCESS mehr). Branding korrigiert (anyvologo).
+
+### TRACKING
+- **1-m Search-Toleranz** (`HANDLER_DISTANCES_M=[1,5,10]`, Default 5 m).
+- **Off-Track State Machine** vorhanden (`features/tracking/utils/offTrack.ts` + Tests), **NICHT verdrahtet**.
+- **Offen:** Winkel / rechts-links / Schlangenlinien (T-45, opencode-WIP `autoCornerDetection`).
+
+### SUBSCRIPTIONS
+- Mitgliederbereich; RevenueCat `managementURL` (+ Store-Fallback); Planwechsel `canSwitchPlanInApp` (in-app nur
+  store-sichere Upgrades; Android Product-Change `oldProductIdentifier` + `WITH_TIME_PRORATION`).
+- **Offen:** Founder Active später vereinfachen / für Neukunden aus regulärer Auswahl nehmen; Bestandskunden erhalten.
+
+### DOG/HOME
+- Neue Quick Actions, Heat-Empty-State, Active-Fährte-Card + GPS-Quality, ShareSheet-Guard, Home-Widget-/i18n-Tests.
 
 ## Verified (im Repository nachprüfbar)
 - **Stack:** Expo SDK 54 / React Native, Expo Router (file-based, `app/`), TypeScript. (`package.json`, `app.json`)
 - **Native:** Continuous Native Generation — `ios/` und `android/` existieren lokal/git-ignored; native Builds verändern den versionierten Tree nicht direkt.
 - **Release-Worktree:** lokaler Release-Worktree ist sauber und steht auf Branch `release/build38-hotfix`, HEAD `f7a5997`.
 - **Build 38 Config im Release-Worktree:** App-Version `1.0.1`, iOS buildNumber `38`, Android versionCode `38`, `runtimeVersion` policy `appVersion`, `updates.url` gesetzt, production channel vorhanden.
-- **Hauptrepo HEAD:** `c268eee fix(navigation): keep analytics tab and present trainer hub as modal` auf Branch
-  `feat/track-module-rewrite` (42 Commits vor `origin/feat/track-module-rewrite`, ungepusht).
-- **Feature-Commits in HEAD:** Backpack `0434182`, Journal `2a85fbc`, Dashboard `0061fed`, Home-Backpack-Integration `e447cd2`,
-  Entitlement-System (T-34) `50ccfd2`, Startseiten-FAB (T-41) `7490969`.
-  Diese Commits sind noch nicht gepusht.
+- **Hauptrepo HEAD:** `2d9e1cc feat(web): relaunch ANYVO website with journal, backpack and design pass` auf Branch
+  `feat/track-module-rewrite`, **0 Commits vor `origin/feat/track-module-rewrite`** (alle zuvor ungepushten Commits
+  wurden mit Freigabe gepusht, HEAD == Remote).
+- **Feature-Commits in HEAD (alle remote):** Backpack `0434182`, Journal `2a85fbc`, Dashboard `0061fed`,
+  Home-Backpack-Integration `e447cd2`, Entitlement-System (T-34) `50ccfd2`, Startseiten-FAB (T-41) `7490969`,
+  Schnellbutton-Kette `7490969`/`e8f57be`/`c268eee`, Benutzernamen (T-43) `7517e1d`, Build-39-Kette bis `6e10838`,
+  Website-Relaunch `2d9e1cc`.
 - **Build-38-Hotfix 2:** EAS Updates veröffentlicht auf Channel/Branch `production`, Runtime `1.0.1`:
   - iOS group `ed746533-d71f-4102-a2b8-a03e59293d97`, update `019fc012-76cc-7bfe-bcad-d1c99453ee3c`
   - Android group `f8c4461c-513c-4039-9369-5eb1c6a956f3`, update `019fc014-3873-7a8b-9a4d-af2eba66de05`
@@ -31,7 +78,7 @@
 - **Backend-Client:** Supabase (`@supabase/*`) für Auth/Daten; Google-OAuth in `services/auth.ts`.
 - **Offline-First:** lokale SQLite mit Tabellen u. a. `local_training_sessions`, `local_track_points`, `local_track_markers`, `sync_queue`, `local_schema_migrations`.
 - **Feature-Domänen im Code:** Tracking/Fährte (`features/tracking/`, `app/track/`), Training/Timer (`app/unit/`), Hunde (`features/dogs/`, `app/dog/`), Smart Coach/Analyse lokal (`features/ai/`), Connect (`features/connect/`, flag-gated), Hilfe/Onboarding (`features/help/`, `components/help/`), Home-Customization.
-- **Agent-Infrastruktur:** `docs/agent/*`, `scripts/agent-*.mjs`, `AGENTS.md`/`CLAUDE.md`-Regeln.
+- **Agent-Infrastruktur:** `docs/agent/*`, `scripts/agent-*.mjs`, `AGENTS.md`-Regeln und `.opencode/`-Konfiguration; `CLAUDE.md`/`.claude/` sind Legacy bis zu einem separaten Cleanup.
 
 ## Verified Remote/Release State (aus dieser Session)
 - **RevenueCat Webhooks:** `revenuecat-webhook` und `revenuecat-webhook-google` wurden in Production deployed, beide ACTIVE und `verify_jwt=false`.
@@ -188,25 +235,38 @@
   der eigenen Zeile → eigener unveränderter Name ist verfügbar. `dog.boss.vibes` gültig (Punkt-Regel konsistent
   Client + CHECK).
 
+## Verified (Website-Relaunch legal-web — committed `2d9e1cc` + gepusht)
+- **Inhalt:** `legal-web/index.html` (Startseite mit Backpack + Journal), `legal-web/funktionen.html` ==
+  `legal-web/funktionen/index.html`, echte Screenshots (`assets/screenshots/*`: journal/backpack/smartanalyse),
+  `assets/site.css`/`site.js`, Meta aktualisiert.
+- **Design-Pass 2 (nur `assets/site.css`):** `.module-card` auf Flex-Column mit pro Bild passendem `aspect-ratio`
+  (2/3 Porträt/Screenshot, 3/2 Landschaft), `.audience-card` als 2-Spalten-Editorial, `.cta-band`
+  `object-fit: contain` mit unscharfem `::before`-Hintergrund, Card-Buttons Sekundärstil, `.tag-row margin-top:auto`.
+- **Verifikation:** 9 Viewport-Breiten (320/375/390/430/768/1024/1280/1440/1920) ohne Overflow; Bild-Containers
+  entsprechen exakt den nativen Aspect-Ratios (`yam20.jpg` 1023×1537, `bazooka.jpg` 1920×1280, `Malu13.jpg` 4000×6000,
+  `11GSLOGODSC4449.jpg` 3500×2333) → `cover` kann den Hund mathematisch nicht beschneiden; „vollständig sichtbar"
+  **nicht visuell bestätigt** (kein Bildeingang).
+- **Commit + Push (mit Freigabe):** `2d9e1cc` selektiv gestaged (nur Legal-Web, fremder WIP unangetastet), gepusht
+  auf `origin/feat/track-module-rewrite` (`6e10838..2d9e1cc`); HEAD == Remote (0/0).
+- **Deployment:** NICHT erfolgt (kein Vercel/Netlify o. ä.).
+
 ## Current Dirty State (Verified via `git status --short`)
-- Das Hauptrepo ist weiterhin dirty (~115 Einträge modified+untracked), Index leer (0 staged).
-- Committed, aber nicht gepusht (42 Commits vor `origin`): Backpack/Journal/Dashboard/Home-Backpack, T-34
-  Entitlement-System, T-36…T-43, Trainer-Hub-Modal (`c268eee`).
-- **Uncommittete Build-39-Arbeit (noch hunk-genau zu committen):** T-39 (`app/(tabs)/training.tsx` +
-  `app/(tabs)/__tests__/training.test.tsx` untracked), T-40 (`app/training-journal.tsx`, `services/trainingFeed.ts`,
-  `features/training/__tests__/journal.test.ts`, `app/__tests__/training-journal.test.tsx` + `services/__tests__/trainingFeed.test.ts`
-  untracked), T-44 (`app/trainer-hub.tsx`, `app/umfrage/index.tsx`, `app/unit/summary.tsx`,
-  `app/(tabs)/__tests__/tab-navigation.test.ts`, Profil-Duplikat-Hunks in `app/(tabs)/profile.tsx`,
-  `trainer.*`-i18n-Hunks in `i18n/de-CH.ts`/`i18n/gsw-CH.ts`), Build-39-Fixes (`components/ui/DateField.tsx` +
-  `DateField.test.tsx` untracked, `services/shareService.ts` + `shareService.test.ts` untracked,
-  T-43-`@username`-Hunks in `profile.tsx`/`trainer/index.tsx`).
+- Das Hauptrepo ist weiterhin dirty (uncommittete WIP/Artefakte), Index leer (0 staged).
+- **Push abgeschlossen:** HEAD `2d9e1cc` == `origin/feat/track-module-rewrite` (0 vor, 0 hinter). Alle bisher
+  ungepushten Commits (Backpack/Journal/Dashboard/Home-Backpack, T-34, T-36…T-44, Build-39-Kette bis `6e10838`,
+  Website-Relaunch `2d9e1cc`) sind jetzt remote.
+- **Uncommittete Build-39-Nacharbeit:** ist grösstenteils committed (DateField, Journal-Karte/Distanz, Trainer-Hub,
+  Summary-Back, Share-Härtung, Release-Nummern, env-Bindung). Im Tree verbleiben v. a. **fremde WIP-Stränge**:
+  ANYVO-ID-Umbennung (`i18n/de-CH.ts`/`gsw-CH.ts`/`fr.ts`), i18n-Hardcode-Migration (`index/sync/track/trainer/unit/
+  connect/tracking/AppLockGate/ShareSheet/DogHeatCard/DogQuickActions/GpsSourcePicker/MarkerBottomSheet/
+  ActiveFaehrteCard/TrackStatsPanel`), optionale Home/Backpack-Test-Files.
 - **Fremd / NICHT committen (ausschliessen):** ANYVO-ID-Umbennung (i18n `username*`→„ANYVO ID", fr komplett),
   i18n-Hardcode-Migration (`trainer/dashboard`, `trainer/index`, `unit/live`, `unit/stats`, `index`, `sync`,
   `track/*`, `tracking/*`, `connect/*`, `AppLockGate`, `ShareSheet`, `DogHeatCard`, `DogQuickActions`,
-  `GpsSourcePicker`, `MarkerBottomSheet`, `ActiveFaehrteCard`, `TrackStatsPanel`), `legal-web/*`, SQL-Dumps,
+  `GpsSourcePicker`, `MarkerBottomSheet`, `ActiveFaehrteCard`, `TrackStatsPanel`), SQL-Dumps,
   Screenshots, `dist-*`, ADRs, `AI_HANDOFF.md`, Workspace-Dateien.
-- **Migrationen:** `20260803120000_fix_shared_trainings_fk.sql` untracked (nicht committed, nicht remote),
-  `20260803140000_profiles_username.sql` committed `7517e1d` (nicht remote). Remote fehlen genau diese 2.
+- **Migrationen remote (applied):** `20260802100000`, `20260802110000`, `20260803130000`, `20260803140000` und
+  `20260803120000` (letztere committed `6e10838` + nachträglich appliziert). Keine Remote-Migration offen.
 
 ## Verified (Build 39 — Release-Readiness-Audit, 2026-08-04) — GATE: NOT READY
 - **Clean-HEAD (`c268eee`, detachierter Worktree):** `npm ci` OK; `tsc --noEmit` 0 Errors; Jest **77 Suites /
@@ -217,9 +277,11 @@
   uncommitteter Arbeit).
 - **Release-Konfiguration (Verified):** `app.json` version `1.0.1`, iOS `buildNumber "38"`, Android
   `versionCode 37` (TASKS.md T-18-Behauptung „38" ist veraltet). `eas.json`: production `autoIncrement:false`,
-  `appVersionSource:local`, channel `production`, buildType `app-bundle`. **`EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`
-  nirgends gesetzt** (nur iOS-Key) → `configurePurchases` (lib/purchases.ts:27) bricht auf Android ab → IAP
-  inaktiv, Trial-Fallback. Sentry-org/project nur als Env in production.
+  `appVersionSource:local`, channel `production`, buildType `app-bundle`, `"environment": "production"` (seit
+  `82b0868`). **`EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` ist als sensible EAS-Env in `production` angelegt**
+  (`eas env:create`, NICHT in Git); `eas env:list production` → `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` +
+  `SENTRY_AUTH_TOKEN` (beide sensitive). `configurePurchases` (lib/purchases.ts:27) liest den Key auf Android
+  damit aus der EAS-production-Umgebung. Sentry-org/project nur als Env in production.
 - **Status explizit:** kein Push, kein Build, keine Remote-Migration, keine History-Reparatur, keine
   Release-Nummern geändert, Working Tree weiterhin dirty, Build 39 aktuell **nicht READY**.
 
@@ -232,6 +294,7 @@
 - Ob die frisch veröffentlichten EAS Updates bereits auf allen realen Geräten angekommen sind.
 - Ob Google Play Build 38 bereits eingereicht, reviewed oder veroeffentlicht wurde.
 - Ob Store-/RevenueCat-Dashboard-Konfiguration vollständig finalisiert ist.
-- Ob die Website-Startseite/Funktionsseite releasefähig ist; sie ist lokal WIP und nicht deployed.
+- Ob die Website releasefähig ist; sie ist committed (`2d9e1cc`) + gepusht, aber **nicht deployed** und die
+  manuelle Sichtprüfung der Hundefotos steht aus.
 - Vollständigkeit/Aktualität der ADR-/Architektur-Docs gegenüber dem aktuellen Code.
 - Ob der Home-Backpack-Flow auf Android und auf echten Geräten vollständig abgenommen ist.
