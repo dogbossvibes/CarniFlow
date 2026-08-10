@@ -73,7 +73,7 @@ export function ConnectEditProfileScreen() {
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <Input label="Anzeigename" placeholder="Wie du in CONNECT erscheinst" value={displayName} onChangeText={setDisplayName} autoCapitalize="words" maxLength={40} />
           <View style={{ height: 12 }} />
-          <Input label="Benutzername" placeholder="@name (optional)" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={24} />
+          <Input label="ANYVO ID" placeholder="z. B. Nebelfalter" value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} maxLength={24} />
           <View style={{ height: 12 }} />
           <Input label="Region" placeholder="z. B. Zürich (optional)" value={region} onChangeText={setRegion} maxLength={40} />
           <View style={{ height: 12 }} />
