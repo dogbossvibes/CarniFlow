@@ -11,7 +11,7 @@ import { haptic } from '@/lib/haptics';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, ensurePurchasesConfigured, IAP_DIAG, revenueCatDiagnostics, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, ensurePurchasesConfigured, type PurchasePackage } from '@/lib/purchases';
 import {
   activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
@@ -233,26 +233,6 @@ export default function PremiumScreen() {
     }
   };
 
-  // ⚠️ TEMPORÄR (IAP-Diagnose, Apple 2.1b): zeigt secret-freien RevenueCat-Status
-  // als Alert (auf echtem Gerät/TestFlight ablesbar). Vor Release entfernen.
-  const runIapDiagnostics = async () => {
-    const d = await revenueCatDiagnostics();
-    const lines = [
-      `platform: ${d.platform} · sdk: ${d.sdkAvailable} · hasApiKey: ${d.hasApiKey}`,
-      `configured: ${d.configured} · isConfigured: ${d.isConfigured}`,
-      `appUserID: ${d.hasAppUserID ? 'ja' : 'nein'} · anon: ${d.isAnonymous}`,
-      `offeringsOk: ${d.offeringsOk} · current: ${d.currentPresent} (${d.currentIdentifier ?? '—'})`,
-      `packages: ${d.currentPackageCount}`,
-      ...d.packages.map(p => `  • ${p.productId} · ${p.priceString ?? '—'} ${p.currencyCode ?? ''}`),
-      `allOfferings: ${d.allOfferingIds.join(', ') || '—'}`,
-      'directProducts:',
-      ...d.directProducts.map(p => `  • ${p.id}: ${p.found ? (p.priceString ?? 'ok') : 'FEHLT'}`),
-      d.error ? `error: ${d.error.code ?? ''} | ${d.error.message ?? ''} | ${d.error.underlying ?? ''}` : 'error: none',
-      `VERDIKT: ${d.verdict}`,
-    ];
-    Alert.alert('IAP-Diagnose', lines.join('\n'));
-  };
-
   return (
     <SafeAreaView style={S.safe} edges={['top']}>
       <TouchableOpacity style={S.closeBtn} onPress={() => router.back()} activeOpacity={0.7}>
@@ -404,12 +384,6 @@ export default function PremiumScreen() {
           <Text style={S.legal}>·</Text>
           <Text style={S.link} accessibilityRole="link" onPress={() => openLegalLink(PRIVACY_URL)}>{t('premium.privacy')}</Text>
         </View>
-        {/* ⚠️ TEMPORÄR: IAP-Diagnose (Apple 2.1b). Vor Release entfernen. */}
-        {IAP_DIAG && (
-          <TouchableOpacity onPress={runIapDiagnostics} style={S.restoreBtn} activeOpacity={0.7}>
-            <Text style={S.restoreTxt}>IAP-Diagnose</Text>
-          </TouchableOpacity>
-        )}
         <View style={{ height: 30 }} />
       </ScrollView>
     </SafeAreaView>

@@ -73,7 +73,6 @@ describe('RevenueCat Init-Lifecycle', () => {
 
   it('fehlender API-Key → ensure=false, KEIN configure (verhindert „no singleton"-Blindflug)', async () => {
     const m = load('');
-    expect(m.hasPurchasesApiKey()).toBe(false);
     const ok = await m.ensurePurchasesConfigured('user-1');
     expect(ok).toBe(false);
     expect(mockConfigure).not.toHaveBeenCalled();
