@@ -933,21 +933,21 @@ export default function LegenScreen() {
             <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${activeSegment ? 'text-ft-acc' : 'text-ft-text'}`}>TS</Text>
           </Pressable>
           <Pressable
-            className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
+            className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${gsPicker ? 'bg-ft-acc border-ft-acc' : 'bg-white/5 border-ft-line-strong'}`}
             accessibilityLabel={t('track.setObjectButton')}
             onPress={() => { hapticTap(); setWinkelSheet(false); setGsPicker(v => !v); }} disabled={phase !== 'recording'}
           >
-            <Ionicons name="cube-outline" size={20} color={gsPicker ? FT.acc : FT.text} />
-            <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${gsPicker ? 'text-ft-acc' : 'text-ft-text'}`}>GS</Text>
+            <Ionicons name="cube-outline" size={20} color={gsPicker ? FT.accText : FT.text} />
+            <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${gsPicker ? 'text-ft-acc-text' : 'text-ft-text'}`}>GS</Text>
           </Pressable>
           <Pressable
             accessibilityLabel={t('track.setAngleButton')}
             accessibilityHint={t('track.setAngleHint')}
-            className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
+            className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${winkelSheet ? 'bg-ft-acc border-ft-acc' : 'bg-white/5 border-ft-line-strong'}`}
             onPress={() => { hapticTap(); setGsPicker(false); setWinkelSheet(v => !v); }} disabled={phase !== 'recording'}
           >
-            <Ionicons name="git-branch-outline" size={20} color={winkelSheet ? FT.acc : FT.text} />
-            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{t('track.angle')}</Text>
+            <Ionicons name="git-branch-outline" size={20} color={winkelSheet ? FT.accText : FT.text} />
+            <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${winkelSheet ? 'text-ft-acc-text' : 'text-ft-text'}`}>{t('track.angle')}</Text>
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
