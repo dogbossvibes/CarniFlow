@@ -70,6 +70,23 @@ describe('Off-Track State Machine', () => {
     expect(r.reliable).toBe(false);
   });
 
+  it('16b) ungültiger seitlicher Abstand (Infinity/NaN) → sicher, kein Trigger, State gehalten', () => {
+    let r = feed(initialOffTrack(), Infinity);
+    expect(r.reliable).toBe(false);
+    expect(r.snap.state).toBe('on_track');
+    r = feed(r.snap, NaN);
+    expect(r.reliable).toBe(false);
+    expect(r.snap.state).toBe('on_track');
+    expect(r.transition).toBeNull();
+  });
+
+  it('16c) nicht akzeptierter Fix (accepted=false) hält den State (keine Eskalation)', () => {
+    const r = drive(initialOffTrack(), 7, 6, { accuracyM: ACC });   // würde normalerweise eskalieren
+    const held = feed(r.snap, 20, { accepted: false });
+    expect(held.reliable).toBe(false);
+    expect(held.snap.state).toBe(r.snap.state);
+  });
+
   it('17) Hysterese: Totzone zwischen recovery und warning hält WARNING (kein Flattern)', () => {
     let r = drive(initialOffTrack(), 5, 2);      // → warning
     expect(r.snap.state).toBe('warning');

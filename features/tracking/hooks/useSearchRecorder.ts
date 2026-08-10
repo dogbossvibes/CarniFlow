@@ -14,6 +14,7 @@ import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind,
 } from '@/features/tracking/utils/positionSource';
 import { DEFAULT_HANDLER_DISTANCE_M, estimateDogProgressM, pointAtDistance } from '@/features/tracking/utils/searchGeometry';
+import { stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev } from '@/features/tracking/utils/searchFix';
@@ -131,6 +132,7 @@ export interface SearchRecorder {
   foundObjects: number;
   totalObjects: number;
   distanceM: number;
+  offTrackState: OffTrackState;   // Phase-1 Off-Track-Status (on_track|warning|off_track) für UI/Recorder
   progressM: number;              // Handler-Fortschritt (Bogenlänge) — unverändert
   dogProgressM: number;           // virtueller Hundefortschritt = progressM + Abstand (geklemmt)
   trackLengthM: number;           // Gesamtlänge der gelegten Fährte (arc.total)
@@ -173,7 +175,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const [paused, setPausedState] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [position, setPosition] = useState<LatLng | null>(null);
-  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, progressM: 0, score: 0 });
+  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, progressM: 0, score: 0, offTrackState: 'on_track' as OffTrackState });
   const [elapsedS, setElapsedS] = useState(0);
   const [gpsDebug, setGpsDebug] = useState<GpsDebug>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
 
@@ -192,6 +194,9 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const devCountRef = useRef(0);
   const offTrackSinceRef = useRef<number | null>(null);
   const inBreakRef = useRef(false);
+  // Phase-1 Off-Track-State-Machine (features/tracking/utils/offTrack). NUR Status
+  // halten/exponieren — KEIN Voice/Haptik/Banner/Recorder-Freeze/Auto-Pause hier.
+  const offTrackRef = useRef<OffTrackSnapshot>(initialOffTrack());
   const foundRef = useRef<Set<number>>(new Set());
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const startMsRef = useRef(0);
@@ -223,6 +228,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
       distanceM: distRef.current,
       progressM: maxCursorMRef.current,
       score: computeScore(),
+      offTrackState: offTrackRef.current.state,
     });
   }, [computeScore]);
 
@@ -303,6 +309,16 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
 
     // ── Abriss-/Neuansatz-Erkennung ──
     const now = Date.now();
+
+    // Phase-1 Off-Track: State-Machine mit dem bereits berechneten seitlichen Abstand
+    // (dev = projectForward().devM) + GPS-Genauigkeit füttern. NUR Status halten —
+    // keine UI/Voice/Haptik/Freeze-/Pause-Aktion (bewusst separate Phase 2+).
+    if (hasTrack) {
+      offTrackRef.current = stepOffTrack(offTrackRef.current, {
+        crossTrackM: dev, accuracyM: accRaw, accepted: true, nowMs: now,
+      }).snap;
+    }
+
     if (!inBreakRef.current) {
       if (dev > BREAK_THRESHOLD_M) {
         if (offTrackSinceRef.current == null) offTrackSinceRef.current = now;
@@ -379,6 +395,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     distRef.current = d;
     devEmaRef.current = 0; devSumRef.current = 0; devCountRef.current = 0;
     offTrackSinceRef.current = null; inBreakRef.current = false;
+    offTrackRef.current = initialOffTrack();
     cursorMRef.current = 0; maxCursorMRef.current = 0;
     foundRef.current = new Set();
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
@@ -434,7 +451,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     ready, recording, paused,
     points: snap.points, position, deviationM: snap.deviationM, onTrack: snap.onTrack,
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
-    distanceM: snap.distanceM, progressM: snap.progressM,
+    distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,
     dogProgressM, trackLengthM: arc.total, estimatedDogPosition,
     elapsedS, score: snap.score, accuracy,
     gpsDebug,
