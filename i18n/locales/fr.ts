@@ -529,6 +529,10 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "membership.benefit.smartAnalysis": "Smart Analyse",
   "membership.benefit.trainerModule": "Fonctions Trainer",
 
+  // NEWBIE-Limits (finale Produktdefinition: 1 entraînement/mois, 0 piste)
+  "premium.newbieTrainingLimit": "Tu as déjà utilisé ton entraînement gratuit de ce mois-ci. Avec Active, documente sans limite.",
+  "premium.newbieTrackLimit": "Les pistes sont disponibles avec Active.",
+
   // Paywall-Legal-Links (Apple 3.1.2)
   "premium.terms": "Conditions d'utilisation",
   "premium.privacy": "Protection des données",
