@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useAppLockSetting } from '@/hooks/useAppLockSetting';
+import { useT } from '@/i18n';
 
 // expo-local-authentication ist nativ → defensiv laden, damit ein Build OHNE das
 // Modul nicht schon beim Import crasht (Feature ist dann einfach inaktiv).
@@ -16,6 +17,7 @@ export const APP_LOCK_AVAILABLE = LocalAuth != null;
 // Hintergrund eine Entsperrung (Face ID / Touch ID / Fingerabdruck / Geräte-Code).
 // Rendert im gesperrten Zustand ein deckendes Overlay über der gesamten App.
 export function AppLockGate() {
+  const { t } = useT();
   const { session } = useSession();
   const { enabled, loaded } = useAppLockSetting();
   const [locked, setLocked] = useState(false);
@@ -30,14 +32,14 @@ export function AppLockGate() {
     authingRef.current = true;
     try {
       const res = await LocalAuth.authenticateAsync({
-        promptMessage: 'ANYVO entsperren',
-        cancelLabel: 'Abbrechen',
+        promptMessage: t('appLock.prompt'),
+        cancelLabel: t('common.cancel'),
         disableDeviceFallback: false,   // Geräte-Code als Rückfall erlaubt
       });
       if (res.success) setLocked(false);
     } catch { /* gesperrt lassen, Nutzer kann erneut versuchen */ }
     finally { authingRef.current = false; }
-  }, []);
+  }, [t]);
 
   // Kaltstart / neues Login: sperren, wenn aktiviert + eingeloggt + verfügbar.
   useEffect(() => {
@@ -74,11 +76,11 @@ export function AppLockGate() {
       <View style={s.iconWrap}>
         <Ionicons name="lock-closed" size={34} color={C.accent} />
       </View>
-      <Text style={s.title}>ANYVO ist gesperrt</Text>
-      <Text style={s.sub}>Zum Entsperren authentifizieren.</Text>
+      <Text style={s.title}>{t('appLock.title')}</Text>
+      <Text style={s.sub}>{t('appLock.subtitle')}</Text>
       <Pressable style={s.btn} onPress={() => void authenticate()}>
         <Ionicons name="finger-print" size={18} color={C.accentText} />
-        <Text style={s.btnTxt}>Entsperren</Text>
+        <Text style={s.btnTxt}>{t('appLock.unlock')}</Text>
       </Pressable>
     </View>
   );

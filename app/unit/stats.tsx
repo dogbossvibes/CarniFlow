@@ -8,6 +8,7 @@ import { ScoreRing } from '@/components/analytics/ScoreRing';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
 import { useTrackStats } from '@/hooks/useTrackStats';
 import { computeUnitStats, type WeekBucket, type DisciplineStat, type CalendarDay } from '@/services/trainingUnitStats';
+import { useT } from '@/i18n';
 
 function formatDur(sec: number): string {
   const m = Math.round(sec / 60);
@@ -56,6 +57,7 @@ function ActivityCalendar({ calendar }: { calendar: CalendarDay[] }) {
 
 export default function StatsScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { feed, loading, refresh } = useTrainingFeed();
   const { meters: trackMeters, count: trackCount, refresh: refreshTrack } = useTrackStats();
 
@@ -71,8 +73,8 @@ export default function StatsScreen() {
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View>
-          <Text style={s.eyebrow}>ANALYSE</Text>
-          <Text style={s.title}>Statistiken</Text>
+          <Text style={s.eyebrow}>{t('analyse.title').toUpperCase()}</Text>
+          <Text style={s.title}>{t('training.stats')}</Text>
         </View>
       </View>
 
@@ -82,39 +84,39 @@ export default function StatsScreen() {
         ) : stats.total === 0 ? (
           <View style={s.empty}>
             <Ionicons name="stats-chart-outline" size={32} color={C.subtle} />
-            <Text style={s.emptyTitle}>Noch keine Daten</Text>
-            <Text style={s.emptyTxt}>Schliesse deine erste Einheit ab, um Statistiken zu sehen.</Text>
+            <Text style={s.emptyTitle}>{t('training.noData')}</Text>
+            <Text style={s.emptyTxt}>{t('training.noDataSub')}</Text>
           </View>
         ) : (
           <>
             {/* Erfolgsring */}
             <View style={s.ringCard}>
-              <ScoreRing score={stats.successRate} size={150} label="Erfolg" />
+              <ScoreRing score={stats.successRate} size={150} label={t('training.success')} />
               <Text style={s.ringSub}>
-                {stats.ratedCount > 0 ? `Ø Bewertung aus ${stats.ratedCount} Einheiten` : 'Noch keine Bewertungen'}
+                {stats.ratedCount > 0 ? t('training.avgRatingFrom', { count: stats.ratedCount }) : t('training.noRatings')}
               </Text>
             </View>
 
             {/* Kennzahlen */}
             <View style={s.statGrid}>
-              <View style={s.statCard}><Text style={s.statVal}>{stats.total}</Text><Text style={s.statLabel}>EINHEITEN</Text></View>
-              <View style={s.statCard}><Text style={s.statVal}>{formatDur(stats.totalDurationSec)}</Text><Text style={s.statLabel}>GESAMTZEIT</Text></View>
-              <View style={s.statCard}><Text style={s.statVal}>{stats.thisWeek}</Text><Text style={s.statLabel}>DIESE WOCHE</Text></View>
+              <View style={s.statCard}><Text style={s.statVal}>{stats.total}</Text><Text style={s.statLabel}>{t('training.units')}</Text></View>
+              <View style={s.statCard}><Text style={s.statVal}>{formatDur(stats.totalDurationSec)}</Text><Text style={s.statLabel}>{t('training.totalTime')}</Text></View>
+              <View style={s.statCard}><Text style={s.statVal}>{stats.thisWeek}</Text><Text style={s.statLabel}>{t('training.thisWeek')}</Text></View>
               <View style={s.statCard}>
                 <Text style={[s.statVal, stats.streak > 0 && { color: C.accent }]}>{stats.streak}</Text>
-                <Text style={s.statLabel}>TAGE-SERIE</Text>
+                <Text style={s.statLabel}>{t('training.streakDays')}</Text>
               </View>
             </View>
 
             {/* Trainings pro Woche */}
-            <Text style={s.label}>TRAININGS PRO WOCHE</Text>
+            <Text style={s.label}>{t('training.perWeek')}</Text>
             <View style={s.panel}><WeeklyBars weekly={stats.weekly} /></View>
 
             {/* Nach Sparte */}
-            <Text style={s.label}>NACH SPARTE</Text>
+            <Text style={s.label}>{t('training.byDiscipline')}</Text>
             <View style={s.panel}>
               {stats.byDiscipline.length === 0 ? (
-                <Text style={s.muted}>Noch keine Übungen erfasst.</Text>
+                <Text style={s.muted}>{t('training.noExercises')}</Text>
               ) : stats.byDiscipline.map((d: DisciplineStat) => (
                 <View key={d.discipline} style={s.discRow}>
                   <Text style={s.discName}>{d.discipline}</Text>
@@ -129,31 +131,31 @@ export default function StatsScreen() {
             {/* Fährtenarbeit (GPS) */}
             {trackCount > 0 && (
               <>
-                <Text style={s.label}>FÄHRTENARBEIT (GPS)</Text>
+                <Text style={s.label}>{t('training.trackWork')}</Text>
                 <View style={s.panel}>
                   <View style={s.faRow}>
                     <View style={s.faItem}>
                       <Text style={s.faVal}>{formatMeters(trackMeters)}</Text>
-                      <Text style={s.faLabel}>FÄHRTENMETER</Text>
+                      <Text style={s.faLabel}>{t('training.trackMeters')}</Text>
                     </View>
                     <View style={s.faDivider} />
                     <View style={s.faItem}>
                       <Text style={s.faVal}>{trackCount}</Text>
-                      <Text style={s.faLabel}>FÄHRTEN</Text>
+                      <Text style={s.faLabel}>{t('training.tracks')}</Text>
                     </View>
                   </View>
-                  <Text style={s.faNote}>Aus dem GPS-Fährtenmodul</Text>
+                  <Text style={s.faNote}>{t('training.fromGpsTrack')}</Text>
                 </View>
               </>
             )}
 
             {/* Aktivitätskalender */}
-            <Text style={s.label}>AKTIVITÄT (12 WOCHEN)</Text>
+            <Text style={s.label}>{t('training.activity12Weeks')}</Text>
             <View style={s.panel}>
               <ActivityCalendar calendar={stats.calendar} />
               <View style={s.legend}>
                 <View style={[s.calCell, { marginRight: 6 }]} />
-                <Text style={s.legendTxt}>kein Training</Text>
+                <Text style={s.legendTxt}>{t('training.noTrainingLegend')}</Text>
                 <View style={[s.calCell, s.calCellActive, { marginLeft: 14, marginRight: 6 }]} />
                 <Text style={s.legendTxt}>Training</Text>
               </View>

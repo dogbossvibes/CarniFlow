@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import {
   BLE_AVAILABLE,
   connectDevice,
@@ -14,6 +15,7 @@ import {
 type Source = 'iphone' | 'extern';
 
 export function GpsSourcePicker() {
+  const { t } = useT();
   const ble = useExternalGps();
   const [source, setSource] = useState<Source>('iphone');
 
@@ -28,35 +30,35 @@ export function GpsSourcePicker() {
 
   return (
     <View>
-      <Text style={s.label}>GPS-QUELLE</Text>
+      <Text style={s.label}>{t('track.gpsSource')}</Text>
       <View style={s.row}>
-        <Chip aktiv={source === 'iphone'} onPress={waehleIphone} icon="phone-portrait-outline" label="iPhone GPS" />
-        <Chip aktiv={source === 'extern'} onPress={waehleExtern} icon="bluetooth-outline" label="Externes GPS" />
+        <Chip aktiv={source === 'iphone'} onPress={waehleIphone} icon="phone-portrait-outline" label={t('track.iphoneGps')} />
+        <Chip aktiv={source === 'extern'} onPress={waehleExtern} icon="bluetooth-outline" label={t('track.externalGps')} />
       </View>
 
       {source === 'extern' && (
         <View style={s.panel}>
           {!BLE_AVAILABLE ? (
-            <Text style={s.hint}>Externes GPS benötigt einen neuen App-Build. (MFi-Empfänger funktionieren ohne — einfach in den iOS-Einstellungen koppeln.)</Text>
+            <Text style={s.hint}>{t('track.externalGpsBuildRequired')}</Text>
           ) : (
             <>
               {ble.status === 'connected' ? (
                 <View style={[s.device, s.deviceOn]}>
                   <Ionicons name="checkmark-circle" size={16} color={C.success} />
-                  <Text style={s.deviceName}>Verbunden</Text>
+                  <Text style={s.deviceName}>{t('track.connected')}</Text>
                   <TouchableOpacity onPress={disconnectDevice} hitSlop={8}>
-                    <Text style={s.trennen}>Trennen</Text>
+                    <Text style={s.trennen}>{t('track.disconnect')}</Text>
                   </TouchableOpacity>
                 </View>
               ) : ble.scanning ? (
                 <View style={s.scanRow}>
                   <ActivityIndicator color={C.accent} size="small" />
-                  <Text style={s.hint}>Suche nach GPS-Geräten…</Text>
+                  <Text style={s.hint}>{t('track.searchGpsDevices')}</Text>
                 </View>
               ) : (
                 <TouchableOpacity style={s.scanBtn} onPress={startScan} activeOpacity={0.8}>
                   <Ionicons name="search" size={15} color={C.accent} />
-                  <Text style={s.scanBtnTxt}>Erneut suchen</Text>
+                  <Text style={s.scanBtnTxt}>{t('track.searchAgain')}</Text>
                 </TouchableOpacity>
               )}
 
@@ -70,14 +72,14 @@ export function GpsSourcePicker() {
                   <Ionicons name="hardware-chip-outline" size={16} color={C.muted} />
                   <Text style={s.deviceName} numberOfLines={1}>{d.name}</Text>
                   <Text style={s.deviceStatus}>
-                    {ble.connectedId === d.id ? 'Verbunden' : ble.status === 'connecting' ? '…' : 'Verbinden'}
+                    {ble.connectedId === d.id ? t('track.connected') : ble.status === 'connecting' ? '…' : t('track.connect')}
                   </Text>
                 </TouchableOpacity>
               ))}
 
               {ble.error ? <Text style={s.error}>{ble.error}</Text> : null}
               {!ble.scanning && ble.devices.length === 0 && !ble.error ? (
-                <Text style={s.hint}>Kein Gerät gefunden. Schalte den Empfänger ein und such erneut.</Text>
+                <Text style={s.hint}>{t('track.noGpsDevice')}</Text>
               ) : null}
             </>
           )}

@@ -1,6 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -17,14 +18,15 @@ export function ConnectEmptyState({ icon = 'sparkles-outline', title, hint }: { 
 }
 
 export function ConnectErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { t } = useT();
   return (
     <View style={s.wrap}>
       <View style={s.iconWrap}><Ionicons name="cloud-offline-outline" size={26} color={C.muted} /></View>
-      <Text style={s.title}>Etwas ist schiefgelaufen</Text>
+      <Text style={s.title}>{t('connect.errorTitle')}</Text>
       <Text style={s.hint}>{message}</Text>
       {onRetry ? (
         <TouchableOpacity style={s.btn} onPress={onRetry} activeOpacity={0.85} accessibilityRole="button">
-          <Text style={s.btnTxt}>Erneut versuchen</Text>
+          <Text style={s.btnTxt}>{t('connect.retry')}</Text>
         </TouchableOpacity>
       ) : null}
     </View>

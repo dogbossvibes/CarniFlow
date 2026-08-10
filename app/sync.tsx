@@ -8,10 +8,12 @@ import { useSyncStore } from '@/features/sync/store/syncStore';
 import { SyncStatusPill } from '@/features/sync/components/SyncStatusPill';
 import { syncNow, retryFailedSync, updateSyncCounts } from '@/features/sync/services/syncEngine';
 import { localCounts } from '@/lib/localDb/client';
+import { useT } from '@/i18n';
 
 // Sync-Center: Status, letzter Sync, ausstehende/fehlgeschlagene Items, manuelle Aktionen.
 export default function SyncCenterScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { isOnline, isSyncing, lastSyncAt, pendingCount, failedCount, conflictCount, lastError } = useSyncStore();
   const [counts, setCounts] = useState<Record<string, number>>({});
 
@@ -21,7 +23,7 @@ export default function SyncCenterScreen() {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const lastSync = lastSyncAt ? new Date(lastSyncAt).toLocaleString('de-CH') : 'Noch nie';
+  const lastSync = lastSyncAt ? new Date(lastSyncAt).toLocaleString('de-CH') : t('sync.never');
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -30,50 +32,50 @@ export default function SyncCenterScreen() {
           <Ionicons name="chevron-back" size={20} color={C.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.title}>Sync-Center</Text>
-          <Text style={s.subtitle}>Offline gespeicherte Daten & Synchronisation.</Text>
+          <Text style={s.title}>{t('sync.title')}</Text>
+          <Text style={s.subtitle}>{t('sync.subtitle')}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={s.statusCard}>
           <View style={s.statusRow}>
-            <Text style={s.statusLabel}>Status</Text>
+            <Text style={s.statusLabel}>{t('sync.status')}</Text>
             <SyncStatusPill />
           </View>
           <View style={s.divider} />
-          <Row label="Verbindung" value={isOnline ? 'Online' : 'Offline'} />
-          <Row label="Letzter Sync" value={lastSync} />
+          <Row label={t('sync.connection')} value={isOnline ? t('sync.online') : t('sync.offline')} />
+          <Row label={t('sync.lastSync')} value={lastSync} />
         </View>
 
-        <Text style={s.section}>Warteschlange</Text>
+        <Text style={s.section}>{t('sync.queue')}</Text>
         <View style={s.grid}>
-          <Stat n={pendingCount} label="Ausstehend" color={C.warning} />
-          <Stat n={failedCount} label="Fehlgeschlagen" color={C.danger} />
-          <Stat n={conflictCount} label="Konflikte" color={C.warning} />
+          <Stat n={pendingCount} label={t('sync.pending')} color={C.warning} />
+          <Stat n={failedCount} label={t('sync.failed')} color={C.danger} />
+          <Stat n={conflictCount} label={t('sync.conflicts')} color={C.warning} />
         </View>
 
-        <Text style={s.section}>Lokal gespeichert</Text>
+        <Text style={s.section}>{t('sync.localStored')}</Text>
         <View style={s.localCard}>
-          <Row label="Trainings / Fährten" value={String(counts.local_training_sessions ?? 0)} />
-          <Row label="GPS-Punkte" value={String(counts.local_track_points ?? 0)} />
-          <Row label="Marker" value={String(counts.local_track_markers ?? 0)} />
-          <Row label="Medien" value={String(counts.local_media_files ?? 0)} last />
+          <Row label={t('sync.trainingTracks')} value={String(counts.local_training_sessions ?? 0)} />
+          <Row label={t('sync.gpsPoints')} value={String(counts.local_track_points ?? 0)} />
+          <Row label={t('sync.markers')} value={String(counts.local_track_markers ?? 0)} />
+          <Row label={t('sync.media')} value={String(counts.local_media_files ?? 0)} last />
         </View>
 
         {lastError && (
-          <View style={s.errCard}><Ionicons name="information-circle-outline" size={15} color={C.muted} /><Text style={s.errTxt}>Letzter Hinweis: {lastError}</Text></View>
+          <View style={s.errCard}><Ionicons name="information-circle-outline" size={15} color={C.muted} /><Text style={s.errTxt}>{t('sync.lastHint', { message: lastError })}</Text></View>
         )}
 
         <View style={{ gap: 10, marginTop: 18 }}>
           <TouchableOpacity style={[s.btn, s.btnPrimary, (!isOnline || isSyncing) && { opacity: 0.5 }]} disabled={!isOnline || isSyncing} onPress={() => syncNow().then(load)} activeOpacity={0.85}>
             <Ionicons name="sync" size={17} color={C.accentText} />
-            <Text style={s.btnPrimaryTxt}>{isSyncing ? 'Synchronisiere…' : 'Jetzt synchronisieren'}</Text>
+            <Text style={s.btnPrimaryTxt}>{isSyncing ? t('sync.syncing') : t('sync.syncNow')}</Text>
           </TouchableOpacity>
           {failedCount > 0 && (
             <TouchableOpacity style={[s.btn, s.btnGhost]} disabled={!isOnline} onPress={() => retryFailedSync().then(load)} activeOpacity={0.85}>
               <Ionicons name="refresh" size={16} color={C.white} />
-              <Text style={s.btnGhostTxt}>Fehlgeschlagene erneut versuchen</Text>
+              <Text style={s.btnGhostTxt}>{t('sync.retryFailed')}</Text>
             </TouchableOpacity>
           )}
         </View>

@@ -4,19 +4,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useT, type TranslationKey } from '@/i18n';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const AREAS: { icon: IconName; color: string; title: string; sub: string; route: string }[] = [
-  { icon: 'people',           color: '#60A5FA', title: 'Kunden',        sub: 'Verbundene Kund:innen verwalten', route: '/(tabs)/clients' },
-  { icon: 'clipboard',        color: '#00F5D4', title: 'Trainingspläne', sub: 'Pläne erstellen & teilen',        route: '/trainer/plaene' },
-  { icon: 'megaphone',        color: '#A78BFA', title: 'Umfragen',       sub: 'Terminumfragen & Ergebnisse',     route: '/umfrage/meine' },
-  { icon: 'chatbubbles',      color: '#F472B6', title: 'Nachrichten',    sub: 'Chat & Feedback mit Kunden',      route: '/chat' },
-  { icon: 'stats-chart',      color: '#FF8A3D', title: 'Analysen',       sub: 'Statistiken & Aktivität',         route: '/(tabs)/analytics' },
+const AREAS: { icon: IconName; color: string; titleKey: TranslationKey; subKey: TranslationKey; route: string }[] = [
+  { icon: 'people',           color: '#60A5FA', titleKey: 'trainer.clients',   subKey: 'trainer.clientsSub',   route: '/(tabs)/clients' },
+  { icon: 'clipboard',        color: '#00F5D4', titleKey: 'trainer.plans',     subKey: 'trainer.plansSub',     route: '/trainer/plaene' },
+  { icon: 'megaphone',        color: '#A78BFA', titleKey: 'trainer.surveys',   subKey: 'trainer.surveysSub',   route: '/umfrage/meine' },
+  { icon: 'chatbubbles',      color: '#F472B6', titleKey: 'profile.messages',  subKey: 'trainer.messagesSub',  route: '/chat' },
+  { icon: 'stats-chart',      color: '#FF8A3D', titleKey: 'trainer.analytics', subKey: 'trainer.analyticsSub', route: '/(tabs)/analytics' },
 ];
 
 export default function TrainerDashboardScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { isTrainerModule } = useCapabilities();
 
   if (!isTrainerModule) {
@@ -24,13 +26,13 @@ export default function TrainerDashboardScreen() {
       <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.header}>
           <TouchableOpacity style={s.back} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={22} color={C.white} /></TouchableOpacity>
-          <Text style={s.title}>Trainer-Dashboard</Text>
+          <Text style={s.title}>{t('trainer.dashboardTitle')}</Text>
         </View>
         <View style={s.locked}>
           <Ionicons name="lock-closed" size={32} color={C.muted} />
-          <Text style={s.lockedTxt}>Trainer-Modul erforderlich</Text>
+          <Text style={s.lockedTxt}>{t('trainer.moduleRequired')}</Text>
           <TouchableOpacity style={s.upgrade} onPress={() => router.push('/premium')} activeOpacity={0.85}>
-            <Text style={s.upgradeTxt}>Trainer freischalten</Text>
+            <Text style={s.upgradeTxt}>{t('trainer.unlock')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -42,20 +44,20 @@ export default function TrainerDashboardScreen() {
       <View style={s.header}>
         <TouchableOpacity style={s.back} onPress={() => router.back()} hitSlop={8}><Ionicons name="chevron-back" size={22} color={C.white} /></TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.eyebrow}>TRAINER</Text>
-          <Text style={s.title}>Dashboard</Text>
+          <Text style={s.eyebrow}>{t('trainer.eyebrow')}</Text>
+          <Text style={s.title}>{t('trainer.dashboard')}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {AREAS.map(a => (
-          <TouchableOpacity key={a.title} style={s.card} onPress={() => router.push(a.route as never)} activeOpacity={0.85}>
+          <TouchableOpacity key={a.route} style={s.card} onPress={() => router.push(a.route as never)} activeOpacity={0.85}>
             <View style={[s.icon, { backgroundColor: `${a.color}1A` }]}>
               <Ionicons name={a.icon} size={22} color={a.color} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={s.cardTitle}>{a.title}</Text>
-              <Text style={s.cardSub}>{a.sub}</Text>
+              <Text style={s.cardTitle}>{t(a.titleKey)}</Text>
+              <Text style={s.cardSub}>{t(a.subKey)}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={C.subtle} />
           </TouchableOpacity>

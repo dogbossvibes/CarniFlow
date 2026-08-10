@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { AnyvoStatCard } from '@/components/ui/AnyvoStatCard';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 
 function fmtDur(sec: number): string {
   const m = Math.floor(sec / 60), s = sec % 60;
@@ -11,14 +12,15 @@ function fmtDur(sec: number): string {
 export function TrackStatsPanel({
   distanceMeters, durationSeconds, articles, deviation,
 }: { distanceMeters: number; durationSeconds: number; articles: string; deviation?: string }) {
+  const { t } = useT();
   return (
     <View style={s.panel}>
-      <AnyvoStatCard value={`${Math.round(distanceMeters)} m`} label="DISTANZ" accent />
+      <AnyvoStatCard value={`${Math.round(distanceMeters)} m`} label={t('track.distance').toUpperCase()} accent />
       <View style={s.sep} />
-      <AnyvoStatCard value={fmtDur(durationSeconds)} label="DAUER" />
+      <AnyvoStatCard value={fmtDur(durationSeconds)} label={t('track.duration').toUpperCase()} />
       <View style={s.sep} />
-      <AnyvoStatCard value={articles} label="GEGENSTÄNDE" />
-      {deviation != null && (<><View style={s.sep} /><AnyvoStatCard value={deviation} label="ABWEICHUNG" /></>)}
+      <AnyvoStatCard value={articles} label={t('track.objects').toUpperCase()} />
+      {deviation != null && (<><View style={s.sep} /><AnyvoStatCard value={deviation} label={t('track.deviation').toUpperCase()} /></>)}
     </View>
   );
 }

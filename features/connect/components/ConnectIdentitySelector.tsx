@@ -4,6 +4,7 @@ import { C } from '@/constants/colors';
 import { SignedImage } from '@/components/ui/SignedImage';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { identityKey, type ConnectPostingIdentity } from '@/features/connect/utils/postingIdentity';
+import { useT } from '@/i18n';
 
 // Wiederverwendbare Auswahl des sichtbaren Absenders (Halter oder berechtigter Hund).
 // Nur Anzeige/Auswahl — die Berechtigung wird in buildPostingIdentities + RLS erzwungen.
@@ -14,10 +15,11 @@ export function ConnectIdentitySelector({
   selected: ConnectPostingIdentity;
   onSelect: (id: ConnectPostingIdentity) => void;
 }) {
+  const { t } = useT();
   const selKey = identityKey(selected);
   return (
     <View>
-      <Text style={s.label}>ALS WEN POSTEN?</Text>
+      <Text style={s.label}>{t('connect.postAs')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.row}>
         {identities.map(id => {
           const active = identityKey(id) === selKey;
@@ -29,7 +31,10 @@ export function ConnectIdentitySelector({
               activeOpacity={0.85}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
-              accessibilityLabel={`${id.type === 'dog' ? 'Hund' : 'Halter'}: ${id.displayName}`}
+              accessibilityLabel={t('connect.identityA11y', {
+                type: id.type === 'dog' ? t('connect.identityDog') : t('connect.identityHandler'),
+                name: id.displayName,
+              })}
             >
               <View style={s.avatar}>
                 {id.avatarUrl
@@ -40,7 +45,7 @@ export function ConnectIdentitySelector({
               </View>
               <View style={{ flexShrink: 1 }}>
                 <Text style={[s.name, active && { color: C.white }]} numberOfLines={1}>{id.displayName}</Text>
-                <Text style={s.type}>{id.type === 'dog' ? 'Hund' : 'Halter'}</Text>
+                <Text style={s.type}>{id.type === 'dog' ? t('connect.identityDog') : t('connect.identityHandler')}</Text>
               </View>
               {active && <Ionicons name="checkmark-circle" size={16} color={C.accent} />}
             </TouchableOpacity>

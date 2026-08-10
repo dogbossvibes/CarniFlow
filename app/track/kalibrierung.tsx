@@ -15,6 +15,7 @@ import {
 import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
 import { useToast } from '@/components/ui/Toast';
 import { HelpButton } from '@/components/help/HelpButton';
+import { useT } from '@/i18n';
 
 const cm = (m: number) => Math.round(m * 100);
 
@@ -28,6 +29,7 @@ export default function StepCalibrationScreen() {
   useKeepAwake();
   const { stepLengthM, setStepLengthM } = useStepLengthSetting();
   const { showToast, toast } = useToast();
+  const { t } = useT();
 
   const [phase, setPhase]   = useState<'intro' | 'measuring' | 'result'>('intro');
   const [distanceM, setDistanceM] = useState(0);
@@ -45,7 +47,7 @@ export default function StepCalibrationScreen() {
     // Berechtigung (nur Permission, keine parallele GPS-Abfrage — Position via positionSource).
     let granted = (await Location.getForegroundPermissionsAsync()).status === 'granted';
     if (!granted) granted = (await Location.requestForegroundPermissionsAsync()).status === 'granted';
-    if (!granted) { showToast('Standortberechtigung fehlt.'); return; }
+    if (!granted) { showToast(t('track.locationPermissionMissing')); return; }
 
     accumRef.current = 0; lastPtRef.current = null;
     setDistanceM(0); setAccuracy(null); setResult(null);
@@ -64,7 +66,7 @@ export default function StepCalibrationScreen() {
       }, { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 });
       stopRef.current = handle.stop;
     } catch {
-      showToast('GPS konnte nicht gestartet werden.');
+      showToast(t('track.gpsStartFailed'));
       setPhase('intro');
     }
   }, [showToast]);
@@ -87,13 +89,13 @@ export default function StepCalibrationScreen() {
   const applyResult = useCallback(async () => {
     if (result == null || !acceptable) return;
     await setStepLengthM(result);   // ungerundet persistiert (useStepLengthSetting)
-    showToast(`Schrittlänge gespeichert: ≈ ${cm(result)} cm`);
+    showToast(t('track.stepLengthSaved', { cm: cm(result) }));
     if (router.canGoBack()) router.back(); else router.replace('/(tabs)/profile' as never);
   }, [result, acceptable, setStepLengthM, showToast, router]);
 
   const remeasure = useCallback(() => { setPhase('intro'); setResult(null); setDistanceM(0); }, []);
 
-  const currentLabel = stepLengthM != null ? `Persönlich: ${cm(stepLengthM)} cm` : 'Standard: 75 cm';
+  const currentLabel = stepLengthM != null ? t('profile.stepLengthPersonal', { cm: cm(stepLengthM) }) : t('profile.stepLengthDefault');
   const qual = getGpsQuality(accuracy);
 
   return (
@@ -103,7 +105,7 @@ export default function StepCalibrationScreen() {
           <Pressable className="w-10 h-10 rounded-[12px] border border-ft-line-strong bg-white/10 items-center justify-center" onPress={cancel} hitSlop={10}>
             <Ionicons name="chevron-back" size={20} color={FT.text} />
           </Pressable>
-          <Text className="text-[18px] font-black text-ft-text">Schrittlänge kalibrieren</Text>
+          <Text className="text-[18px] font-black text-ft-text">{t('track.stepCalibrationTitle')}</Text>
           <View className="flex-1" />
           <HelpButton topicId="track_step_calibration" autoShow tint={FT.text} />
         </View>
@@ -112,31 +114,29 @@ export default function StepCalibrationScreen() {
           {phase === 'intro' && (
             <>
               <View className="rounded-[20px] p-4 bg-white/5 border border-ft-line-strong gap-2">
-                <Text className="text-[13px] text-ft-muted">Aktuell</Text>
+                <Text className="text-[13px] text-ft-muted">{t('track.current')}</Text>
                 <Text className="text-[22px] font-black text-ft-text">{currentLabel}</Text>
               </View>
               <Text className="text-[14px] text-ft-text leading-[21px]">
-                Gehe <Text className="font-black">{CALIBRATION_STEPS} normale Fährtenschritte</Text>. Zähle die
-                Schritte selbst und tippe nach Schritt {CALIBRATION_STEPS} auf Fertig.
+                {t('track.stepCalibrationIntroPrefix')} <Text className="font-black">{t('track.stepCalibrationSteps', { count: CALIBRATION_STEPS })}</Text>. {t('track.stepCalibrationIntroSuffix', { count: CALIBRATION_STEPS })}
               </Text>
               <Text className="text-[12.5px] text-ft-muted leading-[19px]">
-                Für ein gutes Ergebnis möglichst gerade Strecke und guten GPS-Empfang verwenden. ANYVO zählt die
-                Schritte nicht automatisch.
+                {t('track.stepCalibrationHint')}
               </Text>
               <Pressable onPress={startMeasuring} className="flex-row items-center justify-center gap-2 mt-2 rounded-[16px] px-6 py-3.5 bg-ft-acc">
                 <Ionicons name="walk" size={18} color={FT.accText} />
-                <Text className="text-[15px] font-black text-ft-acc-text">Kalibrierung starten</Text>
+                <Text className="text-[15px] font-black text-ft-acc-text">{t('track.startCalibration')}</Text>
               </Pressable>
               {stepLengthM != null && (
                 <Pressable
-                  onPress={() => Alert.alert('Auf Standard zurücksetzen?', 'Die persönliche Schrittlänge wird gelöscht (zurück auf 0,75 m).', [
-                    { text: 'Abbrechen', style: 'cancel' },
-                    { text: 'Zurücksetzen', style: 'destructive', onPress: async () => { await setStepLengthM(null); showToast('Auf Standard (75 cm) zurückgesetzt.'); } },
+                  onPress={() => Alert.alert(t('track.resetStepLengthTitle'), t('track.resetStepLengthBody'), [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('track.reset'), style: 'destructive', onPress: async () => { await setStepLengthM(null); showToast(t('track.resetStepLengthDone')); } },
                   ])}
                   className="flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-3 bg-white/5 border border-ft-line-strong"
                 >
                   <Ionicons name="refresh" size={16} color={FT.muted} />
-                  <Text className="text-[14px] font-bold text-ft-muted">Auf Standard zurücksetzen</Text>
+                  <Text className="text-[14px] font-bold text-ft-muted">{t('track.resetToDefault')}</Text>
                 </Pressable>
               )}
             </>
@@ -144,29 +144,29 @@ export default function StepCalibrationScreen() {
 
           {phase === 'measuring' && (
             <>
-              <Text className="text-[13px] text-ft-muted font-bold tracking-[1.4px] uppercase">Kalibrierung läuft</Text>
-              <Text className="text-[16px] font-black text-ft-text">{CALIBRATION_STEPS} Schritte gehen</Text>
+              <Text className="text-[13px] text-ft-muted font-bold tracking-[1.4px] uppercase">{t('track.calibrationRunning')}</Text>
+              <Text className="text-[16px] font-black text-ft-text">{t('track.walkSteps', { count: CALIBRATION_STEPS })}</Text>
               <View className="rounded-[20px] p-5 bg-white/5 border border-ft-line-strong items-center gap-1 mt-2">
                 <Text className="text-[48px] font-black text-ft-text" style={{ fontVariant: ['tabular-nums'] }}>{distanceM.toFixed(1)} m</Text>
-                <Text className="text-[10px] text-ft-muted font-bold tracking-[1.4px] uppercase">gemessene Strecke</Text>
+                <Text className="text-[10px] text-ft-muted font-bold tracking-[1.4px] uppercase">{t('track.measuredDistance')}</Text>
               </View>
               <View className="flex-row items-center justify-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-ft-line self-center">
                 <Ionicons name="navigate" size={13} color={accuracy != null && accuracy <= 15 ? FT.acc : FT.warn} />
                 <Text className="text-[12px] font-bold text-ft-text">
-                  {accuracy != null ? `GPS ±${Math.round(accuracy)} m` : 'GPS wird gesucht…'}
+                  {accuracy != null ? `GPS ±${Math.round(accuracy)} m` : t('track.gpsSearching')}
                 </Text>
               </View>
               {accuracy != null && accuracy > 20 && (
-                <Text className="text-[12px] text-ft-warn font-semibold text-center">GPS noch zu ungenau. Bitte kurz stehen bleiben.</Text>
+                <Text className="text-[12px] text-ft-warn font-semibold text-center">{t('track.gpsTooInaccurate')}</Text>
               )}
               <Pressable onPress={finishMeasuring} className="flex-row items-center justify-center gap-2 mt-2 rounded-[16px] px-6 py-3.5 bg-ft-acc">
                 <Ionicons name="checkmark" size={18} color={FT.accText} />
-                <Text className="text-[15px] font-black text-ft-acc-text">Fertig – {CALIBRATION_STEPS} Schritte</Text>
+                <Text className="text-[15px] font-black text-ft-acc-text">{t('track.doneSteps', { count: CALIBRATION_STEPS })}</Text>
               </Pressable>
               <Pressable onPress={cancel} className="flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-3 bg-white/5 border border-ft-line-strong">
-                <Text className="text-[14px] font-bold text-ft-muted">Abbrechen</Text>
+                <Text className="text-[14px] font-bold text-ft-muted">{t('common.cancel')}</Text>
               </Pressable>
-              <Text className="text-[11px] text-ft-faint text-center">GPS-Qualität: {qual}</Text>
+              <Text className="text-[11px] text-ft-faint text-center">{t('track.gpsQuality', { quality: qual })}</Text>
             </>
           )}
 
@@ -174,13 +174,13 @@ export default function StepCalibrationScreen() {
             <>
               <View className="rounded-[20px] p-5 bg-white/5 border border-ft-line-strong gap-3">
                 <View>
-                  <Text className="text-[11px] text-ft-muted font-bold tracking-[1.2px] uppercase">Gemessene Strecke</Text>
-                  <Text className="text-[20px] font-black text-ft-text">{distanceM.toFixed(1)} m · {CALIBRATION_STEPS} Schritte</Text>
+                  <Text className="text-[11px] text-ft-muted font-bold tracking-[1.2px] uppercase">{t('track.measuredDistance')}</Text>
+                  <Text className="text-[20px] font-black text-ft-text">{t('track.distanceSteps', { distance: distanceM.toFixed(1), count: CALIBRATION_STEPS })}</Text>
                 </View>
                 <View>
-                  <Text className="text-[11px] text-ft-muted font-bold tracking-[1.2px] uppercase">Deine Schrittlänge</Text>
+                  <Text className="text-[11px] text-ft-muted font-bold tracking-[1.2px] uppercase">{t('track.yourStepLength')}</Text>
                   <Text className="text-[34px] font-black text-ft-acc" style={{ fontVariant: ['tabular-nums'] }}>{result.toFixed(3)} m</Text>
-                  <Text className="text-[13px] text-ft-muted">≈ {cm(result)} cm pro Schritt</Text>
+                  <Text className="text-[13px] text-ft-muted">{t('track.cmPerStep', { cm: cm(result) })}</Text>
                 </View>
               </View>
 
@@ -188,7 +188,7 @@ export default function StepCalibrationScreen() {
                 <View className="rounded-[16px] p-3 bg-white/5 border border-[rgba(255,181,71,0.5)] flex-row items-start gap-2">
                   <Ionicons name="warning-outline" size={16} color={FT.warn} />
                   <Text className="text-[12.5px] text-ft-warn font-semibold flex-1 leading-[19px]">
-                    Das Messergebnis wirkt unplausibel (erwartet {cm(MIN_CALIBRATED_STEP_LENGTH_M)}–{cm(MAX_CALIBRATED_STEP_LENGTH_M)} cm bei gutem GPS). Bitte wiederhole die Kalibrierung.
+                    {t('track.calibrationImplausible', { min: cm(MIN_CALIBRATED_STEP_LENGTH_M), max: cm(MAX_CALIBRATED_STEP_LENGTH_M) })}
                   </Text>
                 </View>
               )}
@@ -198,14 +198,14 @@ export default function StepCalibrationScreen() {
                 className={`flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-3.5 ${acceptable ? 'bg-ft-acc' : 'bg-white/10'}`}
               >
                 <Ionicons name="checkmark-circle" size={18} color={acceptable ? FT.accText : FT.muted} />
-                <Text className={`text-[15px] font-black ${acceptable ? 'text-ft-acc-text' : 'text-ft-muted'}`}>Schrittlänge übernehmen</Text>
+                <Text className={`text-[15px] font-black ${acceptable ? 'text-ft-acc-text' : 'text-ft-muted'}`}>{t('track.applyStepLength')}</Text>
               </Pressable>
               <Pressable onPress={remeasure} className="flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-3 bg-white/5 border border-ft-line-strong">
                 <Ionicons name="refresh" size={16} color={FT.text} />
-                <Text className="text-[14px] font-bold text-ft-text">Erneut messen</Text>
+                <Text className="text-[14px] font-bold text-ft-text">{t('track.measureAgain')}</Text>
               </Pressable>
               <Pressable onPress={cancel} className="flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-2.5">
-                <Text className="text-[13px] font-bold text-ft-muted">Abbrechen</Text>
+                <Text className="text-[13px] font-bold text-ft-muted">{t('common.cancel')}</Text>
               </Pressable>
             </>
           )}

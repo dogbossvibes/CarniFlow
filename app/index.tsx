@@ -3,9 +3,11 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { Redirect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
+import { useT } from '@/i18n';
 
 export default function Index() {
   const { session, loading } = useSession();
+  const { t } = useT();
   const router = useRouter();
   const [timedOut, setTimedOut] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -33,12 +35,12 @@ export default function Index() {
     return (
       <View style={s.center}>
         <View style={s.card}>
-          <Text style={s.title}>ANYVO konnte nicht vollständig gestartet werden.</Text>
+          <Text style={s.title}>{t('common.bootFailed')}</Text>
           <TouchableOpacity style={s.btn} onPress={() => setRetry(r => r + 1)} activeOpacity={0.85}>
-            <Text style={s.btnTxt}>Erneut versuchen</Text>
+            <Text style={s.btnTxt}>{t('common.retry')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.btnGhost} onPress={() => router.replace('/(auth)/login')} activeOpacity={0.85}>
-            <Text style={s.btnGhostTxt}>Zum Login</Text>
+            <Text style={s.btnGhostTxt}>{t('auth.toLogin')}</Text>
           </TouchableOpacity>
           {__DEV__ && <Text style={s.devHint}>Boot Timeout</Text>}
         </View>

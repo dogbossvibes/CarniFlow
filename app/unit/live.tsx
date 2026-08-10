@@ -10,6 +10,7 @@ import { DogIcon } from '@/components/ui/DogIcon';
 import { disciplineColor } from '@/constants/disciplines';
 import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs, setGoalMinutes, resetUnit } from '@/stores/activeTraining';
 import { tapHaptic } from '@/lib/haptics';
+import { useT } from '@/i18n';
 
 function formatTime(sec: number): string {
   const h = Math.floor(sec / 3600);
@@ -37,6 +38,7 @@ function Stars({ value, onChange }: { value: number | null; onChange: (n: number
 
 export default function LiveScreen() {
   const router = useRouter();
+  const { t } = useT();
   const active = useActiveTraining();
 
   const [now, setNow] = useState(Date.now());
@@ -57,9 +59,9 @@ export default function LiveScreen() {
 
   const handleCancel = () => {
     tapHaptic();
-    Alert.alert('Training abbrechen?', 'Die laufende Einheit wird verworfen und nicht gespeichert.', [
-      { text: 'Weiter trainieren', style: 'cancel' },
-      { text: 'Verwerfen', style: 'destructive', onPress: () => { resetUnit(); router.replace('/(tabs)/training' as never); } },
+    Alert.alert(t('training.cancelRunningTitle'), t('training.cancelRunningBody'), [
+      { text: t('training.keepTraining'), style: 'cancel' },
+      { text: t('training.discard'), style: 'destructive', onPress: () => { resetUnit(); router.replace('/(tabs)/training' as never); } },
     ]);
   };
 
@@ -73,15 +75,15 @@ export default function LiveScreen() {
 
         {/* Timer-Kopf */}
         <View style={s.timerWrap}>
-          <Text style={s.timerLabel}>{running ? 'TRAINING LÄUFT' : 'PAUSIERT'}</Text>
+          <Text style={s.timerLabel}>{running ? t('training.runningUpper') : t('training.pausedUpper')}</Text>
           <Text style={s.timer}>{formatTime(elapsed)}</Text>
           <View style={s.dogChip}>
             <DogIcon size={13} color={C.accent} />
-            <Text style={s.dogChipTxt}>{active.dogName ?? 'Hund'}</Text>
+            <Text style={s.dogChipTxt}>{active.dogName ?? t('dogs.dogFallback')}</Text>
           </View>
 
           <View style={s.zielRow}>
-            <Text style={s.zielLabel}>ZIEL</Text>
+            <Text style={s.zielLabel}>{t('training.goal')}</Text>
             {[30, 45, 60, 90].map(min => {
               const aktiv = active.goalMinutes === min;
               return (
@@ -95,12 +97,12 @@ export default function LiveScreen() {
                 </TouchableOpacity>
               );
             })}
-            <Text style={s.zielUnit}>Min</Text>
+            <Text style={s.zielUnit}>{t('training.minutesShort')}</Text>
           </View>
         </View>
 
         <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-          <Text style={s.sectionLabel}>ÜBUNGEN ({active.exercises.length})</Text>
+          <Text style={s.sectionLabel}>{t('training.exercisesCount', { count: active.exercises.length })}</Text>
 
           {active.exercises.map((ex, i) => {
             const accent = disciplineColor(ex.discipline);
@@ -124,7 +126,7 @@ export default function LiveScreen() {
           {/* + Übung hinzufügen */}
           <AnimatedPressable style={s.addBtn} scale={0.97} onPress={() => { tapHaptic(); router.push('/unit/start'); }}>
             <Ionicons name="add" size={20} color={C.accent} />
-            <Text style={s.addTxt}>Übung hinzufügen</Text>
+            <Text style={s.addTxt}>{t('training.addExercise')}</Text>
           </AnimatedPressable>
 
           <View style={{ height: 24 }} />
@@ -138,13 +140,13 @@ export default function LiveScreen() {
             onPress={() => { tapHaptic(); active.paused ? resumeUnit() : pauseUnit(); }}
           >
             <Ionicons name={running ? 'pause' : 'play'} size={22} color={C.white} />
-            <Text style={s.pauseTxt}>{running ? 'Pause' : 'Weiter'}</Text>
+            <Text style={s.pauseTxt}>{running ? t('timer.pause') : t('timer.resume')}</Text>
           </AnimatedPressable>
 
           <AnimatedPressable style={s.endBtn} scale={0.97} onPress={beenden}>
             <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="flag" size={20} color={C.accentText} />
-            <Text style={s.endTxt}>Training beenden</Text>
+            <Text style={s.endTxt}>{t('training.endTraining')}</Text>
           </AnimatedPressable>
         </View>
       </SafeAreaView>

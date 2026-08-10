@@ -15,16 +15,18 @@ import { redeemTrainerCode, redeemTrainerCodeMessage } from '@/services/trainerS
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import type { ConnectionStatus, ConnectionView } from '@/types/connection';
+import { useT, type TranslationKey } from '@/i18n';
 
-const STATUS_META: Record<ConnectionStatus, { label: string; color: string }> = {
-  pending:  { label: 'Anfrage offen', color: C.warning },
-  accepted: { label: 'Verbunden',     color: C.accent },
-  declined: { label: 'Abgelehnt',     color: C.muted },
-  blocked:  { label: 'Blockiert',     color: C.danger },
+const STATUS_META: Record<ConnectionStatus, { labelKey: TranslationKey; color: string }> = {
+  pending:  { labelKey: 'trainer.statusPending',  color: C.warning },
+  accepted: { labelKey: 'trainer.statusAccepted', color: C.accent },
+  declined: { labelKey: 'trainer.statusDeclined', color: C.muted },
+  blocked:  { labelKey: 'trainer.statusBlocked',  color: C.danger },
 };
 
 export default function MyTrainersScreen() {
   const router = useRouter();
+  const { t } = useT();
   const { session } = useSession();
   const meId = session?.user.id;
 
@@ -48,7 +50,7 @@ export default function MyTrainersScreen() {
     setRedeeming(false);
     if (res.status !== 'success' && res.status !== 'already_connected') {
       haptic.error();
-      Alert.alert('Hinweis', redeemTrainerCodeMessage(res.status));
+      Alert.alert(t('trainer.connectHintTitle'), redeemTrainerCodeMessage(res.status));
       return;
     }
     successHaptic();
@@ -61,9 +63,9 @@ export default function MyTrainersScreen() {
 
   const disconnect = (id: string) => {
     tapHaptic();
-    Alert.alert('Verbindung trennen?', 'Der Trainer sieht deine Daten dann nicht mehr.', [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Trennen', style: 'destructive', onPress: async () => { await removeConnection(id); load(); } },
+    Alert.alert(t('trainer.disconnectTitle'), t('trainer.disconnectBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('trainer.disconnect'), style: 'destructive', onPress: async () => { await removeConnection(id); load(); } },
     ]);
   };
 
@@ -74,8 +76,8 @@ export default function MyTrainersScreen() {
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View>
-          <Text style={s.eyebrow}>BETREUUNG</Text>
-          <Text style={s.title}>Meine Trainer</Text>
+          <Text style={s.eyebrow}>{t('trainer.care')}</Text>
+          <Text style={s.title}>{t('trainer.myTrainers')}</Text>
         </View>
       </View>
 
@@ -83,7 +85,7 @@ export default function MyTrainersScreen() {
         <AnimatedPressable style={s.connectBtn} scale={0.97} onPress={() => { tapHaptic(); setSheet(true); }}>
           <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
           <Ionicons name="add" size={20} color={C.accentText} />
-          <Text style={s.connectTxt}>Trainer verbinden</Text>
+          <Text style={s.connectTxt}>{t('trainer.connect')}</Text>
         </AnimatedPressable>
 
         {loading ? (
@@ -91,25 +93,26 @@ export default function MyTrainersScreen() {
         ) : trainers.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="person-outline" size={30} color={C.subtle} />
-            <Text style={s.emptyTitle}>Noch kein Trainer verbunden</Text>
-            <Text style={s.emptyTxt}>Gib den Code deiner Trainer:in ein, um dich zu verbinden.</Text>
+            <Text style={s.emptyTitle}>{t('trainer.noTrainer')}</Text>
+            <Text style={s.emptyTxt}>{t('trainer.noTrainerSub')}</Text>
           </View>
         ) : (
-          trainers.map(t => {
-            const meta = STATUS_META[t.status];
+          trainers.map(trainer => {
+            const meta = STATUS_META[trainer.status];
             return (
-              <TouchableOpacity key={t.id} style={s.card} activeOpacity={0.85}
-                onPress={() => router.push(`/connection/${t.id}?name=${encodeURIComponent(t.counterpartName ?? '')}`)}>
-                <View style={s.avatar}><Text style={s.avatarTxt}>{(t.counterpartName?.[0] ?? '?').toUpperCase()}</Text></View>
+              <TouchableOpacity key={trainer.id} style={s.card} activeOpacity={0.85}
+                onPress={() => router.push(`/connection/${trainer.id}?name=${encodeURIComponent(trainer.counterpartName ?? '')}`)}>
+                <View style={s.avatar}><Text style={s.avatarTxt}>{(trainer.counterpartName?.[0] ?? '?').toUpperCase()}</Text></View>
                 <View style={s.flex}>
-                  <Text style={s.name}>{t.counterpartName ?? 'Trainer'}</Text>
+                  <Text style={s.name}>{trainer.counterpartName ?? t('trainer.eyebrow')}</Text>
+                  {trainer.counterpartUsername ? <Text style={s.usernameTxt}>@{trainer.counterpartUsername}</Text> : null}
                   <View style={[s.statusChip, { borderColor: `${meta.color}55` }]}>
                     <View style={[s.statusDot, { backgroundColor: meta.color }]} />
-                    <Text style={[s.statusTxt, { color: meta.color }]}>{meta.label}</Text>
+                    <Text style={[s.statusTxt, { color: meta.color }]}>{t(meta.labelKey)}</Text>
                   </View>
-                  <Text style={s.permHint}>Berechtigungen verwalten ›</Text>
+                  <Text style={s.permHint}>{t('trainer.managePermissions')}</Text>
                 </View>
-                <AnimatedPressable style={s.unlinkBtn} scale={0.9} onPress={() => disconnect(t.id)}>
+                <AnimatedPressable style={s.unlinkBtn} scale={0.9} onPress={() => disconnect(trainer.id)}>
                   <Ionicons name="trash-outline" size={16} color={C.danger} />
                 </AnimatedPressable>
               </TouchableOpacity>
@@ -127,12 +130,12 @@ export default function MyTrainersScreen() {
         <View style={s.sheet}>
           <SafeAreaView edges={['bottom']}>
             <View style={s.griff} />
-            <Text style={s.sheetTitle}>Trainer-Code eingeben</Text>
-            <Text style={s.sheetSub}>Deine Trainer:in gibt dir den Code aus dem Trainerprofil.</Text>
+            <Text style={s.sheetTitle}>{t('trainer.codeTitle')}</Text>
+            <Text style={s.sheetSub}>{t('trainer.codeSub')}</Text>
             <View style={s.searchRow}>
               <TextInput
                 style={[s.input, s.flex]}
-                placeholder="z. B. CANIS-4827"
+                placeholder={t('trainer.codePlaceholder')}
                 placeholderTextColor={C.placeholder}
                 value={code}
                 onChangeText={setCode}
@@ -170,6 +173,7 @@ const s = StyleSheet.create({
   avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.cardAlt, alignItems: 'center', justifyContent: 'center' },
   avatarTxt: { fontSize: 18, color: C.white, fontWeight: '800' },
   name:   { fontSize: 15, color: C.white, fontWeight: '700' },
+  usernameTxt: { fontSize: 11, color: C.accent, fontWeight: '600', marginTop: 2 },
   statusChip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderWidth: 1, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 4, marginTop: 6 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusTxt: { fontSize: 11, fontWeight: '700' },
