@@ -37,7 +37,7 @@ export function ConnectHomeScreen() {
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         {/* Header: echtes ANYVO-Logo + CONNECT-Badge */}
         <View style={s.header}>
-          <Image source={require('@/assets/images/icon.png')} style={s.logo} contentFit="contain" />
+          <Image source={require('@/assets/images/anyvologo.png')} style={s.logo} contentFit="contain" />
           <Text style={s.brand}>ANYVO</Text>
           <View style={s.badge}><Text style={s.badgeTxt}>CONNECT</Text></View>
         </View>
