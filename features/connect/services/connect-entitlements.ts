@@ -25,8 +25,12 @@ export interface ConnectEntitlements {
 
 export const CONNECT_NEWBIE_MAX_FRIENDS = 25;
 
+// Fail-CLOSED in Production: Entitlements werden erzwungen, sobald es KEIN Dev-Build
+// ist. Ein fehlendes Env-Flag darf in Production NICHT mehr ALL_ACCESS gewähren.
+// In Dev bleibt der weiche Voll-Zugriff (Testbarkeit), außer das Flag erzwingt es.
 export const CONNECT_ENFORCE_ENTITLEMENTS =
-  process.env.EXPO_PUBLIC_CONNECT_ENFORCE_ENTITLEMENTS === 'true';
+  (typeof __DEV__ === 'undefined' || __DEV__ === false)
+  || process.env.EXPO_PUBLIC_CONNECT_ENFORCE_ENTITLEMENTS === 'true';
 
 const ALL_ACCESS: ConnectEntitlements = {
   canViewFeed: true,
