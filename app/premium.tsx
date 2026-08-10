@@ -98,7 +98,7 @@ export default function PremiumScreen() {
   // → bestehenden Active-/Trainer-Zahlern nicht als Wechselziel anbieten.
   const visibleCards = CARDS.filter(c => {
     if (c.plan === 'newbie') return !currentPlan;
-    if (c.plan === 'founder_active') return currentPlan === 'founder_active' || !currentPlan;
+    if (c.plan === 'founder_active') return currentPlan === 'founder_active' || !currentPlan || canSwitchPlanInApp(currentPlan, 'founder_active', { founderAvailable, platform: Platform.OS });
     return true;
   });
   // Preis-Anker für die Founder-Ersparnis: echter Active-Preis aus dem Store
@@ -127,7 +127,7 @@ export default function PremiumScreen() {
     if (!user) { Alert.alert(t('trainer.connectHintTitle'), t('premium.loginRequired')); return; }
     // In-App nur erlaubte Upgrades. Downgrades/gesperrte Wechsel (inkl. Founder für
     // bestehende Zahler) laufen ausschliesslich über die Store-Abo-Verwaltung.
-    if (plan !== 'newbie' && currentPlan && !canSwitchPlanInApp(currentPlan, plan, { founderAvailable })) {
+    if (plan !== 'newbie' && currentPlan && !canSwitchPlanInApp(currentPlan, plan, { founderAvailable, platform: Platform.OS })) {
       Alert.alert(t('common.notice'), t('membership.switchViaStore'));
       return;
     }
@@ -316,7 +316,7 @@ export default function PremiumScreen() {
           const missingStorePackage = card.plan !== 'newbie' && purchasesReady() && !pkg && !iapLoading;
           // Gesperrter Wechsel (Downgrade / nicht erlaubt) → nicht kaufbar, Hinweis auf Store.
           const blockedSwitch = card.plan !== 'newbie' && !isCurrent && !soldOut
-            && !canSwitchPlanInApp(currentPlan, card.plan, { founderAvailable });
+            && !canSwitchPlanInApp(currentPlan, card.plan, { founderAvailable, platform: Platform.OS });
           return (
             <View key={card.plan} style={[S.card, card.founder && S.cardFounder, isRec && !card.founder && S.cardRec, isCurrent && S.cardCurrent]}>
               {isRec && (

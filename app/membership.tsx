@@ -278,7 +278,7 @@ export default function MembershipScreen() {
             // Wechselquelle: 'permanent' (Lifetime) hat bereits alles → keine Wechsel.
             const src: SubscriptionPlan | null = visiblePlan === 'permanent' ? null : visiblePlan;
             const canSwitch = !current && visiblePlan !== 'permanent'
-              && canSwitchPlanInApp(src, c.plan, { founderAvailable });
+              && canSwitchPlanInApp(src, c.plan, { founderAvailable, platform: Platform.OS });
             // Nur bei bezahlten Plänen auf einen nicht-erlaubten Wechsel hinweisen
             // (Downgrade/Kündigung → Store). Newbie/permanent brauchen keinen Hinweis.
             const storeHint = !current && !canSwitch
