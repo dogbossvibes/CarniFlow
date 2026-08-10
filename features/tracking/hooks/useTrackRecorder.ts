@@ -8,8 +8,9 @@ import {
   type MarkerType, type MarkerMaterial, type AngleKind, type TrackPointSample, type MarkerSample,
 } from '@/features/tracking/store/trackingStore';
 import {
-  calculateDistance, calculateHeading, calculateAverageAccuracy, medianLatLng, type LatLng,
+  calculateDistance, calculateAverageAccuracy, medianLatLng, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
+import { detectAutoCorner } from '@/features/tracking/utils/autoCornerDetection';
 import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/services/trackService';
 import { supabase } from '@/lib/supabase';
 import { createLocalTrainingSession, updateTrainingSyncStatus } from '@/features/training/repositories/localTrainingRepository';
@@ -40,27 +41,11 @@ const EMA_ALPHA      = 0.4;  // Glättung der aufgezeichneten LINIE (ruhig, trä
 const PUCK_ALPHA     = 0.6;  // Glättung des LIVE-Pucks separat → folgt flotter,
                              // ohne die aufgezeichnete Linie unruhiger zu machen
 
-// Winkel-Erkennung (zwei Schenkel). Klassifikation über den INNENWINKEL des Wegs
-// (Referenz winkel.png: „30° ≤ spitzer Winkel ≤ 60°"). Innenwinkel = 180 − |Richtungs-
-// änderung am Scheitel|:
-//   Innenwinkel 30–60°  → Spitzwinkel (links/rechts)   → Richtungsänderung ~120–150°
-//   Innenwinkel 75–115° → rechtwinklig ~90°            → Richtungsänderung ~65–105°
-//   Innenwinkel 60–75° oder ausserhalb → unklar → NICHT automatisch markieren
-const LEG_MIN_M           = 4.0;  // moderate Schenkellänge (3–5 m) — bewusst kurze Winkel bleiben erfassbar
-const ACUTE_ANGLE_MIN_DEG = 30;   // Innenwinkel: ab hier Spitzwinkel
-const ACUTE_ANGLE_MAX_DEG = 60;   // Innenwinkel: bis hier Spitzwinkel
-const ANGLE_90_MIN_DEG    = 75;   // Innenwinkel: ab hier rechtwinklig (~90°)
-const ANGLE_90_MAX_DEG    = 115;  // Innenwinkel: bis hier rechtwinklig
-const MAX_ANGLE_ACCURACY_M = 20;  // Winkel nur bestätigen, wenn der Scheitel-Fix genau genug ist
-// KEIN pauschaler Mindestabstand (8–12 m). Nur EIN Schenkel als Abstand, damit der
-// nächste Scheitel saubere Schenkel hat — bewusst nahe beieinander gelegte Winkel
-// bleiben so erfassbar (echte kurze Winkel werden NICHT unterdrückt).
-const CORNER_GAP_M        = LEG_MIN_M;
-// Klassifikation über den Innenwinkel (winkel.png-konform). Falls sich im Feld
-// zeigt, dass direkt die rohe Richtungsänderung gemeint ist → auf false setzen.
-const ANGLE_USE_INTERIOR  = true;
-// Links/Rechts leicht invertierbar, falls der Feldtest sie vertauscht zeigt.
-const ANGLE_INVERT_SIDE   = false;
+// Auto-Winkel-Erkennung: die gesamte reine, testbare Logik lebt in
+// features/tracking/utils/autoCornerDetection.ts (Single Source of Truth) —
+// stabile Ein-/Auslaufschenkel (LEG_MIN_M=4 m, Heading-Abweichung ≤12°, ≥2 Segmente),
+// konzentrierte Scheitel-Richtungsänderung, Innenwinkel-Klassen (75–105° normal,
+// 30–60° spitz), Rechts/Links via Bearing, Corner-Gap + Accuracy-Gate.
 
 // Start-Lock: Stabilisierungsphase direkt nach „Fährte legen". Verhindert, dass
 // GPS-Warmup-/Startdrift (auf iPhone real ~8 m, obwohl man steht) als echte
@@ -83,11 +68,6 @@ const WATCH_OPTS: Location.LocationOptions = {
 interface AcceptedPoint extends LatLng { t: number; accuracy: number | null; cumDist: number; }
 type Raw = { lat: number; lng: number; accuracy: number | null; altitude: number | null; speed: number | null; t: number };
 
-function normalizeDeg(d: number): number {
-  while (d > 180) d -= 360;
-  while (d < -180) d += 360;
-  return d;
-}
 
 export interface TrackRecorderOptions {
   onAngle?: (kind: AngleKind) => void;   // UI: Haptik + Toast bei erkanntem Winkel
@@ -181,76 +161,26 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker);
   }, [store]);
 
-  // Winkel über zwei Schenkel (Einlauf A→Scheitel, Scheitel→Auslauf). Statt stur
-  // den Punkt „LEG_MIN_M zurück" als Scheitel zu nehmen (der oft NEBEN der Ecke
-  // liegt → Marker passte nicht), wird unter allen möglichen Scheiteln im frischen
-  // Fenster der mit der SCHÄRFSTEN Richtungsänderung gesucht = der echte
-  // Winkelpunkt. So sitzt der Marker exakt auf der Ecke und ein sauberer 90°-Knick
-  // wird als rechtwinklig (links/rechts) statt „verschmiert" erkannt.
+  // Auto-Winkel: die gesamte Erkennung (Scheitelwahl, stabile Schenkel, Klassen,
+  // Rechts/Links) liegt in detectAutoCorner() — hier nur Marker/State/Debug.
   const detectCorner = useCallback(() => {
-    const pts = pointsRef.current;
-    const n = pts.length;
-    if (n < 3) return;
-    const C = pts[n - 1];
-
-    // Bester Scheitel-Kandidat: braucht je einen vollen Schenkel (≥ LEG_MIN_M)
-    // davor UND danach UND einen genauen Fix; unter diesen gewinnt die grösste
-    // Richtungsänderung. KEIN pauschaler Mindestabstand → nahe Winkel bleiben möglich.
     const dbg = angleDbgRef.current;
-    let best: { apex: AcceptedPoint; diff: number; mag: number } | null = null;
-    let sawLegShort = false, sawPoorAcc = false;
-    for (let k = n - 2; k > 0; k--) {
-      const apex = pts[k];
-      if (C.cumDist - apex.cumDist < LEG_MIN_M) { sawLegShort = true; continue; }      // Auslauf noch zu kurz
-      if (apex.cumDist - lastCornerAtRef.current < CORNER_GAP_M) break;                 // nur NACH dem letzten Winkel
-      if (apex.accuracy == null || apex.accuracy > MAX_ANGLE_ACCURACY_M) { sawPoorAcc = true; continue; }  // Fix zu ungenau
+    const corner = detectAutoCorner(pointsRef.current, lastCornerAtRef.current);
+    if (!corner) { dbg.lastReject = 'no_corner'; return; }
 
-      // Anker A: LEG_MIN_M vor dem Scheitel; Auslauf-Endpunkt: LEG_MIN_M danach.
-      let ai = k;
-      while (ai > 0 && apex.cumDist - pts[ai].cumDist < LEG_MIN_M) ai--;
-      if (apex.cumDist - pts[ai].cumDist < LEG_MIN_M) { sawLegShort = true; continue; }  // kein voller Einlauf-Schenkel
-      let ci = k;
-      while (ci < n - 1 && pts[ci].cumDist - apex.cumDist < LEG_MIN_M) ci++;
-
-      const diff = normalizeDeg(calculateHeading(apex, pts[ci]) - calculateHeading(pts[ai], apex));
-      const mag = Math.abs(diff);
-      if (!best || mag > best.mag) best = { apex, diff, mag };
-    }
-
-    if (!best || best.mag < 15) {   // praktisch keine Richtungsänderung → kein Winkel
-      dbg.lastReject = best ? 'no_turn' : (sawPoorAcc ? 'poor_accuracy' : sawLegShort ? 'leg_too_short' : 'no_turn');
-      return;
-    }
-
-    const B = best.apex;
-    // Richtung: best.diff ist die VORZEICHENBEHAFTETE Richtungsänderung am Scheitel.
-    // Konvention: + = rechts (im Uhrzeigersinn), − = links. Über ANGLE_INVERT_SIDE
-    // im Feld umkehrbar, falls links/rechts vertauscht wirken.
-    let dir: 'links' | 'rechts' = best.diff > 0 ? 'rechts' : 'links';
-    if (ANGLE_INVERT_SIDE) dir = dir === 'rechts' ? 'links' : 'rechts';
-
-    // Klassifikation über den Innenwinkel des Wegs (= 180 − Richtungsänderung).
-    const angleDeg = ANGLE_USE_INTERIOR ? 180 - best.mag : best.mag;
-    let kind: AngleKind | null = null;
-    if (angleDeg >= ANGLE_90_MIN_DEG && angleDeg <= ANGLE_90_MAX_DEG) {
-      kind = dir;                                                        // ~90° links/rechts
-    } else if (angleDeg >= ACUTE_ANGLE_MIN_DEG && angleDeg <= ACUTE_ANGLE_MAX_DEG) {
-      kind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';         // Spitzwinkel
-    }
-    if (!kind) { dbg.lastReject = 'angle_unclear'; return; }   // 60–75° oder ausserhalb → nicht markieren
-
-    // erkannt → Debug aktualisieren (Spitzwinkel zählen gleich wie 90°-Winkel).
+    const { apex, kind, angleDeg } = corner;
+    const dir: 'links' | 'rechts' = (kind === 'rechts' || kind === 'spitz_rechts') ? 'rechts' : 'links';
     dbg.count++;
     if (kind === 'spitz_rechts' || kind === 'spitz_links') dbg.acuteCount++;
     dbg.lastType = kind; dbg.lastDeg = Math.round(angleDeg); dbg.lastDir = dir; dbg.lastReject = null;
-    if (__DEV__) console.log('[trackRecorder] Winkel', { kind, innenwinkel: Math.round(angleDeg), richtungsaenderung: Math.round(best.mag), richtung: dir });
+    if (__DEV__) console.log('[trackRecorder] Winkel', { kind, innenwinkel: Math.round(angleDeg), richtung: dir });
 
-    lastCornerAtRef.current = B.cumDist;
+    lastCornerAtRef.current = apex.cumDist;
     const now = Date.now();
     void commitMarker({
       id: `angle-${now}-${kind}`, type: 'winkel', material: null, angleKind: kind,   // stabile ID inkl. Typ
-      lat: B.lat, lng: B.lng, accuracy: B.accuracy,
-      distance_from_start: Math.round(B.cumDist * 10) / 10,
+      lat: apex.lat, lng: apex.lng, accuracy: apex.accuracy,
+      distance_from_start: Math.round(apex.cumDist * 10) / 10,
       note: null, audio_url: null, found: false, t: now,
     });
     onAngleRef.current?.(kind);
