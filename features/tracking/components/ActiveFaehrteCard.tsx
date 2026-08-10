@@ -2,9 +2,12 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import {
-  type ActiveFaehrte, statusLabel, statusTone, gpsQualityLabel, fmtClockOfDay, weatherLine,
+  type ActiveFaehrte, statusTone, fmtClockOfDay, weatherLine,
 } from '@/features/tracking/store/activeFaehrtenModel';
 import { useFaehrteElapsed } from '@/features/tracking/hooks/useActiveFaehrte';
+import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
+import { useT, type TranslationKey } from '@/i18n';
+import type { SessionStatus } from '@/features/tracking/store/trackingStore';
 
 // h:mm:ss ab 1 h, sonst mm:ss — eine Fährte kann Stunden reifen.
 function fmt(sec: number) {
@@ -34,6 +37,7 @@ export function ActiveFaehrteCard({
   onOpen: () => void;
   compact?: boolean;
 }) {
+  const { t } = useT();
   const elapsed = useFaehrteElapsed(entry);
   const tone = statusTone(entry.status);
   const color = TONE_COLOR[tone] ?? C.trackTextMut;
@@ -41,9 +45,10 @@ export function ActiveFaehrteCard({
   const recording = entry.status === 'laying';
   const showTime = recording || searching || entry.status === 'resting';
   const showGps  = recording || searching;   // GPS nur bei aktiver Ortung
-  const timeCap  = searching ? 'Suchzeit' : recording ? 'Aufnahme' : 'Liegezeit';
-  const cta = searching ? 'Fortsetzen' : recording ? 'Fortsetzen' : 'Fährte öffnen';
+  const timeCap  = searching ? t('track.searchTime') : recording ? t('track.recording') : t('track.lyingTime');
+  const cta = searching || recording ? t('track.continue') : t('track.openTrack');
   const wLine = weatherLine(entry.weather);
+  const status = localizedStatusLabel(entry.status, t);
 
   return (
     <TouchableOpacity
@@ -51,13 +56,13 @@ export function ActiveFaehrteCard({
       onPress={onOpen}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={`${dogName ? dogName + ': ' : ''}${statusLabel(entry.status)}${showTime ? `, ${fmt(elapsed)}` : ''} — ${cta}`}
+      accessibilityLabel={`${dogName ? dogName + ': ' : ''}${status}${showTime ? `, ${fmt(elapsed)}` : ''} — ${cta}`}
     >
       {/* Kopf: Status-Badge + Hund */}
       <View style={s.head}>
         <View style={[s.badge, { backgroundColor: `${color}22`, borderColor: `${color}66` }]}>
           <View style={[s.dot, { backgroundColor: color }]} />
-          <Text style={[s.badgeTxt, { color }]}>{statusLabel(entry.status)}</Text>
+          <Text style={[s.badgeTxt, { color }]}>{status}</Text>
         </View>
         {dogName ? <Text style={s.dog} numberOfLines={1}>{dogName}</Text> : null}
         <View style={{ flex: 1 }} />
@@ -74,16 +79,16 @@ export function ActiveFaehrteCard({
 
       {/* Kennzahlen: Start · Strecke · Gegenstände (keine Doppelung der Zeit) */}
       <View style={s.stats}>
-        <Stat label="Start"        value={fmtClockOfDay(entry.startedAt)} />
-        <Stat label="Strecke"      value={`${Math.round(entry.distanceMeters)} m`} />
-        <Stat label="Gegenstände"  value={String(entry.objektCount)} />
-        {showGps ? <Stat label="GPS" value={gpsQualityLabel(entry.gpsAccuracy)} accent={color} /> : null}
+        <Stat label={t('common.start')} value={fmtClockOfDay(entry.startedAt)} />
+        <Stat label={t('track.route')} value={`${Math.round(entry.distanceMeters)} m`} />
+        <Stat label={t('track.objects')} value={String(entry.objektCount)} />
+        {showGps ? <Stat label="GPS" value={localizedGpsQuality(entry.gpsAccuracy, t)} accent={color} /> : null}
       </View>
 
       {/* Wetter-Snapshot (einmalig beim Legen erfasst) */}
       <View style={s.weatherRow}>
         <Ionicons name="partly-sunny-outline" size={13} color={C.trackTextMut} />
-        <Text style={s.weatherTxt} numberOfLines={1}>{wLine ?? 'Keine Wetterdaten'}</Text>
+        <Text style={s.weatherTxt} numberOfLines={1}>{wLine ?? t('track.noWeatherData')}</Text>
       </View>
 
       {/* CTA */}
@@ -93,6 +98,29 @@ export function ActiveFaehrteCard({
       </View>
     </TouchableOpacity>
   );
+}
+
+function localizedStatusLabel(status: SessionStatus, t: (key: TranslationKey) => string): string {
+  switch (status) {
+    case 'laying':    return t('track.statusLaying');
+    case 'searching': return t('track.statusSearching');
+    case 'resting':   return t('track.statusResting');
+    case 'laid':      return t('track.statusLaid');
+    case 'completed': return t('track.statusCompleted');
+    case 'cancelled': return t('track.statusCancelled');
+    default:          return t('track.statusActive');
+  }
+}
+
+function localizedGpsQuality(accuracy: number | null | undefined, t: (key: TranslationKey) => string): string {
+  if (accuracy == null) return '—';
+  const q = getGpsQuality(accuracy);
+  switch (q) {
+    case 'sehr-gut': return t('track.gpsVeryGood');
+    case 'gut':      return t('track.gpsGood');
+    case 'mittel':   return t('track.gpsMedium');
+    default:         return t('track.gpsPoor');
+  }
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: string }) {
