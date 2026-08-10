@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { SubscriptionPlan } from '@/features/subscription/plans';
+import { PRODUCT_IDS, type SubscriptionPlan } from '@/features/subscription/plans';
 
 // RevenueCat (Apple/Google In-App-Purchase). Nativ → defensiv laden, damit Expo
 // Go / ein Build ohne das Modul nicht crasht. Ohne API-Key bleibt IAP inaktiv
@@ -22,11 +22,26 @@ export type RestorablePlan = Exclude<SubscriptionPlan, 'newbie'>;
 
 let configured = false;
 
+// ⚠️ TEMPORÄR (IAP-Diagnose, Apple 2.1b): aktiviert RevenueCat-DEBUG-Logs +
+// den sichtbaren Diagnose-Button auch im Release/TestFlight. Vor dem finalen
+// Release wieder auf false setzen / entfernen. Es werden KEINE Secrets/Keys/
+// appUserID-Werte geloggt oder angezeigt.
+export const IAP_DIAG = true;
+
+// Letzter echter getOfferings-Fehler (nur Meta, keine Secrets) — für die Diagnose,
+// da getPackages() selbst defensiv [] zurückliefert.
+let lastOfferingsError: { code: string | null; message: string | null; underlying: string | null } | null = null;
+
 export function configurePurchases(userId?: string) {
   if (!Purchases || configured) return;
   const apiKey = Platform.OS === 'ios' ? IOS_KEY : ANDROID_KEY;
   if (!apiKey) return;
-  try { Purchases.configure({ apiKey, appUserID: userId }); configured = true; } catch { /* ignore */ }
+  try {
+    // DEBUG-Log-Level nur in Dev bzw. temporärer Diagnose (loggt keine Secrets).
+    if (IAP_DIAG || __DEV__) { try { Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG); } catch { /* ignore */ } }
+    Purchases.configure({ apiKey, appUserID: userId });
+    configured = true;
+  } catch { /* ignore */ }
 }
 
 export function purchasesReady(): boolean {
@@ -149,6 +164,13 @@ export async function getPackages(): Promise<PurchasePackage[]> {
       };
     });
   } catch (e: any) {
+    // Echten Fehler für die Diagnose merken (nur Meta, keine Secrets); Verhalten
+    // bleibt: [] zurückgeben, damit die App nie am Offering-Fehler crasht.
+    lastOfferingsError = {
+      code: e?.code ?? null,
+      message: e?.message ?? null,
+      underlying: e?.underlyingErrorMessage ?? e?.userInfo?.readableErrorCode ?? null,
+    };
     if (__DEV__) {
       console.warn('[RevenueCat] getOfferings failed', {
         platform: Platform.OS,
@@ -248,4 +270,97 @@ export async function getManagementURL(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+// ⚠️ TEMPORÄR (IAP-Diagnose, Apple 2.1b). Liefert einen strukturierten, secret-
+// freien Statusbericht: KEINE API-Keys, KEINE appUserID-Werte, keine Tokens.
+// Unterscheidet A) RC/Offering lädt nicht · B) Offering da, aber 0 Packages ·
+// C) einzelne Packages fehlen · D) alle Packages + Preise vorhanden.
+export interface RevenueCatDiagnostics {
+  platform: string;
+  sdkAvailable: boolean;
+  configured: boolean;
+  isConfigured: boolean | null;   // Purchases.isConfigured() (native)
+  hasAppUserID: boolean;
+  isAnonymous: boolean | null;
+  offeringsOk: boolean;
+  currentPresent: boolean;
+  currentIdentifier: string | null;
+  currentPackageCount: number;
+  packages: { packageId: string; productId: string; priceString: string | null; currencyCode: string | null }[];
+  allOfferingIds: string[];
+  directProducts: { id: string; found: boolean; priceString: string | null }[];
+  error: { code: string | null; message: string | null; underlying: string | null } | null;
+  verdict: 'A_rc_or_offering_failed' | 'B_offering_empty' | 'C_missing_packages' | 'D_all_present' | 'not_ready';
+}
+
+export async function revenueCatDiagnostics(): Promise<RevenueCatDiagnostics> {
+  const expectedIds = [PRODUCT_IDS.activeMonthly, PRODUCT_IDS.founderActiveMonthly, PRODUCT_IDS.trainerMonthly];
+  const base: RevenueCatDiagnostics = {
+    platform: Platform.OS,
+    sdkAvailable: PURCHASES_AVAILABLE,
+    configured,
+    isConfigured: null,
+    hasAppUserID: false,
+    isAnonymous: null,
+    offeringsOk: false,
+    currentPresent: false,
+    currentIdentifier: null,
+    currentPackageCount: 0,
+    packages: [],
+    allOfferingIds: [],
+    directProducts: expectedIds.map(id => ({ id, found: false, priceString: null })),
+    error: lastOfferingsError,
+    verdict: 'not_ready',
+  };
+  if (!Purchases) return base;
+
+  try { base.isConfigured = await Purchases.isConfigured(); } catch { /* ignore */ }
+  try { const id = await Purchases.getAppUserID(); base.hasAppUserID = typeof id === 'string' && id.length > 0; } catch { /* ignore */ }
+  try { base.isAnonymous = await Purchases.isAnonymous(); } catch { /* ignore */ }
+
+  // Offering-Pfad
+  try {
+    const offerings = await Purchases.getOfferings();
+    base.offeringsOk = true;
+    base.allOfferingIds = Object.keys(offerings?.all ?? {});
+    const current = offerings?.current ?? null;
+    base.currentPresent = current != null;
+    base.currentIdentifier = current?.identifier ?? null;
+    const pkgs = current?.availablePackages ?? [];
+    base.currentPackageCount = pkgs.length;
+    base.packages = pkgs.map((p: any) => ({
+      packageId: p?.identifier ?? '',
+      productId: p?.product?.identifier ?? '',
+      priceString: p?.product?.priceString ?? null,
+      currencyCode: p?.product?.currencyCode ?? null,
+    }));
+  } catch (e: any) {
+    base.error = {
+      code: e?.code ?? null,
+      message: e?.message ?? null,
+      underlying: e?.underlyingErrorMessage ?? e?.userInfo?.readableErrorCode ?? null,
+    };
+  }
+
+  // Direkter Produkt-Check über die konkreten IDs (löst KEINEN Kauf aus).
+  try {
+    const products = await Purchases.getProducts(expectedIds);
+    base.directProducts = expectedIds.map(id => {
+      const found = (products ?? []).find((p: any) => p?.identifier === id);
+      return { id, found: !!found, priceString: found?.priceString ?? null };
+    });
+  } catch (e: any) {
+    if (!base.error) base.error = { code: e?.code ?? null, message: e?.message ?? null, underlying: e?.underlyingErrorMessage ?? null };
+  }
+
+  // Verdikt
+  const anyDirect = base.directProducts.some(p => p.found);
+  if (!base.configured || base.isConfigured === false) base.verdict = 'not_ready';
+  else if (!base.offeringsOk) base.verdict = 'A_rc_or_offering_failed';
+  else if (base.currentPackageCount === 0 && !anyDirect) base.verdict = 'B_offering_empty';
+  else if (base.packages.length < expectedIds.length || base.directProducts.some(p => !p.found)) base.verdict = 'C_missing_packages';
+  else base.verdict = 'D_all_present';
+
+  return base;
 }
