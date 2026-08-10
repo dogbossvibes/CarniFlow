@@ -537,4 +537,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "premium.terms": "Conditions d'utilisation",
   "premium.privacy": "Protection des données",
   "premium.autoRenewNotice": "L'abonnement se renouvelle automatiquement s'il n'est pas résilié au moins 24 heures avant la fin de la période de facturation en cours. La gestion et la résiliation se font via ton compte Store.",
+
+  // Recovery — lien ouvert sur un autre appareil (PKCE)
+  "auth.recoverySameDevice": "Ouvre le lien de réinitialisation sur le même appareil où tu as demandé « Mot de passe oublié », ou demande un nouveau lien.",
 };
