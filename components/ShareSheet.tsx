@@ -34,15 +34,36 @@ export function ShareSheet({ training, visible, onClose }: Props) {
     setOpts(o => ({ ...o, [key]: !o[key] }));
 
   const handleCreate = async () => {
+    if (loading) return;                       // Doppeltipp verhindern
     setLoading(true);
+
+    let url: string;
     try {
-      const url = await createShareLink(training.id, opts);
-      setShareUrl(url);
-      setStep('link');
-    } catch {
+      url = await createShareLink(training.id, opts);
+    } catch (e) {
+      if (__DEV__) console.error('[share] createShareLink failed', e);
       Alert.alert(t('share.notReadyTitle'), t('share.notReadyBody'));
-    } finally {
       setLoading(false);
+      return;
+    }
+
+    if (!url) {                                // kein falscher Erfolg bei leerer URL
+      if (__DEV__) console.error('[share] createShareLink returned empty url');
+      Alert.alert(t('share.notReadyTitle'), t('share.notReadyBody'));
+      setLoading(false);
+      return;
+    }
+
+    setShareUrl(url);
+    setStep('link');
+    setLoading(false);
+
+    // Erfolg steht fest → direkt den nativen Share-Dialog öffnen. Ein Abbruch
+    // oder Fehler hier ändert den bereits erstellten Link nicht mehr.
+    try {
+      await Share.share({ message: t('share.message', { url }), url });
+    } catch (e) {
+      if (__DEV__) console.error('[share] Share.share failed', e);
     }
   };
 
