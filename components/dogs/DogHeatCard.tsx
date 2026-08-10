@@ -32,16 +32,30 @@ export function DogHeatCard({
 }) {
   const { t } = useT();
   if (cycles.length === 0) {
+    // Variante A — kompakte, horizontale Card. Ganze Card tappbar → bestehender
+    // onAdd-Flow (keine neue Route/Modal). Kein grosser Mint-Button, kein zentraler
+    // Disclaimer (der Prognose-Disclaimer erscheint erst mit einer Prognose).
     return (
-      <View style={s.empty}>
-        <View style={s.emptyIcon}><Ionicons name="heart-circle-outline" size={26} color={PINK} /></View>
-        <Text style={s.emptyTitle}>{t('heat.emptyTitle')}</Text>
-        <Text style={s.emptyTxt}>
-          Trage die erste Läufigkeit ein, damit Anyvo den Zyklus deiner Hündin besser einschätzen kann.
-        </Text>
-        <AnyvoButton label={t('heat.addFirst')} icon="add" onPress={onAdd} />
-        <Text style={s.disclaimer}>{t('heat.disclaimer')}</Text>
-      </View>
+      <TouchableOpacity
+        style={s.emptyCard}
+        onPress={onAdd}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel={`${t('heat.addFirst')}. ${t('heat.emptyDesc')}`}
+        accessibilityHint={t('heat.emptyCta')}
+      >
+        <View style={s.emptyIconSm}>
+          <Ionicons name="heart-circle-outline" size={22} color={PINK} />
+        </View>
+        <View style={s.emptyBody}>
+          <Text style={s.emptyTitleA} numberOfLines={2}>{t('heat.addFirst')}</Text>
+          <Text style={s.emptyDescA} numberOfLines={3}>{t('heat.emptyDesc')}</Text>
+          <View style={s.emptyCtaRow}>
+            <Text style={s.emptyCta}>{t('heat.emptyCta')}</Text>
+            <Ionicons name="chevron-forward" size={14} color={C.accent} />
+          </View>
+        </View>
+      </TouchableOpacity>
     );
   }
 
@@ -134,9 +148,13 @@ const s = StyleSheet.create({
   itemSub:    { fontSize: 12, color: C.trackTextSec, marginTop: 2 },
   trash:      { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
-  empty:      { gap: 12, alignItems: 'center', borderRadius: 18, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 20, paddingVertical: 26 },
-  emptyIcon:  { width: 56, height: 56, borderRadius: 18, backgroundColor: PINK_DIM, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 16.5, color: C.trackText, fontWeight: '800', textAlign: 'center' },
-  emptyTxt:   { fontSize: 13.5, color: C.trackTextSec, fontWeight: '500', lineHeight: 19, textAlign: 'center' },
+  // Variante A — kompakte Empty-State-Card (horizontal, tappbar).
+  emptyCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 14, paddingVertical: 13 },
+  emptyIconSm: { width: 40, height: 40, borderRadius: 12, backgroundColor: PINK_DIM, alignItems: 'center', justifyContent: 'center' },
+  emptyBody:   { flex: 1, gap: 3 },
+  emptyTitleA: { fontSize: 15, color: C.trackText, fontWeight: '800' },
+  emptyDescA:  { fontSize: 12.5, color: C.trackTextSec, fontWeight: '500', lineHeight: 17 },
+  emptyCtaRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
+  emptyCta:    { fontSize: 13, color: C.accent, fontWeight: '800' },
   disclaimer: { fontSize: 11, color: C.trackTextMut, lineHeight: 15, textAlign: 'center', marginTop: 4 },
 });
