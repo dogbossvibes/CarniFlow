@@ -1,5 +1,6 @@
 import { de } from '../locales/de';
 import { gsw } from '../locales/gsw';
+import { fr } from '../locales/fr';
 import { execFileSync } from 'child_process';
 
 function keysOf(obj: Record<string, unknown>) {
@@ -151,5 +152,14 @@ describe('Swiss German localization consistency', () => {
     const identical = keysOf(de).filter((key) => de[key as keyof typeof de] === gsw[key as keyof typeof gsw]);
     expect(identical).toContain('training.title');
     expect(identical.length).toBeGreaterThan(0);
+  });
+
+  it('keeps every quickButton.* key non-empty in DE, gsw and FR', () => {
+    const quickButtonKeys = keysOf(de).filter((key) => key.startsWith('quickButton.'));
+    expect(quickButtonKeys.length).toBeGreaterThan(0);
+    for (const key of quickButtonKeys) {
+      expect(String(gsw[key as keyof typeof gsw] ?? '').trim().length).toBeGreaterThan(0);
+      expect(String(fr[key as keyof typeof fr] ?? '').trim().length).toBeGreaterThan(0);
+    }
   });
 });
