@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
@@ -11,7 +11,7 @@ import { haptic } from '@/lib/haptics';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, IAP_DIAG, revenueCatDiagnostics, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, ensurePurchasesConfigured, IAP_DIAG, revenueCatDiagnostics, type PurchasePackage } from '@/lib/purchases';
 import {
   activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
@@ -53,22 +53,32 @@ export default function PremiumScreen() {
   const { access } = useAccess();
   const { isInternalTester } = useInternalTester();
 
-  useEffect(() => {
-    (async () => {
-      setPackages(await getPackages());
-      setSlots(await getFounderSlots());
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const sub = await getPlanSubscription(user.id);
-        setCurrentPlan(sub?.plan ?? null);
-        setSubStatus(sub?.status ?? null);
-        setTrialEndsAt(sub?.trial_ends_at ?? null);
-        setCancelAtPeriodEnd(sub?.cancel_at_period_end === true);
-      }
-    })();
+  const [iapLoading, setIapLoading] = useState(true);
+
+  // ROOT FIX (Apple 2.1b): RevenueCat GARANTIERT initialisieren, BEVOR Offerings
+  // geladen werden — sonst „no singleton" / leere Paywall. Danach erst getOfferings.
+  const loadIap = useCallback(async () => {
+    setIapLoading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    await ensurePurchasesConfigured(user?.id);
+    const pkgs = await getPackages();
+    setPackages(pkgs);
+    setSlots(await getFounderSlots());
+    if (user) {
+      const sub = await getPlanSubscription(user.id);
+      setCurrentPlan(sub?.plan ?? null);
+      setSubStatus(sub?.status ?? null);
+      setTrialEndsAt(sub?.trial_ends_at ?? null);
+      setCancelAtPeriodEnd(sub?.cancel_at_period_end === true);
+    }
+    setIapLoading(false);
   }, []);
 
+  useEffect(() => { void loadIap(); }, [loadIap]);
+
   const iapReady = purchasesReady() && packages.length > 0;
+  // Nach dem Laden konfiguriert, aber keine Produkte → echter Ladefehler (Retry anbieten).
+  const iapLoadError = !iapLoading && purchasesReady() && packages.length === 0;
   const founderAvailable = slots.remaining > 0 || currentPlan === 'founder_active';
 
   // Trial-Status: Restlaufzeit + Enddatum für das Countdown-Banner. „trialing"
@@ -228,7 +238,7 @@ export default function PremiumScreen() {
   const runIapDiagnostics = async () => {
     const d = await revenueCatDiagnostics();
     const lines = [
-      `platform: ${d.platform} · sdk: ${d.sdkAvailable}`,
+      `platform: ${d.platform} · sdk: ${d.sdkAvailable} · hasApiKey: ${d.hasApiKey}`,
       `configured: ${d.configured} · isConfigured: ${d.isConfigured}`,
       `appUserID: ${d.hasAppUserID ? 'ja' : 'nein'} · anon: ${d.isAnonymous}`,
       `offeringsOk: ${d.offeringsOk} · current: ${d.currentPresent} (${d.currentIdentifier ?? '—'})`,
@@ -304,6 +314,16 @@ export default function PremiumScreen() {
             </View>
           </View>
         ) : (<>
+        {/* Echter Lade-/Fehlerzustand, statt sofort „—"/„nicht geladen" zu zeigen. */}
+        {iapLoading && (
+          <View style={S.loadingRow}><ActivityIndicator color={C.accent} /><Text style={S.loadingTxt}>{t('auth.recoveryChecking')}</Text></View>
+        )}
+        {iapLoadError && (
+          <TouchableOpacity onPress={loadIap} style={S.retryRow} activeOpacity={0.8}>
+            <Ionicons name="refresh" size={16} color={C.accent} />
+            <Text style={S.retryTxt}>{t('premium.notLoaded')} · {t('connect.retry')}</Text>
+          </TouchableOpacity>
+        )}
         {visibleCards.map(card => {
           const meta = PLAN_META[card.plan];
           const isCurrent = currentPlan === card.plan;
@@ -313,7 +333,7 @@ export default function PremiumScreen() {
           const pkgPrice = pkg?.priceString;
           const isRec = card.plan === recommendedPlan && !isCurrent && !soldOut;
           const filled = card.founder || card.plan === 'trainer' || isRec;   // Gradient-CTA
-          const missingStorePackage = card.plan !== 'newbie' && purchasesReady() && !pkg;
+          const missingStorePackage = card.plan !== 'newbie' && purchasesReady() && !pkg && !iapLoading;
           // Gesperrter Wechsel (Downgrade / nicht erlaubt) → nicht kaufbar, Hinweis auf Store.
           const blockedSwitch = card.plan !== 'newbie' && !isCurrent && !soldOut
             && !canSwitchPlanInApp(currentPlan, card.plan, { founderAvailable });
@@ -332,7 +352,7 @@ export default function PremiumScreen() {
                     {card.badgeKey && <View style={[S.badge, card.founder && S.badgeFounder]}><Text style={[S.badgeTxt, card.founder && { color: '#04201b' }]}>{t(card.badgeKey, { limit: FOUNDER_SLOT_LIMIT })}</Text></View>}
                   </View>
                   <View style={S.priceRow}>
-                    <Text style={S.cardPrice}>{card.plan === 'newbie' ? t('premium.free7Days') : (pkgPrice ?? meta.priceLabel)}</Text>
+                    <Text style={S.cardPrice}>{card.plan === 'newbie' ? t('premium.free7Days') : (pkgPrice ?? (iapLoading ? '…' : meta.priceLabel))}</Text>
                     {/* Ersparnis ggü. Active hervorheben (Conversion-Anker für Trial-Nutzer). */}
                     {card.founder && founderAvailable && <Text style={S.savings}>{t('premium.instead', { price: activePriceStr })}</Text>}
                   </View>
@@ -442,6 +462,10 @@ const S = StyleSheet.create({
 
   restoreBtn: { alignItems: 'center', paddingVertical: 14, marginTop: 4 },
   restoreTxt: { fontSize: 13, color: C.muted, fontWeight: '600' },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 24 },
+  loadingTxt: { fontSize: 13, color: C.muted },
+  retryRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, marginBottom: 8, borderRadius: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.card },
+  retryTxt:   { fontSize: 13, color: C.white, fontWeight: '700' },
   legal:      { fontSize: 12, color: C.subtle, textAlign: 'center', marginTop: 4 },
   linksRow:   { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 6 },
   link:       { fontSize: 12, color: C.accent, fontWeight: '600' },

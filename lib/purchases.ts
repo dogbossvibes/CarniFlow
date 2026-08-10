@@ -21,6 +21,7 @@ export type Tier = 'pro' | 'trainer';
 export type RestorablePlan = Exclude<SubscriptionPlan, 'newbie'>;
 
 let configured = false;
+let configuredUserId: string | null = null;   // welcher User zuletzt konfiguriert/eingeloggt
 
 // ⚠️ TEMPORÄR (IAP-Diagnose, Apple 2.1b): aktiviert RevenueCat-DEBUG-Logs +
 // den sichtbaren Diagnose-Button auch im Release/TestFlight. Vor dem finalen
@@ -32,16 +33,55 @@ export const IAP_DIAG = true;
 // da getPackages() selbst defensiv [] zurückliefert.
 let lastOfferingsError: { code: string | null; message: string | null; underlying: string | null } | null = null;
 
+function purchasesApiKey(): string {
+  return Platform.OS === 'ios' ? IOS_KEY : ANDROID_KEY;
+}
+
+// Ist der plattformspezifische RevenueCat-Key im Runtime-Bundle vorhanden?
+// EXPO_PUBLIC_* wird beim Bundle-Export inlined — fehlt der Key (z. B. weil eine
+// OTA-Umgebung ihn nicht enthält), kann `configure` NICHT laufen → „no singleton".
+// Nur bool (kein Wert), auch für die Diagnose nutzbar.
+export function hasPurchasesApiKey(): boolean {
+  return purchasesApiKey().length > 0;
+}
+
+// Idempotente Initialisierung. Erstkonfiguration genau EINMAL; bei bereits
+// konfiguriertem SDK + anderem User → RC-logIn (kein Re-configure). Wirft nie.
 export function configurePurchases(userId?: string) {
-  if (!Purchases || configured) return;
-  const apiKey = Platform.OS === 'ios' ? IOS_KEY : ANDROID_KEY;
+  if (!Purchases) return;
+  const apiKey = purchasesApiKey();
   if (!apiKey) return;
   try {
-    // DEBUG-Log-Level nur in Dev bzw. temporärer Diagnose (loggt keine Secrets).
-    if (IAP_DIAG || __DEV__) { try { Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG); } catch { /* ignore */ } }
-    Purchases.configure({ apiKey, appUserID: userId });
-    configured = true;
+    if (!configured) {
+      // DEBUG-Log-Level nur in Dev bzw. temporärer Diagnose (loggt keine Secrets).
+      if (IAP_DIAG || __DEV__) { try { Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG); } catch { /* ignore */ } }
+      Purchases.configure({ apiKey, appUserID: userId });
+      configured = true;
+      configuredUserId = userId ?? null;
+    } else if (userId && userId !== configuredUserId) {
+      // Bereits konfiguriert, aber neuer/anderer User → sauberer RC-User-Switch.
+      void Purchases.logIn(userId);
+      configuredUserId = userId;
+    }
   } catch { /* ignore */ }
+}
+
+// Garantiert (idempotent), dass RevenueCat vor jedem Store-Zugriff konfiguriert ist.
+// Der NATIVE Status (`isConfigured`) hat Vorrang vor dem lokalen JS-Flag. Wirft nie;
+// liefert false, wenn kein Key vorhanden ist (dann kann/darf configure nicht laufen).
+export async function ensurePurchasesConfigured(userId?: string): Promise<boolean> {
+  if (!Purchases || !purchasesApiKey()) return false;
+  try {
+    if (await Purchases.isConfigured()) {
+      configured = true;
+      if (userId && userId !== configuredUserId) {
+        try { await Purchases.logIn(userId); configuredUserId = userId; } catch { /* ignore */ }
+      }
+      return true;
+    }
+  } catch { /* isConfigured evtl. nicht verfügbar → lokal weiter */ }
+  configurePurchases(userId);
+  return configured;
 }
 
 export function purchasesReady(): boolean {
@@ -279,6 +319,7 @@ export async function getManagementURL(): Promise<string | null> {
 export interface RevenueCatDiagnostics {
   platform: string;
   sdkAvailable: boolean;
+  hasApiKey: boolean;             // ist der plattform-Key im Runtime-Bundle vorhanden?
   configured: boolean;
   isConfigured: boolean | null;   // Purchases.isConfigured() (native)
   hasAppUserID: boolean;
@@ -299,6 +340,7 @@ export async function revenueCatDiagnostics(): Promise<RevenueCatDiagnostics> {
   const base: RevenueCatDiagnostics = {
     platform: Platform.OS,
     sdkAvailable: PURCHASES_AVAILABLE,
+    hasApiKey: hasPurchasesApiKey(),
     configured,
     isConfigured: null,
     hasAppUserID: false,
