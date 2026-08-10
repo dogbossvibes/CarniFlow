@@ -67,6 +67,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="auth/callback" />
+        <Stack.Screen name="auth/recovery" />
         <Stack.Screen name="dog/[id]" />
         {/* Trainer-Hub: Fullscreen-Modal über dem aktuellen Screen (kein Tab).
             Zugang nur mit Trainer-Capability (Gate + Redirect im Screen selbst). */}
