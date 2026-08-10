@@ -162,10 +162,13 @@ export default function MembershipScreen() {
   // Wechsel/Upgrade läuft über die bestehende Paywall /premium (kein zweiter Kauf-Flow).
   const goUpgrade = () => router.push('/premium');
 
+  // Öffentliche Pläne im Vergleich: Gratis/Active/Trainer. Founder Active wird NICHT
+  // mehr angeboten → nur noch für einen (aktuell nicht existierenden) Founder-Bestand
+  // sichtbar, damit dessen aktueller Plan als „Aktiv" erscheint — nie als Kaufziel.
   const compareCards: { plan: SubscriptionPlan; nameKey: TranslationKey; price: string; show: boolean }[] = [
     { plan: 'newbie', nameKey: 'membership.free', price: t('membership.free'), show: true },
     { plan: 'active', nameKey: 'membership.active', price: priceFor('active'), show: true },
-    { plan: 'founder_active', nameKey: 'membership.founder', price: priceFor('founder_active'), show: founderAvailable },
+    { plan: 'founder_active', nameKey: 'membership.founder', price: priceFor('founder_active'), show: visiblePlan === 'founder_active' },
     { plan: 'trainer', nameKey: 'membership.trainer', price: priceFor('trainer'), show: true },
   ];
 

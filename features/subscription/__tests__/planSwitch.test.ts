@@ -19,8 +19,8 @@ describe('canSwitchPlanInApp — Wechselmatrix', () => {
     expect(canSwitchPlanInApp(null, 'trainer', AVAIL)).toBe(true);
   });
 
-  it('Newbie → Founder nur wenn Founder verfügbar', () => {
-    expect(canSwitchPlanInApp('newbie', 'founder_active', AVAIL)).toBe(true);
+  it('Newbie → Founder NICHT mehr möglich (Founder nicht mehr angeboten)', () => {
+    expect(canSwitchPlanInApp('newbie', 'founder_active', AVAIL)).toBe(false);
     expect(canSwitchPlanInApp('newbie', 'founder_active', SOLD_OUT)).toBe(false);
   });
 
@@ -58,15 +58,15 @@ describe('canSwitchPlanInApp — Wechselmatrix', () => {
 });
 
 describe('canSwitchPlanInApp — iOS (eine Subscription-Group)', () => {
-  it('Newbie → Active/Trainer/Founder(elig.) erlaubt', () => {
+  it('Newbie → Active/Trainer erlaubt; Founder nicht', () => {
     expect(canSwitchPlanInApp('newbie', 'active', IOS_AVAIL)).toBe(true);
     expect(canSwitchPlanInApp('newbie', 'trainer', IOS_AVAIL)).toBe(true);
-    expect(canSwitchPlanInApp('newbie', 'founder_active', IOS_AVAIL)).toBe(true);
+    expect(canSwitchPlanInApp('newbie', 'founder_active', IOS_AVAIL)).toBe(false);
   });
 
-  it('Active → Trainer und Active → Founder(elig.) erlaubt', () => {
+  it('Active → Trainer erlaubt; Active → Founder nicht', () => {
     expect(canSwitchPlanInApp('active', 'trainer', IOS_AVAIL)).toBe(true);
-    expect(canSwitchPlanInApp('active', 'founder_active', IOS_AVAIL)).toBe(true);
+    expect(canSwitchPlanInApp('active', 'founder_active', IOS_AVAIL)).toBe(false);
   });
 
   it('Founder → Active und Founder → Trainer erlaubt (Down-/Crossgrade via StoreKit)', () => {
@@ -78,8 +78,8 @@ describe('canSwitchPlanInApp — iOS (eine Subscription-Group)', () => {
     expect(canSwitchPlanInApp('trainer', 'active', IOS_AVAIL)).toBe(true);
   });
 
-  it('Trainer → Founder nur bei Eligibility', () => {
-    expect(canSwitchPlanInApp('trainer', 'founder_active', IOS_AVAIL)).toBe(true);
+  it('Trainer → Founder NICHT möglich (Founder nicht mehr angeboten, auch bei freien Slots)', () => {
+    expect(canSwitchPlanInApp('trainer', 'founder_active', IOS_AVAIL)).toBe(false);
     expect(canSwitchPlanInApp('trainer', 'founder_active', IOS_SOLD_OUT)).toBe(false);
   });
 
@@ -99,5 +99,15 @@ describe('canSwitchPlanInApp — Android bleibt konservativ (Regression)', () =>
   });
   it('Android: Active → Trainer bleibt erlaubt (Upgrade)', () => {
     expect(canSwitchPlanInApp('active', 'trainer', { founderAvailable: true, platform: 'android' })).toBe(true);
+  });
+});
+
+describe('canSwitchPlanInApp — Founder wird nicht mehr angeboten', () => {
+  const sources = [null, 'newbie', 'active', 'trainer', 'founder_active'] as const;
+  it('Founder ist von KEINEM Plan ein Kaufziel (iOS + Android, egal ob Slots frei)', () => {
+    for (const from of sources) {
+      expect(canSwitchPlanInApp(from, 'founder_active', { founderAvailable: true, platform: 'ios' })).toBe(false);
+      expect(canSwitchPlanInApp(from, 'founder_active', { founderAvailable: true, platform: 'android' })).toBe(false);
+    }
   });
 });

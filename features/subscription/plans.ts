@@ -125,19 +125,18 @@ export function isPremiumPlan(plan: SubscriptionPlan | null | undefined): boolea
 export function canSwitchPlanInApp(
   current: SubscriptionPlan | null | undefined,
   target: SubscriptionPlan,
-  opts: { founderAvailable: boolean; platform?: string },
+  opts: { founderAvailable?: boolean; platform?: string },
 ): boolean {
   const from: SubscriptionPlan = current ?? 'newbie';   // kein Abo == Gratis/Newbie
   if (target === from) return false;
-  if (target === 'newbie') return false;                // Downgrade auf Gratis/Kündigung → Store
-  // Founder ist ein limitiertes Sonderangebot → NUR bei Eligibility (Slot-Logik),
-  // auf beiden Plattformen. Kein neuer Founder-Mechanismus.
-  if (target === 'founder_active' && !opts.founderAvailable) return false;
+  // Gratis-Downgrade/Kündigung → Store. Founder Active wird NICHT mehr angeboten
+  // (kein Kauf-/Wechselziel), unabhängig von Plattform/Eligibility. Nur Active/Trainer
+  // sind öffentliche Kaufziele.
+  if (target === 'newbie' || target === 'founder_active') return false;
 
   if (opts.platform === 'ios') {
-    // iOS: alle drei bezahlten Produkte liegen in EINER Apple-Subscription-Group →
-    // StoreKit wickelt Upgrade/Downgrade/Crossgrade selbst ab. Jeder Wechsel auf
-    // einen ANDEREN bezahlten Plan ist erlaubt (Founder zusätzlich nur bei Eligibility).
+    // iOS: die bezahlten Produkte liegen in EINER Apple-Subscription-Group →
+    // StoreKit wickelt Upgrade/Downgrade/Crossgrade selbst ab (Active ↔ Trainer).
     return true;
   }
 
@@ -148,8 +147,6 @@ export function canSwitchPlanInApp(
       return from === 'newbie' || from === 'active' || from === 'founder_active';
     case 'active':
       return from === 'newbie';                          // nur Neueinstieg, kein Downgrade
-    case 'founder_active':
-      return from === 'newbie';                          // limitiert, nur aus Gratis (Eligibility oben)
     default:
       return false;
   }

@@ -32,9 +32,10 @@ const openLegalLink = (url: string) => { Linking.openURL(url).catch(() => { /* n
 
 interface CardDef { plan: SubscriptionPlan; badgeKey?: TranslationKey; features: TranslationKey[]; founder?: boolean }
 
+// Öffentliche Kaufpläne: Newbie (Trial), Active, Trainer. Founder Active wird NICHT
+// mehr angeboten (kein Kauf-/Wechselziel); interne Restore-/Bestandslogik bleibt.
 const CARDS: CardDef[] = [
   { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.feature7Days', 'premium.featureActive', 'premium.featureThenActive', 'premium.featureNoTrainer'] },
-  { plan: 'founder_active', badgeKey: 'premium.badgeFounderSlots', founder: true, features: ['premium.featureFounderPrice', 'premium.featureWhileActive', 'premium.featureActive', 'premium.featureNoTrainer'] },
   { plan: 'active', features: ['premium.featureTrainingProgress', 'premium.featureSmartAnalysis', 'premium.featureCalendarVoice', 'premium.featureNoTrainer'] },
   { plan: 'trainer', badgeKey: 'premium.badgePro', features: ['premium.featureAllActive', 'premium.featureClientPlans', 'premium.featurePollsFeedback', 'premium.featureTrainerDashboard'] },
 ];
@@ -90,17 +91,11 @@ export default function PremiumScreen() {
     ? `${String(trialEnd.getDate()).padStart(2, '0')}.${String(trialEnd.getMonth() + 1).padStart(2, '0')}.${trialEnd.getFullYear()}`
     : null;
 
-  // Empfohlener Plan zum Upgraden: Founder Active (bester Preis) solange Slots frei,
-  // sonst Active. Newbie-Trial-Karte nur zeigen, wenn noch nie abonniert wurde.
-  const recommendedPlan: SubscriptionPlan = founderAvailable ? 'founder_active' : 'active';
-  // Newbie-Trial-Karte nur ohne bestehendes Abo. Founder ist ein limitiertes
-  // Gründer-Angebot NUR für Neu-Mitglieder aus Gratis (oder wer bereits Founder ist)
-  // → bestehenden Active-/Trainer-Zahlern nicht als Wechselziel anbieten.
-  const visibleCards = CARDS.filter(c => {
-    if (c.plan === 'newbie') return !currentPlan;
-    if (c.plan === 'founder_active') return currentPlan === 'founder_active' || !currentPlan || canSwitchPlanInApp(currentPlan, 'founder_active', { founderAvailable, platform: Platform.OS });
-    return true;
-  });
+  // Empfohlener Plan: Active (Standard-Abo). Founder wird nicht mehr angeboten.
+  const recommendedPlan: SubscriptionPlan = 'active';
+  // Newbie-Trial-Karte nur ohne bestehendes Abo. Founder ist nicht in CARDS und
+  // wird daher nirgends als Kaufkarte gerendert.
+  const visibleCards = CARDS.filter(c => c.plan === 'newbie' ? !currentPlan : true);
   // Preis-Anker für die Founder-Ersparnis: echter Active-Preis aus dem Store
   // (gleiche Währung wie die angezeigten Preise), sonst Fallback auf die CHF-Angabe.
   const activePriceStr = packages.find(p => p.productId === PLAN_META.active.productId)?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
@@ -152,7 +147,9 @@ export default function PremiumScreen() {
         Alert.alert(t('trainer.connectHintTitle'), plan === 'trainer' ? t('premium.trainerPackageUnavailable') : t('premium.packageUnavailable'));
         return;
       }
-      // Founder: zuerst Slot atomar beanspruchen.
+      // TOTER PFAD (Cleanup später): Founder Active wird nicht mehr angeboten und ist
+      // weder Karte noch erlaubtes Wechselziel → dieser Zweig ist unerreichbar. Bewusst
+      // (noch) nicht entfernt, um die Slot-/Claim-Logik nicht riskant anzufassen.
       if (plan === 'founder_active') {
         const claim = await claimFounderSlot();
         setSlots(s => ({ used: claim.remaining != null ? FOUNDER_SLOT_LIMIT - claim.remaining : s.used, remaining: claim.remaining }));

@@ -31,9 +31,9 @@ describe('Membership-Seite — Reuse & Guardrails', () => {
     expect(membership).not.toMatch(/isPro \|\| hasLifetimeAccess/);
     expect(membership).not.toMatch(/isPro \? 'permanent'/);
   });
-  it('Founder im Vergleich nur bei freien Slots ODER wenn Nutzer Founder ist', () => {
-    expect(membership).toMatch(/slots\.remaining > 0 \|\| visiblePlan === 'founder_active'/);
-    expect(membership).toMatch(/show: founderAvailable/);
+  it('Founder wird nicht mehr angeboten — Vergleichskarte nur für (Founder-)Bestand sichtbar, nie als Kaufziel', () => {
+    expect(membership).toMatch(/show: visiblePlan === 'founder_active'/);
+    expect(membership).not.toMatch(/show: founderAvailable/);
   });
   it('verwendet anyvologo + ANYVO-Tokens (C.*), keine Fremdfarben', () => {
     expect(membership).toMatch(/anyvologo\.png/);
