@@ -21,6 +21,16 @@ describe('searchHandlerDistanceM — State & Recovery', () => {
     expect(useTrackingStore.getState().searchHandlerDistanceM).toBe(10);
   });
 
+  it('setSearchHandlerDistanceM akzeptiert 1 m (vollwertig)', () => {
+    useTrackingStore.getState().setSearchHandlerDistanceM(1);
+    expect(useTrackingStore.getState().searchHandlerDistanceM).toBe(1);
+  });
+
+  it('Recovery (restorePending) mit 1 m → 1 m wiederhergestellt', () => {
+    useTrackingStore.getState().restorePending(basePending({ searchHandlerDistanceM: 1, status: 'resting' }));
+    expect(useTrackingStore.getState().searchHandlerDistanceM).toBe(1);
+  });
+
   it('15) Recovery (restorePending) mit 10 m → 10 m wiederhergestellt', () => {
     useTrackingStore.getState().restorePending(basePending({ searchHandlerDistanceM: 10, status: 'resting' }));
     expect(useTrackingStore.getState().searchHandlerDistanceM).toBe(10);

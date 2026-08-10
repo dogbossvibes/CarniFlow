@@ -1,6 +1,6 @@
 import {
   estimateDogProgressM, forwardDistanceFromDog, pointAtDistance,
-  isHandlerDistance, DEFAULT_HANDLER_DISTANCE_M, type LL,
+  isHandlerDistance, DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, type LL,
 } from '@/features/tracking/utils/searchGeometry';
 
 // L-förmige Fährte mit 90°-Winkel; cum wird direkt vorgegeben (exakte Bogenlängen).
@@ -17,6 +17,10 @@ describe('searchGeometry — dogEstimatedProgressM', () => {
   });
   it('2) Handler 100 m, Abstand 10 m → 110 m', () => {
     expect(estimateDogProgressM(100, 10, 1000)).toBe(110);
+  });
+  it('7+8) Abstand 1 m: Handler 100 → 101; Clamping am Ende', () => {
+    expect(estimateDogProgressM(100, 1, 1000)).toBe(101);
+    expect(estimateDogProgressM(199.5, 1, 200)).toBe(200);
   });
   it('3+14) Handler 98 m bei Trackende 100 m, Abstand 5 → clamp 100 m (Endklemmung, kein Über-Ende)', () => {
     expect(estimateDogProgressM(98, 5, 100)).toBe(100);
@@ -60,11 +64,12 @@ describe('searchGeometry — forwardDistanceFromDog (gemeinsam Voice + Haptik)',
 });
 
 describe('searchGeometry — Typ & Fallback', () => {
-  it('16) Default-Abstand = 5 m; isHandlerDistance akzeptiert nur 5/10', () => {
+  it('16) Default-Abstand = 5 m; isHandlerDistance akzeptiert 1/5/10', () => {
     expect(DEFAULT_HANDLER_DISTANCE_M).toBe(5);
+    expect([...HANDLER_DISTANCES_M]).toEqual([1, 5, 10]);
+    expect(isHandlerDistance(1)).toBe(true);
     expect(isHandlerDistance(5)).toBe(true);
     expect(isHandlerDistance(10)).toBe(true);
-    expect(isHandlerDistance(7)).toBe(false);
-    expect(isHandlerDistance(undefined)).toBe(false);
+    for (const v of [0, 2, 3, 7, 11, -1, null, undefined]) expect(isHandlerDistance(v as unknown)).toBe(false);
   });
 });

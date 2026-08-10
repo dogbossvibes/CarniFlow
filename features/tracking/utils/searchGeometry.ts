@@ -2,7 +2,7 @@
 // Absuche-Geometrie für den 5/10-m-Hundeführerabstand — REINE, testbare Logik.
 //
 // Das Smartphone ist beim Hundeführer. Der Hund läuft `searchHandlerDistanceM`
-// (5 oder 10 m) VORAUS. Daraus wird ENTLANG der gelegten Fährtenlinie (Bogenlänge)
+// (1, 5 oder 10 m) VORAUS. Daraus wird ENTLANG der gelegten Fährtenlinie (Bogenlänge)
 // eine virtuelle Hundeposition abgeleitet — NICHT durch Verschieben der GPS-
 // Koordinate. Es ist eine gewählte Annahme, keine gemessene Hundeposition.
 //
@@ -10,13 +10,19 @@
 // lineare Interpolation. Reine Funktionen, kein React/Expo.
 // ──────────────────────────────────────────────────────────────────────────
 
-export type SearchHandlerDistanceM = 5 | 10;
+export type SearchHandlerDistanceM = 1 | 5 | 10;
+
+// EINZIGE Source of Truth der erlaubten Hundeführerabstände (1/5/10 m). UI,
+// Sanitizer, Persistenz-Recovery und Tests leiten sich hieraus ab — keine
+// verstreuten Magic Numbers. 1 m ist vollwertig, kein Spezialfall.
+export const HANDLER_DISTANCES_M: readonly SearchHandlerDistanceM[] = [1, 5, 10];
 
 // Fallback, wenn keine Auswahl / keine gespeicherte Session vorliegt (Phase 3/4).
+// Default bewusst UNVERÄNDERT bei 5 m (bestehende gespeicherte 5/10-m-Werte gültig).
 export const DEFAULT_HANDLER_DISTANCE_M: SearchHandlerDistanceM = 5;
 
 export function isHandlerDistance(v: unknown): v is SearchHandlerDistanceM {
-  return v === 5 || v === 10;
+  return v === 1 || v === 5 || v === 10;
 }
 
 // Koordinatenform der gelegten Fährte (deckt sich mit useSearchRecorder.LatLng).

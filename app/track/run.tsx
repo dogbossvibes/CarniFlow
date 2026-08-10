@@ -14,7 +14,7 @@ import { fmtClock } from '@/features/tracking/components/LiveChrome';
 import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
 import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
-import { DEFAULT_HANDLER_DISTANCE_M, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
+import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { hapticSuccess, hapticTap } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
@@ -141,8 +141,8 @@ export default function TrackRunScreen() {
       if (!alive) return;
       // Persistierten Startanker als Fallback merken (RC-4): überlebt App-Neustart.
       if (pending?.startAnchor) setAnchorFallback({ lat: pending.startAnchor.lat, lng: pending.startAnchor.lng });
-      // Recovery: gewählten 5/10-m-Abstand wiederherstellen (nicht erneut fragen).
-      if (pending?.searchHandlerDistanceM === 5 || pending?.searchHandlerDistanceM === 10) {
+      // Recovery: gewählten 1/5/10-m-Abstand wiederherstellen (nicht erneut fragen).
+      if (isHandlerDistance(pending?.searchHandlerDistanceM)) {
         setSearchHandlerDistanceM(pending.searchHandlerDistanceM);
       }
       const decision = decideRecovery(pending);
@@ -592,10 +592,10 @@ export default function TrackRunScreen() {
                   )}
                 </View>
                 {/* Abstand Hundeführer ↔ Hund: bestimmt die virtuelle Hundeposition
-                    (5/10 m entlang der Fährte) für hundebezogene Ansagen. Default 5 m. */}
+                    (1/5/10 m entlang der Fährte) für hundebezogene Ansagen. Default 5 m. */}
                 <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase mt-4">{t('track.searchHandlerDistanceLabel')}</Text>
                 <View className="flex-row gap-2 mt-1.5">
-                  {([5, 10] as const).map(d => {
+                  {HANDLER_DISTANCES_M.map(d => {
                     const on = searchHandlerDistanceM === d;
                     return (
                       <Pressable
