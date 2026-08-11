@@ -12,10 +12,12 @@ import { TrackingMap, type MapMarker } from '@/features/tracking/components/Trac
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
 import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
-import { useTrackVoiceGuidance, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
+import { useTrackVoiceGuidance, say, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
+import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/utils/offTrackFeedback';
+import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
-import { hapticSuccess, hapticTap } from '@/features/tracking/utils/haptics';
+import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
@@ -373,6 +375,40 @@ export default function TrackRunScreen() {
     });
   }, [arming, s.dogProgressM, s.recording, snapData.segments, voiceOn, stepLengthM]);
 
+  // Off-Track-Feedback (Phase 2): Voice + Haptik NUR auf echten State-Übergängen.
+  // Die State-Machine ist bereits debounced → offTrackState ändert sich nur bei einer
+  // bestätigten Transition (kein eigener Debounce nötig). KEIN Progress-/Recorder-
+  // Freeze, keine Auto-Pause — ausschliesslich Feedback.
+  const prevOffTrackRef = useRef<OffTrackState>('on_track');
+  // Transientes Recovery-Banner „Wieder auf der Fährte" — kurz einblenden, nicht
+  // dauerhaft stehen lassen (Warn-/Off-Track-Banner leiten sich dagegen aus dem State ab).
+  const [recoveryVisible, setRecoveryVisible] = useState(false);
+  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const fb = offTrackTransitionFeedback(prevOffTrackRef.current, s.offTrackState);
+    prevOffTrackRef.current = s.offTrackState;
+    if (!fb || !s.recording) return;
+    if (fb.haptic === 'light') hapticTap();
+    else if (fb.haptic === 'strong') hapticMarker();
+    else hapticSuccess();
+    if (voiceOn) say(t(fb.voiceKey));
+    // Recovery-Transition (→ on_track): kurzes positives Banner. Neue Warnung/Off-Track
+    // blendet ein evtl. laufendes Recovery-Banner sofort wieder aus.
+    if (recoveryTimerRef.current) { clearTimeout(recoveryTimerRef.current); recoveryTimerRef.current = null; }
+    if (s.offTrackState === 'on_track') {
+      setRecoveryVisible(true);
+      recoveryTimerRef.current = setTimeout(() => { setRecoveryVisible(false); recoveryTimerRef.current = null; }, 2600);
+    } else {
+      setRecoveryVisible(false);
+    }
+  }, [s.offTrackState, s.recording, voiceOn, t]);
+  // Timer beim Verlassen aufräumen (kein setState nach Unmount).
+  useEffect(() => () => { if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current); }, []);
+
+  // Permanentes Off-Track-Banner leitet sich vom aktuellen State ab (nur während der
+  // aktiven Absuche; im Arming-Overlay unsichtbar).
+  const offBanner = !arming && s.recording ? offTrackBanner(s.offTrackState) : null;
+
   const currentRunSegment = useMemo(() => {
     const step = metersToSteps(s.dogProgressM, stepLengthM);
     return snapData.segments.find(seg => seg.status === 'completed' && step >= seg.startStep && step < seg.endStep) ?? null;
@@ -510,6 +546,29 @@ export default function TrackRunScreen() {
             <Text className="text-[30px] text-ft-text font-black" style={{ fontVariant: ['tabular-nums'] }}>{fmtClock(s.elapsedS)}</Text>
             <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{t('track.searchDuration')}</Text>
           </View>
+
+          {/* Off-Track-Banner (Phase 2): warning dezent (Amber), off_track deutlicher (Rot),
+              Recovery kurz positiv (Mint). Reines Feedback — kein Freeze, keine Auto-Pause. */}
+          {(offBanner || recoveryVisible) && (
+            <View className="absolute top-[84px] left-[14px] right-[14px]" pointerEvents="none">
+              {offBanner === 'off_track' ? (
+                <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3.5 border" style={{ backgroundColor: 'rgba(255,93,108,0.16)', borderColor: 'rgba(255,93,108,0.55)' }}>
+                  <Ionicons name="alert-circle" size={18} color={FT.bad} />
+                  <Text className="flex-1 text-[13.5px] font-black text-[#ff8a94]">{t('track.offTrack')}</Text>
+                </View>
+              ) : offBanner === 'warning' ? (
+                <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3 bg-ft-glass border border-[rgba(255,181,71,0.45)]">
+                  <Ionicons name="warning-outline" size={16} color={FT.warn} />
+                  <Text className="flex-1 text-[13px] font-bold text-ft-warn">{t('track.offTrackWarning')}</Text>
+                </View>
+              ) : recoveryVisible ? (
+                <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3 bg-ft-glass border border-[rgba(21,230,195,0.45)]">
+                  <Ionicons name="checkmark-circle" size={16} color={FT.acc} />
+                  <Text className="flex-1 text-[13px] font-bold text-ft-acc">{t('track.backOnTrack')}</Text>
+                </View>
+              ) : null}
+            </View>
+          )}
 
           {!arming && currentRunSegment && (
             <View className="absolute left-[14px] right-[14px] bottom-[88px] rounded-[16px] px-4 py-3 bg-ft-glass border border-ft-glass-line">

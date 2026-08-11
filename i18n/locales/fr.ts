@@ -145,6 +145,9 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
 
   // Absuche (run)
   "track.searchDuration": "Durée de recherche",
+  "track.offTrackWarning": "Tu t'éloignes de la piste",
+  "track.offTrack": "Tu es à côté de la piste",
+  "track.backOnTrack": "De retour sur la piste",
   "track.evaluate":       "Arrêter et évaluer",
   "track.abortTitle":     "Annuler le travail ?",
   "track.abortBody":      "Le travail ne sera pas enregistré. La piste posée est conservée.",
