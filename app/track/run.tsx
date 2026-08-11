@@ -46,6 +46,9 @@ import {
 // GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Absuche nicht).
 const SHOW_GPS_DEBUG = __DEV__;
 import { startTrackRun, finishTrackRun, getTrackSessionDogName } from '@/features/tracking/services/trackService';
+import { finalizeLocalTrackRun } from '@/features/training/repositories/localTrainingRepository';
+import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
+import * as Crypto from 'expo-crypto';
 
 // Blinkender LIVE-Punkt.
 function RecDot() {
@@ -123,6 +126,7 @@ export default function TrackRunScreen() {
   const startModeRef = useRef<StartMode>('manual-at-start');   // wie der Start bestätigt wurde (Runtime-Info)
   const startedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
+  const searchStartMsRef = useRef<number | null>(null);   // Suchzeit-Start (für lokale Run-Finalisierung)
   const segmentAnnouncementRef = useRef<Record<string, SearchSegmentAnnouncementState>>({});
 
   // Ursprünglicher Startpunkt (Fährtenansatz):
@@ -174,16 +178,20 @@ export default function TrackRunScreen() {
     hapticSuccess();   // haptisches Feedback beim Erreichen des Ansatzes
     if (voiceOn && Speech) { try { Speech.speak('Suche läuft', { language: 'de-DE' }); } catch { /* best-effort */ } }
     const startMs = Date.now();
+    searchStartMsRef.current = startMs;
+    // Stabile client-Run-UUID SOFORT (führende Run-ID, kein Warten auf Supabase).
+    // Wird via setSearchRunId in den PendingTrack persistiert → überlebt App-Kill/Recovery.
+    const runUuid = Crypto.randomUUID();
+    runIdRef.current = runUuid;
+    useTrackingStore.getState().setSearchRunId(runUuid);
     // Gewählten Abstand in den Store spiegeln → landet im PendingTrack-Snapshot (Recovery).
     useTrackingStore.getState().setSearchHandlerDistanceM(searchHandlerDistanceM);
     s.start();
     useTrackingStore.getState().startSearchSession(null, startMs);   // Status 'searching' + Suchzeit-Start
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
-    if (effectiveId) {
-      startTrackRun(effectiveId).then(({ data }) => {
-        if (data) { runIdRef.current = data.id; useTrackingStore.getState().setSearchRunId(data.id); }
-      }).catch(() => {});
-    }
+    // Remote-Start best-effort mit DERSELBEN runUuid als track_runs.id (nicht mehr
+    // ID-führend). Fehler/Offline egal — die lokale Finalisierung ist die Erfolgsschwelle.
+    if (effectiveId) startTrackRun(effectiveId, runUuid).catch(() => {});
   }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM]);
 
   // Manueller „Jetzt starten": innerhalb des dynamischen Radius → direkt nach Tippen; sonst
@@ -271,7 +279,12 @@ export default function TrackRunScreen() {
     const saved = await loadSavedSearchPoints(pending);
     useTrackingStore.getState().setSearchPoints(saved);
     useTrackingStore.getState().setSessionStatus('searching');
-    runIdRef.current = pending.runId ?? null;
+    // DIESELBE runUuid weiterverwenden (keine neue Run-ID, keine Duplikate). Fehlt sie
+    // in einem Legacy-Puffer, deterministisch einmal erzeugen + persistieren.
+    const rid = pending.runId ?? Crypto.randomUUID();
+    runIdRef.current = rid;
+    useTrackingStore.getState().setSearchRunId(rid);
+    searchStartMsRef.current = pending.searchStartedAt ?? Date.now();
     startedRef.current = true;   // verhindert den frischen Start-Effect
     setRecovery(null);
     hapticSuccess();
@@ -283,10 +296,24 @@ export default function TrackRunScreen() {
     const saved = await loadSavedSearchPoints(pending);
     await flushSearchPoints().catch(() => {});
     const sessId = pending.sessionId ?? effectiveId;
-    const runId = pending.runId ?? runIdRef.current;
+    const runId = pending.runId ?? runIdRef.current ?? Crypto.randomUUID();
+    const durationS = pending.searchStartedAt ? Math.max(0, Math.floor((Date.now() - pending.searchStartedAt) / 1000)) : 0;
+    // LOKAL zuerst (durabel): Run-Ergebnis der beendeten Absuche in payload_json.run.
+    if (sessId) {
+      await finalizeLocalTrackRun(sessId, buildRunResultPayload({
+        runId, sessionId: sessId,
+        startedAtMs: pending.searchStartedAt ?? Date.now(), endedAtMs: Date.now(),
+        result: {
+          durationS, score: 0, deviationAvgM: 0, foundObjects: 0, totalObjects: 0,
+          distanceM: pathDistanceM(saved), breaks: [],
+          points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })),
+        },
+        searchHandlerDistanceM: pending.searchHandlerDistanceM,
+      })).catch(() => {});
+    }
     if (sessId && runId) {
       await finishTrackRun(runId, sessId, {
-        durationSeconds: pending.searchStartedAt ? Math.max(0, Math.floor((Date.now() - pending.searchStartedAt) / 1000)) : 0,
+        durationSeconds: durationS,
         distanceMeters: Math.round(pathDistanceM(saved)),
         averageDeviationMeters: 0,
         articlesFound: 0,
@@ -433,11 +460,42 @@ export default function TrackRunScreen() {
         hapticSuccess();   // sofort beim Bestätigen, vor await
         setFinishing(true);
         const res = s.stop();   // ← Search-Recorder beenden (flusht letzten Puffer)
-        useTrackingStore.getState().setSessionStatus('completed');   // vor Navigation → kein Recovery mehr
-        const runId = runIdRef.current;
+        // runUuid ist seit dem Start deterministisch vorhanden (kein Null-Race mehr);
+        // defensiver Fallback, falls doch nicht gesetzt.
+        const runId = runIdRef.current ?? Crypto.randomUUID();
         const sessId = effectiveId;
-        if (sessId && runId) {
-          await finishTrackRun(runId, sessId, {
+
+        // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.
+        //    Schlägt das fehl → KEIN Reset/Navigation (Recovery bleibt möglich, kein Verlust).
+        if (sessId) {
+          try {
+            await finalizeLocalTrackRun(sessId, buildRunResultPayload({
+              runId, sessionId: sessId,
+              startedAtMs: searchStartMsRef.current ?? (Date.now() - res.durationS * 1000), endedAtMs: Date.now(),
+              result: {
+                durationS: res.durationS, score: res.score, deviationAvgM: res.deviationAvgM,
+                foundObjects: res.foundObjects, totalObjects: res.totalObjects, distanceM: res.distanceM,
+                breaks: res.breaks, points: res.points,
+              },
+              searchHandlerDistanceM,
+            }));
+          } catch (e) {
+            console.warn('[trackRun] local finalize', e);
+            setFinishing(false);
+            Alert.alert('Speichern fehlgeschlagen', 'Die Absuche konnte nicht lokal gespeichert werden. Bitte erneut versuchen.');
+            return;   // kein Reset, keine Navigation → Ergebnis bleibt erhalten
+          }
+        }
+
+        // Lokal sicher → Session abschliessen (Recovery bietet sie nicht mehr als laufend an).
+        useTrackingStore.getState().setSessionStatus('completed');
+        useTrackingStore.getState().reset();
+        clearRegistry();
+
+        // 2) Remote best-effort (unverändert; RUN-SAVE2 verschiebt das in die Sync-Queue).
+        //    Blockiert die Navigation NICHT — die Fährte ist lokal bereits durabel.
+        if (sessId) {
+          void finishTrackRun(runId, sessId, {
             durationSeconds:        res.durationS,
             distanceMeters:         res.distanceM,
             averageDeviationMeters: res.deviationAvgM,
@@ -446,8 +504,6 @@ export default function TrackRunScreen() {
             runPoints:              res.points.map(p => ({ lat: p.latitude, lng: p.longitude, t: Date.now() })),
           }).catch(() => {});
         }
-        useTrackingStore.getState().reset();   // Pending leeren → Session gilt als abgeschlossen
-        clearRegistry();
         setFinishing(false);
         router.replace((sessId ? `/track/${sessId}` : '/track') as never);
       } },

@@ -216,11 +216,13 @@ export async function saveTrackEngineData(
 }
 
 // ── Ablauf (Run) ─────────────────────────────────────────────
-export async function startTrackRun(sessionId: string): Promise<Result<{ id: string }>> {
+// `id` optional: clientseitige Run-UUID = track_runs.id (deterministisch, bereitet
+// idempotenten Sync in RUN-SAVE2 vor). Ohne → Server gen_random_uuid().
+export async function startTrackRun(sessionId: string, id?: string): Promise<Result<{ id: string }>> {
   try {
     const { data, error } = await supabase
       .from('track_runs')
-      .insert({ session_id: sessionId, started_at: new Date().toISOString() })
+      .insert({ ...(id ? { id } : {}), session_id: sessionId, started_at: new Date().toISOString() })
       .select('id')
       .single();
     if (error) return fail('startTrackRun', error);

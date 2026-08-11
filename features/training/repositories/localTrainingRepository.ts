@@ -105,6 +105,23 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
   );
 }
 
+// Absuche-/Run-Ergebnis lokal dauerhaft in payload_json.run ablegen (durabler Erfolg,
+// unabhängig vom Remote-Save). Read-merge-write: die bestehende Lay-Summary
+// (payload_json vom Legen-Finalize) bleibt erhalten. Kein Schema-Change.
+export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<string, unknown>): Promise<void> {
+  const db = await getLocalDb();
+  const row = await db.getFirstAsync<{ payload_json: string | null }>(
+    `select payload_json from local_training_sessions where local_id=?`, sessionLocalId,
+  );
+  let payload: Record<string, unknown> = {};
+  if (row?.payload_json) { try { payload = JSON.parse(row.payload_json) ?? {}; } catch { payload = {}; } }
+  payload.run = run;
+  await db.runAsync(
+    `update local_training_sessions set payload_json=?, updated_at=? where local_id=?`,
+    JSON.stringify(payload), nowIso(), sessionLocalId,
+  );
+}
+
 export async function markTrainingAsDeleted(localId: string): Promise<void> {
   const db = await getLocalDb();
   await db.runAsync(`update local_training_sessions set deleted_at=?, sync_status='deleted_pending', updated_at=? where local_id=?`, nowIso(), nowIso(), localId);
