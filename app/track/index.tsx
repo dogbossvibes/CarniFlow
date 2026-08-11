@@ -9,7 +9,10 @@ import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { getTrackSessionById, getUserTrackSessions, deleteTrackSession } from '@/features/tracking/services/trackService';
+import { getTrackSessionById, deleteTrackSession } from '@/features/tracking/services/trackService';
+import { getTrackHistory } from '@/features/tracking/services/trackHistoryService';
+import { markTrainingAsDeleted } from '@/features/training/repositories/localTrainingRepository';
+import { retryFailedSync } from '@/features/sync/services/syncEngine';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import {
@@ -22,7 +25,8 @@ import type { LatLng } from '@/features/tracking/utils/gpsFilter';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-function toRow(r: any): TrackRowData {
+function toRow(r: any, syncLabel: (state: 'pending' | 'failed') => string): TrackRowData {
+  const syncState: 'synced' | 'pending' | 'failed' = r.syncState ?? 'synced';
   return {
     id:        r.id,
     surface:   r.surface_types?.[0] ?? 'Fährte',
@@ -32,6 +36,8 @@ function toRow(r: any): TrackRowData {
     objects:   r.articles_total ?? 0,
     age:       fmtAge(r.lying_time_minutes),
     score:     trackScore(r),
+    syncState,
+    syncLabel: syncState !== 'synced' ? syncLabel(syncState) : undefined,
   };
 }
 
@@ -55,13 +61,15 @@ export default function TrackOverviewScreen() {
     const uid = session?.user.id;
     if (!uid) { setLoading(false); return; }
     setLoading(true);
-    const { data } = await getUserTrackSessions(uid);
-    const all = (data ?? []).filter(r => r.status === 'completed');
-    const mine = effectiveDogId ? all.filter(r => r.dog_id === effectiveDogId) : all;
+    // Remote + lokale (SQLite) Fährten zusammenführen → lokale pending/failed sind
+    // sofort sichtbar; ein Remote-Fehler verdeckt sie nicht (getTrackHistory-Fallback).
+    const merged = (await getTrackHistory(uid)).filter(r => r.status === 'completed');
+    const mine = effectiveDogId ? merged.filter(r => r.dog_id === effectiveDogId) : merged;
     setRows(mine);
-    // Hero-Detail (echte GPS-Spur) der letzten Fährte nachladen.
+    // Hero-Detail (echte GPS-Spur) nur für eine bereits synchronisierte Fährte laden
+    // (lokal-only hat noch keine Remote-Zeile → Skizzen-Fallback der Karte).
     const last = mine[0];
-    if (last) { const { data: detail } = await getTrackSessionById(last.id); setHero(detail); }
+    if (last && !last.isLocalOnly) { const { data: detail } = await getTrackSessionById(last.id); setHero(detail); }
     else setHero(null);
     setLoading(false);
   }, [session?.user.id, effectiveDogId]);
@@ -69,7 +77,11 @@ export default function TrackOverviewScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   // Fährte per Long-Press löschen: erst bestätigen, dann optimistisch entfernen.
+  // Auch die LOKALE Kopie ausblenden (markTrainingAsDeleted), sonst würde die Fährte
+  // beim nächsten Merge aus SQLite wieder auftauchen. Lokal-only → kein Remote-Delete
+  // nötig (funktioniert offline).
   const confirmDelete = useCallback((id: string) => {
+    const localOnly = !!rows.find(r => r.id === id)?.isLocalOnly;
     Alert.alert('Fährte löschen?', 'Möchtest du diese Fährte wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', [
       { text: 'Abbrechen', style: 'cancel' },
       {
@@ -78,8 +90,11 @@ export default function TrackOverviewScreen() {
           const prev = rows;
           const wasHero = hero?.id === id;
           setRows(rs => rs.filter(r => r.id !== id));
-          const { error } = await deleteTrackSession(id);
-          if (error) { setRows(prev); showToast('Fährte konnte nicht gelöscht werden.'); return; }
+          if (!localOnly) {
+            const { error } = await deleteTrackSession(id);
+            if (error) { setRows(prev); showToast('Fährte konnte nicht gelöscht werden.'); return; }
+          }
+          await markTrainingAsDeleted(id).catch(() => {});   // lokale Kopie ausblenden
           showToast('Fährte gelöscht');
           if (wasHero) load();
         },
@@ -87,7 +102,22 @@ export default function TrackOverviewScreen() {
     ]);
   }, [rows, hero, showToast, load]);
 
-  const history = useMemo(() => rows.map(toRow), [rows]);
+  const syncLabel = useCallback(
+    (state: 'pending' | 'failed') => t(state === 'failed' ? 'track.syncFailed' : 'track.syncPending'),
+    [t],
+  );
+  const history = useMemo(() => rows.map(r => toRow(r, syncLabel)), [rows, syncLabel]);
+
+  // Lokal-only-Fährte (noch nicht synchronisiert): kein Remote-Detail öffnen — stattdessen
+  // Sync erneut anstossen (bestehende Queue) und Hinweis zeigen. Sonst normale Auswertung.
+  const openTrack = useCallback((h: TrackRowData) => {
+    if (h.syncState && h.syncState !== 'synced') {
+      void retryFailedSync().then(() => load());
+      showToast(t(h.syncState === 'failed' ? 'track.syncRetry' : 'track.syncPending'));
+      return;
+    }
+    router.push(`/track/${h.id}` as never);
+  }, [router, showToast, t, load]);
   const stats = useMemo(() => ({
     total:  rows.length,
     avg:    averageScore(rows),
@@ -200,7 +230,7 @@ export default function TrackOverviewScreen() {
         ) : (
           <View style={{ gap: 10 }}>
             {history.slice(0, 2).map(h => (
-              <TrackRow key={h.id} h={h} onPress={() => router.push(`/track/${h.id}` as never)} onLongPress={() => confirmDelete(h.id)} />
+              <TrackRow key={h.id} h={h} onPress={() => openTrack(h)} onLongPress={() => confirmDelete(h.id)} />
             ))}
           </View>
         )}

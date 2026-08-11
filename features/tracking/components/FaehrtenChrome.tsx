@@ -139,6 +139,8 @@ export interface TrackRowData {
   objects:   number;
   age:       string;
   score:     number | null;
+  syncState?: 'synced' | 'pending' | 'failed';   // lokal noch nicht/ nicht synchronisiert
+  syncLabel?: string;                              // i18n-Text für den Badge
 }
 
 export function StatTriple({ total, avg, streak }: { total: number; avg: number | null; streak: number }) {
@@ -176,6 +178,20 @@ export function TrackRow({ h, onPress, onLongPress }: { h: TrackRowData; onPress
         <Text style={s.rowMeta} numberOfLines={1}>
           {h.distanceM != null ? `${Math.round(h.distanceM)} m` : '—'} · {h.angles} Winkel · {h.age}
         </Text>
+        {/* Sync-Badge: lokal gespeicherte Fährte, die (noch) nicht synchronisiert ist.
+            Kein Fehlerzustand der Fährte selbst — nur der Remote-Synchronisation. */}
+        {h.syncState && h.syncState !== 'synced' && (
+          <View style={s.syncBadge}>
+            <Ionicons
+              name={h.syncState === 'failed' ? 'warning-outline' : 'cloud-upload-outline'}
+              size={11}
+              color={h.syncState === 'failed' ? C.trackWarning : C.trackTextMut}
+            />
+            <Text style={[s.syncBadgeTxt, h.syncState === 'failed' && { color: C.trackWarning }]} numberOfLines={1}>
+              {h.syncLabel ?? (h.syncState === 'failed' ? 'Sync fehlgeschlagen' : 'Wird synchronisiert')}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={[s.rowScore, { color: h.score != null && h.score >= 90 ? C.trackPrimary : C.trackText }]}>
@@ -220,6 +236,8 @@ const s = StyleSheet.create({
   rowSurface:   { fontSize: 14, color: C.trackText, fontWeight: '800' },
   rowDate:      { fontSize: 11, color: C.trackTextMut },
   rowMeta:      { fontSize: 11, color: C.trackTextSec, marginTop: 2 },
+  syncBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  syncBadgeTxt: { fontSize: 10.5, fontWeight: '700', color: C.trackTextMut },
   rowScore:     { fontSize: 21, fontWeight: '900', letterSpacing: -0.5 },
   rowScoreLabel:{ fontSize: 7.5, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1 },
 });
