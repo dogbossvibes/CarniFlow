@@ -5,6 +5,7 @@ import type { LocalTrainingSession, SyncStatus } from '@/features/sync/types/syn
 // Lokales Repository für Trainingseinheiten/Fährten-Sessions (SQLite = primäre Quelle).
 
 export interface NewLocalTrainingSession {
+  local_id?: string;   // führende UUID (clientseitig beim Start erzeugt); ohne → newLocalId()
   user_id: string;
   dog_id?: string | null;
   category?: string | null;
@@ -32,7 +33,7 @@ export async function createLocalTrainingSession(input: NewLocalTrainingSession)
   const db = await getLocalDb();
   const ts = nowIso();
   const row: LocalTrainingSession = {
-    local_id: newLocalId(), remote_id: null,
+    local_id: input.local_id ?? newLocalId(), remote_id: null,
     user_id: input.user_id, dog_id: input.dog_id ?? null, category: input.category ?? 'IGP',
     type: input.type ?? 'track', status: input.status ?? 'active', title: input.title ?? 'Fährte',
     notes: input.notes ?? null, score: input.score ?? null, visibility: input.visibility ?? null,
@@ -47,7 +48,9 @@ export async function createLocalTrainingSession(input: NewLocalTrainingSession)
     dirty_fields: null, payload_json: null,
   };
   await db.runAsync(
-    `insert into local_training_sessions (
+    // `or ignore`: bei identischer local_id (z. B. Doppeltipp-Start mit derselben
+    // clientUuid) idempotent — kein Duplikat, kein Überschreiben.
+    `insert or ignore into local_training_sessions (
       local_id, remote_id, user_id, dog_id, category, type, status, title, notes, score, visibility,
       started_at, ended_at, duration_seconds, location_name, latitude, longitude, temperature,
       weather_condition, wind_speed, humidity, surface_types, terrain_conditions, created_at, updated_at,
@@ -72,6 +75,33 @@ export async function updateLocalTrainingSession(localId: string, patch: Partial
   await db.runAsync(
     `update local_training_sessions set ${sets}, updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
     ...keys.map(k => map[k]), nowIso(), localId,
+  );
+}
+
+// Gelegte Fährte lokal abschliessen (durabler Erfolg, unabhängig vom Remote-Save).
+// Summary/Segmente wandern in payload_json (kein Schema-Change); sync_status bleibt
+// unverändert (= 'pending'), damit P-SAVE2 die Session zum Upload aufgreift.
+export async function finalizeLocalTrainingSession(localId: string, input: {
+  endedAt: string;
+  durationSeconds: number | null;
+  distanceMeters?: number | null;
+  articlesTotal?: number | null;
+  cornersTotal?: number | null;
+  gpsQualityAverage?: number | null;
+  segments?: unknown;
+  status?: string;
+}): Promise<void> {
+  const db = await getLocalDb();
+  const payload = JSON.stringify({
+    distanceMeters:    input.distanceMeters ?? null,
+    articlesTotal:     input.articlesTotal ?? null,
+    cornersTotal:      input.cornersTotal ?? null,
+    gpsQualityAverage: input.gpsQualityAverage ?? null,
+    segments:          input.segments ?? null,
+  });
+  await db.runAsync(
+    `update local_training_sessions set status=?, ended_at=?, duration_seconds=?, payload_json=?, updated_at=? where local_id=?`,
+    input.status ?? 'completed', input.endedAt, input.durationSeconds ?? null, payload, nowIso(), localId,
   );
 }
 

@@ -12,8 +12,9 @@ import {
 } from '@/features/tracking/utils/gpsFilter';
 import { detectAutoCorner } from '@/features/tracking/utils/autoCornerDetection';
 import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/services/trackService';
-import { supabase } from '@/lib/supabase';
-import { createLocalTrainingSession, updateTrainingSyncStatus } from '@/features/training/repositories/localTrainingRepository';
+import { createLocalTrainingSession, finalizeLocalTrainingSession, updateTrainingSyncStatus, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
+import { buildLocalTrackSessionInput, type LocalTrackSessionMeta } from '@/features/tracking/utils/localTrackSession';
+import { nowIso } from '@/lib/localDb/ids';
 import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
 import { setTrackFixHandler, startBackgroundUpdates, stopBackgroundUpdates } from '@/features/tracking/native/backgroundLocationTask';
@@ -122,6 +123,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   // Offline-First: lokale SQLite-Session + Punkt-Puffer.
   const localSessionId = useRef<string | null>(null);
+  // Vollständiger lokaler Session-Datensatz (aus dem Start) — für idempotentes
+  // ensure-create beim Finalisieren (falls der Start-Insert fehlschlug).
+  const localSessionInputRef = useRef<NewLocalTrainingSession | null>(null);
   const ptBuffer = useRef<{ latitude: number; longitude: number; accuracy: number | null; altitude: number | null; speed: number | null; heading: number | null; timestamp: string }[]>([]);
 
   const flushPoints = useCallback(async () => {
@@ -366,9 +370,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     return { error: null };
   }, [onFix]);
 
-  // Aufnahme scharf schalten: Track-Refs zurücksetzen, Timer + lokale Session
-  // starten und den bereits laufenden Warmup-Stream weiterlaufen lassen.
-  const beginRecording = useCallback(async (sessionId: string | null, dogId: string | null = null): Promise<{ error: string | null }> => {
+  // Aufnahme scharf schalten (LOCAL-FIRST): führende clientUuid ist bereits erzeugt,
+  // die lokale Session wird OHNE Netz/getUser angelegt (owner aus dem Session-Cache).
+  // Punkte/Marker referenzieren ab sofort die stabile local_id — nie eine Remote-ID.
+  const beginRecording = useCallback(async (input: {
+    localId: string; ownerId: string | null | undefined; dogId?: string | null; meta?: LocalTrackSessionMeta;
+  }): Promise<{ error: string | null }> => {
+    if (!input.ownerId) return { error: 'Bitte zuerst anmelden.' };   // sauber abbrechen — keine halbe Session
+    const dogId = input.dogId ?? null;
     if (!watchRef.current) {
       const w = await startWarmup();
       if (w.error) return w;
@@ -385,7 +394,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     lastCornerAtRef.current = -Infinity;
     angleDbgRef.current = { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null };
     ptBuffer.current = [];
-    localSessionId.current = null;
+    // Führende lokale Session-ID SOFORT deterministisch setzen (kein Warten auf Remote/Netz).
+    localSessionId.current = input.localId;
+    localSessionInputRef.current = buildLocalTrackSessionInput({
+      localId: input.localId, ownerId: input.ownerId, dogId, startedAt: nowIso(), meta: input.meta,
+    });
     // Start-Lock scharf: Stabilisierungsphase beginnt jetzt (kein Warmup-Drift als Strecke).
     startLockRef.current = true;
     startLockBeganRef.current = Date.now();
@@ -395,7 +408,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     startMoveHitsRef.current = 0;
     startDriftRejRef.current = 0;
 
-    store.getState().startRecording(sessionId, dogId);   // dogId → hundebasierter Puffer-Slot
+    // currentSessionId bleibt null: Marker gehen lokal (SQLite); die Remote-ID reicht
+    // der Screen erst nach erfolgreichem createTrackSession nach (setCurrentSession).
+    store.getState().startRecording(null, dogId);   // dogId → hundebasierter Puffer-Slot
     store.getState().setStartLockActive(true);   // NACH startRecording (das setzt den Store zurück)
     startMs.current = Date.now();
     if (timerRef.current) clearInterval(timerRef.current);
@@ -413,7 +428,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     }, 1000);
     recordingRef.current = true;   // ← ab jetzt akzeptiert onFix die Fixes
     startFaehrteActivity();        // iOS: Lockscreen / Dynamic Island (no-op sonst)
-    if (__DEV__) console.log('[trackRecorder] recording started', { sessionId });
+    if (__DEV__) console.log('[trackRecorder] recording started', { localId: input.localId });
 
     // ── Hintergrund-Aufnahme: auf Foreground-Service-GPS umschalten, damit die
     // Spur auch bei Display-aus / App in der Tasche weiterläuft. Zeigt dabei die
@@ -447,14 +462,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       headRef.current = await Location.watchHeadingAsync(h => store.getState().setHeading(h.trueHeading ?? h.magHeading));
     } catch { /* Heading optional */ }
 
-    // Lokale SQLite-Session (Offline-First) — best-effort.
+    // Lokale SQLite-Session (Offline-First, KEIN Netz/getUser) — führende ID = input.localId.
+    // Idempotent (insert or ignore) → Doppeltipp-sicher. Schlägt der Insert fehl, laufen die
+    // Punkte weiter gegen dieselbe local_id (kein FK); der Finish-Pfad legt die Zeile per
+    // ensure-create nach, damit nichts verloren geht.
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const local = await createLocalTrainingSession({ user_id: user.id, type: 'track', status: 'active' });
-        localSessionId.current = local.local_id;
-      }
-    } catch (e) { console.warn('[trackRecorder] start', e); }
+      if (localSessionInputRef.current) await createLocalTrainingSession(localSessionInputRef.current);
+    } catch (e) { console.warn('[trackRecorder] local session', e); }
 
     return { error: null };
   }, [startWarmup, store]);
@@ -485,38 +499,73 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     });
   }, [store, commitMarker]);
 
-  // Aufnahme beenden + Lay-Punkte/Summary persistieren.
-  // SOFORT stoppen (synchron) und die Liegezeit starten; das schwere Speichern
-  // (SQLite-Flush + Supabase) läuft im HINTERGRUND und blockiert NICHT die
-  // Navigation zur Liegezeit. saveState spiegelt den Fortschritt in die UI.
-  const finish = useCallback((sessionId: string | null): void => {
+  // Aufnahme beenden. SOFORT stoppen (synchron) und die Liegezeit starten; das
+  // Speichern läuft im HINTERGRUND und blockiert NICHT die Navigation. LOCAL-FIRST:
+  // Erfolg = lokale Finalisierung (durabel, unabhängig von Netz/Remote). Der Remote-
+  // Save bleibt best-effort und ist NICHT Voraussetzung für „gespeichert". Ohne
+  // Remote-ID gibt es KEINEN falschen „saved"-Kurzschluss mehr (ID-Race behoben).
+  const finish = useCallback((remoteSessionId: string | null): void => {
     stopAll();
     const s = store.getState();
     s.stopRecording();
     s.setLayFinishedAt(Date.now());   // ← Liegezeit-Start, sofort verfügbar
     s.setSaveState('saving');
 
+    // Summary synchron aus dem Vor-Stop-Snapshot festhalten.
+    const summary = {
+      endedAt:           new Date().toISOString(),
+      durationSeconds:   s.durationSeconds,
+      distanceMeters:    s.distanceMeters,
+      gpsQualityAverage: calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy)),
+      articlesTotal:     s.markers.filter(m => m.type === 'gegenstand').length,
+      cornersTotal:      s.markers.filter(m => m.type === 'winkel').length,
+      distractionsTotal: s.markers.filter(m => m.type === 'verleitung').length,
+      segments:          s.segments,
+      points:            s.trackPoints,
+    };
+
     void (async () => {
+      // 1) LOKAL sichern = echter Erfolg. Punkte flushen, Session-Zeile sicherstellen
+      //    (ensure-create, falls Start-Insert fehlschlug) und finalisieren.
       try {
         await flushPoints();
-        if (!sessionId) { store.getState().setSaveState('saved'); return; }   // offline → nur lokal
-        const accAvg = calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy));
-        const res = await finishTrackRecording(sessionId, s.trackPoints, {
-          layingDurationSeconds: s.durationSeconds,
-          distanceMeters:        s.distanceMeters,
-          gpsQualityAverage:     accAvg,
-          articlesTotal:         s.markers.filter(m => m.type === 'gegenstand').length,
-          cornersTotal:          s.markers.filter(m => m.type === 'winkel').length,
-          distractionsTotal:     s.markers.filter(m => m.type === 'verleitung').length,
-        }, s.segments);
+        if (localSessionInputRef.current) await createLocalTrainingSession(localSessionInputRef.current);   // idempotent
+        const lid = localSessionId.current;
+        if (lid) {
+          await finalizeLocalTrainingSession(lid, {
+            endedAt:           summary.endedAt,
+            durationSeconds:   summary.durationSeconds,
+            distanceMeters:    summary.distanceMeters,
+            articlesTotal:     summary.articlesTotal,
+            cornersTotal:      summary.cornersTotal,
+            gpsQualityAverage: summary.gpsQualityAverage,
+            segments:          summary.segments,
+            status:            'completed',
+          });
+        }
+        store.getState().setSaveState('saved');   // lokal durabel → Erfolg (auch offline)
+      } catch (e) {
+        console.warn('[trackRecorder] local finalize', e);
+        store.getState().setSaveState('error');   // ehrlich: lokale Persistenz fehlgeschlagen
+        return;
+      }
+
+      // 2) Remote best-effort (unverändert; P-SAVE2 verschiebt das in die Sync-Queue).
+      //    Fehler hier ändern den Save-State NICHT — die Fährte ist lokal sicher.
+      try {
+        if (!remoteSessionId) return;
+        const res = await finishTrackRecording(remoteSessionId, summary.points, {
+          layingDurationSeconds: summary.durationSeconds,
+          distanceMeters:        summary.distanceMeters,
+          gpsQualityAverage:     summary.gpsQualityAverage,
+          articlesTotal:         summary.articlesTotal,
+          cornersTotal:          summary.cornersTotal,
+          distractionsTotal:     summary.distractionsTotal,
+        }, summary.segments);
         if (localSessionId.current) {
           try { await updateTrainingSyncStatus(localSessionId.current, res.error ? 'pending' : 'synced', res.error); } catch { /* best-effort */ }
         }
-        store.getState().setSaveState(res.error ? 'error' : 'saved');
-      } catch (e) {
-        console.warn('[trackRecorder] finish save', e);
-        store.getState().setSaveState('error');
-      }
+      } catch (e) { console.warn('[trackRecorder] remote finish', e); /* lokal bereits sicher */ }
     })();
   }, [stopAll, store, flushPoints]);
 

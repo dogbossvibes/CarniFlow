@@ -13,6 +13,7 @@ function fail<T>(scope: string, error: unknown): Result<T> {
 
 // ── Session anlegen ──────────────────────────────────────────
 export interface NewTrackSessionInput {
+  id?:                string;   // clientseitige UUID = training_sessions.id (deterministisch, idempotent)
   dogId:              string;
   surfaceTypes:       string[];
   terrainConditions:  string[];
@@ -37,6 +38,7 @@ export async function createTrackSession(ownerId: string, input: NewTrackSession
     const { data, error } = await supabase
       .from('training_sessions')
       .insert({
+        ...(input.id ? { id: input.id } : {}),   // clientseitige UUID (sonst gen_random_uuid())
         owner_id:           ownerId,
         dog_id:             input.dogId,
         type:               'track',           // Fährte (eigene SQL-Spalte)

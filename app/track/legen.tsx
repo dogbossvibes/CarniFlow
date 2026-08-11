@@ -365,7 +365,26 @@ export default function LegenScreen() {
       }
     }
 
-    const r = await rec.beginRecording(null, activeDog?.id ?? null);   // sofort scharf (recording=true, Timer); dogId → eigener Puffer-Slot
+    // Führende Session-ID SOFORT (kein Warten auf Supabase, kein getUser). Dieselbe UUID
+    // wird später deterministisch als training_sessions.id verwendet (idempotenter Sync).
+    const uid = session?.user?.id;
+    const clientUuid = Crypto.randomUUID();
+    sessionIdRef.current = null;   // Remote-ID erst nach erfolgreichem Insert (unten)
+    const r = await rec.beginRecording({
+      localId: clientUuid,
+      ownerId: uid,
+      dogId:   activeDog?.id ?? null,
+      meta: {
+        surfaceTypes:      [surface],
+        terrainConditions: condition ? [condition] : [],
+        temperature:       weather?.temperature ?? null,
+        weatherCondition:  weather?.weatherCondition ?? null,
+        windSpeed:         weather?.windSpeed ?? null,
+        humidity:          weather?.humidity ?? null,
+        latitude:          currentPosition?.lat ?? null,
+        longitude:         currentPosition?.lng ?? null,
+      },
+    });   // sofort scharf (recording=true, Timer); lokale Session ist angelegt
     if (r.error) { beganRef.current = false; showToast(r.error); return; }
     setPhase('recording');
     showToast(t('toast.trackRunning'));
@@ -383,10 +402,11 @@ export default function LegenScreen() {
       });
     }
 
-    // Remote-Session im Hintergrund (blockiert die Aufnahme nicht).
-    const uid = session?.user.id;
+    // Remote-Session im Hintergrund (blockiert die Aufnahme nicht). Dieselbe clientUuid
+    // als training_sessions.id → deterministisch, keine Duplikate beim späteren Sync.
     if (uid && activeDog) {
       createTrackSession(uid, {
+        id: clientUuid,
         dogId: activeDog.id, surfaceTypes: [surface], terrainConditions: condition ? [condition] : [],
         lyingTimeMinutes: 0, notes: null, locationName: null,
         temperature:      weather?.temperature ?? null,
