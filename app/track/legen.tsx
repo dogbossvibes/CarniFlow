@@ -23,7 +23,6 @@ import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { reopenTarget, type ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
 import { clearPending } from '@/features/tracking/store/trackPersist';
-import { createTrackSession } from '@/features/tracking/services/trackService';
 import * as Crypto from 'expo-crypto';
 import { claimNewbieQuota, quotaBlock } from '@/services/quotaService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
@@ -389,6 +388,11 @@ export default function LegenScreen() {
     setPhase('recording');
     showToast(t('toast.trackRunning'));
 
+    // Führende Session-ID = clientUuid (deterministisch, kein Warten auf Remote).
+    // Navigation/Registry/Downstream nutzen sie sofort; der Remote-Upload passiert
+    // ausschliesslich über die Sync-Queue nach dem Stop (single source, kein Race).
+    sessionIdRef.current = clientUuid;
+
     // Registry: Fährte gehört ab jetzt dem Hund (dog_id) — bleibt bei Navigation/
     // Hundewechsel erhalten. Sofort persistiert, damit ein Kill nichts verliert.
     // Wetter-Snapshot + Start-Uhrzeit + GPS werden EINMALIG hier festgehalten.
@@ -397,32 +401,9 @@ export default function LegenScreen() {
         ? { temperature: weather.temperature, windSpeed: weather.windSpeed, humidity: weather.humidity, condition: weather.weatherCondition }
         : null;
       useActiveFaehrten.getState().upsert(activeDog.id, {
-        status: 'laying', sessionId: null, startedAt: Date.now(),
+        status: 'laying', sessionId: clientUuid, startedAt: Date.now(),
         gpsAccuracy: useTrackingStore.getState().gpsAccuracy, weather: snap,
       });
-    }
-
-    // Remote-Session im Hintergrund (blockiert die Aufnahme nicht). Dieselbe clientUuid
-    // als training_sessions.id → deterministisch, keine Duplikate beim späteren Sync.
-    if (uid && activeDog) {
-      createTrackSession(uid, {
-        id: clientUuid,
-        dogId: activeDog.id, surfaceTypes: [surface], terrainConditions: condition ? [condition] : [],
-        lyingTimeMinutes: 0, notes: null, locationName: null,
-        temperature:      weather?.temperature ?? null,
-        weatherCondition: weather?.weatherCondition ?? null,
-        windSpeed:        weather?.windSpeed ?? null,
-        humidity:         weather?.humidity ?? null,
-        latitude: currentPosition?.lat ?? null, longitude: currentPosition?.lng ?? null,
-        distraction: false,
-      }).then(({ data, error }) => {
-        if (!error && data) {
-          sessionIdRef.current = data.id;
-          useTrackingStore.getState().setCurrentSession(data.id);
-          useActiveFaehrten.getState().upsert(activeDog.id, { sessionId: data.id });   // ID nachreichen
-        }
-        else showToast(t('toast.offlineSync'));
-      }).catch(() => showToast(t('toast.offlineSync')));
     }
   }, [session, activeDog, rec, showToast, t, surface, condition, weather, currentPosition, isPro, router]);
 
@@ -544,10 +525,10 @@ export default function LegenScreen() {
       }
     }
     hapticSuccess();   // SOFORT beim Stop-Tap
-    const id = sessionIdRef.current;
-    // rec.finish stoppt synchron, startet die Liegezeit und speichert im
-    // HINTERGRUND (saveState). Wir navigieren SOFORT — kein await, keine 2–5 s.
-    rec.finish(id);   // toleriert null (offline → nur lokal gesichert)
+    const id = sessionIdRef.current;   // = clientUuid (deterministisch seit Start)
+    // rec.finish stoppt synchron, finalisiert lokal (durabel) und reiht den Remote-
+    // Upload in die persistente Sync-Queue ein. Wir navigieren SOFORT — kein await.
+    rec.finish();
 
     // Registry: Übergang laying → resting. Liegezeit-Start = jetzt (deckt sich mit
     // dem Store-Übergang in setLayFinishedAt). Kennzahlen für die Karten mitgeben.

@@ -9,12 +9,13 @@ import {
   getLocalTrainingSessionById, setTrainingRemoteId, updateTrainingSyncStatus,
 } from '@/features/training/repositories/localTrainingRepository';
 import {
-  getPendingTrackPoints, getTrackMarkersBySession, updateTrackPointSyncStatus,
+  getTrackPointsBySession, getTrackMarkersBySession, updateTrackPointSyncStatus,
 } from '@/features/tracking/repositories/localTrackRepository';
 import { getPendingMediaFiles, markMediaUploaded, markMediaUploadFailed } from '@/features/media/repositories/localMediaRepository';
 import {
   createRemoteTrainingSession, updateRemoteTrainingSession, deleteRemoteTrainingSession,
   createRemoteTrackPointsBatch, createRemoteTrackMarkersBatch, uploadRemoteMediaFile,
+  deleteRemoteLayTrackPoints, deleteRemoteTrackMarkers,
 } from '@/features/sync/services/remoteTrainingSyncService';
 
 let running = false;
@@ -29,29 +30,35 @@ async function refreshCounts() {
   st.setPendingCount(c.pending); st.setFailedCount(c.failed); st.setConflictCount(c.conflict);
 }
 
-// Eine Trainings-Session + ihre Kinder (Punkte, Marker) hochladen.
-async function syncTrainingSession(localId: string): Promise<{ ok: boolean; error?: string }> {
+// Eine Trainings-Session + ihre Kinder (Punkte, Marker) hochladen. Exportiert für
+// gezielte Idempotenz-/Replace-Tests (kein Verhaltenswechsel gegenüber intern).
+export async function syncTrainingSession(localId: string): Promise<{ ok: boolean; error?: string }> {
   const local = await getLocalTrainingSessionById(localId);
   if (!local) return { ok: true };   // lokal weg → nichts zu tun
 
-  let remoteId = local.remote_id;
-  if (!remoteId) {
-    const res = await createRemoteTrainingSession(local);
-    if (res.error || !res.data) return { ok: false, error: res.error ?? 'Session-Upload fehlgeschlagen' };
-    remoteId = res.data.id;
-    await setTrainingRemoteId(localId, remoteId);   // setzt auch session_remote_id der Kinder
-  }
+  // Idempotenter Session-Upsert: die remote_id IST die lokale UUID (local_id).
+  // Auch wenn eine ACK zuvor verloren ging (remote_id lokal noch null), erzeugt der
+  // Upsert keine zweite Zeile — er aktualisiert dieselbe id.
+  const sres = await createRemoteTrainingSession(local);
+  if (sres.error || !sres.data) return { ok: false, error: sres.error ?? 'Session-Upload fehlgeschlagen' };
+  const remoteId = sres.data.id;   // == local.local_id
+  if (!local.remote_id) await setTrainingRemoteId(localId, remoteId);   // verknüpft Kinder (session_remote_id)
 
-  // Punkte (Batches) — erst MÖGLICH, wenn Session eine remote_id hat (hier gegeben).
-  const points = await getPendingTrackPoints(localId);
-  if (points.length > 0) {
-    const pr = await createRemoteTrackPointsBatch(remoteId, points);
+  // Punkte — idempotenter Replace-by-session (nur gelegte Spur, point_type='lay';
+  // Suchpunkte bleiben unberührt). Delete + Insert → keine Duplikate bei Retry.
+  const layPoints = (await getTrackPointsBySession(localId)).filter(p => (p.point_type ?? 'lay') === 'lay');
+  const dp = await deleteRemoteLayTrackPoints(remoteId);
+  if (dp.error) return { ok: false, error: dp.error };
+  if (layPoints.length > 0) {
+    const pr = await createRemoteTrackPointsBatch(remoteId, layPoints);
     if (pr.error) return { ok: false, error: pr.error };
-    await updateTrackPointSyncStatus(points.map(p => p.local_id), 'synced');
+    await updateTrackPointSyncStatus(layPoints.map(p => p.local_id), 'synced');
   }
 
-  // Marker (nur noch nicht synchronisierte).
-  const markers = (await getTrackMarkersBySession(localId)).filter(m => m.sync_status !== 'synced');
+  // Marker — idempotenter Replace-by-session.
+  const markers = await getTrackMarkersBySession(localId);
+  const dm = await deleteRemoteTrackMarkers(remoteId);
+  if (dm.error) return { ok: false, error: dm.error };
   if (markers.length > 0) {
     const mr = await createRemoteTrackMarkersBatch(remoteId, markers);
     if (mr.error) return { ok: false, error: mr.error };

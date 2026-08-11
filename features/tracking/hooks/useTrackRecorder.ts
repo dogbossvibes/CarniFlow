@@ -11,8 +11,10 @@ import {
   calculateDistance, calculateAverageAccuracy, medianLatLng, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
 import { detectAutoCorner } from '@/features/tracking/utils/autoCornerDetection';
-import { finishTrackRecording, saveTrackMarker } from '@/features/tracking/services/trackService';
-import { createLocalTrainingSession, finalizeLocalTrainingSession, updateTrainingSyncStatus, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
+import { saveTrackMarker } from '@/features/tracking/services/trackService';
+import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
+import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
+import { syncNow } from '@/features/sync/services/syncEngine';
 import { buildLocalTrackSessionInput, type LocalTrackSessionMeta } from '@/features/tracking/utils/localTrackSession';
 import { nowIso } from '@/lib/localDb/ids';
 import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
@@ -502,9 +504,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Aufnahme beenden. SOFORT stoppen (synchron) und die Liegezeit starten; das
   // Speichern läuft im HINTERGRUND und blockiert NICHT die Navigation. LOCAL-FIRST:
   // Erfolg = lokale Finalisierung (durabel, unabhängig von Netz/Remote). Der Remote-
-  // Save bleibt best-effort und ist NICHT Voraussetzung für „gespeichert". Ohne
-  // Remote-ID gibt es KEINEN falschen „saved"-Kurzschluss mehr (ID-Race behoben).
-  const finish = useCallback((remoteSessionId: string | null): void => {
+  // Transport läuft AUSSCHLIESSLICH über die persistente Sync-Queue (P-SAVE2) — kein
+  // direkter finishTrackRecording-Pfad mehr (eine einzige Remote-Sync-Quelle).
+  const finish = useCallback((): void => {
     stopAll();
     const s = store.getState();
     s.stopRecording();
@@ -519,18 +521,16 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       gpsQualityAverage: calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy)),
       articlesTotal:     s.markers.filter(m => m.type === 'gegenstand').length,
       cornersTotal:      s.markers.filter(m => m.type === 'winkel').length,
-      distractionsTotal: s.markers.filter(m => m.type === 'verleitung').length,
       segments:          s.segments,
-      points:            s.trackPoints,
     };
 
     void (async () => {
       // 1) LOKAL sichern = echter Erfolg. Punkte flushen, Session-Zeile sicherstellen
       //    (ensure-create, falls Start-Insert fehlschlug) und finalisieren.
+      const lid = localSessionId.current;
       try {
         await flushPoints();
         if (localSessionInputRef.current) await createLocalTrainingSession(localSessionInputRef.current);   // idempotent
-        const lid = localSessionId.current;
         if (lid) {
           await finalizeLocalTrainingSession(lid, {
             endedAt:           summary.endedAt,
@@ -550,22 +550,15 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         return;
       }
 
-      // 2) Remote best-effort (unverändert; P-SAVE2 verschiebt das in die Sync-Queue).
-      //    Fehler hier ändern den Save-State NICHT — die Fährte ist lokal sicher.
+      // 2) Remote-Transport in die persistente Sync-Queue geben (überlebt App-Kill).
+      //    syncNow() ist best-effort und blockiert NICHTS — die Navigation ist längst
+      //    erfolgt. Schlägt der Upload fehl, bleibt der Queue-Eintrag pending/failed
+      //    für den späteren Retry (SyncProvider bei Start/Reconnect/Foreground).
+      if (!lid) return;
       try {
-        if (!remoteSessionId) return;
-        const res = await finishTrackRecording(remoteSessionId, summary.points, {
-          layingDurationSeconds: summary.durationSeconds,
-          distanceMeters:        summary.distanceMeters,
-          gpsQualityAverage:     summary.gpsQualityAverage,
-          articlesTotal:         summary.articlesTotal,
-          cornersTotal:          summary.cornersTotal,
-          distractionsTotal:     summary.distractionsTotal,
-        }, summary.segments);
-        if (localSessionId.current) {
-          try { await updateTrainingSyncStatus(localSessionId.current, res.error ? 'pending' : 'synced', res.error); } catch { /* best-effort */ }
-        }
-      } catch (e) { console.warn('[trackRecorder] remote finish', e); /* lokal bereits sicher */ }
+        await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: lid, operation: 'create', priority: 1 });
+      } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
+      void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })();
   }, [stopAll, store, flushPoints]);
 
