@@ -14,6 +14,26 @@ function parseObj(s: string | null): any {
   try { return JSON.parse(s); } catch { return null; }
 }
 
+// Nur die Run-Ergänzung aus payload_json.run — für den Fall, dass eine remote-Session
+// existiert, deren track_runs (Absuche) aber noch nicht synchronisiert ist. null, wenn
+// kein/kaputtes payload_json.run. Kanonisch bleibt remote track_runs.run_points; dies
+// füllt nur die Lücke bis der Run gesynct ist.
+export function runSupplementFromPayload(payloadJson: string | null): {
+  runs: { run_points: any }[]; track_data: { run: any };
+  articles_found: number | null; average_deviation_meters: number | null; score: number | null;
+} | null {
+  const payload = parseObj(payloadJson);
+  const run = payload?.run ?? null;
+  if (!run) return null;
+  return {
+    runs: run.run_points ? [{ run_points: run.run_points }] : [],
+    track_data: { run },
+    articles_found: run.articles_found ?? null,
+    average_deviation_meters: run.average_deviation_meters ?? null,
+    score: run.score ?? null,
+  };
+}
+
 export function buildLocalTrackDetail(
   local: LocalTrainingSession, points: LocalTrackPoint[], markers: LocalTrackMarker[],
 ): Record<string, any> {

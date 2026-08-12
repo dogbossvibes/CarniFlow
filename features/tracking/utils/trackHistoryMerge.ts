@@ -90,8 +90,24 @@ export function mergeTrackHistory(remote: any[], local: LocalTrainingSession[]):
     byId.set(r.id, { ...r, syncState: 'synced', isLocalOnly: false });
   }
   for (const l of local) {
-    if (l.status !== 'completed') continue;   // nur abgeschlossene Fährten in den Verlauf
-    if (byId.has(l.local_id)) continue;        // schon remote vorhanden → kein Duplikat
+    if (l.status !== 'completed' || l.deleted_at) continue;   // nur abgeschlossene, nicht gelöschte Fährten
+    const existing = byId.get(l.local_id);
+    if (existing) {
+      // Remote bleibt autoritativ. ABER: ist die Session lokal noch nicht synchronisiert
+      // (z. B. frisch ausgearbeitete Absuche), zeigen wir den Badge und ergänzen die
+      // Run-Daten, wenn die Remote-Zeile den Run noch nicht hat (RUN-SAVE2 pending).
+      if (l.sync_status !== 'synced') {
+        existing.syncState = syncStateOf(l.sync_status);
+        const lr = localSessionToHistoryRow(l);
+        const localRun = lr.track_data?.run;
+        if (localRun && !existing.track_data?.run) {
+          existing.track_data = { ...(existing.track_data ?? {}), run: localRun };
+          if (lr.score != null) existing.score = lr.score;
+          if (lr.articles_found != null) existing.articles_found = lr.articles_found;
+        }
+      }
+      continue;   // kein Duplikat
+    }
     byId.set(l.local_id, localSessionToHistoryRow(l));
   }
   return Array.from(byId.values()).sort((a, b) => sessionTimeMs(b) - sessionTimeMs(a));

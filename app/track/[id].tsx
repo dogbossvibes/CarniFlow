@@ -14,7 +14,7 @@ import { TrackScoreRing } from '@/features/tracking/components/TrackScoreRing';
 import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
 import { FaehrtenHeader, SectionLabel, relDate } from '@/features/tracking/components/FaehrtenChrome';
 import { getTrackSessionById, saveTrackEvaluation } from '@/features/tracking/services/trackService';
-import { getLocalTrackDetail, saveLocalTrackEvaluation } from '@/features/tracking/services/trackHistoryService';
+import { getLocalTrackDetail, getLocalRunSupplement, saveLocalTrackEvaluation } from '@/features/tracking/services/trackHistoryService';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
@@ -51,7 +51,22 @@ export default function TrackAuswertungScreen() {
       // zusammenbauen, damit die Auswertung nie mit „nicht gefunden" abbricht.
       let d = r.data;
       let localOnly = false;
-      if (!d) { d = await getLocalTrackDetail(id).catch(() => null); localOnly = !!d; }
+      if (!d) {
+        d = await getLocalTrackDetail(id).catch(() => null); localOnly = !!d;
+      } else if (!(d.runs?.length)) {
+        // Remote-Session vorhanden, aber der Absuche-Run (track_runs) ist noch nicht
+        // synchronisiert → lokale Run-Daten ergänzen, damit Score/Spur nicht fehlen.
+        const sup = await getLocalRunSupplement(id).catch(() => null);
+        if (sup?.runs?.length) {
+          d = {
+            ...d, runs: sup.runs,
+            track_data: { ...(d.track_data ?? {}), ...sup.track_data },
+            articles_found:           d.articles_found ?? sup.articles_found,
+            average_deviation_meters: d.average_deviation_meters ?? sup.average_deviation_meters,
+            score:                    d.score ?? sup.score,
+          };
+        }
+      }
       setData(d);
       setIsLocalOnly(localOnly);
       if (d) {

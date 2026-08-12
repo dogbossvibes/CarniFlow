@@ -108,16 +108,13 @@ export default function TrackOverviewScreen() {
   );
   const history = useMemo(() => rows.map(r => toRow(r, syncLabel)), [rows, syncLabel]);
 
-  // Lokal-only-Fährte (noch nicht synchronisiert): kein Remote-Detail öffnen — stattdessen
-  // Sync erneut anstossen (bestehende Queue) und Hinweis zeigen. Sonst normale Auswertung.
+  // Navigation ins Detail ist IMMER möglich — auch pending/failed (der Detail-Screen hat
+  // einen lokalen Fallback). Bei nicht synchronisierten Fährten wird der bestehende
+  // Queue-Retry zusätzlich (nicht blockierend) angestossen.
   const openTrack = useCallback((h: TrackRowData) => {
-    if (h.syncState && h.syncState !== 'synced') {
-      void retryFailedSync().then(() => load());
-      showToast(t(h.syncState === 'failed' ? 'track.syncRetry' : 'track.syncPending'));
-      return;
-    }
+    if (h.syncState && h.syncState !== 'synced') void retryFailedSync().catch(() => {});
     router.push(`/track/${h.id}` as never);
-  }, [router, showToast, t, load]);
+  }, [router]);
   const stats = useMemo(() => ({
     total:  rows.length,
     avg:    averageScore(rows),

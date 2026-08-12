@@ -1,4 +1,4 @@
-import { buildLocalTrackDetail } from '@/features/tracking/utils/localTrackDetail';
+import { buildLocalTrackDetail, runSupplementFromPayload } from '@/features/tracking/utils/localTrackDetail';
 import type { LocalTrainingSession, LocalTrackPoint, LocalTrackMarker } from '@/features/sync/types/sync';
 
 const local: LocalTrainingSession = {
@@ -59,5 +59,29 @@ describe('buildLocalTrackDetail — Detail-Fallback aus SQLite (getTrackSessionB
     const d2 = buildLocalTrackDetail(noRun, [], []);
     expect(d2.runs).toEqual([]);
     expect(d2.distance_meters).toBe(100);
+  });
+
+  it('kaputtes payload_json → kein Crash, leere runs', () => {
+    const broken = { ...local, payload_json: '{not json' };
+    const d3 = buildLocalTrackDetail(broken, [], []);
+    expect(d3.runs).toEqual([]);
+    expect(d3.track_data).toEqual({});
+  });
+});
+
+describe('runSupplementFromPayload — Run-Ergänzung für remote-Session ohne gesyncten Run', () => {
+  it('liefert runs + track_data.run + Summary aus payload.run', () => {
+    const s = runSupplementFromPayload(JSON.stringify({ run: { score: 91, articles_found: 2, average_deviation_meters: 1.2, run_points: [{ lat: 47, lng: 8 }] } }));
+    expect(s?.runs).toEqual([{ run_points: [{ lat: 47, lng: 8 }] }]);
+    expect(s?.track_data.run.score).toBe(91);
+    expect(s?.articles_found).toBe(2);
+    expect(s?.average_deviation_meters).toBe(1.2);
+    expect(s?.score).toBe(91);
+  });
+
+  it('ohne run → null; kaputtes JSON → null', () => {
+    expect(runSupplementFromPayload(JSON.stringify({ distanceMeters: 100 }))).toBeNull();
+    expect(runSupplementFromPayload('{not json')).toBeNull();
+    expect(runSupplementFromPayload(null)).toBeNull();
   });
 });

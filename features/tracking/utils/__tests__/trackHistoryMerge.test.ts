@@ -54,11 +54,45 @@ describe('mergeTrackHistory', () => {
     expect(out[0].track_data.run.score).toBe(91);
   });
 
-  it('gleiche Session lokal + remote → nur EIN Eintrag (remote gewinnt, synced)', () => {
-    const out = mergeTrackHistory([remote({ id: 'uuid-1' })], [localSession({ sync_status: 'pending' })]);
+  it('lokal pending mit Run → Badge (pending) + echter Score', () => {
+    const out = mergeTrackHistory([], [localSession({
+      sync_status: 'pending', payload_json: JSON.stringify({ run: { score: 88 } }),
+    })]);
+    expect(out[0].syncState).toBe('pending');
+    expect(out[0].score).toBe(88);
+  });
+
+  it('lokal failed mit Run → Badge (failed) + echter Score', () => {
+    const out = mergeTrackHistory([], [localSession({
+      sync_status: 'failed', payload_json: JSON.stringify({ run: { score: 73 } }),
+    })]);
+    expect(out[0].syncState).toBe('failed');
+    expect(out[0].score).toBe(73);
+  });
+
+  it('gleiche Session lokal(synced) + remote → nur EIN Eintrag (remote, synced)', () => {
+    const out = mergeTrackHistory([remote({ id: 'uuid-1' })], [localSession({ sync_status: 'synced' })]);
     expect(out).toHaveLength(1);
     expect(out[0].syncState).toBe('synced');
     expect(out[0].isLocalOnly).toBe(false);
+  });
+
+  it('Remote-Session ohne Run + lokaler pending Run → ein Eintrag, Run ergänzt + Badge', () => {
+    const localWithRun = localSession({
+      local_id: 'r1', sync_status: 'pending',
+      payload_json: JSON.stringify({ distanceMeters: 250, run: { score: 91, articles_found: 2 } }),
+    });
+    const out = mergeTrackHistory([remote({ id: 'r1', score: null })], [localWithRun]);
+    expect(out).toHaveLength(1);                 // kein Duplikat
+    expect(out[0].syncState).toBe('pending');    // Badge
+    expect(out[0].score).toBe(91);               // Run ergänzt
+    expect(out[0].track_data.run.score).toBe(91);
+    expect(out[0].isLocalOnly).toBe(false);      // Remote bleibt autoritativ
+  });
+
+  it('gelöschte lokale Session taucht NICHT im Merge auf', () => {
+    const out = mergeTrackHistory([], [localSession({ deleted_at: '2026-08-12T00:00:00.000Z' })]);
+    expect(out).toHaveLength(0);
   });
 
   it('lokale pending, die später synced ist (remote da) → kein zweiter Eintrag', () => {
