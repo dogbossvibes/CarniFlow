@@ -15,7 +15,7 @@ import { getPendingMediaFiles, markMediaUploaded, markMediaUploadFailed } from '
 import {
   createRemoteTrainingSession, updateRemoteTrainingSession, deleteRemoteTrainingSession,
   createRemoteTrackPointsBatch, createRemoteTrackMarkersBatch, uploadRemoteMediaFile,
-  deleteRemoteLayTrackPoints, deleteRemoteTrackMarkers,
+  deleteRemoteLayTrackPoints, deleteRemoteTrackMarkers, upsertRemoteTrackRun,
 } from '@/features/sync/services/remoteTrainingSyncService';
 
 let running = false;
@@ -62,6 +62,18 @@ export async function syncTrainingSession(localId: string): Promise<{ ok: boolea
   if (markers.length > 0) {
     const mr = await createRemoteTrackMarkersBatch(remoteId, markers);
     if (mr.error) return { ok: false, error: mr.error };
+  }
+
+  // Absuche-Run (RUN-SAVE2) — NACH dem Parent-Upsert (FK-Reihenfolge). track_runs wird
+  // idempotent per runUuid geschrieben (run_points = kanonische Absuche-Spur). Fehlt
+  // payload_json.run, ist nichts zu tun (reiner Lay-Track). Kein Push von point_type=
+  // 'search' nach track_points (der Detail-Screen liest die Spur aus track_runs.run_points).
+  const run = ((): Record<string, any> | null => {
+    try { const p = local.payload_json ? JSON.parse(local.payload_json) : null; return p?.run ?? null; } catch { return null; }
+  })();
+  if (run?.run_id) {
+    const rr = await upsertRemoteTrackRun(remoteId, run);
+    if (rr.error) return { ok: false, error: rr.error };
   }
 
   await updateTrainingSyncStatus(localId, 'synced');

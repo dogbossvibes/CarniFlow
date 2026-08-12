@@ -45,8 +45,10 @@ import {
 
 // GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Absuche nicht).
 const SHOW_GPS_DEBUG = __DEV__;
-import { startTrackRun, finishTrackRun, getTrackSessionDogName } from '@/features/tracking/services/trackService';
+import { getTrackSessionDogName } from '@/features/tracking/services/trackService';
 import { finalizeLocalTrackRun } from '@/features/training/repositories/localTrainingRepository';
+import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
+import { syncNow } from '@/features/sync/services/syncEngine';
 import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
 import * as Crypto from 'expo-crypto';
 
@@ -189,9 +191,8 @@ export default function TrackRunScreen() {
     s.start();
     useTrackingStore.getState().startSearchSession(null, startMs);   // Status 'searching' + Suchzeit-Start
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
-    // Remote-Start best-effort mit DERSELBEN runUuid als track_runs.id (nicht mehr
-    // ID-führend). Fehler/Offline egal — die lokale Finalisierung ist die Erfolgsschwelle.
-    if (effectiveId) startTrackRun(effectiveId, runUuid).catch(() => {});
+    // Kein direkter Remote-Start mehr (RUN-SAVE2): track_runs wird beim Stop über die
+    // Sync-Queue idempotent per runUuid upserted. runUuid ist bereits lokal geführt.
   }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM]);
 
   // Manueller „Jetzt starten": innerhalb des dynamischen Radius → direkt nach Tippen; sonst
@@ -311,15 +312,11 @@ export default function TrackRunScreen() {
         searchHandlerDistanceM: pending.searchHandlerDistanceM,
       })).catch(() => {});
     }
-    if (sessId && runId) {
-      await finishTrackRun(runId, sessId, {
-        durationSeconds: durationS,
-        distanceMeters: Math.round(pathDistanceM(saved)),
-        averageDeviationMeters: 0,
-        articlesFound: 0,
-        searchHandlerDistanceM: pending.searchHandlerDistanceM,
-        runPoints: saved.map(p => ({ lat: p.lat, lng: p.lng, t: p.t })),
-      }).catch(() => {});
+    // Remote-Transport über die Sync-Queue (RUN-SAVE2), nicht mehr direkt.
+    if (sessId) {
+      try { await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: sessId, operation: 'create', priority: 1 }); }
+      catch (e) { console.warn('[trackRun] enqueue', e); }
+      void syncNow().catch(() => {});
     }
     startedRef.current = true;
     setRecovery(null);
@@ -492,17 +489,14 @@ export default function TrackRunScreen() {
         useTrackingStore.getState().reset();
         clearRegistry();
 
-        // 2) Remote best-effort (unverändert; RUN-SAVE2 verschiebt das in die Sync-Queue).
-        //    Blockiert die Navigation NICHT — die Fährte ist lokal bereits durabel.
+        // 2) Remote-Transport ausschliesslich über die persistente Sync-Queue (RUN-SAVE2):
+        //    dieselbe training_session erneut enqueuen → syncNow lädt Lay + Run (track_runs
+        //    per runUuid) idempotent hoch. Navigation wartet NICHT (lokal bereits durabel).
         if (sessId) {
-          void finishTrackRun(runId, sessId, {
-            durationSeconds:        res.durationS,
-            distanceMeters:         res.distanceM,
-            averageDeviationMeters: res.deviationAvgM,
-            articlesFound:          res.foundObjects,
-            searchHandlerDistanceM: searchHandlerDistanceM,   // deterministischer Kontext → track_data
-            runPoints:              res.points.map(p => ({ lat: p.latitude, lng: p.longitude, t: Date.now() })),
-          }).catch(() => {});
+          try {
+            await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: sessId, operation: 'create', priority: 1 });
+          } catch (e) { console.warn('[trackRun] enqueue', e); }
+          void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
         }
         setFinishing(false);
         router.replace((sessId ? `/track/${sessId}` : '/track') as never);

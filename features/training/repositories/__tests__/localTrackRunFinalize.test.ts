@@ -16,7 +16,8 @@ describe('finalizeLocalTrackRun — Run in payload_json, Lay-Summary bleibt erha
     await finalizeLocalTrackRun('sess-1', { run_id: 'run-1', score: 88 });
     const [sql, payloadStr, , localId] = mockRunAsync.mock.calls[0] as [string, string, string, string];
     expect(sql).toMatch(/update local_training_sessions set payload_json=\?, updated_at=\?/i);
-    expect(sql).not.toMatch(/sync_status/);   // RUN-SAVE1: kein Sync-Status-Umbau
+    // RUN-SAVE2: eine bereits synchronisierte Session geht mit dem neuen Run zurück auf pending.
+    expect(sql).toMatch(/sync_status=case when sync_status='synced' then 'pending' else sync_status end/i);
     const payload = JSON.parse(payloadStr);
     expect(payload.distanceMeters).toBe(100);         // Lay-Summary erhalten
     expect(payload.segments).toEqual([{ id: 's' }]);

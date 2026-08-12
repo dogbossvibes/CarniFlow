@@ -37,11 +37,50 @@ export async function createRemoteTrainingSession(local: LocalTrainingSession): 
       articles_total:      summary.articlesTotal ?? null,
       corners_total:       summary.cornersTotal ?? null,
       gps_quality_average: summary.gpsQualityAverage ?? null,
-      ...(summary.segments ? { track_data: { segments: summary.segments } } : {}),
+      // Absuche-Ergebnis (RUN-SAVE2): Session-Felder + track_data.run (ohne run_points,
+      // die liegen kanonisch in track_runs). Kein Schema-Change, keine erfundenen Werte.
+      ...(summary.run ? {
+        status:                   'completed',
+        search_duration_seconds:  summary.run.duration_seconds ?? null,
+        average_deviation_meters: summary.run.average_deviation_meters ?? null,
+        articles_found:           summary.run.articles_found ?? null,
+      } : {}),
+      ...((summary.segments || summary.run) ? { track_data: {
+        ...(summary.segments ? { segments: summary.segments } : {}),
+        ...(summary.run ? { run: runSummaryForTrackData(summary.run) } : {}),
+      } } : {}),
     }, { onConflict: 'id' }).select('id').single();
     if (error) return fail('createSession', error);
     return { data: data as { id: string }, error: null };
   } catch (e) { return fail('createSession', e); }
+}
+
+// Run-Zusammenfassung für training_sessions.track_data.run — ohne die grosse
+// run_points-Liste (die liegt kanonisch in track_runs.run_points).
+function runSummaryForTrackData(run: Record<string, any>): Record<string, any> {
+  const { run_points: _omit, ...rest } = run;
+  return rest;
+}
+
+// Absuche-Run idempotent: track_runs.id == runUuid → upsert(onConflict:'id') erzeugt
+// keine zweite Run-Zeile (auch bei verlorener ACK / Retry). session_id verweist auf
+// den bereits upserteten Parent (FK-Reihenfolge im syncEngine sichergestellt).
+export async function upsertRemoteTrackRun(remoteSessionId: string, run: Record<string, any>): Promise<RemoteResult<null>> {
+  try {
+    const { error } = await supabase.from('track_runs').upsert({
+      id:                       run.run_id,
+      session_id:               remoteSessionId,
+      started_at:               run.started_at ?? null,
+      ended_at:                 run.ended_at ?? null,
+      duration_seconds:         run.duration_seconds ?? null,
+      distance_meters:          run.distance_meters ?? null,
+      average_deviation_meters: run.average_deviation_meters ?? null,
+      articles_found:           run.articles_found ?? null,
+      run_points:               run.run_points ?? [],
+    }, { onConflict: 'id' });
+    if (error) return fail('upsertTrackRun', error);
+    return { data: null, error: null };
+  } catch (e) { return fail('upsertTrackRun', e); }
 }
 
 export async function updateRemoteTrainingSession(remoteId: string, patch: Record<string, any>): Promise<RemoteResult<null>> {

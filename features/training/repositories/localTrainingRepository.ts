@@ -116,8 +116,11 @@ export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<
   let payload: Record<string, unknown> = {};
   if (row?.payload_json) { try { payload = JSON.parse(row.payload_json) ?? {}; } catch { payload = {}; } }
   payload.run = run;
+  // Eine bereits synchronisierte Session hat mit dem neuen Run frische lokale Daten →
+  // zurück auf 'pending', damit RUN-SAVE2 sie erneut hochlädt (erst nach Run + Punkten
+  // wieder 'synced'). Andere Zustände (pending/failed) bleiben unverändert.
   await db.runAsync(
-    `update local_training_sessions set payload_json=?, updated_at=? where local_id=?`,
+    `update local_training_sessions set payload_json=?, updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
     JSON.stringify(payload), nowIso(), sessionLocalId,
   );
 }

@@ -23,6 +23,7 @@ const mockDelPoints = jest.fn(async (..._a: any[]): Promise<any> => ({ data: nul
 const mockDelMarkers = jest.fn(async (..._a: any[]): Promise<any> => ({ data: null, error: null }));
 const mockInsPoints = jest.fn(async (..._a: any[]): Promise<any> => ({ data: null, error: null }));
 const mockInsMarkers = jest.fn(async (..._a: any[]): Promise<any> => ({ data: null, error: null }));
+const mockUpsertRun = jest.fn(async (..._a: any[]): Promise<any> => ({ data: null, error: null }));
 jest.mock('@/features/sync/services/remoteTrainingSyncService', () => ({
   createRemoteTrainingSession: (...a: any[]) => mockCreateRemote(...a),
   updateRemoteTrainingSession: jest.fn(), deleteRemoteTrainingSession: jest.fn(),
@@ -31,6 +32,7 @@ jest.mock('@/features/sync/services/remoteTrainingSyncService', () => ({
   uploadRemoteMediaFile: jest.fn(),
   deleteRemoteLayTrackPoints: (...a: any[]) => mockDelPoints(...a),
   deleteRemoteTrackMarkers: (...a: any[]) => mockDelMarkers(...a),
+  upsertRemoteTrackRun: (...a: any[]) => mockUpsertRun(...a),
 }));
 
 // Neutralisieren (nicht genutzt in syncTrainingSession) — nur damit der Import lädt.
@@ -62,7 +64,11 @@ beforeEach(() => {
   mockDelMarkers.mockResolvedValue({ data: null, error: null });
   mockInsPoints.mockResolvedValue({ data: null, error: null });
   mockInsMarkers.mockResolvedValue({ data: null, error: null });
+  mockUpsertRun.mockResolvedValue({ data: null, error: null });
 });
+
+const withRun = (run: Record<string, any>) => ({ ...localRow, payload_json: JSON.stringify({ distanceMeters: 100, run }) });
+const RUN = { run_id: 'run-1', duration_seconds: 600, score: 88, run_points: [{ lat: 47, lng: 8 }] };
 
 describe('syncTrainingSession — idempotenter Single-Source-Sync', () => {
   it('Online: Session-Upsert + verknüpft Remote-ID (= local_id) + markiert synced', async () => {
@@ -107,6 +113,40 @@ describe('syncTrainingSession — idempotenter Single-Source-Sync', () => {
 
   it('Punkte-Fehler: ok=false, Session bleibt pending (kein synced)', async () => {
     mockDelPoints.mockResolvedValueOnce({ data: null, error: 'net' });
+    const res = await syncTrainingSession('local-1');
+    expect(res.ok).toBe(false);
+    expect(mockUpdateSyncStatus).not.toHaveBeenCalledWith('local-1', 'synced');
+  });
+});
+
+describe('syncTrainingSession — RUN-SAVE2: track_runs idempotent', () => {
+  it('mit payload_json.run → track_run upsert per runUuid, NACH Parent + Marker (FK)', async () => {
+    mockGetLocal.mockResolvedValue(withRun(RUN));
+    const res = await syncTrainingSession('local-1');
+    expect(res.ok).toBe(true);
+    expect(mockUpsertRun).toHaveBeenCalledWith('local-1', RUN);
+    // FK-/Reihenfolge: Session-Upsert und Marker-Insert VOR dem Run-Upsert.
+    expect(mockCreateRemote.mock.invocationCallOrder[0]).toBeLessThan(mockUpsertRun.mock.invocationCallOrder[0]);
+    expect(mockInsMarkers.mock.invocationCallOrder[0]).toBeLessThan(mockUpsertRun.mock.invocationCallOrder[0]);
+    expect(mockUpdateSyncStatus).toHaveBeenCalledWith('local-1', 'synced');
+  });
+
+  it('ohne run → Lay-Sync unverändert, KEIN track_run upsert', async () => {
+    const res = await syncTrainingSession('local-1');   // localRow ohne payload_json
+    expect(res.ok).toBe(true);
+    expect(mockUpsertRun).not.toHaveBeenCalled();
+  });
+
+  it('doppelter Retry → track_run 2× upsert (idempotent, kein Duplikat)', async () => {
+    mockGetLocal.mockResolvedValue(withRun(RUN));
+    await syncTrainingSession('local-1');
+    await syncTrainingSession('local-1');
+    expect(mockUpsertRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('track_run-Upsert-Fehler → ok=false, NICHT als synced markiert', async () => {
+    mockGetLocal.mockResolvedValue(withRun(RUN));
+    mockUpsertRun.mockResolvedValueOnce({ data: null, error: 'run-500' });
     const res = await syncTrainingSession('local-1');
     expect(res.ok).toBe(false);
     expect(mockUpdateSyncStatus).not.toHaveBeenCalledWith('local-1', 'synced');

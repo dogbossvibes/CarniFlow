@@ -22,7 +22,7 @@ const mockFrom = jest.fn((table: string) => {
 jest.mock('@/lib/supabase', () => ({ supabase: { from: (t: string) => mockFrom(t) } }));
 
 import {
-  createRemoteTrainingSession, deleteRemoteLayTrackPoints, deleteRemoteTrackMarkers,
+  createRemoteTrainingSession, deleteRemoteLayTrackPoints, deleteRemoteTrackMarkers, upsertRemoteTrackRun,
 } from '@/features/sync/services/remoteTrainingSyncService';
 import type { LocalTrainingSession } from '@/features/sync/types/sync';
 
@@ -88,5 +88,47 @@ describe('Replace-by-session Deletes — owner-scoped, idempotent', () => {
     expect(res.error).toBeNull();
     expect(mockFromCalls[0]).toBe('track_markers');
     expect(mockDeleteEqCalls).toContainEqual(['session_id', 'uuid-1']);
+  });
+});
+
+describe('upsertRemoteTrackRun — idempotenter track_runs-Upsert per runUuid', () => {
+  const run = {
+    run_id: 'run-1', started_at: '2026-08-11T10:20:00.000Z', ended_at: '2026-08-11T10:30:00.000Z',
+    duration_seconds: 600, distance_meters: 250, average_deviation_meters: 1.4, articles_found: 2,
+    score: 88, total_objects: 3, breaks: 1, run_points: [{ lat: 47, lng: 8 }],
+  };
+
+  it('upsertet track_runs mit id=runUuid + session_id + run_points, onConflict:id', async () => {
+    const res = await upsertRemoteTrackRun('uuid-1', run);
+    expect(res.error).toBeNull();
+    expect(mockFromCalls[0]).toBe('track_runs');
+    const [row, opts] = mockUpsert.mock.calls[0];
+    expect(row.id).toBe('run-1');
+    expect(row.session_id).toBe('uuid-1');
+    expect(row.duration_seconds).toBe(600);
+    expect(row.average_deviation_meters).toBe(1.4);
+    expect(row.articles_found).toBe(2);
+    expect(row.run_points).toEqual([{ lat: 47, lng: 8 }]);
+    expect(opts).toEqual({ onConflict: 'id' });
+  });
+});
+
+describe('createRemoteTrainingSession — Run-Metadaten aus payload_json.run', () => {
+  it('setzt Session-Search-Felder + track_data.run (ohne run_points)', async () => {
+    const withRun = {
+      ...localBase,
+      payload_json: JSON.stringify({
+        distanceMeters: 250, segments: [{ id: 's1' }],
+        run: { run_id: 'run-1', duration_seconds: 600, average_deviation_meters: 1.4, articles_found: 2, score: 88, run_points: [{ lat: 47, lng: 8 }] },
+      }),
+    };
+    await createRemoteTrainingSession(withRun);
+    const [row] = mockUpsert.mock.calls[0];
+    expect(row.search_duration_seconds).toBe(600);
+    expect(row.average_deviation_meters).toBe(1.4);
+    expect(row.articles_found).toBe(2);
+    expect(row.track_data.segments).toEqual([{ id: 's1' }]);
+    expect(row.track_data.run.score).toBe(88);
+    expect(row.track_data.run.run_points).toBeUndefined();   // run_points liegen in track_runs
   });
 });
