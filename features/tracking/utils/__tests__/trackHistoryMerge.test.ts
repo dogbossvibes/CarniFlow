@@ -44,6 +44,16 @@ describe('mergeTrackHistory', () => {
     expect(out[0].syncState).toBe('failed');
   });
 
+  it('RUN-SAVE3: Score der ausgearbeiteten Absuche (payload.run.score) wird gezeigt', () => {
+    const withRun = localSession({
+      payload_json: JSON.stringify({ distanceMeters: 250, run: { score: 91, articles_found: 2 } }),
+    });
+    const out = mergeTrackHistory([], [withRun]);
+    expect(out[0].score).toBe(91);
+    expect(out[0].articles_found).toBe(2);
+    expect(out[0].track_data.run.score).toBe(91);
+  });
+
   it('gleiche Session lokal + remote → nur EIN Eintrag (remote gewinnt, synced)', () => {
     const out = mergeTrackHistory([remote({ id: 'uuid-1' })], [localSession({ sync_status: 'pending' })]);
     expect(out).toHaveLength(1);

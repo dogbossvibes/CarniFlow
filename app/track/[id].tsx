@@ -14,6 +14,7 @@ import { TrackScoreRing } from '@/features/tracking/components/TrackScoreRing';
 import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
 import { FaehrtenHeader, SectionLabel, relDate } from '@/features/tracking/components/FaehrtenChrome';
 import { getTrackSessionById, saveTrackEvaluation } from '@/features/tracking/services/trackService';
+import { getLocalTrackDetail, saveLocalTrackEvaluation } from '@/features/tracking/services/trackHistoryService';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
@@ -39,13 +40,20 @@ export default function TrackAuswertungScreen() {
 
   const [legs, setLegs]   = useState<LegRow[]>([]);
   const [notes, setNotes] = useState('');
+  const [isLocalOnly, setIsLocalOnly] = useState(false);
 
   useEffect(() => {
     useTrackingStore.getState().reset();   // Flow abgeschlossen → Store leeren
     if (!id) return;
-    getTrackSessionById(id).then(r => {
-      const d = r.data;
+    (async () => {
+      const r = await getTrackSessionById(id);
+      // Fällt remote nichts zurück (noch nicht synchronisiert / offline) → lokal (SQLite)
+      // zusammenbauen, damit die Auswertung nie mit „nicht gefunden" abbricht.
+      let d = r.data;
+      let localOnly = false;
+      if (!d) { d = await getLocalTrackDetail(id).catch(() => null); localOnly = !!d; }
       setData(d);
+      setIsLocalOnly(localOnly);
       if (d) {
         setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0));
         setNotes(d.notes ?? '');
@@ -53,7 +61,7 @@ export default function TrackAuswertungScreen() {
         if (d.dog_id) useActiveFaehrten.getState().remove(d.dog_id);
       }
       setLoading(false);
-    });
+    })();
   }, [id]);
 
   const score = useMemo(() => overallScore(legs), [legs]);
@@ -86,6 +94,14 @@ export default function TrackAuswertungScreen() {
   const onSave = async () => {
     if (!id) return;
     setSaving(true);
+    // Lokal-only Fährte: Auswertung lokal speichern + zur Re-Sync einreihen (kein
+    // Remote-Direktschreiben ohne Remote-Zeile, kein AI-Embedding ohne Remote-Session).
+    if (isLocalOnly) {
+      await saveLocalTrackEvaluation(id, { score, notes: notes.trim() || null }).catch(() => {});
+      setSaving(false);
+      router.replace('/track' as never);
+      return;
+    }
     const { error } = await saveTrackEvaluation(id, { legs, rating: score, notes: notes.trim() || null });
     setSaving(false);
     if (!error) {

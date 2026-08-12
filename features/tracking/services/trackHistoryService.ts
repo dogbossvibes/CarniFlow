@@ -1,6 +1,11 @@
 import { getUserTrackSessions } from '@/features/tracking/services/trackService';
-import { getLocalTrainingSessions } from '@/features/training/repositories/localTrainingRepository';
+import {
+  getLocalTrainingSessions, getLocalTrainingSessionById, updateLocalTrainingSession,
+} from '@/features/training/repositories/localTrainingRepository';
+import { getTrackPointsBySession, getTrackMarkersBySession } from '@/features/tracking/repositories/localTrackRepository';
+import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
 import { mergeTrackHistory, type TrackHistoryRow } from '@/features/tracking/utils/trackHistoryMerge';
+import { buildLocalTrackDetail } from '@/features/tracking/utils/localTrackDetail';
 
 // Verlauf laden = Remote (Supabase) + lokale (SQLite) Fährten zusammenführen.
 // WICHTIG: Ein Remote-Fehler (offline / Supabase down) darf die lokalen Fährten
@@ -11,4 +16,23 @@ export async function getTrackHistory(ownerId: string): Promise<TrackHistoryRow[
     getLocalTrainingSessions(ownerId, { type: 'track' }).catch(() => []),
   ]);
   return mergeTrackHistory(remoteRes.data ?? [], local ?? []);
+}
+
+// Detail einer noch nicht synchronisierten Fährte lokal (SQLite) zusammenbauen —
+// Fallback, wenn getTrackSessionById (remote) nichts liefert. null, wenn lokal unbekannt.
+export async function getLocalTrackDetail(localId: string): Promise<Record<string, any> | null> {
+  const local = await getLocalTrainingSessionById(localId).catch(() => null);
+  if (!local) return null;
+  const [points, markers] = await Promise.all([
+    getTrackPointsBySession(localId).catch(() => []),
+    getTrackMarkersBySession(localId).catch(() => []),
+  ]);
+  return buildLocalTrackDetail(local, points, markers);
+}
+
+// Auswertung (Score/Notiz) einer lokal-only Fährte lokal speichern + zur Re-Sync
+// einreihen. Kein Remote-Direktschreiben (das würde ohne Remote-Zeile verpuffen).
+export async function saveLocalTrackEvaluation(localId: string, input: { score: number; notes: string | null }): Promise<void> {
+  await updateLocalTrainingSession(localId, { score: input.score, notes: input.notes });   // flippt synced→pending
+  await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: localId, operation: 'create', priority: 1 }).catch(() => {});
 }

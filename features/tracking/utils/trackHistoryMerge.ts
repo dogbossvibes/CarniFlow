@@ -46,6 +46,7 @@ function syncStateOf(status: LocalTrainingSession['sync_status']): TrackHistoryS
 // Lokale Session → Verlaufszeile (Summary aus payload_json, P-SAVE1-Finalize).
 export function localSessionToHistoryRow(l: LocalTrainingSession): TrackHistoryRow {
   const payload = parseObj(l.payload_json) ?? {};
+  const run = payload.run ?? null;   // Absuche-Ergebnis (RUN-SAVE1) — falls ausgearbeitet
   const time = l.started_at ?? l.created_at ?? null;
   return {
     id:                 l.local_id,
@@ -58,10 +59,15 @@ export function localSessionToHistoryRow(l: LocalTrainingSession): TrackHistoryR
     distance_meters:    payload.distanceMeters ?? null,
     corners_total:      payload.cornersTotal ?? null,
     articles_total:     payload.articlesTotal ?? null,
+    articles_found:     run?.articles_found ?? null,
     lying_time_minutes: null,
-    score:              l.score ?? null,
+    // Score der ausgearbeiteten Absuche (payload.run.score) bevorzugen, sonst Lay/Session.
+    score:              run?.score ?? l.score ?? null,
     rating:             null,
-    track_data:         payload.segments ? { segments: payload.segments } : null,
+    track_data:         (payload.segments || run) ? {
+      ...(payload.segments ? { segments: payload.segments } : {}),
+      ...(run ? { run } : {}),
+    } : null,
     syncState:          syncStateOf(l.sync_status),
     isLocalOnly:        true,
   };
