@@ -3,7 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
-import { RECOVERY_DEEP_LINK } from '@/features/auth/accountSecurity';
+import { EMAIL_CONFIRM_REDIRECT_URL, RECOVERY_DEEP_LINK } from '@/features/auth/accountSecurity';
 
 // Required to complete OAuth sessions on web (no-op on native)
 WebBrowser.maybeCompleteAuthSession();
@@ -23,7 +23,12 @@ export function signUp(
   return supabase.auth.signUp({
     email:    email.trim(),
     password,
-    options:  { data: { full_name: fullName?.trim(), role } },
+    options:  {
+      data:           { full_name: fullName?.trim(), role },
+      // Nach serverseitiger E-Mail-Verifikation leitet Supabase auf diese
+      // dedizierte Bestätigungsseite (nicht mehr nur auf die Homepage).
+      emailRedirectTo: EMAIL_CONFIRM_REDIRECT_URL,
+    },
   });
 }
 

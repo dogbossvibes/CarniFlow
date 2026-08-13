@@ -8,6 +8,13 @@ export const EMAIL_CHANGE_PENDING_MESSAGE =
   'Bitte prüfe deine E-Mails und bestätige die Änderung. Abhängig von den Sicherheitseinstellungen kann auch eine Bestätigung über deine bisherige Adresse erforderlich sein.';
 export const RECOVERY_DEEP_LINK = 'anyvo://auth/recovery';
 
+// Ziel für den E-Mail-Bestätigungslink nach der Registrierung. Supabase leitet
+// nach serverseitiger Verifikation auf diese dedizierte Web-Bestätigungsseite
+// (statt auf die Homepage). Diese URL muss in Supabase unter
+// Authentication → URL Configuration → Redirect URLs freigegeben sein.
+// Zentral hier gehalten, damit die URL nicht mehrfach hart codiert wird.
+export const EMAIL_CONFIRM_REDIRECT_URL = 'https://anyvo.app/auth/confirmed';
+
 export type AuthProvider = 'email' | 'google' | 'apple' | string;
 
 export function getAuthProvider(user: Pick<User, 'app_metadata'> | null | undefined): AuthProvider {
