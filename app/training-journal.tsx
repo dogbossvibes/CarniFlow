@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useDogs } from '@/hooks/useDogs';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
 import { DISCIPLINES, disciplineColor } from '@/constants/disciplines';
 import type { FeedItem } from '@/services/trainingFeed';
+import { deleteFeedItem } from '@/services/deleteTraining';
 import {
   filterFeed, groupFeed, summarize, paginate, hasMore, disciplinesOf,
   itemDiscipline, itemDogName, itemHasMedia, itemNotePreview,
@@ -41,6 +42,7 @@ export default function TrainingJournalScreen() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const year = new Date().getFullYear();
   const summary = useMemo(() => summarize(feed, year), [feed, year]);
@@ -63,6 +65,30 @@ export default function TrainingJournalScreen() {
     else if (it.source === 'track') router.push(`/track/${it.id}` as never);
     else                            router.push(`/training/${it.id}` as never);
   };
+
+  // Fährteneintrag löschen: bestätigen → über die bestehende vereinheitlichte
+  // Delete-Fassade (deleteFeedItem; löscht die Fährten-Session inkl. FK-Cascade auf
+  // Punkte/Marker/Runs) löschen → Feed neu laden. Nicht optimistisch: der Eintrag
+  // bleibt sichtbar, bis das Löschen bestätigt ist; bei Fehler bleibt er erhalten.
+  const confirmDeleteTrack = useCallback((it: FeedItem) => {
+    Alert.alert(t('journal.deleteTrackTitle'), t('journal.deleteTrackBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'), style: 'destructive',
+        onPress: async () => {
+          setDeletingId(it.id);
+          const { error } = await deleteFeedItem(it);   // RLS: nur eigene Einträge
+          if (error) {
+            setDeletingId(null);
+            Alert.alert(t('journal.deleteError'));
+            return;                                      // Eintrag bleibt sichtbar
+          }
+          await refresh();                               // Feed aktualisieren (kein App-Reload)
+          setDeletingId(null);
+        },
+      },
+    ]);
+  }, [t, refresh]);
 
   const groupLabel = (g: JournalGroup): string => {
     if (g.kind === 'today')     return t('journal.group.today');
@@ -210,6 +236,9 @@ export default function TrainingJournalScreen() {
                         pointsLabel={(pts) => t('dog.pointsShort', { points: pts })}
                         mediaLabel={t('journal.media')}
                         onPress={() => openDetail(it)}
+                        onDelete={it.source === 'track' ? () => confirmDeleteTrack(it) : undefined}
+                        deleting={deletingId === it.id}
+                        deleteLabel={t('journal.deleteTrackA11y')}
                       />
                     ))}
                   </View>
@@ -268,6 +297,7 @@ function EmptyState({ icon, title, text, ctaLabel, onCta }: { icon: IconName; ti
 
 function JournalCard({
   item, dogName, localeTag, minutesLabel, pointsLabel, mediaLabel, onPress,
+  onDelete, deleting, deleteLabel,
 }: {
   item: FeedItem;
   dogName: string;
@@ -276,6 +306,9 @@ function JournalCard({
   pointsLabel: (pts: number) => string;
   mediaLabel: string;
   onPress: () => void;
+  onDelete?: () => void;
+  deleting?: boolean;
+  deleteLabel?: string;
 }) {
   const discipline = itemDiscipline(item);
   const accent = disciplineColor(discipline);
@@ -303,6 +336,21 @@ function JournalCard({
           <View style={s.pill}><Text style={s.pillTxt}>{pointsLabel(item.rating)}</Text></View>
         ) : null}
         {media ? <Ionicons name="images-outline" size={15} color={C.trackTextMut} accessibilityLabel={mediaLabel} /> : null}
+        {onDelete ? (
+          deleting ? (
+            <ActivityIndicator size="small" color={C.trackTextMut} style={s.cardDelete} />
+          ) : (
+            <TouchableOpacity
+              style={s.cardDelete}
+              onPress={onDelete}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={deleteLabel}
+            >
+              <Ionicons name="trash-outline" size={16} color={C.trackTextMut} />
+            </TouchableOpacity>
+          )
+        ) : null}
         <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
       </View>
     </TouchableOpacity>
@@ -349,6 +397,7 @@ const s = StyleSheet.create({
   cardMeta:  { fontSize: 12, color: C.trackTextSec, fontWeight: '600', marginTop: 2 },
   cardNote:  { fontSize: 12, color: C.trackTextMut, fontWeight: '500', marginTop: 2 },
   cardRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardDelete:{ width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   pill:      { borderRadius: 9, borderWidth: 1, borderColor: C.accentMid, backgroundColor: C.accentDim, paddingHorizontal: 9, paddingVertical: 4 },
   pillTxt:   { fontSize: 12, color: C.trackPrimary, fontWeight: '800' },
 

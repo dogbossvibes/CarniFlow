@@ -1625,6 +1625,10 @@ export const deCH = {
   'journal.minutesShort':     '{count} Min.',
   'journal.hoursShort':       '{count} h',
   'journal.media':            'Medien',
+  'journal.deleteTrackTitle': 'Fährte löschen?',
+  'journal.deleteTrackBody':  'Diese Fährte wird dauerhaft aus deinem Trainingsjournal gelöscht.',
+  'journal.deleteTrackA11y':  'Fährte löschen',
+  'journal.deleteError':      'Die Fährte konnte nicht gelöscht werden. Bitte versuche es erneut.',
 
   // Persönliches Hunde-Dashboard (Overview-Tab)
   'dash.todayWith':          'Heute mit {name}',

@@ -1625,6 +1625,10 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'journal.minutesShort':     '{count} Min.',
   'journal.hoursShort':       '{count} h',
   'journal.media':            'Medie',
+  'journal.deleteTrackTitle': 'Fährte lösche?',
+  'journal.deleteTrackBody':  'Die Fährte wird für immer us dim Trainingsjournal glöscht.',
+  'journal.deleteTrackA11y':  'Fährte lösche',
+  'journal.deleteError':      'D Fährte het nöd chönne glöscht werde. Probier s bitte nomal.',
 
   // Persönlichs Hunde-Dashboard (Overview-Tab)
   'dash.todayWith':          'Hüt mit {name}',

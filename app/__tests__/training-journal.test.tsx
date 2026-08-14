@@ -1,10 +1,12 @@
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Text, TouchableOpacity } from 'react-native';
+import { Alert, Text, TouchableOpacity } from 'react-native';
 import TrainingJournalScreen from '@/app/training-journal';
 import type { FeedItem } from '@/services/trainingFeed';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockRefresh = jest.fn(() => Promise.resolve());
+const mockDeleteFeedItem = jest.fn((_item?: FeedItem) => Promise.resolve({ error: null as string | null }));
 let mockFeed: FeedItem[] = [];
 
 const mockLabels: Record<string, string> = {
@@ -66,7 +68,12 @@ jest.mock('@/hooks/useDogs', () => ({
 }));
 
 jest.mock('@/hooks/useTrainingFeed', () => ({
-  useTrainingFeed: () => ({ feed: mockFeed, loading: false, refresh: jest.fn() }),
+  useTrainingFeed: () => ({ feed: mockFeed, loading: false, refresh: mockRefresh }),
+}));
+
+// Bestehende vereinheitlichte Delete-Fassade mocken (kein Supabase im UI-Test).
+jest.mock('@/services/deleteTraining', () => ({
+  deleteFeedItem: (item: FeedItem) => mockDeleteFeedItem(item),
 }));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
@@ -115,6 +122,14 @@ function trackCards(node: ReactTestRenderer): { props: { onPress?: () => void; a
   return (node.root as unknown as { findAllByType: (t: unknown) => { props: { onPress?: () => void; accessibilityLabel?: string } }[] })
     .findAllByType(TouchableOpacity)
     .filter((b) => b.props.accessibilityLabel?.startsWith('Fährte'));
+}
+
+// Lösch-Buttons tragen das (im Test unmockte) Key-Label 'journal.deleteTrackA11y'
+// und kollidieren daher nicht mit der Karten-Filterung oben.
+function deleteButtons(node: ReactTestRenderer): { props: { onPress?: () => void } }[] {
+  return (node.root as unknown as { findAllByType: (t: unknown) => { props: { onPress?: () => void; accessibilityLabel?: string } }[] })
+    .findAllByType(TouchableOpacity)
+    .filter((b) => b.props.accessibilityLabel === 'journal.deleteTrackA11y');
 }
 
 describe('Trainingsjournal — GPS-Fährten (T-40)', () => {
@@ -166,5 +181,78 @@ describe('Trainingsjournal — GPS-Fährten (T-40)', () => {
     const node = render();
     expect(trackCards(node)).toHaveLength(0);
     expect(allStrings(node)).toContain('Obedience');
+  });
+});
+
+describe('Trainingsjournal — Fährte löschen', () => {
+  beforeEach(() => {
+    mockPush.mockReset();
+    mockRefresh.mockClear();
+    mockDeleteFeedItem.mockClear();
+    mockDeleteFeedItem.mockResolvedValue({ error: null });
+  });
+
+  const lastAlertButtons = (): { text?: string; style?: string; onPress?: () => void | Promise<void> }[] => {
+    const spy = Alert.alert as unknown as jest.Mock;
+    return (spy.mock.calls[spy.mock.calls.length - 1]?.[2] ?? []) as never;
+  };
+
+  it('bietet nur bei Fährteneinträgen eine Löschaktion an', () => {
+    mockFeed = [
+      mk({ id: 'tr1', source: 'track' }),
+      mk({ id: 'u1', source: 'unit', exercises: [{ discipline: 'Obedience', exercise_name: 'Fuss', rating: null, notes: null, duration_sec: null, seq_index: 0 }] }),
+    ];
+    const node = render();
+    expect(deleteButtons(node)).toHaveLength(1);   // nur die Fährte
+  });
+
+  it('Löschen bestätigen ruft die Delete-Fassade und aktualisiert den Feed', async () => {
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockFeed = [mk({ id: 'tr42', source: 'track' })];
+    const node = render();
+
+    act(() => { deleteButtons(node)[0].props.onPress?.(); });
+    expect(spy).toHaveBeenCalled();
+    expect(spy.mock.calls[0][0]).toBe('journal.deleteTrackTitle');
+    expect(spy.mock.calls[0][1]).toBe('journal.deleteTrackBody');
+
+    const del = lastAlertButtons().find((b) => b.style === 'destructive');
+    await act(async () => { await del?.onPress?.(); });
+
+    expect(mockDeleteFeedItem).toHaveBeenCalledTimes(1);
+    expect((mockDeleteFeedItem.mock.calls[0][0] as FeedItem).id).toBe('tr42');
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it('Abbrechen löscht nicht und aktualisiert den Feed nicht', async () => {
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockFeed = [mk({ id: 'tr7', source: 'track' })];
+    const node = render();
+
+    act(() => { deleteButtons(node)[0].props.onPress?.(); });
+    const cancel = lastAlertButtons().find((b) => b.style === 'cancel');
+    await act(async () => { await cancel?.onPress?.(); });
+
+    expect(mockDeleteFeedItem).not.toHaveBeenCalled();
+    expect(mockRefresh).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('bei Delete-Fehler bleibt der Eintrag sichtbar und der Feed wird nicht refetcht', async () => {
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockDeleteFeedItem.mockResolvedValueOnce({ error: 'row-level security violation' });
+    mockFeed = [mk({ id: 'tr9', source: 'track' })];
+    const node = render();
+
+    act(() => { deleteButtons(node)[0].props.onPress?.(); });
+    const del = lastAlertButtons().find((b) => b.style === 'destructive');
+    await act(async () => { await del?.onPress?.(); });
+
+    expect(mockDeleteFeedItem).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).not.toHaveBeenCalled();                 // kein Refetch bei Fehler
+    expect(spy.mock.calls.some((c) => c[0] === 'journal.deleteError')).toBe(true);
+    expect(trackCards(node)).toHaveLength(1);                   // Eintrag bleibt sichtbar
+    spy.mockRestore();
   });
 });

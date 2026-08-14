@@ -23,11 +23,30 @@ describe('33-36) Trainingstagebuch führt keine neue Persistenz/Logik ein', () =
   it('34) Screen nutzt den bestehenden Feed-Hook als einzige Datenquelle', () => {
     expect(screen).toMatch(/useTrainingFeed/);
     expect(screen).not.toMatch(/@\/lib\/supabase/);
-    expect(screen).not.toMatch(/getTrainingUnits|getTrainingSessions|addTrainingSession|deleteTraining/);
+    // Kein direkter Datenquellen-Zugriff / keine zweite Persistenz. Das Löschen
+    // läuft ausschliesslich über die bestehende vereinheitlichte deleteFeedItem-
+    // Architektur (siehe Test 37), nicht über rohe Fetch-/Add-Funktionen.
+    expect(screen).not.toMatch(/getTrainingUnits|getTrainingSessions|addTrainingSession/);
   });
 
-  it('35) Screen ändert keine Tracking-/Fährtenlogik (nur Lese-Navigation zu Details)', () => {
+  it('35) Screen ändert keine Tracking-/Fährtenlogik (nur Lese-Navigation + zentrales Delete)', () => {
+    // Kein direkter Zugriff auf trackService/deleteTrackSession — das Löschen geht
+    // über die vereinheitlichte deleteFeedItem-Fassade (services/deleteTraining).
     expect(screen).not.toMatch(/trackService|activeFaehrten|deleteTrackSession|finishTrainingUnit/);
+  });
+
+  it('37) Fährten-Löschen nutzt die bestehende vereinheitlichte Delete-Fassade + Bestätigung + Feed-Refresh', () => {
+    // Genau eine, bestehende Löschlogik (deleteFeedItem), keine Parallel-Implementierung.
+    expect(screen).toMatch(/deleteFeedItem/);
+    expect(screen).toMatch(/@\/services\/deleteTraining/);
+    // Bestätigungsdialog mit den vorgesehenen Keys.
+    expect(screen).toMatch(/Alert\.alert/);
+    expect(screen).toMatch(/journal\.deleteTrackTitle/);
+    expect(screen).toMatch(/journal\.deleteTrackBody/);
+    // Nach erfolgreichem Löschen wird der Feed aktualisiert (kein App-Reload).
+    expect(screen).toMatch(/refresh\(\)/);
+    // Nur Fährteneinträge sind löschbar (source === 'track').
+    expect(screen).toMatch(/source === 'track' \?/);
   });
 
   it('36) Screen enthält keine Abo-/RevenueCat-Logik', () => {
