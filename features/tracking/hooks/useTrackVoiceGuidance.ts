@@ -29,7 +29,7 @@ function translateKey(key: TranslationKey, params: Record<string, string | numbe
   return i18n.t(key, { lng: locale, ...params }) as string;
 }
 
-function say(msg: string, locale: AppLocale = getCurrentLocale()) {
+export function say(msg: string, locale: AppLocale = getCurrentLocale()) {
   try { Speech?.stop(); Speech?.speak(msg, { language: speechLanguage(locale), rate: 1.0 }); } catch { /* ignore */ }
 }
 
