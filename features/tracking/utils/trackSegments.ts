@@ -79,6 +79,17 @@ export const TRACK_SEGMENT_COLORS: Record<TrackSegmentType, string> = {
   custom: C.trackPurple,
 };
 
+// Darstellung der GELEGTEN Fährte (Soll-Linie) auf der Karte. Sie wird IMMER solide
+// in ANYVO-Mint gezeichnet — auch während der Absuche. KEIN lineDashPattern, keine
+// Dimmung: die gestrichelt/gedimmte Variante war von der blauen Ist-Suchspur nicht
+// klar zu unterscheiden (Produktions-Bug). Segment-Overlays (5/10-m-Teilstrecken)
+// bleiben dicker und in ihrer Segmentfarbe. Reine, testbare Funktion.
+export interface LaidStrokeStyle { strokeColor: string; strokeWidth: number; lineDashPattern?: number[] }
+export function laidTrackStroke(kind: 'normal' | 'segment', partColor: string): LaidStrokeStyle {
+  if (kind === 'segment') return { strokeColor: partColor, strokeWidth: 6 };
+  return { strokeColor: partColor || C.trackPrimary, strokeWidth: 4 };
+}
+
 const sentenceLabel: Record<TrackSegmentType, string> = {
   no_food: 'ohne Futter',
   low_food: 'mit wenig Futter',

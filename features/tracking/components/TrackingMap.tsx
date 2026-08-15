@@ -9,7 +9,7 @@ import { ANGLE_SHORT, angleMarkerKind } from '@/features/tracking/utils/angleCla
 import { objectNumbers } from '@/features/tracking/utils/objectMarkers';
 import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/store/trackingStore';
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
-import { buildTrackSegmentPolylines } from '@/features/tracking/utils/trackSegments';
+import { buildTrackSegmentPolylines, laidTrackStroke } from '@/features/tracking/utils/trackSegments';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
@@ -76,7 +76,7 @@ interface Props {
   markers?:         MapMarker[];
   segments?:        TrackSegment[];
   breaks?:          LatLng[];   // Abriss-Punkte (Ausarbeiten) — rote Marker
-  dimLay?:          boolean;    // Soll-Fährte gedimmt zeichnen (Ausarbeiten)
+  dimLay?:          boolean;    // DEPRECATED/ignoriert: gelegte Fährte ist während der Absuche jetzt immer solide Mint (Prod-Bugfix). Prop bleibt für Aufrufer-Kompatibilität.
   startAnchor?:     LatLng | null;   // stabilisierter Startpunkt → Fähnchen (statt erstem Rohpunkt)
   currentPosition:  LatLng | null;
   heading?:         number | null;
@@ -91,7 +91,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, dimLay, startAnchor, currentPosition, heading,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, currentPosition, heading,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
@@ -184,23 +184,27 @@ export function TrackingMap({
         {rawCoords.length > 1 && (
           <Polyline coordinates={rawCoords} strokeColor="rgba(255,255,255,0.35)" strokeWidth={2} />
         )}
-        {/* Gelegte Fährte: beim Legen durchgezogen türkis; im Ausarbeiten gedimmt
-            gestrichelt als Soll-Referenz (zur blauen Ist-Linie unterscheidbar). */}
-        {laySegmentParts.length > 0 ? laySegmentParts.map(part => (
-          <Polyline
-            key={part.id}
-            coordinates={part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng }))}
-            strokeColor={dimLay && part.kind === 'normal' ? 'rgba(21,230,195,0.55)' : part.color}
-            strokeWidth={part.kind === 'segment' ? 6 : (dimLay ? 3.5 : 4)}
-            lineDashPattern={dimLay && part.kind === 'normal' ? [8, 8] : undefined}
-            lineCap="round"
-            lineJoin="round"
-            zIndex={part.kind === 'segment' ? 3 : 2}
-          />
-        )) : layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={dimLay ? 'rgba(21,230,195,0.55)' : C.trackPrimary} strokeWidth={dimLay ? 3.5 : 4} lineDashPattern={dimLay ? [8, 8] : undefined} />
+        {/* Gelegte Fährte (Soll-Linie): IMMER solide ANYVO-Mint — auch während der
+            Absuche. Kein Dash/Dimm (sonst mit der blauen Ist-Suchspur verwechselbar).
+            Stil zentral über laidTrackStroke() (rein/testbar). */}
+        {laySegmentParts.length > 0 ? laySegmentParts.map(part => {
+          const stroke = laidTrackStroke(part.kind, part.color);
+          return (
+            <Polyline
+              key={part.id}
+              coordinates={part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng }))}
+              strokeColor={stroke.strokeColor}
+              strokeWidth={stroke.strokeWidth}
+              lineDashPattern={stroke.lineDashPattern}
+              lineCap="round"
+              lineJoin="round"
+              zIndex={part.kind === 'segment' ? 3 : 2}
+            />
+          );
+        }) : layCoords.length > 1 && (
+          <Polyline coordinates={layCoords} strokeColor={C.trackPrimary} strokeWidth={4} lineCap="round" lineJoin="round" />
         )}
-        {/* Gelaufener Ablauf: blau, durchgezogen */}
+        {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
         {runCoords.length > 1 && (
           <Polyline coordinates={runCoords} strokeColor={C.trackBlue} strokeWidth={4} />
         )}
