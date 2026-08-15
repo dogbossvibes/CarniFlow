@@ -3,6 +3,7 @@ import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
 import { UnitListCard } from "@/components/training/UnitListCard";
 import { SwipeableTrainingItem } from "@/components/training/SwipeableTrainingItem";
+import { ActiveTrialGate } from "@/components/subscription/ActiveTrialGate";
 import { C } from "@/constants/colors";
 import { useT, type TranslationKey } from "@/i18n";
 import { useDogs } from "@/hooks/useDogs";
@@ -363,6 +364,8 @@ export default function HomeScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
       {toast}
+      {/* Proaktives ACTIVE-Trial-Angebot (nur eligible NEWBIE nach 1. Training, mit Cooldown). */}
+      <ActiveTrialGate />
     </SafeAreaView>
   );
 }

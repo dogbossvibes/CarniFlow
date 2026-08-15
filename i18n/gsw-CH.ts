@@ -1630,6 +1630,20 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'journal.deleteTrackA11y':  'Fährte lösche',
   'journal.deleteError':      'D Fährte het nöd chönne glöscht werde. Probier s bitte nomal.',
 
+  // ACTIVE 4-Tage-Store-Trial (nach em erschte Training)
+  'activeTrial.title':             'Parat für meh?',
+  'activeTrial.body1':             'Du häsch dis erschte Training mit ANYVO dokumentiert.',
+  'activeTrial.body2':             'Teschte ACTIVE {days} Täg gratis und entdeck unbegrenzts Training, Fährte und alli ACTIVE-Funktione.',
+  'activeTrial.cta':               '{days} Täg ACTIVE teschte',
+  'activeTrial.later':             'Spöter',
+  'activeTrial.priceNote':         '{days} Täg gratis, dänn {price} / {period}.',
+  'activeTrial.priceNoteNoPrice':  '{days} Täg gratis, dänn de reguläri ACTIVE-Priis.',
+  'activeTrial.error':             'De Chauf het nöd chönne abgschlosse werde. Probier s bitte nomal.',
+  'activeTrial.period.day':        'Tag',
+  'activeTrial.period.week':       'Wuche',
+  'activeTrial.period.month':      'Monet',
+  'activeTrial.period.year':       'Jahr',
+
   // Persönlichs Hunde-Dashboard (Overview-Tab)
   'dash.todayWith':          'Hüt mit {name}',
   'dash.nothingToday':       'Für hüt isch nüt plant.',

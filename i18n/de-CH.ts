@@ -1630,6 +1630,20 @@ export const deCH = {
   'journal.deleteTrackA11y':  'Fährte löschen',
   'journal.deleteError':      'Die Fährte konnte nicht gelöscht werden. Bitte versuche es erneut.',
 
+  // ACTIVE 4-Tage-Store-Trial (nach dem ersten Training)
+  'activeTrial.title':             'Bereit für mehr?',
+  'activeTrial.body1':             'Du hast dein erstes Training mit ANYVO dokumentiert.',
+  'activeTrial.body2':             'Teste ACTIVE {days} Tage kostenlos und entdecke unbegrenztes Training, Fährten und alle ACTIVE-Funktionen.',
+  'activeTrial.cta':               '{days} Tage ACTIVE testen',
+  'activeTrial.later':             'Später',
+  'activeTrial.priceNote':         '{days} Tage kostenlos, danach {price} / {period}.',
+  'activeTrial.priceNoteNoPrice':  '{days} Tage kostenlos, danach regulärer ACTIVE-Preis.',
+  'activeTrial.error':             'Der Kauf konnte nicht abgeschlossen werden. Bitte versuche es erneut.',
+  'activeTrial.period.day':        'Tag',
+  'activeTrial.period.week':       'Woche',
+  'activeTrial.period.month':      'Monat',
+  'activeTrial.period.year':       'Jahr',
+
   // Persönliches Hunde-Dashboard (Overview-Tab)
   'dash.todayWith':          'Heute mit {name}',
   'dash.nothingToday':       'Für heute ist nichts geplant.',

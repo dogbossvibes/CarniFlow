@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
-import type { SubscriptionPlan } from '@/features/subscription/plans';
+import { PRODUCT_IDS, type SubscriptionPlan } from '@/features/subscription/plans';
+import type { StoreTrialOffer } from '@/features/subscription/activeTrial';
 
 // RevenueCat (Apple/Google In-App-Purchase). Nativ → defensiv laden, damit Expo
 // Go / ein Build ohne das Modul nicht crasht. Ohne API-Key bleibt IAP inaktiv
@@ -272,6 +273,99 @@ export async function restorePurchases(): Promise<EntitlementResult> {
   } catch (e: any) {
     return { ok: false, tier: null, plan: null, expiration: null, error: e?.message ?? 'Wiederherstellen fehlgeschlagen' };
   }
+}
+
+// ── ACTIVE 3-Tage-Store-Trial (Introductory Offer) ───────────────────────────
+// RevenueCat/Store ist die Quelle der Wahrheit für Verfügbarkeit, Preis UND die
+// tatsächliche Trial-Dauer. Kein lokaler Timer, keine harte Preis-/Dauer-Codierung.
+
+// ISO-8601-Periode (z. B. 'P4D', 'P1W', 'P1M') → Tage. Rein/testbar.
+export function iso8601PeriodToDays(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const m = /^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?$/.exec(iso.trim());
+  if (!m) return null;
+  const [y, mo, w, d] = [m[1], m[2], m[3], m[4]].map(x => (x ? Number(x) : 0));
+  const days = y * 365 + mo * 30 + w * 7 + d;
+  return days > 0 ? days : null;
+}
+
+// RevenueCat periodUnit ('DAY'|'WEEK'|'MONTH'|'YEAR') × count → Tage.
+export function unitCountToDays(unit: string | null | undefined, count: number | null | undefined): number | null {
+  if (!unit || !count) return null;
+  const u = String(unit).toUpperCase();
+  const per = u.startsWith('DAY') ? 1 : u.startsWith('WEEK') ? 7 : u.startsWith('MONTH') ? 30 : u.startsWith('YEAR') ? 365 : 0;
+  return per ? per * count : null;
+}
+
+// Grobes Abrechnungs-Intervall für die UI-Darstellung („… / Monat").
+export function coarsePeriodLabel(iso: string | null | undefined): 'day' | 'week' | 'month' | 'year' | null {
+  const days = iso8601PeriodToDays(iso);
+  if (days == null) return null;
+  if (days >= 360) return 'year';
+  if (days >= 28) return 'month';
+  if (days >= 7) return 'week';
+  return 'day';
+}
+
+// Freie Trial-Dauer (Tage) aus einem RevenueCat-Produkt lesen — iOS introPrice
+// (price 0) ODER Android freePhase (billingPeriod). null = kein Free-Trial konfiguriert.
+export function freeTrialDaysFromProduct(product: any): number | null {
+  const intro = product?.introPrice;
+  if (intro && (intro.price === 0 || intro.price === '0' || intro.price === 0.0)) {
+    return unitCountToDays(intro.periodUnit, intro.periodNumberOfUnits)
+      ?? iso8601PeriodToDays(intro.period ?? intro.periodISO8601);
+  }
+  const options: any[] = product?.subscriptionOptions ?? [];
+  const freePhase = product?.defaultOption?.freePhase
+    ?? options.map(o => o?.freePhase).find(Boolean);
+  const iso = freePhase?.billingPeriod?.iso8601 ?? freePhase?.billingPeriod;
+  return iso8601PeriodToDays(typeof iso === 'string' ? iso : null);
+}
+
+// Store-Trial-Angebot für ACTIVE. available=true nur, wenn ein Free-Trial-Phase
+// im Store konfiguriert ist UND (iOS) die Introductory-Eligibility nicht klar
+// „ineligible" meldet. So gibt es KEIN falsches Trial-Versprechen, wenn der Store
+// (noch) nichts konfiguriert hat. Wirft nie.
+export async function getActiveTrialOffer(): Promise<StoreTrialOffer> {
+  const empty: StoreTrialOffer = { available: false, productId: null, priceString: null, period: null, freeTrialDays: null };
+  if (!purchasesReady()) return empty;
+  try {
+    const pkgs = await getPackages();
+    const pkg = pkgs.find(p => p.productId === PRODUCT_IDS.activeMonthly) ?? pkgs.find(p => p.tier === 'pro');
+    if (!pkg) return empty;
+    const product = (pkg.raw as any)?.product;
+    const freeTrialDays = freeTrialDaysFromProduct(product);
+
+    let eligible = true;
+    if (Platform.OS === 'ios' && Purchases?.checkTrialOrIntroductoryPriceEligibility) {
+      try {
+        const map = await Purchases.checkTrialOrIntroductoryPriceEligibility([pkg.productId]);
+        // INTRO_ELIGIBILITY_STATUS_INELIGIBLE === 3 → Trial bereits genutzt.
+        if (map?.[pkg.productId]?.status === 3) eligible = false;
+      } catch { /* Eligibility unbekannt → nicht hart sperren */ }
+    }
+
+    const periodIso = product?.subscriptionPeriod ?? product?.defaultOption?.pricingPhases?.slice(-1)?.[0]?.billingPeriod?.iso8601 ?? null;
+    return {
+      available:     eligible && freeTrialDays != null,
+      productId:     pkg.productId,
+      priceString:   pkg.priceString || null,
+      period:        coarsePeriodLabel(periodIso) ?? 'month',
+      freeTrialDays,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+// ACTIVE-Trial kaufen (Store wickelt den 3-Tage-Free-Trial als Introductory Offer
+// ab). Reiner Reuse des bestehenden Kauf-Flows — kein Sonderpfad.
+export async function buyActiveTrial(): Promise<EntitlementResult> {
+  if (!purchasesReady()) return { ok: false, tier: null, plan: null, expiration: null, error: 'IAP nicht verfügbar' };
+  const pkgs = await getPackages();
+  const pkg = pkgs.find(p => p.productId === PRODUCT_IDS.activeMonthly) ?? pkgs.find(p => p.tier === 'pro');
+  if (!pkg) return { ok: false, tier: null, plan: null, expiration: null, error: 'ACTIVE-Paket nicht verfügbar' };
+  return buyPackage(pkg);
 }
 
 // Store-Abo-Verwaltung: RevenueCat liefert die korrekte, plattformspezifische
