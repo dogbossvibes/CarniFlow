@@ -3,6 +3,115 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-08-15 — Claude Code (Fährtenabsuche Production-Fix + OTA)
+
+Branch `feat/track-module-rewrite`, HEAD **`fddd1f1`** == origin (0/0). Reiner Doku/Handoff-Task heute (kein Produktcode).
+- **Realer Feldfehler** (Absuche): gelegte Fährte gestrichelt/gedimmt/transparent, Auto-Winkel fehlen, „nur Gegenstände" angesagt.
+- **Root Cause 1 (Render):** bewusste `dimLay`-Darstellung in `TrackingMap.tsx` → **Solid-Mint-Fix** via zentraler
+  `laidTrackStroke()` (gelegte Fährte solide Mint, Ist-Suchspur separat blau).
+- **Winkelpipeline** Detection→Store→Snapshot→Restore→Search→Map→Voice/Haptik **testgetrieben** verifiziert (nicht die Root Cause).
+- **Root Cause 2 (Feld):** hartes `MAX_ANGLE_ACCURACY_M=20`-Gate → Auto-Winkel entstanden im Feld gar nicht.
+  **Confidence-Erkennung** eingeführt (accept/pending/reject; robuste Accuracy über Sequenz; einzelner schlechter Fix
+  zerstört keinen klaren Winkel). **Schlangenlinien-Regressionsschutz erhalten** (echte 90°/Spitz erkannt; Schlange/S/Zickzack → 0).
+- **Commit `fddd1f1`** (Solid-Track + Confidence + Tests + Reports + DEV-Diagnostik), gepusht.
+- **Production-OTA** iOS + Android, Runtime 1.0.1, Channel `production`, aus sauberem Worktree
+  (iOS `01a00692-…`, Android `01a00697-…`). Kein Build/Submit/DB.
+- **Real-Device-Validierung noch offen** (P0, T-56). Tests: targeted 103 PASS; Gesamt 1191 PASS / 1 FAIL (vorbestehender
+  stale `run-arming.test.ts`). Details: `FAEHRTE_SEARCH_RENDER_AND_GUIDANCE_FIX_REPORT.md`, `FAEHRTE_ANGLE_CONFIDENCE_FIX_REPORT.md`.
+
+## 2026-08-13 — Claude Code (T-54: E-Mail-Aktivierungsflow)
+
+Branch `feat/track-module-rewrite`. **Kein Commit/Push/Build/Deployment.** Fremder WIP unangetastet.
+- **Ursache:** `signUp()` übergab kein `emailRedirectTo` → Supabase nutzte die Site URL → Nutzer landeten
+  ohne Rückmeldung auf der Homepage `anyvo.app`.
+- **Fix (App):** zentrale Konstante `EMAIL_CONFIRM_REDIRECT_URL = 'https://anyvo.app/auth/confirmed'`
+  (`features/auth/accountSecurity.ts`); `signUp()` (`services/auth.ts`) übergibt sie als
+  `options.emailRedirectTo`. Post-Signup-„Bitte E-Mail bestätigen"-UX in `login.tsx` war schon vorhanden → belassen.
+- **Fix (Web):** neue Bestätigungsseite `legal-web/auth/confirmed.html` (dark ANYVO-Brand, mobile-first, Logo,
+  4 Statusansichten) + reiner Resolver `legal-web/assets/auth-confirm.js` (`resolveConfirmStatus` success/expired/
+  error/neutral; **kein** Erfolg bei Direktaufruf). „ANYVO öffnen" → festes `anyvo://` (kein Open-Redirect),
+  Store-Fallback für Desktop.
+- **Tests:** `legal-web/__tests__/authConfirmStatus.test.ts` + `services/__tests__/signup-redirect.test.ts` →
+  grün (mit `auth-security.test.ts` 25 Tests). `tsc --noEmit` 0 Errors, ESLint berührter Dateien 0 Errors,
+  `git diff --check` sauber.
+- **Doku:** `docs/architecture/EMAIL_CONFIRMATION_FLOW.md`.
+- **Manueller Schritt offen:** Supabase → Authentication → URL Configuration → Redirect URLs:
+  `https://anyvo.app/auth/confirmed` freigeben. Deep-Linking bleibt Custom-Scheme (keine Universal Links).
+
+## 2026-08-12 — Claude Code (Off-Track + Save Reliability + App-Store-Release + Production-OTA)
+
+Branch `feat/track-module-rewrite`, HEAD **`4e0bf1e`** == origin (0/0). Verifiziert gegen `git log`.
+- **App-Store-Release:** ANYVO 1.0.1 / iOS Build 40 von Apple genehmigt & veröffentlicht. Apple-IAP/RevenueCat-Fix
+  (`d45a1f3` Init vor Produktladen, `184b193`/`52360f0` Diagnose add/remove), Founder aus Verkauf (`6d30359`,
+  interne Legacy/Restore erhalten), iOS Active↔Trainer-Wechsel (`6dc3462`).
+- **T-45 Auto-Winkel** (`bfc9c58`, Test `87fc3dd`): stabile Ein-/Auslaufschenkel; Schlangenlinien ≠ Winkel;
+  90°/Spitzwinkel getrennt; Links/Rechts; Single-Source-Recorder.
+- **Off-Track** Phase 1 (`c251434`, State im Recorder) + Phase 2 (`bccce35`, Banner/Voice/Haptik/Spam-Schutz).
+  **`freezeProgress` bewusst nicht aktiviert.**
+- **LEGEN Save Reliability** P-SAVE1 `7087e15` (Local-first Session/clientUuid, ID-Race weg, kein getUser-Netz-Zwang),
+  P-SAVE2 `431a2d6` (SQLite durable, Sync-Queue, idempotenter Upsert, Lay/Marker Replace, Retry),
+  P-SAVE3 `94e8ec2` (lokale pending/failed im Verlauf, Merge/Dedupe).
+- **ABSUCHE Save Reliability** RUN-SAVE1 `0ab0520` (runUuid synchron, Run-Ergebnis lokal in `payload_json.run`),
+  RUN-SAVE2 `c47d5a6` (Run über `training_session`-Queue, `track_runs` idempotent per runUuid, kanonisch
+  `track_runs.run_points`, kein `point_type='search'` remote-Replikat), RUN-SAVE3 `cc58df5`+`4e0bf1e`
+  (Verlauf-Score, Detail-Local-Fallback, Remote+Local-Supplement, Delete/hidden, kein Doppel nach Sync).
+- **Production-OTA (Runtime 1.0.1, Channel `production`, iOS + Android, kein Web):** iOS group
+  `4fe50aa1-402a-4d7d-8abc-672ff347f5c8`, Android group `f69ea5a8-93ed-4109-8121-5e6326ccdf13`, Message
+  „fix: improve track save reliability". Aus sauberem HEAD gebündelt (temporärer `git stash -u` mit Freigabe,
+  danach `stash pop`; Working-Tree-Fingerprint vor/nach identisch). Web-Export bricht via `react-native-maps`
+  (bewusst plattformweise ios/android; kein Mobile-Blocker).
+- Prüfungen der Save-Kette: `tsc` 0 Errors, ESLint 0 Errors, `git diff --check` sauber; Save-Suiten grün;
+  Gesamt-Regression 500/501 (einziger Fehler = vorbestehender stale `run-arming`-Test, unabhängig).
+- **Dieses Doku-Update:** nur `docs/agent/*` aktualisiert (CURRENT_STATE/TASKS/SESSION_HANDOFF/DECISIONS/WORK_LOG),
+  kein Produktcode, kein Commit/Push/Build/OTA.
+
+## 2026-08-10 — OpenCode (T-45 Auto-Winkelerkennung)
+
+Reine, begrenzte Tracking-Änderung; kein Commit, Push, Reset, Clean oder DB-Zugriff.
+- Verifizierte Ursache: Der Lege-Recorder klassifizierte nur die gesamte Richtungsänderung über kurze 4-m-Schenkel;
+  kontinuierliche Schlangenlinien/Kurven konnten dadurch wie Winkel aussehen.
+- `hasStableCornerLegs` ergänzt: Die Teilsegmente jedes Ein- und Auslaufschenkels müssen zur jeweiligen
+  Schenkelrichtung passen. Der vorhandene Richtungs-/Innenwinkel- und Markerpfad bleibt unverändert.
+- Neue Regressionstests: 90° links/rechts, Spitzwinkel, Schlangenlinie, weite Kurve sowie GPS-Rauschen auf Gerade
+  und Kurve. `lib/trackGuidance.ts` geprüft, aber nicht verändert: eigenständiger Legacy-/Suchdetektor und kein
+  kleiner gemeinsamer Fix ohne Scope-Ausweitung.
+- Prüfungen: fokussierte Jest-Suites 3/3, 17 Tests PASS; `npm run typecheck` PASS; `git diff --check` PASS.
+
+## 2026-08-05 — opencode (Website-Relaunch committed + gepusht, Handover → Claude Code)
+
+Branch: `feat/track-module-rewrite`, HEAD `2d9e1cc` (**0 Commits vor `origin`** — alle 50 zuvor ungepushten
+Commits jetzt remote). Danach nur Agent-Doku; kein weiterer Commit/Push/Build.
+- **Website-Relaunch (T-22):** `legal-web/index.html` (Startseite: Backpack + Journal), `legal-web/funktionen.html`
+  == `legal-web/funktionen/index.html`, echte Screenshots, Meta. Design-Pass 1 (`.premium`-Klassen, Sync funktionen,
+  Validierung grün) + Design-Pass 2 (nur `assets/site.css`: Flex-Column-Cards mit nativen `aspect-ratio`s 2/3 und 3/2,
+  `.audience-card`-Editorial, `.cta-band` contain, Sekundär-Buttons). Verifikation: 9 Breiten 320–1920 ohne Overflow.
+- **Commit + Push (mit ausdrücklicher Freigabe):** `2d9e1cc feat(web): relaunch ANYVO website with journal, backpack
+  and design pass` selektiv gestaged (nur Legal-Web), gepusht auf `origin/feat/track-module-rewrite`
+  (`6e10838..2d9e1cc`). HEAD == Remote (0/0).
+- **Nicht deployt:** Website ist weder auf Vercel noch anderswo live. „Hund vollständig sichtbar" nicht visuell
+  bestätigt → manuelle Sichtprüfung nötig.
+- **Handover opencode → Claude Code:** manuelle Sektionen in `SESSION_HANDOFF.md` gepflegt; `CURRENT_STATE.md`,
+  `TASKS.md` (T-22 → committed/nicht deployed; Push-Status; Migrationen remote) und `WORK_LOG.md` aktualisiert;
+  AUTO-GENERATED-Block per `npm run agent:handoff -- --agent=claude` regeneriert; `npm run agent:status` grün.
+- Prüfungen: `git status --short`, `git diff --check` — PASS.
+
+## 2026-08-04 — opencode (Handover opencode → Codex: Doku-Commit + Block-Regenerierung)
+
+Branch: `feat/track-module-rewrite`, HEAD `73a2e70` (43 Commits vor `origin`). Nur Agent-/Handoff-Doku;
+kein Product-Code, kein Push, kein Build, keine Migration.
+- **Doku-Commit `73a2e70 chore(agent): record build 39 readiness and remaining release work`** mit Freigabe:
+  `TASKS.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md`, `WORK_LOG.md` (4 Dateien, 568+/179-);
+  `DECISIONS.md` bewusst NICHT (fremder, vorbestehender T-34-Diff unangetastet).
+- **AUTO-GENERATED-Block regeneriert:** `npm run agent:handoff -- --agent=codex` → Generated
+  `2026-08-04T19:18:06.418Z`, Agent `codex`, Branch `feat/track-module-rewrite`, 113 Git-Einträge;
+  kein Stale-Warning mehr in `agent:status`.
+- **Handover opencode → Codex** in den manuellen Sektionen von `SESSION_HANDOFF.md` dokumentiert
+  (Session-Arbeit, geänderte Dateien, uncommitteter Zustand, Tests, bekannte Risiken, Build-/Release-Stand,
+  offene Aufgabe + Akzeptanzkriterien, nächster Schritt, out-of-scope WIP).
+- Prüfungen: `npm run agent:status`, `npm run agent:start`, `git diff --check` — PASS.
+- Git-Zustand unverändert: T-39/T-40/T-44 + Build-39-Fixes uncommittet (hunk-genau zu committen);
+  Migrationen `20260803120000`/`20260803140000` fehlen remote; fremde WIP bleibt unangetastet.
+
 ## 2026-08-04 — opencode (Build-39-Release-Readiness-Audit + Handoff-Doku)
 
 Branch: `feat/track-module-rewrite`, HEAD `c268eee` (42 Commits vor `origin`). Read-only-Audit; danach
@@ -22,8 +131,9 @@ Remote-Migration, keine History-Reparatur, keine Release-Nummern geändert.
 - **Datenbank (verified):** remote fehlen `20260803120000_fix_shared_trainings_fk.sql` (untracked) und
   `20260803140000_profiles_username.sql` (committed) — kein `supabase db push`, nur kontrollierter Workflow.
 - **Release-Konfiguration (verified):** `app.json` version `1.0.1`, iOS `buildNumber "38"`, Android
-  `versionCode 37` (→ 39); `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` nirgends gesetzt (nur iOS-Key) → Android-IAP
-  sonst inaktiv.
+  `versionCode 37` (→ 39); `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` — **Korrektur (später verifiziert):** der Key ist
+  als **sensible EAS-Env in `production`** angelegt (`eas env:create`, nicht in Git; `eas env:list production`
+  → Key + `SENTRY_AUTH_TOKEN`), in Builds geladen via `eas.json` production `"environment": "production"`.
 - **Gate:** Build 39 = **NOT READY** (uncommittete Build-39-Features, fehlende Remote-Migrationen,
   Release-Config-Lücken). Nächste freie TASK-ID jetzt **T-45**.
 - Doku: `TASKS.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md` (manuelle Sektionen; AUTO-GENERATED-Block bewusst

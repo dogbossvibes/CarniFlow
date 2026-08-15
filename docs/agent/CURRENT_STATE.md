@@ -5,7 +5,139 @@
 > Jede Aussage ist als **Verified / Assumed / Unknown** markiert.
 > **Repository state > Git state > Handoff documentation > Agent assumptions.**
 
-## Aktueller Stand — 2026-08-10 (autoritativ, verifiziert via git)
+## Aktueller Stand — 2026-08-15 (autoritativ, verifiziert via git) — MAßGEBLICH
+
+> Ergänzt von Claude Code nach dem **Production-OTA des Fährten-Render-/Confidence-Winkel-Fixes**.
+> Diese Sektion ist die neueste MAßGEBLICHE; ältere Sektionen (ab „2026-08-12" abwärts) sind Historie.
+> Bei Widerspruch gilt DIESE Sektion + echter git-Stand. **Code ist Wahrheit.**
+
+### REPO (Verified)
+- Branch `feat/track-module-rewrite`, **HEAD `fddd1f1`** (`fddd1f1db5798c32cc415e309362e95d32df95ab`),
+  **synchron mit origin** (0 ahead / 0 behind). Working Tree weiterhin **absichtlich dirty** (~88 Einträge,
+  fremder WIP + ältere Doku-Appends — **NICHT anfassen**, siehe „Current Dirty State" unten).
+
+### PRODUCTION-OTA 2026-08-15 (Verified — veröffentlicht)
+- Commit **`fddd1f1`** — `fix: restore track rendering and robust angle detection`, aus **sauberem detached
+  Worktree** gebündelt (kein fremder WIP). Runtime **1.0.1** (policy `appVersion` = iOS/Android Build 40),
+  Channel **`production`**, Environment `production`, plattformweise (kein Web).
+  - **iOS** update `01a00692-bd2f-7edd-868e-54143abe7c41` (group `219a6fc9-3278-4fb6-b01c-45b4b5231f18`)
+  - **Android** update `01a00697-d886-7580-ab39-7528bc0163f5` (group `d88e7d0d-fb09-4e57-b55e-9b63df340828`)
+  - Message: „fix(tracking): restore solid track rendering and robust angle detection".
+  - **Kein neuer nativer Build, keine DB-Migration, kein Store-Submit.** OTA erreicht Build-40-Geräte beim App-Start.
+
+### FÄHRTE — was jetzt PRODUKTIV ist (Verified im Code `fddd1f1`)
+- **Gelegte Fährte in der Absuche = solide, durchgehend, ANYVO-Mint.** Root Cause war die frühere
+  `dimLay`-Darstellung (gedimmt/transparent/gestrichelt) in `features/tracking/components/TrackingMap.tsx`;
+  neue zentrale, reine Renderlogik `laidTrackStroke()` (`features/tracking/utils/trackSegments.ts`). Die
+  **Ist-Suchspur bleibt separat blau**. `dimLay`-Prop deprecated/ignoriert (Aufrufer-kompatibel).
+- **Auto-Winkelerkennung = Confidence-basiert** (`features/tracking/utils/autoCornerDetection.ts`).
+  Das frühere **harte Einzelpunkt-Gate `MAX_ANGLE_ACCURACY_M = 20` ist entfernt** (führte im Feld/Wald dazu,
+  dass Auto-Winkel bei Accuracy > 20 m gar nicht erzeugt wurden). Faktoren (Σ = 1.0): `angle 0.24`,
+  `straightBefore 0.16`, `straightAfter 0.16`, `support 0.10`, `accuracy 0.12` (robust über die Punktsequenz,
+  nicht Einzel-Scheitel), `bearing 0.12`, `legLength 0.10`. Zustände: **accept** (gültige Klasse ∧
+  `minStraight ≥ 0.70` ∧ `confidence ≥ 0.62`), **pending** (Schenkel zu kurz / Grenz-Confidence → weiter
+  Punkte sammeln, **keine Duplikate**), **reject** (Kurve/Schlangenlinie / zu niedrig). Ein einzelner
+  schlechter GPS-Fix zerstört einen geometrisch klaren Winkel nicht mehr.
+- **Schlangenlinien-Schutz bleibt erhalten** (T-45): echte 90°/Spitzwinkel erkannt; Schlangenlinie / S-Kurve /
+  GPS-Zickzack / kontinuierliche Kurve → **0 Winkel** (Regressionstests grün). **Nicht** durch großzügige
+  Accuracy-Schwellen ersetzen.
+- **Winkeltypen:** auto `links/rechts/spitz_links/spitz_rechts`; manuell `GW/OW/BW/Abriss` **unverändert**
+  (separat, eigene Persistenz). **Links/Rechts mathematisch verifiziert** (N→O rechts, N→W links, O→S rechts,
+  O→N links, S→W rechts, S→O links, W→N rechts, W→S links) — keine UI-/Screen-Koordinaten.
+- **Voice/Haptik = NICHT Root Cause.** Der Pfad Detection → Store → Snapshot → Restore → Search → Map →
+  Voice/Haptik ist testgetrieben verifiziert: ein erzeugter Auto-Winkel gelangt korrekt an Karte + Voice + Haptik.
+  Der frühere Eindruck „nur Gegenstände werden angesagt" entstand, weil Auto-Winkel wegen des alten Gates gar
+  nicht erzeugt wurden. Voice/Haptik **bewusst nicht refactored**.
+- **1/5/10-m-Hundeführerabstand** unverändert (Default 5 m): `dogProgressM = trustedHandlerProgressM +
+  searchHandlerDistanceM` (keine echte Hund-GPS-Position; Smartphone beim Hundeführer).
+- **DEV-Diagnostik** `features/tracking/utils/angleDiagnostics.ts` existiert (accept/pending/reject, Confidence,
+  Accuracy, Winkelklasse) — **DEV-only, NICHT produktiv verdrahtet, nicht im Bundle**. Nicht ohne Anlass aktivieren.
+
+### FÄHRTE — was noch getestet werden muss (P0, Verified als offen)
+- **Realer Feldtest des Confidence-Fixes steht aus** (der Fix ist produktiv, aber nicht feldverifiziert):
+  reale Fährte mit 90° rechts/links + Spitzwinkel rechts/links + ≥ 2 Gegenständen + Schlangenlinie bei
+  **schwankender GPS-Accuracy**, iOS **und** Android. Prüfen: Karte (solide Mint-Fährte, separate blaue Suchspur,
+  alle Auto-Winkel + Gegenstände sichtbar), Guidance (Voice/Haptik je Winkeltyp, keine Doppelansagen),
+  Regression (Schlangenlinie → 0 Winkel), 1/5/10-m stichprobenartig, kurzer Off-Track-Test. → siehe `TASKS.md` (T-56).
+
+### OFF-TRACK (Verified — Stand unverändert ggü. 2026-08-12)
+- **Live verdrahtet:** State-Machine im Recorder (`c251434`) + Feedback (`bccce35`): `on_track/warning/off_track`,
+  Recovery-Banner, Voice/Haptik nur auf echten Transitionen, Spam-Schutz. **`freezeProgress` bewusst NICHT aktiv**
+  (nur Feedback, kein Progress-/Recorder-Freeze). Detail-Schwellen/Statistikkern siehe Off-Track-Report — nur die
+  hier genannten Teile sind als live bestätigt.
+
+### TESTSTAND (Verified, `fddd1f1`)
+- Targeted Tracking/Angle/Guidance: **103 PASS** (`laidTrackStroke`, `cornerConfidence`,
+  `searchGuidancePipeline`, `autoCornerDetection`, `angleClassify`, `angleTypes`, `angleDiagnostics` u. a.).
+- Gesamtsuite zuletzt: **1191 PASS / 1 FAIL** — der eine Fehler ist ausschließlich der **vorbestehende stale**
+  `app/track/__tests__/run-arming.test.ts` (erwartet `([5, 10] as const).map`, `run.tsx` unverändert). **Die
+  Suite ist NICHT vollständig grün, solange dieser stale Test existiert.** `tsc --noEmit` 0 Errors, ESLint der
+  berührten Dateien 0 Errors, iOS + Android `expo export` OK.
+
+### RUCKSACK / TRAININGSTAGEBUCH (Verified im Code/git)
+- **Backpack (Rucksack):** Phase A (Datenschicht `0434182`) + Phase B (UI `app/dog-backpack/[id].tsx`, `0434182`)
+  + Home-Integration (`e447cd2`) committed & gepusht. Keine DB-Tabelle/Migration.
+- **Trainingstagebuch (Journal):** `app/training-journal.tsx` auf `useTrainingFeed` (`2a85fbc`) committed;
+  **Fährteneintrag-Löschen** (`deleteFeedItem`) ergänzt in **`c4c075f`** (gepusht). Keine zweite DB.
+
+### REPORTS (Detailquellen — nicht hier duplizieren)
+- `docs/architecture/FAEHRTE_SEARCH_RENDER_AND_GUIDANCE_FIX_REPORT.md` (Render/Pipeline/Root-Cause)
+- `docs/architecture/FAEHRTE_ANGLE_CONFIDENCE_FIX_REPORT.md` (Confidence-Faktoren/Schwellen/Zustände)
+- `FAEHRTE_ANGLE_TYPES_FIX_REPORT.md`, `FAEHRTE_ANGLE_QUICK_PICKER_FIX_REPORT.md`,
+  `FAEHRTE_OFF_TRACK_AND_HANDLER_DISTANCE_FIX_REPORT.md`, `FAEHRTE_ABSUCHE_HANDLER_DISTANCE_FIX_REPORT.md`,
+  `FAEHRTE_STEP_CALIBRATION_FIX_REPORT.md`, `FAEHRTE_TEILSTRECKE_START_STOP_FIX_REPORT.md`.
+
+---
+
+## Aktueller Stand — 2026-08-12 (autoritativ, verifiziert via git) — MAßGEBLICH
+
+> Ergänzt von Claude Code. Spiegelt den REAL gepushten Stand nach Off-Track + Save-Reliability +
+> App-Store-Release + Production-OTA. Ältere Sektionen unten (inkl. „2026-08-10") sind Historie;
+> bei Widerspruch gilt DIESE Sektion + echter git-Stand.
+
+### REPO
+- Branch `feat/track-module-rewrite`, **HEAD `4e0bf1e`**, **synchron mit origin** (0 ahead / 0 behind, verifiziert).
+- Working Tree weiterhin **absichtlich dirty** (fremde WIP-Cluster: Codex/opencode-Agent-Handoff-Dateien,
+  i18n-Hardcode-Migration, ADR/Architecture-Docs, SQL-Dumps, `dist-*`, Screenshots, `.opencode/`). **NICHT anfassen.**
+  Ein bündelbarer Fremd-Diff bleibt in `features/tracking/hooks/useTrackVoiceGuidance.ts` (uncommittet).
+
+### PRODUCT / RELEASE
+- ANYVO **1.0.1**, iOS **Build 40**, `runtimeVersion` policy `appVersion` (→ 1.0.1).
+- **Von Apple genehmigt und im App Store veröffentlicht.**
+- **Production-OTA (2026-08-12)** auf Runtime 1.0.1, Channel `production`, iOS + Android (**kein Web**):
+  iOS group `4fe50aa1-402a-4d7d-8abc-672ff347f5c8`, Android group `f69ea5a8-93ed-4109-8121-5e6326ccdf13`;
+  Message „fix: improve track save reliability"; aus sauberem HEAD `4e0bf1e` gebündelt.
+
+### SUBSCRIPTIONS
+- **Newbie** = Free-Tier (kein einzureichendes Kaufprodukt). **Active** + **Trainer** öffentlich kaufbar.
+- **Founder** NICHT mehr öffentlich kaufbar (`6d30359`); bestehende Founder-Legacy-/Restore-Unterstützung intern erhalten.
+- RevenueCat-Init vor Produktladen abgesichert (`d45a1f3`); Diagnose-Code wieder entfernt (`52360f0`); iOS Active↔Trainer
+  Wechsel möglich (`6dc3462`). Production-EAS-Env `production` hat iOS + Android RevenueCat Public SDK Keys.
+
+### TRACK LEGEN
+- Robuste Auto-Winkel-Erkennung (T-45 `bfc9c58`, Test `87fc3dd`): Schlangenlinien ≠ Winkel, 90°/Spitzwinkel getrennt,
+  Links/Rechts verifiziert, Recorder = Single Source.
+- **Save = Local-first + Sync-Queue + Retry + History-Merge** (P-SAVE1 `7087e15` / P-SAVE2 `431a2d6` / P-SAVE3 `94e8ec2`):
+  clientUuid = `training_sessions.id`; SQLite durable truth; idempotenter Upsert; Lay-Points/Marker Replace-by-session.
+
+### TRACK ABSUCHE
+- **Off-Track Phase 1 (`c251434`) + Phase 2 (`bccce35`)**: State-Machine im Recorder, Banner/Voice/Haptik, Spam-Schutz.
+  **`freezeProgress` bewusst NICHT aktiv** (nur Feedback, kein Progress-/Recorder-Freeze).
+- **Run-Save = Local-first + Queue + Retry** (RUN-SAVE1 `0ab0520` / RUN-SAVE2 `c47d5a6` / RUN-SAVE3 `cc58df5`+`4e0bf1e`):
+  runUuid = `track_runs.id`; Run-Ergebnis zuerst lokal in `payload_json.run`; lokale Run-History + Detail-Local-Fallback.
+- **Kanonische Remote-Absuche-Spur = `track_runs.run_points`** — KEIN zusätzliches `point_type='search'` nach remote `track_points`.
+
+### KNOWN ISSUES / DEFERRED
+- **Freeze Progress** bewusst vertagt (siehe DECISIONS 2026-08-12).
+- **Web-Bundle** bricht via `react-native-maps` (native-only Import) → OTA plattformweise ios/android; kein Mobile-Blocker,
+  **nicht nebenbei fixen**.
+- **Vorbestehender stale Test** `app/track/__tests__/run-arming.test.ts` (erwartet `([5, 10] as const).map`) weiterhin rot,
+  unabhängig von den Save-Fixes.
+- Weitere offene Tasks nur nach echter Repo-Verifikation (siehe `TASKS.md` Update 2026-08-12).
+
+---
+
+## Aktueller Stand — 2026-08-10 (Historie, überholt durch 2026-08-12)
 
 > Ergänzt von Claude Code. Spiegelt den REAL gepushten Stand nach P1–P8 + Security + Branding +
 > Dog/Home-UI. Ältere Sektionen unten bleiben Historie; bei Widerspruch gilt diese Sektion + echter git-Stand.

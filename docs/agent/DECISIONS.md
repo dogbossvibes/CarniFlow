@@ -3,16 +3,45 @@
 > Nur relevante technische Entscheidungen. Kein Kleinklein.
 > Status: `accepted` · `temporary` · `superseded`.
 
-## 2026-07-29 — Repository-basiertes Agent-Handoff-System (Claude ↔ Codex)
+## 2026-08-15 — Confidence-basierte Auto-Winkelerkennung (statt hartem Accuracy-Gate) · `accepted`
 
 Context:
-Zwei Agenten (Claude Code, OpenAI Codex) arbeiten abwechselnd im selben Repo. Ohne
+Im realen Feld/Wald liegt die GPS-Accuracy oft > 20 m. Das frühere harte Einzelpunkt-Gate
+`MAX_ANGLE_ACCURACY_M = 20` verwarf dadurch echte Winkel komplett — Auto-Winkel entstanden gar nicht (Karte +
+Voice + Haptik zeigten „nur Gegenstände", da diese manuell gesetzt werden). Gemeldet als Production-Feldfehler.
+
+Decision:
+- **Winkel:** Die Auto-Winkelerkennung (`features/tracking/utils/autoCornerDetection.ts`) nutzt eine
+  **Confidence-Bewertung** je Kandidat (angle .24 · straightBefore .16 · straightAfter .16 · support .10 ·
+  accuracy .12 · bearing .12 · legLength .10; Σ = 1) mit drei Zuständen **accept / pending / reject** —
+  **kein** hartes Einzelpunkt-Accuracy-Gate mehr.
+- **GPS:** Ein einzelner schlechter Fix darf einen **geometrisch klar bestätigten** Winkel **nicht allein**
+  verwerfen — Accuracy wird **robust über die Punktsequenz** (Median) bewertet, nicht über den Scheitelpunkt.
+- **Schlangenlinie:** **Geradheit/Stabilität vor und nach dem Scheitel ist Pflicht** (harte Untergrenze
+  `minStraight ≥ 0.70` für accept). Schlangenlinie / S-Kurve / GPS-Zickzack / kontinuierliche Kurve → **0 Winkel**.
+  Nicht durch großzügige Accuracy-Schwellen ersetzen.
+- **Guidance:** Karte/Voice/Haptik bleiben **Verbraucher desselben gespeicherten Markerpfads** (kein Refactor;
+  Voice/Haptik waren nicht die Root Cause). Manuelle Winkel GW/OW/BW/Abriss + Marker-/Persistenzarchitektur
+  **unverändert**.
+- **Production:** Der Fix ist per **OTA auf Runtime 1.0.1 / Channel `production`** produktiv ausgeliefert
+  (Commit `fddd1f1`, iOS + Android). Details siehe `docs/architecture/FAEHRTE_ANGLE_CONFIDENCE_FIX_REPORT.md`
+  und `FAEHRTE_SEARCH_RENDER_AND_GUIDANCE_FIX_REPORT.md`.
+
+Consequences:
+- Gewichte/Schwellen sind konservativ + testgedeckt, aber **feld-unvalidiert** → Real-Device-Test (T-56) ist P0.
+- Änderungen an Gewichten/Schwellen/Straightness-Regeln nur mit Feldbeleg **und** Regressionstests.
+
+## 2026-07-29 / 2026-08-10 — Repository-basiertes Agent-Handoff-System (OpenCode ↔ OpenAI Codex)
+
+Context:
+Zwei Agenten (OpenCode, OpenAI Codex) arbeiten abwechselnd im selben Repo. Ohne
 gemeinsame Wahrheit droht Überschreiben fremder Arbeit oder Verlust offener Tasks.
 
 Decision:
 Das Repository ist die gemeinsame Wahrheit. Handoff via `docs/agent/` (manuell gepflegt)
 plus ein automatisch erzeugter Git-Snapshot-Block in `SESSION_HANDOFF.md`
-(`scripts/agent-handoff.mjs`). Regeln in `AGENTS.md` (Codex) und `CLAUDE.md` (Claude).
+(`scripts/agent-handoff.mjs`). Die gemeinsamen Regeln stehen in `AGENTS.md`; OpenCode-spezifische
+Konfiguration liegt unter `.opencode/`.
 Prioritätsregel: **Repository state > Git state > Handoff documentation > Agent assumptions.**
 
 Reason:
@@ -23,9 +52,10 @@ damit ein erneuter Handoff manuellen Inhalt nie überschreibt.
 Consequences:
 - Neue Scripts `agent-handoff`/`agent-status`/`agent-start` + `agent-lib`.
 - Neue npm-Scripts `agent:*`.
-- Claude-`/handoff`-Command in `.claude/commands/`.
+- OpenCode-`/handoff`-Command in `.opencode/commands/`.
 - Agenten müssen beim Start `CURRENT_STATE.md` + `SESSION_HANDOFF.md` + `git status` lesen
   und den Handoff gegen den echten Repo-Zustand verifizieren.
+- `CLAUDE.md` und `.claude/` bleiben bis zu einem separaten Legacy-Cleanup erhalten.
 
 Status: accepted
 
@@ -108,3 +138,84 @@ Status: accepted
 - **Dashboard Phase C ist rein additiv; Smart Analyse bleibt deterministisch, kein Wetter.**
   Warum: Vorgabe. Overview-Karten bündeln vorhandene Quellen (Feed/Ziel/Heat/Backpack/Kalender) ohne neue KI,
   ohne Wetter-API und ohne Änderung bestehender Trainings-/Fährten-/Kalender-/Zyklus-/Abo-Logik.
+
+## 2026-08-02 — Entitlements erweitern Store-Abos additiv (T-34) · accepted
+
+- **`lifetime` ist ein Produktzugriffsrecht, keine Rolle.**
+  Warum: Ausgewählte Benutzer sollen alle aktuellen und zukünftigen regulären Premium-/Trainer-Funktionen ohne
+  Store-Kauf nutzen können, aber keinen Admin-, Debug-, Support- oder Fremddatenzugriff erhalten.
+
+- **Bestehender Capability-Pfad bleibt die zentrale Runtime-Quelle.**
+  Warum: `useCapabilities()`/`getMyCapabilities()` sind bereits die Gates für Pro/Trainer. Entitlements werden dort
+  additiv mit `subscriptions`/`user_capabilities` zusammengeführt; RevenueCat und Store-Receipt-Logik bleiben
+  unverändert.
+
+- **Entitlement-Werte sind kontrolliert und serverseitig verwaltet.**
+  Warum: Sicherheitsrelevante Rechte dürfen keine freien Client-Strings sein. Die Migration beschränkt
+  `entitlement` auf `lifetime`, `beta_tester`, `ambassador`, `staff`; normale Benutzer haben nur RLS-geschützten
+  Lesezugriff auf eigene aktive Entitlements.
+
+## 2026-08-03 — Home-Backpack pro Hund über instanzierte Konfiguration (T-35) · accepted
+
+- **Bestehende Home-Konfiguration bleibt kompatibel.**
+  Einfache Action-IDs bleiben gültig; Backpack-Aktionen und Backpack-Widgets benötigen eine Instanz mit `dogId`.
+  Ungültige oder verwaiste Hunde-Referenzen werden sanitisiert und dürfen keinen Crash auslösen.
+- **`dogs.id` bleibt die einzige fachliche Hundereferenz.**
+  Das Home-Feature verwendet die bestehende Hundequelle, Backpack-Domäne und `/dog-backpack/[id]`-Route; keine zweite
+  Hundestruktur, keine neue Datenbanktabelle und keine Migration.
+
+## 2026-08-11/12 — Track Save Reliability (LEGEN P-SAVE1–3, ABSUCHE RUN-SAVE1–3) · accepted
+
+> Verifiziert gegen Commits `7087e15`/`431a2d6`/`94e8ec2` (LEGEN) und `0ab0520`/`c47d5a6`/`cc58df5`/`4e0bf1e`
+> (ABSUCHE). Keine Datenmigration (Client-UUID auf uuid-PK + `payload_json`/`track_data`). Append-only; ältere
+> Entscheidungen bleiben gültig.
+
+- **SQLite = durable local truth für Track-Save.**
+  Warum: Eine gelegte Fährte / abgeschlossene Absuche darf nie an Netz/Supabase hängen. Lokale Finalisierung ist die
+  Save-Erfolgsschwelle; der Nutzer sieht „gespeichert" nach lokalem, nicht nach remotem Erfolg.
+
+- **Sync-Queue = einziger Remote-Transport nach lokaler Finalisierung.**
+  Warum: Der frühere direkte Remote-Pfad (`createTrackSession`/`finishTrackRecording` bzw. `startTrackRun`/
+  `finishTrackRun`) lief fire-and-forget parallel und konnte bei kurzem Stop/Offline/Netzfehler das Ergebnis verlieren.
+  Ersetzt durch die bestehende persistente `training_session`-Sync-Queue (P-SAVE2). **Keine zweite Sync-Architektur**,
+  **kein** neuer `SyncEntityType='track_run'` — der Run reist mit der Session.
+
+- **clientUuid = `training_sessions.id`, runUuid = `track_runs.id` (deterministisch beim Start).**
+  Warum: Beseitigt den ID-Race (Stop vor Remote-Antwort) und macht Retry idempotent. Verifiziert: `id` ist uuid-PK
+  mit `gen_random_uuid()`-Default → client-seitige UUID zulässig; RLS „owner_id = auth.uid()" bzw. „owner via session"
+  deckt INSERT/UPDATE/DELETE owner-scoped (keine Remote-Migration).
+
+- **Remote-Sync ist idempotent: `upsert(onConflict:'id')` + Replace-by-session.**
+  Warum: Retry/verlorene ACK/App-Kill dürfen keine Doppel-Fährte/-Run erzeugen. Session per Upsert; Lay-Points und
+  Marker per Replace-by-session (delete `session_id`+`point_type='lay'`/Marker → insert). FK-Reihenfolge:
+  Session-Upsert → Lay/Marker → `track_runs`-Upsert → erst danach lokal `synced`.
+
+- **Kanonische Remote-Absuche-Spur = `track_runs.run_points`.**
+  Warum: Der Detail-Screen (`app/track/[id].tsx`) liest die Spur aus `track_runs.run_points`; remote
+  `track_points point_type='search'` wird nirgends gelesen. Daher **NICHT** zusätzlich `point_type='search'` nach
+  remote `track_points` replizieren (keine Doppelspeicherung). Lokal-only Detail nutzt `payload_json.run.run_points`
+  als Lückenfüller.
+
+- **Remote darf NIE die Save-Erfolgsschwelle sein; Navigation wartet nicht auf Remote-Sync.**
+  Warum: Robustheit im Feld (schlechtes Netz). Bei Remote-Fehler bleiben Session + Run + Punkte lokal erhalten,
+  Queue bleibt pending/failed → Retry bei App-Start/Reconnect/Foreground (`SyncProvider`). `sync_failed ≠ save_failed`.
+
+- **Verlauf/Detail zeigen lokale pending/failed Fährten (P-SAVE3/RUN-SAVE3).**
+  Warum: Ein Remote-Ausfall darf lokale Daten nicht verdecken. Remote+Local-Merge (Dedupe über Session-ID, Remote
+  autoritativ, lokaler Run ergänzt fehlenden Remote-Run); Detail-Local-Fallback baut aus SQLite auf.
+
+## 2026-08-11/12 — Off-Track Feedback + Produkt-/Release-Entscheidungen · accepted
+
+- **Off-Track Feedback nur auf echten State-Transitionen; `freezeProgress` DEFERRED.**
+  Warum (`c251434`/`bccce35`): Voice/Haptik/Banner werden einmalig je Transition (on_track/warning/off_track/recovered)
+  ausgelöst (Spam-Schutz via debounced State-Machine). Ein Recorder-/Progress-Freeze bei off_track wird **bewusst
+  vorerst NICHT** verwendet (Produktentscheidung) — nur Feedback, keine Auto-Pause.
+
+- **Founder nicht mehr öffentlich verkaufen.**
+  Warum (`6d30359`): Active + Trainer sind die öffentlich kaufbaren Pläne; Newbie ist Free-Tier. Founder ist aus der
+  regulären Verkaufsauswahl entfernt; interne Legacy-/Restore-Referenzen bleiben für Bestandskunden erhalten.
+
+- **Web ist derzeit kein Release-Ziel der mobilen App.**
+  Warum: Der Web-Export bricht (`react-native-maps` importiert native-only Module). Production-OTA läuft daher
+  plattformweise (`--platform ios|android`) auf Channel/Environment `production`, Runtime 1.0.1. Kein Mobile-Blocker;
+  der Web-Bruch wird **nicht** im Rahmen von Mobile-Fixes nebenbei behoben.

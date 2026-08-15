@@ -4,6 +4,121 @@
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).
 
+## Update 2026-08-15 (Claude Code) — Fährten-Render-/Confidence-Winkel-Fix DEPLOYED (HEAD `fddd1f1`, == origin)
+
+> Verifiziert gegen git/Code. Diese Sektion ist die neueste maßgebliche.
+> **Production-OTA** (Runtime 1.0.1, Channel `production`, iOS + Android; kein Web) aus sauberem Worktree auf `fddd1f1`:
+> iOS update `01a00692-bd2f-7edd-868e-54143abe7c41` (group `219a6fc9-3278-4fb6-b01c-45b4b5231f18`),
+> Android update `01a00697-d886-7580-ab39-7528bc0163f5` (group `d88e7d0d-fb09-4e57-b55e-9b63df340828`).
+
+### Neu DONE (auf origin + per OTA produktiv)
+- **T-55 — Fährten-Absuche: Solid-Mint-Render + Confidence-Winkel** · **DONE(deployed `fddd1f1`)**
+  (1) Gelegte Fährte in der Absuche wieder **solide, durchgehend, Mint** (`laidTrackStroke()` in
+  `features/tracking/utils/trackSegments.ts`; Renderer `TrackingMap.tsx`; `dimLay` deprecated; Ist-Suchspur separat blau).
+  (2) **Confidence-basierte Auto-Winkelerkennung** (`features/tracking/utils/autoCornerDetection.ts`): hartes
+  `MAX_ANGLE_ACCURACY_M=20`-Gate entfernt; Faktoren angle/straightBefore/straightAfter/support/accuracy(robust)/
+  bearing/legLength (Σ=1); Zustände accept/pending/reject; ein schlechter GPS-Fix vetot keinen klaren Winkel mehr;
+  Schlangenlinien-Schutz erhalten. Voice/Haptik/Store/Persistenz/1-5-10-m/Off-Track unverändert. Keine DB/Native.
+  Tests: `laidTrackStroke` (5), `cornerConfidence` (24), `searchGuidancePipeline` (18), `autoCornerDetection` (38).
+  DEV-Diagnostik `angleDiagnostics.ts` (nicht verdrahtet). Reports: `FAEHRTE_SEARCH_RENDER_AND_GUIDANCE_FIX_REPORT.md`,
+  `FAEHRTE_ANGLE_CONFIDENCE_FIX_REPORT.md`.
+
+### OPEN — P0 Real-Device-Test-Gate (Feldfehler → Feldverifikation zwingend)
+- **T-56 — Real-Device-Test Confidence-/Render-Fix (iOS + Android)** · OPEN(P0, Test-Gate)
+  Reale Fährte: 90° rechts, 90° links, Spitzwinkel rechts, Spitzwinkel links, ≥ 2 Gegenstände, Schlangenlinie,
+  **schwankende GPS-Accuracy**. Prüfen:
+  - **iOS** (P0): Karte solide Mint + separate blaue Suchspur, alle Auto-Winkel + Gegenstände sichtbar; Guidance
+    Voice/Haptik je Winkeltyp; keine Doppelansagen.
+  - **Android** (P0): dasselbe.
+  - **Schlangenlinien-Regression im Feld** (P0): Schlangenlinie erzeugt **keinen** Winkel.
+  - **Voice/Haptik-Feldtest** (P0): Rechts-/Links-/Spitz-L/Spitz-R angesagt + vibriert; Gegenstände weiterhin korrekt.
+  - **1/5/10-m-Stichprobe** (P0): Ansage-Zeitpunkt korrekt, Typ/Reihenfolge unverändert.
+  - **Off-Track-Feldtest** (P0): kurzer Off-Track-Abstecher → Feedback korrekt, keine falschen neuen Trigger.
+
+### ► TASK-ID-Stand (aktualisiert 2026-08-15)
+- Neu vergeben: **T-55** (DONE deployed), **T-56** (OPEN P0). **Nächste freie allgemeine TASK-ID: T-57.**
+- Weiterhin offen (unverändert, echter Stand): **Rucksack Phase C / Home-Backpack-Feinschliff** (Backpack A/B +
+  Home-Integration DONE `0434182`/`e447cd2`), **Trainingstagebuch** DONE inkl. Fährten-Löschen (`c4c075f`),
+  **T-54 E-Mail-Confirm** (uncommitted, Supabase-Redirect-URL freigeben + `legal-web` deployen), **T-22 Website
+  deployen**, **T-23 RevenueCat-Dashboard**, **T-24 Store/Release-Monitoring**, **T-21 Dirty-Tree-Strategie**,
+  **Connect-Localization/Supabase-Live-Auth-Checkliste** (siehe untenstehende Blöcke; nicht wieder öffnen, was DONE ist).
+
+## Update 2026-08-13 (Claude Code) — T-54 E-Mail-Aktivierungsflow (uncommitted)
+
+> **Kein Commit/Push/Build/Deployment.** Rein additiv; fremder WIP unangetastet.
+- **T-54 — E-Mail-Aktivierungsflow: dedizierte Bestätigungsseite** · DONE(uncommitted)
+  Ursache: `signUp()` ohne `emailRedirectTo` → Supabase-Site-URL → Homepage ohne Rückmeldung.
+  Fix: zentrale `EMAIL_CONFIRM_REDIRECT_URL` (`features/auth/accountSecurity.ts`), `signUp()`
+  (`services/auth.ts`) setzt `emailRedirectTo`; neue Seite `legal-web/auth/confirmed.html` +
+  Resolver `legal-web/assets/auth-confirm.js` (Status success/expired/error/neutral, kein Erfolg
+  bei Direktaufruf), „ANYVO öffnen" → festes `anyvo://` (Fallback: Store-Links). Tests:
+  `legal-web/__tests__/authConfirmStatus.test.ts`, `services/__tests__/signup-redirect.test.ts`.
+  Doku: `docs/architecture/EMAIL_CONFIRMATION_FLOW.md`.
+  **Manuell offen:** Supabase → Authentication → URL Configuration → Redirect URLs:
+  `https://anyvo.app/auth/confirmed` freigeben. **Website nicht deployed.**
+- **Nächste freie allgemeine TASK-ID:** **T-55**.
+
+## Update 2026-08-12 (Claude Code) — HEAD `4e0bf1e`, synchron mit origin (autoritativ)
+
+> Verifiziert gegen `git log`/Code. Diese Sektion ist maßgeblich; ältere „OPEN"-Blöcke unten
+> (v. a. „Update 2026-08-10") sind dadurch überholt und **SUPERSEDED** (siehe Hinweis dort).
+> **Production:** ANYVO **1.0.1 / iOS Build 40** von Apple **genehmigt & im App Store veröffentlicht**.
+> **Production-OTA** (Runtime 1.0.1, Channel `production`, iOS + Android; kein Web) veröffentlicht:
+> iOS group `4fe50aa1-402a-4d7d-8abc-672ff347f5c8` / update `019ff763-96b1-7a29-87bb-4c73cebce279`,
+> Android group `f69ea5a8-93ed-4109-8121-5e6326ccdf13` / update `019ff765-8a60-7785-a397-0e76cdc1db0d`.
+
+### Neu DONE (auf origin, verifiziert gepusht)
+- **T-45 — Auto-Winkelerkennung gegen kontinuierliche Kurven härten** · **DONE(committed `bfc9c58`, Test `87fc3dd`, gepusht)**
+  Gerade-vor/Gerade-nach-Prüfung (stabile Ein-/Auslaufschenkel); Schlangenlinien werden NICHT als Winkel gewertet;
+  90° ± Toleranz + Spitzwinkel getrennt; Links/Rechts verifiziert; Recorder = Single Source; RUN-Richtung separat
+  test-verifiziert (`87fc3dd`). (Zuvor als „DONE(uncommitted)" geführt → jetzt committed & gepusht.)
+- **T-46 — Off-Track Phase 1 (State in Search-Flow integrieren)** · **DONE(committed `c251434`, gepusht)**
+  `offTrackState` in `useSearchRecorder` verdrahtet/exponiert; **kein Freeze**.
+- **T-47 — Off-Track Phase 2 (Feedback)** · **DONE(committed `bccce35`, gepusht)**
+  Warning-/Off-Track-/Recovery-Banner, Voice, Haptik, Spam-Schutz (nur auf echten Transitionen). **Freeze weiterhin NICHT aktiv.**
+- **T-48 — Off-Track `freezeProgress`** · **DEFERRED (bewusst)**
+  Produktentscheidung: Freeze-Progress wird **vorerst nicht** verwendet (nur Feedback, kein Recorder-/Progress-Freeze).
+- **T-49 — LEGEN Save Reliability (P-SAVE1–3)** · **DONE(committed, gepusht)**
+  P-SAVE1 `7087e15` (Local-first Session, clientUuid, ID-Race weg, kein getUser()-Netz-Zwang beim Start),
+  P-SAVE2 `431a2d6` (SQLite durable truth, persistente `training_session`-Sync-Queue, idempotenter Upsert,
+  Lay-Points + Marker Replace-by-session, Retry/Restart/Reconnect), P-SAVE3 `94e8ec2` (lokale pending/failed
+  Fährten im Verlauf, Remote/Local-Merge, Dedupe über Session-ID, Remote-Ausfall verdeckt lokale Daten nicht).
+- **T-50 — ABSUCHE Save Reliability (RUN-SAVE1–3)** · **DONE(committed, gepusht)**
+  RUN-SAVE1 `0ab0520` (runUuid synchron beim Start, Run-ID-Race weg, Run-Ergebnis zuerst lokal in
+  `payload_json.run`), RUN-SAVE2 `c47d5a6` (direkter Remote-Run-Pfad durch bestehende `training_session`-Queue
+  ersetzt, `track_runs` idempotent per runUuid, kanonische Absuche-Spur = `track_runs.run_points`, KEIN
+  zusätzliches `point_type='search'` nach remote `track_points`), RUN-SAVE3 `cc58df5` + `4e0bf1e` (lokale
+  Absuche sofort im Verlauf, Score/Distanz/Deviation lokal, Detail-Local-Fallback, Remote+Local-Supplement,
+  pending/failed navigierbar, Delete/hidden berücksichtigt, nach Sync keine Doppel-Fährte).
+- **T-51 — Apple IAP / RevenueCat Fix + Founder aus Verkauf + iOS Plan-Wechsel** · **DONE(committed, gepusht)**
+  RevenueCat-Init vor Produktladen abgesichert `d45a1f3`; temporärer StoreKit-Diagnose-Code hinzugefügt `184b193`
+  und wieder entfernt `52360f0` (netto keine Diagnose am HEAD); iOS Active↔Trainer-Wechsel ermöglicht `6dc3462`;
+  Founder aus regulärer Verkaufsauswahl entfernt `6d30359` (interne Legacy-/Restore-Referenzen bleiben erhalten).
+  Production-EAS-Env `production` enthält iOS **und** Android RevenueCat Public SDK Keys (verifiziert via `eas env:list`).
+- **T-52 — Production OTA Runtime 1.0.1 (iOS + Android, kein Web)** · **DONE(deployed 2026-08-12)**
+  `eas update --channel production --environment production --platform ios|android --message "fix: improve track save reliability"`.
+  Beide Updates aus sauberem HEAD `4e0bf1e` gebündelt (temporärer Stash des fremden WIP, danach `stash pop` wiederhergestellt).
+
+### OPEN (weiterhin offen)
+- **T-53 — QA-Regression Save Reliability (Real-Device)** · OPEN(QA)
+  Nutzer bestätigt produktiv „es funktioniert". Sinnvoll bleiben systematische Regressionsläufe: Offline-Stop,
+  App-Kill nach Stop, Reconnect/Retry, keine Duplikate — für LEGEN **und** ABSUche. **Nicht** so behandeln, als sei
+  der Save-Fix noch nicht implementiert (er IST auf Production).
+- **T-24 — Store/Release-Monitoring** · OPEN — OTA-Zustellung/Verhalten auf realen iOS/Android-Geräten prüfen.
+- **T-23 — RevenueCat-Dashboard manuell finalisieren/testen** · OPEN.
+- **T-22 — Website-Relaunch deployen** · DONE(committed `2d9e1cc`, **nicht deployed**).
+- **T-21 — Dirty Working Tree / Release-Branch-Strategie** · OPEN — fremder WIP bleibt unangetastet; keine pauschalen Git-Aktionen.
+- **T-20 — Testerfeedback / Hotfix-Triage** · OPEN.
+
+### Known issues / bewusst offen
+- **Web-Bundle bricht** (`react-native-maps` importiert native-only Module) → OTA läuft plattformweise ios/android;
+  **kein** Release-Blocker für Mobile, **nicht** im Rahmen von Mobile-Fixes nebenbei beheben.
+- **Vorbestehender stale Test** `app/track/__tests__/run-arming.test.ts` (erwartet `([5, 10] as const).map`, Code nutzt
+  `HANDLER_DISTANCES_M`) ist weiterhin rot — **unabhängig** von den Save-Fixes, bewusst NICHT nebenbei gefixt.
+
+### ► TASK-ID-Stand (aktualisiert 2026-08-12)
+- **Nächste freie allgemeine TASK-ID:** **T-53** (T-53 hier bereits als QA-Task vergeben → nächste frei: **T-54**).
+
 ## Update 2026-08-10 (Claude Code) — HEAD `69d7b72`, synchron mit origin
 
 ### Gepusht (DONE, auf origin)
@@ -14,6 +129,8 @@
   `82d01d7` · Home-Widget/i18n-Tests `69d7b72`.
 
 ### OPEN — offene App-Tasks (NICHT erledigt, nur weil Codefragmente existieren)
+> **SUPERSEDED (2026-08-12):** Dieser Block ist überholt. Off-Track (T-46/T-47), Winkel/Rechts-Links (T-45),
+> 1-m-Search (produktiv getestet) und Founder-Vereinfachung (T-51) sind DONE (siehe Update 2026-08-12 oben).
 - **OPEN — Off-Track-Lib in Search-Flow integrieren:** `features/tracking/utils/offTrack.ts` ist committed, aber
   **nicht verdrahtet** (kein Konsument in `app/track/run.tsx`/Recorder).
 - **OPEN — Off-Track UI/Banner/Haptik/Voice/Recorder-Freeze:** separat entscheiden & umsetzen.
@@ -225,7 +342,7 @@
   `agent:handoff -- --agent=claude` regeneriert. Nächste freie TASK-ID: **T-45**.
 
 ## Offen / Blocker
-- **T-45 — Auto-Winkelerkennung gegen kontinuierliche Kurven härten** · DONE(uncommitted)
+- **T-45 — Auto-Winkelerkennung gegen kontinuierliche Kurven härten** · DONE(committed `bfc9c58`, Test `87fc3dd`, gepusht) — *aktualisiert 2026-08-12, siehe Update 2026-08-12 oben*
   `useTrackRecorder` verlangt zusätzlich stabile Ein- und Auslaufschenkel; kontinuierliche Kurven/Schlangenlinien
   werden nicht mehr allein wegen einer großen lokalen Richtungsänderung markiert. Neue reine Regressionstests decken
   90° links/rechts, Spitzwinkel, Kurven und GPS-Rauschen ab. Keine DB-Migration.
