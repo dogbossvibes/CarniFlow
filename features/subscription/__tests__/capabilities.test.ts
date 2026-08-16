@@ -68,16 +68,17 @@ describe('FOUNDER_ACTIVE ≡ ACTIVE (keine Sonder-Feature-Matrix)', () => {
 });
 
 describe('NEWBIE-Quotas (reine Entscheidung)', () => {
-  it('Limits: 1 Hund, 1 Training/Monat, 0 Fährten (Pro-only)', () => {
-    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 1, track: 0 });
+  it('Limits: 1 Hund, 2 Trainings/Monat, 0 Fährten (Pro-only)', () => {
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 0 });
   });
   it('Hund: 1. erlaubt, 2. blockiert', () => {
     expect(quotaAllowsNew(false, 'dog', 0)).toBe(true);
     expect(quotaAllowsNew(false, 'dog', 1)).toBe(false);
   });
-  it('Training: 1. erlaubt, 2. blockiert', () => {
-    expect(quotaAllowsNew(false, 'training', 0)).toBe(true);
-    expect(quotaAllowsNew(false, 'training', 1)).toBe(false);
+  it('Training: 1. + 2. erlaubt, 3. blockiert (2/Monat)', () => {
+    expect(quotaAllowsNew(false, 'training', 0)).toBe(true);   // 1. Training
+    expect(quotaAllowsNew(false, 'training', 1)).toBe(true);   // 2. Training
+    expect(quotaAllowsNew(false, 'training', 2)).toBe(false);  // 3. → blockiert
   });
   it('Fährte: NEWBIE hat keine Fährtenfunktion → nie erlaubt', () => {
     expect(quotaLimit(false, 'track')).toBe(0);
