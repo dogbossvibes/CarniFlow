@@ -3,6 +3,36 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-08-17 — Codex (T-57 Trainer-Verbinden Keyboard-Fix committed)
+
+Branch `feat/track-module-rewrite`, Commit **`0e7aaba fix(trainer): keep connect sheet above keyboard`**; HEAD damit
+**3 Commits vor origin** (0 hinter). Kein Push/Build/OTA/Submit/DB-Vorgang.
+- Ausschließlich `app/trainer/index.tsx` committed (35+/28−): Bottom-Sheet lag ohne Keyboard-Avoidance hinter der
+  Tastatur. `KeyboardAvoidingView` um Backdrop + Sheet (iOS `padding`, Android `height`), flexbasierter Modal-Root,
+  entfernte absolute Sheet-Positionierung und `autoFocus`; Bottom-Safe-Area und Backdrop-Schließen bleiben erhalten.
+- Checks: `npx tsc --noEmit` PASS; `npx jest services/__tests__/trainer-flow.test.ts --runInBand` PASS
+  (1 Suite / 6 Tests); `git diff --check` PASS.
+- Offen bleibt ausschließlich Real-Device-QA: iOS, Galaxy S23 Gesten- und Drei-Button-Navigation, Keyboard
+  öffnen/schließen, Backdrop mit offenem Keyboard, mehrfaches Öffnen/Schließen, kleine Displayhöhe/vergrößerte Schrift
+  sowie gültiger/ungültiger Codefluss. Fremdes WIP blieb unangetastet.
+
+## 2026-08-17 — Claude Code (NEWBIE-Quota Production-Preflight + Trainer-Keyboard-Fix)
+
+Branch `feat/track-module-rewrite`, HEAD **`adfc3b5`** (**2 Commits vor origin**, ungepusht: `c210008`, `adfc3b5`). **Kein Commit/Push/Build/OTA, keine Production-Schreiboperation.**
+- **Supabase-Sicherheitscheck:** nur richtiges Production-Projekt `axkkhyqrjrtbkumaulta` (Org `lkwpufuyneijzttbupsg`)
+  verwendet; Repo war bereits korrekt gelinkt (kein erneutes `supabase link`). `shadesofym` nie angefasst.
+- **NEWBIE-Quota read-only Preflight:** Production liefert bereits `newbie_quota_limit` dog=1/**training=2**/track=0
+  (PostgREST/anon-RPC; `.env`-URL = Production). ⇒ Migration `20260816130000_newbie_training_quota_two.sql` (training 1→2)
+  ist **No-Op / nicht erforderlich**. Warnung: `20260808120000_..._one.sql` (→1) nicht isoliert anwenden (Regression).
+  Premium via `is_pro_member` unberührt; keine User-Daten. Grenze: kein DDL-Dump (kein `SUPABASE_DB_PASSWORD`) →
+  verhaltensbasiert belegt. Keinerlei Schreiboperation ausgeführt.
+- **Trainer-Verbinden Keyboard-Bug (uncommitted):** `app/trainer/index.tsx` — Bottom-Sheet „Code eingeben" von der
+  Tastatur verdeckt. Fix: Vollbild-`KeyboardAvoidingView` (ios:padding/android:height) + `flex-end`-Layout,
+  `position:absolute` entfernt, `autoFocus`; Backdrop-Tap-Schließen erhalten. `tsc --noEmit` (Datei) fehlerfrei.
+  Real-Device-Abnahme iOS/Android offen. Der komplette Diff dieser Datei ist dieser Fix (kein fremder WIP).
+- **Doku/Handoff-Update:** nur `docs/agent/*` (CURRENT_STATE/TASKS/SESSION_HANDOFF/WORK_LOG) + `agent:handoff`
+  AUTO-Block. Kein Produktcode über den obigen uncommitteten Trainer-Fix hinaus.
+
 ## 2026-08-15 — Claude Code (Fährtenabsuche Production-Fix + OTA)
 
 Branch `feat/track-module-rewrite`, HEAD **`fddd1f1`** == origin (0/0). Reiner Doku/Handoff-Task heute (kein Produktcode).

@@ -5,6 +5,44 @@
 > Jede Aussage ist als **Verified / Assumed / Unknown** markiert.
 > **Repository state > Git state > Handoff documentation > Agent assumptions.**
 
+## Aktueller Stand — 2026-08-17 (autoritativ, verifiziert via git) — MAßGEBLICH
+
+> Ergänzt nach der Codex-Übernahme: read-only NEWBIE-Quota-Production-Preflight + **committeter**
+> Trainer-Verbinden-Keyboard-Fix `0e7aaba`. **Kein Push/Build/OTA, keine Production-Schreiboperation.**
+> Diese Sektion ist die neueste MAßGEBLICHE; ältere (ab „2026-08-15" abwärts) sind Historie. **Code ist Wahrheit.**
+
+### REPO (Verified)
+- Branch `feat/track-module-rewrite`, **HEAD `0e7aaba`**, **3 Commits VOR origin** (0 hinter). Working Tree weiterhin
+  absichtlich **dirty** (fremder WIP + Doku-Appends — **NICHT anfassen**).
+- **Neu seit letztem Handoff (`fddd1f1`)** — zwei Subscription-Commits auf dem Branch, **nicht** in dieser Session
+  erstellt und **noch nicht gepusht**: `c210008 feat(subscription): add 3-day ACTIVE trial funnel`,
+  `adfc3b5 fix(subscription): allow 2 NEWBIE trainings per month`.
+- **T-57 committed:** `0e7aaba fix(trainer): keep connect sheet above keyboard` enthält ausschließlich
+  `app/trainer/index.tsx` (Keyboard-Fix, 35+/28−, 3 Hunks). Weitere geänderte Produktdateien im Tree
+  (`features/subscription/plans.ts`, `features/tracking/hooks/useTrackVoiceGuidance.ts`, `hooks/useCapabilities.ts`)
+  sind **fremder WIP — nicht anfassen**.
+
+### NEWBIE-QUOTA — PRODUCTION-PREFLIGHT (Verified read-only, 2026-08-17)
+- **Production `axkkhyqrjrtbkumaulta` liefert bereits** `newbie_quota_limit` = **dog=1, training=2, track=0**
+  (PostgREST/anon-RPC; `.env EXPO_PUBLIC_SUPABASE_URL` = Production bestätigt; Tabelle `newbie_quota_claims` existiert).
+- **Migration `supabase/migrations/20260816130000_newbie_training_quota_two.sql` (training 1→2) = No-Op**
+  (idempotent, keine Datenänderung). **Nicht erforderlich; nicht ohne Freigabe ausführen.**
+- **`20260808120000_newbie_training_quota_one.sql` (→1) NICHT isoliert anwenden** (Regression 2→1).
+- Premium (ACTIVE/FOUNDER/TRAINER/Lifetime) via `is_pro_member`/`user_capabilities.pro_member` **vor**
+  `newbie_quota_limit` auf unbegrenzt kurzgeschlossen → von der Quota unberührt. Keine User-Daten betroffen.
+- **Verifikationsgrenze:** kein DDL-Dump (`pg_dump`/`psql`/`service_role` fehlen; `supabase migration list --linked`
+  scheitert an fehlendem `SUPABASE_DB_PASSWORD`) → Beleg verhaltensbasiert (RPC-Werte), nicht per Body-Dump.
+
+### TRAINER VERBINDEN — KEYBOARD-FIX (Verified im Code, committed `0e7aaba`)
+- **`app/trainer/index.tsx`:** Bottom-Sheet „Code eingeben" war `position:absolute; bottom:0` im `Modal` **ohne**
+  `KeyboardAvoidingView` → Tastatur verdeckte das Feld. Fix: Backdrop + Sheet in Vollbild-`KeyboardAvoidingView`
+  (`behavior ios:padding / android:height`, `modalRoot { flex:1, justifyContent:'flex-end' }`), `position:absolute`
+  entfernt, `autoFocus` gesetzt; Backdrop-Tap-Schließen und Bottom-Safe-Area erhalten.
+- Statisch verifiziert: `npx tsc --noEmit` PASS; `npx jest services/__tests__/trainer-flow.test.ts --runInBand`
+  PASS (1 Suite / 6 Tests); `git diff --check` PASS. **Real-Device-Abnahme iOS/Android (Galaxy S23) steht aus.**
+
+---
+
 ## Aktueller Stand — 2026-08-15 (autoritativ, verifiziert via git) — MAßGEBLICH
 
 > Ergänzt von Claude Code nach dem **Production-OTA des Fährten-Render-/Confidence-Winkel-Fixes**.

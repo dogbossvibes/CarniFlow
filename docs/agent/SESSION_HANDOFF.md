@@ -10,7 +10,7 @@
 
 <!-- AUTO-GENERATED:START -->
 
-Generated: 2026-08-15T21:02:18.275Z
+Generated: 2026-08-17T10:30:53.558Z
 Agent: claude
 Branch: feat/track-module-rewrite
 
@@ -18,14 +18,21 @@ Branch: feat/track-module-rewrite
 ```
 M AGENTS.md
  M AI_HANDOFF.md
+ M app/trainer/index.tsx
  M docs/adr/ADR-001_Domain_Model.md
  M docs/agent/CURRENT_STATE.md
- M docs/agent/DECISIONS.md
  M docs/agent/README.md
  M docs/agent/SESSION_HANDOFF.md
  M docs/agent/TASKS.md
  M docs/agent/WORK_LOG.md
+ M features/subscription/plans.ts
  M features/tracking/hooks/useTrackVoiceGuidance.ts
+ M hooks/useCapabilities.ts
+ M i18n/de-CH.ts
+ M i18n/gsw-CH.ts
+ M i18n/locales/fr.ts
+ M package-lock.json
+ M package.json
  M scripts/agent-handoff.mjs
  M scripts/agent-lib.mjs
  M scripts/agent-start.mjs
@@ -48,6 +55,7 @@ M AGENTS.md
 ?? assets/images/bazooka.jpg
 ?? assets/images/smartanalysescreenshot.png
 ?? canisflow.code-workspace
+?? components/subscription/PremiumInlineUpsell.tsx
 ?? design_handoff_faehrten/screen3.jpg
 ?? dist-auth-android/
 ?? dist-auth-ios/
@@ -94,6 +102,7 @@ M AGENTS.md
 ?? docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
 ?? docs/manual-test/
 ?? "faehrten 6/design_handoff_faehrten/abriss.png"
+?? features/subscription/__tests__/healthCapabilities.test.ts
 ?? legal-web/__tests__/
 ?? legal-web/assets/auth-confirm.js
 ?? legal-web/auth/
@@ -110,34 +119,48 @@ M AGENTS.md
 ```
 AGENTS.md                                          |  10 +-
  AI_HANDOFF.md                                      |   6 +
- docs/adr/ADR-001_Domain_Model.md                   | 416 +++++++++++++++++++
- docs/agent/CURRENT_STATE.md                        | 134 +++++-
- docs/agent/DECISIONS.md                            | 119 +++++-
+ app/trainer/index.tsx                              |  63 ++--
+ docs/adr/ADR-001_Domain_Model.md                   | 416 +++++++++++++++++++++
+ docs/agent/CURRENT_STATE.md                        |  35 ++
  docs/agent/README.md                               |  20 +-
- docs/agent/SESSION_HANDOFF.md                      | 458 +++++++--------------
- docs/agent/TASKS.md                                | 119 +++++-
- docs/agent/WORK_LOG.md                             | 114 ++++-
+ docs/agent/SESSION_HANDOFF.md                      |  61 ++-
+ docs/agent/TASKS.md                                |  25 ++
+ docs/agent/WORK_LOG.md                             |  17 +
+ features/subscription/plans.ts                     |  21 ++
  features/tracking/hooks/useTrackVoiceGuidance.ts   |   2 +
+ hooks/useCapabilities.ts                           |  11 +
+ i18n/de-CH.ts                                      |   6 +
+ i18n/gsw-CH.ts                                     |   6 +
+ i18n/locales/fr.ts                                 |   6 +
+ package-lock.json                                  | 234 ++++++++++++
+ package.json                                       |   1 +
  scripts/agent-handoff.mjs                          |   4 +-
  scripts/agent-lib.mjs                              |   2 +-
  scripts/agent-start.mjs                            |  13 +-
  scripts/agent-status.mjs                           |   2 +-
  .../20260803140000_profiles_username.sql           |  79 +---
- 15 files changed, 1069 insertions(+), 429 deletions(-)
+ 22 files changed, 902 insertions(+), 138 deletions(-)
 ```
 
 ### Modified files
 ```
 AGENTS.md
 AI_HANDOFF.md
+app/trainer/index.tsx
 docs/adr/ADR-001_Domain_Model.md
 docs/agent/CURRENT_STATE.md
-docs/agent/DECISIONS.md
 docs/agent/README.md
 docs/agent/SESSION_HANDOFF.md
 docs/agent/TASKS.md
 docs/agent/WORK_LOG.md
+features/subscription/plans.ts
 features/tracking/hooks/useTrackVoiceGuidance.ts
+hooks/useCapabilities.ts
+i18n/de-CH.ts
+i18n/gsw-CH.ts
+i18n/locales/fr.ts
+package-lock.json
+package.json
 scripts/agent-handoff.mjs
 scripts/agent-lib.mjs
 scripts/agent-start.mjs
@@ -169,6 +192,7 @@ assets/images/backpackscreenshot.png
 assets/images/bazooka.jpg
 assets/images/smartanalysescreenshot.png
 canisflow.code-workspace
+components/subscription/PremiumInlineUpsell.tsx
 design_handoff_faehrten/screen3.jpg
 dist-auth-android/_expo/static/js/android/entry-9a4f5220dacd2f2900cbac6f8f9490c4.hbc
 dist-auth-android/assets/017bc6ba3fc25503e5eb5e53826d48a8
@@ -407,6 +431,7 @@ docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
 docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
 docs/manual-test/FAEHRTE_OFF_TRACK_REAL_DEVICE_TEST.md
 faehrten 6/design_handoff_faehrten/abriss.png
+features/subscription/__tests__/healthCapabilities.test.ts
 legal-web/__tests__/authConfirmStatus.test.ts
 legal-web/assets/auth-confirm.js
 legal-web/auth/confirmed.html
@@ -421,11 +446,11 @@ winkel.png
 
 ### Recent commits
 ```
+adfc3b5 fix(subscription): allow 2 NEWBIE trainings per month
+c210008 feat(subscription): add 3-day ACTIVE trial funnel
+888d25f chore(agent): refresh production handoff state
 fddd1f1 fix: restore track rendering and robust angle detection
 71f2bef fix(tracking): export voice guidance helper used by track run
-c4c075f feat(journal): allow deleting track entries
-92451a0 fix(auth): redirect email confirmation to dedicated page
-4e0bf1e fix(tracking): show unsynced search runs locally
 ```
 
 ### Runtime
@@ -438,19 +463,50 @@ Package manager: npm
 
 > Hinweis: Der AUTO-GENERATED-Block oben wird beim Handoff-Script aktualisiert.
 > Maßgeblich bei Widerspruch bleibt der tatsächliche Repository-Zustand.
-> Stand der manuellen Sektionen: **2026-08-15 (Claude Code)** — Fährten-Render-/Confidence-Winkel-Fix Production-OTA (`fddd1f1`).
+> Stand der manuellen Sektionen: **2026-08-17 (Codex)** — NEWBIE-Quota read-only Production-Preflight (No-Op) +
+> T-57 Trainer-Keyboard-Fix committed als `0e7aaba`; HEAD `0e7aaba`.
 > Hinweis: Der AUTO-GENERATED-Block oben ist ggf. älter als diese manuellen Sektionen; maßgeblich ist der echte git-Stand.
 
 ## Current task
-**Production-Verifikation des neuen Fährten-Winkel-/Render-Fixes.** Der Fix ist committed (**`fddd1f1`**, ==
-origin, 0/0) und als **Production-OTA (Runtime 1.0.1, Channel `production`, iOS + Android)** ausgeliefert. Offen
-ist ausschließlich der **reale Feldtest** (P0). Diese Session war reine Doku/Handoff-Pflege — **kein Produktcode,
-kein Commit/Push/Build/OTA/Submit**.
+**Session 2026-08-17 (Codex):** (1) **Read-only Production-Preflight** der geplanten NEWBIE-Quota-Korrektur
+gegen ANYVO Production (`axkkhyqrjrtbkumaulta`); (2) **T-57 committed** `app/trainer/index.tsx`
+(Bottom-Sheet „Trainer verbinden → Code eingeben" bei Tastatur sichtbar). **Kein Push/Build/OTA/Submit,
+keine Production-Schreiboperation.** HEAD steht auf **`0e7aaba`**, Branch `feat/track-module-rewrite`, und ist
+**3 Commits VOR origin** (`c210008`, `adfc3b5`, `0e7aaba` sind **ungepusht**; 0 hinter origin).
+
+> **Repository-Zustand > Handoff.** Zwei Subscription-Commits sind seit dem letzten Handoff (`fddd1f1`) auf dem
+> Branch, in der vorherigen Session **nicht** erstellt und **noch nicht gepusht** — nur als Repo-Zustand dokumentiert:
+> `c210008 feat(subscription): add 3-day ACTIVE trial funnel` und `adfc3b5 fix(subscription): allow 2 NEWBIE trainings per month`.
+> **Neu in dieser Session:** `0e7aaba fix(trainer): keep connect sheet above keyboard`, ebenfalls ungepusht.
 
 ## Goal
-Realen Feldtest durchführen und sicherstellen: **solide gelegte Fährtenlinie** (Mint, durchgehend), **Auto-Winkel
-erscheinen** in der Absuche (auch bei schwankender Accuracy), **Voice/Haptik** je Winkeltyp, **keine
-Schlangenlinien-Winkel** (Regression). iOS **und** Android.
+NEWBIE-Quota-Zielzustand (dog=1 · training=2 · track=0) sicher auf Production halten **ohne unnötige Migration**,
+den committed Trainer-Verbinden-Keyboard-Fix auf echten Geräten abnehmen und den **realen Feldtest** des
+Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
+
+## NEWBIE-Quota Preflight — Ergebnis (Verified read-only, 2026-08-17)
+- **Production liefert bereits** `newbie_quota_limit` = **dog=1, training=2, track=0** (via PostgREST/anon-RPC gegen
+  `axkkhyqrjrtbkumaulta`; `.env EXPO_PUBLIC_SUPABASE_URL` = Production bestätigt). Tabelle `newbie_quota_claims` existiert.
+- **Migration `supabase/migrations/20260816130000_newbie_training_quota_two.sql` (training 1→2) ist damit ein No-Op**
+  (idempotentes `CREATE OR REPLACE`, keine Datenänderung, keine Wirkung). **Nicht erforderlich.**
+- **Falle:** `20260808120000_newbie_training_quota_one.sql` senkt training auf **1** — darf **nicht isoliert** auf
+  Production laufen (Regression 2→1).
+- Premium (ACTIVE/FOUNDER/TRAINER/Lifetime) via `is_pro_member`/`user_capabilities.pro_member` wird **vor**
+  `newbie_quota_limit` auf unbegrenzt kurzgeschlossen → von der Quota unberührt.
+- **Verifikationsgrenze:** kein DDL-Dump möglich (`pg_dump`/`psql`/`service_role` fehlen; `supabase migration list
+  --linked` scheitert an fehlendem `SUPABASE_DB_PASSWORD`). Beleg ist **verhaltensbasiert** (RPC-Rückgabewerte),
+  nicht per Funktions-Body-Dump.
+
+## Trainer-Verbinden Keyboard-Fix (committed `0e7aaba`, `app/trainer/index.tsx`)
+- **Bug:** Bottom-Sheet „Code eingeben" war `position:absolute; bottom:0` in einem `Modal` **ohne**
+  `KeyboardAvoidingView` → Tastatur verdeckte das Eingabefeld, Eingabe nicht sichtbar.
+- **Fix (Projekt-Idiom):** Backdrop + Sheet in eine Vollbild-`KeyboardAvoidingView`
+  (`behavior={Platform.OS==='ios'?'padding':'height'}`, `modalRoot { flex:1, justifyContent:'flex-end' }`);
+  `position:absolute` vom Sheet entfernt; `autoFocus` aufs Code-Feld. Tap-auf-Backdrop-Schließen bleibt erhalten.
+- **Verifikation:** `npx tsc --noEmit` PASS; `npx jest services/__tests__/trainer-flow.test.ts --runInBand` PASS
+  (1 Suite / 6 Tests); `git diff --check` PASS. **Real-Device-Test iOS/Android steht aus** (Galaxy S23: Gesten- und
+  Drei-Button-Navigation; Keyboard öffnen/schließen, Backdrop bei offenem Keyboard, mehrfaches Öffnen/Schließen,
+  kleine Displayhöhe/vergrößerte Schrift, gültiger/ungültiger Codefluss).
 
 ## Current implementation state (Verified im Code `fddd1f1`)
 - **Solid-Track produktiv:** gelegte Fährte immer solide Mint via `laidTrackStroke()`
@@ -463,6 +519,8 @@ Schlangenlinien-Winkel** (Regression). iOS **und** Android.
 - Voice/Haptik/Store/Persistenz/1-5-10-m/Off-Track **unverändert** (Voice/Haptik waren nicht die Root Cause).
 
 ## Work completed — Stand 2026-08-15
+- **Commit `0e7aaba`** — `fix(trainer): keep connect sheet above keyboard` (ausschließlich
+  `app/trainer/index.tsx`, 35+/28−). Kein Build/OTA/Submit/DB-Vorgang, nicht gepusht.
 - **Commit `fddd1f1`** — `fix: restore track rendering and robust angle detection` (10 Dateien: TrackingMap +
   trackSegments + autoCornerDetection + 5 Tests + 2 Reports; `angleDiagnostics.ts` DEV-only). Gepusht (== origin).
 - **Production-OTA 2026-08-15** aus **sauberem detached Worktree** auf `fddd1f1` (kein fremder WIP), Runtime **1.0.1**,
@@ -488,6 +546,10 @@ Schlangenlinien-Winkel** (Regression). iOS **und** Android.
   Accuracy-Schwellen „reparieren".
 
 ## Known issues / offene Punkte
+- **NEWBIE-Quota-Migration `20260816130000` ist auf Production ein No-Op** (training bereits 2). Nicht ausführen,
+  außer man will die Definition bewusst idempotent festschreiben — **nur nach ausdrücklicher Freigabe**.
+- **Trainer-Verbinden Keyboard-Fix** (`0e7aaba`) ist committed, aber **real-device-untestet** (iOS + Galaxy S23
+  mit Gesten- und Drei-Button-Navigation).
 - **Stale Test** `app/track/__tests__/run-arming.test.ts` (`([5, 10] as const).map` vs. `HANDLER_DISTANCES_M`) rot, unabhängig.
 - **Web-Bundle** bricht via `react-native-maps` → OTA plattformweise ios/android; kein Mobile-Blocker, **nicht nebenbei fixen**.
 - **`freezeProgress` bewusst DEFERRED** — nur Feedback, kein Progress-/Recorder-Freeze.
@@ -505,16 +567,30 @@ Schlangenlinien-Winkel** (Regression). iOS **und** Android.
 ## Do not touch
 - Der gesamte vorbestehende fremde WIP (Produkt-/Tracking-/i18n-WIP, SQL-Dumps, Artefakte, Screenshots, `dist-*`,
   Workspaces, ZIPs, `.opencode/`) — inkl. `features/tracking/hooks/useTrackVoiceGuidance.ts`.
+- **T-57 ist committed:** `app/trainer/index.tsx` in `0e7aaba`; nicht ohne neuen, klar abgegrenzten Auftrag verändern.
+- **Keine Production-DB-Schreiboperation** (NEWBIE-Quota-Migration inkl.) ohne ausdrückliche Freigabe.
 - Keine pauschalen Git-Aktionen (`git add .`, reset, clean, checkout fremder Dateien); kein Push/Build/OTA/Store-Submit ohne Freigabe.
 - Den AUTO-GENERATED-Block nie händisch editieren (nur via `agent:handoff`).
 
 ## Next recommended step
-1. **T-56 Real-Device-Test** Confidence-/Render-Fix auf echten Geräten (iOS **und** Android): solide Mint-Fährte,
+1. **NEWBIE-Quota:** Entscheidung des Nutzers einholen — da Production bereits training=2 liefert, ist die Migration
+   **nicht nötig**; optionales idempotentes Festschreiben nur nach Freigabe. `20260808120000` (→1) **nicht** anwenden.
+2. **Trainer-Keyboard-Fix real-device testen** (iOS + Galaxy S23 Gesten- und Drei-Button-Navigation): „Trainer
+   verbinden → Code eingeben", Sheet über Tastatur sichtbar, getippte Zeichen + CTA sichtbar, Keyboard schließen,
+   Backdrop-Tap bei offenem Keyboard, mehrfaches Öffnen/Schließen, kleine Displayhöhe/vergrößerte Schrift sowie
+   gültiger/ungültiger Codefluss.
+3. **T-56 Real-Device-Test** Confidence-/Render-Fix auf echten Geräten (iOS **und** Android): solide Mint-Fährte,
    Auto-Winkel (90°/Spitz L+R) sichtbar + Voice/Haptik, Schlangenlinie → 0 Winkel, 1/5/10-m-Stichprobe, kurzer Off-Track.
 2. Bei Feldbeleg zur Auto-Erkennung optional die vorbereitete **DEV-Diagnostik** (`angleDiagnostics.ts`) für **eine**
    Fährte aktivieren (accept/pending/reject + Confidence + Accuracy) — danach wieder entfernen.
 3. **T-24 Store/Release-Monitoring** (OTA-Zustellung realer Geräte) · **T-22 Website deployen** · **T-21 Dirty-Tree/
    Release-Branch-Strategie** (fremder WIP unangetastet).
+
+## Relevant files (diese Session 2026-08-17)
+- **Keyboard-Fix (committed `0e7aaba`):** `app/trainer/index.tsx` (Bottom-Sheet „Code eingeben").
+- **NEWBIE-Quota (Repo, keine Ausführung):** `supabase/migrations/20260816130000_newbie_training_quota_two.sql` (No-Op),
+  `20260808120000_newbie_training_quota_one.sql` (→1, nicht isoliert anwenden), `SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql`,
+  `features/subscription/plans.ts` (`NEWBIE_QUOTA = { dog:1, training:2, track:0 }`), `SUBSCRIPTION_P0_DB_DEPLOYMENT.md`.
 
 ## Relevant files (Render- + Confidence-Fix `fddd1f1`)
 - Render: `features/tracking/components/TrackingMap.tsx`, `features/tracking/utils/trackSegments.ts` (`laidTrackStroke`).
@@ -524,5 +600,8 @@ Schlangenlinien-Winkel** (Regression). iOS **und** Android.
 - Konsument (unverändert): `app/track/run.tsx`, `features/tracking/hooks/{useTrackVoiceGuidance,useTrackHapticGuidance,useTrackRecorder}.ts`.
 
 ## Open questions
+- NEWBIE-Quota: Will der Nutzer die No-Op-Migration trotzdem idempotent festschreiben, oder Production so belassen (empfohlen)?
+- Trainer-Keyboard-Fix: Real-Device-Abnahme iOS/Android noch offen; bei Abweichung zuerst reproduzierbaren Beleg
+  und minimale Korrektur festlegen.
 - Justieren einzelne Feld-Fährten die Confidence-Gewichte/Schwellen? Nur mit Regressionstests + Feldbeleg.
 - Wann/ob der Web-Bundle-Bruch (`react-native-maps`) separat behoben wird (kein Mobile-Blocker).
