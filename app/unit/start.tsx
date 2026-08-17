@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,7 +23,7 @@ import { useT } from '@/i18n';
 export default function UnitStartScreen() {
   const router = useRouter();
   const { t } = useT();
-  const { dogs } = useDogs();
+  const { dogs, loading: dogsLoading } = useDogs();
   const { session } = useSession();
   const { profile } = useProfile();
   const active = useActiveTraining();
@@ -38,6 +38,13 @@ export default function UnitStartScreen() {
     addMode ? active.dogId : dogs.length === 1 ? dogs[0].id : null,
   );
   const [dogPickerOpen, setDogPickerOpen] = useState(false);   // nur UI-Disclosure; Auswahllogik unverändert
+
+  // useDogs lädt asynchron: Genau einen Hund erst nach abgeschlossenem Load
+  // übernehmen. Ohne Auswahlfeld gibt es sonst keinen Weg, die für den Start
+  // benötigte dogId zu setzen.
+  useEffect(() => {
+    if (!addMode && !dogsLoading && !selectedDogId && dogs.length === 1) setSelectedDogId(dogs[0].id);
+  }, [addMode, dogsLoading, dogs, selectedDogId]);
 
   // Feste Sparten nach den im Profil aktivierten filtern. Fallback = Standard-
   // Sparten (nicht „alle"), damit Opt-in-Sparten wie Obedience für neue Nutzer
@@ -130,8 +137,13 @@ export default function UnitStartScreen() {
         ) : (
           <>
             <Text style={s.label}>{t('training.dogLabel')}</Text>
-            {dogs.length === 0 ? (
+            {!dogsLoading && dogs.length === 0 ? (
               <View style={s.emptyBox}><Text style={s.emptyTxt}>{t('training.addFirstDog')}</Text></View>
+            ) : dogs.length === 1 ? (
+              <View style={s.lockedDog} accessibilityLabel={t('training.chooseDogA11y', { dog: dogs[0].name })}>
+                <DogIcon size={14} color={C.accent} />
+                <Text style={s.lockedDogTxt}>{dogs[0].name}</Text>
+              </View>
             ) : (
               <>
                 <TouchableOpacity

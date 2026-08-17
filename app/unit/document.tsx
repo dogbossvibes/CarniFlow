@@ -26,6 +26,7 @@ import { DEFAULT_SPARTEN } from '@/constants/sparten';
 import { createDocumentedUnit, updateDocumentedUnit, getTrainingUnitById } from '@/services/trainingUnitService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { DateField } from '@/components/ui/DateField';
+import { DogIcon } from '@/components/ui/DogIcon';
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
 import type { AudioNote } from '@/types';
@@ -51,7 +52,7 @@ export default function DocumentScreen() {
   const editing = !!id;
   // Vom Timer mitgegebene Dauer (Sekunden) → Minuten vorbefüllen.
   const initialMin = duration ? Math.max(1, Math.round(Number(duration) / 60)) : 45;
-  const { dogs } = useDogs();
+  const { dogs, loading: dogsLoading } = useDogs();
   const { session } = useSession();
   const { profile } = useProfile();
   const { categories } = useCustomCategories();
@@ -107,12 +108,11 @@ export default function DocumentScreen() {
     })();
   }, [id]);
 
-  // Genau ein Hund → automatisch wählen, sobald die Hunde geladen sind.
-  // (useDogs lädt async; die useState-Initialisierung greift zu früh, wenn dogs
-  // noch leer ist → dogId bliebe sonst null und Speichern wäre nie möglich.)
+  // Genau einen Hund erst nach abgeschlossenem Load automatisch wählen. Die
+  // Auswahl aus Navigation oder Edit-Modus bleibt dabei unverändert.
   useEffect(() => {
-    if (!editing && !dogId && dogs.length === 1) setDogId(dogs[0].id);
-  }, [dogs, editing, dogId]);
+    if (!editing && !dogsLoading && !dogId && dogs.length === 1) setDogId(dogs[0].id);
+  }, [dogsLoading, dogs, editing, dogId]);
 
   const disc = disciplines.find(d => d.key === activeDisc) ?? disciplines[0];
   const isSelected = (label: string, name: string) =>
@@ -200,7 +200,25 @@ export default function DocumentScreen() {
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Hund */}
-          {dogs.length > 1 && (
+          {!dogsLoading && dogs.length === 0 ? (
+            <>
+              <Text style={s.label}>{t('training.dogLabel')}</Text>
+              <View style={s.emptyDogCard}>
+                <Text style={s.emptyDogTxt}>{t('training.addFirstDog')}</Text>
+                <TouchableOpacity style={s.addDogBtn} onPress={() => router.push('/add-dog')} activeOpacity={0.8}>
+                  <Text style={s.addDogTxt}>{t('training.addFirstDog')}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : dogs.length === 1 ? (
+            <>
+              <Text style={s.label}>{t('training.dogLabel')}</Text>
+              <View style={s.lockedDog} accessibilityLabel={t('training.chooseDogA11y', { dog: dogs[0].name })}>
+                <DogIcon size={14} color={C.accent} />
+                <Text style={s.lockedDogTxt}>{dogs[0].name}</Text>
+              </View>
+            </>
+          ) : dogs.length > 1 && (
             <>
               <Text style={s.label}>{t('training.dogLabel')}</Text>
               <View style={s.chipRow}>
@@ -348,6 +366,12 @@ const s = StyleSheet.create({
   chipActive:   { borderColor: C.accent },
   chipTxt:      { fontSize: 13, color: C.muted, fontWeight: '600' },
   chipTxtActive:{ color: C.accentText, fontWeight: '700' },
+  lockedDog: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start', backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.accent, paddingHorizontal: 14, paddingVertical: 8 },
+  lockedDogTxt: { fontSize: 13, color: C.white, fontWeight: '700' },
+  emptyDogCard: { gap: 10, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
+  emptyDogTxt: { fontSize: 13, color: C.subtle },
+  addDogBtn: { alignSelf: 'flex-start', borderRadius: 12, borderWidth: 1, borderColor: C.accent, paddingHorizontal: 12, paddingVertical: 8 },
+  addDogTxt: { fontSize: 13, color: C.accent, fontWeight: '700' },
 
   customRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   input:     { backgroundColor: C.input, borderRadius: 14, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 14, paddingHorizontal: 14, paddingVertical: 12 },
