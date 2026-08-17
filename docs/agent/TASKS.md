@@ -4,7 +4,7 @@
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).
 
-## Update 2026-08-17 (Codex) — T-57 Trainer-Keyboard-Fix committed `0e7aaba`, HEAD `0e7aaba`
+## Update 2026-08-17 (Codex) — T-57 Trainer-Keyboard-Fix releaseverifiziert `0e7aaba`
 
 > Verifiziert gegen git/Code/Production (read-only). Diese Sektion ist die neueste maßgebliche.
 > **Kein Push/Build/OTA, keine Production-Schreiboperation.** HEAD ist **3 Commits vor origin** (0 hinter):
@@ -12,15 +12,15 @@
 > `0e7aaba fix(trainer): keep connect sheet above keyboard`.
 
 ### Neu
-- **T-57 — Trainer-Verbinden Keyboard-Fix (Code-Eingabe-Sheet)** · DONE(committed `0e7aaba`) / OPEN(real-device QA)
+- **T-57 — Trainer-Verbinden Keyboard-Fix (Code-Eingabe-Sheet)** · DONE(releaseverifiziert `0e7aaba`)
   `app/trainer/index.tsx`: Bottom-Sheet „Code eingeben" wurde von der Tastatur verdeckt (Sheet `position:absolute;
   bottom:0` im `Modal` ohne `KeyboardAvoidingView`). Fix: Backdrop + Sheet in Vollbild-`KeyboardAvoidingView`
   (`behavior ios:padding / android:height`, `modalRoot { flex:1, justifyContent:'flex-end' }`), `position:absolute`
   entfernt, `autoFocus` gesetzt; Backdrop-Tap-Schließen und Bottom-Safe-Area bleiben erhalten. Checks:
   `npx tsc --noEmit` PASS; `trainer-flow.test.ts` PASS (1 Suite / 6 Tests); `git diff --check` PASS.
-  **Offen:** Real-Device-QA auf iOS sowie Galaxy S23 mit Gesten- und Drei-Button-Navigation (Keyboard öffnen/schließen,
-  Backdrop bei offenem Keyboard, mehrfaches Öffnen/Schließen, kleine Displayhöhe/vergrößerte Schrift,
-  gültiger/ungültiger Codefluss). Kein Build/OTA/Submit/DB-Vorgang.
+  **Real-Device-QA abgeschlossen / releaseverifiziert:** iOS PASS; Android / Galaxy S23 PASS (Gesten- und
+  Drei-Button-Navigation). Keyboard öffnen/schließen, sichtbares Eingabefeld + CTA, Backdrop bei offenem Keyboard,
+  mehrfaches Öffnen/Schließen sowie gültiger/ungültiger Codefluss PASS. Kein Build/OTA/Submit/DB-Vorgang.
 - **T-58 — NEWBIE-Quota Production-Preflight (read-only)** · DONE(verified) — **Migration NICHT nötig**
   Production (`axkkhyqrjrtbkumaulta`) liefert bereits `newbie_quota_limit` dog=1/training=2/track=0 (PostgREST/anon).
   `supabase/migrations/20260816130000_newbie_training_quota_two.sql` (training 1→2) ist damit **No-Op**; nicht ohne
@@ -29,7 +29,7 @@
   kein DDL-Dump möglich (kein `SUPABASE_DB_PASSWORD`/`pg_dump`/`service_role`) → verhaltensbasiert, nicht Body-Dump.
 
 ### ► TASK-ID-Stand (aktualisiert 2026-08-17)
-- Neu vergeben: **T-57** (DONE committed / OPEN real-device QA), **T-58** (DONE verified). **Nächste freie TASK-ID: T-59.**
+- Neu vergeben: **T-57** (DONE releaseverifiziert), **T-58** (DONE verified). **Nächste freie TASK-ID: T-59.**
 - Weiterhin OPEN P0: **T-56** Real-Device-Test Confidence-/Render-Fix (siehe Update 2026-08-15 unten).
 
 ## Update 2026-08-15 (Claude Code) — Fährten-Render-/Confidence-Winkel-Fix DEPLOYED (HEAD `fddd1f1`, == origin)

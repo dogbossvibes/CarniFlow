@@ -33,13 +33,16 @@
 - **Verifikationsgrenze:** kein DDL-Dump (`pg_dump`/`psql`/`service_role` fehlen; `supabase migration list --linked`
   scheitert an fehlendem `SUPABASE_DB_PASSWORD`) → Beleg verhaltensbasiert (RPC-Werte), nicht per Body-Dump.
 
-### TRAINER VERBINDEN — KEYBOARD-FIX (Verified im Code, committed `0e7aaba`)
+### TRAINER VERBINDEN — KEYBOARD-FIX (Release-verifiziert, committed `0e7aaba`)
 - **`app/trainer/index.tsx`:** Bottom-Sheet „Code eingeben" war `position:absolute; bottom:0` im `Modal` **ohne**
   `KeyboardAvoidingView` → Tastatur verdeckte das Feld. Fix: Backdrop + Sheet in Vollbild-`KeyboardAvoidingView`
   (`behavior ios:padding / android:height`, `modalRoot { flex:1, justifyContent:'flex-end' }`), `position:absolute`
   entfernt, `autoFocus` gesetzt; Backdrop-Tap-Schließen und Bottom-Safe-Area erhalten.
 - Statisch verifiziert: `npx tsc --noEmit` PASS; `npx jest services/__tests__/trainer-flow.test.ts --runInBand`
-  PASS (1 Suite / 6 Tests); `git diff --check` PASS. **Real-Device-Abnahme iOS/Android (Galaxy S23) steht aus.**
+  PASS (1 Suite / 6 Tests); `git diff --check` PASS.
+- **Real-Device-QA abgeschlossen / releaseverifiziert:** iOS PASS; Android / Galaxy S23 PASS. Tastatur öffnet und
+  schließt korrekt; Eingabefeld und CTA bleiben sichtbar; Backdrop funktioniert auch bei offener Tastatur;
+  erneutes Öffnen/Schließen sowie gültiger und ungültiger Trainer-Codefluss funktionieren weiterhin korrekt.
 
 ---
 

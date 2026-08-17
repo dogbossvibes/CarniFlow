@@ -3,6 +3,13 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-08-17 — Codex (T-57 Real-Device-QA releaseverifiziert)
+
+T-57 bleibt der unveränderte Produktcode-Commit **`0e7aaba fix(trainer): keep connect sheet above keyboard`**.
+Real-Device-QA abgeschlossen: **iOS PASS**; **Android / Galaxy S23 PASS** (Gesten- und Drei-Button-Navigation).
+Keyboard öffnen/schließen, sichtbares Eingabefeld + CTA, Backdrop bei offener Tastatur, mehrfaches Öffnen/Schließen
+sowie gültiger/ungültiger Trainer-Codefluss PASS. Kein Produktcode, Build, OTA, Submit oder DB-Vorgang.
+
 ## 2026-08-17 — Codex (T-57 Trainer-Verbinden Keyboard-Fix committed)
 
 Branch `feat/track-module-rewrite`, Commit **`0e7aaba fix(trainer): keep connect sheet above keyboard`**; HEAD damit
@@ -12,9 +19,8 @@ Branch `feat/track-module-rewrite`, Commit **`0e7aaba fix(trainer): keep connect
   entfernte absolute Sheet-Positionierung und `autoFocus`; Bottom-Safe-Area und Backdrop-Schließen bleiben erhalten.
 - Checks: `npx tsc --noEmit` PASS; `npx jest services/__tests__/trainer-flow.test.ts --runInBand` PASS
   (1 Suite / 6 Tests); `git diff --check` PASS.
-- Offen bleibt ausschließlich Real-Device-QA: iOS, Galaxy S23 Gesten- und Drei-Button-Navigation, Keyboard
-  öffnen/schließen, Backdrop mit offenem Keyboard, mehrfaches Öffnen/Schließen, kleine Displayhöhe/vergrößerte Schrift
-  sowie gültiger/ungültiger Codefluss. Fremdes WIP blieb unangetastet.
+- Die zu diesem Zeitpunkt noch offene Real-Device-QA ist im neueren Eintrag oben als PASS/releaseverifiziert erfasst.
+  Fremdes WIP blieb unangetastet.
 
 ## 2026-08-17 — Claude Code (NEWBIE-Quota Production-Preflight + Trainer-Keyboard-Fix)
 

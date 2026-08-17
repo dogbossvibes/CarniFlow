@@ -464,12 +464,12 @@ Package manager: npm
 > Hinweis: Der AUTO-GENERATED-Block oben wird beim Handoff-Script aktualisiert.
 > Maßgeblich bei Widerspruch bleibt der tatsächliche Repository-Zustand.
 > Stand der manuellen Sektionen: **2026-08-17 (Codex)** — NEWBIE-Quota read-only Production-Preflight (No-Op) +
-> T-57 Trainer-Keyboard-Fix committed als `0e7aaba`; HEAD `0e7aaba`.
+> T-57 Trainer-Keyboard-Fix `0e7aaba` ist releaseverifiziert; HEAD `0e7aaba`.
 > Hinweis: Der AUTO-GENERATED-Block oben ist ggf. älter als diese manuellen Sektionen; maßgeblich ist der echte git-Stand.
 
 ## Current task
 **Session 2026-08-17 (Codex):** (1) **Read-only Production-Preflight** der geplanten NEWBIE-Quota-Korrektur
-gegen ANYVO Production (`axkkhyqrjrtbkumaulta`); (2) **T-57 committed** `app/trainer/index.tsx`
+gegen ANYVO Production (`axkkhyqrjrtbkumaulta`); (2) **T-57 releaseverifiziert** `app/trainer/index.tsx`
 (Bottom-Sheet „Trainer verbinden → Code eingeben" bei Tastatur sichtbar). **Kein Push/Build/OTA/Submit,
 keine Production-Schreiboperation.** HEAD steht auf **`0e7aaba`**, Branch `feat/track-module-rewrite`, und ist
 **3 Commits VOR origin** (`c210008`, `adfc3b5`, `0e7aaba` sind **ungepusht**; 0 hinter origin).
@@ -480,8 +480,8 @@ keine Production-Schreiboperation.** HEAD steht auf **`0e7aaba`**, Branch `feat/
 > **Neu in dieser Session:** `0e7aaba fix(trainer): keep connect sheet above keyboard`, ebenfalls ungepusht.
 
 ## Goal
-NEWBIE-Quota-Zielzustand (dog=1 · training=2 · track=0) sicher auf Production halten **ohne unnötige Migration**,
-den committed Trainer-Verbinden-Keyboard-Fix auf echten Geräten abnehmen und den **realen Feldtest** des
+NEWBIE-Quota-Zielzustand (dog=1 · training=2 · track=0) sicher auf Production halten **ohne unnötige Migration**
+und den **realen Feldtest** des
 Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 
 ## NEWBIE-Quota Preflight — Ergebnis (Verified read-only, 2026-08-17)
@@ -497,16 +497,16 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
   --linked` scheitert an fehlendem `SUPABASE_DB_PASSWORD`). Beleg ist **verhaltensbasiert** (RPC-Rückgabewerte),
   nicht per Funktions-Body-Dump.
 
-## Trainer-Verbinden Keyboard-Fix (committed `0e7aaba`, `app/trainer/index.tsx`)
+## Trainer-Verbinden Keyboard-Fix (releaseverifiziert, committed `0e7aaba`, `app/trainer/index.tsx`)
 - **Bug:** Bottom-Sheet „Code eingeben" war `position:absolute; bottom:0` in einem `Modal` **ohne**
   `KeyboardAvoidingView` → Tastatur verdeckte das Eingabefeld, Eingabe nicht sichtbar.
 - **Fix (Projekt-Idiom):** Backdrop + Sheet in eine Vollbild-`KeyboardAvoidingView`
   (`behavior={Platform.OS==='ios'?'padding':'height'}`, `modalRoot { flex:1, justifyContent:'flex-end' }`);
   `position:absolute` vom Sheet entfernt; `autoFocus` aufs Code-Feld. Tap-auf-Backdrop-Schließen bleibt erhalten.
 - **Verifikation:** `npx tsc --noEmit` PASS; `npx jest services/__tests__/trainer-flow.test.ts --runInBand` PASS
-  (1 Suite / 6 Tests); `git diff --check` PASS. **Real-Device-Test iOS/Android steht aus** (Galaxy S23: Gesten- und
-  Drei-Button-Navigation; Keyboard öffnen/schließen, Backdrop bei offenem Keyboard, mehrfaches Öffnen/Schließen,
-  kleine Displayhöhe/vergrößerte Schrift, gültiger/ungültiger Codefluss).
+  (1 Suite / 6 Tests); `git diff --check` PASS. **Real-Device-QA abgeschlossen / releaseverifiziert:** iOS PASS;
+  Android / Galaxy S23 PASS (Gesten- und Drei-Button-Navigation). Keyboard öffnen/schließen, sichtbares Eingabefeld
+  + CTA, Backdrop bei offenem Keyboard, mehrfaches Öffnen/Schließen sowie gültiger/ungültiger Codefluss PASS.
 
 ## Current implementation state (Verified im Code `fddd1f1`)
 - **Solid-Track produktiv:** gelegte Fährte immer solide Mint via `laidTrackStroke()`
@@ -521,6 +521,8 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 ## Work completed — Stand 2026-08-15
 - **Commit `0e7aaba`** — `fix(trainer): keep connect sheet above keyboard` (ausschließlich
   `app/trainer/index.tsx`, 35+/28−). Kein Build/OTA/Submit/DB-Vorgang, nicht gepusht.
+- **T-57 Real-Device-QA:** iOS und Android / Galaxy S23 (Gesten- und Drei-Button-Navigation) PASS; Fix ist
+  releaseverifiziert. Kein Produktcode, Build, OTA, Submit oder DB-Vorgang in dieser Verifikation.
 - **Commit `fddd1f1`** — `fix: restore track rendering and robust angle detection` (10 Dateien: TrackingMap +
   trackSegments + autoCornerDetection + 5 Tests + 2 Reports; `angleDiagnostics.ts` DEV-only). Gepusht (== origin).
 - **Production-OTA 2026-08-15** aus **sauberem detached Worktree** auf `fddd1f1` (kein fremder WIP), Runtime **1.0.1**,
@@ -548,8 +550,6 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 ## Known issues / offene Punkte
 - **NEWBIE-Quota-Migration `20260816130000` ist auf Production ein No-Op** (training bereits 2). Nicht ausführen,
   außer man will die Definition bewusst idempotent festschreiben — **nur nach ausdrücklicher Freigabe**.
-- **Trainer-Verbinden Keyboard-Fix** (`0e7aaba`) ist committed, aber **real-device-untestet** (iOS + Galaxy S23
-  mit Gesten- und Drei-Button-Navigation).
 - **Stale Test** `app/track/__tests__/run-arming.test.ts` (`([5, 10] as const).map` vs. `HANDLER_DISTANCES_M`) rot, unabhängig.
 - **Web-Bundle** bricht via `react-native-maps` → OTA plattformweise ios/android; kein Mobile-Blocker, **nicht nebenbei fixen**.
 - **`freezeProgress` bewusst DEFERRED** — nur Feedback, kein Progress-/Recorder-Freeze.
@@ -575,11 +575,7 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 ## Next recommended step
 1. **NEWBIE-Quota:** Entscheidung des Nutzers einholen — da Production bereits training=2 liefert, ist die Migration
    **nicht nötig**; optionales idempotentes Festschreiben nur nach Freigabe. `20260808120000` (→1) **nicht** anwenden.
-2. **Trainer-Keyboard-Fix real-device testen** (iOS + Galaxy S23 Gesten- und Drei-Button-Navigation): „Trainer
-   verbinden → Code eingeben", Sheet über Tastatur sichtbar, getippte Zeichen + CTA sichtbar, Keyboard schließen,
-   Backdrop-Tap bei offenem Keyboard, mehrfaches Öffnen/Schließen, kleine Displayhöhe/vergrößerte Schrift sowie
-   gültiger/ungültiger Codefluss.
-3. **T-56 Real-Device-Test** Confidence-/Render-Fix auf echten Geräten (iOS **und** Android): solide Mint-Fährte,
+2. **T-56 Real-Device-Test** Confidence-/Render-Fix auf echten Geräten (iOS **und** Android): solide Mint-Fährte,
    Auto-Winkel (90°/Spitz L+R) sichtbar + Voice/Haptik, Schlangenlinie → 0 Winkel, 1/5/10-m-Stichprobe, kurzer Off-Track.
 2. Bei Feldbeleg zur Auto-Erkennung optional die vorbereitete **DEV-Diagnostik** (`angleDiagnostics.ts`) für **eine**
    Fährte aktivieren (accept/pending/reject + Confidence + Accuracy) — danach wieder entfernen.
@@ -601,7 +597,5 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 
 ## Open questions
 - NEWBIE-Quota: Will der Nutzer die No-Op-Migration trotzdem idempotent festschreiben, oder Production so belassen (empfohlen)?
-- Trainer-Keyboard-Fix: Real-Device-Abnahme iOS/Android noch offen; bei Abweichung zuerst reproduzierbaren Beleg
-  und minimale Korrektur festlegen.
 - Justieren einzelne Feld-Fährten die Confidence-Gewichte/Schwellen? Nur mit Regressionstests + Feldbeleg.
 - Wann/ob der Web-Bundle-Bruch (`react-native-maps`) separat behoben wird (kein Mobile-Blocker).
