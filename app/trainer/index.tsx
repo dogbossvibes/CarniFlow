@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Modal, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -124,32 +124,38 @@ export default function MyTrainersScreen() {
 
       {/* Bottom Sheet: Code eingeben */}
       <Modal visible={sheet} transparent animationType="slide" onRequestClose={() => setSheet(false)}>
-        <TouchableWithoutFeedback onPress={() => setSheet(false)}>
-          <View style={s.backdrop} />
-        </TouchableWithoutFeedback>
-        <View style={s.sheet}>
-          <SafeAreaView edges={['bottom']}>
-            <View style={s.griff} />
-            <Text style={s.sheetTitle}>{t('trainer.codeTitle')}</Text>
-            <Text style={s.sheetSub}>{t('trainer.codeSub')}</Text>
-            <View style={s.searchRow}>
-              <TextInput
-                style={[s.input, s.flex]}
-                placeholder={t('trainer.codePlaceholder')}
-                placeholderTextColor={C.placeholder}
-                value={code}
-                onChangeText={setCode}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                onSubmitEditing={submitCode}
-                returnKeyType="go"
-              />
-              <TouchableOpacity style={s.searchBtn} onPress={submitCode} disabled={redeeming} activeOpacity={0.8}>
-                {redeeming ? <ActivityIndicator size="small" color={C.accentText} /> : <Ionicons name="arrow-forward" size={20} color={C.accentText} />}
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </View>
+        <KeyboardAvoidingView
+          style={s.modalRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableWithoutFeedback onPress={() => setSheet(false)}>
+            <View style={s.backdrop} />
+          </TouchableWithoutFeedback>
+          <View style={s.sheet}>
+            <SafeAreaView edges={['bottom']}>
+              <View style={s.griff} />
+              <Text style={s.sheetTitle}>{t('trainer.codeTitle')}</Text>
+              <Text style={s.sheetSub}>{t('trainer.codeSub')}</Text>
+              <View style={s.searchRow}>
+                <TextInput
+                  style={[s.input, s.flex]}
+                  placeholder={t('trainer.codePlaceholder')}
+                  placeholderTextColor={C.placeholder}
+                  value={code}
+                  onChangeText={setCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoFocus
+                  onSubmitEditing={submitCode}
+                  returnKeyType="go"
+                />
+                <TouchableOpacity style={s.searchBtn} onPress={submitCode} disabled={redeeming} activeOpacity={0.8}>
+                  {redeeming ? <ActivityIndicator size="small" color={C.accentText} /> : <Ionicons name="arrow-forward" size={20} color={C.accentText} />}
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -184,8 +190,9 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 16, color: C.white, fontWeight: '700', marginTop: 6 },
   emptyTxt:   { fontSize: 13, color: C.subtle, textAlign: 'center' },
 
+  modalRoot: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingBottom: 8, paddingTop: 12 },
+  sheet: { backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingBottom: 8, paddingTop: 12 },
   griff: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 12 },
   sheetTitle: { fontSize: 18, color: C.white, fontWeight: '800', marginBottom: 4 },
   sheetSub: { fontSize: 13, color: C.muted, marginBottom: 14 },
