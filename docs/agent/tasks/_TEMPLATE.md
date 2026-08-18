@@ -15,7 +15,7 @@
 | **Ziel** | <ein Satz: was ist erledigt, wenn der Task fertig ist> |
 | **Worktree** | `../anyvo-<slug>` |
 | **Branch** | `<branch>` |
-| **Basis (base)** | `<z. B. main / HEAD>` |
+| **Basis (base)** | `<explizit, z. B. feat/track-module-rewrite>` |
 | **Verantwortlicher Agent** | `<opencode-primary \| engineering-lead \| codex \| …>` |
 | **Status** | `OPEN` \| `IN_PROGRESS` \| `DONE(committed)` \| `BLOCKED` |
 | **Review-Status** | `NONE` \| `REQUESTED` \| `PASS` \| `CHANGES_REQUESTED` |

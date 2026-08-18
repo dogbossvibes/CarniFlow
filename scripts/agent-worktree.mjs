@@ -103,7 +103,7 @@ function scaffoldTaskReport(destWorktree, { taskId, slug, branch, base, worktree
     .replace('<Kurztitel>', slug)
     .replace('`../anyvo-<slug>`', '`' + worktreeRel + '`')
     .replace('`<branch>`', '`' + branch + '`')
-    .replace('`<z. B. main / HEAD>`', '`' + base + '`')
+    .replace('`<explizit, z. B. feat/track-module-rewrite>`', '`' + base + '`')
     + `\n<!-- angelegt ${today} via agent:wt:create -->\n`;
   const destDir = resolve(destWorktree, 'docs/agent/tasks');
   mkdirSync(destDir, { recursive: true });
@@ -118,7 +118,17 @@ function cmdCreate(argv) {
   const { flags, rest } = parseFlags(argv);
   const slug = assertSlug(rest[0]);
   const branch = (flags.branch && flags.branch !== true) ? String(flags.branch) : slug;
-  const base = (flags.base && flags.base !== true) ? String(flags.base) : 'HEAD';
+  // --base ist bewusst PFLICHT: eine explizite Basis verhindert eine versteckte,
+  // womöglich falsche Ausgangsbasis (z. B. still HEAD). Kein stiller Default.
+  if (!flags.base || flags.base === true) {
+    const cur = (() => { try { return git(['branch', '--show-current']); } catch { return ''; } })();
+    console.error('✗ --base fehlt. Bitte die Ausgangsbasis EXPLIZIT angeben (kein stiller Default).');
+    console.error('  • Normalfall: aktueller freigegebener Integrations-/Entwicklungsbranch');
+    if (cur) console.error(`    → aktuell führend: --base ${cur}`);
+    console.error('  • Nur bewusst vom stabilen Hauptbranch ausgehen: --base main');
+    process.exit(1);
+  }
+  const base = String(flags.base);
   const taskId = nextTaskId(flags.task && flags.task !== true ? String(flags.task) : null);
   const dir = resolve(ROOT, '..', `anyvo-${slug}`);
   const worktreeRel = `../anyvo-${slug}`;
@@ -225,7 +235,8 @@ switch (cmd) {
   case 'remove': cmdRemove(argv); break;
   default:
     console.log('ANYVO Worktree-Helfer');
-    console.log('  node scripts/agent-worktree.mjs create <slug> [--branch <name>] [--base <ref>] [--task T-XX]');
+    console.log('  node scripts/agent-worktree.mjs create <slug> --base <ref> [--branch <name>] [--task T-XX]');
+    console.log('    (--base ist Pflicht: explizite Ausgangsbasis, z. B. der aktuelle Integrationsbranch)');
     console.log('  node scripts/agent-worktree.mjs list');
     console.log('  node scripts/agent-worktree.mjs finish <slug>');
     console.log('  node scripts/agent-worktree.mjs remove <slug>   (nur wenn clean)');

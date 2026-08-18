@@ -12,7 +12,7 @@ export const AGENT_DIR = resolve(ROOT, 'docs/agent');
 export const HANDOFF_PATH = resolve(AGENT_DIR, 'SESSION_HANDOFF.md');
 export const MARKER_START = '<!-- AUTO-GENERATED:START -->';
 export const MARKER_END = '<!-- AUTO-GENERATED:END -->';
-export const VALID_AGENTS = ['claude', 'codex', 'unknown'];
+export const VALID_AGENTS = ['opencode', 'codex', 'claude', 'unknown'];
 
 // Nur lesende Git-/Shell-Kommandos. Bei Fehler leere Zeichenkette (kein Abbruch).
 export function sh(cmd) {

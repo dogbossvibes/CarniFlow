@@ -54,8 +54,9 @@ Beispiele: `../anyvo-track-fix`, `../anyvo-health-weight`, `../anyvo-review`.
 ## Ablauf pro Task
 
 1. **Task definieren** (User/ChatGPT): Ziel, Scope, Tabu-Dateien.
-2. **Worktree + Branch anlegen**: `npm run agent:wt:create -- <slug>` (siehe unten).
-   Legt Branch `<slug>`, Worktree `../anyvo-<slug>` und `docs/agent/tasks/<TASK-ID>.md` an.
+2. **Worktree + Branch anlegen**: `npm run agent:wt:create -- <slug> --base <integrationsbranch>`
+   (siehe „Basis (`--base`)" unten). Legt Branch `<slug>`, Worktree `../anyvo-<slug>`
+   und `docs/agent/tasks/<TASK-ID>.md` an.
 3. **Primary Agent** startet **im Worktree** (`cd ../anyvo-<slug>`; `opencode`), liest
    `AGENTS.md` + `docs/agent/` + den eigenen Task-Report.
 4. **Implementieren** (ggf. mit Subagenten), **Tests** ausführen, Report pflegen.
@@ -89,14 +90,25 @@ Ein Parallel-Agent darf **niemals**:
 ## Helfer-Kommandos
 
 ```
-npm run agent:wt:create -- <slug> [--branch <name>] [--base <ref>] [--task T-XX]
+npm run agent:wt:create -- <slug> --base <ref> [--branch <name>] [--task T-XX]
 npm run agent:wt:list                 # alle Worktrees + clean/dirty
 npm run agent:wt:finish -- <slug>     # read-only Abschluss-Checkliste (löscht nichts)
 npm run agent:wt:remove -- <slug>     # entfernt Worktree NUR wenn clean (nie --force)
 ```
 
-- `--base` (Standard: aktueller `HEAD`): Basis-Commit. Für einen unabhängigen Task typischerweise
-  `--base main`, damit er nicht auf fremder, ungemischter Arbeit aufsetzt.
+### Basis (`--base`)
+`--base` ist **Pflicht** und muss **explizit** angegeben werden — es gibt bewusst **keinen**
+stillen Default (kein automatisches `HEAD`). So entsteht keine versteckte oder falsche
+Ausgangsbasis. Regel:
+
+- **Normalfall:** vom **aktuell freigegebenen Integrations-/Entwicklungsbranch** ausgehen.
+  Solange `feat/track-module-rewrite` der führende ANYVO-Integrationsstand ist:
+  `--base feat/track-module-rewrite`.
+- **`--base main`** nur **bewusst**, wenn ein Task ausdrücklich vom stabilen Hauptbranch
+  ausgehen soll (z. B. isolierter Hotfix).
+- Der führende Integrationsbranch kann sich ändern; im Zweifel den aktuell freigegebenen
+  Stand erfragen. Der Helper zeigt bei fehlendem `--base` den aktuellen Branch als Hinweis.
+
 - `create` schreibt den Task-Report **in den neuen Worktree** (Task-Branch), nicht in den Haupt-Tree.
 - `remove` verweigert das Entfernen bei uncommitteten/untracked Änderungen.
 
