@@ -49,3 +49,12 @@ interpretieren oder überschreiben.
 Es macht **kein** commit / push / reset / checkout / clean, löscht nichts,
 wechselt keinen Branch, startet keine Tests und stellt keine Remote-/DB-Verbindung her.
 Manuelle Abschnitte bleiben immer erhalten.
+
+## Paralleler Betrieb (Worktrees)
+Für mehrere gleichzeitige, unabhängige Tasks siehe **`WORKTREES.md`**. Kurz:
+
+- `1 Task = 1 Task-ID = 1 Branch = 1 Worktree = 1 Primary Agent` (Ordner `../anyvo-<slug>`).
+- Jeder Task hat einen eigenen Report unter **`tasks/<TASK-ID>.md`** (Vorlage `tasks/_TEMPLATE.md`).
+  Nur diese Datei wird im Task-Branch gepflegt — **globale** Dateien (`TASKS.md`,
+  `SESSION_HANDOFF.md`, `CURRENT_STATE.md`, `WORK_LOG.md`) erst bei der **Integration**.
+- Helfer: `npm run agent:wt:create|list|finish|remove` (`remove` nur wenn der Worktree clean ist).

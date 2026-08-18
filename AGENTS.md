@@ -54,3 +54,29 @@ The actual repository state always wins over handoff documentation.
 
 The handoff script only rewrites the `AUTO-GENERATED` block of `SESSION_HANDOFF.md`;
 manual sections are never touched.
+
+# Parallel work with Git worktrees
+
+For running several independent tasks at the same time, ANYVO uses Git worktrees.
+Full guide: `docs/agent/WORKTREES.md`.
+
+Core rule:
+```
+1 task = 1 Task-ID (T-XX) = 1 branch = 1 worktree = 1 responsible Primary Agent
+```
+
+- Worktrees are sibling folders: `../anyvo-<slug>`. Multiple Primary Agents may work
+  in parallel, but **never in the same working tree**.
+- Each task keeps its own report in `docs/agent/tasks/<TASK-ID>.md`
+  (template: `docs/agent/tasks/_TEMPLATE.md`). The **global** files (`TASKS.md`,
+  `SESSION_HANDOFF.md`, `CURRENT_STATE.md`, `WORK_LOG.md`) are updated **only at
+  integration** by the responsible integration agent — not by parallel tasks.
+- Helper: `npm run agent:wt:create|list|finish|remove`. `remove` refuses to delete a
+  **dirty** worktree and never uses `--force`.
+- Tool-neutral roles: Primary Agent, Implementation Agent, Review Agent, QA Agent,
+  Subagent. OpenCode is the default Primary Agent (`.opencode/`); OpenAI Codex reads
+  this `AGENTS.md` natively for review/QA. Claude Code is **legacy** and not required.
+
+The NEVER/ALWAYS rules above apply unchanged in every worktree. In addition, a parallel
+agent must never delete or reset another worktree's or the main tree's uncommitted work,
+never clean/reset foreign changes, and never push or merge without explicit approval.
