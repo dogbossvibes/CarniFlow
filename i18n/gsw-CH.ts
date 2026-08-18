@@ -1644,6 +1644,27 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'activeTrial.period.month':      'Monet',
   'activeTrial.period.year':       'Jahr',
 
+  // Dezente Inline-Premium-Hiiwiis (Basiswärt blibed sichtbar)
+  'premiumUpsell.cta':                'Mit Active freischalte',
+  'premiumUpsell.subtitle':           'Verfügbar mit Active, Founder Active oder Trainer.',
+  'health.weightHistoryUpsell':       'Gwichtsverlauf mit Active',
+  'health.dewormingScheduleUpsell':   'Entwurmigs-Rhythmus mit Active',
+  'health.measurementDate':           'Mässdatum',
+  'health.deworming':                 'Entwurmig',
+  'health.lastDeworming':             'Letschti Entwurmig: {date}',
+  'health.noDeworming':               'Kei Entwurmig hinterleit',
+  'health.dewormingDate':             'Datum vo de Entwurmig',
+  'health.productOptional':           'Präparat (optional)',
+  'health.nextDewormingOptional':     'Nächschti Entwurmig (optional)',
+  'health.noDewormingPlanned':        'Kei Termin plant',
+  'health.weightHistory':             'Gwichtsverlauf',
+  'health.noWeightHistory':           'No kei Gwichtsmässig vorhande.',
+  'health.weightFirstMeasurement':    'Erschti Gwichtsmässig erfasst.',
+  'health.weightChange':              'Veränderig sit de letschte Mässig: {value}',
+  'health.dewormingHistory':          'Entwurmigsverlauf',
+  'health.noDewormingHistory':        'No kei Entwurmig erfasst.',
+  'health.scheduledFor':              'Plant: {date}',
+
   // Persönlichs Hunde-Dashboard (Overview-Tab)
   'dash.todayWith':          'Hüt mit {name}',
   'dash.nothingToday':       'Für hüt isch nüt plant.',

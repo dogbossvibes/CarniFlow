@@ -1,7 +1,9 @@
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/hooks/useSession';
 import { getMyCapabilities } from '@/services/capabilityService';
 import { planLevelOf, type PlanLevel, type UserCapabilities } from '@/types/capabilities';
+import { runtimeGrantsCapability, type Capability } from '@/features/subscription/plans';
 
 // Capability-Modell: Funktionen schalten über Capabilities frei, nicht über
 // Rollen. trainer_module impliziert pro_member.
@@ -22,6 +24,14 @@ export function useCapabilities() {
   const hasLifetimeAccess = cap?.hasLifetimeAccess === true;
   const entitlements = cap?.entitlements ?? [];
 
+  // Granulare Capability-Prüfung für einzelne UI-Bereiche (statt pauschaler isPro-
+  // Sperre). Nutzt die bestehende Capability-Matrix (keine zweite Architektur).
+  const can = useCallback(
+    (capability: Capability): boolean =>
+      runtimeGrantsCapability({ pro_member: isPro, trainer_module: isTrainerModule }, capability),
+    [isPro, isTrainerModule],
+  );
+
   return {
     capabilities:    cap,
     isPro,
@@ -29,6 +39,7 @@ export function useCapabilities() {
     hasLifetimeAccess,
     entitlements,
     plan,
+    can,
     loading:         uid ? query.isPending : false,
     refresh:         query.refetch,
   };

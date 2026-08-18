@@ -1,0 +1,16 @@
+import { deCH } from '@/i18n/de-CH';
+import { gswCH } from '@/i18n/gsw-CH';
+import { fr } from '@/i18n/locales/fr';
+
+const healthKeys = Object.keys(deCH).filter(key => key.startsWith('health.'));
+
+describe('Health Phase 2 i18n', () => {
+  it('keeps all Health keys non-empty in DE, Swiss German, and French', () => {
+    for (const dictionary of [deCH, gswCH, fr] as const) {
+      for (const key of healthKeys) {
+        expect(Object.prototype.hasOwnProperty.call(dictionary, key)).toBe(true);
+        expect(String((dictionary as Record<string, string>)[key] ?? '').trim()).not.toBe('');
+      }
+    }
+  });
+});

@@ -15,8 +15,13 @@ export interface DogDocumentRow {
 export interface DogHealthEntryRow {
   id: string; dog_id: string; entry_date: string; weight_kg: number | null;
   load_level: 'leicht' | 'mittel' | 'hoch' | null; is_rest_day: boolean; is_intense: boolean; note: string | null;
+  created_at: string | null;
 }
 export interface DogVetRow { id: string; dog_id: string; appointment_at: string; reason: string | null }
+export interface DogDewormingEntryRow {
+  id: string; dog_id: string; treatment_date: string; product: string | null;
+  note: string | null; next_due_date: string | null; created_at: string | null;
+}
 
 export interface DogHubExtras {
   goal:      DogGoalRow | null;
@@ -41,8 +46,21 @@ export async function getDogDocuments(dogId: string): Promise<DogDocumentRow[]> 
 
 export async function getRecentDogHealth(dogId: string): Promise<DogHealthEntryRow[]> {
   const { data } = await supabase.from('dog_health_entries')
-    .select('*').eq('dog_id', dogId).order('entry_date', { ascending: false }).limit(60);
+    .select('*').eq('dog_id', dogId).order('entry_date', { ascending: false }).order('created_at', { ascending: false }).limit(60);
   return (data ?? []) as DogHealthEntryRow[];
+}
+
+export async function getDogWeightHistory(dogId: string): Promise<DogHealthEntryRow[]> {
+  const { data } = await supabase.from('dog_health_entries')
+    .select('*').eq('dog_id', dogId).not('weight_kg', 'is', null)
+    .order('entry_date', { ascending: true }).order('created_at', { ascending: true }).limit(120);
+  return (data ?? []) as DogHealthEntryRow[];
+}
+
+export async function getRecentDogDewormings(dogId: string): Promise<DogDewormingEntryRow[]> {
+  const { data } = await supabase.from('dog_deworming_entries')
+    .select('*').eq('dog_id', dogId).order('treatment_date', { ascending: false }).order('created_at', { ascending: false }).limit(60);
+  return (data ?? []) as DogDewormingEntryRow[];
 }
 
 // Signed-URL (10 Min.) zum Öffnen/Herunterladen eines Dokuments aus dem
@@ -87,6 +105,17 @@ export interface DogHealthInput {
 export async function addDogHealthEntry(dogId: string, input: DogHealthInput) {
   const owner = await requireUid();
   return supabase.from('dog_health_entries').insert({ owner_id: owner, dog_id: dogId, ...input }).select().single();
+}
+
+export interface DogDewormingInput {
+  treatment_date: string;
+  product: string | null;
+  note: string | null;
+  next_due_date: string | null;
+}
+export async function addDogDewormingEntry(dogId: string, input: DogDewormingInput) {
+  const owner = await requireUid();
+  return supabase.from('dog_deworming_entries').insert({ owner_id: owner, dog_id: dogId, ...input }).select().single();
 }
 
 export async function addDogVetAppointment(dogId: string, appointmentAt: string, reason: string | null) {

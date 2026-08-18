@@ -17,6 +17,7 @@ export type Capability =
   | 'training.create' | 'training.analytics' | 'dogs.manage' | 'ai.feedback'
   | 'calendar.use' | 'voice.notes'
   | 'dogs.backpack' | 'dogs.heat' | 'dogs.commands' | 'dogs.goal'
+  | 'dogs.weightHistory' | 'dogs.dewormingSchedule'
   | 'trainer.dashboard' | 'trainer.clients' | 'trainer.surveys' | 'trainer.comments' | 'trainer.plans';
 
 // Funktions-Capabilities, die auch NEWBIE (kostenlos) hat. Die ANZAHL neuer
@@ -30,9 +31,18 @@ export const BASE_CAPABILITIES: Capability[] = [
 // Gesundheitsdaten sind NICHT premium (NEWBIE erlaubt) — bewusst KEINE dogs.health-
 // Capability, damit Gesundheit nicht mit der Läufigkeit gekoppelt/mitgesperrt wird.
 // ACTIVE/FOUNDER/TRAINER (und Lifetime) erhalten alle Premium-Capabilities.
+//
+// HEALTH-Granularität (final): Allgemeine Gesundheitsdaten, das AKTUELLE Gewicht
+// (erfassen/ändern, inkl. Messdatum) und die LETZTE Entwurmung (inkl. optionalem
+// Präparat) bleiben BASIS (auch NEWBIE) — dafür gibt es bewusst KEINE Capability.
+// Premium-only sind nur die WEITERFÜHRENDEN Health-Funktionen:
+//   • dogs.weightHistory      → Gewichtsverlauf/-diagramm/-trend, Veränderung seit letzter Messung
+//   • dogs.dewormingSchedule  → Entwurmungsverlauf, -rhythmus/Intervallplanung, nächste Entwurmung
+// Läufigkeit bleibt dogs.heat (unverändert premium).
 export const PREMIUM_CAPABILITIES: Capability[] = [
   'training.analytics', 'ai.feedback',
   'dogs.backpack', 'dogs.heat', 'dogs.commands', 'dogs.goal',
+  'dogs.weightHistory', 'dogs.dewormingSchedule',
 ];
 // ACTIVE = BASE + PREMIUM (Kompat-Export für Anzeige/Übersicht).
 export const ACTIVE_CAPABILITIES: Capability[] = [...BASE_CAPABILITIES, ...PREMIUM_CAPABILITIES];
@@ -220,6 +230,17 @@ function capabilitiesFromRuntime(runtime: RuntimeCapabilities): Capability[] {
   if (runtime.trainer_module) return REGULAR_PRODUCT_CAPABILITIES;
   if (runtime.pro_member) return ACTIVE_CAPABILITIES;
   return [];
+}
+
+// Granulare Capability-Prüfung aus den Runtime-Flags (pro_member/trainer_module).
+// Für einzelne UI-Bereiche (z. B. Gewichtsverlauf) statt einer pauschalen isPro-
+// Sperre des ganzen Screens. Reine Funktion, nutzt dieselbe Capability-Matrix.
+export function runtimeGrantsCapability(
+  runtime: RuntimeCapabilities | null | undefined,
+  capability: Capability,
+): boolean {
+  if (!runtime) return false;
+  return capabilitiesFromRuntime(runtime).includes(capability);
 }
 
 export function resolveEffectiveCapabilities(

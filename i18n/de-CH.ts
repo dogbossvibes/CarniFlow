@@ -1644,6 +1644,27 @@ export const deCH = {
   'activeTrial.period.month':      'Monat',
   'activeTrial.period.year':       'Jahr',
 
+  // Dezenter Inline-Premium-Hinweis (Basiswerte bleiben sichtbar)
+  'premiumUpsell.cta':                'Mit Active freischalten',
+  'premiumUpsell.subtitle':           'Verfügbar mit Active, Founder Active oder Trainer.',
+  'health.weightHistoryUpsell':       'Gewichtsverlauf mit Active',
+  'health.dewormingScheduleUpsell':   'Entwurmungsrhythmus mit Active',
+  'health.measurementDate':           'Messdatum',
+  'health.deworming':                 'Entwurmung',
+  'health.lastDeworming':             'Letzte Entwurmung: {date}',
+  'health.noDeworming':               'Keine Entwurmung hinterlegt',
+  'health.dewormingDate':             'Datum der Entwurmung',
+  'health.productOptional':           'Präparat (optional)',
+  'health.nextDewormingOptional':     'Nächste Entwurmung (optional)',
+  'health.noDewormingPlanned':        'Kein Termin geplant',
+  'health.weightHistory':             'Gewichtsverlauf',
+  'health.noWeightHistory':           'Noch keine Gewichtsmessung vorhanden.',
+  'health.weightFirstMeasurement':    'Erste Gewichtsmessung erfasst.',
+  'health.weightChange':              'Veränderung seit letzter Messung: {value}',
+  'health.dewormingHistory':          'Entwurmungsverlauf',
+  'health.noDewormingHistory':        'Noch keine Entwurmung erfasst.',
+  'health.scheduledFor':              'Geplant: {date}',
+
   // Persönliches Hunde-Dashboard (Overview-Tab)
   'dash.todayWith':          'Heute mit {name}',
   'dash.nothingToday':       'Für heute ist nichts geplant.',

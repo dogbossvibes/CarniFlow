@@ -5,7 +5,9 @@ import type { TrendPoint } from '@/types/analytics';
 import { useT } from '@/i18n';
 
 interface Props {
-  points: TrendPoint[];
+  // The visual needs only a dated numeric series. Analytics callers can still
+  // pass full TrendPoints; Health reuses it for kilograms without inventing scores.
+  points: Pick<TrendPoint, 'date' | 'score'>[];
   width?:  number;
   height?: number;
 }

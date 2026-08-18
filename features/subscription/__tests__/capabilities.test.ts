@@ -139,10 +139,13 @@ describe('NEWBIE Gesundheit erlaubt, Läufigkeit (Heat) gesperrt', () => {
     expect(hasCapability(sub('founder_active'), 'dogs.heat')).toBe(true);
     expect(hasCapability(sub('trainer'), 'dogs.heat')).toBe(true);
   });
-  it('dog-health-Screen: KEIN Premium-Redirect (NEWBIE-Gesundheit erlaubt)', () => {
+  it('dog-health-Screen: Basis bleibt ohne Redirect, Premium-Bereiche sind granular gegatet', () => {
     const src = readFileSync('app/dog-health/[id].tsx', 'utf8');
     expect(src).not.toMatch(/router\.replace\('\/premium'/);
-    expect(src).not.toMatch(/useCapabilities/);
+    expect(src).toContain('useCapabilities');
+    expect(src).toContain("can('dogs.weightHistory')");
+    expect(src).toContain("can('dogs.dewormingSchedule')");
+    expect(src).toContain('PremiumInlineUpsell');
   });
   it('dog-heat-Screen: Premium-Redirect vorhanden (Läufigkeit gesperrt)', () => {
     const src = readFileSync('app/dog-heat/[id].tsx', 'utf8');
