@@ -125,6 +125,26 @@ export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<
   );
 }
 
+export async function updateLocalTrackEvaluation(localId: string, input: {
+  score: number;
+  notes: string | null;
+  legs?: { name: string; score: number; max: number }[];
+}): Promise<void> {
+  const db = await getLocalDb();
+  const row = await db.getFirstAsync<{ payload_json: string | null }>(
+    `select payload_json from local_training_sessions where local_id=?`, localId,
+  );
+  let payload: Record<string, unknown> = {};
+  if (row?.payload_json) { try { payload = JSON.parse(row.payload_json) ?? {}; } catch { payload = {}; } }
+  payload.score = input.score;
+  if (input.legs) payload.legs = input.legs;
+  payload.evaluated_at = nowIso();
+  await db.runAsync(
+    `update local_training_sessions set score=?, notes=?, payload_json=?, updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
+    input.score, input.notes, JSON.stringify(payload), nowIso(), localId,
+  );
+}
+
 export async function markTrainingAsDeleted(localId: string): Promise<void> {
   const db = await getLocalDb();
   await db.runAsync(`update local_training_sessions set deleted_at=?, sync_status='deleted_pending', updated_at=? where local_id=?`, nowIso(), nowIso(), localId);

@@ -339,14 +339,17 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     }
 
     // ── Gegenstand verwiesen? ──
+    const dogProgress = estimateDogProgressM(maxCursorMRef.current, handlerDistanceM, arc.total);
+    const dogPos = pointAtDistance(laidPoints, arc.cum, dogProgress);
+    const objectReference = dogPos ?? sm;
     laidObjects.forEach((o, i) => {
-      if (!foundRef.current.has(i) && distM(sm, o.at) <= OBJECT_HIT_M) {
+      if (!foundRef.current.has(i) && distM(objectReference, o.at) <= OBJECT_HIT_M) {
         foundRef.current.add(i);
       }
     });
 
     pushSnapshot();
-  }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum]);
+  }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM]);
 
   // ── Watch ab Mount ──
   useEffect(() => {

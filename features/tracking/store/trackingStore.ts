@@ -187,6 +187,7 @@ function snapshot(s: TrackingState): PendingTrack {
     segments: s.segments, runPoints: s.runPoints, distanceMeters: s.distanceMeters, durationSeconds: s.durationSeconds,
     layFinishedAt: s.layFinishedAt, startAnchor: s.startAnchor, savedAt: Date.now(),
     searchPoints: s.searchTrackPoints, runId: s.searchRunId, status: s.sessionStatus,
+    paused: s.isPaused,   // Pausezustand mit-persistieren → nach App-Kill/-Neustart rekonstruierbar
     searchStartedAt: s.searchStartedAt, searchUpdatedAt: s.searchUpdatedAt,
     layStartedAt: s.layStartedAt, layUpdatedAt: s.layUpdatedAt,
     searchHandlerDistanceM: s.searchHandlerDistanceM,
@@ -208,8 +209,10 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   startRecording: (sessionId, dogId = null) => { void clearPending(dogId); set({ ...INITIAL, currentSessionId: sessionId, dogId, isRecording: true, sessionStatus: 'laying' }); },
   setCurrentSession: (sessionId) => set({ currentSessionId: sessionId }),
   setDogId: (dogId) => set({ dogId }),
-  pauseRecording: () => set({ isPaused: true }),
-  resumeRecording: () => set({ isPaused: false }),
+  // Pause/Resume SOFORT persistieren (kein Debounce), damit ein App-Kill direkt
+  // nach dem Pausieren den Pausezustand nicht verliert.
+  pauseRecording: () => { set({ isPaused: true }); persistNow(get); },
+  resumeRecording: () => { set({ isPaused: false }); persistNow(get); },
   stopRecording: () => set({ isRecording: false, isPaused: false }),
 
   addTrackPoint: (p) => {
@@ -267,6 +270,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // (nach App-Kill). Legacy-sicher (Felder optional). Setzt NICHT auf Aufnahme.
   restoreSearchSession: (p) => set({
     currentSessionId: p.sessionId,
+    isPaused:         p.paused ?? false,   // Recovery: Pausezustand wiederherstellen (kein Auto-Recording)
     dogId:            p.dogId ?? null,
     trackPoints:      p.trackPoints,
     markers:          p.markers,
@@ -303,6 +307,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // Aufnahme — nur die gelegten Daten + Liegezeit-Start.
   restorePending: (p) => set({
     currentSessionId: p.sessionId,
+    isPaused:         p.paused ?? false,   // Recovery: Pausezustand wiederherstellen (kein Auto-Recording)
     dogId:            p.dogId ?? null,
     trackPoints:      p.trackPoints,
     markers:          p.markers,

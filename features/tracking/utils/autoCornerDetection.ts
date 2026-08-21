@@ -1,4 +1,4 @@
-import { calculateHeading, type LatLng } from '@/features/tracking/utils/gpsFilter';
+import { calculateDistance, calculateHeading, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
 
 export interface AutoCornerPoint extends LatLng {
@@ -21,6 +21,7 @@ const CORNER_GAP_M = LEG_MIN_M;         // Mindestabstand zum vorherigen Winkel
 const MIN_TURN_DEG = 15;                // darunter kein Winkel
 const STRAIGHT_WINDOW_M = 8;            // Fenster für die Schenkel-Geradheit (mehr Punkte → robust ggü. 1 Ausreißer)
 const SEG_ALIGN_DEG = 18;              // Segment gilt als „gerade", wenn Heading-Abweichung ≤ diesem Wert
+const MICRO_SEGMENT_M = 0.5;           // Stop-/Jitter-Punkte im Scheitel nicht als echte Richtung werten
 // Winkelklassen (überlappungsfrei; ~90° ±15° normal, 30–60° spitz; dazwischen Totzone).
 const NORMAL_MIN = 75, NORMAL_MAX = 105;
 const SPITZ_MIN = 30, SPITZ_MAX = 60;
@@ -96,22 +97,28 @@ export function legStraightness(points: readonly AutoCornerPoint[], idxs: number
   const chord = calculateHeading(points[idxs[0]], points[idxs[idxs.length - 1]]);
   let aligned = 0, total = 0;
   for (let k = 0; k < idxs.length - 1; k++) {
+    if (calculateDistance(points[idxs[k]], points[idxs[k + 1]]) < MICRO_SEGMENT_M) continue;
     const h = calculateHeading(points[idxs[k]], points[idxs[k + 1]]);
     total++;
     if (Math.abs(normalizeDeg(h - chord)) <= SEG_ALIGN_DEG) aligned++;
   }
-  return total ? aligned / total : 0;
+  if (!total) return 0;
+  const forgivingAligned = total >= 4 ? Math.min(total, aligned + 1) : aligned;
+  return forgivingAligned / total;
 }
 
 // Bearing-Stabilität: 1 − mittlere Abweichung der Segment-Headings zur Sehne.
 function legBearingStability(points: readonly AutoCornerPoint[], idxs: number[]): number {
   if (idxs.length < 3) return 0.5;
   const chord = calculateHeading(points[idxs[0]], points[idxs[idxs.length - 1]]);
-  let sum = 0, n = 0;
+  const deviations: number[] = [];
   for (let k = 0; k < idxs.length - 1; k++) {
-    sum += Math.abs(normalizeDeg(calculateHeading(points[idxs[k]], points[idxs[k + 1]]) - chord));
-    n++;
+    if (calculateDistance(points[idxs[k]], points[idxs[k + 1]]) < MICRO_SEGMENT_M) continue;
+    deviations.push(Math.abs(normalizeDeg(calculateHeading(points[idxs[k]], points[idxs[k + 1]]) - chord)));
   }
+  if (deviations.length >= 4) deviations.splice(deviations.indexOf(Math.max(...deviations)), 1);
+  const sum = deviations.reduce((a, b) => a + b, 0);
+  const n = deviations.length;
   return n ? clamp01(1 - (sum / n) / SEG_ALIGN_DEG) : 0.5;
 }
 
@@ -165,7 +172,15 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
     return { state: 'pending', confidence: 0, kind: null, angleDeg: NaN, reason: 'short_legs', factors: ZERO_FACTORS };
   }
 
-  const diff = normalizeDeg(calculateHeading(apex, points[outb]) - calculateHeading(points[inb], apex));
+  // Richtung aus dem stabilen Schenkelfenster, nicht aus einem einzelnen LEG_MIN-
+  // Endpunkt. Dadurch kann ein verspäteter/versetzter GPS-Fix nahe am Scheitel nicht
+  // alleine die Winkelklasse kippen.
+  const beforeIdx = legIndices(points, apexIndex, false);
+  const afterIdx = legIndices(points, apexIndex, true);
+  const diff = normalizeDeg(
+    calculateHeading(apex, points[afterIdx[afterIdx.length - 1]])
+    - calculateHeading(points[beforeIdx[0]], apex),
+  );
   const magnitude = Math.abs(diff);
   if (magnitude < MIN_TURN_DEG) {
     return { state: 'reject', confidence: 0, kind: null, angleDeg: 180 - magnitude, reason: 'no_turn', factors: ZERO_FACTORS };
@@ -180,8 +195,6 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
       : null;
 
   // Geradheit/Bearing über das erweiterte Fenster (robust ggü. einem Ausreißer).
-  const beforeIdx = legIndices(points, apexIndex, false);
-  const afterIdx = legIndices(points, apexIndex, true);
   const straightBefore = legStraightness(points, beforeIdx);
   const straightAfter = legStraightness(points, afterIdx);
   const support = clamp01((beforeIdx.length + afterIdx.length - 2) / (SUPPORT_TARGET * 2));
@@ -206,6 +219,14 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
   let state: CandidateState;
   let reason: string | null = null;
   if (!kind) { state = 'reject'; reason = 'deadzone'; }
+  else if (
+    confidence >= ACCEPT_CONF
+    && factors.angle >= 0.25
+    && Math.max(straightBefore, straightAfter) >= 0.9
+    && minStraight >= 0.30
+  ) {
+    state = 'accept';
+  }
   else if (minStraight < STRAIGHT_REJECT || confidence < REJECT_CONF) { state = 'reject'; reason = 'curve'; }
   else if (minStraight >= STRAIGHT_ACCEPT && confidence >= ACCEPT_CONF) { state = 'accept'; }
   else { state = 'pending'; reason = 'low_confidence'; }

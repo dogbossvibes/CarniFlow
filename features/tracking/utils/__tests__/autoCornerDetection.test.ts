@@ -130,6 +130,32 @@ describe('detectAutoCorner — GPS-Realismus', () => {
     const s = Array.from({ length: 15 }, (_, i) => { const y = i * 2; return [2.5 * Math.sin(Math.PI * y / 10) + (i % 2 ? -0.15 : 0.15), y] as const; });
     expect(detectAutoCorner(points(s), -Infinity)).toBeNull();
   });
+  it('langsames Durchlaufen mit mehreren Messpunkten im Winkel bleibt erkannt', () => {
+    const c = [
+      [0, -10], [0, -8], [0, -6], [0, -4], [0, -2], [0, 0],
+      [0.15, 0.1], [0.25, -0.05], [0.1, 0.15],
+      [2, 0], [4, 0], [6, 0], [8, 0], [10, 0],
+    ] as const;
+    expect(detectAutoCorner(points(c), -Infinity)?.kind).toBe('rechts');
+  });
+  it('kurzes Stehenbleiben im Winkel erzeugt keinen Verlust des echten Winkels', () => {
+    const c = [
+      [0, -10], [0, -8], [0, -6], [0, -4], [0, -2], [0, 0],
+      [0, 0], [0, 0], [0.05, -0.05],
+      [-2, 0], [-4, 0], [-6, 0], [-8, 0], [-10, 0],
+    ] as const;
+    expect(detectAutoCorner(points(c), -Infinity)?.kind).toBe('links');
+  });
+  it('ein einzelner GPS-Ausreisser kippt eine stabile Ecke nicht', () => {
+    const c = [
+      [0, -10], [0, -8], [0, -6], [2.8, -4.2], [0, -2], [0, 0],
+      [2, 0], [4, 0], [6, 0], [8, 0], [10, 0],
+    ] as const;
+    expect(detectAutoCorner(points(c), -Infinity)?.kind).toBe('rechts');
+  });
+  it('schlechte Accuracy allein verhindert klare Geometrie nicht', () => {
+    expect(detectAutoCorner(points(corner(90, 'links'), 38), -Infinity)?.kind).toBe('links');
+  });
 });
 
 describe('detectAutoCorner — Sequenz / Gap', () => {

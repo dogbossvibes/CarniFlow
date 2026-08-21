@@ -311,6 +311,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.voiceAngle':     'Winkel {inSteps}.',
   'track.voiceDowel':     'Dübel {inSteps}.',
   'track.voiceObject':    'Gegestand {inSteps}.',
+  'track.voiceTrackEnd':  'Ändi vo de Fährte erreicht.',
+  'track.trackEndReached':'Fährtenändi erreicht',
   'track.stepsShort':     'Schr.',
   'track.startPointSetting': 'Startpunkt wird gsetzt … churz stah bliibe',
   'track.segmentActive':  'Teilstrecki aktiv',
@@ -1059,6 +1061,13 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.deviation': 'Abwiichig',
   'track.mapUnavailable': 'Charte nur im Dev-/Store-Build verfügbar',
   'track.startFlag': 'Start',
+  'track.endFlag': 'Ändi',
+  'track.detailDistanceFromStart': 'Entfernig ab Start',
+  'track.detailMaterial': 'Material',
+  'track.detailNote': 'Notiz',
+  'track.detailTrackEnd': 'Fährtenändi',
+  'track.detailTotalDistance': 'Gsamtdistanz',
+  'track.detailNoData': 'Kei wytere Details gspeichered.',
 
   // Phase 3 — App Lock / allgemeini UI
   'appLock.prompt': 'ANYVO entsperre',

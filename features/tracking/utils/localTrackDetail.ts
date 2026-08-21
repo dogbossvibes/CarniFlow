@@ -59,11 +59,14 @@ export function buildLocalTrackDetail(
     articles_total:     payload.articlesTotal ?? run?.total_objects ?? null,
     articles_found:     run?.articles_found ?? null,
     average_deviation_meters: run?.average_deviation_meters ?? null,
-    rating:             null,
-    score:              run?.score ?? local.score ?? null,
+    rating:             payload.score ?? local.score ?? null,
+    score:              payload.score ?? run?.score ?? local.score ?? null,
     track_data:         {
       ...(payload.segments ? { segments: payload.segments } : {}),
       ...(run ? { run } : {}),
+      ...(payload.legs ? { legs: payload.legs } : {}),
+      ...(payload.score != null ? { score: payload.score } : {}),
+      ...(payload.evaluated_at ? { evaluated_at: payload.evaluated_at } : {}),
     },
     points: points.map(p => ({
       latitude: p.latitude, longitude: p.longitude, point_type: p.point_type ?? 'lay',

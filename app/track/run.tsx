@@ -16,6 +16,7 @@ import { useTrackVoiceGuidance, say, type GuidanceAngle } from '@/features/track
 import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/utils/offTrackFeedback';
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
+import { useTrackEndGuidance } from '@/features/tracking/hooks/useTrackEndGuidance';
 import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
@@ -348,7 +349,9 @@ export default function TrackRunScreen() {
   const breakPts  = useMemo(() => s.breaks.map(b => ({ lat: b.at.latitude, lng: b.at.longitude })), [s.breaks]);
   const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
-  const mapMarkers: MapMarker[] = snapData.laidMarkers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind }));
+  const mapMarkers: MapMarker[] = snapData.laidMarkers.map(m => ({
+    id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material,
+  }));
   const winkel = snapData.laidMarkers.filter(m => m.type === 'winkel').length;
 
   // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
@@ -372,6 +375,23 @@ export default function TrackRunScreen() {
   // Haptische Führung: 1× bei Gegenstand voraus, 2× bei Winkel voraus — dieselbe
   // Bogenlängendistanz (dogProgressM) wie die Sprachführung.
   useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, true);
+
+  // Fährtenende-Erkennung + Voice („Ende der Fährte erreicht."), Once-only, auf Basis
+  // der VIRTUELLEN Hundeposition (dogProgressM/estimatedDogPosition, order-aware) und
+  // des gespeicherten Endpunkts (letzter Punkt der gelegten Fährte). Beendet die
+  // Absuche NICHT — nur Anzeige/Voice/Haptik; der Nutzer beendet weiterhin selbst.
+  const endPoint = snapData.laidPoints.length ? snapData.laidPoints[snapData.laidPoints.length - 1] : null;
+  const openMandatoryObjects = Math.max(0, s.totalObjects - s.foundObjects);
+  const trackEndState = useTrackEndGuidance({
+    recording: s.recording && !arming,
+    dogProgressM: s.dogProgressM,
+    trackLengthM: s.trackLengthM,
+    estimatedDogPosition: s.estimatedDogPosition,
+    endPoint,
+    openMandatoryObjects,
+    voiceOn,
+  });
+  const trackEndReached = trackEndState === 'reached' || trackEndState === 'completed';
 
   // Karten-/Skizzen-Marker (Koordinaten) — getrennt von den Bogenlängen-basierten
   // Guidance-Listen (die tragen arcM statt lat/lng).
@@ -582,6 +602,7 @@ export default function TrackRunScreen() {
               layPoints={snapData.laidLatLng} dimLay
               runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
+              dogPosition={!arming && s.estimatedDogPosition ? { lat: s.estimatedDogPosition.latitude, lng: s.estimatedDogPosition.longitude } : null}
               follow={follow}
               onToggleFollow={() => setFollow(f => !f)}
               onUserPan={() => setFollow(false)}
@@ -617,6 +638,17 @@ export default function TrackRunScreen() {
                   <Text className="flex-1 text-[13px] font-bold text-ft-acc">{t('track.backOnTrack')}</Text>
                 </View>
               ) : null}
+            </View>
+          )}
+
+          {/* Fährtenende erreicht — persistentes Mint-Banner. KEIN Auto-Beenden; der
+              Nutzer beendet die Absuche weiterhin bewusst selbst. */}
+          {!arming && s.recording && trackEndReached && (
+            <View className="absolute top-[84px] left-[14px] right-[14px]" pointerEvents="none">
+              <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3.5 border" style={{ backgroundColor: 'rgba(21,230,195,0.16)', borderColor: 'rgba(21,230,195,0.55)' }}>
+                <Ionicons name="flag" size={18} color={FT.acc} />
+                <Text className="flex-1 text-[13.5px] font-black text-ft-acc">{t('track.trackEndReached')}</Text>
+              </View>
             </View>
           )}
 

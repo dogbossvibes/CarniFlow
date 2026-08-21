@@ -37,6 +37,7 @@ export interface PendingTrack {
   searchPoints?:     TrackPointSample[];   // Absuche-Spur (Fallback; SQLite ist autoritativ)
   runId?:            string | null;        // track_runs.id (Supabase-Finalisierung)
   status?:           SessionStatus;        // Session-Status; fehlt bei Legacy → nicht 'searching'
+  paused?:           boolean;               // Pausezustand — überlebt App-Kill; Restore darf NICHT auto-recorden
   searchStartedAt?:  number | null;        // ms: Start der Absuche (Timer-Fortsetzung)
   searchUpdatedAt?:  number | null;        // ms: letzter akzeptierter Suchpunkt
   searchHandlerDistanceM?: SearchHandlerDistanceM;   // 5/10-m-Auswahl (Recovery; optional → Legacy)
