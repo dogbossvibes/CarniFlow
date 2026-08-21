@@ -3,14 +3,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useActiveFaehrtenList } from '@/features/tracking/hooks/useActiveFaehrte';
+import { primaryResumeTarget } from '@/features/tracking/store/activeFaehrtenModel';
 
-// Kleine globale Statuskarte: „N aktive Fährte(n)". Antippen → Logbuch mit der
-// Liste aller aktiven Fährten. Rendert NICHTS, wenn keine offen ist (kein Platz-
-// verbrauch). Bestehende Track-Tokens. Kann in beliebige Screens eingehängt werden.
+// Kleine globale Statuskarte: „N aktive Fährte(n)". Bei GENAU EINER aktiven Fährte
+// führt ein Tap DIREKT in die laufende Fährte (Ein-Tap-Resume, reopenTarget); bei
+// mehreren öffnet er die Liste. Rendert NICHTS, wenn keine offen ist.
 export function GlobalActiveFaehrtenBar({ style }: { style?: object }) {
   const router = useRouter();
   const active = useActiveFaehrtenList();
   if (active.length === 0) return null;
+
+  const onPress = () => {
+    if (active.length === 1) {
+      const { target } = primaryResumeTarget(active);
+      if (target) { router.push(target as never); return; }
+    }
+    router.push('/track/historie' as never);   // mehrere aktive → Liste
+  };
 
   const resting   = active.filter(e => e.status === 'resting').length;
   const searching = active.filter(e => e.status === 'searching').length;
@@ -22,10 +31,10 @@ export function GlobalActiveFaehrtenBar({ style }: { style?: object }) {
   return (
     <TouchableOpacity
       style={[s.bar, style]}
-      onPress={() => router.push('/track/historie' as never)}
+      onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={`${active.length} aktive Fährte${active.length > 1 ? 'n' : ''} — Liste öffnen`}
+      accessibilityLabel={`${active.length} aktive Fährte${active.length > 1 ? 'n' : ''} — ${active.length === 1 ? 'fortsetzen' : 'Liste öffnen'}`}
     >
       <View style={s.dotWrap}><View style={s.dot} /></View>
       <View style={{ flex: 1 }}>

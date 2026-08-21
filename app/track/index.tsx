@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,8 @@ import {
 } from '@/features/tracking/components/FaehrtenChrome';
 import { averageScore, dayStreak, trackScore } from '@/features/tracking/utils/trackScore';
 import { GlobalActiveFaehrtenBar } from '@/features/tracking/components/GlobalActiveFaehrtenBar';
+import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { resolveAutoResume } from '@/features/tracking/store/activeFaehrtenModel';
 import { useToast } from '@/components/ui/Toast';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
 
@@ -41,10 +43,26 @@ function toRow(r: any, syncLabel: (state: 'pending' | 'failed') => string): Trac
   };
 }
 
+// Loop-Schutz: Auto-Resume wird pro App-Start GENAU EINMAL ausgewertet. Danach
+// steuert der Nutzer die Übersicht selbst (Bar/Card bieten Ein-Tap-Resume). Ein
+// neuer App-Start re-initialisiert das Modul → erneute Auswertung.
+let autoResumeConsumed = false;
+
 export default function TrackOverviewScreen() {
   const router = useRouter();
   const { t } = useT();
   const { session } = useSession();
+  const faehrtenHydrated = useActiveFaehrten(s => s.hydrated);
+
+  // Auto-Resume: existiert beim App-Start eine aktiv LAUFENDE Fährte (laying/searching),
+  // direkt in die Live-Ansicht springen (reopenTarget). Genau einmal pro App-Start,
+  // ohne Router-Loop; keine neue Session. Sonst bleibt die Übersicht.
+  useEffect(() => {
+    if (autoResumeConsumed || !faehrtenHydrated) return;
+    autoResumeConsumed = true;
+    const { target } = resolveAutoResume(useActiveFaehrten.getState().list());
+    if (target) router.replace(target as never);
+  }, [faehrtenHydrated, router]);
   const { dogs } = useDogs();
   const { isPro, loading: capLoading } = useCapabilities();
 

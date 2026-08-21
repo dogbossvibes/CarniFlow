@@ -40,6 +40,11 @@ describe('searchGeometry — pointAtDistance (folgt der Fährte um Winkel)', () 
     expect(dog).toBe(17);
     expect(pointAtDistance(L, CUM, dog)).toEqual({ latitude: 0.7, longitude: 1 }); // longitude bleibt 1 → Ecke genommen
   });
+  it('0/5/10 m Abstand: Hundeposition liegt konsistent auf der Bogenlänge', () => {
+    expect(pointAtDistance(L, CUM, estimateDogProgressM(6, 0, 20))).toEqual({ latitude: 0, longitude: 0.6 });
+    expect(pointAtDistance(L, CUM, estimateDogProgressM(6, 5, 20))).toEqual({ latitude: 0.1, longitude: 1 });
+    expect(pointAtDistance(L, CUM, estimateDogProgressM(6, 10, 20))).toEqual({ latitude: 0.6, longitude: 1 });
+  });
   it('clamp 0..total; Degenerate-Fälle', () => {
     expect(pointAtDistance(L, CUM, -5)).toEqual({ latitude: 0, longitude: 0 });
     expect(pointAtDistance(L, CUM, 999)).toEqual({ latitude: 1, longitude: 1 });

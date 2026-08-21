@@ -27,6 +27,7 @@ export interface ActiveFaehrte {
   sessionId:       string | null;        // training_sessions.id (null solange offline)
   runId:           string | null;        // track_runs.id (nur während der Absuche)
   status:          SessionStatus;        // laying | laid | resting | searching | completed | cancelled
+  paused?:         boolean;              // Pausezustand der laufenden Aufnahme (überlebt App-Neustart)
   startedAt:       number | null;        // ms: Beginn der Aufnahme („Start"-Uhrzeit)
   layStartedAt:    number | null;        // ms: Beginn der Liegezeit (resting)
   searchStartedAt: number | null;        // ms: Beginn der Absuche (searching)
@@ -78,6 +79,8 @@ export function upsertEntry(map: ActiveFaehrtenMap, dogId: string, patch: Partia
     sessionId:       patch.sessionId       ?? prev?.sessionId       ?? null,
     runId:           patch.runId           ?? prev?.runId           ?? null,
     status:          (status ?? 'laid') as SessionStatus,
+    // paused darf explizit auf true/false gesetzt werden (kein ??-Merge über false):
+    paused:          'paused' in patch ? !!patch.paused : (prev?.paused ?? false),
     startedAt:       patch.startedAt       ?? prev?.startedAt       ?? null,
     layStartedAt:    patch.layStartedAt    ?? prev?.layStartedAt    ?? null,
     searchStartedAt: patch.searchStartedAt ?? prev?.searchStartedAt ?? null,
@@ -152,6 +155,31 @@ export function reopenTarget(e: ActiveFaehrte): string {
     case 'laying':    return `/track/legen?${q('')}`;
     default:          return `/track?${q('')}`;
   }
+}
+
+// Status, in denen aktiv AUFGEZEICHNET wird (Live-Ansicht) — hierfür ist eine
+// automatische Rückführung sinnvoll. resting/laid (Liegezeit) bleiben bewusst beim
+// Nutzer (Übersicht/Bar), da die Wartezeit evtl. woanders verbracht wird.
+const RECORDING_STATUSES: SessionStatus[] = ['laying', 'searching'];
+export function isRecordingStatus(status: SessionStatus | null | undefined): boolean {
+  return status != null && RECORDING_STATUSES.includes(status);
+}
+
+// Reine Auto-Resume-Entscheidung: Ziel-Route + Eintrag der obersten aktiv LAUFENDEN
+// Fährte (laying/searching, nach sortActive). Sonst null. Der AUFRUFER sichert die
+// Einmaligkeit (Loop-Schutz gegen Router-Ping-Pong) — dieses Modell bleibt rein.
+export function resolveAutoResume(list: ActiveFaehrte[]): { target: string | null; entry: ActiveFaehrte | null } {
+  const recording = sortActive(list.filter(e => isValidEntry(e) && isRecordingStatus(e.status)));
+  const entry = recording[0] ?? null;
+  return { target: entry ? reopenTarget(entry) : null, entry };
+}
+
+// Ein-Tap-Resume für Übersicht/Bar: Ziel der obersten OFFENEN Fährte (auch
+// resting/laid), damit ein Tap direkt in die passende Ansicht zurückführt.
+export function primaryResumeTarget(list: ActiveFaehrte[]): { target: string | null; entry: ActiveFaehrte | null } {
+  const open = sortActive(list.filter(isValidEntry));
+  const entry = open[0] ?? null;
+  return { target: entry ? reopenTarget(entry) : null, entry };
 }
 
 // Kurzlabel für Karten/Listen (Live-Status). recording = laying.

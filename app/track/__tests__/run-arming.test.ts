@@ -18,7 +18,7 @@ describe('TrackRunScreen arming flow', () => {
 
     expect(armingOverlay).toContain('<ScrollView');
     expect(armingOverlay).toContain("t('track.searchHandlerDistanceLabel')");
-    expect(armingOverlay).toContain('([5, 10] as const).map');
+    expect(armingOverlay).toContain('HANDLER_DISTANCES_M.map');
     expect(armingOverlay).toContain('setSearchHandlerDistanceM(d)');
     expect(armingOverlay).toContain("accessibilityLabel={t('track.searchStartNow')}");
   });

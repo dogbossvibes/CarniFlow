@@ -9,6 +9,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
+import { MarkerDetailSheet, type TrackDetailSelection } from '@/features/tracking/components/MarkerDetailSheet';
+import { buildTrackDetailMap } from '@/features/tracking/utils/trackDetailMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { TrackScoreRing } from '@/features/tracking/components/TrackScoreRing';
 import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
@@ -87,13 +89,23 @@ export default function TrackAuswertungScreen() {
 
   const map = useMemo(() => {
     if (!data) return null;
-    const lay: LatLng[] = (data.points ?? []).filter((p: any) => (p.point_type ?? 'lay') === 'lay').map((p: any) => ({ lat: p.latitude, lng: p.longitude }));
-    const run: LatLng[] = ((data.runs ?? [])[0]?.run_points ?? []).map((p: any) => ({ lat: p.lat, lng: p.lng }));
-    const markers: MapMarker[] = (data.markers ?? []).map((m: any) => ({ id: m.id, type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind, material: m.material }));
+    // Logbuch-Kartenmodell ausschließlich aus gespeicherten Daten (keine Winkel-/
+    // Marker-Neuberechnung); reine Funktion buildTrackDetailMap.
+    const detail = buildTrackDetailMap(data);
+    const markers: MapMarker[] = detail.markers.map(m => ({
+      id: m.id, type: m.type, lat: m.lat, lng: m.lng,
+      angleKind: m.angleKind, material: m.material,
+      distanceFromStart: m.distanceFromStart, note: m.note,
+    }));
     const segments = coerceTrackSegments(data.track_data?.segments);
-    const center = lay[Math.floor(lay.length / 2)] ?? null;
-    return { lay, run, markers, segments, center, hasGps: lay.length > 1 };
+    const center = detail.lay[Math.floor(detail.lay.length / 2)] ?? null;
+    return {
+      lay: detail.lay, run: detail.run, markers, segments, center,
+      start: detail.start, end: detail.end, totalDistanceM: detail.totalDistanceM,
+      hasGps: detail.hasLay,
+    };
   }, [data]);
+  const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
   const segmentAnalysis = useMemo(() => analyzeTrackSegments({
     segments: coerceTrackSegments(data?.track_data?.segments),
     layPoints: (data?.points ?? []).map((p: any) => ({ lat: p.latitude, lng: p.longitude, accuracy: p.accuracy ?? null, t: Date.parse(p.timestamp) || 0 })),
@@ -112,7 +124,7 @@ export default function TrackAuswertungScreen() {
     // Lokal-only Fährte: Auswertung lokal speichern + zur Re-Sync einreihen (kein
     // Remote-Direktschreiben ohne Remote-Zeile, kein AI-Embedding ohne Remote-Session).
     if (isLocalOnly) {
-      await saveLocalTrackEvaluation(id, { score, notes: notes.trim() || null }).catch(() => {});
+      await saveLocalTrackEvaluation(id, { score, notes: notes.trim() || null, legs }).catch(() => {});
       setSaving(false);
       router.replace('/track' as never);
       return;
@@ -238,7 +250,13 @@ export default function TrackAuswertungScreen() {
           <View style={[s.card, s.mapCard]}>
             <View style={StyleSheet.absoluteFill}>
               {map?.hasGps ? (
-                <TrackingMap layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments} currentPosition={map.center} follow={false} mapType="hybrid" />
+                <TrackingMap
+                  layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
+                  startAnchor={map.start} endPoint={map.end}
+                  onMarkerPress={(m) => setDetailSel({ kind: 'marker', marker: m })}
+                  onEndPress={() => setDetailSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
+                  currentPosition={map.center} follow={false} mapType="hybrid"
+                />
               ) : (
                 <TrackSketch legs={corners} objects={aTotal} w={320} h={190} progress={1} />
               )}
@@ -305,6 +323,8 @@ export default function TrackAuswertungScreen() {
           <AnyvoButton label="Speichern" icon="checkmark" onPress={onSave} loading={saving} style={{ flex: 1.4 }} />
         </View>
       </KeyboardAvoidingView>
+
+      <MarkerDetailSheet selection={detailSel} onClose={() => setDetailSel(null)} />
     </SafeAreaView>
   );
 }

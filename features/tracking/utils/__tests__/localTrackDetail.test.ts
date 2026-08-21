@@ -11,6 +11,7 @@ const local: LocalTrainingSession = {
   sync_status: 'pending', sync_attempts: 0, last_sync_error: null, last_synced_at: null, dirty_fields: null,
   payload_json: JSON.stringify({
     distanceMeters: 250, cornersTotal: 3, articlesTotal: 2, segments: [{ id: 's1', status: 'completed' }],
+    score: 83, legs: [{ name: 'Ausarbeitung Abschnitt 1', score: 8.3, max: 10 }], evaluated_at: '2026-08-12T10:30:00.000Z',
     run: { run_id: 'run-1', score: 91, articles_found: 2, total_objects: 3, average_deviation_meters: 1.2, run_points: [{ lat: 47, lng: 8 }] },
   }),
 };
@@ -51,7 +52,9 @@ describe('buildLocalTrackDetail — Detail-Fallback aus SQLite (getTrackSessionB
     expect(d.runs).toEqual([{ run_points: [{ lat: 47, lng: 8 }] }]);
     expect(d.track_data.run.score).toBe(91);
     expect(d.track_data.segments).toEqual([{ id: 's1', status: 'completed' }]);
-    expect(d.score).toBe(91);
+    expect(d.track_data.legs).toEqual([{ name: 'Ausarbeitung Abschnitt 1', score: 8.3, max: 10 }]);
+    expect(d.score).toBe(83);
+    expect(d.rating).toBe(83);
   });
 
   it('ohne run → leere runs, kein Crash', () => {

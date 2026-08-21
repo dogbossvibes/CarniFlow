@@ -952,7 +952,15 @@ export default function LegenScreen() {
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            onPress={() => { hapticTap(); if (isPaused) rec.resume(); else rec.pause(); }} disabled={phase !== 'recording'}
+            onPress={() => {
+              hapticTap();
+              const nextPaused = !isPaused;
+              if (isPaused) rec.resume(); else rec.pause();
+              // Pausezustand auch in der Registry spiegeln (nur bei bestehendem Eintrag,
+              // Status bleibt 'laying') → nach App-Neustart eindeutig rekonstruierbar.
+              const dId = activeDog?.id ?? null;
+              if (dId && useActiveFaehrten.getState().get(dId)) useActiveFaehrten.getState().upsert(dId, { paused: nextPaused });
+            }} disabled={phase !== 'recording'}
           >
             <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color={FT.text} />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>

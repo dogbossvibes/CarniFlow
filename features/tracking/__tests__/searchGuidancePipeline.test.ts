@@ -138,6 +138,10 @@ describe('Absuche-Pipeline — Store → Snapshot → Restore (Stufen 2–4)', (
 });
 
 // Map-Aufbereitung exakt wie run.tsx + TrackingMap.
+function mapMarkersFromRunScreen(laidMarkers: MarkerSample[]) {
+  return laidMarkers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material }));
+}
+
 function mapMarkerKinds(laidMarkers: MarkerSample[]) {
   return laidMarkers
     .filter(m => m.lat != null && m.lng != null)
@@ -155,7 +159,7 @@ function mapMarkerKinds(laidMarkers: MarkerSample[]) {
 
 describe('Absuche-Pipeline — Map-Renderer (Stufe 5)', () => {
   it('automatische Winkel werden NICHT herausgefiltert und korrekt gerendert', () => {
-    const rendered = mapMarkerKinds(buildFixtureMarkers());
+    const rendered = mapMarkerKinds(mapMarkersFromRunScreen(buildFixtureMarkers()) as MarkerSample[]);
     expect(rendered).toEqual([
       { render: 'angle', label: '90 R' },
       { render: 'object' },

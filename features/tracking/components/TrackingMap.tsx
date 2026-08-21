@@ -26,7 +26,7 @@ function markerColor(m: MapMarker): string {
   return MARKER_COLOR[m.type];
 }
 
-export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null }
+export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null; distanceFromStart?: number | null; note?: string | null }
 
 // Persistenter Marker: verhindert das „Verschwinden". react-native-maps verwirft
 // bei tracksViewChanges=false und häufigen Re-Renders/Region-Wechseln sonst das
@@ -34,9 +34,9 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // stabile ID sorgen dafür, dass der Marker NICHT bei jedem GPS-Fix neu erzeugt wird
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color }: {
+const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress }: {
   Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder';
-  label?: string; acute?: boolean; duebel?: boolean; color?: string;
+  label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void;
 }) {
   const [track, setTrack] = useState(true);
   useEffect(() => { const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, []);
@@ -65,7 +65,7 @@ const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute
   // leeres Border-View wie beim Abriss-Bug).
   else if (kind === 'cylinder') child = <View style={s.cylBody}><View style={s.cylTop} /></View>;
   else child = <View style={[s.markerDot, { backgroundColor: color }]} />;
-  return <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track}>{child}</Marker>;
+  return <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track} onPress={onPress}>{child}</Marker>;
 });
 
 interface Props {
@@ -78,7 +78,11 @@ interface Props {
   breaks?:          LatLng[];   // Abriss-Punkte (Ausarbeiten) — rote Marker
   dimLay?:          boolean;    // DEPRECATED/ignoriert: gelegte Fährte ist während der Absuche jetzt immer solide Mint (Prod-Bugfix). Prop bleibt für Aufrufer-Kompatibilität.
   startAnchor?:     LatLng | null;   // stabilisierter Startpunkt → Fähnchen (statt erstem Rohpunkt)
+  endPoint?:        LatLng | null;   // gespeichertes Fährtenende (letzter gelegter Punkt) → Ziel-Fähnchen
+  onMarkerPress?:   (m: MapMarker) => void;   // Tap auf einen gespeicherten Feature-Marker (Logbuch-Detail)
+  onEndPress?:      () => void;               // Tap auf das Ziel-Fähnchen (Logbuch-Detail „Fährtenende")
   currentPosition:  LatLng | null;
+  dogPosition?:     LatLng | null;
   heading?:         number | null;
   follow:           boolean;
   mapType?:         MapType;
@@ -91,7 +95,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, currentPosition, heading,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, onMarkerPress, onEndPress, currentPosition, dogPosition, heading,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
@@ -230,25 +234,38 @@ export function TrackingMap({
           </Marker>
         ) : null}
 
+        {/* Fährtenende: gespeicherter Endpunkt (letzter gelegter Punkt) → Ziel-Fähnchen,
+            optisch klar vom (grünen) Startpunkt unterscheidbar. */}
+        {endPoint && (
+          <Marker coordinate={{ latitude: endPoint.lat, longitude: endPoint.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={onEndPress}>
+            <View style={s.endFlagWrap}>
+              <View style={s.endFlag}><Ionicons name="flag" size={12} color="#fff" /></View>
+              <Text style={s.endFlagLabel}>{t('track.endFlag')}</Text>
+            </View>
+          </Marker>
+        )}
+
         {/* Marker: Winkel = mint Geometrie-Badge (90 L/R · SL/SR), Gegenstand =
             neutrales Quadrat-Badge (G1, G2 …), Abriss = Kästchen. Klar getrennt.
             Über PinMarker (memo + stabile ID) bleiben sie dauerhaft sichtbar. */}
         {markerList.map((m, i) => {
           const lat = m.lat as number, lng = m.lng as number;
           const key = m.id ?? `mk-${i}`;
+          // Logbuch: Tap auf einen gespeicherten Marker öffnet die Detailanzeige.
+          const onPress = onMarkerPress ? () => onMarkerPress(m) : undefined;
           if (m.type === 'winkel') {
             // Abriss / GW / OW / BW haben eigene Darstellungen; sonst normaler Winkel.
             const ak = angleMarkerKind(m.angleKind);
-            if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak} />;
+            if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak} onPress={onPress} />;
             const label = (m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠';
             const acute = m.angleKind === 'spitz_links' || m.angleKind === 'spitz_rechts' || m.angleKind === 'spitz';
-            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} />;
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} onPress={onPress} />;
           }
           if (m.type === 'gegenstand') {
-            if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" />;
-            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${objectNo.get(i) ?? ''}`} />;
+            if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" onPress={onPress} />;
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${objectNo.get(i) ?? ''}`} onPress={onPress} />;
           }
-          return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} />;
+          return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} onPress={onPress} />;
         })}
 
         {/* Abriss-Marker (Ausarbeiten): rotes Kreuz-Symbol */}
@@ -264,6 +281,15 @@ export function TrackingMap({
               <View style={s.posCore}>
                 <Ionicons name="navigate" size={16} color="#04110F"
                   style={heading != null ? { transform: [{ rotate: `${heading}deg` }] } : undefined} />
+              </View>
+            </View>
+          </Marker>
+        )}
+        {dogPosition && (
+          <Marker coordinate={{ latitude: dogPosition.lat, longitude: dogPosition.lng }} anchor={{ x: 0.5, y: 0.5 }} flat>
+            <View style={s.dogGlow}>
+              <View style={s.dogCore}>
+                <Ionicons name="paw" size={15} color="#04110F" />
               </View>
             </View>
           </Marker>
@@ -300,6 +326,9 @@ const s = StyleSheet.create({
   startFlagWrap:  { alignItems: 'center' },
   startFlag:      { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, borderWidth: 2, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   startFlagLabel: { marginTop: 2, fontSize: 9, fontWeight: '800', color: C.trackPrimary, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
+  endFlagWrap:    { alignItems: 'center' },
+  endFlag:        { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  endFlagLabel:   { marginTop: 2, fontSize: 9, fontWeight: '800', color: '#fff', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
   markerDot:   { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#04110F' },
   // Winkel: kompaktes, geometrisches Mint-Badge mit Kurzlabel (90 L/R, SL/SR).
   angleBadge:    { minWidth: 20, height: 17, paddingHorizontal: 4, borderRadius: 4, backgroundColor: C.trackPrimary, borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
@@ -326,4 +355,6 @@ const s = StyleSheet.create({
   breakDot:    { width: 18, height: 18, borderRadius: 9, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#2a060a', alignItems: 'center', justifyContent: 'center' },
   posGlow:     { width: 40, height: 40, borderRadius: 20, backgroundColor: C.trackGlow, alignItems: 'center', justifyContent: 'center' },
   posCore:     { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
+  dogGlow:     { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(21,230,195,0.22)', alignItems: 'center', justifyContent: 'center' },
+  dogCore:     { width: 24, height: 24, borderRadius: 12, backgroundColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#04110F' },
 });

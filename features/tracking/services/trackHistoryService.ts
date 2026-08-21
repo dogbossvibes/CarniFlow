@@ -1,6 +1,6 @@
 import { getUserTrackSessions } from '@/features/tracking/services/trackService';
 import {
-  getLocalTrainingSessions, getLocalTrainingSessionById, updateLocalTrainingSession,
+  getLocalTrainingSessions, getLocalTrainingSessionById, updateLocalTrackEvaluation,
 } from '@/features/training/repositories/localTrainingRepository';
 import { getTrackPointsBySession, getTrackMarkersBySession } from '@/features/tracking/repositories/localTrackRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -39,7 +39,7 @@ export async function getLocalRunSupplement(localId: string): Promise<ReturnType
 
 // Auswertung (Score/Notiz) einer lokal-only Fährte lokal speichern + zur Re-Sync
 // einreihen. Kein Remote-Direktschreiben (das würde ohne Remote-Zeile verpuffen).
-export async function saveLocalTrackEvaluation(localId: string, input: { score: number; notes: string | null }): Promise<void> {
-  await updateLocalTrainingSession(localId, { score: input.score, notes: input.notes });   // flippt synced→pending
+export async function saveLocalTrackEvaluation(localId: string, input: { score: number; notes: string | null; legs?: { name: string; score: number; max: number }[] }): Promise<void> {
+  await updateLocalTrackEvaluation(localId, input);   // flippt synced→pending
   await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: localId, operation: 'create', priority: 1 }).catch(() => {});
 }

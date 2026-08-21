@@ -311,6 +311,8 @@ export const deCH = {
   'track.voiceAngle':     'Winkel {inSteps}.',
   'track.voiceDowel':     'Dübel {inSteps}.',
   'track.voiceObject':    'Gegenstand {inSteps}.',
+  'track.voiceTrackEnd':  'Ende der Fährte erreicht.',
+  'track.trackEndReached':'Fährtenende erreicht',
   'track.stepsShort':     'Schr.',
   'track.startPointSetting': 'Startpunkt wird gesetzt … kurz stehen bleiben',
   'track.segmentActive':  'Teilstrecke aktiv',
@@ -1059,6 +1061,13 @@ export const deCH = {
   'track.deviation': 'Abweichung',
   'track.mapUnavailable': 'Karte nur im Dev-/Store-Build verfügbar',
   'track.startFlag': 'Start',
+  'track.endFlag': 'Ende',
+  'track.detailDistanceFromStart': 'Entfernung ab Start',
+  'track.detailMaterial': 'Material',
+  'track.detailNote': 'Notiz',
+  'track.detailTrackEnd': 'Fährtenende',
+  'track.detailTotalDistance': 'Gesamtdistanz',
+  'track.detailNoData': 'Keine weiteren Details gespeichert.',
 
   // Phase 3 — App Lock / allgemeine UI
   'appLock.prompt': 'ANYVO entsperren',
