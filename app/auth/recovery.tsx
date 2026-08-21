@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 import { signOut, updatePassword } from '@/services/auth';
 import { validateNewPassword } from '@/features/auth/accountSecurity';
+import { resolveRecoveryAction, recoveryDiagnosticContext, classifyRecoveryError } from '@/features/auth/recovery';
+import { reportDiagnostic } from '@/lib/diagnostics';
 import { useT } from '@/i18n';
 
 export default function PasswordRecoveryScreen() {
   const router = useRouter();
   const { t } = useT();
-  const params = useLocalSearchParams<{ code?: string; error?: string; error_description?: string }>();
+  const params = useLocalSearchParams<{ code?: string; token_hash?: string; type?: string; error?: string; error_description?: string }>();
   const exchanged = useRef(false);
   const [ready, setReady] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -25,32 +27,67 @@ export default function PasswordRecoveryScreen() {
   useEffect(() => {
     if (exchanged.current) return;
 
-    const code = typeof params.code === 'string' ? params.code : undefined;
-    const hasErr = Boolean(params.error || params.error_description);
+    const p = {
+      code:              typeof params.code === 'string' ? params.code : undefined,
+      token_hash:        typeof params.token_hash === 'string' ? params.token_hash : undefined,
+      type:              typeof params.type === 'string' ? params.type : undefined,
+      error:             typeof params.error === 'string' ? params.error : undefined,
+      error_description: typeof params.error_description === 'string' ? params.error_description : undefined,
+    };
+    const action = resolveRecoveryAction(p);
+    const diagCtx = recoveryDiagnosticContext(p);   // nur Booleans/Typ — nie Token/Code
 
-    if (hasErr) { setLinkError(t('auth.recoveryInvalidLink')); return; }
+    // Präzise Nutzermeldung je nach Fehlerklasse (verbraucht/abgelaufen vs. falsches
+    // Gerät vs. Netzwerk). Sicherheit: die Fehler-MESSAGE geht nur klassifiziert in
+    // die Diagnose, nie die URL/der Code/der Token.
+    const mapError = (message: string | null | undefined): string => {
+      switch (classifyRecoveryError(message)) {
+        case 'same_device': return t('auth.recoverySameDevice');
+        case 'network':     return t('auth.errorNetwork');
+        default:            return t('auth.recoveryInvalidLink');
+      }
+    };
 
-    if (code) {
-      exchanged.current = true;
-      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (error) {
-          // PKCE-Flow-State-/Verifier-Fehler = Link auf anderem Gerät geöffnet bzw.
-          // Verifier verloren → geräte-spezifischer Hinweis statt generisch „ungültig".
-          const isFlowState = /flow state|verifier|code challenge|code_verifier/i.test(error.message ?? '');
-          setLinkError(isFlowState ? t('auth.recoverySameDevice') : t('auth.recoveryInvalidLink'));
-          return;
-        }
-        setReady(true);
+    // Noch kein Token/Code (evtl. sind die Deep-Link-Params noch nicht da) → NICHT
+    // latchen: nur eine evtl. bereits bestehende Recovery-Session akzeptieren, sonst
+    // den Hinweis zeigen und beim Eintreffen der Params erneut auswerten.
+    if (action.kind === 'session') {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) { exchanged.current = true; setReady(true); }
+        else setLinkError(t('auth.recoveryOpenViaMail'));
       });
       return;
     }
 
-    // Kein `code` (Fragment-Format oder bereits gültige Session).
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setReady(Boolean(session));
-      if (!session) setLinkError(t('auth.recoveryOpenViaMail'));
-    });
-  }, [params.code, params.error, params.error_description, t]);
+    exchanged.current = true;   // ab hier ist die Aktion eindeutig (Einmal-Einlösung)
+
+    // Abgelaufener/bereits verbrauchter Einmal-Link (z. B. Mail-Prefetch/Doppel-GET
+    // konsumiert den `/verify`-Token → Redirect trägt error/error_description).
+    if (action.kind === 'error') {
+      reportDiagnostic('password_recovery', 'email', new Error('recovery_error_param'), diagCtx);
+      setLinkError(t('auth.recoveryInvalidLink'));
+      return;
+    }
+
+    // Recovery-Session herstellen und – nur bei Erfolg – den Passwort-Screen freigeben.
+    // Race-Absicherung: ein paralleler Handler (PASSWORD_RECOVERY → Remount) kann die
+    // Session bereits gesetzt haben → dann NICHT „ungültig" anzeigen.
+    const handle = async ({ error }: { error: { message?: string | null } | null }) => {
+      if (!error) { setReady(true); return; }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) { setReady(true); return; }
+      reportDiagnostic('password_recovery', 'email', error, diagCtx);
+      setLinkError(mapError(error.message));
+    };
+
+    // PKCE-`code` (bestehender Flow) ODER token_hash → verifyOtp (prefetch-resistent).
+    if (action.kind === 'exchange') {
+      const code = action.code;
+      supabase.auth.exchangeCodeForSession(code).then(handle);
+    } else {
+      supabase.auth.verifyOtp({ type: 'recovery', token_hash: action.tokenHash }).then(handle);
+    }
+  }, [params.code, params.token_hash, params.type, params.error, params.error_description, t]);
 
   const savePassword = async () => {
     const validation = validateNewPassword(pw1, pw2);

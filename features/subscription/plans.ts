@@ -109,14 +109,15 @@ export interface PlanMeta {
 }
 
 export const PLAN_META: Record<SubscriptionPlan, PlanMeta> = {
-  // WICHTIG: Der Store-/RevenueCat-Preis ist die Quelle der Wahrheit. priceLabel ist
-  // bewusst NEUTRAL ('—'): ein veralteter hardcodierter Preis darf nicht irreführend
-  // erscheinen, wenn das Store-Paket (noch) nicht geladen ist (generischer Zustand
-  // statt falscher Preis). priceChf ist NICHT autoritativ (nur interne Sortierung).
-  newbie:         { id: 'newbie',         name: 'Newbie',         priceChf: 0,  priceLabel: 'Gratis', productId: null,                           trainer: false },
-  founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 4,  priceLabel: '—',      productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
-  active:         { id: 'active',         name: 'Active',         priceChf: 6,  priceLabel: '—',      productId: PRODUCT_IDS.activeMonthly,         trainer: false },
-  trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 15, priceLabel: '—',      productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
+  // Der Store-/RevenueCat-Preis (pkg.priceString) ist die Quelle der Wahrheit und hat
+  // in der UI Vorrang. priceLabel ist der Fallback, wenn das Store-Paket (noch) nicht
+  // geladen ist — er spiegelt den aktuellen ANYVO-Produktstand (NEWBIE CHF 0, ACTIVE
+  // CHF 9, TRAINER CHF 15). priceChf ist NICHT autoritativ (nur interne Sortierung).
+  // Founder Active wird nicht mehr angeboten → priceLabel bleibt neutral.
+  newbie:         { id: 'newbie',         name: 'NEWBIE',         priceChf: 0,  priceLabel: 'CHF 0',          productId: null,                           trainer: false },
+  founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 4,  priceLabel: '—',              productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
+  active:         { id: 'active',         name: 'Active',         priceChf: 9,  priceLabel: 'CHF 9.00/Mt.',   productId: PRODUCT_IDS.activeMonthly,         trainer: false },
+  trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 15, priceLabel: 'CHF 15.00/Mt.',  productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
 };
 
 // Premium = ACTIVE / FOUNDER_ACTIVE / TRAINER. NEWBIE (und unbekannt/null) NICHT.

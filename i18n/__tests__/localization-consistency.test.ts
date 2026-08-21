@@ -77,7 +77,6 @@ const importantPhase3Keys = [
   'training.exerciseCountShort',
   'comments.messagesCount',
   'comments.writeMessage',
-  'premium.featureActive',
   'premium.founderSoldOut',
   'trainer.deletePlanTitle',
   'media.addVideo',
