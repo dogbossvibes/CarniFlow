@@ -57,6 +57,12 @@ export interface MarkerSample {
   audio_url:         string | null;
   found:             boolean;
   t:                 number;
+  // Auto-Winkel-Confidence (nur zur Laufzeit; NICHT in der DB — Persistenz s. u.):
+  // die track_markers-Tabelle hat keine Spalte dafür; DB-Persistenz wäre eine
+  // Migration und ist bewusst als Folgepunkt offen. Historische Marker ohne diese
+  // Felder funktionieren unverändert (undefined).
+  confidence?:       number | null;
+  confidenceLevel?:  'low' | 'medium' | 'high' | null;
 }
 
 interface TrackingState {

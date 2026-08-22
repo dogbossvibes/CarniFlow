@@ -54,4 +54,20 @@ describe('buildDebugSnapshot', () => {
     const snap = buildDebugSnapshot({ engineLabel: 'Fallback (expo-location)', stats: stats(), status: null });
     expect(snap.engine).toBe('expo_fallback');
   });
+
+  it('spiegelt den GPS-Quality-Engine-State, wenn Score vorhanden ist', () => {
+    const snap = buildDebugSnapshot({
+      engineLabel: 'expo', stats: stats({ lastAccuracy: 8 }), status: null,
+      gpsQualityScore: 0.72, gpsQualityLevel: 'good', gpsQualityValid: true,
+      gpsQualitySampleCount: 14, gpsQualityReasons: ['accuracy_variance'],
+    });
+    expect(snap.gpsQualityEngine).toMatchObject({
+      score: 0.72, level: 'good', valid: true, sampleCount: 14, reasons: ['accuracy_variance'],
+    });
+  });
+
+  it('gpsQualityEngine ist null, wenn kein Score geliefert wird', () => {
+    const snap = buildDebugSnapshot({ engineLabel: 'expo', stats: stats(), status: null });
+    expect(snap.gpsQualityEngine).toBeNull();
+  });
 });

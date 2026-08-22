@@ -10,7 +10,14 @@ import {
 import {
   calculateDistance, calculateAverageAccuracy, medianLatLng, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
-import { detectAutoCorner } from '@/features/tracking/utils/autoCornerDetection';
+import {
+  feedCornerBuffer, createCornerConfirmer,
+  type CornerConfirmer, type ConfirmedCorner, type ConfirmQuality,
+} from '@/features/tracking/utils/cornerConfirmation';
+import {
+  createGpsQualityTracker, type GpsQualityTracker, type GpsQualityState,
+} from '@/features/tracking/utils/gpsQualityState';
+import { logConfirmEvent, logConfirmedCornerMetrics, logGpsQualityChange } from '@/features/tracking/utils/angleDiagnostics';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
 import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -95,8 +102,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     angleCount: number; acuteAngleCount: number;
     lastAngleType: AngleKind | null; lastAngleDeg: number | null;
     lastAngleDir: 'links' | 'rechts' | null; lastAngleReject: string | null;
+    gpsQualityScore: number | null; gpsQualityLevel: GpsQualityState['level'] | null;
+    gpsQualityValid: boolean; gpsQualitySamples: number; gpsQualityReasons: string[];
   }>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0,
-       angleCount: 0, acuteAngleCount: 0, lastAngleType: null, lastAngleDeg: null, lastAngleDir: null, lastAngleReject: null });
+       angleCount: 0, acuteAngleCount: 0, lastAngleType: null, lastAngleDeg: null, lastAngleDir: null, lastAngleReject: null,
+       gpsQualityScore: null, gpsQualityLevel: null, gpsQualityValid: false, gpsQualitySamples: 0, gpsQualityReasons: [] });
 
   // Track-Zustand in Refs → kein Stale-Closure im Fix-Handler.
   const pointsRef     = useRef<AcceptedPoint[]>([]);   // akzeptierte, geglättete Linie
@@ -117,6 +127,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null });
   const onAngleRef    = useRef<TrackRecorderOptions['onAngle']>(opts?.onAngle);
   onAngleRef.current  = opts?.onAngle;
+  // Phase 2: adaptive Confirmation-State-Machine (ein Kandidat zur Zeit). Persistiert
+  // einen Winkel erst, wenn er final bestätigt ist (HIGH sofort, MEDIUM nach Beleg).
+  const confirmerRef  = useRef<CornerConfirmer>(createCornerConfirmer());
+  // Phase 3: laufende GPS-Qualitätsbewertung (Rolling Window) als Kontext für die
+  // Confirmation-Anforderung. Beeinflusst NIE die Geometrie, verwirft nie allein.
+  const gpsQualityRef      = useRef<GpsQualityTracker>(createGpsQualityTracker());
+  const gpsQualityStateRef = useRef<GpsQualityState | null>(null);
   // Auto-Erkennung (Winkel/Spitzwinkel) ein/aus — live umschaltbar via Ref.
   const autoDetectRef = useRef<boolean>(opts?.autoDetect ?? true);
   autoDetectRef.current = opts?.autoDetect ?? true;
@@ -167,30 +184,44 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker);
   }, [store]);
 
-  // Auto-Winkel: die gesamte Erkennung (Scheitelwahl, stabile Schenkel, Klassen,
-  // Rechts/Links) liegt in detectAutoCorner() — hier nur Marker/State/Debug.
-  const detectCorner = useCallback(() => {
+  // Übergabe eines FINAL bestätigten Winkels an die bestehende Pipeline (Marker/
+  // Voice/Logbuch/Persistenz) — genau EINMAL je Winkel. Geometrie/Confidence liegen
+  // in autoCornerDetection; die Confirmation-Entscheidung in cornerConfirmation.
+  const persistConfirmedCorner = useCallback((c: ConfirmedCorner) => {
     const dbg = angleDbgRef.current;
-    const corner = detectAutoCorner(pointsRef.current, lastCornerAtRef.current);
-    if (!corner) { dbg.lastReject = 'no_corner'; return; }
-
-    const { apex, kind, angleDeg } = corner;
-    const dir: 'links' | 'rechts' = (kind === 'rechts' || kind === 'spitz_rechts') ? 'rechts' : 'links';
+    const dir: 'links' | 'rechts' = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
     dbg.count++;
-    if (kind === 'spitz_rechts' || kind === 'spitz_links') dbg.acuteCount++;
-    dbg.lastType = kind; dbg.lastDeg = Math.round(angleDeg); dbg.lastDir = dir; dbg.lastReject = null;
-    if (__DEV__) console.log('[trackRecorder] Winkel', { kind, innenwinkel: Math.round(angleDeg), richtung: dir });
+    if (c.kind === 'spitz_rechts' || c.kind === 'spitz_links') dbg.acuteCount++;
+    dbg.lastType = c.kind; dbg.lastDeg = Math.round(c.angleDeg); dbg.lastDir = dir; dbg.lastReject = null;
+    if (__DEV__) logConfirmedCornerMetrics(c);
 
-    lastCornerAtRef.current = apex.cumDist;
+    lastCornerAtRef.current = c.apexCumDist;   // Gap für den nächsten Winkel setzen
     const now = Date.now();
     void commitMarker({
-      id: `angle-${now}-${kind}`, type: 'winkel', material: null, angleKind: kind,   // stabile ID inkl. Typ
-      lat: apex.lat, lng: apex.lng, accuracy: apex.accuracy,
-      distance_from_start: Math.round(apex.cumDist * 10) / 10,
+      id: `angle-${now}-${c.kind}`, type: 'winkel', material: null, angleKind: c.kind,   // stabile ID inkl. Typ
+      lat: c.apexLat, lng: c.apexLng, accuracy: c.accuracyM,
+      distance_from_start: Math.round(c.apexCumDist * 10) / 10,
       note: null, audio_url: null, found: false, t: now,
+      confidence: c.finalConfidence, confidenceLevel: c.finalLevel,   // nur zur Laufzeit; nicht in der DB (s. MarkerSample)
     });
-    onAngleRef.current?.(kind);
+    onAngleRef.current?.(c.kind);
   }, [commitMarker]);
+
+  // Auto-Winkel: pro akzeptiertem Linienpunkt EIN Confirmation-Schritt. Die gesamte
+  // Erkennung (Scheitelwahl, stabile Schenkel, Klassen, Confidence) liegt in
+  // autoCornerDetection; feedCornerBuffer() hält denselben Kandidaten stabil und
+  // liefert nur relevante Lifecycle-Events zurück.
+  const detectCorner = useCallback(() => {
+    // GPS-Quality als Kontext: nur bei gültigem (nicht-Warmup) State koppeln, sonst neutral.
+    const q = gpsQualityStateRef.current;
+    const confirmQuality: ConfirmQuality | undefined = q && q.valid ? q.level : undefined;
+    const events = feedCornerBuffer(confirmerRef.current, pointsRef.current, lastCornerAtRef.current, Date.now(), confirmQuality);
+    for (const ev of events) {
+      if (__DEV__) logConfirmEvent(ev);
+      if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
+      else if (ev.type === 'rejected' || ev.type === 'expired') angleDbgRef.current.lastReject = ev.detail;
+    }
+  }, [persistConfirmedCorner]);
 
   // Start-Lock verarbeiten. Gibt true zurück, sobald in DIESEM Fix freigegeben
   // wurde (der Anker ist dann als erster Linienpunkt gesetzt → Fix läuft normal
@@ -297,6 +328,24 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (!handleStartLock(raw, ema)) { angleDbgRef.current.lastReject = 'start_lock_active'; return; }   // noch am Stabilisieren
     }
 
+    // ── GPS Quality Engine: JEDEN Fix (accepted, distanz-gated oder rejected) in das
+    //    Rolling Window geben. Reine Kontextbewertung — ändert Geometrie/Reject nicht.
+    {
+      const prevQ = lastRawRef.current;
+      const qDist = prevQ ? calculateDistance(prevQ, raw) : null;
+      const qDt = prevQ ? raw.t - prevQ.t : null;
+      const accReject = raw.accuracy == null || raw.accuracy > MAX_ACCURACY_M;
+      const jumpReject = !accReject && !!prevQ && qDt != null && qDt > 0 && (qDist as number) / (qDt / 1000) > MAX_SPEED_MPS;
+      const qState = gpsQualityRef.current.observe({
+        t: raw.t, accuracy: raw.accuracy, distFromPrevM: qDist, dtMs: qDt,
+        rejected: accReject || jumpReject,
+        rejectReason: accReject ? 'accuracy' : jumpReject ? 'jump' : null,
+        speedMps: raw.speed,
+      });
+      if (__DEV__) logGpsQualityChange(gpsQualityStateRef.current, qState);
+      gpsQualityStateRef.current = qState;
+    }
+
     // 1) Zu ungenauer / unrealistischer Fix → kein Linienpunkt (Puck steht schon).
     if (raw.accuracy == null || raw.accuracy > MAX_ACCURACY_M) { rejectedRef.current++; return; }
     const prevRaw = lastRawRef.current;
@@ -394,6 +443,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     lastRawRef.current = null;
     rejectedRef.current = 0;
     lastCornerAtRef.current = -Infinity;
+    confirmerRef.current.reset();   // laufende Confirmation-State-Machine leeren
+    gpsQualityRef.current.reset();  // Rolling-GPS-Qualität leeren
+    gpsQualityStateRef.current = null;
     angleDbgRef.current = { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null };
     ptBuffer.current = [];
     // Führende lokale Session-ID SOFORT deterministisch setzen (kein Warten auf Remote/Netz).
@@ -422,9 +474,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       st.setDuration(sec);
       // Debug: verworfene Fixes gedrosselt (1 Hz) in den State spiegeln.
       const a = angleDbgRef.current;
+      const q = gpsQualityStateRef.current;
       setGpsDebug(d => ({ ...d, rejectedCount: rejectedRef.current,
         angleCount: a.count, acuteAngleCount: a.acuteCount,
-        lastAngleType: a.lastType, lastAngleDeg: a.lastDeg, lastAngleDir: a.lastDir, lastAngleReject: a.lastReject }));
+        lastAngleType: a.lastType, lastAngleDeg: a.lastDeg, lastAngleDir: a.lastDir, lastAngleReject: a.lastReject,
+        gpsQualityScore: q ? Math.round(q.score * 100) / 100 : null, gpsQualityLevel: q?.level ?? null,
+        gpsQualityValid: q?.valid ?? false, gpsQualitySamples: q?.sampleCount ?? 0, gpsQualityReasons: q?.reasons ?? [] }));
       // Live Activity gedrosselt aktualisieren (alle 3 s, nicht im Sekundentakt).
       if (sec % 3 === 0) updateFaehrteActivity({ elapsedS: sec, distanceM: st.distanceMeters, paused: st.isPaused });
     }, 1000);
@@ -507,6 +562,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Transport läuft AUSSCHLIESSLICH über die persistente Sync-Queue (P-SAVE2) — kein
   // direkter finishTrackRecording-Pfad mehr (eine einzige Remote-Sync-Quelle).
   const finish = useCallback((): void => {
+    // Letzten noch offenen (bestätigungswürdigen) Winkel best-effort retten, BEVOR
+    // gestoppt wird — sonst ginge ein Winkel am Track-Ende ohne Auslauf verloren.
+    for (const ev of confirmerRef.current.flush(Date.now())) {
+      if (__DEV__) logConfirmEvent(ev);
+      if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
+    }
     stopAll();
     const s = store.getState();
     s.stopRecording();
@@ -560,7 +621,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })();
-  }, [stopAll, store, flushPoints]);
+  }, [stopAll, store, flushPoints, persistConfirmedCorner]);
 
   return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll, gpsDebug };
 }
