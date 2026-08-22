@@ -1062,6 +1062,11 @@ export default function LegenScreen() {
           lastAngleDegrees={dbg?.lastAngleDeg ?? null}
           lastAngleDirection={dbg?.lastAngleDir ?? null}
           lastAngleRejectedReason={dbg?.lastAngleReject ?? null}
+          gpsQualityScore={dbg?.gpsQualityScore ?? null}
+          gpsQualityLevel={dbg?.gpsQualityLevel ?? null}
+          gpsQualityValid={dbg?.gpsQualityValid ?? null}
+          gpsQualitySampleCount={dbg?.gpsQualitySamples ?? null}
+          gpsQualityReasons={dbg?.gpsQualityReasons ?? null}
           devMode
         />
       )}

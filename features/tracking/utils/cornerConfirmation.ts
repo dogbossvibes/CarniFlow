@@ -38,6 +38,14 @@ export interface ConfirmConfig {
   expiryMs:            number;   // Backstop (NUR Zeit, nicht primär): so lange ohne Abschluss → expire
   classHysteresisVotes: number;  // Umklassifizierung (normal↔spitz / links↔rechts) erst nach so vielen konsistenten Gegenbeobachtungen
   rescueMinOutboundM:  number;   // Flush am Track-Ende: Mindest-Schenkel für die Rettung eines noch nicht bestätigten Winkels (=LEG_MIN_M=4)
+  // GPS-Quality-Kopplung (Phase 3): degradiertes/schlechtes Signal verlangt MEHR
+  // Bestätigungs-Evidenz, verwirft aber NIE allein wegen globaler Qualität.
+  qualityDegradedExtraSamples:   number;   // +Samples bei 'degraded'
+  qualityDegradedExtraOutboundM: number;   // +Meter neuer Schenkel bei 'degraded'
+  qualityPoorExtraSamples:       number;   // +Samples bei 'poor'
+  qualityPoorExtraOutboundM:     number;   // +Meter neuer Schenkel bei 'poor'
+  qualityDegradedMissBonus:      number;   // +tolerierte Misses bei 'degraded' (längere Schlecht-Phase am Scheitel)
+  qualityPoorMissBonus:          number;   // +tolerierte Misses bei 'poor'
 }
 
 export const DEFAULT_CONFIRM_CONFIG: ConfirmConfig = {
@@ -53,7 +61,54 @@ export const DEFAULT_CONFIRM_CONFIG: ConfirmConfig = {
   expiryMs:             20_000,
   classHysteresisVotes: 2,
   rescueMinOutboundM:   4,
+  qualityDegradedExtraSamples:   1,   // good 2/8 → degraded 3/11
+  qualityDegradedExtraOutboundM: 3,
+  qualityPoorExtraSamples:       2,   // good 2/8 → poor 4/14
+  qualityPoorExtraOutboundM:     6,
+  qualityDegradedMissBonus:      1,
+  qualityPoorMissBonus:          2,
 };
+
+// GPS-Qualitäts-Level (Kontext aus der GPS Quality Engine). `undefined` = neutral
+// (Warmup/kein Signal) → exakt bisheriges Verhalten.
+export type ConfirmQuality = 'excellent' | 'good' | 'degraded' | 'poor';
+
+interface QualityRequirement {
+  samples:       number;   // benötigte Folge-Samples (MEDIUM)
+  outboundM:     number;   // ODER so viel neuer Schenkel (MEDIUM)
+  missBonus:     number;   // zusätzlich tolerierte Misses
+  immediateHigh: boolean;  // HIGH sofort bestätigen (nur bei gutem Signal)
+  highMinSamples: number;  // HIGH unter 'degraded': so viele Folge-Samples vor Confirm
+}
+
+function requirementFor(cfg: ConfirmConfig, q: ConfirmQuality | undefined): QualityRequirement {
+  switch (q) {
+    case 'poor':
+      return {
+        samples: cfg.confirmSamples + cfg.qualityPoorExtraSamples,
+        outboundM: cfg.confirmOutboundM + cfg.qualityPoorExtraOutboundM,
+        missBonus: cfg.qualityPoorMissBonus,
+        immediateHigh: false,   // keine blinde Sofort-Persistenz bei poor
+        highMinSamples: cfg.confirmSamples + cfg.qualityPoorExtraSamples,
+      };
+    case 'degraded':
+      return {
+        samples: cfg.confirmSamples + cfg.qualityDegradedExtraSamples,
+        outboundM: cfg.confirmOutboundM + cfg.qualityDegradedExtraOutboundM,
+        missBonus: cfg.qualityDegradedMissBonus,
+        immediateHigh: false,   // minimal zusätzliche Bestätigung
+        highMinSamples: 1,
+      };
+    default:   // 'good' | 'excellent' | undefined → unverändert
+      return {
+        samples: cfg.confirmSamples,
+        outboundM: cfg.confirmOutboundM,
+        missBonus: 0,
+        immediateHigh: true,
+        highMinSamples: 0,
+      };
+  }
+}
 
 // Beobachtung eines Fixes: der aktuell für DENSELBEN Scheitel neu klassifizierte
 // Kandidat (bzw. bei Neuentdeckung der beste Kandidat aus evaluateBestCorner) plus
@@ -129,7 +184,7 @@ interface Active {
 }
 
 export interface CornerConfirmer {
-  observe(obs: CornerObservation | null): ConfirmEvent[];
+  observe(obs: CornerObservation | null, quality?: ConfirmQuality): ConfirmEvent[];
   flush(nowMs: number): ConfirmEvent[];
   reset(): void;
   peek(): { apexCumDist: number; kind: CornerKind } | null;
@@ -164,7 +219,7 @@ export function createCornerConfirmer(config: ConfirmConfig = DEFAULT_CONFIRM_CO
     return ev;
   }
 
-  function startNew(obs: CornerObservation, events: ConfirmEvent[]): void {
+  function startNew(obs: CornerObservation, events: ConfirmEvent[], req: QualityRequirement, q: ConfirmQuality | undefined): void {
     // obs.kind ist hier garantiert gesetzt (nur bei accept aufgerufen).
     const kind = obs.kind as CornerKind;
     active = {
@@ -178,12 +233,14 @@ export function createCornerConfirmer(config: ConfirmConfig = DEFAULT_CONFIRM_CO
       followSamples: 0, misses: 0, everAccept: true, createdAtMs: obs.tMs,
       pendingKind: null, pendingVotes: 0,
     };
-    // HIGH + geometrischer Accept → sofort bestätigen (Section 3: keine Verzögerung).
-    if (obs.level === 'high') {
+    // HIGH + geometrischer Accept → sofort bestätigen, ABER nur bei gutem Signal
+    // (Section 12: bei degraded/poor Bestätigung verlangen statt blinder Persistenz).
+    if (obs.level === 'high' && req.immediateHigh) {
       events.push(finalize(active, 'confirmed', 'high_immediate'));
       active = null;
     } else {
-      events.push(mk('created', active, `${kind} ${obs.confidence.toFixed(2)} ${obs.level}`));
+      const qtag = q && q !== 'good' && q !== 'excellent' ? ` quality=${q}` : '';
+      events.push(mk('created', active, `${kind} ${obs.confidence.toFixed(2)} ${obs.level}${qtag}`));
     }
   }
 
@@ -202,8 +259,9 @@ export function createCornerConfirmer(config: ConfirmConfig = DEFAULT_CONFIRM_CO
     }
   }
 
-  function observe(obs: CornerObservation | null): ConfirmEvent[] {
+  function observe(obs: CornerObservation | null, quality?: ConfirmQuality): ConfirmEvent[] {
     const events: ConfirmEvent[] = [];
+    const req = requirementFor(cfg, quality);
 
     // Zeit-Backstop (nur Sicherheit, nicht primär).
     if (active && obs && obs.tMs - active.createdAtMs > cfg.expiryMs) {
@@ -214,20 +272,22 @@ export function createCornerConfirmer(config: ConfirmConfig = DEFAULT_CONFIRM_CO
     const accept = !!obs && obs.state === 'accept' && obs.kind != null;
 
     if (!active) {
-      if (obs && accept) startNew(obs, events);
+      if (obs && accept) startNew(obs, events, req, quality);
       return events;
     }
 
     // Nicht-accept-Beobachtung → Miss (transienter GPS-Aussetzer) oder echter Rücksprung.
+    // Bei degraded/poor Signal wird eine längere Schlecht-Phase am Scheitel toleriert.
     if (!obs || !accept) {
+      const maxMisses = cfg.maxMisses + req.missBonus;
       active.misses += 1;
       if (obs) active.latestConfidence = obs.confidence;
       const hardReversal = !!obs && obs.state === 'reject' && obs.factors.straightAfter < cfg.rejectStraightAfter;
-      if (hardReversal || active.misses > cfg.maxMisses) {
+      if (hardReversal || active.misses > maxMisses) {
         events.push(finalize(active, 'rejected', hardReversal ? 'bearing_reversed' : 'lost_candidate'));
         active = null;
       } else {
-        events.push(mk('updated', active, `miss ${active.misses}/${cfg.maxMisses}`));
+        events.push(mk('updated', active, `miss ${active.misses}/${maxMisses}${quality && quality !== 'good' && quality !== 'excellent' ? ` quality=${quality}` : ''}`));
       }
       return events;
     }
@@ -246,23 +306,31 @@ export function createCornerConfirmer(config: ConfirmConfig = DEFAULT_CONFIRM_CO
     if (o.confidence > active.bestConfidence) active.bestConfidence = o.confidence;
     maybeReclassify(active, o, events);
 
-    // Confidence hat sich zu HIGH entwickelt → sofort bestätigen (evidenzbasiert).
-    if (o.level === 'high') {
+    // Confidence hat sich zu HIGH entwickelt → bei gutem Signal sofort bestätigen.
+    if (o.level === 'high' && req.immediateHigh) {
       events.push(finalize(active, 'confirmed', 'evidence_upgrade'));
       active = null;
       return events;
     }
-    // Confidence eingebrochen bzw. Schenkel knickt zurück → verwerfen.
+    // Confidence eingebrochen bzw. Schenkel knickt zurück → verwerfen (NICHT wegen GPS-Qualität).
     if (o.confidence < cfg.rejectConfidence || o.factors.straightAfter < cfg.rejectStraightAfter) {
       events.push(finalize(active, 'rejected', 'confidence_collapsed'));
       active = null;
       return events;
     }
-    // MEDIUM: Bestätigung über Bearing-Stabilität UND (genug Samples ODER genug Distanz).
+    // Bestätigung über Bearing-Stabilität UND (genug Samples ODER genug Distanz).
+    // HIGH unter degraded braucht nur eine minimale zusätzliche Bestätigung (highMinSamples);
+    // MEDIUM (und HIGH unter poor) die volle qualitätsabhängige Anforderung.
     const bearingStable = o.factors.straightAfter >= cfg.bearingStableMin;
-    if (bearingStable && (active.followSamples >= cfg.confirmSamples || active.confirmDistanceM >= cfg.confirmOutboundM)) {
-      const why = active.followSamples >= cfg.confirmSamples ? 'evidence_samples' : 'evidence_distance';
-      events.push(finalize(active, 'confirmed', why));
+    const isHigh = o.level === 'high';
+    const needSamples = isHigh && quality === 'degraded' ? req.highMinSamples : req.samples;
+    const needOutbound = isHigh && quality === 'degraded' ? 0 : req.outboundM;
+    const bySamples = active.followSamples >= needSamples;
+    const byDistance = needOutbound > 0 && active.confirmDistanceM >= needOutbound;
+    if (bearingStable && (bySamples || byDistance)) {
+      const why = bySamples ? 'evidence_samples' : 'evidence_distance';
+      const qtag = quality && quality !== 'good' && quality !== 'excellent' ? ` quality=${quality} req=${needSamples}/${needOutbound}m` : '';
+      events.push(finalize(active, 'confirmed', `${why}${qtag}`));
       active = null;
       return events;
     }
@@ -328,8 +396,9 @@ export function feedCornerBuffer(
   points: readonly AutoCornerPoint[],
   lastCornerAtM: number,
   nowMs: number,
+  quality?: ConfirmQuality,
 ): ConfirmEvent[] {
-  if (points.length < 3) return confirmer.observe(null);
+  if (points.length < 3) return confirmer.observe(null, quality);
   const latestCumDist = points[points.length - 1].cumDist;
   const active = confirmer.peek();
 
@@ -343,5 +412,5 @@ export function feedCornerBuffer(
     const best = evaluateBestCorner(points, lastCornerAtM);
     if (best) obs = toObservation(best.candidate, points[best.apexIndex], latestCumDist, nowMs);
   }
-  return confirmer.observe(obs);
+  return confirmer.observe(obs, quality);
 }

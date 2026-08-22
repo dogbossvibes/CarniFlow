@@ -89,6 +89,13 @@ export interface PrecisionDebugPanelProps {
   lastAngleDirection?:     string | null;
   lastAngleRejectedReason?: string | null;
 
+  // GPS Quality Engine (laufender Rolling-Quality-State; nur Debug/DEV).
+  gpsQualityScore?:       number | null;        // 0..1
+  gpsQualityLevel?:       'excellent' | 'good' | 'degraded' | 'poor' | null;
+  gpsQualityValid?:       boolean | null;       // false = Warmup / insufficient_data
+  gpsQualitySampleCount?: number | null;        // Samples im Rolling Window
+  gpsQualityReasons?:     string[] | null;      // relevante Gründe (accuracy, reject_rate, …)
+
   // Sichtbarkeit / Interaktion.
   devMode?:       boolean;                     // Default __DEV__
   activeLayer?:   DebugLayer;
@@ -138,6 +145,7 @@ export function PrecisionDebugPanel(props: PrecisionDebugPanelProps) {
     warmupMs, startAllowed,
     startLockActive, startAnchorSet, startAnchorAccuracy, startDriftRejectedCount,
     angleMarkersCount, acuteAngleMarkersCount, lastAngleType, lastAngleDegrees, lastAngleDirection, lastAngleRejectedReason,
+    gpsQualityScore, gpsQualityLevel, gpsQualityValid, gpsQualitySampleCount, gpsQualityReasons,
     devMode = __DEV__, activeLayer, onSelectLayer, onExport,
   } = props;
 
@@ -209,6 +217,19 @@ export function PrecisionDebugPanel(props: PrecisionDebugPanelProps) {
         <Row label="Rejected" value={fmtNum(stats.rejectedCount)} />
         <Row label="Rejection Rate" value={`${Math.round(stats.rejectionRate * 100)} %`} />
         <Row label="Letzter Reject" value={lastRejectedReason ?? '–'} color={lastRejectedReason ? C.trackDanger : undefined} />
+
+        {gpsQualityScore != null && (
+          <>
+            <SectionTitle>GPS Quality Engine</SectionTitle>
+            <Row label="Quality Score" value={gpsQualityScore.toFixed(2)}
+              color={gpsQualityLevel === 'poor' ? C.trackDanger : gpsQualityLevel === 'degraded' ? C.trackWarning : C.trackPrimary} />
+            <Row label="Level" value={gpsQualityValid === false ? `${gpsQualityLevel ?? '–'} (warming)` : (gpsQualityLevel ?? '–')} />
+            <Row label="Window Samples" value={fmtNum(gpsQualitySampleCount)} />
+            {gpsQualityReasons && gpsQualityReasons.length > 0 && (
+              <Row label="Reasons" value={gpsQualityReasons.join(', ')} color={C.trackWarning} />
+            )}
+          </>
+        )}
 
         <SectionTitle>Sensorik</SectionTitle>
         <Row label="Geschwindigkeit" value={speedMps != null ? `${speedMps.toFixed(1)} m/s` : '–'} />
@@ -307,6 +328,13 @@ export function buildDebugSnapshot(p: PrecisionDebugPanelProps) {
     ios: p.providerStatus ? {
       preciseLocationEnabled: p.providerStatus.preciseLocationEnabled ?? null,
       headingAvailable:       p.providerStatus.headingAvailable ?? null,
+    } : null,
+    gpsQualityEngine: p.gpsQualityScore != null ? {
+      score:       p.gpsQualityScore,
+      level:       p.gpsQualityLevel ?? null,
+      valid:       p.gpsQualityValid ?? null,
+      sampleCount: p.gpsQualitySampleCount ?? null,
+      reasons:     p.gpsQualityReasons ?? null,
     } : null,
     warmupMs:     p.warmupMs ?? null,
     startAllowed: p.startAllowed ?? null,

@@ -15,6 +15,7 @@
 
 import type { CornerConfidence } from '@/features/tracking/utils/cornerConfidence';
 import type { ConfirmEvent, ConfirmedCorner } from '@/features/tracking/utils/cornerConfirmation';
+import type { GpsQualityState } from '@/features/tracking/utils/gpsQualityState';
 
 export interface AngleCandidateDiag {
   accuracyM:              number | null;
@@ -92,6 +93,29 @@ export function formatConfirmedCornerMetrics(c: ConfirmedCorner): string {
 export function logConfirmedCornerMetrics(c: ConfirmedCorner): void {
   if (!__DEV__) return;
   console.log(formatConfirmedCornerMetrics(c));
+}
+
+// ── GPS Quality Engine (Phase 3) — nur bei relevanter Änderung loggen ─────────
+export function formatGpsQuality(q: GpsQualityState): string {
+  const c = q.components;
+  const pct = (x: number | undefined) => (x == null ? 'n/a' : `${Math.round(x * 100)}`);
+  const reasons = q.reasons.length ? ` reason=${q.reasons.join(',')}` : '';
+  return `[gpsQuality] ${q.score.toFixed(2)} ${q.level}${q.valid ? '' : ' (warming)'} `
+    + `acc=${pct(c.accuracy)} temporal=${pct(c.temporalStability)} jump=${pct(c.jumpStability)} `
+    + `reject=${pct(c.rejectionHealth)} cadence=${pct(c.sampleConsistency)} motion=${pct(c.motionConsistency)} `
+    + `n=${q.sampleCount}/${(q.windowDurationMs / 1000).toFixed(0)}s${reasons}`;
+}
+
+// Loggt NUR bei Level-Wechsel oder deutlicher Score-Änderung (kein Log je Rohsample).
+export function logGpsQualityChange(
+  prev: GpsQualityState | null, next: GpsQualityState, scoreDelta = 0.1,
+): void {
+  if (!__DEV__) return;
+  const changed = !prev
+    || prev.level !== next.level
+    || prev.valid !== next.valid
+    || Math.abs(prev.score - next.score) >= scoreDelta;
+  if (changed) console.log(formatGpsQuality(next));
 }
 
 // Aggregierte Marker-Übersicht der gelegten Fährte beim Absuche-Start.
