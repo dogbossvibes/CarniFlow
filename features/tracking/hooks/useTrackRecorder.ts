@@ -11,13 +11,16 @@ import {
   calculateDistance, calculateAverageAccuracy, medianLatLng, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
 import {
+  detectAutoCorner, type AutoCorner,
+} from '@/features/tracking/utils/autoCornerDetection';
+import {
   feedCornerBuffer, createCornerConfirmer,
-  type CornerConfirmer, type ConfirmedCorner, type ConfirmQuality,
+  type CornerConfirmer, type ConfirmQuality,
 } from '@/features/tracking/utils/cornerConfirmation';
 import {
   createGpsQualityTracker, type GpsQualityTracker, type GpsQualityState,
 } from '@/features/tracking/utils/gpsQualityState';
-import { logConfirmEvent, logConfirmedCornerMetrics, logGpsQualityChange } from '@/features/tracking/utils/angleDiagnostics';
+import { logConfirmEvent, logImmediateCorner, logGpsQualityChange } from '@/features/tracking/utils/angleDiagnostics';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
 import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -184,49 +187,60 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker);
   }, [store]);
 
-  // Übergabe eines FINAL bestätigten Winkels an die bestehende Pipeline (Marker/
-  // Voice/Logbuch/Persistenz) — genau EINMAL je Winkel. Geometrie/Confidence liegen
-  // in autoCornerDetection; die Confirmation-Entscheidung in cornerConfirmation.
-  const persistConfirmedCorner = useCallback((c: ConfirmedCorner) => {
+  // HOTFIX (Recall): ein geometrisch AKZEPTIERTER Winkel wird SOFORT persistiert
+  // (Verhalten wie ≤65eceeb). Confidence/Level werden diagnostisch am Marker geführt,
+  // aber blockieren NICHT mehr. Markerposition = erkannter ursprünglicher Scheitel.
+  const persistAcceptedCorner = useCallback((corner: AutoCorner) => {
+    const { apex, kind, angleDeg, confidence, level } = corner;
     const dbg = angleDbgRef.current;
-    const dir: 'links' | 'rechts' = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
+    const dir: 'links' | 'rechts' = (kind === 'rechts' || kind === 'spitz_rechts') ? 'rechts' : 'links';
     dbg.count++;
-    if (c.kind === 'spitz_rechts' || c.kind === 'spitz_links') dbg.acuteCount++;
-    dbg.lastType = c.kind; dbg.lastDeg = Math.round(c.angleDeg); dbg.lastDir = dir; dbg.lastReject = null;
-    if (__DEV__) logConfirmedCornerMetrics(c);
+    if (kind === 'spitz_rechts' || kind === 'spitz_links') dbg.acuteCount++;
+    dbg.lastType = kind; dbg.lastDeg = Math.round(angleDeg); dbg.lastDir = dir; dbg.lastReject = null;
 
-    lastCornerAtRef.current = c.apexCumDist;   // Gap für den nächsten Winkel setzen
+    lastCornerAtRef.current = apex.cumDist;   // Gap → nächster Winkel + verhindert Doppelmarker
+    const qs = gpsQualityStateRef.current;
+    if (__DEV__) logImmediateCorner({
+      kind, angleDeg, confidence, level,
+      quality: qs ? `${qs.level}(${qs.score.toFixed(2)})` : 'n/a',
+      persistReason: 'geometric_accept',
+    });
     const now = Date.now();
     void commitMarker({
-      id: `angle-${now}-${c.kind}`, type: 'winkel', material: null, angleKind: c.kind,   // stabile ID inkl. Typ
-      lat: c.apexLat, lng: c.apexLng, accuracy: c.accuracyM,
-      distance_from_start: Math.round(c.apexCumDist * 10) / 10,
+      id: `angle-${now}-${kind}`, type: 'winkel', material: null, angleKind: kind,   // stabile ID inkl. Typ
+      lat: apex.lat, lng: apex.lng, accuracy: apex.accuracy,
+      distance_from_start: Math.round(apex.cumDist * 10) / 10,
       note: null, audio_url: null, found: false, t: now,
-      confidence: c.finalConfidence, confidenceLevel: c.finalLevel,   // nur zur Laufzeit; nicht in der DB (s. MarkerSample)
+      confidence, confidenceLevel: level,   // nur zur Laufzeit; nicht in der DB (s. MarkerSample)
     });
-    onAngleRef.current?.(c.kind);
+    onAngleRef.current?.(kind);
   }, [commitMarker]);
 
-  // Auto-Winkel: pro akzeptiertem Linienpunkt EIN Confirmation-Schritt. Die gesamte
-  // Erkennung (Scheitelwahl, stabile Schenkel, Klassen, Confidence) liegt in
-  // autoCornerDetection; feedCornerBuffer() hält denselben Kandidaten stabil und
-  // liefert nur relevante Lifecycle-Events zurück.
+  // Auto-Winkel: geometrische Erkennung entscheidet die Persistenz (Sofort-Persist).
+  // Die Adaptive Confirmation läuft PARALLEL im SHADOW-MODE — nur Lifecycle-Diagnostik
+  // (would_confirm/would_reject/…), sie persistiert NICHTS und kann keinen bereits
+  // akzeptierten Winkel mehr verlieren. Die GPS-Quality bleibt reiner Kontext.
   const detectCorner = useCallback(() => {
-    // GPS-Quality als Kontext: nur bei gültigem (nicht-Warmup) State koppeln, sonst neutral.
+    const points = pointsRef.current;
+    const now = Date.now();
     const q = gpsQualityStateRef.current;
     const confirmQuality: ConfirmQuality | undefined = q && q.valid ? q.level : undefined;
-    const events = feedCornerBuffer(confirmerRef.current, pointsRef.current, lastCornerAtRef.current, Date.now(), confirmQuality);
-    for (const ev of events) {
-      if (__DEV__) logConfirmEvent(ev);
-      if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
-      else if (ev.type === 'rejected' || ev.type === 'expired') angleDbgRef.current.lastReject = ev.detail;
+
+    // SHADOW: Confirmation weiterlaufen lassen (kein Persist) — reale Kalibrierungsdaten.
+    if (__DEV__) for (const ev of feedCornerBuffer(confirmerRef.current, points, lastCornerAtRef.current, now, confirmQuality)) {
+      logConfirmEvent(ev);   // [cornerConfirm] = Shadow-Lifecycle, NICHT persistiert
     }
-  }, [persistConfirmedCorner]);
+
+    // PRIMARY: nur bei bestehendem geometrischem state==='accept' → sofort persistieren.
+    const corner = detectAutoCorner(points, lastCornerAtRef.current);
+    if (!corner) { angleDbgRef.current.lastReject = 'no_corner'; return; }
+    persistAcceptedCorner(corner);   // setzt lastCornerAtRef → genau 1 Marker je Winkel
+  }, [persistAcceptedCorner]);
 
   // Start-Lock verarbeiten. Gibt true zurück, sobald in DIESEM Fix freigegeben
   // wurde (der Anker ist dann als erster Linienpunkt gesetzt → Fix läuft normal
   // weiter). Solange false: Stabilisieren, KEINE Linie/Distanz.
-  const handleStartLock = useCallback((raw: Raw, ema: LatLng): boolean => {
+  const handleStartLock = useCallback((raw: Raw, livePos: LatLng): boolean => {
     const s = store.getState();
     const now = raw.t;
     const elapsed = now - startLockBeganRef.current;
@@ -249,7 +263,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     const anchor = startAnchorRef.current;
     let moved = false;
     if (anchor) {
-      const dist = calculateDistance(anchor, ema);
+      const dist = calculateDistance(anchor, livePos);
       const okAcc = raw.accuracy == null || raw.accuracy <= MAX_ACCURACY_M;
       if (dist > START_MOVE_MIN_M && okAcc) {
         startMoveHitsRef.current++;
@@ -269,7 +283,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // Freigeben: Anker sicherstellen (Timeout ohne genug gute Fixes → besten nehmen).
     let a = startAnchorRef.current;
     if (!a) {
-      a = { lat: ema.lat, lng: ema.lng };
+      a = { lat: livePos.lat, lng: livePos.lng };
       startAnchorRef.current = a;
       startAnchorAccRef.current = calculateAverageAccuracy(startFixesRef.current.map(f => f.accuracy)) ?? raw.accuracy;
       s.setStartAnchor({ lat: a.lat, lng: a.lng, accuracy: startAnchorAccRef.current, t: now });
@@ -299,18 +313,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     };
     if (__DEV__) console.log('[trackRecorder] fix', { accuracy: raw.accuracy, recording: recordingRef.current });
 
-    // EMA-Glättung der Position — IMMER (Warmup wie Aufnahme). So folgt der
-    // Live-Puck stets der echten Position und friert NIE ein, auch bei mässigem
-    // GPS. Der Genauigkeits-/Speed-Filter blockt nur das Setzen von LINIEN-Punkten.
-    const prevEma = emaRef.current;
-    const ema: LatLng = prevEma
-      ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
-      : { lat: raw.lat, lng: raw.lng };
-    emaRef.current = ema;
-
-    // Live-Puck getrennt und LEICHTER glätten (PUCK_ALPHA > EMA_ALPHA): er folgt
-    // der echten Position deutlich flotter (weniger „hinkt nach"), während die
-    // aufgezeichnete Linie unten weiter mit dem trägen EMA ruhig bleibt.
+    // Live-Puck IMMER glätten (auch bei später verworfenen Fixes) — er zeigt nur die
+    // aktuelle Standortanzeige und darf nie einfrieren. Die aufgezeichnete Track-EMA
+    // (emaRef) wird dagegen ERST NACH den Accuracy-/Speed-Gates aktualisiert (s. u.),
+    // damit verworfene Fixes die Linie/Distanz/Persistenz/Corner-Buffer nicht mehr
+    // kontaminieren. Track-EMA und Puck-EMA bleiben getrennt.
     const prevPuck = puckRef.current;
     const puck: LatLng = prevPuck
       ? { lat: prevPuck.lat + (raw.lat - prevPuck.lat) * PUCK_ALPHA, lng: prevPuck.lng + (raw.lng - prevPuck.lng) * PUCK_ALPHA }
@@ -325,7 +332,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     //    dass Warmup-/Startdrift (auf iPhone real ~8 m im Stand) als Strecke landet.
     //    Bei Freigabe ist der Anker als erster Linienpunkt gesetzt → Fix läuft weiter.
     if (startLockRef.current) {
-      if (!handleStartLock(raw, ema)) { angleDbgRef.current.lastReject = 'start_lock_active'; return; }   // noch am Stabilisieren
+      // StartLock nutzt die Live-Position (Puck) für die Bewegungserkennung — die
+      // Track-EMA existiert vor dem ersten validierten Fix bewusst noch nicht.
+      if (!handleStartLock(raw, puck)) { angleDbgRef.current.lastReject = 'start_lock_active'; return; }   // noch am Stabilisieren
     }
 
     // ── GPS Quality Engine: JEDEN Fix (accepted, distanz-gated oder rejected) in das
@@ -355,6 +364,16 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (dt > 0 && d / dt > MAX_SPEED_MPS) { rejectedRef.current++; return; }   // unrealistischer Sprung
     }
     lastRawRef.current = raw;
+
+    // 2) Track-EMA NUR aus validierten Fixes (nach Accuracy-/Speed-Gate). So zieht
+    //    kein verworfener Fix die aufgezeichnete Linie/Distanz/Persistenz/Corner-
+    //    Buffer mit. (MIN_STEP-Verhalten unverändert: ein gültiger, aber sub-MIN_STEP-
+    //    Fix aktualisiert die EMA weiterhin — s. Folgepunkt.)
+    const prevEma = emaRef.current;
+    const ema: LatLng = prevEma
+      ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
+      : { lat: raw.lat, lng: raw.lng };
+    emaRef.current = ema;
 
     // 3) Distanz-Gate: erst ab MIN_STEP_M einen neuen Linienpunkt setzen.
     const pts = pointsRef.current;
@@ -562,12 +581,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Transport läuft AUSSCHLIESSLICH über die persistente Sync-Queue (P-SAVE2) — kein
   // direkter finishTrackRecording-Pfad mehr (eine einzige Remote-Sync-Quelle).
   const finish = useCallback((): void => {
-    // Letzten noch offenen (bestätigungswürdigen) Winkel best-effort retten, BEVOR
-    // gestoppt wird — sonst ginge ein Winkel am Track-Ende ohne Auslauf verloren.
-    for (const ev of confirmerRef.current.flush(Date.now())) {
-      if (__DEV__) logConfirmEvent(ev);
-      if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
-    }
+    // Winkel werden bereits bei geometrischem Accept sofort persistiert; die Shadow-
+    // Confirmation wird hier nur noch abgeschlossen (Diagnostik), OHNE zu persistieren
+    // — sonst entstünde ein später Doppelmarker.
+    if (__DEV__) for (const ev of confirmerRef.current.flush(Date.now())) logConfirmEvent(ev);
     stopAll();
     const s = store.getState();
     s.stopRecording();
@@ -621,7 +638,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })();
-  }, [stopAll, store, flushPoints, persistConfirmedCorner]);
+  }, [stopAll, store, flushPoints]);
 
   return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll, gpsDebug };
 }

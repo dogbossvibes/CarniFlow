@@ -95,6 +95,26 @@ export function logConfirmedCornerMetrics(c: ConfirmedCorner): void {
   console.log(formatConfirmedCornerMetrics(c));
 }
 
+// ── Sofort-Persist-Diagnose (Hotfix) — je bei geometrischem Accept persistiertem
+// Winkel: kind, Winkel, Confidence/Level, GPS-Quality, persistReason. Die parallele
+// Shadow-Confirmation meldet ihr späteres would_confirm/would_reject via [cornerConfirm].
+export interface ImmediateCornerDiag {
+  kind:         string;
+  angleDeg:     number;
+  confidence:   number;
+  level:        string;
+  quality:      string;   // z. B. 'good(0.86)'
+  persistReason: string;  // 'geometric_accept'
+}
+export function formatImmediateCorner(d: ImmediateCornerDiag): string {
+  return `[cornerPersist] ${d.kind} ${d.angleDeg.toFixed(0)}° conf=${d.confidence.toFixed(2)}/${d.level} `
+    + `gps=${d.quality} persistReason=${d.persistReason}`;
+}
+export function logImmediateCorner(d: ImmediateCornerDiag): void {
+  if (!__DEV__) return;
+  console.log(formatImmediateCorner(d));
+}
+
 // ── GPS Quality Engine (Phase 3) — nur bei relevanter Änderung loggen ─────────
 export function formatGpsQuality(q: GpsQualityState): string {
   const c = q.components;
