@@ -4,15 +4,21 @@ import type { AngleKind } from '@/features/tracking/store/trackingStore';
 export interface AutoCornerPoint extends LatLng {
   cumDist: number;
   accuracy: number | null;
+  t?: number | null;    // optionaler Zeitstempel (ms) → erlaubt den Geschwindigkeits-Support
 }
 
 export type CornerKind = Extract<AngleKind, 'links' | 'rechts' | 'spitz_links' | 'spitz_rechts'>;
+
+// Confidence-Level. Grenzen s. u. (CONF_HIGH/CONF_MEDIUM) — an bestehenden Testdaten kalibriert.
+export type ConfidenceLevel = 'low' | 'medium' | 'high';
 
 export interface AutoCorner {
   apex: AutoCornerPoint;
   kind: CornerKind;
   angleDeg: number;
-  confidence: number;   // 0..1 — wie sicher der Kandidat ein echter Winkel ist
+  confidence: number;         // 0..1 — wie sicher der Kandidat ein echter Winkel ist
+  level: ConfidenceLevel;     // abgeleitet aus confidence (CONF_HIGH/CONF_MEDIUM)
+  factors: CornerFactors;     // Einzelsignale (Diagnose/Persistenz), NICHT rückwirkend gespeichert
 }
 
 // ── Tunables ────────────────────────────────────────────────────────────────
@@ -45,14 +51,38 @@ const STRAIGHT_REJECT = 0.45;   // darunter → reject (klare Kurve/Schlangenlin
 const ACCEPT_CONF = 0.62;
 const REJECT_CONF = 0.42;
 
+// Confidence-Level-Grenzen. Kalibriert an der bestehenden Winkel-Logik und den
+// Testdaten, NICHT willkürlich:
+//   • ACCEPT_CONF = 0.62 ist die Untergrenze, ab der die Geometrie einen Winkel
+//     überhaupt automatisch akzeptiert → alles knapp darüber ist bewusst nur „medium".
+//   • CONF_MEDIUM (0.60) liegt minimal unter ACCEPT_CONF, damit ein gerade noch
+//     akzeptierter Winkel nicht fälschlich „low" heißt, aber auch nicht sofort „high".
+//   • CONF_HIGH (0.80) verlangt de facto saubere Schenkel UND brauchbare Accuracy;
+//     eine perfekte 90°-Ecke erreicht ≈0.98, eine mit mittelmäßiger Accuracy ≈0.90.
+const CONF_HIGH = 0.80;
+const CONF_MEDIUM = 0.60;
+export function confidenceLevel(score: number): ConfidenceLevel {
+  if (score >= CONF_HIGH) return 'high';
+  if (score >= CONF_MEDIUM) return 'medium';
+  return 'low';
+}
+
+// Geschwindigkeits-Support (F): OPTIONAL und bewusst NICHT im gewichteten Score.
+// Er bestraft langsames Gehen nicht — ein Segment gilt schon ab sehr geringem Tempo
+// als echte Fortbewegung. Er senkt die Aussagekraft nur, wenn ein „Winkel" praktisch
+// aus Stillstand/Mikrobewegung besteht (die Turn-Geometrie ist dann kaum belegt).
+const SPEED_MOVING_MPS = 0.15;  // ~0.5 km/h; normales langsames Gehen (~2–4 km/h) liegt weit darüber
+
 export type CandidateState = 'reject' | 'pending' | 'accept';
 export interface CornerFactors {
   angle: number; straightBefore: number; straightAfter: number;
   support: number; accuracy: number; bearing: number; legLength: number;
+  speedSupport?: number;   // optional: nur wenn Zeitstempel vorliegen (informativ, NICHT im Score)
 }
 export interface CornerCandidate {
   state: CandidateState;
   confidence: number;
+  level: ConfidenceLevel;  // abgeleitet aus confidence (CONF_HIGH/CONF_MEDIUM)
   kind: CornerKind | null;
   angleDeg: number;
   reason: string | null;   // Grund bei reject/pending (z. B. 'deadzone', 'short_legs', 'curve')
@@ -131,6 +161,28 @@ function robustAccuracyScore(points: readonly AutoCornerPoint[], idxs: number[])
   return clamp01((ACC_BAD_M - med) / (ACC_BAD_M - ACC_GOOD_M));
 }
 
+// Optionaler Geschwindigkeits-Support über beide Schenkel. Ergebnis:
+//   • undefined → keine (vollständigen) Zeitstempel vorhanden ODER keine wertbaren
+//     Segmente → kein Einfluss (langsames Gehen wird NIE bestraft).
+//   • 0..1     → Anteil der echten (nicht-Mikro-)Segmente mit plausibler Fortbewegung.
+// Reine Mikrobewegung/Stillstand über den ganzen Schenkel → niedriger Wert; ein
+// echter, wenn auch langsam gelaufener Winkel → hoher Wert.
+function speedSupportScore(points: readonly AutoCornerPoint[], idxs: number[]): number | undefined {
+  let total = 0, moving = 0, micro = 0;
+  for (let k = 0; k < idxs.length - 1; k++) {
+    const a = points[idxs[k]], b = points[idxs[k + 1]];
+    if (a.t == null || b.t == null) return undefined;   // ohne durchgehende Zeit kein Support
+    const dist = calculateDistance(a, b);
+    if (dist < MICRO_SEGMENT_M) { micro++; continue; }  // Stop/Jitter zählt weder als moving noch als Strafe
+    const dt = (b.t - a.t) / 1000;
+    if (dt <= 0) continue;
+    total++;
+    if (dist / dt >= SPEED_MOVING_MPS) moving++;
+  }
+  if (total === 0) return micro > 0 ? 0 : undefined;    // nur Mikrobewegung → 0; gar nichts wertbar → undefined
+  return moving / total;
+}
+
 type Band = 'normal' | 'spitz' | null;
 function bandOf(angleDeg: number): Band {
   const cls = Math.round(angleDeg);
@@ -169,7 +221,7 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
   const inLen = apex.cumDist - points[inb].cumDist;
   const outLen = points[outb].cumDist - apex.cumDist;
   if (inLen < LEG_MIN_M || outLen < LEG_MIN_M) {
-    return { state: 'pending', confidence: 0, kind: null, angleDeg: NaN, reason: 'short_legs', factors: ZERO_FACTORS };
+    return { state: 'pending', confidence: 0, level: 'low', kind: null, angleDeg: NaN, reason: 'short_legs', factors: ZERO_FACTORS };
   }
 
   // Richtung aus dem stabilen Schenkelfenster, nicht aus einem einzelnen LEG_MIN-
@@ -183,7 +235,7 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
   );
   const magnitude = Math.abs(diff);
   if (magnitude < MIN_TURN_DEG) {
-    return { state: 'reject', confidence: 0, kind: null, angleDeg: 180 - magnitude, reason: 'no_turn', factors: ZERO_FACTORS };
+    return { state: 'reject', confidence: 0, level: 'low', kind: null, angleDeg: 180 - magnitude, reason: 'no_turn', factors: ZERO_FACTORS };
   }
   const angleDeg = 180 - magnitude;
   const band = bandOf(angleDeg);
@@ -201,10 +253,18 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
   const accuracy = robustAccuracyScore(points, [...beforeIdx, ...afterIdx]);
   const bearing = (legBearingStability(points, beforeIdx) + legBearingStability(points, afterIdx)) / 2;
   const legLength = clamp01(Math.min(inLen, outLen) / LEG_MIN_M);
+  // Optional (nur mit Zeitstempeln): kleinster Support beider Schenkel — ein Schenkel
+  // aus reinem Stillstand zieht das Ergebnis nach unten, ohne langsames Gehen zu bestrafen.
+  const spBefore = speedSupportScore(points, beforeIdx);
+  const spAfter = speedSupportScore(points, afterIdx);
+  const speedSupport = spBefore == null && spAfter == null
+    ? undefined
+    : Math.min(spBefore ?? 1, spAfter ?? 1);
 
   const factors: CornerFactors = {
     angle: angleScore(angleDeg, band),
     straightBefore, straightAfter, support, accuracy, bearing, legLength,
+    ...(speedSupport === undefined ? {} : { speedSupport }),
   };
   const confidence =
     WEIGHTS.angle * factors.angle +
@@ -231,7 +291,7 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
   else if (minStraight >= STRAIGHT_ACCEPT && confidence >= ACCEPT_CONF) { state = 'accept'; }
   else { state = 'pending'; reason = 'low_confidence'; }
 
-  return { state, confidence, kind, angleDeg, reason, factors };
+  return { state, confidence, level: confidenceLevel(confidence), kind, angleDeg, reason, factors };
 }
 
 // Bester Kandidat über den Puffer (für Tests/Diagnose). Wählt bei mehreren
@@ -271,5 +331,7 @@ export function detectAutoCorner(
     kind: best.candidate.kind,
     angleDeg: best.candidate.angleDeg,
     confidence: best.candidate.confidence,
+    level: best.candidate.level,
+    factors: best.candidate.factors,
   };
 }

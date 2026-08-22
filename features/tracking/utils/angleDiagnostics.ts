@@ -13,6 +13,9 @@
 // vollständigen GPS-Rohtracks — nur aggregierte Kennzahlen.
 // ──────────────────────────────────────────────────────────────────────────
 
+import type { CornerConfidence } from '@/features/tracking/utils/cornerConfidence';
+import type { ConfirmEvent, ConfirmedCorner } from '@/features/tracking/utils/cornerConfirmation';
+
 export interface AngleCandidateDiag {
   accuracyM:              number | null;
   turnAngleDeg:           number;        // Richtungsänderung am Scheitel
@@ -39,6 +42,56 @@ export function formatAngleCandidate(d: AngleCandidateDiag): string {
 export function logAngleCandidate(d: AngleCandidateDiag): void {
   if (!__DEV__) return;
   console.log(formatAngleCandidate(d));
+}
+
+// ── Confidence-Diagnose (nur relevante Finalisierungs-/Kandidaten-Ereignisse) ──
+// Zeigt type, side, angle, Gesamt-Confidence + Level, Einzelkomponenten und die
+// Accept/Reject-Entscheidung. Bewusst KEIN Log je GPS-Sample.
+export interface CornerConfidenceDiag {
+  kind:       string | null;   // links | rechts | spitz_links | spitz_rechts | null
+  side:       'links' | 'rechts' | null;
+  angleDeg:   number;
+  state:      'accept' | 'pending' | 'reject';
+  confidence: CornerConfidence;
+}
+
+export function formatCornerConfidence(d: CornerConfidenceDiag): string {
+  const c = d.confidence;
+  const co = c.components;
+  const pct = (x: number | undefined) => (x == null ? 'n/a' : `${Math.round(x * 100)}`);
+  const reasons = c.reasons?.length ? ` reasons=${c.reasons.join(',')}` : '';
+  return `[cornerConf] ${d.kind ?? '?'}/${d.side ?? '?'} ${d.angleDeg.toFixed(0)}° `
+    + `score=${c.score.toFixed(2)} level=${c.level} state=${d.state} `
+    + `turn=${pct(co.turnStrength)} legs=${pct(co.legSupport)} gps=${pct(co.gpsQuality)} `
+    + `straight=${pct(co.straightness)} stable=${pct(co.stability)} speed=${pct(co.speedSupport)}${reasons}`;
+}
+
+export function logCornerConfidence(d: CornerConfidenceDiag): void {
+  if (!__DEV__) return;
+  console.log(formatCornerConfidence(d));
+}
+
+// ── Confirmation-Lifecycle (Phase 2) — nur relevante Candidate-Ereignisse ─────
+// created | evidence | updated | reclassified | confirmed | rejected | expired.
+// Kein Log je GPS-Rohsample.
+export function formatConfirmEvent(e: ConfirmEvent): string {
+  return `[cornerConfirm] ${e.type} ${e.kind ?? '?'} score=${e.confidence.toFixed(2)} ${e.level} ${e.detail}`;
+}
+export function logConfirmEvent(e: ConfirmEvent): void {
+  if (!__DEV__) return;
+  console.log(formatConfirmEvent(e));
+}
+
+// QA-Metrik je FINAL bestätigtem Winkel (PII-frei) — Grundlage für die Outdoor-Auswertung.
+export function formatConfirmedCornerMetrics(c: ConfirmedCorner): string {
+  const acc = c.accuracyM == null ? 'n/a' : `${c.accuracyM.toFixed(0)}m`;
+  return `[cornerQA] ${c.kind} ${c.angleDeg.toFixed(0)}° init=${c.initialConfidence.toFixed(2)} `
+    + `final=${c.finalConfidence.toFixed(2)}/${c.finalLevel} confirmDist=${c.confirmDistanceM.toFixed(1)}m `
+    + `samples=${c.confirmSamples} acc=${acc} reason=${c.reason}`;
+}
+export function logConfirmedCornerMetrics(c: ConfirmedCorner): void {
+  if (!__DEV__) return;
+  console.log(formatConfirmedCornerMetrics(c));
 }
 
 // Aggregierte Marker-Übersicht der gelegten Fährte beim Absuche-Start.

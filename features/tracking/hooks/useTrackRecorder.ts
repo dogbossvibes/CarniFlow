@@ -10,7 +10,11 @@ import {
 import {
   calculateDistance, calculateAverageAccuracy, medianLatLng, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
-import { detectAutoCorner } from '@/features/tracking/utils/autoCornerDetection';
+import {
+  feedCornerBuffer, createCornerConfirmer,
+  type CornerConfirmer, type ConfirmedCorner,
+} from '@/features/tracking/utils/cornerConfirmation';
+import { logConfirmEvent, logConfirmedCornerMetrics } from '@/features/tracking/utils/angleDiagnostics';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
 import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -117,6 +121,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null });
   const onAngleRef    = useRef<TrackRecorderOptions['onAngle']>(opts?.onAngle);
   onAngleRef.current  = opts?.onAngle;
+  // Phase 2: adaptive Confirmation-State-Machine (ein Kandidat zur Zeit). Persistiert
+  // einen Winkel erst, wenn er final bestätigt ist (HIGH sofort, MEDIUM nach Beleg).
+  const confirmerRef  = useRef<CornerConfirmer>(createCornerConfirmer());
   // Auto-Erkennung (Winkel/Spitzwinkel) ein/aus — live umschaltbar via Ref.
   const autoDetectRef = useRef<boolean>(opts?.autoDetect ?? true);
   autoDetectRef.current = opts?.autoDetect ?? true;
@@ -167,30 +174,41 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker);
   }, [store]);
 
-  // Auto-Winkel: die gesamte Erkennung (Scheitelwahl, stabile Schenkel, Klassen,
-  // Rechts/Links) liegt in detectAutoCorner() — hier nur Marker/State/Debug.
-  const detectCorner = useCallback(() => {
+  // Übergabe eines FINAL bestätigten Winkels an die bestehende Pipeline (Marker/
+  // Voice/Logbuch/Persistenz) — genau EINMAL je Winkel. Geometrie/Confidence liegen
+  // in autoCornerDetection; die Confirmation-Entscheidung in cornerConfirmation.
+  const persistConfirmedCorner = useCallback((c: ConfirmedCorner) => {
     const dbg = angleDbgRef.current;
-    const corner = detectAutoCorner(pointsRef.current, lastCornerAtRef.current);
-    if (!corner) { dbg.lastReject = 'no_corner'; return; }
-
-    const { apex, kind, angleDeg } = corner;
-    const dir: 'links' | 'rechts' = (kind === 'rechts' || kind === 'spitz_rechts') ? 'rechts' : 'links';
+    const dir: 'links' | 'rechts' = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
     dbg.count++;
-    if (kind === 'spitz_rechts' || kind === 'spitz_links') dbg.acuteCount++;
-    dbg.lastType = kind; dbg.lastDeg = Math.round(angleDeg); dbg.lastDir = dir; dbg.lastReject = null;
-    if (__DEV__) console.log('[trackRecorder] Winkel', { kind, innenwinkel: Math.round(angleDeg), richtung: dir });
+    if (c.kind === 'spitz_rechts' || c.kind === 'spitz_links') dbg.acuteCount++;
+    dbg.lastType = c.kind; dbg.lastDeg = Math.round(c.angleDeg); dbg.lastDir = dir; dbg.lastReject = null;
+    if (__DEV__) logConfirmedCornerMetrics(c);
 
-    lastCornerAtRef.current = apex.cumDist;
+    lastCornerAtRef.current = c.apexCumDist;   // Gap für den nächsten Winkel setzen
     const now = Date.now();
     void commitMarker({
-      id: `angle-${now}-${kind}`, type: 'winkel', material: null, angleKind: kind,   // stabile ID inkl. Typ
-      lat: apex.lat, lng: apex.lng, accuracy: apex.accuracy,
-      distance_from_start: Math.round(apex.cumDist * 10) / 10,
+      id: `angle-${now}-${c.kind}`, type: 'winkel', material: null, angleKind: c.kind,   // stabile ID inkl. Typ
+      lat: c.apexLat, lng: c.apexLng, accuracy: c.accuracyM,
+      distance_from_start: Math.round(c.apexCumDist * 10) / 10,
       note: null, audio_url: null, found: false, t: now,
+      confidence: c.finalConfidence, confidenceLevel: c.finalLevel,   // nur zur Laufzeit; nicht in der DB (s. MarkerSample)
     });
-    onAngleRef.current?.(kind);
+    onAngleRef.current?.(c.kind);
   }, [commitMarker]);
+
+  // Auto-Winkel: pro akzeptiertem Linienpunkt EIN Confirmation-Schritt. Die gesamte
+  // Erkennung (Scheitelwahl, stabile Schenkel, Klassen, Confidence) liegt in
+  // autoCornerDetection; feedCornerBuffer() hält denselben Kandidaten stabil und
+  // liefert nur relevante Lifecycle-Events zurück.
+  const detectCorner = useCallback(() => {
+    const events = feedCornerBuffer(confirmerRef.current, pointsRef.current, lastCornerAtRef.current, Date.now());
+    for (const ev of events) {
+      if (__DEV__) logConfirmEvent(ev);
+      if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
+      else if (ev.type === 'rejected' || ev.type === 'expired') angleDbgRef.current.lastReject = ev.detail;
+    }
+  }, [persistConfirmedCorner]);
 
   // Start-Lock verarbeiten. Gibt true zurück, sobald in DIESEM Fix freigegeben
   // wurde (der Anker ist dann als erster Linienpunkt gesetzt → Fix läuft normal
@@ -394,6 +412,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     lastRawRef.current = null;
     rejectedRef.current = 0;
     lastCornerAtRef.current = -Infinity;
+    confirmerRef.current.reset();   // laufende Confirmation-State-Machine leeren
     angleDbgRef.current = { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null };
     ptBuffer.current = [];
     // Führende lokale Session-ID SOFORT deterministisch setzen (kein Warten auf Remote/Netz).
@@ -507,6 +526,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Transport läuft AUSSCHLIESSLICH über die persistente Sync-Queue (P-SAVE2) — kein
   // direkter finishTrackRecording-Pfad mehr (eine einzige Remote-Sync-Quelle).
   const finish = useCallback((): void => {
+    // Letzten noch offenen (bestätigungswürdigen) Winkel best-effort retten, BEVOR
+    // gestoppt wird — sonst ginge ein Winkel am Track-Ende ohne Auslauf verloren.
+    for (const ev of confirmerRef.current.flush(Date.now())) {
+      if (__DEV__) logConfirmEvent(ev);
+      if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
+    }
     stopAll();
     const s = store.getState();
     s.stopRecording();
@@ -560,7 +585,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })();
-  }, [stopAll, store, flushPoints]);
+  }, [stopAll, store, flushPoints, persistConfirmedCorner]);
 
   return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll, gpsDebug };
 }
