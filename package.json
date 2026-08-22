@@ -33,6 +33,7 @@
     "update:development": "eas update --channel development --message",
     "update:preview": "eas update --channel preview --message",
     "update:production": "node ./scripts/update-production.mjs",
+    "guard:prod-supabase": "node ./scripts/guard-prod-supabase.mjs",
     "build:dev:ios": "eas build --profile development --platform ios",
     "build:dev:ios:sim": "eas build --profile development-simulator --platform ios",
     "build:dev:android": "eas build --profile development --platform android",

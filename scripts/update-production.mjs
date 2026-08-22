@@ -9,6 +9,7 @@
 // versehentlich überschreibt.
 import { existsSync, readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { assertProductionSupabase } from './guard-prod-supabase.mjs';
 
 const args = process.argv.slice(2);
 const confirmed = args.includes('--confirm');
@@ -33,5 +34,14 @@ if (!confirmed || !message) {
   process.exit(confirmed ? 1 : 0);
 }
 
+// PERMANENTER GUARD: blockiert die Veröffentlichung, wenn Supabase auf Staging
+// (cbhrxkjclakzlvajyvfn) zeigt. Verhindert den wiederkehrenden Staging-Leak.
+if (!assertProductionSupabase()) {
+  console.log('Abbruch: Production-Guard fehlgeschlagen. Kein Update veröffentlicht.');
+  process.exit(1);
+}
+
 console.log(`Bestätigt. Veröffentliche Production-Update: "${message}"`);
-execSync(`eas update --channel production --message ${JSON.stringify(message)}`, { stdio: 'inherit' });
+// --environment production erzwingt die EAS-Production-Env (Supabase/RC/Sentry) —
+// nicht nur den Channel. Zusammen mit dem Guard kann kein Staging-Bundle rausgehen.
+execSync(`eas update --channel production --environment production --message ${JSON.stringify(message)}`, { stdio: 'inherit' });
