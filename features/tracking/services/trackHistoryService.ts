@@ -5,7 +5,7 @@ import {
 import { getTrackPointsBySession, getTrackMarkersBySession } from '@/features/tracking/repositories/localTrackRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
 import { mergeTrackHistory, type TrackHistoryRow } from '@/features/tracking/utils/trackHistoryMerge';
-import { buildLocalTrackDetail, runSupplementFromPayload } from '@/features/tracking/utils/localTrackDetail';
+import { buildLocalTrackDetail, runSupplementFromPayload, evalSupplementFromPayload, type LocalEvalSupplement } from '@/features/tracking/utils/localTrackDetail';
 
 // Verlauf laden = Remote (Supabase) + lokale (SQLite) Fährten zusammenführen.
 // WICHTIG: Ein Remote-Fehler (offline / Supabase down) darf die lokalen Fährten
@@ -35,6 +35,15 @@ export async function getLocalTrackDetail(localId: string): Promise<Record<strin
 export async function getLocalRunSupplement(localId: string): Promise<ReturnType<typeof runSupplementFromPayload>> {
   const local = await getLocalTrainingSessionById(localId).catch(() => null);
   return local ? runSupplementFromPayload(local.payload_json) : null;
+}
+
+// Bewertungs-Ergänzung (legs/score/notes/evaluated_at) aus der lokalen Session — für
+// eine remote-Session, deren gesyncte Bewertung noch alt/leer ist (pending/fehlgeschlagen).
+// null, wenn lokal keine Bewertung vorliegt. Local-first: der Detail-Screen überlagert
+// damit die neuere lokale Bewertung (overlayLocalEval).
+export async function getLocalEvalSupplement(localId: string): Promise<LocalEvalSupplement | null> {
+  const local = await getLocalTrainingSessionById(localId).catch(() => null);
+  return local ? evalSupplementFromPayload(local.payload_json, local.score ?? null, local.notes ?? null) : null;
 }
 
 // Auswertung (Score/Notiz) einer lokal-only Fährte lokal speichern + zur Re-Sync

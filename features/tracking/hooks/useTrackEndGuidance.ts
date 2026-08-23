@@ -47,7 +47,7 @@ export function useTrackEndGuidance(input: {
       ? distM(input.estimatedDogPosition, input.endPoint)
       : null;
 
-    const { state, justReached } = stepTrackEnd(
+    const { state, justReached, reason } = stepTrackEnd(
       {
         dogProgressM: input.dogProgressM,
         trackLengthM: input.trackLengthM,
@@ -57,6 +57,17 @@ export function useTrackEndGuidance(input: {
       stateRef.current,
       DEFAULT_TRACK_END_OPTIONS,
     );
+
+    // DEV-Diagnose NUR im End-Anlauf (letzte ~10 m) — kein Log je Rohsample.
+    if (__DEV__ && input.trackLengthM > 1) {
+      const remaining = input.trackLengthM - input.dogProgressM;
+      if (remaining <= DEFAULT_TRACK_END_OPTIONS.approachingRemainingM) {
+        const ratio = input.dogProgressM / input.trackLengthM;
+        console.log(`[endDiag] progress=${ratio.toFixed(3)} dogM=${input.dogProgressM.toFixed(1)}/${input.trackLengthM.toFixed(1)} `
+          + `geom=${geomDistanceM == null ? 'n/a' : geomDistanceM.toFixed(1)} openObjects=${input.openMandatoryObjects} `
+          + `state=${state} trigger=${justReached} reason=${reason}`);
+      }
+    }
 
     if (state !== stateRef.current) { stateRef.current = state; setEndState(state); }
     if (justReached) {

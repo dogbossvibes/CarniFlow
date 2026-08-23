@@ -73,12 +73,21 @@ describe('stepTrackEnd — Fährtenende-Erkennung', () => {
     expect(states.slice(1)).toEqual(['completed', 'completed', 'completed', 'completed']);
   });
 
-  it('6. Offene Pflicht-Gegenstände vor dem Ende → kein vorzeitiges completed', () => {
+  it('6. Offene Pflicht-Gegenstände blockieren das TATSÄCHLICHE Ende NICHT (Produktentscheidung)', () => {
+    // Hund order-aware am Ende (progress+geom erfüllt), aber ein Gegenstand wurde wegen
+    // GPS-/EMA-Toleranz nicht automatisch gefunden → Ende trotzdem erreicht, Grund sichtbar.
     const withOpen = stepTrackEnd(atEnd({ openMandatoryObjects: 1 }), 'unseen');
+    expect(withOpen.justReached).toBe(true);
+    expect(withOpen.state).toBe('reached');
+    expect(withOpen.reason).toBe('triggered_open_objects');
+  });
+
+  it('6b. Opt-in openObjectsBlockEnd=true → offene Gegenstände blockieren weiterhin', () => {
+    const opts = { ...DEFAULT_TRACK_END_OPTIONS, openObjectsBlockEnd: true };
+    const withOpen = stepTrackEnd(atEnd({ openMandatoryObjects: 1 }), 'unseen', opts);
     expect(withOpen.justReached).toBe(false);
-    expect(withOpen.state).not.toBe('reached');
-    // Gegenstand gefunden → jetzt erreichbar
-    const afterFound = stepTrackEnd(atEnd({ openMandatoryObjects: 0 }), withOpen.state);
+    expect(withOpen.reason).toBe('open_objects');
+    const afterFound = stepTrackEnd(atEnd({ openMandatoryObjects: 0 }), withOpen.state, opts);
     expect(afterFound.state).toBe('reached');
     expect(afterFound.justReached).toBe(true);
   });

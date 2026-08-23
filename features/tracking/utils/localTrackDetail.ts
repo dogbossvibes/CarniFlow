@@ -34,6 +34,57 @@ export function runSupplementFromPayload(payloadJson: string | null): {
   };
 }
 
+// Lokale Bewertung (legs/score/notes/evaluated_at) aus payload_json — für den Fall,
+// dass eine REMOTE-Session existiert, deren gesyncte Bewertung aber ÄLTER (oder leer)
+// ist als die lokal zuletzt gespeicherte (pending Sync / fehlgeschlagener Sync).
+// null, wenn lokal keine Bewertung vorliegt.
+export interface LocalEvalSupplement {
+  legs: any[] | null;
+  score: number | null;
+  notes: string | null;
+  evaluatedAt: string | null;
+}
+export function evalSupplementFromPayload(
+  payloadJson: string | null, localScore: number | null, localNotes: string | null,
+): LocalEvalSupplement | null {
+  const payload = parseObj(payloadJson) ?? {};
+  const legs = Array.isArray(payload.legs) ? payload.legs : null;
+  const score = payload.score ?? localScore ?? null;
+  const evaluatedAt = payload.evaluated_at ?? null;
+  // Nur ergänzen, wenn wirklich eine Bewertung existiert (legs ODER expliziter Score
+  // aus einer Ausarbeitung). Sonst würde ein leeres Supplement Remote-Daten verdrängen.
+  if (!legs && score == null && evaluatedAt == null) return null;
+  return { legs, score, notes: localNotes ?? null, evaluatedAt };
+}
+
+// Überlagert die lokale Bewertung auf einen REMOTE-Detaildatensatz — local-first:
+// nur, wenn die lokale Bewertung NEUER ist als die remote (evaluated_at-Vergleich)
+// ODER remote noch gar keine legs/score hat. Reine, testbare Funktion. Verschiebt den
+// Winkel/Marker NICHT — nur track_data.legs/score/evaluated_at + top-level score/notes.
+export function overlayLocalEval(
+  remote: Record<string, any>, local: LocalEvalSupplement | null,
+): Record<string, any> {
+  if (!local) return remote;
+  const rtd = (remote.track_data && typeof remote.track_data === 'object') ? remote.track_data : {};
+  const remoteEvalAt: string | null = rtd.evaluated_at ?? null;
+  const remoteHasEval = Array.isArray(rtd.legs) && rtd.legs.length > 0;
+  const localNewer = local.evaluatedAt != null
+    && (remoteEvalAt == null || Date.parse(local.evaluatedAt) > Date.parse(remoteEvalAt));
+  // Lokale Bewertung nur übernehmen, wenn sie neuer ist ODER remote keine hat.
+  if (!localNewer && remoteHasEval) return remote;
+  return {
+    ...remote,
+    notes: local.notes ?? remote.notes ?? null,
+    score: local.score ?? remote.score ?? null,
+    track_data: {
+      ...rtd,
+      ...(local.legs ? { legs: local.legs } : {}),
+      ...(local.score != null ? { score: local.score } : {}),
+      ...(local.evaluatedAt ? { evaluated_at: local.evaluatedAt } : {}),
+    },
+  };
+}
+
 export function buildLocalTrackDetail(
   local: LocalTrainingSession, points: LocalTrackPoint[], markers: LocalTrackMarker[],
 ): Record<string, any> {
