@@ -28,7 +28,15 @@ import type { DogCommand } from '@/features/dogs/dogCommands';
 import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } from '@/components/dogs/types';
 
 // Läufigkeit (nur Hündinnen) — lokal geladen, als eigenständiger Prop reingereicht.
-export interface DogHeatProps { cycles: HeatCycle[]; prediction: HeatPrediction | null; onAdd: () => void; onDelete?: (c: HeatCycle) => void }
+export interface DogHeatProps {
+  cycles: HeatCycle[];
+  prediction: HeatPrediction | null;
+  onAdd: () => void;
+  onOpen?: (c: HeatCycle) => void;
+  onDelete?: (c: HeatCycle) => void;
+  phaseCounts?: Record<string, number>;
+  obsCounts?: Record<string, number>;
+}
 // Kommandoliste — lokal geladen, als eigenständiger Prop reingereicht.
 export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void }
 // Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
@@ -69,7 +77,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
 
 export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
   const { t, locale } = useT();
-  const intlLocale = locale === 'fr' ? 'fr-CH' : 'de-CH';
+  const intlLocale = locale === 'fr' ? 'fr-CH' : locale === 'it' ? 'it-CH' : locale === 'en' ? 'en-GB' : 'de-CH';
   const [tab, setTab] = useState<TabKey>('overview');
   const [aiTipHidden, setAiTipHidden] = useState(false);   // „Später" blendet den KI-Hinweis für diese Sitzung aus
   const id = vm.identity;
@@ -182,7 +190,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                   {isFemale && heat && (
                     <>
                       <Text style={s.sectionLabel}>{t('dash.heat')}</Text>
-                      <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} />
+                      <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} />
                     </>
                   )}
 
@@ -264,7 +272,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
               {tab === 'faehrte'  && <DogFaehrteSummary data={vm.faehrte} onStart={actions.onStartFaehrte} />}
               {tab === 'goals'    && <DogGoalsCard goal={vm.goal} onEdit={actions.onEditGoal} />}
               {tab === 'health'   && <DogHealthLoadCard health={vm.health} onAddEntry={actions.onAddHealth} />}
-              {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onDelete={heat.onDelete} />}
+              {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onDelete={heat.onDelete} phaseCounts={heat.phaseCounts} obsCounts={heat.obsCounts} />}
               {tab === 'commands' && commands && <DogCommandsCard commands={commands.commands} onAdd={commands.onAdd} onOpen={commands.onOpen} onToggleFavorite={commands.onToggleFavorite} onSeedDemo={commands.onSeedDemo} />}
               {tab === 'docs'     && <DogDocumentsCard documents={vm.documents} onAdd={actions.onAddDoc} onOpen={actions.onOpenDocument} onDelete={actions.onDeleteDocument} />}
               {tab === 'trainer'  && <DogTrainerCard trainer={vm.trainer} onChat={actions.onChat} />}
