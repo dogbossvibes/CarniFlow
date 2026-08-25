@@ -11,7 +11,9 @@ describe('keyboard-aware form layouts', () => {
     expect(file).toContain('contentContainerStyle={[s.scroll, { paddingBottom: 32 + insets.bottom }]}');
     expect(file).toContain('keyboardShouldPersistTaps="handled"');
     expect(file).toContain("keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}");
-    expect(file).toMatch(/<TextInput[\s\S]*value=\{notes\}[\s\S]*multiline[\s\S]*<AnyvoButton label=\{t\('common\.save'\)\}/);
+    // The detail screen has notes input and save button in the edit form
+    expect(file).toMatch(/value=\{editNotes\}[\s\S]*multiline/);
+    expect(file).toMatch(/AnyvoButton[\s\S]*label=\{t\('common\.save'\)/);
   });
 
   it('keeps the health notes form scrollable above the keyboard', () => {

@@ -67,9 +67,18 @@ export default function UmfrageErstellenScreen() {
     setTermine(p => p.map((tm, idx) => idx === i ? { ...tm, [field]: value } : tm));
 
   const handleSend = async () => {
-    if (!trainerName.trim()) { alert2(t('poll.validationTitle'), t('poll.errName')); return; }
-    if (arten.length === 0)  { alert2(t('poll.validationTitle'), t('poll.errType')); return; }
-    if (termine.some(tm => !tm.datum || !tm.von)) { alert2(t('poll.validationTitle'), t('poll.errDates')); return; }
+    if (!trainerName.trim()) {
+      Alert.alert(t('poll.validationTitle'), t('poll.errName'), [{ text: t('common.ok') }]);
+      return;
+    }
+    if (arten.length === 0) {
+      Alert.alert(t('poll.validationTitle'), t('poll.errType'), [{ text: t('common.ok') }]);
+      return;
+    }
+    if (termine.some(tm => !tm.datum || !tm.von)) {
+      Alert.alert(t('poll.validationTitle'), t('poll.errDates'), [{ text: t('common.ok') }]);
+      return;
+    }
     if (!session?.user.id) return;
 
     setLoading(true);
@@ -78,8 +87,11 @@ export default function UmfrageErstellenScreen() {
       arten, notiz, termine, kundenIds: kunden,
     });
     setLoading(false);
-    if (error) { alert2(t('common.error'), error); return; }
-    alert2(t('poll.sentTitle'), t('poll.sentBody'), handleBack);
+    if (error) {
+      Alert.alert(t('common.error'), error, [{ text: t('common.ok') }]);
+      return;
+    }
+    Alert.alert(t('poll.sentTitle'), t('poll.sentBody'), [{ text: t('common.ok'), onPress: handleBack }]);
   };
 
   return (
@@ -203,11 +215,6 @@ export default function UmfrageErstellenScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
-
-// Kleine Alert-Hülle (Titel + Text + optionaler OK-Callback) — hält handleSend schlank.
-function alert2(title: string, message: string, onOk?: () => void) {
-  Alert.alert(title, message, onOk ? [{ text: 'OK', onPress: onOk }] : undefined);
 }
 
 const s = StyleSheet.create({
