@@ -8,7 +8,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { getDogById } from '@/services/dogs';
 import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtras } from '@/services/dogHub';
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
-import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
+import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle, type HeatPhase, type HeatObservation, getHeatPhases, getHeatObservations } from '@/features/dogs/heatCycles';
 import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
 import { getBackpack } from '@/features/dogs/backpack';
 import { getCalendarEvents } from '@/services/calendarService';
@@ -43,6 +43,8 @@ export default function DogHubRoute() {
   const lastFaehrteId = useMemo(() => feed.find(it => it.source === 'track')?.id ?? null, [feed]);   // letzte abgeschlossene Fährte
   const [extras, setExtras] = useState<DogHubExtras | null>(null);
   const [heatCycles, setHeatCycles] = useState<HeatCycle[]>([]);
+  const [heatPhaseCounts, setHeatPhaseCounts] = useState<Record<string, number>>({});
+  const [heatObsCounts, setHeatObsCounts] = useState<Record<string, number>>({});
   const [commands, setCommands] = useState<DogCommand[]>([]);
   const [backpackCounts, setBackpackCounts] = useState({ total: 0, active: 0, packed: 0 });
   const [appointments, setAppointments] = useState<DogAppointment[]>([]);
@@ -61,7 +63,21 @@ export default function DogHubRoute() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     getDogHubExtras(id).then(setExtras).catch(() => setExtras(null));
-    getHeatCycles(id).then(setHeatCycles).catch(() => setHeatCycles([]));
+    getHeatCycles(id).then(async (cs) => {
+      setHeatCycles(cs);
+      // Load phase + observation counts for each cycle
+      const pc: Record<string, number> = {};
+      const oc: Record<string, number> = {};
+      await Promise.all(cs.map(async (c) => {
+        try {
+          const [p, o] = await Promise.all([getHeatPhases(c.id), getHeatObservations(c.id)]);
+          pc[c.id] = p.length;
+          oc[c.id] = o.length;
+        } catch { pc[c.id] = 0; oc[c.id] = 0; }
+      }));
+      setHeatPhaseCounts(pc);
+      setHeatObsCounts(oc);
+    }).catch(() => setHeatCycles([]));
     getCommands(id).then(setCommands).catch(() => setCommands([]));
     if (userId) {
       getBackpack(userId, id)
@@ -184,8 +200,11 @@ export default function DogHubRoute() {
       heat={{
         cycles: heatCycles,
         prediction: heatPrediction,
-        onAdd: () => router.push(`/dog-heat/${id}` as never),
+        onAdd: () => router.push(`/dog-heat-new/${id}` as never),
+        onOpen: (c: HeatCycle) => router.push(`/dog-heat/${c.id}` as never),
         onDelete: deleteHeat,
+        phaseCounts: heatPhaseCounts,
+        obsCounts: heatObsCounts,
       }}
       commands={{
         commands,
