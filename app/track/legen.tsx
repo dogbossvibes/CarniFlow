@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { FT } from '@/constants/colors';
-import { useT, type TranslationKey } from '@/i18n';
+import { getLocale, getSpeechLocale, useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/hooks/useSession';
 import { useDogs } from '@/hooks/useDogs';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -94,7 +94,7 @@ const SEGMENT_ICONS: Record<TrackSegmentType, MatIcon> = {
 function speakTrackSegment(text: string) {
   try {
     Speech.stop();
-    Speech.speak(text, { language: 'de-CH', pitch: 1.0, rate: 0.95 });
+    Speech.speak(text, { language: getSpeechLocale(getLocale()), pitch: 1.0, rate: 0.95 });
   } catch { /* best-effort */ }
 }
 
@@ -268,21 +268,21 @@ export default function LegenScreen() {
   // Konflikt-Dialog: eine aktive Fährte dieses Hundes existiert bereits.
   const showConflict = useCallback((dId: string, entry: ActiveFaehrte) => {
     Alert.alert(
-      'Aktive Fährte vorhanden',
-      'Für diesen Hund existiert bereits eine aktive Fährte. Was möchtest du tun?',
+      t('track.conflictTitle' as any),
+      t('track.conflictBody' as any),
       [
-        { text: 'Fährte fortsetzen', onPress: () => router.replace(reopenTarget(entry) as never) },
-        { text: 'Fährte abbrechen', style: 'destructive', onPress: () => {
+        { text: t('track.conflictResume' as any), onPress: () => router.replace(reopenTarget(entry) as never) },
+        { text: t('track.conflictCancel' as any), style: 'destructive', onPress: () => {
             // Bestehende Fährte DIESES Hundes verwerfen (keine Fremdfährte berühren).
             useActiveFaehrten.getState().remove(dId);
             void clearPending(dId);
             if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');
             proceedToStart();   // erst danach darf eine neue Fährte entstehen
           } },
-        { text: 'Abbrechen', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
       ],
     );
-  }, [router, proceedToStart]);
+  }, [router, proceedToStart, t]);
 
   // Start-Taste: erst prüfen, ob der gewählte Hund bereits eine aktive Fährte hat.
   const handleStartPress = useCallback(() => {

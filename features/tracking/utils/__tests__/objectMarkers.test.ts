@@ -35,8 +35,13 @@ describe('objectMarkers — Dübel & G-Nummerierung', () => {
 
 describe('Dübel-Voice (dog-basiert)', () => {
   it('14) Dübel wird namentlich angesagt, sonst „Gegenstand"', () => {
-    expect(objectPhrase('duebel', 5)).toBe('Dübel in ca. 5 Schritten.');
-    expect(objectPhrase('holz', 3)).toBe('Gegenstand in ca. 3 Schritten.');
-    expect(objectPhrase('duebel', 1)).toBe('Dübel in ca. 1 Schritt.');
+    expect(objectPhrase('duebel', 5, 'de')).toBe('Dübel in ca. 5 Schritten.');
+    expect(objectPhrase('holz', 3, 'de')).toBe('Gegenstand in ca. 3 Schritten.');
+    expect(objectPhrase('duebel', 1, 'de')).toBe('Dübel in ca. 1 Schritt.');
+  });
+
+  it('liefert englische Gegenstandsansagen ohne deutschen Fallback', () => {
+    expect(objectPhrase('duebel', 5, 'en')).toBe('Peg in about 5 steps.');
+    expect(objectPhrase('holz', 3, 'en')).toBe('Article in about 3 steps.');
   });
 });

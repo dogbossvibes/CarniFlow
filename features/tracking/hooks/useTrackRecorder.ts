@@ -10,7 +10,8 @@ import {
 import {
   calculateDistance, calculateAverageAccuracy, medianLatLng, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
-import { detectAutoCorner } from '@/features/tracking/utils/autoCornerDetection';
+import { detectAutoCorner, type CornerCandidateEvaluation } from '@/features/tracking/utils/autoCornerDetection';
+import { logAngleCandidate } from '@/features/tracking/utils/angleDiagnostics';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
 import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -21,6 +22,7 @@ import { createLocalTrackPointsBatch, createLocalTrackMarker } from '@/features/
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
 import { setTrackFixHandler, startBackgroundUpdates, stopBackgroundUpdates } from '@/features/tracking/native/backgroundLocationTask';
 import { startFaehrteActivity, updateFaehrteActivity, stopFaehrteActivity } from '@/features/tracking/native/faehrteLiveActivity';
+import i18n from '@/i18n/config';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Robuste Live-Aufnahme der Fährte. Bewusst eigenständig und einfach gehalten,
@@ -171,7 +173,30 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Rechts/Links) liegt in detectAutoCorner() — hier nur Marker/State/Debug.
   const detectCorner = useCallback(() => {
     const dbg = angleDbgRef.current;
-    const corner = detectAutoCorner(pointsRef.current, lastCornerAtRef.current);
+    const evaluations: CornerCandidateEvaluation[] = [];
+    const observeCandidate = __DEV__ ? (evaluation: CornerCandidateEvaluation) => {
+      evaluations.push(evaluation);
+      const { apex, candidate } = evaluation;
+      logAngleCandidate({
+        timestampMs: Date.now(),
+        positionArcM: apex.cumDist,
+        // Die Linienposition ist EMA-geglättet; ihre verwendete Accuracy bleibt
+        // absichtlich die Accuracy des akzeptierten Rohfixes.
+        inputAccuracyM: apex.accuracy,
+        usedAccuracyM: apex.accuracy,
+        turnDeg: candidate.turnDeg,
+        direction: candidate.direction,
+        legBeforeM: candidate.legBeforeM,
+        legAfterM: candidate.legAfterM,
+        straightBefore: candidate.factors.straightBefore,
+        straightAfter: candidate.factors.straightAfter,
+        confidence: candidate.confidence,
+        state: candidate.state,
+        reason: candidate.reason,
+        angleKind: candidate.kind,
+      });
+    } : undefined;
+    const corner = detectAutoCorner(pointsRef.current, lastCornerAtRef.current, observeCandidate);
     if (!corner) { dbg.lastReject = 'no_corner'; return; }
 
     const { apex, kind, angleDeg } = corner;
@@ -183,12 +208,36 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
     lastCornerAtRef.current = apex.cumDist;
     const now = Date.now();
-    void commitMarker({
+    const marker = {
       id: `angle-${now}-${kind}`, type: 'winkel', material: null, angleKind: kind,   // stabile ID inkl. Typ
       lat: apex.lat, lng: apex.lng, accuracy: apex.accuracy,
       distance_from_start: Math.round(apex.cumDist * 10) / 10,
       note: null, audio_url: null, found: false, t: now,
-    });
+    } as const;
+    void commitMarker(marker);
+    if (__DEV__) {
+      const selected = evaluations.find(evaluation => evaluation.apex === apex && evaluation.candidate.state === 'accept');
+      if (selected) {
+        const { candidate } = selected;
+        logAngleCandidate({
+          timestampMs: now,
+          positionArcM: marker.distance_from_start,
+          inputAccuracyM: apex.accuracy,
+          usedAccuracyM: apex.accuracy,
+          turnDeg: candidate.turnDeg,
+          direction: candidate.direction,
+          legBeforeM: candidate.legBeforeM,
+          legAfterM: candidate.legAfterM,
+          straightBefore: candidate.factors.straightBefore,
+          straightAfter: candidate.factors.straightAfter,
+          confidence: candidate.confidence,
+          state: 'accept',
+          reason: null,
+          angleKind: kind,
+          markerId: marker.id,
+        });
+      }
+    }
     onAngleRef.current?.(kind);
   }, [commitMarker]);
 
@@ -449,8 +498,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         if (bg.status === 'granted') {
           setTrackFixHandler(loc => onFixRef.current(loc));
           await startBackgroundUpdates({
-            notificationTitle: '🐾 Fährte läuft',
-            notificationBody:  'Aufnahme aktiv – tippen, um ANYVO zu öffnen',
+            notificationTitle: i18n.t('notification.trackRecordingTitle') as string,
+            notificationBody:  i18n.t('notification.trackRecordingBody') as string,
             notificationColor: '#15E6C3',
           });
           watchRef.current?.remove(); watchRef.current = null;   // Warmup-Watch ablösen

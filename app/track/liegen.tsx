@@ -31,29 +31,29 @@ function fmtAge(sec: number) {
 // zählt die Liegezeit ab `layFinishedAt` hoch; der Nutzer startet die Absuche
 // per Knopf. Die gemessene Liegezeit (Minuten) wird auf der Session gespeichert.
 // Der Lege-Store bleibt unangetastet, damit die Absuche ihn snapshotten kann.
-function materialLabel(material: MarkerMaterial | null | undefined): string {
+function materialLabel(material: MarkerMaterial | null | undefined, t: ReturnType<typeof useT>['t']): string {
   switch (material) {
-    case 'holz':     return 'Holz';
-    case 'duebel':   return 'Dübel';
-    case 'stoff':    return 'Stoff';
-    case 'leder':    return 'Leder';
-    case 'plastik':  return 'Plastik';
-    case 'metall':   return 'Metall';
-    case 'teppich':  return 'Teppich';
-    case 'diverses': return 'Divers';
-    default:         return 'Ohne Material';
+    case 'holz':     return t('track.materialWood');
+    case 'duebel':   return t('track.materialDuebel' as any);
+    case 'stoff':    return t('track.materialFabric');
+    case 'leder':    return t('track.materialLeather' as any);
+    case 'plastik':  return t('track.materialPlastic');
+    case 'metall':   return t('track.materialMetal');
+    case 'teppich':  return t('track.materialCarpet');
+    case 'diverses': return t('track.materialOther');
+    default:         return t('track.materialNone' as any);
   }
 }
 
 // Kennzahlen der gelegten Fährte für die Zusammenfassung.
-function summarize(st: { distanceMeters: number; markers: { type: string; material?: MarkerMaterial | null }[]; segments?: TrackSegment[] }) {
+function summarize(st: { distanceMeters: number; markers: { type: string; material?: MarkerMaterial | null }[]; segments?: TrackSegment[] }, t: ReturnType<typeof useT>['t']) {
   const objects = st.markers.filter(m => m.type === 'gegenstand');
   const completedSegments = (st.segments ?? []).filter(s => s.status === 'completed').sort((a, b) => a.startStep - b.startStep);
   return {
     distanceM: Math.round(st.distanceMeters),
     winkel:    st.markers.filter(m => m.type === 'winkel').length,
     objekte:   objects.length,
-    materials: objects.map((m, i) => ({ index: i + 1, label: materialLabel(m.material) })),
+    materials: objects.map((m, i) => ({ index: i + 1, label: materialLabel(m.material, t) })),
     segments:  completedSegments,
   };
 }
@@ -91,7 +91,7 @@ export default function TrackLiegenScreen() {
   const [starting, setStarting] = useState(false);
   const saveState = useTrackingStore(s => s.saveState);   // Hintergrund-Speicherung nach „Stoppen"
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(() =>
-    hasStore ? summarize(useTrackingStore.getState())
+    hasStore ? summarize(useTrackingStore.getState(), t)
     : regEntry ? { distanceM: regEntry.distanceMeters, winkel: regEntry.winkelCount, objekte: regEntry.objektCount, materials: [], segments: [] }
     : null);
 
@@ -110,7 +110,7 @@ export default function TrackLiegenScreen() {
       if (p && (isRestingRecovery(p) || p.trackPoints.length > 0)) {
         useTrackingStore.getState().restorePending(p);   // KEINE neue sessionId, Status bleibt; setzt dogId
         setStartMs(p.layStartedAt ?? p.layFinishedAt ?? Date.now());
-        setSummary(summarize(p));
+        setSummary(summarize(p, t));
       } else if (startMs == null) {
         setStartMs(Date.now());   // nichts wiederherstellbar → Timer ab jetzt
         setSummary({ distanceM: 0, winkel: 0, objekte: 0, materials: [], segments: [] });
@@ -167,9 +167,9 @@ export default function TrackLiegenScreen() {
 
   // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
   const confirmCancel = (action: unknown) => {
-    Alert.alert('Fährte abbrechen?', 'Die gelegte Fährte bleibt lokal gespeichert. Nur die Liegezeit wird beendet.', [
-      { text: 'Nein', style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
-      { text: 'Ja, abbrechen', style: 'destructive', onPress: () => {
+    Alert.alert(t('track.cancelRestingTitle' as any), t('track.cancelRestingBody' as any), [
+      { text: t('track.cancelRestingNo' as any), style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
+      { text: t('track.cancelRestingConfirm' as any), style: 'destructive', onPress: () => {
         useTrackingStore.getState().setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
         if (dogId) useActiveFaehrten.getState().remove(dogId);   // Registry: Fährte des Hundes entfernen
         void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
@@ -184,12 +184,12 @@ export default function TrackLiegenScreen() {
       if (allowLeaveRef.current) return;   // erlaubte Navigation → durchlassen
       e.preventDefault();                   // Standard-Back/Swipe/Header-Back blocken
       Alert.alert(
-        'Liegezeit läuft',
-        'Die Liegezeit läuft weiter, auch wenn du die App verlässt. Möchtest du zur App zurückkehren oder die Fährte wirklich abbrechen?',
+        t('track.restingExitTitle' as any),
+        t('track.restingExitBody' as any),
         [
-          { text: 'Zurück', style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
-          { text: 'Weiterlaufen lassen', onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },
-          { text: 'Fährte abbrechen', style: 'destructive', onPress: () => confirmCancel(e.data.action) },
+          { text: t('common.back'), style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
+          { text: t('track.restingExitKeepRunning' as any), onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },
+          { text: t('track.cancelRestingConfirm' as any), style: 'destructive', onPress: () => confirmCancel(e.data.action) },
         ],
       );
     });

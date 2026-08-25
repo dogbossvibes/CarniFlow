@@ -3,18 +3,18 @@ import {
 } from '@/features/tracking/components/TrackingStatusBadge';
 
 describe('getTrackingStatusMeta', () => {
-  it('liefert die geforderten Labels', () => {
-    const labels = (s: TrackingDisplayStatus) => getTrackingStatusMeta(s).label;
-    expect(labels('gps_warmup')).toBe('GPS wird stabilisiert');
-    expect(labels('ready')).toBe('Bereit');
-    expect(labels('recording')).toBe('Aufnahme aktiv');
-    expect(labels('moving')).toBe('Aufnahme aktiv');
-    expect(labels('slow_moving')).toBe('Langsame Bewegung');
-    expect(labels('stationary')).toBe('Stillstand erkannt');
-    expect(labels('drift')).toBe('Drift erkannt');
-    expect(labels('gps_poor')).toBe('GPS ungenau');
-    expect(labels('sharp_turn')).toBe('Winkel erkannt');
-    expect(labels('object_placed')).toBe('Gegenstand gesetzt');
+  it('liefert die geforderten Label-Keys', () => {
+    const labels = (s: TrackingDisplayStatus) => getTrackingStatusMeta(s).labelKey;
+    expect(labels('gps_warmup')).toBe('track.status.gpsWarmup');
+    expect(labels('ready')).toBe('track.status.ready');
+    expect(labels('recording')).toBe('track.status.recording');
+    expect(labels('moving')).toBe('track.status.recording');
+    expect(labels('slow_moving')).toBe('track.status.slowMoving');
+    expect(labels('stationary')).toBe('track.status.stationary');
+    expect(labels('drift')).toBe('track.status.drift');
+    expect(labels('gps_poor')).toBe('track.status.gpsPoor');
+    expect(labels('sharp_turn')).toBe('track.status.sharpTurn');
+    expect(labels('object_placed')).toBe('track.status.objectPlaced');
   });
 
   it('liefert Farbe und Icon je Status', () => {

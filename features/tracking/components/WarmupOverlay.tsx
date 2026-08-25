@@ -7,14 +7,6 @@ import { GpsQualityBadge } from '@/features/tracking/components/GpsQualityBadge'
 import { useT } from '@/i18n';
 import type { WarmupState } from '@/features/tracking/hooks/useGpsWarmup';
 
-const TITLE: Record<WarmupState['phase'], string> = {
-  stabilizing: 'GPS wird stabilisiert',
-  ready:       'Bereit',
-  imprecise:   'GPS ungenau',
-  denied:      'Standort nicht erlaubt',
-  error:       'GPS-Fehler',
-};
-
 // Vollflächiges Warmup-Overlay vor der Fährtenaufnahme. Zeigt den GPS-Status und
 // gibt den Start frei (automatisch bei guter Genauigkeit, manuell nach 15 s).
 export function WarmupOverlay({
@@ -53,7 +45,7 @@ export function WarmupOverlay({
         )}
 
         {warning && <Text style={[s.note, blocked && { color: C.trackWarning }]}>{warning}</Text>}
-        {!blocked && <Text style={s.engine}>Engine: {engineLabel}</Text>}
+        {!blocked && <Text style={s.engine}>{t('track.engineLabel' as any)}: {engineLabel}</Text>}
       </View>
 
       <View style={[s.actions, { bottom: actionsBottom }]}>

@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import i18n from '@/i18n/config';
 import {
   startLiegezeitActivity, endLiegezeitActivity, liegezeitActivityAvailable,
 } from '@/features/tracking/native/liegezeitLiveActivity';
@@ -35,8 +36,10 @@ export function fmtSince(startedAt: number, now: number = Date.now()): string {
 
 // Baut den Notification-Inhalt inkl. Deep-Link-Daten (sessionId für „exakt diese Session").
 export function buildLiegezeitContent(meta: LiegezeitMeta, now: number = Date.now()) {
-  const title = meta.dogName ? `Fährte – Liegezeit (${meta.dogName})` : 'Fährte – Liegezeit läuft';
-  const body = `Liegezeit läuft · seit ${fmtSince(meta.startedAt, now)}`;
+  const title = meta.dogName
+    ? i18n.t('notification.liegezeitTitleDog', { name: meta.dogName }) as string
+    : i18n.t('notification.liegezeitTitle') as string;
+  const body = i18n.t('notification.liegezeitBody', { duration: fmtSince(meta.startedAt, now) }) as string;
   return {
     title, body,
     data: { type: LIEGEZEIT_NOTIFICATION_TYPE, sessionId: meta.sessionId ?? '' },
@@ -53,7 +56,7 @@ async function ensureChannel(): Promise<void> {
   if (channelEnsured || Platform.OS !== 'android') return;
   try {
     await Notifications.setNotificationChannelAsync(LIEGEZEIT_CHANNEL_ID, {
-      name: 'Fährte – Liegezeit',
+      name: i18n.t('notification.liegezeitChannel') as string,
       importance: Notifications.AndroidImportance.LOW,   // kein Ton
       enableVibrate: false,
       showBadge: false,

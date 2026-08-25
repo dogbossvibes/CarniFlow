@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
-import { useT } from '@/i18n';
+import { getLocale, getSpeechLocale, useT } from '@/i18n';
+import i18n from '@/i18n/config';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { HelpButton } from '@/components/help/HelpButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
@@ -42,6 +43,7 @@ import {
   segmentDisplayLabel,
   type SearchSegmentAnnouncementState,
 } from '@/features/tracking/utils/trackSegments';
+import { logSearchSnapshot } from '@/features/tracking/utils/angleDiagnostics';
 
 // GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Absuche nicht).
 const SHOW_GPS_DEBUG = __DEV__;
@@ -138,6 +140,25 @@ export default function TrackRunScreen() {
   const startPoint = (snap && snap.laidLatLng.length > 0 ? snap.laidLatLng[0] : null) ?? anchorFallback;
   const approach = useStartPointApproach({ active: arming, start: startPoint });
 
+  // DEV-only Kettenbeleg: Der Snapshot ist die Quelle für die spätere
+  // Winkel-/Gegenstands-Guidance. Es werden nur relative Bogenlängen, niemals
+  // geografische Koordinaten oder Identitäten ausgegeben.
+  useEffect(() => {
+    if (!__DEV__ || !snap) return;
+    logSearchSnapshot({
+      trackPointCount: snap.laidPoints.length,
+      markers: snap.laidMarkers
+        .filter((marker): marker is typeof marker & { type: 'winkel' | 'gegenstand' } => marker.type === 'winkel' || marker.type === 'gegenstand')
+        .map(marker => ({
+          id: marker.id,
+          type: marker.type,
+          angleKind: marker.angleKind,
+          arcM: marker.distance_from_start,
+          hasPosition: marker.lat != null && marker.lng != null,
+        })),
+    });
+  }, [snap]);
+
   // P4: Beim Betreten der Absuche ist die Liegezeit vorbei → System-Anzeige entfernen.
   useEffect(() => { void endLiegezeitNotification(); }, []);
 
@@ -178,7 +199,11 @@ export default function TrackRunScreen() {
     startModeRef.current = mode;   // Runtime-Info (manual-at-start | manual-override)
     setArming(false);
     hapticSuccess();   // haptisches Feedback beim Erreichen des Ansatzes
-    if (voiceOn && Speech) { try { Speech.speak('Suche läuft', { language: 'de-DE' }); } catch { /* best-effort */ } }
+    if (voiceOn && Speech) {
+      try {
+        Speech.speak(i18n.t('track.searchRunning') as string, { language: getSpeechLocale(getLocale()) });
+      } catch { /* best-effort */ }
+    }
     const startMs = Date.now();
     searchStartMsRef.current = startMs;
     // Stabile client-Run-UUID SOFORT (führende Run-ID, kein Warten auf Supabase).
@@ -394,7 +419,7 @@ export default function TrackRunScreen() {
     segmentAnnouncementRef.current = result.state;
     result.messages.forEach(message => {
       if (Speech) {
-        try { Speech.speak(message, { language: 'de-CH', pitch: 1.0, rate: 0.95 }); } catch { /* best-effort */ }
+        try { Speech.speak(message, { language: getSpeechLocale(getLocale()), pitch: 1.0, rate: 0.95 }); } catch { /* best-effort */ }
       }
     });
   }, [arming, s.dogProgressM, s.recording, snapData.segments, voiceOn, stepLengthM]);
@@ -664,7 +689,7 @@ export default function TrackRunScreen() {
                 <Text className="text-[48px] font-black text-ft-text mt-1" style={{ fontVariant: ['tabular-nums'] }}>
                   {approach.distanceM != null ? `${approach.distanceM.toFixed(1)} m` : '– m'}
                 </Text>
-                <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase">Distanz zum Ansatz</Text>
+                <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase">{t('track.distanceToApproach' as any)}</Text>
                 {/* Status: Distanz + gemeldete GPS-Genauigkeit (keine falsche cm-Präzision). */}
                 <View className="flex-row items-center gap-2 mt-3 px-3 py-1.5 rounded-full bg-white/5 border border-ft-line">
                   {approach.armed ? (
@@ -682,20 +707,20 @@ export default function TrackRunScreen() {
                   ) : approach.accuracy == null ? (
                     <>
                       <Ionicons name="navigate" size={13} color={FT.muted} />
-                      <Text className="text-[12px] font-bold text-ft-muted">GPS wird gesucht…</Text>
+                      <Text className="text-[12px] font-bold text-ft-muted">{t('track.gpsSearching' as any)}</Text>
                     </>
                   ) : approach.accuracy > DEFAULT_APPROACH_CONFIG.maxAccuracyM ? (
                     <>
                       <Ionicons name="warning-outline" size={13} color={FT.warn} />
                       <Text className="text-[12px] font-bold text-ft-warn">
-                        GPS wird stabilisiert … ±{Math.round(approach.accuracy)} m
+                        {t('track.gpsStabilizing')} … ±{Math.round(approach.accuracy)} m
                       </Text>
                     </>
                   ) : (
                     <>
                       <Ionicons name="navigate" size={13} color={FT.muted} />
                       <Text className="text-[12px] font-bold text-ft-muted">
-                        {approach.distanceM != null ? `Startpunkt ${Math.round(approach.distanceM)} m entfernt · ` : ''}GPS ±{Math.round(approach.accuracy)} m
+                        {approach.distanceM != null ? `${t('track.startPointDistance' as any, { distance: Math.round(approach.distanceM) })} · ` : ''}GPS ±{Math.round(approach.accuracy)} m
                       </Text>
                     </>
                   )}

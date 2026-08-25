@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import i18n from '@/i18n/config';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Dünner Wrapper um expo-live-activity (Software Mansion) für die Fährten-
@@ -35,13 +36,18 @@ function fmtClock(totalSeconds: number): string {
 function fmtDist(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`;
 }
+function tt(key: string, params?: Record<string, string | number>): string {
+  return i18n.t(key, params) as string;
+}
 
 /** Live Activity beim Aufnahmestart anlegen. Idempotent. */
 export function startFaehrteActivity(dogName?: string): void {
   const la = getLib();
   if (!la || activityId) return;
   try {
-    const title = dogName ? `🐾 Fährte – ${dogName}` : '🐾 Fährte läuft';
+    const title = dogName
+      ? tt('notification.trackRecordingTitleDog', { name: dogName })
+      : tt('notification.trackRecordingTitle');
     const id = la.startActivity(
       { title, subtitle: `${fmtDist(0)} · ${fmtClock(0)}` },
       {
@@ -64,8 +70,8 @@ export function updateFaehrteActivity(opts: { elapsedS: number; distanceM: numbe
   if (!la || !activityId) return;
   try {
     const title = opts.paused
-      ? '⏸︎ Fährte pausiert'
-      : (opts.dogName ? `🐾 Fährte – ${opts.dogName}` : '🐾 Fährte läuft');
+      ? tt('notification.trackPausedTitle')
+      : (opts.dogName ? tt('notification.trackRecordingTitleDog', { name: opts.dogName }) : tt('notification.trackRecordingTitle'));
     la.updateActivity(activityId, {
       title,
       subtitle: `${fmtDist(opts.distanceM)} · ${fmtClock(opts.elapsedS)}`,
@@ -79,7 +85,7 @@ export function stopFaehrteActivity(opts?: { elapsedS: number; distanceM: number
   if (!la || !activityId) return;
   try {
     la.stopActivity(activityId, {
-      title: '✓ Fährte beendet',
+      title: tt('notification.trackFinishedTitle'),
       subtitle: opts ? `${fmtDist(opts.distanceM)} · ${fmtClock(opts.elapsedS)}` : undefined,
     });
   } catch (e) { console.warn('[liveActivity] stop', e); }

@@ -3,27 +3,31 @@ import { formatAngleCandidate, summarizeLaidMarkers, type AngleCandidateDiag } f
 // DEV-Feld-Diagnostik: reine, PII-freie Formatierung. (Logging selbst ist __DEV__-gegatet.)
 
 const base: AngleCandidateDiag = {
-  accuracyM: 8, turnAngleDeg: 92, direction: 'rechts', legBeforeM: 6.2, legAfterM: 5.8,
-  headingDeviationBefore: 4, headingDeviationAfter: 6, accepted: true, rejectReason: null,
-  angleKind: 'rechts', distanceFromStartM: 12.4,
+  timestampMs: Date.UTC(2026, 7, 18), positionArcM: 12.4,
+  inputAccuracyM: 8, usedAccuracyM: 8, turnDeg: 92, direction: 'rechts',
+  legBeforeM: 6.2, legAfterM: 5.8, straightBefore: 0.9, straightAfter: 0.8,
+  confidence: 0.82, state: 'accept', reason: null, angleKind: 'rechts', markerId: 'angle-1',
 };
 
 describe('formatAngleCandidate', () => {
   it('akzeptierter Kandidat: enthält Typ + Bogenlänge, keine Rohkoordinaten', () => {
     const s = formatAngleCandidate(base);
-    expect(s).toContain('accepted:rechts@12.4m');
-    expect(s).toContain('acc=8m');
+    expect(s).toContain('arcM=12.4');
+    expect(s).toContain('accIn=8m');
+    expect(s).toContain('state=accept');
+    expect(s).toContain('marker=angle-1');
     expect(s).not.toMatch(/lat|lng|latitude|longitude/i);
   });
 
-  it('verworfen wegen Accuracy > 20 m wird belegt', () => {
-    const s = formatAngleCandidate({ ...base, accuracyM: 24, accepted: false, rejectReason: 'accuracy>20', angleKind: null, distanceFromStartM: null });
-    expect(s).toContain('acc=24m');
-    expect(s).toContain('rejected:accuracy>20');
+  it('pending wegen niedriger Confidence wird belegt', () => {
+    const s = formatAngleCandidate({ ...base, inputAccuracyM: 24, usedAccuracyM: 24, state: 'pending', reason: 'low_confidence', angleKind: null, markerId: null });
+    expect(s).toContain('accIn=24m');
+    expect(s).toContain('state=pending');
+    expect(s).toContain('reason=low_confidence');
   });
 
   it('fehlende Accuracy → n/a', () => {
-    expect(formatAngleCandidate({ ...base, accuracyM: null })).toContain('acc=n/a');
+    expect(formatAngleCandidate({ ...base, inputAccuracyM: null, usedAccuracyM: null })).toContain('accIn=n/a');
   });
 });
 

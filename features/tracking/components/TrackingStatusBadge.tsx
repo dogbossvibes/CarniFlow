@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { C } from '@/constants/colors';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -19,19 +20,19 @@ export type TrackingDisplayStatus =
   | 'sharp_turn'     // Winkel erkannt
   | 'object_placed'; // Gegenstand gesetzt
 
-interface StatusMeta { label: string; color: string; icon: IconName }
+interface StatusMeta { labelKey: string; color: string; icon: IconName }
 
 const META: Record<TrackingDisplayStatus, StatusMeta> = {
-  gps_warmup:    { label: 'GPS wird stabilisiert', color: C.trackBlue,    icon: 'locate' },
-  ready:         { label: 'Bereit',                color: C.trackPrimary, icon: 'checkmark-circle' },
-  recording:     { label: 'Aufnahme aktiv',        color: C.trackPrimary, icon: 'walk' },
-  moving:        { label: 'Aufnahme aktiv',        color: C.trackPrimary, icon: 'walk' },
-  slow_moving:   { label: 'Langsame Bewegung',     color: C.trackBlue,    icon: 'footsteps' },
-  stationary:    { label: 'Stillstand erkannt',    color: C.trackTextSec, icon: 'pause-circle' },
-  drift:         { label: 'Drift erkannt',         color: C.trackDanger,  icon: 'warning' },
-  gps_poor:      { label: 'GPS ungenau',           color: C.trackWarning, icon: 'alert-circle' },
-  sharp_turn:    { label: 'Winkel erkannt',        color: C.trackPurple,  icon: 'git-branch' },
-  object_placed: { label: 'Gegenstand gesetzt',    color: C.trackPurple,  icon: 'cube' },
+  gps_warmup:    { labelKey: 'track.status.gpsWarmup',    color: C.trackBlue,    icon: 'locate' },
+  ready:         { labelKey: 'track.status.ready',        color: C.trackPrimary, icon: 'checkmark-circle' },
+  recording:     { labelKey: 'track.status.recording',    color: C.trackPrimary, icon: 'walk' },
+  moving:        { labelKey: 'track.status.recording',    color: C.trackPrimary, icon: 'walk' },
+  slow_moving:   { labelKey: 'track.status.slowMoving',   color: C.trackBlue,    icon: 'footsteps' },
+  stationary:    { labelKey: 'track.status.stationary',   color: C.trackTextSec, icon: 'pause-circle' },
+  drift:         { labelKey: 'track.status.drift',        color: C.trackDanger,  icon: 'warning' },
+  gps_poor:      { labelKey: 'track.status.gpsPoor',      color: C.trackWarning, icon: 'alert-circle' },
+  sharp_turn:    { labelKey: 'track.status.sharpTurn',    color: C.trackPurple,  icon: 'git-branch' },
+  object_placed: { labelKey: 'track.status.objectPlaced', color: C.trackPurple,  icon: 'cube' },
 };
 
 // Pure: Label/Farbe/Icon zu einem Status (für Tests/Wiederverwendung).
@@ -42,12 +43,13 @@ export function getTrackingStatusMeta(status: TrackingDisplayStatus): StatusMeta
 // Status-Badge für den Fährten-Screen: prominent (Icon + Label, Akzentrahmen),
 // aber dezent (kompakte Pill auf dunklem Anthrazit, einzeilig). Parent platziert.
 export function TrackingStatusBadge({ status }: { status: TrackingDisplayStatus | null }) {
+  const { t } = useTranslation();
   if (!status) return null;
-  const { label, color, icon } = META[status];
+  const { labelKey, color, icon } = META[status];
   return (
     <View style={[s.badge, { borderColor: color }]}>
       <Ionicons name={icon} size={14} color={color} />
-      <Text style={s.label}>{label}</Text>
+      <Text style={s.label}>{t(labelKey as any)}</Text>
     </View>
   );
 }

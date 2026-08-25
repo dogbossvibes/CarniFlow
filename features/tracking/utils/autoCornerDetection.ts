@@ -54,9 +54,22 @@ export interface CornerCandidate {
   confidence: number;
   kind: CornerKind | null;
   angleDeg: number;
+  turnDeg: number;
+  direction: 'links' | 'rechts' | null;
+  legBeforeM: number;
+  legAfterM: number;
   reason: string | null;   // Grund bei reject/pending (z. B. 'deadzone', 'short_legs', 'curve')
   factors: CornerFactors;
 }
+
+// DEV-Diagnostik kann jeden tatsächlich bewerteten Kandidaten beobachten, ohne
+// die Erkennungsentscheidung oder Produktionstelemetrie zu verändern.
+export interface CornerCandidateEvaluation {
+  apexIndex: number;
+  apex: AutoCornerPoint;
+  candidate: CornerCandidate;
+}
+export type CornerCandidateObserver = (evaluation: CornerCandidateEvaluation) => void;
 
 const ZERO_FACTORS: CornerFactors = { angle: 0, straightBefore: 0, straightAfter: 0, support: 0, accuracy: 0, bearing: 0, legLength: 0 };
 
@@ -162,13 +175,21 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
   const inLen = apex.cumDist - points[inb].cumDist;
   const outLen = points[outb].cumDist - apex.cumDist;
   if (inLen < LEG_MIN_M || outLen < LEG_MIN_M) {
-    return { state: 'pending', confidence: 0, kind: null, angleDeg: NaN, reason: 'short_legs', factors: ZERO_FACTORS };
+    return {
+      state: 'pending', confidence: 0, kind: null, angleDeg: NaN,
+      turnDeg: NaN, direction: null, legBeforeM: inLen, legAfterM: outLen,
+      reason: 'short_legs', factors: ZERO_FACTORS,
+    };
   }
 
   const diff = normalizeDeg(calculateHeading(apex, points[outb]) - calculateHeading(points[inb], apex));
   const magnitude = Math.abs(diff);
   if (magnitude < MIN_TURN_DEG) {
-    return { state: 'reject', confidence: 0, kind: null, angleDeg: 180 - magnitude, reason: 'no_turn', factors: ZERO_FACTORS };
+    return {
+      state: 'reject', confidence: 0, kind: null, angleDeg: 180 - magnitude,
+      turnDeg: magnitude, direction: diff > 0 ? 'rechts' : 'links', legBeforeM: inLen, legAfterM: outLen,
+      reason: 'no_turn', factors: ZERO_FACTORS,
+    };
   }
   const angleDeg = 180 - magnitude;
   const band = bandOf(angleDeg);
@@ -210,13 +231,14 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
   else if (minStraight >= STRAIGHT_ACCEPT && confidence >= ACCEPT_CONF) { state = 'accept'; }
   else { state = 'pending'; reason = 'low_confidence'; }
 
-  return { state, confidence, kind, angleDeg, reason, factors };
+  return { state, confidence, kind, angleDeg, turnDeg: magnitude, direction, legBeforeM: inLen, legAfterM: outLen, reason, factors };
 }
 
 // Bester Kandidat über den Puffer (für Tests/Diagnose). Wählt bei mehreren
 // Accepts die höchste Confidence; sonst den „besten" Pending, sonst Reject.
 export function evaluateBestCorner(
   points: readonly AutoCornerPoint[], lastCornerDistanceM: number,
+  observeCandidate?: CornerCandidateObserver,
 ): { apexIndex: number; candidate: CornerCandidate } | null {
   if (points.length < 3) return null;
   const latest = points[points.length - 1];
@@ -227,6 +249,7 @@ export function evaluateBestCorner(
     if (latest.cumDist - apex.cumDist < LEG_MIN_M) continue;              // Auslauf noch zu kurz
     if (apex.cumDist - lastCornerDistanceM < CORNER_GAP_M) break;        // zu nah am letzten Winkel
     const candidate = classifyCornerCandidate(points, apexIndex);
+    observeCandidate?.({ apexIndex, apex, candidate });
     if (candidate.state === 'accept') {
       if (!bestAccept || candidate.confidence > bestAccept.candidate.confidence) bestAccept = { apexIndex, candidate };
     } else if (!bestOther || candidate.confidence > bestOther.candidate.confidence) {
@@ -242,8 +265,9 @@ export function evaluateBestCorner(
 export function detectAutoCorner(
   points: readonly AutoCornerPoint[],
   lastCornerDistanceM: number,
+  observeCandidate?: CornerCandidateObserver,
 ): AutoCorner | null {
-  const best = evaluateBestCorner(points, lastCornerDistanceM);
+  const best = evaluateBestCorner(points, lastCornerDistanceM, observeCandidate);
   if (!best || best.candidate.state !== 'accept' || !best.candidate.kind) return null;
   return {
     apex: points[best.apexIndex],

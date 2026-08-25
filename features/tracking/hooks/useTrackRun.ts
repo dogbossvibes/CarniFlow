@@ -7,13 +7,37 @@ import {
 import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { detectCorners, cornerLabel, nearestArticleDist, type Corner } from '@/lib/trackGuidance';
 import { startTrackRun, finishTrackRun, markArticleFound, saveTrackRunPoints } from '@/features/tracking/services/trackService';
+import { getLocale, getSpeechLocale } from '@/i18n';
+import i18n from '@/i18n/config';
 
 // expo-speech defensiv laden (nativ; kein Crash, wenn Modul fehlt).
 let Speech: typeof import('expo-speech') | null = null;
 try { Speech = require('expo-speech'); } catch { Speech = null; }
 export const SPEECH_AVAILABLE = Speech != null;
-function say(msg: string) { try { Speech?.stop(); Speech?.speak(msg, { language: 'de-DE', rate: 1.0 }); } catch { /* ignore */ } }
+function say(msg: string) { try { Speech?.stop(); Speech?.speak(msg, { language: getSpeechLocale(getLocale()), rate: 1.0 }); } catch { /* ignore */ } }
 function shutUp() { try { Speech?.stop(); } catch { /* ignore */ } }
+function tt(key: string, params?: Record<string, string | number>) {
+  return i18n.t(key, params) as string;
+}
+function localizedCorner(kind: string) {
+  const locale = getLocale();
+  if (locale === 'fr') {
+    if (kind.includes('spitz')) return 'angle aigu';
+    return 'angle';
+  }
+  if (locale === 'it') {
+    if (kind.includes('spitz')) return 'angolo acuto';
+    return 'angolo';
+  }
+  return cornerLabel(kind as never);
+}
+function localizedSide(side: string | null) {
+  if (!side) return '';
+  const locale = getLocale();
+  if (locale === 'fr') return side === 'links' ? 'à gauche' : 'à droite';
+  if (locale === 'it') return side === 'links' ? 'a sinistra' : 'a destra';
+  return side;
+}
 
 const WATCH_OPTS: Location.LocationOptions = { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1200, distanceInterval: 0 };
 
@@ -76,18 +100,18 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
       .map(m => ({ lat: m.lat as number, lng: m.lng as number }));
     const artDist = nearestArticleDist(cur, open);
 
-    if (artDist < 5) { if (!articleNear.current && since > 6000) { articleNear.current = true; speak('Achtung, Gegenstand ganz in der Nähe.'); } return; }
+    if (artDist < 5) { if (!articleNear.current && since > 6000) { articleNear.current = true; speak(tt('track.voiceObjectVeryNear')); } return; }
     if (artDist > 8) articleNear.current = false;
-    if (artDist >= 5 && artDist < 12) { if (!articleAhead.current && since > 5000) { articleAhead.current = true; speak(`Gegenstand kommt, etwa ${Math.round(artDist)} Meter.`); return; } }
+    if (artDist >= 5 && artDist < 12) { if (!articleAhead.current && since > 5000) { articleAhead.current = true; speak(tt('track.voiceObjectMeters', { meters: Math.round(artDist) })); return; } }
     else if (artDist > 14) articleAhead.current = false;
 
     if (dev <= 8) {
       let nc: Corner | null = null, nd = Infinity;
       for (const c of cornersRef.current) { if (cornerSpoken.current.has(c.index)) continue; const d = calculateDistance(cur, c.point); if (d < nd) { nd = d; nc = c; } }
-      if (nc && nd < 12 && since > 5000) { cornerSpoken.current.add(nc.index); speak(`In ${Math.round(nd)} Metern ${cornerLabel(nc.kind)} nach ${nc.direction}.`); return; }
+      if (nc && nd < 12 && since > 5000) { cornerSpoken.current.add(nc.index); speak(tt('track.voiceCornerMeters', { meters: Math.round(nd), corner: localizedCorner(nc.kind), direction: localizedSide(nc.direction) })); return; }
     }
-    if (dev > 8 && since > 7000) { deviating.current = true; speak(`Du weichst ${Math.round(dev)} Meter${side ? ' nach ' + side : ''} ab.`); return; }
-    if (dev < 3 && deviating.current && since > 5000) { deviating.current = false; speak('Wieder auf der Fährte.'); }
+    if (dev > 8 && since > 7000) { deviating.current = true; speak(tt('track.voiceDeviationMeters', { meters: Math.round(dev), side: localizedSide(side) })); return; }
+    if (dev < 3 && deviating.current && since > 5000) { deviating.current = false; speak(tt('track.voiceBackOnTrack')); }
   }, [speak, store, voiceOnRef]);
 
   const start = useCallback(async (sessionId: string): Promise<{ error: string | null }> => {
@@ -105,7 +129,7 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
     startMs.current = Date.now();
     timerRef.current = setInterval(() => s.setSearchDuration(Math.floor((Date.now() - startMs.current) / 1000)), 1000);
     watchRef.current = await startPositionStream(onFix, WATCH_OPTS);
-    speak('Suche gestartet. Lauf der Fährte.');
+    speak(tt('track.voiceSearchStarted'));
     return { error: null };
   }, [onFix, speak, store]);
 
@@ -114,7 +138,7 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
     const next = s.markers.find(m => m.type === 'gegenstand' && !m.found);
     if (!next) return;
     s.markArticleFound(next.id);
-    speak('Gegenstand gefunden.');
+    speak(tt('track.voiceObjectFound'));
     // Persistieren, falls der Marker eine echte DB-ID hat (sonst nur lokal).
   }, [speak, store]);
 
@@ -134,7 +158,7 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
       articlesFound:          s.articlesFound,
       runPoints:              s.runPoints.map(p => ({ lat: p.lat, lng: p.lng, t: p.t })),
     });
-    if (!res.error) speak('Fährte beendet.');
+    if (!res.error) speak(tt('track.voiceTrackFinished'));
     return { error: res.error };
   }, [speak, stopAll, store]);
 
