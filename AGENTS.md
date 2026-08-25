@@ -2,12 +2,12 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
-# Agent Handoff Protocol (Claude Code ↔ Codex)
+# Agent Handoff Protocol (OpenCode ↔ OpenAI Codex)
 
 This repository is the shared source of truth for both agents. Full guide:
 `docs/agent/README.md`.
 
-## On start (Codex MUST do this, in order)
+## On start (OpenCode and OpenAI Codex MUST do this, in order)
 1. Read `docs/agent/CURRENT_STATE.md`.
 2. Read `docs/agent/SESSION_HANDOFF.md`.
 3. Read `docs/agent/TASKS.md` — the active task IDs, their status, and the **next TASK-ID**.
@@ -18,7 +18,7 @@ This repository is the shared source of truth for both agents. Full guide:
    listed changed files actually exist? Are there additional local changes? Is the
    handoff possibly stale (`npm run agent:status`)?
 
-Codex must **never** assume that uncommitted changes were made by itself.
+An agent must **never** assume that uncommitted changes were made by itself.
 
 ## Priority rule (on any conflict)
 ```
@@ -44,11 +44,11 @@ The actual repository state always wins over handoff documentation.
 - document remaining issues
 - update the handoff before stopping when appropriate
 
-## When handing off to Claude
+## When handing off to another agent
 1. Update the **manual** sections of `docs/agent/SESSION_HANDOFF.md`
    (Current task, Goal, Work completed, Tests, Known issues, Important context,
    Do not touch, Next recommended step, Relevant files, Open questions).
-2. Run `npm run agent:handoff -- --agent=codex`.
+2. Run `npm run agent:handoff -- --agent=<current-agent>` (`opencode` or `codex`).
 3. Run `git status --short`.
 4. Do **not** commit or push. Then stop.
 

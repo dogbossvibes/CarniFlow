@@ -8,7 +8,8 @@
 ## Aktueller Stand — 2026-08-17 (autoritativ, verifiziert via git) — MAßGEBLICH
 
 > Ergänzt nach der Codex-Übernahme: read-only NEWBIE-Quota-Production-Preflight + **committeter**
-> Trainer-Verbinden-Keyboard-Fix `0e7aaba`. **Kein Push/Build/OTA, keine Production-Schreiboperation.**
+> Trainer-Verbinden-Keyboard-Fix `0e7aaba` + T-59-Ein-Hund-Training-Hotfix `b1a8269`.
+> **T-59 ist gepusht und per Production-OTA auf iOS + Android ausgeliefert; keine Production-DB-Schreiboperation.**
 > Diese Sektion ist die neueste MAßGEBLICHE; ältere (ab „2026-08-15" abwärts) sind Historie. **Code ist Wahrheit.**
 
 ### REPO (Verified)
@@ -21,6 +22,10 @@
   `app/trainer/index.tsx` (Keyboard-Fix, 35+/28−, 3 Hunks). Weitere geänderte Produktdateien im Tree
   (`features/subscription/plans.ts`, `features/tracking/hooks/useTrackVoiceGuidance.ts`, `hooks/useCapabilities.ts`)
   sind **fremder WIP — nicht anfassen**.
+- **T-59 deployed:** `b1a8269 fix(training): auto-select single dog for documentation` (4 Dateien) setzt die dogId
+  in Start **und** Dokumentation erst nach abgeschlossenem `useDogs()`-Load, zeigt bei genau einem Hund einen
+  nicht-interaktiven Hund-Chip und bei 0 Hunden den Add-Dog-State. Push auf origin; Production-OTA Runtime 1.0.1 /
+  Channel `production`: iOS `01a010dc-746e-76bb-ac7a-9427bba498be`, Android `01a010e1-1298-7591-97fd-0f7a7a2ceb5e`.
 
 ### NEWBIE-QUOTA — PRODUCTION-PREFLIGHT (Verified read-only, 2026-08-17)
 - **Production `axkkhyqrjrtbkumaulta` liefert bereits** `newbie_quota_limit` = **dog=1, training=2, track=0**

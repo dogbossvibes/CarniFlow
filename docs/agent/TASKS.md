@@ -4,14 +4,54 @@
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).
 
-## Update 2026-08-17 (Codex) — T-57 Trainer-Keyboard-Fix releaseverifiziert `0e7aaba`
+## Update 2026-08-17 (Codex) — T-59 Ein-Hund-Training-Hotfix deployed `b1a8269`
 
 > Verifiziert gegen git/Code/Production (read-only). Diese Sektion ist die neueste maßgebliche.
-> **Kein Push/Build/OTA, keine Production-Schreiboperation.** HEAD ist **3 Commits vor origin** (0 hinter):
-> `c210008 feat(subscription): add 3-day ACTIVE trial funnel`, `adfc3b5 fix(subscription): allow 2 NEWBIE trainings per month`,
-> `0e7aaba fix(trainer): keep connect sheet above keyboard`.
+> T-59 ist gepusht; keine Production-DB-Schreiboperation. Production-OTA Runtime 1.0.1 / Channel `production`:
+> iOS `01a010dc-746e-76bb-ac7a-9427bba498be`, Android `01a010e1-1298-7591-97fd-0f7a7a2ceb5e`.
+
+## Update 2026-08-17 (Codex) — T-60: Staging migration/RLS PASS, Device-QA OPEN
+
+> Kein Commit, Push, OTA, nativer Build oder Production-DB-Vorgang. Der vorbestehende Dirty Tree wurde erhalten.
+
+- **T-60 — Health: Gewichtsverlauf + Entwurmung mit granularen Capabilities** · OPEN(Device-QA), Staging migration/RLS PASS
+  - Basis für alle: Gewicht mit Messdatum sowie letzte Entwurmung mit optionalem Präparat im bestehenden
+    `/dog-health/[id]`-Editor.
+  - Premium via `useCapabilities().can(...)`: `dogs.weightHistory` zeigt Trenddiagramm + Veränderung zur
+    letzten Messung; `dogs.dewormingSchedule` zeigt Entwurmungsverlauf und erlaubt ein freiwillig gesetztes
+    nächstes Datum. NEWBIE bleibt auf dem Screen und erhält nur Inline-Upsells — kein Full-Screen-Redirect.
+  - **Staging PASS (`cbhrxkjclakzlvajyvfn`):** Ausschließlich `20260817190000_dog_deworming_entries.sql`
+    direkt ausgeführt und nur diese Version als applied markiert — kein `db push`, keine andere Pending-Migration.
+    Schema: `owner_id → auth.users`, `dog_id → public.dogs`, RLS aktiv und kein medizinischer Intervall-Default.
+  - **RLS/CRUD PASS:** Owner INSERT/SELECT/UPDATE/DELETE erfolgreich; fremde JWT-Identität erhält
+    SELECT/UPDATE/DELETE = 0 Zeilen und INSERT = RLS denied. Smoke-Hund/-Eintrag danach 0 Zeilen. Jede Policy
+    prüft `owner_id = auth.uid()` und den Besitzer des referenzierten Hundes; kein Trainer-Read-Bypass.
+  - **Fresh Dev-Build PASS / Runtime-QA OPEN:** Lokale iOS- und Android-Development-Clients wurden mit `EXPO_NO_DOTENV=1`,
+    expliziten Staging-`EXPO_PUBLIC_SUPABASE_*`-Variablen und `SENTRY_DISABLE_AUTO_UPLOAD=true` erfolgreich
+    gebaut/installiert. Staging ist im iOS-Export **und** in der Metro-Bundle auf Port 8082 verifiziert.
+    Ein neuer iOS-Simulator wurde erstellt und enthält nur den Dev Client, keine Production-Session. Der Dev
+    Launcher wartet jedoch auf eine nicht automatisierbare iOS-Öffnen-Bestätigung; UI-Automation fehlt. Entgegen
+    der gemeldeten Verfügbarkeit ist `adb` auf diesem Host weiterhin nicht installiert. Kein Staging-Account
+    angelegt, keine Remote-Testdaten erzeugt. NEWBIE/Premium/Keyboard/Safe-Area/Back bleiben offen.
+  - Technisch OTA-fähig (nur JS/SQL, kein Native), aber nicht freigegeben/ausgerollt: kein Commit, Push,
+    Production-Deploy oder OTA.
+  - Checks: `npx tsc --noEmit --skipLibCheck`, fokussierte Jest-Suites (53 Tests), ESLint der berührten Dateien
+    und `git diff --check` PASS. Der vollständige `npx tsc --noEmit`-Lauf überschritt in dieser Session 5 Minuten
+    ohne Diagnose; Real-Device-QA und eine freigegebene Migration stehen noch aus.
+
+### ► TASK-ID-Stand (aktualisiert 2026-08-17)
+- T-60 bleibt bis zur iOS-/Android-Device-QA OPEN. **Nächste freie TASK-ID: T-61.**
 
 ### Neu
+- **T-59 — Training: Ein-Hund-Auswahl nach async Dog-Load** · DONE(deployed `b1a8269`)
+  Ursache: `app/unit/start.tsx` initialisierte `selectedDogId` vor Abschluss von `useDogs()` mit `null`; bei genau
+  einem Hund ist kein Picker verfügbar, daher konnte das Starten keine dogId an `createTrainingUnit` übergeben.
+  Fix: post-load-Fallback in `app/unit/start.tsx` und `app/unit/document.tsx`, sichtbarer nicht-interaktiver
+  Hund-Chip bei 1 Hund, Add-Dog-State bei 0 Hunden; mehrere Hunde behalten Picker/Änderbarkeit. Neue Regressionen:
+  `app/unit/__tests__/{start,document}.test.tsx` (6 PASS: 0/1/mehrere Hunde, async dogId, sichtbarer Name,
+  Save-Payload, Mehrhund-Auswahl). `tsc` und Diff-Check PASS; iOS-/Android-Bundles beim EAS Update PASS.
+  OTA Runtime 1.0.1 / `production`: iOS `01a010dc-746e-76bb-ac7a-9427bba498be`, Android
+  `01a010e1-1298-7591-97fd-0f7a7a2ceb5e`; `b1a8269` auf origin gepusht. Real-Device-Smoke-Test bleibt sinnvoll.
 - **T-57 — Trainer-Verbinden Keyboard-Fix (Code-Eingabe-Sheet)** · DONE(releaseverifiziert `0e7aaba`)
   `app/trainer/index.tsx`: Bottom-Sheet „Code eingeben" wurde von der Tastatur verdeckt (Sheet `position:absolute;
   bottom:0` im `Modal` ohne `KeyboardAvoidingView`). Fix: Backdrop + Sheet in Vollbild-`KeyboardAvoidingView`
@@ -29,7 +69,8 @@
   kein DDL-Dump möglich (kein `SUPABASE_DB_PASSWORD`/`pg_dump`/`service_role`) → verhaltensbasiert, nicht Body-Dump.
 
 ### ► TASK-ID-Stand (aktualisiert 2026-08-17)
-- Neu vergeben: **T-57** (DONE releaseverifiziert), **T-58** (DONE verified). **Nächste freie TASK-ID: T-59.**
+- Neu vergeben: **T-57** (DONE releaseverifiziert), **T-58** (DONE verified), **T-59** (DONE deployed).
+  **Nächste freie TASK-ID: T-60.**
 - Weiterhin OPEN P0: **T-56** Real-Device-Test Confidence-/Render-Fix (siehe Update 2026-08-15 unten).
 
 ## Update 2026-08-15 (Claude Code) — Fährten-Render-/Confidence-Winkel-Fix DEPLOYED (HEAD `fddd1f1`, == origin)

@@ -1,4 +1,4 @@
-# ANYVO — Agent Handoff (Claude Code ↔ Codex)
+# ANYVO — Agent Handoff (OpenCode ↔ OpenAI Codex)
 
 Kurzanleitung für den täglichen Wechsel zwischen den Agenten. Das **Repository**
 ist die gemeinsame technische Wahrheit.
@@ -16,18 +16,22 @@ ist die gemeinsame technische Wahrheit.
 | `../../scripts/agent-status.mjs` | Read-only Statusübersicht + Stale-Warnung. |
 | `../../scripts/agent-start.mjs` | Read-only Kompaktübersicht beim Session-Start. |
 
-## CLAUDE → CODEX
-1. In Claude: `/handoff`  _(oder ohne Slash-Command:)_ `npm run agent:handoff -- --agent=claude`
+## OpenCode → OpenAI Codex
+1. In OpenCode: `/handoff` _(oder manuell:)_ `npm run agent:handoff -- --agent=opencode`.
    - Vorher die **manuellen** Abschnitte in `SESSION_HANDOFF.md` pflegen (Current task, Work completed, …).
-2. Claude schliessen.
-3. Im gleichen Projektordner starten: `codex`
-4. Codex liest `AGENTS.md` → `docs/agent/CURRENT_STATE.md` → `SESSION_HANDOFF.md` → `TASKS.md` und vergleicht mit `git status`.
+2. OpenCode schliessen.
+3. Im gleichen Projektordner starten: `codex`.
+4. Codex folgt `AGENTS.md`, liest die verbindlichen `docs/agent/`-Dateien und vergleicht sie mit `git status`.
 
-## CODEX → CLAUDE
+## OpenAI Codex → OpenCode
 1. In Codex die manuellen Handoff-Abschnitte aktualisieren.
 2. `npm run agent:handoff -- --agent=codex`
 3. Codex schliessen.
-4. Im gleichen Projektordner: `claude`
+4. Im gleichen Projektordner: `opencode`.
+
+## Legacy Claude Code
+`CLAUDE.md` und `.claude/` bleiben bis zur verifizierten OpenCode-/Codex-Übernahme als Legacy erhalten.
+Sie können erst in einem separaten Cleanup entfernt werden; sie sind nicht Teil des aktiven Handoff-Workflows.
 
 ## Status prüfen
 ```

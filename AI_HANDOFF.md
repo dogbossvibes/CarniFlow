@@ -1,5 +1,11 @@
 # AI HANDOFF
 
+> ⚠️ **LEGACY (Stand 2026-07-23) — NICHT der aktuelle Handoff.**
+> Der aktive Agent-Handoff läuft über `docs/agent/SESSION_HANDOFF.md` (+ `TASKS.md`,
+> `CURRENT_STATE.md`, `WORK_LOG.md`, `DECISIONS.md`). Diese Datei bleibt nur als
+> **historische Quelle** erhalten, weil mehrere `docs/handbook-source/*.md` sie zitieren
+> (Fährten-Teilstrecken-Stand, Screenshots, Testzahlen). Nicht als aktuellen Stand verwenden.
+
 ## Projekt
 
 ANYVO Mobile App

@@ -6,7 +6,7 @@
 // Führt NIEMALS aus: commit, push, reset, checkout, clean, Branch-Wechsel,
 // Datei-Löschung, Tests, Remote-/DB-Zugriffe. Nur lesende Git-Kommandos.
 //
-//   node scripts/agent-handoff.mjs --agent=claude|codex|unknown
+//   node scripts/agent-handoff.mjs --agent=opencode|codex|claude|unknown
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
@@ -70,7 +70,7 @@ function buildAutoBlock(agent) {
 function template(autoBlock) {
   return `# Agent Session Handoff
 
-> Aktuellster Handoff zwischen **Claude Code** und **Codex**.
+> Aktuellster Handoff zwischen **OpenCode** und **OpenAI Codex**.
 > Der Block zwischen den AUTO-GENERATED-Markern wird von \`scripts/agent-handoff.mjs\` erzeugt —
 > **nicht manuell** bearbeiten. Alles ausserhalb der Marker wird von den Agenten **manuell** gepflegt.
 >

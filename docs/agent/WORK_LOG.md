@@ -3,6 +3,21 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-08-17 — Codex (T-59 Ein-Hund-Training-Hotfix deployed)
+
+- Commit **`b1a8269 fix(training): auto-select single dog for documentation`** (4 Dateien), auf origin gepusht.
+  Production-OTA für Build 40 / Runtime 1.0.1 / Channel `production`: iOS `01a010dc-746e-76bb-ac7a-9427bba498be`
+  (Group `5546a391-8b76-4a62-9de7-8a688055fad7`), Android `01a010e1-1298-7591-97fd-0f7a7a2ceb5e`
+  (Group `63f2fa56-6c98-406e-9542-114d46a422c3`). Kein nativer Build, Submit oder DB-Vorgang.
+- Ursache verifiziert: `useDogs()` startet leer und lädt asynchron. `app/unit/start.tsx` setzte `selectedDogId`
+  nur beim ersten Render; bei genau einem Hund ohne Picker blieb sie daher `null`, wodurch der Live-Trainingsstart
+  `createTrainingUnit` nicht erreichen konnte. Direkte Dokumentation (`app/unit/document.tsx`) hatte den identischen
+  post-load-Fallback bereits; Edit lädt die gespeicherte dogId, Timer übernimmt Kontext bzw. den einzelnen Hund.
+- Minimaler Fix: post-load dogId-Fallback in Start + Dokumentation, sichtbarer Ein-Hund-Chip und 0-Hund-Add-Dog-State.
+  Neue Regressionen `app/unit/__tests__/{start,document}.test.tsx`: 6 PASS (0/1/mehrere Hunde, Save-Payload,
+  Mehrhund-Auswahl). Training-Tab-Test 6 PASS; `npx tsc --noEmit` und `git diff --check` PASS; iOS-/Android-Export
+  beim OTA PASS. Fremdes WIP unangetastet.
+
 ## 2026-08-17 — Codex (T-57 Real-Device-QA releaseverifiziert)
 
 T-57 bleibt der unveränderte Produktcode-Commit **`0e7aaba fix(trainer): keep connect sheet above keyboard`**.

@@ -45,7 +45,7 @@ console.log('');
 console.log('Warnings:');
 const warnings = [];
 if (!exists) {
-  warnings.push('Kein SESSION_HANDOFF.md gefunden. Erzeuge einen mit: npm run agent:handoff -- --agent=<claude|codex>');
+  warnings.push('Kein SESSION_HANDOFF.md gefunden. Erzeuge einen mit: npm run agent:handoff -- --agent=<opencode|codex>');
 } else if (!auto.generated) {
   warnings.push('Handoff enthält keinen gültigen Generated-Timestamp — Aktualität unklar.');
 } else {

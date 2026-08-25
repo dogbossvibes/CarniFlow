@@ -10,23 +10,30 @@
 
 <!-- AUTO-GENERATED:START -->
 
-Generated: 2026-08-17T10:30:53.558Z
-Agent: claude
+Generated: 2026-08-18T18:42:30.871Z
+Agent: codex
 Branch: feat/track-module-rewrite
 
 ### Git status
 ```
 M AGENTS.md
  M AI_HANDOFF.md
- M app/trainer/index.tsx
+ M app/dog-health/[id].tsx
+ M app/track/run.tsx
+ M components/analytics/TrendLine.tsx
  M docs/adr/ADR-001_Domain_Model.md
  M docs/agent/CURRENT_STATE.md
  M docs/agent/README.md
  M docs/agent/SESSION_HANDOFF.md
  M docs/agent/TASKS.md
  M docs/agent/WORK_LOG.md
+ M features/subscription/__tests__/capabilities.test.ts
  M features/subscription/plans.ts
+ M features/tracking/hooks/useTrackRecorder.ts
  M features/tracking/hooks/useTrackVoiceGuidance.ts
+ M features/tracking/utils/__tests__/angleDiagnostics.test.ts
+ M features/tracking/utils/angleDiagnostics.ts
+ M features/tracking/utils/autoCornerDetection.ts
  M hooks/useCapabilities.ts
  M i18n/de-CH.ts
  M i18n/gsw-CH.ts
@@ -37,9 +44,9 @@ M AGENTS.md
  M scripts/agent-lib.mjs
  M scripts/agent-start.mjs
  M scripts/agent-status.mjs
+ M services/dogHub.ts
  M supabase/migrations/20260803140000_profiles_username.sql
 ?? .claude/development.code-workspace
-?? .opencode/
 ?? ANYVO-current-repository.zip
 ?? STAGING_DEPLOY_RUN.sql
 ?? SUBSCRIPTION_P0_DB_DEPLOYMENT.md
@@ -102,14 +109,20 @@ M AGENTS.md
 ?? docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
 ?? docs/manual-test/
 ?? "faehrten 6/design_handoff_faehrten/abriss.png"
+?? features/dogs/__tests__/health.test.ts
+?? features/dogs/health.ts
 ?? features/subscription/__tests__/healthCapabilities.test.ts
+?? features/tracking/__tests__/voiceGuidanceDiagnostics.test.ts
+?? i18n/__tests__/health-i18n.test.ts
 ?? legal-web/__tests__/
 ?? legal-web/assets/auth-confirm.js
 ?? legal-web/auth/
-?? opencode.json
 ?? screen20.jpg
+?? supabase/migrations/20260817190000_dog_deworming_entries.sql
 ?? supabase/migrations/README.md
+?? supabase/migrations/__tests__/
 ?? supabase/production_public_schema_snapshot.sql
+?? supabase/staging_health_phase2_smoke.sql
 ?? supabase/staging_p0_smoke_verify.sql
 ?? supabase/staging_public_schema_restore.sql
 ?? winkel.png
@@ -119,42 +132,57 @@ M AGENTS.md
 ```
 AGENTS.md                                          |  10 +-
  AI_HANDOFF.md                                      |   6 +
- app/trainer/index.tsx                              |  63 ++--
+ app/dog-health/[id].tsx                            | 146 +++++++-
+ app/track/run.tsx                                  |  20 +
+ components/analytics/TrendLine.tsx                 |   4 +-
  docs/adr/ADR-001_Domain_Model.md                   | 416 +++++++++++++++++++++
- docs/agent/CURRENT_STATE.md                        |  35 ++
+ docs/agent/CURRENT_STATE.md                        |   7 +-
  docs/agent/README.md                               |  20 +-
- docs/agent/SESSION_HANDOFF.md                      |  61 ++-
- docs/agent/TASKS.md                                |  25 ++
- docs/agent/WORK_LOG.md                             |  17 +
+ docs/agent/SESSION_HANDOFF.md                      | 177 +++++++--
+ docs/agent/TASKS.md                                |  51 ++-
+ docs/agent/WORK_LOG.md                             |  15 +
+ .../subscription/__tests__/capabilities.test.ts    |   7 +-
  features/subscription/plans.ts                     |  21 ++
- features/tracking/hooks/useTrackVoiceGuidance.ts   |   2 +
+ features/tracking/hooks/useTrackRecorder.ts        |  56 ++-
+ features/tracking/hooks/useTrackVoiceGuidance.ts   | 106 +++++-
+ .../utils/__tests__/angleDiagnostics.test.ts       |  24 +-
+ features/tracking/utils/angleDiagnostics.ts        | 116 ++++--
+ features/tracking/utils/autoCornerDetection.ts     |  32 +-
  hooks/useCapabilities.ts                           |  11 +
- i18n/de-CH.ts                                      |   6 +
- i18n/gsw-CH.ts                                     |   6 +
- i18n/locales/fr.ts                                 |   6 +
+ i18n/de-CH.ts                                      |  21 ++
+ i18n/gsw-CH.ts                                     |  21 ++
+ i18n/locales/fr.ts                                 |  21 ++
  package-lock.json                                  | 234 ++++++++++++
  package.json                                       |   1 +
  scripts/agent-handoff.mjs                          |   4 +-
  scripts/agent-lib.mjs                              |   2 +-
  scripts/agent-start.mjs                            |  13 +-
  scripts/agent-status.mjs                           |   2 +-
+ services/dogHub.ts                                 |  31 +-
  .../20260803140000_profiles_username.sql           |  79 +---
- 22 files changed, 902 insertions(+), 138 deletions(-)
+ 30 files changed, 1461 insertions(+), 213 deletions(-)
 ```
 
 ### Modified files
 ```
 AGENTS.md
 AI_HANDOFF.md
-app/trainer/index.tsx
+app/dog-health/[id].tsx
+app/track/run.tsx
+components/analytics/TrendLine.tsx
 docs/adr/ADR-001_Domain_Model.md
 docs/agent/CURRENT_STATE.md
 docs/agent/README.md
 docs/agent/SESSION_HANDOFF.md
 docs/agent/TASKS.md
 docs/agent/WORK_LOG.md
+features/subscription/__tests__/capabilities.test.ts
 features/subscription/plans.ts
+features/tracking/hooks/useTrackRecorder.ts
 features/tracking/hooks/useTrackVoiceGuidance.ts
+features/tracking/utils/__tests__/angleDiagnostics.test.ts
+features/tracking/utils/angleDiagnostics.ts
+features/tracking/utils/autoCornerDetection.ts
 hooks/useCapabilities.ts
 i18n/de-CH.ts
 i18n/gsw-CH.ts
@@ -165,16 +193,13 @@ scripts/agent-handoff.mjs
 scripts/agent-lib.mjs
 scripts/agent-start.mjs
 scripts/agent-status.mjs
+services/dogHub.ts
 supabase/migrations/20260803140000_profiles_username.sql
 ```
 
 ### Untracked files
 ```
 .claude/development.code-workspace
-.opencode/agent/primary.md
-.opencode/agents/anyvo-analyst.md
-.opencode/agents/anyvo-engineering-lead.md
-.opencode/commands/handoff.md
 ANYVO-current-repository.zip
 STAGING_DEPLOY_RUN.sql
 SUBSCRIPTION_P0_DB_DEPLOYMENT.md
@@ -431,14 +456,20 @@ docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
 docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
 docs/manual-test/FAEHRTE_OFF_TRACK_REAL_DEVICE_TEST.md
 faehrten 6/design_handoff_faehrten/abriss.png
+features/dogs/__tests__/health.test.ts
+features/dogs/health.ts
 features/subscription/__tests__/healthCapabilities.test.ts
+features/tracking/__tests__/voiceGuidanceDiagnostics.test.ts
+i18n/__tests__/health-i18n.test.ts
 legal-web/__tests__/authConfirmStatus.test.ts
 legal-web/assets/auth-confirm.js
 legal-web/auth/confirmed.html
-opencode.json
 screen20.jpg
+supabase/migrations/20260817190000_dog_deworming_entries.sql
 supabase/migrations/README.md
+supabase/migrations/__tests__/dog-deworming-entries.test.ts
 supabase/production_public_schema_snapshot.sql
+supabase/staging_health_phase2_smoke.sql
 supabase/staging_p0_smoke_verify.sql
 supabase/staging_public_schema_restore.sql
 winkel.png
@@ -446,11 +477,11 @@ winkel.png
 
 ### Recent commits
 ```
-adfc3b5 fix(subscription): allow 2 NEWBIE trainings per month
-c210008 feat(subscription): add 3-day ACTIVE trial funnel
-888d25f chore(agent): refresh production handoff state
-fddd1f1 fix: restore track rendering and robust angle detection
-71f2bef fix(tracking): export voice guidance helper used by track run
+c004949 chore(agent): parallel multi-agent worktree workflow (OpenCode + Codex)
+b1a8269 fix(training): auto-select single dog for documentation
+8fe861f chore(agent): mark trainer keyboard fix release-verified
+8a871c0 chore(agent): record trainer keyboard fix
+0e7aaba fix(trainer): keep connect sheet above keyboard
 ```
 
 ### Runtime
@@ -464,15 +495,20 @@ Package manager: npm
 > Hinweis: Der AUTO-GENERATED-Block oben wird beim Handoff-Script aktualisiert.
 > Maßgeblich bei Widerspruch bleibt der tatsächliche Repository-Zustand.
 > Stand der manuellen Sektionen: **2026-08-17 (Codex)** — NEWBIE-Quota read-only Production-Preflight (No-Op) +
-> T-57 Trainer-Keyboard-Fix `0e7aaba` ist releaseverifiziert; HEAD `0e7aaba`.
+> T-57 Trainer-Keyboard-Fix `0e7aaba` ist releaseverifiziert; T-59 `b1a8269` ist gepusht und per OTA deployed.
 > Hinweis: Der AUTO-GENERATED-Block oben ist ggf. älter als diese manuellen Sektionen; maßgeblich ist der echte git-Stand.
 
 ## Current task
-**Session 2026-08-17 (Codex):** (1) **Read-only Production-Preflight** der geplanten NEWBIE-Quota-Korrektur
-gegen ANYVO Production (`axkkhyqrjrtbkumaulta`); (2) **T-57 releaseverifiziert** `app/trainer/index.tsx`
-(Bottom-Sheet „Trainer verbinden → Code eingeben" bei Tastatur sichtbar). **Kein Push/Build/OTA/Submit,
-keine Production-Schreiboperation.** HEAD steht auf **`0e7aaba`**, Branch `feat/track-module-rewrite`, und ist
-**3 Commits VOR origin** (`c210008`, `adfc3b5`, `0e7aaba` sind **ungepusht**; 0 hinter origin).
+**Session 2026-08-18 (Codex):** Fährten-Voice-Guidance Diagnose Phase 2 — ausschließlich DEV-only
+Ketten-Diagnose + Replay-Tests, uncommitted. Keine Threshold-/Speech-Architektur-Änderung, kein Commit/Push/OTA/
+Production-Vorgang. Die reale Feldursache ist noch offen: Die neue Diagnostik muss beim nächsten Lauf den Pfad
+Auto-Kandidat → Marker → Search-Snapshot → Guidance/Suppression belegen.
+
+**Session 2026-08-17 (Codex):** **T-60 Health Phase 2** — Staging-Migration + RLS/CRUD-Smoketest PASS auf
+`cbhrxkjclakzlvajyvfn`; iOS- und Android-Dev-Clients sind lokal Staging-gebunden, die manuelle NEWBIE/Premium-QA
+ist aber weiterhin OPEN. Android ADB/Emulator ist nun verfügbar. Ein früherer lokaler Android-Login war ein
+gespeicherter Production-Account; er wurde abgemeldet, und es wurden keine Production-Daten geschrieben. Kein
+Commit, Push, OTA oder Production-DB-Vorgang.
 
 > **Repository-Zustand > Handoff.** Zwei Subscription-Commits sind seit dem letzten Handoff (`fddd1f1`) auf dem
 > Branch, in der vorherigen Session **nicht** erstellt und **noch nicht gepusht** — nur als Repo-Zustand dokumentiert:
@@ -480,9 +516,8 @@ keine Production-Schreiboperation.** HEAD steht auf **`0e7aaba`**, Branch `feat/
 > **Neu in dieser Session:** `0e7aaba fix(trainer): keep connect sheet above keyboard`, ebenfalls ungepusht.
 
 ## Goal
-NEWBIE-Quota-Zielzustand (dog=1 · training=2 · track=0) sicher auf Production halten **ohne unnötige Migration**
-und den **realen Feldtest** des
-Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
+Health Phase 2 mit einem Staging-fähigen iOS- und Android-Testzugang manuell abnehmen. NEWBIE-Basiswerte
+müssen sichtbar und bearbeitbar bleiben; nur Verlauf/Planung werden per Capability gegatet.
 
 ## NEWBIE-Quota Preflight — Ergebnis (Verified read-only, 2026-08-17)
 - **Production liefert bereits** `newbie_quota_limit` = **dog=1, training=2, track=0** (via PostgREST/anon-RPC gegen
@@ -519,6 +554,33 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 - Voice/Haptik/Store/Persistenz/1-5-10-m/Off-Track **unverändert** (Voice/Haptik waren nicht die Root Cause).
 
 ## Work completed — Stand 2026-08-15
+- **T-60 Health Phase 2 (uncommitted, local only):** `app/dog-health/[id].tsx` erfasst Gewicht mit lokalem
+  Messdatum und optionale letzte Entwurmung/Präparat. `dogs.weightHistory` zeigt Premium-Nutzern eine
+  Gewichtstrendlinie inkl. Veränderung; `dogs.dewormingSchedule` zeigt Verlauf und erlaubt ein freiwillig
+  gesetztes nächstes Datum. NEWBIE bleibt im Health-Screen; `PremiumInlineUpsell` sperrt nur die
+  weiterführenden Bereiche. `services/dogHub.ts` enthält die additiven Read/Write-Zugriffe.
+- **Lokale Migration:** `supabase/migrations/20260817190000_dog_deworming_entries.sql` legt ausschließlich
+  `dog_deworming_entries` an. Nach Staging-Review wurde sie auf **ANYVO Staging `cbhrxkjclakzlvajyvfn`**
+  direkt und isoliert ausgeführt (kein `db push`) und nur Version `20260817190000` als applied markiert.
+  `owner_id → auth.users` und `dog_id → public.dogs` sind jeweils ON DELETE CASCADE; kein festes medizinisches
+  Intervall. Vier RLS-Policies verlangen bei jeder Operation auth.uid als owner **und** einen eigenen Hund;
+  kein verbundenen-Trainer-Read-Bypass.
+- **Staging CRUD/RLS Smoke PASS:** `supabase/staging_health_phase2_smoke.sql` erzeugte temporär einen
+  Owner-Hund/Entwurmungseintrag, bestätigte Owner CREATE/READ/UPDATE/DELETE sowie fremd SELECT/UPDATE/DELETE =
+   0 und INSERT = RLS denied. Danach: `remaining_smoke_rows=0`, `remaining_smoke_dogs=0`.
+- **Android-Runtime-Vorbereitung:** Debug-Development-Client mit Staging-Bundle auf dem Galaxy-S23-Emulator
+  installiert; Metro-Port 8083 und Staging-Ref verifiziert. Zwei temporäre, bestätigte Staging-Fixtures
+  (NEWBIE/Premium, je ein Hund) wurden angelegt. Der anfänglich erhaltene Production-Login wurde im Profil explizit
+  abgemeldet. Schreibversuche gegen den fremden Fixture-Hund wurden nicht gespeichert (RLS); keine
+  Production-Schreiboperation wurde ausgeführt.
+- **Voice-Guidance Diagnose Phase 2 (uncommitted):** `useTrackRecorder` protokolliert für jeden bewerteten
+  Auto-Winkel-Kandidaten (DEV-only, ohne Koordinaten/PII) Accuracy, Schenkel, Geradheit, Confidence, Ergebnis
+  und bei Marker-Erzeugung ID/arcM. `run.tsx` protokolliert den eingefrorenen Search-Snapshot. Die Voice-Guidance
+  protokolliert Kandidat, Vorausdistanz, Cooldown, Auswahl, Suppression und den Aufruf von `Speech.speak`.
+- **T-59 deployed `b1a8269`:** post-load dogId-Fallback in `app/unit/{start,document}.tsx`, sichtbarer Ein-Hund-Chip,
+  0-Hund-Add-Dog-State und 2 neue Tests. Checks: 2 neue Suites / 6 Tests PASS, Training-Tab 6/6 PASS, `tsc` PASS,
+  Diff-Check PASS, iOS-/Android-OTA-Bundles PASS. OTA Runtime 1.0.1 / `production`: iOS
+  `01a010dc-746e-76bb-ac7a-9427bba498be`, Android `01a010e1-1298-7591-97fd-0f7a7a2ceb5e`; auf origin gepusht.
 - **Commit `0e7aaba`** — `fix(trainer): keep connect sheet above keyboard` (ausschließlich
   `app/trainer/index.tsx`, 35+/28−). Kein Build/OTA/Submit/DB-Vorgang, nicht gepusht.
 - **T-57 Real-Device-QA:** iOS und Android / Galaxy S23 (Gesten- und Drei-Button-Navigation) PASS; Fix ist
@@ -533,6 +595,19 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 - Reports: `FAEHRTE_SEARCH_RENDER_AND_GUIDANCE_FIX_REPORT.md`, `FAEHRTE_ANGLE_CONFIDENCE_FIX_REPORT.md`.
 
 ## Tests / verification (Verified)
+- **T-60:** `npx tsc --noEmit --skipLibCheck` PASS; fokussierte Jest-Suites **6 / 53 PASS** (Health-Helper,
+  Health-Capabilities, Capability-Screen-Gate, i18n, lokale Migration, Keyboard-Form); ESLint der berührten
+  Dateien PASS; `git diff --check` inkl. neuer Dateien PASS. Der vollständige `npx tsc --noEmit`-Lauf
+   überschritt in dieser Session 5 Minuten ohne Diagnose. Kein Real-Device-Test.
+- **Android Runtime:** Staging-Metro/Development-Client startet und der Health-Editor rendert. Vollständige
+  NEWBIE-/Premium-Abnahme ist **nicht** bestanden: die Emulator-Eingabe hatte zunächst gespeicherte
+  Production-Autofill-Daten übernommen; nach Logout war die Fixture-Anmeldung noch nicht zuverlässig abgeschlossen.
+- **Voice-Diagnose:** 4 fokussierte Suites / **69 Tests PASS** (`voiceGuidanceDiagnostics`, Pipeline,
+  Auto-Corner, Diagnostics); `npx tsc --noEmit --skipLibCheck` und `git diff --check` PASS. ESLint: 0 Errors;
+  bestehende Warnings in `run.tsx` sowie die vorbestehende defensive `require('expo-speech')`-Warning bleiben.
+- **T-60 Staging:** Migration-Datei-Check PASS; Remote-Schema/FKs/RLS/Policies read-only verifiziert; isolierter
+  CRUD/RLS-Smoke **8 / 8 PASS**. Migration-History danach: nur vorherige Staging-Version `20260808120000` plus
+  `20260817190000`; andere Pending-Migrationen blieben unangetastet.
 - Targeted Tracking/Angle/Guidance **103 PASS**; Gesamtsuite **1191 PASS / 1 FAIL** = ausschließlich der
   vorbestehende stale `app/track/__tests__/run-arming.test.ts` (`run.tsx` unverändert). **Suite NICHT vollständig
   grün, solange dieser stale Test existiert.** `tsc --noEmit` 0 Errors, ESLint berührter Dateien 0 Errors,
@@ -548,14 +623,43 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
   Accuracy-Schwellen „reparieren".
 
 ## Known issues / offene Punkte
+- **T-60 Runtime-QA OPEN:** Lokaler iOS-Development-Client ist installiert. Er wurde mit `EXPO_NO_DOTENV=1`
+  und expliziten Staging-Variablen gebaut; Staging-Ref ist sowohl im Export als auch in der Metro-Bundle
+  nachgewiesen. Danach wurde ein **neuer** iOS-Simulator erstellt, der nur diesen Client enthält; eine
+  Production-Session ist dort nicht vorhanden. Der Dev Launcher wartet aber auf die iOS-Bestätigung zum Öffnen
+  des Staging-Servers; ohne UI-Automation kann weder sie noch ein Staging-Login eingegeben werden. Keine Staging-
+   Accounts/-Testdaten erzeugt. Android ADB/Emulator ist inzwischen verfügbar; der Development-Client ist Staging-
+   gebunden. Der vorige, gespeicherte Production-Login wurde abgemeldet. Die Staging-Fixture-Anmeldung braucht nach
+   dem Emulator-Neustart eine saubere ADB-Eingabe ohne abgeschnittene Anfangszeichen. NEWBIE-/Premium-Flows,
+   Tastatur, Safe Area, Back und Button-Überlagerungen sind noch nicht manuell bestätigt.
+- **Voice-Guidance:** Es gibt noch keine reale DEV-Trace. Replay belegt: realistisch leicht ungerader 90°-Winkel
+  wird aktuell erzeugt; ein Fortschrittssprung hinter den virtuellen Hund unterdrückt den Marker bewusst;
+  jedes spätere `say()` ruft `Speech.stop()` auf und kann eine Winkelansage ersetzen. Ohne Feldtrace ist die
+  häufigste reale Ursache nicht belastbar zwischen fehlendem Marker und Speech-Kollision zu entscheiden.
 - **NEWBIE-Quota-Migration `20260816130000` ist auf Production ein No-Op** (training bereits 2). Nicht ausführen,
   außer man will die Definition bewusst idempotent festschreiben — **nur nach ausdrücklicher Freigabe**.
 - **Stale Test** `app/track/__tests__/run-arming.test.ts` (`([5, 10] as const).map` vs. `HANDLER_DISTANCES_M`) rot, unabhängig.
 - **Web-Bundle** bricht via `react-native-maps` → OTA plattformweise ios/android; kein Mobile-Blocker, **nicht nebenbei fixen**.
 - **`freezeProgress` bewusst DEFERRED** — nur Feedback, kein Progress-/Recorder-Freeze.
 - Fremder WIP im Tree (inkl. bündelbarer Diff `features/tracking/hooks/useTrackVoiceGuidance.ts`) — **nicht anfassen**.
+- **T-59:** Nachbeobachtung auf echten Geräten für Start und direkte Dokumentation mit 0/1/mehreren Hunden sinnvoll;
+  die Code-/Regressionstests und beide OTA-Bundles sind grün.
 
 ## Important context
+- **Health:** Basis-Gesundheit, aktuelles Gewicht und letzte Entwurmung bleiben NEWBIE-frei. Ausschließlich
+  `dogs.weightHistory` und `dogs.dewormingSchedule` nutzen `useCapabilities().can(...)`; keine pauschale
+  `isPremium`-Sperre oder medizinisch vorgegebene Entwurmungsintervalle.
+- **Staging:** Zielprojekt ist ausschließlich `cbhrxkjclakzlvajyvfn`. Die Remote-Migrationsliste hatte weitere
+  lokale Pending-Versionen, daher **nie `supabase db push`** verwenden. T-60 wurde bewusst via einzelner
+   `db query --file` + einzelner `migration repair --status applied 20260817190000` ausgeführt.
+- **Android Runtime:** ADB liegt unter `$HOME/Library/Android/sdk/platform-tools/adb`; der aktive Emulator ist
+  `emulator-5554` (Galaxy-S23-AVD). Die sichtbaren Screenshots sind auf 920×2000 skaliert, während ADB-Taps auf
+  1080×2340 erfolgen. Für präzise Touch-Bounds kann `adb exec-out uiautomator dump /dev/tty` genutzt werden.
+  Gboard-Autofill darf keine Production-Credentials übernehmen; Production-Account vor jeder Prüfung abmelden.
+- **iOS Dev Runtime:** `lib/supabase.ts` erhält den Zielendpunkt aus statischen `EXPO_PUBLIC_*`-Referenzen.
+  Für Staging deshalb immer `EXPO_NO_DOTENV=1` plus explizite Staging-Variablen verwenden; die Production-`.env`
+  darf niemals von Metro geladen werden. Der lokale Build benötigte nur `SENTRY_DISABLE_AUTO_UPLOAD=true`,
+  um den Debug-Symbolupload ohne Sentry-Org zu überspringen; keine Source-/Native-Änderung.
 - **NICHT erneut bauen:** zweite Track-Sync-Queue · zweite Off-Track-State-Machine · zweite Winkel-Erkennung ·
   separater Run-Sync-Stack · Search-Points zusätzlich remote in `track_points` replizieren (kanonisch ist
   `track_runs.run_points`).
@@ -565,17 +669,35 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 - `AGENTS.md` + `docs/agent/*` sind die gemeinsame Wahrheit (Handoff Claude Code ↔ Codex).
 
 ## Do not touch
+- **T-60-Migration nicht erneut oder auf Production anwenden** und keine Health-OTA veröffentlichen ohne
+  ausdrückliche Freigabe.
+- **Keine Production-Schemaänderung:** T-60 ist nur auf Staging; weder auf `axkkhyqrjrtbkumaulta` anwenden noch
+  eine OTA, einen Build, Commit oder Push ausführen.
 - Der gesamte vorbestehende fremde WIP (Produkt-/Tracking-/i18n-WIP, SQL-Dumps, Artefakte, Screenshots, `dist-*`,
   Workspaces, ZIPs, `.opencode/`) — inkl. `features/tracking/hooks/useTrackVoiceGuidance.ts`.
 - **T-57 ist committed:** `app/trainer/index.tsx` in `0e7aaba`; nicht ohne neuen, klar abgegrenzten Auftrag verändern.
+- **T-59 ist committed/deployed:** `b1a8269` enthält ausschließlich `app/unit/{start,document}.tsx` und
+  `app/unit/__tests__/{start,document}.test.tsx`; nicht ohne neuen, klar abgegrenzten Auftrag verändern.
 - **Keine Production-DB-Schreiboperation** (NEWBIE-Quota-Migration inkl.) ohne ausdrückliche Freigabe.
 - Keine pauschalen Git-Aktionen (`git add .`, reset, clean, checkout fremder Dateien); kein Push/Build/OTA/Store-Submit ohne Freigabe.
 - Den AUTO-GENERATED-Block nie händisch editieren (nur via `agent:handoff`).
 
 ## Next recommended step
-1. **NEWBIE-Quota:** Entscheidung des Nutzers einholen — da Production bereits training=2 liefert, ist die Migration
+1. **Voice-Guidance:** DEV-Build/realen Fährtenlauf durchführen und die neuen `[trackDiag:angle]`,
+   `[trackDiag:snapshot]` und `[trackDiag:voice]`-Zeilen sichern. Erst danach den minimalen fachlichen Fix
+   freigeben: fehlender Marker → Erkennung; vorhandener aber unterdrückter Marker → konkrete Suppression bzw.
+   priorisierte Speech-Ausgabe. Keine Threshold-Änderung auf Verdacht.
+2. **T-60:** Android zunächst mit einer sauber bestätigten Staging-NEWBIE-Fixture anmelden (vorher ggf. Emulator-
+   App-Session prüfen/abmelden), dann den vollständigen NEWBIE-/Premium-Flow testen. Für iOS eine erlaubte
+   UI-Automationsmöglichkeit oder interaktive Bedienung bereitstellen; der frische Simulator und der Staging-
+   Dev-Client stehen bereit. Danach NEWBIE/Premium manuell
+   abnehmen (Messdatum, Trend, Entwurmung, freiwillig gesetztes nächstes Datum, Upgrade/Downgrade,
+   Tastatur, Safe Area, Back, keine Überlagerungen). Erst danach Release-/Production-Entscheidung einholen.
+   Temporäre Staging-Fixtures danach löschen.
+3. **NEWBIE-Quota:** Entscheidung des Nutzers einholen — da Production bereits training=2 liefert, ist die Migration
    **nicht nötig**; optionales idempotentes Festschreiben nur nach Freigabe. `20260808120000` (→1) **nicht** anwenden.
-2. **T-56 Real-Device-Test** Confidence-/Render-Fix auf echten Geräten (iOS **und** Android): solide Mint-Fährte,
+4. **T-59:** Ein-Hund-Start und direkte Dokumentation auf echten Geräten mit 0/1/mehreren Hunden nachbeobachten.
+5. **T-56 Real-Device-Test** Confidence-/Render-Fix auf echten Geräten (iOS **und** Android): solide Mint-Fährte,
    Auto-Winkel (90°/Spitz L+R) sichtbar + Voice/Haptik, Schlangenlinie → 0 Winkel, 1/5/10-m-Stichprobe, kurzer Off-Track.
 2. Bei Feldbeleg zur Auto-Erkennung optional die vorbereitete **DEV-Diagnostik** (`angleDiagnostics.ts`) für **eine**
    Fährte aktivieren (accept/pending/reject + Confidence + Accuracy) — danach wieder entfernen.
@@ -583,6 +705,13 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
    Release-Branch-Strategie** (fremder WIP unangetastet).
 
 ## Relevant files (diese Session 2026-08-17)
+- **T-60 Health:** `app/dog-health/[id].tsx`, `services/dogHub.ts`, `features/dogs/health.ts`,
+  `components/analytics/TrendLine.tsx`, `components/subscription/PremiumInlineUpsell.tsx`,
+  `supabase/migrations/20260817190000_dog_deworming_entries.sql`,
+  `supabase/staging_health_phase2_smoke.sql`,
+  `features/dogs/__tests__/health.test.ts`, `i18n/__tests__/health-i18n.test.ts`,
+  `supabase/migrations/__tests__/dog-deworming-entries.test.ts`.
+- **T-59 (deployed `b1a8269`):** `app/unit/{start,document}.tsx`, `app/unit/__tests__/{start,document}.test.tsx`.
 - **Keyboard-Fix (committed `0e7aaba`):** `app/trainer/index.tsx` (Bottom-Sheet „Code eingeben").
 - **NEWBIE-Quota (Repo, keine Ausführung):** `supabase/migrations/20260816130000_newbie_training_quota_two.sql` (No-Op),
   `20260808120000_newbie_training_quota_one.sql` (→1, nicht isoliert anwenden), `SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql`,
@@ -596,6 +725,8 @@ Fährten-Confidence-/Render-Fixes (P0, T-56, siehe unten).
 - Konsument (unverändert): `app/track/run.tsx`, `features/tracking/hooks/{useTrackVoiceGuidance,useTrackHapticGuidance,useTrackRecorder}.ts`.
 
 ## Open questions
+- **T-60:** Welcher Staging-fähige iOS-/Android-Build und welche NEWBIE-/Premium-Testzugänge stehen für die
+  verbleibende manuelle Runtime-Abnahme bereit?
 - NEWBIE-Quota: Will der Nutzer die No-Op-Migration trotzdem idempotent festschreiben, oder Production so belassen (empfohlen)?
 - Justieren einzelne Feld-Fährten die Confidence-Gewichte/Schwellen? Nur mit Regressionstests + Feldbeleg.
 - Wann/ob der Web-Bundle-Bruch (`react-native-maps`) separat behoben wird (kein Mobile-Blocker).
