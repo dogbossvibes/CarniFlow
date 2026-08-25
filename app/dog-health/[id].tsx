@@ -13,7 +13,8 @@ import {
   type DogDewormingEntryRow, type DogHealthEntryRow,
 } from '@/services/dogHub';
 import { DateField } from '@/components/ui/DateField';
-import { useT } from '@/i18n';
+import { getLocale, useT } from '@/i18n';
+import { formatWeightKg } from '@/i18n/format';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { PremiumInlineUpsell } from '@/components/subscription/PremiumInlineUpsell';
 import { TrendLine } from '@/components/analytics/TrendLine';
@@ -212,7 +213,7 @@ function formatDate(value: string): string {
 
 function signedKg(value: number): string {
   const rounded = Math.round(value * 100) / 100;
-  return `${rounded > 0 ? '+' : ''}${rounded.toLocaleString('de-CH')} kg`;
+  return `${rounded > 0 ? '+' : ''}${formatWeightKg(rounded, getLocale())}`;
 }
 
 const s = StyleSheet.create({
