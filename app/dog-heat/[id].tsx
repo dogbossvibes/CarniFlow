@@ -99,9 +99,11 @@ export default function DogHeatDetail() {
     if (!cycle || !editStart || saving) return;
     setSaving(true);
     try {
+      const endIso = editEnd ? toISODate(editEnd) : null;
       const { error } = await updateHeatCycle(cycle.id, {
         startDate: toISODate(editStart),
-        endDate: editEnd ? toISODate(editEnd) : null,
+        endDate: endIso,
+        status: endIso ? 'completed' : 'active',
         notes: editNotes.trim() || null,
       });
       if (error) { haptic.error(); return; }
