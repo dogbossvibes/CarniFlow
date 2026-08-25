@@ -45,6 +45,7 @@ export default function DogHubRoute() {
   const [heatCycles, setHeatCycles] = useState<HeatCycle[]>([]);
   const [heatPhaseCounts, setHeatPhaseCounts] = useState<Record<string, number>>({});
   const [heatObsCounts, setHeatObsCounts] = useState<Record<string, number>>({});
+  const [heatCurrentPhases, setHeatCurrentPhases] = useState<Record<string, string>>({});
   const [commands, setCommands] = useState<DogCommand[]>([]);
   const [backpackCounts, setBackpackCounts] = useState({ total: 0, active: 0, packed: 0 });
   const [appointments, setAppointments] = useState<DogAppointment[]>([]);
@@ -68,15 +69,22 @@ export default function DogHubRoute() {
       // Load phase + observation counts for each cycle
       const pc: Record<string, number> = {};
       const oc: Record<string, number> = {};
+      const cp: Record<string, string> = {};
       await Promise.all(cs.map(async (c) => {
         try {
           const [p, o] = await Promise.all([getHeatPhases(c.id), getHeatObservations(c.id)]);
           pc[c.id] = p.length;
           oc[c.id] = o.length;
+          // Find current phase: open phase with most recent start date
+          if (p.length > 0) {
+            const open = p.filter(ph => !ph.endDate).sort((a, b) => b.startDate.localeCompare(a.startDate));
+            if (open.length > 0) cp[c.id] = open[0].phaseType;
+          }
         } catch { pc[c.id] = 0; oc[c.id] = 0; }
       }));
       setHeatPhaseCounts(pc);
       setHeatObsCounts(oc);
+      setHeatCurrentPhases(cp);
     }).catch(() => setHeatCycles([]));
     getCommands(id).then(setCommands).catch(() => setCommands([]));
     if (userId) {
@@ -205,6 +213,7 @@ export default function DogHubRoute() {
         onDelete: deleteHeat,
         phaseCounts: heatPhaseCounts,
         obsCounts: heatObsCounts,
+        currentPhases: heatCurrentPhases,
       }}
       commands={{
         commands,

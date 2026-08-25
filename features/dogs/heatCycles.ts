@@ -157,7 +157,8 @@ export async function addHeatCycle(dogId: string, input: Omit<HeatCycle, 'id' | 
     end_date: input.endDate,
     status: input.status ?? 'active',
     notes: input.notes,
-  });
+    phase: input.phase,
+  }).select('id').single();
 }
 
 export async function updateHeatCycle(id: string, updates: {

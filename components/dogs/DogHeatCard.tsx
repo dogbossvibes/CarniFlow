@@ -13,7 +13,7 @@ const PINK_DIM = 'rgba(244,114,182,0.14)';
 // Läufigkeitskalender (nur Hündinnen). Prognose = Schätzung + Verlaufsliste.
 // Kompakte Timeline statt vollem Kalendergitter.
 export function DogHeatCard({
-  cycles, prediction, onAdd, onOpen, onDelete, phaseCounts, obsCounts,
+  cycles, prediction, onAdd, onOpen, onDelete, phaseCounts, obsCounts, currentPhases,
 }: {
   cycles: HeatCycle[];
   prediction: HeatPrediction | null;
@@ -22,6 +22,7 @@ export function DogHeatCard({
   onDelete?: (c: HeatCycle) => void;
   phaseCounts?: Record<string, number>;
   obsCounts?: Record<string, number>;
+  currentPhases?: Record<string, string>;
 }) {
   const { t } = useT();
   if (cycles.length === 0) {
@@ -102,6 +103,7 @@ export function DogHeatCard({
         const range = `${fmtDate(c.startDate)}${c.endDate ? ` – ${fmtDate(c.endDate)}` : ''}`;
         const pc = phaseCounts?.[c.id] ?? 0;
         const oc = obsCounts?.[c.id] ?? 0;
+        const curPhase = active ? currentPhases?.[c.id] : null;
         return (
           <TouchableOpacity
             key={c.id}
@@ -116,8 +118,12 @@ export function DogHeatCard({
                 {range}{dur ? ` · ${dur} ${t('heat.days')}` : c.endDate ? '' : ` · läuft`}
                 {active ? ` · Tag ${Math.floor((Date.now() - new Date(c.startDate).getTime()) / 86400000)}` : ''}
               </Text>
-              {/* Phase + Observation stats */}
-              {(pc > 0 || oc > 0) ? (
+              {/* Current phase badge for active cycles */}
+              {curPhase ? (
+                <Text style={s.itemPhase}>{curPhase}</Text>
+              ) : null}
+              {/* Phase + Observation stats for completed cycles */}
+              {!active && (pc > 0 || oc > 0) ? (
                 <View style={s.itemStats}>
                   {pc > 0 && (
                     <View style={s.itemStat}>
@@ -179,6 +185,7 @@ const s = StyleSheet.create({
   itemDot:    { width: 9, height: 9, borderRadius: 5, backgroundColor: PINK },
   itemDotActive: { backgroundColor: PINK },
   itemTitle:  { fontSize: 14, color: C.trackText, fontWeight: '700' },
+  itemPhase:  { fontSize: 12.5, color: PINK, fontWeight: '700', marginTop: 2 },
   itemSub:    { fontSize: 12, color: C.trackTextSec, marginTop: 2 },
   itemStats:  { flexDirection: 'row', gap: 10, marginTop: 4 },
   itemStat:   { flexDirection: 'row', alignItems: 'center', gap: 4 },

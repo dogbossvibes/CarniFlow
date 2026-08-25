@@ -44,9 +44,7 @@ export default function DogHeatNew() {
       if (error) { haptic.error(); Alert.alert(t('common.error'), t('dog.heatSaveFailedTable')); return; }
       haptic.success();
       // Navigate to the detail screen of the newly created cycle.
-      // The Supabase insert may return the created row.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const newId = (data as any)?.[0]?.id;
+      const newId = data?.id;
       if (newId) {
         router.replace(`/dog-heat/${newId}` as never);
       } else {

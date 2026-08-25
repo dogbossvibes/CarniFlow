@@ -19,6 +19,12 @@ BEGIN
   END IF;
 END $$;
 
+-- Backfill: existing cycles with an end_date are completed, not active.
+UPDATE public.dog_heat_cycles
+SET status = 'completed'
+WHERE end_date IS NOT NULL
+  AND status = 'active';
+
 -- ── Phases ──────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.dog_heat_phases (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -59,9 +65,9 @@ CREATE POLICY "hp_select" ON public.dog_heat_phases FOR SELECT USING (
   owner_id = auth.uid()
   OR EXISTS (
     SELECT 1 FROM public.connections c
-    WHERE c.status = 'accepted'
-      AND ((c.user_id = auth.uid() AND c.counterpart_id = dog_heat_phases.owner_id)
-        OR (c.counterpart_id = auth.uid() AND c.user_id = dog_heat_phases.owner_id))
+    WHERE c.owner_user_id = dog_heat_phases.owner_id
+      AND c.connected_user_id = auth.uid()
+      AND c.status = 'accepted'
   )
 );
 CREATE POLICY "hp_insert" ON public.dog_heat_phases FOR INSERT WITH CHECK (owner_id = auth.uid());
@@ -73,9 +79,9 @@ CREATE POLICY "ho_select" ON public.dog_heat_observations FOR SELECT USING (
   owner_id = auth.uid()
   OR EXISTS (
     SELECT 1 FROM public.connections c
-    WHERE c.status = 'accepted'
-      AND ((c.user_id = auth.uid() AND c.counterpart_id = dog_heat_observations.owner_id)
-        OR (c.counterpart_id = auth.uid() AND c.user_id = dog_heat_observations.owner_id))
+    WHERE c.owner_user_id = dog_heat_observations.owner_id
+      AND c.connected_user_id = auth.uid()
+      AND c.status = 'accepted'
   )
 );
 CREATE POLICY "ho_insert" ON public.dog_heat_observations FOR INSERT WITH CHECK (owner_id = auth.uid());
