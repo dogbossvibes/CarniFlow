@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { validSessionRating } from '@/features/tracking/utils/sessionRating';
 import type { MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
 
@@ -305,7 +306,9 @@ export async function saveTrackEvaluation(sessionId: string, input: EvaluationIn
     const { data: existing } = await supabase.from('training_sessions').select('track_data').eq('id', sessionId).maybeSingle();
     const currentTrackData = ((existing as any)?.track_data && typeof (existing as any).track_data === 'object') ? (existing as any).track_data : {};
     const { error } = await supabase.from('training_sessions').update({
-      rating:     input.rating,
+      // input.rating ist der 0–100-Fährtenscore → NICHT in rating (1–5-Constraint),
+      // sondern in track_data.score. rating bleibt null (Fährte hat kein 1–5-Rating).
+      rating:     validSessionRating(input.rating),
       notes:      input.notes,
       track_data: { ...currentTrackData, legs: input.legs, score: input.rating, evaluated_at: new Date().toISOString() },
     }).eq('id', sessionId);
@@ -363,14 +366,22 @@ export async function getUserTrackSessions(ownerId: string): Promise<Result<any[
 export async function getTrackSessionById(id: string): Promise<Result<any>> {
   try {
     const [{ data: session, error: sErr }, { data: points }, { data: markers }, { data: runs }, engineRes] = await Promise.all([
-      supabase.from('training_sessions').select('*, dog:dogs(name)').eq('id', id).single(),
+      // maybeSingle() statt single(): eine local-first Fährte OHNE Remote-Zeile liefert
+      // 0 Zeilen → das ist ein ERWARTBARER Zustand, KEIN Fehler (früher PGRST116 → LogBox).
+      supabase.from('training_sessions').select('*, dog:dogs(name)').eq('id', id).maybeSingle(),
       supabase.from('track_points').select('*').eq('session_id', id).order('timestamp'),
       supabase.from('track_markers').select('*').eq('session_id', id),
       supabase.from('track_runs').select('*').eq('session_id', id).order('created_at'),
       // best-effort: alte Fährten / fehlende Migration → null (Fehler ignoriert).
       supabase.from('track_engine_sessions').select('*').eq('session_id', id).maybeSingle(),
     ]);
-    if (sErr) return fail('getTrackSessionById', sErr);
+    // Echte Fehler (Netzwerk / Auth / RLS / Server) weiterhin eskalieren + loggen.
+    // Ein PGRST116 („0 rows") kann hier mit maybeSingle() nicht mehr auftreten; falls
+    // ein Aufrufer dennoch 0-rows meldet, als Not-found (nicht als Fehler) behandeln.
+    if (sErr && (sErr as { code?: string }).code !== 'PGRST116') return fail('getTrackSessionById', sErr);
+    // Local-first: keine Remote-Zeile → still „not found" (KEIN console.error). Der
+    // Caller (app/track/[id].tsx) lädt die Fährte dann vollständig aus SQLite.
+    if (!session) return { data: null, error: null };
     return { data: { ...session, points: points ?? [], markers: markers ?? [], runs: runs ?? [], engine: engineRes?.data ?? null }, error: null };
   } catch (e) { return fail('getTrackSessionById', e); }
 }

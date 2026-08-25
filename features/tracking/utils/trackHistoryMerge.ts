@@ -87,7 +87,11 @@ export function mergeTrackHistory(remote: any[], local: LocalTrainingSession[]):
   const byId = new Map<string, TrackHistoryRow>();
   for (const r of remote) {
     if (!r?.id) continue;
-    byId.set(r.id, { ...r, syncState: 'synced', isLocalOnly: false });
+    // Score für die Anzeige aus track_data.score beziehen (dort liegt der 0–100-
+    // Fährtenscore). Ältere Zeilen ohne track_data.score fallen später über
+    // trackScore() auf `rating` zurück — daher hier nur ergänzen, nicht überschreiben.
+    const score = r.score ?? r.track_data?.score ?? null;
+    byId.set(r.id, { ...r, score, syncState: 'synced', isLocalOnly: false });
   }
   for (const l of local) {
     if (l.status !== 'completed' || l.deleted_at) continue;   // nur abgeschlossene, nicht gelöschte Fährten

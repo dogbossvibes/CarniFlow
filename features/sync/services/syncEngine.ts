@@ -12,6 +12,7 @@ import {
   getTrackPointsBySession, getTrackMarkersBySession, updateTrackPointSyncStatus,
 } from '@/features/tracking/repositories/localTrackRepository';
 import { getPendingMediaFiles, markMediaUploaded, markMediaUploadFailed } from '@/features/media/repositories/localMediaRepository';
+import { validSessionRating } from '@/features/tracking/utils/sessionRating';
 import {
   createRemoteTrainingSession, updateRemoteTrainingSession, deleteRemoteTrainingSession,
   createRemoteTrackPointsBatch, createRemoteTrackMarkersBatch, uploadRemoteMediaFile,
@@ -91,7 +92,9 @@ async function processQueueItem(item: Awaited<ReturnType<typeof getPendingSyncOp
         await markSyncCompleted(item.id);
       } else if (item.operation === 'update') {
         const local = await getLocalTrainingSessionById(item.entity_local_id);
-        if (local?.remote_id) { const r = await updateRemoteTrainingSession(local.remote_id, { notes: local.notes, rating: local.score, status: local.status, ended_at: local.ended_at, duration_seconds: local.duration_seconds }); if (r.error) throw new Error(r.error); }
+        // rating nur gültig (1–5) übernehmen; der Fährten-Score (0–100) bleibt in
+        // track_data.score (autoritativ über den create/upsert-Pfad synchronisiert).
+        if (local?.remote_id) { const r = await updateRemoteTrainingSession(local.remote_id, { notes: local.notes, rating: validSessionRating(local.score), status: local.status, ended_at: local.ended_at, duration_seconds: local.duration_seconds }); if (r.error) throw new Error(r.error); }
         else { const res = await syncTrainingSession(item.entity_local_id); if (!res.ok) throw new Error(res.error); }
         await markSyncCompleted(item.id);
       } else {
