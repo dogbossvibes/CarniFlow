@@ -64,3 +64,21 @@ fahertescreen.PNG
 
 # Lokale Native-Modul-Build-Artefakte (Gradle)
 modules/*/android/build/
+
+# Local workspaces / backups
+*.code-workspace
+ANYVO-current-repository.zip
+
+# Local QA / export artifacts
+artifacts/
+dist-auth-*/
+dist-login-*/
+after_bottomnav_*.png
+screen20.jpg
+
+# Local design / QA reference images
+assets/images/Journalscreenshot.png
+assets/images/backpackscreenshot.png
+assets/images/smartanalysescreenshot.png
+design_handoff_faehrten/screen3.jpg
+faehrten 6/design_handoff_faehrten/abriss.png
