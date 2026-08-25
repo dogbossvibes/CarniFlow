@@ -15,7 +15,7 @@ import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePack
 import {
   activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
-import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
+import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, isPremiumPlan, type SubscriptionPlan } from '@/features/subscription/plans';
 import { useT } from '@/i18n';
 import type { TranslationKey } from '@/i18n/de-CH';
 
@@ -35,8 +35,8 @@ interface CardDef { plan: SubscriptionPlan; badgeKey?: TranslationKey; features:
 // Öffentliche Kaufpläne: Newbie (Trial), Active, Trainer. Founder Active wird NICHT
 // mehr angeboten (kein Kauf-/Wechselziel); interne Restore-/Bestandslogik bleibt.
 const CARDS: CardDef[] = [
-  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.feature7Days', 'premium.featureActive', 'premium.featureThenActive', 'premium.featureNoTrainer'] },
-  { plan: 'active', features: ['premium.featureTrainingProgress', 'premium.featureSmartAnalysis', 'premium.featureCalendarVoice', 'premium.featureNoTrainer'] },
+  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.newbieForever', 'premium.newbieOneDog', 'premium.newbieTwoTrainings', 'premium.newbieJournal'] },
+  { plan: 'active', features: ['premium.activeTrial3Days', 'premium.featureTrainingProgress', 'premium.featureSmartAnalysis', 'premium.featureCalendarVoice', 'premium.featureNoTrainer'] },
   { plan: 'trainer', badgeKey: 'premium.badgePro', features: ['premium.featureAllActive', 'premium.featureClientPlans', 'premium.featurePollsFeedback', 'premium.featureTrainerDashboard'] },
 ];
 
@@ -95,7 +95,9 @@ export default function PremiumScreen() {
   const recommendedPlan: SubscriptionPlan = 'active';
   // Newbie-Trial-Karte nur ohne bestehendes Abo. Founder ist nicht in CARDS und
   // wird daher nirgends als Kaufkarte gerendert.
-  const visibleCards = CARDS.filter(c => c.plan === 'newbie' ? !currentPlan : true);
+  // NEWBIE ist der kostenlose Standardplan (kein Trial, keine Aktivierung). Er wird
+  // als aktueller Plan gezeigt, solange kein bezahltes Abo (Active/Trainer) besteht.
+  const visibleCards = CARDS.filter(c => c.plan === 'newbie' ? !isPremiumPlan(currentPlan) : true);
   // Preis-Anker für die Founder-Ersparnis: echter Active-Preis aus dem Store
   // (gleiche Währung wie die angezeigten Preise), sonst Fallback auf die CHF-Angabe.
   const activePriceStr = packages.find(p => p.productId === PLAN_META.active.productId)?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
@@ -303,7 +305,10 @@ export default function PremiumScreen() {
         )}
         {visibleCards.map(card => {
           const meta = PLAN_META[card.plan];
-          const isCurrent = currentPlan === card.plan;
+          // NEWBIE gilt als aktueller Plan, wenn (noch) kein bezahltes Abo besteht
+          // (neues Konto ist automatisch NEWBIE, ohne DB-Eintrag/Aktivierung).
+          const isCurrent = currentPlan === card.plan
+            || (card.plan === 'newbie' && !isPremiumPlan(currentPlan));
           const soldOut = card.founder && !founderAvailable;
           const busy = laden === card.plan;
           const pkg = packageForPlan(card.plan);
@@ -329,7 +334,7 @@ export default function PremiumScreen() {
                     {card.badgeKey && <View style={[S.badge, card.founder && S.badgeFounder]}><Text style={[S.badgeTxt, card.founder && { color: '#04201b' }]}>{t(card.badgeKey, { limit: FOUNDER_SLOT_LIMIT })}</Text></View>}
                   </View>
                   <View style={S.priceRow}>
-                    <Text style={S.cardPrice}>{card.plan === 'newbie' ? t('premium.free7Days') : (pkgPrice ?? (iapLoading ? '…' : meta.priceLabel))}</Text>
+                    <Text style={S.cardPrice}>{card.plan === 'newbie' ? meta.priceLabel : (pkgPrice ?? (iapLoading ? '…' : meta.priceLabel))}</Text>
                     {/* Ersparnis ggü. Active hervorheben (Conversion-Anker für Trial-Nutzer). */}
                     {card.founder && founderAvailable && <Text style={S.savings}>{t('premium.instead', { price: activePriceStr })}</Text>}
                   </View>
@@ -361,7 +366,7 @@ export default function PremiumScreen() {
                   {filled && <LinearGradient colors={['#00FFCC', '#00f0c8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
                   {busy ? <ActivityIndicator color={filled ? C.accentText : C.white} /> : (
                     <Text style={[S.ctaTxt, filled ? { color: C.accentText } : { color: C.white }]}>
-                      {card.plan === 'newbie' ? t('premium.startFree') : (trialing ? t('premium.switchToPlan', { plan: meta.name }) : t('premium.choosePlan', { plan: meta.name }))}
+                      {trialing ? t('premium.switchToPlan', { plan: meta.name }) : t('premium.choosePlan', { plan: meta.name })}
                     </Text>
                   )}
                 </AnimatedPressable>

@@ -21,7 +21,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type VisiblePlan = 'newbie' | 'active' | 'founder_active' | 'trainer' | 'permanent';
 
 const PLAN_NAME_KEY: Record<VisiblePlan, TranslationKey> = {
-  newbie:         'membership.free',
+  newbie:         'membership.newbie',
   active:         'membership.active',
   founder_active: 'membership.founder',
   trainer:        'membership.trainer',
@@ -166,7 +166,7 @@ export default function MembershipScreen() {
   // mehr angeboten → nur noch für einen (aktuell nicht existierenden) Founder-Bestand
   // sichtbar, damit dessen aktueller Plan als „Aktiv" erscheint — nie als Kaufziel.
   const compareCards: { plan: SubscriptionPlan; nameKey: TranslationKey; price: string; show: boolean }[] = [
-    { plan: 'newbie', nameKey: 'membership.free', price: t('membership.free'), show: true },
+    { plan: 'newbie', nameKey: 'membership.newbie', price: t('membership.newbiePrice'), show: true },
     { plan: 'active', nameKey: 'membership.active', price: priceFor('active'), show: true },
     { plan: 'founder_active', nameKey: 'membership.founder', price: priceFor('founder_active'), show: visiblePlan === 'founder_active' },
     { plan: 'trainer', nameKey: 'membership.trainer', price: priceFor('trainer'), show: true },

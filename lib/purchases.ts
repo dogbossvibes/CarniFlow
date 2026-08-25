@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { PRODUCT_IDS, type SubscriptionPlan } from '@/features/subscription/plans';
 import type { StoreTrialOffer } from '@/features/subscription/activeTrial';
+import { reportDiagnostic } from '@/lib/diagnostics';
 
 // RevenueCat (Apple/Google In-App-Purchase). Nativ → defensiv laden, damit Expo
 // Go / ein Build ohne das Modul nicht crasht. Ohne API-Key bleibt IAP inaktiv
@@ -46,7 +47,10 @@ export function configurePurchases(userId?: string) {
       void Purchases.logIn(userId);
       configuredUserId = userId;
     }
-  } catch { /* ignore */ }
+  } catch (e) {
+    // Diagnose (nur Beobachtung): configure/logIn-Fehler sichtbar machen (Fall B).
+    reportDiagnostic('iap_configure', 'store', e, { stage: 'configure' });
+  }
 }
 
 // Garantiert (idempotent), dass RevenueCat vor jedem Store-Zugriff konfiguriert ist.
@@ -168,11 +172,26 @@ function tierOf(productId: string): Tier {
 }
 
 export async function getPackages(): Promise<PurchasePackage[]> {
-  if (!purchasesReady()) return [];
+  if (!purchasesReady()) {
+    // Diagnose (nur Beobachtung): unterscheidet Fall A (Key fehlt) von Fall B
+    // (native nicht konfiguriert). Niemals den Key selbst loggen.
+    reportDiagnostic('iap_configure', 'store', new Error('purchases_not_ready'), {
+      purchasesAvailable: PURCHASES_AVAILABLE,
+      keyPresent: !!purchasesApiKey(),
+      configured,
+    });
+    return [];
+  }
   try {
     const offerings = await Purchases.getOfferings();
     const offeringId = offerings.current?.identifier ?? '';
     const pkgs = offerings.current?.availablePackages ?? [];
+    if (!offerings.current || pkgs.length === 0) {
+      // Fall C (kein aktuelles Offering) bzw. Fall D (Offering ohne Packages).
+      reportDiagnostic('iap_offerings', 'store',
+        new Error(offerings.current ? 'no_packages' : 'no_current_offering'),
+        { offeringPresent: !!offerings.current, packageCount: pkgs.length });
+    }
     return pkgs.map((p: any) => {
       const productId = p.product?.identifier ?? p.identifier;
       return {
@@ -195,6 +214,7 @@ export async function getPackages(): Promise<PurchasePackage[]> {
         message: e?.message ?? null,
       });
     }
+    reportDiagnostic('iap_offerings', 'store', e, { stage: 'get_offerings' });
     return [];
   }
 }
@@ -262,6 +282,8 @@ export async function buyPackage(
         message: e?.message ?? null,
       });
     }
+    // Fall E/F (Store-Produkt nicht verfügbar bzw. Kauf fehlgeschlagen).
+    reportDiagnostic('iap_purchase', 'store', e, { productId: pkg.productId, offeringId: pkg.offeringId });
     return { ok: false, tier: null, plan: null, expiration: null, error: e?.message ?? 'Kauf fehlgeschlagen' };
   }
 }
