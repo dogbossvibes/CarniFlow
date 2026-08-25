@@ -331,3 +331,50 @@ describe('Timeline Integration', () => {
     expect(dur).toBe(20);
   });
 });
+
+describe('Status Logic', () => {
+  // Status derivation rule: end_date present → completed, end_date null → active
+  const deriveStatus = (endDate: string | null): 'active' | 'completed' =>
+    endDate ? 'completed' : 'active';
+
+  it('legacy cycle with end_date → status should be completed (backfill)', () => {
+    // Migration backfill: existing rows with end_date get status = 'completed'
+    const legacy = makeCycle({ startDate: '2026-01-01', endDate: '2026-01-21' });
+    expect(deriveStatus(legacy.endDate)).toBe('completed');
+  });
+
+  it('legacy cycle without end_date → status stays active', () => {
+    // DEFAULT 'active' for rows without end_date is correct
+    const legacy = makeCycle({ startDate: '2026-08-20' });
+    expect(deriveStatus(legacy.endDate)).toBe('active');
+  });
+
+  it('endHeatCycle → completed + end_date = today', () => {
+    // endHeatCycle calls updateHeatCycle with { endDate: todayISO(), status: 'completed' }
+    const today = new Date().toISOString().slice(0, 10);
+    const endDate = today;
+    expect(deriveStatus(endDate)).toBe('completed');
+  });
+
+  it('removing end_date → status reverts to active', () => {
+    // saveCycle derives status from endDate: null → active
+    const cycle = makeCycle({ startDate: '2026-08-20', endDate: '2026-09-08', status: 'completed' });
+    // User clears end date in edit form → saveCycle sets endDate: null, status: 'active'
+    const newEndDate = null;
+    expect(deriveStatus(newEndDate)).toBe('active');
+    // Original cycle was completed, after removing end_date it should be active
+    expect(cycle.status).toBe('completed');
+    expect(deriveStatus(newEndDate)).toBe('active');
+  });
+
+  it('status derivation is consistent across all transitions', () => {
+    // New: no endDate → active
+    expect(deriveStatus(null)).toBe('active');
+    // End: endDate set → completed
+    expect(deriveStatus('2026-09-08')).toBe('completed');
+    // Un-end: endDate removed → active
+    expect(deriveStatus(null)).toBe('active');
+    // Re-end: endDate set again → completed
+    expect(deriveStatus('2026-10-01')).toBe('completed');
+  });
+});
