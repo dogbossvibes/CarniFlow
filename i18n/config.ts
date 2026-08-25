@@ -3,6 +3,8 @@ import { initReactI18next } from 'react-i18next';
 import { de } from './locales/de';
 import { gsw } from './locales/gsw';
 import { fr } from './locales/fr';
+import { it } from './locales/it';
+import { en } from './locales/en';
 
 // expo-localization DEFENSIV laden (gleiches Muster wie expo-haptics/-sensors).
 // Ein statischer `import ... from 'expo-localization'` wirft beim Modul-Import,
@@ -23,18 +25,20 @@ function readDeviceLocaleTag(): string {
 }
 
 // ── i18next-Konfiguration für Anyvo ──
-// Basissprache/Fallback = de. Sprachen: de, gsw, fr (später it, en).
+// Basissprache/Fallback = de. Sprachen: de, gsw, fr, it, en.
 // Ressourcen sind gebündelt (.ts) → offline-first, kein Netzwerk-Load.
 
-export type AppLocale = 'de' | 'gsw' | 'fr';
-export const APP_LOCALES: AppLocale[] = ['de', 'gsw', 'fr'];
+export type AppLocale = 'de' | 'gsw' | 'fr' | 'it' | 'en';
+export const APP_LOCALES: AppLocale[] = ['de', 'gsw', 'fr', 'it', 'en'];
 export const FALLBACK_LOCALE: AppLocale = 'de';
 
 // Beliebige (auch Legacy-)Locale-Strings auf die interne AppLocale normalisieren.
-// de-CH/de-DE/de → de · gsw-CH/gsw → gsw · fr-CH/fr-FR/fr → fr · sonst → de.
+// de-CH/de-DE/de → de · gsw-CH/gsw → gsw · fr-CH/fr-FR/fr → fr · it-CH/it-IT/it → it · en-GB/en-US/en → en · sonst → de.
 export function normalizeLocale(raw: string | null | undefined): AppLocale {
   const s = (raw ?? '').toLowerCase();
   if (s.startsWith('fr')) return 'fr';
+  if (s.startsWith('it')) return 'it';
+  if (s.startsWith('en')) return 'en';
   if (s.startsWith('gsw')) return 'gsw';
   if (s.startsWith('de')) return 'de';
   return 'de';
@@ -63,6 +67,8 @@ if (!i18n.isInitialized) {
         de:  { translation: de },
         gsw: { translation: gsw },
         fr:  { translation: fr },
+        it:  { translation: it },
+        en:  { translation: en },
       },
       lng: detectDeviceLocale(),
       fallbackLng: FALLBACK_LOCALE,

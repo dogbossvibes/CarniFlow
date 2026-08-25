@@ -30,6 +30,8 @@ export const NATIVE_NAME: Record<AppLocale, string> = {
   de:  'Deutsch',
   gsw: 'Schwiizerdütsch',
   fr:  'Français',
+  it:  'Italiano',
+  en:  'English',
 };
 
 const STORAGE_KEY = 'app_locale';
@@ -50,7 +52,7 @@ function resolve(pref: LanguagePreference): AppLocale {
 }
 
 // Legacy-/neue Speicherwerte auf eine gültige Preference normalisieren.
-// 'auto' bleibt 'auto'; 'de-CH'/'de-DE'/'de' → 'de'; 'gsw-CH'/'gsw' → 'gsw'; 'fr*' → 'fr'.
+// 'auto' bleibt 'auto'; bekannte BCP-47-/Legacy-Werte werden über normalizeLocale() abgebildet.
 function parseStoredPreference(raw: string): LanguagePreference {
   if (raw === 'auto') return 'auto';
   return normalizeLocale(raw);
@@ -100,6 +102,13 @@ export function translate(
   locale?: AppLocale,
 ): string {
   return i18n.t(key, { lng: locale, ...(params ?? {}) }) as string;
+}
+
+export function getSpeechLocale(locale: AppLocale = getLocale()): string {
+  if (locale === 'fr') return 'fr-CH';
+  if (locale === 'it') return 'it-IT';
+  if (locale === 'en') return 'en-GB';
+  return 'de-CH';
 }
 
 // Reaktiver Hook: `t` (an aktuelle Sprache gebunden) + Locale + Preference.
