@@ -14,9 +14,11 @@ const AUTO_LABEL: Record<AppLocale, string> = {
   de:  'Automatisch',
   gsw: 'Automatisch',
   fr:  'Automatique',
+  it:  'Automatico',
+  en:  'Automatic',
 };
 
-// Sprach-Auswahl. Optionen: Automatisch, Deutsch, Schwiizerdütsch, Français.
+// Sprach-Auswahl. Optionen: Automatisch, Deutsch, Schwiizerdütsch, Français, Italiano, English.
 // Der Screen nutzt bereits i18n und aktualisiert sich beim Umschalten sofort.
 // Auswahl wird lokal (AsyncStorage) gespeichert + optional ins Profil gesynct.
 export default function LanguageScreen() {
@@ -29,6 +31,8 @@ export default function LanguageScreen() {
     { pref: 'de',   label: NATIVE_NAME.de,  hint: 'Standard' },
     { pref: 'gsw',  label: NATIVE_NAME.gsw, hint: 'Mundart' },
     { pref: 'fr',   label: NATIVE_NAME.fr,  hint: 'Suisse romande' },
+    { pref: 'it',   label: NATIVE_NAME.it,  hint: 'Svizzera italiana' },
+    { pref: 'en',   label: NATIVE_NAME.en,  hint: 'International' },
   ];
 
   return (

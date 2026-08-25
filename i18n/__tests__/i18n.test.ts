@@ -24,7 +24,11 @@ describe('i18n Phase 1 — Fundament', () => {
   it('3. gsw-CH → gsw', () => expect(normalizeLocale('gsw-CH')).toBe('gsw'));
   it('4. fr-CH → fr', () => expect(normalizeLocale('fr-CH')).toBe('fr'));
   it('5. fr-FR → fr', () => expect(normalizeLocale('fr-FR')).toBe('fr'));
-  it('6. unbekannt (en-US) → de', () => expect(normalizeLocale('en-US')).toBe('de'));
+  it('6. en-US → en', () => expect(normalizeLocale('en-US')).toBe('en'));
+  it('6b. it-CH → it', () => expect(normalizeLocale('it-CH')).toBe('it'));
+  it('6c. it-IT → it', () => expect(normalizeLocale('it-IT')).toBe('it'));
+  it('6d. en-GB → en', () => expect(normalizeLocale('en-GB')).toBe('en'));
+  it('6e. unbekannt (pt-BR) → de', () => expect(normalizeLocale('pt-BR')).toBe('de'));
   it('20. Legacy-Wert gsw-CH wird korrekt gelesen', () => {
     applyRemoteLocale('gsw-CH');
     expect(getPreference()).toBe('gsw');
@@ -35,10 +39,17 @@ describe('i18n Phase 1 — Fundament', () => {
   it('7. Auto + fr-CH → fr', () => { setDevice('fr-CH'); expect(detectDeviceLocale()).toBe('fr'); });
   it('8. Auto + de-CH → de', () => { setDevice('de-CH'); expect(detectDeviceLocale()).toBe('de'); });
   it('9. Auto + gsw → de (nie automatisch gsw)', () => { setDevice('gsw'); expect(detectDeviceLocale()).toBe('de'); });
+  it('9b. Auto + it-CH → it', () => { setDevice('it-CH'); expect(detectDeviceLocale()).toBe('it'); });
+  it('9c. Auto + it-IT → it', () => { setDevice('it-IT'); expect(detectDeviceLocale()).toBe('it'); });
+  it('9d. Auto + en-GB → en', () => { setDevice('en-GB'); expect(detectDeviceLocale()).toBe('en'); });
+  it('9e. Auto + en-US → en', () => { setDevice('en-US'); expect(detectDeviceLocale()).toBe('en'); });
+  it('9f. Auto + unbekannt → de', () => { setDevice('pt-BR'); expect(detectDeviceLocale()).toBe('de'); });
 
   // ── Manuelle Auswahl (10–11) ──
   it('10. manuell gsw → gsw', () => { setPreference('gsw'); expect(getLocale()).toBe('gsw'); });
   it('11. manuell fr → fr', () => { setPreference('fr'); expect(getLocale()).toBe('fr'); });
+  it('11b. manuell it → it', () => { setPreference('it'); expect(getLocale()).toBe('it'); });
+  it('11c. manuell en → en', () => { setPreference('en'); expect(getLocale()).toBe('en'); });
 
   // ── Fallback (12–13) ──
   it('12. fehlender fr-Key → de-Fallback', () => {
@@ -59,12 +70,22 @@ describe('i18n Phase 1 — Fundament', () => {
     expect(translate('trainingCount', { count: 1 }, 'fr')).toBe('1 entraînement');
     expect(translate('trainingCount', { count: 2 }, 'fr')).toBe('2 entraînements');
   });
+  it('15b. italienische Singular/Plural', () => {
+    expect(translate('trainingCount', { count: 1 }, 'it')).toBe('1 allenamento');
+    expect(translate('trainingCount', { count: 2 }, 'it')).toBe('2 allenamenti');
+  });
+  it('15c. englische Singular/Plural', () => {
+    expect(translate('trainingCount', { count: 1 }, 'en')).toBe('1 training session');
+    expect(translate('trainingCount', { count: 2 }, 'en')).toBe('2 training sessions');
+  });
 
   // ── Persistenz (16–19) ──
   it('16. Persistenz auto', async () => { setPreference('auto'); await flush(); expect(await AsyncStorage.getItem('app_locale')).toBe('auto'); });
   it('17. Persistenz de',   async () => { setPreference('de');   await flush(); expect(await AsyncStorage.getItem('app_locale')).toBe('de'); });
   it('18. Persistenz gsw',  async () => { setPreference('gsw');  await flush(); expect(await AsyncStorage.getItem('app_locale')).toBe('gsw'); });
   it('19. Persistenz fr',   async () => { setPreference('fr');   await flush(); expect(await AsyncStorage.getItem('app_locale')).toBe('fr'); });
+  it('19b. Persistenz it',  async () => { setPreference('it');   await flush(); expect(await AsyncStorage.getItem('app_locale')).toBe('it'); });
+  it('19c. Persistenz en',  async () => { setPreference('en');   await flush(); expect(await AsyncStorage.getItem('app_locale')).toBe('en'); });
 });
 
 describe('i18n Phase 1 — Intl-Formatter', () => {
@@ -80,5 +101,9 @@ describe('i18n Phase 1 — Intl-Formatter', () => {
   });
   it('fr-Dezimaltrennzeichen ist Komma', () => {
     expect(formatDistance(1500, 'fr')).toMatch(/1,5\s?km/);
+  });
+  it('en nutzt en-GB-Datum und Punkt als Dezimaltrennzeichen', () => {
+    expect(formatDate(new Date(2024, 11, 12), undefined, 'en')).toBe('12/12/2024');
+    expect(formatDistance(1500, 'en')).toMatch(/1\.5\s?km/);
   });
 });

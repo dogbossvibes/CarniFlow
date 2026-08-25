@@ -1,6 +1,8 @@
 import { de } from '../locales/de';
 import { gsw } from '../locales/gsw';
 import { fr } from '../locales/fr';
+import { it as itLocale } from '../locales/it';
+import { en } from '../locales/en';
 import { execFileSync } from 'child_process';
 
 function keysOf(obj: Record<string, unknown>) {
@@ -17,6 +19,110 @@ function emptyValues(candidate: Record<string, unknown>) {
 
 function hasFlatKey(candidate: Record<string, unknown>, key: string) {
   return Object.prototype.hasOwnProperty.call(candidate, key);
+}
+
+function placeholders(value: unknown) {
+  return Array.from(String(value ?? '').matchAll(/\{\{?\w+\}?\}|\{\w+\}/g))
+    .map((match) => match[0])
+    .sort();
+}
+
+const intentionallyNeutralIdenticalKeys = new Set([
+  'track.livePaused',
+  'home.layout',
+  'home.widgets',
+  'dog.sport',
+  'sync.online',
+  'sync.offline',
+  'sync.markers',
+  'home.widgetLabel',
+  'connect.identityA11y',
+  'track.materialOther',
+  'track.iphoneGps',
+  'trainer.dashboard',
+  'trainer.website',
+  'analyse.trend',
+  'journal.hoursShort',
+  'trainer.workspace',
+]);
+
+const intentionallyNeutralValues = new Set([
+  'ANYVO',
+  'CONNECT',
+  'Backpack',
+  'Smart Analyse',
+  'Smart Coach',
+  'OK',
+  'GPS',
+  'LIVE',
+  'ACTIVE',
+  'NEWBIE',
+  'Founder Active',
+  'MFi',
+  'CHF 0',
+  'IGP',
+  'IBGH',
+  'Obedience',
+  'Agility',
+  'Hoopers',
+  'AMICUS',
+  'TASSO',
+  'FINDEFIX',
+  'WebView',
+  'PDF',
+  'JPG, PNG',
+  'kg',
+  'km',
+  'cm',
+  'Modal',
+  'optional',
+  'Start',
+  'Trainer',
+  'Training',
+  'Timer',
+  'Name',
+  'ANYVO ID',
+]);
+
+const germanUiPattern =
+  /[ÄÖÜäöüß]|\b(Bitte|Dauerhaft|Diese|Eigene|Einheit|Fährte|Gegenstand|Hund|Hunde|Passwort|Schritte|Sicherheitscode|Speichern|Trainingstagebuch|Winkel|dein|deine|deinen|gesendet|konnte|löschen|speichern|wird|zuerst)\b/i;
+
+function untranslatedProductiveKeys(reference: Record<string, unknown>, candidate: Record<string, unknown>) {
+  return keysOf(reference).filter((key) => {
+    const value = String(candidate[key] ?? '');
+    return (
+      reference[key] === candidate[key] &&
+      !intentionallyNeutralIdenticalKeys.has(key) &&
+      !intentionallyNeutralValues.has(value)
+    );
+  });
+}
+
+function germanFallbackKeys(candidate: Record<string, unknown>) {
+  return keysOf(candidate).filter((key) => {
+    const value = String(candidate[key] ?? '');
+    return germanUiPattern.test(value) && !intentionallyNeutralValues.has(value);
+  });
+}
+
+const englishForeignUiPattern =
+  /[ÄÖÜäöüßàâçéèêëîïôùûüÿœæÀÂÇÉÈÊËÎÏÔÙÛÜŸŒÆ]|\b(Bitte|Dauerhaft|Diese|Eigene|Einheit|Fährte|Gegenstand|Hund|Hunde|Passwort|Schritte|Sicherheitscode|Speichern|Trainingstagebuch|Winkel|dein|deine|deinen|gesendet|konnte|löschen|speichern|wird|zuerst|Choisis|chien|chiens|piste|entraînement|semaine|giorni|allenamento|cane|cani|traccia|oggetto|angolo|promemoria|Automatico|Automatique|Français|Italiano)\b/i;
+
+function englishForeignFallbackKeys(candidate: Record<string, unknown>) {
+  return keysOf(candidate).filter((key) => {
+    const value = String(candidate[key] ?? '');
+    return (
+      englishForeignUiPattern.test(value) &&
+      !intentionallyNeutralIdenticalKeys.has(key) &&
+      !intentionallyNeutralValues.has(value)
+    );
+  });
+}
+
+function placeholderMismatches(reference: Record<string, unknown>, candidate: Record<string, unknown>) {
+  return keysOf(reference).filter(
+    (key) => JSON.stringify(placeholders(reference[key])) !== JSON.stringify(placeholders(candidate[key])),
+  );
 }
 
 const importantAuthKeys = [
@@ -77,7 +183,6 @@ const importantPhase3Keys = [
   'training.exerciseCountShort',
   'comments.messagesCount',
   'comments.writeMessage',
-  'premium.featureActive',
   'premium.founderSoldOut',
   'trainer.deletePlanTitle',
   'media.addVideo',
@@ -161,5 +266,30 @@ describe('Swiss German localization consistency', () => {
       expect(String(gsw[key as keyof typeof gsw] ?? '').trim().length).toBeGreaterThan(0);
       expect(String(fr[key as keyof typeof fr] ?? '').trim().length).toBeGreaterThan(0);
     }
+  });
+
+  it('keeps French, Italian and English at runtime key parity with German', () => {
+    expect(missingKeys(de, fr)).toEqual([]);
+    expect(missingKeys(de, itLocale)).toEqual([]);
+    expect(missingKeys(de, en)).toEqual([]);
+    expect(emptyValues(fr)).toEqual([]);
+    expect(emptyValues(itLocale)).toEqual([]);
+    expect(emptyValues(en)).toEqual([]);
+  });
+
+  it('prevents French, Italian and English from silently falling back to German UI text', () => {
+    expect(untranslatedProductiveKeys(de, fr)).toEqual([]);
+    expect(untranslatedProductiveKeys(de, itLocale)).toEqual([]);
+    expect(untranslatedProductiveKeys(de, en)).toEqual([]);
+    expect(germanFallbackKeys(fr)).toEqual([]);
+    expect(germanFallbackKeys(itLocale)).toEqual([]);
+    expect(germanFallbackKeys(en)).toEqual([]);
+    expect(englishForeignFallbackKeys(en)).toEqual([]);
+  });
+
+  it('keeps interpolation placeholders identical across German, French, Italian and English', () => {
+    expect(placeholderMismatches(de, fr)).toEqual([]);
+    expect(placeholderMismatches(de, itLocale)).toEqual([]);
+    expect(placeholderMismatches(de, en)).toEqual([]);
   });
 });
