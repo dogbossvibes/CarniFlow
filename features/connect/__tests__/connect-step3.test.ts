@@ -23,7 +23,7 @@ const user = { userId: 'U1', displayName: 'Sandra', avatarUrl: null };
 describe('Abo-Korrektur: NEWBIE statt Beginner', () => {
   it('NEWBIE ist kein kaufbares Produkt, Legacy-ID bleibt lesbar', () => {
     expect('newbieMonthly' in PRODUCT_IDS).toBe(false);
-    expect(PLAN_META.newbie.name).toBe('Newbie');
+    expect(PLAN_META.newbie.name).toBe('NEWBIE');
     expect(PLAN_META.newbie.productId).toBeNull();
     expect(planOfProduct('anyvo_newbie_monthly_0')).toBe('newbie');
   });
