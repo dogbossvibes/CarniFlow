@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#050505">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Passwort zurücksetzen – ANYVO</title>
+<style>
+  :root{
+    --bg:#050505; --card:#111111; --line:rgba(255,255,255,.10);
+    --mint:#15e6c3; --mint-2:#00FFCC; --mint-text:#060606;
+    --text:#fff; --muted:rgba(255,255,255,.66);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(21,230,195,.10), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .card{
+    width:100%; max-width:440px; background:var(--card);
+    border:1px solid var(--line); border-radius:24px;
+    padding:32px 26px; text-align:center;
+    box-shadow:0 30px 80px rgba(0,0,0,.5);
+  }
+  .logo{ width:64px; height:64px; margin:0 auto 18px; display:block; }
+  .badge{
+    width:72px; height:72px; margin:0 auto 20px; border-radius:22px;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(21,230,195,.12); border:1px solid rgba(21,230,195,.28);
+  }
+  .badge svg{ width:34px; height:34px; }
+  h1{ font-size:22px; font-weight:900; letter-spacing:-.3px; margin:0 0 10px; }
+  p{ margin:0 0 8px; color:var(--muted); }
+  .actions{ margin-top:24px; display:flex; flex-direction:column; gap:12px; }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:15px 20px; border-radius:16px; font-weight:800; font-size:15px;
+    text-decoration:none; border:1px solid transparent; cursor:pointer;
+  }
+  .btn-primary{ background:var(--mint); color:var(--mint-text); }
+  .btn-primary:active{ background:var(--mint-2); }
+  .hint{ margin-top:20px; font-size:13px; color:var(--muted); }
+  a{ color:var(--mint); }
+</style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="/assets/images/anyvologo.png" alt="ANYVO" width="64" height="64">
+    <div class="badge" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#15e6c3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    </div>
+    <h1>Passwort zurücksetzen</h1>
+    <p>Öffne ANYVO, um ein neues Passwort festzulegen.</p>
+
+    <div class="actions">
+      <a id="open" class="btn btn-primary" href="#">ANYVO öffnen</a>
+    </div>
+
+    <p class="hint">Falls sich die App nicht automatisch öffnet, tippe auf den Button. ANYVO muss installiert sein.</p>
+  </main>
+
+  <script>
+    // HTTPS-Bridge: reicht den Recovery-Token NUR an den App-Deep-Link weiter.
+    // KEINE Einlösung, kein verifyOtp, keine DB, kein Supabase-Aufruf, kein Logging
+    // des Tokens, keine Speicherung. Die Einlösung passiert erst in der App.
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var tokenHash = params.get('token_hash');
+      var type = params.get('type');
+
+      // Nur der Recovery-Fluss ist hier gültig.
+      if (!tokenHash || type !== 'recovery') return;
+
+      var deepLink = 'anyvo://auth/recovery?token_hash='
+        + encodeURIComponent(tokenHash)
+        + '&type=recovery';
+
+      var btn = document.getElementById('open');
+      btn.setAttribute('href', deepLink);
+
+      // Automatischer Öffnungsversuch; Button bleibt als manueller Fallback.
+      try { window.location.replace(deepLink); } catch (e) { window.location.href = deepLink; }
+    })();
+  </script>
+</body>
+</html>

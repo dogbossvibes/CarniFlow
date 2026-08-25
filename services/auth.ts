@@ -4,12 +4,17 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '@/lib/supabase';
 import { EMAIL_CONFIRM_REDIRECT_URL, RECOVERY_DEEP_LINK } from '@/features/auth/accountSecurity';
+import { reportDiagnostic } from '@/lib/diagnostics';
 
 // Required to complete OAuth sessions on web (no-op on native)
 WebBrowser.maybeCompleteAuthSession();
 
-export function signIn(email: string, password: string) {
-  return supabase.auth.signInWithPassword({ email: email.trim(), password });
+export async function signIn(email: string, password: string) {
+  const res = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+  // Diagnose (nur Beobachtung): echten Auth-Fehlercode sichtbar machen, z. B.
+  // 'invalid_credentials' vs 'email_not_confirmed'. Rückgabe unverändert.
+  if (res.error) reportDiagnostic('email_login', 'email', res.error);
+  return res;
 }
 
 // Rolle wird in den Metadaten mitgegeben; der DB-Trigger handle_new_user
@@ -44,10 +49,13 @@ export function getPasswordRecoveryRedirectTo() {
   });
 }
 
-export function resetPasswordForEmail(email: string) {
-  return supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: getPasswordRecoveryRedirectTo(),
-  });
+export async function resetPasswordForEmail(email: string) {
+  const redirectTo = getPasswordRecoveryRedirectTo();
+  const res = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+  // Diagnose (nur Beobachtung): der Client zeigt aus Datenschutzgründen immer
+  // „Erfolg" — hier wird der tatsächliche Fehler (Rate-Limit, Mailer, …) sichtbar.
+  if (res.error) reportDiagnostic('password_reset', 'email', res.error, { redirectTo });
+  return res;
 }
 
 export function requestPasswordReauthentication() {
@@ -80,15 +88,21 @@ export async function signInWithApple(): Promise<{ error: Error | null }> {
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
       ],
     });
-    if (!credential.identityToken) return { error: new Error('Kein Apple-Token erhalten.') };
+    if (!credential.identityToken) {
+      const tokenErr = new Error('Kein Apple-Token erhalten.');
+      reportDiagnostic('apple_oauth', 'apple', tokenErr, { stage: 'missing_identity_token' });
+      return { error: tokenErr };
+    }
 
     const { error } = await supabase.auth.signInWithIdToken({
       provider: 'apple',
       token:    credential.identityToken,
     });
+    if (error) reportDiagnostic('apple_oauth', 'apple', error, { stage: 'supabase_id_token' });
     return { error: error ?? null };
   } catch (e: any) {
     if (e?.code === 'ERR_REQUEST_CANCELED') return { error: null }; // vom Nutzer abgebrochen
+    reportDiagnostic('apple_oauth', 'apple', e, { stage: 'native_sign_in', nativeCode: e?.code ?? null });
     return { error: e instanceof Error ? e : new Error('Apple-Login fehlgeschlagen') };
   }
 }
@@ -144,6 +158,7 @@ async function runGoogleOAuth(): Promise<GoogleOAuthResult> {
       provider: 'google',
       options:  { redirectTo, queryParams },
     });
+    if (error) reportDiagnostic('google_oauth', 'google', error, { stage: 'web_oauth', redirectTo });
     return { error: error ?? null };
   }
 
@@ -153,8 +168,12 @@ async function runGoogleOAuth(): Promise<GoogleOAuthResult> {
     options:  { redirectTo, skipBrowserRedirect: true, queryParams },
   });
 
-  if (error) return { error };
-  if (!data?.url) return { error: new Error('Keine OAuth-URL erhalten.') };
+  if (error) { reportDiagnostic('google_oauth', 'google', error, { stage: 'sign_in_with_oauth', redirectTo }); return { error }; }
+  if (!data?.url) {
+    const urlErr = new Error('Keine OAuth-URL erhalten.');
+    reportDiagnostic('google_oauth', 'google', urlErr, { stage: 'no_oauth_url', redirectTo });
+    return { error: urlErr };
+  }
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
@@ -166,10 +185,19 @@ async function runGoogleOAuth(): Promise<GoogleOAuthResult> {
   // passing the full URL sends it verbatim as auth_code and always fails.
   const { code, error: oauthErr } = parseOAuthCallbackUrl(result.url);
 
-  if (oauthErr) return { error: new Error(oauthErr) };
-  if (!code)    return { error: new Error('Kein Anmelde-Code von Google erhalten.') };
+  if (oauthErr) {
+    const cbErr = new Error(oauthErr);
+    reportDiagnostic('google_oauth', 'google', cbErr, { stage: 'callback_error', redirectTo });
+    return { error: cbErr };
+  }
+  if (!code) {
+    const noCodeErr = new Error('Kein Anmelde-Code von Google erhalten.');
+    reportDiagnostic('google_oauth', 'google', noCodeErr, { stage: 'no_code', redirectTo });
+    return { error: noCodeErr };
+  }
 
   const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code);
+  if (exchErr) reportDiagnostic('google_oauth', 'google', exchErr, { stage: 'exchange_code', redirectTo });
   return { error: exchErr ?? null };
 }
 

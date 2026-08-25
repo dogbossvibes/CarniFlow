@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#050505">
+<meta name="robots" content="noindex,nofollow">
+<title>Konto bestätigen – ANYVO</title>
+<style>
+  :root{
+    --bg:#050505; --card:#111111; --line:rgba(255,255,255,.10);
+    --mint:#15e6c3; --mint-2:#00FFCC; --mint-text:#060606;
+    --text:#fff; --muted:rgba(255,255,255,.66); --danger:#ff6b6b;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(21,230,195,.10), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .card{
+    width:100%; max-width:440px; background:var(--card);
+    border:1px solid var(--line); border-radius:24px;
+    padding:32px 26px; text-align:center;
+    box-shadow:0 30px 80px rgba(0,0,0,.5);
+  }
+  .logo{ width:64px; height:64px; margin:0 auto 18px; display:block; }
+  .badge{
+    width:72px; height:72px; margin:0 auto 20px; border-radius:22px;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(21,230,195,.12); border:1px solid rgba(21,230,195,.28);
+  }
+  .badge.warn{ background:rgba(255,107,107,.10); border-color:rgba(255,107,107,.30); }
+  .badge svg{ width:34px; height:34px; }
+  h1{ font-size:22px; font-weight:900; letter-spacing:-.3px; margin:0 0 10px; }
+  p{ margin:0 0 8px; color:var(--muted); }
+  p strong{ color:var(--text); font-weight:700; }
+  .actions{ margin-top:24px; display:flex; flex-direction:column; gap:12px; }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:15px 20px; border-radius:16px; font-weight:800; font-size:15px;
+    text-decoration:none; border:1px solid transparent; cursor:pointer;
+  }
+  .btn-primary{ background:var(--mint); color:var(--mint-text); }
+  .btn-primary:active{ background:var(--mint-2); }
+  .stores{ display:flex; gap:10px; justify-content:center; margin-top:6px; flex-wrap:wrap; }
+  .stores a{ color:var(--muted); font-size:13px; font-weight:700; text-decoration:none; }
+  .stores a:hover{ color:var(--text); }
+  .hint{ margin-top:20px; font-size:13px; color:var(--muted); }
+  a{ color:var(--mint); }
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="/assets/images/anyvologo.png" alt="ANYVO" width="64" height="64">
+
+    <!-- Erfolg -->
+    <section data-state="success" hidden>
+      <div class="badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#15e6c3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h1>Konto erfolgreich aktiviert</h1>
+      <p>Deine E-Mail-Adresse wurde bestätigt.</p>
+      <p>Du kannst dich jetzt in ANYVO anmelden.</p>
+    </section>
+
+    <!-- Abgelaufen / bereits verwendet -->
+    <section data-state="expired" hidden>
+      <div class="badge warn" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      </div>
+      <h1>Aktivierungslink nicht mehr gültig</h1>
+      <p>Dieser Aktivierungslink ist ungültig oder abgelaufen.</p>
+      <p>Falls dein Konto bereits aktiviert ist, kannst du dich direkt in ANYVO anmelden. Andernfalls fordere in ANYVO eine neue Bestätigungs-E-Mail an.</p>
+    </section>
+
+    <!-- Allgemeiner Fehler -->
+    <section data-state="error" hidden>
+      <div class="badge warn" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+      </div>
+      <h1>Aktivierung konnte nicht abgeschlossen werden</h1>
+      <p>Bitte versuche es erneut oder öffne ANYVO.</p>
+    </section>
+
+    <!-- Direktaufruf ohne Callback (neutral, kein Erfolg vortäuschen) -->
+    <section data-state="neutral" hidden>
+      <div class="badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#15e6c3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="m4 6 8 6 8-6"/></svg>
+      </div>
+      <h1>E-Mail bestätigen</h1>
+      <p>Öffne den Bestätigungslink aus deiner E-Mail, um dein Konto zu aktivieren.</p>
+      <p>Falls dein Konto bereits aktiviert ist, kannst du dich direkt in ANYVO anmelden.</p>
+    </section>
+
+    <div class="actions">
+      <a class="btn btn-primary" data-open-app href="anyvo://">ANYVO öffnen</a>
+      <div class="stores">
+        <a href="https://apps.apple.com/app/id6776362904">App Store</a>
+        <span aria-hidden="true" style="color:var(--muted)">·</span>
+        <a href="https://play.google.com/store/apps/details?id=com.anyvo.app">Google Play</a>
+      </div>
+    </div>
+
+    <p class="hint">Du kannst dieses Fenster jetzt schliessen.</p>
+  </main>
+
+  <script src="/assets/auth-confirm.js" defer></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.AnyvoAuthConfirm) window.AnyvoAuthConfirm.init(window, document);
+    });
+  </script>
+</body>
+</html>
