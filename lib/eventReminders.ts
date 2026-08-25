@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { eventMeta, type CalendarEvent } from '@/types/calendar';
+import i18n from '@/i18n/config';
 
 // Lokale Reminder vor einem Termin (15 min / 1 h / 24 h …). Die geplanten
 // Notification-IDs werden pro Event gemerkt, damit sie beim Löschen/Ändern
@@ -9,9 +10,15 @@ import { eventMeta, type CalendarEvent } from '@/types/calendar';
 const KEY = (id: string) => `reminders_${id}`;
 
 function label(min: number): string {
-  if (min % 1440 === 0) return `in ${min / 1440} Tag${min / 1440 > 1 ? 'en' : ''}`;
-  if (min % 60 === 0)   return `in ${min / 60} Stunde${min / 60 > 1 ? 'n' : ''}`;
-  return `in ${min} Minuten`;
+  if (min % 1440 === 0) {
+    const count = min / 1440;
+    return i18n.t('notification.reminder.inDays', { count }) as string;
+  }
+  if (min % 60 === 0) {
+    const count = min / 60;
+    return i18n.t('notification.reminder.inHours', { count }) as string;
+  }
+  return i18n.t('notification.reminder.inMinutes', { count: min }) as string;
 }
 
 export async function scheduleEventReminders(ev: CalendarEvent) {

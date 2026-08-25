@@ -9,6 +9,7 @@ import { SyncStatusPill } from '@/features/sync/components/SyncStatusPill';
 import { syncNow, retryFailedSync, updateSyncCounts } from '@/features/sync/services/syncEngine';
 import { localCounts } from '@/lib/localDb/client';
 import { useT } from '@/i18n';
+import { formatDate, formatTime } from '@/i18n/format';
 
 // Sync-Center: Status, letzter Sync, ausstehende/fehlgeschlagene Items, manuelle Aktionen.
 export default function SyncCenterScreen() {
@@ -23,7 +24,8 @@ export default function SyncCenterScreen() {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const lastSync = lastSyncAt ? new Date(lastSyncAt).toLocaleString('de-CH') : t('sync.never');
+  const lastSyncDate = lastSyncAt ? new Date(lastSyncAt) : null;
+  const lastSync = lastSyncDate ? `${formatDate(lastSyncDate)} ${formatTime(lastSyncDate)}` : t('sync.never');
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
