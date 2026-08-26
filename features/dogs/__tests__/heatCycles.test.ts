@@ -1,8 +1,6 @@
-// Mock supabase to avoid native module dependency in tests
-jest.mock('@/lib/supabase', () => ({ supabase: {} }));
-
 import {
   predictHeat,
+  heatCycleDay,
   isActiveCycle,
   durationDays,
   fmtDate,
@@ -11,6 +9,10 @@ import {
   HEAT_OBSERVATION_TYPES,
   type HeatCycle,
 } from '../heatCycles';
+import { toISODate } from '../dateInput';
+
+// Mock supabase to avoid native module dependency in tests
+jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 
 // Helper to create a HeatCycle with sensible defaults
 function makeCycle(overrides: Partial<HeatCycle> & { startDate: string }): HeatCycle {
@@ -56,11 +58,11 @@ describe('predictHeat', () => {
     const today = new Date();
     const start = new Date(today);
     start.setDate(start.getDate() - 5);
-    const iso = start.toISOString().slice(0, 10);
+    const iso = toISODate(start);
     const cycles = [makeCycle({ startDate: iso })];
     const p = predictHeat(cycles)!;
     expect(p.active).toBe(true);
-    expect(p.activeSinceDays).toBe(5);
+    expect(p.activeSinceDays).toBe(6);
   });
 
   it('detects active cycle with end date in the future', () => {
@@ -69,7 +71,7 @@ describe('predictHeat', () => {
     const cycles = [
       makeCycle({
         startDate: '2026-08-01',
-        endDate: future.toISOString().slice(0, 10),
+        endDate: toISODate(future),
       }),
     ];
     const p = predictHeat(cycles)!;
@@ -92,11 +94,11 @@ describe('predictHeat', () => {
     const today = new Date();
     const start = new Date(today);
     start.setDate(start.getDate() - 30);
-    const iso = start.toISOString().slice(0, 10);
+    const iso = toISODate(start);
     const cycles = [makeCycle({ startDate: iso, status: 'active' })];
     const p = predictHeat(cycles)!;
     expect(p.active).toBe(true);
-    expect(p.activeSinceDays).toBe(30);
+    expect(p.activeSinceDays).toBe(31);
   });
 
   it('includes dateRange in prediction', () => {
@@ -130,7 +132,7 @@ describe('isActiveCycle', () => {
     const today = new Date();
     const start = new Date(today);
     start.setDate(start.getDate() - 10);
-    const c = makeCycle({ startDate: start.toISOString().slice(0, 10) });
+    const c = makeCycle({ startDate: toISODate(start) });
     expect(isActiveCycle(c)).toBe(true);
   });
 
@@ -149,7 +151,7 @@ describe('isActiveCycle', () => {
     const start = new Date(today);
     start.setDate(start.getDate() - 5);
     const c = makeCycle({
-      startDate: start.toISOString().slice(0, 10),
+      startDate: toISODate(start),
       status: 'completed',
     });
     // isActiveCycle checks status first, then endDate logic
@@ -171,6 +173,27 @@ describe('durationDays', () => {
 
   it('returns at least 1 day for same-day start and end', () => {
     expect(durationDays('2026-01-01', '2026-01-01')).toBe(1);
+  });
+});
+
+describe('heatCycleDay', () => {
+  it('uses an inclusive day number: the start date is day 1', () => {
+    expect(heatCycleDay('2026-08-12', '2026-08-12')).toBe(1);
+    expect(heatCycleDay('2026-08-12', '2026-08-13')).toBe(2);
+  });
+
+  it('keeps the runtime scenario consistent across all consumers', () => {
+    expect(heatCycleDay('2026-08-12', '2026-08-27')).toBe(16);
+  });
+
+  it('remains date-based across month and year boundaries', () => {
+    expect(heatCycleDay('2026-01-31', '2026-02-01')).toBe(2);
+    expect(heatCycleDay('2026-12-31', '2027-01-01')).toBe(2);
+  });
+
+  it('does not drift around common daylight-saving transitions', () => {
+    expect(heatCycleDay('2026-03-08', '2026-03-09')).toBe(2);
+    expect(heatCycleDay('2026-11-01', '2026-11-02')).toBe(2);
   });
 });
 
@@ -250,7 +273,7 @@ describe('Test 6: Läufigkeit beenden', () => {
     const cycle = makeCycle({ startDate: '2026-08-20', status: 'active' });
     const ended = {
       ...cycle,
-      endDate: new Date().toISOString().slice(0, 10),
+      endDate: toISODate(new Date()),
       status: 'completed' as const,
     };
     expect(ended.status).toBe('completed');
@@ -351,7 +374,7 @@ describe('Status Logic', () => {
 
   it('endHeatCycle → completed + end_date = today', () => {
     // endHeatCycle calls updateHeatCycle with { endDate: todayISO(), status: 'completed' }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toISODate(new Date());
     const endDate = today;
     expect(deriveStatus(endDate)).toBe('completed');
   });

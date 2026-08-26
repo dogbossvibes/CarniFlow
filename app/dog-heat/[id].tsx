@@ -15,7 +15,7 @@ import {
   getHeatCycle, updateHeatCycle, endHeatCycle, deleteHeatCycle,
   getHeatPhases, addHeatPhase, updateHeatPhase, deleteHeatPhase,
   getHeatObservations, addHeatObservation, deleteHeatObservation,
-  fmtDate, durationDays, isActiveCycle,
+  fmtDate, durationDays, heatCycleDay, isActiveCycle,
   HEAT_PHASE_TYPES, HEAT_OBSERVATION_TYPES,
   type HeatCycle, type HeatPhase, type HeatObservation,
 } from '@/features/dogs/heatCycles';
@@ -269,10 +269,16 @@ export default function DogHeatDetail() {
 
   const active = isActiveCycle(cycle);
   const dur = durationDays(cycle.startDate, cycle.endDate);
-  const daySince = Math.floor((Date.now() - new Date(cycle.startDate).getTime()) / 86400000);
+  const today = toISODate(new Date());
+  const cycleDay = heatCycleDay(cycle.startDate, today);
+  const currentPhase = active
+    ? [...phases]
+      .filter(phase => phase.startDate <= today && (!phase.endDate || phase.endDate >= today))
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))[0] ?? null
+    : null;
 
   // Timeline: merge phases + observations chronologically
-  const timeline: Array<{ kind: 'start' | 'end' | 'phase' | 'observation'; date: string; data: HeatPhase | HeatObservation }> = [];
+  const timeline: { kind: 'start' | 'end' | 'phase' | 'observation'; date: string; data: HeatPhase | HeatObservation }[] = [];
   timeline.push({ kind: 'start', date: cycle.startDate, data: cycle as unknown as HeatPhase });
   phases.forEach(p => timeline.push({ kind: 'phase', date: p.startDate, data: p }));
   observations.forEach(o => timeline.push({ kind: 'observation', date: o.date, data: o }));
@@ -313,9 +319,10 @@ export default function DogHeatDetail() {
               <Text style={s.bannerDate}>
                 {fmtDate(cycle.startDate)}{cycle.endDate ? ` – ${fmtDate(cycle.endDate)}` : ''}
               </Text>
+              {active && currentPhase ? <Text style={s.bannerPhase}>Aktuell: {currentPhase.phaseType}</Text> : null}
               <View style={s.bannerStats}>
                 <View style={s.bannerStat}>
-                  <Text style={s.bannerStatV}>{active ? `Tag ${daySince}` : `${dur} Tage`}</Text>
+                  <Text style={s.bannerStatV}>{active ? `Tag ${cycleDay}` : `${dur} Tage`}</Text>
                   <Text style={s.bannerStatL}>{active ? 'Aktuell' : 'Dauer'}</Text>
                 </View>
                 <View style={s.bannerStatDiv} />
@@ -390,7 +397,7 @@ export default function DogHeatDetail() {
                           <View style={s.tlContent}>
                             <Text style={s.tlDate}>{fmtDate(item.date)}</Text>
                             <Text style={s.tlTitle}>{t('heat.cycleStart')}</Text>
-                            {cycle.notes ? <Text style={s.tlSub} numberOfLines={2}>{cycle.notes}</Text> : null}
+                            {cycle.notes ? <View style={s.tlNote}><Text style={s.tlNoteLabel}>Notiz</Text><Text style={s.tlSub} numberOfLines={2}>{cycle.notes}</Text></View> : null}
                           </View>
                         </View>
                       );
@@ -601,6 +608,7 @@ const s = StyleSheet.create({
   bannerTitle:  { fontSize: 14, color: C.trackTextSec, fontWeight: '700' },
   bannerTitleActive: { color: PINK, fontWeight: '800' },
   bannerDate:   { fontSize: 18, color: C.trackText, fontWeight: '900' },
+  bannerPhase:  { alignSelf: 'flex-start', borderRadius: 8, backgroundColor: 'rgba(244,114,182,0.18)', color: '#F9A8D4', fontSize: 12, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 4 },
   bannerStats:  { flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, paddingVertical: 10 },
   bannerStat:   { flex: 1, alignItems: 'center' },
   bannerStatV:  { fontSize: 15, color: C.trackText, fontWeight: '800' },
@@ -635,6 +643,8 @@ const s = StyleSheet.create({
   tlTitle:      { fontSize: 15, color: C.trackText, fontWeight: '800', marginTop: 2 },
   tlValue:      { fontSize: 14, color: C.trackPrimary, fontWeight: '700', marginTop: 2 },
   tlSub:        { fontSize: 12, color: C.trackTextSec, marginTop: 2 },
+  tlNote:       { marginTop: 7, borderLeftWidth: 2, borderLeftColor: 'rgba(244,114,182,0.55)', paddingLeft: 8 },
+  tlNoteLabel:  { fontSize: 9.5, color: C.trackTextMut, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
   tlPhaseActions: { flexDirection: 'row', gap: 4 },
   tlAction:     { padding: 4 },
 

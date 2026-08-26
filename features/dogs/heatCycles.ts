@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { fromISODate, toISODate } from '@/features/dogs/dateInput';
 
 // Läufigkeits-Zyklen — serverseitig in public.dog_heat_cycles (siehe
 // DOG_HEAT_CYCLES.sql; RLS: owner voll, verbundene Trainer lesend).
@@ -45,10 +46,11 @@ export interface HeatPrediction {
   nextDate:        string;         // yyyy-mm-dd (voraussichtlicher nächster Beginn)
   daysUntil:       number;         // Tage bis dahin (negativ = überfällig)
   avgCycleDays:    number | null;  // gemessene Ø-Zykluslänge (null = nur Schätzung)
-  cycleDay:        number;         // Tage seit letztem Beginn
+  cycleDay:        number;         // Zyklustag, Startdatum = Tag 1
   cycleLengthDays: number;         // verwendete Zykluslänge (gemessen oder Default)
   estimate:        boolean;        // true = grobe Schätzung (nur 1 Zyklus / Default)
   active:          boolean;        // aktuell (vermutlich) läufig
+  /** Legacy alias for the inclusive cycle day while a cycle is active. */
   activeSinceDays: number | null;
   dateRange:       string | null;  // z.B. "20. Aug. – 8. Sep."
 }
@@ -95,11 +97,27 @@ export const HEAT_OBSERVATION_TYPES = [
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 const DAY = 86400000;
-const todayISO = () => new Date().toISOString().slice(0, 10);
-const dayDiff = (a: string, b: string) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / DAY);
-const addDays = (iso: string, n: number) => new Date(new Date(iso).getTime() + n * DAY).toISOString().slice(0, 10);
+const todayISO = () => toISODate(new Date());
+const dayDiff = (a: string, b: string) => {
+  const start = fromISODate(a);
+  const end = fromISODate(b);
+  return start && end ? Math.round((end.getTime() - start.getTime()) / DAY) : 0;
+};
+const addDays = (iso: string, n: number) => {
+  const date = fromISODate(iso);
+  if (!date) return iso;
+  date.setDate(date.getDate() + n);
+  return toISODate(date);
+};
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+/**
+ * Inclusive heat-cycle day using date-only local calendar values.
+ * The start date is always day 1, including over month/year/DST boundaries.
+ */
+export function heatCycleDay(startDate: string, onDate = todayISO()): number {
+  return Math.max(1, dayDiff(startDate, onDate) + 1);
+}
+
 const rowToCycle = (r: any): HeatCycle => ({
   id: r.id,
   dogId: r.dog_id,
@@ -111,7 +129,6 @@ const rowToCycle = (r: any): HeatCycle => ({
   createdAt: r.created_at,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rowToPhase = (r: any): HeatPhase => ({
   id: r.id,
   heatCycleId: r.heat_cycle_id,
@@ -122,7 +139,6 @@ const rowToPhase = (r: any): HeatPhase => ({
   createdAt: r.created_at,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const rowToObservation = (r: any): HeatObservation => ({
   id: r.id,
   heatCycleId: r.heat_cycle_id,
@@ -139,6 +155,32 @@ export async function getHeatCycles(dogId: string): Promise<HeatCycle[]> {
   const { data } = await supabase.from('dog_heat_cycles')
     .select('*').eq('dog_id', dogId).order('start_date', { ascending: false });
   return (data ?? []).map(rowToCycle);
+}
+
+/**
+ * Calendar/list views need all heat children at once. Keep the existing CRUD
+ * methods intact, but avoid one phase/observation query per cycle.
+ */
+export async function getHeatCycleDetails(dogId: string): Promise<{
+  cycles: HeatCycle[];
+  phases: HeatPhase[];
+  observations: HeatObservation[];
+}> {
+  const cycles = await getHeatCycles(dogId);
+  if (cycles.length === 0) return { cycles, phases: [], observations: [] };
+
+  const cycleIds = cycles.map(cycle => cycle.id);
+  const [{ data: phaseRows, error: phaseError }, { data: observationRows, error: observationError }] = await Promise.all([
+    supabase.from('dog_heat_phases').select('*').in('heat_cycle_id', cycleIds).order('start_date', { ascending: true }),
+    supabase.from('dog_heat_observations').select('*').in('heat_cycle_id', cycleIds).order('date', { ascending: true }),
+  ]);
+  if (phaseError) throw phaseError;
+  if (observationError) throw observationError;
+  return {
+    cycles,
+    phases: (phaseRows ?? []).map(rowToPhase),
+    observations: (observationRows ?? []).map(rowToObservation),
+  };
 }
 
 export async function getHeatCycle(id: string): Promise<HeatCycle | null> {
@@ -278,11 +320,12 @@ export function predictHeat(cycles: HeatCycle[]): HeatPrediction | null {
   }
   const cycleLengthDays = avgCycleDays ?? DEFAULT_CYCLE_DAYS;
   const nextDate = addDays(last.startDate, cycleLengthDays);
+  const cycleDay = heatCycleDay(last.startDate, today);
 
   // Datumsbereich formatieren
   const fmtDate = (iso: string) => {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
+    const d = fromISODate(iso);
+    if (!d) return iso;
     return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
   };
   const dateRange = last.endDate
@@ -293,11 +336,11 @@ export function predictHeat(cycles: HeatCycle[]): HeatPrediction | null {
     nextDate,
     daysUntil:       dayDiff(today, nextDate),
     avgCycleDays,
-    cycleDay:        Math.max(0, sinceStart),
+    cycleDay,
     cycleLengthDays,
     estimate:        avgCycleDays == null,
     active,
-    activeSinceDays: active ? Math.max(0, sinceStart) : null,
+    activeSinceDays: active ? cycleDay : null,
     dateRange,
   };
 }
@@ -307,15 +350,18 @@ export function predictHeat(cycles: HeatCycle[]): HeatPrediction | null {
 /** Formatiert ein ISO-Datum als lokales Kurzformat */
 export function fmtDate(iso: string | null): string | null {
   if (!iso) return null;
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return null;
+  const d = fromISODate(iso);
+  if (!d) return null;
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 /** Berechnet die Dauer in Tagen zwischen zwei Daten (inkl. Enddatum) */
 export function durationDays(start: string, end: string | null): number | null {
   if (!end) return null;
-  return Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / DAY) + 1);
+  const startDate = fromISODate(start);
+  const endDate = fromISODate(end);
+  if (!startDate || !endDate) return null;
+  return Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / DAY) + 1);
 }
 
 /** Prüft ob ein Zyklus "aktiv" ist (basierend auf Status oder Datum) */

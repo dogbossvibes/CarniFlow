@@ -8,9 +8,11 @@ import { usePlan } from '@/hooks/usePlan';
 import { getDogById } from '@/services/dogs';
 import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtras } from '@/services/dogHub';
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
-import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle, type HeatPhase, type HeatObservation, getHeatPhases, getHeatObservations } from '@/features/dogs/heatCycles';
+import { getHeatCycleDetails, getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
 import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
 import { getBackpack } from '@/features/dogs/backpack';
+import { toISODate } from '@/features/dogs/dateInput';
+import { currentHeatPhase } from '@/features/dogs/heatCalendar';
 import { getCalendarEvents } from '@/services/calendarService';
 import { toDogAppointments, type DogAppointment } from '@/features/dogs/dashboard';
 import type { CalendarEvent } from '@/types/calendar';
@@ -64,24 +66,21 @@ export default function DogHubRoute() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     getDogHubExtras(id).then(setExtras).catch(() => setExtras(null));
-    getHeatCycles(id).then(async (cs) => {
+    getHeatCycleDetails(id).then(({ cycles: cs, phases, observations }) => {
       setHeatCycles(cs);
-      // Load phase + observation counts for each cycle
+      // Phase and observation rows are loaded in two bundled queries, not once per cycle.
       const pc: Record<string, number> = {};
       const oc: Record<string, number> = {};
       const cp: Record<string, string> = {};
-      await Promise.all(cs.map(async (c) => {
-        try {
-          const [p, o] = await Promise.all([getHeatPhases(c.id), getHeatObservations(c.id)]);
-          pc[c.id] = p.length;
-          oc[c.id] = o.length;
-          // Find current phase: open phase with most recent start date
-          if (p.length > 0) {
-            const open = p.filter(ph => !ph.endDate).sort((a, b) => b.startDate.localeCompare(a.startDate));
-            if (open.length > 0) cp[c.id] = open[0].phaseType;
-          }
-        } catch { pc[c.id] = 0; oc[c.id] = 0; }
-      }));
+      const today = toISODate(new Date());
+      phases.forEach(phase => {
+        pc[phase.heatCycleId] = (pc[phase.heatCycleId] ?? 0) + 1;
+      });
+      cs.forEach(cycle => {
+        const current = currentHeatPhase(cycle, phases, today);
+        if (current) cp[cycle.id] = current.phaseType;
+      });
+      observations.forEach(observation => { oc[observation.heatCycleId] = (oc[observation.heatCycleId] ?? 0) + 1; });
       setHeatPhaseCounts(pc);
       setHeatObsCounts(oc);
       setHeatCurrentPhases(cp);
@@ -208,8 +207,9 @@ export default function DogHubRoute() {
       heat={{
         cycles: heatCycles,
         prediction: heatPrediction,
-        onAdd: () => router.push(`/dog-heat-new/${id}` as never),
+        onAdd: () => router.push({ pathname: '/dog-heat-new', params: { id } } as never),
         onOpen: (c: HeatCycle) => router.push(`/dog-heat/${c.id}` as never),
+        onOpenCalendar: () => router.push(`/dog-heat-calendar/${id}` as never),
         onDelete: deleteHeat,
         phaseCounts: heatPhaseCounts,
         obsCounts: heatObsCounts,
