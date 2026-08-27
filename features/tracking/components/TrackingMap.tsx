@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useToast } from '@/components/ui/Toast';
 import { useT } from '@/i18n';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
@@ -100,6 +101,7 @@ export function TrackingMap({
 }: Props) {
   const mapRef = useRef<any>(null);
   const { t } = useT();
+  const { showToast, toast } = useToast();
 
   // Live-Zentrierung: bei jedem Positionswechsel sanft nachführen (wenn follow).
   useEffect(() => {
@@ -301,16 +303,41 @@ export function TrackingMap({
         <View style={[s.fabCol, { top: controlsTop }]}>
           {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
           <Fab icon="locate" onPress={recenter} />
-          {onToggleFollow && <Fab icon={follow ? 'eye' : 'eye-off'} active={follow} onPress={onToggleFollow} />}
+          {onToggleFollow && (
+            <Fab
+              icon={follow ? 'eye' : 'eye-off'}
+              active={follow}
+              accessibilityLabel={follow ? t('track.mapFollow.disableLabel') : t('track.mapFollow.enableLabel')}
+              accessibilityHint={follow ? t('track.mapFollow.disableHint') : t('track.mapFollow.enableHint')}
+              onPress={() => {
+                onToggleFollow();
+                showToast(follow ? t('track.mapFollow.off') : t('track.mapFollow.on'));
+              }}
+            />
+          )}
         </View>
       )}
+      {toast}
     </View>
   );
 }
 
-function Fab({ icon, onPress, active }: { icon: React.ComponentProps<typeof Ionicons>['name']; onPress: () => void; active?: boolean }) {
+function Fab({ icon, onPress, active, accessibilityLabel, accessibilityHint }: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  onPress: () => void;
+  active?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+}) {
   return (
-    <TouchableOpacity style={[s.fab, active && s.fabActive]} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={[s.fab, active && s.fabActive]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+    >
       <Ionicons name={icon} size={20} color={active ? '#04110F' : C.trackText} />
     </TouchableOpacity>
   );

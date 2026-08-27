@@ -249,6 +249,12 @@ export const deCH = {
   'track.objectsShort': 'Gegenst.',
   'track.pause':     'Pause',
   'track.resume':    'Weiter',
+  'track.mapFollow.on': 'Karte folgt deiner Position',
+  'track.mapFollow.off': 'Karten-Follow aus',
+  'track.mapFollow.enableLabel': 'Karte folgen',
+  'track.mapFollow.disableLabel': 'Karten-Follow deaktivieren',
+  'track.mapFollow.enableHint': 'Aktiviert das automatische Folgen deiner Position auf der Karte',
+  'track.mapFollow.disableHint': 'Deaktiviert das automatische Folgen deiner Position auf der Karte',
 
   // Absuche (run)
   'track.searchDuration': 'Suchdauer',

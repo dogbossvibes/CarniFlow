@@ -142,6 +142,12 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.objectsShort": "Objets",
   "track.pause":     "Pause",
   "track.resume":    "Continuer",
+  "track.mapFollow.on": "La carte suit ta position",
+  "track.mapFollow.off": "Suivi de carte désactivé",
+  "track.mapFollow.enableLabel": "Suivre la carte",
+  "track.mapFollow.disableLabel": "Désactiver le suivi de la carte",
+  "track.mapFollow.enableHint": "Active le suivi automatique de ta position sur la carte",
+  "track.mapFollow.disableHint": "Désactive le suivi automatique de ta position sur la carte",
 
   // Absuche (run)
   "track.searchDuration": "Durée de recherche",

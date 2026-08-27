@@ -249,6 +249,12 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.objectsShort': 'Gegest.',
   'track.pause':     'Pause',
   'track.resume':    'Wiiter',
+  'track.mapFollow.on': 'Charte folgt dim Standort',
+  'track.mapFollow.off': 'Charte-Follow us',
+  'track.mapFollow.enableLabel': 'Charte folge',
+  'track.mapFollow.disableLabel': 'Charte-Follow deaktivere',
+  'track.mapFollow.enableHint': 'Aktiviert s automatische Folge vo dim Standort uf dr Charte',
+  'track.mapFollow.disableHint': 'Deaktiviert s automatische Folge vo dim Standort uf dr Charte',
 
   // Absuche (run)
   'track.searchDuration': 'Suechdüür',

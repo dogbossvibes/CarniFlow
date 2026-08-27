@@ -37,7 +37,16 @@ describe('tracking UX safety contract', () => {
     expect(legen.match(/name=\{pocketLock \? 'lock-closed' : 'lock-open-outline'\}/g)).toHaveLength(1);
     expect(run.match(/name=\{pocketLock \? 'lock-closed' : 'lock-open-outline'\}/g)).toHaveLength(1);
     expect(overlay).not.toContain('onToggleFollow');
-    expect(readFileSync('features/tracking/components/TrackingMap.tsx', 'utf8')).toContain("follow ? 'eye' : 'eye-off'");
+    const map = readFileSync('features/tracking/components/TrackingMap.tsx', 'utf8');
+    expect(map).toContain("follow ? 'eye' : 'eye-off'");
+    expect(map).toContain('useToast');
+    expect(map).toContain('showToast');
+    expect(map).toContain("t('track.mapFollow.on')");
+    expect(map).toContain("t('track.mapFollow.off')");
+    expect(map).toContain('accessibilityLabel');
+    expect(map).toContain('accessibilityHint');
+    expect(map).not.toContain("icon=\"lock-open\"");
+    expect(map).not.toContain("icon=\"lock-closed\"");
   });
 
   it('does not pause or finalize from a normal pocket touch', () => {
