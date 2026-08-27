@@ -17,13 +17,12 @@ import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
 import { FaehrtenHeader, SectionLabel, relDate } from '@/features/tracking/components/FaehrtenChrome';
 import { getTrackSessionById, saveTrackEvaluation } from '@/features/tracking/services/trackService';
 import { getLocalTrackDetail, getLocalRunSupplement, getLocalEvalSupplement, saveLocalTrackEvaluation } from '@/features/tracking/services/trackHistoryService';
-import { overlayLocalEval } from '@/features/tracking/utils/localTrackDetail';
+import { mergeTrackDetailData, overlayLocalEval } from '@/features/tracking/utils/localTrackDetail';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
-import type { LatLng } from '@/features/tracking/utils/gpsFilter';
 import {
   TRACK_SEGMENT_COLORS,
   actualSegmentSteps,
@@ -54,26 +53,23 @@ export default function TrackAuswertungScreen() {
       // zusammenbauen, damit die Auswertung nie mit „nicht gefunden" abbricht.
       let d = r.data;
       let localOnly = false;
+      const localDetail = await getLocalTrackDetail(id).catch(() => null);
       if (!d) {
-        d = await getLocalTrackDetail(id).catch(() => null); localOnly = !!d;
+        d = localDetail; localOnly = !!d;
       } else {
+        d = mergeTrackDetailData(d, localDetail);
         if (!(d.runs?.length)) {
-          // Remote-Session vorhanden, aber der Absuche-Run (track_runs) ist noch nicht
-          // synchronisiert → lokale Run-Daten ergänzen, damit Score/Spur nicht fehlen.
           const sup = await getLocalRunSupplement(id).catch(() => null);
           if (sup?.runs?.length) {
             d = {
               ...d, runs: sup.runs,
               track_data: { ...(d.track_data ?? {}), ...sup.track_data },
-              articles_found:           d.articles_found ?? sup.articles_found,
+              articles_found: d.articles_found ?? sup.articles_found,
               average_deviation_meters: d.average_deviation_meters ?? sup.average_deviation_meters,
-              score:                    d.score ?? sup.score,
+              score: d.score ?? sup.score,
             };
           }
         }
-        // Local-first Bewertung: existiert lokal eine NEUERE Auswertung (legs/score/
-        // evaluated_at) als die remote gesyncte (pending/fehlgeschlagener Sync), diese
-        // überlagern → die gespeicherte Bewertung fällt nicht auf Default/100 % zurück.
         const evalSup = await getLocalEvalSupplement(id).catch(() => null);
         if (evalSup) d = overlayLocalEval(d, evalSup);
       }
@@ -106,9 +102,15 @@ export default function TrackAuswertungScreen() {
       distanceFromStart: m.distanceFromStart, note: m.note,
     }));
     const segments = coerceTrackSegments(data.track_data?.segments);
-    const center = detail.lay[Math.floor(detail.lay.length / 2)] ?? null;
+    const fitPoints = [
+      ...detail.lay,
+      ...detail.run,
+      ...detail.markers.filter(m => m.lat != null && m.lng != null).map(m => ({ lat: m.lat as number, lng: m.lng as number })),
+      ...(detail.start ? [detail.start] : []),
+      ...(detail.end ? [detail.end] : []),
+    ];
     return {
-      lay: detail.lay, run: detail.run, markers, segments, center,
+      lay: detail.lay, run: detail.run, markers, segments, fitPoints,
       start: detail.start, end: detail.end, totalDistanceM: detail.totalDistanceM,
       hasGps: detail.hasLay,
     };
@@ -260,10 +262,11 @@ export default function TrackAuswertungScreen() {
               {map?.hasGps ? (
                 <TrackingMap
                   layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
-                  startAnchor={map.start} endPoint={map.end}
+                  startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
+                  onStartPress={() => setDetailSel({ kind: 'start' })}
                   onMarkerPress={(m) => setDetailSel({ kind: 'marker', marker: m })}
                   onEndPress={() => setDetailSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
-                  currentPosition={map.center} follow={false} mapType="hybrid"
+                  currentPosition={null} follow={false} mapType="hybrid"
                 />
               ) : (
                 <TrackSketch legs={corners} objects={aTotal} w={320} h={190} progress={1} />

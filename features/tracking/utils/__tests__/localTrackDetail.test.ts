@@ -1,4 +1,4 @@
-import { buildLocalTrackDetail, runSupplementFromPayload } from '@/features/tracking/utils/localTrackDetail';
+import { buildLocalTrackDetail, mergeTrackDetailData, runSupplementFromPayload } from '@/features/tracking/utils/localTrackDetail';
 import type { LocalTrainingSession, LocalTrackPoint, LocalTrackMarker } from '@/features/sync/types/sync';
 
 const local: LocalTrainingSession = {
@@ -86,5 +86,54 @@ describe('runSupplementFromPayload — Run-Ergänzung für remote-Session ohne g
     expect(runSupplementFromPayload(JSON.stringify({ distanceMeters: 100 }))).toBeNull();
     expect(runSupplementFromPayload('{not json')).toBeNull();
     expect(runSupplementFromPayload(null)).toBeNull();
+  });
+});
+
+describe('mergeTrackDetailData — Remote stale verliert lokale Detaildaten nicht', () => {
+  it('behält Remote-Metadaten, nutzt aber lokal vollständigere lay/run/marker-Daten', () => {
+    const remote = {
+      id: 'uuid-1',
+      dog: { name: 'Rex' },
+      distance_meters: 200,
+      points: [{ latitude: 47, longitude: 8, point_type: 'lay' }],
+      markers: [],
+      runs: [],
+      track_data: { remoteOnly: true },
+    };
+    const localDetail = buildLocalTrackDetail(local, [
+      ...points,
+      { ...points[0], local_id: 'p3', latitude: 47.2, longitude: 8.2, timestamp: '2026-08-12T10:08:00.000Z' },
+    ], markers);
+    const merged = mergeTrackDetailData(remote, localDetail);
+
+    expect(merged.dog).toEqual({ name: 'Rex' });
+    expect(merged.distance_meters).toBe(200);
+    expect(merged.points).toHaveLength(3);
+    expect(merged.markers).toHaveLength(1);
+    expect(merged.markers[0].angle_kind).toBe('gw');
+    expect(merged.runs).toEqual([{ run_points: [{ lat: 47, lng: 8 }] }]);
+    expect(merged.track_data.remoteOnly).toBe(true);
+    expect(merged.track_data.run.score).toBe(91);
+    expect(merged._localMerged).toBe(true);
+  });
+
+  it('nutzt Remote-Arrays, wenn sie mindestens so vollständig sind wie lokal', () => {
+    const remote = {
+      id: 'uuid-1',
+      points: [
+        { latitude: 47, longitude: 8, point_type: 'lay' },
+        { latitude: 47.1, longitude: 8.1, point_type: 'lay' },
+      ],
+      markers: [{ id: 'remote-marker', marker_type: 'gegenstand' }],
+      runs: [{ run_points: [{ lat: 47, lng: 8 }, { lat: 47.1, lng: 8.1 }] }],
+      track_data: {},
+    };
+    const localDetail = buildLocalTrackDetail(local, points, markers);
+    const merged = mergeTrackDetailData(remote, localDetail);
+
+    expect(merged.points).toBe(remote.points);
+    expect(merged.markers).toBe(remote.markers);
+    expect(merged.runs).toBe(remote.runs);
+    expect(merged._localMerged).toBe(false);
   });
 });

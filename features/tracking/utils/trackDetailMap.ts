@@ -2,13 +2,10 @@ import type { AngleKind, MarkerType, MarkerMaterial } from '@/features/tracking/
 
 // Reine, testbare Zusammensetzung des Logbuch-/Detail-Kartenmodells aus einer
 // GESPEICHERTEN Fährte. Verwendet ausschließlich persistierte Daten:
-//   • gelegte Linie   = points(point_type='lay')
-//   • abgesuchte Linie = runs[0].run_points
-//   • Marker          = markers[] mit gespeichertem angle_kind / material /
-//                       distance_from_start / note (KEINE Neuberechnung aus der Polyline)
-//   • Start / Ende    = erster / letzter gelegter Punkt (gespeicherte Endpunkte)
-// So entspricht die historische Darstellung exakt dem, was beim Legen gespeichert wurde.
-
+//   - gelegte Linie = points(point_type='lay')
+//   - abgesuchte Linie = runs[0].run_points
+//   - Marker = markers[] mit gespeichertem angle_kind / material / distance_from_start / note
+//   - Start / Ende = erster / letzter gelegter Punkt
 export interface DetailLatLng { lat: number; lng: number }
 
 export interface DetailMarker {
@@ -57,7 +54,7 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
     type: m.marker_type,
     lat: m.latitude ?? null,
     lng: m.longitude ?? null,
-    angleKind: m.angle_kind ?? null,       // GESPEICHERT — nicht neu klassifiziert
+    angleKind: m.angle_kind ?? null,
     material: m.material ?? null,
     distanceFromStart: m.distance_from_start ?? null,
     note: m.note ?? null,

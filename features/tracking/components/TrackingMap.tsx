@@ -33,7 +33,6 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // gerenderte Marker-Bild. Kurz nach dem Mount wird der Snapshot eingefroren; memo +
 // stabile ID sorgen dafür, dass der Marker NICHT bei jedem GPS-Fix neu erzeugt wird
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress }: {
   Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder';
   label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void;
@@ -79,6 +78,8 @@ interface Props {
   dimLay?:          boolean;    // DEPRECATED/ignoriert: gelegte Fährte ist während der Absuche jetzt immer solide Mint (Prod-Bugfix). Prop bleibt für Aufrufer-Kompatibilität.
   startAnchor?:     LatLng | null;   // stabilisierter Startpunkt → Fähnchen (statt erstem Rohpunkt)
   endPoint?:        LatLng | null;   // gespeichertes Fährtenende (letzter gelegter Punkt) → Ziel-Fähnchen
+  fitToPoints?:     LatLng[];        // Logbuch/Detail: initialer Ausschnitt über alle gespeicherten Punkte, genau einmal
+  onStartPress?:    () => void;      // Tap auf Start-Fähnchen (Logbuch-Detail „Start")
   onMarkerPress?:   (m: MapMarker) => void;   // Tap auf einen gespeicherten Feature-Marker (Logbuch-Detail)
   onEndPress?:      () => void;               // Tap auf das Ziel-Fähnchen (Logbuch-Detail „Fährtenende")
   currentPosition:  LatLng | null;
@@ -95,10 +96,12 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, onMarkerPress, onEndPress, currentPosition, dogPosition, heading,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, onStartPress, onMarkerPress, onEndPress, currentPosition, dogPosition, heading,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
+  const initialFitDoneRef = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
   const { t } = useT();
 
   // Live-Zentrierung: bei jedem Positionswechsel sanft nachführen (wenn follow).
@@ -146,6 +149,23 @@ export function TrackingMap({
   // Fortlaufende Nummer je Gegenstand (G1, G2, …) — nach Index in markerList.
   // Dübel bekommt KEINE G-Nummer (roter Zylinder) → zählt nicht mit (objectNumbers).
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
+  const initialFitCoords = useMemo(
+    () => (fitToPoints ?? [])
+      .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .map(p => ({ latitude: p.lat, longitude: p.lng })),
+    [fitToPoints],
+  );
+
+  // Gespeicherte Detailkarten: einmalig nach dem Laden auf alle persistierten Punkte
+  // fitten. Danach gewinnt die Nutzerinteraktion; keine Kamera-Rücksetzung bei Re-Render.
+  useEffect(() => {
+    if (!mapReady || initialFitDoneRef.current || initialFitCoords.length < 2 || !mapRef.current) return;
+    initialFitDoneRef.current = true;
+    mapRef.current.fitToCoordinates(initialFitCoords, {
+      edgePadding: { top: 34, right: 34, bottom: 34, left: 34 },
+      animated: false,
+    });
+  }, [initialFitCoords, mapReady]);
 
   const recenter = () => {
     const p = currentPosition ?? layPoints[layPoints.length - 1] ?? null;
@@ -177,7 +197,12 @@ export function TrackingMap({
         showsUserLocation
         showsCompass={false}
         showsMyLocationButton={false}
-        onPanDrag={follow && onUserPan ? () => onUserPan() : undefined}
+        scrollEnabled
+        zoomEnabled
+        rotateEnabled
+        pitchEnabled
+        onMapReady={() => setMapReady(true)}
+        onPanDrag={onUserPan ? () => onUserPan() : undefined}
         initialRegion={{
           latitude:  initial ? initial.lat : FALLBACK.latitude,
           longitude: initial ? initial.lng : FALLBACK.longitude,
@@ -222,14 +247,14 @@ export function TrackingMap({
 
         {/* Startpunkt: stabilisierter Anker → Fähnchen; sonst (Auswertung/Legacy) der schlichte Punkt. */}
         {startAnchor ? (
-          <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+          <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={onStartPress}>
             <View style={s.startFlagWrap}>
               <View style={s.startFlag}><Ionicons name="flag" size={12} color="#04110F" /></View>
               <Text style={s.startFlagLabel}>{t('track.startFlag')}</Text>
             </View>
           </Marker>
         ) : start ? (
-          <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} anchor={{ x: 0.5, y: 0.5 }}>
+          <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} anchor={{ x: 0.5, y: 0.5 }} onPress={onStartPress}>
             <View style={s.startDot} />
           </Marker>
         ) : null}

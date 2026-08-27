@@ -133,3 +133,47 @@ export function buildLocalTrackDetail(
     _localOnly: true,
   };
 }
+
+function layPointCount(data: Record<string, any> | null | undefined): number {
+  return ((data?.points ?? []) as any[]).filter(p => (p.point_type ?? 'lay') === 'lay').length;
+}
+
+function runPointCount(data: Record<string, any> | null | undefined): number {
+  return (((data?.runs ?? [])[0]?.run_points ?? []) as any[]).length;
+}
+
+// Remote/local Detail-Merge für bereits synchronisierte oder pending Fährten:
+// Remote bleibt Basis (Dog-Join, Serverfelder), aber lokale SQLite-Daten dürfen
+// vollständigere Punkte/Marker/Run/Evaluation nicht verlieren, wenn Remote stale ist.
+export function mergeTrackDetailData(
+  remote: Record<string, any>,
+  local: Record<string, any> | null,
+): Record<string, any> {
+  if (!local) return remote;
+
+  const useLocalPoints = layPointCount(local) > layPointCount(remote);
+  const useLocalMarkers = ((local.markers ?? []) as any[]).length > ((remote.markers ?? []) as any[]).length;
+  const useLocalRuns = runPointCount(local) > runPointCount(remote);
+
+  const mergedTrackData = {
+    ...(remote.track_data ?? {}),
+    ...(local.track_data ?? {}),
+  };
+
+  return {
+    ...remote,
+    distance_meters: remote.distance_meters ?? local.distance_meters ?? null,
+    corners_total: remote.corners_total ?? local.corners_total ?? null,
+    articles_total: remote.articles_total ?? local.articles_total ?? null,
+    articles_found: remote.articles_found ?? local.articles_found ?? null,
+    average_deviation_meters: remote.average_deviation_meters ?? local.average_deviation_meters ?? null,
+    rating: remote.rating ?? local.rating ?? null,
+    score: remote.score ?? local.score ?? null,
+    notes: remote.notes ?? local.notes ?? null,
+    points: useLocalPoints ? local.points : (remote.points ?? []),
+    markers: useLocalMarkers ? local.markers : (remote.markers ?? []),
+    runs: useLocalRuns ? local.runs : (remote.runs ?? []),
+    track_data: mergedTrackData,
+    _localMerged: useLocalPoints || useLocalMarkers || useLocalRuns,
+  };
+}

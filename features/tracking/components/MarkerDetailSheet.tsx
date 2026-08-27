@@ -11,6 +11,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 // Auswahl im Logbuch: ein gespeicherter Feature-Marker ODER das Fährtenende.
 export type TrackDetailSelection =
+  | { kind: 'start' }
   | { kind: 'marker'; marker: MapMarker }
   | { kind: 'end'; totalDistanceM: number | null };
 
@@ -33,6 +34,14 @@ export function describeSelection(
 ): { icon: IconName; title: string; rows: { label: string; value: string }[] } {
   const distRow = (d: number | null | undefined) =>
     d != null ? [{ label: t('track.detailDistanceFromStart'), value: `${Math.round(d)} m` }] : [];
+
+  if (sel.kind === 'start') {
+    return {
+      icon: 'flag',
+      title: t('track.startFlag'),
+      rows: [{ label: t('track.startFlag'), value: t('track.startFlag') }],
+    };
+  }
 
   if (sel.kind === 'end') {
     return {
