@@ -598,16 +598,6 @@ export default function TrackRunScreen() {
           )}
           <View className="flex-1" />
           <HelpButton topicId="track_search" autoShow tint={FT.text} size={18} />
-          {!arming && s.recording && (
-            <Pressable
-              accessibilityLabel={pocketLock ? 'Absuche entsperren' : 'Absuche sperren'}
-              accessibilityHint={pocketLock ? 'Zum Entsperren gedrückt halten' : 'Sperrt gefährliche Touch-Aktionen'}
-              onPress={() => { if (!pocketLock) { hapticTap(); setPocketLock(true); } }}
-              className={`w-9 h-9 rounded-[11px] items-center justify-center border ${pocketLock ? 'bg-ft-acc border-ft-acc' : 'bg-white/5 border-ft-line-strong'}`}
-            >
-              <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={17} color={pocketLock ? FT.accText : FT.text} />
-            </Pressable>
-          )}
           {/* Sprachausgabe an/aus */}
           <Pressable onPress={() => setVoiceOn(v => !v)} hitSlop={8}
             className={`w-9 h-9 rounded-[11px] items-center justify-center border ${voiceOn ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.4)]' : 'bg-white/5 border-ft-line-strong'}`}>
@@ -632,6 +622,17 @@ export default function TrackRunScreen() {
 
         {/* Karte / Skizze */}
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
+          {!arming && s.recording && (
+            <Pressable
+              accessibilityLabel={pocketLock ? 'Absuche entsperren' : 'Absuche sperren'}
+              accessibilityHint={pocketLock ? 'Zum Entsperren gedrückt halten' : 'Sperrt gefährliche Touch-Aktionen'}
+              onPress={() => { if (!pocketLock) { hapticTap(); setPocketLock(true); } }}
+              className={`absolute top-[64px] right-[14px] z-30 w-9 h-9 rounded-[11px] items-center justify-center border ${pocketLock ? 'bg-ft-acc border-ft-acc' : 'bg-black/90 border-ft-line-strong'}`}
+              style={{ elevation: 30 }}
+            >
+              <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={17} color={pocketLock ? FT.accText : FT.text} />
+            </Pressable>
+          )}
           {view === 'map' ? (
             <TrackingMap
               layPoints={snapData.laidLatLng} dimLay
@@ -641,7 +642,7 @@ export default function TrackRunScreen() {
               follow={follow}
               onToggleFollow={() => setFollow(f => !f)}
               onUserPan={() => setFollow(false)}
-              controlsTop={64}
+              controlsTop={124}
             />
           ) : (
             <View className="flex-1 bg-[#08100e]"><TrackSketch points={snapData.laidLatLng} angleMarkers={sketchAngleMarkers} objectMarkers={sketchObjectMarkers} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>

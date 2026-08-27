@@ -642,16 +642,6 @@ export default function LegenScreen() {
           )}
           <View className="flex-1" />
           <HelpButton topicId="track_laying" autoShow tint={FT.text} />
-          {phase === 'recording' && (
-            <Pressable
-              accessibilityLabel={pocketLock ? 'Aufnahme entsperren' : 'Aufnahme sperren'}
-              accessibilityHint={pocketLock ? 'Zum Entsperren gedrückt halten' : 'Sperrt gefährliche Touch-Aktionen'}
-              onPress={() => { if (!pocketLock) { hapticTap(); setPocketLock(true); } }}
-              className={`w-10 h-10 rounded-[12px] border items-center justify-center ${pocketLock ? 'bg-ft-acc border-ft-acc' : 'bg-white/10 border-ft-line-strong'}`}
-            >
-              <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={19} color={pocketLock ? FT.accText : FT.text} />
-            </Pressable>
-          )}
           <View className="flex-row bg-white/10 rounded-[12px] p-[3px] gap-[2px]">
             {(['map', 'sketch'] as const).map(k => {
               const on = view === k;
@@ -668,6 +658,17 @@ export default function LegenScreen() {
 
         {/* Karte / Skizze */}
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
+          {phase === 'recording' && (
+            <Pressable
+              accessibilityLabel={pocketLock ? 'Aufnahme entsperren' : 'Aufnahme sperren'}
+              accessibilityHint={pocketLock ? 'Zum Entsperren gedrückt halten' : 'Sperrt gefährliche Touch-Aktionen'}
+              onPress={() => { if (!pocketLock) { hapticTap(); setPocketLock(true); } }}
+              className={`absolute top-[64px] right-[14px] z-30 w-10 h-10 rounded-[12px] border items-center justify-center ${pocketLock ? 'bg-ft-acc border-ft-acc' : 'bg-black/90 border-ft-line-strong'}`}
+              style={{ elevation: 30 }}
+            >
+              <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={19} color={pocketLock ? FT.accText : FT.text} />
+            </Pressable>
+          )}
           {view === 'map' ? (
             <TrackingMap
               layPoints={trackPoints}
@@ -679,7 +680,7 @@ export default function LegenScreen() {
               follow={mapFollowMode}
               onToggleFollow={() => setMapFollowMode(!mapFollowMode)}
               onUserPan={() => { if (mapFollowMode) setMapFollowMode(false); }}
-              controlsTop={64}
+              controlsTop={124}
               mapType="hybrid"
             />
           ) : (

@@ -10,6 +10,10 @@ describe('tracking UX safety contract', () => {
     expect(run).toContain('const [pocketLock, setPocketLock]');
     expect(legen).toContain('<PocketLockOverlay');
     expect(run).toContain('<PocketLockOverlay');
+    expect(legen).toContain('top-[64px] right-[14px] z-30');
+    expect(run).toContain('top-[64px] right-[14px] z-30');
+    expect(legen).toContain('controlsTop={124}');
+    expect(run).toContain('controlsTop={124}');
     expect(overlay).toContain('pointerEvents="auto"');
     expect(overlay).toContain('onPress={() => undefined}');
     expect(overlay).toContain('onLongPress={onUnlock}');
@@ -18,6 +22,15 @@ describe('tracking UX safety contract', () => {
     expect(overlay).toContain('onPress={() => undefined}');
     expect(legen).toContain('onRequestStop={requestStop}');
     expect(run).toContain('onRequestStop={handleFinish}');
+  });
+
+  it('renders the visible lock entry in the active map/sketch control layer', () => {
+    expect(legen).toContain("phase === 'recording' && (");
+    expect(run).toContain("!arming && s.recording && (");
+    expect(legen).toContain("setPocketLock(true)");
+    expect(run).toContain("setPocketLock(true)");
+    expect(legen).toContain("name={pocketLock ? 'lock-closed' : 'lock-open-outline'}");
+    expect(run).toContain("name={pocketLock ? 'lock-closed' : 'lock-open-outline'}");
   });
 
   it('does not pause or finalize from a normal pocket touch', () => {
