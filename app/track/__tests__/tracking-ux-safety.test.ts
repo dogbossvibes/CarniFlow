@@ -62,6 +62,7 @@ describe('tracking UX safety contract', () => {
     expect(overlay).toContain('stopLabel = \'Stoppen\'');
     expect(overlay).toContain('Gedrückt halten');
     expect(overlay).toContain('Danach muss das Beenden bestätigt werden.');
+    expect(overlay).toContain('style={{ zIndex: 2, elevation: 2 }}');
     expect(legen).toContain('onRequestStop={requestStop}');
     expect(run).toContain('onRequestStop={handleFinish}');
     expect(run).toContain('stopLabel="Absuche beenden"');

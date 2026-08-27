@@ -20,6 +20,7 @@ export function PocketLockOverlay({
         accessibilityHint="Mindestens 1,8 Sekunden gedrückt halten"
         accessibilityRole="button"
         className="absolute inset-0"
+        style={{ zIndex: 1 }}
         onPress={() => undefined}
         onLongPress={onUnlock}
         delayLongPress={1800}
@@ -29,6 +30,7 @@ export function PocketLockOverlay({
         accessibilityHint="Mindestens 1,8 Sekunden gedrückt halten. Danach muss das Beenden bestätigt werden."
         accessibilityRole="button"
         className="absolute bottom-10 min-w-[190px] h-[56px] rounded-[16px] items-center justify-center border border-ft-bad bg-ft-bad/95 px-5"
+        style={{ zIndex: 2, elevation: 2 }}
         onPress={() => undefined}
         onLongPress={onRequestStop}
         onAccessibilityTap={onRequestStop}
