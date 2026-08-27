@@ -14,6 +14,10 @@ describe('tracking UX safety contract', () => {
     expect(overlay).toContain('onPress={() => undefined}');
     expect(overlay).toContain('onLongPress={onUnlock}');
     expect(overlay).toContain('delayLongPress={1800}');
+    expect(overlay).toContain('onLongPress={onRequestStop}');
+    expect(overlay).toContain('onPress={() => undefined}');
+    expect(legen).toContain('onRequestStop={requestStop}');
+    expect(run).toContain('onRequestStop={handleFinish}');
   });
 
   it('does not pause or finalize from a normal pocket touch', () => {
@@ -39,5 +43,34 @@ describe('tracking UX safety contract', () => {
     expect(run).toContain('Fährtenende erreicht');
     expect(run).toContain('KEIN Auto-Beenden');
     expect(run).toContain('onLongPress={handleFinish}');
+  });
+
+  it('keeps the intentional stop escape path reachable while locked', () => {
+    expect(overlay).toContain('stopLabel = \'Stoppen\'');
+    expect(overlay).toContain('Gedrückt halten');
+    expect(overlay).toContain('Danach muss das Beenden bestätigt werden.');
+    expect(legen).toContain('onRequestStop={requestStop}');
+    expect(run).toContain('onRequestStop={handleFinish}');
+    expect(run).toContain('stopLabel="Absuche beenden"');
+  });
+
+  it('keeps finalization independent of GPS and trajectory state', () => {
+    expect(legen).toContain('const finishTrack = () =>');
+    expect(legen).toContain('rec.finish();');
+    expect(run).toContain('const handleFinish = () =>');
+    expect(run).toContain('const res = s.stop();');
+    expect(legen).not.toContain('if (gpsAccuracy');
+    expect(run).not.toContain('if (s.accuracy');
+    expect(run).not.toContain('if (trajectory');
+  });
+
+  it('retains the existing confirmation and once-only guards', () => {
+    expect(legen).toContain('if (stoppingRef.current) return;');
+    expect(legen).toContain('Fährte beenden');
+    expect(run).toContain('if (finishing || finishRequestedRef.current) return;');
+    expect(run).toContain('if (finishRequestedRef.current) return;');
+    expect(run).toContain('finishRequestedRef.current = true;');
+    expect(run).toContain('track.keepSearching');
+    expect(run).toContain('track.finishTitle');
   });
 });

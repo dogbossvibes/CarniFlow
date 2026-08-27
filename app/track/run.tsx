@@ -110,6 +110,7 @@ export default function TrackRunScreen() {
   const [effectiveId, setEffectiveId] = useState<string | null>(id ?? null);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
+  const finishRequestedRef = useRef(false);   // synchroner Once-only-Guard für Confirm-Callbacks
   const snapData: Snap = snap ?? { laidLatLng: [], laidPoints: [], laidObjects: [], laidMarkers: [], segments: [], level: 'training' as Level };
 
   // Gewählter Abstand Hundeführer↔Hund (5/10 m) — vor Absuchestart gesetzt,
@@ -477,10 +478,12 @@ export default function TrackRunScreen() {
   };
 
   const handleFinish = () => {
-    if (finishing) return;   // Doppelt-Tippen → keine doppelte Finalisierung
+    if (finishing || finishRequestedRef.current) return;   // Doppelt-Tippen → keine doppelte Finalisierung
     Alert.alert(t('track.finishTitle'), t('track.finishBody'), [
       { text: t('track.keepSearching'), style: 'cancel' },
       { text: t('common.finish'), style: 'destructive', onPress: async () => {
+        if (finishRequestedRef.current) return;
+        finishRequestedRef.current = true;
         hapticSuccess();   // sofort beim Bestätigen, vor await
         setFinishing(true);
         const res = s.stop();   // ← Search-Recorder beenden (flusht letzten Puffer)
@@ -505,6 +508,7 @@ export default function TrackRunScreen() {
             }));
           } catch (e) {
             console.warn('[trackRun] local finalize', e);
+            finishRequestedRef.current = false;
             setFinishing(false);
             Alert.alert('Speichern fehlgeschlagen', 'Die Absuche konnte nicht lokal gespeichert werden. Bitte erneut versuchen.');
             return;   // kein Reset, keine Navigation → Ergebnis bleibt erhalten
@@ -825,6 +829,8 @@ export default function TrackRunScreen() {
         duration={fmtClock(s.elapsedS)}
         distanceM={`${Math.round(s.distanceM)} m`}
         onUnlock={unlockPocket}
+        onRequestStop={handleFinish}
+        stopLabel="Absuche beenden"
       />
 
       {SHOW_GPS_DEBUG && (
