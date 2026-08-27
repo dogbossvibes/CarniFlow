@@ -10,478 +10,56 @@
 
 <!-- AUTO-GENERATED:START -->
 
-Generated: 2026-08-18T18:42:30.871Z
-Agent: codex
+Generated: 2026-08-27T15:56:36.161Z
+Agent: claude
 Branch: feat/track-module-rewrite
 
 ### Git status
 ```
-M AGENTS.md
- M AI_HANDOFF.md
- M app/dog-health/[id].tsx
- M app/track/run.tsx
- M components/analytics/TrendLine.tsx
- M docs/adr/ADR-001_Domain_Model.md
- M docs/agent/CURRENT_STATE.md
- M docs/agent/README.md
- M docs/agent/SESSION_HANDOFF.md
- M docs/agent/TASKS.md
- M docs/agent/WORK_LOG.md
- M features/subscription/__tests__/capabilities.test.ts
- M features/subscription/plans.ts
- M features/tracking/hooks/useTrackRecorder.ts
- M features/tracking/hooks/useTrackVoiceGuidance.ts
- M features/tracking/utils/__tests__/angleDiagnostics.test.ts
- M features/tracking/utils/angleDiagnostics.ts
- M features/tracking/utils/autoCornerDetection.ts
- M hooks/useCapabilities.ts
- M i18n/de-CH.ts
+M docs/agent/SESSION_HANDOFF.md
+ M i18n/__tests__/localization-consistency.test.ts
  M i18n/gsw-CH.ts
+ M i18n/locales/en.ts
  M i18n/locales/fr.ts
- M package-lock.json
- M package.json
- M scripts/agent-handoff.mjs
- M scripts/agent-lib.mjs
- M scripts/agent-start.mjs
- M scripts/agent-status.mjs
- M services/dogHub.ts
- M supabase/migrations/20260803140000_profiles_username.sql
-?? .claude/development.code-workspace
-?? ANYVO-current-repository.zip
-?? STAGING_DEPLOY_RUN.sql
-?? SUBSCRIPTION_P0_DB_DEPLOYMENT.md
-?? after_bottomnav_galaxyS23_3button.png
-?? after_bottomnav_galaxyS23_gesture.png
-?? after_bottomnav_tablet_3button.png
-?? after_bottomnav_tablet_gesture.png
-?? artifacts/
-?? assets/images/11GSLOGODSC4449.jpg
-?? assets/images/Journalscreenshot.png
-?? assets/images/Malu13.jpg
-?? assets/images/backpackscreenshot.png
-?? assets/images/bazooka.jpg
-?? assets/images/smartanalysescreenshot.png
-?? canisflow.code-workspace
-?? components/subscription/PremiumInlineUpsell.tsx
-?? design_handoff_faehrten/screen3.jpg
-?? dist-auth-android/
-?? dist-auth-ios/
-?? dist-login-android/
-?? dist-login-ios/
-?? "docs/adr/ADR-002  Database Model"
-?? "docs/adr/ADR-003  Identity & Authorization"
-?? "docs/adr/ADR-004  GPS & Tracking Architecture"
-?? "docs/adr/ADR-005  Track Recording Lifecycle"
-?? "docs/adr/ADR-006  Smart Analysis"
-?? "docs/adr/ADR-007  Offline First & Synchronisation"
-?? "docs/adr/ADR-008  Subscription & Entitlements"
-?? "docs/adr/ADR-009  Connect Architecture"
-?? "docs/adr/ADR-010  UI & Navigation"
-?? "docs/adr/ADR-011  Testing Strategy"
-?? "docs/adr/ADR-012  Release & Deployment"
-?? docs/architecture/CODEX_P0_FIX_01_REVIEW.md
-?? docs/architecture/CODEX_P0_REVIEW.md
-?? docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md
-?? docs/architecture/EMAIL_CONFIRMATION_FLOW.md
-?? docs/architecture/FAEHRTE_ABRISS_MAP_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_ABSUCHE_HANDLER_DISTANCE_ANALYSIS.md
-?? docs/architecture/FAEHRTE_ABSUCHE_HANDLER_DISTANCE_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_ANGLE_QUICK_PICKER_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_ANGLE_TYPES_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_OBJECT_QUICK_PICKER_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_OFF_TRACK_AND_HANDLER_DISTANCE_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_SAVE_RELIABILITY_ANALYSIS.md
-?? docs/architecture/FAEHRTE_SAVE_RELIABILITY_DESIGN.md
-?? docs/architecture/FAEHRTE_STARTPOINT_GPS_ANALYSIS.md
-?? docs/architecture/FAEHRTE_STARTPOINT_GPS_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_STEP_ACCURACY_ANALYSIS.md
-?? docs/architecture/FAEHRTE_STEP_CALIBRATION_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_STEP_LOGIC_UNIFICATION_FIX_REPORT.md
-?? docs/architecture/FAEHRTE_TEILSTRECKE_START_STOP_ANALYSIS.md
-?? docs/architecture/FAEHRTE_TEILSTRECKE_START_STOP_FIX_REPORT.md
-?? docs/architecture/P0-01_DATABASE_TRUTH_REPORT.md
-?? docs/architecture/P0-02_TRACKING_LEGACY_REPORT.md
-?? docs/architecture/P0-03_TRACK_DOMAIN_REPORT.md
-?? docs/architecture/P0-04_SUBSCRIPTION_CAPABILITY_REPORT.md
-?? docs/architecture/P0-05_GPS_PIPELINE_REPORT.md
-?? docs/architecture/P0-06_OFFLINE_TRUTH_REPORT.md
-?? docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
-?? docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
-?? docs/manual-test/
-?? "faehrten 6/design_handoff_faehrten/abriss.png"
-?? features/dogs/__tests__/health.test.ts
-?? features/dogs/health.ts
-?? features/subscription/__tests__/healthCapabilities.test.ts
-?? features/tracking/__tests__/voiceGuidanceDiagnostics.test.ts
-?? i18n/__tests__/health-i18n.test.ts
-?? legal-web/__tests__/
-?? legal-web/assets/auth-confirm.js
-?? legal-web/auth/
-?? screen20.jpg
-?? supabase/migrations/20260817190000_dog_deworming_entries.sql
-?? supabase/migrations/README.md
-?? supabase/migrations/__tests__/
-?? supabase/production_public_schema_snapshot.sql
-?? supabase/staging_health_phase2_smoke.sql
-?? supabase/staging_p0_smoke_verify.sql
-?? supabase/staging_public_schema_restore.sql
-?? winkel.png
+ M i18n/locales/gsw.ts
+ M i18n/locales/it.ts
 ```
 
 ### Diff stat
 ```
-AGENTS.md                                          |  10 +-
- AI_HANDOFF.md                                      |   6 +
- app/dog-health/[id].tsx                            | 146 +++++++-
- app/track/run.tsx                                  |  20 +
- components/analytics/TrendLine.tsx                 |   4 +-
- docs/adr/ADR-001_Domain_Model.md                   | 416 +++++++++++++++++++++
- docs/agent/CURRENT_STATE.md                        |   7 +-
- docs/agent/README.md                               |  20 +-
- docs/agent/SESSION_HANDOFF.md                      | 177 +++++++--
- docs/agent/TASKS.md                                |  51 ++-
- docs/agent/WORK_LOG.md                             |  15 +
- .../subscription/__tests__/capabilities.test.ts    |   7 +-
- features/subscription/plans.ts                     |  21 ++
- features/tracking/hooks/useTrackRecorder.ts        |  56 ++-
- features/tracking/hooks/useTrackVoiceGuidance.ts   | 106 +++++-
- .../utils/__tests__/angleDiagnostics.test.ts       |  24 +-
- features/tracking/utils/angleDiagnostics.ts        | 116 ++++--
- features/tracking/utils/autoCornerDetection.ts     |  32 +-
- hooks/useCapabilities.ts                           |  11 +
- i18n/de-CH.ts                                      |  21 ++
- i18n/gsw-CH.ts                                     |  21 ++
- i18n/locales/fr.ts                                 |  21 ++
- package-lock.json                                  | 234 ++++++++++++
- package.json                                       |   1 +
- scripts/agent-handoff.mjs                          |   4 +-
- scripts/agent-lib.mjs                              |   2 +-
- scripts/agent-start.mjs                            |  13 +-
- scripts/agent-status.mjs                           |   2 +-
- services/dogHub.ts                                 |  31 +-
- .../20260803140000_profiles_username.sql           |  79 +---
- 30 files changed, 1461 insertions(+), 213 deletions(-)
+docs/agent/SESSION_HANDOFF.md                   |  593 ++------
+ i18n/__tests__/localization-consistency.test.ts |  114 +-
+ i18n/gsw-CH.ts                                  |   26 +-
+ i18n/locales/en.ts                              | 1088 ++++++-------
+ i18n/locales/fr.ts                              | 1856 +++++++++++------------
+ i18n/locales/gsw.ts                             |   10 +-
+ i18n/locales/it.ts                              | 1272 ++++++++--------
+ 7 files changed, 2381 insertions(+), 2578 deletions(-)
 ```
 
 ### Modified files
 ```
-AGENTS.md
-AI_HANDOFF.md
-app/dog-health/[id].tsx
-app/track/run.tsx
-components/analytics/TrendLine.tsx
-docs/adr/ADR-001_Domain_Model.md
-docs/agent/CURRENT_STATE.md
-docs/agent/README.md
 docs/agent/SESSION_HANDOFF.md
-docs/agent/TASKS.md
-docs/agent/WORK_LOG.md
-features/subscription/__tests__/capabilities.test.ts
-features/subscription/plans.ts
-features/tracking/hooks/useTrackRecorder.ts
-features/tracking/hooks/useTrackVoiceGuidance.ts
-features/tracking/utils/__tests__/angleDiagnostics.test.ts
-features/tracking/utils/angleDiagnostics.ts
-features/tracking/utils/autoCornerDetection.ts
-hooks/useCapabilities.ts
-i18n/de-CH.ts
+i18n/__tests__/localization-consistency.test.ts
 i18n/gsw-CH.ts
+i18n/locales/en.ts
 i18n/locales/fr.ts
-package-lock.json
-package.json
-scripts/agent-handoff.mjs
-scripts/agent-lib.mjs
-scripts/agent-start.mjs
-scripts/agent-status.mjs
-services/dogHub.ts
-supabase/migrations/20260803140000_profiles_username.sql
+i18n/locales/gsw.ts
+i18n/locales/it.ts
 ```
 
 ### Untracked files
 ```
-.claude/development.code-workspace
-ANYVO-current-repository.zip
-STAGING_DEPLOY_RUN.sql
-SUBSCRIPTION_P0_DB_DEPLOYMENT.md
-after_bottomnav_galaxyS23_3button.png
-after_bottomnav_galaxyS23_gesture.png
-after_bottomnav_tablet_3button.png
-after_bottomnav_tablet_gesture.png
-artifacts/faehrten-teilstrecken/ios/01_boot_home.png
-artifacts/faehrten-teilstrecken/ios/02_faehrten_index.png
-artifacts/faehrten-teilstrecken/ios/03_legen_teilstrecke_abriss_buttons.png
-assets/images/11GSLOGODSC4449.jpg
-assets/images/Journalscreenshot.png
-assets/images/Malu13.jpg
-assets/images/backpackscreenshot.png
-assets/images/bazooka.jpg
-assets/images/smartanalysescreenshot.png
-canisflow.code-workspace
-components/subscription/PremiumInlineUpsell.tsx
-design_handoff_faehrten/screen3.jpg
-dist-auth-android/_expo/static/js/android/entry-9a4f5220dacd2f2900cbac6f8f9490c4.hbc
-dist-auth-android/assets/017bc6ba3fc25503e5eb5e53826d48a8
-dist-auth-android/assets/02bc1fa7c0313217bde2d65ccbff40c9
-dist-auth-android/assets/069d99eb1fa6712c0b9034a58c6b57dd
-dist-auth-android/assets/0747a1317bbe9c6fc340b889ef8ab3ae
-dist-auth-android/assets/0a328cd9c1afd0afe8e3b1ec5165b1b4
-dist-auth-android/assets/1190ab078c57159f4245a328118fcd9a
-dist-auth-android/assets/140c53a7643ea949007aa9a282153849
-dist-auth-android/assets/1681f34aaca71b8dfb70756bca331eb2
-dist-auth-android/assets/19eeb73b9593a38f8e9f418337fc7d10
-dist-auth-android/assets/1f77739ca9ff2188b539c36f30ffa2be
-dist-auth-android/assets/20e71bdf79e3a97bf55fd9e164041578
-dist-auth-android/assets/286d67d3f74808a60a78d3ebf1a5fb57
-dist-auth-android/assets/31b5ffea3daddc69dd01a1f3d6cf63c5
-dist-auth-android/assets/35ba0eaec5a4f5ed12ca16fabeae451d
-dist-auth-android/assets/370dd5af19f8364907b6e2c41f45dbbf
-dist-auth-android/assets/3b89dd103490708d19a95adcae52210e
-dist-auth-android/assets/3cd68ccdb8938e3711da2e8831b85493
-dist-auth-android/assets/3f78af31cca60105799838a1a7a59fbd
-dist-auth-android/assets/412dd9275b6b48ad28f5e3d81bb1f626
-dist-auth-android/assets/4403c6117ec30c859bc95d70ce4a71d3
-dist-auth-android/assets/4e85bc9ebe07e0340c9c4fc2f6c38908
-dist-auth-android/assets/56c8d80832e37783f12c05db7c8849e2
-dist-auth-android/assets/605ed7926cf39a2ad5ec2d1f9d391d3d
-dist-auth-android/assets/61ca7e64b7d605716c57706cef640b9a
-dist-auth-android/assets/6483674c8ab6279e20870d797487d178
-dist-auth-android/assets/6e435534bd35da5fef04168860a9b8fa
-dist-auth-android/assets/778ffc9fe8773a878e9c30a6304784de
-dist-auth-android/assets/78c625386b4d0690b421eb0fc78f7b9c
-dist-auth-android/assets/871378c6eab492a3e689a9385dc45a12
-dist-auth-android/assets/8b078b8487180a92e4a0f8e9a718ab11
-dist-auth-android/assets/8bc5a686abf2a1f5fc8165d6bb0fe9f1
-dist-auth-android/assets/9898592643347b4b60195db5da72e15f
-dist-auth-android/assets/ab19f4cbc543357183a20571f68380a3
-dist-auth-android/assets/adec7d6f310bc577f05e8fe06a5daccf
-dist-auth-android/assets/aff2c65b39a296d4f7e96d0f58169170
-dist-auth-android/assets/b06871f281fee6b241d60582ae9369b9
-dist-auth-android/assets/b49ae8ab2dbccb02c4d11caaacf09eab
-dist-auth-android/assets/b4eb097d35f44ed943676fd56f6bdc51
-dist-auth-android/assets/c3273c9e5321f20d1e42c2efae2578c4
-dist-auth-android/assets/c79c3606a1cf168006ad3979763c7e0c
-dist-auth-android/assets/ca4b48e04dc1ce10bfbddb262c8b835f
-dist-auth-android/assets/d1ea1496f9057eb392d5bbf3732a61b7
-dist-auth-android/assets/d2285965fe34b05465047401b8595dd0
-dist-auth-android/assets/d84e297c3b3e49a614248143d53e40ca
-dist-auth-android/assets/d8b800c443b8972542883e0b9de2bdc6
-dist-auth-android/assets/d8e7601e3df962f83c62371ac14964d8
-dist-auth-android/assets/e20945d7c929279ef7a6f1db184a4470
-dist-auth-android/assets/fad77ae871f985f563a6fea56741411d
-dist-auth-android/metadata.json
-dist-auth-ios/_expo/static/js/ios/entry-581c1204d68d60dded8811b5ef81bc4f.hbc
-dist-auth-ios/assets/017bc6ba3fc25503e5eb5e53826d48a8
-dist-auth-ios/assets/0747a1317bbe9c6fc340b889ef8ab3ae
-dist-auth-ios/assets/0a328cd9c1afd0afe8e3b1ec5165b1b4
-dist-auth-ios/assets/0ea69b5077e7c4696db85dbcba75b0e1
-dist-auth-ios/assets/1190ab078c57159f4245a328118fcd9a
-dist-auth-ios/assets/140c53a7643ea949007aa9a282153849
-dist-auth-ios/assets/1681f34aaca71b8dfb70756bca331eb2
-dist-auth-ios/assets/19eeb73b9593a38f8e9f418337fc7d10
-dist-auth-ios/assets/1f77739ca9ff2188b539c36f30ffa2be
-dist-auth-ios/assets/20e71bdf79e3a97bf55fd9e164041578
-dist-auth-ios/assets/2d0a9133e39524f138be6d4db9f4851f
-dist-auth-ios/assets/31b5ffea3daddc69dd01a1f3d6cf63c5
-dist-auth-ios/assets/370dd5af19f8364907b6e2c41f45dbbf
-dist-auth-ios/assets/3b89dd103490708d19a95adcae52210e
-dist-auth-ios/assets/3cd68ccdb8938e3711da2e8831b85493
-dist-auth-ios/assets/3f78af31cca60105799838a1a7a59fbd
-dist-auth-ios/assets/412dd9275b6b48ad28f5e3d81bb1f626
-dist-auth-ios/assets/4e85bc9ebe07e0340c9c4fc2f6c38908
-dist-auth-ios/assets/56c8d80832e37783f12c05db7c8849e2
-dist-auth-ios/assets/605ed7926cf39a2ad5ec2d1f9d391d3d
-dist-auth-ios/assets/61ca7e64b7d605716c57706cef640b9a
-dist-auth-ios/assets/6483674c8ab6279e20870d797487d178
-dist-auth-ios/assets/6e435534bd35da5fef04168860a9b8fa
-dist-auth-ios/assets/78c625386b4d0690b421eb0fc78f7b9c
-dist-auth-ios/assets/7d40544b395c5949f4646f5e150fe020
-dist-auth-ios/assets/871378c6eab492a3e689a9385dc45a12
-dist-auth-ios/assets/8b078b8487180a92e4a0f8e9a718ab11
-dist-auth-ios/assets/8bc5a686abf2a1f5fc8165d6bb0fe9f1
-dist-auth-ios/assets/9898592643347b4b60195db5da72e15f
-dist-auth-ios/assets/a132ecc4ba5c1517ff83c0fb321bc7fc
-dist-auth-ios/assets/ab19f4cbc543357183a20571f68380a3
-dist-auth-ios/assets/adec7d6f310bc577f05e8fe06a5daccf
-dist-auth-ios/assets/aff2c65b39a296d4f7e96d0f58169170
-dist-auth-ios/assets/b06871f281fee6b241d60582ae9369b9
-dist-auth-ios/assets/b49ae8ab2dbccb02c4d11caaacf09eab
-dist-auth-ios/assets/b4eb097d35f44ed943676fd56f6bdc51
-dist-auth-ios/assets/ca4b48e04dc1ce10bfbddb262c8b835f
-dist-auth-ios/assets/d1ea1496f9057eb392d5bbf3732a61b7
-dist-auth-ios/assets/d2285965fe34b05465047401b8595dd0
-dist-auth-ios/assets/d62ddc38b69aff346c20a28774933d6a
-dist-auth-ios/assets/d84e297c3b3e49a614248143d53e40ca
-dist-auth-ios/assets/d8b800c443b8972542883e0b9de2bdc6
-dist-auth-ios/assets/d8e7601e3df962f83c62371ac14964d8
-dist-auth-ios/assets/dad2fa9f4394a630f0f9a0d6dabd44bc
-dist-auth-ios/assets/e20945d7c929279ef7a6f1db184a4470
-dist-auth-ios/assets/f3a81967828232c893d547162e922764
-dist-auth-ios/assets/fad77ae871f985f563a6fea56741411d
-dist-auth-ios/metadata.json
-dist-login-android/_expo/static/js/android/entry-5edbf41ecf22da9973b5f97eb8470d42.hbc
-dist-login-android/assets/017bc6ba3fc25503e5eb5e53826d48a8
-dist-login-android/assets/02bc1fa7c0313217bde2d65ccbff40c9
-dist-login-android/assets/069d99eb1fa6712c0b9034a58c6b57dd
-dist-login-android/assets/0747a1317bbe9c6fc340b889ef8ab3ae
-dist-login-android/assets/0a328cd9c1afd0afe8e3b1ec5165b1b4
-dist-login-android/assets/1190ab078c57159f4245a328118fcd9a
-dist-login-android/assets/140c53a7643ea949007aa9a282153849
-dist-login-android/assets/1681f34aaca71b8dfb70756bca331eb2
-dist-login-android/assets/19eeb73b9593a38f8e9f418337fc7d10
-dist-login-android/assets/1f77739ca9ff2188b539c36f30ffa2be
-dist-login-android/assets/20e71bdf79e3a97bf55fd9e164041578
-dist-login-android/assets/286d67d3f74808a60a78d3ebf1a5fb57
-dist-login-android/assets/31b5ffea3daddc69dd01a1f3d6cf63c5
-dist-login-android/assets/35ba0eaec5a4f5ed12ca16fabeae451d
-dist-login-android/assets/370dd5af19f8364907b6e2c41f45dbbf
-dist-login-android/assets/3b89dd103490708d19a95adcae52210e
-dist-login-android/assets/3cd68ccdb8938e3711da2e8831b85493
-dist-login-android/assets/3f78af31cca60105799838a1a7a59fbd
-dist-login-android/assets/412dd9275b6b48ad28f5e3d81bb1f626
-dist-login-android/assets/4403c6117ec30c859bc95d70ce4a71d3
-dist-login-android/assets/4e85bc9ebe07e0340c9c4fc2f6c38908
-dist-login-android/assets/56c8d80832e37783f12c05db7c8849e2
-dist-login-android/assets/605ed7926cf39a2ad5ec2d1f9d391d3d
-dist-login-android/assets/61ca7e64b7d605716c57706cef640b9a
-dist-login-android/assets/6e435534bd35da5fef04168860a9b8fa
-dist-login-android/assets/778ffc9fe8773a878e9c30a6304784de
-dist-login-android/assets/78c625386b4d0690b421eb0fc78f7b9c
-dist-login-android/assets/871378c6eab492a3e689a9385dc45a12
-dist-login-android/assets/8b078b8487180a92e4a0f8e9a718ab11
-dist-login-android/assets/9898592643347b4b60195db5da72e15f
-dist-login-android/assets/ab19f4cbc543357183a20571f68380a3
-dist-login-android/assets/adec7d6f310bc577f05e8fe06a5daccf
-dist-login-android/assets/aff2c65b39a296d4f7e96d0f58169170
-dist-login-android/assets/b06871f281fee6b241d60582ae9369b9
-dist-login-android/assets/b49ae8ab2dbccb02c4d11caaacf09eab
-dist-login-android/assets/b4eb097d35f44ed943676fd56f6bdc51
-dist-login-android/assets/c3273c9e5321f20d1e42c2efae2578c4
-dist-login-android/assets/c79c3606a1cf168006ad3979763c7e0c
-dist-login-android/assets/ca4b48e04dc1ce10bfbddb262c8b835f
-dist-login-android/assets/d1ea1496f9057eb392d5bbf3732a61b7
-dist-login-android/assets/d2285965fe34b05465047401b8595dd0
-dist-login-android/assets/d73eae0b5b40e54bf6cb1e308cf8564c
-dist-login-android/assets/d84e297c3b3e49a614248143d53e40ca
-dist-login-android/assets/d8b800c443b8972542883e0b9de2bdc6
-dist-login-android/assets/d8e7601e3df962f83c62371ac14964d8
-dist-login-android/assets/e20945d7c929279ef7a6f1db184a4470
-dist-login-android/assets/fad77ae871f985f563a6fea56741411d
-dist-login-android/metadata.json
-dist-login-ios/_expo/static/js/ios/entry-dd53d916461c92946d69dbb59d0f26d6.hbc
-dist-login-ios/assets/017bc6ba3fc25503e5eb5e53826d48a8
-dist-login-ios/assets/0747a1317bbe9c6fc340b889ef8ab3ae
-dist-login-ios/assets/0a328cd9c1afd0afe8e3b1ec5165b1b4
-dist-login-ios/assets/0ea69b5077e7c4696db85dbcba75b0e1
-dist-login-ios/assets/1190ab078c57159f4245a328118fcd9a
-dist-login-ios/assets/140c53a7643ea949007aa9a282153849
-dist-login-ios/assets/1681f34aaca71b8dfb70756bca331eb2
-dist-login-ios/assets/19eeb73b9593a38f8e9f418337fc7d10
-dist-login-ios/assets/1f77739ca9ff2188b539c36f30ffa2be
-dist-login-ios/assets/20e71bdf79e3a97bf55fd9e164041578
-dist-login-ios/assets/2d0a9133e39524f138be6d4db9f4851f
-dist-login-ios/assets/31b5ffea3daddc69dd01a1f3d6cf63c5
-dist-login-ios/assets/370dd5af19f8364907b6e2c41f45dbbf
-dist-login-ios/assets/3b89dd103490708d19a95adcae52210e
-dist-login-ios/assets/3cd68ccdb8938e3711da2e8831b85493
-dist-login-ios/assets/3f78af31cca60105799838a1a7a59fbd
-dist-login-ios/assets/412dd9275b6b48ad28f5e3d81bb1f626
-dist-login-ios/assets/4e85bc9ebe07e0340c9c4fc2f6c38908
-dist-login-ios/assets/56c8d80832e37783f12c05db7c8849e2
-dist-login-ios/assets/605ed7926cf39a2ad5ec2d1f9d391d3d
-dist-login-ios/assets/61ca7e64b7d605716c57706cef640b9a
-dist-login-ios/assets/6e435534bd35da5fef04168860a9b8fa
-dist-login-ios/assets/78c625386b4d0690b421eb0fc78f7b9c
-dist-login-ios/assets/7d40544b395c5949f4646f5e150fe020
-dist-login-ios/assets/871378c6eab492a3e689a9385dc45a12
-dist-login-ios/assets/8b078b8487180a92e4a0f8e9a718ab11
-dist-login-ios/assets/9898592643347b4b60195db5da72e15f
-dist-login-ios/assets/a132ecc4ba5c1517ff83c0fb321bc7fc
-dist-login-ios/assets/ab19f4cbc543357183a20571f68380a3
-dist-login-ios/assets/adec7d6f310bc577f05e8fe06a5daccf
-dist-login-ios/assets/aff2c65b39a296d4f7e96d0f58169170
-dist-login-ios/assets/b06871f281fee6b241d60582ae9369b9
-dist-login-ios/assets/b49ae8ab2dbccb02c4d11caaacf09eab
-dist-login-ios/assets/b4eb097d35f44ed943676fd56f6bdc51
-dist-login-ios/assets/ca4b48e04dc1ce10bfbddb262c8b835f
-dist-login-ios/assets/d1ea1496f9057eb392d5bbf3732a61b7
-dist-login-ios/assets/d2285965fe34b05465047401b8595dd0
-dist-login-ios/assets/d62ddc38b69aff346c20a28774933d6a
-dist-login-ios/assets/d73eae0b5b40e54bf6cb1e308cf8564c
-dist-login-ios/assets/d84e297c3b3e49a614248143d53e40ca
-dist-login-ios/assets/d8b800c443b8972542883e0b9de2bdc6
-dist-login-ios/assets/d8e7601e3df962f83c62371ac14964d8
-dist-login-ios/assets/dad2fa9f4394a630f0f9a0d6dabd44bc
-dist-login-ios/assets/e20945d7c929279ef7a6f1db184a4470
-dist-login-ios/assets/f3a81967828232c893d547162e922764
-dist-login-ios/assets/fad77ae871f985f563a6fea56741411d
-dist-login-ios/metadata.json
-docs/adr/ADR-002  Database Model
-docs/adr/ADR-003  Identity & Authorization
-docs/adr/ADR-004  GPS & Tracking Architecture
-docs/adr/ADR-005  Track Recording Lifecycle
-docs/adr/ADR-006  Smart Analysis
-docs/adr/ADR-007  Offline First & Synchronisation
-docs/adr/ADR-008  Subscription & Entitlements
-docs/adr/ADR-009  Connect Architecture
-docs/adr/ADR-010  UI & Navigation
-docs/adr/ADR-011  Testing Strategy
-docs/adr/ADR-012  Release & Deployment
-docs/architecture/CODEX_P0_FIX_01_REVIEW.md
-docs/architecture/CODEX_P0_REVIEW.md
-docs/architecture/DOG_PERSONAL_DASHBOARD_PHASE_C_FIX_REPORT.md
-docs/architecture/EMAIL_CONFIRMATION_FLOW.md
-docs/architecture/FAEHRTE_ABRISS_MAP_FIX_REPORT.md
-docs/architecture/FAEHRTE_ABSUCHE_HANDLER_DISTANCE_ANALYSIS.md
-docs/architecture/FAEHRTE_ABSUCHE_HANDLER_DISTANCE_FIX_REPORT.md
-docs/architecture/FAEHRTE_ANGLE_QUICK_PICKER_FIX_REPORT.md
-docs/architecture/FAEHRTE_ANGLE_TYPES_FIX_REPORT.md
-docs/architecture/FAEHRTE_OBJECT_QUICK_PICKER_FIX_REPORT.md
-docs/architecture/FAEHRTE_OFF_TRACK_AND_HANDLER_DISTANCE_FIX_REPORT.md
-docs/architecture/FAEHRTE_SAVE_RELIABILITY_ANALYSIS.md
-docs/architecture/FAEHRTE_SAVE_RELIABILITY_DESIGN.md
-docs/architecture/FAEHRTE_STARTPOINT_GPS_ANALYSIS.md
-docs/architecture/FAEHRTE_STARTPOINT_GPS_FIX_REPORT.md
-docs/architecture/FAEHRTE_STEP_ACCURACY_ANALYSIS.md
-docs/architecture/FAEHRTE_STEP_CALIBRATION_FIX_REPORT.md
-docs/architecture/FAEHRTE_STEP_LOGIC_UNIFICATION_FIX_REPORT.md
-docs/architecture/FAEHRTE_TEILSTRECKE_START_STOP_ANALYSIS.md
-docs/architecture/FAEHRTE_TEILSTRECKE_START_STOP_FIX_REPORT.md
-docs/architecture/P0-01_DATABASE_TRUTH_REPORT.md
-docs/architecture/P0-02_TRACKING_LEGACY_REPORT.md
-docs/architecture/P0-03_TRACK_DOMAIN_REPORT.md
-docs/architecture/P0-04_SUBSCRIPTION_CAPABILITY_REPORT.md
-docs/architecture/P0-05_GPS_PIPELINE_REPORT.md
-docs/architecture/P0-06_OFFLINE_TRUTH_REPORT.md
-docs/architecture/P0_ARCHITECTURE_VERIFICATION_SUMMARY.md
-docs/architecture/TRAINING_JOURNAL_FIX_REPORT.md
-docs/manual-test/FAEHRTE_OFF_TRACK_REAL_DEVICE_TEST.md
-faehrten 6/design_handoff_faehrten/abriss.png
-features/dogs/__tests__/health.test.ts
-features/dogs/health.ts
-features/subscription/__tests__/healthCapabilities.test.ts
-features/tracking/__tests__/voiceGuidanceDiagnostics.test.ts
-i18n/__tests__/health-i18n.test.ts
-legal-web/__tests__/authConfirmStatus.test.ts
-legal-web/assets/auth-confirm.js
-legal-web/auth/confirmed.html
-screen20.jpg
-supabase/migrations/20260817190000_dog_deworming_entries.sql
-supabase/migrations/README.md
-supabase/migrations/__tests__/dog-deworming-entries.test.ts
-supabase/production_public_schema_snapshot.sql
-supabase/staging_health_phase2_smoke.sql
-supabase/staging_p0_smoke_verify.sql
-supabase/staging_public_schema_restore.sql
-winkel.png
+(leer)
 ```
 
 ### Recent commits
 ```
-c004949 chore(agent): parallel multi-agent worktree workflow (OpenCode + Codex)
-b1a8269 fix(training): auto-select single dog for documentation
-8fe861f chore(agent): mark trainer keyboard fix release-verified
-8a871c0 chore(agent): record trainer keyboard fix
-0e7aaba fix(trainer): keep connect sheet above keyboard
+d19e8bd feat(dogs): add heat cycle calendar and phase timeline
+630a9b2 chore(repo): ignore local workspaces and QA artifacts
+0703fde docs(tracking): preserve angle and track-layout reference
+aa40c4e docs(database): preserve production and staging schema snapshots
+6176d97 chore(release): preserve Supabase deployment and verification tooling
 ```
 
 ### Runtime
@@ -494,9 +72,136 @@ Package manager: npm
 
 > Hinweis: Der AUTO-GENERATED-Block oben wird beim Handoff-Script aktualisiert.
 > Maßgeblich bei Widerspruch bleibt der tatsächliche Repository-Zustand.
-> Stand der manuellen Sektionen: **2026-08-17 (Codex)** — NEWBIE-Quota read-only Production-Preflight (No-Op) +
-> T-57 Trainer-Keyboard-Fix `0e7aaba` ist releaseverifiziert; T-59 `b1a8269` ist gepusht und per OTA deployed.
+> Stand der manuellen Sektionen: **2026-08-26 (Codex)** — Phase 6 i18n-Copy-Repair ist uncommitteter WIP;
+> siehe den aktuellen Übergabeblock direkt unten. Kein Commit, Push, OTA, Deploy, nativer Build oder DB-Vorgang.
 > Hinweis: Der AUTO-GENERATED-Block oben ist ggf. älter als diese manuellen Sektionen; maßgeblich ist der echte git-Stand.
+
+## Übergabe (Claude) — Phase 6 i18n ABGESCHLOSSEN (2026-08-27)
+
+### Current task
+**ANYVO Phase 6 — FR / IT / EN Translation Repair + GSW Typo Fix.** Ziel war: alle 1.684 produktiven
+Locale-Werte in FR/IT/EN sprachlich bereinigen, klare GSW-Tippfehler gezielt korrigieren und den
+`localization-consistency`-Quality-Scan gegen German-/Fremdsprachen-Leakage, Key-Name-Leaks und bekannte
+Garbage-Patterns härten. **Status: erledigt, uncommitted.** Kein Architektur-, Produktlogik-, Tracking-,
+DB- oder Native-Change vorgenommen.
+
+### Goal — erreicht
+- FR garbage/mixed = 0; IT garbage/mixed = 0; EN garbage/mixed = 0; EN German leakage = 0 (automatisiert
+  verifiziert, siehe Tests).
+- Placeholder, Key-Parität und alle fünf Sprachen vollständig gehalten (1.684 Keys je Sprache, 0 missing/empty).
+- i18n-/Hardcode-/Gesamttests + `tsc` verifiziert (siehe unten). Es gibt keine dedizierten Voice-/
+  Notification-Testdateien in diesem Repo — die relevanten Locale-Werte (`track.voice*`,
+  `notification.*`) sind Teil der normalen i18n-Suiten und wurden mitprüft.
+
+### Work completed (diese Session, Claude, aufbauend auf FR/IT-WIP von Codex)
+- **Baseline verifiziert:** Branch `feat/track-module-rewrite`, uncommitted vorbestehend:
+  `i18n/locales/fr.ts`, `i18n/locales/it.ts`, `docs/agent/SESSION_HANDOFF.md`. Nichts zurückgesetzt/gestasht.
+- **Programmatisches Audit statt Stichproben:** `i18n/locales/{de,fr,it,en}.ts` sowie `i18n/de-CH.ts` per
+  TypeScript-Compiler-AST (nicht Regex) zu Key/Value-Objekten geparst, um alle 1.684 Werte je Sprache exakt
+  gegen `de` zu vergleichen (Diff-Scripts nur im Scratchpad, nicht im Repo).
+- **EN war faktisch nie überarbeitet** (Handoff-Annahme oben war korrekt): **374 von 1.684 Werten** waren
+  reine "Key-Name-Echo"-Platzhalter (z. B. `track.searchStartHint` → `"Track search start hint"`,
+  `profile.secTrack` → `"PROFILE SEC TRACK"`). Zusätzlich **~180 weitere** Werte hatten Deutsch/Englisch-
+  Mischmasch, kaputte Ergebnisse eines automatisierten Teil-Ersetzungslaufs (z. B.
+  `"Please to tracksansatz gehen. Choose the distance to dog..."`) oder rohe camelCase-Key-Fragmente
+  (`"trainer-Moyoul freischalten"`, `"corner-Erkennung"`). **Alle 552 betroffenen EN-Keys wurden neu auf
+  natürliches Englisch übersetzt** (`i18n/locales/en.ts`, komplett).
+- **IT war trotz Codex-WIP (918+/918−, Parität/Placeholder bereits ok) an ~175 Stellen noch kaputt**: u. a.
+  eine grosse `help.*`/`training.*`-Gruppe mit rohen camelCase-Fragmenten (`"Aiuto faqDogAnswer"`,
+  `"Allenamento chooseDogtitolo"`), erfundene Pseudo-Wörter (`"tuttinamento"`, `"Ksu"`, `"daverksut"`),
+  Deutsch-Leaks (`"Il tuo Zugang ist attivo."`) und ALL-CAPS-Keys mit unübersetztem Englisch
+  (`"RATING LABEL"`, `"BEST PRICE"`, `"SHARE WITH"`) sowie 4 Fälle, in denen der Übersetzer das
+  literale Schlüsselwort „title" statt des Referenzwerts übersetzt hatte (`sync.title`/`chat.title`/
+  `journal.title` → `"Titolo"` statt Inhalt). **Alle ~175 betroffenen IT-Keys korrigiert**
+  (`i18n/locales/it.ts`).
+- **FR war grösstenteils sauber** (Codex-Review war korrekt) — nur **9 echte Bugs** gefunden und behoben:
+  `TEILEN MIT`/`GETEILT MIT`/`BESTER PREIS`/`EMPFOHLEN` blieben unübersetzt Englisch (`"SHARE WITH"` etc.),
+  `profile.noMailApp` behielt `"E-Mail-Programm"`, `calendar.appleGoogleCalendar` hatte falsche Wortstellung,
+  `training.pausedShort`/`training.totalTime` hatten Wortstellungs-/Grammatikfehler, und
+  `analyse.importantHints` nutzte die DE-spezifischen Adjektiv-Endungs-Platzhalter grammatikalisch falsch
+  (siehe unten).
+- **GSW-Tippfehler behoben** (genau wie in der Vorgabe benannt): `Gegestand` → `Gegenstand` (12× in
+  `i18n/gsw-CH.ts`, 5× in `i18n/locales/gsw.ts`), `Beschaffeheit` → `Beschaffenheit` (1×). Die 317
+  DE-identischen Werte wurden **nicht** angefasst.
+- **`analyse.importantHints`** (alle drei Sprachen): Die deutschen Platzhalter `{suffixHint}`/
+  `{suffixImportant}` bilden deutsche Adjektivdeklination ab (`wichtigeR Hinweis` / `wichtigE HinweisE`) und
+  haben keine Entsprechung in FR/IT/EN-Grammatik. FR/IT/EN referenzieren diese zwei Platzhalter jetzt bewusst
+  nicht mehr (i18next ignoriert nicht referenzierte Interpolationswerte, kein Aufrufer-Code geändert) und
+  nutzen stattdessen zahl-neutrale Formulierungen (`"{count} remarque(s) importante(s)"`,
+  `"{count} indicazione/i importante/i"`, `"{count} important note(s)"`). Dafür ist der Key in einer
+  dokumentierten Ausnahme im Placeholder-Test gelistet — bewusste, kommentierte Ausnahme, keine
+  Architekturänderung.
+- **`localization-consistency.test.ts` gehärtet** (klein gehalten, wie gefordert): zwei neue Guards
+  `keyNameLeaks` (erkennt Key-Name-Echo-Fallbacks) und `camelCaseFragmentLeaks` (erkennt rohe
+  camelCase-Key-Fragmente in Werten), je 2 kleine, kommentierte Ausnahme-Listen für echte Grenzfälle
+  (Beispiel-Usernamen, `Row-Level`, `Apple/Google`, FR/IT-Elision vor Grossbuchstaben). Ausserdem
+  `intentionallyNeutralIdenticalKeys` um 19 Keys erweitert (DE selbst nutzt hier bereits Lehnwörter wie
+  „Chat", „Custom", „Engine", „PAUSED" — Identität mit DE ist dort korrekt, keine Übersetzungslücke) und
+  `germanUiPattern` um 9 hochsignifikante Wörter ergänzt (`Zugriff`, `Verwaltung`, `Funktionen`,
+  `Einstellungen`, `Programm`, `erforderlich`, `freischalten`, `verfügbar`, `erfasse`).
+
+### Tests (alle in dieser Session selbst ausgeführt, PASS)
+- `npx jest i18n/__tests__/ --runInBand` → **6 Suites / 81 Tests PASS** (inkl. der 2 neuen Guard-Tests).
+- `npx jest --silent` (voller Lauf) → **122 Suites / 1.341 Tests PASS**, keine Fehlschläge, kein
+  vorbestehender stale Test mehr vorhanden (`app/track/__tests__/run-arming.test.ts` ist grün).
+- `npx tsc --noEmit --pretty false` → **0 Fehler**.
+- `node scripts/localization-hardcoded-scan.mjs --json` → läuft, liefert Report (Kategorien A–I,
+  `releaseRelevantOpen: 17`, unverändert Teil des separaten Hardcode-Backlogs, nicht Teil dieser Phase).
+- `git diff --check` → **PASS**, keine Whitespace-Fehler.
+- Programmatisch verifiziert: FR/IT/EN je 1.684 Keys, 0 missing, 0 extra, 0 empty, 0 Placeholder-Mismatches
+  (ausser der dokumentierten `analyse.importantHints`-Ausnahme).
+
+### Known issues
+- **Restrisiko „stille Falschübersetzung":** Die automatisierten Guards fangen Garbage-/Leak-/Leerwert-
+  Muster zuverlässig, aber **nicht** jede denkbare semantisch falsche, aber grammatikalisch saubere
+  Übersetzung (z. B. wurde `trainer.eyebrow` it="SEZIONE" — wörtlich „Section" statt „Trainer" — nur durch
+  manuellen DE-Abgleich gefunden, nicht durch ein generisches Muster). Es wurde **nicht** jeder der 1.684
+  Werte je Sprache manuell gegen DE gelesen — das wäre über den Rahmen dieser Phase hinausgegangen. Bei
+  weiteren Verdachtsmomenten gezielt nachprüfen, nicht pauschal neu auditieren.
+- Phase-5 Visual Runtime-QA bleibt separat BLOCKED/DEVICE-QA REQUIRED; diese Phase war reine Copy-/Test-QA,
+  keine Geräte-Verifikation der UI-Darstellung (Zeilenumbrüche, Textlänge in Buttons etc.).
+- `media.addSplit` (EN/IT) enthält bewusst einen Zeilenumbruch (`"Add"`/`"Aggi\nungi"`) für einen schmalen
+  Button — analog zur bestehenden DE-Vorlage `'Hinzu\nfügen'`; auf Gerät verifizieren, ob der IT-Trennpunkt
+  „Aggi/ungi" optisch taugt.
+
+### Important context
+- Mapping unverändert: de/gsw → `de-CH`, fr → `fr-CH`, it → `it-IT`, en → `en-GB`.
+- IGP-Kontext: Fährte = piste/track, Gegenstand = objet/oggetto/object, Dübel = piquet/piolo/dowel,
+  Liegezeit = temps de repos/tempo di posa/resting time. Voice-Texte kurz und natürlich gehalten; keine
+  Voice-Architektur oder Speech-Calls geändert.
+- `trainingCount_other` (EN) war in einem eigenen Fix-Durchgang versehentlich auf `"{count} trainings"`
+  gesetzt worden (inkonsistent zu `trainingCount_one` = `"{count} training session"`); korrigiert zu
+  `"{count} training sessions"` — durch den bestehenden Test `i18n/__tests__/i18n.test.ts` (15c) abgesichert.
+
+### Do not touch
+- Keine Produktlogik, i18n-Architektur, Tracking-Algorithmen, TTS-Mapping, DB/Migration, OTA, Deploy oder
+  nativen Build.
+- Keine Git-Reset-/Clean-/Stash-/Checkout-Aktion, kein `git add .`, kein Commit/Push (weiterhin offen —
+  Nutzerentscheidung).
+- `features/ai/components/AiCoachCard.tsx` (Aufrufer von `analyse.importantHints`) bewusst nicht geändert —
+  siehe Kontext oben zu den Deklinations-Platzhaltern.
+
+### Next recommended step
+1. Diff review durch den Nutzer (`git diff i18n/`), danach Commit/Push nach Freigabe.
+2. Optional: gezielte Geräte-Stichprobe für lange FR/IT/EN-Strings in engen UI-Elementen (Buttons, Chips),
+   da diese Phase reine Text-/Test-QA war, keine visuelle Geräte-Verifikation.
+3. Bei Bedarf weitere manuelle Stichproben gegen `de.ts` für Domains, die in dieser Phase nicht im Fokus
+   der automatisierten Muster lagen (semantische Fehlübersetzungen ohne Garbage-Signatur, siehe „Known
+   issues").
+
+### Relevant files
+- Geändert (uncommitted): `i18n/locales/fr.ts`, `i18n/locales/it.ts`, `i18n/locales/en.ts`,
+  `i18n/gsw-CH.ts`, `i18n/locales/gsw.ts`, `i18n/__tests__/localization-consistency.test.ts`.
+- Referenz/Runtime (unverändert): `i18n/locales/de.ts`, `i18n/de-CH.ts`, `i18n/config.ts`, `i18n/index.ts`,
+  `i18n/format.ts`, `features/tracking/hooks/useTrackVoiceGuidance.ts`, `app/track/legen.tsx`,
+  `features/ai/components/AiCoachCard.tsx`.
+
+### Open questions
+- Soll `analyse.importantHints` langfristig auf eine echte i18next-Pluralform (`_one`/`_other` Keys)
+  umgestellt werden, statt der DE-spezifischen Suffix-Platzhalter? Das wäre eine i18n-Architekturänderung
+  und damit ausserhalb dieser Phase — Nutzerentscheidung nötig.
+- Soll die stichprobenartige semantische Prüfung (siehe „Known issues") in einer eigenen Folge-Phase auf
+  alle 1.684 Werte je Sprache ausgeweitet werden, oder reicht der jetzige automatisierte Garbage-/Leak-Scan?
 
 ## Current task
 **Session 2026-08-18 (Codex):** Fährten-Voice-Guidance Diagnose Phase 2 — ausschließlich DEV-only
