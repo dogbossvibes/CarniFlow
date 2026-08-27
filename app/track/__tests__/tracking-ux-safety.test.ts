@@ -18,7 +18,9 @@ describe('tracking UX safety contract', () => {
     expect(overlay).toContain('onPress={() => undefined}');
     expect(overlay).toContain('onLongPress={onUnlock}');
     expect(overlay).toContain('delayLongPress={1800}');
-    expect(overlay).toContain('onPress={onRequestStop}');
+    expect(overlay).toContain('onPress={stopHold.onPress}');
+    expect(overlay).toContain('onPressIn={stopHold.onPressIn}');
+    expect(overlay).toContain('onPressOut={stopHold.onPressOut}');
     expect(overlay).not.toContain('onLongPress={onRequestStop}');
     expect(legen).toContain('onRequestStop={requestStop}');
     expect(run).toContain('onRequestStop={handleFinish}');
@@ -50,11 +52,13 @@ describe('tracking UX safety contract', () => {
   });
 
   it('does not pause or finalize from a normal pocket touch', () => {
-    expect(legen).toContain('onPress={requestStop} disabled={phase !== \'recording\'}');
+    expect(legen).toContain('onPress={stopHold.onPress} onPressIn={stopHold.onPressIn} onPressOut={stopHold.onPressOut} disabled={phase !== \'recording\'}');
     expect(legen).toContain('onPress={() => undefined} onLongPress={togglePause} onAccessibilityTap={togglePause} delayLongPress={1800}');
-    expect(run).toContain('onPress={handleFinish} disabled={finishing || arming}');
+    expect(run).toContain('onPress={stopHold.onPress} onPressIn={stopHold.onPressIn} onPressOut={stopHold.onPressOut} disabled={finishing || arming}');
     expect(legen).not.toContain('onLongPress={requestStop}');
     expect(run).not.toContain('onLongPress={handleFinish}');
+    expect(legen).toContain('Gedrückt halten');
+    expect(run).toContain('Gedrückt halten');
     expect(legen).toContain('Fährtenaufnahme wirklich beenden?');
     expect(run).toContain('track.finishTitle');
   });
@@ -73,14 +77,17 @@ describe('tracking UX safety contract', () => {
   it('does not turn automatic end detection into finalization', () => {
     expect(run).toContain('Fährtenende erreicht');
     expect(run).toContain('KEIN Auto-Beenden');
-    expect(run).toContain('onPress={handleFinish}');
+    expect(run).toContain('onPress={stopHold.onPress}');
   });
 
   it('keeps the intentional stop escape path reachable while locked', () => {
     expect(overlay).toContain('stopLabel = \'Stoppen\'');
-    expect(overlay).toContain('onPress={onRequestStop}');
+    expect(overlay).toContain('onPress={stopHold.onPress}');
+    expect(overlay).toContain('onPressIn={stopHold.onPressIn}');
+    expect(overlay).toContain('onPressOut={stopHold.onPressOut}');
     expect(overlay).not.toContain('onLongPress={onRequestStop}');
-    expect(overlay).toContain('Das Beenden muss danach ausdrücklich bestätigt werden.');
+    expect(overlay).toContain('Danach muss das Beenden bestätigt werden.');
+    expect(overlay).toContain('Gedrückt halten');
     expect(overlay).toContain('style={{ zIndex: 2, elevation: 2 }}');
     expect(legen).toContain('onRequestStop={requestStop}');
     expect(run).toContain('onRequestStop={handleFinish}');

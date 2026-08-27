@@ -47,6 +47,7 @@ import {
 } from '@/features/tracking/utils/trackSegments';
 import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPickerLayout';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
+import { useHoldAction } from '@/features/tracking/hooks/useHoldAction';
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
@@ -562,6 +563,7 @@ export default function LegenScreen() {
       { text: 'Fährte beenden', style: 'destructive', onPress: finishTrack },
     ], { cancelable: true });
   };
+  const stopHold = useHoldAction(requestStop);
 
   const togglePause = useCallback(() => {
     if (phaseRef.current !== 'recording') return;
@@ -1018,10 +1020,11 @@ export default function LegenScreen() {
             accessibilityLabel={t('common.stop')}
             accessibilityHint={t('track.stopLayingHint')}
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-            style={{ flex: 1.3 }} onPress={requestStop} disabled={phase !== 'recording'}
+            style={{ flex: 1.3 }} onPress={stopHold.onPress} onPressIn={stopHold.onPressIn} onPressOut={stopHold.onPressOut} disabled={phase !== 'recording'}
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">{t('common.stop')}</Text>
+            <Text numberOfLines={1} className="text-[8px] font-bold text-[#2a060a]/75">Gedrückt halten</Text>
           </Pressable>
         </View>
       </SafeAreaView>

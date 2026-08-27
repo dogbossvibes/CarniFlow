@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FT } from '@/constants/colors';
+import { useHoldAction } from '@/features/tracking/hooks/useHoldAction';
 
 export function PocketLockOverlay({
   visible, duration, distanceM, onUnlock, onRequestStop, stopLabel = 'Stoppen',
@@ -12,6 +13,7 @@ export function PocketLockOverlay({
   onRequestStop: () => void;
   stopLabel?: string;
 }) {
+  const stopHold = useHoldAction(onRequestStop);
   if (!visible) return null;
   return (
     <View className="absolute inset-0 z-50 items-center justify-center bg-ft-bg/95 px-8" pointerEvents="auto">
@@ -26,14 +28,17 @@ export function PocketLockOverlay({
         delayLongPress={1800}
       />
       <Pressable
-        accessibilityLabel={`${stopLabel}. Beendigungsbestätigung öffnen`}
-        accessibilityHint="Öffnet zuerst die Bestätigung. Das Beenden muss danach ausdrücklich bestätigt werden."
+        accessibilityLabel={`${stopLabel}. Zum Öffnen der Beendigung gedrückt halten`}
+        accessibilityHint="Mindestens 1,8 Sekunden gedrückt halten. Danach muss das Beenden bestätigt werden."
         accessibilityRole="button"
         className="absolute bottom-10 min-w-[190px] h-[56px] rounded-[16px] items-center justify-center border border-ft-bad bg-ft-bad/95 px-5"
         style={{ zIndex: 2, elevation: 2 }}
-        onPress={onRequestStop}
+        onPress={stopHold.onPress}
+        onPressIn={stopHold.onPressIn}
+        onPressOut={stopHold.onPressOut}
       >
         <Text className="text-[12px] font-black text-[#2a060a]">{stopLabel}</Text>
+        <Text className="text-[9px] font-bold text-[#2a060a]/75">Gedrückt halten</Text>
       </Pressable>
       <View pointerEvents="none" className="items-center">
         <View className="w-[72px] h-[72px] rounded-full items-center justify-center bg-ft-acc-dim border-2 border-ft-acc mb-5">
