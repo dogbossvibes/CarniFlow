@@ -23,4 +23,22 @@ describe('saved track detail map interaction contract', () => {
   it('Detailpfad merged lokale vollstaendigere SQLite-Daten in stale Remote-Daten', () => {
     expect(screenSrc).toContain('mergeTrackDetailData(d, localDetail)');
   });
+
+  it('öffnet dieselben gespeicherten Daten in einer echten Vollbildansicht', () => {
+    expect(screenSrc).toContain('presentationStyle="fullScreen"');
+    expect(screenSrc).toContain('accessibilityLabel="Karte vergrößern"');
+    expect(screenSrc).toContain('setFullscreenMap(true)');
+    expect(screenSrc).toContain('fitToTrackToken={fullscreenFitToken}');
+    expect(screenSrc).toContain('onPress={() => setFullscreenFitToken(token => token + 1)}');
+    expect(screenSrc).toContain('setFullscreenSel({ kind: \'marker\', marker: m })');
+    expect(screenSrc).toContain('showUserLocation={false}');
+    expect(screenSrc).toContain('MarkerDetailSheet selection={fullscreenSel}');
+  });
+
+  it('refit wird nur explizit angefordert und setzt keinen User-Pan zurück', () => {
+    expect(mapSrc).toContain('fitToTrackToken?: number');
+    expect(mapSrc).toContain('requestedFit');
+    expect(mapSrc).toContain('if (!initialFit && !requestedFit) return;');
+    expect(mapSrc).toContain('showsUserLocation={showUserLocation}');
+  });
 });

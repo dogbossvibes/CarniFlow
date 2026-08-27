@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -116,6 +116,9 @@ export default function TrackAuswertungScreen() {
     };
   }, [data]);
   const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
+  const [fullscreenMap, setFullscreenMap] = useState(false);
+  const [fullscreenSel, setFullscreenSel] = useState<TrackDetailSelection | null>(null);
+  const [fullscreenFitToken, setFullscreenFitToken] = useState(0);
   const segmentAnalysis = useMemo(() => analyzeTrackSegments({
     segments: coerceTrackSegments(data?.track_data?.segments),
     layPoints: (data?.points ?? []).map((p: any) => ({ lat: p.latitude, lng: p.longitude, accuracy: p.accuracy ?? null, t: Date.parse(p.timestamp) || 0 })),
@@ -272,6 +275,17 @@ export default function TrackAuswertungScreen() {
                 <TrackSketch legs={corners} objects={aTotal} w={320} h={190} progress={1} />
               )}
             </View>
+            {map?.hasGps && (
+              <Pressable
+                accessibilityLabel="Karte vergrößern"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setFullscreenMap(true)}
+                style={s.fullscreenButton}
+              >
+                <Ionicons name="expand-outline" size={19} color={C.trackText} />
+              </Pressable>
+            )}
             <View style={s.legend}>
               <Legend color={C.trackPrimary} label="Fährte" />
               <Legend color="#fff" label="Gegenstand" square />
@@ -336,6 +350,52 @@ export default function TrackAuswertungScreen() {
       </KeyboardAvoidingView>
 
       <MarkerDetailSheet selection={detailSel} onClose={() => setDetailSel(null)} />
+
+      <Modal
+        animationType="slide"
+        onRequestClose={() => { setFullscreenMap(false); setFullscreenSel(null); }}
+        presentationStyle="fullScreen"
+        visible={fullscreenMap}
+      >
+        <SafeAreaView style={s.fullscreen} edges={['top', 'bottom']}>
+          <View style={s.fullscreenHeader}>
+            <Pressable
+              accessibilityLabel="Karte schließen"
+              accessibilityRole="button"
+              hitSlop={10}
+              onPress={() => { setFullscreenMap(false); setFullscreenSel(null); }}
+              style={s.fullscreenHeaderButton}
+            >
+              <Ionicons name="close" size={24} color={C.trackText} />
+            </Pressable>
+            <Text style={s.fullscreenTitle}>Fährte</Text>
+            <View style={s.fullscreenHeaderButton} />
+          </View>
+          <View style={s.fullscreenMap}>
+            {map?.hasGps && (
+              <TrackingMap
+                layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
+                startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
+                fitToTrackToken={fullscreenFitToken}
+                onStartPress={() => setFullscreenSel({ kind: 'start' })}
+                onMarkerPress={(m) => setFullscreenSel({ kind: 'marker', marker: m })}
+                onEndPress={() => setFullscreenSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
+                currentPosition={null} showUserLocation={false} follow={false} hideControls mapType="hybrid"
+              />
+            )}
+            <Pressable
+              accessibilityLabel="Gesamte Fährte anzeigen"
+              accessibilityRole="button"
+              onPress={() => setFullscreenFitToken(token => token + 1)}
+              style={s.fitButton}
+            >
+              <Ionicons name="scan-outline" size={17} color="#04110F" />
+              <Text style={s.fitButtonText}>Gesamte Fährte</Text>
+            </Pressable>
+          </View>
+          <MarkerDetailSheet selection={fullscreenSel} onClose={() => setFullscreenSel(null)} />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -388,6 +448,14 @@ const s = StyleSheet.create({
   condValue: { fontSize: 15, lineHeight: 18, color: C.trackText, fontWeight: '800', marginTop: 1, flexShrink: 1 },
 
   mapCard: { height: 190, overflow: 'hidden', marginBottom: 16, padding: 0 },
+  fullscreenButton: { position: 'absolute', top: 12, right: 12, width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(13,13,13,0.88)', borderWidth: 1, borderColor: C.trackBorder, alignItems: 'center', justifyContent: 'center' },
+  fullscreen: { flex: 1, backgroundColor: C.trackBg },
+  fullscreenHeader: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: C.trackBorder, backgroundColor: C.trackBg },
+  fullscreenHeaderButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  fullscreenTitle: { color: C.trackText, fontSize: 17, fontWeight: '800' },
+  fullscreenMap: { flex: 1 },
+  fitButton: { position: 'absolute', left: 16, bottom: 18, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, borderRadius: 12, backgroundColor: C.trackPrimary, borderWidth: 1, borderColor: C.trackPrimaryDk },
+  fitButtonText: { color: '#04110F', fontSize: 12, fontWeight: '800' },
   legend:  { position: 'absolute', left: 14, bottom: 12, flexDirection: 'row', gap: 14 },
   legendItem:{ flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 9, height: 9 },

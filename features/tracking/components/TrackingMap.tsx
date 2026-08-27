@@ -79,10 +79,12 @@ interface Props {
   startAnchor?:     LatLng | null;   // stabilisierter Startpunkt → Fähnchen (statt erstem Rohpunkt)
   endPoint?:        LatLng | null;   // gespeichertes Fährtenende (letzter gelegter Punkt) → Ziel-Fähnchen
   fitToPoints?:     LatLng[];        // Logbuch/Detail: initialer Ausschnitt über alle gespeicherten Punkte, genau einmal
+  fitToTrackToken?: number;          // expliziter Refit aus der historischen Vollbildkarte
   onStartPress?:    () => void;      // Tap auf Start-Fähnchen (Logbuch-Detail „Start")
   onMarkerPress?:   (m: MapMarker) => void;   // Tap auf einen gespeicherten Feature-Marker (Logbuch-Detail)
   onEndPress?:      () => void;               // Tap auf das Ziel-Fähnchen (Logbuch-Detail „Fährtenende")
   currentPosition:  LatLng | null;
+  showUserLocation?: boolean;
   dogPosition?:     LatLng | null;
   heading?:         number | null;
   follow:           boolean;
@@ -96,11 +98,12 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, onStartPress, onMarkerPress, onEndPress, currentPosition, dogPosition, heading,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
   const initialFitDoneRef = useRef(false);
+  const lastFitTokenRef = useRef<number | undefined>(undefined);
   const [mapReady, setMapReady] = useState(false);
   const { t } = useT();
 
@@ -159,13 +162,17 @@ export function TrackingMap({
   // Gespeicherte Detailkarten: einmalig nach dem Laden auf alle persistierten Punkte
   // fitten. Danach gewinnt die Nutzerinteraktion; keine Kamera-Rücksetzung bei Re-Render.
   useEffect(() => {
-    if (!mapReady || initialFitDoneRef.current || initialFitCoords.length < 2 || !mapRef.current) return;
+    if (!mapReady || initialFitCoords.length < 2 || !mapRef.current) return;
+    const initialFit = !initialFitDoneRef.current;
+    const requestedFit = fitToTrackToken != null && fitToTrackToken !== lastFitTokenRef.current;
+    if (!initialFit && !requestedFit) return;
     initialFitDoneRef.current = true;
+    if (requestedFit) lastFitTokenRef.current = fitToTrackToken;
     mapRef.current.fitToCoordinates(initialFitCoords, {
       edgePadding: { top: 34, right: 34, bottom: 34, left: 34 },
       animated: false,
     });
-  }, [initialFitCoords, mapReady]);
+  }, [fitToTrackToken, initialFitCoords, mapReady]);
 
   const recenter = () => {
     const p = currentPosition ?? layPoints[layPoints.length - 1] ?? null;
@@ -194,7 +201,7 @@ export function TrackingMap({
         provider={RNMaps.PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFill}
         mapType={mapType}
-        showsUserLocation
+        showsUserLocation={showUserLocation}
         showsCompass={false}
         showsMyLocationButton={false}
         scrollEnabled
