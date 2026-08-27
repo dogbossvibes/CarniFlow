@@ -26,13 +26,20 @@ describe('saved track detail map interaction contract', () => {
 
   it('öffnet dieselben gespeicherten Daten in einer echten Vollbildansicht', () => {
     expect(screenSrc).toContain('presentationStyle="fullScreen"');
-    expect(screenSrc).toContain('accessibilityLabel="Karte vergrößern"');
+    expect(screenSrc).toContain('onFullscreen={() => setFullscreenMap(true)}');
     expect(screenSrc).toContain('setFullscreenMap(true)');
     expect(screenSrc).toContain('fitToTrackToken={fullscreenFitToken}');
     expect(screenSrc).toContain('onPress={() => setFullscreenFitToken(token => token + 1)}');
     expect(screenSrc).toContain('setFullscreenSel({ kind: \'marker\', marker: m })');
     expect(screenSrc).toContain('showUserLocation={false}');
     expect(screenSrc).toContain('MarkerDetailSheet selection={fullscreenSel}');
+  });
+
+  it('rendert den Expand-Control innerhalb des nativen Map-Control-Stacks', () => {
+    expect(mapSrc).toContain('onFullscreen?:');
+    expect(mapSrc).toContain('{onFullscreen && <Fab icon="expand-outline" onPress={onFullscreen} />}');
+    expect(mapSrc).toContain('<Fab icon="locate" onPress={recenter} />');
+    expect(screenSrc).not.toContain('style={s.fullscreenButton}');
   });
 
   it('refit wird nur explizit angefordert und setzt keinen User-Pan zurück', () => {

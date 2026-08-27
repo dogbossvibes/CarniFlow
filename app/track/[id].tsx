@@ -269,23 +269,13 @@ export default function TrackAuswertungScreen() {
                   onStartPress={() => setDetailSel({ kind: 'start' })}
                   onMarkerPress={(m) => setDetailSel({ kind: 'marker', marker: m })}
                   onEndPress={() => setDetailSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
+                  onFullscreen={() => setFullscreenMap(true)}
                   currentPosition={null} follow={false} mapType="hybrid"
                 />
               ) : (
                 <TrackSketch legs={corners} objects={aTotal} w={320} h={190} progress={1} />
               )}
             </View>
-            {map?.hasGps && (
-              <Pressable
-                accessibilityLabel="Karte vergrößern"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={() => setFullscreenMap(true)}
-                style={s.fullscreenButton}
-              >
-                <Ionicons name="expand-outline" size={19} color={C.trackText} />
-              </Pressable>
-            )}
             <View style={s.legend}>
               <Legend color={C.trackPrimary} label="Fährte" />
               <Legend color="#fff" label="Gegenstand" square />
@@ -448,7 +438,6 @@ const s = StyleSheet.create({
   condValue: { fontSize: 15, lineHeight: 18, color: C.trackText, fontWeight: '800', marginTop: 1, flexShrink: 1 },
 
   mapCard: { height: 190, overflow: 'hidden', marginBottom: 16, padding: 0 },
-  fullscreenButton: { position: 'absolute', top: 12, right: 12, width: 38, height: 38, borderRadius: 11, backgroundColor: 'rgba(13,13,13,0.88)', borderWidth: 1, borderColor: C.trackBorder, alignItems: 'center', justifyContent: 'center' },
   fullscreen: { flex: 1, backgroundColor: C.trackBg },
   fullscreenHeader: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: C.trackBorder, backgroundColor: C.trackBg },
   fullscreenHeaderButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

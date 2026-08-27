@@ -91,6 +91,7 @@ interface Props {
   mapType?:         MapType;
   onToggleFollow?:  () => void;
   onCompass?:       () => void;
+  onFullscreen?:    () => void;        // gespeicherte Detailkarte: Fullscreen-Entry im Map-Control-Stack
   onUserPan?:       () => void;   // Nutzer verschiebt die Karte selbst → Aufrufer schaltet Follow aus
   hideControls?:    boolean;   // FAB-Spalte ausblenden (z. B. für Live-Overlays)
   controlsTop?:     number;    // Abstand der FAB-Spalte von oben (um Overlays wie die Hunde-Pille zu umgehen)
@@ -99,7 +100,7 @@ interface Props {
 
 export function TrackingMap({
   layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
-  follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
+  follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
   const initialFitDoneRef = useRef(false);
@@ -331,6 +332,7 @@ export function TrackingMap({
       {/* Floating Buttons rechts */}
       {!hideControls && (
         <View style={[s.fabCol, { top: controlsTop }]}>
+          {onFullscreen && <Fab icon="expand-outline" onPress={onFullscreen} />}
           {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
           <Fab icon="locate" onPress={recenter} />
           {onToggleFollow && <Fab icon={follow ? 'lock-closed' : 'lock-open'} active={follow} onPress={onToggleFollow} />}
