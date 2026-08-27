@@ -1022,6 +1022,7 @@ export default function LegenScreen() {
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">{t('common.stop')}</Text>
+            <Text numberOfLines={1} className="text-[8px] font-bold text-[#2a060a]/75">Gedrückt halten</Text>
           </Pressable>
         </View>
       </SafeAreaView>

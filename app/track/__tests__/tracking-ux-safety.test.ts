@@ -44,6 +44,8 @@ describe('tracking UX safety contract', () => {
     expect(legen).toContain('onPress={() => undefined} onLongPress={requestStop} onAccessibilityTap={requestStop} delayLongPress={1800}');
     expect(legen).toContain('onPress={() => undefined} onLongPress={togglePause} onAccessibilityTap={togglePause} delayLongPress={1800}');
     expect(run).toContain('onPress={() => undefined} onLongPress={handleFinish} onAccessibilityTap={handleFinish} delayLongPress={1800}');
+    expect(legen).toContain('Gedrückt halten');
+    expect(run).toContain('Gedrückt halten');
     expect(legen).toContain('Fährtenaufnahme wirklich beenden?');
     expect(run).toContain('track.finishTitle');
   });

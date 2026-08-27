@@ -821,6 +821,7 @@ export default function TrackRunScreen() {
           >
             {finishing ? <ActivityIndicator color="#2a060a" /> : <Ionicons name="stop" size={20} color="#2a060a" />}
             <Text className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.evaluate')}</Text>
+            <Text numberOfLines={1} className="text-[8px] font-bold text-[#2a060a]/75">Gedrückt halten</Text>
           </Pressable>
         </View>
       </SafeAreaView>
