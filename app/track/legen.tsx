@@ -1018,11 +1018,10 @@ export default function LegenScreen() {
             accessibilityLabel={t('common.stop')}
             accessibilityHint={t('track.stopLayingHint')}
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-            style={{ flex: 1.3 }} onPress={() => undefined} onLongPress={requestStop} onAccessibilityTap={requestStop} delayLongPress={1800} disabled={phase !== 'recording'}
+            style={{ flex: 1.3 }} onPress={requestStop} disabled={phase !== 'recording'}
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">{t('common.stop')}</Text>
-            <Text numberOfLines={1} className="text-[8px] font-bold text-[#2a060a]/75">Gedrückt halten</Text>
           </Pressable>
         </View>
       </SafeAreaView>

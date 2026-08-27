@@ -814,14 +814,13 @@ export default function TrackRunScreen() {
           </Pressable>
           <Pressable
             accessibilityLabel="Absuche beenden"
-            accessibilityHint="Zum Öffnen der Bestätigung gedrückt halten"
+            accessibilityHint="Zum Öffnen der Bestätigung tippen"
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
             style={[{ flex: 1.3 }, (finishing || arming) ? { opacity: 0.45 } : null]}
-            onPress={() => undefined} onLongPress={handleFinish} onAccessibilityTap={handleFinish} delayLongPress={1800} disabled={finishing || arming}
+            onPress={handleFinish} disabled={finishing || arming}
           >
             {finishing ? <ActivityIndicator color="#2a060a" /> : <Ionicons name="stop" size={20} color="#2a060a" />}
             <Text className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.evaluate')}</Text>
-            <Text numberOfLines={1} className="text-[8px] font-bold text-[#2a060a]/75">Gedrückt halten</Text>
           </Pressable>
         </View>
       </SafeAreaView>
