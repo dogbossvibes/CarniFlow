@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { FT } from '@/constants/colors';
@@ -45,6 +46,7 @@ import {
   segmentDisplayLabel,
 } from '@/features/tracking/utils/trackSegments';
 import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPickerLayout';
+import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
@@ -169,6 +171,7 @@ export default function LegenScreen() {
   const warmupStartedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
   const stoppingRef = useRef(false);   // Doppelklick-Guard für „Stoppen"
+  const [pocketLock, setPocketLock] = useState(false);
 
   // Automatisch erkannter Winkel (rechts/links/spitz) → Haptik + Hinweis.
   // Der Marker wird im Recorder direkt am Scheitel gesetzt.
@@ -508,7 +511,7 @@ export default function LegenScreen() {
     hapticWarning();
   }, []);
 
-  const onStop = () => {
+  const finishTrack = () => {
     if (stoppingRef.current) return;   // Doppelklick abfangen
     stoppingRef.current = true;
     // Phase 12.12: eine noch aktive Teilstrecke am letzten gültigen TrackPoint
@@ -524,7 +527,7 @@ export default function LegenScreen() {
         }));
       }
     }
-    hapticSuccess();   // SOFORT beim Stop-Tap
+    hapticSuccess();   // bewusst nach Stop-Bestätigung
     const id = sessionIdRef.current;   // = clientUuid (deterministisch seit Start)
     // rec.finish stoppt synchron, finalisiert lokal (durabel) und reiht den Remote-
     // Upload in die persistente Sync-Queue ein. Wir navigieren SOFORT — kein await.
@@ -551,6 +554,46 @@ export default function LegenScreen() {
       }
     }
   };
+
+  const requestStop = () => {
+    if (phaseRef.current !== 'recording' || stoppingRef.current) return;
+    Alert.alert('Fährtenaufnahme wirklich beenden?', 'Die Fährte wird gespeichert und die Liegezeit beginnt.', [
+      { text: 'Weiter aufzeichnen', style: 'cancel' },
+      { text: 'Fährte beenden', style: 'destructive', onPress: finishTrack },
+    ], { cancelable: true });
+  };
+
+  const togglePause = useCallback(() => {
+    if (phaseRef.current !== 'recording') return;
+    hapticTap();
+    const nextPaused = !isPaused;
+    if (isPaused) rec.resume(); else rec.pause();
+    // Pausezustand bleibt in der Registry und damit in der bestehenden Recovery-Persistenz erhalten.
+    const dId = activeDog?.id ?? null;
+    if (dId && useActiveFaehrten.getState().get(dId)) useActiveFaehrten.getState().upsert(dId, { paused: nextPaused });
+  }, [activeDog, isPaused, rec]);
+
+  const guardedBack = useCallback(() => {
+    if (phaseRef.current !== 'recording') {
+      if (router.canGoBack()) router.back(); else router.replace('/track' as never);
+      return;
+    }
+    if (pocketLock) return;
+    Alert.alert('Fährte läuft noch', 'Bitte die Aufnahme bewusst über Stoppen beenden.', [
+      { text: 'Zur Aufnahme', style: 'cancel' },
+    ], { cancelable: true });
+  }, [pocketLock, router]);
+
+  usePreventRemove(phase === 'recording', useCallback(() => {
+    if (!pocketLock) {
+      Alert.alert('Fährte läuft noch', 'Die laufende Aufnahme bleibt aktiv. Stoppen ist nur über Safe Stop möglich.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
+    }
+  }, [pocketLock]));
+
+  const unlockPocket = useCallback(() => {
+    hapticTap();
+    setPocketLock(false);
+  }, []);
 
   // GPS ab >45 m warnen — dann landen keine Linienpunkte (Filter), Distanz bleibt 0.
   const gpsPoor = gpsAccuracy != null && gpsAccuracy > 45;
@@ -583,7 +626,8 @@ export default function LegenScreen() {
         <View className="flex-row items-center gap-3 px-[18px] pb-3" style={{ paddingTop: insets.top + 8 }}>
           <Pressable
             className="w-10 h-10 rounded-[12px] border border-ft-line-strong bg-white/10 items-center justify-center"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} hitSlop={10}
+            accessibilityLabel="Zur Aufnahme"
+            onPress={guardedBack} hitSlop={10}
           >
             <Ionicons name="chevron-back" size={20} color={FT.text} />
           </Pressable>
@@ -598,6 +642,16 @@ export default function LegenScreen() {
           )}
           <View className="flex-1" />
           <HelpButton topicId="track_laying" autoShow tint={FT.text} />
+          {phase === 'recording' && (
+            <Pressable
+              accessibilityLabel={pocketLock ? 'Aufnahme entsperren' : 'Aufnahme sperren'}
+              accessibilityHint={pocketLock ? 'Zum Entsperren gedrückt halten' : 'Sperrt gefährliche Touch-Aktionen'}
+              onPress={() => { if (!pocketLock) { hapticTap(); setPocketLock(true); } }}
+              className={`w-10 h-10 rounded-[12px] border items-center justify-center ${pocketLock ? 'bg-ft-acc border-ft-acc' : 'bg-white/10 border-ft-line-strong'}`}
+            >
+              <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={19} color={pocketLock ? FT.accText : FT.text} />
+            </Pressable>
+          )}
           <View className="flex-row bg-white/10 rounded-[12px] p-[3px] gap-[2px]">
             {(['map', 'sketch'] as const).map(k => {
               const on = view === k;
@@ -952,15 +1006,9 @@ export default function LegenScreen() {
           </Pressable>
           <Pressable
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
-            onPress={() => {
-              hapticTap();
-              const nextPaused = !isPaused;
-              if (isPaused) rec.resume(); else rec.pause();
-              // Pausezustand auch in der Registry spiegeln (nur bei bestehendem Eintrag,
-              // Status bleibt 'laying') → nach App-Neustart eindeutig rekonstruierbar.
-              const dId = activeDog?.id ?? null;
-              if (dId && useActiveFaehrten.getState().get(dId)) useActiveFaehrten.getState().upsert(dId, { paused: nextPaused });
-            }} disabled={phase !== 'recording'}
+            accessibilityLabel={isPaused ? t('track.resume') : t('track.pause')}
+            accessibilityHint="Zum Ändern gedrückt halten"
+            onPress={() => undefined} onLongPress={togglePause} onAccessibilityTap={togglePause} delayLongPress={1800} disabled={phase !== 'recording'}
           >
             <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color={FT.text} />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>
@@ -969,13 +1017,20 @@ export default function LegenScreen() {
             accessibilityLabel={t('common.stop')}
             accessibilityHint={t('track.stopLayingHint')}
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-            style={{ flex: 1.3 }} onPress={onStop} disabled={phase !== 'recording'}
+            style={{ flex: 1.3 }} onPress={() => undefined} onLongPress={requestStop} onAccessibilityTap={requestStop} delayLongPress={1800} disabled={phase !== 'recording'}
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">{t('common.stop')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
+
+      <PocketLockOverlay
+        visible={pocketLock && phase === 'recording'}
+        duration={clock(durationSeconds)}
+        distanceM={`${Math.round(distanceMeters)} m`}
+        onUnlock={unlockPocket}
+      />
 
       <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')}>
         <View className="gap-4 pb-2">

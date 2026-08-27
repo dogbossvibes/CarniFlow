@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, View }
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
@@ -52,6 +53,7 @@ import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepo
 import { syncNow } from '@/features/sync/services/syncEngine';
 import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
 import * as Crypto from 'expo-crypto';
+import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 
 // Blinkender LIVE-Punkt.
 function RecDot() {
@@ -122,6 +124,7 @@ export default function TrackRunScreen() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
+  const [pocketLock, setPocketLock] = useState(false);
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
   const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
@@ -269,7 +272,7 @@ export default function TrackRunScreen() {
   const showRecoveryDialog = (pending: PendingTrack) => {
     Alert.alert('Laufende Absuche fortsetzen?', 'Es wurde eine unterbrochene Absuche gefunden.', [
       { text: 'Fortsetzen', onPress: () => void resumeSearch(pending) },
-      { text: 'Beenden',    onPress: () => void endSearch(pending) },
+      { text: 'Beenden',    onPress: () => confirmRecoveryEnd(pending) },
       { text: 'Verwerfen', style: 'destructive', onPress: () => discardSearch(pending) },
     ], { cancelable: false });
   };
@@ -463,9 +466,13 @@ export default function TrackRunScreen() {
   const devOff = devShown != null && devShown > 8;
 
   const handleCancel = () => {
-    Alert.alert(t('track.abortTitle'), t('track.abortBody'), [
-      { text: t('common.next'), style: 'cancel' },
-      { text: t('common.cancel'), style: 'destructive', onPress: () => { hapticTap(); s.stop(); useTrackingStore.getState().setSessionStatus('cancelled'); useTrackingStore.getState().reset(); clearRegistry(); router.replace('/track' as never); } },
+    Alert.alert('Fährte läuft noch', 'Die Absuche bleibt aktiv. Zum Beenden bitte den Stop-Button gedrückt halten.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
+  };
+
+  const confirmRecoveryEnd = (pending: PendingTrack) => {
+    Alert.alert('Absuche wirklich beenden?', 'Die gespeicherten Suchpunkte bleiben erhalten.', [
+      { text: 'Weiter', style: 'cancel' },
+      { text: 'Absuche beenden', style: 'destructive', onPress: () => void endSearch(pending) },
     ]);
   };
 
@@ -524,6 +531,20 @@ export default function TrackRunScreen() {
     ]);
   };
 
+  const guardedBack = useCallback(() => {
+    if (pocketLock) return;
+    handleCancel();
+  }, [pocketLock]);
+
+  usePreventRemove(!arming && s.recording, useCallback(() => {
+    if (!pocketLock) handleCancel();
+  }, [pocketLock]));
+
+  const unlockPocket = useCallback(() => {
+    hapticTap();
+    setPocketLock(false);
+  }, []);
+
   const metrics: { value: string; label: string; warn?: boolean }[] = [
     { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
     { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
@@ -555,7 +576,7 @@ export default function TrackRunScreen() {
             className="w-9 h-9 rounded-[11px] border border-ft-line-strong bg-white/5 items-center justify-center"
             onPress={arming
               ? () => router.replace((effectiveId ? `/track/liegen?id=${effectiveId}${dogId ? `&dogId=${dogId}` : ''}` : dogId ? `/track/liegen?dogId=${dogId}` : '/track') as never)
-              : handleCancel}
+              : guardedBack}
             hitSlop={8}
           >
             <Ionicons name="chevron-back" size={18} color={FT.text} />
@@ -573,6 +594,16 @@ export default function TrackRunScreen() {
           )}
           <View className="flex-1" />
           <HelpButton topicId="track_search" autoShow tint={FT.text} size={18} />
+          {!arming && s.recording && (
+            <Pressable
+              accessibilityLabel={pocketLock ? 'Absuche entsperren' : 'Absuche sperren'}
+              accessibilityHint={pocketLock ? 'Zum Entsperren gedrückt halten' : 'Sperrt gefährliche Touch-Aktionen'}
+              onPress={() => { if (!pocketLock) { hapticTap(); setPocketLock(true); } }}
+              className={`w-9 h-9 rounded-[11px] items-center justify-center border ${pocketLock ? 'bg-ft-acc border-ft-acc' : 'bg-white/5 border-ft-line-strong'}`}
+            >
+              <Ionicons name={pocketLock ? 'lock-closed' : 'lock-open-outline'} size={17} color={pocketLock ? FT.accText : FT.text} />
+            </Pressable>
+          )}
           {/* Sprachausgabe an/aus */}
           <Pressable onPress={() => setVoiceOn(v => !v)} hitSlop={8}
             className={`w-9 h-9 rounded-[11px] items-center justify-center border ${voiceOn ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.4)]' : 'bg-white/5 border-ft-line-strong'}`}>
@@ -777,15 +808,24 @@ export default function TrackRunScreen() {
             <Text className="text-[10.5px] font-extrabold text-ft-text">{t('track.object')}</Text>
           </Pressable>
           <Pressable
+            accessibilityLabel="Absuche beenden"
+            accessibilityHint="Zum Öffnen der Bestätigung gedrückt halten"
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
             style={[{ flex: 1.3 }, (finishing || arming) ? { opacity: 0.45 } : null]}
-            onPress={handleFinish} disabled={finishing || arming}
+            onPress={() => undefined} onLongPress={handleFinish} onAccessibilityTap={handleFinish} delayLongPress={1800} disabled={finishing || arming}
           >
             {finishing ? <ActivityIndicator color="#2a060a" /> : <Ionicons name="stop" size={20} color="#2a060a" />}
             <Text className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.evaluate')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
+
+      <PocketLockOverlay
+        visible={pocketLock && !arming && s.recording}
+        duration={fmtClock(s.elapsedS)}
+        distanceM={`${Math.round(s.distanceM)} m`}
+        onUnlock={unlockPocket}
+      />
 
       {SHOW_GPS_DEBUG && (
         <PrecisionDebugPanel
