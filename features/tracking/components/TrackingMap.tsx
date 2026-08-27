@@ -301,7 +301,7 @@ export function TrackingMap({
         <View style={[s.fabCol, { top: controlsTop }]}>
           {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
           <Fab icon="locate" onPress={recenter} />
-          {onToggleFollow && <Fab icon={follow ? 'lock-closed' : 'lock-open'} active={follow} onPress={onToggleFollow} />}
+          {onToggleFollow && <Fab icon={follow ? 'eye' : 'eye-off'} active={follow} onPress={onToggleFollow} />}
         </View>
       )}
     </View>

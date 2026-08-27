@@ -33,6 +33,13 @@ describe('tracking UX safety contract', () => {
     expect(run).toContain("name={pocketLock ? 'lock-closed' : 'lock-open-outline'}");
   });
 
+  it('keeps map-follow control separate from the single pocket-lock control', () => {
+    expect(legen.match(/name=\{pocketLock \? 'lock-closed' : 'lock-open-outline'\}/g)).toHaveLength(1);
+    expect(run.match(/name=\{pocketLock \? 'lock-closed' : 'lock-open-outline'\}/g)).toHaveLength(1);
+    expect(overlay).not.toContain('onToggleFollow');
+    expect(readFileSync('features/tracking/components/TrackingMap.tsx', 'utf8')).toContain("follow ? 'eye' : 'eye-off'");
+  });
+
   it('does not pause or finalize from a normal pocket touch', () => {
     expect(legen).toContain('onPress={() => undefined} onLongPress={requestStop} onAccessibilityTap={requestStop} delayLongPress={1800}');
     expect(legen).toContain('onPress={() => undefined} onLongPress={togglePause} onAccessibilityTap={togglePause} delayLongPress={1800}');
