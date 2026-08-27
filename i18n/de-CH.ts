@@ -420,6 +420,13 @@ export const deCH = {
   'heat.obsValueOptional': 'Wert (optional)',
   'heat.obsValuePlaceholder': 'z. B. mittel, 3.2 ng/ml',
   'heat.notFound':   'Läufigkeit nicht gefunden.',
+  'heat.calendarLoadError': 'Der Läufigkeitsverlauf konnte nicht geladen werden.',
+  'heat.calendarTitle': 'Läufigkeitskalender',
+  'heat.noObservationsDay': 'Keine Beobachtungen an diesem Tag.',
+  'heat.viewDetails': 'Details öffnen',
+  'heat.calendarPrevMonth': 'Vorheriger Monat',
+  'heat.calendarNextMonth': 'Nächster Monat',
+  'heat.viewCalendar': 'Kalender ansehen',
 
   // Gesundheit
   'health.title': 'Gesundheit',

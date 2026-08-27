@@ -65,6 +65,8 @@ const intentionallyNeutralIdenticalKeys = new Set([
   'journal.statTrainings',
   'track.engineLabel',
   'profile.streakUpper',
+  'timer.pause',
+  'track.pause',
 ]);
 
 const intentionallyNeutralValues = new Set([
@@ -190,6 +192,7 @@ const keyNameLeakExceptions = new Set([
   'trainer.moduleRequired',
   'trainer.workspace',
   'training.journal',
+  'trainer.profile',
 ]);
 
 function keyNameLeaks(candidate: Record<string, unknown>) {

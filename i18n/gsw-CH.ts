@@ -420,6 +420,13 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'heat.obsValueOptional': 'Wert (optional)',
   'heat.obsValuePlaceholder': 'z.B. mittel, 3.2 ng/ml',
   'heat.notFound':   'Läufigkeit isch nid gfunde.',
+  'heat.calendarLoadError': 'De Läufigkeitsverlauf het nöd chönne glade werde.',
+  'heat.calendarTitle': 'Läufigkeitschalender',
+  'heat.noObservationsDay': 'Kei Beobachtige a däm Tag.',
+  'heat.viewDetails': 'Details öffne',
+  'heat.calendarPrevMonth': 'Vorherige Monet',
+  'heat.calendarNextMonth': 'Nächschte Monet',
+  'heat.viewCalendar': 'Chalender aluege',
 
   // Gesundheit
   'health.title': 'Gsundheit',

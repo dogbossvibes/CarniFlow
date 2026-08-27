@@ -15,6 +15,7 @@ import {
   getHeatCalendarStats, getMonthGrid, heatHistoryMetadata, phaseTone, type HeatCalendarDay, type HeatCalendarFilter, type HeatPhaseTone,
 } from '@/features/dogs/heatCalendar';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useT } from '@/i18n';
 
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -39,6 +40,7 @@ const moveMonth = (cursor: { year: number; month: number }, offset: number) => {
 };
 
 export default function DogHeatCalendarScreen() {
+  const { t } = useT();
   const router = useRouter();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { isPro, loading: capabilityLoading } = useCapabilities();
@@ -110,8 +112,8 @@ export default function DogHeatCalendarScreen() {
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#F472B6" /></View>;
   if (loadError) return (
     <View style={s.center}>
-      <Text style={s.errorText}>Der Läufigkeitsverlauf konnte nicht geladen werden.</Text>
-      <TouchableOpacity style={s.retryButton} onPress={() => void load()}><Text style={s.retryText}>Erneut versuchen</Text></TouchableOpacity>
+      <Text style={s.errorText}>{t('heat.calendarLoadError')}</Text>
+      <TouchableOpacity style={s.retryButton} onPress={() => void load()}><Text style={s.retryText}>{t('common.retry')}</Text></TouchableOpacity>
     </View>
   );
 
@@ -123,10 +125,10 @@ export default function DogHeatCalendarScreen() {
             <Ionicons name="chevron-back" size={20} color={C.trackText} />
           </TouchableOpacity>
           <View style={s.barTitleWrap}>
-            <Text style={s.barTitle}>Läufigkeitskalender</Text>
+            <Text style={s.barTitle}>{t('heat.calendarTitle')}</Text>
             <Text style={s.barSubtitle}>Verlauf & Phasen</Text>
           </View>
-          <TouchableOpacity style={s.iconBtn} onPress={() => router.push({ pathname: '/dog-heat-new', params: { id: dogId } } as never)} hitSlop={8} accessibilityLabel="Läufigkeit hinzufügen">
+          <TouchableOpacity style={s.iconBtn} onPress={() => router.push({ pathname: '/dog-heat-new', params: { id: dogId } } as never)} hitSlop={8} accessibilityLabel={t('heat.add')}>
             <Ionicons name="add" size={20} color={C.trackText} />
           </TouchableOpacity>
         </View>
@@ -134,11 +136,11 @@ export default function DogHeatCalendarScreen() {
         <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: 32 + insets.bottom }]} showsVerticalScrollIndicator={false}>
           <View style={s.calendarCard}>
             <View style={s.monthNav}>
-              <TouchableOpacity style={s.monthButton} onPress={() => setCursor(value => moveMonth(value, -1))} hitSlop={8} accessibilityLabel="Vorheriger Monat">
+              <TouchableOpacity style={s.monthButton} onPress={() => setCursor(value => moveMonth(value, -1))} hitSlop={8} accessibilityLabel={t('heat.calendarPrevMonth')}>
                 <Ionicons name="chevron-back" size={18} color={C.trackText} />
               </TouchableOpacity>
               <Text style={s.monthTitle}>{MONTHS[cursor.month]} {cursor.year}</Text>
-              <TouchableOpacity style={s.monthButton} onPress={() => setCursor(value => moveMonth(value, 1))} hitSlop={8} accessibilityLabel="Nächster Monat">
+              <TouchableOpacity style={s.monthButton} onPress={() => setCursor(value => moveMonth(value, 1))} hitSlop={8} accessibilityLabel={t('heat.calendarNextMonth')}>
                 <Ionicons name="chevron-forward" size={18} color={C.trackText} />
               </TouchableOpacity>
             </View>
@@ -150,7 +152,7 @@ export default function DogHeatCalendarScreen() {
                 </TouchableOpacity>
               ))}
               <TouchableOpacity style={s.todayButton} onPress={() => setCursor({ year: initialDate.getFullYear(), month: initialDate.getMonth() })}>
-                <Text style={s.todayText}>Heute</Text>
+                <Text style={s.todayText}>{t('date.today')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -192,11 +194,11 @@ export default function DogHeatCalendarScreen() {
 
           {activeCycle ? (
             <TouchableOpacity style={s.activeCard} onPress={() => router.push(`/dog-heat/${activeCycle.id}` as never)} activeOpacity={0.82}>
-              <View style={s.activeHead}><View style={s.activeDot} /><Text style={s.activeEyebrow}>Läufigkeit aktiv</Text><Ionicons name="chevron-forward" size={16} color={C.trackTextMut} /></View>
+              <View style={s.activeHead}><View style={s.activeDot} /><Text style={s.activeEyebrow}>{t('heat.currentCycle')}</Text><Ionicons name="chevron-forward" size={16} color={C.trackTextMut} /></View>
               <View style={s.activeDetails}>
-                <View><Text style={s.activeValue}>{formatDate(activeCycle.startDate)}</Text><Text style={s.activeLabel}>Start</Text></View>
-                 <View><Text style={s.activeValue}>Tag {heatCycleDay(activeCycle.startDate, today)}</Text><Text style={s.activeLabel}>Heute</Text></View>
-                <View><Text style={s.activeValue}>{activePhase?.phaseType ?? '—'}</Text><Text style={s.activeLabel}>Aktuell</Text></View>
+                <View><Text style={s.activeValue}>{formatDate(activeCycle.startDate)}</Text><Text style={s.activeLabel}>{t('common.start')}</Text></View>
+                 <View><Text style={s.activeValue}>Tag {heatCycleDay(activeCycle.startDate, today)}</Text><Text style={s.activeLabel}>{t('date.today')}</Text></View>
+                <View><Text style={s.activeValue}>{activePhase?.phaseType ?? '—'}</Text><Text style={s.activeLabel}>{t('track.current')}</Text></View>
               </View>
               <View style={s.cycleLine}>
                 {PHASE_LABELS.map(label => {
@@ -210,7 +212,7 @@ export default function DogHeatCalendarScreen() {
           ) : null}
 
           {histories.length > 0 ? <View style={s.sectionBlock}>
-            <Text style={s.sectionTitle}>Historie</Text>
+            <Text style={s.sectionTitle}>{t('heat.history')}</Text>
             {histories.map(cycle => {
                const duration = durationDays(cycle.startDate, cycle.endDate);
                const metadata = heatHistoryMetadata(duration, phaseCounts[cycle.id] ?? 0, observationCounts[cycle.id] ?? 0);
@@ -226,7 +228,7 @@ export default function DogHeatCalendarScreen() {
           </View> : null}
 
           {(stats.lastCompleted || stats.averageCycleDays || stats.averageHeatDays || stats.averageEstrusDays || stats.nextExpected) ? <View style={s.sectionBlock}>
-            <Text style={s.sectionTitle}>Statistiken</Text>
+            <Text style={s.sectionTitle}>{t('training.stats')}</Text>
             <View style={s.statsGrid}>
               {stats.lastCompleted ? <Stat label="Letzte Läufigkeit" value={fmtDate(stats.lastCompleted.startDate) ?? '—'} /> : null}
               {stats.lastCompleted ? <Stat label="Dauer letzte" value={durationDays(stats.lastCompleted.startDate, stats.lastCompleted.endDate) ? `${durationDays(stats.lastCompleted.startDate, stats.lastCompleted.endDate)} Tage` : '—'} /> : null}
@@ -244,10 +246,10 @@ export default function DogHeatCalendarScreen() {
               <View style={[s.sheetPhaseDot, { backgroundColor: PHASE_COLORS[phaseTone(selectedDay.phase?.phaseType ?? selectedCycle.phase)].background }]} />
               <View style={s.flex}><Text style={s.sheetPhase}>{selectedDay.phase?.phaseType ?? 'Läufigkeit'}</Text><Text style={s.sheetMeta}>Tag {heatCycleDay(selectedCycle.startDate, selectedDay.key)} im Zyklus</Text></View>
             </View>
-            <Text style={s.sheetObservationTitle}>Beobachtungen</Text>
-            {selectedDay.observations.length ? selectedDay.observations.map(observation => <ObservationRow key={observation.id} observation={observation} />) : <Text style={s.sheetEmpty}>Keine Beobachtungen an diesem Tag.</Text>}
+            <Text style={s.sheetObservationTitle}>{t('heat.observations')}</Text>
+            {selectedDay.observations.length ? selectedDay.observations.map(observation => <ObservationRow key={observation.id} observation={observation} />) : <Text style={s.sheetEmpty}>{t('heat.noObservationsDay')}</Text>}
             <TouchableOpacity style={s.sheetAction} onPress={() => { const cycleId = selectedCycle.id; setSelectedDay(null); router.push(`/dog-heat/${cycleId}` as never); }}>
-              <Text style={s.sheetActionText}>Details öffnen</Text><Ionicons name="arrow-forward" size={16} color={C.accentText} />
+              <Text style={s.sheetActionText}>{t('heat.viewDetails')}</Text><Ionicons name="arrow-forward" size={16} color={C.accentText} />
             </TouchableOpacity>
           </View> : null}
         </AnyvoBottomSheet>

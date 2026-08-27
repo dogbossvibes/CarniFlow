@@ -98,7 +98,7 @@ export function DogHeatCard({
       {onOpenCalendar ? (
         <TouchableOpacity style={s.calendarLink} onPress={onOpenCalendar} activeOpacity={0.82} accessibilityRole="button">
           <View style={s.calendarIcon}><Ionicons name="calendar-outline" size={16} color={PINK} /></View>
-          <Text style={s.calendarText}>Kalender ansehen</Text>
+          <Text style={s.calendarText}>{t('heat.viewCalendar')}</Text>
           <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
         </TouchableOpacity>
       ) : null}
