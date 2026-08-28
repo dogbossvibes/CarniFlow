@@ -172,6 +172,7 @@ export default function LegenScreen() {
   const sessionIdRef = useRef<string | null>(null);
   const stoppingRef = useRef(false);   // Doppelklick-Guard für „Stoppen"
   const [pocketLock, setPocketLock] = useState(false);
+  const [pendingExit, setPendingExit] = useState<{ href: string } | { back: true } | null>(null);
 
   // Automatisch erkannter Winkel (rechts/links/spitz) → Haptik + Hinweis.
   // Der Marker wird im Recorder direkt am Scheitel gesetzt.
@@ -535,7 +536,8 @@ export default function LegenScreen() {
     hapticSuccess();   // bewusst nach Stop-Bestätigung
     const id = sessionIdRef.current;   // = clientUuid (deterministisch seit Start)
     // rec.finish stoppt synchron, finalisiert lokal (durabel) und reiht den Remote-
-    // Upload in die persistente Sync-Queue ein. Wir navigieren SOFORT — kein await.
+    // Upload in die persistente Sync-Queue ein. Navigation folgt nach dem
+    // synchronen Session-State-Wechsel, damit der Navigation-Guard deaktiviert ist.
     rec.finish();
 
     // Registry: Übergang laying → resting. Liegezeit-Start = jetzt (deckt sich mit
@@ -548,24 +550,17 @@ export default function LegenScreen() {
     }
     const dq = activeDog ? `&dogId=${activeDog.id}` : '';
     if (id) {
-      router.replace(`/track/liegen?id=${id}${dq}` as never);   // → Wartephase (Liegezeit) → Ausarbeiten
+      setPhase('warmup');
+      setPendingExit({ href: `/track/liegen?id=${id}${dq}` });   // → Wartephase (Liegezeit) → Ausarbeiten
     } else {
       // Offline: noch keine Session-ID, aber die Fährte gehört dem Hund → Liegen mit dogId.
-      if (activeDog) router.replace(`/track/liegen?dogId=${activeDog.id}` as never);
+      setPhase('warmup');
+      if (activeDog) setPendingExit({ href: `/track/liegen?dogId=${activeDog.id}` });
       else {
         showToast(t('toast.localSaved'));
-        if (router.canGoBack()) router.back();
-        else router.replace('/track' as never);
+        setPendingExit(router.canGoBack() ? { back: true } : { href: '/track' });
       }
     }
-  };
-
-  const requestStop = () => {
-    if (phaseRef.current !== 'recording' || stoppingRef.current) return;
-    Alert.alert('Fährtenaufnahme wirklich beenden?', 'Die Fährte wird gespeichert und die Liegezeit beginnt.', [
-      { text: 'Weiter aufzeichnen', style: 'cancel' },
-      { text: 'Fährte beenden', style: 'destructive', onPress: finishTrack },
-    ], { cancelable: true });
   };
 
   const togglePause = useCallback(() => {
@@ -591,9 +586,17 @@ export default function LegenScreen() {
 
   usePreventRemove(phase === 'recording', useCallback(() => {
     if (!pocketLock) {
-      Alert.alert('Fährte läuft noch', 'Die laufende Aufnahme bleibt aktiv. Stoppen ist nur über Safe Stop möglich.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
+      Alert.alert('Fährte läuft noch', 'Die laufende Aufnahme bleibt aktiv. Zum Beenden bitte Stoppen antippen.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
     }
   }, [pocketLock]));
+
+  useEffect(() => {
+    if (!pendingExit || phase === 'recording') return;
+    setPendingExit(null);
+    if ('href' in pendingExit) router.replace(pendingExit.href as never);
+    else if (router.canGoBack()) router.back();
+    else router.replace('/track' as never);
+  }, [pendingExit, phase, router]);
 
   const unlockPocket = useCallback(() => {
     hapticTap();
@@ -1023,7 +1026,7 @@ export default function LegenScreen() {
             accessibilityLabel={t('common.stop')}
             accessibilityHint={t('track.stopLayingHint')}
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-            style={{ flex: 1.3 }} onPress={requestStop} disabled={phase !== 'recording'}
+            style={{ flex: 1.3 }} onPress={finishTrack} disabled={phase !== 'recording'}
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">{t('common.stop')}</Text>
@@ -1036,7 +1039,6 @@ export default function LegenScreen() {
         duration={clock(durationSeconds)}
         distanceM={`${Math.round(distanceMeters)} m`}
         onUnlock={unlockPocket}
-        onRequestStop={requestStop}
       />
 
       <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')}>

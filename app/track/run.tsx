@@ -125,6 +125,7 @@ export default function TrackRunScreen() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
+  const [pendingExit, setPendingExit] = useState<string | null>(null);
   const [pocketLock, setPocketLock] = useState(false);
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
@@ -329,7 +330,7 @@ export default function TrackRunScreen() {
     useTrackingStore.getState().setSessionStatus('completed');
     useTrackingStore.getState().reset();
     clearRegistry();
-    router.replace((sessId ? `/track/${sessId}` : '/track') as never);
+    setPendingExit(sessId ? `/track/${sessId}` : '/track');
   };
 
   // Verwerfen: NUR den Suchlauf löschen (gelegte Fährte bleibt), mit Bestätigung.
@@ -467,7 +468,7 @@ export default function TrackRunScreen() {
   const devOff = devShown != null && devShown > 8;
 
   const handleCancel = () => {
-    Alert.alert('Fährte läuft noch', 'Die Absuche bleibt aktiv. Zum Beenden bitte den Stop-Button gedrückt halten.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
+    Alert.alert('Fährte läuft noch', 'Die Absuche bleibt aktiv. Zum Beenden bitte den Stop-Button antippen.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
   };
 
   const confirmRecoveryEnd = (pending: PendingTrack) => {
@@ -477,62 +478,56 @@ export default function TrackRunScreen() {
     ]);
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (finishing || finishRequestedRef.current) return;   // Doppelt-Tippen → keine doppelte Finalisierung
-    Alert.alert(t('track.finishTitle'), t('track.finishBody'), [
-      { text: t('track.keepSearching'), style: 'cancel' },
-      { text: t('common.finish'), style: 'destructive', onPress: async () => {
-        if (finishRequestedRef.current) return;
-        finishRequestedRef.current = true;
-        hapticSuccess();   // sofort beim Bestätigen, vor await
-        setFinishing(true);
-        const res = s.stop();   // ← Search-Recorder beenden (flusht letzten Puffer)
-        // runUuid ist seit dem Start deterministisch vorhanden (kein Null-Race mehr);
-        // defensiver Fallback, falls doch nicht gesetzt.
-        const runId = runIdRef.current ?? Crypto.randomUUID();
-        const sessId = effectiveId;
+    finishRequestedRef.current = true;
+    hapticSuccess();
+    setFinishing(true);
+    const res = s.stop();   // ← Search-Recorder beenden (flusht letzten Puffer)
+    // runUuid ist seit dem Start deterministisch vorhanden (kein Null-Race mehr);
+    // defensiver Fallback, falls doch nicht gesetzt.
+    const runId = runIdRef.current ?? Crypto.randomUUID();
+    const sessId = effectiveId;
 
-        // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.
-        //    Schlägt das fehl → KEIN Reset/Navigation (Recovery bleibt möglich, kein Verlust).
-        if (sessId) {
-          try {
-            await finalizeLocalTrackRun(sessId, buildRunResultPayload({
-              runId, sessionId: sessId,
-              startedAtMs: searchStartMsRef.current ?? (Date.now() - res.durationS * 1000), endedAtMs: Date.now(),
-              result: {
-                durationS: res.durationS, score: res.score, deviationAvgM: res.deviationAvgM,
-                foundObjects: res.foundObjects, totalObjects: res.totalObjects, distanceM: res.distanceM,
-                breaks: res.breaks, points: res.points,
-              },
-              searchHandlerDistanceM,
-            }));
-          } catch (e) {
-            console.warn('[trackRun] local finalize', e);
-            finishRequestedRef.current = false;
-            setFinishing(false);
-            Alert.alert('Speichern fehlgeschlagen', 'Die Absuche konnte nicht lokal gespeichert werden. Bitte erneut versuchen.');
-            return;   // kein Reset, keine Navigation → Ergebnis bleibt erhalten
-          }
-        }
-
-        // Lokal sicher → Session abschliessen (Recovery bietet sie nicht mehr als laufend an).
-        useTrackingStore.getState().setSessionStatus('completed');
-        useTrackingStore.getState().reset();
-        clearRegistry();
-
-        // 2) Remote-Transport ausschliesslich über die persistente Sync-Queue (RUN-SAVE2):
-        //    dieselbe training_session erneut enqueuen → syncNow lädt Lay + Run (track_runs
-        //    per runUuid) idempotent hoch. Navigation wartet NICHT (lokal bereits durabel).
-        if (sessId) {
-          try {
-            await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: sessId, operation: 'create', priority: 1 });
-          } catch (e) { console.warn('[trackRun] enqueue', e); }
-          void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
-        }
+    // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.
+    //    Schlägt das fehl → KEIN Reset/Navigation (Recovery bleibt möglich, kein Verlust).
+    if (sessId) {
+      try {
+        await finalizeLocalTrackRun(sessId, buildRunResultPayload({
+          runId, sessionId: sessId,
+          startedAtMs: searchStartMsRef.current ?? (Date.now() - res.durationS * 1000), endedAtMs: Date.now(),
+          result: {
+            durationS: res.durationS, score: res.score, deviationAvgM: res.deviationAvgM,
+            foundObjects: res.foundObjects, totalObjects: res.totalObjects, distanceM: res.distanceM,
+            breaks: res.breaks, points: res.points,
+          },
+          searchHandlerDistanceM,
+        }));
+      } catch (e) {
+        console.warn('[trackRun] local finalize', e);
+        finishRequestedRef.current = false;
         setFinishing(false);
-        router.replace((sessId ? `/track/${sessId}` : '/track') as never);
-      } },
-    ]);
+        Alert.alert('Speichern fehlgeschlagen', 'Die Absuche konnte nicht lokal gespeichert werden. Bitte erneut versuchen.');
+        return;   // kein Reset, keine Navigation → Ergebnis bleibt erhalten
+      }
+    }
+
+    // Lokal sicher → Session abschliessen (Recovery bietet sie nicht mehr als laufend an).
+    useTrackingStore.getState().setSessionStatus('completed');
+    useTrackingStore.getState().reset();
+    clearRegistry();
+
+    // 2) Remote-Transport ausschliesslich über die persistente Sync-Queue (RUN-SAVE2):
+    //    dieselbe training_session erneut enqueuen → syncNow lädt Lay + Run (track_runs
+    //    per runUuid) idempotent hoch. Navigation wartet NICHT (lokal bereits durabel).
+    if (sessId) {
+      try {
+        await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: sessId, operation: 'create', priority: 1 });
+      } catch (e) { console.warn('[trackRun] enqueue', e); }
+      void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
+    }
+    setFinishing(false);
+    router.replace((sessId ? `/track/${sessId}` : '/track') as never);
   };
 
   const guardedBack = useCallback(() => {
@@ -543,6 +538,12 @@ export default function TrackRunScreen() {
   usePreventRemove(!arming && s.recording, useCallback(() => {
     if (!pocketLock) handleCancel();
   }, [pocketLock]));
+
+  useEffect(() => {
+    if (!pendingExit || s.recording) return;
+    setPendingExit(null);
+    router.replace(pendingExit as never);
+  }, [pendingExit, router, s.recording]);
 
   const unlockPocket = useCallback(() => {
     hapticTap();
@@ -830,8 +831,6 @@ export default function TrackRunScreen() {
         duration={fmtClock(s.elapsedS)}
         distanceM={`${Math.round(s.distanceM)} m`}
         onUnlock={unlockPocket}
-        onRequestStop={handleFinish}
-        stopLabel="Absuche beenden"
       />
 
       {SHOW_GPS_DEBUG && (

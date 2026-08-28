@@ -18,12 +18,10 @@ describe('tracking UX safety contract', () => {
     expect(overlay).toContain('onPress={() => undefined}');
     expect(overlay).toContain('onLongPress={onUnlock}');
     expect(overlay).toContain('delayLongPress={1800}');
-    expect(overlay).toContain('onPress={onRequestStop}');
-    expect(overlay).not.toContain('onPressIn={stopHold.onPressIn}');
-    expect(overlay).not.toContain('onPressOut={stopHold.onPressOut}');
-    expect(overlay).not.toContain('onLongPress={onRequestStop}');
-    expect(legen).toContain('onRequestStop={requestStop}');
-    expect(run).toContain('onRequestStop={handleFinish}');
+    expect(overlay).not.toContain('onRequestStop');
+    expect(overlay).not.toContain('stopLabel');
+    expect(legen).not.toContain('onRequestStop={requestStop}');
+    expect(run).not.toContain('onRequestStop={handleFinish}');
   });
 
   it('renders the visible lock entry in the active map/sketch control layer', () => {
@@ -52,15 +50,12 @@ describe('tracking UX safety contract', () => {
   });
 
   it('does not pause or finalize from a normal pocket touch', () => {
-    expect(legen).toContain('onPress={requestStop} disabled={phase !== \'recording\'}');
+    expect(legen).toContain('onPress={finishTrack} disabled={phase !== \'recording\'}');
     expect(legen).toContain('onPress={() => undefined} onLongPress={togglePause} onAccessibilityTap={togglePause} delayLongPress={1800}');
     expect(run).toContain('onPress={handleFinish} disabled={finishing || arming}');
-    expect(legen).not.toContain('onLongPress={requestStop}');
-    expect(run).not.toContain('onLongPress={handleFinish}');
-    expect(legen).not.toContain('Gedrückt halten');
+    expect(legen).not.toContain('requestStop');
+    expect(run).not.toContain('track.finishTitle');
     expect(run).not.toContain('Gedrückt halten');
-    expect(legen).toContain('Fährtenaufnahme wirklich beenden?');
-    expect(run).toContain('track.finishTitle');
   });
 
   it('keeps recorder behavior and guards navigation while recording', () => {
@@ -84,37 +79,33 @@ describe('tracking UX safety contract', () => {
     expect(run).toContain('onPress={handleFinish}');
   });
 
-  it('keeps the intentional stop escape path reachable while locked', () => {
-    expect(overlay).toContain('stopLabel = \'Stoppen\'');
-    expect(overlay).toContain('onPress={onRequestStop}');
-    expect(overlay).not.toContain('onPressIn={stopHold.onPressIn}');
-    expect(overlay).not.toContain('onPressOut={stopHold.onPressOut}');
-    expect(overlay).not.toContain('onLongPress={onRequestStop}');
-    expect(overlay).toContain('Danach muss das Beenden bestätigt werden.');
-    expect(overlay).not.toContain('Gedrückt halten');
-    expect(overlay).toContain('style={{ zIndex: 2, elevation: 2 }}');
-    expect(legen).toContain('onRequestStop={requestStop}');
-    expect(run).toContain('onRequestStop={handleFinish}');
-    expect(run).toContain('stopLabel="Absuche beenden"');
+  it('keeps the lock as a separate unlock-only overlay', () => {
+    expect(overlay).not.toContain('onRequestStop');
+    expect(overlay).not.toContain('stopLabel');
+    expect(overlay).toContain('style={{ zIndex: 1 }}');
+    expect(overlay).toContain('onLongPress={onUnlock}');
+    expect(legen).not.toContain('onRequestStop={requestStop}');
+    expect(run).not.toContain('onRequestStop={handleFinish}');
   });
 
   it('keeps finalization independent of GPS and trajectory state', () => {
     expect(legen).toContain('const finishTrack = () =>');
     expect(legen).toContain('rec.finish();');
-    expect(run).toContain('const handleFinish = () =>');
+    expect(run).toContain('const handleFinish = async () =>');
     expect(run).toContain('const res = s.stop();');
     expect(legen).not.toContain('if (gpsAccuracy');
     expect(run).not.toContain('if (s.accuracy');
     expect(run).not.toContain('if (trajectory');
   });
 
-  it('retains the existing confirmation and once-only guards', () => {
+  it('uses direct stop finalization with once-only guards', () => {
     expect(legen).toContain('if (stoppingRef.current) return;');
-    expect(legen).toContain('Fährte beenden');
+    expect(legen).not.toContain('Fährte beenden');
     expect(run).toContain('if (finishing || finishRequestedRef.current) return;');
-    expect(run).toContain('if (finishRequestedRef.current) return;');
     expect(run).toContain('finishRequestedRef.current = true;');
-    expect(run).toContain('track.keepSearching');
-    expect(run).toContain('track.finishTitle');
+    expect(run).not.toContain('track.keepSearching');
+    expect(run).not.toContain('track.finishTitle');
+    expect(legen).toContain('setPendingExit');
+    expect(run).toContain('setPendingExit');
   });
 });
