@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, View }
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import { usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
@@ -54,7 +54,6 @@ import { syncNow } from '@/features/sync/services/syncEngine';
 import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
 import * as Crypto from 'expo-crypto';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
-import { useHoldAction } from '@/features/tracking/hooks/useHoldAction';
 
 // Blinkender LIVE-Punkt.
 function RecDot() {
@@ -127,7 +126,6 @@ export default function TrackRunScreen() {
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
   const [pocketLock, setPocketLock] = useState(false);
-  const allowExitAfterConfirmedStopRef = useRef(false);
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
   const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
@@ -532,27 +530,19 @@ export default function TrackRunScreen() {
           void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
         }
         setFinishing(false);
-        allowExitAfterConfirmedStopRef.current = true;
         router.replace((sessId ? `/track/${sessId}` : '/track') as never);
       } },
     ]);
   };
-  const stopHold = useHoldAction(handleFinish);
 
   const guardedBack = useCallback(() => {
     if (pocketLock) return;
     handleCancel();
   }, [pocketLock]);
 
-  const navigation = useNavigation();
-  usePreventRemove(!arming && s.recording, useCallback(({ data }) => {
-    if (allowExitAfterConfirmedStopRef.current) {
-      allowExitAfterConfirmedStopRef.current = false;
-      navigation.dispatch(data.action);
-      return;
-    }
+  usePreventRemove(!arming && s.recording, useCallback(() => {
     if (!pocketLock) handleCancel();
-  }, [navigation, pocketLock]));
+  }, [pocketLock]));
 
   const unlockPocket = useCallback(() => {
     hapticTap();
@@ -824,14 +814,13 @@ export default function TrackRunScreen() {
           </Pressable>
           <Pressable
             accessibilityLabel="Absuche beenden"
-            accessibilityHint="Zum Öffnen der Bestätigung gedrückt halten"
+            accessibilityHint="Zum Öffnen der Bestätigung tippen"
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
             style={[{ flex: 1.3 }, (finishing || arming) ? { opacity: 0.45 } : null]}
-            onPress={stopHold.onPress} onPressIn={stopHold.onPressIn} onPressOut={stopHold.onPressOut} disabled={finishing || arming}
+            onPress={handleFinish} disabled={finishing || arming}
           >
             {finishing ? <ActivityIndicator color="#2a060a" /> : <Ionicons name="stop" size={20} color="#2a060a" />}
             <Text className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.evaluate')}</Text>
-            <Text numberOfLines={1} className="text-[8px] font-bold text-[#2a060a]/75">Gedrückt halten</Text>
           </Pressable>
         </View>
       </SafeAreaView>

@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import { usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { FT } from '@/constants/colors';
@@ -47,7 +47,6 @@ import {
 } from '@/features/tracking/utils/trackSegments';
 import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPickerLayout';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
-import { useHoldAction } from '@/features/tracking/hooks/useHoldAction';
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
@@ -549,17 +548,12 @@ export default function LegenScreen() {
     }
     const dq = activeDog ? `&dogId=${activeDog.id}` : '';
     if (id) {
-      allowExitAfterConfirmedStopRef.current = true;
       router.replace(`/track/liegen?id=${id}${dq}` as never);   // → Wartephase (Liegezeit) → Ausarbeiten
     } else {
       // Offline: noch keine Session-ID, aber die Fährte gehört dem Hund → Liegen mit dogId.
-      if (activeDog) {
-        allowExitAfterConfirmedStopRef.current = true;
-        router.replace(`/track/liegen?dogId=${activeDog.id}` as never);
-      }
+      if (activeDog) router.replace(`/track/liegen?dogId=${activeDog.id}` as never);
       else {
         showToast(t('toast.localSaved'));
-        allowExitAfterConfirmedStopRef.current = true;
         if (router.canGoBack()) router.back();
         else router.replace('/track' as never);
       }
@@ -573,7 +567,6 @@ export default function LegenScreen() {
       { text: 'Fährte beenden', style: 'destructive', onPress: finishTrack },
     ], { cancelable: true });
   };
-  const stopHold = useHoldAction(requestStop);
 
   const togglePause = useCallback(() => {
     if (phaseRef.current !== 'recording') return;
@@ -596,17 +589,11 @@ export default function LegenScreen() {
     ], { cancelable: true });
   }, [pocketLock, router]);
 
-  const navigation = useNavigation();
-  usePreventRemove(phase === 'recording', useCallback(({ data }) => {
-    if (allowExitAfterConfirmedStopRef.current) {
-      allowExitAfterConfirmedStopRef.current = false;
-      navigation.dispatch(data.action);
-      return;
-    }
+  usePreventRemove(phase === 'recording', useCallback(() => {
     if (!pocketLock) {
       Alert.alert('Fährte läuft noch', 'Die laufende Aufnahme bleibt aktiv. Stoppen ist nur über Safe Stop möglich.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
     }
-  }, [navigation, pocketLock]));
+  }, [pocketLock]));
 
   const unlockPocket = useCallback(() => {
     hapticTap();
@@ -1036,11 +1023,10 @@ export default function LegenScreen() {
             accessibilityLabel={t('common.stop')}
             accessibilityHint={t('track.stopLayingHint')}
             className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-            style={{ flex: 1.3 }} onPress={stopHold.onPress} onPressIn={stopHold.onPressIn} onPressOut={stopHold.onPressOut} disabled={phase !== 'recording'}
+            style={{ flex: 1.3 }} onPress={requestStop} disabled={phase !== 'recording'}
           >
             <Ionicons name="stop" size={20} color="#2a060a" />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">{t('common.stop')}</Text>
-            <Text numberOfLines={1} className="text-[8px] font-bold text-[#2a060a]/75">Gedrückt halten</Text>
           </Pressable>
         </View>
       </SafeAreaView>
