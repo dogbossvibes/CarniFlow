@@ -66,12 +66,23 @@ describe('tracking UX safety contract', () => {
   it('keeps recorder behavior and guards navigation while recording', () => {
     expect(legen).toContain('usePreventRemove(phase === \'recording\'');
     expect(run).toContain('usePreventRemove(!arming && s.recording');
+    expect(legen).toContain('allowExitAfterConfirmedStopRef.current = true');
+    expect(run).toContain('allowExitAfterConfirmedStopRef.current = true');
+    expect(legen).toContain('navigation.dispatch(data.action)');
+    expect(run).toContain('navigation.dispatch(data.action)');
     expect(legen).toContain('rec.pause()');
     expect(legen).toContain('rec.resume()');
     expect(run).toContain('s.stop()');
     expect(run).toContain('setSessionStatus(\'completed\')');
     expect(legen).toContain('onUnlock={unlockPocket}');
     expect(run).toContain('onUnlock={unlockPocket}');
+  });
+
+  it('allows only confirmed finalization to pass the navigation guard', () => {
+    expect(legen).toContain('if (allowExitAfterConfirmedStopRef.current)');
+    expect(run).toContain('if (allowExitAfterConfirmedStopRef.current)');
+    expect(legen).toContain("Alert.alert('Fährte läuft noch'");
+    expect(run).toContain("Alert.alert('Fährte läuft noch'");
   });
 
   it('does not turn automatic end detection into finalization', () => {

@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { FT } from '@/constants/colors';
@@ -302,7 +302,12 @@ export default function LegenScreen() {
     const dId = (params.dogId as string) ?? null;
     if (!dId || conflictShownRef.current) return;
     const entry = useActiveFaehrten.getState().get(dId);
-    if (entry) { conflictShownRef.current = true; showConflict(dId, entry); }
+    const routeSessionId = (params.id as string) ?? null;
+    const currentSessionId = useTrackingStore.getState().currentSessionId;
+    if (entry && shouldShowActiveFaehrteConflict(entry, dId, routeSessionId, currentSessionId)) {
+      conflictShownRef.current = true;
+      showConflict(dId, entry);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -544,12 +549,17 @@ export default function LegenScreen() {
     }
     const dq = activeDog ? `&dogId=${activeDog.id}` : '';
     if (id) {
+      allowExitAfterConfirmedStopRef.current = true;
       router.replace(`/track/liegen?id=${id}${dq}` as never);   // → Wartephase (Liegezeit) → Ausarbeiten
     } else {
       // Offline: noch keine Session-ID, aber die Fährte gehört dem Hund → Liegen mit dogId.
-      if (activeDog) router.replace(`/track/liegen?dogId=${activeDog.id}` as never);
+      if (activeDog) {
+        allowExitAfterConfirmedStopRef.current = true;
+        router.replace(`/track/liegen?dogId=${activeDog.id}` as never);
+      }
       else {
         showToast(t('toast.localSaved'));
+        allowExitAfterConfirmedStopRef.current = true;
         if (router.canGoBack()) router.back();
         else router.replace('/track' as never);
       }
@@ -586,11 +596,17 @@ export default function LegenScreen() {
     ], { cancelable: true });
   }, [pocketLock, router]);
 
-  usePreventRemove(phase === 'recording', useCallback(() => {
+  const navigation = useNavigation();
+  usePreventRemove(phase === 'recording', useCallback(({ data }) => {
+    if (allowExitAfterConfirmedStopRef.current) {
+      allowExitAfterConfirmedStopRef.current = false;
+      navigation.dispatch(data.action);
+      return;
+    }
     if (!pocketLock) {
       Alert.alert('Fährte läuft noch', 'Die laufende Aufnahme bleibt aktiv. Stoppen ist nur über Safe Stop möglich.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
     }
-  }, [pocketLock]));
+  }, [navigation, pocketLock]));
 
   const unlockPocket = useCallback(() => {
     hapticTap();

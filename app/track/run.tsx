@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, View }
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
@@ -127,6 +127,7 @@ export default function TrackRunScreen() {
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
   const [pocketLock, setPocketLock] = useState(false);
+  const allowExitAfterConfirmedStopRef = useRef(false);
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
   const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
@@ -531,6 +532,7 @@ export default function TrackRunScreen() {
           void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
         }
         setFinishing(false);
+        allowExitAfterConfirmedStopRef.current = true;
         router.replace((sessId ? `/track/${sessId}` : '/track') as never);
       } },
     ]);
@@ -542,9 +544,15 @@ export default function TrackRunScreen() {
     handleCancel();
   }, [pocketLock]);
 
-  usePreventRemove(!arming && s.recording, useCallback(() => {
+  const navigation = useNavigation();
+  usePreventRemove(!arming && s.recording, useCallback(({ data }) => {
+    if (allowExitAfterConfirmedStopRef.current) {
+      allowExitAfterConfirmedStopRef.current = false;
+      navigation.dispatch(data.action);
+      return;
+    }
     if (!pocketLock) handleCancel();
-  }, [pocketLock]));
+  }, [navigation, pocketLock]));
 
   const unlockPocket = useCallback(() => {
     hapticTap();
