@@ -35,8 +35,11 @@ describe('objectMarkers — Dübel & G-Nummerierung', () => {
 
 describe('Dübel-Voice (dog-basiert)', () => {
   it('14) Dübel wird namentlich angesagt, sonst „Gegenstand"', () => {
-    expect(objectPhrase('duebel', 5)).toBe('Dübel in ca. 5 Schritten.');
-    expect(objectPhrase('holz', 3)).toBe('Gegenstand in ca. 3 Schritten.');
-    expect(objectPhrase('duebel', 1)).toBe('Dübel in ca. 1 Schritt.');
+    // Locale explizit auf 'de' fixiert: dieser Test prüft die deutsche
+    // Dübel/Gegenstand-Benennungslogik, unabhängig vom System-/Testlocale
+    // (das mit vollständiger EN-Unterstützung nicht mehr automatisch auf 'de' fällt).
+    expect(objectPhrase('duebel', 5, 'de')).toBe('Dübel in ca. 5 Schritten.');
+    expect(objectPhrase('holz', 3, 'de')).toBe('Gegenstand in ca. 3 Schritten.');
+    expect(objectPhrase('duebel', 1, 'de')).toBe('Dübel in ca. 1 Schritt.');
   });
 });

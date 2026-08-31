@@ -2,6 +2,8 @@ import { readFileSync } from 'fs';
 import { deCH } from '@/i18n/de-CH';
 import { gswCH } from '@/i18n/gsw-CH';
 import { fr } from '@/i18n/locales/fr';
+import { it as itLocale } from '@/i18n/locales/it';
+import { en } from '@/i18n/locales/en';
 
 const dashKeys = Object.keys(deCH).filter(k => k.startsWith('dash.'));
 const backpackAdditions = ['backpack.allReady', 'backpack.nonePacked', 'backpack.activeItems'];
@@ -51,11 +53,11 @@ describe('Dashboard-i18n (Phase C)', () => {
     }
   });
 
-  it('keine EN-/IT-Locale-Dateien angelegt', () => {
-    for (const path of ['i18n/locales/en.ts', 'i18n/locales/it.ts']) {
-      let exists = true;
-      try { readFileSync(path, 'utf8'); } catch { exists = false; }
-      expect(exists).toBe(false);
+  it('IT und EN decken Dashboard-Keys ab', () => {
+    const dashKeys = Object.keys(deCH).filter(k => k.startsWith('dash.'));
+    for (const k of dashKeys) {
+      expect(String((itLocale as Record<string, string>)[k] ?? '').trim().length).toBeGreaterThan(0);
+      expect(String((en as Record<string, string>)[k] ?? '').trim().length).toBeGreaterThan(0);
     }
   });
 });

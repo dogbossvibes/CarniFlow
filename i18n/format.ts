@@ -2,13 +2,15 @@ import type { AppLocale } from './config';
 import { getLocale } from './index';
 
 // ── Zentrale Intl-Formatter (Datum, Zeit, Zahl, Distanz) ──
-// Locale-Mapping auf BCP-47: de → de-CH, gsw → de-CH, fr → fr-CH.
+// Locale-Mapping auf BCP-47: de → de-CH, gsw → de-CH, fr → fr-CH, it → it-CH, en → en-GB.
 // Noch NICHT flächendeckend eingesetzt — nur bereitgestellt (Phase 1).
 
 const INTL_LOCALE: Record<AppLocale, string> = {
   de:  'de-CH',
   gsw: 'de-CH',
   fr:  'fr-CH',
+  it:  'it-CH',
+  en:  'en-GB',
 };
 
 function intl(locale?: AppLocale): string {
@@ -46,4 +48,8 @@ export function formatDistance(meters: number, locale?: AppLocale): string {
     return `${formatNumber(Math.round(meters), {}, locale)} m`;
   }
   return `${formatNumber(meters / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }, locale)} km`;
+}
+
+export function formatWeightKg(kg: number, locale?: AppLocale): string {
+  return `${formatNumber(kg, { maximumFractionDigits: 1 }, locale)} kg`;
 }

@@ -79,7 +79,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
 
 export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
   const { t, locale } = useT();
-  const intlLocale = locale === 'fr' ? 'fr-CH' : 'de-CH';
+  const intlLocale = locale === 'fr' ? 'fr-CH' : locale === 'it' ? 'it-CH' : locale === 'en' ? 'en-GB' : 'de-CH';
   const [tab, setTab] = useState<TabKey>('overview');
   const [aiTipHidden, setAiTipHidden] = useState(false);   // „Später" blendet den KI-Hinweis für diese Sitzung aus
   const id = vm.identity;

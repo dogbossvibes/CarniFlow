@@ -16,7 +16,9 @@ const SPEAK_GAP_MS     = 3500;   // Entprellung zwischen zwei Ansagen
 export interface GuidanceAngle { id: string; arcM: number; angleKind: AngleKind | null }
 
 function speechLanguage(locale: AppLocale) {
-  if (locale === 'fr') return 'fr-FR';
+  if (locale === 'fr') return 'fr-CH';
+  if (locale === 'it') return 'it-IT';
+  if (locale === 'en') return 'en-GB';
   return 'de-CH';
 }
 
@@ -33,7 +35,11 @@ export function say(msg: string, locale: AppLocale = getCurrentLocale()) {
 }
 
 function inStepsText(steps: number, locale: AppLocale) {
-  return translateKey('track.voiceInSteps', { steps, plural: steps === 1 ? '' : 'en' }, locale);
+  let plural = steps === 1 ? '' : 'en';
+  if (locale === 'en') plural = steps === 1 ? '' : 's';
+  if (locale === 'fr') plural = '';
+  if (locale === 'it') plural = steps === 1 ? 'o' : 'i';
+  return translateKey('track.voiceInSteps', { steps, plural }, locale);
 }
 
 // Sprechtext: Winkel/Spitzwinkel/Abriss inkl. Richtung, Distanz in GESCHÄTZTEN

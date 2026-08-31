@@ -2,6 +2,8 @@ import { readFileSync } from 'fs';
 import { deCH } from '@/i18n/de-CH';
 import { gswCH } from '@/i18n/gsw-CH';
 import { fr } from '@/i18n/locales/fr';
+import { it as itLocale } from '@/i18n/locales/it';
+import { en } from '@/i18n/locales/en';
 
 const backpackKeys = Object.keys(deCH).filter(k => k.startsWith('backpack.'));
 
@@ -32,18 +34,19 @@ describe('Rucksack-i18n', () => {
     }
   });
 
-  it('23) FR hat für jeden Backpack-Key einen nicht-leeren Wert', () => {
+  it('23) FR und IT haben für jeden Backpack-Key einen nicht-leeren Wert', () => {
     for (const k of backpackKeys) {
       expect(Object.prototype.hasOwnProperty.call(fr, k)).toBe(true);
       expect(String((fr as Record<string, string>)[k] ?? '').trim().length).toBeGreaterThan(0);
+      expect(Object.prototype.hasOwnProperty.call(itLocale, k)).toBe(true);
+      expect(String((itLocale as Record<string, string>)[k] ?? '').trim().length).toBeGreaterThan(0);
     }
   });
 
-  it('keine EN-/IT-Locale-Dateien für den Rucksack angelegt', () => {
-    for (const path of ['i18n/locales/en.ts', 'i18n/locales/it.ts']) {
-      let exists = true;
-      try { readFileSync(path, 'utf8'); } catch { exists = false; }
-      expect(exists).toBe(false);
+  it('EN hat für jeden Backpack-Key einen nicht-leeren Wert', () => {
+    for (const k of backpackKeys) {
+      expect(Object.prototype.hasOwnProperty.call(en, k)).toBe(true);
+      expect(String((en as Record<string, string>)[k] ?? '').trim().length).toBeGreaterThan(0);
     }
   });
 });
@@ -84,10 +87,11 @@ describe('Home-Backpack-Widget (T-42)', () => {
     }
   });
 
-  it('gsw und FR decken alle Home-Backpack-Keys ab', () => {
+  it('gsw, FR und EN decken alle Home-Backpack-Keys ab', () => {
     for (const k of homeBackpackKeys) {
       expect(String((gswCH as Record<string, string>)[k] ?? '').trim().length).toBeGreaterThan(0);
       expect(String((fr as Record<string, string>)[k] ?? '').trim().length).toBeGreaterThan(0);
+      expect(String((en as Record<string, string>)[k] ?? '').trim().length).toBeGreaterThan(0);
     }
   });
 
@@ -115,5 +119,9 @@ describe('Home-Backpack-Widget (T-42)', () => {
     expect(fr['home.selectDog']).toBe('Choisir un chien');
     expect(fr['home.backpackWidgets']).toBe('Widgets Backpack');
     expect(fr['home.backpackWidgetsHint']).toBe("Choisis les Backpacks à afficher sur ton écran d'accueil.");
+    expect(en['home.backpackWidget']).toBe('Backpack widget');
+    expect(en['home.backpackWidgetSelectDog']).toBe('Choose a dog for the widget.');
+    expect(en['home.selectDog']).toBe('Select dog');
+    expect(en['home.backpackWidgets']).toBe('Backpack widgets');
   });
 });

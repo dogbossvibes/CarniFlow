@@ -5,11 +5,11 @@ import { applyRemoteLocale, getLocale, setRemotePersist, type AppLocale } from '
 // Optionaler Profil-Sync der App-Sprache (Remote ⇄ App).
 // Die Sprache lebt lokal in AsyncStorage und funktioniert auch ohne dieses Modul.
 //
-// WICHTIG (keine DB-Migration): Die Spalte `profiles.locale` hat aktuell einen
-// CHECK auf ('de-CH','de-DE','gsw-CH'). Wir schreiben deshalb DB-kompatible
-// Legacy-Werte (de → de-CH, gsw → gsw-CH). Für `fr` gibt es noch keinen erlaubten
-// Wert → bleibt vorerst lokal (kein Remote-Write, kein Crash). Beim Lesen werden
-// Legacy-Werte normalisiert (de-CH → de, gsw-CH → gsw, …).
+// Die Spalte `profiles.locale` hat einen CHECK auf die erlaubten Locale-Codes
+// (Migrationen 20260824120000/20260825120000, bereits auf Production angewendet).
+// Wir schreiben DB-kompatible Legacy-/App-Werte (de → de-CH, gsw → gsw-CH,
+// fr → fr-CH, it → it-CH, en → en-GB). Beim Lesen werden Legacy-Werte
+// normalisiert (de-CH → de, gsw-CH → gsw, …).
 // ─────────────────────────────────────────────────────────────────────────────
 export const LOCALE_SYNC_ENABLED = true;
 
@@ -17,7 +17,10 @@ export const LOCALE_SYNC_ENABLED = true;
 function toDbLocale(locale: AppLocale): string | null {
   if (locale === 'de')  return 'de-CH';
   if (locale === 'gsw') return 'gsw-CH';
-  return null; // fr (und künftige) noch nicht im DB-CHECK → nicht schreiben
+  if (locale === 'fr')  return 'fr-CH';
+  if (locale === 'it')  return 'it-CH';
+  if (locale === 'en')  return 'en-GB';
+  return null;
 }
 
 export async function initLocaleSync(userId: string | null | undefined) {
@@ -31,7 +34,7 @@ export async function initLocaleSync(userId: string | null | undefined) {
   // Künftige Wechsel zusätzlich ins Profil schreiben (nur DB-kompatible Werte).
   setRemotePersist((locale) => {
     const dbValue = toDbLocale(locale);
-    if (!dbValue) return; // z. B. fr → vorerst nur lokal
+    if (!dbValue) return;
     supabase.from('profiles').update({ locale: dbValue }).eq('id', userId).then(
       () => { /* ok */ },
       () => { /* best-effort */ },
