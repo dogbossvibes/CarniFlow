@@ -3,6 +3,7 @@ import {
   isOpenStatus, isValidEntry, upsertEntry, removeEntry, sanitizeMap,
   reconcileWithDogs, sortActive, faehrteElapsedSeconds, reopenTarget, statusLabel,
   hasActiveFaehrte, startDecision, statusTone, gpsQualityLabel, fmtClockOfDay, weatherLine,
+  shouldShowActiveFaehrteConflict,
 } from '@/features/tracking/store/activeFaehrtenModel';
 
 const entry = (dogId: string, over: Partial<ActiveFaehrte> = {}): ActiveFaehrte => ({
@@ -245,5 +246,47 @@ describe('Registry: Wiederöffnen (reopenTarget) — immer mit dogId', () => {
   it('offline ohne sessionId bleibt gültig (nur dogId)', () => {
     expect(reopenTarget(entry('max', { status: 'resting', sessionId: null })))
       .toBe('/track/liegen?dogId=max');
+  });
+});
+
+describe('Regel 4 (Betreten): shouldShowActiveFaehrteConflict', () => {
+  it('1) kein aktiver Eintrag → false', () => {
+    expect(shouldShowActiveFaehrteConflict(null, 'max', null, null)).toBe(false);
+    expect(shouldShowActiveFaehrteConflict(undefined, 'max', 'S1', null)).toBe(false);
+  });
+
+  it('2) aktiver Eintrag eines ANDEREN Hundes → false', () => {
+    const e = entry('luna', { status: 'laying', sessionId: 'S1' });
+    expect(shouldShowActiveFaehrteConflict(e, 'max', null, null)).toBe(false);
+  });
+
+  it('3) aktiver Eintrag desselben Hundes, neue/andere Session → true', () => {
+    const e = entry('max', { status: 'laying', sessionId: 'S1' });
+    expect(shouldShowActiveFaehrteConflict(e, 'max', 'S2', null)).toBe(true);
+    expect(shouldShowActiveFaehrteConflict(e, 'max', null, 'S2')).toBe(true);
+    expect(shouldShowActiveFaehrteConflict(e, 'max', 'S2', 'S3')).toBe(true);
+  });
+
+  it('4) aktiver Eintrag entspricht bereits geöffneter Route- oder Store-Session → false', () => {
+    const e = entry('max', { status: 'laying', sessionId: 'S1' });
+    expect(shouldShowActiveFaehrteConflict(e, 'max', 'S1', null)).toBe(false);    // Route-Session
+    expect(shouldShowActiveFaehrteConflict(e, 'max', null, 'S1')).toBe(false);   // Store-Session
+    expect(shouldShowActiveFaehrteConflict(e, 'max', 'S1', 'S1')).toBe(false);
+  });
+
+  it('5) ungültiger Registry-Eintrag (nicht offen / keine dogId) → false', () => {
+    const completed = entry('max', { status: 'completed' as ActiveFaehrte['status'], sessionId: 'S1' });
+    expect(shouldShowActiveFaehrteConflict(completed, 'max', 'S2', null)).toBe(false);
+    expect(shouldShowActiveFaehrteConflict({ status: 'laying' }, 'max', 'S2', null)).toBe(false);
+  });
+
+  it('offline (kein sessionId): kann nicht als „gleiche Session" erkannt werden → true', () => {
+    const e = entry('max', { status: 'laying', sessionId: null });
+    expect(shouldShowActiveFaehrteConflict(e, 'max', null, null)).toBe(true);
+  });
+
+  it('reine Funktion: kein dogId → false, unabhängig vom Eintrag', () => {
+    const e = entry('max', { status: 'laying', sessionId: 'S1' });
+    expect(shouldShowActiveFaehrteConflict(e, null, 'S1', null)).toBe(false);
   });
 });

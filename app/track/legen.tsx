@@ -22,7 +22,7 @@ import { useVolumeKeyArticleSetting } from '@/hooks/useVolumeKeyArticleSetting';
 import { subscribeQuickAddArticle } from '@/features/tracking/quickAddArticleBus';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
-import { reopenTarget, type ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
+import { reopenTarget, shouldShowActiveFaehrteConflict, type ActiveFaehrte } from '@/features/tracking/store/activeFaehrtenModel';
 import { clearPending } from '@/features/tracking/store/trackPersist';
 import * as Crypto from 'expo-crypto';
 import { claimNewbieQuota, quotaBlock } from '@/services/quotaService';
@@ -134,7 +134,7 @@ export default function LegenScreen() {
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
   const { height: windowHeight } = useWindowDimensions();
   useKeepAwake();   // Display während des Legens anlassen (Bildschirm nicht sperren)
-  const params = useLocalSearchParams<{ dogId?: string }>();
+  const params = useLocalSearchParams<{ dogId?: string; id?: string }>();
   const { session } = useSession();
   const { dogs } = useDogs();
   const { isPro, loading: capLoading } = useCapabilities();

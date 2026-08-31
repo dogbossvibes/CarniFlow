@@ -66,6 +66,36 @@ export function isValidEntry(e: Partial<ActiveFaehrte> | null | undefined): e is
   return !!e && typeof e.dogId === 'string' && e.dogId.length > 0 && isOpenStatus(e.status as SessionStatus);
 }
 
+// Regel 4 (automatisches Betreten von "Fährte legen"): Entscheidet, ob der
+// Konfliktdialog für eine bereits aktive Fährte dieses Hundes gezeigt werden
+// muss. Reine Entscheidungsfunktion — keine Mutation, kein Stop, keine
+// Navigation, kein Recovery.
+//
+// Zeigt NICHT, wenn:
+//   - kein/ungültiger Registry-Eintrag vorliegt,
+//   - der Eintrag einem ANDEREN Hund gehört (defensiv, auch wenn der Aufrufer
+//     bereits per dogId nachschlägt),
+//   - der aktive Eintrag bereits zur aktuell geöffneten Session gehört (Route-
+//     Session-ID ODER Tracking-Store-Session-ID stimmt mit entry.sessionId
+//     überein) — sonst würde blosses Wiederbetreten der eigenen laufenden
+//     Aufnahme fälschlich als Konflikt mit sich selbst erscheinen.
+// Zeigt HINGEGEN, wenn der Eintrag gültig, demselben Hund zugeordnet ist und
+// (mangels sessionId, z. B. offline, oder wegen abweichender Session-ID) nicht
+// eindeutig als dieselbe, bereits offene Session identifiziert werden kann.
+export function shouldShowActiveFaehrteConflict(
+  entry: Partial<ActiveFaehrte> | null | undefined,
+  dogId: string | null | undefined,
+  routeSessionId: string | null | undefined,
+  currentSessionId: string | null | undefined,
+): boolean {
+  if (!dogId || !isValidEntry(entry) || entry.dogId !== dogId) return false;
+  if (entry.sessionId != null) {
+    if (routeSessionId != null && entry.sessionId === routeSessionId) return false;
+    if (currentSessionId != null && entry.sessionId === currentSessionId) return false;
+  }
+  return true;
+}
+
 // Registry-Reducer (rein): fügt einen Eintrag pro dog_id ein/aktualisiert ihn.
 // Nicht-offene Status entfernen den Eintrag (z. B. completed/cancelled).
 export function upsertEntry(map: ActiveFaehrtenMap, dogId: string, patch: Partial<ActiveFaehrte>): ActiveFaehrtenMap {
