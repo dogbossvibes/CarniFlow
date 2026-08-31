@@ -8,9 +8,11 @@ import { usePlan } from '@/hooks/usePlan';
 import { getDogById } from '@/services/dogs';
 import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtras } from '@/services/dogHub';
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
-import { getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
+import { getHeatCycleDetails, getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
 import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
 import { getBackpack } from '@/features/dogs/backpack';
+import { toISODate } from '@/features/dogs/dateInput';
+import { currentHeatPhase } from '@/features/dogs/heatCalendar';
 import { getCalendarEvents } from '@/services/calendarService';
 import { toDogAppointments, type DogAppointment } from '@/features/dogs/dashboard';
 import type { CalendarEvent } from '@/types/calendar';
@@ -43,6 +45,9 @@ export default function DogHubRoute() {
   const lastFaehrteId = useMemo(() => feed.find(it => it.source === 'track')?.id ?? null, [feed]);   // letzte abgeschlossene Fährte
   const [extras, setExtras] = useState<DogHubExtras | null>(null);
   const [heatCycles, setHeatCycles] = useState<HeatCycle[]>([]);
+  const [heatPhaseCounts, setHeatPhaseCounts] = useState<Record<string, number>>({});
+  const [heatObsCounts, setHeatObsCounts] = useState<Record<string, number>>({});
+  const [heatCurrentPhases, setHeatCurrentPhases] = useState<Record<string, string>>({});
   const [commands, setCommands] = useState<DogCommand[]>([]);
   const [backpackCounts, setBackpackCounts] = useState({ total: 0, active: 0, packed: 0 });
   const [appointments, setAppointments] = useState<DogAppointment[]>([]);
@@ -61,7 +66,25 @@ export default function DogHubRoute() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     getDogHubExtras(id).then(setExtras).catch(() => setExtras(null));
-    getHeatCycles(id).then(setHeatCycles).catch(() => setHeatCycles([]));
+    getHeatCycleDetails(id).then(({ cycles: cs, phases, observations }) => {
+      setHeatCycles(cs);
+      // Phase and observation rows are loaded in two bundled queries, not once per cycle.
+      const pc: Record<string, number> = {};
+      const oc: Record<string, number> = {};
+      const cp: Record<string, string> = {};
+      const today = toISODate(new Date());
+      phases.forEach(phase => {
+        pc[phase.heatCycleId] = (pc[phase.heatCycleId] ?? 0) + 1;
+      });
+      cs.forEach(cycle => {
+        const current = currentHeatPhase(cycle, phases, today);
+        if (current) cp[cycle.id] = current.phaseType;
+      });
+      observations.forEach(observation => { oc[observation.heatCycleId] = (oc[observation.heatCycleId] ?? 0) + 1; });
+      setHeatPhaseCounts(pc);
+      setHeatObsCounts(oc);
+      setHeatCurrentPhases(cp);
+    }).catch(() => setHeatCycles([]));
     getCommands(id).then(setCommands).catch(() => setCommands([]));
     if (userId) {
       getBackpack(userId, id)
@@ -184,8 +207,13 @@ export default function DogHubRoute() {
       heat={{
         cycles: heatCycles,
         prediction: heatPrediction,
-        onAdd: () => router.push(`/dog-heat/${id}` as never),
+        onAdd: () => router.push({ pathname: '/dog-heat-new', params: { id } } as never),
+        onOpen: (c: HeatCycle) => router.push(`/dog-heat/${c.id}` as never),
+        onOpenCalendar: () => router.push(`/dog-heat-calendar/${id}` as never),
         onDelete: deleteHeat,
+        phaseCounts: heatPhaseCounts,
+        obsCounts: heatObsCounts,
+        currentPhases: heatCurrentPhases,
       }}
       commands={{
         commands,

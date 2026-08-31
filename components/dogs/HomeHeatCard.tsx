@@ -41,7 +41,7 @@ export function HomeHeatCard({ onOpen }: { onOpen: (dogId: string) => void }) {
   if (!item) return null;
   const { dogName, pred } = item;
   const text = pred.active
-    ? `${dogName} ist seit ca. ${pred.activeSinceDays} Tagen läufig.`
+    ? `${dogName} ist an Tag ${pred.cycleDay} der Läufigkeit.`
     : pred.daysUntil >= 0
       ? `${dogName} wird voraussichtlich in ca. ${pred.daysUntil} Tagen läufig.`
       : `${dogName}: nächste Läufigkeit ist voraussichtlich überfällig.`;

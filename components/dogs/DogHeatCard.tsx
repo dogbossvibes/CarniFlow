@@ -3,38 +3,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { fmtDate, durationDays, heatCycleDay, isActiveCycle } from '@/features/dogs/heatCycles';
 import type { HeatCycle, HeatPrediction } from '@/features/dogs/heatCycles';
 
 // Dezenter Rosa/Pink-Akzent für Läufigkeit (Anyvo bleibt sonst Mint).
 const PINK = '#F472B6';
 const PINK_DIM = 'rgba(244,114,182,0.14)';
 
-const DAY = 86400000;
-function fmt(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-const months = (days: number) => (days / 30.44).toFixed(1).replace('.', ',');
-const durationDays = (c: HeatCycle) =>
-  c.endDate ? Math.max(1, Math.round((new Date(c.endDate).getTime() - new Date(c.startDate).getTime()) / DAY) + 1) : null;
-
 // Läufigkeitskalender (nur Hündinnen). Prognose = Schätzung + Verlaufsliste.
-// Kompakte Timeline statt vollem Kalendergitter (Kalender-Gitter = TODO).
+// Kompakte Timeline statt vollem Kalendergitter.
 export function DogHeatCard({
-  cycles, prediction, onAdd, onDelete,
+  cycles, prediction, onAdd, onOpen, onOpenCalendar, onDelete, phaseCounts, obsCounts, currentPhases,
 }: {
   cycles: HeatCycle[];
   prediction: HeatPrediction | null;
   onAdd: () => void;
-  onDelete?: (cycle: HeatCycle) => void;
+  onOpen?: (c: HeatCycle) => void;
+  onOpenCalendar?: () => void;
+  onDelete?: (c: HeatCycle) => void;
+  phaseCounts?: Record<string, number>;
+  obsCounts?: Record<string, number>;
+  currentPhases?: Record<string, string>;
 }) {
   const { t } = useT();
   if (cycles.length === 0) {
-    // Variante A — kompakte, horizontale Card. Ganze Card tappbar → bestehender
-    // onAdd-Flow (keine neue Route/Modal). Kein grosser Mint-Button, kein zentraler
-    // Disclaimer (der Prognose-Disclaimer erscheint erst mit einer Prognose).
     return (
       <TouchableOpacity
         style={s.emptyCard}
@@ -62,10 +54,12 @@ export function DogHeatCard({
   const p = prediction;
   const headline = p
     ? (p.active
-        ? `Seit ca. ${p.activeSinceDays} Tagen läufig`
+        ? p.cycleDay > 0
+          ? `Tag ${p.cycleDay} läufig`
+          : 'Läufig'
         : p.daysUntil >= 0
-          ? `In ca. ${p.daysUntil} Tagen`
-          : `Voraussichtlich überfällig (${Math.abs(p.daysUntil)} T.)`)
+          ? `In ca. ${p.daysUntil} ${t('heat.days')}`
+          : `Überfällig (${Math.abs(p.daysUntil)} ${t('heat.days')})`)
     : '—';
 
   return (
@@ -75,13 +69,20 @@ export function DogHeatCard({
         <View style={s.pred}>
           <View style={s.predHead}>
             <View style={s.predIcon}><Ionicons name="heart" size={15} color={PINK} /></View>
-            <Text style={s.predEyebrow}>{t('heat.next')}</Text>
+            <Text style={s.predEyebrow}>{p.active ? t('heat.currentCycle') : t('heat.next')}</Text>
           </View>
           <Text style={s.predBig}>{headline}</Text>
-          {!p.active && <Text style={s.predSub}>Voraussichtlich {fmt(p.nextDate)}{p.estimate ? ' · grobe Schätzung' : ''}</Text>}
+          {!p.active && (
+            <Text style={s.predSub}>
+              Voraussichtlich {fmtDate(p.nextDate)}{p.estimate ? ' · grobe Schätzung' : ''}
+            </Text>
+          )}
+          {p.dateRange && (
+            <Text style={s.predSub}>{p.dateRange}</Text>
+          )}
           <View style={s.predStats}>
             <View style={s.stat}>
-              <Text style={s.statV}>{p.avgCycleDays != null ? `${months(p.avgCycleDays)} Mon.` : `~${months(p.cycleLengthDays)} Mon.`}</Text>
+              <Text style={s.statV}>{p.avgCycleDays != null ? `${(p.avgCycleDays / 30.44).toFixed(1).replace('.', ',')} Mon.` : `~${(p.cycleLengthDays / 30.44).toFixed(1).replace('.', ',')} Mon.`}</Text>
               <Text style={s.statL}>Ø Zyklus</Text>
             </View>
             <View style={s.statDiv} />
@@ -94,29 +95,74 @@ export function DogHeatCard({
       ) : null}
 
       <AnyvoButton label={t('heat.add')} icon="add" onPress={onAdd} />
+      {onOpenCalendar ? (
+        <TouchableOpacity style={s.calendarLink} onPress={onOpenCalendar} activeOpacity={0.82} accessibilityRole="button">
+          <View style={s.calendarIcon}><Ionicons name="calendar-outline" size={16} color={PINK} /></View>
+          <Text style={s.calendarText}>Kalender ansehen</Text>
+          <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
+        </TouchableOpacity>
+      ) : null}
 
       {/* Verlauf */}
       <Text style={s.section}>{t('heat.history')}</Text>
       {cycles.map(c => {
-        const dur = durationDays(c);
-        const range = `${fmt(c.startDate)}${c.endDate ? ` – ${fmt(c.endDate)}` : ''}`;
+        const dur = durationDays(c.startDate, c.endDate);
+        const active = isActiveCycle(c);
+        const range = `${fmtDate(c.startDate)}${c.endDate ? ` – ${fmtDate(c.endDate)}` : ''}`;
+        const pc = phaseCounts?.[c.id] ?? 0;
+        const oc = obsCounts?.[c.id] ?? 0;
+        const curPhase = active ? currentPhases?.[c.id] : null;
         return (
-          <View key={c.id} style={s.item}>
-            <View style={s.itemDot} />
+          <TouchableOpacity
+            key={c.id}
+            style={[s.item, active && s.itemActive]}
+            onPress={() => onOpen?.(c)}
+            activeOpacity={onOpen ? 0.7 : 1}
+            disabled={!onOpen}
+          >
+            <View style={[s.itemDot, active && s.itemDotActive]} />
             <View style={{ flex: 1 }}>
-              <Text style={s.itemTitle}>{range}{dur ? ` · ${dur} Tage` : c.endDate ? '' : ' · läuft'}</Text>
-              {(c.phase || c.notes) ? (
+              <Text style={s.itemTitle}>
+                {range}{dur ? ` · ${dur} ${t('heat.days')}` : c.endDate ? '' : ` · läuft`}
+                {active ? ` · Tag ${heatCycleDay(c.startDate)}` : ''}
+              </Text>
+              {/* Current phase badge for active cycles */}
+              {curPhase ? (
+                <Text style={s.itemPhase}>{curPhase}</Text>
+              ) : null}
+              {/* Phase + Observation stats for completed cycles */}
+              {!active && (pc > 0 || oc > 0) ? (
+                <View style={s.itemStats}>
+                  {pc > 0 && (
+                    <View style={s.itemStat}>
+                      <Ionicons name="layers-outline" size={11} color={PINK} />
+                      <Text style={s.itemStatTxt}>{pc} {t('heat.phases')}</Text>
+                    </View>
+                  )}
+                  {oc > 0 && (
+                    <View style={s.itemStat}>
+                      <Ionicons name="eye-outline" size={11} color={C.trackPrimary} />
+                      <Text style={s.itemStatTxt}>{oc} {t('heat.observations')}</Text>
+                    </View>
+                  )}
+                </View>
+              ) : null}
+              {/* Legacy phase or notes */}
+              {(c.phase || c.notes) && pc === 0 ? (
                 <Text style={s.itemSub} numberOfLines={1}>
                   {[c.phase, c.notes].filter(Boolean).join(' · ')}
                 </Text>
               ) : null}
             </View>
+            {onOpen ? (
+              <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
+            ) : null}
             {onDelete ? (
               <TouchableOpacity hitSlop={8} onPress={() => onDelete(c)} style={s.trash} activeOpacity={0.7}>
                 <Ionicons name="trash-outline" size={16} color={C.trackTextMut} />
               </TouchableOpacity>
             ) : null}
-          </View>
+          </TouchableOpacity>
         );
       })}
 
@@ -143,10 +189,19 @@ const s = StyleSheet.create({
 
   section:    { fontSize: 11, color: C.trackTextMut, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginTop: 4 },
   item:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 13, paddingVertical: 12 },
+  itemActive: { borderColor: 'rgba(244,114,182,0.35)', backgroundColor: PINK_DIM },
   itemDot:    { width: 9, height: 9, borderRadius: 5, backgroundColor: PINK },
+  itemDotActive: { backgroundColor: PINK },
   itemTitle:  { fontSize: 14, color: C.trackText, fontWeight: '700' },
+  itemPhase:  { fontSize: 12.5, color: PINK, fontWeight: '700', marginTop: 2 },
   itemSub:    { fontSize: 12, color: C.trackTextSec, marginTop: 2 },
+  itemStats:  { flexDirection: 'row', gap: 10, marginTop: 4 },
+  itemStat:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  itemStatTxt:{ fontSize: 11, color: C.trackTextSec, fontWeight: '600' },
   trash:      { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  calendarLink: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 13, paddingVertical: 11 },
+  calendarIcon: { width: 28, height: 28, borderRadius: 9, backgroundColor: PINK_DIM, alignItems: 'center', justifyContent: 'center' },
+  calendarText: { flex: 1, color: C.trackText, fontSize: 13, fontWeight: '800' },
 
   // Variante A — kompakte Empty-State-Card (horizontal, tappbar).
   emptyCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 14, paddingVertical: 13 },

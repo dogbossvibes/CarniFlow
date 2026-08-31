@@ -28,7 +28,17 @@ import type { DogCommand } from '@/features/dogs/dogCommands';
 import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } from '@/components/dogs/types';
 
 // Läufigkeit (nur Hündinnen) — lokal geladen, als eigenständiger Prop reingereicht.
-export interface DogHeatProps { cycles: HeatCycle[]; prediction: HeatPrediction | null; onAdd: () => void; onDelete?: (c: HeatCycle) => void }
+export interface DogHeatProps {
+  cycles: HeatCycle[];
+  prediction: HeatPrediction | null;
+  onAdd: () => void;
+  onOpen?: (c: HeatCycle) => void;
+  onOpenCalendar?: () => void;
+  onDelete?: (c: HeatCycle) => void;
+  phaseCounts?: Record<string, number>;
+  obsCounts?: Record<string, number>;
+  currentPhases?: Record<string, string>;  // heatCycleId → current phase type name
+}
 // Kommandoliste — lokal geladen, als eigenständiger Prop reingereicht.
 export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void }
 // Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
@@ -182,7 +192,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                   {isFemale && heat && (
                     <>
                       <Text style={s.sectionLabel}>{t('dash.heat')}</Text>
-                      <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} />
+                      <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} currentPhases={heat.currentPhases} />
                     </>
                   )}
 
@@ -264,7 +274,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
               {tab === 'faehrte'  && <DogFaehrteSummary data={vm.faehrte} onStart={actions.onStartFaehrte} />}
               {tab === 'goals'    && <DogGoalsCard goal={vm.goal} onEdit={actions.onEditGoal} />}
               {tab === 'health'   && <DogHealthLoadCard health={vm.health} onAddEntry={actions.onAddHealth} />}
-              {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onDelete={heat.onDelete} />}
+              {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} onDelete={heat.onDelete} phaseCounts={heat.phaseCounts} obsCounts={heat.obsCounts} currentPhases={heat.currentPhases} />}
               {tab === 'commands' && commands && <DogCommandsCard commands={commands.commands} onAdd={commands.onAdd} onOpen={commands.onOpen} onToggleFavorite={commands.onToggleFavorite} onSeedDemo={commands.onSeedDemo} />}
               {tab === 'docs'     && <DogDocumentsCard documents={vm.documents} onAdd={actions.onAddDoc} onOpen={actions.onOpenDocument} onDelete={actions.onDeleteDocument} />}
               {tab === 'trainer'  && <DogTrainerCard trainer={vm.trainer} onChat={actions.onChat} />}
