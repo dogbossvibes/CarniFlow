@@ -109,13 +109,15 @@ export interface PlanMeta {
 }
 
 export const PLAN_META: Record<SubscriptionPlan, PlanMeta> = {
-  // WICHTIG: Der Store-/RevenueCat-Preis ist die Quelle der Wahrheit. priceLabel ist
-  // bewusst NEUTRAL ('—'): ein veralteter hardcodierter Preis darf nicht irreführend
-  // erscheinen, wenn das Store-Paket (noch) nicht geladen ist (generischer Zustand
-  // statt falscher Preis). priceChf ist NICHT autoritativ (nur interne Sortierung).
+  // WICHTIG: Der Store-/RevenueCat-Preis ist die Quelle der Wahrheit und hat in der
+  // UI Vorrang. priceLabel ist nur der Fallback, wenn das Store-Paket (noch) nicht
+  // geladen ist. Für Pläne ohne aktuell gepflegten Preis bleibt priceLabel bewusst
+  // NEUTRAL ('—') statt eines veralteten hardcodierten Preises; ACTIVE spiegelt den
+  // aktuellen Produktstand (CHF 9.00/Mt.). priceChf ist NICHT autoritativ (nur interne
+  // Sortierung).
   newbie:         { id: 'newbie',         name: 'Newbie',         priceChf: 0,  priceLabel: 'Gratis', productId: null,                           trainer: false },
   founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 4,  priceLabel: '—',      productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
-  active:         { id: 'active',         name: 'Active',         priceChf: 6,  priceLabel: '—',      productId: PRODUCT_IDS.activeMonthly,         trainer: false },
+  active:         { id: 'active',         name: 'Active',         priceChf: 9,  priceLabel: 'CHF 9.00/Mt.', productId: PRODUCT_IDS.activeMonthly,         trainer: false },
   trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 15, priceLabel: '—',      productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
 };
 

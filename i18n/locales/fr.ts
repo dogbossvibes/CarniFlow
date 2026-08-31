@@ -1724,5 +1724,5 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "premium.startFree": "Commencer gratuitement",
   "premium.feature7Days": "7 jours gratuits",
   "premium.featureActive": "Toutes les fonctions Active",
-  "premium.featureThenActive": "Puis Active CHF 6.00/mois",
+  "premium.featureThenActive": "Puis Active CHF 9.00/mois",
 };

@@ -1531,7 +1531,7 @@ export const deCH = {
   'premium.badgePro': 'Profi',
   'premium.feature7Days': '7 Tage kostenlos',
   'premium.featureActive': 'Alle Active-Funktionen',
-  'premium.featureThenActive': 'Danach Active CHF 6.00/Mt.',
+  'premium.featureThenActive': 'Danach Active CHF 9.00/Mt.',
   'premium.featureNoTrainer': 'Kein Trainerzugang',
   'premium.featureFounderPrice': 'Dauerhaft CHF 4.00/Mt.',
   'premium.featureWhileActive': 'Solange das Abo aktiv bleibt',

@@ -1531,7 +1531,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'premium.badgePro': 'Profi',
   'premium.feature7Days': '7 Täg gratis',
   'premium.featureActive': 'All Active-Funktione',
-  'premium.featureThenActive': 'Danach Active CHF 6.00/Mt.',
+  'premium.featureThenActive': 'Danach Active CHF 9.00/Mt.',
   'premium.featureNoTrainer': 'Kein Trainerzuegang',
   'premium.featureFounderPrice': 'Duurhaft CHF 4.00/Mt.',
   'premium.featureWhileActive': 'Solang s Abo aktiv bliibt',

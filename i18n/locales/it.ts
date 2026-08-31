@@ -1707,5 +1707,5 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "premium.startFree": "Inizia gratis",
   "premium.feature7Days": "7 giorni gratuiti",
   "premium.featureActive": "Tutte le funzioni Active",
-  "premium.featureThenActive": "Poi Active CHF 6.00/mese",
+  "premium.featureThenActive": "Poi Active CHF 9.00/mese",
 };
