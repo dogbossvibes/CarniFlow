@@ -45,6 +45,15 @@ describe('saved track detail map interaction contract', () => {
     expect(mapSrc).toContain('showsUserLocation={showUserLocation}');
   });
 
+  it('Fullscreen-Header berücksichtigt die Safe Area ohne feste Statusbar-Höhe', () => {
+    expect(screenSrc).toContain('useSafeAreaInsets');
+    expect(screenSrc).toContain('paddingTop: insets.top');
+    expect(screenSrc).toContain('fullscreenHeaderContent');
+    expect(screenSrc).toContain("edges={['bottom']}");
+    expect(screenSrc).not.toContain('top: 44');
+    expect(screenSrc).not.toContain('statusBarTranslucent');
+  });
+
   it('Fullscreen verwendet dieselbe gespeicherte Map-Datenquelle ohne Live-Puck', () => {
     expect(screenSrc).toContain('layPoints={map.lay} runPoints={map.run} markers={map.markers}');
     expect(screenSrc).toContain('currentPosition={null} showUserLocation={false}');

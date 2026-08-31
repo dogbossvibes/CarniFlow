@@ -3,7 +3,7 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
@@ -36,6 +36,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 export default function TrackAuswertungScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -343,19 +344,21 @@ export default function TrackAuswertungScreen() {
         presentationStyle="fullScreen"
         visible={fullscreenMap}
       >
-        <SafeAreaView style={s.fullscreen} edges={['top', 'bottom']}>
-          <View style={s.fullscreenHeader}>
-            <Pressable
-              accessibilityLabel="Karte schließen"
-              accessibilityRole="button"
-              hitSlop={10}
-              onPress={() => { setFullscreenMap(false); setFullscreenSel(null); }}
-              style={s.fullscreenHeaderButton}
-            >
-              <Ionicons name="close" size={24} color={C.trackText} />
-            </Pressable>
-            <Text style={s.fullscreenTitle}>Fährte</Text>
-            <View style={s.fullscreenHeaderButton} />
+        <SafeAreaView style={s.fullscreen} edges={['bottom']}>
+          <View style={[s.fullscreenHeader, { paddingTop: insets.top }]}>
+            <View style={s.fullscreenHeaderContent}>
+              <Pressable
+                accessibilityLabel="Karte schließen"
+                accessibilityRole="button"
+                hitSlop={10}
+                onPress={() => { setFullscreenMap(false); setFullscreenSel(null); }}
+                style={s.fullscreenHeaderButton}
+              >
+                <Ionicons name="close" size={24} color={C.trackText} />
+              </Pressable>
+              <Text style={s.fullscreenTitle}>Fährte</Text>
+              <View style={s.fullscreenHeaderButton} />
+            </View>
           </View>
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
@@ -435,7 +438,8 @@ const s = StyleSheet.create({
 
   mapCard: { height: 190, overflow: 'hidden', marginBottom: 16, padding: 0 },
   fullscreen: { flex: 1, backgroundColor: C.trackBg },
-  fullscreenHeader: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: C.trackBorder, backgroundColor: C.trackBg },
+  fullscreenHeader: { borderBottomWidth: 1, borderBottomColor: C.trackBorder, backgroundColor: C.trackBg },
+  fullscreenHeaderContent: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
   fullscreenHeaderButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   fullscreenTitle: { color: C.trackText, fontSize: 17, fontWeight: '800' },
   fullscreenMap: { flex: 1 },
