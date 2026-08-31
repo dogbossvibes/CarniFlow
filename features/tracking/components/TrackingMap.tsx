@@ -80,15 +80,20 @@ interface Props {
   dimLay?:          boolean;    // DEPRECATED/ignoriert: gelegte Fährte ist während der Absuche jetzt immer solide Mint (Prod-Bugfix). Prop bleibt für Aufrufer-Kompatibilität.
   startAnchor?:     LatLng | null;   // stabilisierter Startpunkt → Fähnchen (statt erstem Rohpunkt)
   endPoint?:        LatLng | null;   // gespeichertes Fährtenende (letzter gelegter Punkt) → Ziel-Fähnchen
+  fitToPoints?:     LatLng[];        // Logbuch/Detail: initialer Ausschnitt über alle gespeicherten Punkte, genau einmal
+  fitToTrackToken?: number;          // expliziter Refit aus der historischen Vollbildkarte
+  onStartPress?:    () => void;      // Tap auf Start-Fähnchen (Logbuch-Detail „Start")
   onMarkerPress?:   (m: MapMarker) => void;   // Tap auf einen gespeicherten Feature-Marker (Logbuch-Detail)
   onEndPress?:      () => void;               // Tap auf das Ziel-Fähnchen (Logbuch-Detail „Fährtenende")
   currentPosition:  LatLng | null;
+  showUserLocation?: boolean;
   dogPosition?:     LatLng | null;
   heading?:         number | null;
   follow:           boolean;
   mapType?:         MapType;
   onToggleFollow?:  () => void;
   onCompass?:       () => void;
+  onFullscreen?:    () => void;        // gespeicherte Detailkarte: Fullscreen-Entry im Map-Control-Stack
   onUserPan?:       () => void;   // Nutzer verschiebt die Karte selbst → Aufrufer schaltet Follow aus
   hideControls?:    boolean;   // FAB-Spalte ausblenden (z. B. für Live-Overlays)
   controlsTop?:     number;    // Abstand der FAB-Spalte von oben (um Overlays wie die Hunde-Pille zu umgehen)
@@ -96,10 +101,13 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, onMarkerPress, onEndPress, currentPosition, dogPosition, heading,
-  follow, mapType = 'hybrid', onToggleFollow, onCompass, onUserPan, hideControls, controlsTop = 14, style,
+  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
+  const initialFitDoneRef = useRef(false);
+  const lastFitTokenRef = useRef<number | undefined>(undefined);
+  const [mapReady, setMapReady] = useState(false);
   const { t } = useT();
   const { showToast, toast } = useToast();
 
@@ -148,6 +156,27 @@ export function TrackingMap({
   // Fortlaufende Nummer je Gegenstand (G1, G2, …) — nach Index in markerList.
   // Dübel bekommt KEINE G-Nummer (roter Zylinder) → zählt nicht mit (objectNumbers).
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
+  const initialFitCoords = useMemo(
+    () => (fitToPoints ?? [])
+      .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .map(p => ({ latitude: p.lat, longitude: p.lng })),
+    [fitToPoints],
+  );
+
+  // Gespeicherte Detailkarten: einmalig nach dem Laden auf alle persistierten Punkte
+  // fitten. Danach gewinnt die Nutzerinteraktion; keine Kamera-Rücksetzung bei Re-Render.
+  useEffect(() => {
+    if (!mapReady || initialFitCoords.length < 2 || !mapRef.current) return;
+    const initialFit = !initialFitDoneRef.current;
+    const requestedFit = fitToTrackToken != null && fitToTrackToken !== lastFitTokenRef.current;
+    if (!initialFit && !requestedFit) return;
+    initialFitDoneRef.current = true;
+    if (requestedFit) lastFitTokenRef.current = fitToTrackToken;
+    mapRef.current.fitToCoordinates(initialFitCoords, {
+      edgePadding: { top: 34, right: 34, bottom: 34, left: 34 },
+      animated: false,
+    });
+  }, [fitToTrackToken, initialFitCoords, mapReady]);
 
   const recenter = () => {
     const p = currentPosition ?? layPoints[layPoints.length - 1] ?? null;
@@ -176,10 +205,15 @@ export function TrackingMap({
         provider={RNMaps.PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFill}
         mapType={mapType}
-        showsUserLocation
+        showsUserLocation={showUserLocation}
         showsCompass={false}
         showsMyLocationButton={false}
-        onPanDrag={follow && onUserPan ? () => onUserPan() : undefined}
+        scrollEnabled
+        zoomEnabled
+        rotateEnabled
+        pitchEnabled
+        onMapReady={() => setMapReady(true)}
+        onPanDrag={onUserPan ? () => onUserPan() : undefined}
         initialRegion={{
           latitude:  initial ? initial.lat : FALLBACK.latitude,
           longitude: initial ? initial.lng : FALLBACK.longitude,
@@ -224,14 +258,14 @@ export function TrackingMap({
 
         {/* Startpunkt: stabilisierter Anker → Fähnchen; sonst (Auswertung/Legacy) der schlichte Punkt. */}
         {startAnchor ? (
-          <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+          <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={onStartPress}>
             <View style={s.startFlagWrap}>
               <View style={s.startFlag}><Ionicons name="flag" size={12} color="#04110F" /></View>
               <Text style={s.startFlagLabel}>{t('track.startFlag')}</Text>
             </View>
           </Marker>
         ) : start ? (
-          <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} anchor={{ x: 0.5, y: 0.5 }}>
+          <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} anchor={{ x: 0.5, y: 0.5 }} onPress={onStartPress}>
             <View style={s.startDot} />
           </Marker>
         ) : null}
@@ -301,6 +335,7 @@ export function TrackingMap({
       {/* Floating Buttons rechts */}
       {!hideControls && (
         <View style={[s.fabCol, { top: controlsTop }]}>
+          {onFullscreen && <Fab icon="expand-outline" onPress={onFullscreen} />}
           {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
           <Fab icon="locate" onPress={recenter} />
           {onToggleFollow && (
