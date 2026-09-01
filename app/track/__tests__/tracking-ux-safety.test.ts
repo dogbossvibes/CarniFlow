@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import { deCH } from '@/i18n/de-CH';
 
 describe('tracking UX safety contract', () => {
   const legen = readFileSync('app/track/legen.tsx', 'utf8');
@@ -161,7 +162,7 @@ describe('tracking UX safety contract', () => {
     expect(legen).toContain("label={t('track.stopLaying')}");
     expect((legen.match(/label=\{t\('track\.stopLaying'\)\}/g) ?? [])).toHaveLength(2);
     expect(legen).not.toContain("t('track.evaluate')");
-    // ABSUCHE: "Stoppen & Auswerten" (track.evaluate) — everywhere (normal
+    // ABSUCHE: "Stopp & Auswerten" (track.evaluate) — everywhere (normal
     // Stop-Button + Pocket-Lock-Stop). Existing, already fully localized key —
     // no near-duplicate key introduced.
     expect(run).toContain("label={t('track.evaluate')}");
@@ -175,5 +176,11 @@ describe('tracking UX safety contract', () => {
     // The hold mechanic itself is untouched by the label parametrization.
     expect(holdToStop).toContain('HOLD_TO_STOP_MS = 1500');
     expect(holdToStop).toContain("label = STOP_LABEL");
+  });
+
+  it('the German track.evaluate value is exactly "Stopp & Auswerten" — not "Stop" or "Stoppen"', () => {
+    expect(deCH['track.evaluate']).toBe('Stopp & Auswerten');
+    expect(deCH['track.evaluate']).not.toBe('Stop & Auswerten');
+    expect(deCH['track.evaluate']).not.toBe('Stoppen & Auswerten');
   });
 });

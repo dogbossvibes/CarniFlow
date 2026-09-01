@@ -48,7 +48,7 @@ describe('NORMALER STOP / LEGEN (finishTrack via HoldToStopButton, wie app/track
     return tree;
   }
 
-  it('zeigt "Stopp" (track.stopLaying) — nicht "Stoppen & Auswerten"', () => {
+  it('zeigt "Stopp" (track.stopLaying) — nicht "Stopp & Auswerten"', () => {
     const tree = renderLegenStop(jest.fn());
     expect(LEGEN_LABEL).toBe('Stopp');
     expect(findAllByProps<{ children: string }>(tree, { children: LEGEN_LABEL }).length).toBeGreaterThan(0);
@@ -139,12 +139,12 @@ describe('NORMALER STOP / ABSUCHE (handleFinish via HoldToStopButton, wie app/tr
     return tree;
   }
 
-  it('zeigt "Stoppen & Auswerten" (track.evaluate) — nicht nur "Stopp"', () => {
+  it('zeigt exakt "Stopp & Auswerten" (track.evaluate) — nicht nur "Stopp"', () => {
     const tree = renderRunStop(jest.fn());
     // track.evaluate ist die bestehende, bereits vollständig lokalisierte Fach-
-    // Beschriftung ("Stop & Auswerten" DE) — bevorzugt statt eines neuen,
+    // Beschriftung ("Stopp & Auswerten" DE) — bevorzugt statt eines neuen,
     // fast-doppelten Keys (Spec „Bestehende i18n-Keys bevorzugen").
-    expect(ABSUCHE_LABEL).toContain('Auswerten');
+    expect(ABSUCHE_LABEL).toBe('Stopp & Auswerten');
     expect(findAllByProps<{ children: string }>(tree, { children: ABSUCHE_LABEL }).length).toBeGreaterThan(0);
     expect(findAllByProps<{ children: string }>(tree, { children: LEGEN_LABEL })).toHaveLength(0);
     act(() => tree.unmount());

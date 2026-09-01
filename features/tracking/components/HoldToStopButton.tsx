@@ -11,7 +11,7 @@ export const HOLD_TO_STOP_MS = 1500;
 // Default-Beschriftung, falls ein Aufrufer keine eigene `label` übergibt — bewusst
 // hardcoded als reiner Fallback (kein i18n hier drin). Die tatsächliche, fachlich
 // korrekte Beschriftung kommt vom jeweiligen Screen per i18n (LEGEN: "Stopp" via
-// t('track.stopLaying'), ABSUCHE: "Stoppen & Auswerten" via t('track.evaluate')) —
+// t('track.stopLaying'), ABSUCHE: "Stopp & Auswerten" via t('track.evaluate')) —
 // siehe app/track/legen.tsx bzw. app/track/run.tsx und deren PocketLockOverlay-
 // Aufrufe. Der Hint-Text bleibt für beide Kontexte identisch (Interaktionshinweis,
 // kein fachlicher Inhalt).
@@ -52,7 +52,7 @@ export function HoldToStopButton({
   showHintLabel?: boolean;
   accessibilityLabel?: string;
   /** Fachlich korrekte, sichtbare Beschriftung — vom Aufrufer per i18n übergeben
-   *  (LEGEN: "Stopp", ABSUCHE: "Stoppen & Auswerten"). Default nur ein reiner
+   *  (LEGEN: "Stopp", ABSUCHE: "Stopp & Auswerten"). Default nur ein reiner
    *  Fallback, kein i18n-Ersatz. */
   label?: string;
   /** Grösse/Form/Position sind Sache des Aufrufers (absolute Overlay-Ecke vs.

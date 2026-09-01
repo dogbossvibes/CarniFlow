@@ -258,7 +258,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
 
   // Absuche (run)
   'track.searchDuration': 'Suechdüür',
-  'track.evaluate':       'Stop & Uswerte',
+  'track.evaluate':       'Stopp & Uswerte',
   'track.searchApproachHint': 'Gang zum Fährteasatz. Wähl de Abstand zum Hund und tipp uf Jetzt starte.',
   'track.searchApproachReached': 'Asatz erreicht',
   'track.searchHandlerDistanceLabel': 'Abstand zum Hund',

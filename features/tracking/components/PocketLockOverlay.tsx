@@ -32,7 +32,7 @@ export function PocketLockOverlay({
   onUnlock: () => void;
   onStop: () => void;
   /** Fachlich korrekte Beschriftung des Locked-Screen-Stops — vom aufrufenden
-   *  Screen übergeben (LEGEN: "Stopp", ABSUCHE: "Stoppen & Auswerten"), damit
+   *  Screen übergeben (LEGEN: "Stopp", ABSUCHE: "Stopp & Auswerten"), damit
    *  Pocket-Lock und normaler Stop-Button immer denselben Text zeigen. Reine
    *  Anzeige-Weiterleitung an HoldToStopButton — kein Bezug zum längst entfernten,
    *  namensähnlichen Confirmation-Escape-Prop aus einer früheren, verworfenen

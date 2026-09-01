@@ -291,7 +291,7 @@ describe('PocketLockOverlay — locked-screen stop hold', () => {
   });
 
   // Pocket-Lock zeigt die vom aufrufenden Screen übergebene, fachlich korrekte
-  // Beschriftung — LEGEN "Stopp", ABSUCHE "Stoppen & Auswerten" — statt eines
+  // Beschriftung — LEGEN "Stopp", ABSUCHE "Stopp & Auswerten" — statt eines
   // fixen Textes. Beide nutzen dieselbe HoldToStopButton-Komponente.
   it('Pocket Lock Legen zeigt "Stopp"', () => {
     let tree!: ReactTestRenderer;
@@ -307,15 +307,17 @@ describe('PocketLockOverlay — locked-screen stop hold', () => {
     act(() => tree.unmount());
   });
 
-  it('Pocket Lock Absuche zeigt "Stoppen & Auswerten" statt "Stopp"', () => {
+  it('Pocket Lock Absuche zeigt exakt "Stopp & Auswerten" — nicht "Stop" oder "Stoppen"', () => {
     let tree!: ReactTestRenderer;
     act(() => {
       tree = TestRenderer.create(
-        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={jest.fn()} onStop={jest.fn()} label="Stoppen & Auswerten" />,
+        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={jest.fn()} onStop={jest.fn()} label="Stopp & Auswerten" />,
       );
     });
     const root = tree.root as unknown as { findAllByProps: (p: { children: string }) => unknown[] };
-    expect(root.findAllByProps({ children: 'Stoppen & Auswerten' }).length).toBeGreaterThan(0);
+    expect(root.findAllByProps({ children: 'Stopp & Auswerten' }).length).toBeGreaterThan(0);
+    expect(root.findAllByProps({ children: 'Stop & Auswerten' })).toHaveLength(0);
+    expect(root.findAllByProps({ children: 'Stoppen & Auswerten' })).toHaveLength(0);
     expect(root.findAllByProps({ children: 'Stopp' })).toHaveLength(0);
     act(() => tree.unmount());
   });

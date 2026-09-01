@@ -239,7 +239,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.pause": "Pause",
   "track.resume": "Next",
   "track.searchDuration": "Search duration",
-  "track.evaluate": "Stop & evaluate",
+  "track.evaluate": "Stop & Evaluate",
   "track.searchApproachHint": "Please walk to the track start. Choose the distance to the dog and tap Start now.",
   "track.searchApproachReached": "Start reached",
   "track.searchHandlerDistanceLabel": "distance to dog",

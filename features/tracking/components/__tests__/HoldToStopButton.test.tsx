@@ -216,17 +216,17 @@ describe('HoldToStopButton — Hold-to-Stop', () => {
     act(() => tree.unmount());
   });
 
-  it('label: renders the exact fachlich-korrekte Beschriftung a caller supplies (e.g. "Stoppen & Auswerten")', () => {
+  it('label: renders the exact fachlich-korrekte Beschriftung a caller supplies (e.g. "Stopp & Auswerten")', () => {
     const onStop = jest.fn();
-    const tree = render(onStop, { label: 'Stoppen & Auswerten' });
-    expect(findAllByProps<{ children: string }>(tree, { children: 'Stoppen & Auswerten' }).length).toBeGreaterThan(0);
+    const tree = render(onStop, { label: 'Stopp & Auswerten' });
+    expect(findAllByProps<{ children: string }>(tree, { children: 'Stopp & Auswerten' }).length).toBeGreaterThan(0);
     expect(findAllByProps<{ children: string }>(tree, { children: 'Stopp' })).toHaveLength(0);
     act(() => tree.unmount());
   });
 
   it('the label change never alters the hold mechanic — same 1500 ms, same guard, same haptic', () => {
     const onStop = jest.fn();
-    const tree = render(onStop, { label: 'Stoppen & Auswerten' });
+    const tree = render(onStop, { label: 'Stopp & Auswerten' });
     const stop = findStop(tree);
 
     act(() => stop.props.onPress());

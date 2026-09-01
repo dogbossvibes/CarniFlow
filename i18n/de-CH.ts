@@ -258,7 +258,7 @@ export const deCH = {
 
   // Absuche (run)
   'track.searchDuration': 'Suchdauer',
-  'track.evaluate':       'Stop & Auswerten',
+  'track.evaluate':       'Stopp & Auswerten',
   'track.searchApproachHint': 'Bitte zum Fährtenansatz gehen. Wähle den Abstand zum Hund und tippe auf Jetzt starten.',
   'track.searchApproachReached': 'Ansatz erreicht',
   'track.searchHandlerDistanceLabel': 'Abstand zum Hund',
