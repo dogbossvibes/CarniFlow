@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -54,6 +54,7 @@ import { syncNow } from '@/features/sync/services/syncEngine';
 import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
 import * as Crypto from 'expo-crypto';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
+import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
 
 // Blinkender LIVE-Punkt.
 function RecDot() {
@@ -813,16 +814,13 @@ export default function TrackRunScreen() {
             <Ionicons name="flag" size={20} color={FT.text} />
             <Text className="text-[10.5px] font-extrabold text-ft-text">{t('track.object')}</Text>
           </Pressable>
-          <Pressable
-            accessibilityLabel="Absuche beenden"
-            accessibilityHint="Zum Öffnen der Bestätigung tippen"
-            className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-            style={[{ flex: 1.3 }, (finishing || arming) ? { opacity: 0.45 } : null]}
-            onPress={handleFinish} disabled={finishing || arming}
-          >
-            {finishing ? <ActivityIndicator color="#2a060a" /> : <Ionicons name="stop" size={20} color="#2a060a" />}
-            <Text className="text-[10.5px] font-extrabold text-[#2a060a]">{t('track.evaluate')}</Text>
-          </Pressable>
+          <HoldToStopButton
+            onStop={handleFinish}
+            disabled={finishing || arming}
+            busy={finishing}
+            containerClassName="h-[60px] rounded-[18px]"
+            containerStyle={{ flex: 1.3 }}
+          />
         </View>
       </SafeAreaView>
 

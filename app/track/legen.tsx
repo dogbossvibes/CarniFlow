@@ -47,6 +47,7 @@ import {
 } from '@/features/tracking/utils/trackSegments';
 import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPickerLayout';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
+import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
@@ -1022,15 +1023,12 @@ export default function LegenScreen() {
             <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color={FT.text} />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>
           </Pressable>
-          <Pressable
-            accessibilityLabel={t('common.stop')}
-            accessibilityHint={t('track.stopLayingHint')}
-            className="h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-ft-bad"
-            style={{ flex: 1.3 }} onPress={finishTrack} disabled={phase !== 'recording'}
-          >
-            <Ionicons name="stop" size={20} color="#2a060a" />
-            <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-[#2a060a]">{t('common.stop')}</Text>
-          </Pressable>
+          <HoldToStopButton
+            onStop={finishTrack}
+            disabled={phase !== 'recording'}
+            containerClassName="h-[60px] rounded-[18px]"
+            containerStyle={{ flex: 1.3 }}
+          />
         </View>
       </SafeAreaView>
 

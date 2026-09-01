@@ -1,5 +1,9 @@
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { PocketLockOverlay, POCKET_STOP_HOLD_MS, POCKET_UNLOCK_HOLD_MS } from '@/features/tracking/components/PocketLockOverlay';
+import { PocketLockOverlay, POCKET_UNLOCK_HOLD_MS } from '@/features/tracking/components/PocketLockOverlay';
+// Der Locked-Screen-Stop nutzt jetzt die gemeinsame HoldToStopButton-Komponente
+// (siehe HoldToStopButton.test.tsx für die generische Hold-Deckung) — Alias hält
+// die bestehenden Zeitangaben unten unverändert lesbar.
+import { HOLD_TO_STOP_MS as POCKET_STOP_HOLD_MS } from '@/features/tracking/components/HoldToStopButton';
 
 jest.mock('@/features/tracking/utils/haptics', () => ({
   hapticSuccess: jest.fn(),

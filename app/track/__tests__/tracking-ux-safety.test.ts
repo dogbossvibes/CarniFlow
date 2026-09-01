@@ -4,6 +4,7 @@ describe('tracking UX safety contract', () => {
   const legen = readFileSync('app/track/legen.tsx', 'utf8');
   const run = readFileSync('app/track/run.tsx', 'utf8');
   const overlay = readFileSync('features/tracking/components/PocketLockOverlay.tsx', 'utf8');
+  const holdToStop = readFileSync('features/tracking/components/HoldToStopButton.tsx', 'utf8');
 
   it('protects both active screens with a real touch-catching pocket lock', () => {
     expect(legen).toContain('const [pocketLock, setPocketLock]');
@@ -52,11 +53,15 @@ describe('tracking UX safety contract', () => {
   });
 
   it('does not pause or finalize from a normal pocket touch', () => {
-    expect(legen).toContain('onPress={finishTrack} disabled={phase !== \'recording\'}');
+    expect(legen).toContain('onStop={finishTrack}');
+    expect(legen).toContain("disabled={phase !== 'recording'}");
     expect(legen).toContain('onPress={() => undefined} onLongPress={togglePause} onAccessibilityTap={togglePause} delayLongPress={1800}');
-    expect(run).toContain('onPress={handleFinish} disabled={finishing || arming}');
+    expect(run).toContain('onStop={handleFinish}');
+    expect(run).toContain('disabled={finishing || arming}');
     expect(legen).not.toContain('requestStop');
     expect(run).not.toContain('track.finishTitle');
+    // "Gedrückt halten" lebt ausschliesslich in der gemeinsamen HoldToStopButton-
+    // Komponente (siehe unten) — kein eigener, dupliziertes Hint-Text in run.tsx.
     expect(run).not.toContain('Gedrückt halten');
   });
 
@@ -78,37 +83,47 @@ describe('tracking UX safety contract', () => {
   it('does not turn automatic end detection into finalization', () => {
     expect(run).toContain('Fährtenende erreicht');
     expect(run).toContain('KEIN Auto-Beenden');
-    expect(run).toContain('onPress={handleFinish}');
+    expect(run).toContain('onStop={handleFinish}');
   });
 
-  it('keeps the lock as a self-contained overlay with exactly two deliberate holds', () => {
+  it('keeps the lock as a self-contained overlay with exactly one unlock hold + the shared stop-hold component', () => {
     // Old, killed touch-bypass API names must never reappear — the locked-screen
-    // stop is its own hold control inside the overlay, not a pass-through to the
-    // underlying screen and not a tap-triggered confirmation flow.
+    // stop is the shared HoldToStopButton, not a pass-through to the underlying
+    // screen and not a tap-triggered confirmation flow.
     expect(overlay).not.toContain('onRequestStop');
     expect(overlay).not.toContain('stopLabel');
     expect(overlay).toContain('style={{ zIndex: 1 }}');
-    // Exactly two interactive Pressable-family elements in the overlay — the
-    // unlock hold and the locked-screen stop hold. No third, competing surface,
-    // and no touch handed through to the screen underneath.
-    expect(overlay.match(/<(Pressable|AnimatedPressable)\b/g)).toHaveLength(2);
+    // Exactly ONE interactive Pressable-family element directly in the overlay —
+    // the unlock hold. The stop hold is delegated to the shared HoldToStopButton
+    // component exactly once, not a second local hold-to-stop implementation.
+    expect(overlay.match(/<(Pressable|AnimatedPressable)\b/g)).toHaveLength(1);
+    expect(overlay.match(/<HoldToStopButton\b/g)).toHaveLength(1);
     expect(legen).not.toContain('onRequestStop={requestStop}');
     expect(run).not.toContain('onRequestStop={handleFinish}');
   });
 
-  it('wires the locked-screen stop hold to the exact same direct finalizer as the normal stop', () => {
-    // PocketLockOverlay receives onStop and calls it — no separate save/navigation/
-    // cleanup logic of its own, no confirmation dialog, no second finalizer.
+  it('wires the locked-screen stop hold to the exact same direct finalizer as the normal stop, via the shared component', () => {
+    // PocketLockOverlay forwards onStop UNCHANGED to the shared HoldToStopButton —
+    // no separate save/navigation/cleanup logic of its own, no confirmation
+    // dialog, no second finalizer, no second hold-to-stop implementation.
     expect(overlay).toContain('onStop: () => void');
-    expect(overlay).toContain('POCKET_STOP_HOLD_MS');
+    expect(overlay).toContain('<HoldToStopButton');
+    expect(overlay).toContain('onStop={onStop}');
     expect(overlay).not.toContain('Alert.alert');
     expect(overlay).not.toContain('import { Alert');
     expect(legen).toContain('onStop={finishTrack}');
     expect(run).toContain('onStop={handleFinish}');
-    // Same one-shot-per-hold guard style already used by the direct finalizers
-    // themselves (finishRequestedRef / stoppingRef) — the overlay must not rely
-    // on the underlying button's own guard to stay idempotent.
-    expect(overlay).toContain('stoppedRef');
+    // The normal Stop buttons in legen.tsx/run.tsx use the SAME shared component
+    // as the pocket-lock stop — no second, competing hold-to-stop implementation
+    // anywhere in the tracking module.
+    expect(legen).toContain('<HoldToStopButton');
+    expect(run).toContain('<HoldToStopButton');
+    // The one-shot-per-hold guard now lives centrally in the shared component
+    // (not duplicated per screen or in the overlay).
+    expect(holdToStop).toContain('stoppedRef');
+    expect(overlay).not.toContain('stoppedRef');
+    expect(legen).not.toContain('stoppedRef');
+    expect(run).not.toContain('stoppedRef');
   });
 
   it('keeps pocket-lock touch blocking intact while the locked stop hold exists', () => {
