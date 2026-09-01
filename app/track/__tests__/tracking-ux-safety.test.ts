@@ -15,9 +15,11 @@ describe('tracking UX safety contract', () => {
     expect(legen).toContain('controlsTop={124}');
     expect(run).toContain('controlsTop={124}');
     expect(overlay).toContain('pointerEvents="auto"');
-    expect(overlay).toContain('onPress={() => undefined}');
-    expect(overlay).toContain('onLongPress={onUnlock}');
-    expect(overlay).toContain('delayLongPress={1800}');
+    expect(overlay).toContain('useHoldAction(complete, POCKET_UNLOCK_HOLD_MS)');
+    expect(overlay).toContain('onPressIn={onPressIn}');
+    expect(overlay).toContain('onPressOut={onPressOut}');
+    expect(overlay).not.toContain('onLongPress={');
+    expect(overlay).not.toContain('delayLongPress={');
     expect(overlay).not.toContain('onRequestStop');
     expect(overlay).not.toContain('stopLabel');
     expect(legen).not.toContain('onRequestStop={requestStop}');
@@ -83,7 +85,9 @@ describe('tracking UX safety contract', () => {
     expect(overlay).not.toContain('onRequestStop');
     expect(overlay).not.toContain('stopLabel');
     expect(overlay).toContain('style={{ zIndex: 1 }}');
-    expect(overlay).toContain('onLongPress={onUnlock}');
+    // Exactly one interactive Pressable-family element in the overlay — no second,
+    // competing stop-escape surface.
+    expect(overlay.match(/<(Pressable|AnimatedPressable)\b/g)).toHaveLength(1);
     expect(legen).not.toContain('onRequestStop={requestStop}');
     expect(run).not.toContain('onRequestStop={handleFinish}');
   });
