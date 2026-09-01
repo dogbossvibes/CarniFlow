@@ -341,6 +341,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.setObjectButton": "Segna oggetto",
   "track.setAngleButton": "Segna angolo",
   "track.setAngleHint": "Scegli l’angolo chiuso, aperto o a terra, oppure una deviazione, nella posizione attuale.",
+  "track.stopLaying": "Ferma",
   "track.stopLayingHint": "Termina la posa della pista e avvia il tempo di posa.",
   "toast.startPointWait": "Attendi: il punto di partenza è ancora in impostazione.",
   "toast.objectSet": "Oggetto segnato",

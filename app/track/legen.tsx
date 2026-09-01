@@ -1026,6 +1026,7 @@ export default function LegenScreen() {
           <HoldToStopButton
             onStop={finishTrack}
             disabled={phase !== 'recording'}
+            label={t('track.stopLaying')}
             containerClassName="h-[60px] rounded-[18px]"
             containerStyle={{ flex: 1.3 }}
           />
@@ -1038,6 +1039,7 @@ export default function LegenScreen() {
         distanceM={`${Math.round(distanceMeters)} m`}
         onUnlock={unlockPocket}
         onStop={finishTrack}
+        label={t('track.stopLaying')}
       />
 
       <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')}>

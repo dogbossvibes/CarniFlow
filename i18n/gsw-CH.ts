@@ -362,6 +362,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.setObjectButton':'Gegestand setze',
   'track.setAngleButton': 'Winkel setze',
   'track.setAngleHint':   'Öffnet d Uswahl: GW, OW, BW oder Abriss a de aktuelle Position.',
+  'track.stopLaying':     'Stopp',
   'track.stopLayingHint': 'Beändet s Lege vo de Fährte und startet d Liegeziit.',
 
   // Fährten-Toasts / Hinweise

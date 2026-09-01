@@ -1,5 +1,6 @@
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { HoldToStopButton, HOLD_TO_STOP_MS } from '@/features/tracking/components/HoldToStopButton';
+import { deCH } from '@/i18n/de-CH';
 
 jest.mock('@/features/tracking/utils/haptics', () => ({ hapticSuccess: jest.fn() }));
 
@@ -7,13 +8,24 @@ jest.mock('@/features/tracking/utils/haptics', () => ({ hapticSuccess: jest.fn()
 // generische Hold-Verhalten selbst ist bereits vollständig in
 // HoldToStopButton.test.tsx abgedeckt — diese Suite bestätigt zusätzlich, dass
 // LEGEN und ABSUCHE exakt dieselbe Komponente mit den jeweils erwarteten Props
-// (disabled/busy) verwenden, statt zwei fast identische Implementierungen.
+// (disabled/busy/label) verwenden, statt zwei fast identische Implementierungen.
+// Die label-Werte sind die echten de-CH-Übersetzungen — exakt das, was
+// t('track.stopLaying')/t('track.evaluate') in legen.tsx/run.tsx liefert.
+const LEGEN_LABEL = deCH['track.stopLaying'];
+const ABSUCHE_LABEL = deCH['track.evaluate'];
+
 type PressableTestNode = { props: { onPress: () => void; onPressIn: () => void; onPressOut: () => void } };
 
 function findStop(tree: ReactTestRenderer): PressableTestNode {
   return (tree.root as unknown as {
     findByProps: (props: { accessibilityLabel: string }) => PressableTestNode;
   }).findByProps({ accessibilityLabel: 'Fährte stoppen' });
+}
+
+function findAllByProps<P extends object>(tree: ReactTestRenderer, props: Partial<P>): { props: P }[] {
+  return (tree.root as unknown as {
+    findAllByProps: (p: Partial<P>) => { props: P }[];
+  }).findAllByProps(props);
 }
 
 describe('NORMALER STOP / LEGEN (finishTrack via HoldToStopButton, wie app/track/legen.tsx verdrahtet)', () => {
@@ -27,6 +39,7 @@ describe('NORMALER STOP / LEGEN (finishTrack via HoldToStopButton, wie app/track
         <HoldToStopButton
           onStop={finishTrack}
           disabled={!recording}
+          label={LEGEN_LABEL}
           containerClassName="h-[60px] rounded-[18px]"
           containerStyle={{ flex: 1.3 }}
         />,
@@ -34,6 +47,14 @@ describe('NORMALER STOP / LEGEN (finishTrack via HoldToStopButton, wie app/track
     });
     return tree;
   }
+
+  it('zeigt "Stopp" (track.stopLaying) — nicht "Stoppen & Auswerten"', () => {
+    const tree = renderLegenStop(jest.fn());
+    expect(LEGEN_LABEL).toBe('Stopp');
+    expect(findAllByProps<{ children: string }>(tree, { children: LEGEN_LABEL }).length).toBeGreaterThan(0);
+    expect(findAllByProps<{ children: string }>(tree, { children: ABSUCHE_LABEL })).toHaveLength(0);
+    act(() => tree.unmount());
+  });
 
   it('Tap → kein Stop', () => {
     const finishTrack = jest.fn();
@@ -109,6 +130,7 @@ describe('NORMALER STOP / ABSUCHE (handleFinish via HoldToStopButton, wie app/tr
           onStop={handleFinish}
           disabled={!!(opts.finishing || opts.arming)}
           busy={!!opts.finishing}
+          label={ABSUCHE_LABEL}
           containerClassName="h-[60px] rounded-[18px]"
           containerStyle={{ flex: 1.3 }}
         />,
@@ -116,6 +138,17 @@ describe('NORMALER STOP / ABSUCHE (handleFinish via HoldToStopButton, wie app/tr
     });
     return tree;
   }
+
+  it('zeigt "Stoppen & Auswerten" (track.evaluate) — nicht nur "Stopp"', () => {
+    const tree = renderRunStop(jest.fn());
+    // track.evaluate ist die bestehende, bereits vollständig lokalisierte Fach-
+    // Beschriftung ("Stop & Auswerten" DE) — bevorzugt statt eines neuen,
+    // fast-doppelten Keys (Spec „Bestehende i18n-Keys bevorzugen").
+    expect(ABSUCHE_LABEL).toContain('Auswerten');
+    expect(findAllByProps<{ children: string }>(tree, { children: ABSUCHE_LABEL }).length).toBeGreaterThan(0);
+    expect(findAllByProps<{ children: string }>(tree, { children: LEGEN_LABEL })).toHaveLength(0);
+    act(() => tree.unmount());
+  });
 
   it('Tap → kein Stop', () => {
     const handleFinish = jest.fn();

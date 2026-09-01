@@ -818,6 +818,7 @@ export default function TrackRunScreen() {
             onStop={handleFinish}
             disabled={finishing || arming}
             busy={finishing}
+            label={t('track.evaluate')}
             containerClassName="h-[60px] rounded-[18px]"
             containerStyle={{ flex: 1.3 }}
           />
@@ -830,6 +831,7 @@ export default function TrackRunScreen() {
         distanceM={`${Math.round(s.distanceM)} m`}
         onUnlock={unlockPocket}
         onStop={handleFinish}
+        label={t('track.evaluate')}
       />
 
       {SHOW_GPS_DEBUG && (

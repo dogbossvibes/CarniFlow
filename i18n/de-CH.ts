@@ -362,6 +362,7 @@ export const deCH = {
   'track.setObjectButton':'Gegenstand setzen',
   'track.setAngleButton': 'Winkel setzen',
   'track.setAngleHint':   'Öffnet die Auswahl: Geschlossener/Offener/Bodenwinkel oder Abriss an der aktuellen Position.',
+  'track.stopLaying':     'Stopp',
   'track.stopLayingHint': 'Beendet das Legen der Fährte und startet die Liegezeit.',
 
   // Fährten-Toasts / Hinweise

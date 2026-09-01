@@ -8,10 +8,13 @@ import { hapticSuccess } from '@/features/tracking/utils/haptics';
 
 export const HOLD_TO_STOP_MS = 1500;
 
-// Feste, hardcoded Beschriftung — bewusst KEIN i18n (dieselbe Konvention wie der
-// Rest des PocketLockOverlay, das durchgehend hardcoded Deutsch nutzt). Beide
-// Kontexte (normaler Stop-Button + Locked-Screen-Stop) zeigen exakt denselben
-// Text, damit sich Stop "gedrückt halten" überall identisch anfühlt.
+// Default-Beschriftung, falls ein Aufrufer keine eigene `label` übergibt — bewusst
+// hardcoded als reiner Fallback (kein i18n hier drin). Die tatsächliche, fachlich
+// korrekte Beschriftung kommt vom jeweiligen Screen per i18n (LEGEN: "Stopp" via
+// t('track.stopLaying'), ABSUCHE: "Stoppen & Auswerten" via t('track.evaluate')) —
+// siehe app/track/legen.tsx bzw. app/track/run.tsx und deren PocketLockOverlay-
+// Aufrufe. Der Hint-Text bleibt für beide Kontexte identisch (Interaktionshinweis,
+// kein fachlicher Inhalt).
 const STOP_LABEL = 'Stopp';
 const STOP_HINT = 'Gedrückt halten';
 
@@ -34,6 +37,7 @@ export function HoldToStopButton({
   busy,
   showHintLabel,
   accessibilityLabel = 'Fährte stoppen',
+  label = STOP_LABEL,
   containerClassName,
   containerStyle,
 }: {
@@ -47,6 +51,10 @@ export function HoldToStopButton({
    *  der accessibilityHint denselben Text ("darunter bzw. als Hint", Spec §5). */
   showHintLabel?: boolean;
   accessibilityLabel?: string;
+  /** Fachlich korrekte, sichtbare Beschriftung — vom Aufrufer per i18n übergeben
+   *  (LEGEN: "Stopp", ABSUCHE: "Stoppen & Auswerten"). Default nur ein reiner
+   *  Fallback, kein i18n-Ersatz. */
+  label?: string;
   /** Grösse/Form/Position sind Sache des Aufrufers (absolute Overlay-Ecke vs.
    *  Flex-Zeilen-Element) — die Komponente selbst besitzt nur die Stop-Optik
    *  (Farbe, Fill, Icon, Label), keine Layout-Annahmen. */
@@ -109,7 +117,7 @@ export function HoldToStopButton({
           className="bg-ft-bad"
         />
         {busy ? <ActivityIndicator color={FT.text} /> : <Ionicons name="stop" size={22} color={FT.text} />}
-        <Text numberOfLines={1} className="text-[9px] font-black text-ft-text mt-[2px]">{STOP_LABEL}</Text>
+        <Text numberOfLines={2} className="text-[9px] font-black text-ft-text text-center mt-[2px]">{label}</Text>
       </AnimatedPressable>
     </>
   );

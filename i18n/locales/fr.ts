@@ -859,6 +859,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.setObjectButton": "Marquer un objet",
   "track.setAngleButton": "Marquer un angle",
   "track.setAngleHint": "Ouvre la sélection : angle fermé, angle ouvert, angle au sol ou rupture à la position actuelle.",
+  "track.stopLaying": "Arrêter",
   "track.stopLayingHint": "Termine la pose de la piste et démarre le temps de repos.",
   "profile.notificationsBlocked": "Notifications bloquées",
   "profile.notificationsBlockedBody": "Active les notifications ANYVO dans les réglages système pour recevoir les rappels et les commentaires.",

@@ -208,4 +208,39 @@ describe('HoldToStopButton — Hold-to-Stop', () => {
     expect(stop.props.accessibilityHint).toBe('Gedrückt halten');
     act(() => tree.unmount());
   });
+
+  it('label: defaults to "Stopp" when no caller-supplied label is given', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop);
+    expect(findAllByProps<{ children: string }>(tree, { children: 'Stopp' }).length).toBeGreaterThan(0);
+    act(() => tree.unmount());
+  });
+
+  it('label: renders the exact fachlich-korrekte Beschriftung a caller supplies (e.g. "Stoppen & Auswerten")', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop, { label: 'Stoppen & Auswerten' });
+    expect(findAllByProps<{ children: string }>(tree, { children: 'Stoppen & Auswerten' }).length).toBeGreaterThan(0);
+    expect(findAllByProps<{ children: string }>(tree, { children: 'Stopp' })).toHaveLength(0);
+    act(() => tree.unmount());
+  });
+
+  it('the label change never alters the hold mechanic — same 1500 ms, same guard, same haptic', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop, { label: 'Stoppen & Auswerten' });
+    const stop = findStop(tree);
+
+    act(() => stop.props.onPress());
+    expect(onStop).not.toHaveBeenCalled();
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(HOLD_TO_STOP_MS - 200));
+    act(() => stop.props.onPressOut());
+    expect(onStop).not.toHaveBeenCalled();
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(HOLD_TO_STOP_MS));
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(hapticSuccess).toHaveBeenCalledTimes(1);
+    act(() => tree.unmount());
+  });
 });

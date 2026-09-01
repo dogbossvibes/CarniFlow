@@ -41,7 +41,7 @@ describe('PocketLockOverlay — hold-to-unlock', () => {
     let tree!: ReactTestRenderer;
     act(() => {
       tree = TestRenderer.create(
-        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={onUnlock} onStop={onStop} />,
+        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={onUnlock} onStop={onStop} label="Stopp" />,
       );
     });
     return tree;
@@ -66,7 +66,7 @@ describe('PocketLockOverlay — hold-to-unlock', () => {
     let tree!: ReactTestRenderer;
     act(() => {
       tree = TestRenderer.create(
-        <PocketLockOverlay visible={false} duration="00:12" distanceM="120 m" onUnlock={jest.fn()} onStop={jest.fn()} />,
+        <PocketLockOverlay visible={false} duration="00:12" distanceM="120 m" onUnlock={jest.fn()} onStop={jest.fn()} label="Stopp" />,
       );
     });
     expect((tree as unknown as { toJSON: () => unknown }).toJSON()).toBeNull();
@@ -159,7 +159,7 @@ describe('PocketLockOverlay — locked-screen stop hold', () => {
     let tree!: ReactTestRenderer;
     act(() => {
       tree = TestRenderer.create(
-        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={onUnlock} onStop={onStop} />,
+        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={onUnlock} onStop={onStop} label="Stopp" />,
       );
     });
     return tree;
@@ -287,6 +287,36 @@ describe('PocketLockOverlay — locked-screen stop hold', () => {
 
     expect(onStop).toHaveBeenCalledTimes(1);
     expect(onUnlock).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+
+  // Pocket-Lock zeigt die vom aufrufenden Screen übergebene, fachlich korrekte
+  // Beschriftung — LEGEN "Stopp", ABSUCHE "Stoppen & Auswerten" — statt eines
+  // fixen Textes. Beide nutzen dieselbe HoldToStopButton-Komponente.
+  it('Pocket Lock Legen zeigt "Stopp"', () => {
+    let tree!: ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={jest.fn()} onStop={jest.fn()} label="Stopp" />,
+      );
+    });
+    const found = (tree.root as unknown as {
+      findAllByProps: (p: { children: string }) => unknown[];
+    }).findAllByProps({ children: 'Stopp' });
+    expect(found.length).toBeGreaterThan(0);
+    act(() => tree.unmount());
+  });
+
+  it('Pocket Lock Absuche zeigt "Stoppen & Auswerten" statt "Stopp"', () => {
+    let tree!: ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={jest.fn()} onStop={jest.fn()} label="Stoppen & Auswerten" />,
+      );
+    });
+    const root = tree.root as unknown as { findAllByProps: (p: { children: string }) => unknown[] };
+    expect(root.findAllByProps({ children: 'Stoppen & Auswerten' }).length).toBeGreaterThan(0);
+    expect(root.findAllByProps({ children: 'Stopp' })).toHaveLength(0);
     act(() => tree.unmount());
   });
 });

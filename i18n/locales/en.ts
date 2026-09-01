@@ -341,6 +341,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.setObjectButton": "article set",
   "track.setAngleButton": "corner set",
   "track.setAngleHint": "Opens the picker: closed/open/ground angle or break-off at the current position.",
+  "track.stopLaying": "Stop",
   "track.stopLayingHint": "Ends laying the track and starts the resting time.",
   "toast.startPointWait": "One moment – start point is still being set.",
   "toast.objectSet": "article set",

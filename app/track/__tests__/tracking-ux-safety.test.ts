@@ -155,4 +155,25 @@ describe('tracking UX safety contract', () => {
     expect(legen).toContain('setPendingExit');
     expect(run).toContain('setPendingExit');
   });
+
+  it('shows the fachlich correct stop label per screen — identical between normal Stop and Pocket Lock', () => {
+    // LEGEN: "Stopp" — everywhere (normal Stop-Button + Pocket-Lock-Stop).
+    expect(legen).toContain("label={t('track.stopLaying')}");
+    expect((legen.match(/label=\{t\('track\.stopLaying'\)\}/g) ?? [])).toHaveLength(2);
+    expect(legen).not.toContain("t('track.evaluate')");
+    // ABSUCHE: "Stoppen & Auswerten" (track.evaluate) — everywhere (normal
+    // Stop-Button + Pocket-Lock-Stop). Existing, already fully localized key —
+    // no near-duplicate key introduced.
+    expect(run).toContain("label={t('track.evaluate')}");
+    expect((run.match(/label=\{t\('track\.evaluate'\)\}/g) ?? [])).toHaveLength(2);
+    expect(run).not.toContain("t('track.stopLaying')");
+    // PocketLockOverlay receives the label from the caller — no hardcoded stop
+    // text of its own, no fixed default baked into the overlay itself (a
+    // required, non-defaulted `label` prop, not `label = 'Stopp'`).
+    expect(overlay).not.toContain("label = 'Stopp'");
+    expect(overlay).toContain('label: string');
+    // The hold mechanic itself is untouched by the label parametrization.
+    expect(holdToStop).toContain('HOLD_TO_STOP_MS = 1500');
+    expect(holdToStop).toContain("label = STOP_LABEL");
+  });
 });

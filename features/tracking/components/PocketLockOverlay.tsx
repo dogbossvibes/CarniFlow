@@ -24,13 +24,21 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 // Stop-Hold), kein Touch-Durchreichen an den darunterliegenden Screen und kein
 // dritter Stop-Escape.
 export function PocketLockOverlay({
-  visible, duration, distanceM, onUnlock, onStop,
+  visible, duration, distanceM, onUnlock, onStop, label,
 }: {
   visible: boolean;
   duration: string;
   distanceM: string;
   onUnlock: () => void;
   onStop: () => void;
+  /** Fachlich korrekte Beschriftung des Locked-Screen-Stops — vom aufrufenden
+   *  Screen übergeben (LEGEN: "Stopp", ABSUCHE: "Stoppen & Auswerten"), damit
+   *  Pocket-Lock und normaler Stop-Button immer denselben Text zeigen. Reine
+   *  Anzeige-Weiterleitung an HoldToStopButton — kein Bezug zum längst entfernten,
+   *  namensähnlichen Confirmation-Escape-Prop aus einer früheren, verworfenen
+   *  Iteration (siehe Git-Historie dieser Datei); bewusst anders benannt, um jede
+   *  Verwechslung auszuschliessen. */
+  label: string;
 }) {
   const progress = useSharedValue(0);
 
@@ -100,6 +108,7 @@ export function PocketLockOverlay({
           Bestätigungsdialog. */}
       <HoldToStopButton
         onStop={onStop}
+        label={label}
         showHintLabel
         containerClassName="absolute right-[18px] bottom-[26px] w-[72px] h-[72px] rounded-[22px]"
         containerStyle={{ zIndex: 2 }}
