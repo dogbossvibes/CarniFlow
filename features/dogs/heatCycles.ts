@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { fromISODate, toISODate } from '@/features/dogs/dateInput';
+import i18n, { type AppLocale } from '@/i18n/config';
 
 // Läufigkeits-Zyklen — serverseitig in public.dog_heat_cycles (siehe
 // DOG_HEAT_CYCLES.sql; RLS: owner voll, verbundene Trainer lesend).
@@ -95,6 +96,19 @@ export const HEAT_OBSERVATION_TYPES = [
 ] as const;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+// BCP-47-Mapping für Intl-Datumsformatierung — dieselbe Konvention wie
+// i18n/format.ts's INTL_LOCALE, hier lokal dupliziert statt importiert: `i18n/index.ts`
+// (getLocale) zieht @react-native-async-storage/async-storage nach, was dieses reine,
+// RN-native-freie Modul in Tests bricht (heatCycles.test.ts läuft ohne AsyncStorage-Mock).
+// i18n/config.ts selbst hat keine solche Abhängigkeit → sicher zu importieren.
+const HEAT_DATE_LOCALE: Record<AppLocale, string> = {
+  de: 'de-CH', gsw: 'de-CH', fr: 'fr-CH', it: 'it-CH', en: 'en-GB',
+};
+function heatIntlDate(d: Date, opts: Intl.DateTimeFormatOptions): string {
+  const locale = HEAT_DATE_LOCALE[i18n.language as AppLocale] ?? 'de-CH';
+  return d.toLocaleDateString(locale, opts);
+}
 
 const DAY = 86400000;
 const todayISO = () => toISODate(new Date());
@@ -322,11 +336,11 @@ export function predictHeat(cycles: HeatCycle[]): HeatPrediction | null {
   const nextDate = addDays(last.startDate, cycleLengthDays);
   const cycleDay = heatCycleDay(last.startDate, today);
 
-  // Datumsbereich formatieren
+  // Datumsbereich formatieren — locale-bewusst (aktive App-Sprache statt hart de-DE).
   const fmtDate = (iso: string) => {
     const d = fromISODate(iso);
     if (!d) return iso;
-    return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
+    return heatIntlDate(d, { day: '2-digit', month: 'short' });
   };
   const dateRange = last.endDate
     ? `${fmtDate(last.startDate)} – ${fmtDate(last.endDate)}`
@@ -347,12 +361,12 @@ export function predictHeat(cycles: HeatCycle[]): HeatPrediction | null {
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 
-/** Formatiert ein ISO-Datum als lokales Kurzformat */
+/** Formatiert ein ISO-Datum als lokales Kurzformat — locale-bewusst (aktive App-Sprache). */
 export function fmtDate(iso: string | null): string | null {
   if (!iso) return null;
   const d = fromISODate(iso);
   if (!d) return null;
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
+  return heatIntlDate(d, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 /** Berechnet die Dauer in Tagen zwischen zwei Daten (inkl. Enddatum) */

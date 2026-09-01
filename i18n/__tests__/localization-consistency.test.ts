@@ -1,6 +1,8 @@
 import { de } from '../locales/de';
 import { gsw } from '../locales/gsw';
 import { fr } from '../locales/fr';
+import { it as itLocale } from '../locales/it';
+import { en } from '../locales/en';
 import { execFileSync } from 'child_process';
 
 function keysOf(obj: Record<string, unknown>) {
@@ -161,5 +163,41 @@ describe('Swiss German localization consistency', () => {
       expect(String(gsw[key as keyof typeof gsw] ?? '').trim().length).toBeGreaterThan(0);
       expect(String(fr[key as keyof typeof fr] ?? '').trim().length).toBeGreaterThan(0);
     }
+  });
+});
+
+// Raw stub/machine-translation guard for IT and EN (added after the EN/IT quality
+// audit found untranslated placeholder text like "Home reset message" and
+// "Dog delete dog message {dog}" shipped as if they were real copy, plus German
+// verb-final word order carried literally into "noun delete?"/"noun eliminare?"
+// dialog titles). Deliberately generic pattern matches, not a full retranslation
+// check — this only needs to catch the shape of these two specific failure modes
+// if they reappear.
+describe('IT/EN raw stub-translation guard', () => {
+  it('has every German reference key in IT and EN, with no empty values', () => {
+    expect(missingKeys(de, itLocale)).toEqual([]);
+    expect(missingKeys(de, en)).toEqual([]);
+    expect(emptyValues(itLocale)).toEqual([]);
+    expect(emptyValues(en)).toEqual([]);
+  });
+
+  it('has no literal "[Domain] [filler words] message/body/title" placeholder stubs in EN', () => {
+    // Requires >=2 lowercase filler words before the generic suffix, so genuine
+    // short labels ("Voice message") don't false-positive on this check.
+    const stubPattern = /^[A-Z][a-z]+(?: [a-z]+){2,} (message|body|title)$/;
+    const stubs = keysOf(de).filter((key) => stubPattern.test(String(en[key as keyof typeof en] ?? '')));
+    expect(stubs).toEqual([]);
+  });
+
+  it('has no German verb-final "noun delete?" word order in EN dialog titles', () => {
+    const wrongOrderPattern = /^[a-z][a-z ]* (delete|remove|cancel)\?$/;
+    const hits = keysOf(de).filter((key) => wrongOrderPattern.test(String(en[key as keyof typeof en] ?? '')));
+    expect(hits).toEqual([]);
+  });
+
+  it('has no German verb-final "sostantivo eliminare?" word order in IT dialog titles', () => {
+    const wrongOrderPattern = /^[a-zàèéìòù][a-zàèéìòù ]* (eliminare|rimuovere|annullare)\?$/;
+    const hits = keysOf(de).filter((key) => wrongOrderPattern.test(String(itLocale[key as keyof typeof itLocale] ?? '')));
+    expect(hits).toEqual([]);
   });
 });

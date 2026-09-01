@@ -24,7 +24,7 @@ const PERIOD_KEY: Record<JournalPeriod, 'journal.period.all' | 'journal.period.7
   all: 'journal.period.all', '7d': 'journal.period.7d', '30d': 'journal.period.30d', year: 'journal.period.year',
 };
 
-const intlLocale = (l: string) => (l === 'fr' ? 'fr-CH' : 'de-CH');
+const intlLocale = (l: string) => (l === 'fr' ? 'fr-CH' : l === 'it' ? 'it-CH' : l === 'en' ? 'en-GB' : 'de-CH');
 
 // Zentrales Trainingstagebuch — spartenübergreifende Historie ALLER dokumentierten
 // Einheiten. Datenquelle: useTrainingFeed (training_units + training_sessions +

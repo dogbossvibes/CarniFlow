@@ -10,9 +10,16 @@ import {
   type HeatCycle,
 } from '../heatCycles';
 import { toISODate } from '../dateInput';
+import i18n from '@/i18n/config';
 
 // Mock supabase to avoid native module dependency in tests
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
+
+// fmtDate/predictHeat format dates using the active app locale (see heatCycles.ts's
+// heatIntlDate). Pin to 'de' explicitly — this file asserts German formatting
+// ("01. Jan"), independent of the test runner's OS locale (which now resolves to a
+// real 'en' since EN is a registered app locale, not silently to 'de' as before).
+beforeAll(async () => { await i18n.changeLanguage('de'); });
 
 // Helper to create a HeatCycle with sensible defaults
 function makeCycle(overrides: Partial<HeatCycle> & { startDate: string }): HeatCycle {
