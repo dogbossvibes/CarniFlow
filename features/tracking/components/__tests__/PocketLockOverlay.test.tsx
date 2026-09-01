@@ -1,5 +1,5 @@
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { PocketLockOverlay, POCKET_UNLOCK_HOLD_MS } from '@/features/tracking/components/PocketLockOverlay';
+import { PocketLockOverlay, POCKET_STOP_HOLD_MS, POCKET_UNLOCK_HOLD_MS } from '@/features/tracking/components/PocketLockOverlay';
 
 jest.mock('@/features/tracking/utils/haptics', () => ({
   hapticSuccess: jest.fn(),
@@ -16,8 +16,14 @@ type PressableTestNode = {
 
 function findUnlock(tree: ReactTestRenderer): PressableTestNode {
   return (tree.root as unknown as {
-    findByProps: (props: { accessibilityRole: string }) => PressableTestNode;
-  }).findByProps({ accessibilityRole: 'button' });
+    findByProps: (props: { accessibilityLabel: string }) => PressableTestNode;
+  }).findByProps({ accessibilityLabel: 'Bildschirm gesperrt. Zum Entsperren gedrückt halten' });
+}
+
+function findLockedStop(tree: ReactTestRenderer): PressableTestNode {
+  return (tree.root as unknown as {
+    findByProps: (props: { accessibilityLabel: string }) => PressableTestNode;
+  }).findByProps({ accessibilityLabel: 'Fährte stoppen' });
 }
 
 describe('PocketLockOverlay — hold-to-unlock', () => {
@@ -27,11 +33,11 @@ describe('PocketLockOverlay — hold-to-unlock', () => {
   });
   afterEach(() => jest.useRealTimers());
 
-  function render(onUnlock: () => void) {
+  function render(onUnlock: () => void, onStop: () => void = jest.fn()) {
     let tree!: ReactTestRenderer;
     act(() => {
       tree = TestRenderer.create(
-        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={onUnlock} />,
+        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={onUnlock} onStop={onStop} />,
       );
     });
     return tree;
@@ -40,11 +46,15 @@ describe('PocketLockOverlay — hold-to-unlock', () => {
   it('renders a full-screen touch-blocking surface when visible', () => {
     const tree = render(jest.fn());
     expect((tree as unknown as { toJSON: () => unknown }).toJSON()).not.toBeNull();
-    // Exactly one interaction handler set for unlocking — no second, competing
-    // stop-escape surface (also verified statically in tracking-ux-safety.test.ts).
+    // Exactly two deliberate interaction surfaces exist — unlock hold and the
+    // locked-screen stop hold — no touch passed through to the screen underneath
+    // (also verified statically in tracking-ux-safety.test.ts).
     const unlock = findUnlock(tree);
     expect(typeof unlock.props.onPressIn).toBe('function');
     expect(typeof unlock.props.onPressOut).toBe('function');
+    const stop = findLockedStop(tree);
+    expect(typeof stop.props.onPressIn).toBe('function');
+    expect(typeof stop.props.onPressOut).toBe('function');
     act(() => tree.unmount());
   });
 
@@ -52,7 +62,7 @@ describe('PocketLockOverlay — hold-to-unlock', () => {
     let tree!: ReactTestRenderer;
     act(() => {
       tree = TestRenderer.create(
-        <PocketLockOverlay visible={false} duration="00:12" distanceM="120 m" onUnlock={jest.fn()} />,
+        <PocketLockOverlay visible={false} duration="00:12" distanceM="120 m" onUnlock={jest.fn()} onStop={jest.fn()} />,
       );
     });
     expect((tree as unknown as { toJSON: () => unknown }).toJSON()).toBeNull();
@@ -129,6 +139,149 @@ describe('PocketLockOverlay — hold-to-unlock', () => {
     const unlock = findUnlock(tree);
 
     act(() => unlock.props.onPress());
+    expect(onUnlock).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+});
+
+describe('PocketLockOverlay — locked-screen stop hold', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    (hapticSuccess as jest.Mock).mockClear();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  function render(onStop: () => void, onUnlock: () => void = jest.fn()) {
+    let tree!: ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <PocketLockOverlay visible duration="00:12" distanceM="120 m" onUnlock={onUnlock} onStop={onStop} />,
+      );
+    });
+    return tree;
+  }
+
+  // A. Ein reiner Tap (onPress, kein Hold) löst nie einen Stop aus.
+  it('a plain tap on the locked-screen stop never stops', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop);
+    const stop = findLockedStop(tree);
+
+    act(() => stop.props.onPress());
+    expect(onStop).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+
+  // B. Kurzer Hold (< 1500 ms) löst keinen Stop aus, Aufnahme bleibt aktiv.
+  it('short press (< hold duration) does not stop', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop);
+    const stop = findLockedStop(tree);
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(POCKET_STOP_HOLD_MS - 200));
+    act(() => stop.props.onPressOut());
+    act(() => jest.advanceTimersByTime(POCKET_STOP_HOLD_MS));
+
+    expect(onStop).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+
+  // C. Abbruch vor Ablauf → Progress-Reset, kein Stop, ein neuer Hold braucht
+  // wieder die volle Dauer (kein Restfortschritt aus dem ersten Versuch).
+  it('cancelling the hold resets progress and requires the full duration again', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop);
+    const stop = findLockedStop(tree);
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(POCKET_STOP_HOLD_MS - 50));
+    act(() => stop.props.onPressOut());
+    expect(onStop).not.toHaveBeenCalled();
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(100));
+    act(() => stop.props.onPressOut());
+    expect(onStop).not.toHaveBeenCalled();
+
+    act(() => tree.unmount());
+  });
+
+  // D. Voller 1500-ms-Hold → onStop (= bestehender Direct-Finalizer) genau 1x,
+  // mit Haptik, ohne Confirmation-Dialog (kein Alert im Overlay, siehe
+  // tracking-ux-safety.test.ts).
+  it('completes the stop exactly once after the full hold duration', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop);
+    const stop = findLockedStop(tree);
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(POCKET_STOP_HOLD_MS));
+
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(hapticSuccess).toHaveBeenCalledTimes(1);
+    act(() => tree.unmount());
+  });
+
+  // E. Über-Halten nach Ablauf löst weiterhin nur einmal aus.
+  it('over-holding past the duration still fires the stop only once', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop);
+    const stop = findLockedStop(tree);
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(POCKET_STOP_HOLD_MS));
+    act(() => jest.advanceTimersByTime(POCKET_STOP_HOLD_MS * 2));
+    act(() => stop.props.onPressOut());
+
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(hapticSuccess).toHaveBeenCalledTimes(1);
+    act(() => tree.unmount());
+  });
+
+  // Doppeltes onPressOut nach Completion darf keinen zweiten Trigger auslösen.
+  it('a second onPressOut after completion does not fire a second stop', () => {
+    const onStop = jest.fn();
+    const tree = render(onStop);
+    const stop = findLockedStop(tree);
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(POCKET_STOP_HOLD_MS));
+    act(() => stop.props.onPressOut());
+    act(() => stop.props.onPressOut());
+
+    expect(onStop).toHaveBeenCalledTimes(1);
+    act(() => tree.unmount());
+  });
+
+  // F. Unlock bleibt unverändert: weiterhin 1500 ms, funktioniert unabhängig
+  // vom neuen Stop-Hold nebeneinander im selben Overlay.
+  it('unlock still works unchanged at 1500 ms alongside the stop hold', () => {
+    const onUnlock = jest.fn();
+    const onStop = jest.fn();
+    const tree = render(onStop, onUnlock);
+    const unlock = findUnlock(tree);
+
+    act(() => unlock.props.onPressIn());
+    act(() => jest.advanceTimersByTime(POCKET_UNLOCK_HOLD_MS));
+
+    expect(onUnlock).toHaveBeenCalledTimes(1);
+    expect(onStop).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+
+  // Holding the stop control must not also trigger unlock, and vice versa —
+  // the two hold surfaces are independent.
+  it('holding the stop control does not also trigger unlock', () => {
+    const onUnlock = jest.fn();
+    const onStop = jest.fn();
+    const tree = render(onStop, onUnlock);
+    const stop = findLockedStop(tree);
+
+    act(() => stop.props.onPressIn());
+    act(() => jest.advanceTimersByTime(POCKET_STOP_HOLD_MS));
+
+    expect(onStop).toHaveBeenCalledTimes(1);
     expect(onUnlock).not.toHaveBeenCalled();
     act(() => tree.unmount());
   });

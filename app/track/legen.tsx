@@ -1039,6 +1039,7 @@ export default function LegenScreen() {
         duration={clock(durationSeconds)}
         distanceM={`${Math.round(distanceMeters)} m`}
         onUnlock={unlockPocket}
+        onStop={finishTrack}
       />
 
       <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')}>

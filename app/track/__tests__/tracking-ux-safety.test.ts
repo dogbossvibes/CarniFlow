@@ -81,15 +81,43 @@ describe('tracking UX safety contract', () => {
     expect(run).toContain('onPress={handleFinish}');
   });
 
-  it('keeps the lock as a separate unlock-only overlay', () => {
+  it('keeps the lock as a self-contained overlay with exactly two deliberate holds', () => {
+    // Old, killed touch-bypass API names must never reappear — the locked-screen
+    // stop is its own hold control inside the overlay, not a pass-through to the
+    // underlying screen and not a tap-triggered confirmation flow.
     expect(overlay).not.toContain('onRequestStop');
     expect(overlay).not.toContain('stopLabel');
     expect(overlay).toContain('style={{ zIndex: 1 }}');
-    // Exactly one interactive Pressable-family element in the overlay — no second,
-    // competing stop-escape surface.
-    expect(overlay.match(/<(Pressable|AnimatedPressable)\b/g)).toHaveLength(1);
+    // Exactly two interactive Pressable-family elements in the overlay — the
+    // unlock hold and the locked-screen stop hold. No third, competing surface,
+    // and no touch handed through to the screen underneath.
+    expect(overlay.match(/<(Pressable|AnimatedPressable)\b/g)).toHaveLength(2);
     expect(legen).not.toContain('onRequestStop={requestStop}');
     expect(run).not.toContain('onRequestStop={handleFinish}');
+  });
+
+  it('wires the locked-screen stop hold to the exact same direct finalizer as the normal stop', () => {
+    // PocketLockOverlay receives onStop and calls it — no separate save/navigation/
+    // cleanup logic of its own, no confirmation dialog, no second finalizer.
+    expect(overlay).toContain('onStop: () => void');
+    expect(overlay).toContain('POCKET_STOP_HOLD_MS');
+    expect(overlay).not.toContain('Alert.alert');
+    expect(overlay).not.toContain('import { Alert');
+    expect(legen).toContain('onStop={finishTrack}');
+    expect(run).toContain('onStop={handleFinish}');
+    // Same one-shot-per-hold guard style already used by the direct finalizers
+    // themselves (finishRequestedRef / stoppingRef) — the overlay must not rely
+    // on the underlying button's own guard to stay idempotent.
+    expect(overlay).toContain('stoppedRef');
+  });
+
+  it('keeps pocket-lock touch blocking intact while the locked stop hold exists', () => {
+    // The overlay still blocks everything underneath with a real touch-catching
+    // surface — the new stop control is an additional deliberate hold INSIDE the
+    // overlay, not a relaxation of the blocking behavior.
+    expect(overlay).toContain('pointerEvents="auto"');
+    expect(overlay).not.toContain('pointerEvents="box-none"');
+    expect(overlay).not.toContain("pointerEvents='box-none'");
   });
 
   it('keeps finalization independent of GPS and trajectory state', () => {

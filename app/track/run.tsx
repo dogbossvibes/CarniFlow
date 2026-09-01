@@ -831,6 +831,7 @@ export default function TrackRunScreen() {
         duration={fmtClock(s.elapsedS)}
         distanceM={`${Math.round(s.distanceM)} m`}
         onUnlock={unlockPocket}
+        onStop={handleFinish}
       />
 
       {SHOW_GPS_DEBUG && (
