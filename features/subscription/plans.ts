@@ -304,10 +304,18 @@ export function isTrainerPlan(plan: SubscriptionPlan | null | undefined): boolea
 // Ein Trial ist „abgelaufen", sobald sein Enddatum vergangen ist — unabhängig
 // davon, ob der Status in der DB noch 'trialing' steht (es gibt keinen Server-Job,
 // der ihn umschaltet). Zentrale Quelle für Gating & Anzeige: gilt für ALLE Trials.
+//
+// NEWBIE ist KEIN Trial (dauerhaft kostenlos, kein Ablaufdatum) und kann daher nie
+// „ablaufen" — auch nicht bei einem Alt-Datensatz aus der Zeit, als NEWBIE noch
+// fälschlich mit status='trialing' + trial_ends_at aktiviert wurde (Legacy-Bug,
+// siehe activatePlan). Ohne diesen Ausschluss würden BASE_CAPABILITIES (Training
+// anlegen, Hunde verwalten, Kalender, Sprachnotizen) nach Ablauf des alten Datums
+// komplett entzogen — NEWBIE hat aber gar keinen Ablauf.
 export function isTrialLapsed(
-  sub: { status?: SubscriptionStatus | null; trial_ends_at?: string | null } | null | undefined,
+  sub: { plan?: SubscriptionPlan | null; status?: SubscriptionStatus | null; trial_ends_at?: string | null } | null | undefined,
 ): boolean {
-  return !!sub && sub.status === 'trialing' && !!sub.trial_ends_at
+  if (!sub || sub.plan === 'newbie') return false;
+  return sub.status === 'trialing' && !!sub.trial_ends_at
     && new Date(sub.trial_ends_at).getTime() < Date.now();
 }
 

@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Tier } from '@/lib/purchases';
 import {
-  planToCapabilities, PLAN_META, TRIAL_DAYS, normalizeSubscriptionPlan,
+  planToCapabilities, PLAN_META, TRIAL_DAYS, normalizeSubscriptionPlan, isPremiumPlan,
   type SubscriptionPlan, type SubscriptionStatus,
 } from '@/features/subscription/plans';
 import { setCapabilities } from '@/services/capabilityService';
@@ -71,10 +71,11 @@ export async function getPlanSubscription(userId: string): Promise<PlanSubscript
   return data ? norm({ ...(data as PlanSubscription), cancel_at_period_end: false }) : null;
 }
 
-// Testabo kündigen: markiert das Abo als „zum Periodenende gekündigt". Der Status
-// bleibt 'trialing', d. h. der Zugriff läuft NORMAL bis trial_ends_at weiter und
-// endet dann automatisch (siehe isTrialLapsed im Gating). Da der Newbie-Trial
-// app-verwaltet ist (kein Apple-Kauf, keine Auto-Abbuchung), reicht dieser Marker.
+// Generischer Trial-Kündigen-Marker: setzt „zum Periodenende gekündigt" auf einem
+// Abo mit status='trialing'. Der Zugriff läuft bis trial_ends_at normal weiter und
+// endet dann automatisch (siehe isTrialLapsed im Gating). Wird von KEINEM Aufrufer
+// mehr für NEWBIE erreicht (NEWBIE ist kein Trial mehr, siehe activatePlan) — bleibt
+// als generischer Mechanismus bestehen, falls je ein anderer Plan trialing wird.
 export async function cancelTrial(userId: string): Promise<{ error: string | null }> {
   const { error } = await supabase
     .from('subscriptions')
@@ -95,8 +96,17 @@ export async function activatePlan(args: {
   providerSubscriptionId?: string | null;
 }): Promise<{ error: string | null }> {
   const meta = PLAN_META[args.plan];
-  const status: SubscriptionStatus = args.status ?? (args.plan === 'newbie' ? 'trialing' : 'active');
+  // NEWBIE ist KEIN Trial (dauerhaft kostenlos, kein Ablaufdatum) — kein
+  // impliziter 'trialing'-Default mehr. Nur ein expliziter args.status
+  // (aktuell von keinem Aufrufer genutzt) kann noch einen anderen Status setzen.
+  const status: SubscriptionStatus = args.status ?? 'active';
   const caps = planToCapabilities(args.plan);
+  // profiles.plan/plan_expires_at ist die ALTE, parallele Gating-Quelle (u. a.
+  // hooks/usePlan.ts → aiUnlocked in app/dog/[id].tsx). Sie muss dieselbe
+  // Premium-Einstufung widerspiegeln wie user_capabilities — NEWBIE ist dort
+  // 'free' mit keinem Ablauf, sonst wurde NEWBIE dort fälschlich als 'premium'
+  // (mit dem alten 7-Tage-Trial-Enddatum als Ablauf) geführt.
+  const premiumMirror = isPremiumPlan(args.plan);
   try {
     const { error } = await supabase.from('subscriptions').upsert({
       user_id: args.userId,
@@ -118,8 +128,8 @@ export async function activatePlan(args: {
     // Runtime-Capabilities + profiles spiegeln.
     await setCapabilities(args.userId, caps);
     await supabase.from('profiles').update({
-      plan: 'premium',
-      plan_expires_at: args.periodEndsAt ?? args.trialEndsAt ?? null,
+      plan: premiumMirror ? 'premium' : 'free',
+      plan_expires_at: premiumMirror ? (args.periodEndsAt ?? args.trialEndsAt ?? null) : null,
       trial_used: true,
       is_trainer: caps.trainer_module,
     }).eq('id', args.userId);

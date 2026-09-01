@@ -389,7 +389,7 @@ export default function ProfilScreen() {
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Text style={s.proBtnText}>{t('premium.try7Days')}</Text>
+                <Text style={s.proBtnText}>{t('premium.upgradeActive')}</Text>
               </AnimatedPressable>
             </View>
           </View>

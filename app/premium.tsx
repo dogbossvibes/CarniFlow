@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, ensurePurchasesConfigured, type PurchasePackage } from '@/lib/purchases';
 import {
-  activatePlan, trialEndDate, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
+  activatePlan, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
 import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
 import { useT } from '@/i18n';
@@ -32,10 +32,14 @@ const openLegalLink = (url: string) => { Linking.openURL(url).catch(() => { /* n
 
 interface CardDef { plan: SubscriptionPlan; badgeKey?: TranslationKey; features: TranslationKey[]; founder?: boolean }
 
-// Öffentliche Kaufpläne: Newbie (Trial), Active, Trainer. Founder Active wird NICHT
-// mehr angeboten (kein Kauf-/Wechselziel); interne Restore-/Bestandslogik bleibt.
+// Öffentliche Kaufpläne: Newbie (dauerhaft kostenlos, KEIN Trial), Active, Trainer.
+// Founder Active wird NICHT mehr angeboten (kein Kauf-/Wechselziel); interne
+// Restore-/Bestandslogik bleibt.
 const CARDS: CardDef[] = [
-  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.feature7Days', 'premium.featureActive', 'premium.featureThenActive', 'premium.featureNoTrainer'] },
+  // NEWBIE hat die Trainerverbindung inklusive (app/trainer/index.tsx ist
+  // ungegatet — keine pro_member/trainer_module-Prüfung). „Kein Trainerzugang"
+  // gilt hier NICHT und darf nicht wiederverwendet werden.
+  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.featureOneDog', 'premium.featureTwoTrainingsMonth', 'premium.featureTrainerConnect', 'premium.featureCalendarTimer', 'premium.featureNoTrack'] },
   { plan: 'active', features: ['premium.featureTrainingProgress', 'premium.featureSmartAnalysis', 'premium.featureCalendarVoice', 'premium.featureNoTrainer'] },
   { plan: 'trainer', badgeKey: 'premium.badgePro', features: ['premium.featureAllActive', 'premium.featureClientPlans', 'premium.featurePollsFeedback', 'premium.featureTrainerDashboard'] },
 ];
@@ -84,8 +88,11 @@ export default function PremiumScreen() {
 
   // Trial-Status: Restlaufzeit + Enddatum für das Countdown-Banner. „trialing"
   // meint den NOCH LAUFENDEN Trial (abgelaufene zählen nicht → normale Upgrade-Ansicht).
+  // NEWBIE ist explizit AUSGESCHLOSSEN: NEWBIE ist dauerhaft kostenlos und kein
+  // Trial — auch nicht für Alt-Konten mit einem noch gespeicherten status='trialing'
+  // aus der Zeit, als NEWBIE fälschlich als 7-Tage-Trial aktiviert wurde.
   const trialEnd = trialEndsAt ? new Date(trialEndsAt) : null;
-  const trialing = subStatus === 'trialing' && (!trialEnd || trialEnd.getTime() > Date.now());
+  const trialing = subStatus === 'trialing' && currentPlan !== 'newbie' && (!trialEnd || trialEnd.getTime() > Date.now());
   const trialDaysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)) : null;
   const trialEndLabel = trialEnd
     ? `${String(trialEnd.getDate()).padStart(2, '0')}.${String(trialEnd.getMonth() + 1).padStart(2, '0')}.${trialEnd.getFullYear()}`
@@ -128,9 +135,9 @@ export default function PremiumScreen() {
     }
     setLaden(plan);
     try {
-      // Newbie Trial: 7 Tage gratis, kein Kauf.
+      // Newbie: dauerhaft kostenlos, kein Kauf, kein Trial, kein Ablaufdatum.
       if (plan === 'newbie') {
-        const { error } = await activatePlan({ userId: user.id, plan, status: 'trialing', trialEndsAt: trialEndDate() });
+        const { error } = await activatePlan({ userId: user.id, plan, status: 'active' });
         if (error) { Alert.alert(t('trainer.connectHintTitle'), t('premium.trialError')); return; }
         finish(plan); return;
       }
@@ -243,7 +250,13 @@ export default function PremiumScreen() {
             <Ionicons name={trialing ? 'hourglass' : 'star'} size={34} color={C.accent} />
           </View>
           <Text style={S.headerTitel}>{trialing ? t('premium.secureAccess') : (currentPlan ? t('premium.yourPlan') : t('premium.chooseAnyvo'))}</Text>
-          <Text style={S.headerSub}>{trialing ? t('premium.chooseBeforeTrialEnds') : t('premium.monthlyCancelable')}</Text>
+          <Text style={S.headerSub}>
+            {trialing
+              ? t('premium.chooseBeforeTrialEnds')
+              : currentPlan === 'newbie'
+                ? t('premium.newbieFreeNotice')
+                : t('premium.monthlyCancelable')}
+          </Text>
         </View>
 
         {/* Trial-Countdown: motiviert zum Wechsel Testversion → Active, bevor der
@@ -329,7 +342,7 @@ export default function PremiumScreen() {
                     {card.badgeKey && <View style={[S.badge, card.founder && S.badgeFounder]}><Text style={[S.badgeTxt, card.founder && { color: '#04201b' }]}>{t(card.badgeKey, { limit: FOUNDER_SLOT_LIMIT })}</Text></View>}
                   </View>
                   <View style={S.priceRow}>
-                    <Text style={S.cardPrice}>{card.plan === 'newbie' ? t('premium.free7Days') : (pkgPrice ?? (iapLoading ? '…' : meta.priceLabel))}</Text>
+                    <Text style={S.cardPrice}>{pkgPrice ?? (iapLoading ? '…' : meta.priceLabel)}</Text>
                     {/* Ersparnis ggü. Active hervorheben (Conversion-Anker für Trial-Nutzer). */}
                     {card.founder && founderAvailable && <Text style={S.savings}>{t('premium.instead', { price: activePriceStr })}</Text>}
                   </View>
