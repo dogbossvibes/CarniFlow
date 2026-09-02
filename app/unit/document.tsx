@@ -11,19 +11,23 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { HelpButton } from '@/components/help/HelpButton';
-import { Glass, isGlass } from '@/components/ui/Glass';
 import { PhotoPicker } from '@/components/ui/PhotoPicker';
 import { AudioRecorder } from '@/components/ui/AudioRecorder';
-import { DurationDrumPicker } from '@/components/ui/DurationDrumPicker';
+import { CompactDurationStepper } from '@/components/ui/CompactDurationStepper';
 import { MultiVideoUpload } from '@/components/training/MultiVideoUpload';
 import { MetricsInput } from '@/components/training/MetricsInput';
+import { CustomExerciseSheet } from '@/components/training/CustomExerciseSheet';
+import { SelectedExerciseCard } from '@/components/training/SelectedExerciseCard';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { DISCIPLINES, customToDiscipline, disciplineColor, type Discipline } from '@/constants/disciplines';
 import { DEFAULT_SPARTEN } from '@/constants/sparten';
-import { createDocumentedUnit, updateDocumentedUnit, getTrainingUnitById } from '@/services/trainingUnitService';
+import {
+  createDocumentedUnit, updateDocumentedUnit, getTrainingUnitById, getRecentExerciseNames,
+} from '@/services/trainingUnitService';
+import { updateCustomCategory } from '@/services/customCategoryService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { DateField } from '@/components/ui/DateField';
 import { DogIcon } from '@/components/ui/DogIcon';
@@ -39,10 +43,16 @@ const EMPTY_METRICS: TrainingMetrics = {
   ausdauer: null, trieblage: null, impulskontrolle: null,
 };
 
+const SCORE_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 function ymd(d: Date) { return d.toISOString().split('T')[0]; }
 
-interface SelExercise { discipline: string; name: string }
+interface SelExercise {
+  discipline: string;
+  name:       string;
+  rating:     number | null;
+  notes:      string | null;
+}
 
 export default function DocumentScreen() {
   const router = useRouter();
@@ -74,7 +84,8 @@ export default function DocumentScreen() {
   const [dogId, setDogId] = useState<string | null>(dogIdParam ?? (dogs.length === 1 ? dogs[0].id : null));
   const [activeDisc, setActiveDisc] = useState<string>(initialDisc);
   const [selected, setSelected] = useState<SelExercise[]>([]);
-  const [customDraft, setCustomDraft] = useState('');
+  const [customSheetOpen, setCustomSheetOpen] = useState(false);
+  const [recentNames, setRecentNames] = useState<string[]>([]);
   const [description, setDescription] = useState(noteParam ?? '');
   const [score, setScore] = useState(0);
   const [date, setDate] = useState(new Date());
@@ -93,7 +104,9 @@ export default function DocumentScreen() {
       const u = data as TrainingUnit | null;
       if (!u) return;
       setDogId(u.dog_id);
-      setSelected((u.exercises ?? []).map(e => ({ discipline: e.discipline, name: e.exercise_name })));
+      setSelected((u.exercises ?? []).map(e => ({
+        discipline: e.discipline, name: e.exercise_name, rating: e.rating, notes: e.notes,
+      })));
       setDescription(u.notes ?? '');
       setScore(u.score ?? 0);
       setDate(u.session_date ? new Date(u.session_date) : new Date());
@@ -115,6 +128,22 @@ export default function DocumentScreen() {
   }, [dogsLoading, dogs, editing, dogId]);
 
   const disc = disciplines.find(d => d.key === activeDisc) ?? disciplines[0];
+  const isCustomDiscipline = !!disc?.key.startsWith('custom:');
+  const activeCategory = isCustomDiscipline
+    ? categories.find(c => `custom:${c.id}` === disc?.key)
+    : undefined;
+
+  // Vorschläge aus der eigenen Trainingshistorie für FESTE Sparten (siehe
+  // CustomExerciseSheet-Kommentar): kein neues Schema, rein lesende Query.
+  useEffect(() => {
+    if (!disc || isCustomDiscipline || !session?.user.id) { setRecentNames([]); return; }
+    let cancelled = false;
+    getRecentExerciseNames(session.user.id, disc.label).then(({ data }) => {
+      if (!cancelled) setRecentNames(data.filter(n => !disc.exercises.includes(n)));
+    });
+    return () => { cancelled = true; };
+  }, [disc?.key, isCustomDiscipline, session?.user.id]);
+
   const isSelected = (label: string, name: string) =>
     selected.some(e => e.discipline === label && e.name === name);
 
@@ -123,20 +152,37 @@ export default function DocumentScreen() {
     setSelected(prev =>
       prev.some(e => e.discipline === label && e.name === name)
         ? prev.filter(e => !(e.discipline === label && e.name === name))
-        : [...prev, { discipline: label, name }],
+        : [...prev, { discipline: label, name, rating: null, notes: null }],
     );
   };
 
-  const addCustom = () => {
-    const v = customDraft.trim();
-    if (!v || !disc) return;
-    if (!isSelected(disc.label, v)) {
-      tapHaptic();
-      setSelected(prev => [...prev, { discipline: disc.label, name: v }]);
+  const handleAddCustomExercise = async (name: string, saveForFuture: boolean) => {
+    if (!disc) return;
+    if (!isSelected(disc.label, name)) {
+      setSelected(prev => [...prev, { discipline: disc.label, name, rating: null, notes: null }]);
     }
-    setCustomDraft('');
+    setCustomSheetOpen(false);
+    // Eigene Sparte + „für zukünftige Trainings speichern": dieselbe Persistenz
+    // wie im Kategorie-Editor (app/unit/new-category.tsx) — keine zweite Logik.
+    if (activeCategory && saveForFuture && !activeCategory.exercises.includes(name)) {
+      const { error } = await updateCustomCategory(activeCategory.id, {
+        name: activeCategory.name, icon: activeCategory.icon, color: activeCategory.color,
+        exercises: [...activeCategory.exercises, name],
+      });
+      if (!error) queryClient.invalidateQueries({ queryKey: ['customCategories'] });
+    }
   };
 
+  const setExerciseRating = (idx: number, rating: number | null) => {
+    setSelected(prev => prev.map((e, i) => (i === idx ? { ...e, rating } : e)));
+  };
+  const setExerciseNotes = (idx: number, notes: string) => {
+    setSelected(prev => prev.map((e, i) => (i === idx ? { ...e, notes } : e)));
+  };
+  const removeExercise = (idx: number) => {
+    tapHaptic();
+    setSelected(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const canSave = !!dogId && selected.length > 0;
 
@@ -164,7 +210,7 @@ export default function DocumentScreen() {
     };
     const exercises = selected.map((e, i) => ({
       discipline: e.discipline, exercise_name: e.name,
-      rating: null, notes: null, duration_sec: null, seq_index: i,
+      rating: e.rating, notes: e.notes?.trim() || null, duration_sec: null, seq_index: i,
     }));
 
     const { error } = editing
@@ -199,71 +245,69 @@ export default function DocumentScreen() {
 
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Hund */}
-          {!dogsLoading && dogs.length === 0 ? (
-            <>
-              <Text style={s.label}>{t('training.dogLabel')}</Text>
-              <View style={s.emptyDogCard}>
-                <Text style={s.emptyDogTxt}>{t('training.addFirstDog')}</Text>
-                <TouchableOpacity style={s.addDogBtn} onPress={() => router.push('/add-dog')} activeOpacity={0.8}>
-                  <Text style={s.addDogTxt}>{t('training.addFirstDog')}</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : dogs.length === 1 ? (
-            <>
-              <Text style={s.label}>{t('training.dogLabel')}</Text>
-              <View style={s.lockedDog} accessibilityLabel={t('training.chooseDogA11y', { dog: dogs[0].name })}>
-                <DogIcon size={14} color={C.accent} />
-                <Text style={s.lockedDogTxt}>{dogs[0].name}</Text>
-              </View>
-            </>
-          ) : dogs.length > 1 && (
-            <>
-              <Text style={s.label}>{t('training.dogLabel')}</Text>
-              <View style={s.chipRow}>
-                {dogs.map(d => {
-                  const aktiv = dogId === d.id;
-                  return (
-                    <TouchableOpacity key={d.id} style={[s.chip, aktiv && s.chipActive]} onPress={() => { tapHaptic(); setDogId(d.id); }} activeOpacity={0.8}>
-                      {aktiv && <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />}
-                      <Text style={[s.chipTxt, aktiv && s.chipTxtActive]}>{d.name}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </>
-          )}
+          {/* Trainingskontext: Hund + Sparte kompakt in einer Card */}
+          <View style={s.contextCard}>
+            {!dogsLoading && dogs.length === 0 ? (
+              <>
+                <Text style={s.label}>{t('training.dogLabel')}</Text>
+                <View style={s.emptyDogCard}>
+                  <Text style={s.emptyDogTxt}>{t('training.addFirstDog')}</Text>
+                  <TouchableOpacity style={s.addDogBtn} onPress={() => router.push('/add-dog')} activeOpacity={0.8}>
+                    <Text style={s.addDogTxt}>{t('training.addFirstDog')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : dogs.length === 1 ? (
+              <>
+                <Text style={s.label}>{t('training.dogLabel')}</Text>
+                <View style={s.lockedDog} accessibilityLabel={t('training.chooseDogA11y', { dog: dogs[0].name })}>
+                  <DogIcon size={14} color={C.accent} />
+                  <Text style={s.lockedDogTxt}>{dogs[0].name}</Text>
+                </View>
+              </>
+            ) : dogs.length > 1 && (
+              <>
+                <Text style={s.label}>{t('training.dogLabel')}</Text>
+                <View style={s.chipRow}>
+                  {dogs.map(d => {
+                    const aktiv = dogId === d.id;
+                    return (
+                      <TouchableOpacity key={d.id} style={[s.chip, aktiv && s.chipActive]} onPress={() => { tapHaptic(); setDogId(d.id); }} activeOpacity={0.8}>
+                        {aktiv && <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />}
+                        <Text style={[s.chipTxt, aktiv && s.chipTxtActive]}>{d.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
 
-          {/* Sparte */}
-          <Text style={s.label}>{t('training.disciplineLabel')}</Text>
-          <View style={s.chipRow}>
-            {disciplines.map(d => {
-              const aktiv = activeDisc === d.key;
-              return (
-                <TouchableOpacity key={d.key} style={[s.chip, aktiv && { borderColor: d.accent, backgroundColor: `${d.accent}1A` }]} onPress={() => { tapHaptic(); setActiveDisc(d.key); }} activeOpacity={0.8}>
-                  <Ionicons name={d.icon} size={13} color={aktiv ? d.accent : C.muted} />
-                  <Text style={[s.chipTxt, aktiv && { color: d.accent, fontWeight: '700' }]}>{d.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-            {/* Eigene Kategorie anlegen — dieselbe Route/Logik wie app/unit/start.tsx,
-                hier als Chip statt separatem Outline-Button (Layout-Konvention
-                dieses Screens: Sparten werden hier durchgängig als Chip-Zeile
-                dargestellt, nicht als Karten-Grid). */}
-            <TouchableOpacity
-              style={s.chip}
-              onPress={() => { tapHaptic(); router.push('/unit/new-category'); }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel={t('training.createCategory')}
-            >
-              <Ionicons name="add" size={13} color={C.accent} />
-              <Text style={[s.chipTxt, { color: C.accent, fontWeight: '700' }]}>{t('training.createCategory')}</Text>
-            </TouchableOpacity>
+            <Text style={[s.label, { marginTop: dogs.length > 0 ? 16 : 0 }]}>{t('training.disciplineLabel')}</Text>
+            <View style={s.chipRow}>
+              {disciplines.map(d => {
+                const aktiv = activeDisc === d.key;
+                return (
+                  <TouchableOpacity key={d.key} style={[s.chip, aktiv && { borderColor: d.accent, backgroundColor: `${d.accent}1A` }]} onPress={() => { tapHaptic(); setActiveDisc(d.key); }} activeOpacity={0.8}>
+                    <Ionicons name={d.icon} size={13} color={aktiv ? d.accent : C.muted} />
+                    <Text style={[s.chipTxt, aktiv && { color: d.accent, fontWeight: '700' }]}>{d.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {/* Eigene Kategorie anlegen — dieselbe Route/Logik wie app/unit/start.tsx. */}
+              <TouchableOpacity
+                style={s.chip}
+                onPress={() => { tapHaptic(); router.push('/unit/new-category'); }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={t('training.createCategory')}
+              >
+                <Ionicons name="add" size={13} color={C.accent} />
+                <Text style={[s.chipTxt, { color: C.accent, fontWeight: '700' }]}>{t('training.createCategory')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Übungen (Mehrfachauswahl) */}
+          {/* Übungen (Mehrfachauswahl) — Chips, unverändert in der Logik */}
           {disc && (
             <>
               <Text style={s.label}>{t('training.exercisesFor', { discipline: disc.label.toUpperCase() })}</Text>
@@ -276,34 +320,50 @@ export default function DocumentScreen() {
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-              {/* Eigene Übung */}
-              <View style={s.customRow}>
-                <TextInput style={[s.input, s.flex]} placeholder={t('training.customExercisePlaceholder')} placeholderTextColor={C.placeholder} value={customDraft} onChangeText={setCustomDraft} onSubmitEditing={addCustom} returnKeyType="done" />
-                <TouchableOpacity style={[s.addBtn, { backgroundColor: disc.accent }]} onPress={addCustom} activeOpacity={0.8}>
-                  <Ionicons name="add" size={22} color="#000" />
+                {recentNames.map(ex => {
+                  const aktiv = isSelected(disc.label, ex);
+                  return (
+                    <TouchableOpacity key={`recent-${ex}`} style={[s.chip, aktiv && { borderColor: disc.accent, backgroundColor: `${disc.accent}1A` }]} onPress={() => toggleExercise(disc.label, ex)} activeOpacity={0.8}>
+                      <Text style={[s.chipTxt, aktiv && { color: disc.accent, fontWeight: '700' }]}>{ex}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  style={s.chip}
+                  onPress={() => { tapHaptic(); setCustomSheetOpen(true); }}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('training.addCustomExercise')}
+                >
+                  <Ionicons name="add" size={13} color={disc.accent} />
+                  <Text style={[s.chipTxt, { color: disc.accent, fontWeight: '700' }]}>{t('training.addCustomExercise')}</Text>
                 </TouchableOpacity>
               </View>
             </>
           )}
 
-          {/* Ausgewählte Übungen */}
+          {/* Ausgewählte Übungen → Karten mit Bewertung + Notiz */}
           {selected.length > 0 && (
             <>
               <Text style={s.label}>{t('training.selectedCount', { count: selected.length })}</Text>
-              <View style={s.chipRow}>
+              <View style={s.selectedList}>
                 {selected.map((e, i) => (
-                  <TouchableOpacity key={`${e.discipline}-${e.name}`} style={s.selChip} onPress={() => { tapHaptic(); setSelected(prev => prev.filter((_, idx) => idx !== i)); }} activeOpacity={0.8}>
-                    <View style={[s.selDot, { backgroundColor: disciplineColor(e.discipline) }]} />
-                    <Text style={s.selChipTxt}>{e.name}</Text>
-                    <Ionicons name="close" size={13} color={C.muted} />
-                  </TouchableOpacity>
+                  <SelectedExerciseCard
+                    key={`${e.discipline}-${e.name}`}
+                    name={e.name}
+                    accentColor={disciplineColor(e.discipline)}
+                    rating={e.rating}
+                    notes={e.notes}
+                    onRatingChange={r => setExerciseRating(i, r)}
+                    onNotesChange={n => setExerciseNotes(i, n)}
+                    onRemove={() => removeExercise(i)}
+                  />
                 ))}
               </View>
             </>
           )}
 
-          {/* Beschreibung */}
+          {/* Trainingsnotiz */}
           <Text style={s.label}>{t('training.descriptionLabel')}</Text>
           <TextInput style={s.textarea} placeholder={t('training.descriptionPlaceholder')} placeholderTextColor={C.placeholder} value={description} onChangeText={setDescription} multiline />
 
@@ -312,52 +372,69 @@ export default function DocumentScreen() {
           <DateField value={date} onChange={setDate} maximumDate={new Date()} />
 
           <Text style={s.label}>{t('training.durationLabel')}</Text>
-          <DurationDrumPicker value={durationMin} onChange={setDurationMin} />
+          <CompactDurationStepper value={durationMin} onChange={setDurationMin} />
 
-          {/* Bewertung 1–10 */}
+          {/* Gesamteindruck 1–10 — kompakte Segment-Leiste, Datenformat unverändert */}
           <Text style={[s.label, { marginTop: 22 }]}>{t('training.ratingLabel')}</Text>
-          <View style={s.scoreRow}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => {
-              const aktiv = score >= n;
-              return (
-                <TouchableOpacity key={n} style={[s.scoreCell, aktiv && s.scoreCellActive]} onPress={() => { tapHaptic(); setScore(score === n ? 0 : n); }} activeOpacity={0.8}>
-                  <Text style={[s.scoreTxt, aktiv && s.scoreTxtActive]}>{n}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={s.scoreCompact}>
+            <Text style={s.scoreValue}>{score ? `${score}/10` : '—/10'}</Text>
+            <View style={s.scoreBar}>
+              {SCORE_STEPS.map(n => {
+                const aktiv = score >= n;
+                return (
+                  <TouchableOpacity
+                    key={n}
+                    style={[s.scoreSeg, aktiv && s.scoreSegActive]}
+                    onPress={() => { tapHaptic(); setScore(score === n ? 0 : n); }}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={String(n)}
+                  />
+                );
+              })}
+            </View>
           </View>
 
-          {/* Fotos */}
-          <Text style={[s.label, { marginTop: 22 }]}>{t('training.photosLabel')}</Text>
-          <PhotoPicker value={photos} onChange={setPhotos} />
-
-          {/* Videos */}
-          <Text style={[s.label, { marginTop: 22 }]}>{t('training.videosLabel')}</Text>
-          <MultiVideoUpload value={videos} onChange={setVideos} />
-
-          {/* Metriken (optional, Basis für KI-Auswertung) */}
+          {/* Metriken (optional, Basis für KI-Auswertung) — bereits kompakt, unverändert */}
           <Text style={[s.label, { marginTop: 22 }]}>{t('training.metricsLabel')}</Text>
           <MetricsInput value={metrics} onChange={setMetrics} />
 
-          {/* Sprachaufnahmen */}
-          <Text style={[s.label, { marginTop: 22 }]}>{t('training.voiceRecordingsLabel')}</Text>
-          <AudioRecorder value={audio} onChange={setAudio} />
+          {/* Medien: Fotos/Videos/Sprachaufnahmen gemeinsam gruppiert, Upload-/
+              Storage-Logik der drei bestehenden Komponenten vollständig unverändert. */}
+          <Text style={[s.label, { marginTop: 22 }]}>{t('training.mediaLabel')}</Text>
+          <View style={s.mediaCard}>
+            <Text style={s.mediaSubLabel}>{t('training.photosLabel')}</Text>
+            <PhotoPicker value={photos} onChange={setPhotos} />
+            <Text style={[s.mediaSubLabel, { marginTop: 16 }]}>{t('training.videosLabel')}</Text>
+            <MultiVideoUpload value={videos} onChange={setVideos} />
+            <Text style={[s.mediaSubLabel, { marginTop: 16 }]}>{t('training.voiceRecordingsLabel')}</Text>
+            <AudioRecorder value={audio} onChange={setAudio} />
+          </View>
 
-          {/* Speichern */}
-          {!canSave && (
-            <Text style={s.saveHint}>
-              {!dogId ? t('training.chooseDogSaveHint') : t('training.chooseExerciseSaveHint')}
-            </Text>
-          )}
-          <AnimatedPressable style={[s.saveBtn, !canSave && { opacity: 0.4 }]} scale={0.97} disabled={!canSave || saving} onPress={speichern}>
-            <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-            <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
-            <Text style={s.saveTxt}>{saving ? t('common.saving') : editing ? t('training.saveChanges') : t('training.saveUnit')}</Text>
-          </AnimatedPressable>
-
-          <View style={{ height: 60 }} />
+          <View style={{ height: 24 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Speichern — sticky/fixed CTA über dem Home Indicator */}
+      <SafeAreaView edges={['bottom']} style={s.footer}>
+        {!canSave && (
+          <Text style={s.saveHint}>
+            {!dogId ? t('training.chooseDogSaveHint') : t('training.chooseExerciseSaveHint')}
+          </Text>
+        )}
+        <AnimatedPressable style={[s.saveBtn, !canSave && { opacity: 0.4 }]} scale={0.97} disabled={!canSave || saving} onPress={speichern}>
+          <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+          <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
+          <Text style={s.saveTxt}>{saving ? t('common.saving') : editing ? t('training.saveChanges') : t('training.saveUnit')}</Text>
+        </AnimatedPressable>
+      </SafeAreaView>
+
+      <CustomExerciseSheet
+        visible={customSheetOpen}
+        onClose={() => setCustomSheetOpen(false)}
+        isCustomDiscipline={isCustomDiscipline}
+        onSave={handleAddCustomExercise}
+      />
     </SafeAreaView>
   );
 }
@@ -375,38 +452,35 @@ const s = StyleSheet.create({
 
   label: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10, marginTop: 18 },
 
+  contextCard: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14 },
+
   chipRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:         { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 9, overflow: 'hidden' },
   chipActive:   { borderColor: C.accent },
   chipTxt:      { fontSize: 13, color: C.muted, fontWeight: '600' },
   chipTxtActive:{ color: C.accentText, fontWeight: '700' },
-  lockedDog: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start', backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.accent, paddingHorizontal: 14, paddingVertical: 8 },
+  lockedDog: { flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'flex-start', backgroundColor: C.cardAlt, borderRadius: 20, borderWidth: 1, borderColor: C.accent, paddingHorizontal: 14, paddingVertical: 8 },
   lockedDogTxt: { fontSize: 13, color: C.white, fontWeight: '700' },
-  emptyDogCard: { gap: 10, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
+  emptyDogCard: { gap: 10, backgroundColor: C.cardAlt, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
   emptyDogTxt: { fontSize: 13, color: C.subtle },
   addDogBtn: { alignSelf: 'flex-start', borderRadius: 12, borderWidth: 1, borderColor: C.accent, paddingHorizontal: 12, paddingVertical: 8 },
   addDogTxt: { fontSize: 13, color: C.accent, fontWeight: '700' },
 
-  customRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
-  input:     { backgroundColor: C.input, borderRadius: 14, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 14, paddingHorizontal: 14, paddingVertical: 12 },
-  addBtn:    { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  selectedList: { gap: 10 },
 
-  selChip:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.cardAlt, borderRadius: 16, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 9 },
-  selDot:     { width: 7, height: 7, borderRadius: 3.5 },
-  selChipTxt: { fontSize: 13, color: C.white, fontWeight: '600' },
+  textarea: { backgroundColor: C.input, borderRadius: 16, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 14, padding: 14, minHeight: 90, textAlignVertical: 'top' },
 
-  textarea: { backgroundColor: C.input, borderRadius: 16, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 14, padding: 14, minHeight: 110, textAlignVertical: 'top' },
+  scoreCompact: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  scoreValue:   { fontSize: 15, color: C.white, fontWeight: '900', minWidth: 46 },
+  scoreBar:     { flex: 1, flexDirection: 'row', gap: 4 },
+  scoreSeg:     { flex: 1, height: 26, borderRadius: 7, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
+  scoreSegActive:{ backgroundColor: C.accent, borderColor: C.accent },
 
-  cardGlass: { backgroundColor: 'transparent', overflow: 'hidden' },
-  glassBg:   { ...StyleSheet.absoluteFillObject },
+  mediaCard: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14 },
+  mediaSubLabel: { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.2 },
 
-  scoreRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  scoreCell:      { width: 44, height: 44, borderRadius: 12, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  scoreCellActive:{ backgroundColor: C.accent, borderColor: C.accent },
-  scoreTxt:       { fontSize: 15, color: C.muted, fontWeight: '800' },
-  scoreTxtActive: { color: C.accentText },
-
-  saveHint:{ fontSize: 12.5, color: C.muted, textAlign: 'center', marginTop: 26, marginBottom: -14, fontWeight: '600' },
-  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 60, borderRadius: 20, overflow: 'hidden', marginTop: 32 },
+  footer:  { paddingHorizontal: 20, paddingTop: 10, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.border },
+  saveHint:{ fontSize: 12.5, color: C.muted, textAlign: 'center', marginBottom: 10, fontWeight: '600' },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 56, borderRadius: 18, overflow: 'hidden', marginBottom: 10 },
   saveTxt: { fontSize: 16, color: C.accentText, fontWeight: '900', letterSpacing: 0.3 },
 });

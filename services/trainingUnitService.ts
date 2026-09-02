@@ -83,6 +83,27 @@ export function getTrainingUnits(ownerId: string, dogId?: string) {
   return q;
 }
 
+// Rein lesend, KEIN neues Schema: leitet „zuletzt selbst benutzte eigene Übungen"
+// für eine feste Sparte aus der bestehenden Trainingshistorie ab (training_exercises
+// über die bereits vorhandene FK-Relation zu training_units gefiltert nach
+// owner_id). Ersetzt für System-Sparten (die keine editierbare Übungsliste haben,
+// im Gegensatz zu custom_categories) eine eigene Persistenz-Tabelle.
+export async function getRecentExerciseNames(ownerId: string, discipline: string, limit = 20) {
+  const { data, error } = await supabase
+    .from('training_exercises')
+    .select('exercise_name, created_at, training_units!inner(owner_id)')
+    .eq('discipline', discipline)
+    .eq('training_units.owner_id', ownerId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) return { data: [] as string[], error };
+  const names: string[] = [];
+  for (const row of (data ?? []) as { exercise_name: string }[]) {
+    if (!names.includes(row.exercise_name)) names.push(row.exercise_name);
+  }
+  return { data: names, error: null };
+}
+
 export function getTrainingUnitById(id: string) {
   return supabase
     .from('training_units')
