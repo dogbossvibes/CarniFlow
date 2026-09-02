@@ -93,6 +93,7 @@ export const DISCIPLINES: Discipline[] = [
       'Distanzkontrolle',
       'Gruppenarbeit',
       'Bleib-Übungen (Gruppe)',
+      'Kegelgruppe umrunden',
       'Eigene Übung',
     ],
   },
