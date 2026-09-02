@@ -3,16 +3,18 @@ import { Alert, Text } from 'react-native';
 import UnitStartScreen from '@/app/unit/start';
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 const mockCreateTrainingUnit = jest.fn();
 const mockStartUnit = jest.fn();
 const mockAddExercise = jest.fn();
 const mockRefresh = jest.fn();
 let mockDogs: { id: string; name: string }[] = [];
 let mockDogsLoading = false;
+let mockCategories: { id: string; owner_id: string; name: string; icon: string; color: string; exercises: string[]; created_at: string }[] = [];
 
 jest.mock('expo-router', () => ({
   useFocusEffect: (effect: () => void) => effect(),
-  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: (...args: unknown[]) => mockReplace(...args) }),
+  useRouter: () => ({ back: jest.fn(), push: (...args: unknown[]) => mockPush(...args), replace: (...args: unknown[]) => mockReplace(...args) }),
 }));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
@@ -27,7 +29,7 @@ jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: mockDogs, loading:
 jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: 'owner-1' } } }) }));
 jest.mock('@/hooks/useProfile', () => ({ useProfile: () => ({ profile: null }) }));
 jest.mock('@/hooks/useCustomCategories', () => ({
-  useCustomCategories: () => ({ categories: [], refresh: () => mockRefresh() }),
+  useCustomCategories: () => ({ categories: mockCategories, refresh: () => mockRefresh() }),
 }));
 jest.mock('@/stores/activeTraining', () => ({
   useActiveTraining: () => ({ unitId: null, dogId: null, dogName: null }),
@@ -88,7 +90,9 @@ describe('UnitStartScreen single-dog selection', () => {
   beforeEach(() => {
     mockDogs = [];
     mockDogsLoading = false;
+    mockCategories = [];
     mockReplace.mockReset();
+    mockPush.mockReset();
     mockCreateTrainingUnit.mockReset();
     mockStartUnit.mockReset();
     mockAddExercise.mockReset();
@@ -147,6 +151,77 @@ describe('UnitStartScreen single-dog selection', () => {
 
     expect(alert).not.toHaveBeenCalled();
     expect(mockCreateTrainingUnit).toHaveBeenCalledWith('owner-1', 'dog-2');
+    alert.mockRestore();
+  });
+});
+
+// Eigene Trainings-Sparte: „+ Eigene Sparte hinzufügen" öffnet die bestehende
+// Anlege-Route, und eine bereits gespeicherte eigene Sparte erscheint als ganz
+// normale, auswählbare Disziplin-Karte — keine zweite Trainingslogik.
+describe('UnitStartScreen — eigene Sparte', () => {
+  beforeEach(() => {
+    mockDogs = [{ id: 'dog-1', name: 'Malu' }];
+    mockDogsLoading = false;
+    mockCategories = [];
+    mockReplace.mockReset();
+    mockPush.mockReset();
+    mockCreateTrainingUnit.mockReset();
+    mockStartUnit.mockReset();
+    mockAddExercise.mockReset();
+    mockRefresh.mockReset();
+  });
+
+  it('navigiert beim Tap auf „Eigene Sparte hinzufügen" zur bestehenden Anlege-Route', () => {
+    const node = render();
+    expect(strings(node)).toContain('training.createCategory');
+
+    const createBtn = (node.root as unknown as {
+      findByProps: (props: { accessibilityLabel: string }) => { props: { onPress: () => void } };
+    }).findByProps({ accessibilityLabel: 'training.createCategory' });
+    act(() => { createBtn.props.onPress(); });
+
+    expect(mockPush).toHaveBeenCalledWith('/unit/new-category');
+  });
+
+  it('zeigt eine gespeicherte eigene Sparte als normale, sofort auswählbare Disziplin-Karte', async () => {
+    mockCategories = [{
+      id: 'cat-1', owner_id: 'owner-1', name: 'Fitness', icon: 'barbell', color: '#A78BFA',
+      exercises: ['Liegestütze'], created_at: '2026-01-01T00:00:00.000Z',
+    }];
+    const node = render();
+
+    expect(strings(node)).toContain('Fitness');
+    const card = (node.root as unknown as {
+      findByProps: (props: { testID: string }) => { props: { onPress: () => Promise<void> } };
+    }).findByProps({ testID: 'discipline-Fitness' });
+
+    await act(async () => { await card.props.onPress(); });
+
+    // Eigene Sparten behalten dieselbe Übungsauswahl-Route wie z. B. Obedience/
+    // Agility (kein Direkt-Start, keine eigene Trainingslogik) — dieselbe
+    // Weiterleitung, die auch für jede andere nicht-feste Sparte greift.
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({
+      pathname: '/unit/[discipline]',
+      params: expect.objectContaining({ discipline: 'custom:cat-1', label: 'Fitness' }),
+    }));
+    expect(mockCreateTrainingUnit).not.toHaveBeenCalled();
+  });
+
+  it('blockiert eine eigene Sparte ohne Übungen mit einem Hinweis statt eines Absturzes', async () => {
+    mockCategories = [{
+      id: 'cat-2', owner_id: 'owner-1', name: 'Leer', icon: 'star', color: '#A78BFA',
+      exercises: [], created_at: '2026-01-01T00:00:00.000Z',
+    }];
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const node = render();
+    const card = (node.root as unknown as {
+      findByProps: (props: { testID: string }) => { props: { onPress: () => Promise<void> } };
+    }).findByProps({ testID: 'discipline-Leer' });
+
+    await act(async () => { await card.props.onPress(); });
+
+    expect(alert).toHaveBeenCalledWith('training.noExercisesTitle', 'training.noExercisesBody');
+    expect(mockPush).not.toHaveBeenCalled();
     alert.mockRestore();
   });
 });

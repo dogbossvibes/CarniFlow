@@ -247,6 +247,20 @@ export default function DocumentScreen() {
                 </TouchableOpacity>
               );
             })}
+            {/* Eigene Kategorie anlegen — dieselbe Route/Logik wie app/unit/start.tsx,
+                hier als Chip statt separatem Outline-Button (Layout-Konvention
+                dieses Screens: Sparten werden hier durchgängig als Chip-Zeile
+                dargestellt, nicht als Karten-Grid). */}
+            <TouchableOpacity
+              style={s.chip}
+              onPress={() => { tapHaptic(); router.push('/unit/new-category'); }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('training.createCategory')}
+            >
+              <Ionicons name="add" size={13} color={C.accent} />
+              <Text style={[s.chipTxt, { color: C.accent, fontWeight: '700' }]}>{t('training.createCategory')}</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Übungen (Mehrfachauswahl) */}

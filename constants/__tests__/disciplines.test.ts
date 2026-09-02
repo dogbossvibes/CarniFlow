@@ -1,4 +1,5 @@
-import { DISCIPLINES, getDiscipline } from '@/constants/disciplines';
+import { DISCIPLINES, getDiscipline, customToDiscipline } from '@/constants/disciplines';
+import type { CustomCategory } from '@/types/customCategory';
 
 // Neue Obedience-Übung „Kegelgruppe umrunden": Der Hund wird zur Kegelgruppe
 // geschickt, umrundet diese und kehrt zum Hundeführer zurück. Übungen haben in
@@ -69,5 +70,42 @@ describe('Obedience-Übung „Kegelgruppe umrunden"', () => {
     expect(keys).toEqual([
       'faehrte', 'unterordnung', 'schutzdienst', 'obedience', 'agility', 'rally', 'mondioring', 'eigene',
     ]);
+  });
+});
+
+// Eigene Trainings-Sparte (Custom Discipline): customToDiscipline() bildet eine
+// gespeicherte custom_categories-Zeile auf dieselbe Discipline-Form ab wie jede
+// feste Sparte — dieselbe Trainingslogik, kein zweites System.
+describe('customToDiscipline — eigene Sparte', () => {
+  const category: CustomCategory = {
+    id:         '11111111-2222-3333-4444-555555555555',
+    owner_id:   'owner-1',
+    name:       'Fitness',
+    icon:       'barbell',
+    color:      '#A78BFA',
+    exercises:  ['Liegestütze', 'Sprints'],
+    created_at: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('erzeugt einen eindeutig als custom markierten Key — nie kollidierend mit einer System-Sparte', () => {
+    const disc = customToDiscipline(category);
+    expect(disc.key).toBe('custom:11111111-2222-3333-4444-555555555555');
+    expect(DISCIPLINES.some(d => d.key === disc.key)).toBe(false);
+  });
+
+  it('übernimmt den Nutzernamen unverändert als label — keine automatische Übersetzung', () => {
+    const disc = customToDiscipline(category);
+    expect(disc.label).toBe('Fitness');
+  });
+
+  it('übernimmt die vom Nutzer erfassten Übungen unverändert', () => {
+    const disc = customToDiscipline(category);
+    expect(disc.exercises).toEqual(['Liegestütze', 'Sprints']);
+  });
+
+  it('verändert keine bestehende System-Disziplin', () => {
+    const keysBefore = DISCIPLINES.map(d => d.key);
+    customToDiscipline(category);
+    expect(DISCIPLINES.map(d => d.key)).toEqual(keysBefore);
   });
 });

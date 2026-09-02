@@ -4,13 +4,14 @@ import DocumentScreen from '@/app/unit/document';
 
 const mockCreateDocumentedUnit = jest.fn();
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 let mockDogs: { id: string; name: string }[] = [];
 let mockDogsLoading = false;
 
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'unit-id' }));
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: (...args: unknown[]) => mockReplace(...args) }),
+  useRouter: () => ({ back: jest.fn(), push: (...args: unknown[]) => mockPush(...args), replace: (...args: unknown[]) => mockReplace(...args) }),
 }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
@@ -98,6 +99,7 @@ describe('DocumentScreen dog selection', () => {
     mockDogsLoading = false;
     mockCreateDocumentedUnit.mockReset();
     mockReplace.mockReset();
+    mockPush.mockReset();
   });
 
   it('blocks saving and shows the add-dog state with no dogs', () => {
@@ -135,5 +137,39 @@ describe('DocumentScreen dog selection', () => {
 
     expect(strings(node)).toEqual(expect.arrayContaining(['Yam', 'Malu']));
     expect(saveButton(node).props.disabled).toBe(true);
+  });
+});
+
+// Eigene Trainings-Sparte: „+ Eigene Sparte hinzufügen" beim nachträglichen
+// Dokumentieren führt zur selben Route/Logik wie in app/unit/start.tsx —
+// keine zweite Anlege-Implementierung.
+describe('DocumentScreen — eigene Sparte anlegen', () => {
+  beforeEach(() => {
+    mockDogs = [];
+    mockDogsLoading = false;
+    mockCreateDocumentedUnit.mockReset();
+    mockReplace.mockReset();
+    mockPush.mockReset();
+  });
+
+  it('navigiert beim Tap auf „Eigene Sparte hinzufügen" zur bestehenden Anlege-Route', () => {
+    const node = render();
+    expect(strings(node)).toContain('training.createCategory');
+
+    const createChip = (node.root as unknown as {
+      findAll: (predicate: (child: {
+        props: { onPress?: () => void };
+        findAllByType: (type: unknown) => { props: { children: unknown } }[];
+      }) => boolean) => { props: { onPress: () => void } }[];
+    }).findAll((child) => (
+      typeof child.props.onPress === 'function'
+      && child.findAllByType(Text).some((text) => text.props.children === 'training.createCategory')
+    ))[0];
+
+    act(() => { createChip.props.onPress(); });
+
+    expect(mockPush).toHaveBeenCalledWith('/unit/new-category');
+    // Kein zweiter, eigener Anlege-Flow — dieselbe Route wie start.tsx.
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
   });
 });
