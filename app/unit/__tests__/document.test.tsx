@@ -284,6 +284,70 @@ describe('DocumentScreen — Eigene Übung Sheet', () => {
     // Feste Sparte: keine Persistenz-Schreiboperation ausgelöst.
     expect(mockUpdateCustomCategory).not.toHaveBeenCalled();
   });
+
+  it('4. Whitespace am Anfang/Ende wird vor der Übernahme entfernt', async () => {
+    const node = render();
+    await flush();
+    tap(node, 'training.addCustomExercise');
+
+    act(() => { inputByPlaceholder(node, 'training.customExercisePlaceholder').props.onChangeText('   Slalom   '); });
+    act(() => { pressableWithText(node, 'common.save').props.onPress(); });
+
+    expect(strings(node)).toContain('Slalom');
+    expect(strings(node)).not.toContain('   Slalom   ');
+  });
+
+  it('11. doppeltes Auslösen von „Hinzufügen" erzeugt keine doppelte Übung', async () => {
+    const node = render();
+    await flush();
+    tap(node, 'training.addCustomExercise');
+    act(() => { inputByPlaceholder(node, 'training.customExercisePlaceholder').props.onChangeText('Cavaletti'); });
+
+    // Zwei schnelle Aufrufe von onSave (z. B. Doppel-Tap), wie es das Sheet
+    // selbst über handleSave auslösen würde — der Zähler in der Überschrift
+    // ("N ausgewählt") muss trotzdem bei 1 bleiben, keine zweite Karte.
+    const onPress = pressableWithText(node, 'common.save').props.onPress;
+    act(() => { onPress(); onPress(); });
+
+    expect(strings(node)).toContain('training.selectedCount');
+    const cavalettiCount = strings(node).filter((txt) => txt === 'Cavaletti').length;
+    expect(cavalettiCount).toBe(1);
+  });
+
+  it('4 (Design). eigene Übung wird optisch als „Eigene Übung" gekennzeichnet', async () => {
+    const node = render();
+    await flush();
+    tap(node, 'training.addCustomExercise');
+    act(() => { inputByPlaceholder(node, 'training.customExercisePlaceholder').props.onChangeText('Cavaletti / Balance'); });
+    act(() => { pressableWithText(node, 'common.save').props.onPress(); });
+
+    // Badge nutzt bewusst denselben, bereits übersetzten Begriff wie der
+    // Sheet-Titel — keine neue i18n-Zeichenkette.
+    expect(strings(node)).toContain('training.customExerciseSheetTitle');
+    expect(strings(node)).toContain('Cavaletti / Balance');
+  });
+
+  it('5. eigene Übung ist mit normalen Übungen derselben Sparte kombinierbar und wird gemeinsam gespeichert', async () => {
+    const node = render();
+    await flush();
+    selectExercise(node);   // vorhandene Preset-Übung „Übung" (siehe DISCIPLINES-Mock)
+
+    tap(node, 'training.addCustomExercise');
+    act(() => { inputByPlaceholder(node, 'training.customExercisePlaceholder').props.onChangeText('Cavaletti / Balance'); });
+    act(() => { pressableWithText(node, 'common.save').props.onPress(); });
+
+    expect(strings(node)).toContain('Übung');
+    expect(strings(node)).toContain('Cavaletti / Balance');
+
+    mockCreateDocumentedUnit.mockResolvedValue({ error: null, data: { id: 'unit-1' } });
+    await act(async () => { await saveButton(node).props.onPress(); });
+
+    const [, , exercises] = mockCreateDocumentedUnit.mock.calls[0];
+    expect(exercises).toEqual(expect.arrayContaining([
+      expect.objectContaining({ exercise_name: 'Übung' }),
+      expect.objectContaining({ exercise_name: 'Cavaletti / Balance' }),
+    ]));
+  });
 });
 
 // Eigene Sparte: „für zukünftige Trainings speichern" hängt an die bestehende
@@ -417,6 +481,36 @@ describe('DocumentScreen — bestehende Einheit bearbeiten', () => {
       'unit-1',
       expect.anything(),
       [expect.objectContaining({ exercise_name: 'Übung', rating: 4, notes: 'Gut gelaufen' })],
+    );
+  });
+
+  it('8. eine zuvor gespeicherte eigene Übung erscheint beim erneuten Öffnen weiterhin korrekt (inkl. Kennzeichnung) und bleibt beim Speichern erhalten', async () => {
+    mockGetTrainingUnitById.mockReset().mockResolvedValue({
+      data: {
+        dog_id: 'dog-1', notes: null, score: null, session_date: '2026-05-01',
+        duration_sec: 1200, photos: [], videos: [], audio_files: [],
+        motivation: null, konzentration: null, praezision: null, ausdauer: null, trieblage: null, impulskontrolle: null,
+        // „Cavaletti / Balance" steht NICHT in der festen Übungsliste des Mocks
+        // (nur 'Übung') — muss dennoch unverändert geladen und als eigene
+        // Übung erkannt werden, rein aus dem Nicht-Vorkommen in der Liste.
+        exercises: [{ discipline: 'Fährte', exercise_name: 'Cavaletti / Balance', rating: null, notes: null }],
+      },
+      error: null,
+    });
+    const node = render();
+    await flush();
+    update(node);
+
+    expect(strings(node)).toContain('Cavaletti / Balance');
+    expect(strings(node)).toContain('training.customExerciseSheetTitle'); // Kennzeichnung sichtbar
+
+    mockUpdateDocumentedUnit.mockResolvedValue({ error: null });
+    await act(async () => { await saveButton(node).props.onPress(); });
+
+    expect(mockUpdateDocumentedUnit).toHaveBeenCalledWith(
+      'unit-1',
+      expect.anything(),
+      [expect.objectContaining({ exercise_name: 'Cavaletti / Balance' })],
     );
   });
 });

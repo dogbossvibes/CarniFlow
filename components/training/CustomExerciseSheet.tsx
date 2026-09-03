@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { C } from '@/constants/colors';
@@ -39,55 +39,69 @@ export function CustomExerciseSheet({ visible, onClose, isCustomDiscipline, onSa
     const trimmed = name.trim();
     if (!trimmed) return;
     tapHaptic();
+    Keyboard.dismiss();
     onSave(trimmed, saveForFuture);
     reset();
   };
 
   return (
     <AnyvoBottomSheet visible={visible} onClose={handleClose} title={t('training.customExerciseSheetTitle')}>
-      <Text style={s.label}>{t('training.customExerciseNameLabel')}</Text>
-      <TextInput
-        style={s.input}
-        placeholder={t('training.customExercisePlaceholder')}
-        placeholderTextColor={C.placeholder}
-        value={name}
-        onChangeText={setName}
-        autoFocus
-        returnKeyType="done"
-        onSubmitEditing={handleSave}
-        maxLength={60}
-      />
+      {/* ROOT CAUSE (T-eigene-Übung): AnyvoBottomSheet selbst hat kein Keyboard-
+          Handling — der Sheet-Inhalt hängt an position:absolute/bottom:0 fest am
+          unteren Bildschirmrand. Das Namensfeld hat autoFocus, öffnet die Tastatur
+          also sofort beim Öffnen des Sheets; ohne Ausgleich schiebt sich „Speichern"
+          (unten in den actions) auf kleinen iPhones hinter die Tastatur und ist
+          nicht mehr erreichbar — die Übung liess sich dadurch nicht zuverlässig
+          hinzufügen. Fix lokal hier (nicht in AnyvoBottomSheet selbst, das von
+          sieben weiteren, unabhängigen Screens genutzt wird): KeyboardAvoidingView
+          um genau diesen Sheet-Inhalt, dasselbe Verhalten wie bereits in
+          app/unit/document.tsx selbst verwendet (padding auf iOS, Android regelt
+          das bereits selbst — kein zweiter, konkurrierender Mechanismus). */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Text style={s.label}>{t('training.customExerciseNameLabel')}</Text>
+        <TextInput
+          style={s.input}
+          placeholder={t('training.customExercisePlaceholder')}
+          placeholderTextColor={C.placeholder}
+          value={name}
+          onChangeText={setName}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={handleSave}
+          maxLength={60}
+        />
 
-      {isCustomDiscipline ? (
-        <TouchableOpacity
-          style={s.toggleRow}
-          onPress={() => { tapHaptic(); setSaveForFuture(v => !v); }}
-          activeOpacity={0.8}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: saveForFuture }}
-        >
-          <View style={[s.checkbox, saveForFuture && s.checkboxActive]}>
-            {saveForFuture && <Ionicons name="checkmark" size={14} color={C.accentText} />}
-          </View>
-          <Text style={s.toggleTxt}>{t('training.saveForFuture')}</Text>
-        </TouchableOpacity>
-      ) : (
-        <Text style={s.hint}>{t('training.saveForFutureAutoHint')}</Text>
-      )}
+        {isCustomDiscipline ? (
+          <TouchableOpacity
+            style={s.toggleRow}
+            onPress={() => { tapHaptic(); setSaveForFuture(v => !v); }}
+            activeOpacity={0.8}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: saveForFuture }}
+          >
+            <View style={[s.checkbox, saveForFuture && s.checkboxActive]}>
+              {saveForFuture && <Ionicons name="checkmark" size={14} color={C.accentText} />}
+            </View>
+            <Text style={s.toggleTxt}>{t('training.saveForFuture')}</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={s.hint}>{t('training.saveForFutureAutoHint')}</Text>
+        )}
 
-      <View style={s.actions}>
-        <TouchableOpacity style={s.cancelBtn} onPress={handleClose} activeOpacity={0.8}>
-          <Text style={s.cancelTxt}>{t('common.cancel')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.saveBtn, !name.trim() && s.saveBtnDisabled]}
-          onPress={handleSave}
-          activeOpacity={0.8}
-          disabled={!name.trim()}
-        >
-          <Text style={s.saveTxt}>{t('common.save')}</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={s.actions}>
+          <TouchableOpacity style={s.cancelBtn} onPress={handleClose} activeOpacity={0.8}>
+            <Text style={s.cancelTxt}>{t('common.cancel')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.saveBtn, !name.trim() && s.saveBtnDisabled]}
+            onPress={handleSave}
+            activeOpacity={0.8}
+            disabled={!name.trim()}
+          >
+            <Text style={s.saveTxt}>{t('common.save')}</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </AnyvoBottomSheet>
   );
 }

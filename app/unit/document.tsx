@@ -147,6 +147,16 @@ export default function DocumentScreen() {
   const isSelected = (label: string, name: string) =>
     selected.some(e => e.discipline === label && e.name === name);
 
+  // „Eigene Übung"-Kennzeichnung ohne neue Spalte: eine Übung gilt als eigen,
+  // wenn sie NICHT in der (festen oder eigenen) Übungsliste der Sparte steht.
+  // Funktioniert dadurch automatisch auch nach dem erneuten Laden eines
+  // gespeicherten Trainings — exercise_name selbst wird bereits unverändert
+  // gespeichert, dafür ist keine Migration nötig.
+  const isCustomExercise = (discLabel: string, name: string) => {
+    const d = disciplines.find(x => x.label === discLabel);
+    return !d || !d.exercises.includes(name);
+  };
+
   const toggleExercise = (label: string, name: string) => {
     tapHaptic();
     setSelected(prev =>
@@ -158,9 +168,16 @@ export default function DocumentScreen() {
 
   const handleAddCustomExercise = async (name: string, saveForFuture: boolean) => {
     if (!disc) return;
-    if (!isSelected(disc.label, name)) {
-      setSelected(prev => [...prev, { discipline: disc.label, name, rating: null, notes: null }]);
-    }
+    // Duplikat-Prüfung ATOMAR im Updater (nicht vorher per isSelected/geschlossener
+    // Closure): ein doppelt ausgelöstes „Hinzufügen" (z. B. Doppel-Tap, bevor React
+    // neu rendert) darf dieselbe Übung nie zweimal einfügen — die Prüfung muss auf
+    // dem tatsächlichen State zum Zeitpunkt der Anwendung laufen, nicht auf einem
+    // möglicherweise veralteten `selected` aus dem Moment des Funktionsaufrufs.
+    setSelected(prev =>
+      prev.some(e => e.discipline === disc.label && e.name === name)
+        ? prev
+        : [...prev, { discipline: disc.label, name, rating: null, notes: null }],
+    );
     setCustomSheetOpen(false);
     // Eigene Sparte + „für zukünftige Trainings speichern": dieselbe Persistenz
     // wie im Kategorie-Editor (app/unit/new-category.tsx) — keine zweite Logik.
@@ -352,6 +369,7 @@ export default function DocumentScreen() {
                     key={`${e.discipline}-${e.name}`}
                     name={e.name}
                     accentColor={disciplineColor(e.discipline)}
+                    isCustom={isCustomExercise(e.discipline, e.name)}
                     rating={e.rating}
                     notes={e.notes}
                     onRatingChange={r => setExerciseRating(i, r)}

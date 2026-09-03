@@ -52,4 +52,21 @@ describe('keyboard-aware form layouts', () => {
     expect(kavBlock).toContain('value={verbal} onChangeText={setVerbal}');
     expect(kavBlock).toMatch(/AnyvoButton label=\{t\('common\.save'\)\}/);
   });
+
+  it('keeps the custom-exercise sheet\'s Speichern button reachable above the keyboard', () => {
+    const file = src('components/training/CustomExerciseSheet.tsx');
+    const kavBlock = file.slice(file.indexOf('<KeyboardAvoidingView'), file.indexOf('</KeyboardAvoidingView>'));
+
+    expect(file).toContain('KeyboardAvoidingView');
+    // AnyvoBottomSheet selbst ist fest am unteren Bildschirmrand (position:absolute,
+    // bottom:0) — dasselbe behavior wie im umgebenden app/unit/document.tsx (dort
+    // bereits etabliert), kein zweiter/konkurrierender Mechanismus, kein Fix an der
+    // gemeinsam genutzten AnyvoBottomSheet selbst (7+ weitere, unabhängige Screens).
+    expect(file).toContain("behavior={Platform.OS === 'ios' ? 'padding' : undefined}");
+    // autoFocus öffnet die Tastatur sofort — Namensfeld und Speichern-Button
+    // müssen beide INNERHALB des KeyboardAvoidingView liegen.
+    expect(kavBlock).toContain('autoFocus');
+    expect(kavBlock).toContain('onChangeText={setName}');
+    expect(kavBlock).toMatch(/onPress=\{handleSave\}[\s\S]*t\('common\.save'\)/);
+  });
 });

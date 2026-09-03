@@ -13,6 +13,10 @@ import { useT } from '@/i18n';
 interface Props {
   name:        string;
   accentColor: string;
+  // Rein clientseitig aus der Sparten-Übungsliste abgeleitet (app/unit/
+  // document.tsx: isCustomExercise) — keine eigene Spalte/Migration nötig,
+  // gilt auch nach dem erneuten Laden eines gespeicherten Trainings.
+  isCustom?:   boolean;
   rating:      number | null;
   notes:       string | null;
   onRatingChange: (rating: number | null) => void;
@@ -21,7 +25,7 @@ interface Props {
 }
 
 export function SelectedExerciseCard({
-  name, accentColor, rating, notes, onRatingChange, onNotesChange, onRemove,
+  name, accentColor, isCustom, rating, notes, onRatingChange, onNotesChange, onRemove,
 }: Props) {
   const { t } = useT();
 
@@ -32,6 +36,12 @@ export function SelectedExerciseCard({
 
   return (
     <View style={s.card}>
+      {isCustom && (
+        <View style={s.customBadge}>
+          <Ionicons name="star" size={10} color={C.accent} />
+          <Text style={s.customBadgeTxt}>{t('training.customExerciseSheetTitle')}</Text>
+        </View>
+      )}
       <View style={s.head}>
         <View style={[s.dot, { backgroundColor: accentColor }]} />
         <Text style={s.name} numberOfLines={1}>{name}</Text>
@@ -68,6 +78,8 @@ export function SelectedExerciseCard({
 
 const s = StyleSheet.create({
   card: { backgroundColor: C.cardAlt, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 12, gap: 8 },
+  customBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
+  customBadgeTxt: { fontSize: 10, color: C.accent, fontWeight: '800', letterSpacing: 0.3 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot:  { width: 7, height: 7, borderRadius: 3.5 },
   name: { flex: 1, fontSize: 13.5, color: C.white, fontWeight: '700' },
