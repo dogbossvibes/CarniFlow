@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -63,27 +64,41 @@ export default function HundHinzufuegenScreen() {
   const [bildLaden,   setBildLaden]   = useState(false);
 
   const bildAuswaehlen = async () => {
-    // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
-    if (Platform.OS !== 'android') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        setFehler(t('dog.photoPermissionError'));
-        return;
+    // HOTFIX: Ein verweigertes Permission-Ergebnis landete bisher nur in der
+    // `fehler`-Box ganz unten im langen Formular (nach allen anderen Feldern) —
+    // von der Foto-Fläche oben aus unsichtbar, ohne zu scrollen. Für den Nutzer
+    // sah das exakt wie "Tap tut nichts" aus, obwohl der Code korrekt reagierte.
+    // Jetzt: Alert.alert() wie im bereits funktionierenden PhotoPicker
+    // (components/ui/PhotoPicker.tsx) — sofort sichtbar, egal wo im Formular
+    // man gerade ist. Zusätzlich try/catch/finally wie beim addDog()-Hotfix,
+    // damit ein geworfener Fehler weder verschluckt wird noch bildLaden
+    // dauerhaft hängen lässt.
+    try {
+      // Android: System Photo Picker (kein READ_MEDIA nötig). iOS: bestehender Flow.
+      if (Platform.OS !== 'android') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(t('media.permissionDenied'), t('dog.photoPermissionError'), [{ text: t('common.ok') }]);
+          return;
+        }
       }
-    }
 
-    setBildLaden(true);
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.85,
-    });
-    setBildLaden(false);
+      setBildLaden(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      setBildUri(result.assets[0].uri);
-      setFehler(null);
+      if (!result.canceled && result.assets[0]) {
+        setBildUri(result.assets[0].uri);
+        setFehler(null);
+      }
+    } catch (e) {
+      Alert.alert(t('media.uploadFailed'), e instanceof Error ? e.message : t('dog.photoUploadError'));
+    } finally {
+      setBildLaden(false);
     }
   };
 

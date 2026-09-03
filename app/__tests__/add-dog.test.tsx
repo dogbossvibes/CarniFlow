@@ -5,12 +5,14 @@
 // Zustand hängen, ohne jede Fehlermeldung. Diese Suite deckt sowohl den
 // bestehenden Normalfall als auch genau dieses Fehlerverhalten ab.
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Text, TextInput } from 'react-native';
+import { Alert, Platform, Text, TextInput } from 'react-native';
 import HundHinzufuegenScreen from '@/app/add-dog';
 
 const mockAddDog = jest.fn();
 const mockBack = jest.fn();
 const mockPush = jest.fn();
+const mockRequestMediaLibraryPermissions = jest.fn();
+const mockLaunchImageLibrary = jest.fn();
 let mockDogs: { id: string }[] = [];
 let mockIsPro = false;
 
@@ -18,8 +20,8 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, push: (...a: unknown[]) => mockPush(...a) }),
 }));
 jest.mock('expo-image-picker', () => ({
-  requestMediaLibraryPermissionsAsync: jest.fn(),
-  launchImageLibraryAsync: jest.fn(),
+  requestMediaLibraryPermissionsAsync: (...a: unknown[]) => mockRequestMediaLibraryPermissions(...a),
+  launchImageLibraryAsync: (...a: unknown[]) => mockLaunchImageLibrary(...a),
 }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
@@ -53,6 +55,14 @@ function findSave(node: ReactTestRenderer) {
   return (node.root as unknown as {
     findAll: (p: (c: { props: { onPress?: () => void }; findAllByType: (t: unknown) => { props: { children: unknown } }[] }) => boolean) => { props: { onPress: () => void; disabled?: boolean } }[];
   }).findAll((c) => typeof c.props.onPress === 'function' && c.findAllByType(Text).some((t) => t.props.children === 'dog.save'))[0];
+}
+
+// Findet die gesamte Foto-Fläche über den Platzhaltertitel „dog.photoAdd" —
+// dasselbe Prinzip wie findSave, immer frisch abfragen.
+function findPhotoCard(node: ReactTestRenderer) {
+  return (node.root as unknown as {
+    findAll: (p: (c: { props: { onPress?: () => void }; findAllByType: (t: unknown) => { props: { children: unknown } }[] }) => boolean) => { props: { onPress: () => void; disabled?: boolean } }[];
+  }).findAll((c) => typeof c.props.onPress === 'function' && c.findAllByType(Text).some((t) => t.props.children === 'dog.photoAdd'))[0];
 }
 
 function nameInput(node: ReactTestRenderer) {
@@ -175,5 +185,102 @@ describe('add-dog', () => {
 
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(mockPush).not.toHaveBeenCalled();
+  });
+});
+
+// HOTFIX „Foto hinzufügen reagiert nicht": Root Cause war ein iOS-Permission-
+// Ergebnis, das nur in der `fehler`-Box ganz unten im Formular landete — von
+// der Foto-Fläche oben aus unsichtbar, ohne zu scrollen. Fix: Alert.alert()
+// (wie im bereits funktionierenden components/ui/PhotoPicker.tsx) statt der
+// unsichtbaren fehler-Box, plus try/catch/finally gegen hängendes bildLaden.
+describe('add-dog — Foto hinzufügen', () => {
+  const originalPlatformOS = Platform.OS;
+  let alertSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    mockRequestMediaLibraryPermissions.mockReset();
+    mockLaunchImageLibrary.mockReset();
+    Platform.OS = 'ios';
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    Platform.OS = originalPlatformOS;
+    alertSpy.mockRestore();
+  });
+
+  it('1. Tap ruft ImagePicker auf', async () => {
+    const node = render();
+    mockRequestMediaLibraryPermissions.mockResolvedValue({ status: 'granted' });
+    mockLaunchImageLibrary.mockResolvedValue({ canceled: true });
+
+    await act(async () => { await findPhotoCard(node).props.onPress(); });
+
+    expect(mockRequestMediaLibraryPermissions).toHaveBeenCalledTimes(1);
+    expect(mockLaunchImageLibrary).toHaveBeenCalledTimes(1);
+  });
+
+  it('2. erfolgreich gewähltes Bild wird als Preview übernommen', async () => {
+    const node = render();
+    mockRequestMediaLibraryPermissions.mockResolvedValue({ status: 'granted' });
+    mockLaunchImageLibrary.mockResolvedValue({ canceled: false, assets: [{ uri: 'file://photo.jpg' }] });
+
+    await act(async () => { await findPhotoCard(node).props.onPress(); });
+
+    // bildUri gesetzt → Karte wechselt vom Platzhalter („dog.photoAdd") zur
+    // Bild-Ansicht mit „dog.photoChange"-Badge (siehe JSX-Zweig in add-dog.tsx).
+    expect(strings(node)).toContain('dog.photoChange');
+    expect(strings(node)).not.toContain('dog.photoAdd');
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('3. Picker cancelled → kein Fehler, kein Alert', async () => {
+    const node = render();
+    mockRequestMediaLibraryPermissions.mockResolvedValue({ status: 'granted' });
+    mockLaunchImageLibrary.mockResolvedValue({ canceled: true });
+
+    await act(async () => { await findPhotoCard(node).props.onPress(); });
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(strings(node)).toContain('dog.photoAdd'); // weiterhin Platzhalter, kein Bild gesetzt
+  });
+
+  it('4. Permission denied → sauber behandelt (sichtbarer Alert statt unsichtbarer fehler-Box)', async () => {
+    const node = render();
+    mockRequestMediaLibraryPermissions.mockResolvedValue({ status: 'denied' });
+
+    await act(async () => { await findPhotoCard(node).props.onPress(); });
+
+    expect(alertSpy).toHaveBeenCalledWith('media.permissionDenied', 'dog.photoPermissionError', expect.any(Array));
+    expect(mockLaunchImageLibrary).not.toHaveBeenCalled();
+  });
+
+  it('5. Picker wirft Exception → sichtbare Fehlerbehandlung, kein hängender Loading-State', async () => {
+    const node = render();
+    mockRequestMediaLibraryPermissions.mockResolvedValue({ status: 'granted' });
+    mockLaunchImageLibrary.mockRejectedValueOnce(new Error('picker crashed'));
+
+    await act(async () => { await findPhotoCard(node).props.onPress(); });
+
+    expect(alertSpy).toHaveBeenCalledWith('media.uploadFailed', 'picker crashed');
+
+    // bildLaden wieder false: ein zweiter Tap ruft den Picker erneut auf statt
+    // dauerhaft disabled zu bleiben (vorher wäre setBildLaden(false) übersprungen worden).
+    mockLaunchImageLibrary.mockResolvedValueOnce({ canceled: false, assets: [{ uri: 'file://photo2.jpg' }] });
+    await act(async () => { await findPhotoCard(node).props.onPress(); });
+    expect(mockLaunchImageLibrary).toHaveBeenCalledTimes(2);
+    expect(strings(node)).toContain('dog.photoChange');
+  });
+
+  it('6. Hund ohne Bild bleibt weiterhin speicherbar (Foto-Fläche nie berührt)', async () => {
+    const node = render();
+    act(() => { nameInput(node).props.onChangeText('Rex'); });
+    mockAddDog.mockResolvedValue({ error: null, data: { id: 'dog-1' } });
+
+    await act(async () => { await findSave(node).props.onPress(); });
+
+    expect(mockRequestMediaLibraryPermissions).not.toHaveBeenCalled();
+    expect(mockLaunchImageLibrary).not.toHaveBeenCalled();
+    expect(mockAddDog).toHaveBeenCalledWith('owner-1', expect.objectContaining({ photo_url: null }));
   });
 });
