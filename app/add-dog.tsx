@@ -91,7 +91,12 @@ export default function HundHinzufuegenScreen() {
     if (!name.trim()) { setFehler(t('dog.nameRequired')); return; }
     const registryError = validateRegistry(registry);
     if (registryError) { setFehler(t(registryError as TranslationKey)); return; }
-    if (!session?.user.id) return;
+    if (!session?.user.id) {
+      // Sitzung ist (noch) nicht bereit — kein stiller Abbruch: sichtbares Feedback
+      // statt eines Buttons, der scheinbar nichts tut.
+      setFehler(t('dog.saveErrorPlain'));
+      return;
+    }
 
     // NEWBIE-Quota: max. 1 Hund. Bestehende Hunde bleiben sichtbar/bearbeitbar;
     // nur das NEUE Anlegen wird gesperrt → Paywall. (Server bleibt autoritativ.)
@@ -104,54 +109,69 @@ export default function HundHinzufuegenScreen() {
     setLaden(true);
     setFehler(null);
 
-    let photoUrl: string | null = null;
+    // HOTFIX: früher war nur der Foto-Upload gegen geworfene Exceptions
+    // abgesichert. Ein Wurf aus addDog() (z. B. Netzwerkabbruch statt eines
+    // regulären {error}-Ergebnisses) liess die Funktion vorher über eine
+    // unbehandelte Rejection verlassen — setLaden(false) wurde nie erreicht,
+    // der Button blieb dauerhaft im Loading-Zustand hängen, ohne jede
+    // Fehlermeldung. Jetzt: try/catch + finally wie beim Foto-Upload.
+    try {
+      let photoUrl: string | null = null;
 
-    if (bildUri) {
-      try {
-        photoUrl = await uploadDogImage(bildUri, session.user.id);
-      } catch (uploadErr) {
-        setLaden(false);
-        setFehler(
-          uploadErr instanceof Error
-            ? t('dog.photoUploadErrorWithMessage', { message: uploadErr.message })
-            : t('dog.photoUploadError')
-        );
+      if (bildUri) {
+        try {
+          photoUrl = await uploadDogImage(bildUri, session.user.id);
+        } catch (uploadErr) {
+          setFehler(
+            uploadErr instanceof Error
+              ? t('dog.photoUploadErrorWithMessage', { message: uploadErr.message })
+              : t('dog.photoUploadError')
+          );
+          return;
+        }
+      }
+
+      const titlesArr = titel.split(',').map(t => t.trim()).filter(Boolean);
+
+      const { error: err } = await addDog(session.user.id, {
+        name:       name.trim(),
+        breed:      rasse.trim() || null,
+        gender:     geschlecht,
+        birth_date: birth ? toISODate(birth) : null,
+        weight_kg:  gewichtKg ? parseFloat(gewichtKg) : null,
+        photo_url:  photoUrl,
+        titles:     titlesArr,
+        sire:       vater.trim()   || null,
+        dam:        mutter.trim()  || null,
+        kennel:     zwinger.trim() || null,
+        discipline:       disciplineToStored(sparte),
+        color:            farbe.trim()     || null,
+        microchip_number: mikrochip.trim() || null,
+        tasso_registered: false,   // Legacy-Spalte: bei neuen Hunden nicht mehr aktiv genutzt
+        ...draftToColumns(registry),
+        vet:              tierarzt.trim()  || null,
+        vaccination:      impfung.trim()   || null,
+        food:             futter.trim()    || null,
+        is_favorite:      false,
+      });
+
+      if (err) {
+        haptic.error();
+        setFehler(t('dog.saveError', { message: err.message }));
         return;
       }
-    }
-
-    const titlesArr = titel.split(',').map(t => t.trim()).filter(Boolean);
-
-    const { error: err } = await addDog(session.user.id, {
-      name:       name.trim(),
-      breed:      rasse.trim() || null,
-      gender:     geschlecht,
-      birth_date: birth ? toISODate(birth) : null,
-      weight_kg:  gewichtKg ? parseFloat(gewichtKg) : null,
-      photo_url:  photoUrl,
-      titles:     titlesArr,
-      sire:       vater.trim()   || null,
-      dam:        mutter.trim()  || null,
-      kennel:     zwinger.trim() || null,
-      discipline:       disciplineToStored(sparte),
-      color:            farbe.trim()     || null,
-      microchip_number: mikrochip.trim() || null,
-      tasso_registered: false,   // Legacy-Spalte: bei neuen Hunden nicht mehr aktiv genutzt
-      ...draftToColumns(registry),
-      vet:              tierarzt.trim()  || null,
-      vaccination:      impfung.trim()   || null,
-      food:             futter.trim()    || null,
-      is_favorite:      false,
-    });
-
-    setLaden(false);
-    if (err) {
+      haptic.success();
+      router.back();
+    } catch (saveErr) {
       haptic.error();
-      setFehler(t('dog.saveError', { message: err.message }));
-      return;
+      setFehler(
+        saveErr instanceof Error
+          ? t('dog.saveError', { message: saveErr.message })
+          : t('dog.saveErrorPlain')
+      );
+    } finally {
+      setLaden(false);
     }
-    haptic.success();
-    router.back();
   };
 
   return (
