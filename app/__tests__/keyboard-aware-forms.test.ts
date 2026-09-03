@@ -35,4 +35,21 @@ describe('keyboard-aware form layouts', () => {
     expect(kavBlock).toContain('value={notes} onChangeText={setNotes} multiline');
     expect(kavBlock).toContain('style={[s.saveBtn, saving && { opacity: 0.6 }]}');
   });
+
+  it('keeps the "Kommando hinzufügen" save button reachable above the keyboard', () => {
+    const file = src('app/dog-command/edit.tsx');
+    const kavBlock = file.slice(file.indexOf('<KeyboardAvoidingView'), file.indexOf('</KeyboardAvoidingView>'));
+
+    expect(file).toContain('KeyboardAvoidingView');
+    expect(file).toContain("behavior={Platform.OS === 'ios' ? 'padding' : 'height'}");
+    expect(file).toContain('contentContainerStyle={[s.scroll, { paddingBottom: 32 + insets.bottom }]}');
+    expect(file).toContain('keyboardShouldPersistTaps="handled"');
+    expect(file).toContain("keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}");
+    // Save-Button und alle Textfelder liegen INNERHALB des KeyboardAvoidingView —
+    // nicht danebem/darunter platziert, sonst würde die Tastatur ihn trotzdem verdecken.
+    expect(kavBlock).toContain('<ScrollView');
+    expect(kavBlock).toContain('value={name} onChangeText={setName}');
+    expect(kavBlock).toContain('value={verbal} onChangeText={setVerbal}');
+    expect(kavBlock).toMatch(/AnyvoButton label=\{t\('common\.save'\)\}/);
+  });
 });

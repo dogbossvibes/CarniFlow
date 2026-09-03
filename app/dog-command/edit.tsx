@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -25,6 +25,7 @@ const toLines = (s: string) => s.split('\n').map(t => t.trim()).filter(Boolean);
 // Editor: Kommando anlegen/bearbeiten (lokal via dogCommands).
 export default function DogCommandEditor() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { isPro, loading: capLoading } = useCapabilities();
   const { t } = useT();
   const { dogId, commandId } = useLocalSearchParams<{ dogId: string; commandId?: string }>();
@@ -91,7 +92,13 @@ export default function DogCommandEditor() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView
+            contentContainerStyle={[s.scroll, { paddingBottom: 32 + insets.bottom }]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            showsVerticalScrollIndicator={false}
+          >
           <Text style={s.label}>{t('cmd.name')}</Text>
           <TextInput value={name} onChangeText={setName} placeholder="z. B. Sitz" placeholderTextColor={C.trackTextMut} style={s.input} />
 
@@ -147,7 +154,8 @@ export default function DogCommandEditor() {
 
           <View style={{ height: 16 }} />
           <AnyvoButton label={t('common.save')} icon="checkmark" onPress={save} loading={saving} />
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -155,6 +163,7 @@ export default function DogCommandEditor() {
 
 const s = StyleSheet.create({
   root:     { flex: 1, backgroundColor: C.trackBg },
+  flex:     { flex: 1 },
   bar:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 },
   iconBtn:  { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' },
   barTitle: { flex: 1, fontSize: 16, color: C.trackText, fontWeight: '800', textAlign: 'center' },
