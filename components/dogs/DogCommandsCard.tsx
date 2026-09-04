@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
+import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { C } from '@/constants/colors';
-import { useT } from '@/i18n';
+import { haptic } from '@/lib/haptics';
+import { useT, type TranslationKey } from '@/i18n';
 import type { DogCommand, Difficulty } from '@/features/dogs/dogCommands';
 
 const SPORT = C.trackPrimary;   // Mint
@@ -27,18 +30,121 @@ function DiffDots({ d }: { d: Difficulty }) {
 
 type Filter = 'all' | 'sport' | 'private' | 'fav';
 
+function CommandRow({
+  command,
+  onOpen,
+  onLongPress,
+  onToggleFavorite,
+  onDeleteRequest,
+  t,
+}: {
+  command: DogCommand;
+  onOpen: (cmd: DogCommand) => void;
+  onLongPress: (cmd: DogCommand) => void;
+  onToggleFavorite: (cmd: DogCommand) => void;
+  onDeleteRequest: (cmd: DogCommand, closeSwipe?: () => void) => void;
+  t: (key: TranslationKey) => string;
+}) {
+  const swipeRef = useRef<SwipeableMethods>(null);
+  const renderDeleteAction = useCallback(() => (
+    <Pressable
+      style={s.swipeDelete}
+      onPress={() => onDeleteRequest(command, () => swipeRef.current?.close())}
+      accessibilityRole="button"
+      accessibilityLabel={t('cmd.delete')}
+      testID={`command-swipe-delete-${command.id}`}
+    >
+      <Ionicons name="trash-outline" size={22} color="#fff" />
+      <Text style={s.swipeDeleteTxt}>{t('common.delete')}</Text>
+    </Pressable>
+  ), [command, onDeleteRequest, t]);
+
+  return (
+    <ReanimatedSwipeable
+      ref={swipeRef}
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      renderRightActions={renderDeleteAction}
+    >
+      <TouchableOpacity
+        style={s.item}
+        activeOpacity={0.8}
+        onPress={() => onOpen(command)}
+        onLongPress={() => onLongPress(command)}
+        delayLongPress={450}
+        accessibilityRole="button"
+        accessibilityLabel={command.name}
+        testID={`command-card-${command.id}`}
+      >
+        <View style={[s.itemBar, { backgroundColor: catColor(command.category) }]} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.itemName} numberOfLines={1}>{command.name}</Text>
+          <View style={s.itemMeta}>
+            <View style={[s.catBadge, { borderColor: `${catColor(command.category)}66` }]}><Text style={[s.catBadgeTxt, { color: catColor(command.category) }]}>{command.category === 'sport' ? 'Sport' : 'Alltag'}</Text></View>
+            {command.area ? <Text style={s.areaTxt}>{command.area}</Text> : null}
+            <DiffDots d={command.difficulty} />
+          </View>
+        </View>
+        <TouchableOpacity
+          hitSlop={8}
+          onPress={() => onToggleFavorite(command)}
+          style={s.star}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={command.isFavorite ? t('cmd.unfavorite') : t('cmd.favorite')}
+          testID={`command-favorite-${command.id}`}
+        >
+          <Ionicons name={command.isFavorite ? 'star' : 'star-outline'} size={18} color={command.isFavorite ? C.trackWarning : C.trackTextMut} />
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </ReanimatedSwipeable>
+  );
+}
+
 // Kommandoliste (pro Hund). Split Sport/Alltag, Favoriten, Difficulty-Dots.
 export function DogCommandsCard({
-  commands, onAdd, onOpen, onToggleFavorite, onSeedDemo,
+  commands, onAdd, onOpen, onEdit, onDelete, onToggleFavorite, onSeedDemo,
 }: {
   commands: DogCommand[];
   onAdd: () => void;
   onOpen: (cmd: DogCommand) => void;
+  onEdit: (cmd: DogCommand) => void;
+  onDelete: (cmd: DogCommand) => void;
   onToggleFavorite: (cmd: DogCommand) => void;
   onSeedDemo?: () => void;
 }) {
   const { t } = useT();
   const [filter, setFilter] = useState<Filter>('all');
+  const [actionCommand, setActionCommand] = useState<DogCommand | null>(null);
+
+  const closeActions = useCallback(() => setActionCommand(null), []);
+
+  const openActions = useCallback((cmd: DogCommand) => {
+    haptic.light();
+    setActionCommand(cmd);
+  }, []);
+
+  const confirmDelete = useCallback((cmd: DogCommand, closeSwipe?: () => void) => {
+    closeActions();
+    haptic.warning();
+    Alert.alert(t('cmd.deleteConfirm'), t('cmd.deleteConfirmBody'), [
+      { text: t('common.cancel'), style: 'cancel', onPress: closeSwipe },
+      { text: t('common.delete'), style: 'destructive', onPress: () => {
+        closeSwipe?.();
+        haptic.heavy();
+        onDelete(cmd);
+      } },
+    ]);
+  }, [closeActions, onDelete, t]);
+
+  const editFromActions = useCallback(() => {
+    if (!actionCommand) return;
+    const cmd = actionCommand;
+    closeActions();
+    haptic.light();
+    onEdit(cmd);
+  }, [actionCommand, closeActions, onEdit]);
 
   if (commands.length === 0) {
     return (
@@ -91,24 +197,34 @@ export function DogCommandsCard({
 
       {/* Liste */}
       {shown.map(c => (
-        <TouchableOpacity key={c.id} style={s.item} activeOpacity={0.8} onPress={() => onOpen(c)}>
-          <View style={[s.itemBar, { backgroundColor: catColor(c.category) }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.itemName} numberOfLines={1}>{c.name}</Text>
-            <View style={s.itemMeta}>
-              <View style={[s.catBadge, { borderColor: `${catColor(c.category)}66` }]}><Text style={[s.catBadgeTxt, { color: catColor(c.category) }]}>{c.category === 'sport' ? 'Sport' : 'Alltag'}</Text></View>
-              {c.area ? <Text style={s.areaTxt}>{c.area}</Text> : null}
-              <DiffDots d={c.difficulty} />
-            </View>
-          </View>
-          <TouchableOpacity hitSlop={8} onPress={() => onToggleFavorite(c)} style={s.star} activeOpacity={0.7}>
-            <Ionicons name={c.isFavorite ? 'star' : 'star-outline'} size={18} color={c.isFavorite ? C.trackWarning : C.trackTextMut} />
-          </TouchableOpacity>
-        </TouchableOpacity>
+        <CommandRow
+          key={c.id}
+          command={c}
+          onOpen={onOpen}
+          onLongPress={openActions}
+          onToggleFavorite={onToggleFavorite}
+          onDeleteRequest={confirmDelete}
+          t={t}
+        />
       ))}
       {shown.length === 0 ? <Text style={s.none}>{t('commands.noneInSelection')}</Text> : null}
 
       <AnyvoButton label={t('commands.addNew')} icon="add" variant="secondary" onPress={onAdd} />
+
+      <AnyvoBottomSheet visible={!!actionCommand} onClose={closeActions} title={actionCommand?.name}>
+        {actionCommand ? (
+          <View style={s.actionSheet}>
+            <TouchableOpacity style={s.action} onPress={editFromActions} activeOpacity={0.85} accessibilityRole="button" testID="command-action-edit">
+              <Ionicons name="create-outline" size={19} color={C.trackText} />
+              <Text style={s.actionTxt}>{t('cmd.edit')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.action} onPress={() => confirmDelete(actionCommand)} activeOpacity={0.85} accessibilityRole="button" testID="command-action-delete">
+              <Ionicons name="trash-outline" size={19} color={C.trackDanger} />
+              <Text style={[s.actionTxt, { color: C.trackDanger }]}>{t('common.delete')}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </AnyvoBottomSheet>
     </View>
   );
 }
@@ -137,6 +253,11 @@ const s = StyleSheet.create({
   dots:      { flexDirection: 'row', gap: 3 },
   dot:       { width: 6, height: 6, borderRadius: 3 },
   star:      { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  swipeDelete:{ width: 96, borderRadius: 14, backgroundColor: C.trackDanger, alignItems: 'center', justifyContent: 'center', gap: 4, alignSelf: 'stretch' },
+  swipeDeleteTxt:{ color: '#fff', fontSize: 12.5, fontWeight: '800' },
+  actionSheet:{ gap: 8, paddingBottom: 6 },
+  action:    { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 14, paddingVertical: 13 },
+  actionTxt: { fontSize: 14.5, color: C.trackText, fontWeight: '800' },
   none:      { fontSize: 12.5, color: C.trackTextMut, textAlign: 'center', paddingVertical: 8 },
 
   empty:     { gap: 12, alignItems: 'center', borderRadius: 18, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 20, paddingVertical: 26 },

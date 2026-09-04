@@ -9,7 +9,7 @@ import { getDogById } from '@/services/dogs';
 import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtras } from '@/services/dogHub';
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
 import { getHeatCycleDetails, getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
-import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
+import { deleteCommand, getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
 import { getBackpack } from '@/features/dogs/backpack';
 import { toISODate } from '@/features/dogs/dateInput';
 import { currentHeatPhase } from '@/features/dogs/heatCalendar';
@@ -117,6 +117,7 @@ export default function DogHubRoute() {
 
   const reloadCommands = () => getCommands(id).then(setCommands).catch(() => {});
   const toggleCmdFav = async (c: DogCommand) => { await toggleCommandFavorite(id, c.id); reloadCommands(); };
+  const deleteCmd = async (c: DogCommand) => { await deleteCommand(id, c.id); reloadCommands(); };
   const seedCmds = async () => { await seedDemoCommands(id); reloadCommands(); };
 
   const openDocument = async (doc: DogDocument) => {
@@ -219,6 +220,8 @@ export default function DogHubRoute() {
         commands,
         onAdd: () => router.push({ pathname: '/dog-command/add', params: { dogId: id } } as never),
         onOpen: (c) => router.push({ pathname: '/dog-command/detail', params: { dogId: id, commandId: c.id } } as never),
+        onEdit: (c) => router.push({ pathname: '/dog-command/edit', params: { dogId: id, commandId: c.id } } as never),
+        onDelete: deleteCmd,
         onToggleFavorite: toggleCmdFav,
         onSeedDemo: seedCmds,
       }}

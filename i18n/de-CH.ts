@@ -524,8 +524,12 @@ export const deCH = {
   'cmd.commonMistakes': 'Typische Fehler',
   'cmd.tips':           'Tipps',
   'cmd.notFound':       'Kommando nicht gefunden.',
+  'cmd.edit':           'Bearbeiten',
+  'cmd.favorite':       'Als Favorit markieren',
+  'cmd.unfavorite':     'Favorit entfernen',
   'cmd.delete':         'Kommando löschen',
   'cmd.deleteConfirm':  'Kommando löschen?',
+  'cmd.deleteConfirmBody': 'Möchtest du dieses Kommando wirklich löschen?',
 
   // Begrüssung (Startseite)
   'greeting.morning': 'Guten Morgen',

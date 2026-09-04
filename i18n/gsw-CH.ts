@@ -524,8 +524,12 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'cmd.commonMistakes': 'Typischi Fähler',
   'cmd.tips':           'Tipps',
   'cmd.notFound':       'Kommando nöd gfunde.',
+  'cmd.edit':           'Bearbeite',
+  'cmd.favorite':       'Als Favorit markiere',
+  'cmd.unfavorite':     'Favorit entferne',
   'cmd.delete':         'Kommando lösche',
   'cmd.deleteConfirm':  'Kommando lösche?',
+  'cmd.deleteConfirmBody': 'Möchtsch du das Kommando würkli lösche?',
 
   // Begrüssung (Startseite)
   'greeting.morning': 'Guete Morge',

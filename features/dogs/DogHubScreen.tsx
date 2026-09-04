@@ -40,7 +40,15 @@ export interface DogHeatProps {
   currentPhases?: Record<string, string>;  // heatCycleId → current phase type name
 }
 // Kommandoliste — lokal geladen, als eigenständiger Prop reingereicht.
-export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void }
+export interface DogCommandsProps {
+  commands: DogCommand[];
+  onAdd: () => void;
+  onOpen: (c: DogCommand) => void;
+  onEdit: (c: DogCommand) => void;
+  onDelete: (c: DogCommand) => void;
+  onToggleFavorite: (c: DogCommand) => void;
+  onSeedDemo?: () => void;
+}
 // Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
 export interface DogBackpackProps { dogName: string; total: number; active: number; packed: number; onOpen: () => void }
 // Dashboard-Termine (bereits gefiltert/sortiert im Route-Wrapper) + Kalender-Öffnen.
@@ -275,7 +283,17 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
               {tab === 'goals'    && <DogGoalsCard goal={vm.goal} onEdit={actions.onEditGoal} />}
               {tab === 'health'   && <DogHealthLoadCard health={vm.health} onAddEntry={actions.onAddHealth} />}
               {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} onDelete={heat.onDelete} phaseCounts={heat.phaseCounts} obsCounts={heat.obsCounts} currentPhases={heat.currentPhases} />}
-              {tab === 'commands' && commands && <DogCommandsCard commands={commands.commands} onAdd={commands.onAdd} onOpen={commands.onOpen} onToggleFavorite={commands.onToggleFavorite} onSeedDemo={commands.onSeedDemo} />}
+              {tab === 'commands' && commands && (
+                <DogCommandsCard
+                  commands={commands.commands}
+                  onAdd={commands.onAdd}
+                  onOpen={commands.onOpen}
+                  onEdit={commands.onEdit}
+                  onDelete={commands.onDelete}
+                  onToggleFavorite={commands.onToggleFavorite}
+                  onSeedDemo={commands.onSeedDemo}
+                />
+              )}
               {tab === 'docs'     && <DogDocumentsCard documents={vm.documents} onAdd={actions.onAddDoc} onOpen={actions.onOpenDocument} onDelete={actions.onDeleteDocument} />}
               {tab === 'trainer'  && <DogTrainerCard trainer={vm.trainer} onChat={actions.onChat} />}
             </View>
