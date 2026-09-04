@@ -46,7 +46,7 @@ export function AnyvoButton({
 }
 
 const s = StyleSheet.create({
-  base:      { height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  base:      { height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', paddingHorizontal: 24 },
   big:       { height: 60, borderRadius: 20 },
   secondary: { backgroundColor: C.trackCardAlt, borderWidth: 1, borderColor: C.trackBorder },
   danger:    { backgroundColor: 'rgba(255,77,77,0.12)', borderWidth: 1, borderColor: 'rgba(255,77,77,0.3)' },

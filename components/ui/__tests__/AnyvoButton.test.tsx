@@ -37,6 +37,14 @@ describe('AnyvoButton – zentrale Klick-Haptik', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it('hat genug horizontalen Innenabstand für Buttons ohne Icon', () => {
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<AnyvoButton label="Dokument hinzufügen" variant="secondary" onPress={() => {}} />); });
+
+    const btn = node.root.findByType(TouchableOpacity);
+    expect(JSON.stringify(btn.props.style)).toContain('"paddingHorizontal":24');
+  });
+
   it('löst KEINE Haptik aus, wenn disabled', () => {
     const onPress = jest.fn();
     let node!: ReactTestRenderer;
