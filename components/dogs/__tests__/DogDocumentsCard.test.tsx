@@ -2,7 +2,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Text } from 'react-native';
+import { Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DogDocumentsCard } from '@/components/dogs/DogDocumentsCard';
 import { translate } from '@/i18n';
@@ -31,5 +31,8 @@ describe('DogDocumentsCard', () => {
     expect(allText(node)).not.toContain(translate('docs.add'));
     const icons = (node.root as unknown as { findAllByType: (t: unknown) => { props: { name?: string } }[] }).findAllByType(Ionicons);
     expect(icons.some(icon => icon.props.name === 'add')).toBe(false);
+    const buttons = (node.root as unknown as { findAllByType: (t: unknown) => { props: { style?: unknown } }[] }).findAllByType(TouchableOpacity);
+    const uploadButton = buttons.find(btn => JSON.stringify(btn.props.style).includes('"minWidth":260'));
+    expect(uploadButton).toBeTruthy();
   });
 });

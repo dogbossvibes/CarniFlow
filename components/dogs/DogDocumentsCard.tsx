@@ -32,7 +32,7 @@ export function DogDocumentsCard({
         <Text style={s.emptyTxt}>
           Lade wichtige Unterlagen deines Hundes hoch – zum Beispiel Impfpass, Stammbaum, Prüfungen oder Tierarztberichte.
         </Text>
-        <AnyvoButton label={t('docs.upload')} onPress={onAdd} />
+        <AnyvoButton label={t('docs.upload')} onPress={onAdd} style={s.emptyCta} />
       </View>
     );
   }
@@ -79,4 +79,5 @@ const s = StyleSheet.create({
   emptyIcon:  { width: 56, height: 56, borderRadius: 18, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 16.5, color: C.trackText, fontWeight: '800' },
   emptyTxt:   { fontSize: 13.5, color: C.trackTextSec, fontWeight: '500', lineHeight: 19, textAlign: 'center', marginBottom: 2 },
+  emptyCta:   { minWidth: 260, maxWidth: '100%', paddingHorizontal: 28 },
 });
