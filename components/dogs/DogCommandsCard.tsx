@@ -154,7 +154,7 @@ export function DogCommandsCard({
         <Text style={s.emptyTxt}>
           Lege eigene Kommandos für Sport und Alltag an, damit du bei jedem Hund den Überblick über Signale, Handsignale und Trainingsziele behältst.
         </Text>
-        <AnyvoButton label={t('commands.add')} icon="add" onPress={onAdd} />
+        <AnyvoButton label={t('commands.add')} onPress={onAdd} />
         {onSeedDemo ? (
           <TouchableOpacity onPress={onSeedDemo} hitSlop={6} style={s.seed}><Text style={s.seedTxt}>{t('commands.loadExamples')}</Text></TouchableOpacity>
         ) : null}
@@ -209,7 +209,7 @@ export function DogCommandsCard({
       ))}
       {shown.length === 0 ? <Text style={s.none}>{t('commands.noneInSelection')}</Text> : null}
 
-      <AnyvoButton label={t('commands.addNew')} icon="add" variant="secondary" onPress={onAdd} />
+      <AnyvoButton label={t('commands.addNew')} variant="secondary" onPress={onAdd} />
 
       <AnyvoBottomSheet visible={!!actionCommand} onClose={closeActions} title={actionCommand?.name}>
         {actionCommand ? (

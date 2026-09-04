@@ -214,7 +214,7 @@ export default function DogBackpackScreen() {
           ) : null}
 
           {/* Aktionen oben */}
-          <AnyvoButton label={t('backpack.addItem')} icon="add" onPress={openAdd} />
+          <AnyvoButton label={t('backpack.addItem')} onPress={openAdd} />
           <View style={{ height: 8 }} />
           <AnyvoButton label={t('backpack.suggestions')} icon="sparkles-outline" variant="secondary" onPress={openSuggestions} />
 
@@ -331,7 +331,7 @@ export default function DogBackpackScreen() {
           </View>
         ) : null}
         <Text style={s.sheetSection}>{t('backpack.ownItem')}</Text>
-        <AnyvoButton label={t('backpack.addItem')} icon="add" variant="secondary" onPress={() => { setSugOpen(false); openAdd(); }} />
+        <AnyvoButton label={t('backpack.addItem')} variant="secondary" onPress={() => { setSugOpen(false); openAdd(); }} />
         <View style={s.chips}>
           {getSuggestions(sugGroup).map(sug => {
             const key = `${sugGroup}:${sug.label}`;

@@ -154,7 +154,7 @@ export default function TrainingHubScreen() {
       </ScrollView>
 
       <TouchableOpacity style={[s.fab, { bottom: fabBottom }]} onPress={() => { haptic.light(); setCreateOpen(true); }} activeOpacity={0.9}>
-        <Ionicons name="add" size={30} color="#001210" />
+        <Ionicons name="calendar-outline" size={28} color="#001210" />
       </TouchableOpacity>
 
       <CreateEventModal visible={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => refresh()} />

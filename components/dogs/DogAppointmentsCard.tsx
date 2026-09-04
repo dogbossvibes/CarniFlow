@@ -44,7 +44,7 @@ export function DogAppointmentsCard({
           <Text style={s.emptyTxt}>{t('dash.noAppointments')}</Text>
           <TouchableOpacity style={s.createBtn} onPress={onOpenCalendar} activeOpacity={0.85}
             accessibilityRole="button" accessibilityLabel={t('dash.createAppointment')}>
-            <Ionicons name="add" size={15} color={C.trackPrimary} />
+            <Ionicons name="calendar-outline" size={15} color={C.trackPrimary} />
             <Text style={s.createTxt}>{t('dash.createAppointment')}</Text>
           </TouchableOpacity>
         </View>

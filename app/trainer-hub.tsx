@@ -228,7 +228,7 @@ export default function TrainerHubScreen() {
             </View>
 
             <TouchableOpacity style={s.sheetCta} onPress={() => go('/umfrage')} activeOpacity={0.85}>
-              <Ionicons name="add" size={20} color={C.accentText} />
+              <Ionicons name="clipboard-outline" size={20} color={C.accentText} />
               <Text style={s.sheetCtaTxt}>{t('trainer.surveyNew')}</Text>
             </TouchableOpacity>
           </View>

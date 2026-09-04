@@ -59,7 +59,7 @@ export function DogDocumentsCard({
           </TouchableOpacity>
         );
       })}
-      <AnyvoButton label={t('docs.add')} icon="add" variant="secondary" onPress={onAdd} />
+      <AnyvoButton label={t('docs.add')} variant="secondary" onPress={onAdd} />
     </View>
   );
 }

@@ -68,7 +68,7 @@ export function ConnectProfileScreen() {
 
             {!acc.profile ? (
               <TouchableOpacity style={s.cta} onPress={() => router.push('/connect/profil-bearbeiten')} activeOpacity={0.85} accessibilityRole="button">
-                <Ionicons name="add" size={18} color={C.accentText} />
+                <Ionicons name="person-circle-outline" size={18} color={C.accentText} />
                 <Text style={s.ctaTxt}>CONNECT-Profil erstellen</Text>
               </TouchableOpacity>
             ) : null}

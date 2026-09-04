@@ -75,7 +75,7 @@ export default function TrainerPlaeneScreen() {
       </ScrollView>
 
       <TouchableOpacity style={[s.fab, { bottom: fabBottom }]} onPress={() => { haptic.light(); router.push('/trainer/plan-neu'); }} activeOpacity={0.9}>
-        <Ionicons name="add" size={24} color={C.accentText} />
+        <Ionicons name="clipboard-outline" size={22} color={C.accentText} />
         <Text style={s.fabTxt}>{t('trainer.newPlan')}</Text>
       </TouchableOpacity>
     </SafeAreaView>

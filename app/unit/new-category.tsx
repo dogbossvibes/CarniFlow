@@ -182,7 +182,7 @@ export default function NewCategoryScreen() {
               returnKeyType="done"
             />
             <TouchableOpacity style={[s.addBtn, { backgroundColor: color }]} onPress={addExercise} activeOpacity={0.8}>
-              <Ionicons name="add" size={22} color="#000" />
+              <Ionicons name="checkmark" size={22} color="#000" />
             </TouchableOpacity>
           </View>
 

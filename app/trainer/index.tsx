@@ -84,7 +84,7 @@ export default function MyTrainersScreen() {
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <AnimatedPressable style={s.connectBtn} scale={0.97} onPress={() => { tapHaptic(); setSheet(true); }}>
           <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-          <Ionicons name="add" size={20} color={C.accentText} />
+          <Ionicons name="link-outline" size={20} color={C.accentText} />
           <Text style={s.connectTxt}>{t('trainer.connect')}</Text>
         </AnimatedPressable>
 

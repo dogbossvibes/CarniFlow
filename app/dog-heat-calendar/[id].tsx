@@ -129,7 +129,7 @@ export default function DogHeatCalendarScreen() {
             <Text style={s.barSubtitle}>Verlauf & Phasen</Text>
           </View>
           <TouchableOpacity style={s.iconBtn} onPress={() => router.push({ pathname: '/dog-heat-new', params: { id: dogId } } as never)} hitSlop={8} accessibilityLabel={t('heat.add')}>
-            <Ionicons name="add" size={20} color={C.trackText} />
+            <Ionicons name="calendar-outline" size={20} color={C.trackText} />
           </TouchableOpacity>
         </View>
 

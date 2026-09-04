@@ -125,7 +125,7 @@ export default function LiveScreen() {
 
           {/* + Übung hinzufügen */}
           <AnimatedPressable style={s.addBtn} scale={0.97} onPress={() => { tapHaptic(); router.push('/unit/start'); }}>
-            <Ionicons name="add" size={20} color={C.accent} />
+            <Ionicons name="create-outline" size={20} color={C.accent} />
             <Text style={s.addTxt}>{t('training.addExercise')}</Text>
           </AnimatedPressable>
 

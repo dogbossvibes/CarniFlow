@@ -177,7 +177,7 @@ export default function HomeScreen() {
             ) : (
               <AnimatedPressable style={s.leerKarte} onPress={() => router.push("/add-dog")}>
                 <View style={s.leerIcon}>
-                  <Ionicons name="add" size={24} color={C.accent} />
+                  <Ionicons name="paw-outline" size={24} color={C.accent} />
                 </View>
                 <View>
                   <Text style={s.leerTitel}>{t("home.addFirstDog")}</Text>

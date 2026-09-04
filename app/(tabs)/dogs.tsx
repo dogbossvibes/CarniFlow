@@ -61,7 +61,7 @@ export default function HundeScreen() {
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <Ionicons name="add" size={22} color={C.accentText} />
+          <Ionicons name="paw-outline" size={22} color={C.accentText} />
         </AnimatedPressable>
       </View>
 
@@ -129,7 +129,7 @@ export default function HundeScreen() {
                   end={{ x: 1, y: 1 }}
                   style={StyleSheet.absoluteFill}
                 />
-                <Ionicons name="add" size={18} color={C.accentText} />
+                <Ionicons name="paw-outline" size={18} color={C.accentText} />
                 <Text style={s.leerBtnText}>{t('dog.add')}</Text>
               </AnimatedPressable>
             </View>

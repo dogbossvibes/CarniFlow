@@ -94,7 +94,7 @@ export function DogHeatCard({
         </View>
       ) : null}
 
-      <AnyvoButton label={t('heat.add')} icon="add" onPress={onAdd} />
+      <AnyvoButton label={t('heat.add')} onPress={onAdd} />
       {onOpenCalendar ? (
         <TouchableOpacity style={s.calendarLink} onPress={onOpenCalendar} activeOpacity={0.82} accessibilityRole="button">
           <View style={s.calendarIcon}><Ionicons name="calendar-outline" size={16} color={PINK} /></View>

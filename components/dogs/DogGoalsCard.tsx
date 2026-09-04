@@ -16,7 +16,7 @@ export function DogGoalsCard({ goal, onEdit }: { goal: DogGoal; onEdit: () => vo
           <Ionicons name="flag-outline" size={22} color={C.trackTextMut} />
           <Text style={s.emptyTxt}>{t('dog.noGoal')}</Text>
         </View>
-        <AnyvoButton label={t('dog.addGoal')} icon="add" variant="secondary" onPress={onEdit} />
+        <AnyvoButton label={t('dog.addGoal')} variant="secondary" onPress={onEdit} />
       </View>
     );
   }

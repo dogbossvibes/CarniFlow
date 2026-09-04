@@ -211,7 +211,7 @@ export default function UnitStartScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('training.createCategory')}
           >
-            <Ionicons name="add" size={20} color={C.accent} />
+            <Ionicons name="create-outline" size={20} color={C.accent} />
             <Text style={s.createBtnTxt}>{t('training.createCategory')}</Text>
           </TouchableOpacity>
         )}

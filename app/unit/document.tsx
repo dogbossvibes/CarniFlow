@@ -267,7 +267,7 @@ export default function DocumentScreen() {
               <View style={s.customRow}>
                 <TextInput style={[s.input, s.flex]} placeholder={t('training.customExercisePlaceholder')} placeholderTextColor={C.placeholder} value={customDraft} onChangeText={setCustomDraft} onSubmitEditing={addCustom} returnKeyType="done" />
                 <TouchableOpacity style={[s.addBtn, { backgroundColor: disc.accent }]} onPress={addCustom} activeOpacity={0.8}>
-                  <Ionicons name="add" size={22} color="#000" />
+                  <Ionicons name="checkmark" size={22} color="#000" />
                 </TouchableOpacity>
               </View>
             </>

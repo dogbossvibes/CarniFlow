@@ -39,7 +39,7 @@ export function DogHealthLoadCard({ health, onAddEntry }: { health: DogHealth; o
         <View style={s.note}><Text style={s.noteTxt}>{health.note}</Text></View>
       ) : null}
 
-      <AnyvoButton label="Eintrag hinzufügen" icon="add" variant="secondary" onPress={onAddEntry} />
+      <AnyvoButton label="Eintrag hinzufügen" variant="secondary" onPress={onAddEntry} />
     </View>
   );
 }

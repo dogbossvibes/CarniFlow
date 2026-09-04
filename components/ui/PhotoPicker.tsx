@@ -149,7 +149,7 @@ export function PhotoPicker({ value, onChange, maxPhotos = 10 }: Props) {
             ladeAnzeige
           ) : (
             <>
-              <Ionicons name="add" size={22} color={C.muted} />
+              <Ionicons name="camera-outline" size={22} color={C.muted} />
               <Text style={S.addTxt}>{t('media.addSplit')}</Text>
             </>
           )}

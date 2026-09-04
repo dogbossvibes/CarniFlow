@@ -480,7 +480,7 @@ export default function HomeCustomizeScreen() {
             accessibilityLabel={t('quickButton.chooseActions')}
           >
             <View style={s.zeileIcon}>
-              <Ionicons name="add" size={18} color={C.accent} />
+              <Ionicons name="apps-outline" size={18} color={C.accent} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.zeileLabel}>{t('quickButton.chooseActions')}</Text>
