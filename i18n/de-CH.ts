@@ -366,6 +366,7 @@ export const deCH = {
   // Dokumente
   'docs.title':      'Dokumente',
   'docs.add':        'Dokument hinzufügen',
+  'docs.upload':     'Dokument hochladen',
   'docs.emptyTitle': 'Noch keine Dokumente',
 
   // Kommandoliste

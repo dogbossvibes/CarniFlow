@@ -340,6 +340,7 @@ export const fr: Record<TranslationKey, string> & Record<string, string> = {
   "toast.localSaved": "Enregistré localement : l’évaluation sera disponible après la synchronisation.",
   "docs.title": "Documents",
   "docs.add": "Ajouter un document",
+  "docs.upload": "Téléverser un document",
   "docs.emptyTitle": "Aucun document pour l’instant",
   "commands.title": "Commandes",
   "commands.add": "Ajouter une commande",

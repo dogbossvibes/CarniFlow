@@ -366,6 +366,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   // Dokumente
   'docs.title':      'Dokument',
   'docs.add':        'Dokument hinzufüege',
+  'docs.upload':     'Dokument ufelade',
   'docs.emptyTitle': 'No kei Dokument',
 
   // Kommandoliste

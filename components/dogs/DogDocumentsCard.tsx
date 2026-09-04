@@ -32,7 +32,7 @@ export function DogDocumentsCard({
         <Text style={s.emptyTxt}>
           Lade wichtige Unterlagen deines Hundes hoch – zum Beispiel Impfpass, Stammbaum, Prüfungen oder Tierarztberichte.
         </Text>
-        <AnyvoButton label={t('docs.add')} icon="add" onPress={onAdd} />
+        <AnyvoButton label={t('docs.upload')} onPress={onAdd} />
       </View>
     );
   }
