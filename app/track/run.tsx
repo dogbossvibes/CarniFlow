@@ -458,6 +458,34 @@ export default function TrackRunScreen() {
   // Permanentes Off-Track-Banner leitet sich vom aktuellen State ab (nur während der
   // aktiven Absuche; im Arming-Overlay unsichtbar).
   const offBanner = !arming && s.recording ? offTrackBanner(s.offTrackState) : null;
+  // Search Start Acquisition (Track-Assoziation am Beginn der Absuche): kurzes,
+  // unaufdringliches Banner zwischen "Jetzt starten" (Arming-Overlay schliesst)
+  // und dem eindeutigen Start-Lock. SEEKING_START zeigt bewusst nichts (der
+  // Ansatz-Hinweis kam bereits im Arming-Overlay) — nur START_CANDIDATE bekommt
+  // einen Hinweistext, START_LOCKED eine kurze, transiente Bestätigung
+  // (derselbe Debounce-/Timer-Aufbau wie das Off-Track-Recovery-Banner oben).
+  // Kein Freeze, keine Blockade — die Absuche läuft im Hintergrund normal weiter.
+  const [startLockedBannerVisible, setStartLockedBannerVisible] = useState(false);
+  const startLockedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevSearchStartRef = useRef(s.searchStartState);
+  useEffect(() => {
+    const prev = prevSearchStartRef.current;
+    prevSearchStartRef.current = s.searchStartState;
+    if (!s.recording || arming) return;
+    if (prev !== 'START_LOCKED' && s.searchStartState === 'START_LOCKED') {
+      hapticSuccess();
+      if (voiceOn) say(t('track.searchStartLocked'));
+      setStartLockedBannerVisible(true);
+      if (startLockedTimerRef.current) clearTimeout(startLockedTimerRef.current);
+      startLockedTimerRef.current = setTimeout(() => { setStartLockedBannerVisible(false); startLockedTimerRef.current = null; }, 1800);
+    }
+  }, [s.searchStartState, s.recording, arming, voiceOn, t]);
+  useEffect(() => () => { if (startLockedTimerRef.current) clearTimeout(startLockedTimerRef.current); }, []);
+  const searchStartBanner = !arming && s.recording
+    ? (s.searchStartState === 'START_CANDIDATE' ? t('track.searchStartCandidate')
+      : startLockedBannerVisible ? t('track.searchStartLocked')
+      : null)
+    : null;
 
   const currentRunSegment = useMemo(() => {
     const step = metersToSteps(s.dogProgressM, stepLengthM);
@@ -676,6 +704,19 @@ export default function TrackRunScreen() {
                   <Text className="flex-1 text-[13px] font-bold text-ft-acc">{t('track.backOnTrack')}</Text>
                 </View>
               ) : null}
+            </View>
+          )}
+
+          {/* Search Start Acquisition: kurzes Banner zwischen "Jetzt starten" und dem
+              eindeutigen Start-Lock (SEEKING_START zeigt hier bewusst nichts — der
+              Ansatz-Hinweis kam bereits im Arming-Overlay). Kein Freeze, keine
+              Blockade — die Absuche läuft im Hintergrund bereits normal weiter. */}
+          {searchStartBanner && (
+            <View className="absolute top-[84px] left-[14px] right-[14px]" pointerEvents="none">
+              <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3 bg-ft-glass border border-ft-glass-line">
+                <Ionicons name="locate-outline" size={16} color={FT.acc} />
+                <Text className="flex-1 text-[13px] font-bold text-ft-text">{searchStartBanner}</Text>
+              </View>
             </View>
           )}
 

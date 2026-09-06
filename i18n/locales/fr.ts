@@ -776,6 +776,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.searchHandlerDistanceOption": "Distance : {meters} mètres",
   "track.searchStartNow": "Démarrer maintenant",
   "track.searchStartHint": "La recherche démarre après ton appui. Hors de la zone de départ, une confirmation est requise.",
+  "track.searchStartCandidate": "Détection du départ de la piste …",
+  "track.searchStartLocked": "Départ de la piste détecté",
   "track.liveResting": "AU REPOS",
   "track.livePaused": "EN PAUSE",
   "track.liveLive": "LIVE",

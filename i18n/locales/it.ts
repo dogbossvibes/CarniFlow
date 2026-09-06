@@ -246,6 +246,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.searchHandlerDistanceOption": "Distanza: {meters} metri",
   "track.searchStartNow": "Avvia ora",
   "track.searchStartHint": "La ricerca inizia solo dopo il tuo tocco. Fuori dall’area di partenza è richiesta una conferma.",
+  "track.searchStartCandidate": "Rilevamento partenza pista …",
+  "track.searchStartLocked": "Partenza pista rilevata",
   "track.offTrackWarning": "Ti stai allontanando dalla pista",
   "track.offTrack": "Sei fuori dalla pista",
   "track.backOnTrack": "Di nuovo sulla pista",

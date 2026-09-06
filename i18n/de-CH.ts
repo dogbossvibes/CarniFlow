@@ -265,6 +265,8 @@ export const deCH = {
   'track.searchHandlerDistanceOption': 'Abstand {meters} Meter',
   'track.searchStartNow': 'Jetzt starten',
   'track.searchStartHint': 'Startet die Absuche erst nach deinem Tippen. Ausserhalb des Startbereichs wird eine Bestätigung verlangt.',
+  'track.searchStartCandidate': 'Fährtenansatz wird erkannt …',
+  'track.searchStartLocked': 'Fährtenansatz erkannt',
   'track.offTrackWarning': 'Du entfernst dich von der Fährte',
   'track.offTrack': 'Du bist neben der Fährte',
   'track.backOnTrack': 'Wieder auf der Fährte',

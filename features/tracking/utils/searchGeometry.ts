@@ -43,6 +43,49 @@ export function forwardDistanceFromDog(eventArcM: number, dogProgressM: number):
   return d >= 0 ? d : null;
 }
 
+// Projiziert p auf eine Polyline, aber NUR innerhalb eines Fortschritts-Fensters
+// [fromM - backM, fromM + lookaheadM]. So zählt die Abweichung gegen den
+// ERWARTETEN Abschnitt — nicht gegen irgendeinen geometrisch nahen Teil der
+// Linie. Liefert die senkrechte Abweichung (m) und die projizierte Bogenlänge
+// atM (m). Gemeinsam genutzt von useSearchRecorder (Fenster relativ zum
+// laufenden Cursor) UND searchStartAcquisition (festes Fenster [0, startWindowM]
+// vor dem Start-Lock) — eine Projektionsfunktion, keine zweite Geometrie-Engine.
+export function projectForward(
+  p: LL, line: LL[], cum: number[], fromM: number, lookaheadM: number, backM: number,
+): { devM: number; atM: number } {
+  if (line.length < 2) {
+    if (!line.length) return { devM: Infinity, atM: fromM };
+    const R = 6371000;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(line[0].latitude - p.latitude);
+    const dLng = toRad(line[0].longitude - p.longitude);
+    const la1 = toRad(p.latitude), la2 = toRad(line[0].latitude);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+    return { devM: 2 * R * Math.asin(Math.min(1, Math.sqrt(h))), atM: fromM };
+  }
+  const total = cum[cum.length - 1];
+  const lo = Math.max(0, fromM - backM);
+  const hi = Math.min(total, fromM + lookaheadM);
+  const mPerLat = 111320;
+  const mPerLng = 111320 * Math.cos((p.latitude * Math.PI) / 180);
+  const X = (q: LL) => ({ x: (q.longitude - p.longitude) * mPerLng, y: (q.latitude - p.latitude) * mPerLat });
+  let best = Infinity, bestAt = fromM;
+  for (let i = 1; i < line.length; i++) {
+    const segLo = cum[i - 1], segHi = cum[i];
+    if (segHi < lo || segLo > hi) continue;          // Segment ausserhalb des Fensters
+    const a = X(line[i - 1]), b = X(line[i]);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? -(a.x * dx + a.y * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = a.x + t * dx, cy = a.y + t * dy;
+    const d = Math.hypot(cx, cy);
+    if (d < best) { best = d; bestAt = segLo + t * (segHi - segLo); }
+  }
+  if (!Number.isFinite(best)) return { devM: Infinity, atM: fromM };
+  return { devM: best, atM: bestAt };
+}
+
 // Koordinate auf der Polyline bei Bogenlänge d (0..total), linear interpoliert.
 // clamp 0..total; null bei leerer Linie. Folgt der Fährte um Winkel herum, weil
 // entlang der kumulierten Segmente gelaufen wird (kein Luftlinien-Versatz).

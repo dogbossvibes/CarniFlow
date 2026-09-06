@@ -265,6 +265,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.searchHandlerDistanceOption': 'Abstand {meters} Meter',
   'track.searchStartNow': 'Jetzt starte',
   'track.searchStartHint': 'Startet d Absuechi erst nach dim Tippe. Usserhalb vom Startbereich wird e Bestätigung verlangt.',
+  'track.searchStartCandidate': 'Fährteansatz wird erkennt …',
+  'track.searchStartLocked': 'Fährteansatz erkennt',
   'track.offTrackWarning': 'Du entfernsch di vo dr Fährte',
   'track.offTrack': 'Du bisch näbe dr Fährte',
   'track.backOnTrack': 'Wieder uf dr Fährte',

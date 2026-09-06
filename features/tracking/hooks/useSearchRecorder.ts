@@ -13,7 +13,12 @@ import * as Location from 'expo-location';
 import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind,
 } from '@/features/tracking/utils/positionSource';
-import { DEFAULT_HANDLER_DISTANCE_M, estimateDogProgressM, pointAtDistance } from '@/features/tracking/utils/searchGeometry';
+import { DEFAULT_HANDLER_DISTANCE_M, estimateDogProgressM, pointAtDistance, projectForward } from '@/features/tracking/utils/searchGeometry';
+import {
+  DEFAULT_SEARCH_START_CONFIG, INITIAL_SEARCH_START, evaluateStartCandidate, firstLegHeadingDeg as computeFirstLegHeadingDeg,
+  stepSearchStart, type SearchStartAcqState, type SearchStartState,
+} from '@/features/tracking/engine/searchStartAcquisition';
+import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import { stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
@@ -89,37 +94,6 @@ function buildArc(line: LatLng[]): { cum: number[]; total: number } {
   return { cum, total: cum.length ? cum[cum.length - 1] : 0 };
 }
 
-// Projiziert p auf die Soll-Fährte, aber NUR innerhalb eines Fortschritts-Fensters
-// [fromM - BACK_M, fromM + LOOKAHEAD_M]. So zählt die Abweichung gegen den ERWARTETEN
-// nächsten Abschnitt — nicht gegen irgendeinen geometrisch nahen Teil der Fährte.
-// Liefert die senkrechte Abweichung (m) und die projizierte Bogenlänge atM (m).
-function projectForward(
-  p: LatLng, line: LatLng[], cum: number[], fromM: number, lookaheadM: number, backM: number,
-): { devM: number; atM: number } {
-  if (line.length < 2) return { devM: line.length ? distM(p, line[0]) : Infinity, atM: fromM };
-  const total = cum[cum.length - 1];
-  const lo = Math.max(0, fromM - backM);
-  const hi = Math.min(total, fromM + lookaheadM);
-  const mPerLat = 111320;
-  const mPerLng = 111320 * Math.cos((p.latitude * Math.PI) / 180);
-  const X = (q: LatLng) => ({ x: (q.longitude - p.longitude) * mPerLng, y: (q.latitude - p.latitude) * mPerLat });
-  let best = Infinity, bestAt = fromM;
-  for (let i = 1; i < line.length; i++) {
-    const segLo = cum[i - 1], segHi = cum[i];
-    if (segHi < lo || segLo > hi) continue;          // Segment ausserhalb des Fensters
-    const a = X(line[i - 1]), b = X(line[i]);
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const len2 = dx * dx + dy * dy;
-    let t = len2 ? -(a.x * dx + a.y * dy) / len2 : 0;
-    t = Math.max(0, Math.min(1, t));
-    const cx = a.x + t * dx, cy = a.y + t * dy;
-    const d = Math.hypot(cx, cy);
-    if (d < best) { best = d; bestAt = segLo + t * (segHi - segLo); }
-  }
-  if (!Number.isFinite(best)) return { devM: Infinity, atM: fromM };
-  return { devM: best, atM: bestAt };
-}
-
 export interface SearchRecorder {
   ready: boolean;
   recording: boolean;
@@ -141,6 +115,12 @@ export interface SearchRecorder {
   score: number;
   accuracy: number | null;
   gpsDebug: GpsDebug;
+  // Search Start Acquisition (Track-Assoziation am Beginn der Absuche): solange
+  // nicht START_LOCKED, ist dogProgressM/estimatedDogPosition NICHT um den
+  // Hundabstand vorgeschoben (siehe engine/searchStartAcquisition.ts). Der
+  // UI-Text wird bewusst NICHT hier zurückgegeben (kein i18n-Zugriff in
+  // diesem reinen Hook) — run.tsx mappt den State selbst über t().
+  searchStartState: SearchStartState;
   // Ohne Argument: frische Absuche (Reset). Mit `resume`: unterbrochene Absuche
   // fortsetzen (P2) — Punkte/Distanz/Timer werden fortgeführt, keine neue Session.
   start: (resume?: { points: LatLng[]; startedAtMs: number }) => void;
@@ -202,6 +182,16 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const startMsRef = useRef(0);
   const cursorMRef = useRef(0);      // aktueller Fortschritt entlang der Soll-Fährte (m)
   const maxCursorMRef = useRef(0);   // weitester erreichter Fortschritt (für Coverage)
+
+  // ── Search Start Acquisition (Track-Assoziation am Beginn der Absuche) ──
+  // Solange nicht START_LOCKED: Track-Projektion bleibt auf das enge Startfenster
+  // beschränkt, der gewählte Hundabstand wird NICHT auf den Fortschritt addiert.
+  // Reiner Reducer, siehe engine/searchStartAcquisition.ts.
+  const [searchStartState, setSearchStartState] = useState<SearchStartState>('SEEKING_START');
+  const searchStartRef = useRef<SearchStartAcqState>(INITIAL_SEARCH_START);
+  // Richtung des ersten Schenkels — Vergleichsbasis für die (rein zusätzliche)
+  // Kurs-Evidenz. Stabil pro laidPoints/arc, kein Recompute je Fix.
+  const firstLegHeading = useMemo(() => computeFirstLegHeadingDeg(laidPoints, arc.cum), [laidPoints, arc.cum]);
 
   const computeScore = useCallback(() => {
     // Ohne Soll-Fährte (Freilauf-Training) gibt es nichts zu bewerten → neutral.
@@ -294,7 +284,55 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     // Projektion nur auf das ERWARTETE Fenster ab dem aktuellen Fortschritt; der
     // Cursor rückt nur vor, wenn der Hund nah genug an der erwarteten Stelle ist.
     let dev: number;
-    if (hasTrack) {
+    // ── Search Start Acquisition (Punkt 2-11): solange nicht START_LOCKED,
+    // bleibt die Track-Projektion auf das enge Startfenster [0, startWindowM]
+    // beschränkt (Punkt 3) — die normale, unveränderte order-aware Projektion
+    // (LOOKAHEAD_M/BACK_M/ADVANCE_DEV_M, cursor-relativ) läuft erst NACH dem
+    // Lock, mit einem Cursor, der deterministisch vom gelockten Startfenster-
+    // Kandidaten übernommen wird (Punkt 10) statt von einem beliebigen späteren
+    // nearest-point-Kandidaten (Punkt 5/11 — genau der Feldtest-Fall).
+    const wasLocked = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
+    if (hasTrack && !wasLocked) {
+      const evalu = evaluateStartCandidate(sm, laidPoints, arc.cum, DEFAULT_SEARCH_START_CONFIG);
+      // Bewegungsrichtung seit dem vorletzten AKZEPTIERTEN Streckenpunkt — nur
+      // zusätzliche Evidenz (Punkt 5/16), niemals eine harte Bedingung.
+      const heading = pts.length >= 2
+        ? calculateHeading(
+            { lat: pts[pts.length - 2].latitude, lng: pts[pts.length - 2].longitude },
+            { lat: pts[pts.length - 1].latitude, lng: pts[pts.length - 1].longitude },
+          )
+        : null;
+      const prevState = searchStartRef.current.state;
+      searchStartRef.current = stepSearchStart(
+        searchStartRef.current, evalu, { position: sm, accuracy: accRaw, headingDeg: heading },
+        firstLegHeading, DEFAULT_SEARCH_START_CONFIG,
+      );
+      if (searchStartRef.current.state !== prevState) {
+        setSearchStartState(searchStartRef.current.state);
+        if (__DEV__) {
+          // Kein PII/keine vollständigen Koordinaten — nur abgeleitete Meterwerte.
+          console.log('[searchStart]', {
+            state: searchStartRef.current.state, support: searchStartRef.current.support,
+            distanceM: evalu.candidateDevM != null ? Math.round(evalu.candidateDevM * 10) / 10 : null,
+            accuracy: accRaw != null ? Math.round(accRaw) : null,
+            candidateProgress: evalu.candidateAtM != null ? Math.round(evalu.candidateAtM * 10) / 10 : null,
+            ambiguity: evalu.ambiguityM != null ? Math.round(evalu.ambiguityM * 10) / 10 : null,
+          });
+          if (searchStartRef.current.state === 'START_LOCKED') {
+            console.log('[searchStart]', {
+              state: 'START_LOCKED', progress: Math.round((searchStartRef.current.lockedAtM ?? 0) * 10) / 10,
+              firstLegHeading, reason: 'stable_start_evidence',
+            });
+          }
+        }
+      }
+      if (searchStartRef.current.state === 'START_LOCKED') {
+        const lockedAt = searchStartRef.current.lockedAtM ?? 0;
+        cursorMRef.current = lockedAt;
+        maxCursorMRef.current = lockedAt;
+      }
+      dev = evalu.candidateDevM != null && Number.isFinite(evalu.candidateDevM) ? evalu.candidateDevM : ZERO_DEV_M;
+    } else if (hasTrack) {
       const proj = projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
       dev = Number.isFinite(proj.devM) ? proj.devM : ZERO_DEV_M;
       if (dev <= ADVANCE_DEV_M && proj.atM > cursorMRef.current) {
@@ -309,38 +347,48 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
 
     // ── Abriss-/Neuansatz-Erkennung ──
     const now = Date.now();
+    // Solange die Track-Assoziation noch nicht eindeutig ist (Punkt 9), wird
+    // weder Off-Track noch Abriss bewertet — beides wäre gegen ein noch nicht
+    // bestätigtes Segment gemessen und könnte einen falschen Alarm auslösen,
+    // während der Handler nachweislich noch am Ansatz steht/ankommt.
+    const startLocked = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
 
     // Phase-1 Off-Track: State-Machine mit dem bereits berechneten seitlichen Abstand
     // (dev = projectForward().devM) + GPS-Genauigkeit füttern. NUR Status halten —
     // keine UI/Voice/Haptik/Freeze-/Pause-Aktion (bewusst separate Phase 2+).
-    if (hasTrack) {
+    if (hasTrack && startLocked) {
       offTrackRef.current = stepOffTrack(offTrackRef.current, {
         crossTrackM: dev, accuracyM: accRaw, accepted: true, nowMs: now,
       }).snap;
     }
 
-    if (!inBreakRef.current) {
-      if (dev > BREAK_THRESHOLD_M) {
-        if (offTrackSinceRef.current == null) offTrackSinceRef.current = now;
-        else if (now - offTrackSinceRef.current >= BREAK_HOLD_MS) {
-          inBreakRef.current = true;
-          breaksRef.current.push({ at: sm, t: Math.floor((now - startMsRef.current) / 1000) });
+    if (startLocked) {
+      if (!inBreakRef.current) {
+        if (dev > BREAK_THRESHOLD_M) {
+          if (offTrackSinceRef.current == null) offTrackSinceRef.current = now;
+          else if (now - offTrackSinceRef.current >= BREAK_HOLD_MS) {
+            inBreakRef.current = true;
+            breaksRef.current.push({ at: sm, t: Math.floor((now - startMsRef.current) / 1000) });
+          }
+        } else {
+          offTrackSinceRef.current = null;
         }
       } else {
-        offTrackSinceRef.current = null;
-      }
-    } else {
-      if (dev <= RECOVER_M) {
-        inBreakRef.current = false;
-        offTrackSinceRef.current = null;
-        const b = breaksRef.current[breaksRef.current.length - 1];
-        if (b) b.recoveredAfterM = Math.round(distRef.current);
+        if (dev <= RECOVER_M) {
+          inBreakRef.current = false;
+          offTrackSinceRef.current = null;
+          const b = breaksRef.current[breaksRef.current.length - 1];
+          if (b) b.recoveredAfterM = Math.round(distRef.current);
+        }
       }
     }
 
     // ── Gegenstand verwiesen? ──
-    const dogProgress = estimateDogProgressM(maxCursorMRef.current, handlerDistanceM, arc.total);
-    const dogPos = pointAtDistance(laidPoints, arc.cum, dogProgress);
+    // Vor START_LOCKED ausschliesslich anhand der Handlerposition (Punkt 4) —
+    // der gewählte Hundabstand darf die virtuelle Hundeposition nicht schon
+    // vorschieben, bevor der Start eindeutig feststeht.
+    const dogProgress = startLocked ? estimateDogProgressM(maxCursorMRef.current, handlerDistanceM, arc.total) : maxCursorMRef.current;
+    const dogPos = startLocked ? pointAtDistance(laidPoints, arc.cum, dogProgress) : null;
     const objectReference = dogPos ?? sm;
     laidObjects.forEach((o, i) => {
       if (!foundRef.current.has(i) && distM(objectReference, o.at) <= OBJECT_HIT_M) {
@@ -349,7 +397,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     });
 
     pushSnapshot();
-  }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM]);
+  }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM, firstLegHeading]);
 
   // ── Watch ab Mount ──
   useEffect(() => {
@@ -400,6 +448,13 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     offTrackSinceRef.current = null; inBreakRef.current = false;
     offTrackRef.current = initialOffTrack();
     cursorMRef.current = 0; maxCursorMRef.current = 0;
+    // Fortsetzen einer bereits laufenden Absuche (Resume) oder Freilauf ohne
+    // Soll-Fährte: die Track-Assoziation wurde vorher schon bestätigt bzw. ist
+    // gegenstandslos → direkt START_LOCKED, keine erneute Akquisition nötig.
+    searchStartRef.current = (resume || !hasTrack)
+      ? { state: 'START_LOCKED', support: DEFAULT_SEARCH_START_CONFIG.requiredFixes, lockedAtM: 0 }
+      : INITIAL_SEARCH_START;
+    setSearchStartState(searchStartRef.current.state);
     foundRef.current = new Set();
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
     setElapsedS(resume ? Math.max(0, Math.floor((Date.now() - resume.startedAtMs) / 1000)) : 0);
@@ -413,7 +468,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     recordingRef.current = true; setRecording(true);
     if (__DEV__) console.log('[searchRecorder] recording started', { resume: !!resume, resumePts: resumePts.length });
     pushSnapshot();
-  }, [pushSnapshot]);
+  }, [pushSnapshot, hasTrack]);
 
   const stop = useCallback((): SearchResult => {
     recordingRef.current = false; setRecording(false);
@@ -447,8 +502,11 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
 
   // Virtueller Hundefortschritt (Bogenlänge) + geschätzte Hundeposition — reine
   // Runtime-Ableitung aus dem bestehenden progressM (Handler). Kein GPS-Rohpunkt.
-  const dogProgressM = estimateDogProgressM(snap.progressM, handlerDistanceM, arc.total);
-  const estimatedDogPosition = pointAtDistance(laidPoints, arc.cum, dogProgressM);
+  // Vor START_LOCKED (Punkt 4): kein Hundabstand-Offset, kein Marker — nur die
+  // Handlerposition selbst zählt, solange die Start-Assoziation nicht feststeht.
+  const startLockedForDisplay = !hasTrack || searchStartState === 'START_LOCKED';
+  const dogProgressM = startLockedForDisplay ? estimateDogProgressM(snap.progressM, handlerDistanceM, arc.total) : snap.progressM;
+  const estimatedDogPosition = startLockedForDisplay ? pointAtDistance(laidPoints, arc.cum, dogProgressM) : null;
 
   return {
     ready, recording, paused,
@@ -458,6 +516,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     dogProgressM, trackLengthM: arc.total, estimatedDogPosition,
     elapsedS, score: snap.score, accuracy,
     gpsDebug,
+    searchStartState,
     start, stop, setPaused, markObject,
   };
 }
