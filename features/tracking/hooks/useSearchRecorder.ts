@@ -257,6 +257,61 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     prevFixRef.current = { lat: raw.latitude, lng: raw.longitude, t: tNow };
     lastFixTRef.current = tNow;
 
+    // ── Search Start Acquisition — MUSS auf JEDEM akzeptierten Fix laufen,
+    // NICHT erst nach dem Liniendichte-Gate (MIN_SEGMENT) weiter unten. Sonst
+    // kann ein stillstehender oder sehr langsam gehender Handler (< 1.5 m
+    // Bewegung zwischen zwei akzeptierten Fixes — der Normalfall direkt am
+    // Fährtenansatz) den Support-Zähler nie über 1 hinaus bringen, weil danach
+    // jeder weitere Fix vor Erreichen dieses Codes early-returned: bestätigter
+    // Production-Regressionsbug (527217d) — ein Handler, der exakt am echten
+    // Start steht, wurde nie gelockt. Der Liniendichte-Gate bleibt unverändert
+    // (steuert weiterhin nur, wann ein neuer Linienpunkt gespeichert wird).
+    const wasLocked = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
+    let startEvalu: ReturnType<typeof evaluateStartCandidate> | null = null;
+    if (hasTrack && !wasLocked) {
+      startEvalu = evaluateStartCandidate(sm, laidPoints, arc.cum, DEFAULT_SEARCH_START_CONFIG);
+      // Bewegungsrichtung seit dem letzten gespeicherten Streckenpunkt — nur
+      // zusätzliche Evidenz (Punkt 5/16), niemals eine harte Bedingung. Unter
+      // einem Meter Bewegung wird kein Kurs berechnet (sonst Richtungsrauschen
+      // bei einem praktisch stillstehenden Handler statt "kein Kurs bekannt").
+      const lastStored = pointsRef.current[pointsRef.current.length - 1] ?? null;
+      const heading = lastStored && distM(lastStored, sm) >= 1
+        ? calculateHeading(
+            { lat: lastStored.latitude, lng: lastStored.longitude },
+            { lat: sm.latitude, lng: sm.longitude },
+          )
+        : null;
+      const prevState = searchStartRef.current.state;
+      searchStartRef.current = stepSearchStart(
+        searchStartRef.current, startEvalu, { position: sm, accuracy: accRaw, headingDeg: heading },
+        firstLegHeading, DEFAULT_SEARCH_START_CONFIG,
+      );
+      if (searchStartRef.current.state !== prevState) {
+        setSearchStartState(searchStartRef.current.state);
+        if (__DEV__) {
+          // Kein PII/keine vollständigen Koordinaten — nur abgeleitete Meterwerte.
+          console.log('[searchStart]', {
+            state: searchStartRef.current.state, support: searchStartRef.current.support,
+            distanceM: startEvalu.candidateDevM != null ? Math.round(startEvalu.candidateDevM * 10) / 10 : null,
+            accuracy: accRaw != null ? Math.round(accRaw) : null,
+            candidateProgress: startEvalu.candidateAtM != null ? Math.round(startEvalu.candidateAtM * 10) / 10 : null,
+            ambiguity: startEvalu.ambiguityM != null ? Math.round(startEvalu.ambiguityM * 10) / 10 : null,
+          });
+          if (searchStartRef.current.state === 'START_LOCKED') {
+            console.log('[searchStart]', {
+              state: 'START_LOCKED', progress: Math.round((searchStartRef.current.lockedAtM ?? 0) * 10) / 10,
+              firstLegHeading, reason: 'stable_start_evidence',
+            });
+          }
+        }
+      }
+      if (searchStartRef.current.state === 'START_LOCKED') {
+        const lockedAt = searchStartRef.current.lockedAtM ?? 0;
+        cursorMRef.current = lockedAt;
+        maxCursorMRef.current = lockedAt;
+      }
+    }
+
     const pts = pointsRef.current;
     if (pts.length > 0) {
       const d = distM(pts[pts.length - 1], sm);
@@ -283,55 +338,14 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     // ── Abweichung von der Soll-Fährte (reihenfolge-bewusst) ──
     // Projektion nur auf das ERWARTETE Fenster ab dem aktuellen Fortschritt; der
     // Cursor rückt nur vor, wenn der Hund nah genug an der erwarteten Stelle ist.
+    // Der Acquisition-Schritt selbst lief bereits weiter oben (auf JEDEM
+    // akzeptierten Fix, siehe Kommentar dort) — hier nur noch: Anzeige-
+    // Abweichung ableiten (Fenster-Kandidat vor dem Lock, sonst normale
+    // Cursor-Projektion) und ggf. den Cursor vorrücken.
     let dev: number;
-    // ── Search Start Acquisition (Punkt 2-11): solange nicht START_LOCKED,
-    // bleibt die Track-Projektion auf das enge Startfenster [0, startWindowM]
-    // beschränkt (Punkt 3) — die normale, unveränderte order-aware Projektion
-    // (LOOKAHEAD_M/BACK_M/ADVANCE_DEV_M, cursor-relativ) läuft erst NACH dem
-    // Lock, mit einem Cursor, der deterministisch vom gelockten Startfenster-
-    // Kandidaten übernommen wird (Punkt 10) statt von einem beliebigen späteren
-    // nearest-point-Kandidaten (Punkt 5/11 — genau der Feldtest-Fall).
-    const wasLocked = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
-    if (hasTrack && !wasLocked) {
-      const evalu = evaluateStartCandidate(sm, laidPoints, arc.cum, DEFAULT_SEARCH_START_CONFIG);
-      // Bewegungsrichtung seit dem vorletzten AKZEPTIERTEN Streckenpunkt — nur
-      // zusätzliche Evidenz (Punkt 5/16), niemals eine harte Bedingung.
-      const heading = pts.length >= 2
-        ? calculateHeading(
-            { lat: pts[pts.length - 2].latitude, lng: pts[pts.length - 2].longitude },
-            { lat: pts[pts.length - 1].latitude, lng: pts[pts.length - 1].longitude },
-          )
-        : null;
-      const prevState = searchStartRef.current.state;
-      searchStartRef.current = stepSearchStart(
-        searchStartRef.current, evalu, { position: sm, accuracy: accRaw, headingDeg: heading },
-        firstLegHeading, DEFAULT_SEARCH_START_CONFIG,
-      );
-      if (searchStartRef.current.state !== prevState) {
-        setSearchStartState(searchStartRef.current.state);
-        if (__DEV__) {
-          // Kein PII/keine vollständigen Koordinaten — nur abgeleitete Meterwerte.
-          console.log('[searchStart]', {
-            state: searchStartRef.current.state, support: searchStartRef.current.support,
-            distanceM: evalu.candidateDevM != null ? Math.round(evalu.candidateDevM * 10) / 10 : null,
-            accuracy: accRaw != null ? Math.round(accRaw) : null,
-            candidateProgress: evalu.candidateAtM != null ? Math.round(evalu.candidateAtM * 10) / 10 : null,
-            ambiguity: evalu.ambiguityM != null ? Math.round(evalu.ambiguityM * 10) / 10 : null,
-          });
-          if (searchStartRef.current.state === 'START_LOCKED') {
-            console.log('[searchStart]', {
-              state: 'START_LOCKED', progress: Math.round((searchStartRef.current.lockedAtM ?? 0) * 10) / 10,
-              firstLegHeading, reason: 'stable_start_evidence',
-            });
-          }
-        }
-      }
-      if (searchStartRef.current.state === 'START_LOCKED') {
-        const lockedAt = searchStartRef.current.lockedAtM ?? 0;
-        cursorMRef.current = lockedAt;
-        maxCursorMRef.current = lockedAt;
-      }
-      dev = evalu.candidateDevM != null && Number.isFinite(evalu.candidateDevM) ? evalu.candidateDevM : ZERO_DEV_M;
+    const nowLocked = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
+    if (hasTrack && !nowLocked) {
+      dev = startEvalu?.candidateDevM != null && Number.isFinite(startEvalu.candidateDevM) ? startEvalu.candidateDevM : ZERO_DEV_M;
     } else if (hasTrack) {
       const proj = projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
       dev = Number.isFinite(proj.devM) ? proj.devM : ZERO_DEV_M;
