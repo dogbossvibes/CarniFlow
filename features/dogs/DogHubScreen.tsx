@@ -61,6 +61,7 @@ export interface DogHubActions {
   onChat:             () => void;
   onUpgrade?:         () => void;
   onOpenJournal?:     () => void;   // „Alle Trainings anzeigen" → Trainingstagebuch (vorgefiltert)
+  onOpenDocumentTraining?: () => void;   // „Training dokumentieren" → bestehender Dokumentieren-Flow, Hund vorausgewählt
 }
 
 type TabKey = 'overview' | 'training' | 'faehrte' | 'goals' | 'health' | 'heat' | 'commands' | 'docs' | 'trainer';
@@ -261,6 +262,14 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                   <DogQuickActions onSelect={actions.onQuickAction} />
                   <Text style={s.sectionLabel}>Letzte Trainings</Text>
                   <DogTrainingList items={vm.recentTrainings} onOpen={actions.onOpenTraining} />
+                  {actions.onOpenDocumentTraining && (
+                    <TouchableOpacity style={s.journalLink} onPress={actions.onOpenDocumentTraining} activeOpacity={0.85}
+                      accessibilityRole="button" accessibilityLabel={t('training.documentTraining')}>
+                      <Ionicons name="create-outline" size={16} color={C.trackPrimary} />
+                      <Text style={s.journalLinkTxt}>{t('training.documentTraining')}</Text>
+                      <Ionicons name="chevron-forward" size={15} color={C.trackTextMut} />
+                    </TouchableOpacity>
+                  )}
                   {actions.onOpenJournal && (
                     <TouchableOpacity style={s.journalLink} onPress={actions.onOpenJournal} activeOpacity={0.85}
                       accessibilityRole="button" accessibilityLabel={t('journal.allTrainings')}>

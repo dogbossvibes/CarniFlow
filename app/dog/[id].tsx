@@ -183,6 +183,7 @@ export default function DogHubRoute() {
     onChat:             () => router.push('/chat' as never),
     onUpgrade:          () => router.push('/premium' as never),
     onOpenJournal:      () => router.push({ pathname: '/training-journal', params: { dogId: id } } as never),
+    onOpenDocumentTraining: () => router.push({ pathname: '/unit/document', params: { dogId: id } } as never),
   };
 
   if (loading) {
