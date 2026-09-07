@@ -2,6 +2,7 @@ import {
   DEFAULT_SEARCH_START_CONFIG, INITIAL_SEARCH_START,
   evaluateStartCandidate, isPlausibleStartFix, stepSearchStart, firstLegHeadingDeg,
   searchStartStatusText, type SearchStartAcqState, type SearchStartFixInput,
+  type SearchStartMotionInput,
 } from '@/features/tracking/engine/searchStartAcquisition';
 import { estimateDogProgressM, type LL } from '@/features/tracking/utils/searchGeometry';
 
@@ -337,5 +338,97 @@ describe('Real-Field-Test-Nachbau (06.09.2026)', () => {
     // genau die Mehrdeutigkeit, die Punkt 3 verhindern soll.
     expect(evaluUnrestricted.candidateDevM!).toBeLessThan(0.5);
     expect(evaluUnrestricted.candidateAtM!).toBeGreaterThan(40);   // späterer Schenkel, arc > 44
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Core-Motion-Erweiterung (Core-Motion-Sensor-Fusion, Punkt 7): motion ist ein
+// rein OPTIONALES Zusatzfeld auf SearchStartFixInput. Alle Tests oben laufen
+// unverändert weiter, ohne motion je zu setzen — das ist selbst bereits der
+// wichtigste Regressionsbeweis: bestehende Aufrufer (useSearchRecorder, Android,
+// iOS ohne Motion-Permission) verhalten sich exakt wie vor dieser Erweiterung.
+// ──────────────────────────────────────────────────────────────────────────
+describe('searchStartAcquisition — Core-Motion-Zusatzevidenz (Punkt 7)', () => {
+  const walking: SearchStartMotionInput = { movementState: 'walking', motionConfidence: 0.9 };
+  const stationaryHighConf: SearchStartMotionInput = { movementState: 'stationary', motionConfidence: 0.9 };
+  const lowConfWalking: SearchStartMotionInput = { movementState: 'walking', motionConfidence: 0.2 };
+
+  it('erster Fix 5 m vom Start entfernt: ein einzelner plausibler Fix darf NIE sofort locken, auch mit starker Motion-Evidenz', () => {
+    const track = nearbyLaterLegTrack(5);
+    const p = toLL(3, 1);   // ~5 m seitlich vom Start, innerhalb der geweiteten Allowance
+    const evalu = evaluateStartCandidate(p, track.points, track.cum, cfg);
+    const sample: SearchStartFixInput = { position: p, accuracy: 6, headingDeg: null, motion: walking };
+    const st = stepSearchStart(INITIAL_SEARCH_START, evalu, sample, null, cfg);
+    expect(st.state).toBe('START_CANDIDATE');
+    expect(st.state).not.toBe('START_LOCKED');
+    expect(st.support).toBe(1);
+  });
+
+  it('Handler-Distanz/Motion darf vor dem Lock NIE einen virtuellen Hundefortschritt erzeugen (lockedAtM bleibt null bis START_LOCKED)', () => {
+    const track = nearbyLaterLegTrack(5);
+    const p = toLL(3, 1);
+    const evalu = evaluateStartCandidate(p, track.points, track.cum, cfg);
+    // Auch bei starker, hoch-confidenter Bewegungsevidenz (z. B. Handler läuft
+    // bereits energisch) darf lockedAtM erst nach dem vollen Support gesetzt
+    // werden — Motion beschleunigt NICHT die Anzahl nötiger Fixes.
+    let st = INITIAL_SEARCH_START;
+    const sample: SearchStartFixInput = { position: p, accuracy: 6, headingDeg: null, motion: walking };
+    st = stepSearchStart(st, evalu, sample, null, cfg);
+    expect(st.lockedAtM).toBeNull();
+    st = stepSearchStart(st, evalu, sample, null, cfg);
+    expect(st.lockedAtM).toBeNull();
+    expect(st.state).toBe('START_CANDIDATE');
+  });
+
+  it('mehrere plausible Fixes (mit Motion-Evidenz) in Folge → START_LOCKED, wie ohne Motion', () => {
+    const track = nearbyLaterLegTrack(5);
+    const p = toLL(3, 1);
+    const evalu = evaluateStartCandidate(p, track.points, track.cum, cfg);
+    let st = INITIAL_SEARCH_START;
+    const sample: SearchStartFixInput = { position: p, accuracy: 6, headingDeg: null, motion: walking };
+    for (let i = 0; i < cfg.requiredFixes; i++) st = stepSearchStart(st, evalu, sample, null, cfg);
+    expect(st.state).toBe('START_LOCKED');
+    expect(st.lockedAtM).not.toBeNull();
+  });
+
+  it('Motion mit ausreichender Confidence (walking/running) weitet die Allowance leicht auf — ein Fix knapp ausserhalb der reinen Accuracy-Allowance wird dadurch plausibel', () => {
+    const track = nearbyLaterLegTrack(5);
+    const p = toLL(4.5, 1);   // Abweichung liegt knapp über der reinen Accuracy-Allowance (4 m), aber innerhalb +motionAllowanceBonusM (2 m)
+    const evalu = evaluateStartCandidate(p, track.points, track.cum, cfg);
+    expect(evalu.candidateDevM!).toBeGreaterThan(4);
+    expect(evalu.candidateDevM!).toBeLessThanOrEqual(4 + cfg.motionAllowanceBonusM);
+
+    const withoutMotion: SearchStartFixInput = { position: p, accuracy: 4, headingDeg: null };
+    expect(isPlausibleStartFix(evalu, withoutMotion, null, cfg)).toBe(false);
+
+    const withMotion: SearchStartFixInput = { position: p, accuracy: 4, headingDeg: null, motion: walking };
+    expect(isPlausibleStartFix(evalu, withMotion, null, cfg)).toBe(true);
+  });
+
+  it('Motion mit zu geringer Confidence gibt KEINEN Bonus — verhält sich wie ganz ohne Motion', () => {
+    const track = nearbyLaterLegTrack(5);
+    const p = toLL(4.5, 1);
+    const evalu = evaluateStartCandidate(p, track.points, track.cum, cfg);
+    const sample: SearchStartFixInput = { position: p, accuracy: 4, headingDeg: null, motion: lowConfWalking };
+    expect(isPlausibleStartFix(evalu, sample, null, cfg)).toBe(false);
+  });
+
+  it('"stationary" mit hoher Confidence bleibt NEUTRAL — kein Malus für einen ruhig stehenden Handler direkt am Start (gleiche Lehre wie der Stillstands-Regressions-Fix)', () => {
+    const track = nearbyLaterLegTrack(5);
+    const p = toLL(3, 1);   // eindeutig innerhalb der reinen Accuracy-Allowance
+    const evalu = evaluateStartCandidate(p, track.points, track.cum, cfg);
+    const withoutMotion: SearchStartFixInput = { position: p, accuracy: 6, headingDeg: null };
+    const withStationary: SearchStartFixInput = { position: p, accuracy: 6, headingDeg: null, motion: stationaryHighConf };
+    expect(isPlausibleStartFix(evalu, withoutMotion, null, cfg)).toBe(true);
+    expect(isPlausibleStartFix(evalu, withStationary, null, cfg)).toBe(true);   // unverändert plausibel, kein Malus
+  });
+
+  it('motion: null (explizit kein Signal, z. B. Android/iOS-Permission verweigert) verhält sich identisch zu motion: undefined', () => {
+    const track = nearbyLaterLegTrack(5);
+    const p = toLL(3, 1);
+    const evalu = evaluateStartCandidate(p, track.points, track.cum, cfg);
+    const withUndefined: SearchStartFixInput = { position: p, accuracy: 6, headingDeg: null };
+    const withNull: SearchStartFixInput = { position: p, accuracy: 6, headingDeg: null, motion: null };
+    expect(isPlausibleStartFix(evalu, withNull, null, cfg)).toBe(isPlausibleStartFix(evalu, withUndefined, null, cfg));
   });
 });

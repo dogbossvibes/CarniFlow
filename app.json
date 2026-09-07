@@ -21,7 +21,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {
           "TrackingDogSportPrecision": "Anyvo benötigt präzisen Standort, um Fährten und Gegenstände möglichst genau aufzuzeichnen."
-        }
+        },
+        "NSMotionUsageDescription": "ANYVO verwendet Bewegungssensoren während einer aktiven Fährte, um GPS-Abweichungen zu erkennen und die Genauigkeit der aufgezeichneten Strecke zu verbessern."
       }
     },
     "android": {

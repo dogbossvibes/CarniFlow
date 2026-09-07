@@ -23,6 +23,22 @@ import { stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackStat
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev } from '@/features/tracking/utils/searchFix';
+import { motionClient } from '@/features/tracking/native/motionClient';
+import {
+  evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand,
+  type MotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
+} from '@/features/tracking/engine/trackFusionEngine';
+import type { AnalyticsSample } from '@/features/tracking/engine/trackAnalytics';
+
+// Core-Motion-Sensor-Fusion (rein additiv, Punkt 2/3): NUR ein Zusatzsignal
+// zur Confidence-Bewertung und zum Live-GPS-Qualitätsindikator (Punkt 15).
+// Beeinflusst NIEMALS Annahme/Ablehnung eines Fixes (evaluateSearchFix bleibt
+// unverändert die einzige Gate-Logik), die geglättete Position (sm), die
+// Cursor-/Projektionslogik oder Search-Start-Acquisition — das würde gegen
+// "Core Motion ersetzt GPS nicht" verstossen. Läuft auf Android/ohne Motion-
+// Permission automatisch mit fusionMode='gps_only' weiter (motionLatestRef
+// bleibt dann schlicht `null`).
+export interface GpsQuality { confidence: number; band: ConfidenceBand; fusionMode: FusionMode }
 
 export interface GpsDebug {
   source: LocationSourceKind | null;
@@ -34,7 +50,23 @@ export interface GpsDebug {
 
 export type LatLng = { latitude: number; longitude: number };
 export type SearchObject = { at: LatLng; index: number; material: string };
-export type Break = { at: LatLng; t: number; recoveredAfterM?: number };
+export type Break = {
+  at: LatLng;
+  t: number;               // Sekunden seit Start, wann der Abriss BESTÄTIGT wurde (Konvention unverändert, z. B. Map-Marker-Zeitpunkt)
+  recoveredAfterM?: number;
+  // Punkt 1 (Re-Acquisition-Zeit): zusätzlich zur bestehenden Distanz-Metrik
+  // (recoveredAfterM) jetzt auch echte Zeitstempel. startedAtSec ist bewusst
+  // NICHT identisch mit `t` — es ist der Moment, in dem der Hund/die virtuelle
+  // Position den äusseren Korridor (BREAK_THRESHOLD_M) tatsächlich verlassen
+  // hat, `t` dagegen erst der spätere, um BREAK_HOLD_MS verzögerte
+  // Bestätigungs-Zeitpunkt. Für die Re-Acquisition-DAUER zählt der echte
+  // Verlassenszeitpunkt, nicht die Bestätigungsverzögerung.
+  startedAtSec: number;
+  // undefined/null = noch offen (Session endete im Abriss) — geht NICHT in
+  // meanSec/maxSec ein (siehe trackAnalytics.computeReacquisitionStats).
+  recoveredAtSec?: number;
+  durationSec?: number;
+};
 
 const toRad = (d: number) => (d * Math.PI) / 180;
 function distM(a: LatLng, b: LatLng): number {
@@ -115,6 +147,10 @@ export interface SearchRecorder {
   score: number;
   accuracy: number | null;
   gpsDebug: GpsDebug;
+  // Core-Motion-Sensor-Fusion (Punkt 15): `null`, solange noch kein Fix
+  // fusionsbewertet wurde (z. B. ganz zu Beginn) — UI zeigt dann einfach
+  // nichts an, kein Blocker.
+  gpsQuality: GpsQuality | null;
   // Search Start Acquisition (Track-Assoziation am Beginn der Absuche): solange
   // nicht START_LOCKED, ist dogProgressM/estimatedDogPosition NICHT um den
   // Hundabstand vorgeschoben (siehe engine/searchStartAcquisition.ts). Der
@@ -131,6 +167,15 @@ export interface SearchRecorder {
 export type SearchResult = {
   points: LatLng[]; breaks: Break[]; foundObjects: number; totalObjects: number;
   deviationAvgM: number; distanceM: number; durationS: number; score: number;
+  // Punkt 10/13: Rohmaterial für die Track Analytics Engine — ein Sample pro
+  // akzeptiertem Fix NACH Start-Lock (siehe onFix). Additiv, bestehende
+  // Konsumenten von SearchResult, die dieses Feld ignorieren, sind unberührt.
+  analyticsSamples: AnalyticsSample[];
+  // Indizes (in laidObjects) der TATSÄCHLICH als gefunden erkannten Gegenstände
+  // (dieselbe autoritative Quelle wie foundObjects/foundRef) — additiv, damit
+  // die Analytics-Engine "found" konsistent mit dem echten Score ableiten kann,
+  // statt es aus Distanzwerten zu schätzen.
+  foundObjectIndices: number[];
 };
 
 export type { Level };
@@ -158,6 +203,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, progressM: 0, score: 0, offTrackState: 'on_track' as OffTrackState });
   const [elapsedS, setElapsedS] = useState(0);
   const [gpsDebug, setGpsDebug] = useState<GpsDebug>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
+  const [gpsQuality, setGpsQuality] = useState<GpsQuality | null>(null);
 
   // ── Refs (live im Callback) ──
   const recordingRef = useRef(false);
@@ -182,6 +228,12 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const startMsRef = useRef(0);
   const cursorMRef = useRef(0);      // aktueller Fortschritt entlang der Soll-Fährte (m)
   const maxCursorMRef = useRef(0);   // weitester erreichter Fortschritt (für Coverage)
+
+  // ── Core-Motion-Sensor-Fusion (rein additiv, siehe GpsQuality-Kommentar oben) ──
+  const motionLatestRef = useRef<MotionInput | null>(null);
+  const motionUnsubRef = useRef<{ remove: () => void } | null>(null);
+  const fusionHistoryRef = useRef<FusionHistory>({ prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null });
+  const analyticsSamplesRef = useRef<AnalyticsSample[]>([]);
 
   // ── Search Start Acquisition (Track-Assoziation am Beginn der Absuche) ──
   // Solange nicht START_LOCKED: Track-Projektion bleibt auf das enge Startfenster
@@ -240,8 +292,10 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     );
 
     // Puck-Glättung IMMER (auch bei verworfenem Linienpunkt) → die Position folgt
-    // weiter, statt einzufrieren.
-    const sm: LatLng = prev
+    // weiter, statt einzufrieren. `let`, weil ein eindeutiger Fusion-Outlier/
+    // Stillstands-Jitter (siehe unten) dies nach der Fusion-Bewertung wieder
+    // auf den Stand VOR dieser Glättung zurücksetzt.
+    let sm: LatLng = prev
       ? { latitude: prev.latitude + SMOOTH_ALPHA * (raw.latitude - prev.latitude),
           longitude: prev.longitude + SMOOTH_ALPHA * (raw.longitude - prev.longitude) }
       : raw;
@@ -256,6 +310,44 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     // bei anschliessendem Distanz-Gate).
     prevFixRef.current = { lat: raw.latitude, lng: raw.longitude, t: tNow };
     lastFixTRef.current = tNow;
+
+    // ── Core-Motion-Sensor-Fusion (rein additiv, siehe GpsQuality-Kommentar
+    // oben im Modul): bewertet NUR die Confidence dieses bereits akzeptierten
+    // Fixes. Beeinflusst weder decision.accepted (oben, bereits entschieden)
+    // noch sm/dev/Cursor — ausschliesslich gpsQuality (Live-Anzeige, Punkt 15)
+    // und das Analytics-Sample (Punkt 10/13).
+    const gpsHeading = loc.coords.heading ?? null;
+    const fusion = evaluateFusion(
+      { latitude: raw.latitude, longitude: raw.longitude, timestamp: tNow, horizontalAccuracy: accRaw, speed, course: gpsHeading },
+      motionLatestRef.current,
+      fusionHistoryRef.current,
+      DEFAULT_FUSION_CONFIG,
+    );
+    fusionHistoryRef.current = { prevAccepted: fusion.acceptedLocation, prevSpeedMps: speed, prevCourseDeg: gpsHeading };
+    setGpsQuality({ confidence: fusion.confidence, band: confidenceBand(fusion.confidence), fusionMode: fusion.fusionMode });
+
+    // ── Sensor-Fusion-Schutzschicht (Punkt 2 der Nachbesserung): ein
+    // eindeutiger GPS-Outlier ODER ein per Motion bestätigtes Stillstands-
+    // Jitter darf weder den Puck noch die Fährtenlinie fortschreiben. Puck +
+    // Glättungsanker (smoothRef) werden auf den Stand VOR dieser Glättung
+    // zurückgesetzt — der letzte akzeptierte gute Punkt bleibt massgebend
+    // (fusionHistoryRef zeigt bereits korrekt auf ihn, nicht auf diesen
+    // Rohfix, siehe oben — der nächste plausible Fix wird dadurch sofort
+    // wieder normal übernommen, keine Lag-Kaskade, kein dauerhaftes
+    // Einfrieren). `evaluateSearchFix` (oben) bleibt die einzige, unveränderte
+    // erste Sicherheitsstufe — dies ist eine rein zusätzliche, zweite Stufe
+    // NUR für bereits gate-akzeptierte Fixes.
+    //
+    // Search-Start-Acquisition (unten) ist bewusst NICHT ausgeklammert: sie
+    // sieht ggf. denselben zurückgesetzten `sm`-Wert erneut (idempotent) —
+    // ein per Motion bestätigter Stillstand am echten Ansatz muss weiterhin
+    // Support aufbauen und locken können (c7eba84-Regression bleibt behoben).
+    const fusionBlocksGeometry = fusion.classification === 'gps_outlier' || fusion.classification === 'stationary';
+    if (fusionBlocksGeometry && prev) {
+      sm = prev;
+      smoothRef.current = sm;
+      setPosition(sm);
+    }
 
     // ── Search Start Acquisition — MUSS auf JEDEM akzeptierten Fix laufen,
     // NICHT erst nach dem Liniendichte-Gate (MIN_SEGMENT) weiter unten. Sonst
@@ -282,8 +374,14 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
           )
         : null;
       const prevState = searchStartRef.current.state;
+      // Core-Motion (Punkt 7): rein optionale Zusatzevidenz, siehe
+      // searchStartAcquisition.ts — niemals ein Gate, nur eine leichte
+      // Aufweitung der erlaubten Abweichung bei erkannter Fussbewegung.
+      const startMotion = motionLatestRef.current
+        ? { movementState: motionLatestRef.current.movementState ?? 'unknown', motionConfidence: motionLatestRef.current.motionConfidence ?? 0 }
+        : null;
       searchStartRef.current = stepSearchStart(
-        searchStartRef.current, startEvalu, { position: sm, accuracy: accRaw, headingDeg: heading },
+        searchStartRef.current, startEvalu, { position: sm, accuracy: accRaw, headingDeg: heading, motion: startMotion },
         firstLegHeading, DEFAULT_SEARCH_START_CONFIG,
       );
       if (searchStartRef.current.state !== prevState) {
@@ -310,6 +408,31 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
         cursorMRef.current = lockedAt;
         maxCursorMRef.current = lockedAt;
       }
+    }
+
+    // ── Fusion-Outlier/Stillstand: Distanz/Cursor/Abweichung/Linie bleiben
+    // komplett unverändert — dieser Fix trägt NICHTS zur geometrischen Fährte
+    // bei (siehe Kommentar oben). Trotzdem ein Analytics-Sample mit
+    // EINGEFRORENER Geometrie (letzter bekannter devEma-Wert, KEIN neuer
+    // Fortschritt entlang der Fährte), damit eine Phase schlechter Sensorik
+    // sichtbar in analysisConfidence einfliesst (Punkt 5/6/9) — die
+    // Hundeleistung (dev/Distanz/Score) selbst bleibt unangetastet.
+    // speedMps bewusst `null`: die gemeldete GPS-Geschwindigkeit ist während
+    // eines Outliers/Jitters selbst nicht vertrauenswürdig genug, um in
+    // Tempo-/Ecken-/Gegenstandsanalysen einzufliessen.
+    if (fusionBlocksGeometry) {
+      const startLockedNow = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
+      if (startLockedNow) {
+        analyticsSamplesRef.current.push({
+          atM: maxCursorMRef.current,
+          tSec: (Date.now() - startMsRef.current) / 1000,
+          devM: Math.round(devEmaRef.current * 10) / 10,
+          confidence: fusion.confidence,
+          speedMps: null,
+        });
+      }
+      if (__DEV__) console.log('[fusion]', fusion.classification, { confidence: Math.round(fusion.confidence * 100) / 100, reasonFlags: fusion.reasonFlags });
+      return;
     }
 
     const pts = pointsRef.current;
@@ -376,13 +499,34 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
       }).snap;
     }
 
+    // ── Analytics-Sample (Punkt 10/13) — nur nach Start-Lock: vor dem Lock
+    // ist `dev` der Startfenster-Kandidat, keine reale Streckenabweichung
+    // (siehe Kommentar oben), das würde die Analyse verfälschen.
+    if (startLocked) {
+      analyticsSamplesRef.current.push({
+        atM: maxCursorMRef.current,
+        tSec: (now - startMsRef.current) / 1000,
+        devM: dev,
+        confidence: fusion.confidence,
+        speedMps: speed,
+      });
+    }
+
     if (startLocked) {
       if (!inBreakRef.current) {
         if (dev > BREAK_THRESHOLD_M) {
           if (offTrackSinceRef.current == null) offTrackSinceRef.current = now;
           else if (now - offTrackSinceRef.current >= BREAK_HOLD_MS) {
             inBreakRef.current = true;
-            breaksRef.current.push({ at: sm, t: Math.floor((now - startMsRef.current) / 1000) });
+            // startedAtSec = der TATSÄCHLICHE Verlassenszeitpunkt des äusseren
+            // Korridors (offTrackSinceRef), nicht der um BREAK_HOLD_MS spätere
+            // Bestätigungszeitpunkt `t` — sonst würde jede Re-Acquisition-Dauer
+            // systematisch um die Bestätigungsverzögerung verkürzt gemessen.
+            breaksRef.current.push({
+              at: sm,
+              t: Math.floor((now - startMsRef.current) / 1000),
+              startedAtSec: Math.max(0, (offTrackSinceRef.current - startMsRef.current) / 1000),
+            });
           }
         } else {
           offTrackSinceRef.current = null;
@@ -392,7 +536,12 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
           inBreakRef.current = false;
           offTrackSinceRef.current = null;
           const b = breaksRef.current[breaksRef.current.length - 1];
-          if (b) b.recoveredAfterM = Math.round(distRef.current);
+          if (b) {
+            b.recoveredAfterM = Math.round(distRef.current);
+            const recoveredAtSec = (now - startMsRef.current) / 1000;
+            b.recoveredAtSec = recoveredAtSec;
+            b.durationSec = Math.round(Math.max(0, recoveredAtSec - b.startedAtSec) * 10) / 10;
+          }
         }
       }
     }
@@ -435,6 +584,32 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     return () => { mounted = false; watchRef.current?.remove(); };
   }, [onFix]);
 
+  // ── Core-Motion-Listener (Punkt 3/16: Listener-Registrierung ist billig;
+  // der eigentlich teure Sensor-Betrieb wird ausschliesslich in start()/stop()
+  // ein-/ausgeschaltet). Samples fliessen nur in motionLatestRef — kein
+  // Re-Render pro 4-Hz-Motion-Sample, nur der nächste GPS-Fix liest den
+  // aktuellsten Wert. Wird recordingRef nicht gesetzt (nicht aufgenommen),
+  // ist motionClient ohnehin gestoppt → keine Samples zu erwarten. ──
+  useEffect(() => {
+    const sub = motionClient.onSample((sMotion) => {
+      motionLatestRef.current = {
+        movementState: sMotion.movementState,
+        stepDelta: sMotion.stepDelta,
+        accelerationMagnitude: sMotion.accelerationMagnitude,
+        rotationMagnitude: sMotion.rotationMagnitude,
+        headingDelta: sMotion.headingDelta,
+        motionConfidence: sMotion.motionConfidence,
+      };
+    });
+    motionUnsubRef.current = sub;
+    return () => {
+      sub.remove();
+      // Defensiv: falls die Absuche noch lief, sauber stoppen (kein Leak über
+      // den Unmount hinaus, Punkt 16).
+      void motionClient.stop();
+    };
+  }, []);
+
   // ── Timer ──
   useEffect(() => {
     if (!recording || paused) return;
@@ -462,6 +637,13 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     offTrackSinceRef.current = null; inBreakRef.current = false;
     offTrackRef.current = initialOffTrack();
     cursorMRef.current = 0; maxCursorMRef.current = 0;
+    // Core-Motion-Fusion (Punkt 3/16): NUR während einer aktiven Absuche aktiv.
+    // Fire-and-forget — ein Start-Fehler (Permission verweigert, kein Modul im
+    // Build, Android) fällt lautlos auf fusionMode='gps_only' zurück, blockiert
+    // die Absuche nie.
+    analyticsSamplesRef.current = [];
+    fusionHistoryRef.current = { prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null };
+    void motionClient.start();
     // Fortsetzen einer bereits laufenden Absuche (Resume) oder Freilauf ohne
     // Soll-Fährte: die Track-Assoziation wurde vorher schon bestätigt bzw. ist
     // gegenstandslos → direkt START_LOCKED, keine erneute Akquisition nötig.
@@ -488,12 +670,17 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     recordingRef.current = false; setRecording(false);
     // Letzten lokalen Persistenz-Puffer schreiben (best-effort, blockiert nicht).
     void flushSearchPoints();
+    // Core-Motion-Fusion sauber stoppen (Punkt 16 — kein CPU/Akku-Verbrauch
+    // ausserhalb einer aktiven Absuche).
+    void motionClient.stop();
     const durationS = Math.floor((Date.now() - startMsRef.current) / 1000);
     return {
       points: pointsRef.current.slice(),
       breaks: breaksRef.current.slice(),
       foundObjects: foundRef.current.size,
       totalObjects,
+      analyticsSamples: analyticsSamplesRef.current.slice(),
+      foundObjectIndices: Array.from(foundRef.current),
       deviationAvgM: devCountRef.current ? Math.round((devSumRef.current / devCountRef.current) * 10) / 10 : 0,
       distanceM: distRef.current,
       durationS,
@@ -529,7 +716,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,
     dogProgressM, trackLengthM: arc.total, estimatedDogPosition,
     elapsedS, score: snap.score, accuracy,
-    gpsDebug,
+    gpsDebug, gpsQuality,
     searchStartState,
     start, stop, setPaused, markObject,
   };

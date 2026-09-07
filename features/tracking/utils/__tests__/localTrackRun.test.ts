@@ -35,3 +35,16 @@ describe('buildRunResultPayload — vollständiges Run-Ergebnis', () => {
     expect(p.search_handler_distance_m).toBeNull();
   });
 });
+
+describe('buildRunResultPayload — analytics (Punkt 10/12/13, additiv)', () => {
+  it('ohne analytics: kein `analytics`-Feld im Payload (kein Dummy-Objekt, keine Migration nötig)', () => {
+    const p = buildRunResultPayload(base);
+    expect('analytics' in p).toBe(false);
+  });
+
+  it('mit analytics: wird 1:1 unverändert ins Payload übernommen', () => {
+    const analytics = { analyticsVersion: 1 as const, trackScore: 77 } as any;
+    const p = buildRunResultPayload({ ...base, analytics });
+    expect(p.analytics).toBe(analytics);
+  });
+});

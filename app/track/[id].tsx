@@ -30,8 +30,15 @@ import {
   coerceTrackSegments,
   segmentDisplayLabel,
 } from '@/features/tracking/utils/trackSegments';
+import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
+// Punkt 8/14 — Anzeigetext je Confidence-Band, bewusst NICHT als "Wahrscheinlichkeit"
+// formuliert (interner Qualitätsindex).
+const CONFIDENCE_BAND_LABEL: Record<TrackAnalytics['analysisConfidenceBand'], string> = {
+  excellent: 'sehr gut', good: 'gut', limited: 'eingeschränkt', unreliable: 'unzuverlässig',
+};
 
 export default function TrackAuswertungScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -112,6 +119,14 @@ export default function TrackAuswertungScreen() {
       hasGps: detail.hasLay,
     };
   }, [data]);
+  // Punkt 14: rein additiv — `undefined` bei Fährten ohne Analyse (ältere
+  // Sessions, Freilauf ohne Soll-Fährte, Recovery-Kurzpfad). Dieselbe
+  // track_data.run-Quelle wie das bestehende segmentAnalysis oben (lokal via
+  // getLocalTrackDetail/getLocalRunSupplement, remote via training_sessions.
+  // track_data — runSummaryForTrackData reicht `analytics` unverändert durch,
+  // keine Migration nötig).
+  const analytics: TrackAnalytics | undefined = data?.track_data?.run?.analytics;
+  const [analyseExpanded, setAnalyseExpanded] = useState(false);
   const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
   const [fullscreenMap, setFullscreenMap] = useState(false);
   const [fullscreenSel, setFullscreenSel] = useState<TrackDetailSelection | null>(null);
@@ -254,6 +269,107 @@ export default function TrackAuswertungScreen() {
               <Text style={s.totalVal}>{totalPts}<Text style={s.totalMax}>/{maxPts}</Text></Text>
             </View>
           </View>
+
+          {/* Analyse (Punkt 14) — rein additiv, automatisch aus Sensor-Fusion/
+              Track-Analytics-Engine abgeleitet. Bewusst als EIGENER Block unter
+              der manuellen Abschnitts-Bewertung, NICHT in die TrackScoreRing/
+              den Punkte-Score oben integriert — Track Score 2.0 und der
+              manuelle Score (trackEvaluation.ts) sind unabhängige Systeme
+              (Punkt 9/11). Ohne `analytics` (ältere Fährten, Freilauf) bleibt
+              der Block einfach weg. */}
+          {analytics && (
+            <>
+              <SectionLabel>Analyse</SectionLabel>
+              <View style={[s.card, { padding: 16, marginBottom: 16 }]}>
+                <View style={s.analyseHeaderRow}>
+                  <View>
+                    <Text style={s.analyseScoreVal}>{analytics.trackScore}<Text style={s.analyseScoreMax}>/100</Text></Text>
+                    <Text style={s.analyseScoreLabel}>TRACK SCORE (AUTOMATISCH)</Text>
+                  </View>
+                  <View style={[s.confidencePill, analytics.analysisConfidenceBand === 'unreliable' && s.confidencePillWarn]}>
+                    <Ionicons
+                      name={analytics.analysisConfidenceBand === 'excellent' || analytics.analysisConfidenceBand === 'good' ? 'checkmark-circle' : 'information-circle'}
+                      size={13}
+                      color={analytics.analysisConfidenceBand === 'unreliable' ? C.trackWarning : C.trackPrimary}
+                    />
+                    <Text style={s.confidencePillTxt}>Analyse-Grundlage: {CONFIDENCE_BAND_LABEL[analytics.analysisConfidenceBand]}</Text>
+                  </View>
+                </View>
+
+                {/* Punkt 9: expliziter Hinweis — schlechte GPS-/Motion-Grundlage
+                    senkt NIE den Hund-Score, nur die Verlässlichkeit der Analyse. */}
+                {analytics.analysisConfidenceHint && (
+                  <View style={s.analyseHintBox}>
+                    <Text style={s.analyseHintText}>{analytics.analysisConfidenceHint}</Text>
+                  </View>
+                )}
+
+                <View style={[s.highlightRow, { marginTop: 14, marginBottom: 0 }]}>
+                  <View style={[s.card, s.highlight]}>
+                    <Ionicons name="analytics-outline" size={18} color={C.trackPrimary} />
+                    <Text style={s.highlightVal}>{analytics.deviation.meanM.toFixed(1)} m</Text>
+                    <Text style={s.highlightLabel}>Ø Spurtreue</Text>
+                  </View>
+                  <View style={[s.card, s.highlight]}>
+                    <Ionicons name="speedometer-outline" size={18} color={C.trackPrimary} />
+                    <Text style={s.highlightVal}>{analytics.pace.avgMps.toFixed(1)} m/s</Text>
+                    <Text style={s.highlightLabel}>Ø Tempo</Text>
+                  </View>
+                  <View style={[s.card, s.highlight]}>
+                    <Ionicons name="return-up-forward-outline" size={18} color={C.trackPrimary} />
+                    <Text style={s.highlightVal}>{analytics.reacquisition.count}</Text>
+                    <Text style={s.highlightLabel}>Neuansätze</Text>
+                  </View>
+                </View>
+
+                {(analytics.corners.length > 0 || analytics.objects.length > 0 || analytics.reacquisition.meanSec != null) && (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setAnalyseExpanded(v => !v)}
+                    style={s.analyseToggle}
+                  >
+                    <Text style={s.analyseToggleTxt}>{analyseExpanded ? 'Details verbergen' : 'Details anzeigen'}</Text>
+                    <Ionicons name={analyseExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={C.trackPrimary} />
+                  </Pressable>
+                )}
+
+                {analyseExpanded && (
+                  <View style={{ marginTop: 10, gap: 10 }}>
+                    {/* Re-Acquisition-Zeit (Punkt 1/9 der Nachbesserung) — nur wenn
+                        mindestens ein Break tatsächlich erholt wurde (meanSec != null,
+                        offene Breaks fliessen NICHT ein, siehe trackAnalytics.ts). */}
+                    {analytics.reacquisition.meanSec != null && (
+                      <View style={s.analyseDetailRow}>
+                        <Text style={s.analyseDetailLabel}>Neuaufnahme Ø</Text>
+                        <Text style={s.analyseDetailValue}>
+                          {analytics.reacquisition.meanSec.toFixed(1)} s
+                          {analytics.reacquisition.maxSec != null && analytics.reacquisition.maxSec !== analytics.reacquisition.meanSec
+                            ? ` · Längste ${analytics.reacquisition.maxSec.toFixed(1)} s` : ''}
+                        </Text>
+                      </View>
+                    )}
+                    {analytics.corners.map((c, i) => (
+                      <View key={`corner-${i}`} style={s.analyseDetailRow}>
+                        <Text style={s.analyseDetailLabel}>Winkel {i + 1} ({c.side === 'links' ? 'links' : c.side === 'rechts' ? 'rechts' : 'Fachwinkel'})</Text>
+                        <Text style={s.analyseDetailValue}>
+                          {c.maxLateralDeviationM != null ? `max. ${c.maxLateralDeviationM.toFixed(1)} m` : 'nicht erreicht'}
+                          {c.overshootM != null && c.overshootM > 0 ? ` · Überschuss ${c.overshootM.toFixed(1)} m` : ''}
+                        </Text>
+                      </View>
+                    ))}
+                    {analytics.objects.map((o, i) => (
+                      <View key={`object-${i}`} style={s.analyseDetailRow}>
+                        <Text style={s.analyseDetailLabel}>Gegenstand {i + 1}{o.found ? '' : ' (nicht gefunden)'}</Text>
+                        <Text style={s.analyseDetailValue}>
+                          {o.minDistanceM != null ? `min. ${o.minDistanceM.toFixed(1)} m` : '—'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </>
+          )}
 
           {/* Fährtenverlauf */}
           <SectionLabel>Fährtenverlauf</SectionLabel>
@@ -451,6 +567,21 @@ const s = StyleSheet.create({
   legendTxt: { fontSize: 10, color: C.trackTextSec, fontWeight: '600' },
 
   notesInput:{ fontSize: 14, color: C.trackText, lineHeight: 21, minHeight: 70, textAlignVertical: 'top' },
+
+  analyseHeaderRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  analyseScoreVal:    { fontSize: 26, color: C.trackPrimary, fontWeight: '900', letterSpacing: -0.5 },
+  analyseScoreMax:    { fontSize: 14, color: C.trackTextMut, fontWeight: '700' },
+  analyseScoreLabel:  { fontSize: 9, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
+  confidencePill:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.06)', maxWidth: 170 },
+  confidencePillWarn: { backgroundColor: C.trackWarning + '1c' },
+  confidencePillTxt:  { fontSize: 10, color: C.trackTextSec, fontWeight: '700', flexShrink: 1 },
+  analyseHintBox:     { marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: C.trackBorder },
+  analyseHintText:    { fontSize: 11.5, lineHeight: 16, color: C.trackTextSec, fontWeight: '600' },
+  analyseToggle:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 14, paddingVertical: 8 },
+  analyseToggleTxt:   { fontSize: 12, color: C.trackPrimary, fontWeight: '800' },
+  analyseDetailRow:   { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  analyseDetailLabel: { fontSize: 12.5, color: C.trackText, fontWeight: '700', flexShrink: 1 },
+  analyseDetailValue: { fontSize: 12, color: C.trackTextSec, fontWeight: '600', textAlign: 'right' },
 
   segmentRow:   { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   segmentBadge: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 1 },

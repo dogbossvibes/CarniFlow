@@ -52,6 +52,9 @@ import { finalizeLocalTrackRun } from '@/features/training/repositories/localTra
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
 import { syncNow } from '@/features/sync/services/syncEngine';
 import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
+import {
+  computeTrackAnalytics, type AnalyticsCornerInput, type AnalyticsObjectInput, type AnalyticsAngleKind,
+} from '@/features/tracking/engine/trackAnalytics';
 import * as Crypto from 'expo-crypto';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
@@ -307,6 +310,22 @@ export default function TrackRunScreen() {
     const runId = pending.runId ?? runIdRef.current ?? Crypto.randomUUID();
     const durationS = pending.searchStartedAt ? Math.max(0, Math.floor((Date.now() - pending.searchStartedAt) / 1000)) : 0;
     // LOKAL zuerst (durabel): Run-Ergebnis der beendeten Absuche in payload_json.run.
+    //
+    // BEKANNTE EINSCHRÄNKUNG (Punkt 8 der Nachbesserung, geprüft, nicht
+    // improvisiert): dieser Recovery-Kurzpfad läuft NICHT über den laufenden
+    // useSearchRecorder — `saved` sind rohe, aus SQLite/dem Store
+    // wiederhergestellte Punkte (lat/lng/accuracy/…), OHNE die pro-Fix
+    // Cursor-Projektion/Abweichung/Fusion-Confidence, aus der
+    // AnalyticsSample[] besteht. Score/deviationAvgM/foundObjects/breaks sind
+    // in diesem Pfad bereits VOR dieser Nachbesserung hart auf 0/leer gesetzt
+    // (dieselbe Einschränkung, nicht neu) — `analytics` würde dieselbe Lücke
+    // erben und könnte nur durch ein vollständiges Offline-Replay der
+    // Fährtenprojektion (projectForward/EMA/Fusion ausserhalb des Hooks neu
+    // implementiert) korrekt gefüllt werden. Das wäre ein grosser, riskanter
+    // Eingriff ausserhalb des Scopes dieser Nachbesserung ("maximal
+    // konservativ") — daher bewusst NICHT improvisiert. `analytics` bleibt
+    // hier absichtlich weg (siehe buildRunResultPayload — additiv/optional,
+    // kein Dummy-Objekt). Test: run-recovery-analytics-gap.test.ts.
     if (sessId) {
       await finalizeLocalTrackRun(sessId, buildRunResultPayload({
         runId, sessionId: sessId,
@@ -317,6 +336,7 @@ export default function TrackRunScreen() {
           points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })),
         },
         searchHandlerDistanceM: pending.searchHandlerDistanceM,
+        // analytics bewusst NICHT gesetzt — siehe Kommentar oben.
       })).catch(() => {});
     }
     // Remote-Transport über die Sync-Queue (RUN-SAVE2), nicht mehr direkt.
@@ -518,6 +538,32 @@ export default function TrackRunScreen() {
     const runId = runIdRef.current ?? Crypto.randomUUID();
     const sessId = effectiveId;
 
+    // Punkt 10/13: Track Analytics Engine — REIN aus In-Session-Daten (keine
+    // gespeicherten Rohpunkte, keine Migration). Ecken/Gegenstände kommen aus
+    // denselben gefilterten Markern, aus denen auch snapData.laidObjects
+    // gebaut wurde (buildSnap) — dieselbe Filterreihenfolge, daher deckt sich
+    // der Index mit res.foundObjectIndices.
+    const cornerInputs: AnalyticsCornerInput[] = snapData.laidMarkers
+      .filter((m): m is typeof m & { angleKind: AnalyticsAngleKind } =>
+        m.type === 'winkel' && m.angleKind != null && m.angleKind !== 'absatz' && m.angleKind !== 'abriss')
+      .map(m => ({ atM: m.distance_from_start, angleKind: m.angleKind }));
+    const objectMarkers = snapData.laidMarkers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
+    const objectInputs: AnalyticsObjectInput[] = objectMarkers.map((m, i) => ({
+      atM: m.distance_from_start, material: m.material, found: res.foundObjectIndices.includes(i),
+    }));
+    const analytics = res.analyticsSamples.length ? computeTrackAnalytics({
+      samples: res.analyticsSamples,
+      corners: cornerInputs,
+      objects: objectInputs,
+      breaks: res.breaks.map(b => ({
+        startedAtSec: b.startedAtSec,
+        recoveredAtSec: b.recoveredAtSec ?? null,
+        durationSec: b.durationSec ?? null,
+      })),
+      trackLengthM: s.trackLengthM,
+      durationS: res.durationS,
+    }) : undefined;
+
     // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.
     //    Schlägt das fehl → KEIN Reset/Navigation (Recovery bleibt möglich, kein Verlust).
     if (sessId) {
@@ -531,6 +577,7 @@ export default function TrackRunScreen() {
             breaks: res.breaks, points: res.points,
           },
           searchHandlerDistanceM,
+          analytics,
         }));
       } catch (e) {
         console.warn('[trackRun] local finalize', e);
@@ -585,6 +632,16 @@ export default function TrackRunScreen() {
     { value: devShown != null ? `${devOff ? '+' : ''}${devShown.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
     { value: s.accuracy != null ? `${Math.round(s.accuracy)} m` : '—', label: 'GPS' },
   ];
+
+  // Punkt 15: dezenter Live-GPS-Qualitäts-Punkt neben der GPS-Kachel — beruht
+  // auf der Fusion-Confidence (nicht dem rohen Accuracy-Meterwert), rein
+  // diagnostisch. KEIN Score/keine Bewertung des Hundes — siehe GpsQuality-
+  // Kommentar in useSearchRecorder.ts.
+  const gpsQualityDotColor = s.gpsQuality
+    ? (s.gpsQuality.band === 'excellent' || s.gpsQuality.band === 'good') ? FT.acc
+      : s.gpsQuality.band === 'limited' ? FT.warn
+      : FT.bad
+    : null;
 
   // GPS-Debug (nur Dev): schlankes gpsDebug → GpsStats fürs PrecisionDebugPanel (nur lesend).
   const dbg = s.gpsDebug;
@@ -754,7 +811,13 @@ export default function TrackRunScreen() {
             {metrics.map((mm, i) => (
               <View key={i} className={`flex-1 items-center ${i > 0 ? 'border-l border-ft-line' : ''}`}>
                 <Text className={`text-[15px] font-black ${mm.warn ? 'text-ft-warn' : 'text-ft-text'}`} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{mm.value}</Text>
-                <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{mm.label}</Text>
+                <View className="flex-row items-center gap-1 mt-px">
+                  <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase">{mm.label}</Text>
+                  {/* Live-GPS-Qualität (Punkt 15) — nur an der GPS-Kachel, rein diagnostisch. */}
+                  {mm.label === 'GPS' && gpsQualityDotColor && (
+                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: gpsQualityDotColor }} />
+                  )}
+                </View>
               </View>
             ))}
           </View>

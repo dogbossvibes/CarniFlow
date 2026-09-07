@@ -36,6 +36,17 @@ export interface SearchStartConfig {
   maxAccuracyM: number;
   /** Grobe Kurstoleranz (Grad) gegen den ersten Schenkel — nur zusätzliche Evidenz, kein Hard-Gate (Punkt 5/16). */
   maxHeadingDeviationDeg: number;
+  /**
+   * Core-Motion-Bonus (Meter) auf die erlaubte seitliche Abweichung, NUR wenn
+   * ein Motion-Sample mit ausreichender Confidence aktive Fussbewegung zeigt
+   * (walking/running) — reine Zusatzevidenz analog zur Kurstoleranz, niemals
+   * ein Gate. Ohne Motion (Android, iOS-Permission verweigert, Modul fehlt)
+   * bleibt das Verhalten exakt wie zuvor: `motion` ist optional/`undefined`
+   * und dieser Bonus greift schlicht nie.
+   */
+  motionAllowanceBonusM: number;
+  /** Mindest-Confidence des Motion-Samples, damit der Bonus überhaupt zählt. */
+  minMotionConfidenceForBonus: number;
 }
 
 // Bewusst dieselbe "3 aufeinanderfolgende Fixes"-Konvention wie beim
@@ -46,7 +57,26 @@ export const DEFAULT_SEARCH_START_CONFIG: SearchStartConfig = {
   requiredFixes: 3,
   maxAccuracyM: 25,
   maxHeadingDeviationDeg: 70,
+  motionAllowanceBonusM: 2,
+  minMotionConfidenceForBonus: 0.6,
 };
+
+// Bewegungszustand analog zu AnyvoMotionModule/trackFusionEngine — bewusst
+// hier noch einmal lokal deklariert (statt importiert), damit dieses reine
+// Engine-Modul weiterhin ohne Abhängigkeit zu modules/anyvo-motion testbar
+// bleibt (gleiches Prinzip wie der bestehende LL-Import aus searchGeometry).
+export type SearchStartMovementState = 'stationary' | 'walking' | 'running' | 'automotive' | 'unknown';
+
+// Optionales, aggregiertes Motion-Sample seit dem letzten Fix (Punkt 3/7 der
+// Core-Motion-Spezifikation). headingDelta ist bewusst NICHT hier enthalten,
+// da CMDeviceMotion ohne Kompass-Referenzrahmen keine verlässliche absolute
+// Peilung liefert — hier zählt nur "bewegt sich der Handler aktiv", nicht
+// "in welche Richtung", um keine falsche Präzision vorzutäuschen.
+export interface SearchStartMotionInput {
+  movementState: SearchStartMovementState;
+  /** 0..1, aus AnyvoMotionManager/trackFusionEngine — je höher, desto verlässlicher movementState. */
+  motionConfidence: number;
+}
 
 export interface SearchStartAcqState {
   state: SearchStartState;
@@ -62,6 +92,14 @@ export interface SearchStartFixInput {
   accuracy: number | null;
   /** Bewegungsrichtung SEIT dem letzten akzeptierten Punkt (Grad), oder null ohne plausible Bewegung. */
   headingDeg: number | null;
+  /**
+   * OPTIONAL: aggregiertes Core-Motion-Sample seit dem letzten Fix (Punkt 7).
+   * `undefined`/`null`, wenn Core Motion nicht verfügbar/erlaubt ist (Android,
+   * iOS-Permission verweigert, natives Modul fehlt) — reine Zusatzevidenz,
+   * niemals ein Gate. Bestehende Aufrufer, die dieses Feld nicht setzen,
+   * verhalten sich exakt wie vor dieser Erweiterung.
+   */
+  motion?: SearchStartMotionInput | null;
 }
 
 export interface SearchStartEvaluation {
@@ -119,7 +157,24 @@ export function isPlausibleStartFix(evalu: SearchStartEvaluation, sample: Search
   // Erlaubte seitliche Abweichung skaliert mit der gemeldeten Genauigkeit
   // (accuracy 3 m → strenge ~3 m Toleranz; accuracy 15 m → grosszügige ~15 m) —
   // kein starrer Meter-Wert, degradiert graziös statt fest zu blockieren.
-  const allowance = sample.accuracy != null ? Math.max(3, sample.accuracy) : 6;
+  let allowance = sample.accuracy != null ? Math.max(3, sample.accuracy) : 6;
+
+  // Core-Motion-Zusatzevidenz (Punkt 7): zeigt das Motion-Sample mit
+  // ausreichender Confidence aktive Fussbewegung (walking/running), wird die
+  // Toleranz leicht aufgeweitet — der Handler bewegt sich nachweislich, ein
+  // etwas grösserer seitlicher Versatz ist dann eher normales GPS-Rauschen
+  // als ein falscher Kandidat. "stationary"/fehlende Motion-Daten bleiben
+  // NEUTRAL (kein Malus) — ein ruhig stehender Handler direkt am Start darf
+  // nicht schlechter bewertet werden als einer ohne Motion-Modul (Punkt 16,
+  // gleiche Lehre wie aus dem Stillstands-Regressions-Fix c7eba84).
+  if (
+    sample.motion != null &&
+    sample.motion.motionConfidence >= cfg.minMotionConfidenceForBonus &&
+    (sample.motion.movementState === 'walking' || sample.motion.movementState === 'running')
+  ) {
+    allowance += cfg.motionAllowanceBonusM;
+  }
+
   if (evalu.candidateDevM > allowance) return false;
 
   // Kurs: nur zusätzliche Evidenz. Fehlender/instabiler Kurs blockiert nie

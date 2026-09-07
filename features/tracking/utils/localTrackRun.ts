@@ -2,6 +2,8 @@
 // Run-Struktur für local_training_sessions.payload_json.run. Enthält alles, was heute
 // nur an finishTrackRun (remote) übergeben wird, plus die stabile client-Run-UUID.
 
+import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
+
 export interface RunResultSource {
   durationS:     number;
   score:         number;
@@ -20,6 +22,11 @@ export function buildRunResultPayload(args: {
   endedAtMs:             number;
   result:                RunResultSource;
   searchHandlerDistanceM?: number;
+  // Punkt 10/12/13: additiv, KEINE Migration nötig — payload_json ist schemalos
+  // (JSONB). Fehlt sie (z. B. Freilauf ohne Soll-Fährte, Recovery-Kurzpfad ohne
+  // laufenden Recorder), bleibt das Feld schlicht weg — bestehende Konsumenten
+  // (detail.tsx) müssen `analytics` immer optional behandeln.
+  analytics?: TrackAnalytics;
 }): Record<string, unknown> {
   const r = args.result;
   return {
@@ -36,5 +43,6 @@ export function buildRunResultPayload(args: {
     breaks:                    r.breaks.length,
     search_handler_distance_m: args.searchHandlerDistanceM ?? null,
     run_points:                r.points.map(p => ({ lat: p.latitude, lng: p.longitude })),
+    ...(args.analytics ? { analytics: args.analytics } : {}),
   };
 }
