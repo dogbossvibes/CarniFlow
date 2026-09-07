@@ -1050,6 +1050,13 @@ export const deCH = {
   'track.angleRight': 'Rechts',
   'track.angleAcuteLeft': 'Spitz L',
   'track.angleAcuteRight': 'Spitz R',
+  // Ausführliche, eindeutige Labels für die Detail-Ansicht eines gespeicherten
+  // Winkels (MarkerDetailSheet) — die kompakten Labels oben bleiben für die
+  // Auswahl-Kacheln beim manuellen Setzen (MarkerBottomSheet) unverändert.
+  'track.angleLeftFull': 'Winkel links',
+  'track.angleRightFull': 'Winkel rechts',
+  'track.angleAcuteLeftFull': 'Spitzwinkel links',
+  'track.angleAcuteRightFull': 'Spitzwinkel rechts',
   'track.angleStep': 'Absatz',
   'track.angleBreak': 'Abriss',
   'track.distractionSub': 'Fremdfährte / Ablenkung',

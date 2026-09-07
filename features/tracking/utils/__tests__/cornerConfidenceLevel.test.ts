@@ -96,16 +96,22 @@ describe('Confidence-Level — HIGH bei sauberen Winkeln', () => {
 });
 
 // ── MEDIUM: nahe Klassengrenze + gedämpfte Accuracy ────────────────────────
+// Kombinationen neu kalibriert (Boundary-Sweep) auf die verbreiterten Bänder
+// (Build-43-Audit, Innenwinkel bis 115° normal): der angle-Score-Faktor ist
+// jetzt grosszügiger (Nenner 25° statt 15°), daher rutschen 80°/82° bei
+// gleicher Accuracy inzwischen nach 'high' — fachlich korrekt (näher an der
+// jetzt breiteren Toleranz), aber diese Tests brauchen einen weiter von 90°
+// entfernten Winkel, um weiterhin gezielt 'medium' zu treffen.
 describe('Confidence-Level — MEDIUM nahe Klassengrenze / moderate Accuracy', () => {
-  it('80°-Winkel mit moderater Accuracy (26 m) → accept, medium', () => {
-    const c = best(points(corner(80, 'rechts'), 26));
+  it('75°-Winkel mit moderater Accuracy (30 m) → accept, medium', () => {
+    const c = best(points(corner(75, 'rechts'), 30));
     expect(c?.state).toBe('accept');
     expect(c?.level).toBe('medium');
     expect(c!.confidence).toBeGreaterThanOrEqual(0.60);
     expect(c!.confidence).toBeLessThan(0.80);
   });
-  it('82° links mit schlechterer Accuracy (30 m) → medium', () => {
-    const c = best(points(corner(82, 'links'), 30));
+  it('80° links mit schlechterer Accuracy (38 m) → medium', () => {
+    const c = best(points(corner(80, 'links'), 38));
     expect(c?.state).toBe('accept');
     expect(c?.level).toBe('medium');
   });

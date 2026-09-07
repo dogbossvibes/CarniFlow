@@ -3,13 +3,25 @@ import { readFileSync } from 'fs';
 const source = () => readFileSync('app/track/run.tsx', 'utf8');
 
 describe('TrackRunScreen arming flow', () => {
-  it('does not start when the approach is armed', () => {
+  // Root-Cause-Fix (Build 43, Abschnitt 1 des Audits — widersprüchliche
+  // "Ansatz erreicht"/"Noch nicht am Startpunkt"-Anzeige): `approach.armed`
+  // ist jetzt bewusst DIE EINE Definition, die sowohl das Banner als auch
+  // handleManualStart (ein expliziter onPress-Handler, siehe Test unten)
+  // lesen — vorher gab es dafür eine ZWEITE, separate Prüfung
+  // (classifyManualStart), die genau den beobachteten Widerspruch erzeugte.
+  // Die eigentliche Schutzvorkehrung — kein AUTOMATISCHER Start ohne
+  // Nutzer-Tap — bleibt unverändert und wird unten weiterhin geprüft: kein
+  // useEffect darf `approach.armed` autonom mit `beginSearchNow` verknüpfen.
+  it('does not start automatically when the approach becomes armed (nur via explizitem onPress, siehe handleManualStart)', () => {
     const src = source();
 
     expect(src).not.toContain("beginSearchNow('automatic')");
     expect(src).not.toContain('beginSearchNow("automatic")');
-    expect(src).not.toMatch(/approach\.armed[\s\S]{0,120}beginSearchNow/);
     expect(src).not.toMatch(/useEffect\([\s\S]{0,260}approach\.armed[\s\S]{0,260}beginSearchNow/);
+    // approach.armed darf beginSearchNow nur innerhalb von handleManualStart
+    // erreichen (explizite Nutzeraktion), nicht ausserhalb davon.
+    const handleManualStartBlock = src.slice(src.indexOf('const handleManualStart'), src.indexOf('}, [approach.armed, approach.distanceM, beginSearchNow]);'));
+    expect(handleManualStartBlock).toMatch(/approach\.armed[\s\S]{0,60}beginSearchNow/);
   });
 
   it('keeps the handler-distance choice inside the scrollable arming overlay', () => {
@@ -26,7 +38,7 @@ describe('TrackRunScreen arming flow', () => {
   it('starts the search only from explicit user actions', () => {
     const src = source();
 
-    expect(src).toContain("if (decision === 'at-start') { beginSearchNow('manual-at-start'); return; }");
+    expect(src).toContain("if (approach.armed) { beginSearchNow('manual-at-start'); return; }");
     expect(src).toContain("onPress: () => beginSearchNow('manual-override')");
     expect(src).toContain('onPress={handleManualStart}');
     expect(src).toContain('if (startedRef.current) return;');

@@ -100,17 +100,28 @@ export function isEligible(sample: ApproachSample, cfg: ApproachConfig): boolean
 
 export interface ApproachState {
   consecutive: number;   // aufeinanderfolgende gültige Fixes im Radius
-  armed:       boolean;  // Startpunkt erreicht + stabil → manueller Start ist möglich
+  armed:       boolean;  // Startpunkt JETZT erreicht + stabil → manueller Start ist möglich
 }
 
 export const INITIAL_APPROACH: ApproachState = { consecutive: 0, armed: false };
 
-// Reiner Reducer: verrechnet einen neuen Fix mit dem Arming-Zustand.
-//   • gültig   → Zähler +1; ab requiredFixes → armed
-//   • ungültig → Zähler zurück auf 0 (ein Ausreißer setzt zurück)
-//   • einmal armed → bleibt armed (kein Zurückfallen).
+// Root-Cause-Fix (echtes iPhone, Build 43 — "'Ansatz erreicht' bei ca. 5,9 m,
+// unmittelbar danach 'Noch nicht am Startpunkt — ca. 6 m entfernt'"): `armed`
+// war bisher ein EINWEG-LATCH ("einmal armed → bleibt armed, kein
+// Zurückfallen" — Kommentar/Test existierten explizit dafür), während der
+// „Jetzt starten"-Button eine ZWEITE, unabhängige, nicht-sticky Prüfung
+// (ehemals classifyManualStart) gegen die AKTUELLE Distanz/Accuracy machte.
+// Weil der dynamische Radius mit BESSERER Accuracy paradoxerweise KLEINER
+// wird, konnte ein früher (bei schlechterer Accuracy, grösserem Radius)
+// erreichtes `armed=true` beliebig lange stehen bleiben, obwohl der Nutzer
+// bei einer später gemeldeten besseren Accuracy (kleinerer Radius) längst
+// wieder ausserhalb liegt — die Banner-Anzeige log dann objektiv, während der
+// Button korrekt ablehnte. Fix: EINE einzige, durchgängig aktuelle Definition
+// — `armed` ist nicht mehr sticky, sondern spiegelt live "die letzten
+// `requiredFixes` aufeinanderfolgenden Fixes lagen im aktuellen dynamischen
+// Radius" wider. Banner UND Button-Gate (run.tsx: handleManualStart) lesen
+// beide exakt dasselbe `armed` — sie können nicht mehr widersprüchlich sein.
 export function reduceApproach(state: ApproachState, sample: ApproachSample, cfg: ApproachConfig): ApproachState {
-  if (state.armed) return state;
   if (isEligible(sample, cfg)) {
     const consecutive = state.consecutive + 1;
     return { consecutive, armed: consecutive >= cfg.requiredFixes };
@@ -121,21 +132,6 @@ export function reduceApproach(state: ApproachState, sample: ApproachSample, cfg
 // Verbleibende gültige Fixes bis zur stabilen Startbereitschaft.
 export function fixesRemaining(state: ApproachState, cfg: ApproachConfig): number {
   return Math.max(0, cfg.requiredFixes - state.consecutive);
-}
-
-// Entscheidung für den MANUELLEN „Jetzt starten"-Button:
-//   • 'at-start'        → Nutzer ist innerhalb des dynamischen Radius → Start nach Tippen
-//   • 'override-needed' → außerhalb / Position unbekannt → bewusste Bestätigung nötig
-export type ManualStartDecision = 'at-start' | 'override-needed';
-export function classifyManualStart(
-  distanceM: number | null,
-  accuracy: number | null,
-  cfg: ApproachConfig,
-): ManualStartDecision {
-  if (distanceM == null || accuracy == null) return 'override-needed';
-  const r = effectiveRadiusM(accuracy, cfg);
-  if (r == null) return 'override-needed';
-  return distanceM <= r ? 'at-start' : 'override-needed';
 }
 
 export const APPROACH_HINT = 'Bitte zum Fährtenansatz gehen. Wähle den Abstand zum Hund und tippe auf Jetzt starten.';

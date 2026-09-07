@@ -54,6 +54,10 @@ export default function TrackAuswertungScreen() {
   const [legs, setLegs]   = useState<LegRow[]>([]);
   const [notes, setNotes] = useState('');
   const [isLocalOnly, setIsLocalOnly] = useState(false);
+  // Abschnitt 8 des Audits: true = Absuche hat KEINE verwertbare Geometrie
+  // erzeugt (0 m Distanz) → steuert nur die Warnhinweis-Anzeige unten, siehe
+  // defaultLegs()/legsFromSession() in trackEvaluation.ts für die Score-Seite.
+  const [hasValidSearchGeometry, setHasValidSearchGeometry] = useState(true);
 
   useEffect(() => {
     useTrackingStore.getState().reset();   // Flow abgeschlossen → Store leeren
@@ -83,7 +87,15 @@ export default function TrackAuswertungScreen() {
       setData(d);
       setIsLocalOnly(localOnly);
       if (d) {
-        setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0));
+        // Root-Cause-Fix (Abschnitt 8 des Audits — "100 Punkte/Vorzüglich
+        // trotz 0 m Suchspur"): distance_meters des Absuche-Runs ist das
+        // direkteste vorhandene Signal für "hat die Absuche überhaupt
+        // verwertbare Geometrie erzeugt" — steuert NUR den Default-Startwert
+        // in legsFromSession (siehe trackEvaluation.ts), eine bereits
+        // gespeicherte manuelle Bewertung bleibt davon unberührt.
+        const hasValidGeometry = ((d.runs?.[0] as { distance_meters?: number | null } | undefined)?.distance_meters ?? 0) > 0;
+        setHasValidSearchGeometry(hasValidGeometry);
+        setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0, hasValidGeometry));
         setNotes(d.notes ?? '');
         // Abschluss-Ansicht → die Fährte dieses Hundes ist nicht mehr „offen".
         if (d.dog_id) useActiveFaehrten.getState().remove(d.dog_id);
@@ -225,6 +237,18 @@ export default function TrackAuswertungScreen() {
               </View>
             </View>
           </View>
+
+          {/* Abschnitt 8 des Audits: Absuche hat keine verwertbare Geometrie
+              erzeugt (0 m Distanz) — automatische Aussage klar von der
+              manuellen Bewertung trennen, kein stiller "100 Punkte"-Anschein. */}
+          {!hasValidSearchGeometry && (
+            <View style={[s.card, { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, marginBottom: 16, backgroundColor: C.trackWarning + '14', borderColor: C.trackWarning + '55', borderWidth: 1 }]}>
+              <Ionicons name="information-circle" size={18} color={C.trackWarning} />
+              <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: C.trackText }}>
+                Automatische Auswertung nicht verfügbar — die Absuche hat keine verwertbare Suchspur aufgezeichnet. Die Punktzahl unten ist noch nicht bewertet, keine automatische Aussage über die Hundeleistung.
+              </Text>
+            </View>
+          )}
 
           {/* Highlights */}
           <View style={s.highlightRow}>

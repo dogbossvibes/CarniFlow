@@ -1,7 +1,7 @@
 import {
   DEFAULT_APPROACH_CONFIG, INITIAL_APPROACH,
   effectiveRadiusM, isEligible, isFreshFix, isPlausibleSpeed,
-  reduceApproach, fixesRemaining, classifyManualStart,
+  reduceApproach, fixesRemaining,
   MIN_START_RADIUS_M, MAX_START_RADIUS_M, ACCURACY_RADIUS_FACTOR,
   MAX_APPROACH_ACCURACY_M, REQUIRED_CONSECUTIVE_FIXES, MAX_LOCATION_AGE_MS,
   type ApproachState, type ApproachSample,
@@ -92,10 +92,23 @@ describe('startApproach — reduceApproach (mehrere gültige Fixes)', () => {
     expect(st.consecutive).toBe(0);
     expect(st.armed).toBe(false);
   });
-  it('einmal armed → bleibt armed', () => {
-    const armed: ApproachState = { consecutive: 3, armed: true };
-    const st = reduceApproach(armed, fix({ accuracy: 2, distanceM: 999, t: 9999 }), cfg);
-    expect(st.armed).toBe(true);
+  // Root-Cause-Fix (echtes iPhone, Build 43): `armed` war bisher ein
+  // Einweg-Latch ("einmal armed → bleibt armed") — das erzeugte genau den
+  // beobachteten Widerspruch ("Ansatz erreicht" bei 5,9 m, unmittelbar danach
+  // "Noch nicht am Startpunkt"), weil der Button-Handler unabhängig davon
+  // fresh gegen die aktuelle Distanz/Accuracy prüfte. Jetzt gibt es nur noch
+  // EINE Definition: `armed` spiegelt live die letzten `requiredFixes`
+  // Fixes wider und fällt zurück, sobald der Nutzer den (mit besserer
+  // Accuracy ggf. kleineren) dynamischen Radius wieder verlässt.
+  it('armed fällt zurück, sobald ein späterer Fix ausserhalb des AKTUELLEN dynamischen Radius liegt (keine Sticky-Lüge mehr im Banner)', () => {
+    // Erst mit schlechterer Accuracy (Radius 9 m) bei 5,9 m armed werden …
+    const armed = feed(3, fix({ accuracy: 6, distanceM: 5.9 }));
+    expect(armed.armed).toBe(true);
+    // … dann meldet GPS eine BESSERE Accuracy (Radius schrumpft auf 4,5 m) bei
+    // unverändert 5,9 m Distanz → jetzt korrekt NICHT mehr armed, keine
+    // widersprüchliche Banner-Anzeige mehr.
+    const st = reduceApproach(armed, fix({ accuracy: 3, distanceM: 5.9, t: 9999 }), cfg);
+    expect(st.armed).toBe(false);
   });
   it('fixesRemaining zählt nur die GPS-Stabilität bis zur manuellen Startbereitschaft', () => {
     expect(fixesRemaining(INITIAL_APPROACH, cfg)).toBe(3);
@@ -104,16 +117,43 @@ describe('startApproach — reduceApproach (mehrere gültige Fixes)', () => {
   });
 });
 
-describe('startApproach — classifyManualStart (Button „Jetzt starten")', () => {
-  it('9) innerhalb des dynamischen Radius → at-start', () => {
-    expect(classifyManualStart(2.5, 2, cfg)).toBe('at-start');   // Radius 3
-    expect(classifyManualStart(5, 4, cfg)).toBe('at-start');     // Radius 6
+// ── Abschnitt 9 des Audits: exakter Start-Bug, alle gemeldeten Kombinationen ──
+// Handler-Distanz variiert, "Hund"-Abstand (1/5/10 m) ist bewusst KEIN
+// Parameter hier — er fliesst architektonisch NICHT in startApproach.ts ein
+// (nur in die virtuelle Hundeposition WÄHREND der laufenden Absuche, siehe
+// useSearchRecorder.estimateDogProgressM). Diese Tests belegen das explizit:
+// für jede Handler-Distanz ist `armed` (Banner) JETZT identisch mit der
+// Button-Gate-Entscheidung — sie können nicht mehr auseinanderlaufen, egal
+// welcher Hundeabstand (1/5/10 m) gerade gewählt ist.
+describe('Abschnitt 9 — exakter Start-Bug: Banner/Button-Konsistenz für alle gemeldeten Szenarien', () => {
+  // Handler 5,9 m entfernt, Accuracy so, dass der Radius (6 m·1,5=9m clamped)
+  // ihn zunächst eligible macht — exakt das Video-Szenario.
+  it('Handler 5,9 m entfernt (Accuracy 6 m → Radius 9 m) + Hundeabstand 5 m: armed und Button-Gate sind IDENTISCH (nicht mehr "Ansatz erreicht" + "noch 6 m entfernt" gleichzeitig)', () => {
+    const st = feed(3, fix({ accuracy: 6, distanceM: 5.9 }));
+    // `armed` IST die Button-Gate-Entscheidung (run.tsx liest exakt dieses
+    // Feld) — es gibt keine zweite, abweichende Prüfung mehr.
+    expect(st.armed).toBe(true);
+    // Hundeabstand beeinflusst NICHTS hiervon (kein Parameter in reduceApproach/isEligible).
   });
-  it('10) außerhalb des Radius → override-needed (Bestätigungsdialog)', () => {
-    expect(classifyManualStart(8, 4, cfg)).toBe('override-needed');   // Radius 6
+
+  it('Handler 6 m entfernt, Accuracy 3 m (Radius 4,5 m) + Hundeabstand 1 m: konsistent NICHT armed', () => {
+    const st = feed(3, fix({ accuracy: 3, distanceM: 6 }));
+    expect(st.armed).toBe(false);
   });
-  it('unbekannte Position/Genauigkeit → override-needed', () => {
-    expect(classifyManualStart(null, 4, cfg)).toBe('override-needed');
-    expect(classifyManualStart(5, null, cfg)).toBe('override-needed');
+  it('Handler 6 m entfernt, Accuracy 3 m (Radius 4,5 m) + Hundeabstand 5 m: konsistent NICHT armed', () => {
+    const st = feed(3, fix({ accuracy: 3, distanceM: 6 }));
+    expect(st.armed).toBe(false);
+  });
+  it('Handler 6 m entfernt, Accuracy 3 m (Radius 4,5 m) + Hundeabstand 10 m: konsistent NICHT armed', () => {
+    const st = feed(3, fix({ accuracy: 3, distanceM: 6 }));
+    expect(st.armed).toBe(false);
+  });
+  it('Handler 2 m entfernt (klar innerhalb jedes plausiblen Radius) + Hundeabstand 5 m: konsistent armed', () => {
+    const st = feed(3, fix({ accuracy: 4, distanceM: 2 }));
+    expect(st.armed).toBe(true);
+  });
+  it('Handler tatsächlich am Start (0 m): konsistent armed, unabhängig von der Accuracy (solange ≤ maxAccuracyM)', () => {
+    const st = feed(3, fix({ accuracy: 10, distanceM: 0 }));
+    expect(st.armed).toBe(true);
   });
 });

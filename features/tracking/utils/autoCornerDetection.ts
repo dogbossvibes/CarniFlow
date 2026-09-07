@@ -28,9 +28,26 @@ const MIN_TURN_DEG = 15;                // darunter kein Winkel
 const STRAIGHT_WINDOW_M = 8;            // Fenster für die Schenkel-Geradheit (mehr Punkte → robust ggü. 1 Ausreißer)
 const SEG_ALIGN_DEG = 18;              // Segment gilt als „gerade", wenn Heading-Abweichung ≤ diesem Wert
 const MICRO_SEGMENT_M = 0.5;           // Stop-/Jitter-Punkte im Scheitel nicht als echte Richtung werten
-// Winkelklassen (überlappungsfrei; ~90° ±15° normal, 30–60° spitz; dazwischen Totzone).
-const NORMAL_MIN = 75, NORMAL_MAX = 105;
-const SPITZ_MIN = 30, SPITZ_MAX = 60;
+// ── Winkelklassen: Innenwinkel vs. Heading-Delta (Root-Cause-Audit) ─────────
+// `angleDeg` weiter unten ist IMMER der INNENWINKEL am Scheitel, NICHT die
+// Heading-Änderung (der tatsächliche Kursschwenk beim Ablaufen). Beide hängen
+// über `angleDeg = 180 − |Heading-Delta|` zusammen (Aussenwinkel-Ergänzung):
+// ein 45°-Innenwinkel-Spitzwinkel entspricht ~135° Heading-Delta, NICHT 45°
+// Heading-Delta — ein Spitzwinkel darf deshalb niemals als "30–60° Heading-
+// Änderung" implementiert werden (das wäre ein nur 30–60° tatsächlicher
+// Kursschwenk = eine sehr SANFTE Kurve, kein Spitzwinkel). Die Grenzen unten
+// sind bewusst in BEIDEN Domänen angegeben, um genau diese Verwechslung
+// zukünftig auszuschliessen:
+//   • normal:  Innenwinkel  65–115° ⇔ Heading-Delta  65–115° (symmetrisch um 90°)
+//   • spitz:   Innenwinkel  15–60°  ⇔ Heading-Delta 120–165°
+//   • Totzone: Innenwinkel (60,65)  ⇔ Heading-Delta (115,120) — schmaler Puffer
+//     gegen Flackern zwischen den Klassen bei grenzwertigen Fixes.
+// Breiter als die ursprünglichen 75–105/30–60 (Innenwinkel) — mit realistischem
+// GPS-Rauschen validiert (siehe cornerAngleClasses.test.ts), nicht blind
+// übernommen: die alten, engeren Bänder liessen bei ±3–6 m Rauschen zu viele
+// echte 90°-/Spitz-Winkel durchs Raster fallen (Totzone traf sie zu oft).
+const NORMAL_MIN = 65, NORMAL_MAX = 115;
+const SPITZ_MIN = 15, SPITZ_MAX = 60;
 // GPS-Accuracy → Score (robust über den MEDIAN der Schenkelpunkte, nicht Einzelpunkt).
 const ACC_GOOD_M = 12;                  // ≤ → Score 1
 const ACC_BAD_M = 40;                   // ≥ → Score 0
@@ -104,18 +121,118 @@ function median(xs: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-// Indizes eines Schenkels innerhalb STRAIGHT_WINDOW_M ab dem Scheitel (vor/nach).
+// Root-Cause-Fix (Build-43-Audit, Abschnitt "starre 7-m-Grenze"): STRAIGHT_WINDOW_M
+// war bisher eine STARRE Obergrenze, die legIndices() unabhängig davon ausschöpfte,
+// ob dabei ein benachbarter Scheitel überstrichen wurde — bei < 7 m Schenkelabstand
+// reichte das Fenster in den Nachbarwinkel hinein und verunreinigte
+// straightBefore/straightAfter mit dessen andersartiger Richtung.
+//
+// Adaptives, multiskaliges Fenster: wächst Punkt für Punkt bis maximal
+// STRAIGHT_WINDOW_M, aber NUR solange die Sehne (Scheitel → aktueller Rand)
+// nah an der zuerst über LEG_MIN_M etablierten Basis-Richtung bleibt. Eine
+// zunehmende Sehnen-Abweichung ist das Signal für einen echten Richtungswechsel
+// (= ein benachbarter Scheitel beginnt) und stoppt das Wachstum DORT — das
+// Fenster wird nie künstlich verkleinert, wenn Platz vorhanden ist (langer,
+// echt gerader Schenkel wächst weiterhin bis 8 m), aber auch nie künstlich
+// vergrössert, wenn kein Platz ist. Die Sehne (nicht ein einzelnes Segment)
+// ist die robuste Bearing-Schätzung: sie mittelt implizit über alle bereits
+// eingeschlossenen Punkte, ein einzelner GPS-Ausreisser kippt sie nicht. Ein
+// Ausreisser-KANDIDAT muss ausserdem durch den NÄCHSTEN Punkt bestätigt werden
+// (zwei aufeinanderfolgende Abweichungen), bevor das Wachstum stoppt — ein
+// isolierter Sprung allein darf einen sonst sauberen Schenkel nicht verkürzen.
+const WINDOW_EXTEND_TOLERANCE_DEG = 28;   // Sehnen-Abweichung von der Basis-Richtung, ab der ein Nachbar-Scheitel vermutet wird
+
+// Lokale Segment-Richtung EINES Schritts (i → next), bezogen auf die
+// Laufrichtung (forward/backward) — Hilfsfunktion für den Vorausblick unten.
+function stepHeading(points: readonly AutoCornerPoint[], i: number, next: number, forward: boolean): number {
+  return forward ? calculateHeading(points[i], points[next]) : calculateHeading(points[next], points[i]);
+}
+
 function legIndices(points: readonly AutoCornerPoint[], apexIndex: number, forward: boolean): number[] {
   const apex = points[apexIndex];
   const idxs = [apexIndex];
-  if (forward) {
-    let i = apexIndex;
-    while (i < points.length - 1 && points[i + 1].cumDist - apex.cumDist <= STRAIGHT_WINDOW_M) { i++; idxs.push(i); }
-  } else {
-    let i = apexIndex;
-    while (i > 0 && apex.cumDist - points[i - 1].cumDist <= STRAIGHT_WINDOW_M) { i--; idxs.push(i); }
-    idxs.reverse();
+  const step = forward ? 1 : -1;
+  let i = apexIndex;
+  // Basis-Richtung: die Sehne vom Scheitel zum ersten Punkt ab LEG_MIN_M —
+  // EINMALIG etabliert, nah am Scheitel, daher noch nicht durch einen fernen
+  // Nachbar-Scheitel verwässert.
+  let baseHeading: number | null = null;
+
+  for (;;) {
+    const next = i + step;
+    if (next < 0 || next >= points.length) break;
+    const dist = forward ? points[next].cumDist - apex.cumDist : apex.cumDist - points[next].cumDist;
+    if (dist > STRAIGHT_WINDOW_M) break;   // harte Obergrenze bleibt bestehen
+
+    if (baseHeading == null) {
+      if (dist >= LEG_MIN_M) {
+        // Robustheit (Regression "einzelner GPS-Ausreisser"): den ALLERERSTEN
+        // Punkt ab LEG_MIN_M ungeprüft als Anker zu übernehmen, ist selbst
+        // anfällig — liegt GENAU dieser Punkt daneben, verankert sich die
+        // gesamte Basis-Richtung am Ausreisser statt an der wahren Richtung.
+        // Ein weiterer Punkt (falls vorhanden) validiert den Kandidaten: eine
+        // stabile, echte Gerade zeigt von dort dieselbe Sehnen-Richtung; ein
+        // einzelner Ausreisser tut das nicht. Bestätigt sich der Kandidat
+        // nicht, wird die Etablierung auf den nächsten Punkt verschoben
+        // (der Ausreisser selbst bleibt trotzdem ganz normal im Fenster).
+        const candidate = forward ? calculateHeading(apex, points[next]) : calculateHeading(points[next], apex);
+        const confirm = next + step;
+        let confirmed = true;
+        if (confirm >= 0 && confirm < points.length) {
+          const confirmDist = forward ? points[confirm].cumDist - apex.cumDist : apex.cumDist - points[confirm].cumDist;
+          if (confirmDist <= STRAIGHT_WINDOW_M) {
+            const confirmChord = forward ? calculateHeading(apex, points[confirm]) : calculateHeading(points[confirm], apex);
+            confirmed = Math.abs(normalizeDeg(confirmChord - candidate)) <= WINDOW_EXTEND_TOLERANCE_DEG;
+          }
+        }
+        if (confirmed) baseHeading = candidate;
+      }
+      i = next;
+      idxs.push(i);
+      continue;
+    }
+
+    // WICHTIG: die LOKALE Segment-Richtung (nur die letzten zwei Punkte) gegen
+    // die Basis prüfen, NICHT die kumulierte Sehne vom Scheitel — eine Sehne
+    // vom weit entfernten Scheitel verwässert einen echten Richtungswechsel
+    // direkt an einem nahen Nachbar-Scheitel (der Winkel zwischen Sehne und
+    // wahrer neuer Richtung ist anfangs klein, selbst wenn der lokale
+    // Kursschwenk bereits die vollen ~90°/135° beträgt).
+    if (calculateDistance(points[i], points[next]) < MICRO_SEGMENT_M) { i = next; idxs.push(i); continue; }
+    const localHeading = stepHeading(points, i, next, forward);
+    const deviates = Math.abs(normalizeDeg(localHeading - baseHeading)) > WINDOW_EXTEND_TOLERANCE_DEG;
+    if (!deviates) { i = next; idxs.push(i); continue; }
+
+    // Abweichung erkannt: NICHT sofort verwerfen (ein einzelner GPS-Sprung
+    // darf das Fenster nicht vorzeitig kappen) — aber auch NICHT erst
+    // aufnehmen und danach entscheiden (das würde immer mindestens einen
+    // kontaminierenden Punkt ins Fenster lassen, bevor eine zweite Abweichung
+    // je bestätigt werden könnte — genau das hätte bei sehr kurzen
+    // Nachbarabständen versagt). Stattdessen ein Punkt VORAUSSCHAUEN, OHNE
+    // `next` schon aufzunehmen: bestätigt sich die Abweichung am
+    // übernächsten Punkt erneut, ist das ein echter Richtungswechsel — das
+    // Fenster stoppt HIER, `next` bleibt aussen vor. Kehrt die Richtung beim
+    // übernächsten Punkt zur Basis zurück, war `next` ein Einzelausreisser —
+    // dann wird er doch aufgenommen und normal weitergewachsen.
+    const peek = next + step;
+    // Ohne verwertbaren Folgepunkt (Rand des Fensters/Puffers erreicht) NICHT
+    // permissiv sein: eine grosse, eindeutige lokale Abweichung (siehe
+    // WINDOW_EXTEND_TOLERANCE_DEG) allein am Fensterrand ohne Bestätigungs-
+    // möglichkeit trotzdem aufzunehmen, würde genau die Kontamination
+    // riskieren, die dieser Mechanismus verhindern soll — konservativ HIER
+    // stoppen ist der sichere Default (kostet höchstens einen Punkt am Rand).
+    let peekDeviates = true;
+    if (peek >= 0 && peek < points.length) {
+      const peekDist = forward ? points[peek].cumDist - apex.cumDist : apex.cumDist - points[peek].cumDist;
+      if (peekDist <= STRAIGHT_WINDOW_M && calculateDistance(points[next], points[peek]) >= MICRO_SEGMENT_M) {
+        const peekHeading = stepHeading(points, next, peek, forward);
+        peekDeviates = Math.abs(normalizeDeg(peekHeading - baseHeading)) > WINDOW_EXTEND_TOLERANCE_DEG;
+      }
+    }
+    if (peekDeviates) break;   // bestätigter (oder unbestätigbarer) Richtungswechsel → Fenster endet VOR `next`
+    i = next; idxs.push(i);    // Einzelausreisser bestätigt sich nicht → aufnehmen, normal weiterwachsen
   }
+  if (!forward) idxs.reverse();
   return idxs;
 }
 
@@ -233,10 +350,12 @@ export function classifyCornerCandidate(points: readonly AutoCornerPoint[], apex
     calculateHeading(apex, points[afterIdx[afterIdx.length - 1]])
     - calculateHeading(points[beforeIdx[0]], apex),
   );
-  const magnitude = Math.abs(diff);
+  const magnitude = Math.abs(diff);   // Heading-Delta (tatsächlicher Kursschwenk), NICHT der Innenwinkel.
   if (magnitude < MIN_TURN_DEG) {
     return { state: 'reject', confidence: 0, level: 'low', kind: null, angleDeg: 180 - magnitude, reason: 'no_turn', factors: ZERO_FACTORS };
   }
+  // Innenwinkel = 180° − Heading-Delta (siehe Kommentar bei NORMAL_MIN/SPITZ_MIN oben).
+  // bandOf() klassifiziert IMMER den Innenwinkel, nie das Heading-Delta direkt.
   const angleDeg = 180 - magnitude;
   const band = bandOf(angleDeg);
   const direction: 'rechts' | 'links' = diff > 0 ? 'rechts' : 'links';

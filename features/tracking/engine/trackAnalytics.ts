@@ -478,8 +478,15 @@ const CONFIDENCE_HINTS: Record<ConfidenceBand, string | null> = {
   unreliable: 'Die GPS-/Sensor-Grundlage für diese Analyse war unzuverlässig. Einzelne Analyse-Details (z. B. Eckenwerte) können ungenau sein — der Track Score des Hundes ist davon unabhängig und nicht herabgesetzt.',
 };
 
+// Root-Cause-Fix (echtes iPhone, Build 43 — "100 Punkte/Vorzüglich trotz 0 m
+// Suchspur, 0 Winkel, 0 Teilstrecken"): bei GAR KEINEN Samples (Absuche hat
+// keine verwertbare Geometrie erzeugt) wurde bisher `1` (== 'excellent',
+// höchste Konfidenz) zurückgegeben — exakt das Gegenteil der Realität.
+// „Keine Daten" muss die NIEDRIGSTE Konfidenz sein, nicht die höchste, sonst
+// zeigt die Auswertung fälschlich "Analyse-Grundlage: sehr gut" für eine
+// Absuche, die de facto nie stattgefunden hat.
 function computeAnalysisConfidence(samples: AnalyticsSample[]): number {
-  if (!samples.length) return 1;
+  if (!samples.length) return 0;
   let sw = 0, swx = 0;
   for (let i = 1; i < samples.length; i++) {
     const dt = Math.max(0.1, samples[i].tSec - samples[i - 1].tSec);
@@ -497,7 +504,17 @@ export function computeTrackAnalytics(input: TrackAnalyticsInput): TrackAnalytic
   const objects = analyzeObjects(input.samples, input.objects);
   const reacquisition = computeReacquisitionStats(input.breaks);
   const pace = computePace(input.samples);
-  const trackScore = computeTrackScore(deviation, corners, objects, reacquisition, pace);
+  // Root-Cause-Fix (echtes iPhone, Build 43 — "100 Punkte/Vorzüglich trotz
+  // 0 m Suchspur"): spurtreueScore/tempoScore/reacquisitionScore sind bewusst
+  // NICHT nullable (anders als winkelScore/gegenstaendeScore) — "keine Ecken"
+  // und "keine Gegenstände" sollen die Fährte zurecht NICHT bestrafen, aber
+  // "0 m Abweichung"/"0 Breaks"/"perfekte Pace-Konsistenz" aus schlicht LEEREN
+  // Samples ist keine echte Leistung, sondern Abwesenheit jeder Daten — ohne
+  // diesen Guard ergäbe computeTrackScore trotzdem ~100, obwohl gar keine
+  // Absuche-Geometrie vorlag. Betrifft NUR den Fall "überhaupt keine Samples"
+  // — eine echte Absuche mit z. B. 0 Ecken/0 Gegenständen bleibt unverändert
+  // unbestraft (siehe winkelScore/gegenstaendeScore, dort weiterhin nullable).
+  const trackScore = input.samples.length === 0 ? 0 : computeTrackScore(deviation, corners, objects, reacquisition, pace);
   const analysisConfidence = computeAnalysisConfidence(input.samples);
   const band = confidenceBand(analysisConfidence);
 

@@ -24,7 +24,7 @@ import { useTrackingStore, type TrackPointSample } from '@/features/tracking/sto
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
 import {
-  DEFAULT_APPROACH_CONFIG, classifyManualStart, type StartMode,
+  DEFAULT_APPROACH_CONFIG, type StartMode,
 } from '@/features/tracking/engine/startApproach';
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 
@@ -206,14 +206,15 @@ export default function TrackRunScreen() {
     // Sync-Queue idempotent per runUuid upserted. runUuid ist bereits lokal geführt.
   }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM]);
 
-  // Manueller „Jetzt starten": innerhalb des dynamischen Radius → direkt nach Tippen; sonst
-  // bewusste Bestätigung (Override). Der Override tut NICHT so, als sei der
+  // Manueller „Jetzt starten": EINE einzige Definition von "Ansatz erreicht" —
+  // exakt dasselbe `approach.armed`, das auch das Banner oben zeigt (Root-
+  // Cause-Fix, siehe startApproach.ts). Banner und Button können dadurch nie
+  // mehr widersprüchlich sein. Der Override tut NICHT so, als sei der
   // GPS-Startpunkt bestätigt (startMode = 'manual-override').
   const handleManualStart = useCallback(() => {
     if (startedRef.current) return;
     hapticTap();
-    const decision = classifyManualStart(approach.distanceM, approach.accuracy, DEFAULT_APPROACH_CONFIG);
-    if (decision === 'at-start') { beginSearchNow('manual-at-start'); return; }
+    if (approach.armed) { beginSearchNow('manual-at-start'); return; }
     const distTxt = approach.distanceM != null ? `ca. ${Math.round(approach.distanceM)} m` : 'unbekannt weit';
     Alert.alert(
       'Noch nicht am Startpunkt',
@@ -223,7 +224,7 @@ export default function TrackRunScreen() {
         { text: 'Trotzdem starten', style: 'destructive', onPress: () => beginSearchNow('manual-override') },
       ],
     );
-  }, [approach.distanceM, approach.accuracy, beginSearchNow]);
+  }, [approach.armed, approach.distanceM, beginSearchNow]);
 
   // 2) Beim Betreten NICHT direkt starten: erst zum Fährtenansatz navigieren
   //    (Arming, Suchzeit läuft noch nicht). Ohne bekannten Startpunkt → Fallback:
@@ -628,22 +629,34 @@ export default function TrackRunScreen() {
     setPocketLock(false);
   }, []);
 
-  const metrics: { value: string; label: string; warn?: boolean }[] = [
-    { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
-    { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
-    { value: devShown != null ? `${devOff ? '+' : ''}${devShown.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
-    { value: s.accuracy != null ? `${Math.round(s.accuracy)} m` : '—', label: 'GPS' },
-  ];
-
-  // Punkt 15: dezenter Live-GPS-Qualitäts-Punkt neben der GPS-Kachel — beruht
-  // auf der Fusion-Confidence (nicht dem rohen Accuracy-Meterwert), rein
-  // diagnostisch. KEIN Score/keine Bewertung des Hundes — siehe GpsQuality-
-  // Kommentar in useSearchRecorder.ts.
-  const gpsQualityDotColor = s.gpsQuality
+  // Root-Cause-Fix (echtes iPhone Build 43 — Abschnitt 7 des Audits): die
+  // bisherige 5×5-Punktlösung neben dem "GPS"-Label war auf realem Gerät
+  // praktisch unsichtbar (UX-Fehler, kein Diagnose-Ersatz). Jetzt ein
+  // sichtbares Text-Label ("GPS · Gut" statt nur "GPS"), Accuracy UND
+  // Qualitätsbewertung bewusst getrennt (Accuracy bleibt der reine Meterwert,
+  // Qualität kommt separat aus dem bestehenden Confidence-System) — dieselben
+  // i18n-Keys/Label wie bereits in SegmentDetailSheet.tsx/[id].tsx
+  // (track.replay.legend.confidence*, alle 5 ANYVO-Sprachen bereits vorhanden,
+  // keine neuen Keys nötig).
+  const gpsQualityLabelKey: Record<'excellent' | 'good' | 'limited' | 'unreliable', string> = {
+    excellent: 'track.replay.legend.confidenceExcellent',
+    good:      'track.replay.legend.confidenceGood',
+    limited:   'track.replay.legend.confidenceLimited',
+    unreliable:'track.replay.legend.confidenceUnreliable',
+  };
+  const gpsQualityColor = s.gpsQuality
     ? (s.gpsQuality.band === 'excellent' || s.gpsQuality.band === 'good') ? FT.acc
       : s.gpsQuality.band === 'limited' ? FT.warn
       : FT.bad
     : null;
+  const gpsLabel = s.gpsQuality ? `GPS · ${t(gpsQualityLabelKey[s.gpsQuality.band] as any)}` : 'GPS';
+
+  const metrics: { value: string; label: string; warn?: boolean }[] = [
+    { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
+    { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
+    { value: devShown != null ? `${devOff ? '+' : ''}${devShown.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
+    { value: s.accuracy != null ? `±${Math.round(s.accuracy)} m` : '—', label: gpsLabel },
+  ];
 
   // GPS-Debug (nur Dev): schlankes gpsDebug → GpsStats fürs PrecisionDebugPanel (nur lesend).
   const dbg = s.gpsDebug;
@@ -810,18 +823,25 @@ export default function TrackRunScreen() {
 
           {/* Metrik-Leiste (unten) */}
           <View className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
-            {metrics.map((mm, i) => (
-              <View key={i} className={`flex-1 items-center ${i > 0 ? 'border-l border-ft-line' : ''}`}>
-                <Text className={`text-[15px] font-black ${mm.warn ? 'text-ft-warn' : 'text-ft-text'}`} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{mm.value}</Text>
-                <View className="flex-row items-center gap-1 mt-px">
-                  <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase">{mm.label}</Text>
-                  {/* Live-GPS-Qualität (Punkt 15) — nur an der GPS-Kachel, rein diagnostisch. */}
-                  {mm.label === 'GPS' && gpsQualityDotColor && (
-                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: gpsQualityDotColor }} />
-                  )}
+            {metrics.map((mm, i) => {
+              // Live-GPS-Qualität (Punkt 15/Abschnitt 7): nur an der GPS-Kachel,
+              // jetzt als sichtbares Text-Label statt eines kaum erkennbaren
+              // 5×5-Punkts. Accuracy (mm.value, "±X m") bleibt getrennt vom
+              // Qualitätswort (mm.label, "GPS · Gut") — keine Verwechslung.
+              const isGpsTile = mm.label.startsWith('GPS');
+              return (
+                <View key={i} className={`flex-1 items-center ${i > 0 ? 'border-l border-ft-line' : ''}`}>
+                  <Text className={`text-[15px] font-black ${mm.warn ? 'text-ft-warn' : 'text-ft-text'}`} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{mm.value}</Text>
+                  <Text
+                    className={`text-[8.5px] font-bold tracking-[1px] uppercase mt-px ${isGpsTile && gpsQualityColor ? '' : 'text-ft-muted'}`}
+                    style={isGpsTile && gpsQualityColor ? { color: gpsQualityColor } : undefined}
+                    numberOfLines={1}
+                  >
+                    {mm.label}
+                  </Text>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           {/* Arming-Overlay: Navigation zum Fährtenansatz. Suchzeit läuft NICHT

@@ -84,9 +84,14 @@ describe('Confidence — kein Winkel (reject/pending), keine Schlangenlinien-Reg
   const S = (amp: number, period: number, n = 15) =>
     Array.from({ length: n }, (_, i) => { const y = i * 2; return [amp * Math.sin(Math.PI * y / period), y] as const; });
 
+  // Amplitude 2 (statt 3) — validiert gegen die verbreiterten Bänder (Build-43-
+  // Audit, Innenwinkel bis 115° normal): bei Amplitude 3 kann ein lokaler
+  // Scheitel knapp innerhalb des jetzt breiteren Normal-Bands liegen
+  // (dokumentierter Trade-off, siehe autoCornerDetection.test.ts). 2 m bleibt
+  // in jedem relevanten Halbperioden-Bereich sicher ausserhalb.
   it('Schlangenlinie → 0 Winkel (kein accept)', () => {
-    expect(detectAutoCorner(points(S(3, 8, 13)), -Infinity)).toBeNull();
-    expect(best(points(S(3, 8, 13)))?.state).not.toBe('accept');
+    expect(detectAutoCorner(points(S(2, 8, 13)), -Infinity)).toBeNull();
+    expect(best(points(S(2, 8, 13)))?.state).not.toBe('accept');
   });
   it('sanfte S-Kurve → 0 Winkel', () => {
     expect(detectAutoCorner(points(S(2, 20, 21)), -Infinity)).toBeNull();
@@ -100,9 +105,9 @@ describe('Confidence — kein Winkel (reject/pending), keine Schlangenlinien-Reg
     expect(c?.state).not.toBe('accept');
     expect(detectAutoCorner(points(noisy, 30), -Infinity)).toBeNull();
   });
-  it('deadzone-Winkel (70°) → reject mit Grund deadzone', () => {
-    const c = best(points(corner(70, 'rechts')));
-    // 70°-Innenwinkel liegt in der Totzone (60–75) → kein Marker
+  it('deadzone-Winkel (62°) → reject mit Grund deadzone', () => {
+    const c = best(points(corner(62, 'rechts')));
+    // 62°-Innenwinkel liegt in der (verbreiterten) Totzone (61–64) → kein Marker
     expect(c?.state === 'accept').toBe(false);
   });
 });

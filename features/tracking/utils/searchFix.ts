@@ -26,7 +26,7 @@ export function distM(a: LL, b: LL): number {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export type SearchFixReason = 'first' | 'ok' | 'accuracy' | 'speed';
+export type SearchFixReason = 'first' | 'ok' | 'accuracy' | 'speed' | 'anchor_reset';
 export interface SearchFixDecision {
   accepted:  boolean;
   reason:    SearchFixReason;
@@ -36,11 +36,46 @@ export interface SearchFixDecision {
 }
 export interface SearchFixPrev { lat: number; lng: number; t: number }
 export interface SearchFixCur  { lat: number; lng: number; t: number; accuracy: number | null; speed: number | null }
+// Zuletzt wegen 'speed' verworfene Kandidaten (nur Position/Zeit) — dient
+// ausschliesslich der Anker-Recovery unten (siehe ANCHOR_RESET_*), KEINE
+// zweite Zustandsquelle für die eigentliche Geometrie.
+export interface SearchFixRejectedRecord { lat: number; lng: number; t: number }
+
+// Root-Cause-Fix (echtes iPhone, Build 43 — "Suchdistanz bleibt 23s bei 0 m,
+// obwohl der GPS-Puck sichtbar wandert"): der ALLERERSTE Fix einer Absuche
+// wurde bisher bedingungslos akzeptiert (keine Alters-/Plausibilisierungs-
+// prüfung, anders als startApproach.ts/isFreshFix für die Arming-Phase) und
+// wurde zum Referenzpunkt für das Speed-Gate ALLER folgenden Fixes. Liefert
+// CoreLocation direkt nach dem Start (dokumentiertes, reales Verhalten) zuerst
+// eine kürzlich zwischengespeicherte, aber geografisch andere letzte Position,
+// wird JEDER echte, nahe Folgefix als unplausibler Sprung verworfen — bis
+// genug Zeit vergangen ist, dass die implizite Geschwindigkeit unter
+// maxSpeedMps fällt (bei z. B. 300 m Anker-Fehler > 20 Sekunden). In dieser
+// Zeit blieb distanceM/deviationM eingefroren (siehe
+// staleFirstFixFreeze.test.ts). Fix: werden mehrere aufeinanderfolgende Fixes
+// wegen 'speed' verworfen UND sind sie (inkl. des aktuellen) untereinander
+// konsistent nah beieinander, ist mit hoher Wahrscheinlichkeit NICHT die neue
+// Position falsch, sondern der alte Anker — der Anker wird dann auf diesen
+// neuen, konsistenten Cluster zurückgesetzt statt die Absuche dauerhaft
+// einzufrieren (der Aufrufer verwirft dazu die bisherige Linie/Distanz, siehe
+// useSearchRecorder.onFix — derselbe "erster Fix"-Reset wie beim echten Start).
+export const ANCHOR_RESET_MIN_CONSECUTIVE = 3;   // Gesamtzahl konsistenter Fixes (inkl. `cur`), die einen Reset auslösen
+export const ANCHOR_RESET_MAX_SPREAD_M    = 8;   // …müssen alle untereinander innerhalb dieses Radius liegen
+
+function clusterIsConsistent(points: readonly { lat: number; lng: number }[], maxSpreadM: number): boolean {
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      if (distM({ latitude: points[i].lat, longitude: points[i].lng }, { latitude: points[j].lat, longitude: points[j].lng }) > maxSpreadM) return false;
+    }
+  }
+  return true;
+}
 
 export function evaluateSearchFix(
   prev: SearchFixPrev | null,
   cur: SearchFixCur,
   params?: { maxAccuracyM?: number; maxSpeedMps?: number },
+  recentRejected?: readonly SearchFixRejectedRecord[],
 ): SearchFixDecision {
   const maxAccuracyM = params?.maxAccuracyM ?? SEARCH_MAX_ACCURACY_M;
   const maxSpeedMps  = params?.maxSpeedMps ?? SEARCH_MAX_SPEED_MPS;
@@ -59,6 +94,13 @@ export function evaluateSearchFix(
   const jumpM = distM({ latitude: prev.lat, longitude: prev.lng }, { latitude: cur.lat, longitude: cur.lng });
   const dt = (cur.t - prev.t) / 1000;
   if (dt > 0 && jumpM / dt > maxSpeedMps) {
+    const needed = ANCHOR_RESET_MIN_CONSECUTIVE - 1;
+    if (recentRejected && recentRejected.length >= needed) {
+      const cluster = [...recentRejected.slice(-needed), { lat: cur.lat, lng: cur.lng, t: cur.t }];
+      if (clusterIsConsistent(cluster, ANCHOR_RESET_MAX_SPREAD_M)) {
+        return { accepted: true, reason: 'anchor_reset', accuracy: cur.accuracy, speed: cur.speed, jumpM };
+      }
+    }
     return { accepted: false, reason: 'speed', accuracy: cur.accuracy, speed: cur.speed, jumpM };
   }
   return { accepted: true, reason: 'ok', accuracy: cur.accuracy, speed: cur.speed, jumpM };

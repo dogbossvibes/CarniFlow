@@ -22,7 +22,7 @@ import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import { stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
-import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev } from '@/features/tracking/utils/searchFix';
+import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
 import { motionClient } from '@/features/tracking/native/motionClient';
 import {
   evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand,
@@ -229,6 +229,11 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
   const prevFixRef = useRef<SearchFixPrev | null>(null);   // letzter AKZEPTIERTER Rohfix (für das Speed-Gate)
+  // Anker-Recovery (Root-Cause-Fix, siehe searchFix.ts ANCHOR_RESET_*): die
+  // zuletzt wegen 'speed' verworfenen Rohfixe (nur Position/Zeit, kein
+  // zweiter Geometrie-Zustand) — leert sich bei jedem Accept oder bei einem
+  // Accuracy-Reject (der sagt nichts über einen falschen Anker aus).
+  const recentRejectedRef = useRef<SearchFixRejectedRecord[]>([]);
   const lastFixTRef = useRef(0);      // Zeitstempel des letzten akzeptierten Fix (Ausreisser-Filter)
   const rejectedRef = useRef(0);      // verworfene Fixes (Ausreisser/Genauigkeit) — Debug
   const distRef = useRef(0);
@@ -306,10 +311,14 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     const prev = smoothRef.current;
 
     // Fix-Annahme wie beim Legen (Genauigkeit ≤ 45 m, Speed ≤ 12 m/s), gegen den
-    // letzten AKZEPTIERTEN Rohfix. KEIN absoluter Jump-Filter mehr.
+    // letzten AKZEPTIERTEN Rohfix. KEIN absoluter Jump-Filter mehr. Anker-
+    // Recovery (recentRejectedRef) erlaubt einen Reset, wenn der Anker selbst
+    // der Fehler war (siehe searchFix.ts ANCHOR_RESET_*).
     const decision = evaluateSearchFix(
       prevFixRef.current,
       { lat: raw.latitude, lng: raw.longitude, t: tNow, accuracy: accRaw, speed },
+      undefined,
+      recentRejectedRef.current,
     );
 
     // Puck-Glättung IMMER (auch bei verworfenem Linienpunkt) → die Position folgt
@@ -325,7 +334,31 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
 
     if (!recordingRef.current || pausedRef.current) return;
 
-    if (!decision.accepted) { rejectedRef.current++; logSearchFix(decision); return; }
+    if (!decision.accepted) {
+      rejectedRef.current++;
+      // Nur 'speed'-Rejects zählen als Evidenz für einen falschen Anker — ein
+      // Accuracy-Reject sagt nichts darüber aus und würde eine echte
+      // Ausreisser-Serie fälschlich als "konsistent" erscheinen lassen.
+      recentRejectedRef.current = decision.reason === 'speed'
+        ? [...recentRejectedRef.current.slice(-4), { lat: raw.latitude, lng: raw.longitude, t: tNow }]
+        : [];
+      logSearchFix(decision);
+      return;
+    }
+    recentRejectedRef.current = [];
+
+    // Anker-Recovery griff (siehe searchFix.ts): der bisherige Anker war
+    // vermutlich selbst falsch (z. B. ein geografisch veralteter erster Fix) —
+    // die bislang darauf aufgebaute Linie/Distanz wird verworfen, dieser Fix
+    // wird wie ein neuer "erster" Punkt behandelt (kein Phantom-Sprung in der
+    // aufgezeichneten Distanz). Suchstart-Acquisition (unten) bleibt unberührt
+    // (arbeitet ohnehin gegen die Soll-Fährte, nicht gegen pointsRef).
+    if (decision.reason === 'anchor_reset') {
+      if (__DEV__) console.log('[searchFix] anchor_reset', { jumpM: decision.jumpM != null ? Math.round(decision.jumpM) : null });
+      pointsRef.current = [];
+      pointsTimeRef.current = [];
+      distRef.current = 0;
+    }
 
     // Akzeptiert → als Referenz für das nächste Speed-Gate merken (wie Legen: auch
     // bei anschliessendem Distanz-Gate).
@@ -667,6 +700,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     breaksRef.current = [];
     smoothRef.current = resumePts.length ? resumePts[resumePts.length - 1] : null;
     prevFixRef.current = null;   // Zeitlücke → nächster Fix ist neuer Referenzpunkt (kein Speed-Gate gegen alten Fix)
+    recentRejectedRef.current = [];
     lastFixTRef.current = 0; rejectedRef.current = 0;
     let d = 0;
     for (let i = 1; i < resumePts.length; i++) d += distM(resumePts[i - 1], resumePts[i]);

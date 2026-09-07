@@ -262,8 +262,10 @@ describe('Absuche-Pipeline — STRAIGHTNESS-MATRIX (T-45 bleibt korrekt)', () =>
   it('C) sanfte S-Kurve → NICHT erkannt', () => {
     expect(detectAutoCorner(points(S(2, 20, 21)), -Infinity)).toBeNull();
   });
+  // Amplitude 2 (statt 3) — siehe autoCornerDetection.test.ts für die
+  // ausführliche Begründung (verbreiterte Bänder, Build-43-Audit).
   it('D) Schlangenlinie → NICHT erkannt', () => {
-    expect(detectAutoCorner(points(S(3, 8, 13)), -Infinity)).toBeNull();
+    expect(detectAutoCorner(points(S(2, 8, 13)), -Infinity)).toBeNull();
   });
   it('E) GPS-Zickzack auf Gerade → NICHT erkannt', () => {
     expect(detectAutoCorner(points([[0, 0], [0.25, 2], [-0.2, 4], [0.18, 6], [-0.15, 8], [0.2, 10], [-0.18, 12]]), -Infinity)).toBeNull();

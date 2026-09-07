@@ -239,3 +239,13 @@ describe('trackAnalytics — deviation stats direkt (Grenzfall leere Samples)', 
     expect(stats.maxReliableM).toBe(0);
   });
 });
+
+describe('trackAnalytics — Root-Cause-Fix Build 43: leere Samples (keine verwertbare Absuche-Geometrie)', () => {
+  it('0 Samples → analysisConfidence=0 (unreliable), NICHT mehr 1/excellent — sonst würde "Analyse-Grundlage: sehr gut" für eine nie stattgefundene Absuche angezeigt', () => {
+    const res = computeTrackAnalytics(baseInput({ samples: [], corners: [], objects: [], breaks: [] }));
+    expect(res.analysisConfidence).toBe(0);
+    expect(res.analysisConfidenceBand).toBe('unreliable');
+    expect(res.analysisConfidenceHint).not.toBeNull();
+    expect(res.trackScore).toBe(0);
+  });
+});

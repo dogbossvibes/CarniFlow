@@ -21,9 +21,12 @@ const MATERIAL_KEY: Partial<Record<MarkerMaterial, TranslationKey>> = {
   teppich: 'track.materialCarpet', diverses: 'track.materialOther',
 };
 
+// Ausführliche Labels ("Winkel links" statt nur "Links") — als Sheet-Titel
+// steht der Typ hier ohne umgebenden Kontext, "Links" allein wäre mehrdeutig
+// (Root-Cause-Fix: eindeutige Anzeige gespeicherter Winkel-Typen, Audit-Vorgabe).
 const ANGLE_KEY: Partial<Record<AngleKind, TranslationKey>> = {
-  links: 'track.angleLeft', rechts: 'track.angleRight',
-  spitz_links: 'track.angleAcuteLeft', spitz_rechts: 'track.angleAcuteRight',
+  links: 'track.angleLeftFull', rechts: 'track.angleRightFull',
+  spitz_links: 'track.angleAcuteLeftFull', spitz_rechts: 'track.angleAcuteRightFull',
   absatz: 'track.angleStep', abriss: 'track.angleBreak',
 };
 

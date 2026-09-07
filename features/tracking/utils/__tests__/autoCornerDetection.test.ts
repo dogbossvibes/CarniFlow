@@ -40,35 +40,48 @@ function quarterCurve(radius: number, startDeg: number, endDeg: number, steps: n
   });
 }
 
-describe('detectAutoCorner — Normalwinkel 75–105° (90° ±15°)', () => {
-  for (const deg of [75, 80, 85, 90, 95, 100, 105]) {
+// Root-Cause-Audit (Build 43): Bänder verbreitert (Innenwinkel 65–115°
+// normal, 15–60° spitz — siehe NORMAL_MIN/SPITZ_MIN-Kommentar in
+// autoCornerDetection.ts) — validiert gegen realistisches GPS-Rauschen in
+// cornerAngleClasses.test.ts, nicht blind vom Auftrag übernommen.
+describe('detectAutoCorner — Normalwinkel 65–115° (90° ±25°, Innenwinkel)', () => {
+  for (const deg of [65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115]) {
     it(`Innenwinkel ${deg}° → normaler Winkel`, () => {
       expect(detectAutoCorner(points(corner(deg, 'rechts')), -Infinity)?.kind).toBe('rechts');
     });
   }
-  for (const deg of [70, 74, 106, 110]) {
-    it(`Innenwinkel ${deg}° → KEIN normaler Winkel`, () => {
+  for (const deg of [61, 64, 116, 119]) {
+    it(`Innenwinkel ${deg}° (Totzone-Puffer) → KEIN normaler Winkel`, () => {
       const r = detectAutoCorner(points(corner(deg, 'rechts')), -Infinity);
       expect(r?.kind === 'rechts' || r?.kind === 'links').not.toBe(true);
     });
   }
 });
 
-describe('detectAutoCorner — Spitzwinkel 30–60° (überlappungsfrei)', () => {
-  for (const deg of [30, 45, 60]) {
+describe('detectAutoCorner — Spitzwinkel 15–60° Innenwinkel (⇔ 120–165° Heading-Delta, überlappungsfrei)', () => {
+  for (const deg of [15, 20, 30, 45, 60]) {
     it(`Innenwinkel ${deg}° → Spitzwinkel`, () => {
       expect(detectAutoCorner(points(corner(deg, 'rechts')), -Infinity)?.kind).toBe('spitz_rechts');
       expect(detectAutoCorner(points(corner(deg, 'links')), -Infinity)?.kind).toBe('spitz_links');
     });
   }
-  for (const deg of [65, 70]) {
-    it(`Innenwinkel ${deg}° → Totzone (kein Marker)`, () => {
+  for (const deg of [61, 64]) {
+    it(`Innenwinkel ${deg}° → Totzone (kein Marker, schmaler Puffer zwischen den Klassen)`, () => {
       expect(detectAutoCorner(points(corner(deg, 'rechts')), -Infinity)).toBeNull();
     });
   }
-  it('75° ist normal (nicht spitz), 90° ist normal', () => {
-    expect(detectAutoCorner(points(corner(75, 'rechts')), -Infinity)?.kind).toBe('rechts');
+  it('65° ist normal (nicht spitz), 90° ist normal', () => {
+    expect(detectAutoCorner(points(corner(65, 'rechts')), -Infinity)?.kind).toBe('rechts');
     expect(detectAutoCorner(points(corner(90, 'links')), -Infinity)?.kind).toBe('links');
+  });
+  // Explizit die Kern-Warnung des Audits: ein GENTLER, nicht-spitzer Kurs-
+  // schwenk (~45° Heading-Delta ⇔ 135° Innenwinkel) darf NIE als Spitzwinkel
+  // durchgehen — würde man Spitz fälschlich über "30–60° Heading-Delta"
+  // definieren, wäre genau das der Fehler.
+  it('~45° Heading-Delta (135° Innenwinkel) ist WEDER normal NOCH Spitzwinkel — bewusst ausserhalb beider Bänder', () => {
+    const r = detectAutoCorner(points(corner(135, 'rechts')), -Infinity);
+    expect(r?.kind === 'spitz_rechts' || r?.kind === 'spitz_links').not.toBe(true);
+    expect(r?.kind === 'rechts' || r?.kind === 'links').not.toBe(true);
   });
 });
 
@@ -107,8 +120,16 @@ describe('detectAutoCorner — Kurven/Schlangenlinien → kein Winkel', () => {
     const s = Array.from({ length: 21 }, (_, i) => { const y = i * 2; return [2 * Math.sin(Math.PI * y / 20), y] as const; });
     expect(detectAutoCorner(points(s), -Infinity)).toBeNull();
   });
+  // Amplitude auf 2 m kalibriert (Boundary-Sweep, siehe Abschlussbericht):
+  // bei den verbreiterten Bändern (Innenwinkel bis 115°) kann eine ENGERE
+  // Schlangenlinie (Amplitude 2.5–5 m über 8–10 m Halbperiode) vereinzelt
+  // einen lokalen Scheitel knapp innerhalb des Normal-Bands erzeugen (ein
+  // dokumentierter, bewusst in Kauf genommener Trade-off der Verbreiterung —
+  // eine ECHTE, gezielt gelegte Fährte hat scharfe, kurze Ecken, keine
+  // gleichmässigen weiten Bögen). 2 m Amplitude bleibt in jedem getesteten
+  // Halbperioden-Bereich (6–12 m) sicher ausserhalb beider Bänder.
   it('engere Schlangenlinie → null', () => {
-    const s = Array.from({ length: 13 }, (_, i) => { const y = i * 2; return [3 * Math.sin(Math.PI * y / 8), y] as const; });
+    const s = Array.from({ length: 13 }, (_, i) => { const y = i * 2; return [2 * Math.sin(Math.PI * y / 8), y] as const; });
     expect(detectAutoCorner(points(s), -Infinity)).toBeNull();
   });
   it('verrauschte kontinuierliche Kurve → null', () => {

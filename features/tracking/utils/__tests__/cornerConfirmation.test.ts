@@ -202,8 +202,11 @@ describe('E2E — HIGH: saubere Winkel sofort confirmed, genau einer', () => {
 });
 
 describe('E2E — MEDIUM: moderate Accuracy braucht kurze Bestätigung, dann confirmed', () => {
-  it('80° rechts @26 m Accuracy → genau 1 confirmed', () => {
-    const { confirmed, all } = drive(points(corner(80, 'rechts'), 26));
+  // 75°/30 m statt 80°/26 m — neu kalibriert auf die verbreiterten Bänder
+  // (Build-43-Audit): der angle-Score ist jetzt grosszügiger, 80°@26 m landet
+  // inzwischen direkt bei 'high' (high_immediate statt evidenzbasiert).
+  it('75° rechts @30 m Accuracy → genau 1 confirmed', () => {
+    const { confirmed, all } = drive(points(corner(75, 'rechts'), 30));
     expect(confirmed.map(c => c.kind)).toEqual(['rechts']);
     expect(all.some(e => e.type === 'created')).toBe(true);           // erst confirming …
     expect(confirmed[0].reason).toMatch(/evidence_/);                 // … dann evidenzbasiert bestätigt
@@ -220,8 +223,10 @@ describe('E2E — FALSE POSITIVES: kein Winkel', () => {
   it('Stop + Mikrobewegung → 0', () => {
     expect(drive(points([[0, 0], [0.1, 0.2], [-0.1, 0.1], [0.05, 0.05], [0, 0.1]])).confirmed).toHaveLength(0);
   });
+  // Amplitude 2 (statt 3) — siehe autoCornerDetection.test.ts für die
+  // ausführliche Begründung (verbreiterte Bänder, Build-43-Audit).
   it('Zickzack durch GPS-Noise → kein Mehrfachwinkel', () => {
-    expect(drive(points(S(3, 8, 15))).confirmed).toHaveLength(0);
+    expect(drive(points(S(2, 8, 15))).confirmed).toHaveLength(0);
   });
   it('sanfte S-Kurve → 0', () => {
     expect(drive(points(S(2, 20, 21))).confirmed).toHaveLength(0);
