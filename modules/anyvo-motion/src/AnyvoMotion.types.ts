@@ -16,6 +16,11 @@ export interface MotionSample {
   movementState:          MovementState;
   motionConfidence:       number;   // 0..1 — wie viele Sensor-Quellen liefern gerade Daten
   activityConfidence:     ActivityConfidenceLevel;   // CMMotionActivity-eigene Confidence (oder 'low' als Fallback)
+  // Alter der zugrundeliegenden CMMotionActivity-Klassifikation in ms (Punkt 9
+  // des Audits, rein diagnostisch — NICHT Teil der Fusion-Entscheidungslogik,
+  // die nutzt intern bereits ihre eigene Staleness-Prüfung). `null` = noch nie
+  // eine Activity empfangen (kein CMMotionActivityManager verfügbar/erlaubt).
+  activityAgeMs?:         number | null;
 }
 
 export interface MotionStatus {

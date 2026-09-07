@@ -54,7 +54,15 @@ public class AnyvoPrecisionLocationModule: Module {
       let mode = options["mode"] as? String ?? "tracking_dog_sport"
       let enableHeading = options["enableHeading"] as? Bool ?? false
       let allowBackground = options["allowBackground"] as? Bool ?? false
-      self.locationManager.start(mode: mode, enableHeading: enableHeading, allowBackground: allowBackground)
+      // Root-Cause-Fix (Build 42): `intervalMs` wurde hier bisher nie gelesen —
+      // JS erwartet per Vertrag (PrecisionTrackingOptions, Default 1000) eine
+      // Drosselung des Emits, die native Seite lieferte bislang jeden
+      // CLLocationManager-Fix ungedrosselt durch. Numeric-Typing defensiv (JS
+      // liefert i. d. R. eine Zahl, aber NSNumber-Brücken variieren je nach Pfad).
+      let intervalMs = (options["intervalMs"] as? NSNumber)?.doubleValue
+        ?? (options["intervalMs"] as? Double)
+        ?? 1000
+      self.locationManager.start(mode: mode, enableHeading: enableHeading, allowBackground: allowBackground, intervalMs: intervalMs)
     }
 
     AsyncFunction("stopPrecisionTracking") {

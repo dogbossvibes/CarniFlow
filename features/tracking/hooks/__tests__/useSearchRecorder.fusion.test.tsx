@@ -224,6 +224,77 @@ describe('useSearchRecorder — Sensor-Fusion-Schutzschicht (Punkt 2 der Nachbes
     expect(getRecorder().gpsQuality?.band).not.toBe('excellent');
   });
 
+  // Root-Cause-Regressionstest (echtes iPhone, Build 42 — "Ist-Suchspur fehlt
+  // komplett"): Apples CMMotionActivityManager (AnyvoMotionManager.swift)
+  // klassifiziert nach echtem Bewegungsbeginn real bekanntermassen noch
+  // mehrere Sekunden als 'stationary' nach, UND `lastActivity` dort hat KEINEN
+  // Staleness-Timeout — movementState kann also während einer ganzen realen
+  // Gehstrecke fälschlich 'stationary' bleiben, während Beschleunigung/
+  // Rotation/Schritte längst echte Bewegung zeigen. Vor dem Fix genügte
+  // movementState==='stationary' in motionLooksStationary() ALLEIN (sofortiges
+  // return true) → jeder Fix wäre als 'stationary' eingefroren worden, obwohl
+  // die Sensorik echte Bewegung zeigt. Dieser Test bildet genau das nach.
+  it('movementState bleibt (Aktivitäts-Klassifikator veraltet) auf "stationary", aber Beschleunigung/Rotation/Schritte zeigen echtes Gehen → Linie friert NIE komplett ein', async () => {
+    const laidPoints = denseLeg(0, 80, 0);
+    const { getRecorder } = mount(laidPoints);
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+
+    const y = lockAndWalk(getRecorder, 5);   // ~10 m Basisdistanz
+    const distAfterLock = getRecorder().distanceM;
+
+    // movementState bewusst weiterhin 'stationary' (veraltete Apple-Klassifikation),
+    // aber accel/rotation/stepDelta zeigen unzweideutig echtes Gehen.
+    feedMotion({
+      movementState: 'stationary', motionConfidence: 0.9,
+      accelerationMagnitude: 0.3, rotationMagnitude: 0.4, stepDelta: 1,
+    });
+
+    let walked = y;
+    const distances: number[] = [distAfterLock];
+    for (let i = 0; i < 6; i++) {
+      walked += 2;
+      feed(6, 0, walked);
+      distances.push(getRecorder().distanceM);
+    }
+
+    // JEDER einzelne Schritt muss die Linie weiter wachsen lassen — kein
+    // einziges eingefrorenes Segment, obwohl movementState durchgehend
+    // 'stationary' meldet.
+    for (let i = 1; i < distances.length; i++) {
+      expect(distances[i]).toBeGreaterThan(distances[i - 1]);
+    }
+    expect(getRecorder().distanceM).toBeGreaterThan(distAfterLock + 8);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_motion');
+  });
+
+  it('20+ gute Fixes am Stück (mit gelegentlichem stale movementState dazwischen) → keine langfristige Freeze-Kaskade', async () => {
+    const laidPoints = denseLeg(0, 120, 0);
+    const { getRecorder } = mount(laidPoints);
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+
+    const y0 = lockAndWalk(getRecorder, 5);
+    let y = y0;
+    const distances: number[] = [getRecorder().distanceM];
+    for (let i = 0; i < 22; i++) {
+      // Jeder 5. Fix meldet (wie auf echtem Gerät beobachtet) ein veraltetes
+      // 'stationary' bei gleichzeitig echten Bewegungssignalen — darf laut Fix
+      // nie eine Kaskade auslösen, die spätere Fixes ebenfalls einfriert.
+      feedMotion(i % 5 === 0
+        ? { movementState: 'stationary', accelerationMagnitude: 0.3, rotationMagnitude: 0.4, stepDelta: 1 }
+        : { movementState: 'walking', accelerationMagnitude: 0.3, rotationMagnitude: 0.4, stepDelta: 1 });
+      y += 2;
+      feed(6, 0, y);
+      distances.push(getRecorder().distanceM);
+    }
+
+    for (let i = 1; i < distances.length; i++) {
+      expect(distances[i]).toBeGreaterThan(distances[i - 1]);
+    }
+    expect(getRecorder().distanceM).toBeGreaterThan(y0 + 30);
+  });
+
   it('Motion unavailable (kein Sample je gefeuert) → GPS-only reproduziert exakt das alte Verhalten', async () => {
     const laidPoints = denseLeg(0, 60, 0);
     const { getRecorder } = mount(laidPoints);

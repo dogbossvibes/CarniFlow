@@ -80,6 +80,7 @@ final class AnyvoMotionManager {
     currentStepTotal = 0
     currentCadence = nil
     lastActivity = nil
+    lastActivityAt = nil
     pedometerAuthDenied = false
   }
 
@@ -134,7 +135,33 @@ final class AnyvoMotionManager {
     manager.startActivityUpdates(to: OperationQueue.main) { [weak self] activity in
       guard let self = self, let activity = activity else { return }
       self.lastActivity = activity
+      // Root-Cause-Fix (Build 42 — "Ist-Suchspur fehlt komplett"): bisher wurde
+      // `lastActivity` unbegrenzt weitergegeben, auch wenn Apples Klassifikator
+      // seit dem Beginn echter Bewegung keine neue Meldung mehr geschickt hat.
+      // Monotoner Empfangszeitstempel (systemUptime) → Staleness unten in
+      // movementState()/emitAggregatedSample() prüfbar, unbeeinflusst von
+      // Systemzeitänderungen.
+      self.lastActivityAt = ProcessInfo.processInfo.systemUptime
     }
+  }
+
+  // Wie lange gilt eine CMMotionActivity-Klassifikation noch als aktuell?
+  // CMMotionActivityManager garantiert KEIN periodisches "Heartbeat"-Update,
+  // solange sich der Zustand nicht ändert — ein zu kurzer Wert würde also auch
+  // eine noch korrekte, bloss lange unveränderte Klassifikation ständig als
+  // "stale" verwerfen. Der Wert ist deshalb NICHT willkürlich 5 s, sondern an
+  // der einzigen bereits im Projekt etablierten Grösse für "wie lange darf ein
+  // Handler plausibel noch am Fährtenansatz stehen, bevor echte Bewegung zu
+  // erwarten ist" ausgerichtet (START_LOCK_MIN_MS = 5000 ms in
+  // useTrackRecorder.ts) — plus einem kleinen Puffer für die eigene, alle
+  // 250 ms laufende Aggregation (emitAggregatedSample), damit nicht jeder
+  // einzelne Emit-Tick knapp an der Grenze kippt.
+  private static let activityStalenessMaxS: TimeInterval = 6.0
+  private var lastActivityAt: TimeInterval?
+
+  private func hasFreshActivity() -> Bool {
+    guard lastActivity != nil, let at = lastActivityAt else { return false }
+    return ProcessInfo.processInfo.systemUptime - at <= Self.activityStalenessMaxS
   }
 
   // MARK: - Aggregation / Emit
@@ -172,8 +199,17 @@ final class AnyvoMotionManager {
     // überhaupt Daten".
     var confidence = 0.6
     if !pedometerAuthDenied && CMPedometer.isStepCountingAvailable() { confidence += 0.2 }
-    if lastActivity != nil { confidence += 0.2 }
+    if hasFreshActivity() { confidence += 0.2 }   // eine veraltete Klassifikation darf die Confidence nicht mehr anheben
     confidence = min(1.0, confidence)
+
+    // Instrumentation (Punkt 9 des Audits): rein informativ, additiv, fliesst
+    // NICHT in movementState/confidence-Berechnung ein (die nutzt intern
+    // bereits hasFreshActivity()) — erlaubt der JS-Seite aber, das reale
+    // Staleness-Verhalten auf einem echten Gerät sichtbar zu machen
+    // (`[fusion]`-DEV-Log in useSearchRecorder.ts).
+    let activityAgeMs: Any = lastActivityAt != nil
+      ? (ProcessInfo.processInfo.systemUptime - lastActivityAt!) * 1000
+      : NSNull()
 
     onSample?([
       "timestamp": now,
@@ -185,16 +221,18 @@ final class AnyvoMotionManager {
       "movementState": state,
       "motionConfidence": confidence,
       "activityConfidence": activityConfidence,
+      "activityAgeMs": activityAgeMs,
     ])
 
     resetWindow()
   }
 
-  // Fallback-Heuristik, falls CMMotionActivityManager nicht verfügbar/verweigert:
+  // Fallback-Heuristik, falls CMMotionActivityManager nicht verfügbar/verweigert
+  // ODER die letzte Klassifikation zu alt ist (siehe activityStalenessMaxS):
   // grobe Klassifikation allein aus der gemittelten Beschleunigungsmagnitude.
   // Nur ein Zusatzsignal — niemals harte Wahrheit (siehe Fusion-Engine JS-seitig).
   private func movementState(accelMag: Double) -> (String, String) {
-    if let activity = lastActivity {
+    if hasFreshActivity(), let activity = lastActivity {
       let conf: String
       switch activity.confidence {
       case .low: conf = "low"
@@ -208,7 +246,10 @@ final class AnyvoMotionManager {
       if activity.automotive { return ("automotive", conf) }
       return ("unknown", conf)
     }
-    // Ohne Activity-Manager: grobe Schwellen (empirisch konservativ, kein
+    // Ohne (frischen) Activity-Manager: grobe Schwellen aus der eigenen,
+    // garantiert aktuellen (250-ms-Fenster) Beschleunigungsmagnitude — anders
+    // als eine veraltete Apple-Klassifikation ist das echte, taufrische
+    // Evidenz, deshalb hier weiterhin zulässig (empirisch konservativ, kein
     // Ersatz für echte Klassifikation — deshalb activityConfidence "low").
     if accelMag < 0.03 { return ("stationary", "low") }
     if accelMag < 0.25 { return ("walking", "low") }

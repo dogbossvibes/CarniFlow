@@ -248,6 +248,10 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
 
   // ── Core-Motion-Sensor-Fusion (rein additiv, siehe GpsQuality-Kommentar oben) ──
   const motionLatestRef = useRef<MotionInput | null>(null);
+  // Rein diagnostisch (Punkt 9 des Audits) — bewusst NICHT Teil von MotionInput/
+  // evaluateFusion (keine Funktions-/Signaturänderung an der reinen Fusion-
+  // Engine), nur für das sparsame [fusion]-DEV-Log unten.
+  const motionActivityAgeMsRef = useRef<number | null>(null);
   const motionUnsubRef = useRef<{ remove: () => void } | null>(null);
   const fusionHistoryRef = useRef<FusionHistory>({ prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null });
   const analyticsSamplesRef = useRef<AnalyticsSample[]>([]);
@@ -448,7 +452,11 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
           speedMps: null,
         });
       }
-      if (__DEV__) console.log('[fusion]', fusion.classification, { confidence: Math.round(fusion.confidence * 100) / 100, reasonFlags: fusion.reasonFlags });
+      if (__DEV__) console.log('[fusion]', fusion.classification, {
+        confidence: Math.round(fusion.confidence * 100) / 100, reasonFlags: fusion.reasonFlags,
+        source: gpsDebug.source, movementState: motionLatestRef.current?.movementState ?? null,
+        activityAgeMs: motionActivityAgeMsRef.current, geometryBlocked: true,
+      });
       return;
     }
 
@@ -578,6 +586,12 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     });
 
     pushSnapshot();
+  // gpsDebug.source bewusst NICHT in den Deps: es wird nur für das sparsame
+  // [fusion]-DEV-Log gelesen (Instrumentation, Punkt 9 des Audits) — würde es
+  // hier mitlaufen, würde jede Source-Änderung (z. B. native→expo-Fallback)
+  // onFix neu erzeugen und damit den Location-Watch-Effect (Deps: [onFix])
+  // unnötig neu starten. Ein evtl. kurz veralteter Wert im Log ist unkritisch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM, firstLegHeading]);
 
   // ── Watch ab Mount ──
@@ -618,6 +632,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
         headingDelta: sMotion.headingDelta,
         motionConfidence: sMotion.motionConfidence,
       };
+      motionActivityAgeMsRef.current = sMotion.activityAgeMs ?? null;
     });
     motionUnsubRef.current = sub;
     return () => {

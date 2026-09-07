@@ -121,12 +121,34 @@ export function confidenceBand(confidence: number): ConfidenceBand {
 }
 
 // Ist Motion (laut den gelieferten Werten) mit "kein Ausschlag" vereinbar?
+//
+// Root-Cause-Fix (echtes iPhone, Build 42 — "Ist-Suchspur fehlt komplett"):
+// `movementState === 'stationary'` durfte hier bisher ALLEIN genügen (sofortiges
+// return true, ohne jede Rücksicht auf accel/rotation/Schritte). Apples
+// CMMotionActivityManager (AnyvoMotionManager.swift) klassifiziert nach dem
+// tatsächlichen Bewegungsbeginn real bekanntermassen noch mehrere Sekunden
+// (teils deutlich länger) als 'stationary' nach, UND `lastActivity` dort hat
+// keinerlei Staleness-Timeout — eine einzige frühe, längst überholte
+// Klassifikation blieb so für die gesamte Session massgebend. Kombiniert mit
+// dem harten `return true` bei movementState==='stationary' hat das jeden
+// nachfolgenden, tatsächlich laufenden Fix als 'stationary' eingestuft →
+// fusionBlocksGeometry in useSearchRecorder blieb dauerhaft true → die Ist-
+// Suchspur wuchs nie (siehe SEARCH-LINE-REGRESSION im Abschlussbericht).
+// Fix: movementState ist wie überall sonst im Modul (vgl. motionCorroboratesTurn,
+// searchStartAcquisition) NIE mehr alleiniger Beweis — nur die schnellen,
+// echtzeitnahen Signale (Beschleunigung/Rotation/Schritte) entscheiden. Liegen
+// GAR KEINE Echtzeit-Signale vor (alle drei null), ist "stationary" NICHT der
+// sichere Default mehr (das wäre derselbe Fehler nur anders verpackt) —
+// fehlende Evidenz darf eine laufende Fährte nie einfrieren.
 function motionLooksStationary(motion: MotionInput | null, cfg: FusionConfig): boolean {
   if (!motion) return false;
-  if (motion.movementState === 'stationary') return true;
-  const accelOk = motion.accelerationMagnitude == null || motion.accelerationMagnitude < cfg.stationaryAccelThreshold;
-  const rotOk = motion.rotationMagnitude == null || motion.rotationMagnitude < cfg.stationaryRotationThreshold;
-  const noSteps = motion.stepDelta == null || motion.stepDelta === 0;
+  const accelHasData = motion.accelerationMagnitude != null;
+  const rotHasData = motion.rotationMagnitude != null;
+  const stepHasData = motion.stepDelta != null;
+  if (!accelHasData && !rotHasData && !stepHasData) return false;   // keine Echtzeit-Evidenz → nicht stationär annehmen
+  const accelOk = !accelHasData || (motion.accelerationMagnitude as number) < cfg.stationaryAccelThreshold;
+  const rotOk = !rotHasData || (motion.rotationMagnitude as number) < cfg.stationaryRotationThreshold;
+  const noSteps = !stepHasData || motion.stepDelta === 0;
   return accelOk && rotOk && noSteps;
 }
 

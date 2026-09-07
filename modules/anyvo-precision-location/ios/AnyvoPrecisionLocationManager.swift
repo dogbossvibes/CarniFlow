@@ -22,6 +22,40 @@ final class AnyvoPrecisionLocationManager: NSObject, CLLocationManagerDelegate {
   private var backgroundAllowed = false
   private var running = false
 
+  // Root-Cause-Fix (echtes iPhone, Build 42 — Audit bestätigt: JS übergibt
+  // `intervalMs`, aber die native Seite hat ihn bislang nie gelesen).
+  // CLLocationManager selbst kennt keinen Zeit-Throttle (nur distanceFilter) —
+  // unter kCLLocationAccuracyBestForNavigation + distanceFilter=None liefert
+  // es Fixes so schnell wie iOS intern erlaubt, JEDER wurde bisher ungedrosselt
+  // an JS emittiert. Fix: CLLocationManager läuft unverändert weiter (kein
+  // Stop/Start-Zyklus, keine Genauigkeits-/Verhaltensänderung) — nur der EMIT
+  // an JS wird auf `emitIntervalMs` gedrosselt, per monotoner Zeitquelle
+  // (ProcessInfo.systemUptime — unbeeinflusst von Systemzeit-/Zeitzonen-
+  // Änderungen, anders als `Date()`/`timeIntervalSince1970`).
+  private var emitIntervalMs: Double = 1000
+  private var lastEmitMonotonic: TimeInterval?
+  // Plausibilisierung: CoreLocation liefert nach startUpdatingLocation() häufig
+  // zuerst die letzte zwischengespeicherte (ggf. deutlich ältere) Position,
+  // bevor der erste wirklich frische Fix eintrifft. Ein Fix, dessen eigener
+  // Zeitstempel bereits beim Empfang älter als dieser Wert ist, gilt als
+  // "gecacht" und wird verworfen (weder emittiert noch als Referenz für den
+  // Emit-Takt verwendet) — sonst könnte eine veraltete Position der
+  // Fährtenlogik als "aktueller" Fix untergeschoben werden. 10 s ist grosszügig
+  // genug für echte, aber langsame Fixes (schlechter Empfang/Kaltstart) und
+  // trotzdem weit unter typischen Cache-Alter (oft Minuten).
+  private let staleLocationMaxAgeMs: Double = 10_000
+
+  // Instrumentation (Punkt 9 des Audits): NUR im expliziten "debug"-Modus aktiv
+  // (derselbe TrackingMode-Wert, den configure(mode:) bereits kennt — kein
+  // neuer Parameter) — in "tracking_dog_sport"/"walking" (Produktion) fällt
+  // KEIN einziges Diagnose-Log an. print() landet ausschliesslich in der
+  // lokalen Xcode-/Console.app-Konsole des angeschlossenen Geräts, nie in
+  // einem Nutzer-sichtbaren UI — für einen gezielten echten-iPhone-Retest
+  // bewusst auch in TestFlight-/Release-Konfigurationen sichtbar (kein
+  // `#if DEBUG`, das würde in einem EAS-"production"-Build stumm herausfallen).
+  private var diagLoggingEnabled = false
+  private var receivedFixCount = 0
+
   override init() {
     super.init()
     manager.delegate = self
@@ -29,10 +63,12 @@ final class AnyvoPrecisionLocationManager: NSObject, CLLocationManagerDelegate {
 
   // MARK: - Start / Stop
 
-  func start(mode: String, enableHeading: Bool, allowBackground: Bool) {
+  func start(mode: String, enableHeading: Bool, allowBackground: Bool, intervalMs: Double) {
     configure(mode: mode)
     headingEnabled = enableHeading
     backgroundAllowed = allowBackground
+    emitIntervalMs = max(0, intervalMs)
+    lastEmitMonotonic = nil   // frischer Start → nächster valider Fix ist wieder "der erste" (sofort emittiert)
 
     // Background nur auf ausdrücklichen Wunsch — sonst keine unnötige
     // Hintergrund-Aktivierung (und keine Always-Berechtigung erzwingen).
@@ -68,11 +104,13 @@ final class AnyvoPrecisionLocationManager: NSObject, CLLocationManagerDelegate {
     running = false
     headingEnabled = false
     lastHeadingWarnAt = 0
+    lastEmitMonotonic = nil
   }
 
   // MARK: - Modus-Konfiguration
 
   private func configure(mode: String) {
+    diagLoggingEnabled = false   // Default: aus — nur der explizite "debug"-Zweig unten schaltet es an.
     switch mode {
     case "walking":
       // Spazier-Modus: hohe (nicht maximale) Genauigkeit spart Akku; ein
@@ -89,6 +127,8 @@ final class AnyvoPrecisionLocationManager: NSObject, CLLocationManagerDelegate {
       manager.distanceFilter = kCLDistanceFilterNone
       manager.activityType = .otherNavigation
       manager.pausesLocationUpdatesAutomatically = false
+      diagLoggingEnabled = true
+      receivedFixCount = 0
 
     default: // "tracking_dog_sport"
       // BestForNavigation: höchste Präzision (iOS nutzt zusätzliche Sensor-
@@ -212,7 +252,33 @@ final class AnyvoPrecisionLocationManager: NSObject, CLLocationManagerDelegate {
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
     guard let loc = locations.last else { return }
     let now = loc.timestamp.timeIntervalSince1970 * 1000
-    lastLocationAt = now
+    lastLocationAt = now   // Diagnose/Status (buildStatus): jeder EMPFANGENE Fix, unabhängig von Drosselung/Verwurf.
+    receivedFixCount += 1
+
+    // Plausibilisierung (s. Kommentar bei staleLocationMaxAgeMs): ein von
+    // CoreLocation zwischengespeichert ausgelieferter, bereits veralteter Fix
+    // wird verworfen — weder emittiert noch als Referenz für den Emit-Takt
+    // benutzt (kein `lastEmitMonotonic`-Update, gilt also NICHT als "erster Fix").
+    let ageMs = Date().timeIntervalSince1970 * 1000 - now
+    if ageMs > staleLocationMaxAgeMs {
+      if diagLoggingEnabled { print("[AnyvoPrecisionLocation] received=\(receivedFixCount) emitted=NO reason=stale ageMs=\(Int(ageMs))") }
+      return
+    }
+
+    // Emit-Drosselung: CLLocationManager liefert unverändert weiter so schnell
+    // wie iOS erlaubt (kein Stop/Start, keine Genauigkeitsänderung) — nur der
+    // JS-Emit hält den vereinbarten `intervalMs`-Vertrag ein. Monotone
+    // Zeitquelle (systemUptime), damit eine Systemzeit-/Zeitzonenänderung den
+    // Takt nicht verfälscht. Erster valider (nicht-gecachter) Fix immer sofort.
+    let nowMonotonic = ProcessInfo.processInfo.systemUptime
+    let isFirstEmit = lastEmitMonotonic == nil
+    let elapsedMs = isFirstEmit ? nil : (nowMonotonic - lastEmitMonotonic!) * 1000
+    if let elapsedMs = elapsedMs, elapsedMs < emitIntervalMs {
+      if diagLoggingEnabled { print("[AnyvoPrecisionLocation] received=\(receivedFixCount) emitted=NO reason=throttled intervalMs=\(Int(emitIntervalMs)) elapsedMs=\(Int(elapsedMs))") }
+      return
+    }
+    lastEmitMonotonic = nowMonotonic
+    if diagLoggingEnabled { print("[AnyvoPrecisionLocation] received=\(receivedFixCount) emitted=YES first=\(isFirstEmit) intervalMs=\(Int(emitIntervalMs)) elapsedMs=\(elapsedMs.map { Int($0) }.map(String.init) ?? "n/a")") }
 
     let hAcc = loc.horizontalAccuracy
     let accuracy: Any = hAcc >= 0 ? hAcc : NSNull()
