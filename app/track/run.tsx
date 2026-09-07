@@ -53,8 +53,9 @@ import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepo
 import { syncNow } from '@/features/sync/services/syncEngine';
 import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
 import {
-  computeTrackAnalytics, type AnalyticsCornerInput, type AnalyticsObjectInput, type AnalyticsAngleKind,
+  type AnalyticsCornerInput, type AnalyticsObjectInput, type AnalyticsAngleKind,
 } from '@/features/tracking/engine/trackAnalytics';
+import { computeTrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
 import * as Crypto from 'expo-crypto';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
@@ -551,7 +552,7 @@ export default function TrackRunScreen() {
     const objectInputs: AnalyticsObjectInput[] = objectMarkers.map((m, i) => ({
       atM: m.distance_from_start, material: m.material, found: res.foundObjectIndices.includes(i),
     }));
-    const analytics = res.analyticsSamples.length ? computeTrackAnalytics({
+    const analytics = res.analyticsSamples.length ? computeTrackAnalyticsV2({
       samples: res.analyticsSamples,
       corners: cornerInputs,
       objects: objectInputs,
@@ -578,6 +579,7 @@ export default function TrackRunScreen() {
           },
           searchHandlerDistanceM,
           analytics,
+          pointsTimeSec: res.pointsTimeSec,
         }));
       } catch (e) {
         console.warn('[trackRun] local finalize', e);

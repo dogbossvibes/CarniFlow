@@ -22,7 +22,10 @@ const MARKER_COLOR: Record<MarkerType, string> = {
 };
 
 // Dübel-Gegenstände heben sich mit eigener (Holz-)Farbe von übrigen Gegenständen ab.
-function markerColor(m: MapMarker): string {
+// Exportiert (Punkt 8 des Track-Replay-Auftrags): TrackReplayMap zeichnet
+// dieselben Winkel-/Gegenstands-/Dübel-Marker wie hier — Wiederverwendung
+// statt einer zweiten, abweichenden Marker-Darstellung.
+export function markerColor(m: MapMarker): string {
   if (m.type === 'gegenstand' && m.material === 'duebel') return C.trackWood;
   return MARKER_COLOR[m.type];
 }
@@ -35,7 +38,7 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // stabile ID sorgen dafür, dass der Marker NICHT bei jedem GPS-Fix neu erzeugt wird
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress }: {
+export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress }: {
   Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder';
   label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void;
 }) {

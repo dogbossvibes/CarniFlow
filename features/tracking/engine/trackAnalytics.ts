@@ -18,20 +18,23 @@ export const ANALYTICS_VERSION = 1 as const;
 
 // Dieselbe Abweichungs-Konvention wie useSearchRecorder.computeScore (FULL_DEV_M/
 // ZERO_DEV_M) — eine Quelle der Wahrheit für "was gilt als gut/schlecht auf der
-// Fährte", kein zweiter, abweichender Massstab.
-const FULL_DEV_M = 1.5;
-const ZERO_DEV_M = 10;
-const ON_TRACK_M = 3.0;          // wie useSearchRecorder ON_TRACK_M
-const RELIABLE_CONFIDENCE_FLOOR = 0.5;   // ab hier zählt ein Sample für "maxReliableM"/Score
+// Fährte", kein zweiter, abweichender Massstab. Exportiert, damit
+// trackSegmentAnalysis.ts (Segment-Zonen/-Score) dieselben Konstanten
+// wiederverwendet, statt eigene, abweichende Grenzen zu erfinden (Punkt 3/14
+// der Segmentanalyse-Nachbesserung).
+export const FULL_DEV_M = 1.5;
+export const ZERO_DEV_M = 10;
+export const ON_TRACK_M = 3.0;          // wie useSearchRecorder ON_TRACK_M
+export const RELIABLE_CONFIDENCE_FLOOR = 0.5;   // ab hier zählt ein Sample für "maxReliableM"/Score
 
-const CORNER_WINDOW_BEFORE_M = 8;
-const CORNER_WINDOW_AFTER_M = 15;
+export const CORNER_WINDOW_BEFORE_M = 8;
+export const CORNER_WINDOW_AFTER_M = 15;
 const CORNER_ARRIVAL_TOLERANCE_M = 3;
 const CORNER_DEV_FULL_M = 1.0;
 const CORNER_DEV_ZERO_M = 8;
 const CORNER_OVERSHOOT_ZERO_M = 10;
 
-const OBJECT_AREA_M = 2.5;       // wie useSearchRecorder OBJECT_HIT_M
+export const OBJECT_AREA_M = 2.5;       // wie useSearchRecorder OBJECT_HIT_M
 const OBJECT_STATIONARY_MIN_S = 1.5;
 
 // ── Eingaben ──────────────────────────────────────────────────────────────

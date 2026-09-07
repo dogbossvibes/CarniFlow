@@ -176,6 +176,11 @@ export type SearchResult = {
   // die Analytics-Engine "found" konsistent mit dem echten Score ableiten kann,
   // statt es aus Distanzwerten zu schätzen.
   foundObjectIndices: number[];
+  // Punkt 17 (Track-Replay): Sekunden-seit-Start je Eintrag in `points`,
+  // gleiche Länge/Reihenfolge wie `points` — additiv, KEINE zweite Geometrie.
+  // Kürzer als `points` (Resume, ältere Sessions vor dieser Erweiterung) =
+  // Replay für diese Session nicht verfügbar (siehe app/track/run.tsx).
+  pointsTimeSec: number[];
 };
 
 export type { Level };
@@ -209,6 +214,18 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const recordingRef = useRef(false);
   const pausedRef = useRef(false);
   const pointsRef = useRef<LatLng[]>([]);
+  // Punkt 17 (Track-Replay-Auftrag): EINE Sekunden-seit-Start-Zeit pro
+  // pointsRef-Eintrag, im selben Moment (`pts.push(sm)`) fortgeschrieben —
+  // keine zweite, parallele Geometrie-Quelle, nur ein additiver Zeitstempel
+  // auf der bereits bestehenden, MIN_SEGMENT-gegateten Ist-Suchspur. Von der
+  // Fusion-Schutzschicht neutralisierte Fixes (gps_outlier/stationary)
+  // erreichen `pts.push` gar nicht erst (frühes return oben) — Ausreisser
+  // stehen dadurch bereits hier nie in der Replay-Geometrie, kein Sondercode
+  // nötig. Bei Resume bleibt dieses Array (bewusst) leer für die
+  // vor-Resume-Punkte → Länge weicht dann von pointsRef ab, wodurch
+  // buildRunResultPayload Replay korrekt als nicht verfügbar erkennt
+  // (keine erfundenen Zeitstempel für Alt-Punkte ohne echte Zeit).
+  const pointsTimeRef = useRef<number[]>([]);
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
   const prevFixRef = useRef<SearchFixPrev | null>(null);   // letzter AKZEPTIERTER Rohfix (für das Speed-Gate)
@@ -442,6 +459,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
       distRef.current += d;
     }
     pts.push(sm);
+    pointsTimeRef.current.push(Math.round(((tNow - startMsRef.current) / 1000) * 10) / 10);
     logSearchFix(decision);
 
     // ── Trennung Legen/Suche: akzeptierten Suchpunkt SEPARAT führen. In den Store
@@ -626,6 +644,11 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     // Fortsetzen: mit den wiederhergestellten Punkten seeden (Linie/Distanz laufen
     // weiter); frisch: leer.
     pointsRef.current = resumePts.slice();
+    // Bewusst NICHT mit Platzhalter-Zeiten für resumePts vorbefüllt — echte
+    // Zeitstempel für die vor-Resume-Punkte sind nicht bekannt. Die
+    // resultierende Längen-Differenz zu pointsRef ist das Signal für "Replay
+    // für diese Session nicht verfügbar" (siehe SearchResult.pointsTimeSec).
+    pointsTimeRef.current = [];
     breaksRef.current = [];
     smoothRef.current = resumePts.length ? resumePts[resumePts.length - 1] : null;
     prevFixRef.current = null;   // Zeitlücke → nächster Fix ist neuer Referenzpunkt (kein Speed-Gate gegen alten Fix)
@@ -681,6 +704,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
       totalObjects,
       analyticsSamples: analyticsSamplesRef.current.slice(),
       foundObjectIndices: Array.from(foundRef.current),
+      pointsTimeSec: pointsTimeRef.current.slice(),
       deviationAvgM: devCountRef.current ? Math.round((devSumRef.current / devCountRef.current) * 10) / 10 : 0,
       distanceM: distRef.current,
       durationS,

@@ -31,6 +31,8 @@ import {
   segmentDisplayLabel,
 } from '@/features/tracking/utils/trackSegments';
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
+import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
+import { useT } from '@/i18n';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -44,6 +46,7 @@ export default function TrackAuswertungScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useT();
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -126,6 +129,7 @@ export default function TrackAuswertungScreen() {
   // track_data — runSummaryForTrackData reicht `analytics` unverändert durch,
   // keine Migration nötig).
   const analytics: TrackAnalytics | undefined = data?.track_data?.run?.analytics;
+  const isReplayEligible = useMemo(() => isTrackReplayEligible(data), [data]);
   const [analyseExpanded, setAnalyseExpanded] = useState(false);
   const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
   const [fullscreenMap, setFullscreenMap] = useState(false);
@@ -302,6 +306,23 @@ export default function TrackAuswertungScreen() {
                   <View style={s.analyseHintBox}>
                     <Text style={s.analyseHintText}>{analytics.analysisConfidenceHint}</Text>
                   </View>
+                )}
+
+                {/* Track Replay (Segmentanalyse-Nachbesserung, Punkt 7) — nur
+                    sichtbar, wenn wirklich genug Daten vorhanden sind (Analytics
+                    v2 + vollständige Zeitstempel je Punkt, Punkt 18). Eigener,
+                    strengerer Check als `analytics` oben (das reicht schon für
+                    v1-Fährten ohne Replay-Fähigkeit). */}
+                {isReplayEligible && (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.push({ pathname: '/track/replay/[id]', params: { id: String(id) } } as never)}
+                    style={s.replayButton}
+                  >
+                    <Ionicons name="play-circle-outline" size={18} color={C.trackPrimary} />
+                    <Text style={s.replayButtonTxt}>{t('track.replayAction')}</Text>
+                    <Ionicons name="chevron-forward" size={15} color={C.trackTextMut} />
+                  </Pressable>
                 )}
 
                 <View style={[s.highlightRow, { marginTop: 14, marginBottom: 0 }]}>
@@ -577,6 +598,8 @@ const s = StyleSheet.create({
   confidencePillTxt:  { fontSize: 10, color: C.trackTextSec, fontWeight: '700', flexShrink: 1 },
   analyseHintBox:     { marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: C.trackBorder },
   analyseHintText:    { fontSize: 11.5, lineHeight: 16, color: C.trackTextSec, fontWeight: '600' },
+  replayButton:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: C.trackBorder },
+  replayButtonTxt:    { flex: 1, fontSize: 13, color: C.trackText, fontWeight: '800' },
   analyseToggle:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 14, paddingVertical: 8 },
   analyseToggleTxt:   { fontSize: 12, color: C.trackPrimary, fontWeight: '800' },
   analyseDetailRow:   { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },

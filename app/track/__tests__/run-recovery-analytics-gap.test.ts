@@ -35,7 +35,11 @@ describe('Recovery-Kurzpfad (endSearch) — Analytics-Lücke dokumentiert (Punkt
     const handleFinishStart = src.indexOf('const handleFinish = async');
     expect(handleFinishStart).toBeGreaterThan(-1);
     const handleFinishBody = src.slice(handleFinishStart, handleFinishStart + 3000);
-    expect(handleFinishBody).toContain('computeTrackAnalytics');
-    expect(handleFinishBody).toMatch(/analytics,?\s*\n?\s*\}\)\)/);
+    // Seit der Segmentanalyse-Nachbesserung: computeTrackAnalyticsV2 (additiver
+    // Analytics-v2-Wrapper, siehe trackSegmentAnalysis.ts) statt der reinen
+    // v1-Funktion — computeTrackAnalytics bleibt intern weiterhin die Basis.
+    expect(handleFinishBody).toContain('computeTrackAnalyticsV2');
+    expect(handleFinishBody).toMatch(/analytics,/);
+    expect(handleFinishBody).toMatch(/pointsTimeSec:\s*res\.pointsTimeSec/);
   });
 });
