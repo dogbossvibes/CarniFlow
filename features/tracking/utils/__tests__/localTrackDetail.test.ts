@@ -48,8 +48,16 @@ describe('buildLocalTrackDetail — Detail-Fallback aus SQLite (getTrackSessionB
     expect(d.markers[0].angle_kind).toBe('gw');
   });
 
-  it('runs aus payload.run.run_points (kanonisch), track_data.run + segments', () => {
-    expect(d.runs).toEqual([{ run_points: [{ lat: 47, lng: 8 }] }]);
+  it('runs im vollen track_runs-Shape (run_points kanonisch + distance_meters), track_data.run + segments', () => {
+    // runs[0] spiegelt jetzt eine remote track_runs-Zeile (siehe
+    // runRowFromPayload) — vorher wurde der Run auf `{ run_points }` reduziert,
+    // wodurch app/track/[id].tsx' hasValidGeometry-Prüfung lokal immer
+    // fehlschlug (Feldtest BUILD40 + EXPO).
+    expect(d.runs).toHaveLength(1);
+    expect(d.runs[0].run_points).toEqual([{ lat: 47, lng: 8 }]);
+    expect(d.runs[0].average_deviation_meters).toBe(1.2);
+    expect(d.runs[0].articles_found).toBe(2);
+    expect(d.runs[0]).toHaveProperty('distance_meters');
     expect(d.track_data.run.score).toBe(91);
     expect(d.track_data.segments).toEqual([{ id: 's1', status: 'completed' }]);
     expect(d.track_data.legs).toEqual([{ name: 'Ausarbeitung Abschnitt 1', score: 8.3, max: 10 }]);
@@ -74,8 +82,11 @@ describe('buildLocalTrackDetail — Detail-Fallback aus SQLite (getTrackSessionB
 
 describe('runSupplementFromPayload — Run-Ergänzung für remote-Session ohne gesyncten Run', () => {
   it('liefert runs + track_data.run + Summary aus payload.run', () => {
-    const s = runSupplementFromPayload(JSON.stringify({ run: { score: 91, articles_found: 2, average_deviation_meters: 1.2, run_points: [{ lat: 47, lng: 8 }] } }));
-    expect(s?.runs).toEqual([{ run_points: [{ lat: 47, lng: 8 }] }]);
+    const s = runSupplementFromPayload(JSON.stringify({ run: { score: 91, articles_found: 2, average_deviation_meters: 1.2, distance_meters: 40, run_points: [{ lat: 47, lng: 8 }] } }));
+    expect(s?.runs).toHaveLength(1);
+    expect(s?.runs[0].run_points).toEqual([{ lat: 47, lng: 8 }]);
+    expect(s?.runs[0].distance_meters).toBe(40);   // darf nicht mehr wegfallen
+    expect(s?.runs[0].articles_found).toBe(2);
     expect(s?.track_data.run.score).toBe(91);
     expect(s?.articles_found).toBe(2);
     expect(s?.average_deviation_meters).toBe(1.2);
