@@ -30,6 +30,7 @@ import {
 } from '@/features/tracking/engine/trackFusionEngine';
 import type { AnalyticsSample } from '@/features/tracking/engine/trackAnalytics';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
+import { formatSearchFixDiag, type SearchFixDiag, type SearchFixStatus } from '@/features/tracking/utils/searchFixDiag';
 
 // Core-Motion-Sensor-Fusion (rein additiv, Punkt 2/3): NUR ein Zusatzsignal
 // zur Confidence-Bewertung und zum Live-GPS-Qualitätsindikator (Punkt 15).
@@ -186,8 +187,14 @@ export type SearchResult = {
 
 export type { Level };
 
-export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: SearchObject[]; level: Level; sessionId?: string | null; handlerDistanceM?: number }): SearchRecorder {
+export function useSearchRecorder(opts: {
+  laidPoints: LatLng[]; laidObjects: SearchObject[]; level: Level; sessionId?: string | null; handlerDistanceM?: number;
+  /** QA-Diagnose: pro eingehendem Fix genau ein Endstatus (siehe searchFixDiag.ts). Rein beobachtend. */
+  onFixDiag?: (d: SearchFixDiag) => void;
+}): SearchRecorder {
   const { laidPoints, laidObjects, level } = opts;
+  const onFixDiagRef = useRef(opts.onFixDiag);
+  onFixDiagRef.current = opts.onFixDiag;
   const handlerDistanceM = opts.handlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M;
   const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
   const totalObjects = laidObjects.length || model.objects;
@@ -209,6 +216,11 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, progressM: 0, score: 0, offTrackState: 'on_track' as OffTrackState });
   const [elapsedS, setElapsedS] = useState(0);
   const [gpsDebug, setGpsDebug] = useState<GpsDebug>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
+  // Aktuelle Quelle zusätzlich als Ref: `onFix` liest gpsDebug bewusst NICHT
+  // über die Deps (siehe Kommentar am Ende von onFix) — für die QA-Diagnose
+  // wird deshalb dieser Ref gelesen, damit dort die WIRKLICH aktive Quelle
+  // steht und nicht der Wert vom Zeitpunkt der Callback-Erzeugung.
+  const gpsSourceRef = useRef<LocationSourceKind | null>(null);
   const [gpsQuality, setGpsQuality] = useState<GpsQuality | null>(null);
 
   // ── Refs (live im Callback) ──
@@ -335,8 +347,35 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
 
     if (!recordingRef.current || pausedRef.current) return;
 
+    // QA-Diagnose (rein beobachtend, siehe searchFixDiag.ts): Ausgangswerte
+    // festhalten, damit jeder Ausgang unten GENAU EINEN Endstatus meldet.
+    const pointsBefore = pointsRef.current.length;
+    const distanceBefore = distRef.current;
+    const dtMs = prevFixRef.current ? tNow - prevFixRef.current.t : null;
+    const emitDiag = (status: SearchFixStatus, fusionClass: string | null) => {
+      const cb = onFixDiagRef.current;
+      if (!cb && !__DEV__) return;
+      const d: SearchFixDiag = {
+        status,
+        source: gpsSourceRef.current,
+        accuracy: accRaw,
+        dtMs,
+        jumpM: decision.jumpM,
+        speedMps: decision.jumpM != null && dtMs != null && dtMs > 0 ? decision.jumpM / (dtMs / 1000) : null,
+        movementState: motionLatestRef.current?.movementState ?? null,
+        fusion: fusionClass,
+        pointsBefore,
+        pointsAfter: pointsRef.current.length,
+        distanceBefore,
+        distanceAfter: distRef.current,
+      };
+      cb?.(d);
+      if (__DEV__ && !cb) console.log(formatSearchFixDiag(d));
+    };
+
     if (!decision.accepted) {
       rejectedRef.current++;
+      emitDiag(decision.reason === 'accuracy' ? 'REJECT_ACCURACY' : 'REJECT_SPEED', null);
       // Nur 'speed'-Rejects zählen als Evidenz für einen falschen Anker — ein
       // Accuracy-Reject sagt nichts darüber aus und würde eine echte
       // Ausreisser-Serie fälschlich als "konsistent" erscheinen lassen.
@@ -497,18 +536,23 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
         source: gpsDebug.source, movementState: motionLatestRef.current?.movementState ?? null,
         activityAgeMs: motionActivityAgeMsRef.current, geometryBlocked: true,
       });
+      emitDiag(fusion.classification === 'stationary' ? 'BLOCK_FUSION_STATIONARY' : 'BLOCK_FUSION_OUTLIER', fusion.classification);
       return;
     }
 
     const pts = pointsRef.current;
     if (pts.length > 0) {
       const d = distM(pts[pts.length - 1], sm);
-      if (d < MIN_SEGMENT) return;   // Liniendichte-Gate: noch kein neuer Linienpunkt
+      if (d < MIN_SEGMENT) {   // Liniendichte-Gate: noch kein neuer Linienpunkt
+        emitDiag('SKIP_MIN_SEGMENT', fusion.classification);
+        return;
+      }
       distRef.current += d;
     }
     pts.push(sm);
     pointsTimeRef.current.push(Math.round(((tNow - startMsRef.current) / 1000) * 10) / 10);
     logSearchFix(decision);
+    emitDiag('ACCEPTED', fusion.classification);
 
     // ── Trennung Legen/Suche: akzeptierten Suchpunkt SEPARAT führen. In den Store
     //    (searchTrackPoints, NIE die gelegte `trackPoints`) spiegeln und inkrementell
@@ -635,6 +679,28 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM, firstLegHeading]);
 
   // ── Watch ab Mount ──
+  //
+  // Root-Cause-Fix (Feldtest B, CURRENT+EXPO — "Timer läuft, Distanz bleibt
+  // exakt 0 m, keine Suchlinie"): dieser Effect hing an `[onFix]`. `onFix`
+  // ist ein useCallback über u. a. `laidPoints`/`laidObjects`/`arc` — bekommt
+  // der Hook diese Props mit NEUER Identität pro Render (genau das passiert
+  // in run.tsx, solange `snap === null` ist: `snap ?? { laidPoints: [],
+  // laidObjects: [], … }` erzeugt jedes Mal frische Arrays), ändert sich
+  // `onFix` bei jedem Render → dieser Effect räumte die Positionsquelle ab
+  // und abonnierte neu → setGpsDebug/setReady lösten das nächste Render aus →
+  // Endlosschleife. Die Subscription wurde dabei schneller neu aufgebaut, als
+  // ein GPS-Fix (~1 Hz) überhaupt eintreffen konnte: onFix lief nie, pts/
+  // distRef blieben leer — während der native Karten-User-Location-Punkt
+  // (TrackingMap showUserLocation, unabhängig von dieser Pipeline) weiter
+  // sichtbar wanderte. Genau das Videobild.
+  //
+  // Fix: die Subscription wird GENAU EINMAL pro Mount aufgebaut; der aktuelle
+  // onFix wird über eine Ref gelesen (dasselbe Muster, das useTrackRecorder
+  // mit `onFixRef` bereits verwendet). Damit ist der Hook auch gegen instabile
+  // Prop-Identitäten immun — unabhängig davon, dass run.tsx die Identitäten
+  // zusätzlich stabilisiert.
+  const onFixRef = useRef(onFix);
+  onFixRef.current = onFix;
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -644,8 +710,9 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
       // Zentrale Positionsquelle: natives Precision-Modul bevorzugt, expo-Fallback.
       const handle = await startPositionSource(
         (s) => {
+          gpsSourceRef.current = s.source;
           setGpsDebug(d => (d.source === s.source && d.provider === s.provider) ? d : { ...d, source: s.source, provider: s.provider });
-          onFix(sampleToLocationObject(s));
+          onFixRef.current(sampleToLocationObject(s));
         },
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 },
       );
@@ -654,7 +721,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
       setGpsDebug(d => ({ ...d, isNativeAvailable: handle.info.isNativeAvailable, rawGnssSupported: handle.info.rawGnssSupported, source: d.source ?? handle.info.source }));
     })();
     return () => { mounted = false; watchRef.current?.remove(); };
-  }, [onFix]);
+  }, []);
 
   // ── Core-Motion-Listener (Punkt 3/16: Listener-Registrierung ist billig;
   // der eigentlich teure Sensor-Betrieb wird ausschliesslich in start()/stop()

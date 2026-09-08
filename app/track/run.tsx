@@ -75,6 +75,20 @@ function RecDot() {
   return <Animated.View className="w-2 h-2 rounded-full bg-ft-bad" style={{ opacity: op }} />;
 }
 
+// Stabiler Leer-Snapshot auf MODUL-Ebene (nicht pro Render neu): wird als
+// Fallback verwendet, solange der echte Snapshot noch nicht geladen ist.
+// Neue Array-Identitäten pro Render würden useSearchRecorder in eine
+// Endlosschleife aus Abmelden/Neu-Abonnieren der Positionsquelle treiben
+// (Root-Cause Feldtest B — Details im Watch-Effect von useSearchRecorder.ts).
+const EMPTY_SNAP_CONST = {
+  laidLatLng: [] as { lat: number; lng: number }[],
+  laidPoints: [] as { latitude: number; longitude: number }[],
+  laidObjects: [] as { at: { latitude: number; longitude: number }; index: number; material: string }[],
+  laidMarkers: [] as ReturnType<typeof useTrackingStore.getState>['markers'],
+  segments: [] as ReturnType<typeof useTrackingStore.getState>['segments'],
+  level: 'training' as Level,
+};
+
 // AUSARBEITEN — der Hund läuft die gelegte Fährte ab. Snapshot (laidPoints,
 // laidObjects, level) wird beim Betreten aus dem Lege-Store übernommen; der
 // useSearchRecorder startet genau einmal und liefert Spur, Abrisse, Abweichung,
@@ -111,13 +125,21 @@ export default function TrackRunScreen() {
     };
   };
   type Snap = ReturnType<typeof buildSnap>;
+  // Modul-stabiler Leer-Snapshot (siehe snapData unten) — bewusst EIN Objekt
+  // für die gesamte Lebensdauer, nicht pro Render neu.
+  const EMPTY_SNAP = EMPTY_SNAP_CONST as Snap;
 
   const [phase, setPhase] = useState<'checking' | 'ready'>('checking');
   const [effectiveId, setEffectiveId] = useState<string | null>(id ?? null);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
   const finishRequestedRef = useRef(false);   // synchroner Once-only-Guard für Confirm-Callbacks
-  const snapData: Snap = snap ?? { laidLatLng: [], laidPoints: [], laidObjects: [], laidMarkers: [], segments: [], level: 'training' as Level };
+  // WICHTIG (Root-Cause-Fix Feldtest B): der Fallback muss eine STABILE
+  // Identität haben. Als Inline-Objektliteral erzeugte er bei jedem Render
+  // neue leere Arrays → useSearchRecorder baute seine Positionsquelle in einer
+  // Endlosschleife neu auf und verarbeitete nie einen Fix (Details siehe
+  // Kommentar am Watch-Effect in useSearchRecorder.ts).
+  const snapData: Snap = snap ?? EMPTY_SNAP;
 
   // Gewählter Abstand Hundeführer↔Hund (5/10 m) — vor Absuchestart gesetzt,
   // persistiert (Store/PendingTrack) und bei Recovery wiederhergestellt (Default 5).
@@ -173,6 +195,20 @@ export default function TrackRunScreen() {
         setSnap(buildSnap());
         setRecovery(decision.pending);   // → Dialog
       } else {
+        // Root-Cause-Fix (Feldtest B): `buildSnap()` liest AUSSCHLIESSLICH den
+        // Laufzeit-Store. Nach App-Neustart/-Kill in der Liegezeit (im Feld
+        // ~1:49 h) ist der Store leer — ohne Recovery-Fall wurde die gelegte
+        // Fährte hier bislang NIE nachgeladen: keine Geometrie auf der Karte,
+        // kein Startpunkt („Der gespeicherte Fährtenansatz ist nicht
+        // verfügbar"), keine Abweichung. Der Puffer (loadPending) enthält
+        // trackPoints/markers/segments/startAnchor bereits vollständig — er
+        // wird jetzt zurückgespielt, bevor der Snapshot gebaut wird.
+        // restorePending setzt KEINE neue Session und startet nichts; es füllt
+        // nur den leeren Store (dieselbe Funktion, die liegen.tsx nutzt).
+        const st = useTrackingStore.getState();
+        if (st.trackPoints.length === 0 && pending && pending.trackPoints.length > 0) {
+          st.restorePending(pending);
+        }
         setEffectiveId(id ?? null);
         setSnap(buildSnap());
       }
@@ -257,13 +293,24 @@ export default function TrackRunScreen() {
 
   useEffect(() => { if (effectiveId) getTrackSessionDogName(effectiveId).then(r => { if (r.data) setDogName(r.data); }); }, [effectiveId]);
 
-  // GPS-Genauigkeit + Strecke der Absuche gedrosselt (4 s) in die Registry spiegeln,
-  // damit die Karten „Suche läuft" mit GPS-Qualität zeigen. Nur vorhandene Daten.
+  // GPS-Genauigkeit gedrosselt (4 s) in die Registry spiegeln, damit die Karten
+  // „Suche läuft" mit GPS-Qualität zeigen. Nur vorhandene Daten.
+  //
+  // Root-Cause-Fix (Feldtest B — „Liegezeit zeigt plötzlich 0 m / 8 Winkel /
+  // 7 Gegenstände"): hier wurde zusätzlich `distanceMeters: s.distanceM`
+  // geschrieben — also die ABSUCHE-Distanz (startet bei 0) in ein Feld, das
+  // laut activeFaehrtenModel.ts ausdrücklich die Kennzahl der GELEGTEN Fährte
+  // ist und von liegen.tsx als Fallback-Zusammenfassung gelesen wird
+  // (`regEntry.distanceMeters`). Sobald die Absuche betreten wurde, überschrieb
+  // dieser Intervall die gelegten 252 m mit 0 — Winkel/Gegenstände blieben
+  // unberührt, weil sie hier nicht mitgeschrieben werden. Exakt das beobachtete
+  // Muster. Die Absuche-Distanz gehört nicht in dieses Feld und wird hier nicht
+  // mehr geschrieben.
   useEffect(() => {
     if (!dogId || phase !== 'ready') return;
     const iv = setInterval(() => {
       useActiveFaehrten.getState().upsert(dogId, {
-        gpsAccuracy: s.accuracy ?? null, distanceMeters: Math.round(s.distanceM),
+        gpsAccuracy: s.accuracy ?? null,
       });
     }, 4000);
     return () => clearInterval(iv);
