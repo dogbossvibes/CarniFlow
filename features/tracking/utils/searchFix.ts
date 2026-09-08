@@ -53,20 +53,50 @@ export interface SearchFixRejectedRecord { lat: number; lng: number; t: number }
 // maxSpeedMps fällt (bei z. B. 300 m Anker-Fehler > 20 Sekunden). In dieser
 // Zeit blieb distanceM/deviationM eingefroren (siehe
 // staleFirstFixFreeze.test.ts). Fix: werden mehrere aufeinanderfolgende Fixes
-// wegen 'speed' verworfen UND sind sie (inkl. des aktuellen) untereinander
-// konsistent nah beieinander, ist mit hoher Wahrscheinlichkeit NICHT die neue
-// Position falsch, sondern der alte Anker — der Anker wird dann auf diesen
-// neuen, konsistenten Cluster zurückgesetzt statt die Absuche dauerhaft
-// einzufrieren (der Aufrufer verwirft dazu die bisherige Linie/Distanz, siehe
-// useSearchRecorder.onFix — derselbe "erster Fix"-Reset wie beim echten Start).
+// wegen 'speed' verworfen, wird geprüft, ob sie EIN plausibler, in sich
+// konsistenter Cluster/Pfad sind — dann ist mit hoher Wahrscheinlichkeit NICHT
+// die neue Position falsch, sondern der alte Anker.
+//
+// Zweite Root-Cause-Ergänzung (Feldtest-Audit, "Puck bewegt sich, Distanz
+// bleibt 0 m" bei degradierter Ansatz-Genauigkeit, z. B. ±16 m): die
+// ursprüngliche Prüfung verlangte, dass ALLE Punkte (paarweise) innerhalb
+// ANCHOR_RESET_MAX_SPREAD_M liegen — das passt für einen STEHENDEN Handler
+// nahe einem falschen Anker (Ursprungsfall), aber NICHT für einen GEHENDEN
+// Handler, der sich vom falschen Anker konsequent WEGBEWEGT (jeder Folgepunkt
+// liegt weiter vom vorigen entfernt als 8 m, obwohl der Pfad selbst absolut
+// plausibel ist). Für genau diesen Fall zusätzlich: eine KONSEKUTIVE
+// Geschwindigkeits-Plausibilisierung — bilden die Rejects (chronologisch,
+// Schritt für Schritt) einen in sich schlüssigen Pfad (jeder Schritt selbst
+// ≤ maxSpeedMps), ist das ebenfalls ausreichend Beleg für einen falschen
+// Anker, unabhängig von der absoluten Streuung. Beide Kriterien sind additiv
+// (ODER) — keins ersetzt das andere, beide decken unterschiedliche reale
+// Szenarien ab (stehend vs. gehend).
 export const ANCHOR_RESET_MIN_CONSECUTIVE = 3;   // Gesamtzahl konsistenter Fixes (inkl. `cur`), die einen Reset auslösen
-export const ANCHOR_RESET_MAX_SPREAD_M    = 8;   // …müssen alle untereinander innerhalb dieses Radius liegen
+export const ANCHOR_RESET_MAX_SPREAD_M    = 8;   // „stehend"-Fall: alle paarweise innerhalb dieses Radius
 
 function clusterIsConsistent(points: readonly { lat: number; lng: number }[], maxSpreadM: number): boolean {
   for (let i = 0; i < points.length; i++) {
     for (let j = i + 1; j < points.length; j++) {
       if (distM({ latitude: points[i].lat, longitude: points[i].lng }, { latitude: points[j].lat, longitude: points[j].lng }) > maxSpreadM) return false;
     }
+  }
+  return true;
+}
+
+// „gehend"-Fall: kein absolutes Streuungsmass, sondern INTERNE Schlüssigkeit —
+// jeder EINZELNE Schritt zwischen chronologisch aufeinanderfolgenden Punkten
+// muss für sich genommen mit maxSpeedMps plausibel sein. Anders als die
+// Ablehnung gegen den (mutmasslich falschen) alten Anker verlangt das nicht
+// „nah beieinander", sondern nur "ein durchgehend plausibler Pfad".
+function trajectoryIsConsistent(
+  points: readonly { lat: number; lng: number; t: number }[], maxSpeedMps: number,
+): boolean {
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    const dt = (b.t - a.t) / 1000;
+    if (dt <= 0) return false;
+    const step = distM({ latitude: a.lat, longitude: a.lng }, { latitude: b.lat, longitude: b.lng });
+    if (step / dt > maxSpeedMps) return false;
   }
   return true;
 }
@@ -97,7 +127,7 @@ export function evaluateSearchFix(
     const needed = ANCHOR_RESET_MIN_CONSECUTIVE - 1;
     if (recentRejected && recentRejected.length >= needed) {
       const cluster = [...recentRejected.slice(-needed), { lat: cur.lat, lng: cur.lng, t: cur.t }];
-      if (clusterIsConsistent(cluster, ANCHOR_RESET_MAX_SPREAD_M)) {
+      if (clusterIsConsistent(cluster, ANCHOR_RESET_MAX_SPREAD_M) || trajectoryIsConsistent(cluster, maxSpeedMps)) {
         return { accepted: true, reason: 'anchor_reset', accuracy: cur.accuracy, speed: cur.speed, jumpM };
       }
     }

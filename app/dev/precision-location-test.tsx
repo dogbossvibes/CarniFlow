@@ -13,6 +13,10 @@ import {
   type PrecisionLocation, type ProviderStatus, type RawGnssSupportStatus,
   type GnssStatusAndroid, type HeadingPoint, type TrackingError,
 } from '@/modules/anyvo-precision-location';
+import {
+  getLocationSourceMode, setLocationSourceMode, loadPersistedLocationSourceMode,
+  type LocationSourceMode,
+} from '@/features/tracking/utils/locationSourceMode';
 
 // Dev-Test-Screen für anyvo-precision-location (Phase 1–3).
 // Öffnen: Deep-Link  anyvo://dev/precision-location-test
@@ -47,6 +51,16 @@ function PrecisionLocationTestContent() {
   const [accReqMsg, setAccReqMsg] = useState<string | null>(null);
 
   const subs = useRef<{ remove: () => void }[]>([]);
+  const [sourceMode, setSourceMode] = useState<LocationSourceMode>(getLocationSourceMode());
+
+  useEffect(() => {
+    loadPersistedLocationSourceMode().then(setSourceMode);
+  }, []);
+
+  const chooseSourceMode = (mode: LocationSourceMode) => {
+    setLocationSourceMode(mode);
+    setSourceMode(mode);
+  };
 
   const native = isNativeModuleAvailable();
   const [support] = useState<RawGnssSupportStatus>(() => isRawGnssSupported());
@@ -110,6 +124,31 @@ function PrecisionLocationTestContent() {
       </View>
 
       <ScrollView contentContainerStyle={s.body}>
+        <Section title="QA A/B — echte Fährtenaufnahme (Legen/Ansatz/Absuche)">
+          <Text style={s.note}>
+            Wirkt auf useTrackRecorder/useSearchRecorder/useStartPointApproach/
+            Schrittkalibrierung — NICHT nur auf den Test unten. LEGACY = exakt
+            der alte, auf Build 40 funktionierende expo-location-Pfad (keine
+            AnyvoPrecisionLocation). Übersteht App-Neustart.
+          </Text>
+          <View style={s.abRow}>
+            <TouchableOpacity
+              style={[s.abBtn, sourceMode === 'legacy' && s.abBtnActive]}
+              onPress={() => chooseSourceMode('legacy')}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.abBtnTxt, sourceMode === 'legacy' && s.abBtnTxtActive]}>LEGACY</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.abBtn, sourceMode === 'precision' && s.abBtnActive]}
+              onPress={() => chooseSourceMode('precision')}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.abBtnTxt, sourceMode === 'precision' && s.abBtnTxtActive]}>PRECISION</Text>
+            </TouchableOpacity>
+          </View>
+        </Section>
+
         <Section title="Engine">
           <Row label="Engine" value={native ? 'Native Precision' : 'Fallback (expo-location)'} good={native} />
           <Row label="Provider" value={IS_IOS ? 'iOS Core Location' : 'Android LocationManager'} />
@@ -243,4 +282,9 @@ const s = StyleSheet.create({
   btnStart:{ backgroundColor: C.accent },
   btnStop: { backgroundColor: '#ff5d6c' },
   btnTxt:  { fontSize: 15, fontWeight: '800', color: C.white },
+  abRow:   { flexDirection: 'row', gap: 8, marginTop: 4 },
+  abBtn:   { flex: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  abBtnActive: { backgroundColor: C.accent, borderColor: C.accent },
+  abBtnTxt: { fontSize: 13, fontWeight: '800', color: C.white },
+  abBtnTxtActive: { color: C.accentText },
 });

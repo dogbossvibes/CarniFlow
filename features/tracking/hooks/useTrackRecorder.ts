@@ -18,6 +18,8 @@ import {
   createGpsQualityTracker, type GpsQualityTracker, type GpsQualityState,
 } from '@/features/tracking/utils/gpsQualityState';
 import { logConfirmEvent, logConfirmedCornerMetrics, logGpsQualityChange } from '@/features/tracking/utils/angleDiagnostics';
+import { legacyDetectCorner, type LegacyAcceptedPoint } from '@/features/tracking/utils/legacyCornerDetection';
+import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
 import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -207,11 +209,35 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     onAngleRef.current?.(c.kind);
   }, [commitMarker]);
 
+  // ENGINE=BUILD40 (Golden-Reference-Audit, Punkt 3/4): identisch zum
+  // historischen Einzelschuss-Verhalten aus Commit 82bd17c — genau EIN
+  // Kandidat pro Aufruf, sofort committed, KEIN Bestätigungspuffer. Bewusst
+  // eine separate Funktion statt eine Fallunterscheidung mitten in der neuen
+  // Pipeline, damit BUILD40 nachvollziehbar exakt der alte Pfad bleibt.
+  const persistLegacyCorner = useCallback((pts: readonly LegacyAcceptedPoint[]) => {
+    const r = legacyDetectCorner(pts, lastCornerAtRef.current);
+    const dbg = angleDbgRef.current;
+    if (r.reject) { dbg.lastReject = r.reject; return; }
+    dbg.count++;
+    if (r.kind === 'spitz_rechts' || r.kind === 'spitz_links') dbg.acuteCount++;
+    dbg.lastType = r.kind; dbg.lastDeg = r.angleDeg; dbg.lastDir = r.dir; dbg.lastReject = null;
+    lastCornerAtRef.current = r.apex.cumDist;
+    const now = Date.now();
+    void commitMarker({
+      id: `angle-${now}-${r.kind}`, type: 'winkel', material: null, angleKind: r.kind,
+      lat: r.apex.lat, lng: r.apex.lng, accuracy: r.apex.accuracy,
+      distance_from_start: Math.round(r.apex.cumDist * 10) / 10,
+      note: null, audio_url: null, found: false, t: now,
+    });
+    onAngleRef.current?.(r.kind);
+  }, [commitMarker]);
+
   // Auto-Winkel: pro akzeptiertem Linienpunkt EIN Confirmation-Schritt. Die gesamte
   // Erkennung (Scheitelwahl, stabile Schenkel, Klassen, Confidence) liegt in
   // autoCornerDetection; feedCornerBuffer() hält denselben Kandidaten stabil und
   // liefert nur relevante Lifecycle-Events zurück.
   const detectCorner = useCallback(() => {
+    if (getTrackingEngineMode() === 'build40') { persistLegacyCorner(pointsRef.current); return; }
     // GPS-Quality als Kontext: nur bei gültigem (nicht-Warmup) State koppeln, sonst neutral.
     const q = gpsQualityStateRef.current;
     const confirmQuality: ConfirmQuality | undefined = q && q.valid ? q.level : undefined;
@@ -221,7 +247,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
       else if (ev.type === 'rejected' || ev.type === 'expired') angleDbgRef.current.lastReject = ev.detail;
     }
-  }, [persistConfirmedCorner]);
+  }, [persistConfirmedCorner, persistLegacyCorner]);
 
   // Start-Lock verarbeiten. Gibt true zurück, sobald in DIESEM Fix freigegeben
   // wurde (der Anker ist dann als erster Linienpunkt gesetzt → Fix läuft normal

@@ -9,6 +9,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { FT } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
+import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
 import { useSession } from '@/hooks/useSession';
 import { useDogs } from '@/hooks/useDogs';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -606,11 +607,23 @@ export default function LegenScreen() {
 
   // GPS ab >45 m warnen — dann landen keine Linienpunkte (Filter), Distanz bleibt 0.
   const gpsPoor = gpsAccuracy != null && gpsAccuracy > 45;
-  const metrics: { value: string; label: string; warn?: boolean }[] = [
+  // Konsistente GPS-Qualitätsanzeige über alle drei Phasen (Legen/Ansatz/
+  // Absuche, Golden-Reference-Audit Punkt 6) — reine Anzeige, KEIN neues
+  // Accuracy-Gate: getGpsQuality() ist die bestehende, bereits an anderer
+  // Stelle (ActiveFaehrteCard/trackingStore) verwendete Klassifikation.
+  const gpsQualityBand = gpsAccuracy != null ? getGpsQuality(gpsAccuracy) : null;
+  const gpsQualityKey: Record<'sehr-gut' | 'gut' | 'mittel' | 'schwach', TranslationKey> = {
+    'sehr-gut': 'track.gpsVeryGood', 'gut': 'track.gpsGood', 'mittel': 'track.gpsMedium', 'schwach': 'track.gpsPoor',
+  };
+  const gpsQualityColor = gpsQualityBand === 'sehr-gut' || gpsQualityBand === 'gut' ? FT.acc
+    : gpsQualityBand === 'mittel' ? FT.warn
+    : gpsQualityBand === 'schwach' ? FT.warn : undefined;
+  const gpsLabel = gpsQualityBand ? `GPS · ${t(gpsQualityKey[gpsQualityBand])}` : 'GPS';
+  const metrics: { value: string; label: string; warn?: boolean; labelColor?: string }[] = [
     { value: `${Math.round(distanceMeters)} m`, label: `≈ ${metersToSteps(distanceMeters, stepLengthM)} ${t('track.stepsShort')}` },
     { value: String(gegenstaende), label: t('track.objectsShort') },
     { value: String(winkel), label: t('track.angle') },
-    { value: gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : '–', label: 'GPS', warn: gpsPoor },
+    { value: gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : '–', label: gpsLabel, warn: gpsPoor, labelColor: gpsQualityColor },
   ];
 
   // GPS-Debug (nur Dev): schlankes gpsDebug → GpsStats fürs PrecisionDebugPanel (nur lesend).
@@ -719,7 +732,11 @@ export default function LegenScreen() {
             {metrics.map((mm, i) => (
               <View key={i} className={`flex-1 items-center ${i > 0 ? 'border-l border-ft-line' : ''}`}>
                 <Text className={`text-[15px] font-black ${mm.warn ? 'text-ft-warn' : 'text-ft-text'}`} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{mm.value}</Text>
-                <Text className="text-[8.5px] text-ft-muted font-bold tracking-[1px] uppercase mt-px">{mm.label}</Text>
+                <Text
+                  className={`text-[8.5px] font-bold tracking-[1px] uppercase mt-px ${mm.labelColor ? '' : 'text-ft-muted'}`}
+                  style={mm.labelColor ? { color: mm.labelColor } : undefined}
+                  numberOfLines={1}
+                >{mm.label}</Text>
               </View>
             ))}
           </View>

@@ -29,6 +29,7 @@ import {
   type MotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
 } from '@/features/tracking/engine/trackFusionEngine';
 import type { AnalyticsSample } from '@/features/tracking/engine/trackAnalytics';
+import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 
 // Core-Motion-Sensor-Fusion (rein additiv, Punkt 2/3): NUR ein Zusatzsignal
 // zur Confidence-Bewertung und zum Live-GPS-Qualitätsindikator (Punkt 15).
@@ -159,7 +160,7 @@ export interface SearchRecorder {
   searchStartState: SearchStartState;
   // Ohne Argument: frische Absuche (Reset). Mit `resume`: unterbrochene Absuche
   // fortsetzen (P2) — Punkte/Distanz/Timer werden fortgeführt, keine neue Session.
-  start: (resume?: { points: LatLng[]; startedAtMs: number }) => void;
+  start: (resume?: { points: LatLng[]; startedAtMs: number }, opts?: { forceLocked?: boolean }) => void;
   stop: () => SearchResult;
   setPaused: (p: boolean) => void;
   markObject: () => void;
@@ -396,7 +397,13 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     // sieht ggf. denselben zurückgesetzten `sm`-Wert erneut (idempotent) —
     // ein per Motion bestätigter Stillstand am echten Ansatz muss weiterhin
     // Support aufbauen und locken können (c7eba84-Regression bleibt behoben).
-    const fusionBlocksGeometry = fusion.classification === 'gps_outlier' || fusion.classification === 'stationary';
+    // ENGINE=BUILD40 (Golden-Reference-Audit, Punkt 5): Core Motion darf in
+    // diesem Modus weiterhin Daten/Confidence liefern (evaluateFusion/
+    // setGpsQuality laufen unverändert oben) — es darf nur NICHTS blockieren:
+    // keine Position, keine Distanz, keine Linie, keine GPS-Fixes verwerfen.
+    // Der historische Stand (82bd17c) kannte trackFusionEngine.ts gar nicht.
+    const fusionBlocksGeometry = getTrackingEngineMode() !== 'build40'
+      && (fusion.classification === 'gps_outlier' || fusion.classification === 'stationary');
     if (fusionBlocksGeometry && prev) {
       sm = prev;
       smoothRef.current = sm;
@@ -687,7 +694,7 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
   }, [recording, paused]);
 
   // ── Steuerung ──
-  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number }) => {
+  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number }, opts?: { forceLocked?: boolean }) => {
     const resumePts = resume?.points ?? [];
     // Fortsetzen: mit den wiederhergestellten Punkten seeden (Linie/Distanz laufen
     // weiter); frisch: leer.
@@ -716,10 +723,24 @@ export function useSearchRecorder(opts: { laidPoints: LatLng[]; laidObjects: Sea
     analyticsSamplesRef.current = [];
     fusionHistoryRef.current = { prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null };
     void motionClient.start();
-    // Fortsetzen einer bereits laufenden Absuche (Resume) oder Freilauf ohne
-    // Soll-Fährte: die Track-Assoziation wurde vorher schon bestätigt bzw. ist
-    // gegenstandslos → direkt START_LOCKED, keine erneute Akquisition nötig.
-    searchStartRef.current = (resume || !hasTrack)
+    // Fortsetzen einer bereits laufenden Absuche (Resume), Freilauf ohne
+    // Soll-Fährte (die Track-Assoziation ist dann gegenstandslos), ODER ein
+    // ausdrücklicher manueller Override ("Trotzdem starten", run.tsx
+    // handleManualStart mode='manual-override') → direkt START_LOCKED, keine
+    // Akquisition nötig. Root-Cause-Fix (Golden-Reference-Audit, Punkt 2):
+    // vorher konnte "Trotzdem starten" recording/Timer starten, OHNE dass
+    // SearchStartAcquisition je START_LOCKED erreichte — ein stiller,
+    // ungültiger Zustand (LIVE + Timer läuft, aber Cursor/Fortschritt bleiben
+    // auf 0 eingefroren, da hasTrack&&!locked die Cursor-Projektion blockiert).
+    // Ein EXPLIZITER manueller Override bedeutet: der Handler übernimmt
+    // bewusst die Verantwortung für "ich stehe am Start" — das muss die
+    // Aufnahme dann auch wirklich freigeben, nicht nur so tun.
+    // ENGINE=BUILD40 (Golden-Reference-Audit, Punkt 3): SearchStartAcquisition
+    // ist ein Modul, das im historischen Stand (82bd17c) nicht existierte —
+    // der erste akzeptierte Fix war dort direkt der Referenzpunkt, ohne
+    // Konsekutiv-/Fenster-Gate. BUILD40 reproduziert das exakt.
+    const build40 = getTrackingEngineMode() === 'build40';
+    searchStartRef.current = (resume || !hasTrack || opts?.forceLocked || build40)
       ? { state: 'START_LOCKED', support: DEFAULT_SEARCH_START_CONFIG.requiredFixes, lockedAtM: 0 }
       : INITIAL_SEARCH_START;
     setSearchStartState(searchStartRef.current.state);

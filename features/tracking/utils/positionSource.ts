@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { precisionLocationClient as client } from '@/features/tracking/native/precisionLocationClient';
+import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
 
 // Zentrale Positionsquelle für die Fährtenaufnahme.
 //
@@ -9,6 +10,14 @@ import { precisionLocationClient as client } from '@/features/tracking/native/pr
 // Debug-Metadaten (source/provider) und einen statischen Info-Block.
 //
 // Bewusst schlank: kapselt nur die Quelle, ändert KEINE Filter-/Schwellenlogik.
+//
+// QA-A/B-Schalter (Build-43-Feldtest-Audit, siehe locationSourceMode.ts):
+// steht `getLocationSourceMode() === 'legacy'`, wird AnyvoPrecisionLocation
+// NICHT gestartet — es läuft exakt derselbe reine expo-location-Zweig wie
+// der bisherige Fehler-Fallback unten (`startLegacyExpoLocation`), also exakt
+// der alte, auf Build 40 nachweislich funktionierende Pfad. Alles danach
+// (EMA, Distanz-Gates, Search-Start-Acquisition, Corner-Detection) bleibt in
+// beiden Modi unverändert — die Hooks kennen den Modus nicht.
 
 export type LocationSourceKind = 'native' | 'expo' | 'external';
 
@@ -58,6 +67,38 @@ export function sampleToLocationObject(s: PositionSourceSample): Location.Locati
   } as Location.LocationObject;
 }
 
+// Exakt der alte, auf Build 40 (Commit 82bd17c) nachweislich funktionierende
+// iOS-Pfad: reines expo-location, dieselben Optionen wie damals. `timeInterval`
+// wird bewusst weiterhin durchgereicht (Android nutzt es echt — auf iOS ist es
+// laut expo-locations eigener LocationOptions.swift/Location.types.d.ts ein
+// No-Op, siehe Audit-Kommentar oben — KEIN eigenes Verhalten wird hier
+// erfunden, nur exakt das alte Options-Objekt reproduziert).
+async function startLegacyExpoLocation(
+  onEmit: (s: StreamSample, fallbackSource: LocationSourceKind) => void,
+  opts: Location.LocationOptions,
+  providerLabel: string,
+): Promise<() => void> {
+  const sub = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.BestForNavigation,
+      timeInterval: opts.timeInterval ?? 1000,
+      distanceInterval: 0,
+    },
+    (loc) => onEmit({
+      lat: loc.coords.latitude,
+      lng: loc.coords.longitude,
+      accuracy: loc.coords.accuracy ?? null,
+      altitude: loc.coords.altitude ?? null,
+      speed: loc.coords.speed ?? null,
+      course: loc.coords.heading ?? null,
+      t: loc.timestamp || Date.now(),
+      provider: providerLabel,
+      source: 'expo',
+    }, 'expo'),
+  );
+  return () => sub.remove();
+}
+
 // Startet die Positionsquelle. Gibt eine stop-Funktion + statische Info zurück.
 export async function startPositionSource(
   onSample: (s: PositionSourceSample) => void,
@@ -73,6 +114,13 @@ export async function startPositionSource(
     onSample(sample);
   };
 
+  // 0) QA-A/B-Schalter: LEGACY erzwingt den alten expo-location-Pfad, ohne
+  //    AnyvoPrecisionLocation überhaupt zu starten (siehe locationSourceMode.ts).
+  if (getLocationSourceMode() === 'legacy') {
+    const stop = await startLegacyExpoLocation(emit, opts, 'expo-location-legacy');
+    return { stop, info: { ...info, isNativeAvailable: false, source: 'expo', provider: 'expo-location-legacy' } };
+  }
+
   // 1) Bevorzugt: natives Modul / BLE über positionStream (fällt intern bereits
   //    auf expo-location zurück, wenn kein natives Modul im Build ist).
   try {
@@ -82,24 +130,7 @@ export async function startPositionSource(
     // 2) Harte Sicherung: schlägt der native Start fehl (z. B. Modul vorhanden,
     //    aber Fehler), auf reines expo-location zurückfallen. Kein Crash.
     console.warn('[positionSource] Native/positionStream fehlgeschlagen — Fallback auf expo-location.', e);
-    const sub = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: opts.timeInterval ?? 1000,
-        distanceInterval: 0,
-      },
-      (loc) => emit({
-        lat: loc.coords.latitude,
-        lng: loc.coords.longitude,
-        accuracy: loc.coords.accuracy ?? null,
-        altitude: loc.coords.altitude ?? null,
-        speed: loc.coords.speed ?? null,
-        course: loc.coords.heading ?? null,
-        t: loc.timestamp || Date.now(),
-        provider: 'expo-location',
-        source: 'expo',
-      }, 'expo'),
-    );
-    return { stop: () => sub.remove(), info: { ...info, source: 'expo', provider: 'expo-location' } };
+    const stop = await startLegacyExpoLocation(emit, opts, 'expo-location');
+    return { stop, info: { ...info, source: 'expo', provider: 'expo-location' } };
   }
 }

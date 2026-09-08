@@ -13,6 +13,7 @@ import { TrackingMap, type MapMarker } from '@/features/tracking/components/Trac
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
 import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
+import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
 import { useTrackVoiceGuidance, say, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/utils/offTrackFeedback';
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
@@ -199,7 +200,14 @@ export default function TrackRunScreen() {
     useTrackingStore.getState().setSearchRunId(runUuid);
     // Gewählten Abstand in den Store spiegeln → landet im PendingTrack-Snapshot (Recovery).
     useTrackingStore.getState().setSearchHandlerDistanceM(searchHandlerDistanceM);
-    s.start();
+    // Root-Cause-Fix (Golden-Reference-Audit, Punkt 2): ein ausdrücklicher
+    // manueller Override ("Trotzdem starten") darf keinen stillen, ungültigen
+    // Zustand erzeugen (LIVE + Timer läuft, aber SearchStartAcquisition nie
+    // START_LOCKED) — er gibt die Aufnahme jetzt auch WIRKLICH frei
+    // (forceLocked), statt zusätzlich noch die interne Akquisition zu
+    // verlangen. 'manual-at-start' (Ansatz bereits per approach.armed
+    // bestätigt) durchläuft weiterhin die normale Akquisition unverändert.
+    s.start(undefined, { forceLocked: mode === 'manual-override' });
     useTrackingStore.getState().startSearchSession(null, startMs);   // Status 'searching' + Suchzeit-Start
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
     // Kein direkter Remote-Start mehr (RUN-SAVE2): track_runs wird beim Stop über die
@@ -651,6 +659,21 @@ export default function TrackRunScreen() {
     : null;
   const gpsLabel = s.gpsQuality ? `GPS · ${t(gpsQualityLabelKey[s.gpsQuality.band] as any)}` : 'GPS';
 
+  // Golden-Reference-Audit Punkt 6: dieselbe konsistente Anzeige auch in der
+  // ANSATZ-Phase (vorher nur ein roher ±X m-Text, kein Qualitäts-Band) —
+  // reine Zusatz-Anzeige, KEIN neues Accuracy-Gate (approach.armed/
+  // maxAccuracyM bleiben exakt wie zuvor die einzigen Bedingungen).
+  // getGpsQuality()/die vier existierenden i18n-Keys sind dieselben wie in
+  // legen.tsx (track.gpsVeryGood/gpsGood/gpsMedium/gpsPoor).
+  const approachQualityBand = approach.accuracy != null ? getGpsQuality(approach.accuracy) : null;
+  const approachQualityKey: Record<'sehr-gut' | 'gut' | 'mittel' | 'schwach', string> = {
+    'sehr-gut': 'track.gpsVeryGood', 'gut': 'track.gpsGood', 'mittel': 'track.gpsMedium', 'schwach': 'track.gpsPoor',
+  };
+  const approachQualityColor = approachQualityBand === 'sehr-gut' || approachQualityBand === 'gut' ? FT.acc
+    : approachQualityBand === 'mittel' ? FT.warn
+    : approachQualityBand === 'schwach' ? FT.warn : FT.muted;
+  const approachGpsLabel = approachQualityBand ? `GPS · ${t(approachQualityKey[approachQualityBand] as any)}` : 'GPS';
+
   const metrics: { value: string; label: string; warn?: boolean }[] = [
     { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
     { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
@@ -896,6 +919,14 @@ export default function TrackRunScreen() {
                     </>
                   )}
                 </View>
+                {/* Konsistentes GPS-Qualitäts-Band (Punkt 6 des Audits) — unabhängig
+                    vom obigen Status-Text immer sichtbar, solange eine Genauigkeit
+                    gemeldet ist. Reine Anzeige, kein zusätzliches Gate. */}
+                {approach.accuracy != null && (
+                  <Text className="text-[10.5px] font-bold mt-1.5" style={{ color: approachQualityColor }}>
+                    {approachGpsLabel}
+                  </Text>
+                )}
                 {/* Abstand Hundeführer ↔ Hund: bestimmt die virtuelle Hundeposition
                     (1/5/10 m entlang der Fährte) für hundebezogene Ansagen. Default 5 m. */}
                 <Text className="text-[9px] text-ft-muted font-bold tracking-[1.4px] uppercase mt-4">{t('track.searchHandlerDistanceLabel')}</Text>
