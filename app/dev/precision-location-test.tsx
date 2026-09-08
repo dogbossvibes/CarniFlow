@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Redirect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { C } from '@/constants/colors';
@@ -17,17 +17,26 @@ import {
   getLocationSourceMode, setLocationSourceMode, loadPersistedLocationSourceMode,
   type LocationSourceMode,
 } from '@/features/tracking/utils/locationSourceMode';
+import {
+  getTrackingEngineMode, setTrackingEngineMode, loadPersistedTrackingEngineMode,
+  type TrackingEngineMode,
+} from '@/features/tracking/utils/trackingEngineMode';
 
-// Dev-Test-Screen für anyvo-precision-location (Phase 1–3).
-// Öffnen: Deep-Link  anyvo://dev/precision-location-test
+// Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
+// QA-Golden-Reference-A/B-Schalter (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/
+// PRECISION).
+// Öffnen: Profil → Fährten-Einstellungen → „Fährten-Diagnose", oder Deep-Link
+// anyvo://dev/precision-location-test
+//
+// Bewusst NICHT mehr hinter `__DEV__`: der laufende Golden-Reference-Feldtest
+// findet auf einem echten TestFlight-Build (Build 43) statt, wo `__DEV__`
+// false ist — der Schalter wäre dort sonst unerreichbar. Der Screen ist rein
+// lesend/umschaltend für QA und verändert KEINE Trackinglogik; er ist nur
+// über den ausdrücklich als Testmodus bezeichneten Profil-Eintrag erreichbar.
 const IS_ANDROID = Platform.OS === 'android';
 const IS_IOS = Platform.OS === 'ios';
 
 export default function PrecisionLocationTestScreen() {
-  if (!__DEV__) {
-    return <Redirect href="/(tabs)/home" />;
-  }
-
   return <PrecisionLocationTestContent />;
 }
 
@@ -52,15 +61,29 @@ function PrecisionLocationTestContent() {
 
   const subs = useRef<{ remove: () => void }[]>([]);
   const [sourceMode, setSourceMode] = useState<LocationSourceMode>(getLocationSourceMode());
+  const [engineMode, setEngineMode] = useState<TrackingEngineMode>(getTrackingEngineMode());
 
   useEffect(() => {
     loadPersistedLocationSourceMode().then(setSourceMode);
+    loadPersistedTrackingEngineMode().then(setEngineMode);
   }, []);
 
   const chooseSourceMode = (mode: LocationSourceMode) => {
     setLocationSourceMode(mode);
     setSourceMode(mode);
   };
+  const chooseEngineMode = (mode: TrackingEngineMode) => {
+    setTrackingEngineMode(mode);
+    setEngineMode(mode);
+  };
+  // Klartext des aktuell aktiven Zustands — der Feldtest vergleicht
+  // A = BUILD40 + EXPO gegen B = CURRENT + EXPO.
+  const engineLabel = engineMode === 'build40' ? 'BUILD40' : 'CURRENT';
+  const sourceLabel = sourceMode === 'legacy' ? 'EXPO' : 'PRECISION';
+  const combiLabel = `${engineLabel} + ${sourceLabel}`;
+  const combiHint = engineMode === 'build40' && sourceMode === 'legacy' ? 'Test A (Golden Reference)'
+    : engineMode === 'current' && sourceMode === 'legacy' ? 'Test B (neue Engine, ohne Precision)'
+    : sourceMode === 'precision' ? 'Precision — auf Build 43 noch NICHT als Vergleich verwenden' : '';
 
   const native = isNativeModuleAvailable();
   const [support] = useState<RawGnssSupportStatus>(() => isRawGnssSupported());
@@ -120,16 +143,54 @@ function PrecisionLocationTestContent() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={8} style={s.back}>
           <Ionicons name="chevron-back" size={20} color={C.white} />
         </TouchableOpacity>
-        <Text style={s.title}>Precision Location · Test</Text>
+        <Text style={s.title}>Fährten-Diagnose · Testmodus</Text>
       </View>
 
       <ScrollView contentContainerStyle={s.body}>
-        <Section title="QA A/B — echte Fährtenaufnahme (Legen/Ansatz/Absuche)">
+        <Section title="Aktiv für die echte Fährtenaufnahme">
+          <View style={s.activeBox}>
+            <Text style={s.activeVal}>{combiLabel}</Text>
+            {combiHint ? <Text style={s.activeHint}>{combiHint}</Text> : null}
+          </View>
           <Text style={s.note}>
-            Wirkt auf useTrackRecorder/useSearchRecorder/useStartPointApproach/
-            Schrittkalibrierung — NICHT nur auf den Test unten. LEGACY = exakt
-            der alte, auf Build 40 funktionierende expo-location-Pfad (keine
-            AnyvoPrecisionLocation). Übersteht App-Neustart.
+            Gilt für Legen, Ansatz und Absuche (useTrackRecorder/
+            useSearchRecorder/useStartPointApproach/Schrittkalibrierung) —
+            nicht nur für den Modul-Test weiter unten. Beide Einstellungen
+            überstehen einen App-Neustart.
+          </Text>
+        </Section>
+
+        <Section title="Tracking Engine">
+          <Text style={s.note}>
+            BUILD40 = die auf Build 40 nachweislich funktionierende Logik
+            (historische Winkelerkennung, kein Such-Start-Lock, Core Motion
+            nur beobachtend). CURRENT = heutige Engine.
+          </Text>
+          <View style={s.abRow}>
+            <TouchableOpacity
+              style={[s.abBtn, engineMode === 'build40' && s.abBtnActive]}
+              onPress={() => chooseEngineMode('build40')}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.abBtnTxt, engineMode === 'build40' && s.abBtnTxtActive]}>BUILD40</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.abBtn, engineMode === 'current' && s.abBtnActive]}
+              onPress={() => chooseEngineMode('current')}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.abBtnTxt, engineMode === 'current' && s.abBtnTxtActive]}>CURRENT</Text>
+            </TouchableOpacity>
+          </View>
+        </Section>
+
+        <Section title="Location Source">
+          <Text style={s.note}>
+            EXPO = exakt der alte, auf Build 40 funktionierende
+            expo-location-Pfad (AnyvoPrecisionLocation wird gar nicht
+            gestartet). PRECISION = natives Modul. Hinweis: auf Build 43
+            enthält das native Modul noch die alte 1-Hz-Drosselung —
+            PRECISION daher vorerst NICHT als Vergleichsmassstab verwenden.
           </Text>
           <View style={s.abRow}>
             <TouchableOpacity
@@ -137,7 +198,7 @@ function PrecisionLocationTestContent() {
               onPress={() => chooseSourceMode('legacy')}
               activeOpacity={0.85}
             >
-              <Text style={[s.abBtnTxt, sourceMode === 'legacy' && s.abBtnTxtActive]}>LEGACY</Text>
+              <Text style={[s.abBtnTxt, sourceMode === 'legacy' && s.abBtnTxtActive]}>EXPO</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.abBtn, sourceMode === 'precision' && s.abBtnActive]}
@@ -282,6 +343,9 @@ const s = StyleSheet.create({
   btnStart:{ backgroundColor: C.accent },
   btnStop: { backgroundColor: '#ff5d6c' },
   btnTxt:  { fontSize: 15, fontWeight: '800', color: C.white },
+  activeBox: { paddingHorizontal: 12, paddingVertical: 12, gap: 3 },
+  activeVal: { fontSize: 20, fontWeight: '900', color: C.accent, letterSpacing: 0.5 },
+  activeHint:{ fontSize: 12, color: C.muted, fontWeight: '700' },
   abRow:   { flexDirection: 'row', gap: 8, marginTop: 4 },
   abBtn:   { flex: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   abBtnActive: { backgroundColor: C.accent, borderColor: C.accent },

@@ -454,6 +454,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "profile.stepLength": "step length",
   "profile.stepLengthPersonal": "Profile step length personal {cm}",
   "profile.stepLengthDefault": "Default: 75 cm",
+  "profile.trackDiagnostics": "Track diagnostics (test mode)",
+  "profile.trackDiagnosticsSub": "Switch tracking engine and GPS source for the field test.",
   "profile.myTrainerProfile": "My trainer profile",
   "profile.becomeTrainer": "trainer be",
   "profile.trainerHub": "Trainer hub",

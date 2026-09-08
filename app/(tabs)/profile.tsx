@@ -575,6 +575,23 @@ export default function ProfilScreen() {
             wert={stepLength.stepLengthM != null ? t('profile.stepLengthPersonal', { cm: Math.round(stepLength.stepLengthM * 100) }) : t('profile.stepLengthDefault')}
             onPress={() => router.push('/track/kalibrierung' as never)}
           />
+
+          {/* Temporär für den laufenden Golden-Reference-Feldtest: Zugang zur
+              bereits bestehenden QA-Oberfläche (Tracking-Engine BUILD40/CURRENT,
+              Location-Source EXPO/PRECISION). Ändert selbst keine Trackinglogik. */}
+          <View style={s.trenner} />
+          <TouchableOpacity style={s.zeile} onPress={() => router.push('/dev/precision-location-test' as never)} activeOpacity={0.7}>
+            <View style={s.zeileIcon}>
+              <Ionicons name="flask-outline" size={17} color={C.muted} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.zeileLabel}>{t('profile.trackDiagnostics')}</Text>
+              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                {t('profile.trackDiagnosticsSub')}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={C.muted} />
+          </TouchableOpacity>
         </View>
 
         {__DEV__ && (

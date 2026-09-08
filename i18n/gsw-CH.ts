@@ -475,6 +475,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'profile.stepLength': 'Schrittlängi',
   'profile.stepLengthPersonal': 'Persönlich: {cm} cm',
   'profile.stepLengthDefault': 'Standard: 75 cm',
+  'profile.trackDiagnostics': 'Fährte-Diagnose (Teschtmodus)',
+  'profile.trackDiagnosticsSub': 'Tracking-Engine und GPS-Quelle für de Feldtescht umschalte.',
   'profile.myTrainerProfile': 'Mis Trainer-Profil',
   'profile.becomeTrainer': 'Trainer werde',
   'profile.trainerHub': 'Trainer-Hub',

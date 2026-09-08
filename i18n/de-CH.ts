@@ -475,6 +475,8 @@ export const deCH = {
   'profile.stepLength': 'Schrittlänge',
   'profile.stepLengthPersonal': 'Persönlich: {cm} cm',
   'profile.stepLengthDefault': 'Standard: 75 cm',
+  'profile.trackDiagnostics': 'Fährten-Diagnose (Testmodus)',
+  'profile.trackDiagnosticsSub': 'Tracking-Engine und GPS-Quelle für den Feldtest umschalten.',
   'profile.myTrainerProfile': 'Mein Trainer-Profil',
   'profile.becomeTrainer': 'Trainer werden',
   'profile.trainerHub': 'Trainer-Hub',

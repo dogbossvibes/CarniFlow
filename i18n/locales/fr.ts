@@ -923,6 +923,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "profile.stepLength": "Longueur de pas",
   "profile.stepLengthPersonal": "Personnelle : {cm} cm",
   "profile.stepLengthDefault": "Standard : 75 cm",
+  "profile.trackDiagnostics": "Diagnostic de piste (mode test)",
+  "profile.trackDiagnosticsSub": "Basculer le moteur de suivi et la source GPS pour le test terrain.",
   "profile.myTrainerProfile": "Mon profil d’entraîneur",
   "profile.becomeTrainer": "Devenir entraîneur",
   "profile.trainerHub": "Espace entraîneur",

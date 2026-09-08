@@ -484,6 +484,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "profile.stepLength": "Lunghezza del passo",
   "profile.stepLengthPersonal": "Personale: {cm} cm",
   "profile.stepLengthDefault": "Predefinita: 75 cm",
+  "profile.trackDiagnostics": "Diagnostica pista (modalità test)",
+  "profile.trackDiagnosticsSub": "Cambia motore di tracciamento e sorgente GPS per il test sul campo.",
   "profile.myTrainerProfile": "Il mio profilo allenatore",
   "profile.becomeTrainer": "Diventa allenatore",
   "profile.trainerHub": "Hub allenatore",
