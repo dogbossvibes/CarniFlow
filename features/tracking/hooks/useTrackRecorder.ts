@@ -11,15 +11,26 @@ import {
   calculateDistance, calculateAverageAccuracy, medianLatLng, type LatLng,
 } from '@/features/tracking/utils/gpsFilter';
 import {
-  feedCornerBuffer, createCornerConfirmer,
-  type CornerConfirmer, type ConfirmedCorner, type ConfirmQuality,
+  createCornerConfirmer,
+  type CornerConfirmer, type ConfirmedCorner,
 } from '@/features/tracking/utils/cornerConfirmation';
 import {
   createGpsQualityTracker, type GpsQualityTracker, type GpsQualityState,
 } from '@/features/tracking/utils/gpsQualityState';
 import { logConfirmEvent, logConfirmedCornerMetrics, logGpsQualityChange } from '@/features/tracking/utils/angleDiagnostics';
 import { legacyDetectCorner, type LegacyAcceptedPoint } from '@/features/tracking/utils/legacyCornerDetection';
+import {
+  detectShortLegCorners, DETECTOR_INPUT, type ShortLegPoint,
+} from '@/features/tracking/utils/shortLegCornerDetection';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
+import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
+import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
+import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { markWarmupStarted, markReportedSource, markWarmupStopped, markMotionStarted, markMotionSample } from '@/features/tracking/utils/trackingWarmupState';
+import { pushQaCandidateLine, clearQaCandidateLog } from '@/features/tracking/utils/qaCandidateLog';
+import { evaluateStopFlush } from '@/features/tracking/utils/stopFlushCorner';
+import { motionClient } from '@/features/tracking/native/motionClient';
+import { MotionEvidenceBuffer } from '@/features/tracking/utils/motionTurnEvidence';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
 import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -116,6 +127,29 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const puckRef       = useRef<LatLng | null>(null);   // schneller geglättete Position für den LIVE-Puck
   const lastRawRef    = useRef<Raw | null>(null);      // letzter (akzeptierter) Rohfix
   const lastCornerAtRef = useRef<number>(-Infinity);   // cumDist des letzten Winkels
+  // ── Eigener, dichterer Punktstrom NUR für die Winkel-Erkennung ──
+  // Die aufgezeichnete LINIE bleibt unverändert (EMA_ALPHA 0,4 / MIN_STEP_M 2 m).
+  // Für kurze Schenkel (Feldschema: ~3,75 m) reicht dieser Strom nicht: er
+  // liefert dort ~1 Punkt pro Schenkel, und die ruhige Glättung rundet die
+  // Ecke über ~2 m ab. Der Detektor bekommt deshalb denselben Fix-Strom mit
+  // leichterer Glättung und feinerem Distanz-Gate (siehe DETECTOR_INPUT).
+  // Reine Erkennungs-Eingabe: weder Linie, Distanz, Persistenz noch Auswertung
+  // sehen diese Punkte.
+  const detectPointsRef = useRef<ShortLegPoint[]>([]);
+  const detectEmaRef = useRef<LatLng | null>(null);
+  // UNGEGLÄTTETE Fixe der letzten Meter — ausschliesslich für den
+  // Stop-assisted Flush am Sessionende (die Glättung hat über einen sehr
+  // kurzen Schlussnachlauf die neue Richtung noch nicht eingeholt, gemessen in
+  // stopFlushCorner.test.ts). Kleiner Ringpuffer, nie persistiert.
+  const rawTailRef = useRef<ShortLegPoint[]>([]);
+  // Core-Motion-Mitschnitt beim Legen — NUR im QA-Diagnosemodus und NUR für
+  // ENGINE=CURRENT. Rein beobachtend: erzeugt keinen Kandidaten, verwirft
+  // keinen, verändert keine Confidence, keine Distanz, kein GPS.
+  const motionBufRef = useRef<MotionEvidenceBuffer>(new MotionEvidenceBuffer(20));
+  const motionSubRef = useRef<{ remove: () => void } | null>(null);
+  const motionActiveRef = useRef(false);
+  const qaRef = useRef(false);
+  const qaLastRejectRef = useRef<string | null>(null);
   // Start-Lock (Stabilisierungsphase): Anker + Bewegungserkennung + Drift-Zähler.
   const startLockRef      = useRef<boolean>(false);              // true ⇒ Startphase aktiv
   const startLockBeganRef = useRef<number>(0);                   // ms: Beginn der Startphase
@@ -168,6 +202,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       setTrackFixHandler(null);
       void stopBackgroundUpdates();
     }
+    // QA-Motion-Mitschnitt beenden (falls er lief) und den sichtbaren
+    // Aktiv-Zustand zurücksetzen.
+    if (motionActiveRef.current) {
+      motionActiveRef.current = false;
+      motionSubRef.current?.remove(); motionSubRef.current = null;
+      void motionClient.stop();
+    }
+    markWarmupStopped();
     const st = store.getState();
     if (st.startLockActive) st.setStartLockActive(false);
     stopFaehrteActivity({ elapsedS: st.durationSeconds, distanceM: st.distanceMeters });
@@ -236,18 +278,72 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Erkennung (Scheitelwahl, stabile Schenkel, Klassen, Confidence) liegt in
   // autoCornerDetection; feedCornerBuffer() hält denselben Kandidaten stabil und
   // liefert nur relevante Lifecycle-Events zurück.
-  const detectCorner = useCallback(() => {
-    if (getTrackingEngineMode() === 'build40') { persistLegacyCorner(pointsRef.current); return; }
-    // GPS-Quality als Kontext: nur bei gültigem (nicht-Warmup) State koppeln, sonst neutral.
-    const q = gpsQualityStateRef.current;
-    const confirmQuality: ConfirmQuality | undefined = q && q.valid ? q.level : undefined;
-    const events = feedCornerBuffer(confirmerRef.current, pointsRef.current, lastCornerAtRef.current, Date.now(), confirmQuality);
-    for (const ev of events) {
-      if (__DEV__) logConfirmEvent(ev);
-      if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
-      else if (ev.type === 'rejected' || ev.type === 'expired') angleDbgRef.current.lastReject = ev.detail;
+  // Adaptive Short-Leg-Erkennung (CURRENT): arbeitet auf dem dichteren
+  // Detektor-Puffer und meldet nur NEUE, noch nicht persistierte Winkel.
+  // Ersetzt für kurze Schenkel die bisherige, an LEG_MIN_M = 4 m gebundene
+  // Kandidatenbewertung; die Marker-/Voice-/Persistenz-Pipeline dahinter
+  // bleibt unverändert.
+  const persistShortLegCorners = useCallback(() => {
+    const { corners, diagnostics } = detectShortLegCorners(detectPointsRef.current);
+    if (__DEV__ && diagnostics.length) {
+      const last = diagnostics[diagnostics.length - 1];
+      if (last.rejectReason) angleDbgRef.current.lastReject = last.rejectReason;
     }
-  }, [persistConfirmedCorner, persistLegacyCorner]);
+    // ── QA-Diagnose (nur Diagnosemodus): eine Zeile je Kandidat, inklusive
+    // Motion-Turn-Evidenz, falls Core Motion mitläuft. Rein beobachtend.
+    if (qaRef.current && diagnostics.length) {
+      const last = diagnostics[diagnostics.length - 1];
+      const changed = last.rejectReason !== qaLastRejectRef.current;
+      qaLastRejectRef.current = last.rejectReason;
+      if (changed || last.classification) {
+        const ev = motionActiveRef.current && last.t != null
+          ? motionBufRef.current.evidenceFor(last.t)
+          : null;
+        pushQaCandidateLine(
+          `[gps] ${new Date(last.t ?? Date.now()).toISOString().slice(11, 19)} ` +
+          `acc=${last.accuracyM?.toFixed(1) ?? '—'}m typ=${last.classification ?? '—'} ` +
+          `innen=${last.interiorAngleDeg?.toFixed(1) ?? '—'}° conf=${last.confidence.toFixed(2)} ` +
+          `grund=${last.rejectReason ?? 'akzeptiert'}` +
+          (ev ? ` | [motion] netYaw=${ev.netYawDeg.toFixed(1)}° gross=${ev.grossYawDeg.toFixed(1)}° ` +
+            `mono=${ev.monotonicity.toFixed(2)} yawShare=${ev.yawShare.toFixed(2)} ` +
+            `steps=${ev.steps} cad=${ev.cadence?.toFixed(0) ?? '—'} state=${ev.movementState ?? '—'} ` +
+            `turnEvidence=${ev.evidence?.toFixed(3) ?? '—'}` : ''),
+        );
+      }
+    }
+    for (const c of corners) {
+      if (c.atM <= lastCornerAtRef.current) continue;   // schon gemeldet
+      lastCornerAtRef.current = c.atM;
+      const dbg = angleDbgRef.current;
+      dbg.count++;
+      if (c.kind === 'spitz_rechts' || c.kind === 'spitz_links') dbg.acuteCount++;
+      dbg.lastType = c.kind;
+      dbg.lastDir = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
+      dbg.lastReject = null;
+      const p = detectPointsRef.current[c.apexIndex];
+      const now = Date.now();
+      void commitMarker({
+        id: `angle-${now}-${c.kind}`, type: 'winkel', material: null, angleKind: c.kind,
+        lat: p.lat, lng: p.lng, accuracy: p.accuracy,
+        distance_from_start: Math.round(c.atM * 10) / 10,
+        note: null, audio_url: null, found: false, t: now,
+      });
+      onAngleRef.current?.(c.kind);
+    }
+  }, [commitMarker]);
+
+  const detectCorner = useCallback(() => {
+    // BUILD40: unveränderte historische Einzelschuss-Erkennung.
+    if (getTrackingEngineMode() === 'build40') { persistLegacyCorner(pointsRef.current); return; }
+    // CURRENT: adaptive Short-Leg-Erkennung auf dem dichteren Detektor-Puffer.
+    // Die frühere, an LEG_MIN_M = 4 m gebundene Confirmation-Kaskade
+    // (feedCornerBuffer/classifyCornerCandidate) konnte Schenkel unter 4 m
+    // strukturell nie bestätigen — nachgerechnet, siehe
+    // shortLegCornerDetection.ts. autoCornerDetection/cornerConfirmation
+    // bleiben als Module unverändert bestehen (weiterhin getestet), werden
+    // hier aber nicht mehr aufgerufen.
+    persistShortLegCorners();
+  }, [persistLegacyCorner, persistShortLegCorners]);
 
   // Start-Lock verarbeiten. Gibt true zurück, sobald in DIESEM Fix freigegeben
   // wurde (der Anker ist dann als erster Linienpunkt gesetzt → Fix läuft normal
@@ -382,6 +478,29 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     }
     lastRawRef.current = raw;
 
+    // ── Detektor-Puffer fortschreiben (nur Winkel-Erkennung, siehe oben) ──
+    {
+      const a = DETECTOR_INPUT.emaAlpha;
+      const prevD = detectEmaRef.current;
+      const dEma: LatLng = prevD
+        ? { lat: prevD.lat + (raw.lat - prevD.lat) * a, lng: prevD.lng + (raw.lng - prevD.lng) * a }
+        : { lat: raw.lat, lng: raw.lng };
+      detectEmaRef.current = dEma;
+      const dPts = detectPointsRef.current;
+      const dLast = dPts[dPts.length - 1];
+      const dStep = dLast ? calculateDistance(dLast, dEma) : 0;
+      if (!dLast || dStep >= DETECTOR_INPUT.minStepM) {
+        dPts.push({ lat: dEma.lat, lng: dEma.lng, cumDist: (dLast?.cumDist ?? 0) + dStep, accuracy: raw.accuracy, t: raw.t });
+      }
+      // Rohfix-Ring für den Stop-Flush (ungeglättet, kein Gate). Nur die
+      // letzten Meter werden gebraucht — bewusst klein gehalten.
+      const rt = rawTailRef.current;
+      const rLast = rt[rt.length - 1];
+      const rStep = rLast ? calculateDistance(rLast, { lat: raw.lat, lng: raw.lng }) : 0;
+      rt.push({ lat: raw.lat, lng: raw.lng, cumDist: (rLast?.cumDist ?? 0) + rStep, accuracy: raw.accuracy, t: raw.t });
+      if (rt.length > 60) rt.splice(0, rt.length - 60);
+    }
+
     // 3) Distanz-Gate: erst ab MIN_STEP_M einen neuen Linienpunkt setzen.
     const pts = pointsRef.current;
     const last = pts[pts.length - 1];
@@ -418,21 +537,52 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
   const startWarmup = useCallback(async (): Promise<{ error: string | null }> => {
     if (watchRef.current) return { error: null };
+    // Persistierte QA-Einstellungen MÜSSEN geladen sein, bevor die
+    // Positionsquelle ihren Modus liest — sonst startet ein Feldtest direkt
+    // nach dem App-Start auf dem Default statt auf der gewählten Quelle.
+    // Idempotent; nach dem ersten Aufruf praktisch kostenlos.
+    await hydrateQaModes();
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return { error: 'Standortberechtigung fehlt. Bitte in den Einstellungen erlauben.' };
     // iOS: falls „Genauer Standort" reduziert ist, einmalig präzise Ortung
     // anfragen (nutzt NSLocationTemporaryUsageDescriptionDictionary). Best-effort;
     // no-op ohne natives Modul oder wenn bereits präzise.
     precisionLocationClient.requestTemporaryFullAccuracy('TrackingDogSportPrecision').catch(() => {});
+    // Was JETZT tatsächlich gilt — nicht die Präferenz von später. Ab hier ist
+    // die Quelle für diesen Stream festgeschrieben (startWarmup ist idempotent,
+    // ein späteres Umschalten wechselt den laufenden Stream bewusst NICHT).
+    const activeEngine = getTrackingEngineMode();
+    const activeSource = getLocationSourceMode();
+    qaRef.current = isQaDiagnosticsEnabled();
     try {
       // Zentrale Positionsquelle: natives Precision-Modul bevorzugt, expo-Fallback.
       const handle = await startPositionSource((s) => {
         // Debug (source/provider) nur bei Änderung setzen — kein Re-Render-Sturm.
         setGpsDebug(d => (d.source === s.source && d.provider === s.provider) ? d : { ...d, source: s.source, provider: s.provider });
+        markReportedSource(s.source ?? null);
         onFix(sampleToLocationObject(s));
       }, WATCH_OPTS);
       watchRef.current = { remove: handle.stop };
+      markWarmupStarted(activeEngine, activeSource);
       setGpsDebug(d => ({ ...d, isNativeAvailable: handle.info.isNativeAvailable, rawGnssSupported: handle.info.rawGnssSupported, source: d.source ?? handle.info.source }));
+      // Core Motion NUR im QA-Diagnosemodus und NUR für ENGINE=CURRENT.
+      // Ausschliesslich beobachtend (siehe motionTurnEvidence.ts): die Samples
+      // landen in einem RAM-Ringpuffer und werden je Kandidat protokolliert.
+      // Sie fliessen NICHT in Erkennung, Confidence, Distanz oder GPS ein.
+      if (qaRef.current && activeEngine === 'current' && !motionActiveRef.current) {
+        motionActiveRef.current = true;
+        motionBufRef.current.clear();
+        markMotionStarted();
+        motionSubRef.current = motionClient.onSample((m) => {
+          markMotionSample();
+          motionBufRef.current.push({
+            t: m.timestamp, headingDelta: m.headingDelta,
+            rotationMagnitude: m.rotationMagnitude, accelerationMagnitude: m.accelerationMagnitude,
+            stepDelta: m.stepDelta, cadence: m.cadence, movementState: m.movementState,
+          });
+        });
+        void motionClient.start();
+      }
     } catch {
       return { error: 'GPS konnte nicht gestartet werden. Bitte kurz im Freien erneut versuchen.' };
     }
@@ -469,6 +619,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     lastRawRef.current = null;
     rejectedRef.current = 0;
     lastCornerAtRef.current = -Infinity;
+    detectPointsRef.current = [];
+    detectEmaRef.current = null;
+    rawTailRef.current = [];
+    // QA-Mitschrift gehört zu GENAU EINER Aufzeichnung.
+    qaLastRejectRef.current = null;
+    if (qaRef.current) { clearQaCandidateLog(); motionBufRef.current.clear(); }
     confirmerRef.current.reset();   // laufende Confirmation-State-Machine leeren
     gpsQualityRef.current.reset();  // Rolling-GPS-Qualität leeren
     gpsQualityStateRef.current = null;
@@ -594,6 +750,41 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (__DEV__) logConfirmEvent(ev);
       if (ev.type === 'confirmed' && ev.corner) persistConfirmedCorner(ev.corner);
     }
+    // ── Stop-assisted final corner flush (PROTOTYP, QA-Diagnosemodus + CURRENT) ──
+    // Das ausdrückliche Ende ist eine Information, die während der Aufnahme
+    // nicht zur Verfügung steht: der kurze Nachlauf ist nicht „noch nicht
+    // fertig", sondern vollständig. Deshalb darf ein noch offener letzter
+    // Kandidat genau EINMAL mit kürzerem Nachlauf, dafür strengeren
+    // Kriterien bewertet werden (siehe stopFlushCorner.ts).
+    // Bewusst noch nicht für alle Nutzer aktiv: die Wirkung wird in dieser
+    // Runde im Feld beobachtet, nicht ausgerollt.
+    if (qaRef.current && getTrackingEngineMode() === 'current' && autoDetectRef.current) {
+      const flush = evaluateStopFlush(
+        detectPointsRef.current, lastCornerAtRef.current, undefined, rawTailRef.current,
+      );
+      const d = flush.diagnostics;
+      pushQaCandidateLine(
+        `[stop-flush] ${flush.corner ? `WINKEL ${flush.corner.kind}` : 'kein Winkel'} ` +
+        `grund=${d.rejectReason ?? '—'} nachlauf=${d.tailM ?? '—'}m/${d.tailSamples ?? '—'}P ` +
+        `innen=${d.interiorAngleDeg ?? '—'}° conf=${d.confidence}`,
+      );
+      if (flush.corner) {
+        const p = detectPointsRef.current[flush.corner.apexIndex];
+        const now = Date.now();
+        lastCornerAtRef.current = flush.corner.atM;
+        angleDbgRef.current.count++;
+        if (flush.corner.kind === 'spitz_rechts' || flush.corner.kind === 'spitz_links') angleDbgRef.current.acuteCount++;
+        angleDbgRef.current.lastType = flush.corner.kind;
+        angleDbgRef.current.lastReject = null;
+        void commitMarker({
+          id: `angle-${now}-${flush.corner.kind}`, type: 'winkel', material: null, angleKind: flush.corner.kind,
+          lat: p.lat, lng: p.lng, accuracy: p.accuracy,
+          distance_from_start: Math.round(flush.corner.atM * 10) / 10,
+          note: null, audio_url: null, found: false, t: now,
+        });
+        onAngleRef.current?.(flush.corner.kind);
+      }
+    }
     stopAll();
     const s = store.getState();
     s.stopRecording();
@@ -647,7 +838,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })();
-  }, [stopAll, store, flushPoints, persistConfirmedCorner]);
+  }, [stopAll, store, flushPoints, persistConfirmedCorner, commitMarker]);
 
   return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll, gpsDebug };
 }

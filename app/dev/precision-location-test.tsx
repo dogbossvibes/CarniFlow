@@ -14,13 +14,23 @@ import {
   type GnssStatusAndroid, type HeadingPoint, type TrackingError,
 } from '@/modules/anyvo-precision-location';
 import {
-  getLocationSourceMode, setLocationSourceMode, loadPersistedLocationSourceMode,
+  getLocationSourceMode, setLocationSourceMode,
   type LocationSourceMode,
 } from '@/features/tracking/utils/locationSourceMode';
 import {
-  getTrackingEngineMode, setTrackingEngineMode, loadPersistedTrackingEngineMode,
+  getTrackingEngineMode, setTrackingEngineMode,
   type TrackingEngineMode,
 } from '@/features/tracking/utils/trackingEngineMode';
+import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
+import { isQaDiagnosticsEnabled, setQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
+import {
+  getActiveTrackingModes, subscribeActiveTrackingModes, type ActiveTrackingModes,
+} from '@/features/tracking/utils/trackingWarmupState';
+import {
+  getQaCandidateLines, subscribeQaCandidateLog, clearQaCandidateLog,
+} from '@/features/tracking/utils/qaCandidateLog';
+import { motionClient } from '@/features/tracking/native/motionClient';
+import type { MotionStatus } from '@/modules/anyvo-motion';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
 // QA-Golden-Reference-A/B-Schalter (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/
@@ -62,11 +72,32 @@ function PrecisionLocationTestContent() {
   const subs = useRef<{ remove: () => void }[]>([]);
   const [sourceMode, setSourceMode] = useState<LocationSourceMode>(getLocationSourceMode());
   const [engineMode, setEngineMode] = useState<TrackingEngineMode>(getTrackingEngineMode());
+  const [qaOn, setQaOn] = useState<boolean>(isQaDiagnosticsEnabled());
+  const [activeModes, setActiveModes] = useState<ActiveTrackingModes>(getActiveTrackingModes());
+  const [qaLines, setQaLines] = useState<readonly string[]>(getQaCandidateLines());
+  const [motionModule, setMotionModule] = useState<boolean>(false);
+  const [motionAvailable, setMotionAvailable] = useState<boolean>(false);
+  const [motionStatus, setMotionStatus] = useState<MotionStatus | null>(null);
 
   useEffect(() => {
-    loadPersistedLocationSourceMode().then(setSourceMode);
-    loadPersistedTrackingEngineMode().then(setEngineMode);
+    // Die persistierten Werte werden inzwischen bereits beim App-Start geladen
+    // (app/_layout.tsx → hydrateQaModes). Der Aufruf hier ist nur noch die
+    // Absicherung, dass der Screen nie einen veralteten Default anzeigt.
+    void hydrateQaModes().then(() => {
+      setSourceMode(getLocationSourceMode());
+      setEngineMode(getTrackingEngineMode());
+      setQaOn(isQaDiagnosticsEnabled());
+    });
   }, []);
+  useEffect(() => subscribeActiveTrackingModes(setActiveModes), []);
+  // Verfügbarkeit des nativen Motion-Moduls — genau die vorhandene Prüfung,
+  // keine neue API. Ein Feldtest darf nicht still ohne Motion-Daten laufen.
+  useEffect(() => {
+    setMotionModule(motionClient.isModuleAvailable());
+    setMotionAvailable(motionClient.isAvailable());
+    motionClient.getStatus().then(setMotionStatus).catch(() => setMotionStatus(null));
+  }, []);
+  useEffect(() => subscribeQaCandidateLog(setQaLines), []);
 
   const chooseSourceMode = (mode: LocationSourceMode) => {
     setLocationSourceMode(mode);
@@ -76,6 +107,17 @@ function PrecisionLocationTestContent() {
     setTrackingEngineMode(mode);
     setEngineMode(mode);
   };
+  const toggleQa = () => { const next = !qaOn; setQaDiagnosticsEnabled(next); setQaOn(next); };
+
+  // Läuft gerade ein GPS-Warmup im Lege-Recorder? Dann ist die Quelle für
+  // diesen Stream festgeschrieben — bewusst kein Hot-Swap einer laufenden
+  // Location-Subscription nur für QA.
+  const warmupRunning = activeModes.warmupActive;
+  const pendingChange = warmupRunning &&
+    (activeModes.engine !== engineMode || activeModes.source !== sourceMode);
+  const activeCombi = warmupRunning
+    ? `${activeModes.engine === 'build40' ? 'BUILD40' : 'CURRENT'} · ${activeModes.source === 'legacy' ? 'EXPO' : 'PRECISION'}`
+    : null;
   // Klartext des aktuell aktiven Zustands — der Feldtest vergleicht
   // A = BUILD40 + EXPO gegen B = CURRENT + EXPO.
   const engineLabel = engineMode === 'build40' ? 'BUILD40' : 'CURRENT';
@@ -156,8 +198,69 @@ function PrecisionLocationTestContent() {
             Gilt für Legen, Ansatz und Absuche (useTrackRecorder/
             useSearchRecorder/useStartPointApproach/Schrittkalibrierung) —
             nicht nur für den Modul-Test weiter unten. Beide Einstellungen
-            überstehen einen App-Neustart.
+            werden beim App-Start rehydriert und gelten damit auch ohne diesen
+            Screen.
           </Text>
+          {warmupRunning && (
+            <>
+              <Row label="Gerade aktiv im Lege-Screen" value={activeCombi ?? '—'} good />
+              <Row label="Quelle meldet" value={activeModes.reportedSource ?? 'wartet auf ersten Fix'} />
+            </>
+          )}
+          {pendingChange && (
+            <Text style={s.warn}>
+              Ein GPS-Stream läuft bereits ({activeCombi}). Die Änderung wird
+              beim nächsten Fährtenstart aktiv — dafür den Lege-Screen
+              verlassen und neu öffnen. Ein laufender Stream wird bewusst nicht
+              umgehängt.
+            </Text>
+          )}
+        </Section>
+
+        <Section title="QA-Diagnose beim Legen">
+          <Text style={s.note}>
+            Schaltet ausschliesslich BEOBACHTENDE Zusatzfunktionen frei: die
+            Anzeige der tatsächlich aktiven Engine/Source im Lege-Screen, die
+            Kandidaten-Mitschrift unten und — nur mit ENGINE=CURRENT — den
+            Core-Motion-Mitschnitt. Verändert weder Erkennung noch Confidence,
+            GPS oder Distanz. Nichts davon wird gespeichert.
+          </Text>
+          <View style={s.abRow}>
+            <TouchableOpacity style={[s.abBtn, !qaOn && s.abBtnActive]} onPress={() => { if (qaOn) toggleQa(); }} activeOpacity={0.85}>
+              <Text style={[s.abBtnTxt, !qaOn && s.abBtnTxtActive]}>AUS</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.abBtn, qaOn && s.abBtnActive]} onPress={() => { if (!qaOn) toggleQa(); }} activeOpacity={0.85}>
+              <Text style={[s.abBtnTxt, qaOn && s.abBtnTxtActive]}>EIN</Text>
+            </TouchableOpacity>
+          </View>
+          <Row label="Motion beim Legen" value={qaOn && engineMode === 'current' ? 'wird mitgeschnitten' : 'aus'} good={qaOn && engineMode === 'current'} />
+        </Section>
+
+        <Section title="Motion">
+          <View style={s.activeBox}>
+            <Text style={[s.activeVal, !motionAvailable && s.activeValBad]}>
+              {motionAvailable ? 'Motion · verfügbar' : 'Motion · nicht verfügbar'}
+            </Text>
+            {warmupRunning && (
+              <Text style={s.activeHint}>
+                {activeModes.motion === 'live' ? `Motion · aktiv (${activeModes.motionSamples} Samples)`
+                  : activeModes.motion === 'waiting' ? 'Motion · keine Samples'
+                    : 'Motion · nicht mitgeschnitten (QA aus oder ENGINE=BUILD40)'}
+              </Text>
+            )}
+          </View>
+          <Row label="Natives Modul im Build" value={motionModule ? 'Ja' : 'Nein'} good={motionModule} />
+          <Row label="Device Motion" value={motionStatus?.deviceMotionAvailable ? 'Ja' : 'Nein'} good={motionStatus?.deviceMotionAvailable} />
+          <Row label="Schrittzähler" value={motionStatus?.stepCountingAvailable ? 'Ja' : 'Nein'} good={motionStatus?.stepCountingAvailable} />
+          <Row label="Bewegungsklassifikation" value={motionStatus?.activityAvailable ? 'Ja' : 'Nein'} good={motionStatus?.activityAvailable} />
+          <Row label="Bewegungsberechtigung" value={motionStatus?.pedometerAuthorized ? 'erteilt' : 'fehlt/verweigert'} good={motionStatus?.pedometerAuthorized} />
+          {!motionModule && (
+            <Text style={s.warn}>
+              Das native Motion-Modul steckt nicht in diesem Build. Der Feldtest
+              läuft dann ohne Motion-Daten — GPS, Erkennung und Aufzeichnung sind
+              davon unberührt.
+            </Text>
+          )}
         </Section>
 
         <Section title="Tracking Engine">
@@ -275,6 +378,49 @@ function PrecisionLocationTestContent() {
           </Section>
         ) : null}
 
+        {qaOn && (
+          <Section title={`Kandidaten-Mitschrift  ·  ${qaLines.length}`}>
+            {qaLines.length ? (
+              <>
+                {qaLines.slice(-24).map((line, i) => (
+                  <Text key={`${i}-${line.slice(0, 12)}`} style={s.logLine}>{line}</Text>
+                ))}
+                <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => clearQaCandidateLog()} activeOpacity={0.85}>
+                  <Ionicons name="trash-outline" size={18} color={C.white} />
+                  <Text style={s.btnTxt}>Mitschrift leeren</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={s.note}>
+                Noch nichts aufgezeichnet. Die Mitschrift füllt sich während einer
+                Fährte je Winkel-Kandidat und wird bei jedem neuen Aufnahmestart
+                geleert. Sie liegt nur im Arbeitsspeicher.
+              </Text>
+            )}
+          </Section>
+        )}
+
+        {qaOn && (
+          <Section title="Feldprotokoll">
+            <Text style={s.note}>
+              Golden-Field-Route (verbindlich):{'\n'}
+              Start → L → 3,75 m → R → 3,75 m → SR → 3,75 m → SL → ca. 1,25 m → Ende{'\n'}
+              Erwartet: 90 L → 90 R → SR → SL. Schrittlänge 75 cm, je 5 Schritte.
+            </Text>
+            <Text style={s.note}>
+              Anschliessend als Gegenprobe je einmal, jeweils ohne Richtungswechsel:{'\n'}
+              1. gerade gehen{'\n'}
+              2. Handy ansehen{'\n'}
+              3. Handy beim Gehen um 90° drehen{'\n'}
+              4. bücken{'\n'}
+              5. Gegenstand setzen{'\n'}
+              6. Dübel setzen{'\n'}
+              7. im Stand drehen{'\n'}
+              Erwartung: kein zusätzlicher Winkel.
+            </Text>
+          </Section>
+        )}
+
         <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={requestPermission} activeOpacity={0.85}>
           <Ionicons name="key-outline" size={18} color={C.white} />
           <Text style={s.btnTxt}>GPS-Berechtigung anfragen</Text>
@@ -326,6 +472,8 @@ function Row({ label, value, good }: { label: string; value: string; good?: bool
 
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: C.bg },
+  activeValBad: { color: C.muted },
+  logLine: { fontSize: 10.5, color: C.muted, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 3 },
   head:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
   back:    { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' },
   title:   { fontSize: 18, color: C.white, fontWeight: '800' },

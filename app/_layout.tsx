@@ -20,6 +20,7 @@ import { initMonitoring, captureError } from '@/lib/monitoring';
 import { SyncProvider } from '@/features/sync/components/SyncProvider';
 import { AppLockGate } from '@/components/AppLockGate';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
 import { useT } from '@/i18n';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
@@ -28,6 +29,13 @@ void initMonitoring();
 // Aktive-Fährten-Registry aus dem lokalen Speicher laden (offene Fährten pro Hund
 // überleben App-Neustart). Einmalig, unabhängig vom Login — rein lokal, kein Netz.
 void useActiveFaehrten.getState().hydrate();
+
+// QA-Einstellungen (Location-Source, Tracking-Engine, Diagnosemodus) aus dem
+// lokalen Speicher laden. Ohne das standen sie nach jedem App-Neustart wieder
+// auf ihren Defaults, obwohl der Diagnose-Screen etwas anderes gespeichert
+// hatte — ein Feldtest lief dann unbemerkt in der falschen Konfiguration.
+// Rein lokal, kein Netz, kein Login; verändert ohne gesetzte QA-Werte nichts.
+void hydrateQaModes();
 
 // Globaler Fehler-Fallback: fängt Render-Fehler im gesamten Baum ab,
 // meldet sie und bietet einen Neustart-Button (statt Blank-Crash).

@@ -34,6 +34,7 @@ import { angleEvent, objectEvent, trackEventLabelKey, type TrackEvent } from '@/
 import { getSpeechLocale } from '@/i18n';
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
+import { QaModeBadge } from '@/features/tracking/components/QaModeBadge';
 import type { GpsStats } from '@/features/tracking/engine/types';
 import { useToast } from '@/components/ui/Toast';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
@@ -705,6 +706,10 @@ export default function LegenScreen() {
             })}
           </View>
         </View>
+
+        {/* QA-Diagnose: tatsächlich aktive Engine/Source. Rendert ausserhalb des
+            QA-Modus nichts — auch keinen Abstand. */}
+        <QaModeBadge />
 
         {/* Karte / Skizze */}
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
