@@ -11,6 +11,7 @@ import { objectNumbers } from '@/features/tracking/utils/objectMarkers';
 import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/store/trackingStore';
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
 import { buildTrackSegmentPolylines, laidTrackStroke } from '@/features/tracking/utils/trackSegments';
+import { useSmartTrackCamera } from '@/features/tracking/hooks/useSmartTrackCamera';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
@@ -92,6 +93,15 @@ interface Props {
   showUserLocation?: boolean;
   dogPosition?:     LatLng | null;
   heading?:         number | null;
+  // ── Smart Follow (navigationsartige Kartenansicht) ──
+  // Aktiv nur während einer laufenden Aufnahme/Absuche; historische Karten
+  // (Logbuch/Detail/Fullscreen-Replay) bleiben unverändert bei der
+  // klassischen Region-Nachführung. Reine Darstellung — siehe smartCamera.ts.
+  smartFollow?:     boolean;
+  /** Vom Fix gemeldeter Kurs (Grad) für die Laufrichtung, falls verfügbar. */
+  courseDeg?:       number | null;
+  /** Gemeldete Geschwindigkeit (m/s) — entscheidet, ob `courseDeg` belastbar ist. */
+  speedMps?:        number | null;
   follow:           boolean;
   mapType?:         MapType;
   onToggleFollow?:  () => void;
@@ -105,6 +115,7 @@ interface Props {
 
 export function TrackingMap({
   layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
@@ -114,14 +125,29 @@ export function TrackingMap({
   const { t } = useT();
   const { showToast, toast } = useToast();
 
-  // Live-Zentrierung: bei jedem Positionswechsel sanft nachführen (wenn follow).
+  // Smart Follow (nur während aktiver Aufnahme/Absuche): navigationsartige
+  // Kamera — Laufrichtung oben, eigene Position im unteren Drittel, weiche
+  // Rotation. Reine Darstellung; der Hook fasst keinen Tracking-Zustand an.
+  const camera = useSmartTrackCamera({
+    position: currentPosition,
+    deviceHeadingDeg: heading ?? null,
+    courseDeg: courseDeg ?? null,
+    speedMps: speedMps ?? null,
+    enabled: smartFollow && mapReady,
+  });
+  useEffect(() => { camera.attachMap(mapRef.current); }, [camera, mapReady]);
+
+  // Klassische Live-Zentrierung (historische/nicht-aktive Karten). Bei
+  // aktivem Smart Follow übernimmt ausschliesslich der Kamera-Controller —
+  // sonst würden sich zwei Nachführungen gegenseitig überschreiben.
   useEffect(() => {
+    if (smartFollow) return;
     if (!follow || !currentPosition || !mapRef.current) return;
     mapRef.current.animateToRegion({
       latitude: currentPosition.lat, longitude: currentPosition.lng,
       latitudeDelta: 0.0016, longitudeDelta: 0.0016,
     }, 300);
-  }, [currentPosition, follow]);
+  }, [currentPosition, follow, smartFollow]);
 
   // Koordinaten nur neu berechnen, wenn ein Punkt hinzukommt (Länge ändert sich),
   // nicht bei jedem Positions-Fix → flüssigere Karte, weniger Renderlast.
@@ -216,7 +242,12 @@ export function TrackingMap({
         rotateEnabled
         pitchEnabled
         onMapReady={() => setMapReady(true)}
-        onPanDrag={onUserPan ? () => onUserPan() : undefined}
+        onPanDrag={() => {
+          // Eigene Kartengeste ⇒ Auto-Follow SOFORT pausieren (kein
+          // automatisches Zurückspringen). Der Recenter-Button holt sie zurück.
+          if (smartFollow) camera.onUserGesture();
+          onUserPan?.();
+        }}
         initialRegion={{
           latitude:  initial ? initial.lat : FALLBACK.latitude,
           longitude: initial ? initial.lng : FALLBACK.longitude,
@@ -340,7 +371,44 @@ export function TrackingMap({
         <View style={[s.fabCol, { top: controlsTop }]}>
           {onFullscreen && <Fab icon="expand-outline" onPress={onFullscreen} />}
           {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
-          <Fab icon="locate" onPress={recenter} />
+
+          {/* Kartenmodi (nur während aktiver Aufnahme/Absuche): Laufrichtung /
+              Norden / Frei — kompakt gestapelt im bestehenden FAB-Stil. */}
+          {smartFollow && (
+            <>
+              <Fab
+                icon="navigate"
+                active={camera.mode === 'heading'}
+                accessibilityLabel={t('track.mapMode.heading')}
+                onPress={() => { camera.setMode('heading'); showToast(t('track.mapMode.heading')); }}
+              />
+              <Fab
+                icon="compass"
+                active={camera.mode === 'north'}
+                accessibilityLabel={t('track.mapMode.north')}
+                onPress={() => { camera.setMode('north'); showToast(t('track.mapMode.north')); }}
+              />
+              <Fab
+                icon="hand-left-outline"
+                active={camera.mode === 'free'}
+                accessibilityLabel={t('track.mapMode.free')}
+                onPress={() => { camera.setMode('free'); showToast(t('track.mapMode.free')); }}
+              />
+              <PitchFab pitched={camera.pitched} onPress={camera.togglePitch} label={camera.pitched ? '3D' : '2D'} />
+              {/* Recenter: erscheint, sobald eine eigene Geste Smart Follow
+                  pausiert hat — kein stilles Zurückspringen. */}
+              {camera.paused && (
+                <Fab
+                  icon="locate"
+                  active
+                  accessibilityLabel={t('track.mapMode.resumeFollow')}
+                  onPress={() => { camera.recenter(); showToast(t('track.mapMode.resumeFollow')); }}
+                />
+              )}
+            </>
+          )}
+
+          {!smartFollow && <Fab icon="locate" onPress={recenter} />}
           {onToggleFollow && (
             <Fab
               icon={follow ? 'eye' : 'eye-off'}
@@ -357,6 +425,23 @@ export function TrackingMap({
       )}
       {toast}
     </View>
+  );
+}
+
+// 2D/3D-Umschalter im selben FAB-Stil, nur mit Textlabel statt Icon.
+// react-native-maps unterstützt `pitch` über animateCamera auf beiden
+// Plattformen — es wird also KEINE neue native Abhängigkeit dafür gebraucht.
+function PitchFab({ pitched, onPress, label }: { pitched: boolean; onPress: () => void; label: string }) {
+  return (
+    <TouchableOpacity
+      style={[s.fab, pitched && s.fabActive]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Text style={[s.pitchTxt, pitched && s.pitchTxtActive]}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -387,6 +472,8 @@ const s = StyleSheet.create({
   fabCol:      { position: 'absolute', right: 14, top: 14, gap: 10 },
   fab:         { width: 46, height: 46, borderRadius: 14, backgroundColor: 'rgba(13,13,13,0.9)', borderWidth: 1, borderColor: C.trackBorder, alignItems: 'center', justifyContent: 'center' },
   fabActive:   { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary },
+  pitchTxt:       { fontSize: 13, fontWeight: '900', color: C.white, letterSpacing: 0.5 },
+  pitchTxtActive: { color: '#04110F' },
   startDot:    { width: 16, height: 16, borderRadius: 8, backgroundColor: C.trackPrimary, borderWidth: 3, borderColor: '#04110F' },
   startFlagWrap:  { alignItems: 'center' },
   startFlag:      { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, borderWidth: 2, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },

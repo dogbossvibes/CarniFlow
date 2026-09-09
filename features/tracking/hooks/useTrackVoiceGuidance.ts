@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { angleEvent, objectEvent, trackEventGuidanceKey } from '@/features/tracking/utils/trackEventVoice';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
 import { DEFAULT_GUIDANCE_OPTIONS, stepGuidanceEngine, type GuidanceFeature, type GuidanceFeatureState } from '@/features/tracking/utils/guidanceEngine';
 import { metersToSteps } from '@/features/tracking/utils/steps';
@@ -46,25 +47,15 @@ function inStepsText(steps: number, locale: AppLocale) {
 // Schritten („ca.", da aus GPS-Distanz abgeleitet — kein echter Pedometer).
 function phraseFor(kind: AngleKind | null, steps: number, locale: AppLocale = getCurrentLocale()): string {
   const inSteps = inStepsText(steps, locale);
-  const keyFor = (key: TranslationKey) => translateKey(key, { inSteps }, locale);
-  switch (kind) {
-    case 'links':        return keyFor('track.voiceLeft');
-    case 'rechts':       return keyFor('track.voiceRight');
-    case 'spitz_links':  return keyFor('track.voiceAcuteLeft');
-    case 'spitz_rechts': return keyFor('track.voiceAcuteRight');
-    case 'spitz':        return keyFor('track.voiceAcute');
-    case 'abriss':       return keyFor('track.voiceBreak');
-    case 'gw':           return keyFor('track.voiceGw');
-    case 'ow':           return keyFor('track.voiceOw');
-    case 'bw':           return keyFor('track.voiceBw');
-    default:             return keyFor('track.voiceAngle');
-  }
+  // Zuordnung Event → Schlüssel liegt zentral in trackEventVoice.ts, damit
+  // Legen und Absuche dieselben fachlichen Begriffe verwenden (Punkt 3).
+  return translateKey(trackEventGuidanceKey(angleEvent(kind)), { inSteps }, locale);
 }
 
 // Gegenstand-Ansage (dog-basiert). Dübel wird namentlich angesagt, sonst „Gegenstand".
 export function objectPhrase(material: string | null | undefined, steps: number, locale: AppLocale = getCurrentLocale()): string {
   const inSteps = inStepsText(steps, locale);
-  return translateKey(material === 'duebel' ? 'track.voiceDowel' : 'track.voiceObject', { inSteps }, locale);
+  return translateKey(trackEventGuidanceKey(objectEvent(material)), { inSteps }, locale);
 }
 
 // Sprachführung beim Ablaufen: kündigt den nächsten gelegten Winkel/Abriss ODER

@@ -3,8 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { C } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
-import { ANGLE_LABEL } from '@/features/tracking/utils/angleClassify';
-import type { AngleKind, MarkerMaterial } from '@/features/tracking/store/trackingStore';
+import { angleEvent, trackEventLabelKey } from '@/features/tracking/utils/trackEventVoice';
+import type { MarkerMaterial } from '@/features/tracking/store/trackingStore';
 import type { MapMarker } from '@/features/tracking/components/TrackingMap';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -21,14 +21,10 @@ const MATERIAL_KEY: Partial<Record<MarkerMaterial, TranslationKey>> = {
   teppich: 'track.materialCarpet', diverses: 'track.materialOther',
 };
 
-// Ausführliche Labels ("Winkel links" statt nur "Links") — als Sheet-Titel
-// steht der Typ hier ohne umgebenden Kontext, "Links" allein wäre mehrdeutig
-// (Root-Cause-Fix: eindeutige Anzeige gespeicherter Winkel-Typen, Audit-Vorgabe).
-const ANGLE_KEY: Partial<Record<AngleKind, TranslationKey>> = {
-  links: 'track.angleLeftFull', rechts: 'track.angleRightFull',
-  spitz_links: 'track.angleAcuteLeftFull', spitz_rechts: 'track.angleAcuteRightFull',
-  absatz: 'track.angleStep', abriss: 'track.angleBreak',
-};
+// Ausführliche Labels ("Winkel links" statt nur "Links") kommen aus der
+// ZENTRALEN Event→Text-Zuordnung (trackEventVoice.ts) — dieselbe Quelle, die
+// Legen (Toast/Voice) und Absuche (Ansage) verwenden. Vorher lag hier eine
+// zweite, nur teilweise gefüllte Map mit deutschem Hardcode-Fallback.
 
 // Reine Detail-Ableitung aus einer Auswahl — nur GESPEICHERTE Werte, keine Berechnung.
 export function describeSelection(
@@ -56,7 +52,7 @@ export function describeSelection(
 
   const m = sel.marker;
   if (m.type === 'winkel') {
-    const label = (m.angleKind && (ANGLE_KEY[m.angleKind] ? t(ANGLE_KEY[m.angleKind]!) : ANGLE_LABEL[m.angleKind])) || t('track.angle');
+    const label = t(trackEventLabelKey(angleEvent(m.angleKind ?? null)));
     return {
       icon: 'git-branch',
       title: label,

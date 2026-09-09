@@ -18,6 +18,7 @@ import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { useTrackRecorder } from '@/features/tracking/hooks/useTrackRecorder';
 import { BackgroundLocationDisclosure } from '@/features/tracking/components/BackgroundLocationDisclosure';
 import { useAutoDetectSetting } from '@/hooks/useAutoDetectSetting';
+import { useLayVoiceSetting } from '@/hooks/useLayVoiceSetting';
 import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
 import { useVolumeKeyArticleSetting } from '@/hooks/useVolumeKeyArticleSetting';
 import { subscribeQuickAddArticle } from '@/features/tracking/quickAddArticleBus';
@@ -29,7 +30,8 @@ import * as Crypto from 'expo-crypto';
 import { claimNewbieQuota, quotaBlock } from '@/services/quotaService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
-import { ANGLE_LABEL } from '@/features/tracking/utils/angleClassify';
+import { angleEvent, objectEvent, trackEventLabelKey, type TrackEvent } from '@/features/tracking/utils/trackEventVoice';
+import { getSpeechLocale } from '@/i18n';
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import type { GpsStats } from '@/features/tracking/engine/types';
@@ -99,6 +101,17 @@ function speakTrackSegment(text: string) {
   try {
     Speech.stop();
     Speech.speak(text, { language: 'de-CH', pitch: 1.0, rate: 0.95 });
+  } catch { /* best-effort */ }
+}
+
+// Sprachbestätigung eines TATSÄCHLICH gesetzten/erkannten Events beim Legen.
+// Bewusst nur die Kurzform („Winkel links", „Dübel", „Absatz") — keine
+// Vorhersage, keine Distanz. Die Zuordnung liegt zentral in
+// trackEventVoice.ts und ist damit identisch zur Absuche.
+function speakTrackEvent(label: string) {
+  try {
+    Speech.stop();
+    Speech.speak(label, { language: getSpeechLocale(), pitch: 1.0, rate: 0.95 });
   } catch { /* best-effort */ }
 }
 
@@ -178,12 +191,26 @@ export default function LegenScreen() {
 
   // Automatisch erkannter Winkel (rechts/links/spitz) → Haptik + Hinweis.
   // Der Marker wird im Recorder direkt am Scheitel gesetzt.
+  // Ein Event wird GENAU EINMAL bestätigt: Marker (im Recorder) + Haptik +
+  // Toast + Sprachbestätigung. Alle drei Rückmeldungen benutzen denselben,
+  // zentral zugeordneten Begriff (trackEventVoice.ts) — identisch zur Absuche.
+  const layVoice = useLayVoiceSetting();   // Sprachausgabe beim Legen (Default AUS)
+  const layVoiceRef = useRef(false);
+  layVoiceRef.current = layVoice.enabled;
+  const announceEvent = useCallback((event: TrackEvent, mode: 'detected' | 'set') => {
+    const label = t(trackEventLabelKey(event));
+    // Toast IMMER — das Gate sitzt ausschliesslich vor der Sprachausgabe.
+    // Marker (Recorder) und Haptik laufen ohnehin ausserhalb dieser Funktion.
+    showToast(t(mode === 'detected' ? 'track.eventDetected' : 'track.eventSet', { label }));
+    if (layVoiceRef.current) speakTrackEvent(label);
+  }, [showToast, t]);
+
   const onAngle = useCallback((kind: AngleKind) => {
     setLastAngle(kind);
     // Automatisch erkannt → gedrosselt: Abriss als Warnung, sonst Winkel-Impuls.
     if (kind === 'abriss') hapticWarning(); else hapticAngle();
-    showToast(`${ANGLE_LABEL[kind]} erkannt`);
-  }, [showToast]);
+    announceEvent(angleEvent(kind), 'detected');
+  }, [announceEvent]);
 
   const { autoDetect, setAutoDetect } = useAutoDetectSetting();
   const { stepLengthM } = useStepLengthSetting();   // optionale persönliche Schrittlänge (Default 0,75 m)
@@ -203,7 +230,8 @@ export default function LegenScreen() {
     hapticMarker();                 // sofort, VOR dem Speichern
     lastMaterialRef.current = material;
     void rec.addMarker('gegenstand', { material });
-  }, [rec, showToast, t]);
+    announceEvent(objectEvent(material), 'set');   // „Gegenstand" bzw. „Dübel"
+  }, [rec, showToast, t, announceEvent]);
 
   // Schnell-Gegenstand (Hardware-Taste / Kurzbefehl): ohne Material-Auswahl, am
   // zuletzt gewählten Material. Nur während laufender Aufnahme.
@@ -212,8 +240,8 @@ export default function LegenScreen() {
     if (!useTrackingStore.getState().startAnchor) { showToast(t('toast.startPointWait')); return; }
     hapticMarker();                 // sofort, VOR dem Speichern
     void rec.addMarker('gegenstand', { material: lastMaterialRef.current });
-    showToast(t('toast.objectSet'));
-  }, [rec, showToast, t]);
+    announceEvent(objectEvent(lastMaterialRef.current), 'set');
+  }, [rec, showToast, t, announceEvent]);
 
   // Manuell einen Fachwinkel (GW/OW/BW) ODER Abriss an der aktuellen Position setzen.
   // Nutzt dieselbe currentPosition/positionSource wie die Aufnahme (keine extra GPS-Abfrage).
@@ -227,9 +255,9 @@ export default function LegenScreen() {
     // (commitMarker → s.addMarker vor dem ersten await) → Karte reagiert sofort.
     void rec.addMarker('winkel', { angleKind });
     if (angleKind === 'abriss') hapticWarning(); else hapticAngle();   // Feedback nach der Annahme
-    showToast(`${ANGLE_LABEL[angleKind]} gesetzt`);
+    announceEvent(angleEvent(angleKind), 'set');
     setWinkelSheet(false);
-  }, [rec, showToast, t]);
+  }, [rec, showToast, t, announceEvent]);
 
   // iOS-Kurzbefehl (Deep-Link) → Schnell-Gegenstand, solange aufgenommen wird.
   useEffect(() => {
@@ -699,6 +727,7 @@ export default function LegenScreen() {
               startAnchor={startAnchor}
               currentPosition={currentPosition}
               heading={heading}
+              smartFollow
               follow={mapFollowMode}
               onToggleFollow={() => setMapFollowMode(!mapFollowMode)}
               onUserPan={() => { if (mapFollowMode) setMapFollowMode(false); }}
@@ -876,6 +905,30 @@ export default function LegenScreen() {
                       : t('track.manualHint')}
                   </Text>
 
+                  {/* Sprachausgabe beim Legen (Default AUS). Gilt NUR fürs Legen —
+                      die Sprachführung der Absuche hat ihren eigenen Schalter.
+                      Marker/Haptik/Toast laufen unabhängig davon immer. */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.layVoiceToggle')}</Text>
+                  <View className="flex-row gap-2 self-stretch">
+                    {([[true, t('track.layVoiceOn'), 'volume-high'], [false, t('track.layVoiceOff'), 'volume-mute']] as const).map(([val, label, icon]) => {
+                      const on = layVoice.enabled === val;
+                      return (
+                        <Pressable
+                          key={String(val)}
+                          onPress={() => void layVoice.setEnabled(val)}
+                          disabled={!layVoice.loaded}
+                          accessibilityRole="switch"
+                          accessibilityState={{ checked: on }}
+                          accessibilityLabel={t('track.layVoiceToggle')}
+                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          <Ionicons name={icon} size={15} color={on ? FT.acc : FT.muted} />
+                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text className="text-[11px] text-ft-faint self-start mb-1">{t('track.layVoiceToggleSub')}</Text>
+
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
                   <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
@@ -990,7 +1043,7 @@ export default function LegenScreen() {
                 ] as const).map(o => (
                   <Pressable
                     key={o.kind}
-                    accessibilityLabel={t('track.setAngle', { label: ANGLE_LABEL[o.kind] })}
+                    accessibilityLabel={t('track.setAngle', { label: t(trackEventLabelKey(angleEvent(o.kind))) })}
                     onPress={() => placeWinkel(o.kind)}
                     className="flex-1 h-[64px] rounded-[16px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
                   >

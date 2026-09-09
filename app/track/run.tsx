@@ -810,6 +810,7 @@ export default function TrackRunScreen() {
               layPoints={snapData.laidLatLng} dimLay
               runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
+              smartFollow={!arming}
               dogPosition={!arming && s.estimatedDogPosition ? { lat: s.estimatedDogPosition.latitude, lng: s.estimatedDogPosition.longitude } : null}
               follow={follow}
               onToggleFollow={() => setFollow(f => !f)}
