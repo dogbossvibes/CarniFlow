@@ -169,6 +169,11 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.detailNoData": "Aucun autre détail enregistré.",
 
   "track.replayAction": "Revoir la piste",
+  "track.analysisSection": "Analyse",
+  "track.analysisPending": "Le Track Score 2.0 est calculé après la recherche.",
+  "track.analysisPendingHint": "L'analyse automatique évalue entre autres la fidélité à la piste, les angles, les objets et l'allure.",
+  "track.analysisUnavailable": "Analyse automatique non disponible pour cette recherche.",
+  "track.manualScoreLabel": "Évaluation manuelle",
   "track.replay.title": "Lecture",
   "track.replay.unavailable": "La lecture n'est pas disponible pour cette piste.",
   "track.replay.playLabel": "Démarrer la lecture",

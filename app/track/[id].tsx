@@ -20,6 +20,8 @@ import { getLocalTrackDetail, getLocalRunSupplement, saveLocalTrackEvaluation } 
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { trackAnalysisState, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
+import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
@@ -141,6 +143,11 @@ export default function TrackAuswertungScreen() {
   // track_data — runSummaryForTrackData reicht `analytics` unverändert durch,
   // keine Migration nötig).
   const analytics: TrackAnalytics | undefined = data?.track_data?.run?.analytics;
+  // Rein darstellend (siehe trackAnalysisState.ts): unterscheidet „Absuche
+  // steht noch aus" von „Absuche gelaufen, aber ohne Analyse". Bisher sahen
+  // beide Fälle identisch aus — nämlich gar nicht.
+  const analysisState = trackAnalysisState(data, analytics);
+  const qaDiagnostics = isQaDiagnosticsEnabled();
   const isReplayEligible = useMemo(() => isTrackReplayEligible(data), [data]);
   const [analyseExpanded, setAnalyseExpanded] = useState(false);
   const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
@@ -226,7 +233,7 @@ export default function TrackAuswertungScreen() {
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Hero */}
           <View style={[s.card, s.cardGlow, s.hero]}>
-            <TrackScoreRing value={score} size={118} label="Punkte" sub={verdict.sub} />
+            <TrackScoreRing value={score} size={118} label={t('track.manualScoreLabel')} sub={verdict.sub} />
             <View style={{ flex: 1 }}>
               <Text style={s.eyebrow}>{dogName} · {relDate(data.session_date ?? data.created_at)}</Text>
               <Text style={s.heroHeadline}>{verdict.headline}</Text>
@@ -293,7 +300,7 @@ export default function TrackAuswertungScreen() {
           <View style={[s.card, { padding: 16, marginBottom: 16 }]}>
             <LegBars rows={legs} editable onChange={(i, v) => setLegs(prev => prev.map((l, j) => j === i ? { ...l, score: v } : l))} />
             <View style={s.totalRow}>
-              <Text style={s.totalLabel}>GESAMTPUNKTZAHL</Text>
+              <Text style={s.totalLabel}>GESAMTPUNKTZAHL · {t('track.manualScoreLabel')}</Text>
               <Text style={s.totalVal}>{totalPts}<Text style={s.totalMax}>/{maxPts}</Text></Text>
             </View>
           </View>
@@ -305,6 +312,38 @@ export default function TrackAuswertungScreen() {
               manuelle Score (trackEvaluation.ts) sind unabhängige Systeme
               (Punkt 9/11). Ohne `analytics` (ältere Fährten, Freilauf) bleibt
               der Block einfach weg. */}
+          {/* Fehlt die automatische Analyse, verschwindet der Bereich nicht mehr
+              kommentarlos — die zwei Fälle bedeuten für den Nutzer völlig
+              Unterschiedliches. Reine Darstellung: keine Berechnung, keine
+              Schwelle, kein Zugriff auf Tracking-/Recovery-Logik. */}
+          {analysisState === 'pending_search' && (
+            <>
+              <SectionLabel>{t('track.analysisSection')}</SectionLabel>
+              <View style={[s.card, s.analyseEmpty]}>
+                <Ionicons name="time-outline" size={18} color={C.trackTextSec} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.analyseEmptyTitle}>{t('track.analysisPending')}</Text>
+                  <Text style={s.analyseEmptyHint}>{t('track.analysisPendingHint')}</Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {analysisState === 'unavailable' && (
+            <>
+              <SectionLabel>{t('track.analysisSection')}</SectionLabel>
+              <View style={[s.card, s.analyseEmpty]}>
+                <Ionicons name="information-circle-outline" size={18} color={C.trackTextSec} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.analyseEmptyTitle}>{t('track.analysisUnavailable')}</Text>
+                  {/* Technischer Grund NUR im QA-Diagnosemodus — und dort als
+                      reine Faktenzeile, ohne geratene Ursache. */}
+                  {qaDiagnostics && <Text style={s.analyseEmptyQa}>{analysisQaFacts(data)}</Text>}
+                </View>
+              </View>
+            </>
+          )}
+
           {analytics && (
             <>
               <SectionLabel>Analyse</SectionLabel>
@@ -617,6 +656,12 @@ const s = StyleSheet.create({
   analyseScoreVal:    { fontSize: 26, color: C.trackPrimary, fontWeight: '900', letterSpacing: -0.5 },
   analyseScoreMax:    { fontSize: 14, color: C.trackTextMut, fontWeight: '700' },
   analyseScoreLabel:  { fontSize: 9, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
+  // Dezenter Empty State für den Analysebereich — bewusst ruhiger als die
+  // Analyse-Karte selbst (kein Score, keine Farbe, nur Hinweis).
+  analyseEmpty:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, marginBottom: 16 },
+  analyseEmptyTitle:  { fontSize: 13, color: C.trackText, fontWeight: '700', lineHeight: 18 },
+  analyseEmptyHint:   { fontSize: 12, color: C.trackTextSec, lineHeight: 17, marginTop: 4 },
+  analyseEmptyQa:     { fontSize: 10.5, color: C.trackTextSec, marginTop: 6, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   confidencePill:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.06)', maxWidth: 170 },
   confidencePillWarn: { backgroundColor: C.trackWarning + '1c' },
   confidencePillTxt:  { fontSize: 10, color: C.trackTextSec, fontWeight: '700', flexShrink: 1 },

@@ -233,6 +233,11 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.detailNoData": "No further details saved.",
 
   "track.replayAction": "Replay track",
+  "track.analysisSection": "Analysis",
+  "track.analysisPending": "Track Score 2.0 is calculated after the search.",
+  "track.analysisPendingHint": "The automatic analysis rates track accuracy, corners, articles and pace, among other things.",
+  "track.analysisUnavailable": "Automatic analysis is not available for this search.",
+  "track.manualScoreLabel": "Manual rating",
   "track.replay.title": "Replay",
   "track.replay.unavailable": "Replay isn't available for this track.",
   "track.replay.playLabel": "Start replay",

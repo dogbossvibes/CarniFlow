@@ -1134,6 +1134,11 @@ export const deCH = {
 
   // Segmentanalyse / Track Replay / Heatmap
   'track.replayAction': 'Fährte wiedergeben',
+  'track.analysisSection': 'Analyse',
+  'track.analysisPending': 'Track Score 2.0 wird nach der Absuche berechnet.',
+  'track.analysisPendingHint': 'Die automatische Analyse bewertet unter anderem Spurtreue, Winkel, Gegenstände und Tempo.',
+  'track.analysisUnavailable': 'Automatische Analyse für diese Absuche nicht verfügbar.',
+  'track.manualScoreLabel': 'Manuelle Bewertung',
   'track.replay.title': 'Wiedergabe',
   'track.replay.unavailable': 'Für diese Fährte ist keine Wiedergabe verfügbar.',
   'track.replay.playLabel': 'Wiedergabe starten',

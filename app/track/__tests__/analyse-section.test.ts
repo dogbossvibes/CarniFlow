@@ -44,6 +44,68 @@ describe('Track-Detail — Analyse-Sektion (Punkt 9/14, additiv)', () => {
     expect(reacqLine).toBeDefined();
   });
 
+  it('zeigt statt eines leeren Bereichs einen Empty State — beide Fälle unterscheidbar', () => {
+    const src = source();
+    // Zustand kommt aus dem reinen Helfer, nicht aus einer neuen Screen-Logik.
+    expect(src).toContain("import { trackAnalysisState, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';");
+    expect(src).toContain('const analysisState = trackAnalysisState(data, analytics);');
+    expect(src).toContain("{analysisState === 'pending_search' && (");
+    expect(src).toContain("{analysisState === 'unavailable' && (");
+    // Texte kommen aus i18n, nicht hartkodiert.
+    expect(src).toContain("t('track.analysisPending')");
+    expect(src).toContain("t('track.analysisPendingHint')");
+    expect(src).toContain("t('track.analysisUnavailable')");
+  });
+
+  it('nennt im normalen Nutzer-UI keine technischen Begriffe', () => {
+    const src = source();
+    const start = src.indexOf("{analysisState === 'pending_search' && (");
+    const end = src.indexOf('{analytics && (', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const block = src.slice(start, end);
+    for (const word of ['START_LOCKED', 'payload', 'Recovery', 'endSearch']) {
+      // Erlaubt ist der Begriff nur in Kommentaren, nicht in gerendertem Text.
+      const rendered = block.split('\n').filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('*'));
+      expect(rendered.join('\n')).not.toContain(word);
+    }
+  });
+
+  it('der technische Grund erscheint ausschliesslich im QA-Diagnosemodus', () => {
+    const src = source();
+    expect(src).toContain('const qaDiagnostics = isQaDiagnosticsEnabled();');
+    expect(src).toContain('{qaDiagnostics && <Text style={s.analyseEmptyQa}>{analysisQaFacts(data)}</Text>}');
+  });
+
+  it('Begriffstrennung: manueller Score ist als manuelle Bewertung benannt', () => {
+    const src = source();
+    expect(src).toContain("label={t('track.manualScoreLabel')}");
+    expect(src).toContain("GESAMTPUNKTZAHL · {t('track.manualScoreLabel')}");
+    // Der automatische Wert behält sein bestehendes Label.
+    expect(src).toContain('TRACK SCORE (AUTOMATISCH)');
+  });
+
+  it('die bestehende Track-Score-2.0-Karte bleibt unverändert gerendert', () => {
+    const src = source();
+    expect(src).toContain('{analytics && (');
+    expect(src).toContain('<Text style={s.analyseScoreVal}>{analytics.trackScore}<Text style={s.analyseScoreMax}>/100</Text></Text>');
+    expect(src).toContain('<SectionLabel>Analyse</SectionLabel>');
+  });
+
+  it('keine Tracking-/Analyse-/Recovery-Logik im Screen verändert', () => {
+    const src = source();
+    // Der Screen berechnet weiterhin NICHTS selbst.
+    expect(src).not.toContain('computeTrackAnalytics');
+    expect(src).not.toContain('computeTrackAnalyticsV2');
+    expect(src).not.toContain('finalizeLocalTrackRun');
+    expect(src).not.toContain('buildRunResultPayload');
+    // Und der Helfer schreibt nichts.
+    const helper = readFileSync('features/tracking/utils/trackAnalysisState.ts', 'utf8');
+    expect(helper).not.toContain('AsyncStorage');
+    expect(helper).not.toContain('await ');
+    expect(helper).not.toMatch(/\bset[A-Z]/);
+  });
+
   it('verwendet ausschliesslich bestehende Design-Tokens (C.*), keine neuen Farben', () => {
     const src = source();
     const analyseBlockMatch = src.match(/\{analytics && \(([\s\S]*?)\n {10}\)\}/);

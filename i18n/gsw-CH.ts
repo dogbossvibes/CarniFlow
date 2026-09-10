@@ -1131,6 +1131,11 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
 
   // Segmentanalyse / Track Replay / Heatmap
   'track.replayAction': 'Fährte abspiele',
+  'track.analysisSection': 'Analyse',
+  'track.analysisPending': 'Track Score 2.0 wird nach de Absuechi brechnet.',
+  'track.analysisPendingHint': 'D automatischi Analyse bewertet unter anderem Spurtreui, Winkel, Gegeschtänd und Tempo.',
+  'track.analysisUnavailable': 'Automatischi Analyse für die Absuechi nid verfüegbar.',
+  'track.manualScoreLabel': 'Manuelli Bewertig',
   'track.replay.title': 'Wiedergab',
   'track.replay.unavailable': 'Für die Fährte gits kei Wiedergab.',
   'track.replay.playLabel': 'Wiedergab starte',
