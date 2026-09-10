@@ -284,7 +284,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Kandidatenbewertung; die Marker-/Voice-/Persistenz-Pipeline dahinter
   // bleibt unverändert.
   const persistShortLegCorners = useCallback(() => {
-    const { corners, diagnostics } = detectShortLegCorners(detectPointsRef.current);
+    // Motion-Confidence-Kopplung (±0,12): der Detector bekommt eine reine
+    // NACHSCHLAGEFUNKTION für die Turn-Evidenz zum Kandidaten-Zeitpunkt. Läuft
+    // kein Motion-Mitschnitt (Normalfall: kein QA-Modus oder ENGINE=BUILD40),
+    // wird nichts übergeben und die Confidence bleibt exakt wie bisher.
+    const turnEvidenceAt = motionActiveRef.current
+      ? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceFor(t))
+      : undefined;
+    const { corners, diagnostics } = detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt);
     if (__DEV__ && diagnostics.length) {
       const last = diagnostics[diagnostics.length - 1];
       if (last.rejectReason) angleDbgRef.current.lastReject = last.rejectReason;
@@ -299,11 +306,17 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         const ev = motionActiveRef.current && last.t != null
           ? motionBufRef.current.evidenceFor(last.t)
           : null;
+        // Confidence-Rechenweg sichtbar machen: vorher + Motion = nachher → Entscheidung.
+        const before = last.confidenceBeforeMotion;
+        const adj = last.motionAdjustment;
+        const confTrail = before != null && adj != null
+          ? `conf ${before.toFixed(2)} ${adj >= 0 ? '+' : '−'} motion ${Math.abs(adj).toFixed(2)} = ${last.confidence.toFixed(2)}`
+          : `conf ${last.confidence.toFixed(2)}`;
         pushQaCandidateLine(
           `[gps] ${new Date(last.t ?? Date.now()).toISOString().slice(11, 19)} ` +
           `acc=${last.accuracyM?.toFixed(1) ?? '—'}m typ=${last.classification ?? '—'} ` +
-          `innen=${last.interiorAngleDeg?.toFixed(1) ?? '—'}° conf=${last.confidence.toFixed(2)} ` +
-          `grund=${last.rejectReason ?? 'akzeptiert'}` +
+          `innen=${last.interiorAngleDeg?.toFixed(1) ?? '—'}° ${confTrail} ` +
+          `→ ${last.rejectReason ? `rejected (${last.rejectReason})` : 'accepted'}` +
           (ev ? ` | [motion] netYaw=${ev.netYawDeg.toFixed(1)}° gross=${ev.grossYawDeg.toFixed(1)}° ` +
             `mono=${ev.monotonicity.toFixed(2)} yawShare=${ev.yawShare.toFixed(2)} ` +
             `steps=${ev.steps} cad=${ev.cadence?.toFixed(0) ?? '—'} state=${ev.movementState ?? '—'} ` +

@@ -43,6 +43,15 @@
 // ──────────────────────────────────────────────────────────────────────────
 import { calculateHeading, calculateDistance } from '@/features/tracking/utils/gpsFilter';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
+import { applyMotionToConfidence, type TurnEvidence } from '@/features/tracking/utils/motionTurnEvidence';
+
+/**
+ * Nachschlagefunktion für die Core-Motion-Turn-Evidenz zu einem Kandidaten-
+ * Zeitpunkt. Wird von aussen hereingereicht (der Detector kennt Core Motion
+ * nicht selbst). Fehlt sie oder liefert sie `null`, bleibt die Confidence
+ * exakt wie zuvor — der gesamte bisherige Pfad ist damit unverändert.
+ */
+export type TurnEvidenceLookup = (tMs: number | null) => TurnEvidence | null | undefined;
 
 export interface ShortLegPoint {
   lat: number; lng: number;
@@ -349,6 +358,13 @@ export interface ShortLegDiagnostics {
   accuracyWeightedConfidence: number | null;
   /** Tatsächlich gewählte Fensterskala (m). */
   chosenScaleM: number | null;
+  // ── Motion-Confidence-Kopplung (±0,12, siehe motionTurnEvidence.ts) ──
+  /** Confidence VOR der Motion-Kopplung. */
+  confidenceBeforeMotion: number | null;
+  /** Verschiebung durch Motion (−0,12 … +0,12). 0 = keine Motion-Daten. */
+  motionAdjustment: number | null;
+  /** Turn-Evidenz, die zur Verschiebung geführt hat (0..1, null = keine Daten). */
+  motionTurnEvidence: number | null;
 }
 
 export interface ShortLegCandidate {
@@ -369,6 +385,7 @@ function emptyDiag(p: ShortLegPoint, reason: ShortLegRejectReason): ShortLegDiag
     detectorPointCount: null, effectiveSpatialSpacingM: null, fitMethod: null,
     fitResidualBeforeM: null, fitResidualAfterM: null,
     accuracyWeightedConfidence: null, chosenScaleM: null,
+    confidenceBeforeMotion: null, motionAdjustment: null, motionTurnEvidence: null,
   };
 }
 
@@ -378,6 +395,7 @@ function emptyDiag(p: ShortLegPoint, reason: ShortLegRejectReason): ShortLegDiag
  */
 export function evaluateShortLegCorner(
   points: readonly ShortLegPoint[], apexIndex: number, lastCornerAtM: number, motion?: ShortLegMotion | null,
+  turnEvidenceAt?: TurnEvidenceLookup,
 ): ShortLegCandidate {
   const apex = points[apexIndex];
   const reject = (r: ShortLegRejectReason): ShortLegCandidate =>
@@ -418,6 +436,7 @@ export function evaluateShortLegCorner(
     fitResidualAfterM: Math.round(after.residualM * 100) / 100,
     accuracyWeightedConfidence: null,
     chosenScaleM: Math.max(before.scaleM, after.scaleM),
+    confidenceBeforeMotion: null, motionAdjustment: null, motionTurnEvidence: null,
   };
 
   if (magnitude < MIN_TURN_DEG) { diag.rejectReason = 'no_turn'; return { accepted: false, kind: null, apexIndex, diagnostics: diag }; }
@@ -468,10 +487,29 @@ export function evaluateShortLegCorner(
     0.24 * lengthScore + 0.22 * sampleScore + 0.22 * straightScore +
     0.16 * turnScore + 0.10 * concScore + 0.06 * accScore + motionBonus,
   );
-  diag.confidence = Math.round(confidence * 1000) / 1000;
   diag.accuracyWeightedConfidence = Math.round(accScore * 1000) / 1000;
 
-  if (confidence < ACCEPT_SCORE) { diag.rejectReason = 'low_evidence'; return { accepted: false, kind: null, apexIndex, diagnostics: diag }; }
+  // ── MOTION-CONFIDENCE-KOPPLUNG (±0,12) ─────────────────────────────────
+  // Greift AUSSCHLIESSLICH hier, an der Confidence-Stufe, und nur für
+  // Kandidaten, die den vollständigen Geometriepfad bereits durchlaufen haben
+  // (stabile Fenster, Turn, Signal-Rausch, Konzentration, Klassifikation sind
+  // zu diesem Zeitpunkt alle bestanden). Ein Kandidat, der vorher an
+  // no_window_before/after gescheitert ist, kommt hier nie an — Motion kann
+  // ihn also strukturell nicht retten.
+  //
+  // Genau die in der Research-Runde vermessene Kopplung, unverändert
+  // übernommen (applyMotionToConfidence, max ±0,12): starke passende
+  // Turn-Evidenz hebt leicht an, klar widersprüchliche senkt leicht ab,
+  // starke Geometrie wird nie gesenkt. Ohne Motion-Daten passiert nichts.
+  const ev = turnEvidenceAt?.(apex.t ?? null) ?? null;
+  const confidenceBefore = confidence;
+  const adjusted = ev ? applyMotionToConfidence(confidence, ev) : confidence;
+  diag.confidenceBeforeMotion = Math.round(confidenceBefore * 1000) / 1000;
+  diag.motionAdjustment = Math.round((adjusted - confidenceBefore) * 1000) / 1000;
+  diag.motionTurnEvidence = ev?.evidence ?? null;
+  diag.confidence = Math.round(adjusted * 1000) / 1000;
+
+  if (adjusted < ACCEPT_SCORE) { diag.rejectReason = 'low_evidence'; return { accepted: false, kind: null, apexIndex, diagnostics: diag }; }
   return { accepted: true, kind, apexIndex, diagnostics: diag };
 }
 
@@ -482,6 +520,7 @@ export function evaluateShortLegCorner(
  */
 export function detectShortLegCorners(
   rawPoints: readonly ShortLegPoint[], motion?: ShortLegMotion | null,
+  turnEvidenceAt?: TurnEvidenceLookup,
 ): { corners: { kind: AngleKind; apexIndex: number; atM: number }[]; diagnostics: ShortLegDiagnostics[]; detectorPointCount: number } {
   // Räumliche Normalisierung ZUERST: ab hier ist die Punktfolge unabhängig
   // von der Fixrate (siehe resampleBySpacing).
@@ -504,7 +543,7 @@ export function detectShortLegCorners(
   // echte Ecken, ohne sie überhaupt zu bewerten (belegt bei 4 Hz).
   const scored: { c: ShortLegCandidate; kind: AngleKind; atM: number; conf: number }[] = [];
   for (let i = 1; i < points.length - 1; i++) {
-    const c = evaluateShortLegCorner(points, i, -Infinity, motion);
+    const c = evaluateShortLegCorner(points, i, -Infinity, motion, turnEvidenceAt);
     diagnostics.push(c.diagnostics);
     if (c.accepted && c.kind) scored.push({ c, kind: c.kind, atM: points[i].cumDist, conf: c.diagnostics.confidence });
   }

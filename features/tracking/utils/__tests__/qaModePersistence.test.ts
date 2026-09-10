@@ -161,35 +161,48 @@ describe('Moduswechsel bei laufendem Warmup', () => {
   });
 });
 
-describe('Motion beim Legen ist QA-only, CURRENT-only und rein beobachtend', () => {
+describe('Motion beim Legen ist QA-only und CURRENT-only', () => {
   const rec = read('features/tracking/hooks/useTrackRecorder.ts');
 
   it('startet nur im QA-Modus und nur mit ENGINE=CURRENT', () => {
     expect(rec).toContain("if (qaRef.current && activeEngine === 'current' && !motionActiveRef.current)");
   });
 
-  it('Motion fliesst nirgends in die Erkennung ein', () => {
-    // detectCorner/persistShortLegCorners/persistLegacyCorner bekommen keinen
-    // Motion-Parameter, und detectShortLegCorners wird ohne Motion aufgerufen.
-    expect(rec).toContain('detectShortLegCorners(detectPointsRef.current)');
-    expect(rec).not.toMatch(/detectShortLegCorners\([^)]*motion/i);
-    // Die Turn-Evidenz wird ausschliesslich für die QA-Logzeile berechnet.
-    const evidenceUses = rec.match(/motionBufRef\.current\.evidenceFor/g) ?? [];
-    expect(evidenceUses).toHaveLength(1);
+  it('Motion wirkt AUSSCHLIESSLICH als Confidence-Nachschlagefunktion', () => {
+    // GEÄNDERTER VERTRAG (diese Runde): Motion fliesst jetzt an genau EINER
+    // Stelle in die Erkennung ein — als Nachschlagefunktion für die
+    // Turn-Evidenz an der Confidence-Stufe (±0,12, siehe
+    // motionConfidenceCoupling.test.ts). Der alte ShortLegMotion-Parameter
+    // bleibt bewusst ungenutzt (`null`), damit sich der dortige +0,06-Bonus
+    // NICHT zusätzlich aufaddiert.
+    expect(rec).toContain('detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt)');
+    expect(rec).toContain('const turnEvidenceAt = motionActiveRef.current');
+    // Ohne laufenden Motion-Mitschnitt wird gar nichts übergeben.
+    expect(rec).toContain("? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceFor(t))");
+    expect(rec).toContain(': undefined;');
   });
 
-  it('keine Confidence-Kopplung in dieser Runde', () => {
+  it('die Kopplung selbst liegt im Detector, nicht im Recorder', () => {
     expect(rec).not.toContain('applyMotionToConfidence');
+    const det = read('features/tracking/utils/shortLegCornerDetection.ts');
+    expect(det).toContain('applyMotionToConfidence');
+    // …und dort ausschliesslich an der Confidence-Stufe, nach der Klassifikation.
+    const classifyAt = det.indexOf('diag.classification = kind;');
+    expect(det.indexOf('applyMotionToConfidence(confidence, ev)')).toBeGreaterThan(classifyAt);
   });
 
-  it('Motion verändert weder GPS-Quelle noch Distanz', () => {
-    // Der Motion-Listener schreibt ausschliesslich in den Ringpuffer.
+  it('Motion verändert weder GPS-Quelle noch Distanz noch die Linie', () => {
     const listener = rec.slice(rec.indexOf('motionSubRef.current = motionClient.onSample'));
     const body = listener.slice(0, listener.indexOf('void motionClient.start()'));
     expect(body).toContain('motionBufRef.current.push');
     expect(body).not.toContain('addTrackPoint');
     expect(body).not.toContain('distRef');
     expect(body).not.toContain('pointsRef');
+  });
+
+  it('der Research-Retry bleibt unverdrahtet', () => {
+    expect(rec).not.toContain('motionSupportedCornerRetry');
+    expect(rec).not.toContain('tryMotionSupportedLocalCorner');
   });
 });
 
