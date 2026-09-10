@@ -117,6 +117,7 @@ describe('no_window_before/after kann durch Motion NIEMALS akzeptiert werden', (
     available: true, evidence: 1, netYawDeg: 135, grossYawDeg: 135, monotonicity: 1,
     concentration: 1, peakYawRateDps: 200, rotationDurationS: 1.2, yawShare: 0.9,
     totalRotationDeg: 150, peakRotationRateRadS: 3, steps: 4, stepRate: 1.8, cadence: 108,
+    gaitAccelFraction: 1, gaitAccelThreshold: 0.1, locomotionSource: 'steps+gait_accel',
     movementState: 'walking', sampleCount: 8, windowStartMs: 0, windowEndMs: 0,
     windowDurationS: 2, gates: { netYaw: 1, monotonicity: 1, locomotion: 1, yawShare: 1 },
   };

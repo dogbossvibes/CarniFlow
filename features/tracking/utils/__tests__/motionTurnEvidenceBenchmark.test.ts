@@ -155,7 +155,16 @@ describe('Motion-Turn-Evidenz — Fenster-Sweep', () => {
   //    Vertikale ist im vorhandenen Payload identisch zu einer Körperdrehung.
   //  • "90° mit kurzem Halt am Scheitel": echte Ecke, aber ohne Schritte im
   //    Fenster → niedrige Evidenz. Unschädlich, weil Motion nie ein Veto hat.
-  const EXCEPTIONS = ['geradeaus + Handy um 90° drehen', '90° mit kurzem Halt am Scheitel'];
+  //  • "im Stand drehen mit 2 Ausfallschritten": NEU seit dem Wechsel auf
+  //    Variante E (Gang-Beschleunigungssignatur statt hartem Schritt-Gate).
+  //    Zwei echte Ausfallschritte erzeugen dieselbe Beschleunigungssignatur wie
+  //    Gehen — der gemessene Preis dafür, dass ein realer Turn bei stillem
+  //    CMPedometer nicht mehr auf Evidenz 0 fällt (Feldbefund Teil B).
+  const EXCEPTIONS = [
+    'geradeaus + Handy um 90° drehen',
+    '90° mit kurzem Halt am Scheitel',
+    'im Stand drehen mit 2 Ausfallschritten',
+  ];
 
   it('bestes Fenster: grösster Abstand zwischen schwächstem Positiv und stärkstem Negativ', () => {
     const summary: string[] = ['Fenster | min(Pos) | max(Neg) | Abstand | min(Pos)* | max(Neg)* | Abstand*'];

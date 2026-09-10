@@ -324,6 +324,13 @@ export type ShortLegRejectReason =
 
 /** Vollständige QA-Diagnose je Kandidat (Punkt 12 der Vorgabe). */
 export interface ShortLegDiagnostics {
+  /**
+   * Index des bewerteten Scheitelpunkts im Detektor-Puffer. Reine
+   * ZUORDNUNGS-Metadaten für QA: erlaubt es, eine akzeptierte Ecke eindeutig
+   * ihrer Diagnose zuzuordnen, statt über `diagnostics[length-1]` zu raten.
+   * Fliesst nirgends in die Erkennung ein.
+   */
+  apexIndex: number;
   t: number | null;
   lat: number; lng: number;
   legBeforeM: number | null;
@@ -374,9 +381,9 @@ export interface ShortLegCandidate {
   diagnostics: ShortLegDiagnostics;
 }
 
-function emptyDiag(p: ShortLegPoint, reason: ShortLegRejectReason): ShortLegDiagnostics {
+function emptyDiag(p: ShortLegPoint, apexIndex: number, reason: ShortLegRejectReason): ShortLegDiagnostics {
   return {
-    t: p.t ?? null, lat: p.lat, lng: p.lng,
+    apexIndex, t: p.t ?? null, lat: p.lat, lng: p.lng,
     legBeforeM: null, legAfterM: null, sampleCountBefore: null, sampleCountAfter: null,
     bearingBefore: null, bearingAfter: null, headingDeltaDeg: null, interiorAngleDeg: null,
     classification: null, accuracyM: p.accuracy, confidence: 0, rejectReason: reason,
@@ -399,7 +406,7 @@ export function evaluateShortLegCorner(
 ): ShortLegCandidate {
   const apex = points[apexIndex];
   const reject = (r: ShortLegRejectReason): ShortLegCandidate =>
-    ({ accepted: false, kind: null, apexIndex, diagnostics: emptyDiag(apex, r) });
+    ({ accepted: false, kind: null, apexIndex, diagnostics: emptyDiag(apex, apexIndex, r) });
 
   if (apex.cumDist - lastCornerAtM < CORNER_GAP_M) return reject('too_close_to_previous');
 
@@ -413,7 +420,7 @@ export function evaluateShortLegCorner(
   const interior = 180 - magnitude;
 
   const diag: ShortLegDiagnostics = {
-    t: apex.t ?? null, lat: apex.lat, lng: apex.lng,
+    apexIndex, t: apex.t ?? null, lat: apex.lat, lng: apex.lng,
     legBeforeM: Math.round(before.lengthM * 100) / 100,
     legAfterM: Math.round(after.lengthM * 100) / 100,
     sampleCountBefore: before.sampleCount, sampleCountAfter: after.sampleCount,

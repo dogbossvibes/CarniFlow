@@ -319,7 +319,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           `→ ${last.rejectReason ? `rejected (${last.rejectReason})` : 'accepted'}` +
           (ev ? ` | [motion] netYaw=${ev.netYawDeg.toFixed(1)}° gross=${ev.grossYawDeg.toFixed(1)}° ` +
             `mono=${ev.monotonicity.toFixed(2)} yawShare=${ev.yawShare.toFixed(2)} ` +
-            `steps=${ev.steps} cad=${ev.cadence?.toFixed(0) ?? '—'} state=${ev.movementState ?? '—'} ` +
+            `locomotion=${ev.locomotionSource} steps=${ev.steps} ` +
+            `accelFraction=${ev.gaitAccelFraction.toFixed(2)} accelThr=${ev.gaitAccelThreshold.toFixed(2)}g ` +
+            `cad=${ev.cadence?.toFixed(0) ?? '—'} state=${ev.movementState ?? '—'} ` +
             `turnEvidence=${ev.evidence?.toFixed(3) ?? '—'}` : ''),
         );
       }
@@ -327,6 +329,28 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     for (const c of corners) {
       if (c.atM <= lastCornerAtRef.current) continue;   // schon gemeldet
       lastCornerAtRef.current = c.atM;
+      // ── QA: JEDE automatisch akzeptierte Ecke bekommt genau EINE Zeile ──
+      // Zuordnung über den stabilen `apexIndex` der Diagnose, nicht mehr über
+      // `diagnostics[length-1]` — der gehörte praktisch nie zur bestätigten
+      // Ecke, weshalb akzeptierte Winkel bisher gar nicht protokolliert wurden.
+      if (qaRef.current) {
+        const d = diagnostics.find(x => x.apexIndex === c.apexIndex) ?? null;
+        const ev = motionActiveRef.current && d?.t != null ? motionBufRef.current.evidenceFor(d.t) : null;
+        const before = d?.confidenceBeforeMotion ?? null;
+        const adj = d?.motionAdjustment ?? null;
+        const trail = before != null && adj != null
+          ? `conf ${before.toFixed(2)} ${adj >= 0 ? '+' : '−'} motion ${Math.abs(adj).toFixed(2)} = ${(d?.confidence ?? 0).toFixed(2)}`
+          : `conf ${(d?.confidence ?? 0).toFixed(2)}`;
+        const dir = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
+        pushQaCandidateLine(
+          `AUTO ${new Date(d?.t ?? Date.now()).toISOString().slice(11, 19)} ` +
+          `idx=${c.apexIndex} ${c.kind} (${dir}) innen=${d?.interiorAngleDeg?.toFixed(1) ?? '—'}° ` +
+          `acc=${d?.accuracyM?.toFixed(1) ?? '—'}m ${trail} → accepted` +
+          (ev ? ` | turnEvidence=${ev.evidence?.toFixed(3) ?? '—'} locomotion=${ev.locomotionSource} ` +
+            `steps=${ev.steps} accelFraction=${ev.gaitAccelFraction.toFixed(2)} ` +
+            `netYaw=${ev.netYawDeg.toFixed(1)}° mono=${ev.monotonicity.toFixed(2)} yawShare=${ev.yawShare.toFixed(2)}` : ''),
+        );
+      }
       const dbg = angleDbgRef.current;
       dbg.count++;
       if (c.kind === 'spitz_rechts' || c.kind === 'spitz_links') dbg.acuteCount++;
@@ -735,6 +759,15 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     const s = store.getState();
     const now = Date.now();
     const pos = s.currentPosition;
+    // ── QA: manuell gesetzte Winkel bekommen eine EIGENE, klar abgegrenzte
+    // Zeile. Automatisch und manuell dürfen im Log nie verwechselt werden.
+    if (qaRef.current && type === 'winkel') {
+      pushQaCandidateLine(
+        `MANUAL ${new Date(now).toISOString().slice(11, 19)} ` +
+        `${markerOpts?.angleKind ?? 'winkel'} ` +
+        `acc=${s.gpsAccuracy?.toFixed(1) ?? '—'}m bei ${Math.round(s.distanceMeters * 10) / 10} m → manuell gesetzt`,
+      );
+    }
     await commitMarker({
       id: `${type}-${now}`,
       type,

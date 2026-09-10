@@ -62,6 +62,13 @@ export interface TurnEvidenceParams {
   /** Fortbewegung in Schritten/s. Unten/oben der Rampe. */
   stepRateLo: number;
   stepRateHi: number;
+  /**
+   * Gang-Beschleunigungssignatur (Variante E, REALER GERÄTEBEFUND):
+   * `accelerationMagnitude` ab diesem Wert (g) gilt als Gehbewegung.
+   */
+  gaitAccelThresholdG: number;
+  /** So viel Anteil der Fenster-Samples muss darüber liegen (0..1). */
+  gaitAccelMinFraction: number;
   /** Yaw-Anteil an der Gesamtrotation. Unten/oben der Rampe. */
   yawShareLo: number;
   yawShareHi: number;
@@ -78,6 +85,8 @@ export const TURN_EVIDENCE_DEFAULTS: TurnEvidenceParams = {
   monoHi: 0.75,
   stepRateLo: 0.6,
   stepRateHi: 1.4,
+  gaitAccelThresholdG: 0.10,
+  gaitAccelMinFraction: 0.70,
   yawShareLo: 0.20,
   yawShareHi: 0.40,
   burstSec: 0.75,
@@ -117,6 +126,12 @@ export interface TurnEvidence {
   steps: number;
   stepRate: number;
   cadence: number | null;
+  /** Anteil der Fenster-Samples über `gaitAccelThresholdG` (0..1). */
+  gaitAccelFraction: number;
+  /** Der verwendete Schwellwert (g) — zur Nachvollziehbarkeit im QA-Log. */
+  gaitAccelThreshold: number;
+  /** Woher die Fortbewegungs-Evidenz stammt. */
+  locomotionSource: 'steps' | 'gait_accel' | 'steps+gait_accel' | 'none';
   /** Häufigster movementState im Fenster. */
   movementState: MovementState | null;
   sampleCount: number;
@@ -142,6 +157,8 @@ function emptyEvidence(tc: number, params: TurnEvidenceParams): TurnEvidence {
     netYawDeg: 0, grossYawDeg: 0, monotonicity: 0, concentration: 0,
     peakYawRateDps: 0, rotationDurationS: 0, yawShare: 0, totalRotationDeg: 0,
     peakRotationRateRadS: 0, steps: 0, stepRate: 0, cadence: null,
+    gaitAccelFraction: 0, gaitAccelThreshold: params.gaitAccelThresholdG,
+    locomotionSource: 'none',
     movementState: null, sampleCount: 0,
     windowStartMs: tc - params.halfWindowSec * 1000,
     windowEndMs: tc + params.halfWindowSec * 1000,
@@ -208,6 +225,7 @@ export function computeTurnEvidence(
   let peakYawRate = 0;
   let peakRotRate = 0;
   let steps = 0;
+  let gaitAccelSamples = 0;
   const stateCount = new Map<MovementState, number>();
 
   for (let i = 0; i < win.length; i++) {
@@ -219,6 +237,7 @@ export function computeTurnEvidence(
     peakYawRate = Math.max(peakYawRate, Math.abs(s.headingDelta) / d);
     peakRotRate = Math.max(peakRotRate, s.rotationMagnitude);
     steps += s.stepDelta;
+    if (s.accelerationMagnitude >= params.gaitAccelThresholdG) gaitAccelSamples++;
     stateCount.set(s.movementState, (stateCount.get(s.movementState) ?? 0) + 1);
   }
 
@@ -261,10 +280,34 @@ export function computeTurnEvidence(
   const cadences = win.map(s => s.cadence).filter((c): c is number => c != null);
   const cadence = cadences.length ? cadences[cadences.length - 1] : null;
 
+  // ── FORTBEWEGUNGS-NACHWEIS (Variante E) ────────────────────────────────
+  // REALER GERÄTEBEFUND (Feldtest Teil B, 19:20:28): `stepDelta` ist ein Delta
+  // eines KUMULATIVEN CMPedometer-Zählers, der nur bei einem Pedometer-Callback
+  // vorrückt. Callbacks kommen gebündelt und verzögert, und in der Anlaufphase
+  // zunächst gar nicht (dann ist auch `cadence` null). Ein ±1-s-Fenster kann
+  // deshalb `steps=0` melden, während nachweislich gegangen wird — im Feld hat
+  // genau das eine klare 62°-Drehung (mono 0,95) auf Evidenz 0,000 gesetzt.
+  //
+  // Deshalb gilt Fortbewegung jetzt als belegt, wenn ENTWEDER Schritte gemeldet
+  // wurden ODER eine durchgehende Gang-Beschleunigungssignatur vorliegt.
+  // CMMotionActivity (`movementState`, `activityConfidence`, `activityAgeMs`)
+  // ist bewusst KEIN Gate: die Klassifikation hinkt einem Stopp um Sekunden
+  // hinterher und meldet dann noch `walking` — gemessen kippt sie damit genau
+  // den kritischen Negativfall „Standdrehung direkt nach dem Gehen".
+  const gaitAccelFraction = win.length ? gaitAccelSamples / win.length : 0;
+  const stepsGate = ramp(stepRate, params.stepRateLo, params.stepRateHi);
+  const gaitGate = gaitAccelFraction >= params.gaitAccelMinFraction ? 1 : 0;
+  const locomotion = Math.max(stepsGate, gaitGate);
+  const locomotionSource: TurnEvidence['locomotionSource'] =
+    stepsGate > 0 && gaitGate > 0 ? 'steps+gait_accel'
+      : stepsGate > 0 ? 'steps'
+        : gaitGate > 0 ? 'gait_accel'
+          : 'none';
+
   const gates = {
     netYaw: ramp(netYawDeg, params.netYawLoDeg, params.netYawHiDeg),
     monotonicity: ramp(monotonicity, params.monoLo, params.monoHi),
-    locomotion: ramp(stepRate, params.stepRateLo, params.stepRateHi),
+    locomotion,
     yawShare: ramp(yawShare, params.yawShareLo, params.yawShareHi),
   };
   // Multiplikativ: JEDES Teilkriterium muss erfüllt sein. Eine echte Ecke im
@@ -278,7 +321,11 @@ export function computeTurnEvidence(
     netYawDeg, grossYawDeg: grossYaw, monotonicity, concentration,
     peakYawRateDps: peakYawRate, rotationDurationS: bestRun, yawShare,
     totalRotationDeg: totalRotDeg, peakRotationRateRadS: peakRotRate,
-    steps, stepRate, cadence, movementState,
+    steps, stepRate, cadence,
+    gaitAccelFraction: Math.round(gaitAccelFraction * 1000) / 1000,
+    gaitAccelThreshold: params.gaitAccelThresholdG,
+    locomotionSource,
+    movementState,
     sampleCount: win.length,
     windowStartMs: win[0].t, windowEndMs: win[win.length - 1].t, windowDurationS,
     gates,
@@ -390,6 +437,9 @@ export function formatCandidateEvidenceLog(
     `yawShare=${f(ev.yawShare, 2)}`,
     `steps=${ev.steps}`,
     `rate=${f(ev.stepRate, 2)}/s`,
+    `locomotion=${ev.locomotionSource}`,
+    `accelFraction=${f(ev.gaitAccelFraction, 2)}`,
+    `accelThr=${f(ev.gaitAccelThreshold, 2)}g`,
     `cad=${f(ev.cadence, 0)}`,
     `state=${ev.movementState ?? '—'}`,
     `→ turnEvidence=${ev.evidence == null ? '—' : ev.evidence.toFixed(3)}`,
