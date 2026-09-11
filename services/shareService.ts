@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
 
 export interface ShareOptions {
   includeNotes: boolean;
@@ -67,8 +68,27 @@ export async function shareViaSystem(url: string, title: string) {
     return;
   }
 
-  // Native: use expo-sharing
-  const { default: Sharing } = await import('expo-sharing');
+  // Native: expo-sharing.
+  //
+  // WICHTIG: expo-sharing (14.x) hat KEINEN Default-Export — der Einstiegspunkt
+  // exportiert ausschliesslich die benannten Funktionen `isAvailableAsync` und
+  // `shareAsync`. Ein `const { default: Sharing } = await import(...)` ergab
+  // deshalb `undefined` und scheiterte mit "Cannot read property
+  // 'isAvailableAsync' of undefined". Deshalb ein Namespace-Import (oben, wie
+  // bei expo-clipboard) plus eine ausdrückliche Fähigkeitsprüfung. Auf Web
+  // greift ohnehin der Zweig darüber; dort löst das Paket auf einen
+  // harmlosen navigator.share-Shim auf.
+  if (
+    !Sharing
+    || typeof Sharing.isAvailableAsync !== 'function'
+    || typeof Sharing.shareAsync !== 'function'
+  ) {
+    // Unverändertes Verhalten des bisherigen Nicht-verfügbar-Falls: die Link
+    // landet in der Zwischenablage, statt dass der Nutzer einen Fehler sieht.
+    await copyToClipboard(url);
+    return;
+  }
+
   const isAvailable = await Sharing.isAvailableAsync();
   if (isAvailable) {
     await Sharing.shareAsync(url, { dialogTitle: title });
