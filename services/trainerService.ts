@@ -13,6 +13,45 @@ export type RedeemTrainerCodeStatus =
 export interface RedeemTrainerCodeResult {
   status: RedeemTrainerCodeStatus;
   connectionId: string | null;
+  /**
+   * QA-Diagnose des Redeem-Versuchs. Bewusst OHNE Tokens und ohne
+   * vollständige Nutzer-IDs — nur so viel, dass man am Gerät erkennen kann,
+   * WO der Flow scheitert (Session fehlt, RPC nicht vorhanden, RLS, Lookup).
+   * Wird nur bei einem Fehlschlag ausgewertet/angezeigt.
+   */
+  diagnostics?: RedeemDiagnostics;
+}
+
+export interface RedeemDiagnostics {
+  /** Lag beim Aufruf eine Supabase-Session vor? */
+  sessionPresent: boolean;
+  /** Erste acht Zeichen der auth.uid() — reicht zum Abgleich, ist keine Kennung. */
+  uidPrefix: string | null;
+  /** Normalisierter Code, wie er an die RPC ging. */
+  normalizedCode: string;
+  /** Hat die RPC geantwortet, oder musste der Direktpfad übernehmen? */
+  rpcUsed: boolean;
+  rpcErrorCode: string | null;
+  rpcErrorMessage: string | null;
+  /** Wurde über trainer_profiles direkt gesucht (Fallback)? */
+  fallbackLookupUsed: boolean;
+  fallbackFoundTrainer: boolean | null;
+  /** Fehlercode des letzten direkten Tabellenzugriffs (z. B. 42501 = RLS). */
+  tableErrorCode: string | null;
+}
+
+/** Ein-Zeilen-Zusammenfassung für die QA-Anzeige. */
+export function formatRedeemDiagnostics(d: RedeemDiagnostics | undefined): string {
+  if (!d) return '';
+  return [
+    `session=${d.sessionPresent ? 'ja' : 'NEIN'}`,
+    `uid=${d.uidPrefix ?? '—'}`,
+    `code=${d.normalizedCode || '—'}`,
+    `rpc=${d.rpcUsed ? 'ok' : `fehlgeschlagen(${d.rpcErrorCode ?? '—'})`}`,
+    d.rpcErrorMessage ? `rpcMsg=${d.rpcErrorMessage}` : '',
+    d.fallbackLookupUsed ? `fallback=ja trainerGefunden=${d.fallbackFoundTrainer ? 'ja' : 'NEIN'}` : '',
+    d.tableErrorCode ? `tabelle=${d.tableErrorCode}` : '',
+  ].filter(Boolean).join(' · ');
 }
 
 // Trainer-Code im Format CANIS-4827.
@@ -126,20 +165,34 @@ export function redeemTrainerCodeMessage(status: RedeemTrainerCodeStatus): strin
 
 export async function redeemTrainerCode(rawCode: string): Promise<RedeemTrainerCodeResult> {
   const code = normalizeCode(rawCode);
-  if (!code) return { status: 'invalid_code', connectionId: null };
+  const diag: RedeemDiagnostics = {
+    sessionPresent: false, uidPrefix: null, normalizedCode: code,
+    rpcUsed: false, rpcErrorCode: null, rpcErrorMessage: null,
+    fallbackLookupUsed: false, fallbackFoundTrainer: null, tableErrorCode: null,
+  };
+  if (!code) return { status: 'invalid_code', connectionId: null, diagnostics: diag };
 
   const rpc = await supabase.rpc('redeem_trainer_code', { p_code: code });
+  if (rpc.error) {
+    diag.rpcErrorCode = rpc.error.code ?? null;
+    diag.rpcErrorMessage = rpc.error.message ?? null;
+  }
   if (!rpc.error && Array.isArray(rpc.data) && rpc.data[0]?.status) {
+    diag.rpcUsed = true;
     const row = rpc.data[0] as { status: RedeemTrainerCodeStatus; connection_id?: string | null };
-    return { status: row.status, connectionId: row.connection_id ?? null };
+    return { status: row.status, connectionId: row.connection_id ?? null, diagnostics: diag };
   }
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) return { status: 'forbidden', connectionId: null };
+  diag.sessionPresent = !userError && !!user;
+  diag.uidPrefix = user?.id ? user.id.slice(0, 8) : null;
+  if (userError || !user) return { status: 'forbidden', connectionId: null, diagnostics: diag };
 
+  diag.fallbackLookupUsed = true;
   const trainer = await findTrainerByCode(code);
-  if (!trainer) return { status: 'invalid_code', connectionId: null };
-  if (trainer.trainerId === user.id) return { status: 'self_connection', connectionId: null };
+  diag.fallbackFoundTrainer = !!trainer;
+  if (!trainer) return { status: 'invalid_code', connectionId: null, diagnostics: diag };
+  if (trainer.trainerId === user.id) return { status: 'self_connection', connectionId: null, diagnostics: diag };
 
   const existing = await supabase
     .from('connections')
@@ -150,8 +203,11 @@ export async function redeemTrainerCode(rawCode: string): Promise<RedeemTrainerC
     .limit(1)
     .maybeSingle();
 
-  if (existing.error) return { status: 'server_error', connectionId: null };
-  if (existing.data) return { status: 'already_connected', connectionId: existing.data.id as string };
+  if (existing.error) {
+    diag.tableErrorCode = existing.error.code ?? null;
+    return { status: 'server_error', connectionId: null, diagnostics: diag };
+  }
+  if (existing.data) return { status: 'already_connected', connectionId: existing.data.id as string, diagnostics: diag };
 
   const inserted = await supabase
     .from('connections')
@@ -166,14 +222,18 @@ export async function redeemTrainerCode(rawCode: string): Promise<RedeemTrainerC
     .single();
 
   if (inserted.error) {
-    if (inserted.error.code === '23505') return { status: 'already_connected', connectionId: null };
-    if (inserted.error.code === '42501') return { status: 'forbidden', connectionId: null };
-    return { status: 'server_error', connectionId: null };
+    diag.tableErrorCode = inserted.error.code ?? null;
+    if (inserted.error.code === '23505') return { status: 'already_connected', connectionId: null, diagnostics: diag };
+    if (inserted.error.code === '42501') return { status: 'forbidden', connectionId: null, diagnostics: diag };
+    return { status: 'server_error', connectionId: null, diagnostics: diag };
   }
 
   const connectionId = inserted.data.id as string;
   const perms = await supabase.from('connection_permissions').insert({ connection_id: connectionId });
-  if (perms.error && perms.error.code === '42501') return { status: 'forbidden', connectionId };
+  if (perms.error && perms.error.code === '42501') {
+    diag.tableErrorCode = perms.error.code;
+    return { status: 'forbidden', connectionId, diagnostics: diag };
+  }
 
-  return { status: 'success', connectionId };
+  return { status: 'success', connectionId, diagnostics: diag };
 }

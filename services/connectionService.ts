@@ -30,12 +30,25 @@ export function isTrainerConnectionForClient(c: ConnectionView): boolean {
 }
 
 // ── Verbindungen ─────────────────────────────────────────────
+/**
+ * Letzter Lesefehler aus `listConnections`. Die Funktion wirft bewusst NICHT
+ * (sechs Aufrufer verlassen sich darauf), aber ein verschluckter Fehler war
+ * bisher nicht von „keine Verbindungen" zu unterscheiden — genau der Zustand,
+ * der sich anfühlt wie „Trainer verbinden funktioniert nicht". Nur Code und
+ * Meldung, keine Daten.
+ */
+let lastReadError: { code: string | null; message: string } | null = null;
+export function getLastConnectionReadError(): { code: string | null; message: string } | null {
+  return lastReadError;
+}
+
 export async function listConnections(userId: string): Promise<ConnectionView[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('connections').select('*')
     .or(`owner_user_id.eq.${userId},connected_user_id.eq.${userId}`)
     .eq('connection_type', 'trainer_client')
     .order('created_at', { ascending: false });
+  lastReadError = error ? { code: error.code ?? null, message: error.message } : null;
   const rows = (data as Connection[]) ?? [];
   if (!rows.length) return [];
 

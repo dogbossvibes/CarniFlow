@@ -10,8 +10,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useSession } from '@/hooks/useSession';
-import { isTrainerConnectionForClient, listConnections, removeConnection } from '@/services/connectionService';
-import { redeemTrainerCode, redeemTrainerCodeMessage } from '@/services/trainerService';
+import { getLastConnectionReadError, isTrainerConnectionForClient, listConnections, removeConnection } from '@/services/connectionService';
+import { redeemTrainerCode, redeemTrainerCodeMessage, formatRedeemDiagnostics } from '@/services/trainerService';
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import type { ConnectionStatus, ConnectionView } from '@/types/connection';
@@ -36,10 +36,22 @@ export default function MyTrainersScreen() {
   const [code, setCode]         = useState('');
   const [redeeming, setRedeeming] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const load = useCallback(() => {
     if (!meId) return;
     setLoading(true);
-    listConnections(meId).then(cs => { setTrainers(cs.filter(isTrainerConnectionForClient)); setLoading(false); });
+    // Fehler wurden hier bisher verschluckt: ohne `catch` blieb der Spinner bei
+    // einem abgelehnten Lesezugriff für immer stehen, und eine leere Liste war
+    // nicht von „keine Trainer" zu unterscheiden.
+    listConnections(meId)
+      .then(cs => {
+        setTrainers(cs.filter(isTrainerConnectionForClient));
+        const read = getLastConnectionReadError();
+        setLoadError(read ? `[${read.code ?? '—'}] ${read.message}` : null);
+      })
+      .catch((e: unknown) => { setLoadError(e instanceof Error ? e.message : String(e)); })
+      .finally(() => setLoading(false));
   }, [meId]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -50,7 +62,13 @@ export default function MyTrainersScreen() {
     setRedeeming(false);
     if (res.status !== 'success' && res.status !== 'already_connected') {
       haptic.error();
-      Alert.alert(t('trainer.connectHintTitle'), redeemTrainerCodeMessage(res.status));
+      // QA-Diagnose an die Meldung anhängen: ohne sie ist am Gerät nicht
+      // unterscheidbar, ob Session, RPC, Code-Lookup oder RLS gescheitert ist.
+      const detail = formatRedeemDiagnostics(res.diagnostics);
+      Alert.alert(
+        t('trainer.connectHintTitle'),
+        detail ? `${redeemTrainerCodeMessage(res.status)}\n\n[${res.status}] ${detail}` : redeemTrainerCodeMessage(res.status),
+      );
       return;
     }
     successHaptic();
@@ -90,6 +108,12 @@ export default function MyTrainersScreen() {
 
         {loading ? (
           <ActivityIndicator color={C.accent} style={{ marginTop: 30 }} />
+        ) : loadError ? (
+          <View style={s.empty}>
+            <Ionicons name="alert-circle-outline" size={30} color={C.danger} />
+            <Text style={s.emptyTitle}>{t('trainer.connectHintTitle')}</Text>
+            <Text style={s.emptyTxt}>{loadError}</Text>
+          </View>
         ) : trainers.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="person-outline" size={30} color={C.subtle} />
