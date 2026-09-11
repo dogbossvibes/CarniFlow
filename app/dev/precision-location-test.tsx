@@ -30,6 +30,11 @@ import {
   getQaCandidateLines, subscribeQaCandidateLog, clearQaCandidateLog,
 } from '@/features/tracking/utils/qaCandidateLog';
 import { motionClient } from '@/features/tracking/native/motionClient';
+import { useSession } from '@/hooks/useSession';
+import {
+  listRecentLaySessions, buildExportForSession, shareQaExport, copyQaExport,
+  type QaSessionSummary,
+} from '@/features/tracking/services/qaTrackExportService';
 import type { MotionStatus } from '@/modules/anyvo-motion';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
@@ -78,6 +83,11 @@ function PrecisionLocationTestContent() {
   const [motionModule, setMotionModule] = useState<boolean>(false);
   const [motionAvailable, setMotionAvailable] = useState<boolean>(false);
   const [motionStatus, setMotionStatus] = useState<MotionStatus | null>(null);
+  // ── Fährten-QA-Export ──
+  const { session } = useSession();
+  const [qaSessions, setQaSessions] = useState<QaSessionSummary[]>([]);
+  const [qaBusy, setQaBusy] = useState<string | null>(null);
+  const [qaResult, setQaResult] = useState<string | null>(null);
 
   useEffect(() => {
     // Die persistierten Werte werden inzwischen bereits beim App-Start geladen
@@ -98,6 +108,29 @@ function PrecisionLocationTestContent() {
     motionClient.getStatus().then(setMotionStatus).catch(() => setMotionStatus(null));
   }, []);
   useEffect(() => subscribeQaCandidateLog(setQaLines), []);
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    listRecentLaySessions(uid, 5).then(setQaSessions).catch(() => setQaSessions([]));
+  }, [session?.user?.id]);
+
+  const runExport = async (localId: string, mode: 'share' | 'copy') => {
+    setQaBusy(localId); setQaResult(null);
+    try {
+      const exported = await buildExportForSession(localId);
+      if (mode === 'share') {
+        const name = await shareQaExport(exported);
+        setQaResult(`${name} · ${exported.pointCount} Punkte · ${exported.totalDistanceM} m`);
+      } else {
+        const len = await copyQaExport(exported);
+        setQaResult(`In die Zwischenablage kopiert · ${exported.pointCount} Punkte · ${(len / 1024).toFixed(0)} KB`);
+      }
+    } catch (e) {
+      setQaResult(`Fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setQaBusy(null);
+    }
+  };
 
   const chooseSourceMode = (mode: LocationSourceMode) => {
     setLocationSourceMode(mode);
@@ -378,6 +411,48 @@ function PrecisionLocationTestContent() {
           </Section>
         ) : null}
 
+        <Section title="Fährten-QA Export">
+          <Text style={s.note}>
+            Exportiert die GELEGTE Spur einer Fährte (nur point_type lay,
+            keine Absuche) als anonymisiertes JSON: erster Punkt wird (0,0),
+            alles Weitere lokale x/y-Meter, Zeitstempel relativ. Keine
+            Koordinaten, keine Konto-, Hunde- oder Standortdaten.
+          </Text>
+          {qaSessions.length === 0 ? (
+            <Text style={s.note}>Keine gelegte Fährte mit Punkten gefunden.</Text>
+          ) : (
+            qaSessions.map((q, i) => (
+              <View key={q.localId} style={s.qaSessionBox}>
+                <Row
+                  label={i === 0 ? 'Letzte gelegte Fährte' : `Fährte ${i + 1}`}
+                  value={`${q.layPointCount} Punkte${q.startedAt ? ` · ${q.startedAt.slice(0, 16).replace('T', ' ')}` : ''}`}
+                />
+                <View style={s.abRow}>
+                  <TouchableOpacity
+                    style={[s.abBtn, s.abBtnActive]}
+                    onPress={() => void runExport(q.localId, 'share')}
+                    disabled={qaBusy != null}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[s.abBtnTxt, s.abBtnTxtActive]}>
+                      {qaBusy === q.localId ? '…' : 'JSON teilen'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.abBtn}
+                    onPress={() => void runExport(q.localId, 'copy')}
+                    disabled={qaBusy != null}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={s.abBtnTxt}>Kopieren</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+          {qaResult ? <Text style={s.note}>{qaResult}</Text> : null}
+        </Section>
+
         {qaOn && (
           <Section title={`Kandidaten-Mitschrift  ·  ${qaLines.length}`}>
             {qaLines.length ? (
@@ -473,6 +548,7 @@ function Row({ label, value, good }: { label: string; value: string; good?: bool
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: C.bg },
   activeValBad: { color: C.muted },
+  qaSessionBox: { marginBottom: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' },
   logLine: { fontSize: 10.5, color: C.muted, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 3 },
   head:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
   back:    { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' },

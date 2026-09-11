@@ -84,6 +84,19 @@ export async function getTrackPointsBySession(sessionLocalId: string): Promise<L
   return db.getAllAsync<LocalTrackPoint>(`select * from local_track_points where session_local_id=? order by timestamp asc`, sessionLocalId);
 }
 
+/**
+ * Nur die GELEGTE Spur (`point_type='lay'`) — ohne Such-/Run-Punkte.
+ * Gegenstück zur bestehenden Such-Abfrage weiter oben; wird vom QA-Export
+ * genutzt, damit dort garantiert keine Absuche-Geometrie beigemischt wird.
+ */
+export async function getLayTrackPointsBySession(sessionLocalId: string): Promise<LocalTrackPoint[]> {
+  const db = await getLocalDb();
+  return db.getAllAsync<LocalTrackPoint>(
+    `select * from local_track_points where session_local_id=? and point_type='lay' order by timestamp asc`,
+    sessionLocalId,
+  );
+}
+
 export async function getPendingTrackPoints(sessionLocalId: string): Promise<LocalTrackPoint[]> {
   const db = await getLocalDb();
   return db.getAllAsync<LocalTrackPoint>(`select * from local_track_points where session_local_id=? and sync_status!='synced' order by timestamp asc`, sessionLocalId);
