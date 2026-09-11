@@ -222,6 +222,44 @@ describe('Datenquelle: ausschliesslich gelegte Punkte', () => {
     expect(src).not.toMatch(/getTrackPointsBySession\b/);
   });
 
+  it('REGRESSION: expo-sharing wird als Namespace importiert, nicht über default', () => {
+    // Ursache des Gerätefehlers „Cannot read property 'isAvailableAsync' of
+    // undefined": expo-sharing@14 hat KEINEN Default-Export, nur benannte
+    // Funktionen. `{ default: Sharing }` ergibt deshalb undefined.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const src = require('fs').readFileSync('features/tracking/services/qaTrackExportService.ts', 'utf8');
+    expect(src).toContain("import * as Sharing from 'expo-sharing'");
+    // Nur der ausführbare Code zählt — im Kommentar steht das fehlerhafte
+    // Muster absichtlich, als Erklärung der Ursache.
+    const code = src.split('\n').filter((l: string) => !l.trim().startsWith('//') && !l.trim().startsWith('*')).join('\n');
+    expect(code).not.toContain('{ default: Sharing }');
+    // Defensive Prüfung vor jeder Nutzung.
+    expect(src).toContain("typeof Sharing.isAvailableAsync !== 'function'");
+    expect(src).toContain("typeof Sharing.shareAsync !== 'function'");
+    expect(src).toContain('Teilen ist in diesem App-Build nicht verfügbar.');
+  });
+
+  it('expo-sharing stellt die benötigten Funktionen als benannte Exporte bereit', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Sharing = require('expo-sharing');
+    expect(typeof Sharing.isAvailableAsync).toBe('function');
+    expect(typeof Sharing.shareAsync).toBe('function');
+    // …und eben KEINEN Default-Export mit diesen Funktionen.
+    expect(Sharing.default?.isAvailableAsync).toBeUndefined();
+  });
+
+  it('der Kopieren-Pfad bleibt unberührt — Namespace-Import ohne default', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const src = require('fs').readFileSync('features/tracking/services/qaTrackExportService.ts', 'utf8');
+    expect(src).toContain("const Clipboard = await import('expo-clipboard');");
+    expect(src).not.toContain("{ default: Clipboard }");
+    expect(src).toContain('Clipboard.setStringAsync(json)');
+    // Die Datei wird erst NACH der Sharing-Prüfung geschrieben — kein
+    // verwaister Schreibvorgang, wenn Teilen gar nicht möglich ist.
+    const shareFn = src.slice(src.indexOf('export async function shareQaExport'));
+    expect(shareFn.indexOf('Sharing.isAvailableAsync')).toBeLessThan(shareFn.indexOf('writeAsStringAsync'));
+  });
+
   it('der Export markiert seinen Inhalt explizit als lay', () => {
     expect(buildQaTrackExport('x', rawLayPoints(), []).pointType).toBe('lay');
   });

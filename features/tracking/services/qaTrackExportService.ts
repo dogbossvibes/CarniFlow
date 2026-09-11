@@ -4,6 +4,7 @@
 // Eingriff in Erkennung, Aufzeichnung, Sync oder Persistenz — es wird nichts
 // geschrieben und nichts gelöscht.
 
+import * as Sharing from 'expo-sharing';
 import {
   getLayTrackPointsBySession, getTrackMarkersBySession,
 } from '@/features/tracking/repositories/localTrackRepository';
@@ -61,6 +62,25 @@ export async function buildExportForSession(localId: string): Promise<QaTrackExp
  */
 export async function shareQaExport(exported: QaTrackExport): Promise<string> {
   assertNoAbsoluteData(exported);
+
+  // expo-sharing exportiert AUSSCHLIESSLICH benannte Funktionen
+  // (`isAvailableAsync`, `shareAsync`) — es gibt keinen Default-Export.
+  // Ein `const { default: Sharing } = await import('expo-sharing')` liefert
+  // deshalb `undefined` und scheitert auf dem Gerät mit
+  // "Cannot read property 'isAvailableAsync' of undefined". Deshalb ein
+  // Namespace-Import plus ausdrückliche Prüfung, bevor irgendetwas
+  // geschrieben wird.
+  if (
+    !Sharing
+    || typeof Sharing.isAvailableAsync !== 'function'
+    || typeof Sharing.shareAsync !== 'function'
+  ) {
+    throw new Error('Teilen ist in diesem App-Build nicht verfügbar.');
+  }
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error('Teilen ist auf diesem Gerät nicht verfügbar. Nutze stattdessen „Kopieren".');
+  }
+
   const name = qaExportFileName(exported);
   const json = serializeQaTrackExport(exported);
 
@@ -70,10 +90,11 @@ export async function shareQaExport(exported: QaTrackExport): Promise<string> {
   const uri = `${dir}${name}`;
   await FileSystem.writeAsStringAsync(uri, json);
 
-  const { default: Sharing } = await import('expo-sharing');
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, { dialogTitle: 'Fährten-QA-Export', mimeType: 'application/json', UTI: 'public.json' });
-  }
+  await Sharing.shareAsync(uri, {
+    dialogTitle: 'Fährten-QA-Export',
+    mimeType: 'application/json',
+    UTI: 'public.json',
+  });
   return name;
 }
 
