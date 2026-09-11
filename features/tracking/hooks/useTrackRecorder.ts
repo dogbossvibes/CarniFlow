@@ -28,6 +28,11 @@ import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { markWarmupStarted, markReportedSource, markWarmupStopped, markMotionStarted, markMotionSample } from '@/features/tracking/utils/trackingWarmupState';
 import { pushQaCandidateLine, clearQaCandidateLog } from '@/features/tracking/utils/qaCandidateLog';
+import {
+  saveQaSessionCapture, pathLength,
+  type QaCapturePoint, type QaMarkerMeta, type QaAutoDiagnostic,
+  type QaMarkerSource, type QaDistanceScale,
+} from '@/features/tracking/utils/qaSessionCapture';
 import { evaluateStopFlush } from '@/features/tracking/utils/stopFlushCorner';
 import { motionClient } from '@/features/tracking/native/motionClient';
 import { MotionEvidenceBuffer } from '@/features/tracking/utils/motionTurnEvidence';
@@ -150,6 +155,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const motionActiveRef = useRef(false);
   const qaRef = useRef(false);
   const qaLastRejectRef = useRef<string | null>(null);
+  // ── QA-Mitschnitt (nur im Diagnosemodus befüllt) ──
+  // Ursprung für die Anonymisierung: der erste eingegangene Rohfix.
+  const qaOriginRef = useRef<{ lat: number; lng: number; t: number } | null>(null);
+  const qaRawFixesRef = useRef<QaCapturePoint[]>([]);
+  const qaRawCountRef = useRef(0);
+  const qaAcceptedCountRef = useRef(0);
+  const qaMarkerMetaRef = useRef<QaMarkerMeta[]>([]);
   // Start-Lock (Stabilisierungsphase): Anker + Bewegungserkennung + Drift-Zähler.
   const startLockRef      = useRef<boolean>(false);              // true ⇒ Startphase aktiv
   const startLockBeganRef = useRef<number>(0);                   // ms: Beginn der Startphase
@@ -182,6 +194,34 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // ensure-create beim Finalisieren (falls der Start-Insert fehlschlug).
   const localSessionInputRef = useRef<NewLocalTrainingSession | null>(null);
   const ptBuffer = useRef<{ latitude: number; longitude: number; accuracy: number | null; altitude: number | null; speed: number | null; heading: number | null; timestamp: string }[]>([]);
+
+  // Relativkoordinaten für den QA-Mitschnitt. Der Ursprung ist der erste
+  // Rohfix; er selbst wird NICHT mitgeschrieben, nur die Differenzen.
+  const qaRel = useCallback((lat: number, lng: number, t: number, accuracy: number | null, cumDistM?: number): QaCapturePoint => {
+    const o = qaOriginRef.current;
+    const mPerLat = 111320;
+    const mPerLng = 111320 * Math.cos(((o?.lat ?? lat) * Math.PI) / 180);
+    return {
+      x: Math.round(((lng - (o?.lng ?? lng)) * mPerLng) * 1000) / 1000,
+      y: Math.round(((lat - (o?.lat ?? lat)) * mPerLat) * 1000) / 1000,
+      accuracy,
+      tMs: t - (o?.t ?? t),
+      ...(cumDistM != null ? { cumDistM: Math.round(cumDistM * 100) / 100 } : {}),
+    };
+  }, []);
+
+  /**
+   * Marker-Herkunft für den QA-Export festhalten. Rein additiv.
+   *
+   * `markerId` MUSS die von `createLocalTrackMarker` vergebene `local_id`
+   * (`mk_…`) sein — nur über die lässt sich der Export später wieder mit der
+   * Herkunft zusammenführen. Die ID im Store (`angle-<ts>-<kind>`) ist eine
+   * andere und taucht in der Datenbank nicht auf.
+   */
+  const qaNoteMarker = useCallback((markerId: string, source: QaMarkerSource, scale: QaDistanceScale, apexIndex: number | null) => {
+    if (!qaRef.current) return;
+    qaMarkerMetaRef.current.push({ markerId, source, scale, apexIndex });
+  }, []);
 
   const flushPoints = useCallback(async () => {
     const sid = localSessionId.current;
@@ -218,15 +258,21 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   useEffect(() => () => stopAll(), [stopAll]);
 
   // Marker im Store + lokal (SQLite) + Supabase ablegen (best-effort).
-  const commitMarker = useCallback(async (marker: MarkerSample) => {
+  const commitMarker = useCallback(async (
+    marker: MarkerSample,
+    qa?: { source: QaMarkerSource; scale: QaDistanceScale; apexIndex: number | null },
+  ) => {
     const s = store.getState();
     s.addMarker(marker);
     if (localSessionId.current) {
-      try { await createLocalTrackMarker(localSessionId.current, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null }); }
+      try {
+        const dbId = await createLocalTrackMarker(localSessionId.current, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null });
+        if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qa.apexIndex);
+      }
       catch (e) { console.warn('[trackRecorder] marker', e); }
     }
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker);
-  }, [store]);
+  }, [store, qaNoteMarker]);
 
   // Übergabe eines FINAL bestätigten Winkels an die bestehende Pipeline (Marker/
   // Voice/Logbuch/Persistenz) — genau EINMAL je Winkel. Geometrie/Confidence liegen
@@ -270,7 +316,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       lat: r.apex.lat, lng: r.apex.lng, accuracy: r.apex.accuracy,
       distance_from_start: Math.round(r.apex.cumDist * 10) / 10,
       note: null, audio_url: null, found: false, t: now,
-    });
+    }, { source: 'build40', scale: 'line', apexIndex: null });
     onAngleRef.current?.(r.kind);
   }, [commitMarker]);
 
@@ -364,7 +410,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         lat: p.lat, lng: p.lng, accuracy: p.accuracy,
         distance_from_start: Math.round(c.atM * 10) / 10,
         note: null, audio_url: null, found: false, t: now,
-      });
+      }, { source: 'auto', scale: 'detector', apexIndex: c.apexIndex });
       onAngleRef.current?.(c.kind);
     }
   }, [commitMarker]);
@@ -458,6 +504,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     };
     if (__DEV__) console.log('[trackRecorder] fix', { accuracy: raw.accuracy, recording: recordingRef.current });
 
+    // ── QA-Mitschnitt: JEDER eingegangene Rohfix, vor allen Gates. Nur im
+    // Diagnosemodus; ausserhalb passiert hier nichts. ──
+    if (qaRef.current) {
+      if (!qaOriginRef.current) qaOriginRef.current = { lat: raw.lat, lng: raw.lng, t: raw.t };
+      qaRawCountRef.current++;
+      qaRawFixesRef.current.push(qaRel(raw.lat, raw.lng, raw.t, raw.accuracy));
+    }
+
     // EMA-Glättung der Position — IMMER (Warmup wie Aufnahme). So folgt der
     // Live-Puck stets der echten Position und friert NIE ein, auch bei mässigem
     // GPS. Der Genauigkeits-/Speed-Filter blockt nur das Setzen von LINIEN-Punkten.
@@ -514,6 +568,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (dt > 0 && d / dt > MAX_SPEED_MPS) { rejectedRef.current++; return; }   // unrealistischer Sprung
     }
     lastRawRef.current = raw;
+    if (qaRef.current) qaAcceptedCountRef.current++;
 
     // ── Detektor-Puffer fortschreiben (nur Winkel-Erkennung, siehe oben) ──
     {
@@ -568,7 +623,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (autoDetectRef.current) {
       detectCorner();
     }
-  }, [store, flushPoints, detectCorner, handleStartLock]);
+  }, [store, flushPoints, detectCorner, handleStartLock, qaRel]);
   onFixRef.current = onFix;
 
   // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
@@ -661,6 +716,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     rawTailRef.current = [];
     // QA-Mitschrift gehört zu GENAU EINER Aufzeichnung.
     qaLastRejectRef.current = null;
+    qaOriginRef.current = null;
+    qaRawFixesRef.current = [];
+    qaRawCountRef.current = 0;
+    qaAcceptedCountRef.current = 0;
+    qaMarkerMetaRef.current = [];
     if (qaRef.current) { clearQaCandidateLog(); motionBufRef.current.clear(); }
     confirmerRef.current.reset();   // laufende Confirmation-State-Machine leeren
     gpsQualityRef.current.reset();  // Rolling-GPS-Qualität leeren
@@ -781,7 +841,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       audio_url: markerOpts?.audioUrl ?? null,
       found: false,
       t: now,
-    });
+      // Manuelle Marker zählen auf `store.distanceMeters` — also auf der
+      // aufgezeichneten Linie, nicht auf dem Detektor-Puffer.
+    }, { source: 'manual', scale: 'line', apexIndex: null });
   }, [store, commitMarker]);
 
   // Aufnahme beenden. SOFORT stoppen (synchron) und die Liegezeit starten; das
@@ -827,10 +889,65 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           lat: p.lat, lng: p.lng, accuracy: p.accuracy,
           distance_from_start: Math.round(flush.corner.atM * 10) / 10,
           note: null, audio_url: null, found: false, t: now,
-        });
+        }, { source: 'stop_flush', scale: 'detector', apexIndex: flush.corner.apexIndex });
         onAngleRef.current?.(flush.corner.kind);
       }
     }
+    // ── QA-Mitschnitt schreiben (nur Diagnosemodus) ──────────────────────
+    // Muss VOR stopAll() laufen: danach sind Detektor-Puffer und Rohring leer.
+    // Rein lesend gegenüber der Erkennung — die Winkel dieses Durchlaufs werden
+    // verworfen, es werden nur die Diagnosen übernommen.
+    if (qaRef.current && localSessionId.current) {
+      try {
+        const detectPts = detectPointsRef.current;
+        const linePts = pointsRef.current;
+        const sweep = detectShortLegCorners(detectPts);
+        const acceptedIdx = new Set(sweep.corners.map(c => c.apexIndex));
+        const autoDiagnostics: QaAutoDiagnostic[] = sweep.diagnostics.map(d => ({
+          apexIndex: d.apexIndex,
+          tMs: d.t == null ? null : d.t - (qaOriginRef.current?.t ?? d.t),
+          bearingBefore: d.bearingBefore,
+          bearingAfter: d.bearingAfter,
+          headingDeltaDeg: d.headingDeltaDeg,
+          interiorAngleDeg: d.interiorAngleDeg,
+          classification: d.classification,
+          confidenceBeforeMotion: d.confidenceBeforeMotion,
+          motionAdjustment: d.motionAdjustment,
+          confidence: d.confidence,
+          rejectReason: d.rejectReason,
+          accepted: acceptedIdx.has(d.apexIndex),
+        }));
+        const detectorPoints = detectPts.map(p => qaRel(p.lat, p.lng, p.t ?? 0, p.accuracy, p.cumDist));
+        const linePoints = linePts.map(p => qaRel(p.lat, p.lng, p.t, p.accuracy, p.cumDist));
+        const rawFixes = qaRawFixesRef.current;
+        void saveQaSessionCapture({
+          captureVersion: 1,
+          sessionLocalId: localSessionId.current,
+          durationMs: rawFixes.length ? rawFixes[rawFixes.length - 1].tMs : 0,
+          counts: {
+            rawFixes: qaRawCountRef.current,
+            acceptedFixes: qaAcceptedCountRef.current,
+            rejectedFixes: rejectedRef.current,
+            detectorPoints: detectorPoints.length,
+            linePoints: linePoints.length,
+          },
+          distances: {
+            rawPathM: pathLength(rawFixes),
+            detectorPathM: detectPts.length ? Math.round(detectPts[detectPts.length - 1].cumDist * 100) / 100 : 0,
+            recordedLineM: linePts.length ? Math.round(linePts[linePts.length - 1].cumDist * 100) / 100 : 0,
+            storeDistanceM: Math.round(store.getState().distanceMeters * 100) / 100,
+          },
+          rawFixes,
+          detectorPoints,
+          linePoints,
+          markers: qaMarkerMetaRef.current.slice(),
+          autoDiagnostics,
+        });
+      } catch (e) {
+        console.warn('[trackRecorder] QA-Mitschnitt', e);
+      }
+    }
+
     stopAll();
     const s = store.getState();
     s.stopRecording();
@@ -884,7 +1001,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })();
-  }, [stopAll, store, flushPoints, persistConfirmedCorner, commitMarker]);
+  }, [stopAll, store, flushPoints, persistConfirmedCorner, commitMarker, qaRel]);
 
   return { startWarmup, beginRecording, pause, resume, addMarker, finish, stopAll, gpsDebug };
 }

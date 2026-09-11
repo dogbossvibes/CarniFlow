@@ -109,7 +109,7 @@ describe('Exportstruktur', () => {
   const exported = buildQaTrackExport('local-abc-123', rawLayPoints(), rawMarkers);
 
   it('enthält die geforderten Felder und Metadaten', () => {
-    expect(exported.schemaVersion).toBe(1);
+    expect(exported.schemaVersion).toBe(2);
     expect(exported.pointType).toBe('lay');
     expect(exported.pointCount).toBe(exported.points.length);
     expect(exported.durationMs).toBeGreaterThan(0);
@@ -262,5 +262,27 @@ describe('Datenquelle: ausschliesslich gelegte Punkte', () => {
 
   it('der Export markiert seinen Inhalt explizit als lay', () => {
     expect(buildQaTrackExport('x', rawLayPoints(), []).pointType).toBe('lay');
+  });
+
+  it('der Service führt den QA-Mitschnitt mit den DB-Daten zusammen', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const src = require('fs').readFileSync('features/tracking/services/qaTrackExportService.ts', 'utf8');
+    expect(src).toContain('loadQaSessionCapture(localId)');
+    expect(src).toContain('buildQaTrackExport(localId, points, markers, capture)');
+    // Ein fehlender Mitschnitt darf den Export nicht scheitern lassen — eine
+    // Session ohne QA-Modus bleibt exportierbar.
+    expect(src).toContain('loadQaSessionCapture(localId).catch(() => null)');
+    // Und er wird nur gelesen, nie geschrieben oder gelöscht.
+    expect(src).not.toContain('saveQaSessionCapture');
+    expect(src).not.toContain('clearQaSessionCaptures');
+  });
+
+  it('das Sicherheitsnetz läuft weiterhin vor jeder Weitergabe', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const src = require('fs').readFileSync('features/tracking/services/qaTrackExportService.ts', 'utf8');
+    const build = src.slice(src.indexOf('export async function buildExportForSession'));
+    const fn = build.slice(0, build.indexOf('export async function shareQaExport'));
+    expect(fn).toContain('assertNoAbsoluteData(exported)');
+    expect(fn.indexOf('buildQaTrackExport')).toBeLessThan(fn.indexOf('assertNoAbsoluteData'));
   });
 });

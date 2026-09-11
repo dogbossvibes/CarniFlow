@@ -9,6 +9,7 @@ import {
   getLayTrackPointsBySession, getTrackMarkersBySession,
 } from '@/features/tracking/repositories/localTrackRepository';
 import { getLocalTrainingSessions } from '@/features/training/repositories/localTrainingRepository';
+import { loadQaSessionCapture } from '@/features/tracking/utils/qaSessionCapture';
 import {
   buildQaTrackExport, serializeQaTrackExport, qaExportFileName, assertNoAbsoluteData,
   type QaTrackExport,
@@ -44,13 +45,22 @@ export async function listRecentLaySessions(ownerId: string, limit = 5): Promise
   return out;
 }
 
-/** Baut den anonymisierten Export EINER Session. */
+/**
+ * Baut den anonymisierten Export EINER Session.
+ *
+ * Der QA-Mitschnitt (Detektor-Puffer, Rohfixe, Marker-Herkunft) kommt aus einem
+ * getrennten QA-Bereich und ist optional: fehlt er — QA-Modus war beim Legen
+ * aus, oder die Session stammt aus der Zeit davor —, bleibt der Export gültig
+ * und meldet das ehrlich über `qaCaptureAvailable: false`, statt fehlende
+ * Werte zu erfinden.
+ */
 export async function buildExportForSession(localId: string): Promise<QaTrackExport> {
-  const [points, markers] = await Promise.all([
+  const [points, markers, capture] = await Promise.all([
     getLayTrackPointsBySession(localId),
     getTrackMarkersBySession(localId).catch(() => []),
+    loadQaSessionCapture(localId).catch(() => null),
   ]);
-  const exported = buildQaTrackExport(localId, points, markers);
+  const exported = buildQaTrackExport(localId, points, markers, capture);
   // Sicherheitsnetz vor jeder Weitergabe: lieber kein Export als ein Leck.
   assertNoAbsoluteData(exported);
   return exported;

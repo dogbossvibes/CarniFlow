@@ -16,7 +16,8 @@ import {
 } from '@/features/tracking/utils/shortLegCornerDetection';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
 import type {
-  AnonPoint as _AnonPoint, AnonMarker as _AnonMarker, QaTrackExport as _QaExport,
+  AnonPoint as _AnonPoint, AnonMarker as _AnonMarker,
+  QaTrackExport as _QaExport, QaTrackExportV1 as _QaExportV1,
 } from '@/features/tracking/utils/qaTrackExport';
 
 const M_PER_DEG = 111320;
@@ -29,7 +30,7 @@ export {
   qaExportFileName, assertNoAbsoluteData, hashSessionId,
 } from '@/features/tracking/utils/qaTrackExport';
 export type {
-  RawLayPoint, RawTrackMarker, AnonPoint, AnonMarker, QaTrackExport,
+  RawLayPoint, RawTrackMarker, AnonPoint, AnonMarker, QaTrackExport, QaTrackExportV1,
 } from '@/features/tracking/utils/qaTrackExport';
 
 export interface SessionFixture {
@@ -39,6 +40,12 @@ export interface SessionFixture {
   markers: _AnonMarker[];
   /** Die real gelaufene Sollfolge. */
   groundTruth: GroundTruthEvent[];
+  /**
+   * Der im Feld tatsächlich benutzte Detektor-Puffer, falls der Export ihn
+   * mitbringt (Schema v2). Er ersetzt die Nachbildung aus `points` — die kann
+   * ihn nur annähern, weil die Linie 2-m-gegated ist.
+   */
+  detectorPoints?: { x: number; y: number; accuracy: number | null; tMs: number; cumDistM?: number }[] | null;
 }
 
 export interface GroundTruthEvent {
@@ -51,13 +58,56 @@ export interface GroundTruthEvent {
 }
 
 /**
+ * Ein v1-Export auf v2 heben. v1-Dateien bleiben damit lesbar: alles, was v1
+ * nie erfasst hat, wird ehrlich als „nicht vorhanden" markiert statt
+ * rekonstruiert. Nur `recordedLineM` lässt sich übernehmen — v1s
+ * `totalDistanceM` IST die Linienlänge.
+ */
+export function migrateQaExportV1(v1: _QaExportV1): _QaExport {
+  return {
+    ...v1,
+    schemaVersion: 2,
+    markers: v1.markers.map(m => ({
+      ...m,
+      source: m.source ?? 'unknown',
+      scale: m.scale ?? 'unknown',
+      apexIndex: m.apexIndex ?? null,
+    })),
+    qaCaptureAvailable: false,
+    distances: {
+      rawPathM: null, detectorPathM: null,
+      recordedLineM: v1.totalDistanceM, storeDistanceM: null,
+    },
+    counts: {
+      rawFixes: null, acceptedFixes: null, rejectedFixes: null,
+      detectorPoints: null, linePoints: null, persistedPoints: v1.points.length,
+    },
+    rawFixes: [], detectorPoints: [], linePoints: [], autoDiagnostics: [],
+  };
+}
+
+/** Nimmt v1 wie v2 entgegen und liefert immer die v2-Struktur. */
+export function readQaExport(raw: _QaExport | _QaExportV1): _QaExport {
+  return raw.schemaVersion === 2 ? raw : migrateQaExportV1(raw);
+}
+
+/**
  * Eine exportierte QA-Datei direkt als Fixture laden — genau der Weg, den die
  * echten Teil-A-/Teil-B-Dateien nehmen werden.
+ *
+ * Enthält der Export einen QA-Mitschnitt, ist `detectorPoints` die
+ * MASSGEBLICHE Eingabe: das ist exakt die Punktfolge, auf der der Detektor im
+ * Feld gearbeitet hat. Ohne Mitschnitt bleibt nur die Linie, aus der der
+ * Detektor-Puffer nachgebildet werden muss (v1-Verhalten).
  */
 export function fixtureFromExport(
-  label: string, exported: _QaExport, groundTruth: GroundTruthEvent[],
+  label: string, exported: _QaExport | _QaExportV1, groundTruth: GroundTruthEvent[],
 ): SessionFixture {
-  return { label, points: exported.points, markers: exported.markers, groundTruth };
+  const e = readQaExport(exported);
+  return {
+    label, points: e.points, markers: e.markers, groundTruth,
+    detectorPoints: e.detectorPoints.length ? e.detectorPoints : null,
+  };
 }
 
 /** Anonymisierte Punkte → Detektor-Eingabe, exakt wie im Recorder. */
@@ -78,6 +128,25 @@ export function fixtureToDetectorBuffer(points: readonly _AnonPoint[]): ShortLeg
     out.push({ lat: ema[1] / M_PER_DEG, lng: ema[0] / M_PER_DEG, cumDist: cum, accuracy: p.accuracy, t: p.tMs });
   }
   return out;
+}
+
+/**
+ * Mitgeschnittene Detektor-Punkte → Detektor-Eingabe. Hier wird NICHTS mehr
+ * geglättet oder gegated: diese Punkte haben beides im Feld bereits
+ * durchlaufen. `cumDistM` kommt aus dem Mitschnitt, damit die Marker-Distanzen
+ * auf demselben Massstab liegen wie dort.
+ */
+export function capturedDetectorBuffer(
+  pts: readonly { x: number; y: number; accuracy: number | null; tMs: number; cumDistM?: number }[],
+): ShortLegPoint[] {
+  let cum = 0;
+  return pts.map((p, i) => {
+    if (i > 0 && p.cumDistM == null) cum += Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
+    return {
+      lat: p.y / M_PER_DEG, lng: p.x / M_PER_DEG,
+      cumDist: p.cumDistM ?? cum, accuracy: p.accuracy, t: p.tMs,
+    };
+  });
 }
 
 /** Die ungeglättete Punktfolge mit cumDist — für Vergleichsmessungen. */
@@ -131,7 +200,9 @@ function directionOf(kind: AngleKind | null): 'links' | 'rechts' | null {
 export function evaluateAgainstGroundTruth(
   fixture: SessionFixture, searchRadiusM = 2.5,
 ): { events: EventEvaluation[]; detected: AngleKind[]; diagnostics: ShortLegDiagnostics[] } {
-  const buffer = fixtureToDetectorBuffer(fixture.points);
+  const buffer = fixture.detectorPoints?.length
+    ? capturedDetectorBuffer(fixture.detectorPoints)
+    : fixtureToDetectorBuffer(fixture.points);
   const { corners, diagnostics } = detectShortLegCorners(buffer);
 
   const events = fixture.groundTruth.map((gt): EventEvaluation => {
