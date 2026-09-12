@@ -20,6 +20,7 @@
 // ausschliesslich relative Koordinaten und relative Zeiten.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { MovementState } from '@/modules/anyvo-motion';
 
 const KEY_PREFIX = 'anyvo.qa.trackCapture.';
 const INDEX_KEY = 'anyvo.qa.trackCapture.index';
@@ -65,8 +66,86 @@ export interface QaAutoDiagnostic {
   accepted: boolean;
 }
 
+/**
+ * QA v2.1 — EIN Motion-Rohsample, wie es LIVE im Puffer lag.
+ * Zeiten relativ zum Kandidaten-Zeitpunkt, damit nichts Absolutes exportiert
+ * wird und jedes Auswertefenster (±1 s oder anders) nachrechenbar bleibt.
+ */
+export interface QaMotionSample {
+  /** ms relativ zum Kandidaten-Zeitpunkt. Negativ = davor. */
+  dtMs: number;
+  headingDelta: number;
+  rotationMagnitude: number;
+  accelerationMagnitude: number;
+  stepDelta: number;
+  cadence: number | null;
+  movementState: MovementState;
+}
+
+/**
+ * QA v2.1 — was zum Zeitpunkt EINES Kandidaten an Motion-Evidenz vorlag.
+ *
+ * DREI EBENEN, strikt getrennt:
+ *
+ *   LIVE RECORDED       `samples` — die Rohsamples, die WÄHREND der Session im
+ *                       Ringpuffer lagen. Nicht nachgerechnet, nicht ergänzt.
+ *   DERIVED             `netYawDeg` … `turnEvidence` — Aggregate, die die
+ *                       bestehende Variante-E-Logik daraus berechnet hat.
+ *                       Unverändert übernommen, nicht neu gebildet.
+ *   FINISH RECONSTRUCTED  gibt es hier NICHT. Der Block wird ausschliesslich
+ *                       live geschrieben; `source` ist deshalb fest 'live'.
+ *                       Der finish-Sweep in `autoDiagnostics` bleibt getrennt
+ *                       und ist als Rekonstruktion gekennzeichnet.
+ */
+export interface QaCandidateMotion {
+  // ── Zuordnung ────────────────────────────────────────────────────────────
+  apexIndex: number;
+  /** ms relativ zum Aufnahmebeginn — der Zeitpunkt, für den ausgewertet wurde. */
+  evaluatedAtMs: number;
+  /** Auswertefenster, relativ zum Kandidaten (ms). */
+  windowStartMs: number;
+  windowEndMs: number;
+
+  // ── LIVE RECORDED: Verfügbarkeit ─────────────────────────────────────────
+  sampleCount: number;
+  /** Alter des ältesten/jüngsten Samples im Fenster, relativ zum Kandidaten. */
+  firstSampleAgeMs: number | null;
+  lastSampleAgeMs: number | null;
+  /** false = im Fenster lag gar nichts. Unterscheidet „keine Evidenz" von
+   *  „Evidenz sagt: keine Drehung". */
+  motionAvailable: boolean;
+
+  // ── DERIVED: Aggregate der bestehenden Variante-E-Logik ──────────────────
+  netYawDeg: number;
+  grossYawDeg: number;
+  monotonicity: number;
+  yawShare: number;
+  accelerationEvidence: number;
+  stepDelta: number;
+  cadence: number | null;
+  movementState: MovementState | null;
+  locomotionEvidence: 'steps' | 'gait_accel' | 'steps+gait_accel' | 'none';
+  /** 0..1 oder null, wenn keine Daten. */
+  turnEvidence: number | null;
+  /** Was die ±0,12-Kopplung tatsächlich auf die Confidence gelegt hat. */
+  adjustmentApplied: number;
+
+  // ── LIVE RECORDED: die Rohsamples ────────────────────────────────────────
+  /** Mit Kontext über das Auswertefenster hinaus (s. QA_MOTION_CONTEXT_MS). */
+  samples: QaMotionSample[];
+
+  /** Immer 'live'. Feld existiert, damit eine spätere Rekonstruktionsquelle
+   *  unterscheidbar wäre, ohne das Schema erneut zu brechen. */
+  source: 'live';
+}
+
+/** Kontext vor/nach dem Auswertefenster, damit auch grössere Fenster
+ *  nachrechenbar sind. */
+export const QA_MOTION_CONTEXT_MS = 2000;
+
 export interface QaSessionCapture {
-  captureVersion: 1;
+  /** 1 = Schema v2.0 (ohne Motion), 2 = v2.1 (mit candidateMotionEvidence). */
+  captureVersion: 1 | 2;
   sessionLocalId: string;
   /** Dauer der Aufzeichnung (ms), relativ. */
   durationMs: number;
@@ -87,7 +166,10 @@ export interface QaSessionCapture {
   detectorPoints: QaCapturePoint[];
   linePoints: QaCapturePoint[];
   markers: QaMarkerMeta[];
+  /** FINISH RECONSTRUCTED — Neuberechnung beim Stop, OHNE Motion. */
   autoDiagnostics: QaAutoDiagnostic[];
+  /** LIVE RECORDED + DERIVED — QA v2.1. Fehlt bei captureVersion 1. */
+  candidateMotionEvidence?: QaCandidateMotion[];
 }
 
 const keyFor = (sessionLocalId: string) => `${KEY_PREFIX}${sessionLocalId}`;
@@ -114,7 +196,8 @@ export async function loadQaSessionCapture(sessionLocalId: string): Promise<QaSe
     const raw = await AsyncStorage.getItem(keyFor(sessionLocalId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as QaSessionCapture;
-    return parsed?.captureVersion === 1 ? parsed : null;
+    // v2.0-Mitschnitte (captureVersion 1) bleiben lesbar.
+    return parsed?.captureVersion === 1 || parsed?.captureVersion === 2 ? parsed : null;
   } catch {
     return null;
   }

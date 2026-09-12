@@ -29,13 +29,13 @@ import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsM
 import { markWarmupStarted, markReportedSource, markWarmupStopped, markMotionStarted, markMotionSample } from '@/features/tracking/utils/trackingWarmupState';
 import { pushQaCandidateLine, clearQaCandidateLog } from '@/features/tracking/utils/qaCandidateLog';
 import {
-  saveQaSessionCapture, pathLength,
+  saveQaSessionCapture, pathLength, QA_MOTION_CONTEXT_MS,
   type QaCapturePoint, type QaMarkerMeta, type QaAutoDiagnostic,
-  type QaMarkerSource, type QaDistanceScale,
+  type QaMarkerSource, type QaDistanceScale, type QaCandidateMotion,
 } from '@/features/tracking/utils/qaSessionCapture';
 import { evaluateStopFlush } from '@/features/tracking/utils/stopFlushCorner';
 import { motionClient } from '@/features/tracking/native/motionClient';
-import { MotionEvidenceBuffer } from '@/features/tracking/utils/motionTurnEvidence';
+import { MotionEvidenceBuffer, TURN_EVIDENCE_DEFAULTS } from '@/features/tracking/utils/motionTurnEvidence';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
 import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -162,6 +162,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const qaRawCountRef = useRef(0);
   const qaAcceptedCountRef = useRef(0);
   const qaMarkerMetaRef = useRef<QaMarkerMeta[]>([]);
+  /** QA v2.1: Motion-Evidenz je bewertetem Kandidaten, LIVE mitgeschnitten. */
+  const qaCandidateMotionRef = useRef<QaCandidateMotion[]>([]);
+  /** Verhindert Doppel-Einträge: je apexIndex genau ein Mitschnitt. */
+  const qaMotionSeenRef = useRef<Set<number>>(new Set());
   // Start-Lock (Stabilisierungsphase): Anker + Bewegungserkennung + Drift-Zähler.
   const startLockRef      = useRef<boolean>(false);              // true ⇒ Startphase aktiv
   const startLockBeganRef = useRef<number>(0);                   // ms: Beginn der Startphase
@@ -338,6 +342,59 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       ? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceFor(t))
       : undefined;
     const { corners, diagnostics } = detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt);
+
+    // ── QA v2.1: Motion-Evidenz LIVE je Kandidat festhalten ────────────────
+    // Rein beobachtend. Greift nur im QA-Diagnosemodus und nur, solange Core
+    // Motion ohnehin läuft. Es wird NICHTS neu berechnet — die Aggregate
+    // stammen aus derselben Auswertung, die der Detektor gerade benutzt hat,
+    // und die Rohsamples kommen unverändert aus dem Ringpuffer.
+    if (qaRef.current && motionActiveRef.current) {
+      for (const d of diagnostics) {
+        const tCand = d.t;
+        if (tCand == null || qaMotionSeenRef.current.has(d.apexIndex)) continue;
+        // Nur Kandidaten, bei denen Motion überhaupt eine Rolle spielen kann:
+        // die Geometrie muss bis zur Richtungsmessung gekommen sein.
+        if (d.headingDeltaDeg == null) continue;
+        qaMotionSeenRef.current.add(d.apexIndex);
+        const ev = motionBufRef.current.evidenceFor(tCand);
+        const samples = motionBufRef.current.samplesIn(
+          tCand - (TURN_EVIDENCE_DEFAULTS.halfWindowSec * 1000 + QA_MOTION_CONTEXT_MS),
+          tCand + (TURN_EVIDENCE_DEFAULTS.halfWindowSec * 1000 + QA_MOTION_CONTEXT_MS),
+        );
+        const t0 = qaOriginRef.current?.t ?? tCand;
+        qaCandidateMotionRef.current.push({
+          apexIndex: d.apexIndex,
+          evaluatedAtMs: Math.round(tCand - t0),
+          windowStartMs: Math.round(ev.windowStartMs - tCand),
+          windowEndMs: Math.round(ev.windowEndMs - tCand),
+          sampleCount: ev.sampleCount,
+          firstSampleAgeMs: samples.length ? Math.round(samples[0].t - tCand) : null,
+          lastSampleAgeMs: samples.length ? Math.round(samples[samples.length - 1].t - tCand) : null,
+          motionAvailable: ev.available,
+          netYawDeg: Math.round(ev.netYawDeg * 100) / 100,
+          grossYawDeg: Math.round(ev.grossYawDeg * 100) / 100,
+          monotonicity: Math.round(ev.monotonicity * 1000) / 1000,
+          yawShare: Math.round(ev.yawShare * 1000) / 1000,
+          accelerationEvidence: Math.round(ev.gaitAccelFraction * 1000) / 1000,
+          stepDelta: ev.steps,
+          cadence: ev.cadence,
+          movementState: ev.movementState,
+          locomotionEvidence: ev.locomotionSource,
+          turnEvidence: ev.evidence,
+          adjustmentApplied: d.motionAdjustment ?? 0,
+          samples: samples.map(x => ({
+            dtMs: Math.round(x.t - tCand),
+            headingDelta: Math.round(x.headingDelta * 100) / 100,
+            rotationMagnitude: Math.round(x.rotationMagnitude * 1000) / 1000,
+            accelerationMagnitude: Math.round(x.accelerationMagnitude * 1000) / 1000,
+            stepDelta: x.stepDelta,
+            cadence: x.cadence,
+            movementState: x.movementState,
+          })),
+          source: 'live',
+        });
+      }
+    }
     if (__DEV__ && diagnostics.length) {
       const last = diagnostics[diagnostics.length - 1];
       if (last.rejectReason) angleDbgRef.current.lastReject = last.rejectReason;
@@ -721,6 +778,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaRawCountRef.current = 0;
     qaAcceptedCountRef.current = 0;
     qaMarkerMetaRef.current = [];
+    qaCandidateMotionRef.current = [];
+    qaMotionSeenRef.current.clear();
     if (qaRef.current) { clearQaCandidateLog(); motionBufRef.current.clear(); }
     confirmerRef.current.reset();   // laufende Confirmation-State-Machine leeren
     gpsQualityRef.current.reset();  // Rolling-GPS-Qualität leeren
@@ -921,7 +980,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         const linePoints = linePts.map(p => qaRel(p.lat, p.lng, p.t, p.accuracy, p.cumDist));
         const rawFixes = qaRawFixesRef.current;
         void saveQaSessionCapture({
-          captureVersion: 1,
+          captureVersion: 2,
           sessionLocalId: localSessionId.current,
           durationMs: rawFixes.length ? rawFixes[rawFixes.length - 1].tMs : 0,
           counts: {
@@ -942,6 +1001,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           linePoints,
           markers: qaMarkerMetaRef.current.slice(),
           autoDiagnostics,
+          candidateMotionEvidence: qaCandidateMotionRef.current.slice(),
         });
       } catch (e) {
         console.warn('[trackRecorder] QA-Mitschnitt', e);

@@ -83,6 +83,10 @@ export function migrateQaExportV1(v1: _QaExportV1): _QaExport {
       detectorPoints: null, linePoints: null, persistedPoints: v1.points.length,
     },
     rawFixes: [], detectorPoints: [], linePoints: [], autoDiagnostics: [],
+    // v1 kannte weder Motion noch die Nebenversion.
+    schemaMinor: 0,
+    candidateMotionEvidence: undefined,
+    motionCaptureAvailable: false,
   };
 }
 

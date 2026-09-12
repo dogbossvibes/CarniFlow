@@ -407,6 +407,22 @@ export class MotionEvidenceBuffer {
   clear(): void { this.samples = []; }
   get size(): number { return this.samples.length; }
 
+  /**
+   * QA v2.1 — NUR LESEN. Liefert die Rohsamples eines Zeitfensters, damit ein
+   * Feldlauf später exakt nachgerechnet werden kann (±1 s oder jedes andere
+   * Fenster). Verändert weder Puffer noch Berechnung: `computeTurnEvidence`,
+   * die Gates und alle Parameter bleiben unangetastet.
+   */
+  samplesIn(fromMs: number, toMs: number): MotionWindowSample[] {
+    return this.samples.filter(s => s.t >= fromMs && s.t <= toMs).map(s => ({ ...s }));
+  }
+
+  /** QA v2.1 — Zeitstempel des ältesten/jüngsten Samples, oder null. */
+  get span(): { firstMs: number; lastMs: number } | null {
+    if (!this.samples.length) return null;
+    return { firstMs: this.samples[0].t, lastMs: this.samples[this.samples.length - 1].t };
+  }
+
   evidenceFor(
     candidateTimeMs: number,
     params: TurnEvidenceParams = TURN_EVIDENCE_DEFAULTS,
