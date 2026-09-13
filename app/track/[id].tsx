@@ -21,6 +21,7 @@ import { pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
+import { retryFailedSyncForSession } from '@/features/sync/services/syncEngine';
 import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
@@ -93,6 +94,10 @@ export default function TrackAuswertungScreen() {
       }
       setData(d);
       setIsLocalOnly(localOnly);
+      // Track-Open = Retry-Anlass: ist die lokale Session nicht 'synced', werden
+      // fehlgeschlagene Queue-Items erneut versucht (nicht blockierend, egal von
+      // welchem Screen aus geöffnet). Die Anzeige oben bleibt davon unabhängig.
+      void retryFailedSyncForSession(id).catch(() => {});
       if (d) {
         // Root-Cause-Fix (Abschnitt 8 des Audits — "100 Punkte/Vorzüglich
         // trotz 0 m Suchspur"): das Geometrie-Signal steuert NUR den

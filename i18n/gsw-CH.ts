@@ -1650,7 +1650,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'analyse.trainingBalance30': 'Trainingsbalance · 30 Täg',
   'analyse.scoreTrends': 'Score-Trends',
   'analyse.moreTrainingForTrend': 'Sammle meh Trainings für din Verlauf 📈',
-  'analyse.optionalSummary': 'Optionali KI-Zämefassig',
+  'analyse.optionalSummary': 'Optionali Trainings-Zämefassig',
   'analyse.summaryIntro': 'Erstellt uf Wunsch e zuesätzlichi Text-Zämefassig vo dine Trainings. Tipp dezue uf „Aktualisiere“.',
   'analyse.summaryRunning': 'Dini Trainingsdate werded usgwertet…',
   'analyse.positive': 'Positiv',

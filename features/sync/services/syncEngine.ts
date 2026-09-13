@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useSyncStore } from '@/features/sync/store/syncStore';
 import {
   getPendingSyncOperations, markSyncProcessing, markSyncCompleted, markSyncFailed,
-  retryFailedOperations, syncQueueCounts, clearCompleted,
+  retryFailedOperations, markSyncConflict, syncQueueCounts, clearCompleted,
 } from '@/features/sync/repositories/syncQueueRepository';
 import {
   getLocalTrainingSessionById, setTrainingRemoteId, updateTrainingSyncStatus,
@@ -31,11 +31,20 @@ async function refreshCounts() {
   st.setPendingCount(c.pending); st.setFailedCount(c.failed); st.setConflictCount(c.conflict);
 }
 
+// Grund, warum ein Queue-Item NICHT rekonstruierbar ist: die lokale Session
+// (mit Punkten, Markern, Run) existiert auf diesem Gerät nicht mehr. Früher
+// wurde dieser Fall still als `ok: true` („nichts zu tun") abgehakt — der
+// Nutzer sah „synchronisiert", obwohl remote track_markers/track_runs fehlten
+// (Production-Befund 84b3c0ea: 0 Marker, 0 Runs, nie nachgezogen).
+export const LOCAL_SESSION_MISSING = 'Lokale Session nicht gefunden – nicht rekonstruierbar';
+
+export interface SyncSessionResult { ok: boolean; error?: string; reason?: 'local_missing' }
+
 // Eine Trainings-Session + ihre Kinder (Punkte, Marker) hochladen. Exportiert für
 // gezielte Idempotenz-/Replace-Tests (kein Verhaltenswechsel gegenüber intern).
-export async function syncTrainingSession(localId: string): Promise<{ ok: boolean; error?: string }> {
+export async function syncTrainingSession(localId: string): Promise<SyncSessionResult> {
   const local = await getLocalTrainingSessionById(localId);
-  if (!local) return { ok: true };   // lokal weg → nichts zu tun
+  if (!local) return { ok: false, error: LOCAL_SESSION_MISSING, reason: 'local_missing' };
 
   // Idempotenter Session-Upsert: die remote_id IST die lokale UUID (local_id).
   // Auch wenn eine ACK zuvor verloren ging (remote_id lokal noch null), erzeugt der
@@ -110,10 +119,18 @@ async function processQueueItem(item: Awaited<ReturnType<typeof getPendingSyncOp
         // rating nur gültig (1–5) übernehmen; der Fährten-Score (0–100) bleibt in
         // track_data.score (autoritativ über den create/upsert-Pfad synchronisiert).
         if (local?.remote_id) { const r = await updateRemoteTrainingSession(local.remote_id, { notes: local.notes, rating: validSessionRating(local.score), status: local.status, ended_at: local.ended_at, duration_seconds: local.duration_seconds }); if (r.error) throw new Error(r.error); }
-        else { const res = await syncTrainingSession(item.entity_local_id); if (!res.ok) throw new Error(res.error); }
+        else {
+          const res = await syncTrainingSession(item.entity_local_id);
+          if (res.reason === 'local_missing') { await markSyncConflict(item.id, res.error); return; }
+          if (!res.ok) throw new Error(res.error);
+        }
         await markSyncCompleted(item.id);
       } else {
         const res = await syncTrainingSession(item.entity_local_id);
+        // Lokale Session weg → terminal 'conflict' (sichtbar, nicht endlos
+        // retried; retryFailedOperations fasst nur 'failed' an). Kein
+        // updateTrainingSyncStatus: die Zeile existiert nicht mehr.
+        if (res.reason === 'local_missing') { await markSyncConflict(item.id, res.error); return; }
         if (!res.ok) throw new Error(res.error);
         await markSyncCompleted(item.id);
       }
@@ -169,4 +186,18 @@ export async function syncNow(): Promise<void> {
 
 export async function syncPendingOperations() { return syncNow(); }
 export async function retryFailedSync() { await retryFailedOperations(); await syncNow(); }
+
+// Beim Öffnen einer Fährte/Einheit: ist die lokale Session nicht 'synced'
+// (pending/failed), fehlgeschlagene Queue-Items wieder in den Retry-Pfad
+// nehmen — egal von welchem Screen aus geöffnet wurde (Startliste, Logbuch,
+// Hero, Run-Abschluss). Vorher hing der Retry nur an der Startliste, am
+// Sync-Screen und am Dev-Debug; ein 'failed' Item blieb sonst dauerhaft liegen.
+// Bestehende Semantik unverändert: retryFailedOperations (failed → pending,
+// attempts bleiben gezählt) + syncNow. Ohne lokale Session: nichts zu retryen.
+export async function retryFailedSyncForSession(localId: string): Promise<boolean> {
+  const local = await getLocalTrainingSessionById(localId).catch(() => null);
+  if (!local || local.sync_status === 'synced') return false;
+  await retryFailedSync();
+  return true;
+}
 export async function updateSyncCounts() { await refreshCounts(); }

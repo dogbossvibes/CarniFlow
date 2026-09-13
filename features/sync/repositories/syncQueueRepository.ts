@@ -44,9 +44,16 @@ export async function markSyncFailed(id: string, error: string): Promise<void> {
   await db.runAsync(`update sync_queue set status='failed', attempts=attempts+1, last_error=?, updated_at=? where id=?`, error.slice(0, 500), nowIso(), id);
 }
 
-export async function markSyncConflict(id: string): Promise<void> {
+// Terminaler, sichtbarer Zustand (Sync-Screen „Konflikte"): wird von
+// retryFailedOperations NICHT wieder auf 'pending' gesetzt. `reason` landet in
+// last_error, damit der Grund nachlesbar bleibt (z. B. lokale Session fehlt).
+export async function markSyncConflict(id: string, reason?: string): Promise<void> {
   const db = await getLocalDb();
-  await db.runAsync(`update sync_queue set status='conflict', updated_at=? where id=?`, nowIso(), id);
+  if (reason != null) {
+    await db.runAsync(`update sync_queue set status='conflict', last_error=?, updated_at=? where id=?`, reason.slice(0, 500), nowIso(), id);
+  } else {
+    await db.runAsync(`update sync_queue set status='conflict', updated_at=? where id=?`, nowIso(), id);
+  }
 }
 
 export async function retryFailedOperations(): Promise<void> {

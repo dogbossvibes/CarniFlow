@@ -1653,7 +1653,7 @@ export const deCH = {
   'analyse.trainingBalance30': 'Trainingsbalance · 30 Tage',
   'analyse.scoreTrends': 'Score-Trends',
   'analyse.moreTrainingForTrend': 'Sammle mehr Trainings für deinen Verlauf 📈',
-  'analyse.optionalSummary': 'Optionale KI-Zusammenfassung',
+  'analyse.optionalSummary': 'Optionale Trainings-Zusammenfassung',
   'analyse.summaryIntro': 'Erstellt auf Wunsch eine zusätzliche Text-Zusammenfassung deiner Trainings. Tippe dazu auf „Aktualisieren“.',
   'analyse.summaryRunning': 'Deine Trainingsdaten werden ausgewertet…',
   'analyse.positive': 'Positiv',

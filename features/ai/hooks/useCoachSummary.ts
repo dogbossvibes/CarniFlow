@@ -4,7 +4,8 @@ import { useSession } from '@/hooks/useSession';
 import { refreshCoachSummary, UNAVAILABLE_SUMMARY } from '@/features/ai/services/insightService';
 import type { CoachSummary } from '@/features/ai/types/aiCoach';
 
-// KI-Zusammenfassung — läuft NICHT automatisch (LLM-Kosten), erst auf „Aktualisieren".
+// Regelbasierte Trainings-Zusammenfassung (insightService.refreshCoachSummary —
+// KEIN LLM, keine externe API). Läuft NICHT automatisch, erst auf „Aktualisieren".
 export function useCoachSummary(dogId?: string | null, periodDays = 7) {
   const { session } = useSession();
   const uid = session?.user.id;
