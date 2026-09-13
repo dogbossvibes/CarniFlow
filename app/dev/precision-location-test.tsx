@@ -32,9 +32,9 @@ import {
 import { motionClient } from '@/features/tracking/native/motionClient';
 import { useSession } from '@/hooks/useSession';
 import {
-  listRecentLaySessions, buildExportForSession, shareQaExport, copyQaExport,
-  type QaSessionSummary,
+  buildExportForSession, shareQaExport, copyQaExport, formatQaSessionRow, reconcileQaSelection,
 } from '@/features/tracking/services/qaTrackExportService';
+import { useQaLaySessions } from '@/features/tracking/hooks/useQaLaySessions';
 import type { MotionStatus } from '@/modules/anyvo-motion';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
@@ -85,7 +85,16 @@ function PrecisionLocationTestContent() {
   const [motionStatus, setMotionStatus] = useState<MotionStatus | null>(null);
   // ── Fährten-QA-Export ──
   const { session } = useSession();
-  const [qaSessions, setQaSessions] = useState<QaSessionSummary[]>([]);
+  // Sessionliste fokus-aktuell (useQaLaySessions): bei jeder Rückkehr auf diesen
+  // Screen neu aus SQLite — nie eine veraltete „Letzte gelegte Fährte".
+  const { sessions: qaSessions } = useQaLaySessions(session?.user?.id, 5);
+  const qaSessionsRef = useRef(qaSessions);
+  qaSessionsRef.current = qaSessions;
+  // Sichtbar ausgewählte Zeile (localId). Nach jedem Refresh abgeglichen: ist die
+  // Session nicht mehr in der neuen Liste, wird die Auswahl zurückgesetzt (kein
+  // stiller Export einer anderen Session); ist sie noch da, bleibt sie erhalten.
+  const [qaSelected, setQaSelected] = useState<string | null>(null);
+  useEffect(() => { setQaSelected(prev => reconcileQaSelection(prev, qaSessions)); }, [qaSessions]);
   const [qaBusy, setQaBusy] = useState<string | null>(null);
   const [qaResult, setQaResult] = useState<string | null>(null);
 
@@ -108,22 +117,24 @@ function PrecisionLocationTestContent() {
     motionClient.getStatus().then(setMotionStatus).catch(() => setMotionStatus(null));
   }, []);
   useEffect(() => subscribeQaCandidateLog(setQaLines), []);
-  useEffect(() => {
-    const uid = session?.user?.id;
-    if (!uid) return;
-    listRecentLaySessions(uid, 5).then(setQaSessions).catch(() => setQaSessions([]));
-  }, [session?.user?.id]);
-
   const runExport = async (localId: string, mode: 'share' | 'copy') => {
+    // Export läuft AUSSCHLIESSLICH über die localId der sichtbar gewählten Zeile.
+    // Ist diese Session in der AKTUELL geladenen Liste nicht mehr enthalten
+    // (Liste wurde zwischenzeitlich aktualisiert), Auswahl zurücksetzen und
+    // NICHT still exportieren.
+    const row = qaSessionsRef.current.find(q => q.localId === localId);
+    if (!row) { setQaSelected(null); setQaResult('Sessionliste wurde aktualisiert – bitte Fährte erneut auswählen.'); return; }
+    setQaSelected(localId);
     setQaBusy(localId); setQaResult(null);
     try {
-      const exported = await buildExportForSession(localId);
+      const exported = await buildExportForSession(row.localId);
+      // Kennung im Ergebnis = exakt die sessionId der erzeugten Datei (Zeile ↔ Datei prüfbar).
       if (mode === 'share') {
-        const name = await shareQaExport(exported);
-        setQaResult(`${name} · ${exported.pointCount} Punkte · ${exported.totalDistanceM} m`);
+        const name = await shareQaExport(exported, { startedAt: row.startedAt });
+        setQaResult(`${name} · ${exported.sessionId} · ${exported.pointCount} Punkte · ${exported.totalDistanceM} m`);
       } else {
         const len = await copyQaExport(exported);
-        setQaResult(`In die Zwischenablage kopiert · ${exported.pointCount} Punkte · ${(len / 1024).toFixed(0)} KB`);
+        setQaResult(`In die Zwischenablage kopiert · ${exported.sessionId} · ${exported.pointCount} Punkte · ${(len / 1024).toFixed(0)} KB`);
       }
     } catch (e) {
       setQaResult(`Fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`);
@@ -422,10 +433,10 @@ function PrecisionLocationTestContent() {
             <Text style={s.note}>Keine gelegte Fährte mit Punkten gefunden.</Text>
           ) : (
             qaSessions.map((q, i) => (
-              <View key={q.localId} style={s.qaSessionBox}>
+              <View key={q.localId} style={[s.qaSessionBox, qaSelected === q.localId && s.qaSessionBoxSelected]}>
                 <Row
                   label={i === 0 ? 'Letzte gelegte Fährte' : `Fährte ${i + 1}`}
-                  value={`${q.layPointCount} Punkte${q.startedAt ? ` · ${q.startedAt.slice(0, 16).replace('T', ' ')}` : ''}`}
+                  value={formatQaSessionRow(q)}
                 />
                 <View style={s.abRow}>
                   <TouchableOpacity
@@ -549,6 +560,7 @@ const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: C.bg },
   activeValBad: { color: C.muted },
   qaSessionBox: { marginBottom: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)' },
+  qaSessionBoxSelected: { borderWidth: 1, borderColor: C.trackPrimary, borderRadius: 8, paddingHorizontal: 6 },
   logLine: { fontSize: 10.5, color: C.muted, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 3 },
   head:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
   back:    { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.06)' },

@@ -291,9 +291,27 @@ export function buildQaTrackExport(
   };
 }
 
-/** Dateiname für den Export. */
-export function qaExportFileName(e: QaTrackExport): string {
-  return `anyvo-track-qa-${e.sessionId}.json`;
+/**
+ * Dateiname für den Export. Mit `startedAtIso` (Sessionstart aus der lokalen
+ * Sessionliste, Testmodus) wird lokales Datum + Uhrzeit eingebettet —
+ * `anyvo-track-qa-2026-09-13-1028-qa-1a2b3c4d.json` — damit alte und neue
+ * Exporte nicht mehr nur über den Hash unterscheidbar sind. Nur Ziffern und
+ * Bindestriche (filesystem-safe). Der JSON-Inhalt bleibt unverändert
+ * (weiterhin ohne absolute Zeitstempel); ohne/ungültigem Datum bleibt der
+ * bisherige Name.
+ */
+export function qaExportFileName(e: QaTrackExport, startedAtIso?: string | null): string {
+  const stamp = fileNameStamp(startedAtIso);
+  return stamp ? `anyvo-track-qa-${stamp}-${e.sessionId}.json` : `anyvo-track-qa-${e.sessionId}.json`;
+}
+
+/** `YYYY-MM-DD-HHMM` in lokaler Zeit; null bei fehlendem/ungültigem Datum. */
+export function fileNameStamp(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}`;
 }
 
 export function serializeQaTrackExport(e: QaTrackExport): string {

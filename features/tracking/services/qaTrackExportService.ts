@@ -11,17 +11,63 @@ import {
 import { getLocalTrainingSessions } from '@/features/training/repositories/localTrainingRepository';
 import { loadQaSessionCapture } from '@/features/tracking/utils/qaSessionCapture';
 import {
-  buildQaTrackExport, serializeQaTrackExport, qaExportFileName, assertNoAbsoluteData,
+  buildQaTrackExport, serializeQaTrackExport, qaExportFileName, assertNoAbsoluteData, hashSessionId,
   type QaTrackExport,
 } from '@/features/tracking/utils/qaTrackExport';
 
 export interface QaSessionSummary {
   localId: string;
+  /**
+   * Gehashte QA-Session-ID — EXAKT die `sessionId`, die der Export dieser Zeile
+   * trägt (hashSessionId(localId)). Macht Zeile ↔ Datei eindeutig zuordenbar,
+   * ohne die rohe UUID anzuzeigen.
+   */
+  qaId: string;
   /** ISO-String des Starts — nur für die Auswahlliste, nicht im Export. */
   startedAt: string | null;
   durationSeconds: number | null;
   /** Anzahl gelegter Punkte (lay). */
   layPointCount: number;
+  /** Beim Legen finalisierte Distanz (payload_json.distanceMeters) — nur gelesen, nicht neu berechnet; null, wenn nicht vorhanden. */
+  distanceM: number | null;
+}
+
+/** Distanz aus dem beim Finalize gespeicherten payload_json lesen (keine Neuberechnung). */
+function distanceFromPayload(payloadJson: string | null | undefined): number | null {
+  if (!payloadJson) return null;
+  try {
+    const v = (JSON.parse(payloadJson) as { distanceMeters?: unknown }).distanceMeters;
+    return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  } catch { return null; }
+}
+
+/**
+ * Auswahl nach einem Listen-Refresh abgleichen: bleibt erhalten, wenn die
+ * Session noch in der Liste ist; sonst zurückgesetzt (nie still auf eine andere
+ * Session springen). Reine Funktion.
+ */
+export function reconcileQaSelection(prev: string | null, sessions: readonly QaSessionSummary[]): string | null {
+  if (prev == null) return null;
+  return sessions.some(q => q.localId === prev) ? prev : null;
+}
+
+/**
+ * Anzeigezeile einer Session (Testmodus): lokales Datum + Uhrzeit, Punkte,
+ * Distanz (falls vorhanden) und die kurze QA-Kennung. Reine Funktion.
+ */
+export function formatQaSessionRow(q: QaSessionSummary): string {
+  const parts: string[] = [];
+  if (q.startedAt) {
+    const d = new Date(q.startedAt);
+    if (!Number.isNaN(d.getTime())) {
+      const p2 = (n: number) => String(n).padStart(2, '0');
+      parts.push(`${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`);
+    }
+  }
+  parts.push(`${q.layPointCount} Punkte`);
+  if (q.distanceM != null) parts.push(`${Math.round(q.distanceM)} m`);
+  parts.push(q.qaId);
+  return parts.join(' · ');
 }
 
 /**
@@ -37,9 +83,11 @@ export async function listRecentLaySessions(ownerId: string, limit = 5): Promise
     if (!points.length) continue;
     out.push({
       localId: s.local_id,
+      qaId: hashSessionId(s.local_id),
       startedAt: s.started_at ?? s.created_at ?? null,
       durationSeconds: s.duration_seconds ?? null,
       layPointCount: points.length,
+      distanceM: distanceFromPayload(s.payload_json),
     });
   }
   return out;
@@ -70,7 +118,7 @@ export async function buildExportForSession(localId: string): Promise<QaTrackExp
  * Schreibt den Export in eine temporäre Datei und öffnet das native
  * Teilen-Menü. Gibt den Dateinamen zurück.
  */
-export async function shareQaExport(exported: QaTrackExport): Promise<string> {
+export async function shareQaExport(exported: QaTrackExport, opts?: { startedAt?: string | null }): Promise<string> {
   assertNoAbsoluteData(exported);
 
   // expo-sharing exportiert AUSSCHLIESSLICH benannte Funktionen
@@ -91,7 +139,8 @@ export async function shareQaExport(exported: QaTrackExport): Promise<string> {
     throw new Error('Teilen ist auf diesem Gerät nicht verfügbar. Nutze stattdessen „Kopieren".');
   }
 
-  const name = qaExportFileName(exported);
+  // Dateiname mit Sessionstart (Datum/Uhrzeit) aus der Listenzeile — der JSON-Inhalt bleibt identisch.
+  const name = qaExportFileName(exported, opts?.startedAt);
   const json = serializeQaTrackExport(exported);
 
   const FileSystem = await import('expo-file-system/legacy');
