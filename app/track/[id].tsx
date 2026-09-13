@@ -17,6 +17,7 @@ import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
 import { FaehrtenHeader, SectionLabel, relDate } from '@/features/tracking/components/FaehrtenChrome';
 import { getTrackSessionById, saveTrackEvaluation } from '@/features/tracking/services/trackService';
 import { getLocalTrackDetail, getLocalRunSupplement, saveLocalTrackEvaluation } from '@/features/tracking/services/trackHistoryService';
+import { pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
@@ -85,6 +86,14 @@ export default function TrackAuswertungScreen() {
             score:                    d.score ?? sup.score,
           };
         }
+      }
+      // Marker-Fallback: Remote authoritative, sonst lokale Marker derselben Session
+      // (Production-Befund: Marker-Sync scheiterte am DB-Contract → remote 0 Marker,
+      // obwohl die Winkel lokal vorliegen). Keine Duplikate (pickDetailMarkers).
+      if (d && !localOnly && !(d.markers?.length)) {
+        const local = await getLocalTrackDetail(id).catch(() => null);
+        const picked = pickDetailMarkers(d.markers ?? [], local?.markers ?? []);
+        if (picked.length > 0) d = { ...d, markers: picked };
       }
       setData(d);
       setIsLocalOnly(localOnly);

@@ -15,7 +15,7 @@ import { getPendingMediaFiles, markMediaUploaded, markMediaUploadFailed } from '
 import { validSessionRating } from '@/features/tracking/utils/sessionRating';
 import {
   createRemoteTrainingSession, updateRemoteTrainingSession, deleteRemoteTrainingSession,
-  createRemoteTrackPointsBatch, createRemoteTrackMarkersBatch, uploadRemoteMediaFile,
+  createRemoteTrackPointsBatch, createRemoteTrackMarkersBatch, createRemoteTrackMarkersIndividually, uploadRemoteMediaFile,
   deleteRemoteLayTrackPoints, deleteRemoteTrackMarkers, upsertRemoteTrackRun,
 } from '@/features/sync/services/remoteTrainingSyncService';
 
@@ -56,13 +56,24 @@ export async function syncTrainingSession(localId: string): Promise<{ ok: boolea
     await updateTrackPointSyncStatus(layPoints.map(p => p.local_id), 'synced');
   }
 
-  // Marker — idempotenter Replace-by-session.
+  // Marker — idempotenter Replace-by-session. Ein Marker-Fehler darf den
+  // Run-Sync NICHT verhindern (Production-Befund: ein einziger vom DB-Contract
+  // abgelehnter Marker liess Batch + Run scheitern → 0 Marker, 0 track_runs).
+  // Ablauf: Batch → bei Fehler Einzel-Inserts (gültige Marker bleiben erhalten)
+  // → Run wird in jedem Fall geschrieben → Marker-Fehler wird DANACH als
+  // ok:false gemeldet (Queue-Item bleibt failed/retry, Session nicht 'synced').
   const markers = await getTrackMarkersBySession(localId);
   const dm = await deleteRemoteTrackMarkers(remoteId);
   if (dm.error) return { ok: false, error: dm.error };
+  let markerError: string | null = null;
   if (markers.length > 0) {
     const mr = await createRemoteTrackMarkersBatch(remoteId, markers);
-    if (mr.error) return { ok: false, error: mr.error };
+    if (mr.error) {
+      const single = await createRemoteTrackMarkersIndividually(remoteId, markers);
+      if (single.failed.length > 0) {
+        markerError = `markers: ${single.failed.length}/${markers.length} abgelehnt (${single.failed[0].error})`;
+      }
+    }
   }
 
   // Absuche-Run (RUN-SAVE2) — NACH dem Parent-Upsert (FK-Reihenfolge). track_runs wird
@@ -76,6 +87,10 @@ export async function syncTrainingSession(localId: string): Promise<{ ok: boolea
     const rr = await upsertRemoteTrackRun(remoteId, run);
     if (rr.error) return { ok: false, error: rr.error };
   }
+
+  // Marker-Fehler erst JETZT melden: Run ist gesichert, der Retry versucht die
+  // Marker erneut (Replace-by-session), nichts wird still verschluckt.
+  if (markerError) return { ok: false, error: markerError };
 
   await updateTrainingSyncStatus(localId, 'synced');
   return { ok: true };

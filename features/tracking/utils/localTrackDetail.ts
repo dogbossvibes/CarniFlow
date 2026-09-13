@@ -128,3 +128,28 @@ export function buildLocalTrackDetail(
     _localOnly: true,
   };
 }
+
+// ── Marker-Fallback für den Detail-Screen ────────────────────────────────
+// Remote bleibt authoritative, sobald dort Marker vorliegen. Liefert Remote
+// jedoch 0 Marker (z. B. weil der Marker-Sync am alten DB-Contract scheiterte,
+// Production-Befund 13.09.2026), werden die LOKALEN Marker derselben Session
+// angezeigt — gleicher Row-Shape wie eine track_markers-Zeile (siehe
+// buildLocalTrackDetail). Kein blindes Zusammenmischen beider Quellen;
+// innerhalb der gewählten Quelle wird per stabiler `id` dedupliziert.
+export interface DetailMarkerRowLike { id?: string | null }
+
+export function pickDetailMarkers<T extends DetailMarkerRowLike>(remote: T[] | null | undefined, local: T[] | null | undefined): T[] {
+  const dedupe = (rows: T[]): T[] => {
+    const seen = new Set<string>();
+    return rows.filter(r => {
+      const key = r.id == null ? null : String(r.id);
+      if (key == null) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  if (remote && remote.length > 0) return dedupe(remote);
+  if (local && local.length > 0) return dedupe(local);
+  return [];
+}

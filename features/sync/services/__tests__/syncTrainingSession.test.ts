@@ -24,11 +24,13 @@ const mockDelMarkers = jest.fn(async (..._a: any[]): Promise<any> => ({ data: nu
 const mockInsPoints = jest.fn(async (..._a: any[]): Promise<any> => ({ data: null, error: null }));
 const mockInsMarkers = jest.fn(async (..._a: any[]): Promise<any> => ({ data: null, error: null }));
 const mockUpsertRun = jest.fn(async (..._a: any[]): Promise<any> => ({ data: null, error: null }));
+const mockInsMarkersIndividually = jest.fn(async (..._a: any[]): Promise<any> => ({ inserted: 0, failed: [] }));
 jest.mock('@/features/sync/services/remoteTrainingSyncService', () => ({
   createRemoteTrainingSession: (...a: any[]) => mockCreateRemote(...a),
   updateRemoteTrainingSession: jest.fn(), deleteRemoteTrainingSession: jest.fn(),
   createRemoteTrackPointsBatch: (...a: any[]) => mockInsPoints(...a),
   createRemoteTrackMarkersBatch: (...a: any[]) => mockInsMarkers(...a),
+  createRemoteTrackMarkersIndividually: (...a: any[]) => mockInsMarkersIndividually(...a),
   uploadRemoteMediaFile: jest.fn(),
   deleteRemoteLayTrackPoints: (...a: any[]) => mockDelPoints(...a),
   deleteRemoteTrackMarkers: (...a: any[]) => mockDelMarkers(...a),
@@ -150,5 +152,58 @@ describe('syncTrainingSession — RUN-SAVE2: track_runs idempotent', () => {
     const res = await syncTrainingSession('local-1');
     expect(res.ok).toBe(false);
     expect(mockUpdateSyncStatus).not.toHaveBeenCalledWith('local-1', 'synced');
+  });
+});
+
+// ── Marker-Fehler dürfen den Run-Sync nicht zerstören (Production-Befund qa-0ec8c4ca) ──
+describe('Marker-Fehlersemantik: Run wird trotz Marker-Fehler gesichert', () => {
+  const RUN2 = { run_id: 'run-uuid-2', run_points: [{ lat: 1, lng: 2, t: 0 }] };
+  const M_OK = { local_id: 'm1', marker_type: 'winkel', angle_kind: 'rechts' };
+  const M_BAD = { local_id: 'm2', marker_type: 'winkel', angle_kind: 'spitz_rechts' };
+
+  it('Batch scheitert, Einzel-Insert scheitert für 1 Marker → Run trotzdem upserted, ok=false mit markers-Fehler, NICHT synced', async () => {
+    mockGetLocal.mockResolvedValue({ ...localRow, payload_json: JSON.stringify({ run: RUN2 }) });
+    mockGetMarkers.mockResolvedValue([M_OK, M_BAD]);
+    mockInsMarkers.mockResolvedValueOnce({ data: null, error: 'new row violates check constraint "track_markers_angle_kind_check"' });
+    mockInsMarkersIndividually.mockResolvedValueOnce({ inserted: 1, failed: [{ localId: 'm2', error: 'check constraint' }] });
+    const res = await syncTrainingSession('local-1');
+    expect(mockInsMarkersIndividually).toHaveBeenCalledWith('local-1', [M_OK, M_BAD]);
+    expect(mockUpsertRun).toHaveBeenCalledWith('local-1', RUN2);      // Run gesichert
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/^markers: 1\/2 abgelehnt/);              // nicht verschluckt → Retry
+    expect(mockUpdateSyncStatus).not.toHaveBeenCalledWith('local-1', 'synced');
+  });
+
+  it('Batch scheitert, Einzel-Inserts gelingen alle → ok=true, synced', async () => {
+    mockGetLocal.mockResolvedValue({ ...localRow, payload_json: JSON.stringify({ run: RUN2 }) });
+    mockGetMarkers.mockResolvedValue([M_OK, M_BAD]);
+    mockInsMarkers.mockResolvedValueOnce({ data: null, error: 'transient' });
+    mockInsMarkersIndividually.mockResolvedValueOnce({ inserted: 2, failed: [] });
+    const res = await syncTrainingSession('local-1');
+    expect(mockUpsertRun).toHaveBeenCalledWith('local-1', RUN2);
+    expect(res.ok).toBe(true);
+    expect(mockUpdateSyncStatus).toHaveBeenCalledWith('local-1', 'synced');
+  });
+
+  it('Batch gelingt (rechts + spitz_rechts unter neuem Contract) → kein Einzel-Insert, Run upserted, synced', async () => {
+    mockGetLocal.mockResolvedValue({ ...localRow, payload_json: JSON.stringify({ run: RUN2 }) });
+    mockGetMarkers.mockResolvedValue([M_OK, M_BAD]);
+    const res = await syncTrainingSession('local-1');
+    expect(mockInsMarkers).toHaveBeenCalledTimes(1);
+    expect(mockInsMarkersIndividually).not.toHaveBeenCalled();
+    expect(mockUpsertRun).toHaveBeenCalledWith('local-1', RUN2);
+    expect(res.ok).toBe(true);
+  });
+
+  it('Reihenfolge bleibt Session → Punkte → Marker → Run', async () => {
+    const order: string[] = [];
+    mockCreateRemote.mockImplementationOnce(async () => { order.push('session'); return { data: { id: 'local-1' }, error: null }; });
+    mockInsPoints.mockImplementationOnce(async () => { order.push('points'); return { data: null, error: null }; });
+    mockInsMarkers.mockImplementationOnce(async () => { order.push('markers'); return { data: null, error: null }; });
+    mockUpsertRun.mockImplementationOnce(async () => { order.push('run'); return { data: null, error: null }; });
+    mockGetLocal.mockResolvedValue({ ...localRow, payload_json: JSON.stringify({ run: RUN2 }) });
+    mockGetMarkers.mockResolvedValue([M_OK]);
+    await syncTrainingSession('local-1');
+    expect(order).toEqual(['session', 'points', 'markers', 'run']);
   });
 });

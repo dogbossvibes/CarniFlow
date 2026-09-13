@@ -140,18 +140,39 @@ export async function createRemoteTrackPointsBatch(remoteSessionId: string, poin
   } catch (e) { return fail('pointsBatch', e); }
 }
 
+function markerRow(remoteSessionId: string, m: LocalTrackMarker) {
+  return {
+    session_id: remoteSessionId, marker_type: m.marker_type, material: m.material, angle_kind: m.angle_kind,
+    latitude: m.latitude, longitude: m.longitude, accuracy: m.accuracy,
+    distance_from_start: m.distance_from_start, note: m.note, audio_url: m.audio_remote_url, found: false,
+  };
+}
+
 export async function createRemoteTrackMarkersBatch(remoteSessionId: string, markers: LocalTrackMarker[]): Promise<RemoteResult<null>> {
   try {
     if (markers.length === 0) return { data: null, error: null };
-    const rows = markers.map(m => ({
-      session_id: remoteSessionId, marker_type: m.marker_type, material: m.material, angle_kind: m.angle_kind,
-      latitude: m.latitude, longitude: m.longitude, accuracy: m.accuracy,
-      distance_from_start: m.distance_from_start, note: m.note, audio_url: m.audio_remote_url, found: false,
-    }));
-    const { error } = await supabase.from('track_markers').insert(rows);
+    const { error } = await supabase.from('track_markers').insert(markers.map(m => markerRow(remoteSessionId, m)));
     if (error) return fail('markersBatch', error);
     return { data: null, error: null };
   } catch (e) { return fail('markersBatch', e); }
+}
+
+// Einzel-Insert je Marker — Fallback, wenn der Batch verweigert wurde (ein
+// einziger ungültiger Marker liess bisher den GANZEN Batch scheitern und riss
+// den Run-Sync mit). Gültige Marker landen, ungültige werden namentlich gemeldet.
+export async function createRemoteTrackMarkersIndividually(
+  remoteSessionId: string, markers: LocalTrackMarker[],
+): Promise<{ inserted: number; failed: { localId: string; error: string }[] }> {
+  const failed: { localId: string; error: string }[] = [];
+  let inserted = 0;
+  for (const m of markers) {
+    try {
+      const { error } = await supabase.from('track_markers').insert(markerRow(remoteSessionId, m));
+      if (error) failed.push({ localId: m.local_id, error: error.message ?? String(error) });
+      else inserted++;
+    } catch (e) { failed.push({ localId: m.local_id, error: e instanceof Error ? e.message : String(e) }); }
+  }
+  return { inserted, failed };
 }
 
 // ── Medien ───────────────────────────────────────────────────
