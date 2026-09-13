@@ -119,11 +119,11 @@ describe('canonicalArcM — Projektion auf laidPoints', () => {
   describe('Fallbacks (dokumentiert, keine erfundenen Werte)', () => {
     it('ohne Koordinate, mit distance_from_start → stored_fallback', () => {
       const r = canonicalArcM({ id: 'f1', lat: null, lng: null, distance_from_start: 7.5 }, LINE, ARC.cum);
-      expect(r).toEqual({ arcM: 7.5, offLineM: null, source: 'stored_fallback' });
+      expect(r).toEqual({ arcM: 7.5, offLineM: null, source: 'stored_fallback', segmentIndex: null, selection: null });
     });
     it('ohne Koordinate, ohne distance_from_start → unavailable (kein Wert)', () => {
       const r = canonicalArcM({ id: 'f2', lat: null, lng: null }, LINE, ARC.cum);
-      expect(r).toEqual({ arcM: null, offLineM: null, source: 'unavailable' });
+      expect(r).toEqual({ arcM: null, offLineM: null, source: 'unavailable', segmentIndex: null, selection: null });
     });
     it('Linie mit < 2 Punkten → Projektion technisch unmöglich → stored_fallback', () => {
       const one = [LINE[0]];

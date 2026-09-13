@@ -72,7 +72,10 @@ describe('18. Canonical-Arc-Regression (7cc2cc6 unverändert)', () => {
     expect(run).toContain('const eventArcs = buildSearchEventArcs(st.markers, laidPoints);');
   });
   it('canonicalArc.ts / searchGeometry.buildArc unverändert referenziert', () => {
-    expect(strip(read('features/tracking/utils/canonicalArc.ts'))).toContain('projectForward(');
+    // Seit dem Self-Crossing-Fix projiziert canonicalArc auf ALLE Segmente
+    // (projectOntoSegments, dieselbe Rechnung wie projectForward; Nearest-
+    // Fallback numerisch identisch — canonicalArcSelfCrossing.test.ts A).
+    expect(strip(read('features/tracking/utils/canonicalArc.ts'))).toContain('projectOntoSegments(');
     expect(strip(read('features/tracking/hooks/useSearchRecorder.ts'))).toContain('const arc = useMemo(() => buildArc(laidPoints), [laidPoints]);');
   });
 });

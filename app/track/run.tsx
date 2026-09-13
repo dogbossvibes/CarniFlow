@@ -122,7 +122,11 @@ export default function TrackRunScreen() {
   const buildSnap = (withRecovery = false) => {
     const st = useTrackingStore.getState();
     const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
-    const laidPoints = st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng }));
+    // `t` (Fix-Zeitstempel je Linienpunkt) bleibt erhalten: canonicalArc wählt
+    // bei selbst-benachbarten Schenkeln den Durchgang über die gemeinsame
+    // Zeitachse Marker ↔ Linie (P0 „Self-Crossing", qa-0ec8c4ca). Für den
+    // Recorder (LL) ist das Feld unsichtbar.
+    const laidPoints = st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng, t: p.t }));
     // Kanonische Eventposition (P0-Fix „Canonical Reference Progress"): JEDER
     // Marker bekommt seine Bogenlänge auf GENAU dieser laidPoints-Linie —
     // per Projektion seiner Koordinate (canonicalArc.ts). `distance_from_start`
@@ -134,7 +138,7 @@ export default function TrackRunScreen() {
       for (const m of st.markers) {
         const a = eventArcs[m.id];
         console.log('[canonicalArc]', {
-          id: m.id, type: m.type, angleKind: m.angleKind, source: a?.source,
+          id: m.id, type: m.type, angleKind: m.angleKind, source: a?.source, selection: a?.selection, segmentIndex: a?.segmentIndex,
           storedM: m.distance_from_start, canonicalM: a?.arcM != null ? Math.round(a.arcM * 100) / 100 : null,
           deltaM: a?.arcM != null ? Math.round((a.arcM - m.distance_from_start) * 100) / 100 : null,
           offLineM: a?.offLineM != null ? Math.round(a.offLineM * 100) / 100 : null,

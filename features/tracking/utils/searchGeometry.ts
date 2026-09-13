@@ -108,6 +108,38 @@ export function projectForward(
   return { devM: best, atM: bestAt };
 }
 
+// Projektion von p auf JEDES Segment der Polyline — dieselbe Rechnung wie in
+// projectForward (lokale Tangentialebene um p, Klemmung auf das Segment), nur
+// ohne Fenster und ohne Minimum-Auswahl. Wird von canonicalArc.ts genutzt, um
+// bei selbst-benachbarten/zurücklaufenden Schenkeln ALLE Kandidaten zu sehen
+// statt nur den geometrisch nächsten. Reihenfolge = Segmentindex (0..n-2);
+// argmin über `offLineM` (erstes Minimum) ist numerisch identisch zu
+// projectForward(p, line, cum, 0, total, 0).
+export interface SegmentProjection {
+  segmentIndex: number;   // Segment line[i] → line[i+1]
+  frac: number;           // 0..1 Position auf dem Segment
+  arcM: number;           // Bogenlänge cum[i] + frac·(cum[i+1] − cum[i])
+  offLineM: number;       // senkrechter/geklemmter Abstand p → Segment (m)
+}
+
+export function projectOntoSegments(p: LL, line: readonly LL[], cum: readonly number[]): SegmentProjection[] {
+  const out: SegmentProjection[] = [];
+  if (line.length < 2) return out;
+  const mPerLat = 111320;
+  const mPerLng = 111320 * Math.cos((p.latitude * Math.PI) / 180);
+  const X = (q: LL) => ({ x: (q.longitude - p.longitude) * mPerLng, y: (q.latitude - p.latitude) * mPerLat });
+  for (let i = 1; i < line.length; i++) {
+    const a = X(line[i - 1]), b = X(line[i]);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? -(a.x * dx + a.y * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const cx = a.x + t * dx, cy = a.y + t * dy;
+    out.push({ segmentIndex: i - 1, frac: t, arcM: cum[i - 1] + t * (cum[i] - cum[i - 1]), offLineM: Math.hypot(cx, cy) });
+  }
+  return out;
+}
+
 // Koordinate auf der Polyline bei Bogenlänge d (0..total), linear interpoliert.
 // clamp 0..total; null bei leerer Linie. Folgt der Fährte um Winkel herum, weil
 // entlang der kumulierten Segmente gelaufen wird (kein Luftlinien-Versatz).

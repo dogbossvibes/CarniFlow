@@ -8,6 +8,10 @@
  * `points` teilen im Export denselben Ursprung (points[0]).
  *
  * KEINE neue Corner Detection — nur vorhandene Marker gegen vorhandene Linie.
+ *
+ * Produktpfad: Linienpunkte tragen `t` (TrackPointSample.t), Marker `t`
+ * (MarkerSample.t) — beides im Export als tMs relativ zum ersten Linienpunkt.
+ * Damit läuft hier die ZEIT-Auswahl (selection 'time'), genau wie in run.tsx.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -30,6 +34,7 @@ const RUNS: Run[] = [
   { id: 'Lauf 9',  file: 'lauf9-qa-01e12e75.json',  sessionId: 'qa-01e12e75' },
   { id: 'Lauf 10', file: 'lauf10-qa-5637ad58.json', sessionId: 'qa-5637ad58' },
   { id: 'R1',      file: 'r1-qa-03d970ff.json',     sessionId: 'qa-03d970ff' },
+  { id: 'Spitz',   file: 'spitz-qa-0ec8c4ca.json',  sessionId: 'qa-0ec8c4ca' },
 ];
 
 // Golden-Pins: von genau diesem Code auf den realen Exporten berechnet (Regression,
@@ -40,6 +45,9 @@ const EXPECTED: Record<string, { angleKind: string; storedM: number; canonicalM:
   'qa-01e12e75': [{ angleKind: 'rechts',      storedM: 4.8,  canonicalM: 7.76 }],
   'qa-5637ad58': [{ angleKind: 'rechts',      storedM: 5.7,  canonicalM: 9.23 }],
   'qa-03d970ff': [{ angleKind: 'links',       storedM: 11.4, canonicalM: 12.05 }],
+  // qa-0ec8c4ca (R → L → SL → SR gelaufen, nur R + SR erkannt): SR liegt am
+  // Linien-Scheitel 18.20 m (Segment 6/7), NICHT mehr am frühen Schenkel 6.29 m.
+  'qa-0ec8c4ca': [{ angleKind: 'rechts',      storedM: 5.9,  canonicalM: 2.49 }, { angleKind: 'spitz_rechts', storedM: 27.5, canonicalM: 18.20 }],
 };
 
 describe('Canonical arcM auf realen Feld-Exporten', () => {
@@ -48,13 +56,13 @@ describe('Canonical arcM auf realen Feld-Exporten', () => {
     it(`${run.id} (${run.sessionId})`, () => {
       const j = JSON.parse(fs.readFileSync(path.join(FIX, run.file), 'utf8'));
       expect(j.sessionId).toBe(run.sessionId);
-      const line: LL[] = j.points.map((p: { x: number; y: number }) => toLL(p.x, p.y));
+      const line = j.points.map((p: { x: number; y: number; tMs: number }) => ({ ...toLL(p.x, p.y), t: p.tMs }));
       const total = buildArc(line).total;
-      const markers = (j.markers as { type: string; angleKind: string | null; x: number | null; y: number | null; atM: number | null }[])
+      const markers = (j.markers as { type: string; angleKind: string | null; x: number | null; y: number | null; atM: number | null; tMs: number | null }[])
         .map((m, i) => ({
           id: `m${i}`, type: m.type, angleKind: m.angleKind,
           ...(m.x != null && m.y != null ? { lat: toLL(m.x, m.y).latitude, lng: toLL(m.x, m.y).longitude } : { lat: null, lng: null }),
-          distance_from_start: m.atM,
+          distance_from_start: m.atM, t: m.tMs,
         }));
       const arcs = buildSearchEventArcs(markers, line);
       if (markers.length === 0) rows.push(`${run.id.padEnd(8)} ${run.sessionId}  — keine Marker (Linie ${total.toFixed(2)} m)`);
@@ -63,6 +71,7 @@ describe('Canonical arcM auf realen Feld-Exporten', () => {
       markers.forEach((m, i) => {
         const a = arcs[m.id];
         expect(a.source).toBe('projected');
+        expect(a.selection).toBe('time');
         expect(a.arcM as number).toBeGreaterThanOrEqual(0);
         expect(a.arcM as number).toBeLessThanOrEqual(total + 1e-9);
         const delta = (a.arcM as number) - (m.distance_from_start as number);
