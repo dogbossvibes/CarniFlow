@@ -14,6 +14,8 @@
 //   • es gab eine Absuche, aber keine Analyse → sie ist für diesen Lauf nicht da
 // Bisher sahen beide identisch aus, nämlich gar nicht.
 
+import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
+
 /** Nur die Felder, die für die Entscheidung gebraucht werden. */
 export interface TrackAnalysisSource {
   track_data?: { run?: Record<string, unknown> | null } | null;
@@ -44,8 +46,83 @@ export function trackAnalysisState(
   data: TrackAnalysisSource | null | undefined,
   analytics: unknown,
 ): TrackAnalysisState {
-  if (analytics) return 'available';
+  if (isUsableTrackAnalytics(analytics)) return 'available';
   return hasSearchRun(data) ? 'unavailable' : 'pending_search';
+}
+
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * „Verwertbare" Analyse = genau die Felder, die die Analyse-Karte rendert
+ * (Track Score, Confidence-Band, Ø Spurtreue, Ø Tempo, Neuansätze, Ecken/
+ * Gegenstände). Ein bloss truthy-Objekt (z. B. `{}` aus einem abgebrochenen
+ * Schreibvorgang) reicht NICHT — sonst würde die Karte mit leeren Werten
+ * oder gar nicht rendern, während der Zustand „available" meldet. Keine
+ * Versionshürde: v1 und v2 gelten gleichermassen, solange sie vollständig sind.
+ */
+export function isUsableTrackAnalytics(a: unknown): a is TrackAnalytics {
+  if (!a || typeof a !== 'object') return false;
+  const x = a as Record<string, unknown>;
+  const dev = x.deviation as Record<string, unknown> | undefined;
+  const pace = x.pace as Record<string, unknown> | undefined;
+  const reacq = x.reacquisition as Record<string, unknown> | undefined;
+  return isNum(x.trackScore)
+    && typeof x.analysisConfidenceBand === 'string'
+    && !!dev && isNum(dev.meanM)
+    && !!pace && isNum(pace.avgMps)
+    && !!reacq && isNum(reacq.count)
+    && Array.isArray(x.corners) && Array.isArray(x.objects);
+}
+
+/**
+ * Hat die Absuche verwertbare Geometrie (> 0 m Suchspur) erzeugt?
+ *
+ * Gemeinsame Quelle für Warnhinweis UND Default der manuellen Abschnitts-
+ * Bewertung. Bisher zählte NUR `runs[0].distance_meters` (remote track_runs-
+ * Zeile bzw. lokale Run-Ergänzung). Production-Befund 13.09.2026 (Session mit
+ * 134 m Fährte, Track Score 90): track_runs war nie synchronisiert (0 Zeilen),
+ * `track_data.run` in training_sessions führte aber distance_meters=136 m UND
+ * analytics — der Screen zeigte deshalb gleichzeitig „keine verwertbare
+ * Suchspur" und einen automatischen Track Score. `track_data.run` ist auf
+ * beiden Pfaden (lokal wie remote) vorhanden und wird daher zuerst gelesen;
+ * die runs-Zeile bleibt als zweite Quelle.
+ */
+export function hasSearchGeometry(data: TrackAnalysisSource | null | undefined): boolean {
+  const run = data?.track_data?.run ?? null;
+  const fromTrackData = run && isNum(run.distance_meters) ? run.distance_meters : null;
+  const row = Array.isArray(data?.runs) ? (data!.runs[0] as { distance_meters?: unknown } | undefined) : undefined;
+  const fromRow = row && isNum(row.distance_meters) ? row.distance_meters : null;
+  return Math.max(fromTrackData ?? 0, fromRow ?? 0) > 0;
+}
+
+export interface TrackAnalysisAvailability {
+  state: TrackAnalysisState;
+  /** Nur bei state === 'available' gesetzt — dieselbe Referenz wie track_data.run.analytics. */
+  analytics: TrackAnalytics | null;
+  hasSearchGeometry: boolean;
+  /**
+   * Gelber Hinweis „Automatische Auswertung nicht verfügbar — keine verwertbare
+   * Suchspur". Per Konstruktion NIE gleichzeitig mit einer verwertbaren
+   * Analyse: liegt eine vor, gibt es eine automatische Auswertung, der Satz
+   * wäre falsch.
+   */
+  showNoSearchTrackWarning: boolean;
+}
+
+/**
+ * EINE Source of Truth für den Detail-/Auswertungs-Screen: Analyse-Zustand,
+ * verwertbares Analytics-Objekt, Geometrie-Signal und Warnhinweis werden aus
+ * demselben Datensatz abgeleitet — keine zweite, unabhängige Prüfung im Screen.
+ */
+export function trackAnalysisAvailability(data: TrackAnalysisSource | null | undefined): TrackAnalysisAvailability {
+  const raw = data?.track_data?.run?.analytics;
+  const state = trackAnalysisState(data, raw);
+  const analytics = state === 'available' ? (raw as TrackAnalytics) : null;
+  const geometry = hasSearchGeometry(data);
+  return {
+    state, analytics, hasSearchGeometry: geometry,
+    showNoSearchTrackWarning: !geometry && state !== 'available',
+  };
 }
 
 /**

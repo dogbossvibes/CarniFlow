@@ -21,7 +21,7 @@ import { pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
-import { trackAnalysisState, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
+import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
@@ -57,10 +57,6 @@ export default function TrackAuswertungScreen() {
   const [legs, setLegs]   = useState<LegRow[]>([]);
   const [notes, setNotes] = useState('');
   const [isLocalOnly, setIsLocalOnly] = useState(false);
-  // Abschnitt 8 des Audits: true = Absuche hat KEINE verwertbare Geometrie
-  // erzeugt (0 m Distanz) → steuert nur die Warnhinweis-Anzeige unten, siehe
-  // defaultLegs()/legsFromSession() in trackEvaluation.ts für die Score-Seite.
-  const [hasValidSearchGeometry, setHasValidSearchGeometry] = useState(true);
 
   useEffect(() => {
     useTrackingStore.getState().reset();   // Flow abgeschlossen → Store leeren
@@ -99,14 +95,11 @@ export default function TrackAuswertungScreen() {
       setIsLocalOnly(localOnly);
       if (d) {
         // Root-Cause-Fix (Abschnitt 8 des Audits — "100 Punkte/Vorzüglich
-        // trotz 0 m Suchspur"): distance_meters des Absuche-Runs ist das
-        // direkteste vorhandene Signal für "hat die Absuche überhaupt
-        // verwertbare Geometrie erzeugt" — steuert NUR den Default-Startwert
-        // in legsFromSession (siehe trackEvaluation.ts), eine bereits
-        // gespeicherte manuelle Bewertung bleibt davon unberührt.
-        const hasValidGeometry = ((d.runs?.[0] as { distance_meters?: number | null } | undefined)?.distance_meters ?? 0) > 0;
-        setHasValidSearchGeometry(hasValidGeometry);
-        setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0, hasValidGeometry));
+        // trotz 0 m Suchspur"): das Geometrie-Signal steuert NUR den
+        // Default-Startwert in legsFromSession (siehe trackEvaluation.ts), eine
+        // bereits gespeicherte manuelle Bewertung bleibt davon unberührt.
+        // Dieselbe Quelle wie Warnhinweis/Analyse unten (trackAnalysisState.ts).
+        setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0, hasSearchGeometry(d)));
         setNotes(d.notes ?? '');
         // Abschluss-Ansicht → die Fährte dieses Hundes ist nicht mehr „offen".
         if (d.dog_id) useActiveFaehrten.getState().remove(d.dog_id);
@@ -151,11 +144,17 @@ export default function TrackAuswertungScreen() {
   // getLocalTrackDetail/getLocalRunSupplement, remote via training_sessions.
   // track_data — runSummaryForTrackData reicht `analytics` unverändert durch,
   // keine Migration nötig).
-  const analytics: TrackAnalytics | undefined = data?.track_data?.run?.analytics;
-  // Rein darstellend (siehe trackAnalysisState.ts): unterscheidet „Absuche
-  // steht noch aus" von „Absuche gelaufen, aber ohne Analyse". Bisher sahen
-  // beide Fälle identisch aus — nämlich gar nicht.
-  const analysisState = trackAnalysisState(data, analytics);
+  // EINE Source of Truth (trackAnalysisState.ts): Analyse-Zustand, verwertbares
+  // Analytics-Objekt, Geometrie-Signal und Warnhinweis kommen aus demselben
+  // Helfer. Vorher las der Warnhinweis `runs[0].distance_meters` (track_runs-
+  // Zeile) und die Analyse-Karte `track_data.run.analytics` — zwei Quellen, die
+  // in Production auseinanderliefen („keine verwertbare Suchspur" neben 90/100).
+  const availability = useMemo(() => trackAnalysisAvailability(data), [data]);
+  const analytics: TrackAnalytics | null = availability.analytics;
+  // Rein darstellend: unterscheidet „Absuche steht noch aus" von „Absuche
+  // gelaufen, aber ohne Analyse". Bisher sahen beide Fälle identisch aus —
+  // nämlich gar nicht.
+  const analysisState = availability.state;
   const qaDiagnostics = isQaDiagnosticsEnabled();
   const isReplayEligible = useMemo(() => isTrackReplayEligible(data), [data]);
   const [analyseExpanded, setAnalyseExpanded] = useState(false);
@@ -230,7 +229,11 @@ export default function TrackAuswertungScreen() {
 
   const highlights: { icon: IconName; value: string; label: string }[] = [
     { icon: 'flag',          value: `${aFound}/${aTotal}`, label: 'Gegenstände' },
-    { icon: 'git-branch',    value: String(corners),       label: 'Winkel' },
+    // corners_total = Anzahl der beim LEGEN gespeicherten Winkel-Marker (alle
+    // angle_kinds inkl. Absatz/Abriss; useTrackRecorder Summary). NICHT die
+    // automatisch analysierten Ecken (analytics.corners, ohne Absatz/Abriss)
+    // und NICHT die remote synchronisierten track_markers — daher „gelegt".
+    { icon: 'git-branch',    value: String(corners),       label: 'Winkel gelegt' },
     { icon: 'trail-sign',     value: String(segmentAnalysis.count), label: 'Teilstrecken' },
   ];
 
@@ -240,12 +243,18 @@ export default function TrackAuswertungScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Hero */}
+          {/* Hero — links Ring (nur Zahl + /100), Beschriftung „Manuelle
+              Bewertung" UNTER dem Ring (ausserhalb der Kreisgrafik), rechts die
+              Notenstufe genau EINMAL prominent. Vorher lagen Label und Notenstufe
+              zusätzlich IM Ring (Überlappung, doppelte Bewertung). */}
           <View style={[s.card, s.cardGlow, s.hero]}>
-            <TrackScoreRing value={score} size={118} label={t('track.manualScoreLabel')} sub={verdict.sub} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.eyebrow}>{dogName} · {relDate(data.session_date ?? data.created_at)}</Text>
-              <Text style={s.heroHeadline}>{verdict.headline}</Text>
+            <View style={s.heroRingCol}>
+              <TrackScoreRing value={score} size={96} stroke={9} showMax />
+              <Text style={s.heroRingCaption} numberOfLines={2}>{t('track.manualScoreLabel')}</Text>
+            </View>
+            <View style={s.heroBody}>
+              <Text style={s.eyebrow} numberOfLines={1}>{dogName} · {relDate(data.session_date ?? data.created_at)}</Text>
+              <Text style={s.heroHeadline} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{verdict.headline}</Text>
               <View style={s.tagRow}>
                 {data.distance_meters != null && <Tag>{Math.round(data.distance_meters)} m</Tag>}
                 <Tag>{surface}</Tag>
@@ -256,8 +265,9 @@ export default function TrackAuswertungScreen() {
 
           {/* Abschnitt 8 des Audits: Absuche hat keine verwertbare Geometrie
               erzeugt (0 m Distanz) — automatische Aussage klar von der
-              manuellen Bewertung trennen, kein stiller "100 Punkte"-Anschein. */}
-          {!hasValidSearchGeometry && (
+              manuellen Bewertung trennen, kein stiller "100 Punkte"-Anschein.
+              Per Konstruktion nie neben einer verwertbaren Analyse (Helfer). */}
+          {availability.showNoSearchTrackWarning && (
             <View style={[s.card, { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, marginBottom: 16, backgroundColor: C.trackWarning + '14', borderColor: C.trackWarning + '55', borderWidth: 1 }]}>
               <Ionicons name="information-circle" size={18} color={C.trackWarning} />
               <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: C.trackText }}>
@@ -620,7 +630,14 @@ const s = StyleSheet.create({
   card:     { backgroundColor: C.trackCard, borderRadius: 20, borderWidth: 1, borderColor: C.trackBorder },
   cardGlow: { borderColor: C.trackPrimaryDk + '38', shadowColor: C.trackPrimary, shadowOpacity: 0.22, shadowRadius: 22, shadowOffset: { width: 0, height: 12 }, elevation: 5 },
 
-  hero:        { flexDirection: 'row', alignItems: 'center', gap: 18, padding: 20, marginBottom: 14 },
+  hero:        { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, marginBottom: 14 },
+  // Feste Spaltenbreite für Ring + Caption: die Caption („Manuelle Bewertung",
+  // uppercase) ist breiter als der Ring und darf 2-zeilig umbrechen — nie in
+  // die Kreisgrafik, nie in die rechte Spalte. Rechts bleibt auf 320 pt Breite
+  // (kleinstes iPhone) noch ≥ 120 pt für Notenstufe + Chips.
+  heroRingCol: { width: 110, alignItems: 'center', gap: 6 },
+  heroRingCaption: { fontSize: 9, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', textAlign: 'center', lineHeight: 12 },
+  heroBody:    { flex: 1, minWidth: 0 },
   eyebrow:     { fontSize: 11, color: C.trackTextMut, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 },
   heroHeadline:{ fontSize: 26, color: C.trackText, fontWeight: '900', letterSpacing: -0.5, lineHeight: 26, marginBottom: 10 },
 

@@ -7,7 +7,13 @@ import {
   trackAnalysisState, hasSearchRun, analysisQaFacts,
 } from '@/features/tracking/utils/trackAnalysisState';
 
-const analyticsV2 = { analyticsVersion: 2, trackScore: 84, analysisConfidenceBand: 'good' };
+// Vollständiges Objekt = genau die Felder, die die Analyse-Karte rendert.
+const full = (over: Record<string, unknown> = {}) => ({
+  analyticsVersion: 2, trackScore: 84, analysisConfidenceBand: 'good', analysisConfidenceHint: null,
+  deviation: { meanM: 0.7 }, pace: { avgMps: 0.1 }, reacquisition: { count: 0, meanSec: null, maxSec: null },
+  corners: [], objects: [], ...over,
+});
+const analyticsV2 = full();
 
 describe('trackAnalysisState', () => {
   it('nur gelegte Fährte, keine Absuche → Hinweis „nach der Absuche"', () => {
@@ -32,7 +38,7 @@ describe('trackAnalysisState', () => {
   });
 
   it('v1-Analytics zählen genauso als vorhanden — keine Versionshürde für die Karte', () => {
-    const v1 = { analyticsVersion: 1, trackScore: 71, analysisConfidenceBand: 'fair' };
+    const v1 = full({ analyticsVersion: 1, trackScore: 71, analysisConfidenceBand: 'limited' });
     expect(trackAnalysisState({ track_data: { run: { analytics: v1 } } }, v1)).toBe('available');
   });
 

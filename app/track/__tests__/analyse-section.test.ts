@@ -9,7 +9,11 @@ const source = () => readFileSync('app/track/[id].tsx', 'utf8');
 describe('Track-Detail — Analyse-Sektion (Punkt 9/14, additiv)', () => {
   it('rendert nur, wenn analytics vorhanden ist (ältere Fährten bleiben unverändert)', () => {
     const src = source();
-    expect(src).toContain('const analytics: TrackAnalytics | undefined = data?.track_data?.run?.analytics;');
+    // Analytics kommen ausschliesslich aus dem gemeinsamen Helfer (nur bei
+    // verwertbarer Analyse gesetzt) — keine zweite Leseart im Screen.
+    expect(src).toContain('const availability = useMemo(() => trackAnalysisAvailability(data), [data]);');
+    expect(src).toContain('const analytics: TrackAnalytics | null = availability.analytics;');
+    expect(src).not.toContain('data?.track_data?.run?.analytics');
     expect(src).toContain('{analytics && (');
   });
 
@@ -47,8 +51,8 @@ describe('Track-Detail — Analyse-Sektion (Punkt 9/14, additiv)', () => {
   it('zeigt statt eines leeren Bereichs einen Empty State — beide Fälle unterscheidbar', () => {
     const src = source();
     // Zustand kommt aus dem reinen Helfer, nicht aus einer neuen Screen-Logik.
-    expect(src).toContain("import { trackAnalysisState, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';");
-    expect(src).toContain('const analysisState = trackAnalysisState(data, analytics);');
+    expect(src).toContain("import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';");
+    expect(src).toContain('const analysisState = availability.state;');
     expect(src).toContain("{analysisState === 'pending_search' && (");
     expect(src).toContain("{analysisState === 'unavailable' && (");
     // Texte kommen aus i18n, nicht hartkodiert.
@@ -79,7 +83,8 @@ describe('Track-Detail — Analyse-Sektion (Punkt 9/14, additiv)', () => {
 
   it('Begriffstrennung: manueller Score ist als manuelle Bewertung benannt', () => {
     const src = source();
-    expect(src).toContain("label={t('track.manualScoreLabel')}");
+    // Beschriftung steht UNTER dem Ring (eigener Text), nicht mehr als Ring-Label.
+    expect(src).toContain("<Text style={s.heroRingCaption} numberOfLines={2}>{t('track.manualScoreLabel')}</Text>");
     expect(src).toContain("GESAMTPUNKTZAHL · {t('track.manualScoreLabel')}");
     // Der automatische Wert behält sein bestehendes Label.
     expect(src).toContain('TRACK SCORE (AUTOMATISCH)');
