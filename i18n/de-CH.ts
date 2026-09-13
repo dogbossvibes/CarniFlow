@@ -1160,6 +1160,8 @@ export const deCH = {
   'track.replay.legend.paceSlow': 'Langsam',
   'track.replay.legend.paceNormal': 'Normal',
   'track.replay.legend.paceFast': 'Schnell',
+  'track.replay.legendReference': 'Gelegte Fährte',
+  'track.replay.legendSearch': 'Gelaufene Absuche',
   'track.segments.type.straight': 'Gerade {n}',
   'track.segments.type.corner': 'Winkel {n}',
   'track.segments.type.objectZone': 'Gegenstandszone {n}',

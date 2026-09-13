@@ -258,6 +258,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.replay.legend.paceSlow": "Lento",
   "track.replay.legend.paceNormal": "Normale",
   "track.replay.legend.paceFast": "Veloce",
+  "track.replay.legendReference": "Pista tracciata",
+  "track.replay.legendSearch": "Cerca percorsa",
   "track.segments.type.straight": "Rettilineo {n}",
   "track.segments.type.corner": "Angolo {n}",
   "track.segments.type.objectZone": "Zona oggetto {n}",

@@ -258,6 +258,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.replay.legend.paceSlow": "Slow",
   "track.replay.legend.paceNormal": "Normal",
   "track.replay.legend.paceFast": "Fast",
+  "track.replay.legendReference": "Laid track",
+  "track.replay.legendSearch": "Walked search route",
   "track.segments.type.straight": "Straight {n}",
   "track.segments.type.corner": "Corner {n}",
   "track.segments.type.objectZone": "Object zone {n}",

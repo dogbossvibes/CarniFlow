@@ -21,18 +21,39 @@ import type { ReplayGeometryPoint } from '@/features/tracking/engine/trackReplay
 //
 // Performance (Punkt 20): Laid-Linie + Heatmap-Teile werden vom Aufrufer
 // EINMAL memoiziert übergeben (nicht pro Animationsframe neu berechnet) — nur
-// der Puck-Marker bewegt sich pro Tick, die Polylines bleiben stabil.
+// der Puck-Marker und die „gelaufene" Teilspur ändern sich pro Tick.
+//
+// Ebenen (zIndex aufsteigend) — Gerätebefund: Referenz (Mint) und gelaufene
+// Absuche waren nicht unterscheidbar, weil die Ist-Spur NUR als Heatmap-
+// Teile gezeichnet wurde: Abweichungs-Band „sehr gering" und Tempo „normal"
+// nutzen dieselbe Mint-Farbe wie die Referenz, und Segmente ohne Metrik/
+// Zeitfenster lassen Lücken → die Spur wirkte unvollständig.
+//   1  Referenz (gelegte Fährte)      Mint  C.trackPrimary, 4 pt — IMMER komplett
+//   2  volle Absuche-Route (Unterbau) Blau  C.trackBlue, dezent (Alpha), 8 pt — IMMER komplett
+//   3  bereits abgespielte Absuche    Blau  C.trackBlue, voll, 8 pt — wächst mit der Replay-Zeit
+//   4  Heatmap-Teile (Analyse)        bestehende Bandfarben, 4 pt — unverändert obenauf
+//   5  Puck
+// Die blaue Einfassung (breiter als die Heatmap) macht die Ist-Spur auch dort
+// eindeutig blau, wo ein Heatmap-Teil selbst mint ist. Keine neue Farbe.
 
 interface Props {
   layPoints: LatLng[];
   markers: MapMarker[];
   heatmapParts: HeatmapPart[];
   puckPosition: ReplayGeometryPoint | null;
+  /** Vollständige gelaufene Absuche-Route (alle run_points) — immer sichtbar. */
+  runPoints?: ReplayGeometryPoint[];
+  /** Bereits abgespielter Teil derselben Route (bis zur aktuellen Replay-Zeit). */
+  playedPoints?: ReplayGeometryPoint[];
   startAnchor?: LatLng | null;
   endPoint?: LatLng | null;
 }
 
-export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition, startAnchor, endPoint }: Props) {
+/** Dezenter Unterbau der vollen Route: bestehendes trackBlue mit Alpha (kein neuer Farbwert). */
+export const SEARCH_ROUTE_FULL_STROKE = C.trackBlue + '73';
+export const SEARCH_ROUTE_PLAYED_STROKE = C.trackBlue;
+
+export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition, runPoints = [], playedPoints = [], startAnchor, endPoint }: Props) {
   const mapRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   const fitDoneRef = useRef(false);
@@ -45,10 +66,23 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
   const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers]);
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
 
+  const runCoords = useMemo(
+    () => runPoints.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
+    [runPoints],
+  );
+  const playedCoords = useMemo(
+    () => playedPoints.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
+    [playedPoints],
+  );
+  // Bei 0 s liefert replayTraveledPoints [Startpunkt, Puck=Startpunkt] — eine
+  // Linie ohne Ausdehnung wird nicht gezeichnet (abgespielt = nur Start).
+  const hasPlayedLine = playedCoords.length > 1
+    && playedCoords.some(c => c.latitude !== playedCoords[0].latitude || c.longitude !== playedCoords[0].longitude);
+
   const fitCoords = useMemo(() => {
-    const runCoords = heatmapParts.flatMap(p => p.coordinates);
-    return [...layCoords, ...runCoords];
-  }, [layCoords, heatmapParts]);
+    const heatCoords = heatmapParts.flatMap(p => p.coordinates);
+    return [...layCoords, ...runCoords, ...heatCoords];
+  }, [layCoords, runCoords, heatmapParts]);
 
   if (!MAPS_AVAILABLE || !RNMaps) {
     return (
@@ -84,21 +118,34 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
         }}
         initialRegion={{ latitude: initial.lat, longitude: initial.lng, latitudeDelta: 0.0025, longitudeDelta: 0.0025 }}
       >
+        {/* 1 Referenz — immer komplett, nie nach Replay-Zeit abgeschnitten. */}
         {layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={laidTrackStroke('normal', C.trackPrimary).strokeColor} strokeWidth={4} lineCap="round" lineJoin="round" zIndex={2} />
+          <Polyline coordinates={layCoords} strokeColor={laidTrackStroke('normal', C.trackPrimary).strokeColor} strokeWidth={4} lineCap="round" lineJoin="round" zIndex={1} />
         )}
 
-        {/* Heatmap-eingefärbte Ist-Suchspur — vorab memoiziert übergeben,
-            ändert sich NICHT während des Replays (nur der Puck bewegt sich). */}
+        {/* 2 volle Absuche-Route — dezenter blauer Unterbau, immer komplett. */}
+        {runCoords.length > 1 && (
+          <Polyline coordinates={runCoords} strokeColor={SEARCH_ROUTE_FULL_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={2} />
+        )}
+
+        {/* 3 bereits abgespielter Teil — kräftig blau, wächst mit der Zeit. */}
+        {hasPlayedLine && (
+          <Polyline coordinates={playedCoords} strokeColor={SEARCH_ROUTE_PLAYED_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={3} />
+        )}
+
+        {/* 4 Heatmap-eingefärbte Ist-Suchspur — vorab memoiziert übergeben,
+            ändert sich NICHT während des Replays. Schmaler als die blaue
+            Einfassung, damit die Analysefarbe sichtbar bleibt UND die Spur
+            eindeutig als Absuche erkennbar ist. */}
         {heatmapParts.map(part => (
           <Polyline
             key={part.segmentId}
             coordinates={part.coordinates.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
             strokeColor={part.color}
-            strokeWidth={5}
+            strokeWidth={4}
             lineCap="round"
             lineJoin="round"
-            zIndex={3}
+            zIndex={4}
           />
         ))}
 
@@ -138,6 +185,12 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
           </Marker>
         )}
       </MapView>
+
+      {/* Legende Referenz vs. Absuche — dieselben Tokens wie die Polylines. */}
+      <View style={s.legend} pointerEvents="none">
+        <View style={s.legendItem}><View style={[s.legendLine, { backgroundColor: C.trackPrimary }]} /><Text style={s.legendTxt}>{t('track.replay.legendReference')}</Text></View>
+        <View style={s.legendItem}><View style={[s.legendLine, { backgroundColor: C.trackBlue }]} /><Text style={s.legendTxt}>{t('track.replay.legendSearch')}</Text></View>
+      </View>
     </View>
   );
 }
@@ -145,6 +198,10 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
 const s = StyleSheet.create({
   fallback:    { ...StyleSheet.absoluteFillObject, backgroundColor: C.trackSurface, alignItems: 'center', justifyContent: 'center', gap: 10 },
   fallbackTxt: { fontSize: 13, color: C.trackTextMut },
+  legend:      { position: 'absolute', left: 12, bottom: 10, flexDirection: 'row', gap: 12, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: 'rgba(4,17,15,0.62)' },
+  legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendLine:  { width: 16, height: 4, borderRadius: 2 },
+  legendTxt:   { fontSize: 10, color: C.trackTextSec, fontWeight: '700' },
   startFlag:   { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackPrimary, borderWidth: 2, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   endFlag:     { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   puckGlow:    { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(21,230,195,0.22)', alignItems: 'center', justifyContent: 'center' },

@@ -1157,6 +1157,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.replay.legend.paceSlow': 'Langsam',
   'track.replay.legend.paceNormal': 'Normal',
   'track.replay.legend.paceFast': 'Schnäll',
+  'track.replay.legendReference': 'Gleiti Fährte',
+  'track.replay.legendSearch': 'Gloffeni Absuechi',
   'track.segments.type.straight': 'Gradi {n}',
   'track.segments.type.corner': 'Winkel {n}',
   'track.segments.type.objectZone': 'Gegestandszone {n}',

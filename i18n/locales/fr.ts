@@ -194,6 +194,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.replay.legend.paceSlow": "Lent",
   "track.replay.legend.paceNormal": "Normal",
   "track.replay.legend.paceFast": "Rapide",
+  "track.replay.legendReference": "Piste posée",
+  "track.replay.legendSearch": "Recherche parcourue",
   "track.segments.type.straight": "Ligne droite {n}",
   "track.segments.type.corner": "Angle {n}",
   "track.segments.type.objectZone": "Zone d'objet {n}",

@@ -14,7 +14,7 @@ import { SegmentDetailSheet } from '@/features/tracking/components/SegmentDetail
 import { extractTrackReplayData } from '@/features/tracking/utils/trackReplayData';
 import {
   initialReplayState, tickReplay, playReplay, pauseReplay, seekReplay, setReplaySpeed,
-  replayProgress, formatReplayClock, replayPositionAt, replayEventsFromSegments, segmentAtTime,
+  replayProgress, formatReplayClock, replayPositionAt, replayTraveledPoints, replayEventsFromSegments, segmentAtTime,
   REPLAY_SPEEDS, type ReplaySpeed, type ReplayEvent,
 } from '@/features/tracking/engine/trackReplay';
 import { buildHeatmapParts, type HeatmapMetric } from '@/features/tracking/engine/trackHeatmap';
@@ -98,6 +98,15 @@ export default function TrackReplayScreen() {
     () => (replayData ? replayPositionAt(replayData.geometry, state.elapsedSec) : null),
     [replayData, state.elapsedSec],
   );
+  // Volle gelaufene Absuche-Route (alle run_points, stabil) + bereits
+  // abgespielter Teil (bis elapsedSec, endet am Puck) — beide aus derselben
+  // Replay-Geometrie, keine zweite Datenquelle. Die volle Route bleibt beim
+  // Spulen/Abspielen immer sichtbar.
+  const fullRoutePoints = useMemo(() => replayData?.geometry.points ?? [], [replayData]);
+  const playedRoutePoints = useMemo(
+    () => (replayData ? replayTraveledPoints(replayData.geometry, state.elapsedSec) : []),
+    [replayData, state.elapsedSec],
+  );
   const events = useMemo(() => (replayData ? replayEventsFromSegments(replayData.analytics.segments) : []), [replayData]);
   const highlights = replayData?.analytics.segmentHighlights ?? [];
   const totalSec = replayData?.geometry.pointsTimeSec.length
@@ -161,6 +170,7 @@ export default function TrackReplayScreen() {
       <View style={s.mapWrap}>
         <TrackReplayMap
           layPoints={layPoints} markers={markers} heatmapParts={heatmapParts} puckPosition={puckPosition}
+          runPoints={fullRoutePoints} playedPoints={playedRoutePoints}
           startAnchor={detailMap?.start ?? null}
           endPoint={detailMap?.end ?? null}
         />
