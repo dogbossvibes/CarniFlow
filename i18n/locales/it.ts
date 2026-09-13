@@ -467,6 +467,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "profile.secAccount": "ACCOUNT",
   "profile.secTrack": "PISTE",
   "profile.secDev": "SVILUPPO",
+  "profile.secDiagnostics": "SVILUPPATORE E DIAGNOSTICA",
   "profile.secTrainer": "ALLENATORE",
   "profile.secTrainerTools": "STRUMENTI ALLENATORE",
   "profile.secInvites": "INVITI",

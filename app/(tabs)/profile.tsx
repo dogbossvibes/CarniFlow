@@ -4,6 +4,7 @@ import { C } from "@/constants/colors";
 import { useDogs } from "@/hooks/useDogs";
 import { usePlan } from "@/hooks/usePlan";
 import { useCapabilities } from "@/hooks/useCapabilities";
+import { useDiagnosticsAccess } from "@/hooks/useDiagnosticsAccess";
 import { useAccess } from "@/hooks/useAccess";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { useNotificationSetting } from "@/hooks/useNotificationSetting";
@@ -154,6 +155,7 @@ export default function ProfilScreen() {
 
   const { expiresAt } = usePlan();
   const { isPro, isTrainerModule, plan } = useCapabilities();
+  const diagnosticsAccess = useDiagnosticsAccess();   // intern: Diagnose-Bereich (fail closed)
   const { access } = useAccess();
   // Sichtbares Plan-Label für die Mitgliedschafts-Row. „Lifetime"/Sonderrechte
   // werden NIE als solche benannt → neutral „Dauerhaft freigeschaltet".
@@ -575,23 +577,6 @@ export default function ProfilScreen() {
             wert={stepLength.stepLengthM != null ? t('profile.stepLengthPersonal', { cm: Math.round(stepLength.stepLengthM * 100) }) : t('profile.stepLengthDefault')}
             onPress={() => router.push('/track/kalibrierung' as never)}
           />
-
-          {/* Temporär für den laufenden Golden-Reference-Feldtest: Zugang zur
-              bereits bestehenden QA-Oberfläche (Tracking-Engine BUILD40/CURRENT,
-              Location-Source EXPO/PRECISION). Ändert selbst keine Trackinglogik. */}
-          <View style={s.trenner} />
-          <TouchableOpacity style={s.zeile} onPress={() => router.push('/dev/precision-location-test' as never)} activeOpacity={0.7}>
-            <View style={s.zeileIcon}>
-              <Ionicons name="flask-outline" size={17} color={C.muted} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.zeileLabel}>{t('profile.trackDiagnostics')}</Text>
-              <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                {t('profile.trackDiagnosticsSub')}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={C.muted} />
-          </TouchableOpacity>
         </View>
 
         {__DEV__ && (
@@ -706,6 +691,35 @@ export default function ProfilScreen() {
             );
           })}
         </View>
+
+        {/* Intern: Diagnose-Zugang NUR für interne Tester (profiles.is_internal_tester,
+            serverseitig per Trigger geschützt — siehe hooks/useDiagnosticsAccess.ts).
+            Für alle anderen wird der Bereich gar nicht gerendert (kein Platzhalter). */}
+        {diagnosticsAccess.allowed && (
+          <>
+            <Text style={s.abschnitt}>{t('profile.secDiagnostics')}</Text>
+            <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}
+              <TouchableOpacity
+                style={s.zeile}
+                onPress={() => router.push('/dev/precision-location-test' as never)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('profile.trackDiagnostics')}
+              >
+                <View style={s.zeileIcon}>
+                  <Ionicons name="pulse-outline" size={17} color={C.muted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.zeileLabel}>{t('profile.trackDiagnostics')}</Text>
+                  <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                    {t('profile.trackDiagnosticsSub')}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={C.muted} />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         <Text style={s.abschnitt}>{t('profile.secSupport')}</Text>
         <View style={[s.karte, isGlass && s.glassTransparent]}>{isGlass && <Glass style={s.glassBg} />}

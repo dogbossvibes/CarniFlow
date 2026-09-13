@@ -31,6 +31,7 @@ import {
 } from '@/features/tracking/utils/qaCandidateLog';
 import { motionClient } from '@/features/tracking/native/motionClient';
 import { useSession } from '@/hooks/useSession';
+import { DiagnosticsRouteGate } from '@/components/DiagnosticsRouteGate';
 import {
   buildExportForSession, shareQaExport, copyQaExport, formatQaSessionRow, reconcileQaSelection,
 } from '@/features/tracking/services/qaTrackExportService';
@@ -40,19 +41,26 @@ import type { MotionStatus } from '@/modules/anyvo-motion';
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
 // QA-Golden-Reference-A/B-Schalter (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/
 // PRECISION).
-// Öffnen: Profil → Fährten-Einstellungen → „Fährten-Diagnose", oder Deep-Link
+// Öffnen: Profil → „Entwickler & Diagnose" → „Fährten-Diagnose" (nur interne Tester), oder Deep-Link
 // anyvo://dev/precision-location-test
 //
-// Bewusst NICHT mehr hinter `__DEV__`: der laufende Golden-Reference-Feldtest
-// findet auf einem echten TestFlight-Build (Build 43) statt, wo `__DEV__`
-// false ist — der Schalter wäre dort sonst unerreichbar. Der Screen ist rein
-// lesend/umschaltend für QA und verändert KEINE Trackinglogik; er ist nur
-// über den ausdrücklich als Testmodus bezeichneten Profil-Eintrag erreichbar.
+// Bewusst NICHT hinter `__DEV__` (Feldtests laufen auf echten Store-/TestFlight-
+// Builds, wo `__DEV__` false ist), sondern hinter dem Route-Gate unten: nur
+// interne Tester (profiles.is_internal_tester) sehen den Profil-Eintrag UND
+// dürfen die Route öffnen. Der Screen ist rein lesend/umschaltend für QA und
+// verändert KEINE Trackinglogik.
 const IS_ANDROID = Platform.OS === 'android';
 const IS_IOS = Platform.OS === 'ios';
 
+// Route-Gate: dieselbe Authority wie der Profil-Eintrag (DiagnosticsRouteGate →
+// useDiagnosticsAccess → profiles.is_internal_tester, serverseitig geschützt).
+// Ein Deep-Link (anyvo://dev/precision-location-test) reicht damit nicht.
 export default function PrecisionLocationTestScreen() {
-  return <PrecisionLocationTestContent />;
+  return (
+    <DiagnosticsRouteGate>
+      <PrecisionLocationTestContent />
+    </DiagnosticsRouteGate>
+  );
 }
 
 function PrecisionLocationTestContent() {

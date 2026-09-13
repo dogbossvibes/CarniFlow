@@ -457,6 +457,7 @@ export const deCH = {
   'profile.secAccount':      'KONTO',
   'profile.secTrack':        'FÄHRTEN',
   'profile.secDev':          'ENTWICKLUNG',
+  'profile.secDiagnostics': 'ENTWICKLER & DIAGNOSE',
   'profile.secTrainer':      'TRAINER',
   'profile.secTrainerTools': 'TRAINER-TOOLS',
   'profile.secInvites':      'EINLADUNGEN',

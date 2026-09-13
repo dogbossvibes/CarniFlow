@@ -305,6 +305,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "profile.secAccount":      "COMPTE",
   "profile.secTrack":        "PISTAGE",
   "profile.secDev":          "DÉVELOPPEMENT",
+  "profile.secDiagnostics": "DÉVELOPPEUR & DIAGNOSTIC",
   "profile.secTrainer":      "ENTRAÎNEUR",
   "profile.secTrainerTools": "OUTILS ENTRAÎNEUR",
   "profile.secInvites":      "INVITATIONS",

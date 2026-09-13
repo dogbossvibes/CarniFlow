@@ -457,6 +457,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'profile.secAccount':      'KONTO',
   'profile.secTrack':        'FÄHRTE',
   'profile.secDev':          'ENTWICKLIG',
+  'profile.secDiagnostics': 'ENTWICKLER & DIAGNOSE',
   'profile.secTrainer':      'TRAINER',
   'profile.secTrainerTools': 'TRAINER-TOOLS',
   'profile.secInvites':      'IILADIGE',
