@@ -13,7 +13,7 @@ import * as Location from 'expo-location';
 import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind,
 } from '@/features/tracking/utils/positionSource';
-import { DEFAULT_HANDLER_DISTANCE_M, estimateDogProgressM, pointAtDistance, projectForward } from '@/features/tracking/utils/searchGeometry';
+import { DEFAULT_HANDLER_DISTANCE_M, buildArc, estimateDogProgressM, pointAtDistance, projectForward } from '@/features/tracking/utils/searchGeometry';
 import {
   DEFAULT_SEARCH_START_CONFIG, INITIAL_SEARCH_START, evaluateStartCandidate, firstLegHeadingDeg as computeFirstLegHeadingDeg,
   stepSearchStart, type SearchStartAcqState, type SearchStartState,
@@ -122,11 +122,8 @@ const SCORE_MODEL: Record<Level, { trackPts: number; objectPts: number; objects:
 };
 
 // ── Bogenlängen (kumuliert) entlang der Soll-Fährte ──
-function buildArc(line: LatLng[]): { cum: number[]; total: number } {
-  const cum: number[] = [0];
-  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + distM(line[i - 1], line[i]));
-  return { cum, total: cum.length ? cum[cum.length - 1] : 0 };
-}
+// Liegt jetzt in searchGeometry.ts (buildArc/haversineM, identische Formel),
+// damit der Search-Snapshot Eventpositionen auf EXAKT diesem Maßstab bauen kann.
 
 export interface SearchRecorder {
   ready: boolean;

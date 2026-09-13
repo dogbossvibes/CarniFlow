@@ -233,7 +233,10 @@ describe('Punkt 5 — savedStart und erster Polyline-Punkt teilen dieselbe Quell
   it('laidLatLng[0] (Gate 1) und laidPoints[0] (Gate 2) leiten sich beide aus st.trackPoints ab', () => {
     const src = readFileSync('app/track/run.tsx', 'utf8');
     expect(src).toMatch(/laidLatLng:\s*st\.trackPoints\.map/);
-    expect(src).toMatch(/laidPoints:\s*st\.trackPoints\.map/);
+    // laidPoints wird in buildSnap seit „Canonical Reference Progress" zuerst
+    // als Konstante gebaut (Quelle unverändert st.trackPoints) und dann sowohl
+    // in den Snapshot als auch in die Eventprojektion gegeben.
+    expect(src).toMatch(/const laidPoints = st\.trackPoints\.map/);
     expect(src).toMatch(/const startPoint = \(snap && snap\.laidLatLng\.length > 0 \? snap\.laidLatLng\[0\]/);
   });
 });

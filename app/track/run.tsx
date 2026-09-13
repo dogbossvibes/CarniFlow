@@ -28,6 +28,7 @@ import {
   DEFAULT_APPROACH_CONFIG, type StartMode,
 } from '@/features/tracking/engine/startApproach';
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
+import { buildSearchEventArcs, type CanonicalArc } from '@/features/tracking/utils/canonicalArc';
 
 // expo-speech defensiv laden (nativ; kein Crash, wenn Modul fehlt).
 let Speech: typeof import('expo-speech') | null = null;
@@ -85,6 +86,7 @@ const EMPTY_SNAP_CONST = {
   laidPoints: [] as { latitude: number; longitude: number }[],
   laidObjects: [] as { at: { latitude: number; longitude: number }; index: number; material: string }[],
   laidMarkers: [] as ReturnType<typeof useTrackingStore.getState>['markers'],
+  eventArcs: {} as Record<string, CanonicalArc>,
   segments: [] as ReturnType<typeof useTrackingStore.getState>['segments'],
   level: 'training' as Level,
 };
@@ -115,11 +117,31 @@ export default function TrackRunScreen() {
   const buildSnap = () => {
     const st = useTrackingStore.getState();
     const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
+    const laidPoints = st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng }));
+    // Kanonische Eventposition (P0-Fix „Canonical Reference Progress"): JEDER
+    // Marker bekommt seine Bogenlänge auf GENAU dieser laidPoints-Linie —
+    // per Projektion seiner Koordinate (canonicalArc.ts). `distance_from_start`
+    // ist ab hier keine Search-Authority mehr (Auto-Winkel trugen dort den
+    // Detektor-Maßstab, Lauf 9: 4,8 m gespeichert ↔ 7,8 m auf der Linie).
+    const eventArcs = buildSearchEventArcs(st.markers, laidPoints);
+    if (__DEV__) {
+      // Reine Diagnose (kein Gate, keine Schwelle): Maßstabsabweichung + seitlicher Abstand je Marker.
+      for (const m of st.markers) {
+        const a = eventArcs[m.id];
+        console.log('[canonicalArc]', {
+          id: m.id, type: m.type, angleKind: m.angleKind, source: a?.source,
+          storedM: m.distance_from_start, canonicalM: a?.arcM != null ? Math.round(a.arcM * 100) / 100 : null,
+          deltaM: a?.arcM != null ? Math.round((a.arcM - m.distance_from_start) * 100) / 100 : null,
+          offLineM: a?.offLineM != null ? Math.round(a.offLineM * 100) / 100 : null,
+        });
+      }
+    }
     return {
       laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),
-      laidPoints: st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng })),
+      laidPoints,
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number }, index: i, material: m.material ?? '' })),
       laidMarkers: st.markers,
+      eventArcs,
       segments: st.segments,
       level: 'training' as Level,
     };
@@ -438,20 +460,23 @@ export default function TrackRunScreen() {
   const winkel = snapData.laidMarkers.filter(m => m.type === 'winkel').length;
 
   // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
-  // Bogenlänge). Ereignis-Bogenlänge = marker.distance_from_start (bei Platzierung
-  // aufgezeichnet → order-korrekt, immun gegen Selbstkreuzung).
+  // Bogenlänge). Ereignis-Bogenlänge = KANONISCHE arcM aus dem Snapshot
+  // (Projektion der Markerkoordinate auf laidPoints, canonicalArc.ts) — derselbe
+  // Maßstab wie dogProgressM. NICHT mehr marker.distance_from_start (dort lag bei
+  // Auto-Winkeln der Detektor-Maßstab). Ein Marker ohne bestimmbare Position
+  // ('unavailable') kann nicht angesagt werden und bleibt aussen vor.
   const guidanceAngles = useMemo<GuidanceAngle[]>(
     () => snapData.laidMarkers
       .filter(m => m.type === 'winkel')
-      .map(m => ({ id: m.id, arcM: m.distance_from_start, angleKind: m.angleKind })),
-    [snapData.laidMarkers],
+      .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, angleKind: m.angleKind }]; }),
+    [snapData.laidMarkers, snapData.eventArcs],
   );
   // Gegenstände (inkl. material für die Voice-Ansage „Dübel"/„Gegenstand").
   const guidanceObjects = useMemo<GuidanceObject[]>(
     () => snapData.laidMarkers
       .filter(m => m.type === 'gegenstand')
-      .map(m => ({ id: m.id, arcM: m.distance_from_start, material: m.material })),
-    [snapData.laidMarkers],
+      .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, material: m.material }]; }),
+    [snapData.laidMarkers, snapData.eventArcs],
   );
   useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects);
 
@@ -599,14 +624,14 @@ export default function TrackRunScreen() {
     // gespeicherten Rohpunkte, keine Migration). Ecken/Gegenstände kommen aus
     // denselben gefilterten Markern, aus denen auch snapData.laidObjects
     // gebaut wurde (buildSnap) — dieselbe Filterreihenfolge, daher deckt sich
-    // der Index mit res.foundObjectIndices.
+    // der Index mit res.foundObjectIndices. atM = kanonische arcM (Snapshot).
     const cornerInputs: AnalyticsCornerInput[] = snapData.laidMarkers
       .filter((m): m is typeof m & { angleKind: AnalyticsAngleKind } =>
         m.type === 'winkel' && m.angleKind != null && m.angleKind !== 'absatz' && m.angleKind !== 'abriss')
-      .map(m => ({ atM: m.distance_from_start, angleKind: m.angleKind }));
+      .flatMap(m => { const atM = snapData.eventArcs[m.id]?.arcM; return atM == null ? [] : [{ atM, angleKind: m.angleKind }]; });
     const objectMarkers = snapData.laidMarkers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
     const objectInputs: AnalyticsObjectInput[] = objectMarkers.map((m, i) => ({
-      atM: m.distance_from_start, material: m.material, found: res.foundObjectIndices.includes(i),
+      atM: snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start, material: m.material, found: res.foundObjectIndices.includes(i),
     }));
     const analytics = res.analyticsSamples.length ? computeTrackAnalyticsV2({
       samples: res.analyticsSamples,

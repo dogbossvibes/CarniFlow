@@ -28,6 +28,28 @@ export function isHandlerDistance(v: unknown): v is SearchHandlerDistanceM {
 // Koordinatenform der gelegten Fährte (deckt sich mit useSearchRecorder.LatLng).
 export interface LL { latitude: number; longitude: number }
 
+// Haversine (m) — exakt dieselbe Formel wie `distM` in useSearchRecorder.ts,
+// damit die hier gebaute Bogenlänge numerisch identisch zu der ist, gegen die
+// die Absuche projiziert (kein zweiter Maßstab).
+const EARTH_R = 6371000;
+const toRad = (d: number) => (d * Math.PI) / 180;
+export function haversineM(a: LL, b: LL): number {
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const la1 = toRad(a.latitude), la2 = toRad(b.latitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+// Kumulierte Bogenlängen entlang der Soll-Fährte. EINZIGE Quelle des Search-
+// Maßstabs: useSearchRecorder (Cursor/Progress) und der Search-Snapshot
+// (kanonische Eventpositionen, canonicalArc.ts) nutzen dieselbe Funktion.
+export function buildArc(line: LL[]): { cum: number[]; total: number } {
+  const cum: number[] = [0];
+  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + haversineM(line[i - 1], line[i]));
+  return { cum, total: cum.length ? cum[cum.length - 1] : 0 };
+}
+
 // Virtueller Hundefortschritt (Bogenlänge). Handler-Fortschritt + Abstand,
 // geklemmt auf die Track-Länge (nie über das Ende hinaus — Phase 14).
 export function estimateDogProgressM(handlerProgressM: number, handlerDistanceM: number, trackTotalM: number): number {
