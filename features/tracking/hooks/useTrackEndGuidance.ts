@@ -32,14 +32,23 @@ export function useTrackEndGuidance(input: {
   endPoint: LL | null;
   openMandatoryObjects: number;
   voiceOn: boolean;
+  // Recovery (Search-Recovery-State): Ende in DIESEM Run bereits angesagt →
+  // beim (Wieder-)Start direkt 'completed', keine zweite Ansage. `onFired`
+  // spiegelt die einmalige Ansage nach aussen. Erkennungslogik unverändert.
+  initialFired?: boolean;
+  onFired?: () => void;
 }): TrackEndState {
   const stateRef = useRef<TrackEndState>('unseen');
   const [endState, setEndState] = useState<TrackEndState>('unseen');
+  const onFiredRef = useRef(input.onFired);
+  onFiredRef.current = input.onFired;
 
-  // Neue Absuche / neue Fährte → Once-only-Status zurücksetzen.
+  // Neue Absuche / neue Fährte → Once-only-Status zurücksetzen; Recovery mit
+  // bereits angesagtem Ende → 'completed' (once-only bleibt gewahrt).
   useEffect(() => {
-    if (!input.recording) { stateRef.current = 'unseen'; setEndState('unseen'); }
-  }, [input.recording, input.endPoint]);
+    if (!input.recording) { stateRef.current = 'unseen'; setEndState('unseen'); return; }
+    if (input.initialFired && stateRef.current === 'unseen') { stateRef.current = 'completed'; setEndState('completed'); }
+  }, [input.recording, input.endPoint, input.initialFired]);
 
   useEffect(() => {
     if (!input.recording || input.dogProgressM == null) return;
@@ -62,6 +71,7 @@ export function useTrackEndGuidance(input: {
     if (justReached) {
       hapticSuccess();
       if (input.voiceOn) say(i18n.t('track.voiceTrackEnd') as string);
+      onFiredRef.current?.();
     }
   }, [
     input.recording, input.dogProgressM, input.trackLengthM,

@@ -4,6 +4,11 @@ import { schedulePersist, writePendingNow, clearPending, type PendingTrack } fro
 import { EMPTY_GPS_STATS, type GpsStats, type TrackPointStatus } from '@/features/tracking/engine/types';
 import { sanitizeRestoredSegments, type TrackSegment } from '@/features/tracking/utils/trackSegments';
 import { DEFAULT_HANDLER_DISTANCE_M, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
+import {
+  freshSearchRunState, sanitizeSearchRunState,
+  type SearchRunState, type SearchRunBreak, type SearchSegmentAnnounced,
+} from '@/features/tracking/store/searchRunState';
+import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
 export type MarkerMaterial = 'stoff' | 'holz' | 'duebel' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
@@ -87,6 +92,7 @@ interface TrackingState {
   searchRunId:         string | null;              // track_runs.id der aktiven Absuche (P2 Recovery/Finalisierung)
   sessionStatus:       SessionStatus;              // Session-Lebenszyklus (P2)
   searchHandlerDistanceM: SearchHandlerDistanceM;  // Absuche: gewählter Abstand Hundeführer↔Hund (5/10 m)
+  searchRunState:      SearchRunState;             // Recovery-State des aktiven Runs (Fortschritt/Dedupe/Funde …)
   searchStartedAt:     number | null;              // ms: Start der Absuche (Timer-Fortsetzung bei Recovery)
   searchUpdatedAt:     number | null;              // ms: letzter akzeptierter Suchpunkt
   layStartedAt:        number | null;              // ms: Start der Liegezeit (= Lege-Ende) — P3, zeitstempelbasiert
@@ -129,6 +135,14 @@ interface TrackingState {
   setSearchHandlerDistanceM: (v: SearchHandlerDistanceM) => void;  // 5/10-m-Auswahl (vor Absuche)
   setSessionStatus: (status: SessionStatus) => void;
   restoreSearchSession: (p: PendingTrack) => void; // Recovery: Absuche-Metadaten + Punkte aus dem Puffer zurückspielen (P2)
+  // ── Search-Recovery-State (gehört zur aktiven searchRunId) ──
+  noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
+  noteSearchObjectFound: (objectKey: string) => void;      // sofort persistiert
+  noteSearchVoiceFired: (featureId: string) => void;       // sofort persistiert
+  noteSearchHapticFired: (featureId: string) => void;      // sofort persistiert
+  noteSearchEndFired: () => void;                          // sofort persistiert
+  setSearchSegmentAnnouncements: (rec: Record<string, SearchSegmentAnnounced>) => void;  // sofort persistiert
+  noteSearchOffTrackState: (state: OffTrackState) => void; // sofort persistiert (nur echte Übergänge)
   markArticleFound: (markerId: string) => void;
   setCurrentPosition: (pos: LatLng, accuracy?: number | null) => void;
   setHeading: (deg: number | null) => void;
@@ -167,6 +181,7 @@ const INITIAL = {
   searchRunId:           null as string | null,
   sessionStatus:         'laid' as SessionStatus,   // neutraler Default (nicht 'searching' → keine Recovery)
   searchHandlerDistanceM: DEFAULT_HANDLER_DISTANCE_M as SearchHandlerDistanceM,   // Fallback 5 m
+  searchRunState:        freshSearchRunState(),
   searchStartedAt:       null as number | null,
   searchUpdatedAt:       null as number | null,
   layStartedAt:          null as number | null,
@@ -197,6 +212,7 @@ function snapshot(s: TrackingState): PendingTrack {
     searchStartedAt: s.searchStartedAt, searchUpdatedAt: s.searchUpdatedAt,
     layStartedAt: s.layStartedAt, layUpdatedAt: s.layUpdatedAt,
     searchHandlerDistanceM: s.searchHandlerDistanceM,
+    searchRun: s.searchRunState,
   };
 }
 // Puffer wird HUNDEBASIERT geschrieben (Schlüssel = dog_id). Ohne dog_id fällt
@@ -261,12 +277,16 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // Spur NIE. SQLite ist autoritativ (searchPersist); hier zusätzlich der (entprellte)
   // AsyncStorage-Snapshot für die Recovery (P2) — inkl. searchUpdatedAt.
   addSearchPoint: (p) => { set(s => ({ searchTrackPoints: [...s.searchTrackPoints, p], searchUpdatedAt: p.t })); persist(get); },
-  resetSearchPoints: () => set({ searchTrackPoints: [] }),
+  // Frische Suchspur = frischer Run-State (Discard/Neustart darf nichts übernehmen).
+  resetSearchPoints: () => set({ searchTrackPoints: [], searchRunState: freshSearchRunState() }),
   setSearchPoints: (pts) => { set({ searchTrackPoints: pts }); persistNow(get); },
   // Frische Absuche (P2): Status 'searching' + Metadaten; sofort persistieren, damit
   // ein Kill direkt nach dem Start wiederherstellbar bleibt.
   startSearchSession: (runId, startedAtMs) => {
-    set({ sessionStatus: 'searching', searchRunId: runId, searchStartedAt: startedAtMs, searchUpdatedAt: startedAtMs, searchTrackPoints: [] });
+    set({
+      sessionStatus: 'searching', searchRunId: runId, searchStartedAt: startedAtMs, searchUpdatedAt: startedAtMs,
+      searchTrackPoints: [], searchRunState: freshSearchRunState(),   // neue runId → kein State des alten Runs
+    });
     persistNow(get);
   },
   setSearchRunId: (runId) => { set({ searchRunId: runId }); persistNow(get); },
@@ -290,7 +310,50 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     searchStartedAt:   p.searchStartedAt ?? null,
     searchUpdatedAt:   p.searchUpdatedAt ?? null,
     searchHandlerDistanceM: p.searchHandlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M,   // Recovery: 5-m-Fallback
+    searchRunState:    sanitizeSearchRunState(p.searchRun),   // Legacy ohne Feld → FRESH (Degradation)
   }),
+
+  // ── Search-Recovery-State ──
+  // Fortschritt/Abweichung/Abrisse: je akzeptiertem Suchpunkt EIN Store-Update, Persistenz
+  // über den bestehenden 4-s-Debounce (schedulePersist) — kein AsyncStorage im GPS-Hotpath.
+  // maxCursorM wird NIE rückwärts geschrieben.
+  noteSearchRunProgress: (p) => {
+    set(s => ({ searchRunState: {
+      ...s.searchRunState,
+      maxCursorM: Math.max(s.searchRunState.maxCursorM, p.maxCursorM),
+      devSumM: p.devSumM, devCount: p.devCount, breaks: p.breaks,
+    } }));
+    persist(get);
+  },
+  noteSearchObjectFound: (key) => {
+    if (get().searchRunState.foundObjectIds.includes(key)) return;
+    set(s => ({ searchRunState: { ...s.searchRunState, foundObjectIds: [...s.searchRunState.foundObjectIds, key] } }));
+    persistNow(get);
+  },
+  noteSearchVoiceFired: (id) => {
+    if (get().searchRunState.voiceFiredIds.includes(id)) return;
+    set(s => ({ searchRunState: { ...s.searchRunState, voiceFiredIds: [...s.searchRunState.voiceFiredIds, id] } }));
+    persistNow(get);
+  },
+  noteSearchHapticFired: (id) => {
+    if (get().searchRunState.hapticFiredIds.includes(id)) return;
+    set(s => ({ searchRunState: { ...s.searchRunState, hapticFiredIds: [...s.searchRunState.hapticFiredIds, id] } }));
+    persistNow(get);
+  },
+  noteSearchEndFired: () => {
+    if (get().searchRunState.endFired) return;
+    set(s => ({ searchRunState: { ...s.searchRunState, endFired: true } }));
+    persistNow(get);
+  },
+  setSearchSegmentAnnouncements: (rec) => {
+    set(s => ({ searchRunState: { ...s.searchRunState, segmentAnnouncements: rec } }));
+    persistNow(get);
+  },
+  noteSearchOffTrackState: (state) => {
+    if (get().searchRunState.offTrackState === state) return;
+    set(s => ({ searchRunState: { ...s.searchRunState, offTrackState: state } }));
+    persistNow(get);
+  },
 
   markArticleFound: (markerId) => set(s => ({
     markers: s.markers.map(m => m.id === markerId ? { ...m, found: true } : m),

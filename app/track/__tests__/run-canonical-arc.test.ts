@@ -38,8 +38,9 @@ describe('run.tsx: Search-Guidance verwendet ausschliesslich kanonische arcM', (
   });
 
   it('useTrackVoiceGuidance / useTrackHapticGuidance bekommen weiterhin dieselben Listen (dogProgressM + arcM)', () => {
-    expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects);');
-    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, true);');
+    // (6. Argument = Search-Recovery-Seeds/Callbacks; Listen und dogProgressM unverändert)
+    expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery);');
+    expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, true, hapticRecovery);');
   });
 });
 

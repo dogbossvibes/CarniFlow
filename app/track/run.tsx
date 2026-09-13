@@ -29,6 +29,7 @@ import {
 } from '@/features/tracking/engine/startApproach';
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import { buildSearchEventArcs, type CanonicalArc } from '@/features/tracking/utils/canonicalArc';
+import type { SearchRunState } from '@/features/tracking/store/searchRunState';
 
 // expo-speech defensiv laden (nativ; kein Crash, wenn Modul fehlt).
 let Speech: typeof import('expo-speech') | null = null;
@@ -89,6 +90,7 @@ const EMPTY_SNAP_CONST = {
   eventArcs: {} as Record<string, CanonicalArc>,
   segments: [] as ReturnType<typeof useTrackingStore.getState>['segments'],
   level: 'training' as Level,
+  recovery: null as SearchRunState | null,
 };
 
 // AUSARBEITEN — der Hund läuft die gelegte Fährte ab. Snapshot (laidPoints,
@@ -114,7 +116,10 @@ export default function TrackRunScreen() {
 
   // Snapshot der gelegten Fährte (aus dem Store — nach Recovery via restoreSearchSession
   // befüllt). Wird nach der Recovery-Entscheidung EINMAL gesetzt und bleibt stabil.
-  const buildSnap = () => {
+  // `withRecovery`: Search-Recovery-State desselben Runs (nach restoreSearchSession
+  // im Store) in den Snapshot übernehmen → seedet Voice/Haptik/Ende/Segmente.
+  // Frischer Start und Discard bauen den Snapshot OHNE Recovery (recovery: null).
+  const buildSnap = (withRecovery = false) => {
     const st = useTrackingStore.getState();
     const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
     const laidPoints = st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng }));
@@ -139,11 +144,12 @@ export default function TrackRunScreen() {
     return {
       laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),
       laidPoints,
-      laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number }, index: i, material: m.material ?? '' })),
+      laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number }, index: i, material: m.material ?? '', id: m.id })),
       laidMarkers: st.markers,
       eventArcs,
       segments: st.segments,
       level: 'training' as Level,
+      recovery: withRecovery ? st.searchRunState : null,
     };
   };
   type Snap = ReturnType<typeof buildSnap>;
@@ -186,6 +192,9 @@ export default function TrackRunScreen() {
   const runIdRef = useRef<string | null>(null);
   const searchStartMsRef = useRef<number | null>(null);   // Suchzeit-Start (für lokale Run-Finalisierung)
   const segmentAnnouncementRef = useRef<Record<string, SearchSegmentAnnouncementState>>({});
+  // Off-Track-Übergänge (Feedback nur auf echten State-Wechseln); wird bei Resume aus
+  // dem Search-Recovery-State geseedet (siehe resumeSearch), bei Discard zurückgesetzt.
+  const prevOffTrackRef = useRef<OffTrackState>('on_track');
 
   // Ursprünglicher Startpunkt (Fährtenansatz):
   //   1) gültiger Runtime-Startpunkt (erster gelegter Punkt = StartAnchor),
@@ -211,10 +220,10 @@ export default function TrackRunScreen() {
       }
       const decision = decideRecovery(pending);
       if (decision.kind === 'recovery') {
-        useTrackingStore.getState().restoreSearchSession(decision.pending);   // laid + Metadaten in den (evtl. leeren) Store
+        useTrackingStore.getState().restoreSearchSession(decision.pending);   // laid + Metadaten + Run-State in den (evtl. leeren) Store
         setEffectiveId(decision.pending.sessionId ?? id ?? null);
         runIdRef.current = decision.pending.runId ?? null;
-        setSnap(buildSnap());
+        setSnap(buildSnap(true));        // inkl. Search-Recovery-State (Dedupe-Seeds)
         setRecovery(decision.pending);   // → Dialog
       } else {
         // Root-Cause-Fix (Feldtest B): `buildSnap()` liest AUSSCHLIESSLICH den
@@ -266,7 +275,10 @@ export default function TrackRunScreen() {
     // verlangen. 'manual-at-start' (Ansatz bereits per approach.armed
     // bestätigt) durchläuft weiterhin die normale Akquisition unverändert.
     s.start(undefined, { forceLocked: mode === 'manual-override' });
-    useTrackingStore.getState().startSearchSession(null, startMs);   // Status 'searching' + Suchzeit-Start
+    // Status 'searching' + Suchzeit-Start + FRISCHER Run-State. runUuid wird hier
+    // mitgegeben (vorher `null` → überschrieb die Zeile davor und der Puffer verlor
+    // die runId; Resume erzeugte dadurch eine NEUE Run-ID statt derselben).
+    useTrackingStore.getState().startSearchSession(runUuid, startMs);
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
     // Kein direkter Remote-Start mehr (RUN-SAVE2): track_runs wird beim Stop über die
     // Sync-Queue idempotent per runUuid upserted. runUuid ist bereits lokal geführt.
@@ -378,7 +390,15 @@ export default function TrackRunScreen() {
     startedRef.current = true;   // verhindert den frischen Start-Effect
     setRecovery(null);
     hapticSuccess();
-    s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })), startedAtMs: pending.searchStartedAt ?? Date.now() });
+    // Search-Recovery-State DESSELBEN Runs (restoreSearchSession → Store, legacy-
+    // sicher saniert): Fortschritt/Funde/Abrisse/Abweichung/Off-Track seeden.
+    // Off-Track- und Segment-Dedupe werden VOR dem Start gesetzt, damit der erste
+    // Snapshot keinen falschen Übergang (on_track→…) meldet und Segmente nicht
+    // erneut angesagt werden.
+    const runState = useTrackingStore.getState().searchRunState;
+    prevOffTrackRef.current = runState.offTrackState;
+    segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };
+    s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })), startedAtMs: pending.searchStartedAt ?? Date.now(), runState });
   };
 
   // Beenden: vorhandene Suchpunkte speichern + Session sauber abschliessen.
@@ -440,10 +460,14 @@ export default function TrackRunScreen() {
       { text: 'Verwerfen', style: 'destructive', onPress: async () => {
         const sessId = pending.sessionId ?? effectiveId;
         if (sessId) await deleteSearchPointsBySession(sessId).catch(() => {});
-        useTrackingStore.getState().resetSearchPoints();
+        useTrackingStore.getState().resetSearchPoints();   // leert auch den Run-State
         useTrackingStore.getState().setSessionStatus('cancelled');
         clearRegistry();
         startedRef.current = false;   // erlaubt einen frischen Start (neue Absuche, neue runId)
+        // Kein State des verworfenen Runs darf in den neuen Search überlaufen.
+        segmentAnnouncementRef.current = {};
+        prevOffTrackRef.current = 'on_track';
+        setSnap(buildSnap(false));
         setRecovery(null);
       } },
     ]);
@@ -478,17 +502,29 @@ export default function TrackRunScreen() {
       .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, material: m.material }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
-  useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects);
+  // Search-Recovery-State: Seeds (bereits angesagt/ausgelöst in DIESEM Run) aus dem
+  // Snapshot; jede neue Ansage/Auslösung wird sofort in den Run-State gespiegelt.
+  // Voice und Haptik führen getrennte Mengen (unterschiedliche Triggerdistanzen).
+  const voiceRecovery = useMemo(() => ({
+    initialAnnouncedIds: snapData.recovery?.voiceFiredIds,
+    onAnnounced: (id: string) => useTrackingStore.getState().noteSearchVoiceFired(id),
+  }), [snapData.recovery]);
+  const hapticRecovery = useMemo(() => ({
+    initialFiredIds: snapData.recovery?.hapticFiredIds,
+    onFired: (id: string) => useTrackingStore.getState().noteSearchHapticFired(id),
+  }), [snapData.recovery]);
+  useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery);
 
   // Haptische Führung: 1× bei Gegenstand voraus, 2× bei Winkel voraus — dieselbe
   // Bogenlängendistanz (dogProgressM) wie die Sprachführung.
-  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, true);
+  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, true, hapticRecovery);
 
   // Fährtenende-Erkennung + Voice („Ende der Fährte erreicht."), Once-only, auf Basis
   // der VIRTUELLEN Hundeposition (dogProgressM/estimatedDogPosition, order-aware) und
   // des gespeicherten Endpunkts (letzter Punkt der gelegten Fährte). Beendet die
   // Absuche NICHT — nur Anzeige/Voice/Haptik; der Nutzer beendet weiterhin selbst.
   const endPoint = snapData.laidPoints.length ? snapData.laidPoints[snapData.laidPoints.length - 1] : null;
+  const noteEndFired = useCallback(() => useTrackingStore.getState().noteSearchEndFired(), []);
   const openMandatoryObjects = Math.max(0, s.totalObjects - s.foundObjects);
   const trackEndState = useTrackEndGuidance({
     recording: s.recording && !arming,
@@ -498,6 +534,8 @@ export default function TrackRunScreen() {
     endPoint,
     openMandatoryObjects,
     voiceOn,
+    initialFired: snapData.recovery?.endFired ?? false,
+    onFired: noteEndFired,
   });
   const trackEndReached = trackEndState === 'reached' || trackEndState === 'completed';
 
@@ -520,6 +558,7 @@ export default function TrackRunScreen() {
       state: segmentAnnouncementRef.current,
     });
     segmentAnnouncementRef.current = result.state;
+    if (result.messages.length) useTrackingStore.getState().setSearchSegmentAnnouncements(result.state);   // Recovery-State
     result.messages.forEach(message => {
       if (Speech) {
         try { Speech.speak(message, { language: 'de-CH', pitch: 1.0, rate: 0.95 }); } catch { /* best-effort */ }
@@ -531,7 +570,6 @@ export default function TrackRunScreen() {
   // Die State-Machine ist bereits debounced → offTrackState ändert sich nur bei einer
   // bestätigten Transition (kein eigener Debounce nötig). KEIN Progress-/Recorder-
   // Freeze, keine Auto-Pause — ausschliesslich Feedback.
-  const prevOffTrackRef = useRef<OffTrackState>('on_track');
   // Transientes Recovery-Banner „Wieder auf der Fährte" — kurz einblenden, nicht
   // dauerhaft stehen lassen (Warn-/Off-Track-Banner leiten sich dagegen aus dem State ab).
   const [recoveryVisible, setRecoveryVisible] = useState(false);

@@ -61,18 +61,35 @@ export function objectPhrase(material: string | null | undefined, steps: number,
 // Sprachführung beim Ablaufen: kündigt den nächsten gelegten Winkel/Abriss ODER
 // Gegenstand (inkl. „Dübel") „etwas voraus" an — Distanz relativ zur VIRTUELLEN
 // HUNDEPOSITION (dogProgressM, Bogenlänge), jeden Punkt genau einmal.
+// Recovery (Search-Recovery-State): `initialAnnouncedIds` seedet Features, die in
+// DIESEM Run bereits angesagt wurden (→ nie erneut); `onAnnounced` spiegelt jede
+// neue Ansage nach aussen (Persistenz). Schwellen/Texte/Locale unverändert.
+export interface VoiceGuidanceRecovery {
+  initialAnnouncedIds?: readonly string[];
+  onAnnounced?: (featureId: string) => void;
+}
+
 export function useTrackVoiceGuidance(
   dogProgressM: number | null,
   angles: GuidanceAngle[],
   voiceOn: boolean,
   stepLengthM?: number,
   objects: { id: string; arcM: number; material?: string | null }[] = [],
+  recovery?: VoiceGuidanceRecovery,
 ) {
   const stateRef     = useRef<Record<string, GuidanceFeatureState>>({});
   const lastSpeakRef = useRef(0);
+  const onAnnouncedRef = useRef(recovery?.onAnnounced);
+  onAnnouncedRef.current = recovery?.onAnnounced;
+  const initialIds = recovery?.initialAnnouncedIds;
 
-  // Bei neuem Lauf (neue Listen) die „schon angesagt"-Menge zurücksetzen.
-  useEffect(() => { stateRef.current = {}; }, [angles, objects]);
+  // Bei neuem Lauf (neue Listen) die „schon angesagt"-Menge zurücksetzen — bzw.
+  // aus dem Recovery-State desselben Runs seeden ('announced' → nie wieder).
+  useEffect(() => {
+    const seeded: Record<string, GuidanceFeatureState> = {};
+    for (const id of initialIds ?? []) seeded[id] = 'announced';
+    stateRef.current = seeded;
+  }, [angles, objects, initialIds]);
 
   useEffect(() => {
     if (!voiceOn || dogProgressM == null || !SPEECH_AVAILABLE) return;
@@ -93,6 +110,7 @@ export function useTrackVoiceGuidance(
       // Distanz → geschätzte Schritte über die zentrale Utility (persönliche Schrittlänge optional).
       const steps = Math.max(1, metersToSteps(bestD, stepLengthM));
       say(best.kind === 'angle' ? phraseFor(best.angleKind, steps, locale) : objectPhrase(best.material, steps, locale), locale);
+      onAnnouncedRef.current?.(best.id);
     }
   }, [dogProgressM, angles, objects, voiceOn, stepLengthM]);
 

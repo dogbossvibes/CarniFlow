@@ -27,17 +27,30 @@ async function buzz(n: number) {
 // Haptische Führung beim Absuchen: 1× vibrieren, wenn sich ein Gegenstand nähert,
 // 2× vibrieren, wenn ein Winkel voraus liegt — jeden Punkt genau einmal. Läuft
 // unabhängig von der Sprachausgabe.
+// Recovery (Search-Recovery-State): `initialFiredIds` seedet bereits ausgelöste
+// Features DIESES Runs, `onFired` spiegelt neue Auslösungen nach aussen. Eigene
+// Identitätsmenge (nicht die der Voice) — die Triggerdistanzen unterscheiden sich.
+export interface HapticGuidanceRecovery {
+  initialFiredIds?: readonly string[];
+  onFired?: (featureId: string) => void;
+}
+
 export function useTrackHapticGuidance(
   dogProgressM: number | null,
   angles: GuidanceAngle[],
   objects: GuidanceObject[],
   enabled: boolean,
+  recovery?: HapticGuidanceRecovery,
 ) {
   const firedRef = useRef<Set<string>>(new Set());
   const lastRef  = useRef(0);
+  const onFiredRef = useRef(recovery?.onFired);
+  onFiredRef.current = recovery?.onFired;
+  const initialIds = recovery?.initialFiredIds;
 
-  // Bei neuem Lauf (neue Listen) die „schon ausgelöst"-Menge zurücksetzen.
-  useEffect(() => { firedRef.current = new Set(); }, [angles, objects]);
+  // Bei neuem Lauf (neue Listen) die „schon ausgelöst"-Menge zurücksetzen — bzw.
+  // aus dem Recovery-State desselben Runs seeden.
+  useEffect(() => { firedRef.current = new Set(initialIds ?? []); }, [angles, objects, initialIds]);
 
   useEffect(() => {
     if (!enabled || dogProgressM == null || !Haptics) return;
@@ -61,6 +74,7 @@ export function useTrackHapticGuidance(
       firedRef.current.add(bestId);
       lastRef.current = now;
       void buzz(pulses);
+      onFiredRef.current?.(bestId);
     }
   }, [dogProgressM, angles, objects, enabled]);
 }

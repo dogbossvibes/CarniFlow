@@ -35,7 +35,12 @@ jest.mock('@/features/tracking/utils/positionSource', () => ({
 }));
 
 jest.mock('@/features/tracking/store/trackingStore', () => ({
-  useTrackingStore: { getState: () => ({ addSearchPoint: jest.fn(), resetSearchPoints: jest.fn() }) },
+  // Search-Recovery-State: der Recorder spiegelt Fortschritt/Funde/Off-Track in den Store.
+  useTrackingStore: { getState: () => ({
+    addSearchPoint: jest.fn(), resetSearchPoints: jest.fn(),
+    noteSearchRunProgress: jest.fn(), noteSearchObjectFound: jest.fn(), noteSearchOffTrackState: jest.fn(),
+    searchRunState: { offTrackState: 'on_track' },
+  }) },
 }));
 jest.mock('@/features/tracking/store/searchPersist', () => ({
   enqueueSearchPoint: jest.fn(), flushSearchPoints: jest.fn(async () => true), resetSearchBuffer: jest.fn(),

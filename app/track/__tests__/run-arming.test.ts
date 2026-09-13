@@ -64,7 +64,10 @@ describe('TrackRunScreen arming flow', () => {
 
     expect(recoveryBlock).toContain("setSessionStatus('searching')");
     expect(recoveryBlock).toContain('s.start({ points: saved.map');
-    expect(beginBlock).toContain('useTrackingStore.getState().startSearchSession(null, startMs)');
+    // Search-Recovery-State: die frische Session bekommt die runUuid mit (vorher
+    // `null` → überschrieb setSearchRunId und der Puffer verlor die Run-ID).
+    expect(beginBlock).toContain('useTrackingStore.getState().startSearchSession(runUuid, startMs)');
+    expect(beginBlock).not.toContain('startSearchSession(null');
     expect(src).not.toMatch(/setArming\(false\)[\s\S]{0,160}approach\.armed/);
   });
 });

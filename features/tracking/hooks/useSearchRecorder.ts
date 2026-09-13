@@ -21,6 +21,7 @@ import {
 import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import { stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
+import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
 import { motionClient } from '@/features/tracking/native/motionClient';
@@ -51,7 +52,8 @@ export interface GpsDebug {
 }
 
 export type LatLng = { latitude: number; longitude: number };
-export type SearchObject = { at: LatLng; index: number; material: string };
+// `id` = stabile Marker-ID (Recovery-Identität der Funde); fehlt sie, gilt der Index.
+export type SearchObject = { at: LatLng; index: number; material: string; id?: string };
 export type Break = {
   at: LatLng;
   t: number;               // Sekunden seit Start, wann der Abriss BESTÄTIGT wurde (Konvention unverändert, z. B. Map-Marker-Zeitpunkt)
@@ -158,7 +160,9 @@ export interface SearchRecorder {
   searchStartState: SearchStartState;
   // Ohne Argument: frische Absuche (Reset). Mit `resume`: unterbrochene Absuche
   // fortsetzen (P2) — Punkte/Distanz/Timer werden fortgeführt, keine neue Session.
-  start: (resume?: { points: LatLng[]; startedAtMs: number }, opts?: { forceLocked?: boolean }) => void;
+  // `runState` (Search-Recovery-State) seedet Fortschritt/Funde/Abrisse/Abweichung/
+  // Off-Track desselben Runs; fehlt er (Legacy-Puffer) → wie bisher ab 0.
+  start: (resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState }, opts?: { forceLocked?: boolean }) => void;
   stop: () => SearchResult;
   setPaused: (p: boolean) => void;
   markObject: () => void;
@@ -663,8 +667,24 @@ export function useSearchRecorder(opts: {
     laidObjects.forEach((o, i) => {
       if (!foundRef.current.has(i) && distM(objectReference, o.at) <= OBJECT_HIT_M) {
         foundRef.current.add(i);
+        // Recovery-State: Fund sofort persistieren (stabile Marker-ID, sonst Index).
+        useTrackingStore.getState().noteSearchObjectFound(searchObjectKey(o, i));
       }
     });
+
+    // ── Search-Recovery-State (P0): Referenzfortschritt (maxCursor, OHNE
+    // handlerDistance), Abweichungs-Statistik und Abrisse je akzeptiertem
+    // Suchpunkt in den Store spiegeln — derselbe Takt wie addSearchPoint, die
+    // Persistenz läuft über den bestehenden 4-s-Debounce (kein Hotpath-Write).
+    // Off-Track: nur der diskrete State, nur bei echtem Wechsel.
+    {
+      const st = useTrackingStore.getState();
+      st.noteSearchRunProgress({
+        maxCursorM: maxCursorMRef.current, devSumM: devSumRef.current, devCount: devCountRef.current,
+        breaks: breaksRef.current.slice(),
+      });
+      if (st.searchRunState.offTrackState !== offTrackRef.current.state) st.noteSearchOffTrackState(offTrackRef.current.state);
+    }
 
     pushSnapshot();
   // gpsDebug.source bewusst NICHT in den Deps: es wird nur für das sparsame
@@ -758,7 +778,7 @@ export function useSearchRecorder(opts: {
   }, [recording, paused]);
 
   // ── Steuerung ──
-  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number }, opts?: { forceLocked?: boolean }) => {
+  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState }, opts?: { forceLocked?: boolean }) => {
     const resumePts = resume?.points ?? [];
     // Fortsetzen: mit den wiederhergestellten Punkten seeden (Linie/Distanz laufen
     // weiter); frisch: leer.
@@ -768,7 +788,6 @@ export function useSearchRecorder(opts: {
     // resultierende Längen-Differenz zu pointsRef ist das Signal für "Replay
     // für diese Session nicht verfügbar" (siehe SearchResult.pointsTimeSec).
     pointsTimeRef.current = [];
-    breaksRef.current = [];
     smoothRef.current = resumePts.length ? resumePts[resumePts.length - 1] : null;
     prevFixRef.current = null;   // Zeitlücke → nächster Fix ist neuer Referenzpunkt (kein Speed-Gate gegen alten Fix)
     recentRejectedRef.current = [];
@@ -776,10 +795,22 @@ export function useSearchRecorder(opts: {
     let d = 0;
     for (let i = 1; i < resumePts.length; i++) d += distM(resumePts[i - 1], resumePts[i]);
     distRef.current = d;
-    devEmaRef.current = 0; devSumRef.current = 0; devCountRef.current = 0;
+    // ── Search-Recovery-State (P0): derselbe Run läuft weiter, nicht „ungefähr
+    // am selben Ort neu". Seed aus dem persistierten Run-State:
+    //   • cursor/maxCursor = maxCursorM (monoton, Referenzmaßstab laidPoints) →
+    //     projectForward sucht ab hier im normalen [cursor−4, cursor+20]-Fenster.
+    //   • devSum/devCount, breaks → Score/deviationAvg bleiben run-bezogen.
+    //   • Off-Track: nur der diskrete State; Streaks/inBreak/offTrackSince starten
+    //     frisch (RESET SAFE — die State-Machine bestätigt Wechsel ohnehin per
+    //     Debounce; kein falscher Übergang, weil run.tsx prevOffTrack ebenfalls seedet).
+    // Fehlt runState (Legacy-Puffer) → Fortschritt 0 wie bisher (Degradation).
+    const rs = resume?.runState ?? null;
+    devEmaRef.current = 0; devSumRef.current = rs?.devSumM ?? 0; devCountRef.current = rs?.devCount ?? 0;
+    breaksRef.current = rs ? rs.breaks.map(b => ({ ...b, at: { ...b.at } })) : [];
     offTrackSinceRef.current = null; inBreakRef.current = false;
-    offTrackRef.current = initialOffTrack();
-    cursorMRef.current = 0; maxCursorMRef.current = 0;
+    offTrackRef.current = { ...initialOffTrack(), state: rs?.offTrackState ?? 'on_track' };
+    const seedCursorM = rs ? Math.max(0, Math.min(arc.total, rs.maxCursorM)) : 0;
+    cursorMRef.current = seedCursorM; maxCursorMRef.current = seedCursorM;
     // Core-Motion-Fusion (Punkt 3/16): NUR während einer aktiven Absuche aktiv.
     // Fire-and-forget — ein Start-Fehler (Permission verweigert, kein Modul im
     // Build, Android) fällt lautlos auf fusionMode='gps_only' zurück, blockiert
@@ -805,10 +836,12 @@ export function useSearchRecorder(opts: {
     // Konsekutiv-/Fenster-Gate. BUILD40 reproduziert das exakt.
     const build40 = getTrackingEngineMode() === 'build40';
     searchStartRef.current = (resume || !hasTrack || opts?.forceLocked || build40)
-      ? { state: 'START_LOCKED', support: DEFAULT_SEARCH_START_CONFIG.requiredFixes, lockedAtM: 0 }
+      ? { state: 'START_LOCKED', support: DEFAULT_SEARCH_START_CONFIG.requiredFixes, lockedAtM: seedCursorM }
       : INITIAL_SEARCH_START;
     setSearchStartState(searchStartRef.current.state);
+    // Funde: stabile Marker-IDs (Fallback Index) zurück auf laidObjects abbilden.
     foundRef.current = new Set();
+    if (rs) laidObjects.forEach((o, i) => { if (rs.foundObjectIds.includes(searchObjectKey(o, i))) foundRef.current.add(i); });
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
     setElapsedS(resume ? Math.max(0, Math.floor((Date.now() - resume.startedAtMs) / 1000)) : 0);
     pausedRef.current = false; setPausedState(false);
@@ -821,7 +854,7 @@ export function useSearchRecorder(opts: {
     recordingRef.current = true; setRecording(true);
     if (__DEV__) console.log('[searchRecorder] recording started', { resume: !!resume, resumePts: resumePts.length });
     pushSnapshot();
-  }, [pushSnapshot, hasTrack]);
+  }, [pushSnapshot, hasTrack, arc.total, laidObjects]);
 
   const stop = useCallback((): SearchResult => {
     recordingRef.current = false; setRecording(false);
@@ -856,7 +889,11 @@ export function useSearchRecorder(opts: {
       const d = distM(cur, o.at);
       if (d < bestD) { bestD = d; bestI = i; }
     });
-    if (bestI >= 0) { foundRef.current.add(bestI); pushSnapshot(); }
+    if (bestI >= 0) {
+      foundRef.current.add(bestI);
+      useTrackingStore.getState().noteSearchObjectFound(searchObjectKey(laidObjects[bestI], bestI));
+      pushSnapshot();
+    }
   }, [laidObjects, pushSnapshot]);
 
   // Virtueller Hundefortschritt (Bogenlänge) + geschätzte Hundeposition — reine
