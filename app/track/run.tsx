@@ -502,13 +502,33 @@ export default function TrackRunScreen() {
       .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, material: m.material }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
+  // ── Search-Guidance Activation Guard ─────────────────────────────────────
+  // EIN zentraler Zustand für ACTIVE SEARCH GUIDANCE (Winkel/Gegenstand/Dübel/
+  // GW-OW-BW-Abriss-Voice, deren Haptik, Segment-Ansagen, Off-Track-Feedback,
+  // Ende). Zwei bestehende Recorder-Authorities, beide nötig:
+  //   • `s.recording` — true erst ab s.start() (beginSearchNow/resumeSearch),
+  //     false nach stop()/Discard.
+  //   • `s.searchStartState === 'START_LOCKED'` — der Fährtenansatz ist
+  //     tatsächlich erkannt (Search-Start-Acquisition). Während SEEKING_START/
+  //     START_CANDIDATE läuft recording bereits, dogProgressM ist ≥ 0 → ohne
+  //     diese Bedingung sprächen Events nahe dem Start schon in der
+  //     Acquisition. Resume/Freilauf/Override/BUILD40 starten direkt LOCKED.
+  // Vorher (Arming, Recovery-Dialog, leerer Snapshot, Acquisition) konnten
+  // Events vorzeitig sprechen/vibrieren und dabei „verbraucht" werden.
+  // `arming` ist keine Zusatzbedingung nötig (immer false, bevor recording
+  // true wird). Bewusst NICHT gegated (Pre-Search-/Übergangs-Feedback):
+  // „Suche läuft", Start-Haptik, „Fährtenansatz erkannt" (Lock-Übergang),
+  // Toasts/Banner.
+  const searchGuidanceActive = s.recording && s.searchStartState === 'START_LOCKED';
+
   // Search-Recovery-State: Seeds (bereits angesagt/ausgelöst in DIESEM Run) aus dem
   // Snapshot; jede neue Ansage/Auslösung wird sofort in den Run-State gespiegelt.
   // Voice und Haptik führen getrennte Mengen (unterschiedliche Triggerdistanzen).
   const voiceRecovery = useMemo(() => ({
     initialAnnouncedIds: snapData.recovery?.voiceFiredIds,
     onAnnounced: (id: string) => useTrackingStore.getState().noteSearchVoiceFired(id),
-  }), [snapData.recovery]);
+    enabled: searchGuidanceActive,
+  }), [snapData.recovery, searchGuidanceActive]);
   const hapticRecovery = useMemo(() => ({
     initialFiredIds: snapData.recovery?.hapticFiredIds,
     onFired: (id: string) => useTrackingStore.getState().noteSearchHapticFired(id),
@@ -517,7 +537,7 @@ export default function TrackRunScreen() {
 
   // Haptische Führung: 1× bei Gegenstand voraus, 2× bei Winkel voraus — dieselbe
   // Bogenlängendistanz (dogProgressM) wie die Sprachführung.
-  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, true, hapticRecovery);
+  useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);
 
   // Fährtenende-Erkennung + Voice („Ende der Fährte erreicht."), Once-only, auf Basis
   // der VIRTUELLEN Hundeposition (dogProgressM/estimatedDogPosition, order-aware) und
@@ -527,7 +547,7 @@ export default function TrackRunScreen() {
   const noteEndFired = useCallback(() => useTrackingStore.getState().noteSearchEndFired(), []);
   const openMandatoryObjects = Math.max(0, s.totalObjects - s.foundObjects);
   const trackEndState = useTrackEndGuidance({
-    recording: s.recording && !arming,
+    recording: searchGuidanceActive,
     dogProgressM: s.dogProgressM,
     trackLengthM: s.trackLengthM,
     estimatedDogPosition: s.estimatedDogPosition,
@@ -551,7 +571,7 @@ export default function TrackRunScreen() {
   );
 
   useEffect(() => {
-    if (!voiceOn || arming || !s.recording || snapData.segments.length === 0) return;
+    if (!voiceOn || !searchGuidanceActive || snapData.segments.length === 0) return;
     const result = searchSegmentAnnouncements({
       segments: snapData.segments,
       currentStep: metersToSteps(s.dogProgressM, stepLengthM),   // hundebezogen (5/10-m-Versatz entlang der Fährte)
@@ -564,7 +584,7 @@ export default function TrackRunScreen() {
         try { Speech.speak(message, { language: 'de-CH', pitch: 1.0, rate: 0.95 }); } catch { /* best-effort */ }
       }
     });
-  }, [arming, s.dogProgressM, s.recording, snapData.segments, voiceOn, stepLengthM]);
+  }, [searchGuidanceActive, s.dogProgressM, snapData.segments, voiceOn, stepLengthM]);
 
   // Off-Track-Feedback (Phase 2): Voice + Haptik NUR auf echten State-Übergängen.
   // Die State-Machine ist bereits debounced → offTrackState ändert sich nur bei einer
@@ -575,9 +595,13 @@ export default function TrackRunScreen() {
   const [recoveryVisible, setRecoveryVisible] = useState(false);
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    // Guard ZUERST: solange keine aktive Suche läuft, wird weder Feedback gegeben
+    // noch prevOffTrackRef fortgeschrieben (ein Übergang wird nicht „verbraucht";
+    // der Recovery-Seed aus resumeSearch bleibt bis zum ersten aktiven Tick stehen).
+    if (!searchGuidanceActive) return;
     const fb = offTrackTransitionFeedback(prevOffTrackRef.current, s.offTrackState);
     prevOffTrackRef.current = s.offTrackState;
-    if (!fb || !s.recording) return;
+    if (!fb) return;
     if (fb.haptic === 'light') hapticTap();
     else if (fb.haptic === 'strong') hapticMarker();
     else hapticSuccess();
@@ -591,7 +615,7 @@ export default function TrackRunScreen() {
     } else {
       setRecoveryVisible(false);
     }
-  }, [s.offTrackState, s.recording, voiceOn, t]);
+  }, [s.offTrackState, searchGuidanceActive, voiceOn, t]);
   // Timer beim Verlassen aufräumen (kein setState nach Unmount).
   useEffect(() => () => { if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current); }, []);
 

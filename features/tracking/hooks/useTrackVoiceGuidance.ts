@@ -67,6 +67,11 @@ export function objectPhrase(material: string | null | undefined, steps: number,
 export interface VoiceGuidanceRecovery {
   initialAnnouncedIds?: readonly string[];
   onAnnounced?: (featureId: string) => void;
+  // Activation Guard: solange false (Arming, Recovery-Dialog, vor beginSearchNow,
+  // nach Stop/Discard), wird die Guidance-Engine NICHT gerechnet — kein Feature
+  // wird angesagt UND keines als approaching/announced/reached/passed
+  // „verbraucht". Default true (bestehende Aufrufer unverändert).
+  enabled?: boolean;
 }
 
 export function useTrackVoiceGuidance(
@@ -82,6 +87,7 @@ export function useTrackVoiceGuidance(
   const onAnnouncedRef = useRef(recovery?.onAnnounced);
   onAnnouncedRef.current = recovery?.onAnnounced;
   const initialIds = recovery?.initialAnnouncedIds;
+  const enabled = recovery?.enabled ?? true;
 
   // Bei neuem Lauf (neue Listen) die „schon angesagt"-Menge zurücksetzen — bzw.
   // aus dem Recovery-State desselben Runs seeden ('announced' → nie wieder).
@@ -92,7 +98,8 @@ export function useTrackVoiceGuidance(
   }, [angles, objects, initialIds]);
 
   useEffect(() => {
-    if (!voiceOn || dogProgressM == null || !SPEECH_AVAILABLE) return;
+    // Guard VOR dem Engine-Schritt: disabled darf keinen Zustand fortschreiben.
+    if (!enabled || !voiceOn || dogProgressM == null || !SPEECH_AVAILABLE) return;
     const now = Date.now();
     if (now - lastSpeakRef.current < SPEAK_GAP_MS) return;
 
@@ -112,7 +119,7 @@ export function useTrackVoiceGuidance(
       say(best.kind === 'angle' ? phraseFor(best.angleKind, steps, locale) : objectPhrase(best.material, steps, locale), locale);
       onAnnouncedRef.current?.(best.id);
     }
-  }, [dogProgressM, angles, objects, voiceOn, stepLengthM]);
+  }, [enabled, dogProgressM, angles, objects, voiceOn, stepLengthM]);
 
   // Beim Verlassen / Stummschalten laufende Ansage stoppen.
   useEffect(() => { if (!voiceOn) { try { Speech?.stop(); } catch { /* ignore */ } } }, [voiceOn]);
