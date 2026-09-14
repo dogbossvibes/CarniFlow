@@ -97,9 +97,13 @@ describe('Schwellen unverändert', () => {
     expect(rec).toContain('const BREAK_THRESHOLD_M = 6.0;');
     expect(rec).toContain('if (!foundRef.current.has(i) && distM(objectReference, o.at) <= OBJECT_HIT_M) {');
   });
-  it('Cursor-Seed läuft über den normalen projectForward-Pfad (kein Voll-Linien-Workaround)', () => {
+  it('Cursor-Seed läuft über den normalen Fenster-Projektionspfad (kein Voll-Linien-Workaround)', () => {
     const rec = strip(read('features/tracking/hooks/useSearchRecorder.ts'));
-    expect(rec).toContain('const proj = projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);');
+    // Seit dem Live-Cursor-Fix (Self-Crossing): Kandidaten im UNVERÄNDERTEN Fenster
+    // [cursor − BACK_M, cursor + LOOKAHEAD_M], Auswahl per Lotfuss-Kontinuität; ohne
+    // Vorgänger weiterhin projectForward mit demselben Fenster.
+    expect(rec).toContain('const cands = projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);');
+    expect(rec).toContain(': projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);');
     expect(rec).toContain('cursorMRef.current = seedCursorM; maxCursorMRef.current = seedCursorM;');
     expect(rec).toContain('lockedAtM: seedCursorM');
   });

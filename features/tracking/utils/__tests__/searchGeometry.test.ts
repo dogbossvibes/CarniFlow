@@ -78,3 +78,57 @@ describe('searchGeometry — Typ & Fallback', () => {
     for (const v of [0, 2, 3, 7, 11, -1, null, undefined]) expect(isHandlerDistance(v as unknown)).toBe(false);
   });
 });
+
+// ── P0 Live-Cursor: Fensterkandidaten + Kontinuitäts-Auswahl ─────────────────
+// eslint-disable-next-line import/first
+import { buildArc, projectForward, projectForwardCandidates, pickContinuousProjection, predictContinuityFoot, projectOntoSegments } from '@/features/tracking/utils/searchGeometry';
+
+describe('projectForwardCandidates / pickContinuousProjection', () => {
+  const M = 111320, LAT0 = 47, LNG0 = 8, M_LNG = M * Math.cos((LAT0 * Math.PI) / 180);
+  const at = (x: number, y: number) => ({ latitude: LAT0 + y / M, longitude: LNG0 + x / M_LNG });
+  // Hinweg x=0 (0→30 m), Rückweg x=1 (30→0 m): Gesamtlänge 61 m.
+  const line = [at(0, 0), at(0, 10), at(0, 20), at(0, 30), at(1, 30), at(1, 20), at(1, 10), at(1, 0)];
+  const { cum, total } = buildArc(line);
+
+  it('liefert alle lokalen Minima im Fenster (mit Lotfusspunkt); argmin = projectForward', () => {
+    const p = at(0.6, 15);
+    // Fenster [8, 32]: Hinweg-Kandidat 15 m; das Rückweg-Segment 31–41 m berührt das Fenster
+    // (dieselbe Überlappungsregel wie projectForward) → geklemmter Kandidat an dessen Ende (41 m).
+    const c = projectForwardCandidates(p, line, cum, 12, 20, 4);
+    expect(c.map(x => Math.round(x.arcM))).toEqual([15, 41]);
+    expect(c[0].point.latitude).toBeCloseTo(at(0, 15).latitude, 9);
+    // Fenster [26, 50]: Hinweg-Segment 20–30 m berührt das Fenster → geklemmter Kandidat an dessen Anfang (20 m); Rückweg 46 m.
+    const wide = projectForwardCandidates(p, line, cum, 30, 20, 4);
+    expect(wide.map(x => Math.round(x.arcM)).sort((a, b) => a - b)).toEqual([20, 46]);
+    const ref = projectForward(p, line, cum, 30, 20, 4);
+    const best = wide.reduce((b, x) => (x.offLineM < b.offLineM ? x : b));
+    expect(best.arcM).toBeCloseTo(ref.atM, 9);
+    expect(best.offLineM).toBeCloseTo(ref.devM, 9);
+    expect(projectForwardCandidates(p, [line[0]], [0], 0, 20, 4)).toEqual([]);
+    expect(projectOntoSegments(p, line, cum)).toHaveLength(line.length - 1);
+  });
+
+  it('ohne Vorgänger: nächster Kandidat (bisheriges Verhalten)', () => {
+    const p = at(0.6, 15);
+    const c = projectForwardCandidates(p, line, cum, 0, 61, 4);
+    const pick = pickContinuousProjection(c, null)!;
+    expect(Math.round(pick.arcM)).toBe(46);   // Rückweg ist 0,4 m entfernt, Hinweg 0,6 m
+    expect(pickContinuousProjection([], null)).toBeNull();
+  });
+
+  it('mit Vorgänger: Kontinuität + seitlicher Abstand — der geometrisch nähere Rückweg verliert gegen den gelaufenen Hinweg', () => {
+    const prevP = at(0.6, 13), p = at(0.6, 15);
+    const c = projectForwardCandidates(p, line, cum, 13, 61, 4);
+    const pick = pickContinuousProjection(c, predictContinuityFoot(at(0, 13), prevP, p, line, cum, 13))!;
+    expect(Math.round(pick.arcM)).toBe(15);
+    // Kosten: Hinweg 0 (Lotfuss exakt auf Vorhersage) + 0,6; Rückweg |(1,15)−(0,15)| = 1 + 0,4 = 1,4.
+  });
+
+  it('echte Kehre: nach dem Wendepunkt gewinnt der Rückweg, weil Vorhersage und Lotfuss dort zusammenfallen', () => {
+    const prevP = at(0.5, 29.5), p = at(1.2, 28);   // um die Kehre auf den Rückweg
+    const c = projectForwardCandidates(p, line, cum, 29.5, 20, 4);
+    const pick = pickContinuousProjection(c, predictContinuityFoot(at(0, 29.5), prevP, p, line, cum, 29.5))!;
+    expect(Math.round(pick.arcM)).toBe(33);   // Rückweg bei 28 m ⇒ arc 30+1+2 = 33
+    expect(pick.arcM).toBeLessThan(total);
+  });
+});

@@ -120,6 +120,7 @@ export interface SegmentProjection {
   frac: number;           // 0..1 Position auf dem Segment
   arcM: number;           // Bogenlänge cum[i] + frac·(cum[i+1] − cum[i])
   offLineM: number;       // senkrechter/geklemmter Abstand p → Segment (m)
+  point: LL;              // Lotfusspunkt auf dem Segment (Koordinate)
 }
 
 export function projectOntoSegments(p: LL, line: readonly LL[], cum: readonly number[]): SegmentProjection[] {
@@ -135,9 +136,100 @@ export function projectOntoSegments(p: LL, line: readonly LL[], cum: readonly nu
     let t = len2 ? -(a.x * dx + a.y * dy) / len2 : 0;
     t = Math.max(0, Math.min(1, t));
     const cx = a.x + t * dx, cy = a.y + t * dy;
-    out.push({ segmentIndex: i - 1, frac: t, arcM: cum[i - 1] + t * (cum[i] - cum[i - 1]), offLineM: Math.hypot(cx, cy) });
+    const A = line[i - 1], B = line[i];
+    out.push({
+      segmentIndex: i - 1, frac: t, arcM: cum[i - 1] + t * (cum[i] - cum[i - 1]), offLineM: Math.hypot(cx, cy),
+      point: { latitude: A.latitude + t * (B.latitude - A.latitude), longitude: A.longitude + t * (B.longitude - A.longitude) },
+    });
   }
   return out;
+}
+
+// ── Live-Search: Projektionskandidaten im Fortschrittsfenster ────────────────
+//
+// P0 „Live Search Cursor / Self-Crossing" (qa-0ec8c4ca): projectForward wählt
+// im Fenster [fromM − backM, fromM + lookaheadM] das geometrisch NÄCHSTE
+// Segment. Bei selbst-benachbarten Schenkeln (Rückweg wenige Dezimeter neben
+// dem Hinweg, Linie kürzer als das Fenster) sprang der Cursor so mit einem
+// einzigen 2-m-Schritt um 14 m auf den Rückweg; danach wurde die Schleife gegen
+// den falschen Schenkel gemessen (3,5-m-„Abweichung", Segment übersprungen).
+//
+// Hier werden ALLE lokalen Abstandsminima im Fenster geliefert; die Auswahl
+// (pickContinuousProjection) nutzt die Kontinuität des Lotfusspunkts: der
+// vorherige Lotfusspunkt wird um die reale Handler-Verschiebung seit dem
+// vorherigen akzeptierten Punkt verschoben (vorhergesagter Lotfuss). Kosten
+// eines Kandidaten = Abstand seines Lotfusses zur Vorhersage + sein seitlicher
+// Abstand zum Handler — beides Meter geometrischer Inkonsistenz, gleich
+// gewichtet, ohne Faktor. Der Kandidat mit den kleinsten Kosten gewinnt.
+// Beispiel qa-0ec8c4ca, Schritt 4: Hinweg 6,5 m (Lotfuss 0,2 m neben der
+// Vorhersage, 0,56 m seitlich) schlägt Rückweg 18,7 m (Lotfuss ~2 m neben der
+// Vorhersage, 0,14 m seitlich) — obwohl der Rückweg näher ist. Reine Geometrie
+// aus bestehenden Messgrössen — keine Meter-/Zeit-/Verhältnis-Schwelle.
+// Fenster, Monotonie und Vorrück-Bedingung (ADVANCE_DEV_M) bleiben unverändert
+// beim Aufrufer.
+export function projectForwardCandidates(
+  p: LL, line: readonly LL[], cum: readonly number[], fromM: number, lookaheadM: number, backM: number,
+): SegmentProjection[] {
+  if (line.length < 2) return [];
+  const total = cum[cum.length - 1];
+  const lo = Math.max(0, fromM - backM);
+  const hi = Math.min(total, fromM + lookaheadM);
+  // Dieselbe Fenster-Überlappungsregel wie projectForward (Segment zählt, sobald es das Fenster berührt).
+  const inWindow = projectOntoSegments(p, line, cum).filter(c => cum[c.segmentIndex + 1] >= lo && cum[c.segmentIndex] <= hi);
+  const out: SegmentProjection[] = [];
+  for (let k = 0; k < inWindow.length; k++) {
+    const c = inWindow[k];
+    const prev = k > 0 ? inWindow[k - 1].offLineM : Infinity;
+    const next = k < inWindow.length - 1 ? inWindow[k + 1].offLineM : Infinity;
+    if (!(c.offLineM <= prev && c.offLineM <= next)) continue;
+    const last = out[out.length - 1];
+    if (last && last.arcM === c.arcM && last.offLineM === c.offLineM) continue;   // Plateau am gemeinsamen Scheitel
+    out.push(c);
+  }
+  return out;
+}
+
+/**
+ * Vorhergesagter Lotfuss für die Kontinuitäts-Auswahl.
+ *  • Mit Vorgängerpunkt: vorheriger Lotfuss + reale Verschiebung (prevP → p).
+ *  • Ohne Vorgängerpunkt (nur Cursor bekannt — direkt nach anchor_reset oder
+ *    Resume ohne wiederhergestellte Punkte): der Handler folgt der Fährte —
+ *    Lotfuss = Linienpunkt bei `fromM + |p − prevFoot|` (die zurückgelegte
+ *    Distanz entlang der Referenz getragen, folgt Kurven/Kehren). Reine
+ *    Geometrie aus vorhandenen Grössen, keine Schwelle.
+ */
+export function predictContinuityFoot(
+  prevFoot: LL, prevP: LL | null, p: LL, line: readonly LL[], cum: readonly number[], fromM: number,
+): LL {
+  if (prevP) {
+    return { latitude: prevFoot.latitude + (p.latitude - prevP.latitude), longitude: prevFoot.longitude + (p.longitude - prevP.longitude) };
+  }
+  return pointAtDistance(line as LL[], cum as number[], fromM + haversineM(prevFoot, p)) ?? prevFoot;
+}
+
+/**
+ * Kontinuitäts-Auswahl (siehe oben): Kosten = |Lotfuss − predictedFoot| + offLineM.
+ * Ohne `predictedFoot` (erster Punkt nach Start-Lock) → nächster Kandidat
+ * (bisheriges Verhalten). null nur bei leerer Kandidatenliste.
+ */
+export function pickContinuousProjection(
+  candidates: readonly SegmentProjection[], predictedFoot: LL | null,
+): SegmentProjection | null {
+  if (!candidates.length) return null;
+  let best = candidates[0];
+  if (!predictedFoot) {
+    for (const c of candidates) if (c.offLineM < best.offLineM) best = c;
+    return best;
+  }
+  const predicted = predictedFoot;
+  const costOf = (c: SegmentProjection) => haversineM(c.point, predicted) + c.offLineM;
+  let bestCost = costOf(best);
+  for (let k = 1; k < candidates.length; k++) {
+    const c = candidates[k];
+    const cost = costOf(c);
+    if (cost < bestCost) { best = c; bestCost = cost; }
+  }
+  return best;
 }
 
 // Koordinate auf der Polyline bei Bogenlänge d (0..total), linear interpoliert.

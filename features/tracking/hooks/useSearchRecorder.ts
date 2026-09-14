@@ -13,7 +13,10 @@ import * as Location from 'expo-location';
 import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind,
 } from '@/features/tracking/utils/positionSource';
-import { DEFAULT_HANDLER_DISTANCE_M, buildArc, estimateDogProgressM, pointAtDistance, projectForward } from '@/features/tracking/utils/searchGeometry';
+import {
+  DEFAULT_HANDLER_DISTANCE_M, buildArc, estimateDogProgressM, pointAtDistance, projectForward,
+  projectForwardCandidates, pickContinuousProjection, predictContinuityFoot, type LL as GeoLL,
+} from '@/features/tracking/utils/searchGeometry';
 import {
   DEFAULT_SEARCH_START_CONFIG, INITIAL_SEARCH_START, evaluateStartCandidate, firstLegHeadingDeg as computeFirstLegHeadingDeg,
   stepSearchStart, type SearchStartAcqState, type SearchStartState,
@@ -240,6 +243,10 @@ export function useSearchRecorder(opts: {
   // buildRunResultPayload Replay korrekt als nicht verfügbar erkennt
   // (keine erfundenen Zeitstempel für Alt-Punkte ohne echte Zeit).
   const pointsTimeRef = useRef<number[]>([]);
+  // Lotfusspunkt des zuletzt akzeptierten Punkts auf der Soll-Fährte — Kontinuität
+  // der Referenzsegment-Auswahl (P0 Live-Cursor/Self-Crossing, siehe searchGeometry
+  // projectForwardCandidates/pickContinuousProjection). null = kein Vorgänger.
+  const prevFootRef = useRef<GeoLL | null>(null);
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
   const prevFixRef = useRef<SearchFixPrev | null>(null);   // letzter AKZEPTIERTER Rohfix (für das Speed-Gate)
@@ -398,6 +405,7 @@ export function useSearchRecorder(opts: {
       if (__DEV__) console.log('[searchFix] anchor_reset', { jumpM: decision.jumpM != null ? Math.round(decision.jumpM) : null });
       pointsRef.current = [];
       pointsTimeRef.current = [];
+      prevFootRef.current = null;
       distRef.current = 0;
     }
 
@@ -581,12 +589,32 @@ export function useSearchRecorder(opts: {
     if (hasTrack && !nowLocked) {
       dev = startEvalu?.candidateDevM != null && Number.isFinite(startEvalu.candidateDevM) ? startEvalu.candidateDevM : ZERO_DEV_M;
     } else if (hasTrack) {
-      const proj = projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
+      // P0 Live-Cursor (qa-0ec8c4ca): nicht mehr blind das geometrisch nächste
+      // Segment im Fenster, sondern der Kandidat, dessen Lotfusspunkt zur
+      // Kontinuität „vorheriger Lotfusspunkt + reale Handler-Verschiebung seit
+      // dem vorherigen akzeptierten Punkt" passt (Gleichstand → kleinerer
+      // Abstand). Fenster/Monotonie/ADVANCE_DEV_M unverändert; ohne Vorgänger
+      // (erster Punkt nach Lock/Reset) identisch zu projectForward.
+      const prevAccepted = pts.length >= 2 ? pts[pts.length - 2] : null;
+      // Vorgänger-Lotfuss: aus dem letzten Schritt; sonst (nach Resume mit
+      // Seed-Cursor oder nach anchor_reset bei bestehendem Cursor) der
+      // Linienpunkt am aktuellen Cursor — dann ohne Vorgängerpunkt, d. h. die
+      // Kontinuität geht von Verschiebung 0 aus. Nur bei Cursor 0 und ohne
+      // Vorgänger (frischer Start) bleibt es beim nächsten Kandidaten.
+      const prevFoot = prevFootRef.current
+        ?? (prevAccepted || cursorMRef.current > 0 ? pointAtDistance(laidPoints, arc.cum, cursorMRef.current) : null);
+      const cands = projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
+      const predicted = prevFoot ? predictContinuityFoot(prevFoot, prevAccepted, sm, laidPoints, arc.cum, cursorMRef.current) : null;
+      const chosen = pickContinuousProjection(cands, predicted);
+      const proj = chosen
+        ? { devM: chosen.offLineM, atM: chosen.arcM }
+        : projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);
       dev = Number.isFinite(proj.devM) ? proj.devM : ZERO_DEV_M;
       if (dev <= ADVANCE_DEV_M && proj.atM > cursorMRef.current) {
         cursorMRef.current = proj.atM;
         if (proj.atM > maxCursorMRef.current) maxCursorMRef.current = proj.atM;
       }
+      prevFootRef.current = chosen ? chosen.point : pointAtDistance(laidPoints, arc.cum, proj.atM);
     } else {
       dev = 0;
     }
@@ -811,6 +839,10 @@ export function useSearchRecorder(opts: {
     offTrackRef.current = { ...initialOffTrack(), state: rs?.offTrackState ?? 'on_track' };
     const seedCursorM = rs ? Math.max(0, Math.min(arc.total, rs.maxCursorM)) : 0;
     cursorMRef.current = seedCursorM; maxCursorMRef.current = seedCursorM;
+    // Kontinuität: Lotfusspunkt des Vorgängers wird im Fix-Handler gesetzt; beim
+    // Fortsetzen wird er dort lazy am geseedeten Cursor abgeleitet (der letzte
+    // wiederhergestellte Punkt ist der Vorgänger).
+    prevFootRef.current = null;
     // Core-Motion-Fusion (Punkt 3/16): NUR während einer aktiven Absuche aktiv.
     // Fire-and-forget — ein Start-Fehler (Permission verweigert, kein Modul im
     // Build, Android) fällt lautlos auf fusionMode='gps_only' zurück, blockiert
