@@ -32,11 +32,11 @@
 // aufgerufen. Sie ist ein eigener, einmaliger Schritt am Sessionende.
 
 import {
-  robustBearing, stableLegWindow,
+  robustBearing, stableLegWindow, detectShortLegCorners,
   MIN_LEG_M, MIN_TURN_DEG, MIN_TURN_TO_NOISE, MIN_TURN_CONCENTRATION,
   TURN_CONCENTRATION_M, CORNER_GAP_M, NORMAL_MIN, NORMAL_MAX, SPITZ_MIN, SPITZ_MAX,
   ACC_GOOD_M, ACC_BAD_M, STRAIGHT_TOL_DEG,
-  type ShortLegPoint,
+  type ShortLegPoint, type TurnEvidenceLookup,
 } from '@/features/tracking/utils/shortLegCornerDetection';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
 
@@ -195,11 +195,43 @@ export function evaluateStopFlush(
   lastCornerAtM: number,
   params: StopFlushParams = STOP_FLUSH_DEFAULTS,
   rawTail?: readonly ShortLegPoint[] | null,
+  turnEvidenceAt?: TurnEvidenceLookup,
 ): StopFlushResult {
   const n = points.length;
   if (n < 4) return { corner: null, diagnostics: emptyDiag('too_few_points') };
 
   const endDist = points[n - 1].cumDist;
+
+  // Canonical path: evaluate the complete final detector buffer with the
+  // same classifier used during recording. The legacy short-tail heuristic
+  // below remains only as a conservative fallback for incomplete windows.
+  const shared = detectShortLegCorners(points, null, turnEvidenceAt);
+  const sharedCandidates = shared.corners
+    .filter(c => c.atM > lastCornerAtM && endDist - c.atM <= params.maxTailM)
+    .sort((a, b) => {
+      const ca = shared.diagnostics.find(x => x.apexIndex === a.apexIndex)?.confidence ?? 0;
+      const cb = shared.diagnostics.find(x => x.apexIndex === b.apexIndex)?.confidence ?? 0;
+      return cb - ca || b.atM - a.atM;
+    });
+  if (sharedCandidates.length) {
+    const chosen = sharedCandidates[0];
+    const d = shared.diagnostics.find(x => x.apexIndex === chosen.apexIndex);
+    if (d) {
+      return {
+        corner: chosen,
+        diagnostics: {
+          apexIndex: d.apexIndex, t: d.t, atM: chosen.atM,
+          legBeforeM: d.legBeforeM, tailM: d.legAfterM, tailSamples: d.sampleCountAfter,
+          bearingBefore: d.bearingBefore, bearingAfter: d.bearingAfter,
+          headingDeltaDeg: d.headingDeltaDeg, interiorAngleDeg: d.interiorAngleDeg,
+          spreadBeforeDeg: d.spreadBeforeDeg, spreadTailDeg: d.spreadAfterDeg,
+          turnConcentration: d.turnConcentrationM, accuracyM: d.accuracyM,
+          confidence: d.confidence, classification: d.classification,
+          rejectReason: null,
+        },
+      };
+    }
+  }
 
   // Kandidaten im Nachlauf-Bereich, vom Ende nach hinten. Der stärkste
   // (grösste Richtungsänderung mit ausreichender Evidenz) gewinnt.

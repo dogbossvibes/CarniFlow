@@ -92,6 +92,9 @@ export const TURN_EVIDENCE_DEFAULTS: TurnEvidenceParams = {
   burstSec: 0.75,
 };
 
+/** Small trailing window used to account for GPS/apex vs. handset timing skew. */
+export const TURN_EVIDENCE_TRAILING_DELAYS_SEC = [0, 0.5, 1.0, 1.5, 2.0] as const;
+
 export interface TurnEvidence {
   /** false = keine Motion-Daten im Fenster. Dann ist `evidence` null und der
    *  Kandidat MUSS wie "keine Information" behandelt werden — nie wie
@@ -429,6 +432,23 @@ export class MotionEvidenceBuffer {
     cumDistAt?: ((tMs: number) => number | null) | null,
   ): TurnEvidence {
     return computeTurnEvidence(this.samples, candidateTimeMs, params, cumDistAt);
+  }
+
+  /**
+   * Evaluate the candidate at the apex and at a bounded trailing set of
+   * centres. Motion remains evidence only; this never creates a GPS corner.
+   */
+  evidenceForTrailing(
+    candidateTimeMs: number,
+    params: TurnEvidenceParams = TURN_EVIDENCE_DEFAULTS,
+    cumDistAt?: ((tMs: number) => number | null) | null,
+  ): TurnEvidence {
+    let best = this.evidenceFor(candidateTimeMs, params, cumDistAt);
+    for (const delay of TURN_EVIDENCE_TRAILING_DELAYS_SEC.slice(1)) {
+      const next = this.evidenceFor(candidateTimeMs + delay * 1000, params, cumDistAt);
+      if ((next.evidence ?? -1) > (best.evidence ?? -1)) best = next;
+    }
+    return best;
   }
 }
 

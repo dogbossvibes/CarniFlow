@@ -178,7 +178,7 @@ describe('Motion beim Legen ist QA-only und CURRENT-only', () => {
     expect(rec).toContain('detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt)');
     expect(rec).toContain('const turnEvidenceAt = motionActiveRef.current');
     // Ohne laufenden Motion-Mitschnitt wird gar nichts übergeben.
-    expect(rec).toContain("? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceFor(t))");
+    expect(rec).toContain("? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceForTrailing(t))");
     expect(rec).toContain(': undefined;');
   });
 

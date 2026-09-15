@@ -471,6 +471,15 @@ describe('QA-Diagnose (vorbereitet, nicht verdrahtet)', () => {
     expect(buf.evidenceFor(candidateT).evidence).toBeCloseTo(computeTurnEvidence(samples, candidateT).evidence!, 10);
   });
 
+  it('ordnet verzögerte Motion-Evidenz bis zu zwei Sekunden nach dem Apex zu', () => {
+    const buf = new MotionEvidenceBuffer(30);
+    const { samples, candidateT } = SCENARIOS[0].build(23);
+    samples.forEach(s => buf.push(s));
+    const delayed = buf.evidenceForTrailing(candidateT);
+    expect(delayed.windowEndMs).toBeGreaterThanOrEqual(candidateT);
+    expect(delayed.windowEndMs).toBeLessThanOrEqual(candidateT + 2500);
+  });
+
   it('Logzeile enthält alle geforderten QA-Felder und keine Rohdaten', () => {
     const { samples, candidateT } = SCENARIOS[0].build(37);
     const ev = computeTurnEvidence(samples, candidateT);

@@ -339,7 +339,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // kein Motion-Mitschnitt (Normalfall: kein QA-Modus oder ENGINE=BUILD40),
     // wird nichts übergeben und die Confidence bleibt exakt wie bisher.
     const turnEvidenceAt = motionActiveRef.current
-      ? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceFor(t))
+      ? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceForTrailing(t))
       : undefined;
     const { corners, diagnostics } = detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt);
 
@@ -928,6 +928,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (qaRef.current && getTrackingEngineMode() === 'current' && autoDetectRef.current) {
       const flush = evaluateStopFlush(
         detectPointsRef.current, lastCornerAtRef.current, undefined, rawTailRef.current,
+        motionActiveRef.current ? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceForTrailing(t)) : undefined,
       );
       const d = flush.diagnostics;
       pushQaCandidateLine(
@@ -960,7 +961,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       try {
         const detectPts = detectPointsRef.current;
         const linePts = pointsRef.current;
-        const sweep = detectShortLegCorners(detectPts);
+        const sweep = detectShortLegCorners(
+          detectPts,
+          null,
+          motionActiveRef.current
+            ? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceForTrailing(t))
+            : undefined,
+        );
         const acceptedIdx = new Set(sweep.corners.map(c => c.apexIndex));
         const autoDiagnostics: QaAutoDiagnostic[] = sweep.diagnostics.map(d => ({
           apexIndex: d.apexIndex,

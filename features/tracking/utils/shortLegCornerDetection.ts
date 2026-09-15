@@ -128,6 +128,8 @@ export const ACC_GOOD_M = 10, ACC_BAD_M = 35;
 /** Innenwinkel-Bänder (identisch zur bestehenden Klassifikation). */
 export const NORMAL_MIN = 65, NORMAL_MAX = 115;
 export const SPITZ_MIN = 15, SPITZ_MAX = 60;
+/** Interior angles below SPITZ_MIN require unusually strong multi-sample evidence. */
+export const EXTREME_SPITZ_MIN_INTERIOR = 0.5;
 /** Mindestabstand zum zuletzt bestätigten Winkel. */
 export const CORNER_GAP_M = 2.0;
 /** Gesamt-Evidenz, ab der ein Kandidat angenommen wird. */
@@ -471,10 +473,24 @@ export function evaluateShortLegCorner(
     return { accepted: false, kind: null, apexIndex, diagnostics: diag };
   }
 
+  // Motion is looked up before classification so a delayed, but still
+  // causally related, turn can support an already-robust GPS candidate.
+  const ev = turnEvidenceAt?.(apex.t ?? null) ?? null;
+  const geometryStrong =
+    interior >= EXTREME_SPITZ_MIN_INTERIOR && interior < SPITZ_MIN &&
+    before.sampleCount >= MIN_SAMPLES_SHORT && after.sampleCount >= MIN_SAMPLES_SHORT &&
+    Math.max(before.spreadDeg, after.spreadDeg) <= 18 &&
+    before.residualM <= 0.6 && after.residualM <= 0.6 &&
+    concentration >= 0.75;
   const dir: 'links' | 'rechts' = headingDelta > 0 ? 'rechts' : 'links';
   let kind: AngleKind | null = null;
   if (interior >= NORMAL_MIN && interior <= NORMAL_MAX) kind = dir;
   else if (interior >= SPITZ_MIN && interior <= SPITZ_MAX) kind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';
+  else if (geometryStrong) {
+    // Do not widen SPITZ_MIN globally: this branch is gated by stable legs,
+    // concentrated multi-sample geometry and (when available) delayed motion.
+    kind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';
+  }
   if (!kind) { diag.rejectReason = 'angle_unclear'; return { accepted: false, kind: null, apexIndex, diagnostics: diag }; }
   diag.classification = kind;
 
@@ -508,7 +524,6 @@ export function evaluateShortLegCorner(
   // übernommen (applyMotionToConfidence, max ±0,12): starke passende
   // Turn-Evidenz hebt leicht an, klar widersprüchliche senkt leicht ab,
   // starke Geometrie wird nie gesenkt. Ohne Motion-Daten passiert nichts.
-  const ev = turnEvidenceAt?.(apex.t ?? null) ?? null;
   const confidenceBefore = confidence;
   const adjusted = ev ? applyMotionToConfidence(confidence, ev) : confidence;
   diag.confidenceBeforeMotion = Math.round(confidenceBefore * 1000) / 1000;

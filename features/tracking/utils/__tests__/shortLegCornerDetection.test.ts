@@ -109,6 +109,29 @@ describe('Pflichtsequenz L → R → SR → SL bei 3,75 m Schenkeln', () => {
   });
 });
 
+describe('Extrem enger Spitzwinkel mit verzögerter Motion-Evidenz', () => {
+  it('klassifiziert robuste 171°-Geometrie als spitz_rechts ohne SPITZ_MIN zu ändern', () => {
+    const pts: ShortLegPoint[] = [];
+    const add = (x: number, y: number) => {
+      const prev = pts[pts.length - 1];
+      pts.push({ lat: y / M_PER_DEG, lng: x / M_PER_DEG, accuracy: 5, t: 1000 + pts.length * 500,
+        cumDist: (prev?.cumDist ?? 0) + (prev ? Math.hypot(x - prev.lng * M_PER_DEG, y - prev.lat * M_PER_DEG) : 0) });
+    };
+    for (let y = -6; y <= -1; y += 1) add(0, y);
+    add(0, 0);
+    const r = 171.2 * RAD;
+    for (let d = 1; d <= 6; d += 1) add(Math.sin(r) * d, Math.cos(r) * d);
+    const ev = () => ({ available: true, evidence: 0.8, netYawDeg: 40, grossYawDeg: 45,
+      monotonicity: 0.9, concentration: 0.9, peakYawRateDps: 80, rotationDurationS: 1,
+      yawShare: 0.5, totalRotationDeg: 90, peakRotationRateRadS: 1, steps: 2, stepRate: 1,
+      cadence: 100, gaitAccelFraction: 1, gaitAccelThreshold: 0.1, locomotionSource: 'steps' as const,
+      movementState: 'walking' as const, sampleCount: 5, windowStartMs: 0, windowEndMs: 3000,
+      windowDurationS: 3, gates: { netYaw: 1, monotonicity: 1, locomotion: 1, yawShare: 1 } });
+    const result = detectShortLegCorners(pts, null, ev);
+    expect(result.corners.map(c => c.kind)).toContain('spitz_rechts');
+  });
+});
+
 // ── 7. Längenmatrix ───────────────────────────────────────────────────────
 describe('Längenmatrix der Vier-Winkel-Sequenz (0 Drift, 1 Hz)', () => {
   const LENGTHS = [3, 3.5, 3.75, 4, 5, 6, 8, 10];
