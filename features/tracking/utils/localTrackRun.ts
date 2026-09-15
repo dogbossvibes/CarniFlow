@@ -4,6 +4,7 @@
 
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import type { TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
+import type { TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 
 export interface RunResultSource {
   durationS:     number;
@@ -27,7 +28,7 @@ export function buildRunResultPayload(args: {
   // (JSONB). Fehlt sie (z. B. Freilauf ohne Soll-Fährte, Recovery-Kurzpfad ohne
   // laufenden Recorder), bleibt das Feld schlicht weg — bestehende Konsumenten
   // (detail.tsx) müssen `analytics` immer optional behandeln.
-  analytics?: TrackAnalytics | TrackAnalyticsV2;
+  analytics?: TrackAnalytics | TrackAnalyticsV2 | TrackAnalyticsV3;
   // Punkt 17 (Track-Replay): Sekunden-seit-Start je Eintrag in result.points,
   // gleiche Länge/Reihenfolge. Additiv auf demselben run_points-Array (KEINE
   // zweite Geometrie) — fehlt sie oder stimmt die Länge nicht überein

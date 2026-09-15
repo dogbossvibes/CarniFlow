@@ -26,7 +26,6 @@ import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
-import type { LatLng } from '@/features/tracking/utils/gpsFilter';
 import {
   TRACK_SEGMENT_COLORS,
   actualSegmentSteps,
@@ -35,15 +34,29 @@ import {
   segmentDisplayLabel,
 } from '@/features/tracking/utils/trackSegments';
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
+import type { TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
+import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 // Punkt 8/14 — Anzeigetext je Confidence-Band, bewusst NICHT als "Wahrscheinlichkeit"
 // formuliert (interner Qualitätsindex).
-const CONFIDENCE_BAND_LABEL: Record<TrackAnalytics['analysisConfidenceBand'], string> = {
-  excellent: 'sehr gut', good: 'gut', limited: 'eingeschränkt', unreliable: 'unzuverlässig',
+const CONFIDENCE_BAND_LABEL: Record<TrackAnalytics['analysisConfidenceBand'], TranslationKey> = {
+  excellent: 'track.replay.legend.confidenceExcellent', good: 'track.replay.legend.confidenceGood',
+  limited: 'track.replay.legend.confidenceLimited', unreliable: 'track.replay.legend.confidenceUnreliable',
+};
+
+const MATERIAL_LABEL_KEYS: Record<string, TranslationKey> = {
+  leder: 'track.materialLeather', holz: 'track.materialWood', filz: 'track.materialFelt',
+  stoff: 'track.materialFabric', plastik: 'track.materialPlastic', duebel: 'track.materialDowel',
+  metall: 'track.materialMetal', teppich: 'track.materialCarpet', diverses: 'track.materialOther',
+};
+const CORNER_INTERPRETATION_KEYS: Record<TrackAnalyticsV3['corners'][number]['interpretation'], TranslationKey> = {
+  clean: 'track.analysisClean', short_control_phase: 'track.analysisCornerShortControl',
+  likely_overshoot: 'track.analysisCornerOvershoot', longer_search_phase: 'track.analysisCornerLongSearch',
+  reacquisition_required: 'track.analysisCornerRecovery', not_reliably_assessable: 'track.objectInsufficientData',
 };
 
 export default function TrackAuswertungScreen() {
@@ -128,6 +141,7 @@ export default function TrackAuswertungScreen() {
       id: m.id, type: m.type, lat: m.lat, lng: m.lng,
       angleKind: m.angleKind, material: m.material,
       distanceFromStart: m.distanceFromStart, note: m.note,
+      objectIndex: m.objectIndex, legIndex: m.legIndex,
     }));
     const segments = coerceTrackSegments(data.track_data?.segments);
     const fitPoints = [
@@ -155,7 +169,7 @@ export default function TrackAuswertungScreen() {
   // Zeile) und die Analyse-Karte `track_data.run.analytics` — zwei Quellen, die
   // in Production auseinanderliefen („keine verwertbare Suchspur" neben 90/100).
   const availability = useMemo(() => trackAnalysisAvailability(data), [data]);
-  const analytics: TrackAnalytics | null = availability.analytics;
+  const analytics: TrackAnalytics | TrackAnalyticsV3 | null = availability.analytics as TrackAnalytics | TrackAnalyticsV3 | null;
   // Rein darstellend: unterscheidet „Absuche steht noch aus" von „Absuche
   // gelaufen, aber ohne Analyse". Bisher sahen beide Fälle identisch aus —
   // nämlich gar nicht.
@@ -214,7 +228,6 @@ export default function TrackAuswertungScreen() {
   const dogName = data.dog?.name ?? 'Fährte';
   const surface = data.surface_types?.[0] ?? 'Fährte';
   const corners = data.corners_total ?? 0;
-  const aFound = data.articles_found ?? 0;
   const aTotal = data.articles_total ?? 0;
 
   // Bedingungen (echtes Wetter zur Startposition + Untergrund/Beschaffenheit).
@@ -375,7 +388,7 @@ export default function TrackAuswertungScreen() {
                 <View style={s.analyseHeaderRow}>
                   <View>
                     <Text style={s.analyseScoreVal}>{analytics.trackScore}<Text style={s.analyseScoreMax}>/100</Text></Text>
-                    <Text style={s.analyseScoreLabel}>TRACK SCORE (AUTOMATISCH)</Text>
+                    <Text style={s.analyseScoreLabel}>{t('track.analysisScoreTitle')}</Text>
                   </View>
                   <View style={[s.confidencePill, analytics.analysisConfidenceBand === 'unreliable' && s.confidencePillWarn]}>
                     <Ionicons
@@ -383,9 +396,11 @@ export default function TrackAuswertungScreen() {
                       size={13}
                       color={analytics.analysisConfidenceBand === 'unreliable' ? C.trackWarning : C.trackPrimary}
                     />
-                    <Text style={s.confidencePillTxt}>Analyse-Grundlage: {CONFIDENCE_BAND_LABEL[analytics.analysisConfidenceBand]}</Text>
+                    <Text style={s.confidencePillTxt}>{t('track.analysisFoundation')}: {t(CONFIDENCE_BAND_LABEL[analytics.analysisConfidenceBand])}</Text>
                   </View>
                 </View>
+
+                <Text style={s.analyseScoreHelp}>{t('track.analysisScoreHelp')}</Text>
 
                 {/* Punkt 9: expliziter Hinweis — schlechte GPS-/Motion-Grundlage
                     senkt NIE den Hund-Score, nur die Verlässlichkeit der Analyse. */}
@@ -393,6 +408,9 @@ export default function TrackAuswertungScreen() {
                   <View style={s.analyseHintBox}>
                     <Text style={s.analyseHintText}>{analytics.analysisConfidenceHint}</Text>
                   </View>
+                )}
+                {analyticsV3 && (analyticsV3.analysisConfidenceBand === 'limited' || analyticsV3.analysisConfidenceBand === 'unreliable') && (
+                  <View style={s.analyseHintBox}><Text style={s.analyseHintText}>{t('track.analysisQualityHint')}</Text></View>
                 )}
 
                 {/* Track Replay (Segmentanalyse-Nachbesserung, Punkt 7) — nur
@@ -412,11 +430,41 @@ export default function TrackAuswertungScreen() {
                   </Pressable>
                 )}
 
+                {analyticsV3 && (
+                  <View style={s.analyseOverview}>
+                    <View style={s.analyseDetailRow}>
+                      <Text style={s.analyseDetailLabel}>{t('track.analysisFlow')}</Text>
+                      <Text style={s.analyseDetailValue}>{analyticsV3.deviationEvents.length ? `${analyticsV3.deviationEvents.length} ${t('track.analysisDeviationEvents')}` : t('track.analysisStable')}</Text>
+                    </View>
+                    <View style={s.analyseDetailRow}>
+                      <Text style={s.analyseDetailLabel}>{t('track.analysisCorners')}</Text>
+                      <Text style={s.analyseDetailValue}>
+                        {analyticsV3.corners.filter(corner => corner.interpretation === 'clean').length} {t('track.analysisClean')}
+                        {' · '}{analyticsV3.corners.filter(corner => corner.interpretation === 'longer_search_phase').length} {t('track.analysisLongSearch')}
+                      </Text>
+                    </View>
+                    <View style={s.analyseDetailRow}>
+                      <Text style={s.analyseDetailLabel}>{t('track.analysisRecovery')}</Text>
+                      <Text style={s.analyseDetailValue}>{analyticsV3.reacquisition.completedCount
+                        ? `${analyticsV3.reacquisition.completedCount} · Ø ${analyticsV3.reacquisition.meanSec?.toFixed(1)} s`
+                        : t('track.analysisNoRecoveryRequired')}</Text>
+                    </View>
+                    <View style={s.analyseDetailRow}>
+                      <Text style={s.analyseDetailLabel}>{t('track.analysisObjects')}</Text>
+                      <Text style={s.analyseDetailValue}>{analyticsV3.objects.length} {t('track.analysisPlaced')} · {analyticsV3.objects.filter(object => object.status === 'likely_contact').length} {t('track.analysisLikelyContacts')} · {analyticsV3.objects.filter(object => object.status === 'inconclusive').length} {t('track.analysisInconclusiveContacts')}</Text>
+                    </View>
+                    <View style={s.analyseDetailRow}>
+                      <Text style={s.analyseDetailLabel}>{t('track.analysisPace')}</Text>
+                      <Text style={s.analyseDetailValue}>{analyticsV3.pace.avgMps.toFixed(2)} m/s · {analyticsV3.pace.stopGoPhases} {t('track.analysisStopGo')}</Text>
+                    </View>
+                  </View>
+                )}
+
                 <View style={[s.highlightRow, { marginTop: 14, marginBottom: 0 }]}>
                   <View style={[s.card, s.highlight]}>
                     <Ionicons name="analytics-outline" size={18} color={C.trackPrimary} />
-                    <Text style={s.highlightVal}>{analytics.deviation.meanM.toFixed(1)} m</Text>
-                    <Text style={s.highlightLabel}>Ø Spurtreue</Text>
+                    <Text style={s.highlightVal}>{analyticsV3 ? `${analyticsV3.deviationEvents.length}` : `${analytics.deviation.meanM.toFixed(1)} m`}</Text>
+                    <Text style={s.highlightLabel}>{analyticsV3 ? t('track.analysisDeviationEvents') : t('track.analysisLineDeviation')}</Text>
                   </View>
                   <View style={[s.card, s.highlight]}>
                     <Ionicons name="speedometer-outline" size={18} color={C.trackPrimary} />
@@ -425,12 +473,12 @@ export default function TrackAuswertungScreen() {
                   </View>
                   <View style={[s.card, s.highlight]}>
                     <Ionicons name="return-up-forward-outline" size={18} color={C.trackPrimary} />
-                    <Text style={s.highlightVal}>{analytics.reacquisition.count}</Text>
-                    <Text style={s.highlightLabel}>Neuansätze</Text>
+                    <Text style={s.highlightVal}>{analyticsV3 ? `${analyticsV3.assessableDistance.percent} %` : '—'}</Text>
+                    <Text style={s.highlightLabel}>{t('track.analysisAssessableDistance')}</Text>
                   </View>
                 </View>
 
-                {(analytics.corners.length > 0 || analytics.objects.length > 0 || analytics.reacquisition.meanSec != null) && (
+                {(analytics.corners.length > 0 || analytics.objects.length > 0 || analytics.reacquisition.meanSec != null || !!analyticsV3) && (
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => setAnalyseExpanded(v => !v)}
@@ -443,12 +491,25 @@ export default function TrackAuswertungScreen() {
 
                 {analyseExpanded && (
                   <View style={{ marginTop: 10, gap: 10 }}>
+                    {analyticsV3 && <Text style={s.analyseDetailLabel}>{t('track.analysisTechnical')} · {t('track.analysisLineDeviation')}: {analytics.deviation.meanM.toFixed(1)} m · Median {analytics.deviation.medianM.toFixed(1)} m · P95 {analytics.deviation.p95M.toFixed(1)} m</Text>}
+                    {analyticsV3?.deviationEvents.map(event => (
+                      <View key={event.id} style={s.analyseDetailRow}>
+                        <Text style={s.analyseDetailLabel}>{t('track.analysisDeviationEvents')} · {event.startAlongTrackM.toFixed(0)} m</Text>
+                        <Text style={s.analyseDetailValue}>{event.durationSec.toFixed(1)} s · max. {event.maxLineDeviationM.toFixed(1)} m · Confidence {Math.round(event.confidence * 100)} %</Text>
+                      </View>
+                    ))}
                     {/* Re-Acquisition-Zeit (Punkt 1/9 der Nachbesserung) — nur wenn
                         mindestens ein Break tatsächlich erholt wurde (meanSec != null,
                         offene Breaks fliessen NICHT ein, siehe trackAnalytics.ts). */}
+                    {analyticsV3?.reacquisition.count === 0 && (
+                      <View style={s.analyseDetailRow}>
+                        <Text style={s.analyseDetailLabel}>{t('track.analysisRecovery')}</Text>
+                        <Text style={s.analyseDetailValue}>{t('track.analysisNoRecoveryRequired')}</Text>
+                      </View>
+                    )}
                     {analytics.reacquisition.meanSec != null && (
                       <View style={s.analyseDetailRow}>
-                        <Text style={s.analyseDetailLabel}>Neuaufnahme Ø</Text>
+                        <Text style={s.analyseDetailLabel}>{t('track.analysisRecovery')} Ø</Text>
                         <Text style={s.analyseDetailValue}>
                           {analytics.reacquisition.meanSec.toFixed(1)} s
                           {analytics.reacquisition.maxSec != null && analytics.reacquisition.maxSec !== analytics.reacquisition.meanSec
@@ -462,14 +523,25 @@ export default function TrackAuswertungScreen() {
                         <Text style={s.analyseDetailValue}>
                           {c.maxLateralDeviationM != null ? `max. ${c.maxLateralDeviationM.toFixed(1)} m` : 'nicht erreicht'}
                           {c.overshootM != null && c.overshootM > 0 ? ` · Überschuss ${c.overshootM.toFixed(1)} m` : ''}
+                          {'interpretation' in c ? ` · ${t(CORNER_INTERPRETATION_KEYS[c.interpretation])}` : ''}
+                          {'stabilizationTimeSec' in c ? c.stabilizationTimeSec != null
+                            ? ` · ${t('track.analysisStabilizedAfter')} ${c.stabilizationTimeSec.toFixed(1)} s / ${c.stabilizationDistanceM?.toFixed(1) ?? '—'} m`
+                            : ` · ${t('track.analysisNotReliable')}` : ''}
+                          {'speedBeforeMps' in c && 'speedAfterMps' in c && c.speedBeforeMps != null && c.speedAfterMps != null
+                            ? ` · ${c.speedBeforeMps.toFixed(2)} → ${c.speedAfterMps.toFixed(2)} m/s${'speedChangePercent' in c && c.speedChangePercent != null ? ` (${c.speedChangePercent > 0 ? '+' : ''}${c.speedChangePercent} %)` : ''}` : ''}
                         </Text>
                       </View>
                     ))}
                     {analytics.objects.map((o, i) => (
                       <View key={`object-${i}`} style={s.analyseDetailRow}>
-                        <Text style={s.analyseDetailLabel}>Gegenstand {i + 1}{o.found ? '' : ' (nicht gefunden)'}</Text>
+                        <Text style={s.analyseDetailLabel}>G{i + 1} · {o.material && MATERIAL_LABEL_KEYS[o.material] ? t(MATERIAL_LABEL_KEYS[o.material]) : t('track.analysisMaterialUnknown')}</Text>
                         <Text style={s.analyseDetailValue}>
-                          {o.minDistanceM != null ? `min. ${o.minDistanceM.toFixed(1)} m` : '—'}
+                          {'status' in o
+                            ? o.status === 'likely_contact' ? t('track.objectLikelyContact')
+                              : o.status === 'inconclusive' ? t('track.objectInconclusive')
+                                : o.status === 'no_clear_contact' ? t('track.objectNoClearContact')
+                                  : t('track.objectInsufficientData')
+                            : 'Automatische Kontaktanalyse für diese historische Fährte nicht verfügbar'}
                         </Text>
                       </View>
                     ))}
@@ -503,6 +575,28 @@ export default function TrackAuswertungScreen() {
               <Legend color={C.trackWarning} label="Korrektur" />
             </View>
           </View>
+
+          {!!map?.markers.some(marker => marker.type === 'gegenstand') && (
+            <>
+              <SectionLabel>{t('track.analysisObjects')}</SectionLabel>
+              <View style={[s.card, { padding: 16, marginBottom: 16, gap: 10 }]}>
+                {map.markers.filter(marker => marker.type === 'gegenstand').map((marker, index) => {
+                  const material = marker.material && MATERIAL_LABEL_KEYS[marker.material] ? t(MATERIAL_LABEL_KEYS[marker.material]) : t('track.analysisMaterialUnknown');
+                  const label = marker.material === 'duebel' ? material : `G${marker.objectIndex ?? index + 1}`;
+                  return (
+                    <Pressable key={marker.id ?? index} style={s.objectLogRow} onPress={() => setDetailSel({ kind: 'marker', marker })}>
+                      <Text style={s.objectLogTitle}>{label} · {material}</Text>
+                      <Text style={s.objectLogMeta}>
+                        {marker.distanceFromStart != null ? `${Math.round(marker.distanceFromStart)} m` : 'Entfernung unbekannt'}
+                        {marker.legIndex != null ? ` · ${t('track.analysisLeg')} ${marker.legIndex}` : ''}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={15} color={C.trackTextMut} />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          )}
 
           {segmentAnalysis.count > 0 && (
             <>
@@ -687,6 +781,8 @@ const s = StyleSheet.create({
   analyseScoreVal:    { fontSize: 26, color: C.trackPrimary, fontWeight: '900', letterSpacing: -0.5 },
   analyseScoreMax:    { fontSize: 14, color: C.trackTextMut, fontWeight: '700' },
   analyseScoreLabel:  { fontSize: 9, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 },
+  analyseScoreHelp:   { fontSize: 11, lineHeight: 16, color: C.trackTextSec, marginTop: 10 },
+  analyseOverview:    { marginTop: 14, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.trackBorder, gap: 10 },
   // Dezenter Empty State für den Analysebereich — bewusst ruhiger als die
   // Analyse-Karte selbst (kein Score, keine Farbe, nur Hinweis).
   analyseEmpty:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, marginBottom: 16 },
@@ -705,6 +801,9 @@ const s = StyleSheet.create({
   analyseDetailRow:   { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
   analyseDetailLabel: { fontSize: 12.5, color: C.trackText, fontWeight: '700', flexShrink: 1 },
   analyseDetailValue: { fontSize: 12, color: C.trackTextSec, fontWeight: '600', textAlign: 'right' },
+  objectLogRow:       { minHeight: 44, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: C.trackBorder, gap: 8 },
+  objectLogTitle:     { flex: 1, fontSize: 13, color: C.trackText, fontWeight: '800' },
+  objectLogMeta:      { fontSize: 11, color: C.trackTextSec, fontWeight: '600' },
 
   segmentRow:   { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   segmentBadge: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 1 },

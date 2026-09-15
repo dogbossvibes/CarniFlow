@@ -7,11 +7,12 @@
 // dürfen nicht crashen — Replay wird für sie schlicht nicht angeboten).
 
 import { isTrackAnalyticsV2, type TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
+import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isReplayAvailable, type ReplayGeometry } from '@/features/tracking/engine/trackReplay';
 
 export interface TrackReplayData {
   geometry: ReplayGeometry;
-  analytics: TrackAnalyticsV2;
+  analytics: TrackAnalyticsV2 | TrackAnalyticsV3;
 }
 
 interface RawRunPoint { lat: number; lng: number; t?: number }
@@ -22,7 +23,7 @@ export function extractTrackReplayData(data: unknown): TrackReplayData | null {
     track_data?: { run?: { analytics?: unknown } };
   };
   const analytics = d.track_data?.run?.analytics;
-  if (!isTrackAnalyticsV2(analytics as never)) return null;
+  if (!isTrackAnalyticsV2(analytics as never) && !isTrackAnalyticsV3(analytics)) return null;
 
   const rawPoints = d.runs?.[0]?.run_points ?? [];
   const hasAllTimestamps = rawPoints.length > 0 && rawPoints.every(p => typeof p.t === 'number');
@@ -32,7 +33,7 @@ export function extractTrackReplayData(data: unknown): TrackReplayData | null {
   };
   if (!isReplayAvailable(geometry)) return null;
 
-  return { geometry, analytics: analytics as TrackAnalyticsV2 };
+  return { geometry, analytics: analytics as TrackAnalyticsV2 | TrackAnalyticsV3 };
 }
 
 export function isTrackReplayEligible(data: unknown): boolean {

@@ -47,13 +47,14 @@ interface Props {
   playedPoints?: ReplayGeometryPoint[];
   startAnchor?: LatLng | null;
   endPoint?: LatLng | null;
+  onMarkerPress?: (marker: MapMarker) => void;
 }
 
 /** Dezenter Unterbau der vollen Route: bestehendes trackBlue mit Alpha (kein neuer Farbwert). */
 export const SEARCH_ROUTE_FULL_STROKE = C.trackBlue + '73';
 export const SEARCH_ROUTE_PLAYED_STROKE = C.trackBlue;
 
-export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition, runPoints = [], playedPoints = [], startAnchor, endPoint }: Props) {
+export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition, runPoints = [], playedPoints = [], startAnchor, endPoint, onMarkerPress }: Props) {
   const mapRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   const fitDoneRef = useRef(false);
@@ -163,18 +164,19 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
         {markerList.map((m, i) => {
           const lat = m.lat as number, lng = m.lng as number;
           const key = m.id ?? `mk-${i}`;
+          const onPress = onMarkerPress ? () => onMarkerPress(m) : undefined;
           if (m.type === 'winkel') {
             const ak = angleMarkerKind(m.angleKind);
-            if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak} />;
+            if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak} onPress={onPress} />;
             const label = (m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠';
             const acute = m.angleKind === 'spitz_links' || m.angleKind === 'spitz_rechts' || m.angleKind === 'spitz';
-            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} />;
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} onPress={onPress} />;
           }
           if (m.type === 'gegenstand') {
-            if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" />;
-            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${objectNo.get(i) ?? ''}`} />;
+            if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" onPress={onPress} />;
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${m.objectIndex ?? objectNo.get(i) ?? ''}`} onPress={onPress} />;
           }
-          return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} />;
+          return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} onPress={onPress} />;
         })}
 
         {puckPosition && (

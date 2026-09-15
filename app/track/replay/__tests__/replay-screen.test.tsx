@@ -179,6 +179,27 @@ describe('TrackReplayScreen — Rendering & Interaktion (Punkt 22)', () => {
     expect(textNodesWith(root, '2.1 m').length).toBeGreaterThan(0);
   });
 
+  it('v3: G1-Karten-Tap öffnet Kontaktphase mit Material und vorsichtiger Statusbezeichnung', async () => {
+    const data: any = trackWithReplay();
+    data.markers.push({ id: 'marker-g1', marker_type: 'gegenstand', latitude: 0.0002, longitude: 0, material: 'leder', distance_from_start: 20 });
+    const analytics: any = data.track_data.run.analytics;
+    analytics.analyticsVersion = 3;
+    analytics.segments[1] = { ...analytics.segments[1], type: 'object_zone', objectIndex: 0, score: null };
+    analytics.objects = [{ objectId: 'stable-g1', objectIndex: 1, material: 'leder', legIndex: 1, alongTrackPositionM: 20,
+      proximityWindowStartSec: 14, proximityWindowEndSec: 22, minRecordedDistanceM: 2,
+      speedBeforeMps: 0.7, minimumSpeedMps: 0.1, stopDurationSec: 7.8, speedAfterMps: 0.6,
+      contactConfidence: 0.9, status: 'likely_contact', reasonCodes: ['stable_stop'] }];
+    mockData = data;
+    const root = await mount();
+    const replayMap = asTestNode(root).findAll(n => typeof n.type === 'function' && (n.type as { name?: string }).name === 'TrackReplayMap')[0];
+    expect(replayMap).toBeDefined();
+    expect(replayMap.props.markers[0]).toMatchObject({ objectIndex: 1, material: 'leder' });
+    await act(async () => { replayMap.props.onMarkerPress(replayMap.props.markers[0]); });
+    expect(textNodesWith(root, 'G1').length).toBeGreaterThan(0);
+    expect(textNodesWith(root, 'Likely object contact').length).toBeGreaterThan(0);
+    expect(textNodesWith(root, '7.8 s').length).toBeGreaterThan(0);
+  });
+
   it('Details-Sheet schliesst sich wieder (onClose/onRequestClose)', async () => {
     mockData = trackWithReplay();
     const root = await mount();

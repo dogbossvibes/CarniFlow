@@ -31,7 +31,7 @@ export function markerColor(m: MapMarker): string {
   return MARKER_COLOR[m.type];
 }
 
-export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null; distanceFromStart?: number | null; note?: string | null }
+export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null; distanceFromStart?: number | null; note?: string | null; objectIndex?: number | null; legIndex?: number | null }
 
 // Persistenter Marker: verhindert das „Verschwinden". react-native-maps verwirft
 // bei tracksViewChanges=false und häufigen Re-Renders/Region-Wechseln sonst das
@@ -333,7 +333,7 @@ export function TrackingMap({
           }
           if (m.type === 'gegenstand') {
             if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" onPress={onPress} />;
-            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${objectNo.get(i) ?? ''}`} onPress={onPress} />;
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${m.objectIndex ?? objectNo.get(i) ?? ''}`} onPress={onPress} />;
           }
           return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} onPress={onPress} />;
         })}

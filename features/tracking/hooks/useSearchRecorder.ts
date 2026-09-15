@@ -538,10 +538,15 @@ export function useSearchRecorder(opts: {
       if (startLockedNow) {
         analyticsSamplesRef.current.push({
           atM: maxCursorMRef.current,
+          searchDistanceM: distRef.current,
           tSec: (Date.now() - startMsRef.current) / 1000,
           devM: Math.round(devEmaRef.current * 10) / 10,
           confidence: fusion.confidence,
           speedMps: null,
+          accuracyM: accRaw,
+          geometryAccepted: false,
+          fusionClassification: fusion.classification,
+          motionConfidence: motionLatestRef.current?.motionConfidence ?? null,
         });
       }
       if (__DEV__) console.log('[fusion]', fusion.classification, {
@@ -648,10 +653,15 @@ export function useSearchRecorder(opts: {
     if (startLocked) {
       analyticsSamplesRef.current.push({
         atM: maxCursorMRef.current,
+        searchDistanceM: distRef.current,
         tSec: (now - startMsRef.current) / 1000,
         devM: dev,
         confidence: fusion.confidence,
         speedMps: speed,
+        accuracyM: accRaw,
+        geometryAccepted: true,
+        fusionClassification: fusion.classification,
+        motionConfidence: motionLatestRef.current?.motionConfidence ?? null,
       });
     }
 

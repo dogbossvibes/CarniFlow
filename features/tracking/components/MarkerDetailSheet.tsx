@@ -16,7 +16,7 @@ export type TrackDetailSelection =
   | { kind: 'end'; totalDistanceM: number | null };
 
 const MATERIAL_KEY: Partial<Record<MarkerMaterial, TranslationKey>> = {
-  holz: 'track.materialWood', duebel: 'track.materialDowel', stoff: 'track.materialFabric',
+  holz: 'track.materialWood', duebel: 'track.materialDowel', stoff: 'track.materialFabric', filz: 'track.materialFelt',
   leder: 'track.materialLeather', plastik: 'track.materialPlastic', metall: 'track.materialMetal',
   teppich: 'track.materialCarpet', diverses: 'track.materialOther',
 };
@@ -64,10 +64,11 @@ export function describeSelection(
     const materialLabel = m.material && MATERIAL_KEY[m.material] ? t(MATERIAL_KEY[m.material]!) : null;
     return {
       icon: isDowel ? 'ellipse' : 'flag',
-      title: isDowel ? t('track.materialDowel') : t('track.object'),
+      title: isDowel ? t('track.materialDowel') : m.objectIndex ? `G${m.objectIndex}` : t('track.object'),
       rows: [
         ...(materialLabel && !isDowel ? [{ label: t('track.detailMaterial'), value: materialLabel }] : []),
         ...distRow(m.distanceFromStart),
+        ...(m.legIndex != null ? [{ label: t('track.analysisLeg'), value: String(m.legIndex) }] : []),
         ...(m.note ? [{ label: t('track.detailNote'), value: m.note }] : []),
       ],
     };

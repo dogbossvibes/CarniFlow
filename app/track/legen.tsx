@@ -59,6 +59,7 @@ const GEGENSTAND_MATERIALS: { material: MarkerMaterial; icon: MatIcon; label: st
   { material: 'holz',     icon: 'leaf-outline',        label: 'Holz' },
   { material: 'duebel',   icon: 'git-commit-outline',  label: 'Dübel' },
   { material: 'stoff',    icon: 'shirt-outline',       label: 'Stoff' },
+  { material: 'filz',     icon: 'layers-outline',      label: 'Filz' },
   { material: 'leder',    icon: 'bag-outline',         label: 'Leder' },
   { material: 'plastik',  icon: 'cube-outline',        label: 'Plastik' },
   { material: 'metall',   icon: 'magnet-outline',      label: 'Metall' },

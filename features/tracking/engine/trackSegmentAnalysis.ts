@@ -408,8 +408,8 @@ export function computeSegmentHighlights(segments: AnalyticsSegment[]): SegmentH
 // `segments`) bleibt exakt wie vorher — TrackAnalyticsV2 ist ein separater,
 // zusätzlicher Typ mit `analyticsVersion: 2`. Alte, bereits gespeicherte
 // Fährten mit v1 bleiben unverändert lesbar (kein Migrations-, kein
-// Schreibzwang); computeTrackAnalyticsV2() ist das, was NEUE Absuchen ab
-// jetzt tatsächlich berechnen/speichern.
+// Schreibzwang); computeTrackAnalyticsV2() bleibt für historische Sessions
+// und Regressionstests erhalten. Neue Absuchen nutzen v3 als additiven Wrapper.
 export interface TrackAnalyticsV2 extends Omit<TrackAnalytics, 'analyticsVersion'> {
   analyticsVersion: 2;
   segments: AnalyticsSegment[];

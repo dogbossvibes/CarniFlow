@@ -5,13 +5,11 @@
 // entgegen — KEINE gespeicherten Rohpunkte (payload_json.run speichert nur
 // {lat,lng}, siehe localTrackRun.ts, dafür nicht reichhaltig genug).
 //
-// WICHTIG (Punkt 9): "Track Score" (hier: trackScore) und "Analysis
-// Confidence" (analysisConfidence) sind STRIKT getrennt. Schlechtes GPS/
-// niedrige Motion-Confidence senkt NIE trackScore — es senkt ausschliesslich
-// analysisConfidence und schaltet einen erklärenden UI-Hinweis frei
-// (analysisConfidenceHint). trackScore ist additiv und ersetzt NICHT das
-// bestehende, manuelle Pro-Schenkel-Scoring (trackEvaluation.ts) — beide
-// Systeme existieren unabhängig nebeneinander.
+// HISTORISCHE v1/v2-Regel: "Track Score" und "Analysis Confidence" waren
+// getrennt; schlechte Sensorik änderte den alten Score nicht. Die versionierte
+// v3-Auswertung bewertet ausdrücklich die Analysequalität, ohne GPS als
+// tatsächliche Hundeposition oder Prüfungsleistung zu interpretieren. v1/v2
+// bleiben unverändert lesbar. Das manuelle Pro-Schenkel-Scoring bleibt separat.
 // ──────────────────────────────────────────────────────────────────────────
 
 export const ANALYTICS_VERSION = 1 as const;
@@ -42,6 +40,8 @@ const OBJECT_STATIONARY_MIN_S = 1.5;
 export interface AnalyticsSample {
   /** Handler-Fortschritt entlang der Soll-Fährte (Bogenlänge, m) zum Zeitpunkt dieses Fixes. */
   atM: number;
+  /** Zurückgelegte, bereits akzeptierte Search-Linienlänge (m), optional bei historischen Samples. */
+  searchDistanceM?: number;
   /** Sekunden seit Absuche-Start. */
   tSec: number;
   /** Seitliche Abweichung zur Soll-Fährte (m) zu diesem Zeitpunkt. */
@@ -54,6 +54,14 @@ export interface AnalyticsSample {
   confidence: number;
   /** m/s, falls von der Plattform geliefert; sonst null (wird aus atM/tSec-Deltas geschätzt). */
   speedMps: number | null;
+  /** Horizontale GPS-Unsicherheit in Metern; fehlt bei historischen Analytics. */
+  accuracyM?: number | null;
+  /** Rein diagnostisch: durfte der Fix die bestehende Suchgeometrie aktualisieren? */
+  geometryAccepted?: boolean;
+  /** Klassifikation der bestehenden Fusion; wird nur als Qualitäts-/Plausibilitätssignal genutzt. */
+  fusionClassification?: string | null;
+  /** Optionales Core-Motion-Vertrauen. Niemals eine Positionsquelle. */
+  motionConfidence?: number | null;
 }
 
 // Bewusst lokal deklariert (kein Import aus trackingStore) — reines,
@@ -72,6 +80,14 @@ export interface AnalyticsObjectInput {
   atM: number;
   material: string | null;
   found: boolean;
+  /** Stabile Marker-ID; optional für historische Aufzeichnungen. */
+  objectId?: string;
+  /** Fortlaufende G-Nummer (1-basiert). */
+  objectIndex?: number;
+  /** Schenkelnummer (1-basiert), soweit aus den Lay-Markern bestimmbar. */
+  legIndex?: number | null;
+  /** Genauigkeit des beim Legen gespeicherten GPS-Fixes. */
+  positionAccuracyM?: number | null;
 }
 
 export interface AnalyticsBreakInput {
@@ -90,6 +106,8 @@ export interface TrackAnalyticsInput {
   breaks: AnalyticsBreakInput[];
   trackLengthM: number;
   durationS: number;
+  /** Nur v3: optionaler Hinweis auf den möglichen Führer-Hund-Versatz; niemals eine Positionskorrektur. */
+  handlerDistanceHintM?: number | null;
 }
 
 // ── Ausgaben ──────────────────────────────────────────────────────────────

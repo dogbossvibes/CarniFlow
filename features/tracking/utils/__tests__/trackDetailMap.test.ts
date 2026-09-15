@@ -57,7 +57,17 @@ describe('buildTrackDetailMap — Logbuch aus gespeicherten Daten', () => {
   });
 
   it('Gegenstand mit Material + Note wird gemappt', () => {
-    expect(m.markers[4]).toMatchObject({ type: 'gegenstand', material: 'leder', distanceFromStart: 210, note: 'Handschuh' });
+    expect(m.markers[4]).toMatchObject({ type: 'gegenstand', material: 'leder', distanceFromStart: 210, note: 'Handschuh', objectIndex: 1, legIndex: 5 });
+  });
+
+  it('13+14) historische Materialien fehlen optional, drei Objekte bleiben G1/G2/G3', () => {
+    const history = buildTrackDetailMap({ markers: [
+      { id: 'old', marker_type: 'gegenstand', distance_from_start: 10 },
+      { id: 'wood', marker_type: 'gegenstand', material: 'holz', distance_from_start: 20 },
+      { id: 'felt', marker_type: 'gegenstand', material: 'filz', distance_from_start: 30 },
+    ] });
+    expect(history.markers.map(marker => marker.objectIndex)).toEqual([1, 2, 3]);
+    expect(history.markers[0]).toMatchObject({ id: 'old', material: null, legIndex: 1 });
   });
 
   it('Dübel (material=duebel) bleibt erhalten', () => {

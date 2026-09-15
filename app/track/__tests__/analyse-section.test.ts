@@ -12,15 +12,16 @@ describe('Track-Detail — Analyse-Sektion (Punkt 9/14, additiv)', () => {
     // Analytics kommen ausschliesslich aus dem gemeinsamen Helfer (nur bei
     // verwertbarer Analyse gesetzt) — keine zweite Leseart im Screen.
     expect(src).toContain('const availability = useMemo(() => trackAnalysisAvailability(data), [data]);');
-    expect(src).toContain('const analytics: TrackAnalytics | null = availability.analytics;');
-    expect(src).not.toContain('data?.track_data?.run?.analytics');
+    expect(src).toContain('const analytics: TrackAnalytics | TrackAnalyticsV3 | null =');
+    expect(src).not.toContain('data?.track_data?.run?.analytics;');
     expect(src).toContain('{analytics && (');
   });
 
   it('zeigt Track Score EXPLIZIT als eigenen, automatischen Wert — getrennt vom manuellen Punkte-Score', () => {
     const src = source();
     expect(src).toContain('analytics.trackScore');
-    expect(src).toContain('TRACK SCORE (AUTOMATISCH)');
+    expect(src).toContain("t('track.analysisScoreTitle')");
+    expect(src).toContain("t('track.analysisScoreHelp')");
     // Der manuelle Score (trackEvaluation.ts) bleibt die TrackScoreRing oben — kein Merge.
     expect(src).toContain('<TrackScoreRing value={score}');
   });
@@ -41,10 +42,11 @@ describe('Track-Detail — Analyse-Sektion (Punkt 9/14, additiv)', () => {
   it('zeigt Neuaufnahme-Zeit (Punkt 1/9 der Nachbesserung) dezent im bestehenden Detailbereich, nur wenn echte Werte vorliegen', () => {
     const src = source();
     expect(src).toContain('analytics.reacquisition.meanSec != null');
-    expect(src).toContain('Neuaufnahme Ø');
+    expect(src).toContain("t('track.analysisRecovery')} Ø");
+    expect(src).toContain("t('track.analysisNoRecoveryRequired')");
     expect(src).toContain('Längste');
     // Kein neuer UI-Block — dieselbe s.analyseDetailRow-Card wie Winkel/Gegenstände.
-    const reacqLine = src.split('\n').find(l => l.includes('Neuaufnahme Ø'));
+    const reacqLine = src.split('\n').find(l => l.includes("t('track.analysisRecovery')} Ø"));
     expect(reacqLine).toBeDefined();
   });
 
@@ -86,15 +88,23 @@ describe('Track-Detail — Analyse-Sektion (Punkt 9/14, additiv)', () => {
     // Beschriftung steht UNTER dem Ring (eigener Text), nicht mehr als Ring-Label.
     expect(src).toContain("<Text style={s.heroRingCaption} numberOfLines={2}>{t('track.manualScoreLabel')}</Text>");
     expect(src).toContain("GESAMTPUNKTZAHL · {t('track.manualScoreLabel')}");
-    // Der automatische Wert behält sein bestehendes Label.
-    expect(src).toContain('TRACK SCORE (AUTOMATISCH)');
+    // Automatische Analyse ist als ANYVO-Messwert benannt, keine Prüfungsnote.
+    expect(src).toContain("t('track.analysisScoreTitle')");
   });
 
-  it('die bestehende Track-Score-2.0-Karte bleibt unverändert gerendert', () => {
+  it('die automatische Score-Karte bleibt separat vom manuellen Score gerendert', () => {
     const src = source();
     expect(src).toContain('{analytics && (');
     expect(src).toContain('<Text style={s.analyseScoreVal}>{analytics.trackScore}<Text style={s.analyseScoreMax}>/100</Text></Text>');
     expect(src).toContain('<SectionLabel>Analyse</SectionLabel>');
+  });
+
+  it('GPS-Abstand wird als Linienabweichung bezeichnet und nie als Fundbehauptung ausgegeben', () => {
+    const src = source();
+    expect(src).toContain("t('track.analysisLineDeviation')");
+    expect(src).not.toContain('Ø Spurtreue');
+    expect(src).not.toContain('(nicht gefunden)');
+    expect(src).toContain("t('track.objectLikelyContact')");
   });
 
   it('keine Tracking-/Analyse-/Recovery-Logik im Screen verändert', () => {

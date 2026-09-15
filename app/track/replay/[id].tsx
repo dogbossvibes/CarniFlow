@@ -19,6 +19,7 @@ import {
 } from '@/features/tracking/engine/trackReplay';
 import { buildHeatmapParts, type HeatmapMetric } from '@/features/tracking/engine/trackHeatmap';
 import type { AnalyticsSegment } from '@/features/tracking/engine/trackSegmentAnalysis';
+import { isTrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 
 const HEATMAP_METRICS: HeatmapMetric[] = ['deviation', 'confidence', 'pace'];
 const HEATMAP_METRIC_LABEL_KEY = {
@@ -56,7 +57,7 @@ export default function TrackReplayScreen() {
   const replayData = useMemo(() => extractTrackReplayData(data), [data]);
   const detailMap = useMemo(() => (data ? buildTrackDetailMap(data) : null), [data]);
   const markers: MapMarker[] = useMemo(
-    () => (detailMap ? detailMap.markers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material })) : []),
+    () => (detailMap ? detailMap.markers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material, distanceFromStart: m.distanceFromStart, objectIndex: m.objectIndex, legIndex: m.legIndex })) : []),
     [detailMap],
   );
   const layPoints = useMemo(() => detailMap?.lay ?? [], [detailMap]);
@@ -108,7 +109,12 @@ export default function TrackReplayScreen() {
     [replayData, state.elapsedSec],
   );
   const events = useMemo(() => (replayData ? replayEventsFromSegments(replayData.analytics.segments) : []), [replayData]);
-  const highlights = replayData?.analytics.segmentHighlights ?? [];
+  // Historische v2-Highlights haben die Eckdauer fälschlich als „schnellste
+  // Neuaufnahme“ interpretiert. Beide irrelevanten/missverständlichen Chips
+  // in der normalen Replay-UI ausblenden; Rohdaten bleiben im Payload erhalten.
+  const highlights = (replayData?.analytics.segmentHighlights ?? []).filter(highlight =>
+    highlight.labelKey !== 'track.segments.highlights.lowestDeviation'
+    && highlight.labelKey !== 'track.segments.highlights.fastestReacquisition');
   const totalSec = replayData?.geometry.pointsTimeSec.length
     ? replayData.geometry.pointsTimeSec[replayData.geometry.pointsTimeSec.length - 1] : 0;
 
@@ -132,6 +138,14 @@ export default function TrackReplayScreen() {
     if (!replayData) return;
     setState(prev => pauseReplay(seekReplay(prev, ev.timeSec, replayData.geometry)));
     setSelectedSegment(segmentAtTime(replayData.analytics.segments, ev.timeSec));
+  }
+
+  function openMarker(marker: MapMarker) {
+    if (!replayData || marker.type !== 'gegenstand' || marker.objectIndex == null) return;
+    const segment = replayData.analytics.segments.find(item => item.type === 'object_zone' && item.objectIndex === marker.objectIndex! - 1) ?? null;
+    if (!segment) return;
+    setSelectedSegment(segment);
+    if (segment.startTimeSec != null) setState(previous => pauseReplay(seekReplay(previous, segment.startTimeSec!, replayData.geometry)));
   }
 
   if (loading) {
@@ -173,6 +187,7 @@ export default function TrackReplayScreen() {
           runPoints={fullRoutePoints} playedPoints={playedRoutePoints}
           startAnchor={detailMap?.start ?? null}
           endPoint={detailMap?.end ?? null}
+          onMarkerPress={openMarker}
         />
       </View>
 
@@ -228,6 +243,16 @@ export default function TrackReplayScreen() {
       {events.length > 0 && (
         <View style={s.timelineWrap}>
           <View style={s.timelineTrack} />
+          {isTrackAnalyticsV3(replayData.analytics) && replayData.analytics.objects.map(object => object.proximityWindowStartSec != null && object.proximityWindowEndSec != null ? (
+            <View
+              key={`contact-${object.objectId ?? object.objectIndex}`}
+              pointerEvents="none"
+              style={[s.contactPhase, {
+                left: `${(totalSec > 0 ? object.proximityWindowStartSec / totalSec : 0) * 100}%`,
+                width: `${Math.max(1.5, (totalSec > 0 ? (object.proximityWindowEndSec - object.proximityWindowStartSec) / totalSec : 0) * 100)}%`,
+              }]}
+            />
+          ) : null)}
           {events.map((ev, i) => (
             <Pressable
               key={`${ev.segmentId}-${i}`}
@@ -294,6 +319,7 @@ const s = StyleSheet.create({
 
   timelineWrap: { height: 26, marginHorizontal: 16, marginTop: 14, justifyContent: 'center' },
   timelineTrack: { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: C.trackBorder },
+  contactPhase: { position: 'absolute', top: 7, height: 12, borderRadius: 6, backgroundColor: C.trackPurple + '66' },
   timelineDot: { position: 'absolute', width: 20, height: 20, borderRadius: 10, backgroundColor: C.trackSurface, borderWidth: 1, borderColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center', marginLeft: -10 },
 
   highlightsRow: { marginTop: 14, flexGrow: 0 },

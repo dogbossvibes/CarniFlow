@@ -59,7 +59,7 @@ import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
 import {
   type AnalyticsCornerInput, type AnalyticsObjectInput, type AnalyticsAngleKind,
 } from '@/features/tracking/engine/trackAnalytics';
-import { computeTrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
+import { computeTrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import * as Crypto from 'expo-crypto';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
@@ -705,9 +705,15 @@ export default function TrackRunScreen() {
       .flatMap(m => { const atM = snapData.eventArcs[m.id]?.arcM; return atM == null ? [] : [{ atM, angleKind: m.angleKind }]; });
     const objectMarkers = snapData.laidMarkers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
     const objectInputs: AnalyticsObjectInput[] = objectMarkers.map((m, i) => ({
-      atM: snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start, material: m.material, found: res.foundObjectIndices.includes(i),
+      objectId: m.id,
+      objectIndex: objectMarkers.slice(0, i + 1).filter(marker => marker.material !== 'duebel').length,
+      atM: snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start,
+      material: m.material,
+      found: res.foundObjectIndices.includes(i),
+      positionAccuracyM: m.accuracy,
+      legIndex: 1 + cornerInputs.filter(corner => corner.atM <= (snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start)).length,
     }));
-    const analytics = res.analyticsSamples.length ? computeTrackAnalyticsV2({
+    const analytics = res.analyticsSamples.length ? computeTrackAnalyticsV3({
       samples: res.analyticsSamples,
       corners: cornerInputs,
       objects: objectInputs,
@@ -718,6 +724,7 @@ export default function TrackRunScreen() {
       })),
       trackLengthM: s.trackLengthM,
       durationS: res.durationS,
+      handlerDistanceHintM: searchHandlerDistanceM,
     }) : undefined;
 
     // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.

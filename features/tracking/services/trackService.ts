@@ -370,7 +370,9 @@ export async function getTrackSessionById(id: string): Promise<Result<any>> {
       // 0 Zeilen → das ist ein ERWARTBARER Zustand, KEIN Fehler (früher PGRST116 → LogBox).
       supabase.from('training_sessions').select('*, dog:dogs(name)').eq('id', id).maybeSingle(),
       supabase.from('track_points').select('*').eq('session_id', id).order('timestamp'),
-      supabase.from('track_markers').select('*').eq('session_id', id),
+      // Fortlaufende G-Nummern müssen nach der gespeicherten Lege-Reihenfolge
+      // stabil bleiben; ohne ORDER BY konnte PostgREST Marker beliebig liefern.
+      supabase.from('track_markers').select('*').eq('session_id', id).order('created_at').order('distance_from_start'),
       supabase.from('track_runs').select('*').eq('session_id', id).order('created_at'),
       // best-effort: alte Fährten / fehlende Migration → null (Fehler ignoriert).
       supabase.from('track_engine_sessions').select('*').eq('session_id', id).maybeSingle(),

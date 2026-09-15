@@ -3,12 +3,13 @@
 // direkt nach .eq() awaited werden) und bietet order()/maybeSingle()/single().
 type Resp = { data: unknown; error: unknown };
 const mockResp: Record<string, Resp> = {};
+const mockOrders: { table: string; column: string }[] = [];
 function mockBuilder(table: string) {
   const r = (): Resp => mockResp[table] ?? { data: null, error: null };
   const b: Record<string, unknown> = {};
   b.select = () => b;
   b.eq = () => b;
-  b.order = () => Promise.resolve(r());
+  b.order = (column: string) => { mockOrders.push({ table, column }); return b; };
   b.maybeSingle = () => Promise.resolve(r());
   b.single = () => Promise.resolve(r());
   (b as { then: unknown }).then = (res: (v: Resp) => unknown, rej: (e: unknown) => unknown) =>
@@ -21,6 +22,7 @@ import { getTrackSessionById } from '@/features/tracking/services/trackService';
 
 function setResponses(map: Record<string, Resp>) {
   for (const k of Object.keys(mockResp)) delete mockResp[k];
+  mockOrders.length = 0;
   Object.assign(mockResp, map);
 }
 
@@ -53,6 +55,10 @@ describe('getTrackSessionById — local-first tolerant (T-59)', () => {
     expect(res.data.markers).toHaveLength(1);
     expect(res.data.runs).toHaveLength(1);
     expect(res.data.engine).toEqual({ session_id: 's1' });
+    expect(mockOrders.filter(order => order.table === 'track_markers')).toEqual([
+      { table: 'track_markers', column: 'created_at' },
+      { table: 'track_markers', column: 'distance_from_start' },
+    ]);
     expect(errSpy).not.toHaveBeenCalled();
   });
 

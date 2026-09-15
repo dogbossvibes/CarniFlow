@@ -20,6 +20,8 @@ export interface DetailMarker {
   material: MarkerMaterial | null;
   distanceFromStart: number | null;
   note: string | null;
+  objectIndex: number | null;
+  legIndex: number | null;
 }
 
 export interface TrackDetailMap {
@@ -52,16 +54,28 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
   const run: DetailLatLng[] = ((d.runs ?? [])[0]?.run_points ?? [])
     .map((p) => ({ lat: p.lat, lng: p.lng }));
 
-  const markers: DetailMarker[] = (d.markers ?? []).map((m) => ({
-    id: String(m.id),
-    type: m.marker_type,
-    lat: m.latitude ?? null,
-    lng: m.longitude ?? null,
-    angleKind: m.angle_kind ?? null,       // GESPEICHERT — nicht neu klassifiziert
-    material: m.material ?? null,
-    distanceFromStart: m.distance_from_start ?? null,
-    note: m.note ?? null,
-  }));
+  const sourceMarkers = d.markers ?? [];
+  const cornerDistances = sourceMarkers
+    .filter(marker => marker.marker_type === 'winkel' && marker.angle_kind !== 'absatz' && marker.angle_kind !== 'abriss')
+    .map(marker => marker.distance_from_start ?? 0);
+  let nextObjectIndex = 0;
+  const markers: DetailMarker[] = sourceMarkers.map((m) => {
+    const isNumberedObject = m.marker_type === 'gegenstand' && m.material !== 'duebel';
+    const objectIndex = isNumberedObject ? ++nextObjectIndex : null;
+    const distance = m.distance_from_start ?? null;
+    return {
+      id: String(m.id),
+      type: m.marker_type,
+      lat: m.latitude ?? null,
+      lng: m.longitude ?? null,
+      angleKind: m.angle_kind ?? null,       // GESPEICHERT — nicht neu klassifiziert
+      material: m.material ?? null,
+      distanceFromStart: distance,
+      note: m.note ?? null,
+      objectIndex,
+      legIndex: isNumberedObject && distance != null ? 1 + cornerDistances.filter(cornerDistance => cornerDistance <= distance).length : null,
+    };
+  });
 
   return {
     lay,

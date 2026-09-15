@@ -11,7 +11,7 @@ import {
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
-export type MarkerMaterial = 'stoff' | 'holz' | 'duebel' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
+export type MarkerMaterial = 'stoff' | 'filz' | 'holz' | 'duebel' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
 // Winkel-/Figur-Typen einer Fährte. Schärfe (rechtwinklig/spitz) und Richtung
 // (links/rechts) sind getrennt: ein Spitzwinkel ist immer AUCH nach links oder
 // rechts. 'spitz' (ohne Richtung) bleibt nur für Altdaten erhalten.
