@@ -24,6 +24,7 @@ import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/util
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
+import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
 import {
   DEFAULT_APPROACH_CONFIG, type StartMode,
 } from '@/features/tracking/engine/startApproach';
@@ -205,7 +206,14 @@ export default function TrackRunScreen() {
   //   2) persistierter startAnchor als Fallback (nach App-Neustart),
   //   3) sonst null → kontrollierte Recovery (kein stiller Sofortstart).
   const startPoint = (snap && snap.laidLatLng.length > 0 ? snap.laidLatLng[0] : null) ?? anchorFallback;
-  const approach = useStartPointApproach({ active: arming, start: startPoint });
+  const approach = useStartPointApproach({ active: arming, start: startPoint, liveFix: s.liveFix });
+
+  // Bisher im Approach: präzise Ortung nur während der Annäherung anfragen.
+  // Die Berechtigung kommt vom Recorder; kein zweiter Location-Start/Stop.
+  useEffect(() => {
+    if (!arming || !s.ready) return;
+    try { void precisionLocationClient.requestTemporaryFullAccuracy('TrackingDogSportPrecision').catch(() => {}); } catch { /* best-effort */ }
+  }, [arming, s.ready]);
 
   // P4: Beim Betreten der Absuche ist die Liegezeit vorbei → System-Anzeige entfernen.
   useEffect(() => { void endLiegezeitNotification(); }, []);
