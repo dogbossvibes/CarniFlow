@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import {
-  startPositionSource, sampleToLocationObject, type LocationSourceKind,
+  startPositionSource, sampleToLocationObject, type LocationSourceKind, type PositionSourceSample,
 } from '@/features/tracking/utils/positionSource';
 import {
   DEFAULT_HANDLER_DISTANCE_M, buildArc, estimateDogProgressM, pointAtDistance, projectForward,
@@ -136,6 +136,8 @@ export interface SearchRecorder {
   paused: boolean;
   points: LatLng[];
   position: LatLng | null;
+  /** Ungeglätteter Live-Fix für die Annäherung, auch vor start(); nur lesend. */
+  liveFix: Readonly<Pick<PositionSourceSample, 'lat' | 'lng' | 'accuracy' | 't'>> | null;
   deviationM: number;
   onTrack: boolean;
   breaks: Break[];
@@ -217,6 +219,7 @@ export function useSearchRecorder(opts: {
   const [paused, setPausedState] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [position, setPosition] = useState<LatLng | null>(null);
+  const [liveFix, setLiveFix] = useState<SearchRecorder['liveFix']>(null);
   const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, progressM: 0, score: 0, offTrackState: 'on_track' as OffTrackState });
   const [elapsedS, setElapsedS] = useState(0);
   const [gpsDebug, setGpsDebug] = useState<GpsDebug>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
@@ -323,6 +326,7 @@ export function useSearchRecorder(opts: {
 
   // ── Kernlogik ──
   const onFix = useCallback((loc: Location.LocationObject) => {
+    setLiveFix({ lat: loc.coords.latitude, lng: loc.coords.longitude, accuracy: loc.coords.accuracy ?? null, t: loc.timestamp });
     const accRaw = loc.coords.accuracy ?? null;
     setAccuracy(accRaw != null ? Math.round(accRaw) : null);
 
@@ -938,7 +942,7 @@ export function useSearchRecorder(opts: {
 
   return {
     ready, recording, paused,
-    points: snap.points, position, deviationM: snap.deviationM, onTrack: snap.onTrack,
+    points: snap.points, position, liveFix, deviationM: snap.deviationM, onTrack: snap.onTrack,
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
     distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,
     dogProgressM, trackLengthM: arc.total, estimatedDogPosition,
