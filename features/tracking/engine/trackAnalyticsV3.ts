@@ -368,6 +368,30 @@ function sideAndSharpness(kind: AnalyticsCornerInput['angleKind']): Pick<CornerA
   return { side: 'unbekannt', sharpness: 'unbekannt' };
 }
 
+function contiguousReliableRuns(items: readonly ClassifiedAnalyticsSample[]): ClassifiedAnalyticsSample[][] {
+  const sorted = [...items].sort((a, b) => a.sample.tSec - b.sample.tSec);
+  const runs: ClassifiedAnalyticsSample[][] = [];
+  let run: ClassifiedAnalyticsSample[] = [];
+  for (const item of sorted) {
+    const previous = run[run.length - 1];
+    const dt = previous ? item.sample.tSec - previous.sample.tSec : 0;
+    const dm = previous ? item.sample.atM - previous.sample.atM : 0;
+    const continuous = previous
+      && Number.isFinite(dt)
+      && dt > 0
+      && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec
+      && Number.isFinite(dm)
+      && dm >= 0;
+    if (previous && !continuous) {
+      runs.push(run);
+      run = [];
+    }
+    run.push(item);
+  }
+  if (run.length) runs.push(run);
+  return runs;
+}
+
 export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corners: AnalyticsCornerInput[]): CornerAnalysisV3[] {
   return corners.map(corner => {
     const shape = sideAndSharpness(corner.angleKind);
@@ -388,6 +412,8 @@ export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corner
     }, { item: reliable[0], distance: Number.POSITIVE_INFINITY });
     const before = reliable.filter(item => item.sample.atM < corner.atM);
     const after = reliable.filter(item => item.sample.atM >= corner.atM);
+    const afterRuns = contiguousReliableRuns(after);
+    if (!afterRuns.some(run => run.length >= TRACK_ANALYSIS_THRESHOLDS.cornerStableConsecutiveSamples)) return empty;
     const speedBeforeMps = averageSpeed(before);
     const speedAfterMps = averageSpeed(after);
     const speedChangePercent = speedBeforeMps != null && speedBeforeMps > 0 && speedAfterMps != null
@@ -397,7 +423,18 @@ export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corner
     let confirmedExcursion: ClassifiedAnalyticsSample[] | null = null;
     let recoveredAt: ClassifiedAnalyticsSample | null = null;
     let insideCount = 0;
+    let previousAfter: ClassifiedAnalyticsSample | null = null;
     for (const item of after) {
+      if (previousAfter) {
+        const dt = item.sample.tSec - previousAfter.sample.tSec;
+        const dm = item.sample.atM - previousAfter.sample.atM;
+        if (!(dt > 0 && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec && Number.isFinite(dm) && dm >= 0)) {
+          excursion = [];
+          confirmedExcursion = null;
+          insideCount = 0;
+        }
+      }
+      previousAfter = item;
       if (item.sample.devM > item.dynamicCorridorM) {
         excursion.push(item);
         insideCount = 0;
@@ -415,7 +452,15 @@ export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corner
 
     let stableRun: ClassifiedAnalyticsSample[] = [];
     let stabilizedAt: ClassifiedAnalyticsSample | null = null;
+    stableRun = [];
+    previousAfter = null;
     for (const item of after) {
+      if (previousAfter) {
+        const dt = item.sample.tSec - previousAfter.sample.tSec;
+        const dm = item.sample.atM - previousAfter.sample.atM;
+        if (!(dt > 0 && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec && Number.isFinite(dm) && dm >= 0)) stableRun = [];
+      }
+      previousAfter = item;
       if (item.sample.devM <= item.dynamicCorridorM) {
         stableRun.push(item);
         if (stableRun.length >= TRACK_ANALYSIS_THRESHOLDS.cornerStableConsecutiveSamples) {

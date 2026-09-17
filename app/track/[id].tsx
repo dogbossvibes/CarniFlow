@@ -34,7 +34,6 @@ import {
   segmentDisplayLabel,
 } from '@/features/tracking/utils/trackSegments';
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
-import type { TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
 import { useT, type TranslationKey } from '@/i18n';
@@ -170,6 +169,7 @@ export default function TrackAuswertungScreen() {
   // in Production auseinanderliefen („keine verwertbare Suchspur" neben 90/100).
   const availability = useMemo(() => trackAnalysisAvailability(data), [data]);
   const analytics: TrackAnalytics | TrackAnalyticsV3 | null = availability.analytics as TrackAnalytics | TrackAnalyticsV3 | null;
+  const analyticsV3 = isTrackAnalyticsV3(analytics) ? analytics : null;
   // Rein darstellend: unterscheidet „Absuche steht noch aus" von „Absuche
   // gelaufen, aber ohne Analyse". Bisher sahen beide Fälle identisch aus —
   // nämlich gar nicht.
@@ -228,6 +228,7 @@ export default function TrackAuswertungScreen() {
   const dogName = data.dog?.name ?? 'Fährte';
   const surface = data.surface_types?.[0] ?? 'Fährte';
   const corners = data.corners_total ?? 0;
+  const aFound = data.articles_found ?? 0;
   const aTotal = data.articles_total ?? 0;
 
   // Bedingungen (echtes Wetter zur Startposition + Untergrund/Beschaffenheit).

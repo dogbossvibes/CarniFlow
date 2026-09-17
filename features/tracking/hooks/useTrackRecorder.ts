@@ -356,7 +356,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         // die Geometrie muss bis zur Richtungsmessung gekommen sein.
         if (d.headingDeltaDeg == null) continue;
         qaMotionSeenRef.current.add(d.apexIndex);
-        const ev = motionBufRef.current.evidenceFor(tCand);
+        const ev = motionBufRef.current.evidenceForTrailing(tCand);
         const samples = motionBufRef.current.samplesIn(
           tCand - (TURN_EVIDENCE_DEFAULTS.halfWindowSec * 1000 + QA_MOTION_CONTEXT_MS),
           tCand + (TURN_EVIDENCE_DEFAULTS.halfWindowSec * 1000 + QA_MOTION_CONTEXT_MS),
@@ -407,7 +407,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       qaLastRejectRef.current = last.rejectReason;
       if (changed || last.classification) {
         const ev = motionActiveRef.current && last.t != null
-          ? motionBufRef.current.evidenceFor(last.t)
+          ? motionBufRef.current.evidenceForTrailing(last.t)
           : null;
         // Confidence-Rechenweg sichtbar machen: vorher + Motion = nachher → Entscheidung.
         const before = last.confidenceBeforeMotion;
@@ -438,7 +438,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       // Ecke, weshalb akzeptierte Winkel bisher gar nicht protokolliert wurden.
       if (qaRef.current) {
         const d = diagnostics.find(x => x.apexIndex === c.apexIndex) ?? null;
-        const ev = motionActiveRef.current && d?.t != null ? motionBufRef.current.evidenceFor(d.t) : null;
+        const ev = motionActiveRef.current && d?.t != null ? motionBufRef.current.evidenceForTrailing(d.t) : null;
         const before = d?.confidenceBeforeMotion ?? null;
         const adj = d?.motionAdjustment ?? null;
         const trail = before != null && adj != null

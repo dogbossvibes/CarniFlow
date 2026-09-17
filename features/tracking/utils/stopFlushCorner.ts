@@ -207,7 +207,12 @@ export function evaluateStopFlush(
   // below remains only as a conservative fallback for incomplete windows.
   const shared = detectShortLegCorners(points, null, turnEvidenceAt);
   const sharedCandidates = shared.corners
-    .filter(c => c.atM > lastCornerAtM && endDist - c.atM <= params.maxTailM)
+    // Apply the same inter-corner spacing guard as the live path. The shared
+    // detector supplies the same candidate identity/NMS, but it can still
+    // return an already-reported apex from the final buffer.
+    .filter(c => c.atM > lastCornerAtM
+      && (lastCornerAtM === -Infinity || c.atM - lastCornerAtM >= CORNER_GAP_M)
+      && endDist - c.atM <= params.maxTailM)
     .sort((a, b) => {
       const ca = shared.diagnostics.find(x => x.apexIndex === a.apexIndex)?.confidence ?? 0;
       const cb = shared.diagnostics.find(x => x.apexIndex === b.apexIndex)?.confidence ?? 0;

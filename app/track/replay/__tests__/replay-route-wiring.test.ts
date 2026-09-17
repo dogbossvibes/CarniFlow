@@ -19,7 +19,7 @@ describe('Replay-Screen Route-Verdrahtung', () => {
     expect(src).toContain('REPLAY_SPEEDS');
   });
   it('Marker weiterhin aus buildTrackDetailMap (Referenzpositionen), nicht aus Search-GPS', () => {
-    expect(src).toContain('detailMap.markers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material }))');
+    expect(src).toContain('detailMap.markers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material, distanceFromStart: m.distanceFromStart, objectIndex: m.objectIndex, legIndex: m.legIndex }))');
   });
   it('Legende in allen Locales vorhanden', () => {
     for (const f of ['i18n/de-CH.ts', 'i18n/gsw-CH.ts', 'i18n/locales/en.ts', 'i18n/locales/fr.ts', 'i18n/locales/it.ts']) {

@@ -105,6 +105,18 @@ describe('Winkelstabilisierung v3 (Ground Truth bleibt erhalten)', () => {
     expect(result.interpretation).toBe('not_reliably_assessable');
     expect(result.stabilizationTimeSec).toBeNull();
   });
+
+  it('9) unterbrochene Samplefolge überbrückt keine Winkelstabilisierung', () => {
+    const points = [
+      sample(14, 14), sample(18, 18), sample(20, 20),
+      // App-Wechsel/Pause: die drei späteren Fixe sind kein zusammenhängendes
+      // Evidenzfenster und dürfen keine stabile Ecke vortäuschen.
+      sample(22, 27), sample(24, 28),
+    ];
+    const result = analyzeCornersV3(classifyAnalyticsSamples(points), corner)[0];
+    expect(result.interpretation).toBe('not_reliably_assessable');
+    expect(result.stabilizationTimeSec).toBeNull();
+  });
 });
 
 describe('Automatische Gegenstandskontakte ohne Fundbehauptung', () => {

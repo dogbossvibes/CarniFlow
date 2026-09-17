@@ -52,7 +52,7 @@ describe('Analyse-Zustand — eine Quelle', () => {
     const src = source();
     expect(src).toContain('const availability = useMemo(() => trackAnalysisAvailability(data), [data]);');
     expect(src).toContain('{availability.showNoSearchTrackWarning && (');
-    expect(src).toContain('const analytics: TrackAnalytics | null = availability.analytics;');
+    expect(src).toContain('const analytics: TrackAnalytics | TrackAnalyticsV3 | null = availability.analytics as TrackAnalytics | TrackAnalyticsV3 | null;');
     expect(src).toContain('{analytics && (');
     // Keine zweite, unabhängige Geometrie-/Analytics-Prüfung mehr im Screen.
     expect(src).not.toContain('hasValidSearchGeometry');

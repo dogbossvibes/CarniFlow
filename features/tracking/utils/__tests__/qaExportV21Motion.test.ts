@@ -252,7 +252,7 @@ describe('6. Keine algorithmische Änderung', () => {
     const s = src('features/tracking/hooks/useTrackRecorder.ts');
     expect(s).toContain('if (qaRef.current && motionActiveRef.current) {');
     // Die Aggregate stammen aus derselben Auswertung, die der Detektor nutzt.
-    expect(s).toContain('const ev = motionBufRef.current.evidenceFor(tCand);');
+    expect(s).toContain('const ev = motionBufRef.current.evidenceForTrailing(tCand);');
     // Der Detektoraufruf selbst ist unverändert.
     expect(s).toContain('detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt)');
   });
