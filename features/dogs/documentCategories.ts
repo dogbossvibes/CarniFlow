@@ -2,8 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-// Dokument-Kategorien (im `dog_documents.kind`-Textfeld gespeichert — keine Migration).
+// UI-Kategorien. `kind` bleibt als Legacy-Feld kompatibel; neue Dokumente
+// können zusätzlich die Health-Metadaten `category`/`subtype` verwenden.
 export interface DocCategory { key: string; label: string; icon: IconName }
+
+export const HEALTH_DOC_SUBTYPES = [
+  { key: 'vaccination', label: 'Impfung' },
+  { key: 'lab', label: 'Labor' },
+  { key: 'vet_report', label: 'Tierarztbericht' },
+  { key: 'imaging', label: 'Bildgebung / Röntgen' },
+  { key: 'medication', label: 'Rezept / Medikament' },
+  { key: 'other', label: 'Sonstiges' },
+] as const;
 
 export const DOC_CATEGORIES: DocCategory[] = [
   { key: 'gesundheit',   label: 'Gesundheit',        icon: 'medkit-outline' },
@@ -21,10 +31,20 @@ const META: Record<string, { label: string; icon: IconName }> = {
   stammbaum: { label: 'Stammbaum', icon: 'ribbon-outline' },
   hd_ed:     { label: 'HD/ED',     icon: 'medical-outline' },
   pruefung:  { label: 'Prüfung',   icon: 'trophy-outline' },
+  health:    { label: 'Gesundheit', icon: 'medkit-outline' },
+  breeding:  { label: 'Zucht / Stammbuch', icon: 'ribbon-outline' },
+  insurance: { label: 'Versicherung', icon: 'shield-checkmark-outline' },
+  other:     { label: 'Sonstiges', icon: 'document-text-outline' },
 };
 
 export function categoryLabel(key: string): string { return META[key]?.label ?? 'Sonstiges'; }
 export function categoryIcon(key: string): IconName { return META[key]?.icon ?? 'document-text-outline'; }
+
+export function isHealthDocument(document: { kind?: string | null; category?: string | null; subtype?: string | null }): boolean {
+  if (document.category === 'health') return true;
+  if (document.category && document.category !== 'health') return false;
+  return ['impfpass', 'hd_ed', 'gesundheit', 'tierarzt'].includes(document.kind ?? '');
+}
 
 // Dateityp aus dem Objekt-Pfad/URL ableiten (Anzeige-Badge).
 export type DocFileType = 'pdf' | 'image' | 'file';

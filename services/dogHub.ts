@@ -9,6 +9,7 @@ export interface DogGoalRow {
 }
 export interface DogDocumentRow {
   id: string; dog_id: string; kind: string; title: string | null;
+  category: string | null; subtype: string | null;
   file_url: string | null; issued_on: string | null; note: string | null;
   created_at: string | null;
 }
@@ -17,10 +18,15 @@ export interface DogHealthEntryRow {
   load_level: 'leicht' | 'mittel' | 'hoch' | null; is_rest_day: boolean; is_intense: boolean; note: string | null;
   created_at: string | null;
 }
-export interface DogVetRow { id: string; dog_id: string; appointment_at: string; reason: string | null }
+export interface DogVetRow {
+  id: string; dog_id: string; appointment_at: string; reason: string | null;
+  status: string | null; clinic_name: string | null; diagnosis: string | null;
+  treatment: string | null; cost_amount: number | null; document_id: string | null;
+  completed_at: string | null; note: string | null; created_at: string | null;
+}
 export interface DogDewormingEntryRow {
   id: string; dog_id: string; treatment_date: string; product: string | null;
-  note: string | null; next_due_date: string | null; created_at: string | null;
+  note: string | null; next_due_date: string | null; treatment_type?: string | null; created_at: string | null;
 }
 
 export interface DogHubExtras {
@@ -131,7 +137,10 @@ export async function deleteDogDocument(id: string, path: string | null) {
   return supabase.from('dog_documents').delete().eq('id', id);
 }
 
-export interface DogDocumentInput { kind: string; title: string | null; file_url: string | null; issued_on: string | null; note: string | null }
+export interface DogDocumentInput {
+  kind: string; title: string | null; file_url: string | null; issued_on: string | null; note: string | null;
+  category?: string | null; subtype?: string | null;
+}
 export async function addDogDocument(dogId: string, input: DogDocumentInput) {
   const owner = await requireUid();
   return supabase.from('dog_documents').insert({ owner_id: owner, dog_id: dogId, ...input }).select().single();

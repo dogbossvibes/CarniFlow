@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import type { HealthCalendarSourceType } from '@/types/health';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -27,6 +28,10 @@ export interface CalendarEvent {
   status:      EventStatus;
   reminder_minutes: number[];   // z. B. [15, 60, 1440]
   repeat:      EventRepeat;
+  // Optional keeps existing calendar consumers compatible while the DB
+  // columns remain nullable for legacy events.
+  source_type?: HealthCalendarSourceType | null;
+  source_id?:   string | null;
   created_at:  string;
   dog?:        { name: string; photo_url: string | null } | null;
 }
@@ -34,7 +39,7 @@ export interface CalendarEvent {
 export type NewCalendarEvent = Pick<
   CalendarEvent,
   'dog_id' | 'dog_ids' | 'trainer_id' | 'type' | 'types' | 'title' | 'start_at' | 'end_at'
-  | 'location' | 'discipline' | 'notes' | 'reminder_minutes' | 'repeat'
+  | 'location' | 'discipline' | 'notes' | 'reminder_minutes' | 'repeat' | 'source_type' | 'source_id'
 >;
 
 export interface EventTypeMeta {

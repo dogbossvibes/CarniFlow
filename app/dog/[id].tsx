@@ -176,6 +176,7 @@ export default function DogHubRoute() {
     },
     onOpenTraining:     openTraining,
     onAddHealth:        () => dog && router.push(`/dog-health/${dog.id}` as never),
+    onOpenHealthRecord: () => dog && router.push(`/dog-health-record/${dog.id}` as never),
     onAddDoc:           () => dog && router.push(`/dog-document/${dog.id}` as never),
     onOpenDocument:     openDocument,
     onDeleteDocument:   deleteDocument,

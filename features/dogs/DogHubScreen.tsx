@@ -54,6 +54,7 @@ export interface DogHubActions {
   onQuickAction:      (k: QuickActionKey) => void;
   onOpenTraining?:    (item: DogTrainingItem) => void;
   onAddHealth:        () => void;
+  onOpenHealthRecord?: () => void;
   onAddDoc:           () => void;
   onOpenDocument?:    (doc: DogDocument) => void;
   onDeleteDocument?:  (doc: DogDocument) => void;
@@ -130,6 +131,19 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
               <View style={s.badgeRow}>
                 {badges.map(b => <View key={b} style={s.badge}><Text style={s.badgeTxt}>{b}</Text></View>)}
               </View>
+            ) : null}
+
+            {actions.onOpenHealthRecord ? (
+              <TouchableOpacity style={s.healthEntry} onPress={actions.onOpenHealthRecord} activeOpacity={0.84} accessibilityRole="button">
+                <View style={s.healthEntryIcon}><Ionicons name="medkit-outline" size={18} color={C.trackPrimary} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.healthEntryTitle}>Gesundheitsakte</Text>
+                  <Text style={s.healthEntrySub} numberOfLines={1}>
+                    {vm.health.nextVetLabel ? `Nächster Termin: ${vm.health.nextVetLabel}` : vm.health.weightKg != null ? `Gewicht: ${vm.health.weightKg} kg` : 'Noch keine Gesundheitsdaten'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={17} color={C.trackTextMut} />
+              </TouchableOpacity>
             ) : null}
 
             {/* Oberste Karte: offene Fährte dieses Hundes (falls vorhanden). Bindet
@@ -321,4 +335,8 @@ const s = StyleSheet.create({
   cmdLink:   { fontSize: 13, color: C.trackPrimary, fontWeight: '800' },
   journalLink:{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 14, paddingVertical: 13, marginTop: 4 },
   journalLinkTxt:{ flex: 1, fontSize: 14, color: C.trackText, fontWeight: '700' },
+  healthEntry:{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 13 },
+  healthEntryIcon:{ width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' },
+  healthEntryTitle:{ fontSize: 14.5, color: C.trackText, fontWeight: '800' },
+  healthEntrySub:{ fontSize: 11.5, color: C.trackTextSec, fontWeight: '600', marginTop: 2 },
 });

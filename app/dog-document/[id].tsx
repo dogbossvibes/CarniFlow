@@ -11,7 +11,7 @@ import { addDogDocument } from '@/services/dogHub';
 import { uploadDogDocument } from '@/services/storage';
 import { toISODate } from '@/features/dogs/dateInput';
 import { DateField } from '@/components/ui/DateField';
-import { DOC_CATEGORIES } from '@/features/dogs/documentCategories';
+import { DOC_CATEGORIES, HEALTH_DOC_SUBTYPES } from '@/features/dogs/documentCategories';
 import { useT } from '@/i18n';
 
 type PickedFile = { uri: string; name: string; mime: string };
@@ -19,11 +19,13 @@ type PickedFile = { uri: string; name: string; mime: string };
 // Editor: Dokument hochladen (Storage `dog-documents`) + Zeile in dog_documents.
 export default function DogDocumentEditor() {
   const router = useRouter();
-  const { id: dogId } = useLocalSearchParams<{ id: string }>();
+  const { id: dogId, category: requestedCategory } = useLocalSearchParams<{ id: string; category?: string }>();
+  const healthMode = requestedCategory === 'health';
   const { showToast, toast } = useToast();
   const { t } = useT();
 
   const [kind, setKind]   = useState('gesundheit');
+  const [subtype, setSubtype] = useState('other');
   const [title, setTitle] = useState('');
   const [file, setFile]   = useState<PickedFile | null>(null);
   const [issued, setIssued] = useState<Date | null>(null);
@@ -49,6 +51,7 @@ export default function DogDocumentEditor() {
       const { error } = await addDogDocument(dogId, {
         kind, title: title.trim() || null, file_url: path,
         issued_on: issuedOn ? toISODate(issuedOn) : null, note: note.trim() || null,
+        ...(healthMode ? { category: 'health', subtype } : {}),
       });
       if (error) throw error;
       router.back();
@@ -69,7 +72,7 @@ export default function DogDocumentEditor() {
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={s.label}>{t('dog.category')}</Text>
+          <Text style={s.label}>{healthMode ? 'Gesundheitskategorie' : t('dog.category')}</Text>
           <View style={s.kinds}>
             {DOC_CATEGORIES.map(k => {
               const on = kind === k.key;
@@ -80,6 +83,18 @@ export default function DogDocumentEditor() {
               );
             })}
           </View>
+
+          {healthMode ? (
+            <>
+              <Text style={s.label}>Dokumenttyp</Text>
+              <View style={s.kinds}>
+                {HEALTH_DOC_SUBTYPES.map(item => {
+                  const on = subtype === item.key;
+                  return <TouchableOpacity key={item.key} style={[s.kind, on && s.kindOn]} onPress={() => setSubtype(item.key)} activeOpacity={0.85}><Text style={[s.kindTxt, on && s.kindTxtOn]}>{item.label}</Text></TouchableOpacity>;
+                })}
+              </View>
+            </>
+          ) : null}
 
           <Text style={s.label}>{t('dog.file')}</Text>
           <TouchableOpacity style={s.fileBtn} onPress={pick} activeOpacity={0.85}>
