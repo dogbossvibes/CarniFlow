@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Tier } from '@/lib/purchases';
 import {
-  planToCapabilities, PLAN_META, TRIAL_DAYS, normalizeSubscriptionPlan, isPremiumPlan,
+  planToCapabilities, PLAN_META, normalizeSubscriptionPlan, isPremiumPlan,
   type SubscriptionPlan, type SubscriptionStatus,
 } from '@/features/subscription/plans';
 import { setCapabilities } from '@/services/capabilityService';
@@ -138,8 +138,6 @@ export async function activatePlan(args: {
     return { error: e?.message ?? 'Aktivierung fehlgeschlagen' };
   }
 }
-
-export const trialEndDate = () => new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString();
 
 // Founder-Slots: Status lesen + beanspruchen (Edge Function).
 export async function getFounderSlots(): Promise<{ used: number; remaining: number }> {

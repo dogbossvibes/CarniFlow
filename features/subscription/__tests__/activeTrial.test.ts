@@ -2,8 +2,10 @@ import {
   evaluateActiveTrialEligibility, shouldProactivelyShowOffer,
   storeTrialMatchesTarget, displayTrialDays,
   ACTIVE_TRIAL_MIN_ACCOUNT_AGE_MS, ACTIVE_TRIAL_LATER_COOLDOWN_MS, ACTIVE_TRIAL_MAX_OFFERS,
+  ACTIVE_TRIAL_TARGET_DAYS,
   type ActiveTrialEligibilityInput,
 } from '@/features/subscription/activeTrial';
+import * as plans from '@/features/subscription/plans';
 
 const H = 60 * 60 * 1000;
 
@@ -99,5 +101,15 @@ describe('Store-Trial-Dauer/Preis', () => {
     expect(displayTrialDays({ freeTrialDays: 4 })).toBe(4);
     expect(displayTrialDays({ freeTrialDays: null })).toBe(3);
     expect(displayTrialDays(null)).toBe(3);
+  });
+});
+
+describe('Release-Cleanup: toter TRIAL_DAYS-Konstant entfernt, ACTIVE-Trial unangetastet', () => {
+  it('ACTIVE_TRIAL_TARGET_DAYS bleibt 3 Tage (einzige lebende Trial-Konstante)', () => {
+    expect(ACTIVE_TRIAL_TARGET_DAYS).toBe(3);
+  });
+  it('plans.ts exportiert kein TRIAL_DAYS mehr (0 Aufrufstellen vor der Entfernung, siehe subscriptionService.ts)', () => {
+    expect((plans as Record<string, unknown>).TRIAL_DAYS).toBeUndefined();
+    expect(plans).not.toHaveProperty('TRIAL_DAYS');
   });
 });

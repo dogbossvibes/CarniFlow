@@ -97,8 +97,6 @@ export const PRODUCT_IDS = {
   trainerMonthly:       'anyvo_trainer_monthly_30.00',
 } as const;
 
-export const TRIAL_DAYS = 7;
-
 export interface PlanMeta {
   id:        SubscriptionPlan;
   name:      string;
