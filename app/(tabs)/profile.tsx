@@ -24,7 +24,7 @@ import { getPlanSubscription, cancelTrial } from "@/services/subscriptionService
 import { setShareTrainingsDefault } from "@/services/profileService";
 import { getMyInvitations } from "@/services/umfrageService";
 import type { TrainerUmfrage } from "@/types/umfrage";
-import { supabase } from "@/lib/supabase";
+import { supabase, SUPABASE_BACKEND_ENV } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { ALLE_SPARTEN, DEFAULT_SPARTEN } from "@/constants/sparten";
 import { useT, NATIVE_NAME } from "@/i18n";
@@ -775,7 +775,10 @@ export default function ProfilScreen() {
           />
         </View>
 
-        <Text style={s.version}>ANYVO v1.0.0</Text>
+        <Text style={s.version}>ANYVO v1.0.3</Text>
+        {SUPABASE_BACKEND_ENV === 'staging' && (
+          <Text style={s.backendIndicator}>Backend: STAGING</Text>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -974,6 +977,14 @@ const s = StyleSheet.create({
     fontSize: 12,
     color: C.subtle,
     marginTop: 20,
+  },
+  backendIndicator: {
+    textAlign: "center",
+    fontSize: 11,
+    color: C.warning,
+    marginTop: 6,
+    fontWeight: "700",
+    letterSpacing: 0.4,
   },
 
   planBtn: {

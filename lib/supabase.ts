@@ -2,15 +2,56 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Platform } from 'react-native';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL
-  ?? 'https://axkkhyqrjrtbkumaulta.supabase.co';
+const EXPECTED_PROJECT_REFS = {
+  production: 'axkkhyqrjrtbkumaulta',
+  staging: 'cbhrxkjclakzlvajyvfn',
+} as const;
 
-const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
-  ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4a2toeXFyanJ0Ymt1bWF1bHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzAwNjQsImV4cCI6MjA5NTMwNjA2NH0.K9GwIWsqi2g5HK7P7xCezFeFd4lbgr8Rqqrkpxd8uFE';
+type BackendEnvironment = keyof typeof EXPECTED_PROJECT_REFS;
+
+function configurationError(message: string): never {
+  throw new Error(`[Supabase configuration] ${message}`);
+}
+
+function projectRefFromUrl(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return configurationError('EXPO_PUBLIC_SUPABASE_URL must be a valid HTTPS URL.');
+  }
+  if (parsed.protocol !== 'https:') {
+    return configurationError('EXPO_PUBLIC_SUPABASE_URL must use HTTPS.');
+  }
+  const match = parsed.hostname.match(/^([a-z0-9]+)\.supabase\.co$/i);
+  if (!match) {
+    return configurationError('EXPO_PUBLIC_SUPABASE_URL must use the canonical Supabase project hostname.');
+  }
+  return match[1];
+}
+
+const backendEnvironment = process.env.EXPO_PUBLIC_BACKEND_ENV;
+if (backendEnvironment !== 'production' && backendEnvironment !== 'staging') {
+  configurationError('EXPO_PUBLIC_BACKEND_ENV must be production or staging.');
+}
+const validatedBackendEnvironment = backendEnvironment as BackendEnvironment;
+
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+if (!url) configurationError('EXPO_PUBLIC_SUPABASE_URL is required.');
+
+const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+if (!key) configurationError('EXPO_PUBLIC_SUPABASE_ANON_KEY is required.');
+
+const projectRef = projectRefFromUrl(url);
+if (projectRef !== EXPECTED_PROJECT_REFS[validatedBackendEnvironment]) {
+  configurationError(`Supabase project does not match the ${validatedBackendEnvironment} backend target.`);
+}
 
 // Für progress-fähige Direct-Uploads zum Storage-REST-Endpoint.
 export const SUPABASE_URL = url;
 export const SUPABASE_ANON_KEY = key;
+export const SUPABASE_BACKEND_ENV: BackendEnvironment = validatedBackendEnvironment;
+export const SUPABASE_PROJECT_REF = projectRef;
 
 export const supabase = createClient(url, key, {
   auth: {
