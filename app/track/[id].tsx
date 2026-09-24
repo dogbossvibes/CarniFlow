@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,12 @@ import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
 import { useT, type TranslationKey } from '@/i18n';
+import {
+  addTrackFeedback, deleteTrackFeedback, getTrackShare, listAcceptedTrainers, listTrackFeedback,
+  revokeTrackShare, shareTrack, updateTrackFeedback,
+  type TrackFeedback, type TrackShare,
+} from '@/services/trackShareService';
+import { supabase } from '@/lib/supabase';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -181,6 +187,15 @@ export default function TrackAuswertungScreen() {
   const [fullscreenMap, setFullscreenMap] = useState(false);
   const [fullscreenSel, setFullscreenSel] = useState<TrackDetailSelection | null>(null);
   const [fullscreenFitToken, setFullscreenFitToken] = useState(0);
+  const [sharePickerOpen, setSharePickerOpen] = useState(false);
+  const [trainers, setTrainers] = useState<Awaited<ReturnType<typeof listAcceptedTrainers>>>([]);
+  const [shares, setShares] = useState<TrackShare[]>([]);
+  const [feedback, setFeedback] = useState<TrackFeedback[]>([]);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [editingFeedbackId, setEditingFeedbackId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selectedTrainer, setSelectedTrainer] = useState<Awaited<ReturnType<typeof listAcceptedTrainers>>[number] | null>(null);
   const segmentAnalysis = useMemo(() => analyzeTrackSegments({
     segments: coerceTrackSegments(data?.track_data?.segments),
     layPoints: (data?.points ?? []).map((p: any) => ({ lat: p.latitude, lng: p.longitude, accuracy: p.accuracy ?? null, t: Date.parse(p.timestamp) || 0 })),
@@ -192,6 +207,52 @@ export default function TrackAuswertungScreen() {
       found: !!m.found, t: Date.parse(m.created_at) || 0,
     })),
   }), [data]);
+
+  const refreshSharing = useCallback(async () => {
+    if (!id) return;
+    const { data: user } = await supabase.auth.getUser();
+    setCurrentUserId(user.user?.id ?? null);
+    const sharesResult = await getTrackShare(String(id));
+    const nextShares = sharesResult.data ?? [];
+    setShares(nextShares);
+    const active = nextShares.find(s => !s.revoked_at);
+    if (active) {
+      const result = await listTrackFeedback(active.id);
+      setFeedback((result.data as TrackFeedback[] | null) ?? []);
+    } else setFeedback([]);
+  }, [id]);
+
+  useEffect(() => { void refreshSharing(); }, [refreshSharing]);
+
+  const openSharePicker = async () => {
+    const rows = await listAcceptedTrainers(currentUserId ?? (await supabase.auth.getUser()).data.user?.id ?? '');
+    setTrainers(rows);
+    setSelectedTrainer(null);
+    setSharePickerOpen(true);
+  };
+
+  const createShare = async (trainerId: string) => {
+    if (!id) return;
+    const result = await shareTrack(String(id), trainerId);
+    if (result.error) Alert.alert('Freigabe nicht möglich', result.error.message);
+    else { setSharePickerOpen(false); setSelectedTrainer(null); await refreshSharing(); }
+  };
+
+  const revokeShare = (share: TrackShare) => Alert.alert('Freigabe beenden?', 'Der Trainer verliert sofort den Zugriff auf diese Fährte.', [
+    { text: 'Abbrechen', style: 'cancel' },
+    { text: 'Beenden', style: 'destructive', onPress: async () => { await revokeTrackShare(share.id); await refreshSharing(); } },
+  ]);
+
+  const submitFeedback = async () => {
+    const share = shares.find(s => !s.revoked_at);
+    if (!share || !currentUserId || !feedbackText.trim()) return;
+    setFeedbackBusy(true);
+    if (editingFeedbackId) await updateTrackFeedback(editingFeedbackId, { body: feedbackText });
+    else await addTrackFeedback(share.id, currentUserId, feedbackText);
+    setFeedbackText(''); setEditingFeedbackId(null); setFeedbackBusy(false);
+    const result = await listTrackFeedback(share.id);
+    setFeedback((result.data as TrackFeedback[] | null) ?? []);
+  };
 
   const onSave = async () => {
     if (!id) return;
@@ -281,6 +342,32 @@ export default function TrackAuswertungScreen() {
               </View>
             </View>
           </View>
+
+          {data.status === 'completed' && (
+            <View style={[s.card, s.shareCard]}>
+              <View style={s.shareHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.shareTitle}>{shares.some(share => !share.revoked_at) ? 'Mit Trainer geteilt' : 'Trainerfeedback'}</Text>
+                  <Text style={s.shareHint}>{shares.some(share => !share.revoked_at) ? 'Diese Fährte ist für den ausgewählten Trainer sichtbar.' : 'Teile die abgeschlossene Fährte privat mit einem akzeptierten Trainer.'}</Text>
+                </View>
+                <Ionicons name="share-social-outline" size={22} color={C.trackPrimary} />
+              </View>
+              {shares.filter(share => !share.revoked_at).map(share => (
+                <View key={share.id} style={s.shareRow}>
+                  <Text style={s.shareRowText}>Mit Trainer geteilt</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Freigabe beenden" onPress={() => revokeShare(share)}>
+                    <Text style={s.shareDanger}>Freigabe beenden</Text>
+                  </Pressable>
+                </View>
+              ))}
+              {!shares.some(share => !share.revoked_at) && (
+                <Pressable accessibilityRole="button" accessibilityLabel="Mit Trainer teilen" onPress={openSharePicker} style={s.shareButton}>
+                  <Ionicons name="person-add-outline" size={18} color="#04110F" />
+                  <Text style={s.shareButtonText}>Mit Trainer teilen</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {/* Abschnitt 8 des Audits: Absuche hat keine verwertbare Geometrie
               erzeugt (0 m Distanz) — automatische Aussage klar von der
@@ -645,6 +732,35 @@ export default function TrackAuswertungScreen() {
           <View style={{ height: 18 }} />
           <SmartFeedbackSection dogId={data.dog_id} />
 
+          {shares.some(share => !share.revoked_at) && (
+            <>
+              <SectionLabel>Trainerfeedback</SectionLabel>
+              <View style={[s.card, { padding: 16, gap: 12 }]}>
+                {feedback.length === 0 && <Text style={s.shareHint}>Noch kein Feedback vorhanden.</Text>}
+                {feedback.map(item => (
+                  <View key={item.id} style={s.feedbackRow}>
+                    <View style={s.feedbackMeta}>
+                      <Text style={s.feedbackAuthor}>{item.author_user_id === currentUserId ? 'Du' : 'Trainer'}</Text>
+                      <Text style={s.feedbackDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                    </View>
+                    <Text style={s.feedbackBody}>{item.body}</Text>
+                    {item.reaction && <Text style={s.feedbackReaction}>{item.reaction}</Text>}
+                    {item.author_user_id === currentUserId && (
+                      <View style={s.feedbackActions}>
+                        <Pressable onPress={() => { setEditingFeedbackId(item.id); setFeedbackText(item.body); }}><Text style={s.shareAction}>Bearbeiten</Text></Pressable>
+                        <Pressable onPress={async () => { await deleteTrackFeedback(item.id); await refreshSharing(); }}><Text style={s.shareDanger}>Löschen</Text></Pressable>
+                      </View>
+                    )}
+                  </View>
+                ))}
+                <TextInput value={feedbackText} onChangeText={setFeedbackText} placeholder="Antwort schreiben…" placeholderTextColor={C.trackTextMut} multiline style={s.feedbackInput} />
+                <Pressable accessibilityRole="button" accessibilityLabel="Feedback senden" disabled={feedbackBusy || !feedbackText.trim()} onPress={submitFeedback} style={[s.shareButton, (!feedbackText.trim() || feedbackBusy) && { opacity: 0.45 }]}>
+                  <Text style={s.shareButtonText}>{editingFeedbackId ? 'Antwort aktualisieren' : 'Antwort senden'}</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+
           <View style={{ height: 24 }} />
         </ScrollView>
 
@@ -656,6 +772,35 @@ export default function TrackAuswertungScreen() {
       </KeyboardAvoidingView>
 
       <MarkerDetailSheet selection={detailSel} onClose={() => setDetailSel(null)} />
+
+      <Modal visible={sharePickerOpen} transparent animationType="slide" onRequestClose={() => setSharePickerOpen(false)}>
+        <View style={s.sheetWrap}>
+          <Pressable style={s.sheetBackdrop} onPress={() => setSharePickerOpen(false)} />
+          <View style={s.shareSheet}>
+            <Text style={s.shareSheetTitle}>Mit Trainer teilen</Text>
+            <Text style={s.shareHint}>Nur akzeptierte Trainerverbindungen können ausgewählt werden.</Text>
+            {trainers.length === 0 ? (
+              <View style={{ gap: 12 }}>
+                <Text style={s.shareHint}>Noch kein akzeptierter Trainer verbunden.</Text>
+                <Pressable style={s.shareButton} onPress={() => { setSharePickerOpen(false); router.push('/(tabs)/clients' as never); }}><Text style={s.shareButtonText}>Trainer verbinden</Text></Pressable>
+              </View>
+            ) : selectedTrainer ? (
+              <View style={{ gap: 12 }}>
+                <Text style={s.shareHint}>Trainer: {selectedTrainer.counterpartName ?? 'Trainer'}</Text>
+                <Text style={s.shareHint}>Geteilt werden die bereits gespeicherten Fährtendaten: Verlauf, Suchspur, Marker, Analyse, Wetter und Notizen.</Text>
+                <Pressable style={s.shareButton} onPress={() => createShare(selectedTrainer.counterpartId)}><Text style={s.shareButtonText}>Fährte teilen</Text></Pressable>
+                <Pressable onPress={() => setSelectedTrainer(null)}><Text style={s.shareAction}>Anderen Trainer auswählen</Text></Pressable>
+              </View>
+            ) : trainers.map(trainer => (
+              <Pressable key={trainer.id} style={s.trainerOption} onPress={() => setSelectedTrainer(trainer)}>
+                <Ionicons name="person-outline" size={18} color={C.trackPrimary} />
+                <Text style={s.trainerOptionText}>{trainer.counterpartName ?? 'Trainer'}</Text>
+                <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         animationType="slide"
@@ -777,6 +922,30 @@ const s = StyleSheet.create({
   legendTxt: { fontSize: 10, color: C.trackTextSec, fontWeight: '600' },
 
   notesInput:{ fontSize: 14, color: C.trackText, lineHeight: 21, minHeight: 70, textAlignVertical: 'top' },
+  shareCard: { padding: 16, marginBottom: 16, gap: 12 },
+  shareHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  shareTitle: { color: C.trackText, fontSize: 16, fontWeight: '800' },
+  shareHint: { color: C.trackTextSec, fontSize: 12, lineHeight: 17, flexShrink: 1 },
+  shareRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.trackBorder },
+  shareRowText: { color: C.trackText, fontSize: 13, fontWeight: '700', flex: 1 },
+  shareDanger: { color: C.trackWarning, fontSize: 12, fontWeight: '800' },
+  shareAction: { color: C.trackPrimary, fontSize: 12, fontWeight: '800' },
+  shareButton: { minHeight: 44, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: C.trackPrimary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  shareButtonText: { color: '#04110F', fontSize: 13, fontWeight: '900' },
+  feedbackRow: { gap: 5, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: C.trackBorder },
+  feedbackMeta: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  feedbackAuthor: { color: C.trackText, fontSize: 12, fontWeight: '800' },
+  feedbackDate: { color: C.trackTextMut, fontSize: 11 },
+  feedbackBody: { color: C.trackTextSec, fontSize: 13, lineHeight: 19 },
+  feedbackReaction: { fontSize: 18 },
+  feedbackActions: { flexDirection: 'row', gap: 16 },
+  feedbackInput: { minHeight: 54, color: C.trackText, fontSize: 14, lineHeight: 20, textAlignVertical: 'top', borderWidth: 1, borderColor: C.trackBorder, borderRadius: 12, padding: 10 },
+  shareSheet: { backgroundColor: C.trackCard, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12, borderWidth: 1, borderColor: C.trackBorder },
+  sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject },
+  shareSheetTitle: { color: C.trackText, fontSize: 20, fontWeight: '900' },
+  trainerOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  trainerOptionText: { flex: 1, color: C.trackText, fontSize: 14, fontWeight: '700' },
 
   analyseHeaderRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   analyseScoreVal:    { fontSize: 26, color: C.trackPrimary, fontWeight: '900', letterSpacing: -0.5 },

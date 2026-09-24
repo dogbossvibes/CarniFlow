@@ -71,6 +71,7 @@ export default function TrainerHubScreen() {
   // (Terminumfragen, Mini Umfragen, Neue Umfrage) in einem Dialog. Navigation
   // unverändert: alle Routen sind die bisherigen.
   const TOOLS: Tool[] = [
+    { icon: 'trail-sign', color: C.accent, titleKey: 'trainer.sharedTracks', subKey: 'trainer.sharedTracksSub', route: '/trainer/shared-tracks' },
     { icon: 'clipboard', color: C.accent, titleKey: 'trainer.plans', subKey: 'trainer.plansToolSub', route: '/trainer/plaene' },
     { icon: 'bar-chart', color: C.trackBlue, titleKey: 'trainer.stats', subKey: 'trainer.statsToolSub', route: '/(tabs)/activity' },
     { icon: 'chatbubble-ellipses', color: C.sparteObedience, titleKey: 'profile.messages', subKey: 'trainer.messagesHubSub', route: '/chat' },
