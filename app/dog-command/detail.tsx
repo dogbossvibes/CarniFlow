@@ -66,7 +66,7 @@ export default function DogCommandDetail() {
 
           {cmd.goal ? <Section icon="flag-outline" title={t('cmd.goal')}><Text style={s.body}>{cmd.goal}</Text></Section> : null}
 
-          <Section icon="volume-medium-outline" title={t('cmd.signal')}><Text style={s.body}>„{cmd.verbalCue}"</Text></Section>
+          <Section icon="volume-medium-outline" title={t('cmd.signal')}><Text style={s.body}>„{cmd.verbalCue}“</Text></Section>
 
           {cmd.handSignal ? <Section icon="hand-left-outline" title={t('cmd.handSignal')}><Text style={s.body}>{cmd.handSignal}</Text></Section> : null}
 
