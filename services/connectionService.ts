@@ -39,10 +39,16 @@ export async function listConnections(userId: string): Promise<ConnectionView[]>
   const rows = (data as Connection[]) ?? [];
   if (!rows.length) return [];
 
+  // Namensauflösung läuft über die security-definer RPC statt direktem
+  // profiles-SELECT (20260926080000): profiles ist jetzt strikt auf die
+  // eigene Zeile beschränkt; die RPC gibt nur id/full_name/username zurück,
+  // und nur für Trainer-Profile oder bestehende trainer_client-Verbindungen
+  // des aufrufenden Nutzers — genau der hier benötigte Fall.
   const counterpartIds = rows.map(r => r.owner_user_id === userId ? r.connected_user_id : r.owner_user_id);
-  const { data: profs } = await supabase.from('profiles').select('id,full_name,username').in('id', counterpartIds);
-  const nameById = new Map((profs ?? []).map(p => [p.id, p.full_name as string | null]));
-  const usernameById = new Map((profs ?? []).map(p => [p.id, p.username as string | null]));
+  const { data: profs } = await supabase.rpc('get_profile_display_names', { p_ids: counterpartIds }) as
+    { data: { id: string; full_name: string | null; username: string | null }[] | null };
+  const nameById = new Map((profs ?? []).map(p => [p.id, p.full_name]));
+  const usernameById = new Map((profs ?? []).map(p => [p.id, p.username]));
 
   return rows.map(r => {
     const myRole = r.owner_user_id === userId ? 'owner' : 'connected';

@@ -74,9 +74,13 @@ export function updateTrainerProfile(userId: string, patch: Partial<NewTrainerPr
 
 async function attachNames(rows: { user_id: string; code: string; bio: string | null; location: string | null; specialties: string[]; is_verified: boolean }[]): Promise<TrainerSearchResult[]> {
   if (!rows.length) return [];
+  // Diese ids sind Trainer-Profile (trainer_profiles-Suchtreffer): die RPC
+  // (20260926080000) löst sie unabhängig von einer bestehenden Verbindung
+  // auf, exakt wie die frühere profiles_select-Ausnahme "role = 'trainer'".
   const ids = rows.map(r => r.user_id);
-  const { data: profs } = await supabase.from('profiles').select('id,full_name').in('id', ids);
-  const nameById = new Map((profs ?? []).map(p => [p.id, p.full_name as string | null]));
+  const { data: profs } = await supabase.rpc('get_profile_display_names', { p_ids: ids }) as
+    { data: { id: string; full_name: string | null; username: string | null }[] | null };
+  const nameById = new Map((profs ?? []).map(p => [p.id, p.full_name]));
   return rows.map(r => ({
     trainerId:   r.user_id,
     name:        nameById.get(r.user_id) ?? null,
