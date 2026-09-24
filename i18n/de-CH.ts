@@ -54,6 +54,9 @@ export const deCH = {
   'profile.editProfile': 'Profil bearbeiten',
   'profile.name': 'Name',
   'profile.namePlaceholder': 'Dein Name',
+  'profile.phone': 'Telefonnummer',
+  'profile.phonePlaceholder': '+41 79 123 45 67',
+  'profile.phoneHelp': 'Für Notfallinformationen und Kontaktangaben.',
   'profile.nameMissingTitle': 'Name fehlt',
   'profile.nameMissingBody': 'Bitte gib einen Namen ein.',
   'profile.saveFailed': 'Konnte nicht gespeichert werden. Bitte später erneut versuchen.',
@@ -474,7 +477,8 @@ export const deCH = {
   'health.recordActiveMedication': 'Aktive Medikamente',
   'health.recordConditions': 'Diagnosen',
   'health.recordOwnerContact': 'Besitzerkontakt',
-  'health.shareTitle': 'Freigaben', 'health.shareNew': 'Neue Freigabe', 'health.shareExisting': 'Bestehende Freigaben', 'health.sharePerson': 'Person', 'health.sharePreset': 'Voreinstellung', 'health.sharePermissions': 'Berechtigungen', 'health.shareStart': 'Gültig ab', 'health.shareEnd': 'Gültig bis', 'health.shareCreate': 'Freigabe erstellen', 'health.shareUpdate': 'Freigabe aktualisieren', 'health.shareCancel': 'Abbrechen', 'health.shareEdit': 'Bearbeiten', 'health.shareRevoke': 'Widerrufen', 'health.shareActive': 'Aktiv', 'health.shareFuture': 'Beginnt am', 'health.shareExpired': 'Abgelaufen', 'health.shareRevoked': 'Widerrufen', 'health.shareNoConnections': 'Keine akzeptierte Verbindung vorhanden. Nutze zuerst den bestehenden ANYVO-Verbindungsbereich.', 'health.shareNoGrants': 'Noch keine Gesundheitsfreigaben.', 'health.shareOwnerOnly': 'Freigaben können nur vom Hundehalter verwaltet werden.',
+  'health.recordPhoneMissing': 'Telefonnummer nicht hinterlegt',
+  'health.shareTitle': 'Freigaben', 'health.shareNew': 'Neue Freigabe', 'health.shareExisting': 'Bestehende Freigaben', 'health.sharePerson': 'Person', 'health.sharePreset': 'Voreinstellung', 'health.sharePermissions': 'Berechtigungen', 'health.shareStart': 'Gültig ab', 'health.shareEnd': 'Gültig bis', 'health.shareCreate': 'Freigabe erstellen', 'health.shareUpdate': 'Freigabe aktualisieren', 'health.shareCancel': 'Abbrechen', 'health.shareEdit': 'Bearbeiten', 'health.shareRevoke': 'Widerrufen', 'health.shareActive': 'Aktiv', 'health.shareFuture': 'Beginnt am', 'health.shareExpired': 'Abgelaufen', 'health.shareRevoked': 'Widerrufen', 'health.shareNoConnections': 'Keine akzeptierte Verbindung vorhanden. Nutze zuerst den bestehenden ANYVO-Verbindungsbereich.', 'health.shareNoConnectionsTitle': 'Noch niemand verbunden', 'health.shareNoConnectionsBody': 'Verbinde zuerst eine Person mit ANYVO. Danach kannst du genau auswählen, welche Gesundheitsdaten sie sehen darf.', 'health.shareConnectPerson': 'Person verbinden', 'health.shareSelectPerson': 'Wähle eine Person aus, um die sichtbaren Gesundheitsbereiche festzulegen.', 'health.shareReadOnly': 'Diese Person darf nur die ausgewählten Gesundheitsdaten ansehen.', 'health.shareSelectAll': 'Alles auswählen', 'health.shareClear': 'Auswahl aufheben', 'health.shareAcceptedConnection': 'Akzeptierte ANYVO-Verbindung', 'health.shareConnectionFallback': 'Verbindung', 'health.shareNoGrants': 'Noch keine Gesundheitsfreigaben.', 'health.shareOwnerOnly': 'Freigaben können nur vom Hundehalter verwaltet werden.',
 
   // Empty States
   'empty.noDogs':     'Noch keine Hunde. Füge deinen ersten Hund hinzu.',
@@ -1028,6 +1032,8 @@ export const deCH = {
   'trainer.clientsCardSub': 'Verwalte Anfragen & Kunden',
   'trainer.activeClients': 'Aktive',
   'trainer.clientRequests': 'Anfragen',
+  'trainer.sharedTracks': 'Geteilte Fährten',
+  'trainer.sharedTracksSub': 'Fährten von Kund:innen prüfen',
   'trainer.plansToolSub': 'Erstelle, teile & verwalte Pläne',
   'trainer.statsToolSub': 'Fortschritt & Auswertungen',
   'trainer.surveysToolSub': 'Termin- & Mini-Umfragen',

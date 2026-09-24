@@ -54,6 +54,9 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'profile.editProfile': 'Profil bearbeite',
   'profile.name': 'Name',
   'profile.namePlaceholder': 'Din Name',
+  'profile.phone': 'Telefonnummer',
+  'profile.phonePlaceholder': '+41 79 123 45 67',
+  'profile.phoneHelp': 'Für Notfallinformatione und Kontaktangabe.',
   'profile.nameMissingTitle': 'Name fehlt',
   'profile.nameMissingBody': 'Bitte gib en Name ii.',
   'profile.saveFailed': 'Het nöd chönne gspeicheret werde. Bitte spöter nomal versueche.',
@@ -474,7 +477,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'health.recordActiveMedication': 'Aktivi Medikament',
   'health.recordConditions': 'Diagnose',
   'health.recordOwnerContact': 'Besitzerkontakt',
-  'health.shareTitle': 'Freigabe', 'health.shareNew': 'Neui Freigab', 'health.shareExisting': 'Bestehendi Freigabe', 'health.sharePerson': 'Person', 'health.sharePreset': 'Voreinstellung', 'health.sharePermissions': 'Berechtige', 'health.shareStart': 'Gültig ab', 'health.shareEnd': 'Gültig bis', 'health.shareCreate': 'Freigab erstelle', 'health.shareUpdate': 'Freigab aktualisiere', 'health.shareCancel': 'Abbreche', 'health.shareEdit': 'Bearbeite', 'health.shareRevoke': 'Widerrüefe', 'health.shareActive': 'Aktiv', 'health.shareFuture': 'Startet am', 'health.shareExpired': 'Abglaufe', 'health.shareRevoked': 'Widerrüefe', 'health.shareNoConnections': 'Kei akzeptierti Verbindig vorhande. Nutz zuerst de bestehend ANYVO-Verbindigsbereich.', 'health.shareNoGrants': 'No kei Gesundheitsfreigabe.', 'health.shareOwnerOnly': 'Freigabe chönd nur vom Hundebsitzer verwaltet werde.',
+  'health.recordPhoneMissing': 'Kei Telefonnummer hinterleit',
+  'health.shareTitle': 'Freigabe', 'health.shareNew': 'Neui Freigab', 'health.shareExisting': 'Bestehendi Freigabe', 'health.sharePerson': 'Person', 'health.sharePreset': 'Voreinstellung', 'health.sharePermissions': 'Berechtige', 'health.shareStart': 'Gültig ab', 'health.shareEnd': 'Gültig bis', 'health.shareCreate': 'Freigab erstelle', 'health.shareUpdate': 'Freigab aktualisiere', 'health.shareCancel': 'Abbreche', 'health.shareEdit': 'Bearbeite', 'health.shareRevoke': 'Widerrüefe', 'health.shareActive': 'Aktiv', 'health.shareFuture': 'Startet am', 'health.shareExpired': 'Abglaufe', 'health.shareRevoked': 'Widerrüefe', 'health.shareNoConnections': 'Kei akzeptierti Verbindig vorhande. Nutz zuerst de bestehend ANYVO-Verbindigsbereich.', 'health.shareNoConnectionsTitle': 'No niemer verbunde', 'health.shareNoConnectionsBody': 'Verbinde zerscht e Person mit ANYVO. Denn chasch genau uswahl, weli Gsundheitsdate sie darf gseh.', 'health.shareConnectPerson': 'Person verbinde', 'health.shareSelectPerson': 'Wähl e Person, zum d sichtbare Gsundheitsbereiche festzlege.', 'health.shareReadOnly': 'Die Person darf nume d usgwählte Gsundheitsdate aluege.', 'health.shareSelectAll': 'Alles uswähle', 'health.shareClear': 'Uswahl ufhebe', 'health.shareAcceptedConnection': 'Akzeptierti ANYVO-Verbindig', 'health.shareConnectionFallback': 'Verbindig', 'health.shareNoGrants': 'No kei Gesundheitsfreigabe.', 'health.shareOwnerOnly': 'Freigabe chönd nur vom Hundebsitzer verwaltet werde.',
 
   // Empty States
   'empty.noDogs':     'No kei Hünd. Füeg dis erste Hund hinzue.',
@@ -1028,6 +1032,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'trainer.clientsCardSub': 'Verwalt Aafrage & Kund:inne',
   'trainer.activeClients': 'Aktivi',
   'trainer.clientRequests': 'Aafrage',
+  'trainer.sharedTracks': 'Gteilti Fährte',
+  'trainer.sharedTracksSub': 'Fährte vo Kund:inne prüefe',
   'trainer.plansToolSub': 'Erstelle, teil & verwalt Plän',
   'trainer.statsToolSub': 'Fortschritt & Uswertig',
   'trainer.surveysToolSub': 'Termin- & Mini-Umfrage',
