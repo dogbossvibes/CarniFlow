@@ -30,7 +30,7 @@ export default function DogBackpackScreen() {
     if (!capLoading && !isPro) router.replace('/premium' as never);
   }, [capLoading, isPro, router]);
   const { user } = useSession();
-  const { id: dogId, name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const { id: dogId, name, openAdd: openAddParam } = useLocalSearchParams<{ id: string; name?: string; openAdd?: string }>();
   const userId = user?.id ?? '';
   const dogName = (name ?? '').trim();
 
@@ -56,6 +56,10 @@ export default function DogBackpackScreen() {
 
   const openAdd = () => { setEditId(null); setDraftLabel(''); setDraftCat(undefined); setLabelError(false); setEditorOpen(true); };
   const openEdit = (it: DogBackpackItem) => { setEditId(it.id); setDraftLabel(it.label); setDraftCat(it.category); setLabelError(false); setEditorOpen(true); };
+
+  useEffect(() => {
+    if (openAddParam === '1' && userId && dogId) openAdd();
+  }, [dogId, openAddParam, userId]);
 
   const submitEditor = async () => {
     if (!userId || !dogId) return;

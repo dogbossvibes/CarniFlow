@@ -10,7 +10,7 @@ import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtra
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
 import { getHeatCycleDetails, getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
 import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
-import { getBackpack } from '@/features/dogs/backpack';
+import { getBackpack, type DogBackpackItem } from '@/features/dogs/backpack';
 import { toISODate } from '@/features/dogs/dateInput';
 import { currentHeatPhase } from '@/features/dogs/heatCalendar';
 import { getCalendarEvents } from '@/services/calendarService';
@@ -50,6 +50,7 @@ export default function DogHubRoute() {
   const [heatCurrentPhases, setHeatCurrentPhases] = useState<Record<string, string>>({});
   const [commands, setCommands] = useState<DogCommand[]>([]);
   const [backpackCounts, setBackpackCounts] = useState({ total: 0, active: 0, packed: 0 });
+  const [backpackItems, setBackpackItems] = useState<DogBackpackItem[]>([]);
   const [appointments, setAppointments] = useState<DogAppointment[]>([]);
 
   useEffect(() => {
@@ -88,12 +89,18 @@ export default function DogHubRoute() {
     getCommands(id).then(setCommands).catch(() => setCommands([]));
     if (userId) {
       getBackpack(userId, id)
-        .then(list => setBackpackCounts({
-          total: list.length,
-          active: list.filter(i => i.isActive).length,
-          packed: list.filter(i => i.isActive && i.isPacked).length,
-        }))
-        .catch(() => setBackpackCounts({ total: 0, active: 0, packed: 0 }));
+        .then(list => {
+          setBackpackItems(list);
+          setBackpackCounts({
+            total: list.length,
+            active: list.filter(i => i.isActive).length,
+            packed: list.filter(i => i.isActive && i.isPacked).length,
+          });
+        })
+        .catch(() => {
+          setBackpackItems([]);
+          setBackpackCounts({ total: 0, active: 0, packed: 0 });
+        });
       // Termine (hundegefiltert, sortiert) — Dashboard „Nächste Termine" + „Heute".
       getCalendarEvents(userId).then(
         ({ data }) => setAppointments(toDogAppointments((data ?? []) as CalendarEvent[], id)),
@@ -177,6 +184,8 @@ export default function DogHubRoute() {
     onOpenTraining:     openTraining,
     onAddHealth:        () => dog && router.push(`/dog-health/${dog.id}` as never),
     onOpenHealthRecord: () => dog && router.push(`/dog-health-record/${dog.id}` as never),
+    onOpenCommands:     () => dog && router.push(`/dog-command/${dog.id}` as never),
+    onOpenGoals:        () => dog && router.push(`/dog-goals/${dog.id}` as never),
     onAddDoc:           () => dog && router.push(`/dog-document/${dog.id}` as never),
     onOpenDocument:     openDocument,
     onDeleteDocument:   deleteDocument,
@@ -228,7 +237,9 @@ export default function DogHubRoute() {
         total: backpackCounts.total,
         active: backpackCounts.active,
         packed: backpackCounts.packed,
+        items: backpackItems,
         onOpen: () => router.push({ pathname: '/dog-backpack/[id]', params: { id, name: dog?.name ?? '' } } as never),
+        onAdd: () => router.push({ pathname: '/dog-backpack/[id]', params: { id, name: dog?.name ?? '', openAdd: '1' } } as never),
       }}
       appointments={{
         items: appointments,

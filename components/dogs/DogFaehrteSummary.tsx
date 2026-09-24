@@ -5,7 +5,7 @@ import { C } from '@/constants/colors';
 import type { DogFaehrteSummary } from './types';
 
 // Fährten-Zusammenfassung: Kennzahlen + Qualität % + Mini-Fortschrittslinie.
-export function DogFaehrteSummary({ data, onStart }: { data: DogFaehrteSummary; onStart: () => void }) {
+export function DogFaehrteSummary({ data, onStart, showStart = true }: { data: DogFaehrteSummary; onStart: () => void; showStart?: boolean }) {
   const cells = [
     { v: String(data.thisWeek), l: 'Diese Woche' },
     { v: data.avgLengthLabel ?? '—', l: 'Ø Länge' },
@@ -39,7 +39,7 @@ export function DogFaehrteSummary({ data, onStart }: { data: DogFaehrteSummary; 
           <Text style={s.empty}>Noch keine Fährten erfasst.</Text>
         )}
       </View>
-      <AnyvoButton label="Fährte starten" icon="footsteps" onPress={onStart} />
+      {showStart ? <AnyvoButton label="Fährte starten" icon="footsteps" onPress={onStart} /> : null}
     </View>
   );
 }
