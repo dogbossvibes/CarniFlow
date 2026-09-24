@@ -53,15 +53,17 @@ create policy "own quota claims" on public.newbie_quota_claims
   for select to authenticated using (user_id = auth.uid());
 
 -- Limits: einzige serverseitige Quelle der Wahrheit.
--- track = 0: NEWBIE hat keine Fährtenfunktion (Pro-only). Der Claim-Check bleibt als
--- Defense-in-Depth erhalten und verweigert NEWBIE jede Fährte serverseitig (used >= 0).
+-- track = 1 pro Kalendermonat: NEWBIE darf eine Fährte/Monat anlegen. Der Claim-Check
+-- bleibt als Defense-in-Depth erhalten und verweigert NEWBIE jede weitere Fährte im
+-- selben Kalendermonat serverseitig (used >= 1).
 create or replace function public.newbie_quota_limit(p_kind text)
 returns int language sql immutable as $$
-  select case p_kind when 'dog' then 1 when 'training' then 2 when 'track' then 0 else 0 end
+  select case p_kind when 'dog' then 1 when 'training' then 2 when 'track' then 1 else 0 end
 $$;
--- Finaler produktiver Wert (training = 2) wird über die additive Migration
--- 20260816130000_newbie_training_quota_two.sql gesetzt. Diese Setup-Datei spiegelt
--- den finalen Stand dokumentarisch (single source of truth): dog=1, training=2, track=0.
+-- Finaler produktiver Wert wird über additive Migrationen gesetzt: training = 2 via
+-- 20260816130000_newbie_training_quota_two.sql, track = 1 via
+-- 20260925090000_newbie_track_quota_one.sql. Diese Setup-Datei spiegelt den finalen
+-- Stand dokumentarisch (single source of truth): dog=1, training=2, track=1.
 
 -- Premium-Erkennung (ACTIVE/FOUNDER/TRAINER). Setzt CAPABILITY_MODEL_SETUP.sql voraus.
 create or replace function public.is_pro_member(p_user_id uuid)

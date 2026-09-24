@@ -175,9 +175,11 @@ export function planToCapabilities(plan: SubscriptionPlan): { pro_member: boolea
 export type QuotaKind = 'dog' | 'training' | 'track';
 
 // Max. NEUE Objekte im Zählzeitraum: Hund = 1 (all-time), Training = 2 pro
-// Kalendermonat (UTC). Fährte = 0: NEWBIE hat KEINE Fährtenfunktion (Pro-only-Feature),
-// daher keine monatliche Fährten-Quota. Premium (ACTIVE/FOUNDER/TRAINER) = unbegrenzt.
-export const NEWBIE_QUOTA: Record<QuotaKind, number> = { dog: 1, training: 2, track: 0 };
+// Kalendermonat (UTC), Fährte = 1 pro Kalendermonat (UTC) — konsistent zur
+// serverseitigen public.newbie_quota_limit() (siehe
+// supabase/migrations/20260925090000_newbie_track_quota_one.sql). Premium
+// (ACTIVE/FOUNDER/TRAINER) = unbegrenzt (quotaLimit() gibt Infinity zurück).
+export const NEWBIE_QUOTA: Record<QuotaKind, number> = { dog: 1, training: 2, track: 1 };
 
 export function quotaLimit(isPro: boolean, kind: QuotaKind): number {
   return isPro ? Infinity : NEWBIE_QUOTA[kind];

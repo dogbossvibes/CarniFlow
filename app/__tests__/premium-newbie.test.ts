@@ -31,7 +31,7 @@ describe('NEWBIE ist kein Trial — Paywall (app/premium.tsx)', () => {
 
   it('NEWBIE-Karte wirbt nicht mehr mit 7 Tagen / „Alle Active-Funktionen" / Auto-Wechsel zu Active', () => {
     expect(premium).not.toMatch(/features: \['premium\.feature7Days', 'premium\.featureActive', 'premium\.featureThenActive'/);
-    expect(premium).toMatch(/features: \['premium\.featureOneDog', 'premium\.featureTwoTrainingsMonth', 'premium\.featureTrainerConnect', 'premium\.featureCalendarTimer', 'premium\.featureNoTrack'\]/);
+    expect(premium).toMatch(/features: \['premium\.featureOneDog', 'premium\.featureTwoTrainingsMonth', 'premium\.featureTrainerConnect', 'premium\.featureCalendarTimer', 'premium\.featureOneTrackMonth'\]/);
   });
 
   it('NEWBIE-Karte behauptet nicht „Kein Trainerzugang" — NEWBIE hat die Trainerverbindung inklusive', () => {

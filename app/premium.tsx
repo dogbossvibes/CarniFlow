@@ -39,7 +39,7 @@ const CARDS: CardDef[] = [
   // NEWBIE hat die Trainerverbindung inklusive (app/trainer/index.tsx ist
   // ungegatet — keine pro_member/trainer_module-Prüfung). „Kein Trainerzugang"
   // gilt hier NICHT und darf nicht wiederverwendet werden.
-  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.featureOneDog', 'premium.featureTwoTrainingsMonth', 'premium.featureTrainerConnect', 'premium.featureCalendarTimer', 'premium.featureNoTrack'] },
+  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.featureOneDog', 'premium.featureTwoTrainingsMonth', 'premium.featureTrainerConnect', 'premium.featureCalendarTimer', 'premium.featureOneTrackMonth'] },
   { plan: 'active', features: ['premium.featureTrainingProgress', 'premium.featureSmartAnalysis', 'premium.featureCalendarVoice', 'premium.featureNoTrainer'] },
   { plan: 'trainer', badgeKey: 'premium.badgePro', features: ['premium.featureAllActive', 'premium.featureClientPlans', 'premium.featurePollsFeedback', 'premium.featureTrainerDashboard'] },
 ];

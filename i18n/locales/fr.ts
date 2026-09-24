@@ -708,7 +708,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
 
   // NEWBIE-Limits (finale Produktdefinition: 1 entraînement/mois, 0 piste)
   "premium.newbieTrainingLimit": "Tu as déjà utilisé ton entraînement gratuit de ce mois-ci. Avec Active, documente sans limite.",
-  "premium.newbieTrackLimit": "Les pistes sont disponibles avec Active.",
+  "premium.newbieTrackLimit": "Tu as déjà utilisé ta piste gratuite de ce mois-ci. Avec Active, documente des pistes illimitées.",
 
   // Paywall-Legal-Links (Apple 3.1.2)
   "premium.terms": "Conditions d'utilisation",
@@ -1841,7 +1841,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "premium.featureTwoTrainingsMonth": "2 entraînements par mois",
   "premium.featureTrainerConnect": "Connexion avec ton entraîneur",
   "premium.featureCalendarTimer": "Calendrier & minuteur d’entraînement",
-  "premium.featureNoTrack": "Pas de piste",
+  "premium.featureOneTrackMonth": "1 piste par mois",
   "premium.featureFounderPrice": "CHF 4.00/mois à vie",
   "premium.featureWhileActive": "Tant que l’abonnement reste actif",
   "premium.featureTrainingProgress": "Entraînement, chiens et progrès",

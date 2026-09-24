@@ -86,10 +86,10 @@ describe('handleQuotaBlock — UX', () => {
 
 describe('SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql — Struktur', () => {
   const sql = readFileSync('SUBSCRIPTION_NEWBIE_QUOTAS_SETUP.sql', 'utf8').toLowerCase();
-  it('Limits: dog=1, training=2, track=0 (NEWBIE: 2 Trainings/Monat, keine Fährte)', () => {
+  it('Limits: dog=1, training=2, track=1 (NEWBIE: 2 Trainings/Monat, 1 Fährte/Monat)', () => {
     expect(sql).toMatch(/'dog' then 1/);
     expect(sql).toMatch(/'training' then 2/);
-    expect(sql).toMatch(/'track' then 0/);
+    expect(sql).toMatch(/'track' then 1/);
   });
   it('monatliche Rücksetzung: Claims sind auf den Kalendermonat (YYYY-MM, UTC) begrenzt', () => {
     expect(sql).toMatch(/'yyyy-mm'/);
@@ -154,7 +154,7 @@ describe('Migration 20260808120000_newbie_training_quota_one.sql — Struktur (h
   });
 });
 
-describe('Migration 20260816130000_newbie_training_quota_two.sql — Struktur (final)', () => {
+describe('Migration 20260816130000_newbie_training_quota_two.sql — Struktur (historisch, Step 3)', () => {
   const mig = readFileSync('supabase/migrations/20260816130000_newbie_training_quota_two.sql', 'utf8').toLowerCase();
   it('ersetzt ausschliesslich newbie_quota_limit (CREATE OR REPLACE)', () => {
     expect(mig).toMatch(/create or replace function public\.newbie_quota_limit/);
@@ -163,6 +163,37 @@ describe('Migration 20260816130000_newbie_training_quota_two.sql — Struktur (f
     expect(mig).toMatch(/'dog' then 1/);
     expect(mig).toMatch(/'training' then 2/);
     expect(mig).toMatch(/'track' then 0/);
+  });
+  it('Signatur/Attribute erhalten: language sql immutable (kein security definer/search_path)', () => {
+    expect(mig).toMatch(/language sql immutable/);
+    expect(mig).not.toMatch(/security definer/);
+  });
+  it('additiv & nicht-destruktiv: kein DROP/DELETE, keine RLS-/Policy-/Grant-/Table-Änderung', () => {
+    expect(mig).not.toMatch(/drop\s+table/);
+    expect(mig).not.toMatch(/drop\s+function/);
+    expect(mig).not.toMatch(/\bdelete\s+from\b/);
+    expect(mig).not.toMatch(/enable row level security/);
+    expect(mig).not.toMatch(/create\s+policy/);
+    expect(mig).not.toMatch(/drop\s+policy/);
+    expect(mig).not.toMatch(/\brevoke\b/);
+    expect(mig).not.toMatch(/create\s+table/);
+  });
+  it('ändert keine anderen RPCs (nur newbie_quota_limit; claim/status bleiben → Premium ausgenommen, Monatsreset unverändert)', () => {
+    expect(mig).not.toMatch(/function public\.claim_newbie_quota/);
+    expect(mig).not.toMatch(/function public\.newbie_quota_status/);
+    expect(mig).not.toMatch(/function public\.is_pro_member/);
+  });
+});
+
+describe('Migration 20260925090000_newbie_track_quota_one.sql — Struktur (final)', () => {
+  const mig = readFileSync('supabase/migrations/20260925090000_newbie_track_quota_one.sql', 'utf8').toLowerCase();
+  it('ersetzt ausschliesslich newbie_quota_limit (CREATE OR REPLACE)', () => {
+    expect(mig).toMatch(/create or replace function public\.newbie_quota_limit/);
+  });
+  it('finale Server-Limits: dog=1, training=2, track=1 (1 Fährte/Kalendermonat)', () => {
+    expect(mig).toMatch(/'dog' then 1/);
+    expect(mig).toMatch(/'training' then 2/);
+    expect(mig).toMatch(/'track' then 1/);
   });
   it('Signatur/Attribute erhalten: language sql immutable (kein security definer/search_path)', () => {
     expect(mig).toMatch(/language sql immutable/);
