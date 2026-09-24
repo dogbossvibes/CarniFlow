@@ -7,6 +7,8 @@ const metadata = readMigration('20260921100000_health_document_metadata.sql');
 const domain = readMigration('20260921110000_health_domain.sql');
 const grants = readMigration('20260921120000_health_access_grants.sql');
 const calendar = readMigration('20260921130000_health_calendar_sources.sql');
+const localRlsHarness = readFileSync('supabase/local/health_sharing_rls_test.sql', 'utf8');
+const stagingHarness = readFileSync('scripts/qa/health-staging-rls.mjs', 'utf8');
 
 describe('health foundation migrations', () => {
   it('keeps legacy document kinds and accepts current UI values', () => {
@@ -84,5 +86,51 @@ describe('health foundation migrations', () => {
       expect(calendar).toContain(sourceType);
     }
     expect(calendar).not.toMatch(/insert into public\.calendar_events/i);
+  });
+
+  it('does not swallow an unauthorized grant insert in the local harness', () => {
+    expect(localRlsHarness).toContain("inserted := true;");
+    expect(localRlsHarness).toContain("if inserted then");
+    expect(localRlsHarness).toContain("raise exception 'RLS FAIL non-owner grant INSERT'");
+    expect(localRlsHarness).not.toMatch(/raise exception 'RLS FAIL non-owner grant INSERT'[\s\S]*exception when others then null/i);
+  });
+
+  it('keeps the remote harness fail-closed and Auth-session based', () => {
+    expect(stagingHarness).toContain("const EXPECTED_PROJECT_REF = 'cbhrxkjclakzlvajyvfn';");
+    expect(stagingHarness).toContain("const PRODUCTION_PROJECT_REF = 'axkkhyqrjrtbkumaulta';");
+    expect(stagingHarness).toContain('signInWithPassword');
+    expect(stagingHarness).toContain("process.argv.includes('--execute')");
+    expect(stagingHarness).toContain('Service-role credentials are forbidden');
+    expect(stagingHarness).not.toMatch(/auth\.users/);
+    expect(stagingHarness).not.toMatch(/PGPASSWORD/);
+  });
+
+  it('reports a sanitized active stage for remote failures', () => {
+    expect(stagingHarness).toContain('let activeStage = \'STARTUP\';');
+    expect(stagingHarness).toContain('primary_stage=${failure.stage}');
+    expect(stagingHarness).toContain('primary_error=${sanitizeError(failure.error)}');
+    expect(stagingHarness).toContain('cleanup=FAIL');
+    expect(stagingHarness).toContain('cleanup_error=${sanitizeError(cleanupFailure.error)}');
+    expect(stagingHarness).toContain('capturePrimaryFailure(error);');
+    expect(stagingHarness).toContain('await cleanupSafely');
+    expect(stagingHarness).toContain('owner_matches_session=');
+    expect(stagingHarness).toContain('bucket_match=');
+    expect(stagingHarness).toContain('path_owner_match=');
+    expect(stagingHarness).toContain('safeStorageError(uploadError)');
+    expect(stagingHarness).toContain('statusCode: error?.statusCode');
+    expect(stagingHarness).toContain(".png`");
+    expect(stagingHarness).toContain("contentType: 'image/png'");
+    expect(stagingHarness).not.toContain("contentType: 'text/plain'");
+    expect(stagingHarness).toContain('Bearer [redacted]');
+    expect(stagingHarness).toContain('const REQUIRED_ENV_NAMES = [');
+    for (const stage of [
+      'ENV_VALIDATION', 'PROJECT_REF_GUARD', 'OWNER_AUTH', 'TRAINER_AUTH',
+      'VET_AUTH', 'FAMILY_AUTH', 'UNRELATED_AUTH', 'FIXTURE_CREATE',
+      'OWNER_RLS', 'UNRELATED_RLS', 'TRAINER_RLS', 'VET_RLS', 'FAMILY_RLS',
+      'CUSTOM_GRANT', 'TIME_BOUND_GRANTS', 'LEGACY_BYPASS', 'STORAGE',
+      'STORAGE_UPLOAD', 'WRITE_PROTECTION', 'GRANT_MANAGEMENT', 'CROSS_OWNER', 'CLEANUP',
+    ]) {
+      expect(stagingHarness).toContain(`setStage('${stage}')`);
+    }
   });
 });

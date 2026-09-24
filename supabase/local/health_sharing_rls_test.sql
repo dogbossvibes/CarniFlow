@@ -207,14 +207,24 @@ select pg_temp.assert_count('custom document after grant update', (select count(
 select pg_temp.assert_count('custom storage after grant update', (select count(*) from storage.objects where name like '11111111-%'), 1);
 
 -- Grant-management attacks: only the owner may create, modify, or revoke.
-do $$ begin
+do $$
+declare
+  inserted boolean := false;
+begin
+  -- The INSERT must fail. Keep the success marker outside the exception
+  -- handler so a successful unauthorized write cannot be swallowed.
   begin
     insert into public.dog_health_access_grants (dog_id,owner_id,grantee_user_id,role_preset)
     values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','11111111-1111-1111-1111-111111111111','66666666-6666-6666-6666-666666666666','custom');
+    inserted := true;
+  exception when others then
+    null;
+  end;
+  if inserted then
     raise exception 'RLS FAIL non-owner grant INSERT';
-  exception when others then null;
   end;
 end $$;
+
 update public.dog_health_access_grants
 set can_edit_health=true
 where id='a4000000-0000-0000-0000-000000000001';

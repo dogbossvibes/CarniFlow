@@ -9,6 +9,7 @@ import {
   checkUsernameAvailable,
   mapUsernameCheckResult,
   normalizeUsername,
+  updatePhoneNumber,
   updateUsername,
   validateUsername,
 } from '@/services/profileService';
@@ -235,5 +236,18 @@ describe('updateUsername', () => {
     const res = await updateUsername('u1', 'mäx');
     expect(res.error).toBe('Ungültiger Benutzername.');
     expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe('updatePhoneNumber', () => {
+  it('trimmt die Nummer und speichert eine leere Eingabe als null', async () => {
+    mockUpdate({ error: null });
+    const res = await updatePhoneNumber('u1', '  +41 79 123 45 67  ');
+    expect(res).toEqual({ error: null });
+    expect(from.mock.results[0].value.update).toHaveBeenCalledWith({ phone_number: '+41 79 123 45 67' });
+
+    mockUpdate({ error: null });
+    await updatePhoneNumber('u1', '   ');
+    expect(from.mock.results[1].value.update).toHaveBeenCalledWith({ phone_number: null });
   });
 });

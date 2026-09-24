@@ -85,6 +85,11 @@ export async function updateDisplayName(userId: string, fullName: string): Promi
   return { error: dbErr?.message ?? null };
 }
 
+export async function updatePhoneNumber(userId: string, phoneNumber: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('profiles').update({ phone_number: phoneNumber.trim() || null }).eq('id', userId);
+  return { error: error?.message ?? null };
+}
+
 export function upgradeToPremium(userId: string, expiresAt: string) {
   return supabase
     .from('profiles')

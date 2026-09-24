@@ -56,7 +56,6 @@ export default function HundHinzufuegenScreen() {
   const [mikrochip,   setMikrochip]   = useState('');
   const [registry,    setRegistry]    = useState<RegistryDraft>(EMPTY_REGISTRY_DRAFT);
   const [tierarzt,    setTierarzt]    = useState('');
-  const [impfung,     setImpfung]     = useState('');
   const [futter,      setFutter]      = useState('');
   const [bildUri,     setBildUri]     = useState<string | null>(null);
   const [fehler,      setFehler]      = useState<string | null>(null);
@@ -165,7 +164,6 @@ export default function HundHinzufuegenScreen() {
         tasso_registered: false,   // Legacy-Spalte: bei neuen Hunden nicht mehr aktiv genutzt
         ...draftToColumns(registry),
         vet:              tierarzt.trim()  || null,
-        vaccination:      impfung.trim()   || null,
         food:             futter.trim()    || null,
         is_favorite:      false,
       });
@@ -376,7 +374,6 @@ export default function HundHinzufuegenScreen() {
           <Text style={s.gruppeLabel}>{t('dog.health')}</Text>
           <View style={s.felder}>
             <Input label={t('dog.vet')} placeholder={t('dog.vetPlaceholder')} value={tierarzt} onChangeText={setTierarzt} autoCapitalize="words" />
-            <Input label={t('dog.vaccination')} placeholder={t('dog.vaccinationPlaceholder')} value={impfung} onChangeText={setImpfung} />
             <Input label={t('dog.food')} placeholder={t('dog.foodPlaceholder')} value={futter} onChangeText={setFutter} autoCapitalize="words" />
           </View>
 

@@ -5,6 +5,7 @@ export type Plan = 'free' | 'premium';
 export type Profile = {
   id:                      string;
   full_name:               string | null;
+  phone_number:            string | null;
   username:                string | null;   // öffentlicher @-Name (ohne @, klein), siehe T-43
   plan:                    Plan;
   plan_expires_at:         string | null;
@@ -81,8 +82,8 @@ export type NewDog = Pick<Dog,
   | 'color' | 'microchip_number' | 'tasso_registered'
   | 'registry_country_code' | 'registry_type' | 'registry_name' | 'registry_number'
   | 'discipline'
-  | 'vet' | 'vaccination' | 'food'
->;
+  | 'vet' | 'food'
+> & { vaccination?: Dog['vaccination'] };
 
 export type TrainingCategory = 'IGP' | 'IBGH' | 'Mondioring' | 'Alltagstraining';
 export type TrainingType     = 'privat' | 'trainer';

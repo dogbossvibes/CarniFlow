@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { queryClient } from '@/lib/queryClient';
-import { checkUsernameAvailable, mapUsernameCheckResult, updateDisplayName, updateUsername, validateUsername } from '@/services/profileService';
+import { checkUsernameAvailable, mapUsernameCheckResult, updateDisplayName, updatePhoneNumber, updateUsername, validateUsername } from '@/services/profileService';
 import type { UsernameValidationError } from '@/services/profileService';
 import { useT, type TranslationKey } from '@/i18n';
 
@@ -43,6 +43,7 @@ export default function EditProfileScreen() {
 
   // Benutzername (T-43): null = noch nicht hydriert (Profil-Cache).
   const [username, setUsername] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>({ state: 'idle' });
 
   const currentEmail = user?.email ?? '';
@@ -53,7 +54,10 @@ export default function EditProfileScreen() {
     if (username === null && profile !== undefined) {
       setUsername(profile?.username ?? '');
     }
-  }, [profile, username]);
+    if (phoneNumber === null && profile !== undefined) {
+      setPhoneNumber(profile?.phone_number ?? '');
+    }
+  }, [phoneNumber, profile, username]);
 
   // Verfügbarkeitscheck (debounced 400 ms) bei Eingabe — nie für den eigenen Namen.
   useEffect(() => {
@@ -94,7 +98,8 @@ export default function EditProfileScreen() {
   const speichernName = async () => {
     if (!user) return;
     if (!name.trim()) { Alert.alert(t('profile.nameMissingTitle'), t('profile.nameMissingBody')); return; }
-    if (username === null) return;
+    if (username === null || phoneNumber === null) return;
+    const phone = phoneNumber;
     const res = validateUsername(username);
     if (!res.ok) { Alert.alert(t('common.error'), t(USERNAME_ERROR_KEY[res.error])); return; }
     setSavingName(true);
@@ -104,6 +109,14 @@ export default function EditProfileScreen() {
       if (uerr) {
         setSavingName(false);
         Alert.alert(t('common.error'), taken ? t('profile.usernameTaken') : t('profile.saveFailed'));
+        return;
+      }
+    }
+    if (!error) {
+      const { error: phoneError } = await updatePhoneNumber(user.id, phone);
+      if (phoneError) {
+        setSavingName(false);
+        Alert.alert(t('common.error'), t('profile.saveFailed'));
         return;
       }
     }
@@ -156,6 +169,17 @@ export default function EditProfileScreen() {
           <Text style={s.usernameErr}>{t(usernameStatus.errorKey)}</Text>
         ) : null}
         <Text style={s.hint}>{t('profile.usernameHelp')}</Text>
+
+        <View style={{ height: 12 }} />
+        <Input
+          label={t('profile.phone')}
+          placeholder={t('profile.phonePlaceholder')}
+          value={phoneNumber ?? ''}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
+          autoComplete="tel"
+        />
+        <Text style={s.hint}>{t('profile.phoneHelp')}</Text>
 
         {/* E-Mail (nur Anzeige) */}
         <Text style={s.label}>{t('auth.email').toUpperCase()}</Text>
