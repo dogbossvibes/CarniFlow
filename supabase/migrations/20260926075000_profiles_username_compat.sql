@@ -1,0 +1,24 @@
+-- ANYVO: minimal Staging/Production schema-compatibility shim.
+--
+-- 20260926080000_profiles_least_privilege_access.sql's get_profile_display_names()
+-- RPC returns profiles.username — genuinely used at runtime (not merely
+-- incidental to that migration): services/connectionService.ts sets
+-- counterpartUsername from it, displayed as an @-handle in
+-- app/(tabs)/clients.tsx and app/trainer/index.tsx, and used as the display-
+-- name fallback in app/dog-health-sharing/[id].tsx. Production already has
+-- this column (confirmed read-only, 25.09.2026). Staging does not, because
+-- the historical migration that adds it — 20260803140000_profiles_username.sql
+-- — was never applied there.
+--
+-- This migration does NOT reproduce 20260803140000: no format CHECK
+-- constraint, no case-insensitive uniqueness index, no
+-- check_username_available() RPC. Those exist to govern SETTING a username
+-- (services/profileService.ts's updateUsername flow) — a separate,
+-- pre-existing, out-of-scope gap on Staging, unrelated to this security work.
+-- This migration only makes the column exist so get_profile_display_names()
+-- can select it; a NULL username is already handled everywhere it's read.
+--
+-- Harmless everywhere: ADD COLUMN IF NOT EXISTS is a no-op on Production and
+-- on any environment where 20260803140000 was already applied in full.
+alter table public.profiles
+  add column if not exists username text;
