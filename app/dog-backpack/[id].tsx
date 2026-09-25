@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Alert, Keyboard, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +21,6 @@ export default function DogBackpackScreen() {
   const router = useRouter();
   const { t } = useT();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
   const { user } = useSession();
   const { id: dogId, name, openAdd: openAddParam } = useLocalSearchParams<{ id: string; name?: string; openAdd?: string }>();
   const userId = user?.id ?? '';
@@ -256,34 +255,14 @@ export default function DogBackpackScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Editor-Sheet: Hinzufügen / Bearbeiten.
-          ROOT CAUSE (RC Backpack-Tastatur): AnyvoBottomSheet selbst hat kein
-          Keyboard-Handling — der Sheet-Inhalt hängt an position:absolute/
-          bottom:0 fest am unteren Bildschirmrand, ohne obere Höhenbegrenzung.
-          Das Bezeichnung-Feld hat autoFocus (Tastatur öffnet sofort). Ein
-          reines KeyboardAvoidingView ohne ScrollView (wie zuvor hier und wie
-          in CustomExerciseSheet.tsx) reicht bei diesem Formular nicht: mit
-          Bezeichnung + Fehlermeldung + Kategorie-Chips (mehrzeilig) + Button
-          kann der Inhalt zusammen mit der Tastatur höher werden als der
-          Bildschirm — ohne Scroll-Grenze wächst der Sheet-Inhalt einfach über
-          den oberen Bildschirmrand hinaus, das Bezeichnung-Feld landet
-          unsichtbar oberhalb der sichtbaren Fläche. Fix lokal hier (nicht in
-          AnyvoBottomSheet selbst, das von sieben weiteren, unabhängigen
-          Screens genutzt wird — Präzedenzfall CustomExerciseSheet.tsx):
-          KeyboardAvoidingView (padding, iOS) um eine ScrollView mit einer aus
-          der tatsächlichen Fensterhöhe berechneten maxHeight (funktioniert
-          responsiv auf kleinen und großen iPhones, kein Pixel-Wert für ein
-          einzelnes Gerät) — dieselbe Kombination wie bereits in
-          app/dog-health-record/[id].tsx für ein Sheet-Formular verwendet. */}
-      <AnyvoBottomSheet visible={editorOpen} onClose={() => setEditorOpen(false)} title={t(editId ? 'backpack.editItem' : 'backpack.addItem')}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView
-            style={{ maxHeight: Math.round(windowHeight * 0.62) }}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-            onScrollBeginDrag={Keyboard.dismiss}
-            showsVerticalScrollIndicator={false}
-          >
+      {/* The shared sheet moves above the keyboard; the form scrolls within its remaining height. */}
+      <AnyvoBottomSheet keyboardAware visible={editorOpen} onClose={() => setEditorOpen(false)} title={t(editId ? 'backpack.editItem' : 'backpack.addItem')}>
+        <ScrollView
+          style={s.editorScroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          showsVerticalScrollIndicator={false}
+        >
             <Text style={s.fieldLabel}>{t('backpack.labelField')}</Text>
             <TextInput
               value={draftLabel}
@@ -315,11 +294,10 @@ export default function DogBackpackScreen() {
               })}
             </View>
 
-            <View style={{ height: 14 }} />
-            <AnyvoButton label={t(editId ? 'backpack.save' : 'backpack.add')} icon="checkmark" onPress={submitEditor} disabled={submitting} />
-            <View style={{ height: 6 }} />
-          </ScrollView>
-        </KeyboardAvoidingView>
+        </ScrollView>
+        <View style={s.editorFooter}>
+          <AnyvoButton label={t(editId ? 'backpack.save' : 'backpack.add')} icon="checkmark" onPress={submitEditor} disabled={submitting} />
+        </View>
       </AnyvoBottomSheet>
 
       {/* Aktionen-Sheet je Eintrag */}
@@ -396,6 +374,8 @@ export default function DogBackpackScreen() {
 
 const s = StyleSheet.create({
   root:      { flex: 1, backgroundColor: C.trackBg },
+  editorScroll: { flexShrink: 1 },
+  editorFooter: { paddingTop: 14, paddingBottom: 6 },
   bar:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 },
   iconBtn:   { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' },
   barTitle:  { flex: 1, fontSize: 16, color: C.trackText, fontWeight: '800', textAlign: 'center', paddingHorizontal: 8 },

@@ -1,7 +1,7 @@
 // RC-Fix "Backpack Gegenstand hinzufügen" — Tastatur/Input-Sichtbarkeit.
-// Root Cause: app/dog-backpack/[id].tsx wraps its editor sheet in
-// KeyboardAvoidingView + a height-bounded ScrollView (see the in-file
-// comment for the full explanation). The actual on-device keyboard-avoidance
+// Root Cause: a child KeyboardAvoidingView never moved the absolutely
+// bottom-anchored shared sheet. The editor now opts into outer sheet avoidance.
+// The actual on-device keyboard-avoidance
 // behavior (does the sheet visually stay above the keyboard on a real
 // iPhone) cannot be reliably asserted by a JS unit test — that part requires
 // manual device verification (documented in the final report). This suite
@@ -16,6 +16,7 @@ import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
 import { Text, TextInput } from 'react-native';
 import DogBackpackScreen from '@/app/dog-backpack/[id]';
+import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 
 const mockGetBackpack = jest.fn();
 const mockAddItem = jest.fn();
@@ -167,18 +168,29 @@ describe('Backpack: no subscription gate anywhere in this screen (NEWBIE/ACTIVE/
 
 describe('Backpack editor sheet: keyboard-aware layout structure', () => {
   const content = readFileSync('app/dog-backpack/[id].tsx', 'utf8');
-  it('wraps the editor content in KeyboardAvoidingView (iOS: padding)', () => {
-    expect(content).toMatch(/<KeyboardAvoidingView behavior=\{Platform\.OS === 'ios' \? 'padding' : undefined\}>/);
+  it('opts in only the editor; the Backpack action and suggestion sheets keep the default', async () => {
+    const node = render();
+    await act(async () => { await Promise.resolve(); });
+    const sheets = (node.root as unknown as {
+      findAll: (predicate: (instance: { type: unknown }) => boolean) => { props: { keyboardAware?: boolean } }[];
+    }).findAll((instance) => instance.type === AnyvoBottomSheet);
+    expect(sheets).toHaveLength(3);
+    expect(sheets[0].props.keyboardAware).toBe(true);
+    expect(sheets[1].props.keyboardAware).toBeUndefined();
+    expect(sheets[2].props.keyboardAware).toBeUndefined();
   });
-  it('bounds the ScrollView height from the actual window size (responsive, not a single hardcoded pixel offset)', () => {
-    expect(content).toMatch(/maxHeight: Math\.round\(windowHeight \* 0\.62\)/);
+  it('removes the inner keyboard offset and lets the content shrink inside the outer sheet', () => {
+    expect(content).not.toMatch(/<KeyboardAvoidingView/);
+    expect(content).toMatch(/editorScroll: \{ flexShrink: 1 \}/);
+    expect(content).toMatch(/<View style=\{s\.editorFooter\}>/);
   });
   it('keyboardShouldPersistTaps="handled" so chip/button taps work while the keyboard is open', () => {
     expect(content).toMatch(/keyboardShouldPersistTaps="handled"/);
   });
-  it('iOS interactive keyboard dismiss + scroll-to-dismiss are wired', () => {
+  it('iOS interactive keyboard dismissal is not preempted by an immediate dismiss', () => {
     expect(content).toMatch(/keyboardDismissMode=\{Platform\.OS === 'ios' \? 'interactive' : 'on-drag'\}/);
-    expect(content).toMatch(/onScrollBeginDrag=\{Keyboard\.dismiss\}/);
+    expect(content).not.toMatch(/onScrollBeginDrag=\{Keyboard\.dismiss\}/);
+    expect(content).toMatch(/Keyboard\.dismiss\(\)/);
   });
   it('returnKeyType="done" submits via onSubmitEditing', () => {
     expect(content).toMatch(/returnKeyType="done"/);
