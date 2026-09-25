@@ -62,15 +62,23 @@ export async function getCommand(dogId: string, id: string): Promise<DogCommand 
   return (await getCommands(dogId)).find(c => c.id === id) ?? null;
 }
 
-export async function addCommand(dogId: string, input: NewCommand): Promise<DogCommand> {
+export interface AddCommandResult { data: DogCommand | null; blocked: boolean }
+
+// NEWBIE-Limit ist eine GLEICHZEITIGE Obergrenze (aktueller Bestand), keine
+// Monats-Quota: löschen gibt einen Slot sofort wieder frei. Enforcement hier
+// im Service (nicht nur UI-Disabling) — beide Aufrufer (add.tsx, edit.tsx)
+// reichen `limit` nur für NEWBIE (isPro=false); Premium ruft ohne limit auf
+// → unbegrenzt.
+export async function addCommand(dogId: string, input: NewCommand, opts?: { limit?: number }): Promise<AddCommandResult> {
+  const list = await getCommands(dogId);
+  if (opts?.limit != null && list.length >= opts.limit) return { data: null, blocked: true };
   const now = new Date().toISOString();
   const cmd: DogCommand = {
     ...input, id: `${Date.now()}`, dogId,
     videoUrl: null, audioUrl: null, lastUsedAt: null, usageCount: 0, createdAt: now, updatedAt: now,
   };
-  const list = await getCommands(dogId);
   await writeAll(dogId, [cmd, ...list]);
-  return cmd;
+  return { data: cmd, blocked: false };
 }
 
 export async function updateCommand(dogId: string, id: string, patch: Partial<NewCommand>): Promise<void> {

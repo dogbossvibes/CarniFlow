@@ -7,6 +7,7 @@ import { C } from '@/constants/colors';
 import { haptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { NEWBIE_COMMAND_LIMIT } from '@/features/subscription/plans';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import {
   addCommand, updateCommand, getCommand, COMMAND_AREAS,
@@ -26,15 +27,9 @@ const toLines = (s: string) => s.split('\n').map(t => t.trim()).filter(Boolean);
 export default function DogCommandEditor() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isPro, loading: capLoading } = useCapabilities();
+  const { isPro } = useCapabilities();
   const { t } = useT();
   const { dogId, commandId } = useLocalSearchParams<{ dogId: string; commandId?: string }>();
-
-  // NEWBIE (Nicht-Pro) hat keine Kommandoerfassung: auf die bestehende Upgrade-Ansicht
-  // (Active) leiten. Nutzt das bestehende zentrale isPro-Gate.
-  useEffect(() => {
-    if (!capLoading && !isPro) router.replace('/premium' as never);
-  }, [capLoading, isPro, router]);
 
   const [name, setName]         = useState('');
   const [category, setCategory] = useState<CommandCategory>('sport');
@@ -72,14 +67,23 @@ export default function DogCommandEditor() {
       difficulty, isFavorite: fav,
     };
     try {
-      if (commandId) await updateCommand(dogId, commandId, payload);
-      else await addCommand(dogId, payload);
+      if (commandId) {
+        await updateCommand(dogId, commandId, payload);
+      } else {
+        const result = await addCommand(dogId, payload, { limit: isPro ? undefined : NEWBIE_COMMAND_LIMIT });
+        if (result.blocked) {
+          haptic.error();
+          Alert.alert(t('premium.newbieLimitTitle'), t('premium.newbieCommandLimit'), [
+            { text: t('common.cancel'), style: 'cancel' },
+            { text: t('premium.upgradeActive'), onPress: () => router.push('/premium' as never) },
+          ]);
+          return;
+        }
+      }
       haptic.success();
       router.back();
     } finally { setSaving(false); }
   };
-
-  if (!capLoading && !isPro) return null;
 
   return (
     <View style={s.root}>

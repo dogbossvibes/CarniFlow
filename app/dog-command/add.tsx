@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { tapHaptic, successHaptic } from '@/lib/haptics';
+import { NEWBIE_COMMAND_LIMIT } from '@/features/subscription/plans';
+import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import { addCommand, type CommandCategory } from '@/features/dogs/dogCommands';
 
 const SPORT = C.trackPrimary;   // Mint
@@ -23,15 +24,9 @@ const PRESETS: Record<CommandCategory, string[]> = {
 // je Kommando bearbeiten — so bleibt das Hinzufügen kurz und übersichtlich.
 export default function DogCommandAdd() {
   const router = useRouter();
-  const { isPro, loading: capLoading } = useCapabilities();
+  const { isPro } = useCapabilities();
   const { t } = useT();
   const { dogId } = useLocalSearchParams<{ dogId: string }>();
-
-  // NEWBIE (Nicht-Pro) hat keine Kommandoerfassung: auf die bestehende Upgrade-Ansicht
-  // (Active) leiten. Nutzt das bestehende zentrale isPro-Gate.
-  useEffect(() => {
-    if (!capLoading && !isPro) router.replace('/premium' as never);
-  }, [capLoading, isPro, router]);
 
   const [category, setCategory] = useState<CommandCategory>('sport');
   const [added, setAdded] = useState<Record<string, true>>({});   // "cat:name" → schon hinzugefügt
@@ -43,14 +38,21 @@ export default function DogCommandAdd() {
     if (!dogId || added[keyOf(name)]) return;
     tapHaptic();
     setAdded(a => ({ ...a, [keyOf(name)]: true }));
-    await addCommand(dogId, {
+    const result = await addCommand(dogId, {
       name, category, area: null, verbalCue: name, handSignal: null, goal: null, description: null,
       steps: [], tips: [], commonMistakes: [], difficulty: 'easy', isFavorite: false,
-    });
+    }, { limit: isPro ? undefined : NEWBIE_COMMAND_LIMIT });
+    if (result.blocked) {
+      setAdded(a => { const next = { ...a }; delete next[keyOf(name)]; return next; });
+      haptic.error();
+      Alert.alert(t('premium.newbieLimitTitle'), t('premium.newbieCommandLimit'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('premium.upgradeActive'), onPress: () => router.push('/premium' as never) },
+      ]);
+      return;
+    }
     successHaptic();
   };
-
-  if (!capLoading && !isPro) return null;
 
   return (
     <View style={s.root}>
