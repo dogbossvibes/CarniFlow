@@ -35,6 +35,7 @@ function materialLabel(material: MarkerMaterial | null | undefined): string {
     case 'holz':     return 'Holz';
     case 'duebel':   return 'Dübel';
     case 'stoff':    return 'Stoff';
+    case 'filz':     return 'Filz';
     case 'leder':    return 'Leder';
     case 'plastik':  return 'Plastik';
     case 'metall':   return 'Metall';
