@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useSession } from '@/hooks/useSession';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { getMyTrainerProfile, createTrainerProfile, updateTrainerProfile } from '@/services/trainerService';
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
@@ -21,6 +22,7 @@ export default function TrainerEditScreen() {
   const router = useRouter();
   const { t } = useT();
   const { session } = useSession();
+  const { isTrainerModule, loading: capLoading } = useCapabilities();
 
   const [existing, setExisting] = useState<TrainerProfile | null>(null);
   const [loading, setLoading]   = useState(true);
@@ -43,6 +45,15 @@ export default function TrainerEditScreen() {
       setLoading(false);
     })();
   }, [session?.user.id]);
+
+  // BE A TRAINER (professionelles Profil anlegen) erfordert trainer_module —
+  // anders als CONNECT WITH A TRAINER (app/trainer/index.tsx, ungegatet).
+  // Bestehende Trainer:innen dürfen ihr Profil weiter bearbeiten, auch falls
+  // das Abo zwischenzeitlich inkonsistent geladen wird — nur die NEU-Anlage
+  // ohne trainer_module wird auf Premium geleitet.
+  useEffect(() => {
+    if (!capLoading && !loading && !isTrainerModule && !existing) router.replace('/premium' as never);
+  }, [capLoading, loading, isTrainerModule, existing, router]);
 
   const speichern = async () => {
     if (!session?.user.id) return;
@@ -67,7 +78,8 @@ export default function TrainerEditScreen() {
     if (wasExisting) router.back();
   };
 
-  if (loading) return <View style={s.center}><ActivityIndicator color={C.accent} size="large" /></View>;
+  if (loading || capLoading) return <View style={s.center}><ActivityIndicator color={C.accent} size="large" /></View>;
+  if (!isTrainerModule && !existing) return null;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

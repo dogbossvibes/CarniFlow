@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Share, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useSession } from '@/hooks/useSession';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { getMyClientConnections, respondToConnection, removeConnection } from '@/services/connectionService';
 import { getMyTrainerProfile } from '@/services/trainerService';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
@@ -16,11 +17,20 @@ import { useT } from '@/i18n';
 
 function initial(name: string | null) { return (name?.trim()?.[0] ?? '?').toUpperCase(); }
 
+// Professionelle Kundenverwaltung — nur für BE A TRAINER (trainer_module).
+// CONNECT WITH A TRAINER (NEWBIE/ACTIVE) gehört auf app/trainer/index.tsx und
+// führt NIE hierher; dieses Gate ist Verteidigung in der Tiefe, falls doch
+// jemand ungegated hierher navigiert (z. B. ein alter Deep-Link).
 export default function ClientsScreen() {
   const router = useRouter();
   const { t } = useT();
   const { session } = useSession();
   const meId = session?.user.id;
+  const { isTrainerModule, loading: capLoading } = useCapabilities();
+
+  useEffect(() => {
+    if (!capLoading && !isTrainerModule) router.replace('/trainer' as never);
+  }, [capLoading, isTrainerModule, router]);
 
   const [clients, setClients] = useState<ConnectionView[]>([]);
   const [trainerProfile, setTrainerProfile] = useState<TrainerProfile | null>(null);
@@ -59,6 +69,8 @@ export default function ClientsScreen() {
 
   const pending = clients.filter(c => c.status === 'pending');
   const active  = clients.filter(c => c.status === 'accepted');
+
+  if (!capLoading && !isTrainerModule) return null;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

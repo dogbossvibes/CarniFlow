@@ -782,7 +782,7 @@ export default function TrackAuswertungScreen() {
             {trainers.length === 0 ? (
               <View style={{ gap: 12 }}>
                 <Text style={s.shareHint}>Noch kein akzeptierter Trainer verbunden.</Text>
-                <Pressable style={s.shareButton} onPress={() => { setSharePickerOpen(false); router.push('/(tabs)/clients' as never); }}><Text style={s.shareButtonText}>Trainer verbinden</Text></Pressable>
+                <Pressable style={s.shareButton} onPress={() => { setSharePickerOpen(false); router.push('/trainer' as never); }}><Text style={s.shareButtonText}>Trainer verbinden</Text></Pressable>
               </View>
             ) : selectedTrainer ? (
               <View style={{ gap: 12 }}>
