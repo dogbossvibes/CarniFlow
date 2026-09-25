@@ -38,10 +38,17 @@ interface CardDef { plan: SubscriptionPlan; badgeKey?: TranslationKey; features:
 const CARDS: CardDef[] = [
   // NEWBIE hat die Trainerverbindung inklusive (app/trainer/index.tsx ist
   // ungegatet — keine pro_member/trainer_module-Prüfung). „Kein Trainerzugang"
-  // gilt hier NICHT und darf nicht wiederverwendet werden.
-  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.featureOneDog', 'premium.featureTwoTrainingsMonth', 'premium.featureTrainerConnect', 'premium.featureCalendarTimer', 'premium.featureOneTrackMonth'] },
-  { plan: 'active', features: ['premium.featureTrainingProgress', 'premium.featureSmartAnalysis', 'premium.featureCalendarVoice', 'premium.featureNoTrainer'] },
-  { plan: 'trainer', badgeKey: 'premium.badgePro', features: ['premium.featureAllActive', 'premium.featureClientPlans', 'premium.featurePollsFeedback', 'premium.featureTrainerDashboard'] },
+  // gilt hier NICHT und darf nicht wiederverwendet werden — CONNECT WITH A
+  // TRAINER (featureTrainerConnect) ist von BE A TRAINER (Trainer-Plan,
+  // Trainerbereich/Kundenverwaltung/Trainer-Code) strikt getrennt; siehe
+  // Customer Release Phase 8.
+  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.featureOneDog', 'premium.featureTwoTrainingsMonth', 'premium.featureOneTrackMonth', 'premium.featureTrainerConnect', 'premium.featureHealthRecord', 'premium.featureHealthSharing', 'premium.featureBackpack', 'premium.featureFiveCommands', 'premium.featureCalendarTimer'] },
+  // ACTIVE bekommt dieselbe Trainerverbindung wie NEWBIE (kein Trainer-Plan
+  // nötig) — NIE mehr „Kein Trainerzugang". Der professionelle Trainerbereich
+  // bleibt ausschliesslich dem Trainer-Plan vorbehalten (trainer-hub.tsx,
+  // eigenes trainer_module-Gate).
+  { plan: 'active', features: ['premium.featureUnlimitedDogs', 'premium.featureUnlimitedTrainings', 'premium.featureUnlimitedTracks', 'premium.featureTrainerConnect', 'premium.featureHealthRecord', 'premium.featureHealthSharing', 'premium.featureBackpack', 'premium.featureUnlimitedCommands', 'premium.featureSmartAnalysis'] },
+  { plan: 'trainer', badgeKey: 'premium.badgePro', features: ['premium.featureAllActive', 'premium.featureTrainerCode', 'premium.featureClientPlans', 'premium.featurePollsFeedback', 'premium.featureTrainerDashboard'] },
 ];
 
 const MONTH_MS = 30 * 86400000;

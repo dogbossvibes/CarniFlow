@@ -22,14 +22,20 @@ export type Capability =
 
 // Funktions-Capabilities, die auch NEWBIE (kostenlos) hat. Die ANZAHL neuer
 // Aktionen ist zusätzlich durch Monats-Quotas begrenzt (siehe quotaLimit).
+// Release-Korrektur (Customer Release Phase 8): dogs.backpack und
+// dogs.commands sind jetzt BASIS — NEWBIE bekommt Backpack voll und
+// Kommandoerfassung bis zu NEWBIE_COMMAND_LIMIT (siehe unten; das ist eine
+// gleichzeitige Obergrenze, keine Monats-Quota, und wird NICHT über dieses
+// Capability-System durchgesetzt, sondern in features/dogs/dogCommands.ts).
 export const BASE_CAPABILITIES: Capability[] = [
   'training.create', 'dogs.manage', 'calendar.use', 'voice.notes',
+  'dogs.backpack', 'dogs.commands',
 ];
 // Premium-only. NEWBIE erhält KEINE davon: Smart Coach/Analyse (training.analytics,
-// ai.feedback) sowie die Hunde-Zusatzfunktionen Backpack, Läufigkeit/Heat-Tracking
-// (dogs.heat), Kommandoerfassung und persönliches Trainingsziel. Allgemeine
-// Gesundheitsdaten sind NICHT premium (NEWBIE erlaubt) — bewusst KEINE dogs.health-
-// Capability, damit Gesundheit nicht mit der Läufigkeit gekoppelt/mitgesperrt wird.
+// ai.feedback) sowie die Hunde-Zusatzfunktionen Läufigkeit/Heat-Tracking
+// (dogs.heat) und persönliches Trainingsziel. Allgemeine Gesundheitsdaten sind
+// NICHT premium (NEWBIE erlaubt) — bewusst KEINE dogs.health-Capability, damit
+// Gesundheit nicht mit der Läufigkeit gekoppelt/mitgesperrt wird.
 // ACTIVE/FOUNDER/TRAINER (und Lifetime) erhalten alle Premium-Capabilities.
 //
 // HEALTH-Granularität (final): Allgemeine Gesundheitsdaten, das AKTUELLE Gewicht
@@ -41,7 +47,7 @@ export const BASE_CAPABILITIES: Capability[] = [
 // Läufigkeit bleibt dogs.heat (unverändert premium).
 export const PREMIUM_CAPABILITIES: Capability[] = [
   'training.analytics', 'ai.feedback',
-  'dogs.backpack', 'dogs.heat', 'dogs.commands', 'dogs.goal',
+  'dogs.heat', 'dogs.goal',
   'dogs.weightHistory', 'dogs.dewormingSchedule',
 ];
 // ACTIVE = BASE + PREMIUM (Kompat-Export für Anzeige/Übersicht).
@@ -49,6 +55,11 @@ export const ACTIVE_CAPABILITIES: Capability[] = [...BASE_CAPABILITIES, ...PREMI
 export const TRAINER_CAPABILITIES: Capability[] = [
   'trainer.dashboard', 'trainer.clients', 'trainer.surveys', 'trainer.comments', 'trainer.plans',
 ];
+
+// NEWBIE-Kommandolimit: GLEICHZEITIGE Obergrenze (aktueller Bestand pro Hund),
+// keine Monats-Quota — löschen eines Kommandos gibt sofort einen Slot frei.
+// Durchgesetzt in features/dogs/dogCommands.ts (addCommand), nicht nur in der UI.
+export const NEWBIE_COMMAND_LIMIT = 5;
 
 export type UserEntitlement =
   | 'lifetime'

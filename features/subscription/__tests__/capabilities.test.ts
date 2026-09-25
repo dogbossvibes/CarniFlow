@@ -93,9 +93,11 @@ describe('NEWBIE-Quotas (reine Entscheidung)', () => {
 });
 
 describe('NEWBIE finale Produktdefinition — Feature-Locks (Premium-only)', () => {
-  // Backpack, Gesundheit, Kommandoerfassung, persönliches Ziel + Smart Analyse.
+  // Customer Release Phase 8: dogs.backpack und dogs.commands sind jetzt
+  // BASIS (NEWBIE erlaubt, Kommandos nur bis NEWBIE_COMMAND_LIMIT) — nicht
+  // mehr hier. Läufigkeit, persönliches Ziel + Smart Analyse bleiben Premium.
   const FEATURE_LOCKS: Capability[] = [
-    'dogs.backpack', 'dogs.heat', 'dogs.commands', 'dogs.goal',
+    'dogs.heat', 'dogs.goal',
     'training.analytics', 'ai.feedback',
   ];
   it('NEWBIE: alle Feature-Locks + Trainer gesperrt', () => {

@@ -31,21 +31,41 @@ describe('NEWBIE ist kein Trial — Paywall (app/premium.tsx)', () => {
 
   it('NEWBIE-Karte wirbt nicht mehr mit 7 Tagen / „Alle Active-Funktionen" / Auto-Wechsel zu Active', () => {
     expect(premium).not.toMatch(/features: \['premium\.feature7Days', 'premium\.featureActive', 'premium\.featureThenActive'/);
-    expect(premium).toMatch(/features: \['premium\.featureOneDog', 'premium\.featureTwoTrainingsMonth', 'premium\.featureTrainerConnect', 'premium\.featureCalendarTimer', 'premium\.featureOneTrackMonth'\]/);
+    expect(premium).toMatch(/features: \['premium\.featureOneDog', 'premium\.featureTwoTrainingsMonth', 'premium\.featureOneTrackMonth', 'premium\.featureTrainerConnect', 'premium\.featureHealthRecord', 'premium\.featureHealthSharing', 'premium\.featureBackpack', 'premium\.featureFiveCommands', 'premium\.featureCalendarTimer'\]/);
   });
 
-  it('NEWBIE-Karte behauptet nicht „Kein Trainerzugang" — NEWBIE hat die Trainerverbindung inklusive', () => {
+  it('Customer Release Phase 8: weder NEWBIE- noch ACTIVE-Karte behaupten „Kein Trainerzugang" — beide connecten ungegatet', () => {
     // app/trainer/index.tsx (Client verbindet sich per Code mit seinem Trainer)
     // hat KEINE pro_member/trainer_module-Prüfung — die Verbindung ist für ALLE
-    // Pläne inkl. NEWBIE ungegatet. „Kein Trainerzugang" (premium.featureNoTrainer)
-    // meint das TRAINER-Plan-Modul (trainer.moduleRequired, app/trainer/dashboard.tsx
-    // /plaene.tsx) und darf auf der NEWBIE-Karte nicht auftauchen.
+    // Pläne inkl. NEWBIE/ACTIVE ungegatet. featureNoTrainer existiert nirgends
+    // mehr (auch nicht als i18n-Key) und darf nicht wieder auftauchen.
+    expect(premium).not.toMatch(/featureNoTrainer/);
     const newbieCardLine = premium.split('\n').find(l => l.includes("plan: 'newbie', badgeKey:"));
+    const activeCardLine = premium.split('\n').find(l => l.includes("plan: 'active',"));
     expect(newbieCardLine).toBeDefined();
-    expect(newbieCardLine).not.toMatch(/featureNoTrainer/);
+    expect(activeCardLine).toBeDefined();
     expect(newbieCardLine).toMatch(/featureTrainerConnect/);
+    expect(activeCardLine).toMatch(/featureTrainerConnect/);
     const trainerIndex = readFileSync('app/trainer/index.tsx', 'utf8');
     expect(trainerIndex).not.toMatch(/isPro\b|pro_member|trainer_module|useCapabilities/);
+    for (const locale of ['i18n/de-CH.ts', 'i18n/gsw-CH.ts', 'i18n/locales/en.ts', 'i18n/locales/fr.ts', 'i18n/locales/it.ts']) {
+      expect(readFileSync(locale, 'utf8')).not.toMatch(/featureNoTrainer/);
+    }
+  });
+
+  it('professioneller Trainerbereich bleibt getrennt gegatet: (tabs)/clients.tsx und trainer/edit.tsx prüfen trainer_module, nie generisches isPro', () => {
+    const clients = readFileSync('app/(tabs)/clients.tsx', 'utf8');
+    const trainerEdit = readFileSync('app/trainer/edit.tsx', 'utf8');
+    expect(clients).toMatch(/isTrainerModule/);
+    expect(clients).not.toMatch(/\bisPro\b/);
+    expect(trainerEdit).toMatch(/isTrainerModule/);
+    expect(trainerEdit).not.toMatch(/\bisPro\b/);
+  });
+
+  it('Track-Sharing-CTA „Trainer verbinden" führt zum Client-Connect-Screen, nicht zur professionellen Kundenverwaltung', () => {
+    const trackDetail = readFileSync('app/track/[id].tsx', 'utf8');
+    expect(trackDetail).not.toMatch(/router\.push\('\/\(tabs\)\/clients' as never\)/);
+    expect(trackDetail).toMatch(/router\.push\('\/trainer' as never\)/);
   });
 
   it('NEWBIE-Preis kommt aus derselben PLAN_META-Quelle wie alle anderen Karten (kein Sonderfall mehr)', () => {
