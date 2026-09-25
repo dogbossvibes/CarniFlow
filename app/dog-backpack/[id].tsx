@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ export default function DogBackpackScreen() {
   const router = useRouter();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { user } = useSession();
   const { id: dogId, name, openAdd: openAddParam } = useLocalSearchParams<{ id: string; name?: string; openAdd?: string }>();
   const userId = user?.id ?? '';
@@ -45,6 +46,12 @@ export default function DogBackpackScreen() {
   const [draftLabel, setDraftLabel] = useState('');
   const [draftCat, setDraftCat] = useState<EquipmentCategory | undefined>(undefined);
   const [labelError, setLabelError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  // Synchronous re-entrancy guard: `submitting` state is only visible after a
+  // re-render, so onSubmitEditing (keyboard Done) and the Hinzufügen button
+  // firing for the same intent could both pass a state-only check before
+  // either re-render lands. A ref is read/written synchronously.
+  const submittingRef = useRef(false);
 
   const openAdd = () => { setEditId(null); setDraftLabel(''); setDraftCat(undefined); setLabelError(false); setEditorOpen(true); };
   const openEdit = (it: DogBackpackItem) => { setEditId(it.id); setDraftLabel(it.label); setDraftCat(it.category); setLabelError(false); setEditorOpen(true); };
@@ -54,14 +61,25 @@ export default function DogBackpackScreen() {
   }, [dogId, openAddParam, userId]);
 
   const submitEditor = async () => {
-    if (!userId || !dogId) return;
+    // Guard against a duplicate item from keyboard-submit (onSubmitEditing)
+    // and the "Hinzufügen" button firing for the same intent — checked via a
+    // ref so it is effective immediately, not only after the next re-render.
+    if (!userId || !dogId || submittingRef.current) return;
     const label = draftLabel.trim();
     if (!label) { setLabelError(true); haptic.error(); return; }
-    if (editId) await updateItem(userId, dogId, editId, { label, category: draftCat });
-    else        await addItem(userId, dogId, { label, category: draftCat });
-    haptic.success();
-    setEditorOpen(false);
-    reload();
+    submittingRef.current = true;
+    setSubmitting(true);
+    Keyboard.dismiss();
+    try {
+      if (editId) await updateItem(userId, dogId, editId, { label, category: draftCat });
+      else        await addItem(userId, dogId, { label, category: draftCat });
+      haptic.success();
+      setEditorOpen(false);
+      reload();
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   // ── Aktionen je Eintrag ───────────────────────────────────────────────────
@@ -238,43 +256,69 @@ export default function DogBackpackScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {/* Editor-Sheet: Hinzufügen / Bearbeiten */}
+      {/* Editor-Sheet: Hinzufügen / Bearbeiten.
+          ROOT CAUSE (RC Backpack-Tastatur): AnyvoBottomSheet selbst hat kein
+          Keyboard-Handling — der Sheet-Inhalt hängt an position:absolute/
+          bottom:0 fest am unteren Bildschirmrand, ohne obere Höhenbegrenzung.
+          Das Bezeichnung-Feld hat autoFocus (Tastatur öffnet sofort). Ein
+          reines KeyboardAvoidingView ohne ScrollView (wie zuvor hier und wie
+          in CustomExerciseSheet.tsx) reicht bei diesem Formular nicht: mit
+          Bezeichnung + Fehlermeldung + Kategorie-Chips (mehrzeilig) + Button
+          kann der Inhalt zusammen mit der Tastatur höher werden als der
+          Bildschirm — ohne Scroll-Grenze wächst der Sheet-Inhalt einfach über
+          den oberen Bildschirmrand hinaus, das Bezeichnung-Feld landet
+          unsichtbar oberhalb der sichtbaren Fläche. Fix lokal hier (nicht in
+          AnyvoBottomSheet selbst, das von sieben weiteren, unabhängigen
+          Screens genutzt wird — Präzedenzfall CustomExerciseSheet.tsx):
+          KeyboardAvoidingView (padding, iOS) um eine ScrollView mit einer aus
+          der tatsächlichen Fensterhöhe berechneten maxHeight (funktioniert
+          responsiv auf kleinen und großen iPhones, kein Pixel-Wert für ein
+          einzelnes Gerät) — dieselbe Kombination wie bereits in
+          app/dog-health-record/[id].tsx für ein Sheet-Formular verwendet. */}
       <AnyvoBottomSheet visible={editorOpen} onClose={() => setEditorOpen(false)} title={t(editId ? 'backpack.editItem' : 'backpack.addItem')}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <Text style={s.fieldLabel}>{t('backpack.labelField')}</Text>
-          <TextInput
-            value={draftLabel}
-            onChangeText={(v) => { setDraftLabel(v); if (labelError && v.trim()) setLabelError(false); }}
-            placeholder={t('backpack.labelPlaceholder')}
-            placeholderTextColor={C.trackTextMut}
-            style={[s.input, labelError && s.inputError]}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={submitEditor}
-            accessibilityLabel={t('backpack.labelField')}
-          />
-          {labelError ? <Text style={s.errorTxt}>{t('backpack.emptyLabelError')}</Text> : null}
+          <ScrollView
+            style={{ maxHeight: Math.round(windowHeight * 0.62) }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            onScrollBeginDrag={Keyboard.dismiss}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={s.fieldLabel}>{t('backpack.labelField')}</Text>
+            <TextInput
+              value={draftLabel}
+              onChangeText={(v) => { setDraftLabel(v); if (labelError && v.trim()) setLabelError(false); }}
+              placeholder={t('backpack.labelPlaceholder')}
+              placeholderTextColor={C.trackTextMut}
+              style={[s.input, labelError && s.inputError]}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={submitEditor}
+              accessibilityLabel={t('backpack.labelField')}
+            />
+            {labelError ? <Text style={s.errorTxt}>{t('backpack.emptyLabelError')}</Text> : null}
 
-          <Text style={s.fieldLabel}>{t('backpack.categoryField')}</Text>
-          <View style={s.chips}>
-            <TouchableOpacity style={[s.chip, !draftCat && s.chipOn]} onPress={() => setDraftCat(undefined)} activeOpacity={0.85}
-              accessibilityRole="button" accessibilityState={{ selected: !draftCat }} accessibilityLabel={t('backpack.noCategory')}>
-              <Text style={[s.chipTxt, !draftCat && s.chipTxtOn]}>{t('backpack.noCategory')}</Text>
-            </TouchableOpacity>
-            {EQUIPMENT_CATEGORIES.map(c => {
-              const on = draftCat === c;
-              return (
-                <TouchableOpacity key={c} style={[s.chip, on && s.chipOn]} onPress={() => setDraftCat(on ? undefined : c)} activeOpacity={0.85}
-                  accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={t(CATEGORY_I18N_KEY[c] as never)}>
-                  <Text style={[s.chipTxt, on && s.chipTxtOn]}>{t(CATEGORY_I18N_KEY[c] as never)}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+            <Text style={s.fieldLabel}>{t('backpack.categoryField')}</Text>
+            <View style={s.chips}>
+              <TouchableOpacity style={[s.chip, !draftCat && s.chipOn]} onPress={() => setDraftCat(undefined)} activeOpacity={0.85}
+                accessibilityRole="button" accessibilityState={{ selected: !draftCat }} accessibilityLabel={t('backpack.noCategory')}>
+                <Text style={[s.chipTxt, !draftCat && s.chipTxtOn]}>{t('backpack.noCategory')}</Text>
+              </TouchableOpacity>
+              {EQUIPMENT_CATEGORIES.map(c => {
+                const on = draftCat === c;
+                return (
+                  <TouchableOpacity key={c} style={[s.chip, on && s.chipOn]} onPress={() => setDraftCat(on ? undefined : c)} activeOpacity={0.85}
+                    accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={t(CATEGORY_I18N_KEY[c] as never)}>
+                    <Text style={[s.chipTxt, on && s.chipTxtOn]}>{t(CATEGORY_I18N_KEY[c] as never)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-          <View style={{ height: 14 }} />
-          <AnyvoButton label={t(editId ? 'backpack.save' : 'backpack.add')} icon="checkmark" onPress={submitEditor} />
-          <View style={{ height: 6 }} />
+            <View style={{ height: 14 }} />
+            <AnyvoButton label={t(editId ? 'backpack.save' : 'backpack.add')} icon="checkmark" onPress={submitEditor} disabled={submitting} />
+            <View style={{ height: 6 }} />
+          </ScrollView>
         </KeyboardAvoidingView>
       </AnyvoBottomSheet>
 
