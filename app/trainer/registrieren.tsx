@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
 import { useSession } from '@/hooks/useSession';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useT, type TranslationKey } from '@/i18n';
 
 const FEATURES: [string, TranslationKey][] = [
@@ -20,6 +21,7 @@ export default function TrainerRegistrierenScreen() {
   const router = useRouter();
   const { t } = useT();
   const { session } = useSession();
+  const { isTrainerModule, loading: capLoading } = useCapabilities();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +29,16 @@ export default function TrainerRegistrierenScreen() {
     const n = session?.user.user_metadata?.full_name;
     if (n) setName(n);
   }, [session]);
+
+  // BE A TRAINER only (Customer Release Phase 10): this screen writes
+  // profiles.is_trainer=true directly (a legacy field capabilityService.ts
+  // still reads as a pre-migration fallback) — without this gate, removing
+  // the old blanket layout redirect would let any NEWBIE/ACTIVE user reach
+  // this route directly and self-grant trainer status.
+  useEffect(() => {
+    if (!capLoading && !isTrainerModule) router.replace('/premium' as never);
+  }, [capLoading, isTrainerModule, router]);
+  if (!capLoading && !isTrainerModule) return null;
 
   const handleRegister = async () => {
     if (!name.trim()) { Alert.alert('Ups 🐾', t('trainer.nameRequired')); return; }

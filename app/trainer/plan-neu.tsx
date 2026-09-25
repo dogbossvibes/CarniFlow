@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { getMyClientConnections } from '@/services/connectionService';
 import { createPlan } from '@/services/trainingPlanService';
 import { successHaptic, tapHaptic } from '@/lib/haptics';
@@ -19,6 +20,14 @@ export default function PlanNeuScreen() {
   const { t } = useT();
   const { session } = useSession();
   const { profile } = useProfile();
+  const { isTrainerModule, loading: capLoading } = useCapabilities();
+
+  // BE A TRAINER only (Customer Release Phase 10): creating a plan is a
+  // professional action. Previously relied solely on the parent layout's
+  // blanket redirect, now removed — this screen needs its own gate.
+  useEffect(() => {
+    if (!capLoading && !isTrainerModule) router.replace('/premium' as never);
+  }, [capLoading, isTrainerModule, router]);
 
   const [active, setActive]         = useState<{ id: string; name: string | null }[]>([]);
   const [title, setTitle]           = useState('');
@@ -56,6 +65,8 @@ export default function PlanNeuScreen() {
     successHaptic();
     router.back();
   };
+
+  if (!capLoading && !isTrainerModule) return null;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
