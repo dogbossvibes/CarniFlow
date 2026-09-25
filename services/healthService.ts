@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { createOwnEvent, deleteCalendarEvent, updateCalendarEvent } from '@/services/calendarService';
-import { listConnections } from '@/services/connectionService';
+import { listConnections, PERSON_CONNECTION_TYPE } from '@/services/connectionService';
 import { isHealthDocument } from '@/features/dogs/documentCategories';
 import type { ConnectionView } from '@/types/connection';
 import { HEALTH_PERMISSIONS, type HealthCondition, type HealthMedication, type HealthPermission, type HealthRolePreset, type HealthVaccination } from '@/types/health';
@@ -79,10 +79,19 @@ export async function loadHealthAccessGrants(dogId: string): Promise<{ data: Hea
   return { data: (result.data as HealthAccessGrantRow[]) ?? [], error: result.error };
 }
 
+// Health-Sharing-Empfänger können sowohl akzeptierte Trainer (trainer_client)
+// als auch generische verbundene ANYVO-Personen (PERSON_CONNECTION_TYPE, über
+// „Person verbinden" gefunden) sein — beide Verbindungstypen sind gleichwertig
+// wählbar; die eigentliche Zugriffssteuerung läuft ausschliesslich über die
+// granularen dog_health_access_grants, nicht über den Verbindungstyp.
 export async function loadHealthGrantConnections(): Promise<{ data: HealthGrantConnection[]; error: { message: string } | null }> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: [], error: { message: 'Nicht eingeloggt' } };
-  const result = await listConnections(user.id);
+  const [trainers, people] = await Promise.all([
+    listConnections(user.id, 'trainer_client'),
+    listConnections(user.id, PERSON_CONNECTION_TYPE),
+  ]);
+  const result = [...trainers, ...people];
   return { data: result.filter(connection => connection.myRole === 'owner' && connection.status === 'accepted').map(connection => ({ ...connection, eligible: true })), error: null };
 }
 

@@ -478,7 +478,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'health.recordConditions': 'Diagnose',
   'health.recordOwnerContact': 'Besitzerkontakt',
   'health.recordPhoneMissing': 'Kei Telefonnummer hinterleit',
-  'health.shareTitle': 'Freigabe', 'health.shareNew': 'Neui Freigab', 'health.shareExisting': 'Bestehendi Freigabe', 'health.sharePerson': 'Person', 'health.sharePreset': 'Voreinstellung', 'health.sharePermissions': 'Berechtige', 'health.shareStart': 'Gültig ab', 'health.shareEnd': 'Gültig bis', 'health.shareCreate': 'Freigab erstelle', 'health.shareUpdate': 'Freigab aktualisiere', 'health.shareCancel': 'Abbreche', 'health.shareEdit': 'Bearbeite', 'health.shareRevoke': 'Widerrüefe', 'health.shareActive': 'Aktiv', 'health.shareFuture': 'Startet am', 'health.shareExpired': 'Abglaufe', 'health.shareRevoked': 'Widerrüefe', 'health.shareNoConnections': 'Kei akzeptierti Verbindig vorhande. Nutz zuerst de bestehend ANYVO-Verbindigsbereich.', 'health.shareNoConnectionsTitle': 'No niemer verbunde', 'health.shareNoConnectionsBody': 'Verbinde zerscht e Person mit ANYVO. Denn chasch genau uswahl, weli Gsundheitsdate sie darf gseh.', 'health.shareConnectPerson': 'Person verbinde', 'health.shareSelectPerson': 'Wähl e Person, zum d sichtbare Gsundheitsbereiche festzlege.', 'health.shareReadOnly': 'Die Person darf nume d usgwählte Gsundheitsdate aluege.', 'health.shareSelectAll': 'Alles uswähle', 'health.shareClear': 'Uswahl ufhebe', 'health.shareAcceptedConnection': 'Akzeptierti ANYVO-Verbindig', 'health.shareConnectionFallback': 'Verbindig', 'health.shareNoGrants': 'No kei Gesundheitsfreigabe.', 'health.shareOwnerOnly': 'Freigabe chönd nur vom Hundebsitzer verwaltet werde.',
+  'health.shareTitle': 'Freigabe', 'health.shareNew': 'Neui Freigab', 'health.shareExisting': 'Bestehendi Freigabe', 'health.sharePerson': 'Person', 'health.sharePreset': 'Voreinstellung', 'health.sharePermissions': 'Berechtige', 'health.shareStart': 'Gültig ab', 'health.shareEnd': 'Gültig bis', 'health.shareCreate': 'Freigab erstelle', 'health.shareUpdate': 'Freigab aktualisiere', 'health.shareCancel': 'Abbreche', 'health.shareEdit': 'Bearbeite', 'health.shareRevoke': 'Widerrüefe', 'health.shareActive': 'Aktiv', 'health.shareFuture': 'Startet am', 'health.shareExpired': 'Abglaufe', 'health.shareRevoked': 'Widerrüefe', 'health.shareNoConnections': 'Kei akzeptierti Verbindig vorhande. Nutz zuerst de bestehend ANYVO-Verbindigsbereich.', 'health.shareNoConnectionsTitle': 'No niemer verbunde', 'health.shareNoConnectionsBody': 'Verbinde zerscht e Person mit ANYVO. Denn chasch genau uswahl, weli Gsundheitsdate sie darf gseh.', 'health.shareConnectPerson': 'Person verbinde', 'health.shareSearchSub': 'Sueche nach ANYVO-ID oder Name.', 'health.shareSearchPlaceholder': 'ANYVO ID oder Name sueche', 'health.shareSearchNoResults': 'Kei Person gfunde.', 'health.shareSelectPerson': 'Wähl e Person, zum d sichtbare Gsundheitsbereiche festzlege.', 'health.shareReadOnly': 'Die Person darf nume d usgwählte Gsundheitsdate aluege.', 'health.shareSelectAll': 'Alles uswähle', 'health.shareClear': 'Uswahl ufhebe', 'health.shareAcceptedConnection': 'Akzeptierti ANYVO-Verbindig', 'health.shareConnectionFallback': 'Verbindig', 'health.shareNoGrants': 'No kei Gesundheitsfreigabe.', 'health.shareOwnerOnly': 'Freigabe chönd nur vom Hundebsitzer verwaltet werde.',
 
   // Empty States
   'empty.noDogs':     'No kei Hünd. Füeg dis erste Hund hinzue.',
@@ -1065,6 +1065,11 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'trainer.managePermissions': 'Berächtigunge verwalte ›',
   'trainer.codeTitle': 'Trainer-Code iigee',
   'trainer.codeSub': 'Dini Trainer:in git dir de Code us em Trainerprofil.',
+  'trainer.chooseConnectMethod': 'Wie wottsch di verbinde?',
+  'trainer.searchTitle': 'Trainer sueche',
+  'trainer.searchSub': 'Sueche nach Name, ANYVO-ID oder Ort.',
+  'trainer.searchPlaceholder': 'ANYVO ID oder Name sueche',
+  'trainer.searchNoResults': 'Kei Trainer:in gfunde.',
   'trainer.codePlaceholder': 'z. B. CANIS-4827',
 
   'connect.errorTitle': 'Öppis isch schiefgloffe',

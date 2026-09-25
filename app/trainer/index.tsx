@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View,
@@ -11,10 +11,11 @@ import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { useSession } from '@/hooks/useSession';
 import { isTrainerConnectionForClient, listConnections, removeConnection } from '@/services/connectionService';
-import { redeemTrainerCode, redeemTrainerCodeMessage } from '@/services/trainerService';
+import { redeemTrainerCode, redeemTrainerCodeMessage, searchTrainers } from '@/services/trainerService';
 import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic, haptic } from '@/lib/haptics';
 import type { ConnectionStatus, ConnectionView } from '@/types/connection';
+import type { TrainerSearchResult } from '@/types/trainer';
 import { useT, type TranslationKey } from '@/i18n';
 
 const STATUS_META: Record<ConnectionStatus, { labelKey: TranslationKey; color: string }> = {
@@ -32,9 +33,18 @@ export default function MyTrainersScreen() {
 
   const [trainers, setTrainers] = useState<ConnectionView[]>([]);
   const [loading, setLoading]   = useState(true);
+  // "Trainer verbinden" öffnet zuerst eine Auswahl (Code eingeben / suchen) —
+  // CONNECT WITH A TRAINER bleibt für jeden Plan erreichbar (Customer Release
+  // Phase 8/9): dieser Screen prüft keine Subscription-Capability.
+  const [chooser, setChooser]   = useState(false);
   const [sheet, setSheet]       = useState(false);
   const [code, setCode]         = useState('');
   const [redeeming, setRedeeming] = useState(false);
+  const [searchSheet, setSearchSheet] = useState(false);
+  const [query, setQuery]       = useState('');
+  const [results, setResults]   = useState<TrainerSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!meId) return;
@@ -55,6 +65,40 @@ export default function MyTrainersScreen() {
     }
     successHaptic();
     setSheet(false); setCode('');
+    queryClient.invalidateQueries({ queryKey: ['connections'] });
+    queryClient.invalidateQueries({ queryKey: ['hubBadge'] });
+    queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
+    load();
+  };
+
+  // Trainer suchen: debounced, nutzt die bestehende (bereits ungegatete)
+  // searchTrainers() — durchsucht ausschliesslich trainer_profiles (Code/Ort/
+  // Bio), Namen kommen über die least-privilege RPC get_profile_display_names.
+  useEffect(() => {
+    if (!searchSheet) return;
+    const q = query.trim();
+    if (!q) { setResults([]); setSearching(false); return; }
+    setSearching(true);
+    const timer = setTimeout(() => {
+      searchTrainers(q).then(r => { setResults(r); setSearching(false); }).catch(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, searchSheet]);
+
+  // Verbinden über einen Suchtreffer läuft über denselben atomaren,
+  // bereits getesteten RPC-Pfad wie Code-Eingabe (redeemTrainerCode mit dem
+  // Code des Treffers) — keine parallele Direct-Insert-Logik.
+  const connectFromSearch = async (result: TrainerSearchResult) => {
+    setConnectingId(result.trainerId);
+    const res = await redeemTrainerCode(result.code);
+    setConnectingId(null);
+    if (res.status !== 'success' && res.status !== 'already_connected') {
+      haptic.error();
+      Alert.alert(t('trainer.connectHintTitle'), redeemTrainerCodeMessage(res.status));
+      return;
+    }
+    successHaptic();
+    setSearchSheet(false); setQuery(''); setResults([]);
     queryClient.invalidateQueries({ queryKey: ['connections'] });
     queryClient.invalidateQueries({ queryKey: ['hubBadge'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
@@ -82,7 +126,7 @@ export default function MyTrainersScreen() {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        <AnimatedPressable style={s.connectBtn} scale={0.97} onPress={() => { tapHaptic(); setSheet(true); }}>
+        <AnimatedPressable style={s.connectBtn} scale={0.97} onPress={() => { tapHaptic(); setChooser(true); }}>
           <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
           <Ionicons name="add" size={20} color={C.accentText} />
           <Text style={s.connectTxt}>{t('trainer.connect')}</Text>
@@ -122,6 +166,40 @@ export default function MyTrainersScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
+      {/* Bottom Sheet: Auswahl — Code eingeben ODER Trainer suchen */}
+      <Modal visible={chooser} transparent animationType="slide" onRequestClose={() => setChooser(false)}>
+        <KeyboardAvoidingView style={s.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <TouchableWithoutFeedback onPress={() => setChooser(false)}>
+            <View style={s.backdrop} />
+          </TouchableWithoutFeedback>
+          <View style={s.sheet}>
+            <SafeAreaView edges={['bottom']}>
+              <View style={s.griff} />
+              <Text style={s.sheetTitle}>{t('trainer.connect')}</Text>
+              <Text style={s.sheetSub}>{t('trainer.chooseConnectMethod')}</Text>
+              <TouchableOpacity style={s.chooserOption} activeOpacity={0.85}
+                onPress={() => { tapHaptic(); setChooser(false); setSheet(true); }}>
+                <View style={s.chooserIcon}><Ionicons name="key-outline" size={18} color={C.accent} /></View>
+                <View style={s.flex}>
+                  <Text style={s.chooserTitle}>{t('trainer.codeTitle')}</Text>
+                  <Text style={s.chooserSub}>{t('trainer.codeSub')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={C.subtle} />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.chooserOption} activeOpacity={0.85}
+                onPress={() => { tapHaptic(); setChooser(false); setSearchSheet(true); }}>
+                <View style={s.chooserIcon}><Ionicons name="search-outline" size={18} color={C.accent} /></View>
+                <View style={s.flex}>
+                  <Text style={s.chooserTitle}>{t('trainer.searchTitle')}</Text>
+                  <Text style={s.chooserSub}>{t('trainer.searchSub')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={C.subtle} />
+              </TouchableOpacity>
+            </SafeAreaView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Bottom Sheet: Code eingeben */}
       <Modal visible={sheet} transparent animationType="slide" onRequestClose={() => setSheet(false)}>
         <KeyboardAvoidingView
@@ -153,6 +231,52 @@ export default function MyTrainersScreen() {
                   {redeeming ? <ActivityIndicator size="small" color={C.accentText} /> : <Ionicons name="arrow-forward" size={20} color={C.accentText} />}
                 </TouchableOpacity>
               </View>
+            </SafeAreaView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Bottom Sheet: Trainer suchen */}
+      <Modal visible={searchSheet} transparent animationType="slide" onRequestClose={() => setSearchSheet(false)}>
+        <KeyboardAvoidingView style={s.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <TouchableWithoutFeedback onPress={() => setSearchSheet(false)}>
+            <View style={s.backdrop} />
+          </TouchableWithoutFeedback>
+          <View style={s.sheet}>
+            <SafeAreaView edges={['bottom']}>
+              <View style={s.griff} />
+              <Text style={s.sheetTitle}>{t('trainer.searchTitle')}</Text>
+              <Text style={s.sheetSub}>{t('trainer.searchSub')}</Text>
+              <View style={s.searchRow}>
+                <TextInput
+                  style={[s.input, s.searchInput, s.flex]}
+                  placeholder={t('trainer.searchPlaceholder')}
+                  placeholderTextColor={C.placeholder}
+                  value={query}
+                  onChangeText={setQuery}
+                  autoCorrect={false}
+                  autoFocus
+                />
+                {searching ? <ActivityIndicator size="small" color={C.accent} style={s.searchSpinner} /> : null}
+              </View>
+              <ScrollView style={s.searchResults} keyboardShouldPersistTaps="handled">
+                {results.length === 0 && query.trim().length >= 2 && !searching ? (
+                  <Text style={s.searchEmpty}>{t('trainer.searchNoResults')}</Text>
+                ) : null}
+                {results.map(r => (
+                  <TouchableOpacity key={r.trainerId} style={s.resultRow} activeOpacity={0.85}
+                    onPress={() => connectFromSearch(r)} disabled={connectingId === r.trainerId}>
+                    <View style={s.avatar}><Text style={s.avatarTxt}>{(r.name?.[0] ?? '?').toUpperCase()}</Text></View>
+                    <View style={s.flex}>
+                      <Text style={s.name}>{r.name ?? t('trainer.eyebrow')}</Text>
+                      {r.location ? <Text style={s.resultSub}>{r.location}</Text> : null}
+                    </View>
+                    {connectingId === r.trainerId
+                      ? <ActivityIndicator size="small" color={C.accent} />
+                      : <Ionicons name="add-circle-outline" size={22} color={C.accent} />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </SafeAreaView>
           </View>
         </KeyboardAvoidingView>
@@ -199,4 +323,16 @@ const s = StyleSheet.create({
   searchRow: { flexDirection: 'row', gap: 10 },
   input: { backgroundColor: C.input, borderRadius: 14, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 16, fontWeight: '700', letterSpacing: 2, paddingHorizontal: 14, paddingVertical: 13 },
   searchBtn: { width: 50, height: 50, borderRadius: 14, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+
+  chooserOption: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.cardAlt, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14, marginTop: 10 },
+  chooserIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: `${C.accent}1A`, alignItems: 'center', justifyContent: 'center' },
+  chooserTitle: { fontSize: 15, color: C.white, fontWeight: '800' },
+  chooserSub: { fontSize: 12, color: C.muted, marginTop: 2 },
+
+  searchInput: { fontWeight: '500', letterSpacing: 0 },
+  searchSpinner: { position: 'absolute', right: 14, top: 15 },
+  searchResults: { maxHeight: 340, marginTop: 4 },
+  searchEmpty: { fontSize: 13, color: C.subtle, textAlign: 'center', paddingVertical: 20 },
+  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+  resultSub: { fontSize: 12, color: C.muted, marginTop: 2 },
 });

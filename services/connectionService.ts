@@ -13,6 +13,13 @@ function genInviteCode(): string {
   return out;
 }
 
+// Generischer Personen-Connection-Typ (z. B. für Health Sharing): jede ANYVO-
+// Person, nicht zwingend ein professioneller Trainer. connections.connection_type
+// ist ein reines text-Feld ohne CHECK-Constraint und die RLS (create/read/update/
+// delete own connection) ist bereits typ-agnostisch — kein Migrations-Bedarf für
+// diesen Typwert selbst.
+export const PERSON_CONNECTION_TYPE = 'health_contact';
+
 export function isTrainerClientConnection(c: Pick<Connection, 'connection_type'>): boolean {
   return c.connection_type === 'trainer_client';
 }
@@ -30,20 +37,24 @@ export function isTrainerConnectionForClient(c: ConnectionView): boolean {
 }
 
 // ── Verbindungen ─────────────────────────────────────────────
-export async function listConnections(userId: string): Promise<ConnectionView[]> {
+// connectionType default bleibt 'trainer_client' — bestehende Aufrufer (Trainer
+// Connect, Track Sharing, Trainer-Hub) sind unverändert. Health Sharing ruft mit
+// PERSON_CONNECTION_TYPE auf.
+export async function listConnections(userId: string, connectionType: string = 'trainer_client'): Promise<ConnectionView[]> {
   const { data } = await supabase
     .from('connections').select('*')
     .or(`owner_user_id.eq.${userId},connected_user_id.eq.${userId}`)
-    .eq('connection_type', 'trainer_client')
+    .eq('connection_type', connectionType)
     .order('created_at', { ascending: false });
   const rows = (data as Connection[]) ?? [];
   if (!rows.length) return [];
 
   // Namensauflösung läuft über die security-definer RPC statt direktem
-  // profiles-SELECT (20260926080000): profiles ist jetzt strikt auf die
+  // profiles-SELECT (20260926080000, erweitert in 20260928080000 auf jeden
+  // Connection-Typ statt nur trainer_client): profiles ist strikt auf die
   // eigene Zeile beschränkt; die RPC gibt nur id/full_name/username zurück,
-  // und nur für Trainer-Profile oder bestehende trainer_client-Verbindungen
-  // des aufrufenden Nutzers — genau der hier benötigte Fall.
+  // und nur für Trainer-Profile oder eine bestehende Verbindung (beliebigen
+  // Typs) des aufrufenden Nutzers — genau der hier benötigte Fall.
   const counterpartIds = rows.map(r => r.owner_user_id === userId ? r.connected_user_id : r.owner_user_id);
   const { data: profs } = await supabase.rpc('get_profile_display_names', { p_ids: counterpartIds }) as
     { data: { id: string; full_name: string | null; username: string | null }[] | null };
@@ -61,6 +72,44 @@ export async function listConnections(userId: string): Promise<ConnectionView[]>
       counterpartUsername: usernameById.get(counterpartId) ?? null,
     };
   });
+}
+
+export interface AnyvoPersonResult { id: string; fullName: string | null; username: string | null }
+
+// Bounded, authenticated-only Suche nach einer ANYVO-Person via ANYVO-ID/
+// Benutzername oder Name — für Health Sharing „Person verbinden" (Phase 9).
+// Nutzt die neue search_anyvo_people-RPC (20260928080000): kein Browsen ohne
+// Suchbegriff, keine private Spalte (nie phone_number/plan/email), nie anonym
+// ausführbar. NICHT dieselbe RPC wie get_profile_display_names (die löst nur
+// bereits bekannte ids auf, hier wird gesucht).
+export async function searchAnyvoPeople(query: string): Promise<AnyvoPersonResult[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+  const { data, error } = await supabase.rpc('search_anyvo_people', { p_query: q }) as
+    { data: { id: string; full_name: string | null; username: string | null }[] | null; error: unknown };
+  if (error || !data) return [];
+  return data.map(p => ({ id: p.id, fullName: p.full_name, username: p.username }));
+}
+
+// Owner-initiierte generische Personen-Verbindung (z. B. für Health Sharing):
+// sofort 'accepted', kein Code/Redeem-RPC nötig — die Ziel-Person wird über
+// searchAnyvoPeople gefunden, keine privaten Felder verlassen dabei je den
+// Server. Kein „Trainer werden", keine Trainer-Capability, keine automatische
+// Track-Sharing-Berechtigung (can_view_shared_track prüft weiterhin exakt
+// connection_type = 'trainer_client').
+export async function connectAnyvoPerson(ownerUserId: string, personId: string): Promise<{ data: Connection | null; error: string | null }> {
+  if (ownerUserId === personId) return { data: null, error: 'Du kannst dich nicht mit dir selbst verbinden.' };
+  const existing = await supabase
+    .from('connections').select('*')
+    .eq('owner_user_id', ownerUserId).eq('connected_user_id', personId).eq('connection_type', PERSON_CONNECTION_TYPE)
+    .maybeSingle();
+  if (existing.data) return { data: existing.data as Connection, error: null };
+  const { data, error } = await supabase
+    .from('connections')
+    .insert({ owner_user_id: ownerUserId, connected_user_id: personId, status: 'accepted', created_by: 'owner', connection_type: PERSON_CONNECTION_TYPE })
+    .select('*').single();
+  if (error) return { data: null, error: error.message };
+  return { data: data as Connection, error: null };
 }
 
 export function respondToConnection(id: string, status: ConnectionStatus) {
