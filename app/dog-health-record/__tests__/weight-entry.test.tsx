@@ -1,23 +1,31 @@
 // RC-Fix "Digital Health Record — Gewicht erfassen" (TestFlight Build 46),
-// part 1 + part 2 (systemic fix for ALL Health quick-action forms).
+// parts 1–3 (systemic fix for ALL Health quick-action forms).
 // Part 1 root cause: the shared quick-action AnyvoBottomSheet never opted
 // into keyboardAware mode, so the sheet never repositioned above the
 // keyboard. Part 2 root cause (found on device retest after part 1
 // shipped): the sheet DID reposition, but its scrollable body — the only
 // flexShrink:1 element among fixed-size siblings (griff/title/footer) —
 // collapsed to a sliver instead of claiming its leftover share of the
-// keyboard-reduced height. See the in-file comment in
-// app/dog-health-record/[id].tsx for the full explanation. The actual
-// on-device keyboard-visibility/collapse behavior cannot be reliably
-// asserted by a JS unit test (documented as manual device retest below);
-// this suite covers everything that IS reliably testable: the intended flex
-// layout structure, decimal input (dot and comma), invalid/empty rejection,
-// same-weight/different-date independence, every quick-action variant
-// rendering its own fields, and state resetting correctly when switching
-// between quick-action types.
+// keyboard-reduced height. Part 3 root cause (found on device retest after
+// part 2 shipped): iOS's decimal-pad keyboard has no Return/Done key at
+// all, so there was never a way to finish/confirm entry — "blind typing"
+// wasn't a visibility regression, it's that nothing on the decimal-pad
+// itself lets the user confirm they're done. Fixed with a reusable iOS
+// keyboard accessory ("Fertig") attached via inputAccessoryViewID to any
+// Field using keyboardType="decimal-pad" — zero per-field code. See the
+// in-file comments in app/dog-health-record/[id].tsx for the full
+// explanation. The actual on-device keyboard-visibility/collapse/accessory-
+// bar behavior cannot be reliably asserted by a JS unit test (documented as
+// manual device retest below); this suite covers everything that IS
+// reliably testable: the intended flex layout structure, decimal input (dot
+// and comma), invalid/empty rejection, same-weight/different-date
+// independence, every quick-action variant rendering its own fields, state
+// resetting correctly when switching between quick-action types, the
+// numeric keyboard type and its accessory wiring, and that the accessory's
+// Done action only dismisses the keyboard — never state, never save.
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
-import { Text, TextInput } from 'react-native';
+import { InputAccessoryView, Keyboard, Platform, Text, TextInput } from 'react-native';
 import DogHealthRecordRoute from '@/app/dog-health-record/[id]';
 import type { Dog } from '@/types';
 import type { HealthOverviewData } from '@/services/healthService';
@@ -86,7 +94,7 @@ function render(): ReactTestRenderer {
 
 function weightInput(node: ReactTestRenderer) {
   return (node.root as unknown as {
-    findAllByType: (t: unknown) => { props: { placeholder?: string; value: string; onChangeText: (v: string) => void } }[];
+    findAllByType: (t: unknown) => { props: { placeholder?: string; value: string; onChangeText: (v: string) => void; keyboardType?: string; inputAccessoryViewID?: string } }[];
   }).findAllByType(TextInput).find((i) => i.props.placeholder === 'z. B. 24,5')!;
 }
 
@@ -235,6 +243,96 @@ describe('Digital Health Record: "Gewicht erfassen" weight entry', () => {
     await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
     expect(mockCreateWeightEntry).toHaveBeenCalledTimes(1);
     expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+  });
+});
+
+describe('Digital Health Record: iOS numeric keyboard accessory ("Fertig")', () => {
+  const originalPlatformOS = Platform.OS;
+  beforeEach(() => {
+    Platform.OS = 'ios';
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    mockCreateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'entry-1' }, error: null, reminderSync: 'not_required' });
+    mockUpdateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'entry-1' }, error: null, reminderSync: 'not_required' });
+  });
+  afterEach(() => { Platform.OS = originalPlatformOS; });
+
+  it('the Gewicht field uses the decimal-pad keyboard', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    expect(weightInput(node).props.keyboardType).toBe('decimal-pad');
+  });
+
+  it('the Gewicht field is wired to the accessory via inputAccessoryViewID', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    expect(weightInput(node).props.inputAccessoryViewID).toBe('health-numeric-done');
+  });
+
+  it('a normal text field (e.g. Notiz) has no inputAccessoryViewID — normal Return behavior is preserved, unchanged', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    const notiz = allInputs(node).find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'Optional');
+    expect(notiz).toBeTruthy();
+    expect((notiz!.props as unknown as { inputAccessoryViewID?: string }).inputAccessoryViewID).toBeUndefined();
+    expect((notiz!.props as unknown as { keyboardType?: string }).keyboardType).toBe('default');
+  });
+
+  it('renders exactly one InputAccessoryView with the "Fertig" (common.done) label, attached to the same ID', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    const accessories = (node.root as unknown as { findAllByType: (t: unknown) => { props: { nativeID?: string } }[] }).findAllByType(InputAccessoryView);
+    expect(accessories).toHaveLength(1);
+    expect(accessories[0].props.nativeID).toBe('health-numeric-done');
+    expect(strings(node)).toContain('common.done');
+  });
+
+  it('pressing "Fertig" dismisses the keyboard but does not clear the typed value or trigger save', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    act(() => { weightInput(node).props.onChangeText('24,5'); });
+
+    const dismissSpy = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+    const doneButton = (node.root as unknown as {
+      findAll: (p: (c: { props: { onPress?: () => void }; findAllByType: (t: unknown) => { props: { children: unknown } }[] }) => boolean) => { props: { onPress: () => void } }[];
+    }).findAll((c) => typeof c.props.onPress === 'function' && c.findAllByType(Text).some((t) => t.props.children === 'common.done'))[0];
+    act(() => { doneButton.props.onPress(); });
+
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
+    expect(weightInput(node).props.value).toBe('24,5');
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled();
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+    dismissSpy.mockRestore();
+  });
+
+  it('Save remains a separate, explicit action — the typed value only saves via Speichern, not via Fertig', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    act(() => { weightInput(node).props.onChangeText('24,5'); });
+    const doneButton = (node.root as unknown as {
+      findAll: (p: (c: { props: { onPress?: () => void }; findAllByType: (t: unknown) => { props: { children: unknown } }[] }) => boolean) => { props: { onPress: () => void } }[];
+    }).findAll((c) => typeof c.props.onPress === 'function' && c.findAllByType(Text).some((t) => t.props.children === 'common.done'))[0];
+    act(() => { doneButton.props.onPress(); });
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled();
+
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateWeightEntry).toHaveBeenCalledTimes(1);
+    expect(mockCreateWeightEntry).toHaveBeenCalledWith('dog-1', expect.objectContaining({ weight_kg: 24.5 }));
+  });
+
+  it('the accessory does not render on Android (InputAccessoryView is iOS-only by design)', async () => {
+    Platform.OS = 'android';
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    const accessories = (node.root as unknown as { findAllByType: (t: unknown) => unknown[] }).findAllByType(InputAccessoryView);
+    expect(accessories).toHaveLength(0);
   });
 });
 
