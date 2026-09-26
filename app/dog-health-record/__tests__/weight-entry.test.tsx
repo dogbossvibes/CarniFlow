@@ -410,3 +410,17 @@ describe('Digital Health Record quick-action sheet: keyboard-aware flex layout',
     expect(content).toMatch(/keyboardShouldPersistTaps="handled"/);
   });
 });
+
+describe('Digital Health Record: temporary OTA identity diagnostic', () => {
+  it('renders the fixed marker, outside AnyvoBottomSheet, before the ScrollView', async () => {
+    const node = render();
+    await flush();
+    expect(strings(node)).toContain('HEALTH-DIAG-2026-09-26-A');
+    expect(strings(node)).toContain('OTA DIAG');
+  });
+  it('is placed in the normal screen body, not inside a bottom sheet', () => {
+    const content = readFileSync('app/dog-health-record/[id].tsx', 'utf8');
+    const beforeSheet = content.split('<AnyvoBottomSheet keyboardAware')[0];
+    expect(beforeSheet).toContain('<HealthOtaDiagnostic />');
+  });
+});
