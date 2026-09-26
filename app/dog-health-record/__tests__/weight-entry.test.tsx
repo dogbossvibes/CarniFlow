@@ -1,14 +1,20 @@
-// RC-Fix "Digital Health Record — Gewicht erfassen" (TestFlight Build 46).
-// Root cause: the shared quick-action AnyvoBottomSheet never opted into
-// keyboardAware mode, so the decimal-pad keyboard obscured the "Gewicht in
-// kg" field — see the in-file comment in app/dog-health-record/[id].tsx for
-// the full explanation. The actual on-device keyboard-visibility behavior
-// cannot be reliably asserted by a JS unit test (documented as manual device
-// retest below); this suite covers everything that IS reliably testable:
-// decimal input (dot and comma), invalid/empty rejection, and — the real
-// product requirement behind this bug — that the same weight on a different
-// date always creates a NEW measurement, never overwrites/updates an
-// existing one.
+// RC-Fix "Digital Health Record — Gewicht erfassen" (TestFlight Build 46),
+// part 1 + part 2 (systemic fix for ALL Health quick-action forms).
+// Part 1 root cause: the shared quick-action AnyvoBottomSheet never opted
+// into keyboardAware mode, so the sheet never repositioned above the
+// keyboard. Part 2 root cause (found on device retest after part 1
+// shipped): the sheet DID reposition, but its scrollable body — the only
+// flexShrink:1 element among fixed-size siblings (griff/title/footer) —
+// collapsed to a sliver instead of claiming its leftover share of the
+// keyboard-reduced height. See the in-file comment in
+// app/dog-health-record/[id].tsx for the full explanation. The actual
+// on-device keyboard-visibility/collapse behavior cannot be reliably
+// asserted by a JS unit test (documented as manual device retest below);
+// this suite covers everything that IS reliably testable: the intended flex
+// layout structure, decimal input (dot and comma), invalid/empty rejection,
+// same-weight/different-date independence, every quick-action variant
+// rendering its own fields, and state resetting correctly when switching
+// between quick-action types.
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
 import { Text, TextInput } from 'react-native';
@@ -92,6 +98,24 @@ function findByText(node: ReactTestRenderer, text: string) {
 
 function openWeightSheet(node: ReactTestRenderer) {
   act(() => { findByText(node, 'health.recordWeight').props.onPress(); });
+}
+
+function openQuickAction(node: ReactTestRenderer, labelKey: string) {
+  act(() => { findByText(node, labelKey).props.onPress(); });
+}
+
+function strings(node: ReactTestRenderer): string[] {
+  return (node.root as unknown as {
+    findAllByType: (type: unknown) => { props: { children: unknown } }[];
+  }).findAllByType(Text)
+    .flatMap((t) => (Array.isArray(t.props.children) ? t.props.children : [t.props.children]))
+    .filter((c): c is string => typeof c === 'string');
+}
+
+function allInputs(node: ReactTestRenderer) {
+  return (node.root as unknown as {
+    findAllByType: (t: unknown) => { props: { value?: string } }[];
+  }).findAllByType(TextInput);
 }
 
 async function flush() { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); }
@@ -214,7 +238,51 @@ describe('Digital Health Record: "Gewicht erfassen" weight entry', () => {
   });
 });
 
-describe('Digital Health Record weight sheet: keyboard-aware structure', () => {
+describe('Digital Health Record: every quick-action variant renders its own fields', () => {
+  const VARIANTS: [string, string][] = [
+    ['health.recordVaccination', 'Impfart'],
+    ['health.recordParasites', 'Behandlungstyp'],
+    ['health.recordMedication', 'Name'],
+    ['health.recordVet', 'Termin'],
+    ['health.recordWeight', 'Gewicht in kg'],
+    ['health.recordAllergy', 'Allergie'],
+    ['health.recordIntolerance', 'Unverträglichkeit'],
+    ['health.recordDiagnosis', 'Diagnose'],
+  ];
+  it.each(VARIANTS)('opening "%s" renders its distinguishing field ("%s")', async (actionLabelKey, expectedLabel) => {
+    const node = render();
+    await flush();
+    openQuickAction(node, actionLabelKey);
+    expect(strings(node)).toContain(expectedLabel);
+  });
+});
+
+describe('Digital Health Record: switching quick-action type resets state correctly', () => {
+  it('typing into Gewicht, then opening a different quick action, does not leak the typed value into the new form', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    act(() => { weightInput(node).props.onChangeText('30'); });
+    // Switch to Impfung without saving — openSheet resets text1/text2/text3.
+    openQuickAction(node, 'health.recordVaccination');
+    const impfartInput = allInputs(node).find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'z. B. Tollwut');
+    expect(impfartInput).toBeTruthy();
+    expect(impfartInput!.props.value).toBe('');
+    expect(allInputs(node).some((i) => i.props.value === '30')).toBe(false);
+  });
+
+  it('reopening Gewicht fresh after switching away starts with an empty field again', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    act(() => { weightInput(node).props.onChangeText('30'); });
+    openQuickAction(node, 'health.recordVaccination');
+    openWeightSheet(node);
+    expect(weightInput(node).props.value).toBe('');
+  });
+});
+
+describe('Digital Health Record quick-action sheet: keyboard-aware flex layout', () => {
   const content = readFileSync('app/dog-health-record/[id].tsx', 'utf8');
   it('the shared quick-action sheet opts into AnyvoBottomSheet keyboardAware', () => {
     expect(content).toMatch(/<AnyvoBottomSheet keyboardAware visible=\{sheet !== null\}/);
@@ -223,9 +291,22 @@ describe('Digital Health Record weight sheet: keyboard-aware structure', () => {
     expect(content).not.toMatch(/<KeyboardAvoidingView/);
     expect(content).not.toMatch(/\bKeyboardAvoidingView\b.*from 'react-native'/);
   });
-  it('Speichern sits in a fixed footer outside the scrollable field area — reachable regardless of scroll position', () => {
+  it('the scrollable body sits in its own explicit flex:1/minHeight:0 container (sheetBody) — one definite boundary for Yoga to distribute the keyboard-reduced height against', () => {
+    expect(content).toMatch(/<View style=\{s\.sheetBody\}>/);
+    expect(content).toMatch(/sheetBody: \{ flex: 1, minHeight: 0 \}/);
+  });
+  it('the ScrollView itself claims space with flex:1/minHeight:0, not just flexShrink:1 — it does not passively collapse toward zero', () => {
+    expect(content).toMatch(/<ScrollView style=\{s\.sheetScroll\}/);
+    expect(content).toMatch(/sheetScroll: \{ flex: 1, minHeight: 0 \}/);
+    expect(content).not.toMatch(/sheetScroll: \{ flexShrink: 1 \}/);
+  });
+  it('Speichern sits in a fixed footer outside the scrollable body — reachable regardless of scroll position, and not itself given flex:1 (it must keep its natural size, not compete for the scroll body\'s space)', () => {
     expect(content).toMatch(/<View style=\{s\.sheetFooter\}>/);
     expect(content).toMatch(/sheetFooter: \{ paddingTop: 14, paddingBottom: 6 \}/);
+  });
+  it('AnyvoBottomSheet.tsx itself was not modified for this fix — the shared component\'s repositioning mechanism was already proven correct by Backpack; the defect and its fix are scoped to this screen\'s own container hierarchy', () => {
+    const sheetComponent = readFileSync('components/ui/AnyvoBottomSheet.tsx', 'utf8');
+    expect(sheetComponent).not.toMatch(/sheetBody/);
   });
   it('keyboardShouldPersistTaps="handled" so date/notes fields stay tappable while the keyboard is open', () => {
     expect(content).toMatch(/keyboardShouldPersistTaps="handled"/);
