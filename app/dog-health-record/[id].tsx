@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Linking, Platform, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
-import * as Updates from 'expo-updates';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '@/lib/session-context';
 import { useProfile } from '@/hooks/useProfile';
-import { useDiagnosticsAccess } from '@/hooks/useDiagnosticsAccess';
 import { C } from '@/constants/colors';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
@@ -258,20 +256,6 @@ export default function DogHealthRecordRoute() {
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.flex}>
         <View style={s.header}><TouchableOpacity style={s.iconButton} hitSlop={8} onPress={() => router.back()}><Ionicons name="chevron-back" size={20} color={C.trackText} /></TouchableOpacity><View style={s.headerText}><Text style={s.headerTitle} numberOfLines={1}>{t('health.recordTitle')}</Text><Text style={s.headerDog} numberOfLines={1} ellipsizeMode="tail">{dog.name}</Text></View>{isOwner ? <TouchableOpacity style={s.iconButton} hitSlop={8} onPress={() => router.push({ pathname: '/dog-health-sharing/[id]', params: { id: dogId } } as never)}><Ionicons name="people-outline" size={20} color={C.trackText} /></TouchableOpacity> : <View style={s.iconButton} />}</View>
-        {/* TEMPORARY DIAGNOSTIC (Customer Release, 26.09.2026) — do not treat as
-            permanent UI. Deliberately rendered here, in the normal screen body
-            above the ScrollView and completely outside AnyvoBottomSheet, so it
-            cannot be hidden by whatever the Health sheet is doing. Purpose:
-            prove unambiguously, from the device itself, which JS bundle is
-            actually running — expo-updates' default (unconfigured) behavior
-            only checks/applies updates around a genuine cold launch, and if a
-            downloaded update ever fails to launch, expo-updates silently and
-            automatically falls back to the update EMBEDDED in this exact
-            binary (Updates.isEmergencyLaunch) — this would explain zero
-            visible change across multiple published OTAs and cold relaunches
-            without any error surfaced anywhere else. Remove once diagnosis is
-            complete. */}
-        <HealthOtaDiagnostic />
         <ScrollView
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={C.trackPrimary} colors={[C.trackPrimary]} />}
           showsVerticalScrollIndicator={false}
@@ -542,176 +526,6 @@ function HealthNumericKeyboardAccessory() {
   );
 }
 
-// TEMPORARY DIAGNOSTIC — remove once OTA-identity diagnosis is complete.
-// Every property/function read below is a real, documented export of the
-// installed expo-updates version (29.0.19), read from its own type
-// declarations (node_modules/expo-updates/build/*.d.ts) — nothing here is
-// guessed or invented:
-//   Updates.useUpdates() → currentlyRunning (updateId, channel, createdAt,
-//     runtimeVersion, isEmbeddedLaunch, isEmergencyLaunch,
-//     emergencyLaunchReason) plus live isUpdateAvailable / isUpdatePending /
-//     isDownloading / checkError / downloadError /
-//     lastCheckForUpdateTimeSinceRestart.
-//   Updates.checkForUpdateAsync() → UpdateCheckResult (isAvailable,
-//     isRollBackToEmbedded, manifest, reason). Never auto-triggers a fetch.
-//   Updates.fetchUpdateAsync() → UpdateFetchResult (isNew,
-//     isRollBackToEmbedded, manifest). Only ever called from the explicit
-//     "Update laden" button below.
-//   Updates.reloadAsync() → applies the most recently fetched update. Only
-//     ever called from the explicit "Neu starten" button below — never
-//     automatically, and never chained after a successful fetch.
-//   Updates.readLogEntriesAsync() → UpdatesLogEntry[] (timestamp, message,
-//     code, level, updateId?, assetId?, stacktrace?). Only timestamp, level,
-//     code and message are ever rendered; stacktrace is never shown, and
-//     message is passed through redactSecrets() as a defensive measure even
-//     though the installed native logger (UpdatesLogger.swift) never embeds
-//     header/token values in its log strings.
-// Gated behind the existing internal-diagnostics allowlist
-// (useDiagnosticsAccess → profiles.is_internal_tester / tester_level), the
-// same authority as Profile → "Entwickler & Diagnose" — fail-closed: loading
-// or no access renders nothing. checkError/downloadError show only
-// `.message`, never a stack trace.
-const HEALTH_DIAG_MARKER = 'HEALTH-DIAG-2026-09-26-A';
-const HEALTH_DIAG_LOG_LIMIT = 8;
-
-function redactSecrets(message: string): string {
-  return message
-    .replace(/EAS-HMAC-SHA256\s+\S+/gi, '[redacted]')
-    .replace(/bearer\s+\S+/gi, 'Bearer [redacted]')
-    // Whatever follows "authorization:"/"authorization=" is the credential
-    // itself, not part of the human-readable message — redact the rest of
-    // the line, not just its first whitespace-delimited token.
-    .replace(/authorization\s*[:=]\s*.+/gi, 'authorization: [redacted]');
-}
-
-function describeCheckResult(result: Updates.UpdateCheckResult): { headline: string; detail?: string } {
-  if (result.isAvailable) return { headline: 'Update gefunden', detail: `updateId: ${result.manifest.id}` };
-  if (result.isRollBackToEmbedded) return { headline: 'Rollback zur eingebetteten Version verfügbar' };
-  return { headline: `Kein Update verfügbar (${result.reason})` };
-}
-
-function describeFetchResult(result: Updates.UpdateFetchResult): { headline: string; detail?: string } {
-  if (result.isNew) return { headline: 'Update geladen – Neustart erforderlich', detail: `updateId: ${result.manifest.id}` };
-  if (result.isRollBackToEmbedded) return { headline: 'Update geladen – Neustart erforderlich', detail: 'Rollback zur eingebetteten Version' };
-  return { headline: 'Kein neues Update beim Laden gefunden' };
-}
-
-function HealthOtaDiagnostic() {
-  const { allowed, loading } = useDiagnosticsAccess();
-  const { currentlyRunning, isUpdatePending, isUpdateAvailable, isDownloading, checkError, downloadError, lastCheckForUpdateTimeSinceRestart } = Updates.useUpdates();
-  const [checking, setChecking] = useState(false);
-  const [checkResult, setCheckResult] = useState<Updates.UpdateCheckResult | null>(null);
-  const [checkFailure, setCheckFailure] = useState<string | null>(null);
-  const [fetching, setFetching] = useState(false);
-  const [fetchResult, setFetchResult] = useState<Updates.UpdateFetchResult | null>(null);
-  const [fetchFailure, setFetchFailure] = useState<string | null>(null);
-  const [logs, setLogs] = useState<Updates.UpdatesLogEntry[]>([]);
-  const [logsFailure, setLogsFailure] = useState<string | null>(null);
-
-  const loadLogs = useCallback(async () => {
-    try {
-      const entries = await Updates.readLogEntriesAsync();
-      setLogs(entries.slice(-HEALTH_DIAG_LOG_LIMIT).reverse());
-      setLogsFailure(null);
-    } catch (cause) {
-      setLogsFailure(cause instanceof Error ? cause.message : 'Log-Abruf nicht möglich');
-    }
-  }, []);
-
-  useFocusEffect(useCallback(() => { if (allowed) loadLogs(); }, [allowed, loadLogs]));
-
-  if (loading || !allowed) return null;
-
-  const runCheck = async () => {
-    setChecking(true); setCheckFailure(null); setFetchResult(null); setFetchFailure(null);
-    try { setCheckResult(await Updates.checkForUpdateAsync()); }
-    catch (cause) { setCheckResult(null); setCheckFailure(cause instanceof Error ? cause.message : 'Prüfung nicht möglich'); }
-    finally { setChecking(false); loadLogs(); }
-  };
-
-  const runFetch = async () => {
-    setFetching(true); setFetchFailure(null);
-    try { setFetchResult(await Updates.fetchUpdateAsync()); }
-    catch (cause) { setFetchResult(null); setFetchFailure(cause instanceof Error ? cause.message : 'Laden nicht möglich'); }
-    finally { setFetching(false); loadLogs(); }
-  };
-
-  // Only ever invoked here, on explicit tap — never automatically, never
-  // chained after a successful fetch.
-  const runReload = () => { Updates.reloadAsync(); };
-
-  const created = currentlyRunning.createdAt ? currentlyRunning.createdAt.toISOString() : 'n/a';
-  const lastCheck = lastCheckForUpdateTimeSinceRestart ? lastCheckForUpdateTimeSinceRestart.toISOString() : 'n/a';
-  const checkInfo = checkResult ? describeCheckResult(checkResult) : null;
-  const fetchInfo = fetchResult ? describeFetchResult(fetchResult) : null;
-  const fetchSucceeded = fetchResult != null && (fetchResult.isNew || fetchResult.isRollBackToEmbedded);
-
-  return (
-    <View style={s.otaDiag}>
-      <Text style={s.otaDiagTitle}>OTA DIAG</Text>
-      <Text style={s.otaDiagLine}>updateId: {currentlyRunning.updateId ?? 'n/a (embedded)'}</Text>
-      <Text style={s.otaDiagLine}>embedded: {currentlyRunning.isEmbeddedLaunch ? 'YES' : 'NO'}</Text>
-      <Text style={s.otaDiagLine}>runtime: {currentlyRunning.runtimeVersion ?? 'n/a'}</Text>
-      <Text style={s.otaDiagLine}>channel: {currentlyRunning.channel ?? 'n/a'}</Text>
-      <Text style={s.otaDiagLine}>created: {created}</Text>
-      <Text style={s.otaDiagLine}>
-        emergencyLaunch: {currentlyRunning.isEmergencyLaunch ? 'YES' : 'NO'}
-        {currentlyRunning.isEmergencyLaunch && currentlyRunning.emergencyLaunchReason ? ` (${currentlyRunning.emergencyLaunchReason})` : ''}
-      </Text>
-      <Text style={s.otaDiagLine}>
-        pending: {isUpdatePending ? 'YES' : 'NO'} · available: {isUpdateAvailable ? 'YES' : 'NO'} · downloading: {isDownloading ? 'YES' : 'NO'}
-      </Text>
-      <Text style={s.otaDiagLine}>lastCheckForUpdateTimeSinceRestart: {lastCheck}</Text>
-      {checkError ? <Text style={s.otaDiagError}>checkError: {checkError.message}</Text> : null}
-      {downloadError ? <Text style={s.otaDiagError}>downloadError: {downloadError.message}</Text> : null}
-      <Text style={s.otaDiagMarker}>marker: {HEALTH_DIAG_MARKER}</Text>
-
-      <View style={s.otaDiagActions}>
-        <TouchableOpacity style={s.otaDiagButton} onPress={runCheck} disabled={checking} accessibilityRole="button">
-          <Text style={s.otaDiagButtonText}>{checking ? 'Prüfe…' : 'OTA prüfen'}</Text>
-        </TouchableOpacity>
-      </View>
-      {checkFailure ? <Text style={s.otaDiagError}>checkForUpdateAsync fehlgeschlagen: {checkFailure}</Text> : null}
-
-      {checkInfo ? (
-        <View style={s.otaDiagActions}>
-          <Text style={s.otaDiagLine}>{checkInfo.headline}</Text>
-          {checkInfo.detail ? <Text style={s.otaDiagLine}>{checkInfo.detail}</Text> : null}
-          {checkResult?.isAvailable && !fetchResult ? (
-            <TouchableOpacity style={s.otaDiagButton} onPress={runFetch} disabled={fetching} accessibilityRole="button">
-              <Text style={s.otaDiagButtonText}>{fetching ? 'Lädt…' : 'Update laden'}</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : null}
-      {fetchFailure ? <Text style={s.otaDiagError}>fetchUpdateAsync fehlgeschlagen: {fetchFailure}</Text> : null}
-
-      {fetchInfo ? (
-        <View style={s.otaDiagActions}>
-          <Text style={s.otaDiagLine}>{fetchInfo.headline}</Text>
-          {fetchInfo.detail ? <Text style={s.otaDiagLine}>{fetchInfo.detail}</Text> : null}
-          {fetchSucceeded ? (
-            <TouchableOpacity style={[s.otaDiagButton, s.otaDiagButtonDanger]} onPress={runReload} accessibilityRole="button">
-              <Text style={s.otaDiagButtonText}>Neu starten</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : null}
-
-      <Text style={[s.otaDiagTitle, s.otaDiagLogsTitle]}>LOGS</Text>
-      {logsFailure ? <Text style={s.otaDiagError}>readLogEntriesAsync fehlgeschlagen: {logsFailure}</Text> : null}
-      {!logsFailure && logs.length === 0 ? <Text style={s.otaDiagLine}>keine Einträge</Text> : null}
-      <ScrollView style={s.otaDiagLogs} nestedScrollEnabled>
-        {logs.map((entry, index) => (
-          <Text key={`${entry.timestamp}-${index}`} style={s.otaDiagLogLine}>
-            [{new Date(entry.timestamp).toISOString()}] {entry.level} · {entry.code}: {redactSecrets(entry.message)}
-          </Text>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
 function Field({ label, value, onChangeText, placeholder, keyboardType = 'default' }: { label: string; value: string; onChangeText: (value: string) => void; placeholder: string; keyboardType?: 'default' | 'decimal-pad' }) {
   const isNumeric = keyboardType === 'decimal-pad';
   return (
@@ -749,5 +563,5 @@ function kindIcon(kind: HealthTimelineItem['kind']): React.ComponentProps<typeof
 function kindLabel(kind: HealthTimelineItem['kind']): string { return kind === 'vaccination' ? 'Impfung' : kind === 'parasite' ? 'Parasiten' : kind === 'medication' ? 'Medikament' : kind === 'vet' ? 'Tierarzt' : kind === 'weight' ? 'Gewicht' : kind === 'condition' ? 'Diagnose / Allergie' : 'Dokument'; }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.trackBg }, flex: { flex: 1 }, center: { flex: 1, backgroundColor: C.trackBg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }, error: { color: C.trackTextSec, fontSize: 15, textAlign: 'center' }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 12 }, iconButton: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' }, headerText: { flex: 1, alignItems: 'center' }, headerTitle: { color: C.trackText, fontWeight: '900', fontSize: 16 }, headerDog: { color: C.trackTextSec, fontSize: 12, marginTop: 2 }, scroll: { padding: 16, gap: 14 }, tabs: { flexDirection: 'row', gap: 8 }, tab: { flex: 1, paddingVertical: 11, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard }, tabActive: { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary }, tabText: { color: C.trackTextSec, fontWeight: '800', fontSize: 13 }, tabTextActive: { color: C.accentText }, content: { gap: 12 }, warning: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.warningDim, borderRadius: 14, borderWidth: 1, borderColor: C.warning, padding: 12 }, warningText: { flex: 1, color: C.trackTextSec, fontSize: 12 }, heroRow: { flexDirection: 'row', alignItems: 'center', gap: 13 }, heroIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, eyebrow: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }, heroTitle: { color: C.trackText, fontSize: 20, fontWeight: '900', marginTop: 3 }, muted: { color: C.trackTextSec, fontSize: 12, marginTop: 3 }, section: { color: C.trackTextMut, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 5 }, actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, action: { alignItems: 'center', gap: 6, paddingVertical: 11, borderRadius: 15, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, minHeight: 82, justifyContent: 'center' }, actionIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, actionText: { color: C.trackTextSec, fontSize: 11, fontWeight: '800', textAlign: 'center', lineHeight: 15 }, valueHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }, valueCopy: { flex: 1, paddingRight: 12 }, value: { color: C.trackText, fontSize: 25, fontWeight: '900', marginTop: 4 }, weightEmptyPrimary: { color: C.trackText, fontSize: 16, lineHeight: 21, fontWeight: '800', marginTop: 4 }, weightAdd: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 6, minHeight: 44 }, weightAddText: { color: C.trackPrimary, fontSize: 13, fontWeight: '800' }, empty: { color: C.trackTextMut, fontSize: 13, lineHeight: 19 }, filters: { gap: 8, paddingBottom: 2 }, timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 13 }, timelineIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, rowTitle: { color: C.trackText, fontSize: 14, fontWeight: '800' }, sheetScroll: { flexShrink: 1 }, sheetFooter: { paddingTop: 14, paddingBottom: 6 }, otaDiag: { backgroundColor: '#FFD400', borderWidth: 3, borderColor: '#B30000', borderRadius: 10, marginHorizontal: 16, marginBottom: 10, padding: 10, gap: 2 }, otaDiagTitle: { color: '#B30000', fontSize: 13, fontWeight: '900', letterSpacing: 1 }, otaDiagLine: { color: '#1a1a1a', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }, otaDiagError: { color: '#B30000', fontSize: 12, fontWeight: '800', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }, otaDiagMarker: { color: '#1a1a1a', fontSize: 12, fontWeight: '900', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginTop: 4 }, otaDiagActions: { marginTop: 8, gap: 6 }, otaDiagButton: { alignSelf: 'flex-start', backgroundColor: '#1a1a1a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }, otaDiagButtonDanger: { backgroundColor: '#B30000' }, otaDiagButtonText: { color: '#FFD400', fontSize: 12, fontWeight: '900' }, otaDiagLogsTitle: { marginTop: 8 }, otaDiagLogs: { maxHeight: 140, marginTop: 4 }, otaDiagLogLine: { color: '#1a1a1a', fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 2 }, accessoryBar: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', backgroundColor: C.trackCard, borderTopWidth: 1, borderTopColor: C.trackBorder, paddingHorizontal: 16, paddingVertical: 10 }, accessoryDone: { color: C.trackPrimary, fontSize: 16, fontWeight: '800' }, formLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, marginTop: 10 }, dateFieldGap: { marginTop: 10 }, input: { color: C.trackText, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15 }, choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 4 }, switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.trackCard, borderRadius: 14, padding: 10 }, detail: { gap: 10, paddingBottom: 12 }, detailIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, detailDate: { color: C.trackTextSec, fontSize: 13 }, detailText: { color: C.trackText, fontSize: 15, lineHeight: 22 }, detailActions: { gap: 8, marginTop: 8 }, timelineSecondary: { color: C.trackPrimary, fontSize: 11.5, fontWeight: '700', marginTop: 2 }, detailRow: { gap: 2 }, detailLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }, detailDocLink: { color: C.trackPrimary, fontSize: 13, fontWeight: '700', marginTop: 4 }, gabenHeading: { color: C.trackTextMut, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 14 }, adminRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, padding: 12 }, adminRowTitle: { color: C.trackText, fontSize: 13.5, fontWeight: '800' }, adminRowActions: { flexDirection: 'row', gap: 10 }, emergency: { gap: 10, paddingBottom: 14 }, emergencyName: { color: C.trackText, fontSize: 25, fontWeight: '900' }, emergencyLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase', marginTop: 8 }, emergencyText: { color: C.trackText, fontSize: 15 }, emergencyLink: { color: C.trackPrimary },
+  root: { flex: 1, backgroundColor: C.trackBg }, flex: { flex: 1 }, center: { flex: 1, backgroundColor: C.trackBg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }, error: { color: C.trackTextSec, fontSize: 15, textAlign: 'center' }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 12 }, iconButton: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' }, headerText: { flex: 1, alignItems: 'center' }, headerTitle: { color: C.trackText, fontWeight: '900', fontSize: 16 }, headerDog: { color: C.trackTextSec, fontSize: 12, marginTop: 2 }, scroll: { padding: 16, gap: 14 }, tabs: { flexDirection: 'row', gap: 8 }, tab: { flex: 1, paddingVertical: 11, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard }, tabActive: { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary }, tabText: { color: C.trackTextSec, fontWeight: '800', fontSize: 13 }, tabTextActive: { color: C.accentText }, content: { gap: 12 }, warning: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.warningDim, borderRadius: 14, borderWidth: 1, borderColor: C.warning, padding: 12 }, warningText: { flex: 1, color: C.trackTextSec, fontSize: 12 }, heroRow: { flexDirection: 'row', alignItems: 'center', gap: 13 }, heroIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, eyebrow: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }, heroTitle: { color: C.trackText, fontSize: 20, fontWeight: '900', marginTop: 3 }, muted: { color: C.trackTextSec, fontSize: 12, marginTop: 3 }, section: { color: C.trackTextMut, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 5 }, actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, action: { alignItems: 'center', gap: 6, paddingVertical: 11, borderRadius: 15, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, minHeight: 82, justifyContent: 'center' }, actionIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, actionText: { color: C.trackTextSec, fontSize: 11, fontWeight: '800', textAlign: 'center', lineHeight: 15 }, valueHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }, valueCopy: { flex: 1, paddingRight: 12 }, value: { color: C.trackText, fontSize: 25, fontWeight: '900', marginTop: 4 }, weightEmptyPrimary: { color: C.trackText, fontSize: 16, lineHeight: 21, fontWeight: '800', marginTop: 4 }, weightAdd: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 6, minHeight: 44 }, weightAddText: { color: C.trackPrimary, fontSize: 13, fontWeight: '800' }, empty: { color: C.trackTextMut, fontSize: 13, lineHeight: 19 }, filters: { gap: 8, paddingBottom: 2 }, timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 13 }, timelineIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, rowTitle: { color: C.trackText, fontSize: 14, fontWeight: '800' }, sheetScroll: { flexShrink: 1 }, sheetFooter: { paddingTop: 14, paddingBottom: 6 }, accessoryBar: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', backgroundColor: C.trackCard, borderTopWidth: 1, borderTopColor: C.trackBorder, paddingHorizontal: 16, paddingVertical: 10 }, accessoryDone: { color: C.trackPrimary, fontSize: 16, fontWeight: '800' }, formLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, marginTop: 10 }, dateFieldGap: { marginTop: 10 }, input: { color: C.trackText, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15 }, choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 4 }, switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.trackCard, borderRadius: 14, padding: 10 }, detail: { gap: 10, paddingBottom: 12 }, detailIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, detailDate: { color: C.trackTextSec, fontSize: 13 }, detailText: { color: C.trackText, fontSize: 15, lineHeight: 22 }, detailActions: { gap: 8, marginTop: 8 }, timelineSecondary: { color: C.trackPrimary, fontSize: 11.5, fontWeight: '700', marginTop: 2 }, detailRow: { gap: 2 }, detailLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }, detailDocLink: { color: C.trackPrimary, fontSize: 13, fontWeight: '700', marginTop: 4 }, gabenHeading: { color: C.trackTextMut, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 14 }, adminRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, padding: 12 }, adminRowTitle: { color: C.trackText, fontSize: 13.5, fontWeight: '800' }, adminRowActions: { flexDirection: 'row', gap: 10 }, emergency: { gap: 10, paddingBottom: 14 }, emergencyName: { color: C.trackText, fontSize: 25, fontWeight: '900' }, emergencyLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase', marginTop: 8 }, emergencyText: { color: C.trackText, fontSize: 15 }, emergencyLink: { color: C.trackPrimary },
 });

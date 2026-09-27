@@ -50,28 +50,6 @@ const mockDeleteMedication = jest.fn();
 const mockCreateVaccination = jest.fn();
 const mockUpdateVaccination = jest.fn();
 
-// OTA diagnostic (Phase B/D, 27.09.2026): expo-updates is mocked explicitly
-// so check/fetch/reload can be driven deterministically per test, instead of
-// relying on whatever safe/falsy defaults jest-expo's native-module stub
-// happens to resolve unmocked calls to.
-const mockCheckForUpdateAsync = jest.fn();
-const mockFetchUpdateAsync = jest.fn();
-const mockReloadAsync = jest.fn();
-const mockReadLogEntriesAsync = jest.fn();
-let mockUseUpdatesReturn: {
-  currentlyRunning: { isEmbeddedLaunch: boolean; isEmergencyLaunch: boolean; emergencyLaunchReason: string | null; updateId?: string; channel?: string; createdAt?: Date; runtimeVersion?: string };
-  isUpdatePending: boolean; isUpdateAvailable: boolean; isDownloading: boolean;
-  checkError?: Error; downloadError?: Error; lastCheckForUpdateTimeSinceRestart?: Date;
-};
-jest.mock('expo-updates', () => ({
-  useUpdates: () => mockUseUpdatesReturn,
-  checkForUpdateAsync: (...a: unknown[]) => mockCheckForUpdateAsync(...a),
-  fetchUpdateAsync: (...a: unknown[]) => mockFetchUpdateAsync(...a),
-  reloadAsync: (...a: unknown[]) => mockReloadAsync(...a),
-  readLogEntriesAsync: (...a: unknown[]) => mockReadLogEntriesAsync(...a),
-  clearLogEntriesAsync: jest.fn(),
-}));
-
 // Diagnostics access (existing internal-tester allowlist, unmocked
 // implementation — only its data source, useProfile, is stubbed here).
 // Defaults to an allowed developer profile so every pre-existing test in
@@ -183,14 +161,6 @@ async function flush() { await act(async () => { await Promise.resolve(); await 
 
 beforeEach(() => {
   mockProfile = { is_internal_tester: true, tester_level: 'developer' };
-  mockUseUpdatesReturn = {
-    currentlyRunning: { isEmbeddedLaunch: true, isEmergencyLaunch: false, emergencyLaunchReason: null },
-    isUpdatePending: false, isUpdateAvailable: false, isDownloading: false,
-  };
-  mockCheckForUpdateAsync.mockReset();
-  mockFetchUpdateAsync.mockReset();
-  mockReloadAsync.mockReset();
-  mockReadLogEntriesAsync.mockReset().mockResolvedValue([]);
   mockLoadMedicationAdministrations.mockReset().mockResolvedValue({ data: [], error: null });
   mockCreateMedicationAdministration.mockReset().mockResolvedValue({ data: { id: 'admin-1' }, error: null });
   mockUpdateMedicationAdministration.mockReset().mockResolvedValue({ data: { id: 'admin-1' }, error: null });
@@ -520,153 +490,6 @@ describe('Digital Health Record quick-action sheet: keyboard-aware layout (corre
     const backpackContent = readFileSync('app/dog-backpack/[id].tsx', 'utf8');
     expect(backpackContent).toMatch(/editorScroll: \{ flexShrink: 1 \}/);
     expect(backpackContent).not.toMatch(/\bsheetBody\b/);
-  });
-});
-
-describe('Digital Health Record: temporary OTA identity diagnostic', () => {
-  it('renders the fixed marker, outside AnyvoBottomSheet, before the ScrollView', async () => {
-    const node = render();
-    await flush();
-    expect(strings(node)).toContain('HEALTH-DIAG-2026-09-26-A');
-    expect(strings(node)).toContain('OTA DIAG');
-  });
-  it('is placed in the normal screen body, not inside a bottom sheet', () => {
-    const content = readFileSync('app/dog-health-record/[id].tsx', 'utf8');
-    const beforeSheet = content.split('<AnyvoBottomSheet keyboardAware')[0];
-    expect(beforeSheet).toContain('<HealthOtaDiagnostic />');
-  });
-});
-
-const MANIFEST = { id: 'update-xyz', createdAt: '2026-09-27T00:00:00.000Z', runtimeVersion: '1.0.3', launchAsset: { url: 'https://example.com/a.js' }, assets: [], metadata: {} };
-
-describe('Digital Health Record: OTA diagnostic controls (Phase B, 27.09.2026) — internal-tester only, no automatic reload', () => {
-  it('is hidden entirely when the viewer is not an internal tester (fail-closed)', async () => {
-    mockProfile = null;
-    const node = render();
-    await flush();
-    expect(strings(node)).not.toContain('OTA DIAG');
-    expect(strings(node)).not.toContain('HEALTH-DIAG-2026-09-26-A');
-    expect(findByText(node, 'OTA prüfen')).toBeUndefined();
-  });
-
-  it('is hidden when tester_level is outside the diagnostics allowlist (e.g. "trainer")', async () => {
-    mockProfile = { is_internal_tester: true, tester_level: 'trainer' };
-    const node = render();
-    await flush();
-    expect(strings(node)).not.toContain('OTA DIAG');
-  });
-
-  it('renders for an allowed internal tester (developer/qa/admin)', async () => {
-    const node = render();
-    await flush();
-    expect(strings(node)).toContain('OTA DIAG');
-    expect(findByText(node, 'OTA prüfen')).toBeTruthy();
-  });
-
-  it('"OTA prüfen" calls checkForUpdateAsync exactly once per press', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: false, isRollBackToEmbedded: false, manifest: undefined, reason: 'noUpdateAvailableOnServer' });
-    const node = render();
-    await flush();
-    await act(async () => { findByText(node, 'OTA prüfen').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(1);
-    await act(async () => { findByText(node, 'OTA prüfen').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(2);
-  });
-
-  it('shows "Update gefunden" and the updateId when an update is available — offers "Update laden"', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true, isRollBackToEmbedded: false, reason: undefined, manifest: MANIFEST });
-    const node = render();
-    await flush();
-    await act(async () => { findByText(node, 'OTA prüfen').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(strings(node)).toContain('Update gefunden');
-    expect(strings(node)).toContain(`updateId: ${MANIFEST.id}`);
-    expect(findByText(node, 'Update laden')).toBeTruthy();
-  });
-
-  it('shows the not-available reason and offers no "Update laden" button when no update is available', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: false, isRollBackToEmbedded: false, manifest: undefined, reason: 'noUpdateAvailableOnServer' });
-    const node = render();
-    await flush();
-    await act(async () => { findByText(node, 'OTA prüfen').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(strings(node)).toContain('Kein Update verfügbar (noUpdateAvailableOnServer)');
-    expect(findByText(node, 'Update laden')).toBeUndefined();
-  });
-
-  it('checkForUpdateAsync failures are shown safely (message only) and do not crash the screen', async () => {
-    mockCheckForUpdateAsync.mockRejectedValue(new Error('Network request failed'));
-    const node = render();
-    await flush();
-    await act(async () => { findByText(node, 'OTA prüfen').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(strings(node).some((line) => line.includes('Network request failed'))).toBe(true);
-  });
-
-  it('fetchUpdateAsync is only called after the explicit "Update laden" press — never automatically after a check', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true, isRollBackToEmbedded: false, reason: undefined, manifest: MANIFEST });
-    const node = render();
-    await flush();
-    await act(async () => { findByText(node, 'OTA prüfen').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(mockFetchUpdateAsync).not.toHaveBeenCalled();
-    mockFetchUpdateAsync.mockResolvedValue({ isNew: true, isRollBackToEmbedded: false, manifest: MANIFEST });
-    await act(async () => { findByText(node, 'Update laden').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(mockFetchUpdateAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('after a successful fetch, shows "Update geladen – Neustart erforderlich" and a "Neu starten" button — reloadAsync is not yet called', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true, isRollBackToEmbedded: false, reason: undefined, manifest: MANIFEST });
-    mockFetchUpdateAsync.mockResolvedValue({ isNew: true, isRollBackToEmbedded: false, manifest: MANIFEST });
-    const node = render();
-    await flush();
-    await act(async () => { findByText(node, 'OTA prüfen').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    await act(async () => { findByText(node, 'Update laden').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(strings(node)).toContain('Update geladen – Neustart erforderlich');
-    expect(findByText(node, 'Neu starten')).toBeTruthy();
-    expect(mockReloadAsync).not.toHaveBeenCalled();
-  });
-
-  it('reloadAsync is only called after the explicit "Neu starten" press — never automatically', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true, isRollBackToEmbedded: false, reason: undefined, manifest: MANIFEST });
-    mockFetchUpdateAsync.mockResolvedValue({ isNew: true, isRollBackToEmbedded: false, manifest: MANIFEST });
-    const node = render();
-    await flush();
-    await act(async () => { findByText(node, 'OTA prüfen').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    await act(async () => { findByText(node, 'Update laden').props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-    expect(mockReloadAsync).not.toHaveBeenCalled();
-    act(() => { findByText(node, 'Neu starten').props.onPress(); });
-    expect(mockReloadAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders recent log entries (timestamp, level, code, message)', async () => {
-    mockReadLogEntriesAsync.mockResolvedValue([
-      { timestamp: 1790000000000, message: 'AppController sharedInstance created', code: 'None', level: 'info' },
-    ]);
-    const node = render();
-    await flush();
-    const rendered = strings(node).join('\n');
-    expect(rendered).toContain('AppController sharedInstance created');
-    expect(rendered).toContain('info');
-    expect(rendered).toContain('None');
-    expect(rendered).toContain(new Date(1790000000000).toISOString());
-  });
-
-  it('update logs render without secrets — anything resembling an authorization header, bearer token, or EAS-HMAC signature is redacted', async () => {
-    mockReadLogEntriesAsync.mockResolvedValue([
-      { timestamp: 1790000001000, message: 'authorization: EAS-HMAC-SHA256 1790294400-abc123SECRET', code: 'None', level: 'warn' },
-      { timestamp: 1790000002000, message: 'Bearer sk-should-not-appear', code: 'None', level: 'warn' },
-    ]);
-    const node = render();
-    await flush();
-    const rendered = strings(node).join('\n');
-    expect(rendered).not.toContain('abc123SECRET');
-    expect(rendered).not.toContain('sk-should-not-appear');
-    expect(rendered).not.toMatch(/EAS-HMAC-SHA256 \S+/);
-    expect(rendered).toContain('[redacted]');
-  });
-
-  it('readLogEntriesAsync failures are shown safely and do not crash the screen', async () => {
-    mockReadLogEntriesAsync.mockRejectedValue(new Error('log read failed'));
-    const node = render();
-    await flush();
-    expect(strings(node).some((line) => line.includes('log read failed'))).toBe(true);
   });
 });
 
