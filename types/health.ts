@@ -47,6 +47,7 @@ export interface HealthVaccination {
   vaccine_name: string | null;
   note: string | null;
   document_id: string | null;
+  batch_number: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +62,30 @@ export interface HealthMedication {
   starts_on: string;
   ends_on: string | null;
   is_active: boolean;
+  note: string | null;
+  // Phase 3 (28.09.2026) — new, optional, additive columns alongside the
+  // existing free-text dosage/frequency above; nothing existing was renamed.
+  dose_amount: number | null;
+  dose_unit: string | null;
+  administration_route: string | null;
+  prescribing_vet: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Phase 3 (28.09.2026) — "Gaben": each dose actually given to the dog, as an
+// independent historical event under a HealthMedication parent. Creating one
+// never overwrites the parent medication or any other administration.
+export interface HealthMedicationAdministration {
+  id: string;
+  owner_id: string;
+  dog_id: string;
+  medication_id: string;
+  administered_at: string;
+  amount: number | null;
+  unit: string | null;
+  administration_route: string | null;
+  location: string | null;
   note: string | null;
   created_at: string;
   updated_at: string;

@@ -3,12 +3,13 @@ import { createOwnEvent, deleteCalendarEvent, updateCalendarEvent } from '@/serv
 import { listConnections, PERSON_CONNECTION_TYPE } from '@/services/connectionService';
 import { isHealthDocument } from '@/features/dogs/documentCategories';
 import type { ConnectionView } from '@/types/connection';
-import { HEALTH_PERMISSIONS, type HealthCondition, type HealthMedication, type HealthPermission, type HealthRolePreset, type HealthVaccination } from '@/types/health';
+import { HEALTH_PERMISSIONS, type HealthCondition, type HealthMedication, type HealthMedicationAdministration, type HealthPermission, type HealthRolePreset, type HealthVaccination } from '@/types/health';
 import type { DogDocumentRow, DogDewormingEntryRow, DogHealthEntryRow, DogVetRow } from '@/services/dogHub';
 
 export type HealthConditionRow = HealthCondition;
 export type HealthMedicationRow = HealthMedication;
 export type HealthVaccinationRow = HealthVaccination;
+export type HealthMedicationAdministrationRow = HealthMedicationAdministration;
 export type HealthSection = 'entries' | 'vaccinations' | 'medications' | 'conditions' | 'parasites' | 'vetVisits' | 'documents';
 export type ReminderSyncStatus = 'synced' | 'not_required' | 'failed';
 export interface HealthMutationResult<T> { data: T | null; error: { message: string } | null; reminderSync: ReminderSyncStatus; }
@@ -186,6 +187,31 @@ export async function updateVetVisit(id: string, input: Partial<{ appointment_at
   return withReminder(result, () => syncHealthReminder(current.data?.owner_id, current.data?.dog_id, 'health_vet_visit', result.data?.id, result.data?.appointment_at, result.data ? `Tierarzt · ${result.data.reason || 'Termin'}` : 'Tierarzttermin'));
 }
 export async function updateWeightEntry(id: string, input: Partial<{ entry_date: string; weight_kg: number; note: string | null }>) { const result = await supabase.from('dog_health_entries').update(input).eq('id', id).select().single(); return withReminder(result, async () => 'not_required'); }
+
+// Phase 3 (28.09.2026) — medication administration history ("Gaben"). Each
+// call creates/updates/deletes exactly one independent historical row; the
+// parent medication row and every other administration are never touched.
+// No reminder sync — these are records of the past, not upcoming events.
+export async function loadMedicationAdministrations(medicationId: string): Promise<{ data: HealthMedicationAdministrationRow[]; error: { message: string } | null }> {
+  const result = await supabase.from('dog_health_medication_administrations').select('*').eq('medication_id', medicationId).order('administered_at', { ascending: false });
+  return { data: (result.data as HealthMedicationAdministrationRow[]) ?? [], error: result.error };
+}
+
+export async function createMedicationAdministration(dogId: string, medicationId: string, input: Omit<HealthMedicationAdministration, 'id' | 'owner_id' | 'dog_id' | 'medication_id' | 'created_at' | 'updated_at'>): Promise<{ data: HealthMedicationAdministrationRow | null; error: { message: string } | null }> {
+  const owner_id = await ownerId();
+  const result = await supabase.from('dog_health_medication_administrations').insert({ owner_id, dog_id: dogId, medication_id: medicationId, ...input }).select().single();
+  return { data: result.data as HealthMedicationAdministrationRow | null, error: result.error };
+}
+
+export async function updateMedicationAdministration(id: string, input: Partial<Omit<HealthMedicationAdministration, 'id' | 'owner_id' | 'dog_id' | 'medication_id' | 'created_at' | 'updated_at'>>): Promise<{ data: HealthMedicationAdministrationRow | null; error: { message: string } | null }> {
+  const result = await supabase.from('dog_health_medication_administrations').update({ ...input, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+  return { data: result.data as HealthMedicationAdministrationRow | null, error: result.error };
+}
+
+export async function deleteMedicationAdministration(id: string): Promise<{ error: { message: string } | null }> {
+  const result = await supabase.from('dog_health_medication_administrations').delete().eq('id', id);
+  return { error: result.error };
+}
 
 export async function deleteVaccination(id: string) { return deleteHealthRow('dog_health_vaccinations', id, 'health_vaccination'); }
 export async function deleteMedication(id: string) { return deleteHealthRow('dog_health_medications', id, 'health_medication'); }

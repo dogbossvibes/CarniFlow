@@ -11,6 +11,12 @@ export interface HealthTimelineItem {
   title: string;
   date: string | null;
   detail: string | null;
+  // Phase 3 (28.09.2026): an optional second line for the Verlauf card — used
+  // for the vaccination "Nächste Fälligkeit" label so it is always visible
+  // on the card itself, not only inside the detail sheet. The DB column is
+  // next_due_on — there is no separate valid_until field, so this must never
+  // be worded "Gültig bis" (a distinct semantic that doesn't exist here).
+  secondary?: string | null;
 }
 
 function safeDate(value: string | null | undefined): string | null {
@@ -21,8 +27,15 @@ function safeDate(value: string | null | undefined): string | null {
 
 function timelineId(kind: HealthTimelineKind, id: string): string { return `${kind}:${id}`; }
 
+// Local dd.mm.yyyy formatter (CH-Format), matching the convention used
+// elsewhere for Health dates, without pulling in the screen's own formatDate.
+function fmtDayMonthYear(value: string): string | null {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}` : null;
+}
+
 export function buildHealthTimeline(data: HealthOverviewData): HealthTimelineItem[] {
-  const vaccinations = data.vaccinations.map((row: HealthVaccination) => ({ id: timelineId('vaccination', row.id), kind: 'vaccination' as const, title: row.vaccine_name || row.vaccine_type, date: safeDate(row.administered_on), detail: row.clinic_name }));
+  const vaccinations = data.vaccinations.map((row: HealthVaccination) => ({ id: timelineId('vaccination', row.id), kind: 'vaccination' as const, title: row.vaccine_name || row.vaccine_type, date: safeDate(row.administered_on), detail: row.clinic_name, secondary: row.next_due_on ? `Nächste Fälligkeit: ${fmtDayMonthYear(row.next_due_on) ?? row.next_due_on}` : null }));
   const parasites = data.parasites.map((row: DogDewormingEntryRow) => ({ id: timelineId('parasite', row.id), kind: 'parasite' as const, title: row.product || parasiteLabel(row.treatment_type), date: safeDate(row.treatment_date), detail: row.next_due_date ? `Fällig ${row.next_due_date}` : null }));
   const medications = data.medications.map((row: HealthMedication) => ({ id: timelineId('medication', row.id), kind: 'medication' as const, title: row.name, date: safeDate(row.starts_on), detail: [row.dosage, row.frequency, row.is_active ? 'aktiv' : 'inaktiv'].filter(Boolean).join(' · ') || null }));
   const vets = data.vetVisits.map((row: DogVetRow) => ({ id: timelineId('vet', row.id), kind: 'vet' as const, title: row.reason || 'Tierarztbesuch', date: safeDate(row.appointment_at), detail: row.clinic_name }));

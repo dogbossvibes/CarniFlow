@@ -9,7 +9,7 @@ describe('health timeline aggregation', () => {
       ...empty,
       entries: [{ id: 'weight', dog_id: 'd', entry_date: '2026-09-20', weight_kg: 20, load_level: null, is_rest_day: false, is_intense: false, note: null, created_at: '2026-09-20T08:00:00Z' }],
       conditions: [{ id: 'condition', owner_id: 'o', dog_id: 'd', kind: 'allergy', name: 'Huhn', status: 'active', started_on: '2026-09-19', ended_on: null, note: null, created_at: '2026-09-19T08:00:00Z', updated_at: '2026-09-19T08:00:00Z' }],
-      vaccinations: [{ id: 'vaccine', owner_id: 'o', dog_id: 'd', vaccine_type: 'Tollwut', administered_on: '2026-09-21', next_due_on: null, clinic_name: null, vaccine_name: null, note: null, document_id: null, created_at: '2026-09-21T08:00:00Z', updated_at: '2026-09-21T08:00:00Z' }],
+      vaccinations: [{ id: 'vaccine', owner_id: 'o', dog_id: 'd', vaccine_type: 'Tollwut', administered_on: '2026-09-21', next_due_on: null, clinic_name: null, vaccine_name: null, note: null, document_id: null, batch_number: null, created_at: '2026-09-21T08:00:00Z', updated_at: '2026-09-21T08:00:00Z' }],
     };
     const result = buildHealthTimeline(data);
     expect(result.map(item => item.id)).toEqual(['vaccination:vaccine', 'weight:weight', 'condition:condition']);
@@ -18,8 +18,8 @@ describe('health timeline aggregation', () => {
 
   it('puts malformed and null dates last without crashing', () => {
     const data: HealthOverviewData = { ...empty, medications: [
-      { id: 'bad', owner_id: 'o', dog_id: 'd', name: 'A', dosage: null, frequency: null, starts_on: 'not-a-date', ends_on: null, is_active: false, note: null, created_at: 'bad', updated_at: 'bad' },
-      { id: 'good', owner_id: 'o', dog_id: 'd', name: 'B', dosage: null, frequency: null, starts_on: '2026-09-22', ends_on: null, is_active: true, note: null, created_at: '2026-09-22', updated_at: '2026-09-22' },
+      { id: 'bad', owner_id: 'o', dog_id: 'd', name: 'A', dosage: null, frequency: null, starts_on: 'not-a-date', ends_on: null, is_active: false, note: null, dose_amount: null, dose_unit: null, administration_route: null, prescribing_vet: null, created_at: 'bad', updated_at: 'bad' },
+      { id: 'good', owner_id: 'o', dog_id: 'd', name: 'B', dosage: null, frequency: null, starts_on: '2026-09-22', ends_on: null, is_active: true, note: null, dose_amount: null, dose_unit: null, administration_route: null, prescribing_vet: null, created_at: '2026-09-22', updated_at: '2026-09-22' },
     ] };
     const result = buildHealthTimeline(data);
     expect(result.map(item => item.id)).toEqual(['medication:good', 'medication:bad']);

@@ -25,8 +25,9 @@
 // Done action only dismisses the keyboard — never state, never save.
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
-import { InputAccessoryView, Keyboard, Platform, ScrollView, Text, TextInput } from 'react-native';
+import { Alert, InputAccessoryView, Keyboard, Platform, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
 import DogHealthRecordRoute from '@/app/dog-health-record/[id]';
+import { AnyvoChip } from '@/components/ui/AnyvoChip';
 import type { Dog } from '@/types';
 import type { HealthOverviewData } from '@/services/healthService';
 
@@ -34,6 +35,20 @@ const mockLoadHealthOverview = jest.fn();
 const mockCreateWeightEntry = jest.fn();
 const mockUpdateWeightEntry = jest.fn();
 const mockGetDogById = jest.fn();
+
+// Phase 3 (28.09.2026): medication administration history ("Gaben"). Named
+// (rather than the anonymous jest.fn() used for untouched sibling mutations
+// below) specifically so tests can assert the parent medication record is
+// never touched when only an administration is saved/edited/deleted.
+const mockLoadMedicationAdministrations = jest.fn();
+const mockCreateMedicationAdministration = jest.fn();
+const mockUpdateMedicationAdministration = jest.fn();
+const mockDeleteMedicationAdministration = jest.fn();
+const mockUpdateMedication = jest.fn();
+const mockCreateMedication = jest.fn();
+const mockDeleteMedication = jest.fn();
+const mockCreateVaccination = jest.fn();
+const mockUpdateVaccination = jest.fn();
 
 // OTA diagnostic (Phase B/D, 27.09.2026): expo-updates is mocked explicitly
 // so check/fetch/reload can be driven deterministically per test, instead of
@@ -108,11 +123,15 @@ jest.mock('@/services/healthService', () => ({
   loadHealthOverview: (...a: unknown[]) => mockLoadHealthOverview(...a),
   createWeightEntry: (...a: unknown[]) => mockCreateWeightEntry(...a),
   updateWeightEntry: (...a: unknown[]) => mockUpdateWeightEntry(...a),
-  deleteWeightEntry: jest.fn(), createVaccination: jest.fn(), updateVaccination: jest.fn(), deleteVaccination: jest.fn(),
-  createMedication: jest.fn(), updateMedication: jest.fn(), deleteMedication: jest.fn(),
+  deleteWeightEntry: jest.fn(), createVaccination: (...a: unknown[]) => mockCreateVaccination(...a), updateVaccination: (...a: unknown[]) => mockUpdateVaccination(...a), deleteVaccination: jest.fn(),
+  createMedication: (...a: unknown[]) => mockCreateMedication(...a), updateMedication: (...a: unknown[]) => mockUpdateMedication(...a), deleteMedication: (...a: unknown[]) => mockDeleteMedication(...a),
   createParasiteTreatment: jest.fn(), updateParasiteTreatment: jest.fn(), deleteParasiteTreatment: jest.fn(),
   createVetVisit: jest.fn(), updateVetVisit: jest.fn(), deleteVetVisit: jest.fn(),
   createCondition: jest.fn(), updateCondition: jest.fn(), deleteCondition: jest.fn(),
+  loadMedicationAdministrations: (...a: unknown[]) => mockLoadMedicationAdministrations(...a),
+  createMedicationAdministration: (...a: unknown[]) => mockCreateMedicationAdministration(...a),
+  updateMedicationAdministration: (...a: unknown[]) => mockUpdateMedicationAdministration(...a),
+  deleteMedicationAdministration: (...a: unknown[]) => mockDeleteMedicationAdministration(...a),
 }));
 
 function render(): ReactTestRenderer {
@@ -141,6 +160,11 @@ function openQuickAction(node: ReactTestRenderer, labelKey: string) {
   act(() => { findByText(node, labelKey).props.onPress(); });
 }
 
+function findChip(node: ReactTestRenderer, label: string) {
+  return (node.root as unknown as { findAllByType: (t: unknown) => { props: { label: string; onPress: () => void } }[] })
+    .findAllByType(AnyvoChip).find((c) => c.props.label === label)!;
+}
+
 function strings(node: ReactTestRenderer): string[] {
   return (node.root as unknown as {
     findAllByType: (type: unknown) => { props: { children: unknown } }[];
@@ -151,7 +175,7 @@ function strings(node: ReactTestRenderer): string[] {
 
 function allInputs(node: ReactTestRenderer) {
   return (node.root as unknown as {
-    findAllByType: (t: unknown) => { props: { value?: string } }[];
+    findAllByType: (t: unknown) => { props: { value?: string; placeholder?: string; onChangeText: (v: string) => void } }[];
   }).findAllByType(TextInput);
 }
 
@@ -167,6 +191,15 @@ beforeEach(() => {
   mockFetchUpdateAsync.mockReset();
   mockReloadAsync.mockReset();
   mockReadLogEntriesAsync.mockReset().mockResolvedValue([]);
+  mockLoadMedicationAdministrations.mockReset().mockResolvedValue({ data: [], error: null });
+  mockCreateMedicationAdministration.mockReset().mockResolvedValue({ data: { id: 'admin-1' }, error: null });
+  mockUpdateMedicationAdministration.mockReset().mockResolvedValue({ data: { id: 'admin-1' }, error: null });
+  mockDeleteMedicationAdministration.mockReset().mockResolvedValue({ error: null });
+  mockCreateMedication.mockReset().mockResolvedValue({ data: { id: 'med-1' }, error: null, reminderSync: 'not_required' });
+  mockUpdateMedication.mockReset().mockResolvedValue({ data: { id: 'med-1' }, error: null, reminderSync: 'not_required' });
+  mockDeleteMedication.mockReset().mockResolvedValue({ data: null, error: null, reminderSync: 'not_required' });
+  mockCreateVaccination.mockReset().mockResolvedValue({ data: { id: 'vacc-1' }, error: null, reminderSync: 'not_required' });
+  mockUpdateVaccination.mockReset().mockResolvedValue({ data: { id: 'vacc-1' }, error: null, reminderSync: 'not_required' });
 });
 
 describe('Digital Health Record: "Gewicht erfassen" weight entry', () => {
@@ -724,5 +757,312 @@ describe('Digital Health Record quick-action sheet: Backpack-parity structural s
     await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
     expect(mockCreateWeightEntry).toHaveBeenCalledTimes(2);
     expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+  });
+});
+
+// PHASE 3 (28.09.2026): vaccination details + medication administration
+// history ("Gaben"). Extends the existing Digital Health Record only — same
+// Übersicht/Verlauf/Dokumente navigation, same filters, same Verlauf ->
+// detail sheet pattern; the detail sheet body is enriched for vaccination
+// and medication kinds only, everything else keeps its original generic body.
+function switchToVerlauf(node: ReactTestRenderer) {
+  act(() => { findByText(node, 'health.recordTimeline').props.onPress(); });
+}
+
+const VACCINATION_ROW = {
+  id: 'vacc-1', owner_id: 'owner-1', dog_id: 'dog-1',
+  vaccine_type: 'Tollwut', vaccine_name: null as string | null,
+  administered_on: '2026-09-27', next_due_on: '2029-09-27',
+  clinic_name: 'Tierklinik Zürich', note: 'Gut vertragen', batch_number: 'LOT-2026-A1',
+  document_id: null as string | null,
+  created_at: '2026-09-27T08:00:00Z', updated_at: '2026-09-27T08:00:00Z',
+};
+
+const MEDICATION_ROW = {
+  id: 'med-1', owner_id: 'owner-1', dog_id: 'dog-1',
+  name: 'Rimadyl', dosage: '1,5 ml', frequency: '2x täglich',
+  starts_on: '2026-09-20', ends_on: null as string | null, is_active: true,
+  note: 'Nach dem Essen geben', dose_amount: null as number | null, dose_unit: null as string | null,
+  administration_route: 'oral', prescribing_vet: 'Dr. Meier',
+  created_at: '2026-09-20T08:00:00Z', updated_at: '2026-09-20T08:00:00Z',
+};
+
+function administrationRow(overrides: Partial<typeof MEDICATION_ROW> & { id: string; administered_at: string; amount?: number | null; unit?: string | null; administration_route?: string | null; location?: string | null; note?: string | null }) {
+  return {
+    owner_id: 'owner-1', dog_id: 'dog-1', medication_id: 'med-1',
+    amount: null, unit: null, administration_route: null, location: null, note: null,
+    created_at: overrides.administered_at, updated_at: overrides.administered_at,
+    ...overrides,
+  };
+}
+
+describe('Digital Health Record Phase 3 — vaccination details (Verlauf)', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, vaccinations: [VACCINATION_ROW] });
+  });
+
+  it('vaccination card in Verlauf shows name, date, and "Nächste Fälligkeit" next-due when present (never "Gültig bis" — the DB column is next_due_on, there is no separate valid_until field)', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    expect(strings(node)).toContain('Tollwut');
+    expect(strings(node).some((line) => line.includes('Nächste Fälligkeit') && line.includes('27.09.2029'))).toBe(true);
+    expect(strings(node).some((line) => line.includes('Gültig bis'))).toBe(false);
+  });
+
+  it('tapping a vaccination card opens its detail sheet with every saved field', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Tollwut').props.onPress(); });
+    const rendered = strings(node);
+    expect(rendered).toContain('Tollwut');
+    expect(rendered.some((l) => l.includes('27.09.2026'))).toBe(true); // Datum
+    expect(rendered.some((l) => l.includes('27.09.2029'))).toBe(true); // Nächste Fälligkeit
+    expect(rendered).toContain('Nächste Fälligkeit');
+    expect(rendered).not.toContain('Gültig bis / nächste Fälligkeit');
+    expect(rendered).toContain('Tierklinik Zürich');
+    expect(rendered).toContain('LOT-2026-A1');
+    expect(rendered).toContain('Gut vertragen');
+  });
+
+  it('multiple vaccinations of the same type on different dates are preserved independently in Verlauf', async () => {
+    mockLoadHealthOverview.mockResolvedValue({
+      ...EMPTY_OVERVIEW,
+      vaccinations: [
+        { ...VACCINATION_ROW, id: 'vacc-1', administered_on: '2023-09-27', next_due_on: '2026-09-27' },
+        { ...VACCINATION_ROW, id: 'vacc-2', administered_on: '2026-09-27', next_due_on: '2029-09-27' },
+      ],
+    });
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    const rendered = strings(node);
+    expect(rendered.filter((l) => l === 'Tollwut')).toHaveLength(2);
+    expect(rendered.some((l) => l.includes('27.09.2026'))).toBe(true);
+    expect(rendered.some((l) => l.includes('27.09.2029'))).toBe(true);
+  });
+
+  it('the existing "Impfungen" Verlauf filter still shows vaccination events only', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, vaccinations: [VACCINATION_ROW], medications: [MEDICATION_ROW] });
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Impfungen').props.onPress(); });
+    const rendered = strings(node);
+    expect(rendered).toContain('Tollwut');
+    expect(rendered).not.toContain('Rimadyl');
+  });
+
+  // Audit finding: document_id already existed on dog_health_vaccinations
+  // but had no UI to set it. Smallest possible fix — a picker over the
+  // SAME health documents already loaded for the Dokumente tab.
+  it('vaccination form offers the existing health documents to link, and saving persists the selected document_id', async () => {
+    mockLoadHealthOverview.mockResolvedValue({
+      ...EMPTY_OVERVIEW,
+      documents: [{ id: 'doc-1', dog_id: 'dog-1', kind: 'impfpass', title: 'Impfpass Scan', category: 'health', subtype: null, file_url: 'x.pdf', issued_on: '2026-09-01', note: null, created_at: '2026-09-01' }],
+    });
+    const node = render();
+    await flush();
+    openQuickAction(node, 'health.recordVaccination');
+    expect(strings(node)).toContain('Impfpass Scan');
+    act(() => { findChip(node, 'Impfpass Scan').props.onPress(); });
+    const impfart = allInputs(node).find((i) => i.props.placeholder === 'z. B. Tollwut')!;
+    act(() => { impfart.props.onChangeText('Tollwut'); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateVaccination).toHaveBeenCalledWith('dog-1', expect.objectContaining({ document_id: 'doc-1' }));
+  });
+
+  it('"Kein Dokument" clears a previously selected document on save', async () => {
+    mockLoadHealthOverview.mockResolvedValue({
+      ...EMPTY_OVERVIEW,
+      documents: [{ id: 'doc-1', dog_id: 'dog-1', kind: 'impfpass', title: 'Impfpass Scan', category: 'health', subtype: null, file_url: 'x.pdf', issued_on: '2026-09-01', note: null, created_at: '2026-09-01' }],
+      vaccinations: [{ ...VACCINATION_ROW, document_id: 'doc-1' }],
+    });
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Tollwut').props.onPress(); });
+    act(() => { findByText(node, 'Bearbeiten').props.onPress(); });
+    act(() => { findChip(node, 'Kein Dokument').props.onPress(); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockUpdateVaccination).toHaveBeenCalledWith('vacc-1', expect.objectContaining({ document_id: null }));
+  });
+});
+
+describe('Digital Health Record Phase 3 — medication treatment + "Gaben" administration history', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [MEDICATION_ROW] });
+  });
+
+  function openMedicationDetail(node: ReactTestRenderer) {
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Rimadyl').props.onPress(); });
+  }
+
+  it('the existing "Medikamente" Verlauf filter still shows medication treatments', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, vaccinations: [VACCINATION_ROW], medications: [MEDICATION_ROW] });
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Medikamente').props.onPress(); });
+    const rendered = strings(node);
+    expect(rendered).toContain('Rimadyl');
+    expect(rendered).not.toContain('Tollwut');
+  });
+
+  it('medication detail shows the full treatment summary (dose, route, period, status, prescribing vet, note)', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    const rendered = strings(node);
+    expect(rendered).toContain('Rimadyl');
+    expect(rendered).toContain('1,5 ml');
+    expect(rendered).toContain('oral');
+    expect(rendered).toContain('Aktiv');
+    expect(rendered).toContain('Dr. Meier');
+    expect(rendered).toContain('Nach dem Essen geben');
+  });
+
+  it('"Gabe dokumentieren" is visible in the medication detail sheet', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    expect(findByText(node, 'Gabe dokumentieren')).toBeTruthy();
+  });
+
+  it('loads the administration history for this medication on-demand, sorted newest first as returned', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValue({
+      data: [
+        administrationRow({ id: 'a-3', administered_at: '2026-09-28T08:05:00Z', amount: 1.5, unit: 'ml', administration_route: 'oral', location: 'Zuhause' }),
+        administrationRow({ id: 'a-2', administered_at: '2026-09-27T20:10:00Z', amount: 1.5, unit: 'ml', administration_route: 'oral', location: 'Zuhause' }),
+        administrationRow({ id: 'a-1', administered_at: '2026-09-27T08:15:00Z', amount: 1.5, unit: 'ml', administration_route: 'oral', location: 'Zuhause' }),
+      ], error: null,
+    });
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    expect(mockLoadMedicationAdministrations).toHaveBeenCalledWith('med-1');
+    const rendered = strings(node);
+    // Compute the expected HH:MM the same way the component does (local
+    // Date methods) so this assertion is independent of the test host's timezone.
+    const timeLabel = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+    const idx3 = rendered.findIndex((l) => l.includes('28.09.2026'));
+    const idx2 = rendered.findIndex((l) => l.includes('27.09.2026') && l.includes(timeLabel('2026-09-27T20:10:00Z')));
+    const idx1 = rendered.findIndex((l) => l.includes('27.09.2026') && l.includes(timeLabel('2026-09-27T08:15:00Z')));
+    expect(idx3).toBeGreaterThan(-1);
+    expect(idx2).toBeGreaterThan(idx3);
+    expect(idx1).toBeGreaterThan(idx2);
+  });
+
+  it('"Gabe dokumentieren" opens a form and saving appends a NEW administration without touching the parent medication', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+
+    const inputs = allInputs(node);
+    const amount = inputs.find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'z. B. 1,5')!;
+    const unit = inputs.find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'z. B. ml')!;
+    const route = inputs.find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'z. B. oral')!;
+    const location = inputs.find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'z. B. Zuhause')!;
+    act(() => { amount.props.onChangeText('1,5'); });
+    act(() => { unit.props.onChangeText('ml'); });
+    act(() => { route.props.onChangeText('oral'); });
+    act(() => { location.props.onChangeText('Zuhause'); });
+
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(1);
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledWith('dog-1', 'med-1', expect.objectContaining({ amount: 1.5, unit: 'ml', administration_route: 'oral', location: 'Zuhause' }));
+    expect(mockUpdateMedication).not.toHaveBeenCalled();
+    expect(mockCreateMedication).not.toHaveBeenCalled();
+  });
+
+  it('the same amount logged twice on the same day creates TWO independent administrations — never merged, never overwritten', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+
+    for (let i = 0; i < 2; i += 1) {
+      act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+      const amount = allInputs(node).find((i2) => (i2.props as unknown as { placeholder?: string }).placeholder === 'z. B. 1,5')!;
+      act(() => { amount.props.onChangeText('1,5'); });
+      await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    }
+
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(2);
+    // Neither call carries an id to merge against — each is an independent insert.
+    for (const call of mockCreateMedicationAdministration.mock.calls) {
+      expect(call[2]).not.toHaveProperty('id');
+    }
+  });
+
+  it('administrations remain linked to the correct medication_id', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledWith('dog-1', 'med-1', expect.anything());
+  });
+
+  it('editing one administration calls update with only that administration\'s id — never bulk, never affecting others', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValue({
+      data: [
+        administrationRow({ id: 'a-2', administered_at: '2026-09-27T20:10:00Z', amount: 1.5 }),
+        administrationRow({ id: 'a-1', administered_at: '2026-09-27T08:15:00Z', amount: 1.5 }),
+      ], error: null,
+    });
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+
+    const editButtons = (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress: () => void } }[] })
+      .findAllByType(TouchableOpacity).filter((c) => c.props.accessibilityLabel === 'Gabe bearbeiten');
+    expect(editButtons.length).toBe(2);
+    act(() => { editButtons[0].props.onPress(); });
+    const noteInput = allInputs(node).find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'Optional' && (i.props as unknown as { value?: string }).value === '');
+    if (noteInput) act(() => { noteInput.props.onChangeText('Aktualisiert'); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+
+    expect(mockUpdateMedicationAdministration).toHaveBeenCalledTimes(1);
+    expect(mockUpdateMedicationAdministration.mock.calls[0][0]).toBe('a-2');
+    expect(mockDeleteMedicationAdministration).not.toHaveBeenCalled();
+  });
+
+  it('deleting one administration only deletes that row by id — parent medication and other administrations untouched', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValue({
+      data: [administrationRow({ id: 'a-2', administered_at: '2026-09-27T20:10:00Z' }), administrationRow({ id: 'a-1', administered_at: '2026-09-27T08:15:00Z' })],
+      error: null,
+    });
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+
+    const deleteButtons = (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress: () => void } }[] })
+      .findAllByType(TouchableOpacity).filter((c) => c.props.accessibilityLabel === 'Gabe löschen');
+    expect(deleteButtons.length).toBe(2);
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _msg, buttons) => {
+      const destructive = buttons?.find((b) => b.text === 'Löschen');
+      destructive?.onPress?.();
+    });
+    act(() => { deleteButtons[0].props.onPress(); });
+    await flush();
+    alertSpy.mockRestore();
+
+    expect(mockDeleteMedicationAdministration).toHaveBeenCalledTimes(1);
+    expect(mockDeleteMedicationAdministration).toHaveBeenCalledWith('a-2');
+    expect(mockUpdateMedication).not.toHaveBeenCalled();
+    expect(mockDeleteMedication).not.toHaveBeenCalled();
   });
 });
