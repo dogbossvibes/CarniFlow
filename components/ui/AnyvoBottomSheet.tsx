@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, StyleSheet, Text, TouchableWithoutFeedback, View, type KeyboardEvent } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View, type KeyboardEvent } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 
 // ROOT CAUSE (Customer Release, 27.09.2026 — Health keyboard visibility never
@@ -74,20 +75,62 @@ function KeyboardAwareSheet({ backdrop, sheet }: { backdrop: React.ReactNode; sh
   );
 }
 
-// Bottom-Sheet im ANYVO-Design (Marker wählen, Kompass …).
+// ROOT CAUSE (Health Record, 28.09.2026 — physical-device report: sheets
+// "cannot be reliably closed" — no visible close control, dragging/swiping
+// does nothing, a swipe near the top edge can trigger iOS Control Center
+// instead): this component never implemented an actual dismiss gesture. The
+// "griff" bar is purely decorative — it is a plain <View>, wired to no
+// PanResponder/gesture-handler at all — so "dragging/swiping" was never
+// connected to anything, on any consumer, ever. The Modal's own
+// `animationType="slide"` is only the open/close transition, not an
+// interactive drag. The ONLY working dismiss path was tapping the backdrop
+// (TouchableWithoutFeedback outside the sheet) — for a tall or keyboard-
+// squeezed sheet that backdrop area can shrink to almost nothing, leaving
+// the user with no reachable escape path at all. (Swipes starting above the
+// screen — over the status bar / Dynamic Island — are an iOS system gesture
+// zone no in-app view can intercept; that part of the report is expected iOS
+// behavior, not fixable from inside the sheet.)
+//
+// Fix: an explicit, always-reachable close (X) button, opt-in via
+// `closeButton` so every existing consumer (Backpack, the tracking marker/
+// compass/segment sheets, edit-dog, heat calendar, the custom-exercise
+// sheet) keeps its exact current rendering unless it explicitly asks for
+// the button — this file is the only place the prop is passed `true`. The
+// button sits in the header, above any scrollable body, so it stays
+// reachable without scrolling and remains visible while the keyboard is
+// open; pressing it dismisses the keyboard (if any) and then calls the
+// caller's own onClose — never anything else, so it can never itself save
+// or mutate data. Backdrop-tap dismissal is left completely unchanged and
+// still works everywhere it already did, as a secondary method.
 export function AnyvoBottomSheet({
-  visible, onClose, title, children, keyboardAware = false,
-}: { visible: boolean; onClose: () => void; title?: string; children: React.ReactNode; keyboardAware?: boolean }) {
+  visible, onClose, title, children, keyboardAware = false, closeButton = false,
+}: { visible: boolean; onClose: () => void; title?: string; children: React.ReactNode; keyboardAware?: boolean; closeButton?: boolean }) {
   const backdrop = (
     <TouchableWithoutFeedback onPress={onClose}>
       <View style={s.backdrop} />
     </TouchableWithoutFeedback>
   );
+  const handleCloseButton = () => { Keyboard.dismiss(); onClose(); };
   const sheet = (
     <View style={[s.sheet, keyboardAware && s.keyboardSheet]}>
       <SafeAreaView edges={['bottom']} style={keyboardAware && s.keyboardSafeArea}>
         <View style={s.griff} />
-        {title ? <Text style={s.title}>{title}</Text> : null}
+        {title || closeButton ? (
+          <View style={s.header}>
+            <Text style={s.title} numberOfLines={2}>{title ?? ''}</Text>
+            {closeButton ? (
+              <TouchableOpacity
+                onPress={handleCloseButton}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Schließen"
+                style={s.closeButton}
+              >
+                <Ionicons name="close" size={20} color={C.trackText} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
         {children}
       </SafeAreaView>
     </View>
@@ -107,5 +150,7 @@ const s = StyleSheet.create({
   keyboardSheet: { position: 'relative', maxHeight: '100%', flexShrink: 1 },
   keyboardSafeArea: { flexShrink: 1 },
   griff:    { width: 40, height: 4, borderRadius: 2, backgroundColor: C.trackBorder, alignSelf: 'center', marginBottom: 14 },
-  title:    { fontSize: 18, color: C.trackText, fontWeight: '900', marginBottom: 16 },
+  header:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 },
+  title:    { flex: 1, fontSize: 18, color: C.trackText, fontWeight: '900' },
+  closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: C.trackCard, borderWidth: 1, borderColor: C.trackBorder },
 });

@@ -27,6 +27,7 @@ import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
 import { Alert, InputAccessoryView, Keyboard, Platform, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
 import DogHealthRecordRoute from '@/app/dog-health-record/[id]';
+import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { AnyvoChip } from '@/components/ui/AnyvoChip';
 import type { Dog } from '@/types';
 import type { HealthOverviewData } from '@/services/healthService';
@@ -428,7 +429,7 @@ describe('Digital Health Record quick-action sheet: keyboard-aware layout (corre
   const content = readFileSync('app/dog-health-record/[id].tsx', 'utf8');
 
   it('the shared quick-action sheet opts into AnyvoBottomSheet keyboardAware', () => {
-    expect(content).toMatch(/<AnyvoBottomSheet keyboardAware visible=\{sheet !== null\}/);
+    expect(content).toMatch(/<AnyvoBottomSheet keyboardAware closeButton visible=\{sheet !== null\}/);
   });
   it('the redundant local KeyboardAvoidingView was removed (double avoidance can over-compensate)', () => {
     expect(content).not.toMatch(/<KeyboardAvoidingView/);
@@ -887,5 +888,322 @@ describe('Digital Health Record Phase 3 — medication treatment + "Gaben" admin
     expect(mockDeleteMedicationAdministration).toHaveBeenCalledWith('a-2');
     expect(mockUpdateMedication).not.toHaveBeenCalled();
     expect(mockDeleteMedication).not.toHaveBeenCalled();
+  });
+});
+
+// REGRESSION (Gaben, 28.09.2026): physical-device report — "Gabe
+// dokumentieren" visibly did nothing (no form/sheet opened). Root cause,
+// proven from source: openAdminForm/openAdminEdit set adminSheetOpen=true
+// WITHOUT clearing `detail`, so the medication detail sheet
+// (visible={detail !== null}) and a separate admin-editor sheet
+// (visible={adminSheetOpen}) were simultaneously visible=true — two
+// independent AnyvoBottomSheet instances, each its own native <Modal> on
+// iOS, which cannot reliably present concurrently (a second concurrent
+// presentation is commonly dropped silently, matching "onPress fires,
+// state changes, nothing visible"). react-test-renderer has no real
+// UIKit view-controller-presentation stacking semantics, so the
+// pre-existing suite above (using the same mocks) could pass even with two
+// simultaneously visible sheets in the real tree — it is structurally
+// blind to this exact bug class. Fixed by merging the two sheets into ONE
+// AnyvoBottomSheet whose body toggles between the detail view and the
+// admin editor via the existing adminSheetOpen boolean (the same
+// single-sheet/conditional-content pattern already used above for the
+// emergency vs. normal quick-action sheet) — there is never more than one
+// AnyvoBottomSheet visible=true for this part of the screen. These tests
+// assert that invariant directly, plus the cancel ("Abbrechen") path and
+// medication-id retention across open/cancel/reopen.
+describe('Digital Health Record Phase 3 — "Gabe dokumentieren" nested-sheet regression (28.09.2026)', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [MEDICATION_ROW] });
+  });
+
+  function openMedicationDetail(node: ReactTestRenderer) {
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Rimadyl').props.onPress(); });
+  }
+
+  function detailAdminSheets(node: ReactTestRenderer) {
+    // Both the medication-detail sheet and the admin editor now render
+    // through the SAME AnyvoBottomSheet element (visible={detail !== null}).
+    // Distinguish it from the unrelated quick-action sheet at the top of the
+    // file (visible={sheet !== null}) by title: only this one ever renders
+    // "Rimadyl" (detail.title) or "Gabe dokumentieren"/"Gabe bearbeiten".
+    return (node.root as unknown as {
+      findAllByType: (t: unknown) => { props: { visible: boolean; title?: string } }[];
+    }).findAllByType(AnyvoBottomSheet).filter((sh) => sh.props.title === 'Rimadyl' || sh.props.title === 'Gabe dokumentieren' || sh.props.title === 'Gabe bearbeiten');
+  }
+
+  it('there is only ONE AnyvoBottomSheet instance covering medication detail + the Gabe editor — never two stacked sheets', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    expect(detailAdminSheets(node)).toHaveLength(1);
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    // Still exactly one instance — only its title/content switched.
+    expect(detailAdminSheets(node)).toHaveLength(1);
+  });
+
+  it('tapping "Gabe dokumentieren" actually opens the form — the sheet stays visible and its title switches to "Gabe dokumentieren"', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    const sheet = detailAdminSheets(node)[0];
+    expect(sheet.props.visible).toBe(true);
+    expect(sheet.props.title).toBe('Gabe dokumentieren');
+    expect(allInputs(node).some((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'z. B. 1,5')).toBe(true);
+  });
+
+  it('the medication id (medicationDetailId) is retained while the admin editor is open — saving still targets med-1', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledWith('dog-1', 'med-1', expect.anything());
+  });
+
+  it('"Abbrechen" returns to the medication detail view within the same sheet, without saving anything', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    expect(detailAdminSheets(node)[0].props.title).toBe('Gabe dokumentieren');
+
+    act(() => { findByText(node, 'Abbrechen').props.onPress(); });
+
+    expect(mockCreateMedicationAdministration).not.toHaveBeenCalled();
+    const sheet = detailAdminSheets(node)[0];
+    expect(sheet.props.visible).toBe(true);
+    expect(sheet.props.title).toBe('Rimadyl');
+    expect(strings(node)).toContain('Gabe dokumentieren'); // back to the detail body's own button
+  });
+
+  it('after cancelling, reopening "Gabe dokumentieren" starts a fresh (non-edit) entry, and saving creates exactly one administration for med-1', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    act(() => { findByText(node, 'Abbrechen').props.onPress(); });
+
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(1);
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledWith('dog-1', 'med-1', expect.anything());
+    expect(mockUpdateMedicationAdministration).not.toHaveBeenCalled();
+  });
+
+  it('editing an administration opens the SAME merged sheet, prefilled, with its title switched to "Gabe bearbeiten" — not a second stacked sheet', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValue({
+      data: [administrationRow({ id: 'a-1', administered_at: '2026-09-27T08:15:00Z', amount: 1.5, unit: 'ml' })], error: null,
+    });
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+
+    const editButton = (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress: () => void } }[] })
+      .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'Gabe bearbeiten')!;
+    act(() => { editButton.props.onPress(); });
+
+    expect(detailAdminSheets(node)).toHaveLength(1);
+    const sheet = detailAdminSheets(node)[0];
+    expect(sheet.props.visible).toBe(true);
+    expect(sheet.props.title).toBe('Gabe bearbeiten');
+    const amount = allInputs(node).find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'z. B. 1,5');
+    expect(amount?.props.value).toBe('1.5');
+  });
+
+  it('closing the whole sheet (onClose) clears both detail and the admin editor, so reopening a different medication never shows a stale Gabe editor first', async () => {
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+
+    const sheet = detailAdminSheets(node)[0] as unknown as { props: { onClose: () => void } };
+    act(() => { sheet.props.onClose(); });
+
+    expect(detailAdminSheets(node)).toHaveLength(0);
+    openMedicationDetail(node);
+    await flush();
+    expect(detailAdminSheets(node)[0].props.title).toBe('Rimadyl');
+  });
+
+  it('no parent medication mutation occurs anywhere in the create/cancel/edit flow', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValue({
+      data: [administrationRow({ id: 'a-1', administered_at: '2026-09-27T08:15:00Z' })], error: null,
+    });
+    const node = render();
+    await flush();
+    openMedicationDetail(node);
+    await flush();
+
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    act(() => { findByText(node, 'Abbrechen').props.onPress(); });
+
+    const editButton = (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress: () => void } }[] })
+      .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'Gabe bearbeiten')!;
+    act(() => { editButton.props.onPress(); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+
+    expect(mockUpdateMedication).not.toHaveBeenCalled();
+    expect(mockCreateMedication).not.toHaveBeenCalled();
+    expect(mockDeleteMedication).not.toHaveBeenCalled();
+  });
+});
+
+// REGRESSION (Health Record, 28.09.2026): physical-device report — Health
+// bottom sheets had no reliable way to close. Source-level cause: this
+// screen's two AnyvoBottomSheet consumers relied ENTIRELY on the shared
+// component's backdrop tap (dragging/swiping never did anything — the
+// "griff" handle was purely decorative, wired to no gesture at all — see
+// components/ui/AnyvoBottomSheet.tsx for the full root-cause note). On a
+// tall or keyboard-squeezed sheet that backdrop area can shrink to an
+// unreachable sliver, trapping the user. Fixed by opting both Health sheets
+// into the new AnyvoBottomSheet `closeButton` prop (an explicit, always-
+// reachable header X, see the same file). These tests prove the button
+// exists, is reachable, and — critically — that closing NEVER implicitly
+// saves/mutates anything and always leaves clean state behind.
+describe('Digital Health Record — explicit close (X) button (28.09.2026)', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockCreateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'entry-1' }, error: null, reminderSync: 'not_required' });
+    mockUpdateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'entry-1' }, error: null, reminderSync: 'not_required' });
+  });
+
+  function findCloseButton(node: ReactTestRenderer) {
+    return (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress: () => void } }[] })
+      .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'Schließen');
+  }
+
+  it('the medication create sheet has a functioning explicit close action', async () => {
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    const node = render();
+    await flush();
+    openQuickAction(node, 'health.recordMedication');
+    const close = findCloseButton(node);
+    expect(close).toBeTruthy();
+    act(() => { close!.props.onPress(); });
+    expect(findByText(node, 'Speichern')).toBeFalsy(); // sheet is gone
+  });
+
+  it('closing the medication create sheet does not call create/update for any Health entity', async () => {
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    const node = render();
+    await flush();
+    openQuickAction(node, 'health.recordMedication');
+    const inputs = allInputs(node);
+    const name = inputs.find((i) => (i.props as unknown as { placeholder?: string }).placeholder === 'Medikament')!;
+    act(() => { name.props.onChangeText('Rimadyl'); });
+    act(() => { findCloseButton(node)!.props.onPress(); });
+    expect(mockCreateMedication).not.toHaveBeenCalled();
+    expect(mockUpdateMedication).not.toHaveBeenCalled();
+  });
+
+  it('the vaccination create sheet has a functioning explicit close action', async () => {
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    const node = render();
+    await flush();
+    openQuickAction(node, 'health.recordVaccination');
+    act(() => { findCloseButton(node)!.props.onPress(); });
+    expect(mockCreateVaccination).not.toHaveBeenCalled();
+    expect(findByText(node, 'Speichern')).toBeFalsy();
+  });
+
+  it('the Gewicht sheet can be closed via the explicit close button without saving', async () => {
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    act(() => { weightInput(node).props.onChangeText('24,5'); });
+    act(() => { findCloseButton(node)!.props.onPress(); });
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled();
+    expect(findByText(node, 'Speichern')).toBeFalsy();
+  });
+
+  it('closing an edit (via X) does not persist stale edit state — a later, unrelated "add" for a different entity still creates, never updates the closed edit target', async () => {
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, vaccinations: [VACCINATION_ROW] });
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Tollwut').props.onPress(); });
+    act(() => { findByText(node, 'Bearbeiten').props.onPress(); }); // editId is now 'vacc-1', sheet === 'vaccination'
+    act(() => { findCloseButton(node)!.props.onPress(); }); // closed via X, never saved
+
+    act(() => { findByText(node, 'health.recordOverview').props.onPress(); }); // back to Übersicht for the quick-action buttons
+    openWeightSheet(node); // an unrelated, fresh "add" for a different entity
+    act(() => { weightInput(node).props.onChangeText('24'); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+
+    expect(mockCreateWeightEntry).toHaveBeenCalledTimes(1);
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+    expect(mockUpdateVaccination).not.toHaveBeenCalled();
+    expect(mockCreateVaccination).not.toHaveBeenCalled();
+  });
+});
+
+describe('Digital Health Record — medication detail sheet close + clean-state (28.09.2026)', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [MEDICATION_ROW, { ...MEDICATION_ROW, id: 'med-2', name: 'Cortison' }] });
+  });
+
+  function findCloseButton(node: ReactTestRenderer) {
+    return (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress: () => void } }[] })
+      .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'Schließen');
+  }
+
+  it('the medication detail sheet has a functioning explicit close action', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Rimadyl').props.onPress(); });
+    await flush();
+    const close = findCloseButton(node);
+    expect(close).toBeTruthy();
+    act(() => { close!.props.onPress(); });
+    expect(strings(node)).not.toContain('GABEN');
+  });
+
+  it('closing the detail sheet clears temporary state — reopening a DIFFERENT medication never shows a stale admin editor first', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Rimadyl').props.onPress(); });
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    act(() => { findCloseButton(node)!.props.onPress(); });
+
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Cortison').props.onPress(); });
+    await flush();
+    expect(strings(node)).toContain('Cortison');
+    expect(strings(node)).not.toContain('Gabe bearbeiten');
+    // The detail body (not the admin editor) is showing — "Gabe dokumentieren" button is present again.
+    expect(findByText(node, 'Gabe dokumentieren')).toBeTruthy();
+  });
+
+  it('closing while the admin ("Gabe dokumentieren") editor is active clears BOTH detail and admin state in one action', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Rimadyl').props.onPress(); });
+    await flush();
+    act(() => { findByText(node, 'Gabe dokumentieren').props.onPress(); });
+    expect(strings(node)).toContain('Gabe dokumentieren'); // sheet title now the form
+
+    act(() => { findCloseButton(node)!.props.onPress(); });
+
+    expect(mockCreateMedicationAdministration).not.toHaveBeenCalled();
+    expect(strings(node)).not.toContain('GABEN');
+    expect(strings(node)).not.toContain('Menge');
   });
 });

@@ -328,7 +328,7 @@ export default function DogHealthRecordRoute() {
           likely explanation is the device still running a stale bundle
           (see the still-open OTA-delivery/persisted-state investigation),
           not a remaining layout defect in this file. */}
-      <AnyvoBottomSheet keyboardAware visible={sheet !== null} onClose={() => setSheet(null)} title={sheetTitle(sheet)}>
+      <AnyvoBottomSheet keyboardAware closeButton visible={sheet !== null} onClose={() => { setSheet(null); setEditId(null); }} title={sheetTitle(sheet)}>
         {sheet === 'emergency' ? (
           <Emergency dog={dog} data={data} ownerName={typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : null} ownerEmail={user?.email ?? null} ownerPhone={profile?.phone_number ?? null} />
         ) : (
@@ -343,8 +343,54 @@ export default function DogHealthRecordRoute() {
           </>
         )}
       </AnyvoBottomSheet>
-      <AnyvoBottomSheet keyboardAware visible={detail !== null} onClose={() => setDetail(null)} title={detail?.title}>
-        {detail ? (
+      {/* ROOT CAUSE (Gaben, 28.09.2026 — physical-device report: "Gabe
+          dokumentieren" visibly did nothing): this used to be TWO separate
+          AnyvoBottomSheet instances — the medication detail sheet
+          (visible={detail !== null}) and a second "admin editor" sheet
+          (visible={adminSheetOpen}) — with onOpenAdminForm setting
+          adminSheetOpen=true WITHOUT clearing detail, so both were
+          simultaneously visible=true. Each AnyvoBottomSheet wraps its own
+          independent <Modal>, and React Native's iOS Modal cannot reliably
+          present a second, separate full-screen Modal while a first one is
+          already presented — the underlying UIKit presentation is silently
+          dropped, matching exactly "onPress fires, state changes, nothing
+          visible". Fixed by merging into ONE sheet whose body switches
+          between the detail view and the admin editor via a single boolean
+          (adminSheetOpen) — the same "one sheet, conditional content"
+          pattern already used above for the emergency vs. normal
+          quick-action form. Never two Modals at once. detail itself is
+          untouched by opening/closing the editor, so medicationDetailId
+          (and therefore dogId/medicationId context for
+          create/updateMedicationAdministration) is preserved exactly as
+          before — this was purely a presentation bug, never a state bug.
+          onClose (the header X, wired below) always resets adminEditId too
+          — even though both openAdminForm/openAdminEdit already overwrite
+          it on next open — so no stale edit-target id can ever linger in
+          state while the sheet is closed. */}
+      <AnyvoBottomSheet
+        keyboardAware
+        closeButton
+        visible={detail !== null}
+        onClose={() => { setDetail(null); setAdminSheetOpen(false); setAdminEditId(null); }}
+        title={adminSheetOpen ? (adminEditId ? 'Gabe bearbeiten' : 'Gabe dokumentieren') : detail?.title}
+      >
+        {adminSheetOpen ? (
+          <>
+            <ScrollView style={s.sheetScroll} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} showsVerticalScrollIndicator={false}>
+              <DateField style={s.dateFieldGap} label="Datum" value={adminDate} onChange={setAdminDate} maximumDate={new Date()} />
+              <DateField style={s.dateFieldGap} label="Uhrzeit" value={adminTime} onChange={setAdminTime} mode="time" />
+              <Field label="Menge" value={adminAmount} onChangeText={setAdminAmount} placeholder="z. B. 1,5" keyboardType="decimal-pad" />
+              <Field label="Einheit" value={adminUnit} onChangeText={setAdminUnit} placeholder="z. B. ml" />
+              <Field label="Art der Gabe" value={adminRoute} onChangeText={setAdminRoute} placeholder="z. B. oral" />
+              <Field label="Ort" value={adminLocation} onChangeText={setAdminLocation} placeholder="z. B. Zuhause" />
+              <Field label="Notiz" value={adminNote} onChangeText={setAdminNote} placeholder="Optional" />
+            </ScrollView>
+            <View style={[s.sheetFooter, s.adminFooterRow]}>
+              <AnyvoButton label="Abbrechen" variant="secondary" style={s.adminFooterButton} onPress={() => setAdminSheetOpen(false)} />
+              <AnyvoButton label="Speichern" icon="checkmark" style={s.adminFooterButton} onPress={saveAdmin} loading={adminSaving} />
+            </View>
+          </>
+        ) : detail ? (
           <DetailBody
             detail={detail} data={data} isOwner={isOwner}
             administrations={administrations} adminLoading={adminLoading}
@@ -352,25 +398,6 @@ export default function DogHealthRecordRoute() {
             onOpenAdminForm={openAdminForm} onEditAdmin={openAdminEdit} onDeleteAdmin={deleteAdmin}
           />
         ) : null}
-      </AnyvoBottomSheet>
-      {/* "Gabe dokumentieren" — a separate, self-contained sheet stacked above
-          the medication detail sheet (same pattern Backpack already uses for
-          its own editor + action + suggestions sheets). Saving here only
-          ever inserts/updates the ONE administration row identified by
-          adminEditId; it never touches the parent medication row. */}
-      <AnyvoBottomSheet keyboardAware visible={adminSheetOpen} onClose={() => setAdminSheetOpen(false)} title={adminEditId ? 'Gabe bearbeiten' : 'Gabe dokumentieren'}>
-        <ScrollView style={s.sheetScroll} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} showsVerticalScrollIndicator={false}>
-          <DateField style={s.dateFieldGap} label="Datum" value={adminDate} onChange={setAdminDate} maximumDate={new Date()} />
-          <DateField style={s.dateFieldGap} label="Uhrzeit" value={adminTime} onChange={setAdminTime} mode="time" />
-          <Field label="Menge" value={adminAmount} onChangeText={setAdminAmount} placeholder="z. B. 1,5" keyboardType="decimal-pad" />
-          <Field label="Einheit" value={adminUnit} onChangeText={setAdminUnit} placeholder="z. B. ml" />
-          <Field label="Art der Gabe" value={adminRoute} onChangeText={setAdminRoute} placeholder="z. B. oral" />
-          <Field label="Ort" value={adminLocation} onChangeText={setAdminLocation} placeholder="z. B. Zuhause" />
-          <Field label="Notiz" value={adminNote} onChangeText={setAdminNote} placeholder="Optional" />
-        </ScrollView>
-        <View style={s.sheetFooter}>
-          <AnyvoButton label="Speichern" icon="checkmark" onPress={saveAdmin} loading={adminSaving} />
-        </View>
       </AnyvoBottomSheet>
       {toast}
     </View>
@@ -563,5 +590,5 @@ function kindIcon(kind: HealthTimelineItem['kind']): React.ComponentProps<typeof
 function kindLabel(kind: HealthTimelineItem['kind']): string { return kind === 'vaccination' ? 'Impfung' : kind === 'parasite' ? 'Parasiten' : kind === 'medication' ? 'Medikament' : kind === 'vet' ? 'Tierarzt' : kind === 'weight' ? 'Gewicht' : kind === 'condition' ? 'Diagnose / Allergie' : 'Dokument'; }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.trackBg }, flex: { flex: 1 }, center: { flex: 1, backgroundColor: C.trackBg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }, error: { color: C.trackTextSec, fontSize: 15, textAlign: 'center' }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 12 }, iconButton: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' }, headerText: { flex: 1, alignItems: 'center' }, headerTitle: { color: C.trackText, fontWeight: '900', fontSize: 16 }, headerDog: { color: C.trackTextSec, fontSize: 12, marginTop: 2 }, scroll: { padding: 16, gap: 14 }, tabs: { flexDirection: 'row', gap: 8 }, tab: { flex: 1, paddingVertical: 11, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard }, tabActive: { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary }, tabText: { color: C.trackTextSec, fontWeight: '800', fontSize: 13 }, tabTextActive: { color: C.accentText }, content: { gap: 12 }, warning: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.warningDim, borderRadius: 14, borderWidth: 1, borderColor: C.warning, padding: 12 }, warningText: { flex: 1, color: C.trackTextSec, fontSize: 12 }, heroRow: { flexDirection: 'row', alignItems: 'center', gap: 13 }, heroIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, eyebrow: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }, heroTitle: { color: C.trackText, fontSize: 20, fontWeight: '900', marginTop: 3 }, muted: { color: C.trackTextSec, fontSize: 12, marginTop: 3 }, section: { color: C.trackTextMut, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 5 }, actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, action: { alignItems: 'center', gap: 6, paddingVertical: 11, borderRadius: 15, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, minHeight: 82, justifyContent: 'center' }, actionIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, actionText: { color: C.trackTextSec, fontSize: 11, fontWeight: '800', textAlign: 'center', lineHeight: 15 }, valueHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }, valueCopy: { flex: 1, paddingRight: 12 }, value: { color: C.trackText, fontSize: 25, fontWeight: '900', marginTop: 4 }, weightEmptyPrimary: { color: C.trackText, fontSize: 16, lineHeight: 21, fontWeight: '800', marginTop: 4 }, weightAdd: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 6, minHeight: 44 }, weightAddText: { color: C.trackPrimary, fontSize: 13, fontWeight: '800' }, empty: { color: C.trackTextMut, fontSize: 13, lineHeight: 19 }, filters: { gap: 8, paddingBottom: 2 }, timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 13 }, timelineIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, rowTitle: { color: C.trackText, fontSize: 14, fontWeight: '800' }, sheetScroll: { flexShrink: 1 }, sheetFooter: { paddingTop: 14, paddingBottom: 6 }, accessoryBar: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', backgroundColor: C.trackCard, borderTopWidth: 1, borderTopColor: C.trackBorder, paddingHorizontal: 16, paddingVertical: 10 }, accessoryDone: { color: C.trackPrimary, fontSize: 16, fontWeight: '800' }, formLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, marginTop: 10 }, dateFieldGap: { marginTop: 10 }, input: { color: C.trackText, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15 }, choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 4 }, switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.trackCard, borderRadius: 14, padding: 10 }, detail: { gap: 10, paddingBottom: 12 }, detailIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, detailDate: { color: C.trackTextSec, fontSize: 13 }, detailText: { color: C.trackText, fontSize: 15, lineHeight: 22 }, detailActions: { gap: 8, marginTop: 8 }, timelineSecondary: { color: C.trackPrimary, fontSize: 11.5, fontWeight: '700', marginTop: 2 }, detailRow: { gap: 2 }, detailLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }, detailDocLink: { color: C.trackPrimary, fontSize: 13, fontWeight: '700', marginTop: 4 }, gabenHeading: { color: C.trackTextMut, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 14 }, adminRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, padding: 12 }, adminRowTitle: { color: C.trackText, fontSize: 13.5, fontWeight: '800' }, adminRowActions: { flexDirection: 'row', gap: 10 }, emergency: { gap: 10, paddingBottom: 14 }, emergencyName: { color: C.trackText, fontSize: 25, fontWeight: '900' }, emergencyLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase', marginTop: 8 }, emergencyText: { color: C.trackText, fontSize: 15 }, emergencyLink: { color: C.trackPrimary },
+  root: { flex: 1, backgroundColor: C.trackBg }, flex: { flex: 1 }, center: { flex: 1, backgroundColor: C.trackBg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }, error: { color: C.trackTextSec, fontSize: 15, textAlign: 'center' }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 12 }, iconButton: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' }, headerText: { flex: 1, alignItems: 'center' }, headerTitle: { color: C.trackText, fontWeight: '900', fontSize: 16 }, headerDog: { color: C.trackTextSec, fontSize: 12, marginTop: 2 }, scroll: { padding: 16, gap: 14 }, tabs: { flexDirection: 'row', gap: 8 }, tab: { flex: 1, paddingVertical: 11, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard }, tabActive: { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary }, tabText: { color: C.trackTextSec, fontWeight: '800', fontSize: 13 }, tabTextActive: { color: C.accentText }, content: { gap: 12 }, warning: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.warningDim, borderRadius: 14, borderWidth: 1, borderColor: C.warning, padding: 12 }, warningText: { flex: 1, color: C.trackTextSec, fontSize: 12 }, heroRow: { flexDirection: 'row', alignItems: 'center', gap: 13 }, heroIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, eyebrow: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 }, heroTitle: { color: C.trackText, fontSize: 20, fontWeight: '900', marginTop: 3 }, muted: { color: C.trackTextSec, fontSize: 12, marginTop: 3 }, section: { color: C.trackTextMut, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 5 }, actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 }, action: { alignItems: 'center', gap: 6, paddingVertical: 11, borderRadius: 15, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, minHeight: 82, justifyContent: 'center' }, actionIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, actionText: { color: C.trackTextSec, fontSize: 11, fontWeight: '800', textAlign: 'center', lineHeight: 15 }, valueHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }, valueCopy: { flex: 1, paddingRight: 12 }, value: { color: C.trackText, fontSize: 25, fontWeight: '900', marginTop: 4 }, weightEmptyPrimary: { color: C.trackText, fontSize: 16, lineHeight: 21, fontWeight: '800', marginTop: 4 }, weightAdd: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 6, minHeight: 44 }, weightAddText: { color: C.trackPrimary, fontSize: 13, fontWeight: '800' }, empty: { color: C.trackTextMut, fontSize: 13, lineHeight: 19 }, filters: { gap: 8, paddingBottom: 2 }, timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.trackCard, borderRadius: 16, borderWidth: 1, borderColor: C.trackBorder, padding: 13 }, timelineIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, rowTitle: { color: C.trackText, fontSize: 14, fontWeight: '800' }, sheetScroll: { flexShrink: 1 }, sheetFooter: { paddingTop: 14, paddingBottom: 6 }, adminFooterRow: { flexDirection: 'row', gap: 10 }, adminFooterButton: { flex: 1 }, accessoryBar: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', backgroundColor: C.trackCard, borderTopWidth: 1, borderTopColor: C.trackBorder, paddingHorizontal: 16, paddingVertical: 10 }, accessoryDone: { color: C.trackPrimary, fontSize: 16, fontWeight: '800' }, formLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, marginTop: 10 }, dateFieldGap: { marginTop: 10 }, input: { color: C.trackText, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15 }, choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 4 }, switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.trackCard, borderRadius: 14, padding: 10 }, detail: { gap: 10, paddingBottom: 12 }, detailIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: C.accentDim, alignItems: 'center', justifyContent: 'center' }, detailDate: { color: C.trackTextSec, fontSize: 13 }, detailText: { color: C.trackText, fontSize: 15, lineHeight: 22 }, detailActions: { gap: 8, marginTop: 8 }, timelineSecondary: { color: C.trackPrimary, fontSize: 11.5, fontWeight: '700', marginTop: 2 }, detailRow: { gap: 2 }, detailLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }, detailDocLink: { color: C.trackPrimary, fontSize: 13, fontWeight: '700', marginTop: 4 }, gabenHeading: { color: C.trackTextMut, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 14 }, adminRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: C.trackCard, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, padding: 12 }, adminRowTitle: { color: C.trackText, fontSize: 13.5, fontWeight: '800' }, adminRowActions: { flexDirection: 'row', gap: 10 }, emergency: { gap: 10, paddingBottom: 14 }, emergencyName: { color: C.trackText, fontSize: 25, fontWeight: '900' }, emergencyLabel: { color: C.trackTextMut, fontSize: 10, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase', marginTop: 8 }, emergencyText: { color: C.trackText, fontSize: 15 }, emergencyLink: { color: C.trackPrimary },
 });

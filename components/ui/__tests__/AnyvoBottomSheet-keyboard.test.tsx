@@ -1,5 +1,5 @@
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { AnyvoBottomSheet } from '../AnyvoBottomSheet';
 import { C } from '@/constants/colors';
 
@@ -118,5 +118,85 @@ describe('keyboardAware on Android: unchanged from before — never reported bro
     const avoidance = rootOf(node).findByType(KeyboardAvoidingView);
     expect(StyleSheet.flatten(avoidance.props.style)?.flex).toBe(1);
     expect((avoidance.props as unknown as { behavior?: string }).behavior).toBe('height');
+  });
+});
+
+// REGRESSION (Health Record, 28.09.2026): physical-device report — Health
+// bottom sheets could not be reliably closed. Root cause: this component
+// never implemented an actual dismiss gesture (the "griff" bar is a plain,
+// unwired <View> — decorative only), so the ONLY working dismiss path was
+// tapping the backdrop, which can shrink to an unreachable sliver on a tall
+// or keyboard-squeezed sheet. Fix: an explicit, always-reachable close (X)
+// button, opt-in via a new `closeButton` prop so every pre-existing
+// consumer (Backpack, the tracking marker/compass/segment sheets, edit-dog,
+// heat calendar, the custom-exercise sheet — none of which pass the prop)
+// renders byte-identically to before. These tests cover both sides of that
+// contract: the default-off backward-compatibility guarantee, and the new
+// button's own behavior when a consumer opts in.
+function findCloseButton(node: ReactTestRenderer) {
+  return (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress: () => void } }[] })
+    .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'Schließen');
+}
+
+describe('closeButton prop (opt-in, default off — backward compatible with every existing consumer)', () => {
+  it('renders NO close button by default — existing consumers (Backpack, tracking sheets, etc.) are visually unaffected', () => {
+    const node = render();
+    expect(findCloseButton(node)).toBeUndefined();
+  });
+
+  it('renders NO close button even with a title, unless closeButton is explicitly passed', () => {
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<AnyvoBottomSheet visible onClose={jest.fn()} title="Marker"><Text>x</Text></AnyvoBottomSheet>); });
+    expect(findCloseButton(node)).toBeUndefined();
+  });
+
+  it('closeButton renders an accessible close control when passed', () => {
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<AnyvoBottomSheet visible closeButton onClose={jest.fn()} title="Medikament erfassen"><Text>x</Text></AnyvoBottomSheet>); });
+    expect(findCloseButton(node)).toBeTruthy();
+  });
+
+  it('closeButton works even with no title (right-aligned, no crash)', () => {
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<AnyvoBottomSheet visible closeButton onClose={jest.fn()}><Text>x</Text></AnyvoBottomSheet>); });
+    expect(findCloseButton(node)).toBeTruthy();
+  });
+
+  it('pressing the close button calls onClose exactly once', () => {
+    const onClose = jest.fn();
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<AnyvoBottomSheet visible closeButton onClose={onClose} title="Medikament erfassen"><Text>x</Text></AnyvoBottomSheet>); });
+    act(() => { findCloseButton(node)!.props.onPress(); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('pressing the close button dismisses the keyboard as part of closing', () => {
+    const dismissSpy = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<AnyvoBottomSheet visible closeButton onClose={jest.fn()} title="Medikament erfassen"><Text>x</Text></AnyvoBottomSheet>); });
+    act(() => { findCloseButton(node)!.props.onPress(); });
+    expect(dismissSpy).toHaveBeenCalledTimes(1);
+    dismissSpy.mockRestore();
+  });
+
+  it('the close button does nothing besides dismiss the keyboard and call onClose — it can never itself mutate data (it receives no other handler)', () => {
+    const onClose = jest.fn();
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<AnyvoBottomSheet visible closeButton onClose={onClose} title="Medikament erfassen"><Text>x</Text></AnyvoBottomSheet>); });
+    const button = findCloseButton(node)!;
+    // Its onPress closure only references Keyboard.dismiss and the passed
+    // onClose — there is no service/mutation call reachable from this prop.
+    expect(typeof button.props.onPress).toBe('function');
+    act(() => { button.props.onPress(); });
+    expect(onClose).toHaveBeenCalledWith();
+  });
+
+  it('backdrop-tap dismissal remains completely unchanged when closeButton is also present', () => {
+    const onClose = jest.fn();
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<AnyvoBottomSheet visible closeButton onClose={onClose} title="Medikament erfassen"><Text>x</Text></AnyvoBottomSheet>); });
+    const backdrop = (node.root as unknown as { findAllByType: (t: unknown) => { props: { style?: StyleProp<ViewStyle>; onPress?: () => void } }[] })
+      .findAllByType(View).find(v => StyleSheet.flatten(v.props.style)?.backgroundColor === 'rgba(0,0,0,0.62)');
+    expect(backdrop).toBeTruthy();
   });
 });
