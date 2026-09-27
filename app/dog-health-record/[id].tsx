@@ -11,6 +11,7 @@ import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { AnyvoCard } from '@/components/ui/AnyvoCard';
 import { AnyvoChip } from '@/components/ui/AnyvoChip';
 import { DateField } from '@/components/ui/DateField';
+import { SwipeableHealthRow } from '@/components/ui/SwipeableHealthRow';
 import { DogDocumentsCard } from '@/components/dogs/DogDocumentsCard';
 import type { DogDocument } from '@/components/dogs/types';
 import { TrendLine } from '@/components/analytics/TrendLine';
@@ -122,9 +123,31 @@ export default function DogHealthRecordRoute() {
     if (item.kind === 'condition') { const row = data.conditions.find(value => value.id === id); if (!row) return; setSheet(row.kind); setText1(row.name); setText2(row.note ?? ''); setDate1(row.started_on ? new Date(row.started_on) : new Date()); }
   };
 
+  // Swipe-left-to-delete (28.09.2026): this is the SAME confirm+delete flow
+  // already used by the detail sheet's own "Löschen" button (onEdit/onDelete
+  // passed to DetailBody) — now also reachable directly from a Verlauf card
+  // via SwipeableHealthRow, without opening the detail sheet first. Kept as
+  // one function, one confirmation, one delete call so the two entry points
+  // can never drift apart. 'document' timeline rows are excluded here on
+  // purpose — Health documents already have their own dedicated delete flow
+  // (the Dokumente tab's deleteDocument, below), and duplicating a second,
+  // conflicting destructive control for the same row was explicitly out of
+  // scope. Medication gets its own confirmation copy: dog_health_medication_
+  // administrations.medication_id is "on delete cascade" (see
+  // supabase/migrations/20260929090000_health_vaccination_medication_history.sql),
+  // so deleting a medication genuinely does delete every "Gabe" documented
+  // for it — that must never happen silently. Vaccinations keep the generic
+  // copy: dog_health_vaccinations.document_id is "on delete set null" — the
+  // OTHER direction of that FK — so deleting a vaccination never touches its
+  // linked document (verified from schema, not assumed).
+  const deleteConfirmCopy = (item: HealthTimelineItem): { title: string; message: string } => item.kind === 'medication'
+    ? { title: `${item.title} löschen?`, message: 'Dieses Medikament und die dazu dokumentierten Gaben werden dauerhaft gelöscht. Verknüpfte Erinnerungen werden ebenfalls bereinigt.' }
+    : { title: `${item.title} löschen?`, message: 'Der Gesundheitseintrag wird dauerhaft entfernt. Verknüpfte Erinnerungen werden ebenfalls bereinigt.' };
+
   const deleteItem = (item: HealthTimelineItem) => {
     if (item.kind === 'document') return;
-    Alert.alert(`${item.title} löschen?`, 'Der Gesundheitseintrag wird dauerhaft entfernt. Verknüpfte Erinnerungen werden ebenfalls bereinigt.', [
+    const { title, message } = deleteConfirmCopy(item);
+    Alert.alert(title, message, [
       { text: 'Abbrechen', style: 'cancel' },
       { text: 'Löschen', style: 'destructive', onPress: async () => {
         const id = item.id.split(':')[1];
@@ -264,7 +287,7 @@ export default function DogHealthRecordRoute() {
           <View style={s.tabs}>{(['overview', 'timeline', 'documents'] as Tab[]).map(key => <TouchableOpacity key={key} onPress={() => setTab(key)} style={[s.tab, tab === key && s.tabActive]}><Text style={[s.tabText, tab === key && s.tabTextActive]}>{key === 'overview' ? t('health.recordOverview') : key === 'timeline' ? t('health.recordTimeline') : t('health.recordDocuments')}</Text></TouchableOpacity>)}</View>
           {Object.keys(data.sectionErrors ?? {}).length > 0 ? <View style={s.warning}><Ionicons name="warning-outline" size={17} color={C.trackWarning} /><Text style={s.warningText}>{t('health.recordPartialLoad')}</Text></View> : null}
           {tab === 'overview' && <Overview dog={dog} status={status} due={due} data={data} measurements={measurements} trend={trend} onAction={openSheet} onTimeline={() => setTab('timeline')} />}
-          {tab === 'timeline' && <Timeline items={filteredTimeline} filter={filter} onFilter={setFilter} onDetail={setDetail} />}
+          {tab === 'timeline' && <Timeline items={filteredTimeline} filter={filter} onFilter={setFilter} onDetail={setDetail} onDelete={deleteItem} isOwner={isOwner} />}
           {tab === 'documents' && <DogDocumentsCard documents={documents} onAdd={() => router.push({ pathname: '/dog-document/[id]', params: { id: dogId, category: 'health' } } as never)} onOpen={openDocument} onDelete={isOwner ? deleteDocument : undefined} />}
         </ScrollView>
       </SafeAreaView>
@@ -418,12 +441,23 @@ function Overview({ dog, status, due, data, measurements, trend, onAction, onTim
     <Text style={s.section}>{t('health.recordQuickActions')}</Text><View style={s.actionGrid}>{ACTIONS.map(action => <TouchableOpacity key={action.key} style={[s.action, { width: actionWidth }]} onPress={() => onAction(action.key)}><View style={s.actionIcon}><Ionicons name={action.icon} size={19} color={C.trackPrimary} /></View><Text style={s.actionText} numberOfLines={2}>{t(action.labelKey)}</Text></TouchableOpacity>)}</View>
     <Text style={s.section}>{t('health.recordCurrentValues')}</Text><AnyvoCard><View style={s.valueHeader}><View style={s.valueCopy}><Text style={s.eyebrow}>{t('health.recordWeight').toUpperCase()}</Text>{latestWeight != null ? <Text style={s.value}>{latestWeight} kg</Text> : <><Text style={s.weightEmptyPrimary} numberOfLines={2}>Noch kein Gewicht erfasst</Text><TouchableOpacity style={s.weightAdd} onPress={() => onAction('weight')} activeOpacity={0.8}><Text style={s.weightAddText}>Gewicht hinzufügen</Text><Ionicons name="arrow-forward" size={15} color={C.trackPrimary} /></TouchableOpacity></>}{latestMeasurement ? <Text style={s.muted}>{formatDate(latestMeasurement.entry_date)}{trend?.delta != null ? ` · ${trend.delta >= 0 ? '+' : ''}${trend.delta.toFixed(1)} kg` : ''}</Text> : null}</View><Ionicons name="scale-outline" size={26} color={C.trackPrimary} /></View>{measurements.length > 1 ? <TrendLine points={measurements.slice(-8).map(entry => ({ date: entry.entry_date, score: entry.weight_kg! }))} width={trendWidth} /> : null}</AnyvoCard>
     <Text style={s.section}>{t('health.recordNext')}</Text>{due.length ? due.slice(0, 3).map(item => <DueRow key={item.id} item={item} />) : <Empty text={t('health.recordNoDue')} />}
-    <Text style={s.section}>{t('health.recordRecent')}</Text>{buildHealthTimeline(data).slice(0, 4).map(item => <TimelineRow key={item.id} item={item} onPress={() => onTimeline()} />)}{buildHealthTimeline(data).length === 0 ? <Empty text={t('health.recordNoActivities')} /> : null}
+    <Text style={s.section}>{t('health.recordRecent')}</Text>{buildHealthTimeline(data).slice(0, 4).map(item => <TimelineRow key={item.id} item={item} onPress={() => onTimeline()} onDelete={() => {}} deletable={false} />)}{buildHealthTimeline(data).length === 0 ? <Empty text={t('health.recordNoActivities')} /> : null}
   </View>;
 }
 
-function Timeline({ items, filter, onFilter, onDetail }: { items: HealthTimelineItem[]; filter: HealthTimelineFilter; onFilter: (filter: HealthTimelineFilter) => void; onDetail: (item: HealthTimelineItem) => void }) { return <View style={s.content}><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>{FILTERS.map(item => <AnyvoChip key={item.key} label={item.label} active={filter === item.key} onPress={() => onFilter(item.key)} />)}</ScrollView>{items.length ? items.map(item => <TimelineRow key={`${item.kind}-${item.id}`} item={item} onPress={() => onDetail(item)} />) : <Empty text="Keine Einträge für diesen Filter" />}</View>; }
-function TimelineRow({ item, onPress }: { item: HealthTimelineItem; onPress: () => void }) { return <TouchableOpacity style={s.timelineRow} onPress={onPress} activeOpacity={0.8}><View style={s.timelineIcon}><Ionicons name={kindIcon(item.kind)} size={18} color={C.trackPrimary} /></View><View style={{ flex: 1 }}><Text style={s.rowTitle}>{item.title}</Text><Text style={s.muted}>{kindLabel(item.kind)} · {formatDate(item.date)}{item.detail ? ` · ${item.detail}` : ''}</Text>{item.secondary ? <Text style={s.timelineSecondary}>{item.secondary}</Text> : null}</View><Ionicons name="chevron-forward" size={16} color={C.trackTextMut} /></TouchableOpacity>; }
+function Timeline({ items, filter, onFilter, onDetail, onDelete, isOwner }: { items: HealthTimelineItem[]; filter: HealthTimelineFilter; onFilter: (filter: HealthTimelineFilter) => void; onDetail: (item: HealthTimelineItem) => void; onDelete: (item: HealthTimelineItem) => void; isOwner: boolean }) { return <View style={s.content}><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>{FILTERS.map(item => <AnyvoChip key={item.key} label={item.label} active={filter === item.key} onPress={() => onFilter(item.key)} />)}</ScrollView>{items.length ? items.map(item => <TimelineRow key={`${item.kind}-${item.id}`} item={item} onPress={() => onDetail(item)} onDelete={() => onDelete(item)} deletable={isOwner && item.kind !== 'document'} />) : <Empty text="Keine Einträge für diesen Filter" />}</View>; }
+// Swipe-left-to-delete (28.09.2026): SwipeableHealthRow only reveals the
+// action and forwards the tap — deletable=false (non-owner, or a 'document'
+// row, which keeps its own dedicated delete flow in the Dokumente tab
+// instead) renders the exact same card with no swipe affordance at all, so
+// tap-to-open-detail is completely unaffected either way.
+function TimelineRow({ item, onPress, onDelete, deletable }: { item: HealthTimelineItem; onPress: () => void; onDelete: () => void; deletable: boolean }) {
+  return (
+    <SwipeableHealthRow enabled={deletable} onDelete={onDelete} accessibilityLabel={`${item.title} löschen`}>
+      <TouchableOpacity style={s.timelineRow} onPress={onPress} activeOpacity={0.8}><View style={s.timelineIcon}><Ionicons name={kindIcon(item.kind)} size={18} color={C.trackPrimary} /></View><View style={{ flex: 1 }}><Text style={s.rowTitle}>{item.title}</Text><Text style={s.muted}>{kindLabel(item.kind)} · {formatDate(item.date)}{item.detail ? ` · ${item.detail}` : ''}</Text>{item.secondary ? <Text style={s.timelineSecondary}>{item.secondary}</Text> : null}</View><Ionicons name="chevron-forward" size={16} color={C.trackTextMut} /></TouchableOpacity>
+    </SwipeableHealthRow>
+  );
+}
 function DueRow({ item }: { item: DueItem }) { return <View style={s.timelineRow}><View style={s.timelineIcon}><Ionicons name="calendar-outline" size={18} color={item.days <= 30 ? C.trackWarning : C.trackPrimary} /></View><View style={{ flex: 1 }}><Text style={s.rowTitle}>{item.title}</Text><Text style={s.muted}>{formatDate(item.date)} · {item.days < 0 ? 'überfällig' : item.days === 0 ? 'heute' : `in ${item.days} Tagen`}</Text></View></View>; }
 function Empty({ text }: { text: string }) { return <AnyvoCard><Text style={s.empty}>{text}</Text></AnyvoCard>; }
 

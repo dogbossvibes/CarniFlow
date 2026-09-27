@@ -1,3 +1,9 @@
+// Swipe-left-to-delete (28.09.2026) needs react-native-gesture-handler's own
+// Jest environment setup (native module install/mocking) — required only for
+// ReanimatedSwipeable-wrapped Verlauf rows added below; every pre-existing
+// test in this file is unaffected by it being present.
+import 'react-native-gesture-handler/jestSetup';
+
 // RC-Fix "Digital Health Record — Gewicht erfassen" (TestFlight Build 46),
 // parts 1–3 (systemic fix for ALL Health quick-action forms).
 // Part 1 root cause: the shared quick-action AnyvoBottomSheet never opted
@@ -36,6 +42,16 @@ const mockLoadHealthOverview = jest.fn();
 const mockCreateWeightEntry = jest.fn();
 const mockUpdateWeightEntry = jest.fn();
 const mockGetDogById = jest.fn();
+
+// Swipe-left-to-delete (28.09.2026): named (rather than the anonymous
+// jest.fn() these used to be) so tests can assert the exact row id passed
+// to the exact delete service for each timeline kind, from the NEW swipe
+// entry point specifically — not just the pre-existing detail-sheet one.
+const mockDeleteWeightEntry = jest.fn();
+const mockDeleteVaccination = jest.fn();
+const mockDeleteParasiteTreatment = jest.fn();
+const mockDeleteVetVisit = jest.fn();
+const mockDeleteCondition = jest.fn();
 
 // Phase 3 (28.09.2026): medication administration history ("Gaben"). Named
 // (rather than the anonymous jest.fn() used for untouched sibling mutations
@@ -102,11 +118,11 @@ jest.mock('@/services/healthService', () => ({
   loadHealthOverview: (...a: unknown[]) => mockLoadHealthOverview(...a),
   createWeightEntry: (...a: unknown[]) => mockCreateWeightEntry(...a),
   updateWeightEntry: (...a: unknown[]) => mockUpdateWeightEntry(...a),
-  deleteWeightEntry: jest.fn(), createVaccination: (...a: unknown[]) => mockCreateVaccination(...a), updateVaccination: (...a: unknown[]) => mockUpdateVaccination(...a), deleteVaccination: jest.fn(),
+  deleteWeightEntry: (...a: unknown[]) => mockDeleteWeightEntry(...a), createVaccination: (...a: unknown[]) => mockCreateVaccination(...a), updateVaccination: (...a: unknown[]) => mockUpdateVaccination(...a), deleteVaccination: (...a: unknown[]) => mockDeleteVaccination(...a),
   createMedication: (...a: unknown[]) => mockCreateMedication(...a), updateMedication: (...a: unknown[]) => mockUpdateMedication(...a), deleteMedication: (...a: unknown[]) => mockDeleteMedication(...a),
-  createParasiteTreatment: jest.fn(), updateParasiteTreatment: jest.fn(), deleteParasiteTreatment: jest.fn(),
-  createVetVisit: jest.fn(), updateVetVisit: jest.fn(), deleteVetVisit: jest.fn(),
-  createCondition: jest.fn(), updateCondition: jest.fn(), deleteCondition: jest.fn(),
+  createParasiteTreatment: jest.fn(), updateParasiteTreatment: jest.fn(), deleteParasiteTreatment: (...a: unknown[]) => mockDeleteParasiteTreatment(...a),
+  createVetVisit: jest.fn(), updateVetVisit: jest.fn(), deleteVetVisit: (...a: unknown[]) => mockDeleteVetVisit(...a),
+  createCondition: jest.fn(), updateCondition: jest.fn(), deleteCondition: (...a: unknown[]) => mockDeleteCondition(...a),
   loadMedicationAdministrations: (...a: unknown[]) => mockLoadMedicationAdministrations(...a),
   createMedicationAdministration: (...a: unknown[]) => mockCreateMedicationAdministration(...a),
   updateMedicationAdministration: (...a: unknown[]) => mockUpdateMedicationAdministration(...a),
@@ -1205,5 +1221,236 @@ describe('Digital Health Record — medication detail sheet close + clean-state 
     expect(mockCreateMedicationAdministration).not.toHaveBeenCalled();
     expect(strings(node)).not.toContain('GABEN');
     expect(strings(node)).not.toContain('Menge');
+  });
+});
+
+// SWIPE-LEFT-TO-DELETE (28.09.2026): Verlauf timeline cards can now be
+// deleted by swiping left to reveal a red "Löschen" action, matching
+// components/training/SwipeableTrainingItem.tsx's already-shipped,
+// Build-48-compatible ReanimatedSwipeable pattern (same already-installed
+// react-native-gesture-handler dependency — no new package). The actual
+// on-device pan-gesture reveal cannot be reliably asserted by a JS unit
+// test (documented manual-device-retest precedent already established
+// above, for a different gesture/animation concern) — react-test-renderer
+// has no real UIKit/Reanimated gesture-recognizer semantics. What IS
+// reliably testable, and is covered here: the revealed action exists and is
+// reachable, tapping it (not merely rendering/swiping) is what triggers the
+// confirmation dialog, cancelling never deletes, confirming calls the exact
+// existing delete service with the exact selected row id (reusing
+// deleteItem — the SAME function the pre-existing detail-sheet "Löschen"
+// button already called, so this is one delete pipeline with two entry
+// points, not a duplicated one), a successful delete refreshes Verlauf, and
+// a failed delete leaves the entry in place and never pretends to have
+// succeeded. Every pre-existing test in this file (quick-action sheets,
+// vaccination/medication detail, Gaben, the explicit close button, filters)
+// still passes unmodified above — proving none of that regressed.
+const VET_ROW = { id: 'vet-1', dog_id: 'dog-1', appointment_at: '2026-09-10T09:00:00Z', reason: 'Kontrolle', status: 'scheduled', clinic_name: 'Tierklinik Zürich', diagnosis: null, treatment: null, cost_amount: null, document_id: null, completed_at: null, note: null, created_at: '2026-09-01T00:00:00Z' };
+const PARASITE_ROW = { id: 'para-1', dog_id: 'dog-1', treatment_date: '2026-09-05', product: 'Bravecto', note: null, next_due_date: '2026-12-05', treatment_type: 'flea_tick', created_at: '2026-09-05T00:00:00Z' };
+const CONDITION_ROW = { id: 'cond-1', owner_id: 'owner-1', dog_id: 'dog-1', kind: 'allergy' as const, name: 'Huhn', status: 'active' as const, started_on: '2026-01-01', ended_on: null, note: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' };
+// Two independent weight entries with the SAME kg value on different dates —
+// exactly the case the swipe-delete flow must never conflate (WEIGHT
+// special case in the task spec).
+const WEIGHT_ROW_OLD = { id: 'w-old', dog_id: 'dog-1', entry_date: '2026-09-01', weight_kg: 24.5, load_level: null, is_rest_day: false, is_intense: false, note: null, created_at: '2026-09-01T00:00:00Z' };
+const WEIGHT_ROW_NEW = { id: 'w-new', dog_id: 'dog-1', entry_date: '2026-09-15', weight_kg: 24.5, load_level: null, is_rest_day: false, is_intense: false, note: null, created_at: '2026-09-15T00:00:00Z' };
+const DOCUMENT_ROW = { id: 'doc-1', dog_id: 'dog-1', kind: 'sonstiges', title: 'Laborbericht', category: 'health', subtype: null, file_url: 'x.pdf', issued_on: '2026-09-01', note: null, created_at: '2026-09-01' };
+
+describe('Digital Health Record Verlauf — swipe-left-to-delete (28.09.2026)', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockDeleteWeightEntry.mockReset().mockResolvedValue({ error: null, reminderSync: 'not_required' });
+    mockDeleteVaccination.mockReset().mockResolvedValue({ error: null, reminderSync: 'not_required' });
+    mockDeleteParasiteTreatment.mockReset().mockResolvedValue({ error: null, reminderSync: 'not_required' });
+    mockDeleteVetVisit.mockReset().mockResolvedValue({ error: null, reminderSync: 'not_required' });
+    mockDeleteCondition.mockReset().mockResolvedValue({ error: null, reminderSync: 'not_required' });
+    mockDeleteMedication.mockReset().mockResolvedValue({ data: null, error: null, reminderSync: 'not_required' });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({
+      ...EMPTY_OVERVIEW,
+      entries: [WEIGHT_ROW_NEW, WEIGHT_ROW_OLD],
+      vaccinations: [VACCINATION_ROW],
+      medications: [MEDICATION_ROW],
+      parasites: [PARASITE_ROW],
+      vetVisits: [VET_ROW],
+      conditions: [CONDITION_ROW],
+      documents: [DOCUMENT_ROW],
+    });
+  });
+
+  function findDeleteAction(node: ReactTestRenderer, label: string, nth = 0) {
+    return (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress: () => void } }[] })
+      .findAllByType(TouchableOpacity).filter((c) => c.props.accessibilityLabel === label)[nth];
+  }
+  function confirmDestructive() {
+    return jest.spyOn(Alert, 'alert').mockImplementation((_title, _msg, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+  }
+  function confirmCancel() {
+    return jest.spyOn(Alert, 'alert').mockImplementation((_title, _msg, buttons) => {
+      buttons?.find((b) => b.style === 'cancel')?.onPress?.();
+    });
+  }
+
+  it('a deletable Verlauf card reveals a "<Titel> löschen" delete action', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    expect(findDeleteAction(node, 'Tollwut löschen')).toBeTruthy();
+  });
+
+  it('tapping the card itself (not the delete action) still opens the detail sheet, unaffected by the swipe wrapper', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Tollwut').props.onPress(); });
+    expect(strings(node)).toContain('Tierklinik Zürich');
+  });
+
+  it('rendering the Verlauf list alone never deletes anything — the revealed action must be explicitly tapped', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    expect(mockDeleteVaccination).not.toHaveBeenCalled();
+    expect(mockDeleteMedication).not.toHaveBeenCalled();
+    expect(mockDeleteWeightEntry).not.toHaveBeenCalled();
+  });
+
+  it('tapping the delete action opens a confirmation dialog — it does not delete immediately', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findDeleteAction(node, 'Tollwut löschen')!.props.onPress(); });
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertSpy.mock.calls[0][0]).toBe('Tollwut löschen?');
+    expect(mockDeleteVaccination).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('cancelling the confirmation does NOT delete', async () => {
+    const alertSpy = confirmCancel();
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findDeleteAction(node, 'Tollwut löschen')!.props.onPress(); });
+    await flush();
+    expect(mockDeleteVaccination).not.toHaveBeenCalled();
+    expect(strings(node)).toContain('Tollwut'); // card still present
+    alertSpy.mockRestore();
+  });
+
+  it('confirming deletes exactly the selected vaccination and preserves its linked document (dog_health_vaccinations.document_id is "on delete set null" — the vaccination row itself is what deleteVaccination removes; the document row is never touched)', async () => {
+    const alertSpy = confirmDestructive();
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    const callsBefore = mockLoadHealthOverview.mock.calls.length;
+    act(() => { findDeleteAction(node, 'Tollwut löschen')!.props.onPress(); });
+    await flush();
+    expect(mockDeleteVaccination).toHaveBeenCalledTimes(1);
+    expect(mockDeleteVaccination).toHaveBeenCalledWith('vacc-1');
+    expect(mockLoadHealthOverview.mock.calls.length).toBeGreaterThan(callsBefore); // Verlauf refreshed
+    alertSpy.mockRestore();
+  });
+
+  it('medication confirmation copy discloses the Gaben cascade — the DB FK is "on delete cascade" for dog_health_medication_administrations.medication_id', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findDeleteAction(node, 'Rimadyl löschen')!.props.onPress(); });
+    const [, message] = alertSpy.mock.calls[0];
+    expect(message).toContain('Gaben');
+    expect(message).toContain('dauerhaft gelöscht');
+    alertSpy.mockRestore();
+  });
+
+  it('confirming a medication delete targets exactly that medication only — deleteMedication receives its id, no other medication is touched', async () => {
+    const alertSpy = confirmDestructive();
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findDeleteAction(node, 'Rimadyl löschen')!.props.onPress(); });
+    await flush();
+    expect(mockDeleteMedication).toHaveBeenCalledTimes(1);
+    expect(mockDeleteMedication).toHaveBeenCalledWith('med-1');
+    alertSpy.mockRestore();
+  });
+
+  it('WEIGHT: deleting one dated weight entry never targets another entry with the same kg value — the swipe action on the OLDER row deletes only w-old', async () => {
+    const alertSpy = confirmDestructive();
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    // Two "Gewicht" cards exist (same title); sorted newest-first, so index 1 is the older (w-old) row.
+    act(() => { findDeleteAction(node, 'Gewicht löschen', 1)!.props.onPress(); });
+    await flush();
+    expect(mockDeleteWeightEntry).toHaveBeenCalledTimes(1);
+    expect(mockDeleteWeightEntry).toHaveBeenCalledWith('w-old');
+  });
+
+  it('vaccination, parasite, vet, and condition kinds each route to their own exact delete service with the exact selected row id', async () => {
+    const alertSpy = confirmDestructive();
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+
+    act(() => { findDeleteAction(node, 'Bravecto löschen')!.props.onPress(); });
+    await flush();
+    expect(mockDeleteParasiteTreatment).toHaveBeenCalledWith('para-1');
+
+    act(() => { findDeleteAction(node, 'Kontrolle löschen')!.props.onPress(); });
+    await flush();
+    expect(mockDeleteVetVisit).toHaveBeenCalledWith('vet-1');
+
+    act(() => { findDeleteAction(node, 'Huhn löschen')!.props.onPress(); });
+    await flush();
+    expect(mockDeleteCondition).toHaveBeenCalledWith('cond-1');
+    alertSpy.mockRestore();
+  });
+
+  it('a failed delete leaves the card in place and never removes it — no optimistic deletion', async () => {
+    mockDeleteVaccination.mockResolvedValue({ error: { message: 'network' }, reminderSync: 'not_required' });
+    const alertSpy = confirmDestructive();
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    const callsBefore = mockLoadHealthOverview.mock.calls.length;
+    act(() => { findDeleteAction(node, 'Tollwut löschen')!.props.onPress(); });
+    await flush();
+    expect(mockLoadHealthOverview.mock.calls.length).toBe(callsBefore); // never refreshed — nothing to "undo"
+    expect(strings(node)).toContain('Tollwut'); // card still rendered, never removed
+    alertSpy.mockRestore();
+  });
+
+  it('DOCUMENTS: a document Verlauf card has NO swipe-delete action — deleting a document keeps its own dedicated workflow (the Dokumente tab), not duplicated here', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    expect(findDeleteAction(node, 'Laborbericht löschen')).toBeUndefined();
+  });
+
+  it('a non-owner (shared Health access) sees no swipe-delete action on any Verlauf card', async () => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: { ...DOG, owner_id: 'someone-else' }, error: null });
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    expect(findDeleteAction(node, 'Tollwut löschen')).toBeUndefined();
+    expect(findDeleteAction(node, 'Rimadyl löschen')).toBeUndefined();
+  });
+
+  it('the Übersicht "recent activity" preview list never gets swipe-delete — it is a compact summary, not the full Verlauf', async () => {
+    const node = render();
+    await flush(); // stays on the default 'overview' tab
+    expect(findDeleteAction(node, 'Tollwut löschen')).toBeUndefined();
+  });
+
+  it('existing Verlauf filters still work after adding swipe-delete', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findByText(node, 'Medikamente').props.onPress(); });
+    const rendered = strings(node);
+    expect(rendered).toContain('Rimadyl');
+    expect(rendered).not.toContain('Tollwut');
   });
 });
