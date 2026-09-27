@@ -25,7 +25,7 @@
 // Done action only dismisses the keyboard — never state, never save.
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
-import { InputAccessoryView, Keyboard, Platform, Text, TextInput } from 'react-native';
+import { InputAccessoryView, Keyboard, Platform, ScrollView, Text, TextInput } from 'react-native';
 import DogHealthRecordRoute from '@/app/dog-health-record/[id]';
 import type { Dog } from '@/types';
 import type { HealthOverviewData } from '@/services/healthService';
@@ -634,5 +634,95 @@ describe('Digital Health Record: OTA diagnostic controls (Phase B, 27.09.2026) �
     const node = render();
     await flush();
     expect(strings(node).some((line) => line.includes('log read failed'))).toBe(true);
+  });
+});
+
+// PHASE 1–5 (28.09.2026): physical-device report — quick-action forms
+// visually collapsed BEFORE the keyboard even opened. Backpack (a confirmed
+// working AnyvoBottomSheet consumer on the same device) was used as the
+// canonical structural reference. A line-by-line audit against
+// app/dog-backpack/[id].tsx found the shell already matching on every
+// flex/minHeight/maxHeight/keyboard prop; the one real divergence was this
+// ScrollView's own contentContainerStyle (sheetContent, a gap/paddingBottom
+// object Backpack's editor ScrollView never sets at all) — removed, with
+// equivalent field-to-field spacing moved onto formLabel/dateFieldGap
+// instead, matching how Backpack's own fieldLabel already carries its
+// spacing. This suite proves structural parity with Backpack; it does not
+// (and cannot, from a JS unit test) prove the physical-device symptom itself
+// was caused by the removed style, since no other divergence was found.
+describe('Digital Health Record quick-action sheet: Backpack-parity structural shell (28.09.2026)', () => {
+  const healthContent = readFileSync('app/dog-health-record/[id].tsx', 'utf8');
+  const backpackContent = readFileSync('app/dog-backpack/[id].tsx', 'utf8');
+
+  it('no Health-specific contentContainerStyle wrapper remains on the quick-action ScrollView — matches Backpack, which sets none', () => {
+    expect(healthContent).not.toMatch(/sheetContent:\s*\{/);
+    expect(healthContent).not.toMatch(/contentContainerStyle=\{s\.sheetContent\}/);
+    expect(healthContent).toMatch(/<ScrollView style=\{s\.sheetScroll\} keyboardShouldPersistTaps="handled" keyboardDismissMode=\{Platform\.OS === 'ios' \? 'interactive' : 'on-drag'\} showsVerticalScrollIndicator=\{false\}>/);
+  });
+
+  it('Health\'s sheetScroll/sheetFooter are byte-identical in shape to Backpack\'s editorScroll/editorFooter', () => {
+    expect(healthContent).toMatch(/sheetScroll: \{ flexShrink: 1 \}/);
+    expect(backpackContent).toMatch(/editorScroll: \{ flexShrink: 1 \}/);
+    expect(healthContent).toMatch(/sheetFooter: \{ paddingTop: 14, paddingBottom: 6 \}/);
+    expect(backpackContent).toMatch(/editorFooter: \{ paddingTop: 14, paddingBottom: 6 \}/);
+  });
+
+  it('both Health and Backpack use AnyvoBottomSheet with keyboardAware, keyboardShouldPersistTaps="handled" and the same keyboardDismissMode expression', () => {
+    for (const content of [healthContent, backpackContent]) {
+      expect(content).toMatch(/<AnyvoBottomSheet keyboardAware /);
+      expect(content).toMatch(/keyboardShouldPersistTaps="handled"/);
+      expect(content).toMatch(/keyboardDismissMode=\{Platform\.OS === 'ios' \? 'interactive' : 'on-drag'\}/);
+    }
+  });
+
+  it('Backpack has no KeyboardAvoidingView of its own (relies entirely on the shared AnyvoBottomSheet mechanism, same as Health)', () => {
+    expect(backpackContent).not.toMatch(/<KeyboardAvoidingView/);
+  });
+
+  it.each(['health.recordVaccination', 'health.recordParasites', 'health.recordMedication', 'health.recordVet', 'health.recordWeight', 'health.recordAllergy', 'health.recordIntolerance', 'health.recordDiagnosis'])(
+    'form body for "%s" exists immediately on open, before any keyboard interaction, with Save reachable',
+    async (actionLabelKey) => {
+      const node = render();
+      await flush();
+      openQuickAction(node, actionLabelKey);
+      // The sheet's ScrollView must already contain rendered form content —
+      // not an empty/collapsed body — the instant the sheet opens.
+      const scrollView = (node.root as unknown as { findAllByType: (t: unknown) => { props: { children: unknown } }[] })
+        .findAllByType(ScrollView).find((sv) => Array.isArray(sv.props.children) ? sv.props.children.length > 0 : sv.props.children != null);
+      expect(scrollView).toBeTruthy();
+      expect(findByText(node, 'Speichern')).toBeTruthy();
+    },
+  );
+
+  it('the footer is a direct Fragment/Modal-tree sibling of the ScrollView, not nested inside any flex:1/minHeight:0 wrapper (no such wrapper exists in this file)', () => {
+    expect(healthContent).not.toMatch(/flex:\s*1,\s*minHeight:\s*0/);
+    expect(healthContent).not.toMatch(/minHeight:\s*0,\s*flex:\s*1/);
+  });
+
+  it('every DateField call in renderForm carries the same dateFieldGap spacing style, mirroring how Backpack keeps spacing on the field itself rather than the container', () => {
+    const renderFormLine = healthContent.split('\n').find((line) => line.includes('function renderForm('))!;
+    const dateFieldOpenTags = renderFormLine.match(/<DateField /g) ?? [];
+    const dateFieldGapUsages = renderFormLine.match(/<DateField style=\{s\.dateFieldGap\}/g) ?? [];
+    expect(dateFieldOpenTags.length).toBeGreaterThanOrEqual(9);
+    expect(dateFieldGapUsages.length).toBe(dateFieldOpenTags.length);
+  });
+
+  it('Backpack remains completely unchanged by this Health-side pass', () => {
+    expect(backpackContent).toContain("editorFooter: { paddingTop: 14, paddingBottom: 6 }");
+    expect(backpackContent).not.toMatch(/dateFieldGap|sheetContent|HealthNumericKeyboardAccessory/);
+  });
+
+  it('same weight on two different dates still remains independently saveable after the shell alignment (editId semantics unchanged)', async () => {
+    const node = render();
+    await flush();
+    openWeightSheet(node);
+    act(() => { weightInput(node).props.onChangeText('24,5'); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateWeightEntry).toHaveBeenNthCalledWith(1, 'dog-1', expect.objectContaining({ weight_kg: 24.5 }));
+    openWeightSheet(node);
+    act(() => { weightInput(node).props.onChangeText('24,5'); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateWeightEntry).toHaveBeenCalledTimes(2);
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
   });
 });
