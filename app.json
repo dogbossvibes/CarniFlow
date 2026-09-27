@@ -16,7 +16,7 @@
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "47",
+      "buildNumber": "48",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {
