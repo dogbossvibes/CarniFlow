@@ -29,13 +29,22 @@ type Filter = 'all' | 'sport' | 'private' | 'fav';
 
 // Kommandoliste (pro Hund). Split Sport/Alltag, Favoriten, Difficulty-Dots.
 export function DogCommandsCard({
-  commands, onAdd, onOpen, onToggleFavorite, onSeedDemo,
+  commands, onAdd, onOpen, onToggleFavorite, onSeedDemo, onDelete,
 }: {
   commands: DogCommand[];
   onAdd: () => void;
   onOpen: (cmd: DogCommand) => void;
   onToggleFavorite: (cmd: DogCommand) => void;
   onSeedDemo?: () => void;
+  // ANYVO-wide long-press delete standardization (29.09.2026): commands are
+  // stored purely in local AsyncStorage per dog_id (see
+  // features/dogs/dogCommands.ts) — no Supabase table, no RLS, no
+  // cross-device sync. There is therefore no server-side ownership/sharing
+  // concern to gate on here (unlike Läufigkeit/Health): a connected trainer
+  // on a different device simply has their own separate, empty local list
+  // under the same dogId key. onDelete is optional so callers that don't
+  // want this affordance (none currently) can omit it.
+  onDelete?: (cmd: DogCommand) => void;
 }) {
   const { t } = useT();
   const [filter, setFilter] = useState<Filter>('all');
@@ -91,7 +100,14 @@ export function DogCommandsCard({
 
       {/* Liste */}
       {shown.map(c => (
-        <TouchableOpacity key={c.id} style={s.item} activeOpacity={0.8} onPress={() => onOpen(c)}>
+        <TouchableOpacity
+          key={c.id} style={s.item} activeOpacity={0.8}
+          onPress={() => onOpen(c)}
+          onLongPress={onDelete ? () => onDelete(c) : undefined}
+          delayLongPress={350}
+          accessibilityRole="button"
+          accessibilityLabel={onDelete ? `${c.name}, lange drücken zum Löschen` : undefined}
+        >
           <View style={[s.itemBar, { backgroundColor: catColor(c.category) }]} />
           <View style={{ flex: 1 }}>
             <Text style={s.itemName} numberOfLines={1}>{c.name}</Text>

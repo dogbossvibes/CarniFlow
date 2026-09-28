@@ -874,7 +874,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'dog.noDate': 'Kei Datum',
   'dog.uploadAndSave': 'Ufelade & speichere',
   'dog.deleteHeatTitle': 'Läufigkeit lösche?',
-  'dog.deleteEntryBody': 'De Iitrag wird entfernt.',
+  'dog.deleteEntryBody': 'Die Läufigkeit wird dauerhaft glöscht.',
   'dog.deleteDocumentTitle': 'Dokument lösche?',
   'dog.deleteDocumentBody': '„{title}" wird dauerhaft entfernt.',
   'dog.smartCoachLocked': 'Personalisierte Trainingsempfehlige mit Active oder Premium.',

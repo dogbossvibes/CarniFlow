@@ -451,10 +451,27 @@ function Timeline({ items, filter, onFilter, onDetail, onDelete, isOwner }: { it
 // row, which keeps its own dedicated delete flow in the Dokumente tab
 // instead) renders the exact same card with no swipe affordance at all, so
 // tap-to-open-detail is completely unaffected either way.
+// Long-press delete (28.09.2026, ANYVO-wide standardization) added
+// ADDITIONALLY to the existing swipe-left action — both call the exact same
+// `onDelete` (== deleteItem(item), the one authoritative confirm+delete
+// path), so there is no duplicated deletion logic and no gesture conflict:
+// ReanimatedSwipeable's pan recognizer only claims predominantly-horizontal
+// drags, onLongPress only fires after delayLongPress with the touch staying
+// essentially stationary, and a normal tap still only ever calls onPress.
+// This exact "swipe + long-press, same handler, same TouchableOpacity"
+// combination is already proven safe in production by
+// app/track/historie.tsx (SwipeableTrainingItem + onLongPress).
 function TimelineRow({ item, onPress, onDelete, deletable }: { item: HealthTimelineItem; onPress: () => void; onDelete: () => void; deletable: boolean }) {
   return (
     <SwipeableHealthRow enabled={deletable} onDelete={onDelete} accessibilityLabel={`${item.title} löschen`}>
-      <TouchableOpacity style={s.timelineRow} onPress={onPress} activeOpacity={0.8}><View style={s.timelineIcon}><Ionicons name={kindIcon(item.kind)} size={18} color={C.trackPrimary} /></View><View style={{ flex: 1 }}><Text style={s.rowTitle}>{item.title}</Text><Text style={s.muted}>{kindLabel(item.kind)} · {formatDate(item.date)}{item.detail ? ` · ${item.detail}` : ''}</Text>{item.secondary ? <Text style={s.timelineSecondary}>{item.secondary}</Text> : null}</View><Ionicons name="chevron-forward" size={16} color={C.trackTextMut} /></TouchableOpacity>
+      <TouchableOpacity
+        style={s.timelineRow} onPress={onPress} activeOpacity={0.8}
+        onLongPress={deletable ? onDelete : undefined} delayLongPress={350}
+        accessibilityRole="button"
+        accessibilityLabel={deletable ? `${item.title}, lange drücken zum Löschen` : undefined}
+      >
+        <View style={s.timelineIcon}><Ionicons name={kindIcon(item.kind)} size={18} color={C.trackPrimary} /></View><View style={{ flex: 1 }}><Text style={s.rowTitle}>{item.title}</Text><Text style={s.muted}>{kindLabel(item.kind)} · {formatDate(item.date)}{item.detail ? ` · ${item.detail}` : ''}</Text>{item.secondary ? <Text style={s.timelineSecondary}>{item.secondary}</Text> : null}</View><Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
+      </TouchableOpacity>
     </SwipeableHealthRow>
   );
 }

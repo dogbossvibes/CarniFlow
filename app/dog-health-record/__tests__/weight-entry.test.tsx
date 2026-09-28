@@ -1454,3 +1454,68 @@ describe('Digital Health Record Verlauf — swipe-left-to-delete (28.09.2026)', 
     expect(rendered).not.toContain('Tollwut');
   });
 });
+
+// ANYVO-wide long-press-delete standardization (28.09.2026): long press
+// added ADDITIONALLY to the existing swipe-left action on Verlauf cards —
+// both call the exact same onDelete (== deleteItem(item)), so there is no
+// duplicated deletion logic and, per the already-proven-safe
+// app/track/historie.tsx precedent (SwipeableTrainingItem + onLongPress
+// together in production), no gesture conflict with ReanimatedSwipeable.
+describe('Digital Health Record Verlauf — long-press delete, additional to swipe (28.09.2026)', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockDeleteVaccination.mockReset().mockResolvedValue({ error: null, reminderSync: 'not_required' });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, vaccinations: [VACCINATION_ROW] });
+  });
+
+  function findRow(node: ReactTestRenderer, label: string) {
+    return (node.root as unknown as { findAllByType: (t: unknown) => { props: { onPress?: () => void; onLongPress?: () => void; accessibilityLabel?: string } }[] })
+      .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === label);
+  }
+
+  it('a deletable card also exposes onLongPress, wired to the same confirm+delete path as swipe', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    const row = findRow(node, 'Tollwut, lange drücken zum Löschen');
+    expect(row).toBeTruthy();
+    expect(typeof row!.props.onLongPress).toBe('function');
+  });
+
+  it('long press alone does not delete', async () => {
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findRow(node, 'Tollwut, lange drücken zum Löschen')!.props.onLongPress?.(); });
+    expect(mockDeleteVaccination).not.toHaveBeenCalled();
+  });
+
+  it('long press opens the same confirmation dialog swipe already used', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findRow(node, 'Tollwut, lange drücken zum Löschen')!.props.onLongPress?.(); });
+    expect(alertSpy).toHaveBeenCalledWith('Tollwut löschen?', expect.any(String), expect.any(Array));
+    alertSpy.mockRestore();
+  });
+
+  it('confirming a long-press delete calls the exact same service with the exact same id', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => { buttons?.find((b) => b.style === 'destructive')?.onPress?.(); });
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    act(() => { findRow(node, 'Tollwut, lange drücken zum Löschen')!.props.onLongPress?.(); });
+    await flush();
+    expect(mockDeleteVaccination).toHaveBeenCalledWith('vacc-1');
+    alertSpy.mockRestore();
+  });
+
+  it('a document card (no delete authority for this row kind) has no long-press-delete accessibilityLabel either', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, documents: [{ id: 'doc-1', dog_id: 'dog-1', kind: 'sonstiges', title: 'Laborbericht', category: 'health', subtype: null, file_url: 'x.pdf', issued_on: '2026-09-01', note: null, created_at: '2026-09-01' }] });
+    const node = render();
+    await flush();
+    switchToVerlauf(node);
+    expect(findRow(node, 'Laborbericht, lange drücken zum Löschen')).toBeUndefined();
+  });
+});

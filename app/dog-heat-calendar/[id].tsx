@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { fromISODate } from '@/features/dogs/dateInput';
+import { useT } from '@/i18n';
+import { haptic } from '@/lib/haptics';
+import { useSession } from '@/lib/session-context';
+import { getDogById } from '@/services/dogs';
 import {
-  getHeatCycleDetails, heatCycleDay, isActiveCycle, durationDays, fmtDate,
+  getHeatCycleDetails, heatCycleDay, isActiveCycle, durationDays, fmtDate, deleteHeatCycle,
   type HeatCycle, type HeatObservation, type HeatPhase,
 } from '@/features/dogs/heatCycles';
 import {
@@ -15,6 +19,7 @@ import {
   getHeatCalendarStats, getMonthGrid, heatHistoryMetadata, phaseTone, type HeatCalendarDay, type HeatCalendarFilter, type HeatPhaseTone,
 } from '@/features/dogs/heatCalendar';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useToast } from '@/components/ui/Toast';
 
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -43,6 +48,9 @@ export default function DogHeatCalendarScreen() {
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { isPro, loading: capabilityLoading } = useCapabilities();
   const insets = useSafeAreaInsets();
+  const { t } = useT();
+  const { user } = useSession();
+  const { showToast, toast } = useToast();
   const today = useMemo(() => dayKey(new Date()), []);
   const initialDate = fromISODate(today) ?? new Date();
   const [cursor, setCursor] = useState({ year: initialDate.getFullYear(), month: initialDate.getMonth() });
@@ -53,6 +61,14 @@ export default function DogHeatCalendarScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [selectedDay, setSelectedDay] = useState<HeatCalendarDay | null>(null);
+  // Long-press delete (28.09.2026): dog_heat_cycles RLS grants SELECT to the
+  // owner AND any connected+accepted trainer (read-only — no insert/update/
+  // delete policy exists for trainers, see DOG_HEAT_CYCLES.sql), so this
+  // screen can genuinely be viewed by a non-owner. Ownership must be
+  // determined explicitly — HeatCycle itself carries no owner_id in its
+  // mapped TS shape — so "Löschen" is only ever offered when it actually is
+  // this user's own dog, matching backend/RLS delete authority exactly.
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     if (!capabilityLoading && !isPro) router.replace('/premium' as never);
@@ -74,7 +90,38 @@ export default function DogHeatCalendarScreen() {
     }
   }, [dogId]);
 
+  useEffect(() => {
+    if (!dogId) { setIsOwner(false); return; }
+    let cancelled = false;
+    getDogById(dogId).then(({ data }) => { if (!cancelled) setIsOwner(!!data && data.owner_id === user?.id); });
+    return () => { cancelled = true; };
+  }, [dogId, user?.id]);
+
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  // Long-press delete: the SAME service (deleteHeatCycle) and the SAME
+  // confirmation copy already used by every existing delete entry point for
+  // this record type (app/dog-heat/[id].tsx's detail-screen button,
+  // app/dog/[id].tsx's Hub preview trash icon) — reused via the shared
+  // dog.deleteHeatTitle/dog.deleteEntryBody i18n keys, not duplicated.
+  // Long-press only ever opens this confirmation; it never deletes by
+  // itself. Deleting one cycle never touches another — deleteHeatCycle
+  // targets exactly cycle.id, and after a successful delete `load()`
+  // re-fetches cycles/phases/observations together, so History, the
+  // calendar grid, and the Statistiken block all recompute from the fresh
+  // data (nothing here is a stale/optimistic local removal).
+  const confirmDeleteCycle = useCallback((cycle: HeatCycle) => {
+    Alert.alert(t('dog.deleteHeatTitle'), t('dog.deleteEntryBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => {
+        const { error } = await deleteHeatCycle(cycle.id);
+        if (error) { haptic.error(); showToast('Löschen nicht möglich'); return; }
+        haptic.success();
+        showToast('Läufigkeit gelöscht');
+        await load();
+      } },
+    ]);
+  }, [t, load, showToast]);
 
   const visibleCycles = useMemo(() => filterHeatCycles(cycles, filter), [cycles, filter]);
   const days = useMemo(() => buildHeatCalendarDays({
@@ -214,7 +261,22 @@ export default function DogHeatCalendarScreen() {
             {histories.map(cycle => {
                const duration = durationDays(cycle.startDate, cycle.endDate);
                const metadata = heatHistoryMetadata(duration, phaseCounts[cycle.id] ?? 0, observationCounts[cycle.id] ?? 0);
-              return <TouchableOpacity key={cycle.id} style={s.historyRow} onPress={() => router.push(`/dog-heat/${cycle.id}` as never)} activeOpacity={0.8}>
+              // Normal tap: unchanged (opens the cycle detail). Long press
+              // (owner only — matches the dog_heat_cycles delete RLS policy,
+              // which grants delete to owner_id = auth.uid() only, never a
+              // connected trainer): confirmDeleteCycle. delayLongPress
+              // matches the established ANYVO convention (app/track/
+              // historie.tsx's onLongPress + delayLongPress={350}), so a
+              // long press never also fires onPress and opens the detail
+              // screen behind the confirmation.
+              return <TouchableOpacity
+                key={cycle.id} style={s.historyRow} activeOpacity={0.8}
+                onPress={() => router.push(`/dog-heat/${cycle.id}` as never)}
+                onLongPress={isOwner ? () => confirmDeleteCycle(cycle) : undefined}
+                delayLongPress={350}
+                accessibilityRole="button"
+                accessibilityLabel={isOwner ? `${fmtDate(cycle.startDate)} – ${fmtDate(cycle.endDate)}, lange drücken zum Löschen` : undefined}
+              >
                 <View style={s.historyIcon}><Ionicons name="heart-outline" size={16} color="#F472B6" /></View>
                 <View style={s.historyBody}>
                   <Text style={s.historyTitle}>{fmtDate(cycle.startDate)} – {fmtDate(cycle.endDate)}</Text>
@@ -252,6 +314,7 @@ export default function DogHeatCalendarScreen() {
           </View> : null}
         </AnyvoBottomSheet>
       </SafeAreaView>
+      {toast}
     </View>
   );
 }

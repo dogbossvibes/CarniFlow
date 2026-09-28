@@ -874,7 +874,20 @@ export const deCH = {
   'dog.noDate': 'Kein Datum',
   'dog.uploadAndSave': 'Hochladen & speichern',
   'dog.deleteHeatTitle': 'Läufigkeit löschen?',
-  'dog.deleteEntryBody': 'Der Eintrag wird entfernt.',
+  // CORRECTED (29.09.2026): the previous copy asserted that phases and
+  // observations "will be deleted" — dog_heat_phases/dog_heat_observations
+  // reference this cycle by heat_cycle_id, but no CREATE TABLE/FK for either
+  // is checked into this repo (DOG_HEAT_CYCLES.sql only defines
+  // dog_heat_cycles itself), so their actual on-delete behavior (cascade,
+  // RESTRICT, or orphaned) cannot be verified from source — that was an
+  // unverified claim stated as fact, not a confirmed cascade disclosure.
+  // Corrected to describe only the operation that IS known and requested:
+  // the cycle entry itself is deleted. Do not re-add a phases/observations
+  // claim here unless the actual schema is confirmed. Shared by every
+  // delete confirmation for this record type (app/dog-heat/[id].tsx,
+  // app/dog/[id].tsx, app/dog-heat-calendar/[id].tsx) — one string, one
+  // authoritative copy.
+  'dog.deleteEntryBody': 'Dieser Läufigkeitseintrag wird dauerhaft gelöscht.',
   'dog.deleteDocumentTitle': 'Dokument löschen?',
   'dog.deleteDocumentBody': '„{title}" wird dauerhaft entfernt.',
   'dog.smartCoachLocked': 'Personalisierte Trainingsempfehlungen mit Active oder Premium.',

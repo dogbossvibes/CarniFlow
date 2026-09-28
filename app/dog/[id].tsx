@@ -9,7 +9,7 @@ import { getDogById } from '@/services/dogs';
 import { getDogHubExtras, getDogDocumentUrl, deleteDogDocument, type DogHubExtras } from '@/services/dogHub';
 import { buildDogHubVM } from '@/features/dogs/buildDogHubVM';
 import { getHeatCycleDetails, getHeatCycles, deleteHeatCycle, predictHeat, type HeatCycle } from '@/features/dogs/heatCycles';
-import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, type DogCommand } from '@/features/dogs/dogCommands';
+import { getCommands, toggleFavorite as toggleCommandFavorite, seedDemoCommands, deleteCommand, type DogCommand } from '@/features/dogs/dogCommands';
 import { getBackpack, type DogBackpackItem } from '@/features/dogs/backpack';
 import { toISODate } from '@/features/dogs/dateInput';
 import { currentHeatPhase } from '@/features/dogs/heatCalendar';
@@ -22,6 +22,7 @@ import { DogHubScreen, type DogHubActions } from '@/features/dogs/DogHubScreen';
 import { useDogActiveFaehrte } from '@/features/tracking/hooks/useActiveFaehrte';
 import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
 import { useT } from '@/i18n';
+import { useToast } from '@/components/ui/Toast';
 import type { DogDocument, DogTrainingItem } from '@/components/dogs/types';
 import type { Dog } from '@/types';
 
@@ -34,6 +35,7 @@ export default function DogHubRoute() {
   const { isPremium } = usePlan();
   const { user } = useSession();
   const userId = user?.id ?? '';
+  const { showToast, toast } = useToast();
 
   const [dog, setDog]     = useState<Dog | null>(null);
   const [loading, setLoad] = useState(true);
@@ -112,11 +114,22 @@ export default function DogHubRoute() {
   const vm = useMemo(() => (dog ? buildDogHubVM(dog, feed, extras ?? undefined, dynamic) : null), [dog, feed, extras, dynamic]);
   const heatPrediction = useMemo(() => predictHeat(heatCycles), [heatCycles]);
 
+  // Ownership consistency fix (29.09.2026 audit): dog_heat_cycles RLS grants
+  // DELETE to owner_id = auth.uid() only. `dog` (this screen's own already-
+  // loaded record) and `user` (already destructured above) are enough to
+  // gate this locally — no extra fetch needed, unlike app/dog-heat/[id].tsx
+  // and app/dog-heat-calendar/[id].tsx, which don't otherwise load the dog
+  // record and fetch it purely for this check.
+  const isHeatOwner = dog?.owner_id === user?.id;
   const deleteHeat = (c: HeatCycle) => {
     Alert.alert(t('dog.deleteHeatTitle'), t('dog.deleteEntryBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: async () => {
-        await deleteHeatCycle(c.id);
+        // Error-handling fix (29.09.2026 audit): previously ignored the
+        // result and always reloaded, silently pretending to have succeeded
+        // even on failure.
+        const { error } = await deleteHeatCycle(c.id);
+        if (error) { showToast('Läufigkeit konnte nicht gelöscht werden'); return; }
         getHeatCycles(id).then(setHeatCycles).catch(() => {});
       } },
     ]);
@@ -125,6 +138,22 @@ export default function DogHubRoute() {
   const reloadCommands = () => getCommands(id).then(setCommands).catch(() => {});
   const toggleCmdFav = async (c: DogCommand) => { await toggleCommandFavorite(id, c.id); reloadCommands(); };
   const seedCmds = async () => { await seedDemoCommands(id); reloadCommands(); };
+  // ANYVO-wide long-press delete standardization (29.09.2026): same
+  // authoritative deleteCommand already used by the command detail screen's
+  // own delete button (app/dog-command/detail.tsx) — same confirmation copy
+  // (t('cmd.deleteConfirm') + the exact same interpolated body), reused
+  // rather than duplicated. deleteCommand is local AsyncStorage (no network
+  // error to surface), but the write is still wrapped so a failure never
+  // silently pretends to have removed the command from the visible list.
+  const deleteCmd = (c: DogCommand) => {
+    Alert.alert(t('cmd.deleteConfirm'), `„${c.name}" wird entfernt.`, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => {
+        try { await deleteCommand(id, c.id); reloadCommands(); }
+        catch { showToast('Kommando konnte nicht gelöscht werden'); }
+      } },
+    ]);
+  };
 
   const openDocument = async (doc: DogDocument) => {
     if (!doc.fileUrl) return;
@@ -210,6 +239,7 @@ export default function DogHubRoute() {
   }
 
   return (
+    <>
     <DogHubScreen
       vm={vm}
       actions={actions}
@@ -220,7 +250,12 @@ export default function DogHubRoute() {
         onAdd: () => router.push({ pathname: '/dog-heat-new', params: { id } } as never),
         onOpen: (c: HeatCycle) => router.push(`/dog-heat/${c.id}` as never),
         onOpenCalendar: () => router.push(`/dog-heat-calendar/${id}` as never),
-        onDelete: deleteHeat,
+        // Ownership consistency fix (29.09.2026 audit): only pass onDelete
+        // when isHeatOwner — DogHeatCard already renders its trash icon
+        // conditionally on `onDelete` being present (see
+        // components/dogs/DogHeatCard.tsx), so this is the smallest
+        // possible fix, no change needed in the card component itself.
+        onDelete: isHeatOwner ? deleteHeat : undefined,
         phaseCounts: heatPhaseCounts,
         obsCounts: heatObsCounts,
         currentPhases: heatCurrentPhases,
@@ -231,6 +266,7 @@ export default function DogHubRoute() {
         onOpen: (c) => router.push({ pathname: '/dog-command/detail', params: { dogId: id, commandId: c.id } } as never),
         onToggleFavorite: toggleCmdFav,
         onSeedDemo: seedCmds,
+        onDelete: deleteCmd,
       }}
       backpack={{
         dogName: dog?.name ?? '',
@@ -250,6 +286,8 @@ export default function DogHubRoute() {
       lastFaehrteId={lastFaehrteId}
       onOpenLastFaehrte={lastFaehrteId ? () => router.push(`/track/${lastFaehrteId}` as never) : undefined}
     />
+    {toast}
+    </>
   );
 }
 

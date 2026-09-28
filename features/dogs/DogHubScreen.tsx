@@ -39,7 +39,7 @@ export interface DogHeatProps {
   currentPhases?: Record<string, string>;  // heatCycleId → current phase type name
 }
 // Kommandoliste — lokal geladen, als eigenständiger Prop reingereicht.
-export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void }
+export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; onOpen: (c: DogCommand) => void; onToggleFavorite: (c: DogCommand) => void; onSeedDemo?: () => void; onDelete?: (c: DogCommand) => void }
 // Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
 export interface DogBackpackProps { dogName: string; total: number; active: number; packed: number; items?: DogBackpackItem[]; onOpen: () => void; onAdd?: () => void }
 // Dashboard-Termine (bereits gefiltert/sortiert im Route-Wrapper) + Kalender-Öffnen.
@@ -203,6 +203,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                     onOpen={commands.onOpen}
                     onToggleFavorite={commands.onToggleFavorite}
                     onSeedDemo={commands.onSeedDemo}
+                    onDelete={commands.onDelete}
                   />
                 ) : (
                   <View style={s.commandEmptyHub}>

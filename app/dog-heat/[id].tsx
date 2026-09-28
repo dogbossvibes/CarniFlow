@@ -21,6 +21,8 @@ import {
 } from '@/features/dogs/heatCycles';
 import { useT } from '@/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useSession } from '@/lib/session-context';
+import { getDogById } from '@/services/dogs';
 
 const PINK = '#F472B6';
 const PINK_DIM = 'rgba(244,114,182,0.14)';
@@ -32,6 +34,14 @@ export default function DogHeatDetail() {
   const { id: heatCycleId } = useLocalSearchParams<{ id: string }>();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+  const { user } = useSession();
+  // Ownership consistency fix (29.09.2026 audit): dog_heat_cycles RLS grants
+  // DELETE to owner_id = auth.uid() only — a connected, accepted trainer can
+  // reach this screen (their SELECT grant permits it) but was previously
+  // shown the "Löschen" button unconditionally. HeatCycle carries no
+  // owner_id, so ownership is resolved via the parent dog record, matching
+  // app/dog-heat-calendar/[id].tsx's own check.
+  const [isOwner, setIsOwner] = useState(false);
 
   // Premium gate
   useEffect(() => {
@@ -84,6 +94,13 @@ export default function DogHeatDetail() {
   }, [heatCycleId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!cycle?.dogId) { setIsOwner(false); return; }
+    let cancelled = false;
+    getDogById(cycle.dogId).then(({ data }) => { if (!cancelled) setIsOwner(!!data && data.owner_id === user?.id); });
+    return () => { cancelled = true; };
+  }, [cycle?.dogId, user?.id]);
 
   // ── Edit Cycle ────────────────────────────────────────────────────────────
 
@@ -141,7 +158,13 @@ export default function DogHeatDetail() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('common.delete'), style: 'destructive', onPress: async () => {
-          await deleteHeatCycle(cycle.id);
+          // Error-handling fix (29.09.2026 audit): previously ignored the
+          // result and navigated back unconditionally, silently pretending
+          // to have succeeded even on failure (e.g. RLS rejecting a non-
+          // owner). Now checks .error, matching saveCycle's own convention
+          // in this same file, and only leaves the screen on success.
+          const { error } = await deleteHeatCycle(cycle.id);
+          if (error) { haptic.error(); Alert.alert('Löschen nicht möglich', 'Die Läufigkeit konnte nicht gelöscht werden.'); return; }
           haptic.success();
           router.back();
         }},
@@ -464,8 +487,10 @@ export default function DogHeatDetail() {
               </>
             )}
 
-            {/* Delete Cycle */}
-            {!editing && (
+            {/* Delete Cycle — owner only (29.09.2026 audit fix): matches the
+                dog_heat_cycles DELETE RLS policy exactly; a connected trainer
+                viewing this screen never sees this button. */}
+            {!editing && isOwner && (
               <TouchableOpacity style={s.deleteBtn} onPress={handleDeleteCycle} activeOpacity={0.85}>
                 <Ionicons name="trash-outline" size={16} color={C.trackDanger} />
                 <Text style={s.deleteTxt}>{t('common.delete')}</Text>
