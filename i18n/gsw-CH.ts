@@ -465,6 +465,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'health.recordIntolerance': 'Unverträglichkeit',
   'health.recordDiagnosis': 'Diagnose',
   'health.recordEmergency': 'Notfall',
+  'health.recordHeat': 'Läufigkeit',
   'health.recordNoDue': 'Kei Fälligkeit bevorstehend hinterleit',
   'health.recordNoData': 'No kei Gsundheitsdate',
   'health.recordNoActivities': 'No kei Gsundheitsaktivitäte erfasst',

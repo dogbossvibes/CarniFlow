@@ -481,6 +481,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "health.recordIntolerance": "Intolleranza",
   "health.recordDiagnosis": "Diagnosi",
   "health.recordEmergency": "Emergenza",
+  "health.recordHeat": "Calore",
   "health.recordNoDue": "Nessuna scadenza imminente",
   "health.recordNoData": "Nessun dato sanitario",
   "health.recordNoActivities": "Nessuna attività sanitaria registrata",

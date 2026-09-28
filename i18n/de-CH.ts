@@ -465,6 +465,7 @@ export const deCH = {
   'health.recordIntolerance': 'Unverträglichkeit',
   'health.recordDiagnosis': 'Diagnose',
   'health.recordEmergency': 'Notfall',
+  'health.recordHeat': 'Läufigkeit',
   'health.recordNoDue': 'Keine anstehenden Fälligkeiten hinterlegt',
   'health.recordNoData': 'Noch keine Gesundheitsdaten',
   'health.recordNoActivities': 'Noch keine Gesundheitsaktivitäten erfasst',

@@ -312,6 +312,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "health.recordIntolerance": "Intolérance",
   "health.recordDiagnosis": "Diagnostic",
   "health.recordEmergency": "Urgence",
+  "health.recordHeat": "Chaleurs",
   "health.recordNoDue": "Aucune échéance à venir",
   "health.recordNoData": "Aucune donnée de santé pour l’instant",
   "health.recordNoActivities": "Aucune activité de santé enregistrée",

@@ -54,6 +54,14 @@ export interface HeatPrediction {
   /** Legacy alias for the inclusive cycle day while a cycle is active. */
   activeSinceDays: number | null;
   dateRange:       string | null;  // z.B. "20. Aug. – 8. Sep."
+  // Health-Läufigkeit-Integration (29.09.2026): kürzester/längster gemessener
+  // Start-zu-Start-Abstand — additiv aus demselben, bereits vorhandenen und
+  // geprüften `valid`-Gaps-Array berechnet, das auch avgCycleDays liefert
+  // (dieselbe Plausibilitätsfilterung `g > 30 && g < 600`, keine zweite,
+  // abweichende Berechnung). null, solange avgCycleDays selbst null ist
+  // (< 2 abgeschlossene Zyklen mit plausiblem Abstand).
+  minGapDays:      number | null;
+  maxGapDays:      number | null;
 }
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -326,11 +334,17 @@ export function predictHeat(cycles: HeatCycle[]): HeatPrediction | null {
   );
 
   let avgCycleDays: number | null = null;
+  let minGapDays: number | null = null;
+  let maxGapDays: number | null = null;
   if (asc.length >= 2) {
     const gaps: number[] = [];
     for (let i = 1; i < asc.length; i++) gaps.push(dayDiff(asc[i - 1].startDate, asc[i].startDate));
     const valid = gaps.filter(g => g > 30 && g < 600); // unplausible Abstände ignorieren
-    if (valid.length) avgCycleDays = Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
+    if (valid.length) {
+      avgCycleDays = Math.round(valid.reduce((a, b) => a + b, 0) / valid.length);
+      minGapDays = Math.min(...valid);
+      maxGapDays = Math.max(...valid);
+    }
   }
   const cycleLengthDays = avgCycleDays ?? DEFAULT_CYCLE_DAYS;
   const nextDate = addDays(last.startDate, cycleLengthDays);
@@ -356,6 +370,43 @@ export function predictHeat(cycles: HeatCycle[]): HeatPrediction | null {
     active,
     activeSinceDays: active ? cycleDay : null,
     dateRange,
+    minGapDays,
+    maxGapDays,
+  };
+}
+
+// ── Health-Läufigkeit-Integration (29.09.2026) ─────────────────────────────
+
+export interface HeatHistoryStats {
+  count:            number;         // alle dokumentierten Zyklen (aktiv + abgeschlossen)
+  averageDays:      number | null;  // Ø Dauer, nur abgeschlossene Zyklen, ≥ 2 nötig
+  averageGapDays:   number | null;  // Ø Start-zu-Start-Abstand (siehe predictHeat)
+  minGapDays:        number | null;
+  maxGapDays:        number | null;
+}
+
+/**
+ * Rein mathematische Verlaufsstatistik für die Health-Läufigkeitsintegration.
+ * Wiederverwendet ausschließlich bereits vorhandene, geprüfte Berechnungen
+ * (durationDays, predictHeat) — keine neue medizinische Bewertungslogik,
+ * keine zweite parallele Abstands-/Dauer-Berechnung. Durchschnittswerte
+ * erscheinen nur, wenn genug Daten vorliegen (nie ein Fake-Ø aus 1 Wert).
+ */
+export function getHeatHistoryStats(cycles: HeatCycle[]): HeatHistoryStats {
+  const completedDurations = cycles
+    .filter(c => !isActiveCycle(c))
+    .map(c => durationDays(c.startDate, c.endDate))
+    .filter((d): d is number => d != null);
+  const averageDays = completedDurations.length >= 2
+    ? Math.round(completedDurations.reduce((a, b) => a + b, 0) / completedDurations.length)
+    : null;
+  const prediction = predictHeat(cycles);
+  return {
+    count: cycles.length,
+    averageDays,
+    averageGapDays: prediction?.avgCycleDays ?? null,
+    minGapDays: prediction?.minGapDays ?? null,
+    maxGapDays: prediction?.maxGapDays ?? null,
   };
 }
 

@@ -109,6 +109,19 @@ export function genderLabel(g: DogGender): string | null {
   return g === 'male' ? '♂ Rüde' : g === 'female' ? '♀ Hündin' : null;
 }
 
+// Canonical female-dog check (Health/Läufigkeit-Integration, 29.09.2026).
+// Matches the exact comparison already used consistently everywhere else in
+// this codebase (DogHubScreen.tsx's `isFemale`, DogCard.tsx, HomeHeatCard.tsx,
+// add-dog.tsx/edit-dog.tsx) — `dog.gender === 'female'`, the real, canonical
+// stored value (types/index.ts: `gender: 'male' | 'female' | null`). Male,
+// unset (null), and any other/unexpected value are all treated as
+// "not confirmed female" — never render Läufigkeit UI unless the dog is
+// unambiguously female. Accepts a minimal `{ gender }` shape so callers don't
+// need a full `Dog` object just to check this.
+export function isFemaleDog(dog: { gender: DogGender } | null | undefined): boolean {
+  return dog?.gender === 'female';
+}
+
 // DB-`Dog` → Identität (nur Basisfelder, sonst null).
 export function dogToIdentity(dog: Dog): DogIdentity {
   const status = dog.discipline;

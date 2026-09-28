@@ -1,8 +1,29 @@
 import type { DogDewormingEntryRow, DogHealthEntryRow, DogVetRow, DogDocumentRow } from '@/services/dogHub';
 import type { HealthCondition, HealthMedication, HealthVaccination } from '@/types/health';
 import type { HealthOverviewData } from '@/services/healthService';
+// Type-only import — heatCycles.ts pulls in lib/supabase (→ AsyncStorage) at
+// module scope. This file was previously free of that dependency and is
+// imported very widely (every Health test file included); importing the
+// runtime `durationDays` from there would drag that whole chain in here too.
+// `import type` erases at compile time, so only the type comes along; the
+// one-line duration formula below is intentionally duplicated from
+// heatCycles.ts's own durationDays (kept byte-identical) rather than
+// importing it — not a second parallel Läufigkeits-*business logic*, just
+// avoiding an unrelated dependency-chain regression for a single pure sum.
+import type { HeatCycle } from '@/features/dogs/heatCycles';
+import { fromISODate } from '@/features/dogs/dateInput';
 
-export type HealthTimelineKind = 'vaccination' | 'parasite' | 'medication' | 'vet' | 'weight' | 'condition' | 'document';
+// Byte-identical to heatCycles.ts's own durationDays — see the import-type
+// note above for why it is duplicated here instead of imported.
+function heatDurationDays(start: string, end: string | null): number | null {
+  if (!end) return null;
+  const startDate = fromISODate(start);
+  const endDate = fromISODate(end);
+  if (!startDate || !endDate) return null;
+  return Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1);
+}
+
+export type HealthTimelineKind = 'vaccination' | 'parasite' | 'medication' | 'vet' | 'weight' | 'condition' | 'document' | 'heat';
 export type HealthTimelineFilter = 'all' | HealthTimelineKind | 'condition_group';
 
 export interface HealthTimelineItem {
@@ -34,7 +55,16 @@ function fmtDayMonthYear(value: string): string | null {
   return Number.isFinite(date.getTime()) ? `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}` : null;
 }
 
-export function buildHealthTimeline(data: HealthOverviewData): HealthTimelineItem[] {
+// Läufigkeit-Integration (29.09.2026): optionaler 2. Parameter, additiv —
+// jeder bestehende Aufrufer, der nur `data` übergibt, bleibt unverändert
+// funktionsfähig (Default `[]`). Gender-Gating (nur Hündinnen) passiert
+// beim Aufrufer (app/dog-health-record/[id].tsx via isFemaleDog) — diese
+// Funktion bleibt rein und rendert einfach, was ihr übergeben wird. Die
+// vollständige, spezialisierte Historie bleibt im eigenen
+// Läufigkeit-Bereich (components/dogs/HealthHeatSection.tsx); dies ist nur
+// eine zweite, kompakte Darstellung derselben Daten — kein zweites
+// Datenmodell.
+export function buildHealthTimeline(data: HealthOverviewData, heatCycles: HeatCycle[] = []): HealthTimelineItem[] {
   const vaccinations = data.vaccinations.map((row: HealthVaccination) => ({ id: timelineId('vaccination', row.id), kind: 'vaccination' as const, title: row.vaccine_name || row.vaccine_type, date: safeDate(row.administered_on), detail: row.clinic_name, secondary: row.next_due_on ? `Nächste Fälligkeit: ${fmtDayMonthYear(row.next_due_on) ?? row.next_due_on}` : null }));
   const parasites = data.parasites.map((row: DogDewormingEntryRow) => ({ id: timelineId('parasite', row.id), kind: 'parasite' as const, title: row.product || parasiteLabel(row.treatment_type), date: safeDate(row.treatment_date), detail: row.next_due_date ? `Fällig ${row.next_due_date}` : null }));
   const medications = data.medications.map((row: HealthMedication) => ({ id: timelineId('medication', row.id), kind: 'medication' as const, title: row.name, date: safeDate(row.starts_on), detail: [row.dosage, row.frequency, row.is_active ? 'aktiv' : 'inaktiv'].filter(Boolean).join(' · ') || null }));
@@ -42,7 +72,8 @@ export function buildHealthTimeline(data: HealthOverviewData): HealthTimelineIte
   const weights = data.entries.filter(e => e.weight_kg != null).map((row: DogHealthEntryRow) => ({ id: timelineId('weight', row.id), kind: 'weight' as const, title: 'Gewicht', date: safeDate(row.entry_date), detail: `${row.weight_kg} kg` }));
   const conditions = data.conditions.map((row: HealthCondition) => ({ id: timelineId('condition', row.id), kind: 'condition' as const, title: row.name, date: safeDate(row.started_on || row.created_at), detail: conditionLabel(row.kind) }));
   const documents = data.documents.map((row: DogDocumentRow) => ({ id: timelineId('document', row.id), kind: 'document' as const, title: row.title || 'Gesundheitsdokument', date: safeDate(row.issued_on || row.created_at), detail: row.subtype }));
-  return [...vaccinations, ...parasites, ...medications, ...vets, ...weights, ...conditions, ...documents].sort((a, b) => {
+  const heat = heatCycles.map((cycle: HeatCycle) => { const duration = heatDurationDays(cycle.startDate, cycle.endDate); return { id: timelineId('heat', cycle.id), kind: 'heat' as const, title: 'Läufigkeit', date: safeDate(cycle.startDate), detail: cycle.endDate ? `${fmtDayMonthYear(cycle.startDate)} – ${fmtDayMonthYear(cycle.endDate)}` : `Seit ${fmtDayMonthYear(cycle.startDate)}`, secondary: duration ? `${duration} Tage` : null }; });
+  return [...vaccinations, ...parasites, ...medications, ...vets, ...weights, ...conditions, ...documents, ...heat].sort((a, b) => {
     const aTime = a.date ? Date.parse(a.date) : null;
     const bTime = b.date ? Date.parse(b.date) : null;
     if (aTime == null && bTime != null) return 1;
