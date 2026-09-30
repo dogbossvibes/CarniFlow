@@ -16,6 +16,7 @@ jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
   getTrackMarkersBySession: (...a: unknown[]) => mockMarkers(...a),
 }));
 jest.mock('@/features/tracking/utils/qaSessionCapture', () => ({ loadQaSessionCapture: (...a: unknown[]) => mockCapture(...a) }));
+jest.mock('@/features/tracking/utils/qaSearchCapture', () => ({ loadQaSearchCapture: async () => null }));
 jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(async () => false), shareAsync: jest.fn() }));
 
 const A = 'aaaaaaaa-1111-4111-8111-111111111111';   // heute, neu

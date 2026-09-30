@@ -268,7 +268,7 @@ describe('Datenquelle: ausschliesslich gelegte Punkte', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const src = require('fs').readFileSync('features/tracking/services/qaTrackExportService.ts', 'utf8');
     expect(src).toContain('loadQaSessionCapture(localId)');
-    expect(src).toContain('buildQaTrackExport(localId, points, markers, capture)');
+    expect(src).toContain('buildQaTrackExport(localId, points, markers, capture, search)');
     // Ein fehlender Mitschnitt darf den Export nicht scheitern lassen — eine
     // Session ohne QA-Modus bleibt exportierbar.
     expect(src).toContain('loadQaSessionCapture(localId).catch(() => null)');

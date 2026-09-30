@@ -208,7 +208,7 @@ describe('Cursor / Fortschritt / Distanz / Score / Analytics bleiben IDENTISCH',
     const src = fs.readFileSync('features/tracking/hooks/useSearchRecorder.ts', 'utf8');
     const uses = src.split('\n').filter(l => l.includes('replayDenseRef'));
     // Deklaration, Reset (anchor_reset, start), Feed (Länge + push), stop() — sonst nichts.
-    for (const l of uses) expect(l).toMatch(/useRef|= \[\]|\.length|\.push\(|replayGeometryArrays\(/);
+    for (const l of uses) expect(l).toMatch(/useRef|= \[\]|\.length|\.push\(|replayGeometryArrays\(|\.map\(p => \(\{ lat: p\.lat/);
     expect(src).toContain('const replay = replayDisabledRef.current ? null : replayGeometryArrays(replayDenseRef.current);');
     // Das Feed-Statement steht VOR dem Liniendichte-Gate und NACH dem Fusion-Return.
     const feed = src.indexOf('replayDenseRef.current.push(');

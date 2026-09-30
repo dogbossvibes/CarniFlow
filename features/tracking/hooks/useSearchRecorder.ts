@@ -8,6 +8,8 @@
  * Portiert aus design_handoff_faehrten/useSearchRecorder.ts; der Helfer distM
  * (Haversine auf {latitude,longitude}) ist hier lokal definiert.
  */
+import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { SEARCH_QA_LIMITS, type SearchQaTelemetry, type SearchQaRawFix } from '@/features/tracking/utils/qaSearchCapture';
 import { replayGeometryArrays, REPLAY_GEOMETRY, type ReplayGeoPoint } from '@/features/tracking/utils/searchReplayGeometry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Location from 'expo-location';
@@ -197,6 +199,9 @@ export type SearchResult = {
   // Feld. Fehlt es (Resume, Legacy, zu wenige Punkte), gilt `points`.
   replayPoints?: LatLng[];
   replayPointsTimeSec?: number[];
+  // QA-Telemetrie (nur im QA-Diagnosemodus; rein beobachtend — siehe qaSearchCapture.ts).
+  // Keine Metrik, kein Cursor, kein Score liest dieses Feld.
+  qa?: SearchQaTelemetry;
 };
 
 export type { Level };
@@ -257,6 +262,9 @@ export function useSearchRecorder(opts: {
   // Dichter Display-Strom (siehe SearchResult.replayPoints). NIE von Cursor/Distanz/Score gelesen.
   const replayDenseRef = useRef<ReplayGeoPoint[]>([]);
   const replayEmaRef = useRef<LatLng | null>(null);
+  // QA-Telemetrie (null = QA aus). Reiner Beobachter: wird nur geschrieben, nie von Cursor/Distanz/Score gelesen.
+  const qaTelRef = useRef<SearchQaTelemetry | null>(null);
+  const qaLastCursorSampleSecRef = useRef(-Infinity);
   const replayDisabledRef = useRef(false);   // Resume: Vor-Resume-Punkte haben keine dichte Spur
   // Lotfusspunkt des zuletzt akzeptierten Punkts auf der Soll-Fährte — Kontinuität
   // der Referenzsegment-Auswahl (P0 Live-Cursor/Self-Crossing, siehe searchGeometry
@@ -370,6 +378,14 @@ export function useSearchRecorder(opts: {
     setPosition(sm);
 
     if (!recordingRef.current || pausedRef.current) return;
+
+    // QA-Search-Telemetrie: JEDER eingehende Fix, vor allen Filtern (rein beobachtend).
+    const qaRawRec: SearchQaRawFix | null = qaTelRef.current && qaTelRef.current.raw.length < SEARCH_QA_LIMITS.maxRaw
+      ? { lat: raw.latitude, lng: raw.longitude, accuracy: accRaw, t: tNow, accepted: decision.accepted, reason: decision.accepted ? null : decision.reason }
+      : null;
+    if (qaTelRef.current) {
+      if (qaRawRec) qaTelRef.current.raw.push(qaRawRec); else qaTelRef.current.truncated.raw = true;
+    }
 
     // QA-Diagnose (rein beobachtend, siehe searchFixDiag.ts): Ausgangswerte
     // festhalten, damit jeder Ausgang unten GENAU EINEN Endstatus meldet.
@@ -548,6 +564,7 @@ export function useSearchRecorder(opts: {
     // eines Outliers/Jitters selbst nicht vertrauenswürdig genug, um in
     // Tempo-/Ecken-/Gegenstandsanalysen einzufliessen.
     if (fusionBlocksGeometry) {
+      if (qaRawRec) { qaRawRec.accepted = false; qaRawRec.reason = `fusion_${fusion.classification}`; }
       const startLockedNow = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
       if (startLockedNow) {
         analyticsSamplesRef.current.push({
@@ -576,6 +593,10 @@ export function useSearchRecorder(opts: {
     // Fix-Akzeptanz und Fusion-Schutzschicht (Outlier/Stillstand haben oben
     // bereits returned). Reiner Schreibzugriff auf eine eigene Ref — kein
     // Einfluss auf pointsRef, distRef, Cursor, Score oder Analytics.
+    // QA: gefilterter Strom (akzeptiert + Fusion-Schutzschicht, Metrik-Glättung) — vor dem 1,5-m-Gate.
+    if (qaTelRef.current && qaTelRef.current.filtered.length < SEARCH_QA_LIMITS.maxFiltered) {
+      qaTelRef.current.filtered.push({ lat: sm.latitude, lng: sm.longitude, tSec: Math.round(((tNow - startMsRef.current) / 1000) * 10) / 10 });
+    }
     // Eigene, leichte Glättung (EMA 0,7 wie der Lege-Detektor) statt der trägen
     // Metrik-Glättung (0,4): sie rundet eine Ecke über mehrere Meter ab und wäre
     // genau der Grund, warum der Scheitel in der Darstellung fehlt. Die Kette
@@ -747,6 +768,37 @@ export function useSearchRecorder(opts: {
       }
     });
 
+    // ── QA-Search-Telemetrie (rein beobachtend; nach allen Metrik-Updates) ──
+    if (qaTelRef.current) {
+      try {
+        const tel = qaTelRef.current;
+        const tSec = (tNow - startMsRef.current) / 1000;
+        // Cursor/Progress: höchstens alle cursorSampleEverySec s, begrenzt — kein Frame-Logging.
+        if (hasTrack && tSec - qaLastCursorSampleSecRef.current >= SEARCH_QA_LIMITS.cursorSampleEverySec) {
+          if (tel.cursorSamples.length < SEARCH_QA_LIMITS.maxCursorSamples) {
+            let seg = 0;
+            for (let k = 0; k < arc.cum.length; k++) { if (arc.cum[k] <= cursorMRef.current) seg = k; else break; }
+            tel.cursorSamples.push({
+              tSec, progressM: maxCursorMRef.current, cursorM: cursorMRef.current, segmentIndex: seg, devM: dev,
+              lat: sm.latitude, lng: sm.longitude,
+            });
+            qaLastCursorSampleSecRef.current = tSec;
+          } else tel.truncated.cursor = true;
+        }
+        // Gegenstände: geringster Abstand der Handler-Position + Fortschritt an dieser Stelle.
+        laidObjects.forEach((o, i) => {
+          const d = distM(sm, o.at);
+          const a = tel.objectApproach[i] ?? (tel.objectApproach[i] = { index: i, minHandlerDistM: null, progressAtClosestM: null });
+          if (a.minHandlerDistM == null || d < a.minHandlerDistM) { a.minHandlerDistM = d; a.progressAtClosestM = maxCursorMRef.current; }
+        });
+        // Ende: geringster Abstand zum Endpunkt der Soll-Fährte.
+        if (laidPoints.length) {
+          const de = distM(sm, laidPoints[laidPoints.length - 1]);
+          if (tel.minDistToEndM == null || de < tel.minDistToEndM) { tel.minDistToEndM = de; tel.progressAtMinEndM = maxCursorMRef.current; }
+        }
+      } catch { /* QA darf die Absuche nie beeinträchtigen */ }
+    }
+
     // ── Search-Recovery-State (P0): Referenzfortschritt (maxCursor, OHNE
     // handlerDistance), Abweichungs-Statistik und Abrisse je akzeptiertem
     // Suchpunkt in den Store spiegeln — derselbe Takt wie addSearchPoint, die
@@ -866,6 +918,7 @@ export function useSearchRecorder(opts: {
     replayDenseRef.current = [];
     replayEmaRef.current = null;
     replayDisabledRef.current = resumePts.length > 0;
+    qaLastCursorSampleSecRef.current = -Infinity;
     smoothRef.current = resumePts.length ? resumePts[resumePts.length - 1] : null;
     prevFixRef.current = null;   // Zeitlücke → nächster Fix ist neuer Referenzpunkt (kein Speed-Gate gegen alten Fix)
     recentRejectedRef.current = [];
@@ -925,6 +978,11 @@ export function useSearchRecorder(opts: {
     foundRef.current = new Set();
     if (rs) laidObjects.forEach((o, i) => { if (rs.foundObjectIds.includes(searchObjectKey(o, i))) foundRef.current.add(i); });
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
+    // QA-Search-Telemetrie nur im QA-Diagnosemodus; sonst null → kein Overhead.
+    qaTelRef.current = isQaDiagnosticsEnabled()
+      ? { startedAtMs: startMsRef.current, resumed: resumePts.length > 0, raw: [], filtered: [], display: [], cursorSamples: [], objectApproach: [],
+          minDistToEndM: null, progressAtMinEndM: null, truncated: { raw: false, cursor: false } }
+      : null;
     setElapsedS(resume ? Math.max(0, Math.floor((Date.now() - resume.startedAtMs) / 1000)) : 0);
     pausedRef.current = false; setPausedState(false);
     // Frisch: Store-Suchspur leeren. Fortsetzen: Store wurde extern (restoreSearchSession)
@@ -947,7 +1005,11 @@ export function useSearchRecorder(opts: {
     void motionClient.stop();
     const durationS = Math.floor((Date.now() - startMsRef.current) / 1000);
     const replay = replayDisabledRef.current ? null : replayGeometryArrays(replayDenseRef.current);
+    const qaTel = qaTelRef.current
+      ? { ...qaTelRef.current, display: replayDisabledRef.current ? [] : replayDenseRef.current.map(p => ({ lat: p.lat, lng: p.lng, tSec: p.t })) }
+      : undefined;
     return {
+      ...(qaTel ? { qa: qaTel } : {}),
       ...(replay ? { replayPoints: replay.points, replayPointsTimeSec: replay.timeSec } : {}),
       points: pointsRef.current.slice(),
       breaks: breaksRef.current.slice(),

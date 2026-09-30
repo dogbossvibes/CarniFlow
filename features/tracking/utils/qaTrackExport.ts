@@ -13,6 +13,7 @@
 // Diese Datei verändert NICHTS an der Erkennung: keine Schwellen, keine
 // Klassen, keine Fenster, keine Fusion. Sie liest nur.
 
+import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
 import type {
   QaSessionCapture, QaCapturePoint, QaMarkerSource, QaDistanceScale, QaAutoDiagnostic, QaTurnFusion, QaImuOnlyEvent,
   QaCandidateMotion,
@@ -94,7 +95,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2;
+  schemaMinor?: 0 | 1 | 2 | 3;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -163,6 +164,15 @@ export interface QaTrackExport {
   turnFusion?: QaTurnFusion[];
   /** Gerichtete Drehungen ohne GPS-Ecke — protokolliert, nie persistiert. */
   imuOnlyEvents?: QaImuOnlyEvent[];
+
+  // ── QA v2.3 (schemaMinor 3) ─────────────────────────────────────────────
+  /**
+   * Diagnose der ABSUCHE zu dieser Fährte (Ströme raw/filtered/display/run/replay,
+   * Cursor-Samples, Gegenstände, Ende, Replay-Parität). Rein beobachtend; nur
+   * vorhanden, wenn die Absuche im QA-Modus lief. Relative Koordinaten (Ursprung =
+   * erster gelegter Punkt) und relative Zeit.
+   */
+  searchDiagnostics?: QaSearchDiagnostics;
 }
 
 export function toMs(t: string | number | null | undefined): number {
@@ -244,6 +254,7 @@ export function buildQaTrackExport(
   points: readonly RawLayPoint[],
   markers: readonly RawTrackMarker[],
   capture?: QaSessionCapture | null,
+  search?: QaSearchDiagnostics | null,
 ): QaTrackExport {
   const anon = anonymizePoints(points);
   let dist = 0;
@@ -256,7 +267,7 @@ export function buildQaTrackExport(
   const motion = capture?.candidateMotionEvidence;
   return {
     schemaVersion: 2,
-    schemaMinor: capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0,
+    schemaMinor: search ? 3 : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0,
     sessionId: hashSessionId(sessionLocalId),
     pointType: 'lay',
     pointCount: anon.length,
@@ -296,6 +307,7 @@ export function buildQaTrackExport(
     motionCaptureAvailable: !!motion && motion.length > 0,
     ...(capture?.turnFusion ? { turnFusion: capture.turnFusion } : {}),
     ...(capture?.imuOnlyEvents ? { imuOnlyEvents: capture.imuOnlyEvents } : {}),
+    ...(search ? { searchDiagnostics: search } : {}),
   };
 }
 
@@ -362,6 +374,21 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
   // QA v2.2: Turn-Fusion und IMU-only-Ereignisse tragen nur relative Zeiten.
   for (const t of e.turnFusion ?? []) {
     if (t.tMs != null && Math.abs(t.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Fusions-Zeitstempel.');
+  }
+  // QA v2.3: Search-Diagnose — nur relative Zeit (Sekunden seit Suchstart) und relative
+  // Meter. Absolute Unix-Sekunden wären ≥ 1e9.
+  const sd = e.searchDiagnostics;
+  if (sd) {
+    const secs: (number | null | undefined)[] = [
+      sd.end.manualStopTSec, sd.end.eventFired?.tSec,
+      ...sd.cursor.samples.map(c => c.tSec),
+      ...sd.geometry.run.map(p => p.tSec), ...sd.geometry.replay.map(p => p.tSec),
+      ...sd.geometry.raw.map(p => p.tSec), ...sd.geometry.filtered.map(p => p.tSec),
+      sd.maxRunGapSec, sd.maxReplayGapSec,
+    ];
+    for (const v of secs) if (v != null && Math.abs(v) >= 1e8) throw new Error('QA-Export enthält einen absoluten Search-Zeitstempel.');
+    const coords = [...sd.geometry.run, ...sd.geometry.replay, ...sd.geometry.raw, ...sd.geometry.filtered, ...sd.cursor.samples];
+    for (const c of coords) if (Math.abs(c.x) >= 1e6 || Math.abs(c.y) >= 1e6) throw new Error('QA-Export enthält absolute Search-Koordinaten.');
   }
   for (const v of e.imuOnlyEvents ?? []) {
     if (Math.abs(v.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten IMU-Zeitstempel.');

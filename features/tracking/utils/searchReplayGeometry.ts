@@ -141,3 +141,25 @@ export function replayGeometryArrays(dense: readonly ReplayGeoPoint[]):
   if (!g) return null;
   return { points: g.map(p => ({ latitude: p.lat, longitude: p.lng })), timeSec: g.map(p => p.t) };
 }
+
+/**
+ * QA (nur lesend): Richtungswechsel-Knoten der dichten Spur — dieselbe Regel, nach
+ * der `buildReplayGeometry` Ecken schützt (DP-Knoten, an dem die vereinfachte
+ * Polylinie um ≥ turnDeg abknickt). Verändert `buildReplayGeometry` nicht; dient
+ * ausschliesslich der Geometrie-Parität in der QA-Diagnose (keine Ground Truth).
+ */
+export function findTurnVertices(dense: readonly ReplayGeoPoint[]): { index: number; headingChangeDeg: number }[] {
+  const n = dense.length;
+  if (n < 3 || n > REPLAY_GEOMETRY.maxDensePoints) return [];
+  const { x, y } = toXY(dense);
+  const keep = douglasPeucker(x, y, REPLAY_GEOMETRY.epsilonM);
+  const kept: number[] = [];
+  for (let i = 0; i < n; i++) if (keep[i]) kept.push(i);
+  const out: { index: number; headingChangeDeg: number }[] = [];
+  for (let k = 1; k < kept.length - 1; k++) {
+    const a = kept[k - 1], i = kept[k], b = kept[k + 1];
+    const change = angleDiffDeg(headingDeg(x[a], y[a], x[i], y[i]), headingDeg(x[i], y[i], x[b], y[b]));
+    if (change >= REPLAY_GEOMETRY.turnDeg) out.push({ index: i, headingChangeDeg: change });
+  }
+  return out;
+}

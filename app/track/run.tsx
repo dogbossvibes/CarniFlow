@@ -18,6 +18,8 @@ import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { useTrackEndGuidance } from '@/features/tracking/hooks/useTrackEndGuidance';
+import { buildSearchDiagnostics, saveQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
+import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
@@ -550,7 +552,24 @@ export default function TrackRunScreen() {
   // des gespeicherten Endpunkts (letzter Punkt der gelegten Fährte). Beendet die
   // Absuche NICHT — nur Anzeige/Voice/Haptik; der Nutzer beendet weiterhin selbst.
   const endPoint = snapData.laidPoints.length ? snapData.laidPoints[snapData.laidPoints.length - 1] : null;
-  const noteEndFired = useCallback(() => useTrackingStore.getState().noteSearchEndFired(), []);
+  // QA (rein beobachtend): Zustand beim einmaligen Ende-Ereignis festhalten. Die
+  // Ende-Logik selbst (useTrackEndGuidance/stepTrackEnd) bleibt unverändert; Haptik
+  // und Voice feuern im selben Tick wie `onFired` (siehe useTrackEndGuidance).
+  const sLatestRef = useRef(s);
+  sLatestRef.current = s;
+  const voiceOnRef = useRef(voiceOn);
+  voiceOnRef.current = voiceOn;
+  const qaEndRef = useRef<{ tSec: number; progressM: number; searchDistanceM: number; voice: boolean } | null>(null);
+  const noteEndFired = useCallback(() => {
+    useTrackingStore.getState().noteSearchEndFired();
+    if (isQaDiagnosticsEnabled() && !qaEndRef.current) {
+      const st = sLatestRef.current;
+      qaEndRef.current = {
+        tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
+        progressM: st.dogProgressM, searchDistanceM: st.distanceM, voice: voiceOnRef.current,
+      };
+    }
+  }, []);
   const openMandatoryObjects = Math.max(0, s.totalObjects - s.foundObjects);
   const trackEndState = useTrackEndGuidance({
     recording: searchGuidanceActive,
@@ -707,6 +726,31 @@ export default function TrackRunScreen() {
       positionAccuracyM: m.accuracy,
       legIndex: 1 + cornerInputs.filter(corner => corner.atM <= (snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start)).length,
     }));
+    // QA-Search-Diagnose (nur QA-Modus, rein beobachtend, best-effort): Ströme,
+    // Cursor-Samples, Gegenstände, Ende, Replay-Parität → eigener QA-Speicher.
+    // Verändert weder `res` noch Analytics/Score/Distanz.
+    if (res.qa && sessId && snapData.laidPoints.length) {
+      try {
+        const stopSec = (Date.now() - (searchStartMsRef.current ?? res.qa.startedAtMs)) / 1000;
+        const diag = buildSearchDiagnostics({
+          origin: snapData.laidPoints[0],
+          telemetry: res.qa,
+          run: { points: res.points, pointsTimeSec: res.pointsTimeSec },
+          replay: res.replayPoints && res.replayPointsTimeSec ? { points: res.replayPoints, timeSec: res.replayPointsTimeSec } : null,
+          analyticsSampleCount: res.analyticsSamples.length,
+          resumed: res.qa.resumed,
+          laid: { total: s.trackLengthM, end: snapData.laidPoints[snapData.laidPoints.length - 1] },
+          objects: objectInputs.map((o, i) => ({
+            index: i, at: { latitude: objectMarkers[i].lat as number, longitude: objectMarkers[i].lng as number },
+            atM: o.atM ?? null, found: o.found ?? null, legIndex: o.legIndex ?? null,
+          })),
+          cornerAtM: cornerInputs.map(c => c.atM),
+          end: { fired: qaEndRef.current, hapticFired: qaEndRef.current ? true : null, voiceFired: qaEndRef.current ? qaEndRef.current.voice : null },
+          manualStopTSec: stopSec,
+        });
+        void saveQaSearchCapture(sessId, diag);
+      } catch (e) { console.warn('[trackRun] QA search capture', e); }
+    }
     const analytics = res.analyticsSamples.length ? computeTrackAnalyticsV3({
       samples: res.analyticsSamples,
       corners: cornerInputs,

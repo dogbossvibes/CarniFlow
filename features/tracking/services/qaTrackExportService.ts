@@ -10,6 +10,7 @@ import {
 } from '@/features/tracking/repositories/localTrackRepository';
 import { getLocalTrainingSessions } from '@/features/training/repositories/localTrainingRepository';
 import { loadQaSessionCapture } from '@/features/tracking/utils/qaSessionCapture';
+import { loadQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
 import {
   buildQaTrackExport, serializeQaTrackExport, qaExportFileName, assertNoAbsoluteData, hashSessionId,
   type QaTrackExport,
@@ -103,12 +104,13 @@ export async function listRecentLaySessions(ownerId: string, limit = 5): Promise
  * Werte zu erfinden.
  */
 export async function buildExportForSession(localId: string): Promise<QaTrackExport> {
-  const [points, markers, capture] = await Promise.all([
+  const [points, markers, capture, search] = await Promise.all([
     getLayTrackPointsBySession(localId),
     getTrackMarkersBySession(localId).catch(() => []),
     loadQaSessionCapture(localId).catch(() => null),
+    loadQaSearchCapture(localId).catch(() => null),
   ]);
-  const exported = buildQaTrackExport(localId, points, markers, capture);
+  const exported = buildQaTrackExport(localId, points, markers, capture, search);
   // Sicherheitsnetz vor jeder Weitergabe: lieber kein Export als ein Leck.
   assertNoAbsoluteData(exported);
   return exported;
