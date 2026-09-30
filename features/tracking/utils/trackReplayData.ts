@@ -9,6 +9,7 @@
 import { isTrackAnalyticsV2, type TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isReplayAvailable, type ReplayGeometry } from '@/features/tracking/engine/trackReplay';
+import { selectDisplayRunPoints } from '@/features/tracking/utils/searchDisplayGeometry';
 
 export interface TrackReplayData {
   geometry: ReplayGeometry;
@@ -25,7 +26,8 @@ export function extractTrackReplayData(data: unknown): TrackReplayData | null {
   const analytics = d.track_data?.run?.analytics;
   if (!isTrackAnalyticsV2(analytics as never) && !isTrackAnalyticsV3(analytics)) return null;
 
-  const rawPoints = d.runs?.[0]?.run_points ?? [];
+  // Darstellung: turn-aware `replay_points`, sonst unverändert `run_points` (Legacy).
+  const rawPoints: RawRunPoint[] = selectDisplayRunPoints(data).points;
   const hasAllTimestamps = rawPoints.length > 0 && rawPoints.every(p => typeof p.t === 'number');
   const geometry: ReplayGeometry = {
     points: rawPoints.map(p => ({ latitude: p.lat, longitude: p.lng })),

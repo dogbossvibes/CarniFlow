@@ -121,7 +121,7 @@ describe('Extrem enger Spitzwinkel mit verzögerter Motion-Evidenz', () => {
     add(0, 0);
     const r = 171.2 * RAD;
     for (let d = 1; d <= 6; d += 1) add(Math.sin(r) * d, Math.cos(r) * d);
-    const ev = () => ({ available: true, evidence: 0.8, netYawDeg: 40, grossYawDeg: 45,
+    const ev = () => ({ available: true, evidence: 0.8, netYawDeg: 40, signedNetYawDeg: 0, grossYawDeg: 45,
       monotonicity: 0.9, concentration: 0.9, peakYawRateDps: 80, rotationDurationS: 1,
       yawShare: 0.5, totalRotationDeg: 90, peakRotationRateRadS: 1, steps: 2, stepRate: 1,
       cadence: 100, gaitAccelFraction: 1, gaitAccelThreshold: 0.1, locomotionSource: 'steps' as const,

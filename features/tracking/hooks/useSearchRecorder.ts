@@ -8,6 +8,7 @@
  * Portiert aus design_handoff_faehrten/useSearchRecorder.ts; der Helfer distM
  * (Haversine auf {latitude,longitude}) ist hier lokal definiert.
  */
+import { replayGeometryArrays, REPLAY_GEOMETRY, type ReplayGeoPoint } from '@/features/tracking/utils/searchReplayGeometry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import {
@@ -189,6 +190,13 @@ export type SearchResult = {
   // Kürzer als `points` (Resume, ältere Sessions vor dieser Erweiterung) =
   // Replay für diese Session nicht verfügbar (siehe app/track/run.tsx).
   pointsTimeSec: number[];
+  // Turn-aware Replay-/Display-Geometrie (rein darstellend, additiv): dichter
+  // Strom VOR dem 1,5-m-Gate, beim Stop vereinfacht (Ecken behalten Vor-Anker/
+  // Scheitel/Nach-Anker, Geraden werden ausgedünnt). Cursor, Score, Distanz und
+  // Analytics lesen ausschliesslich `points`/`analyticsSamples` — nie dieses
+  // Feld. Fehlt es (Resume, Legacy, zu wenige Punkte), gilt `points`.
+  replayPoints?: LatLng[];
+  replayPointsTimeSec?: number[];
 };
 
 export type { Level };
@@ -246,6 +254,10 @@ export function useSearchRecorder(opts: {
   // buildRunResultPayload Replay korrekt als nicht verfügbar erkennt
   // (keine erfundenen Zeitstempel für Alt-Punkte ohne echte Zeit).
   const pointsTimeRef = useRef<number[]>([]);
+  // Dichter Display-Strom (siehe SearchResult.replayPoints). NIE von Cursor/Distanz/Score gelesen.
+  const replayDenseRef = useRef<ReplayGeoPoint[]>([]);
+  const replayEmaRef = useRef<LatLng | null>(null);
+  const replayDisabledRef = useRef(false);   // Resume: Vor-Resume-Punkte haben keine dichte Spur
   // Lotfusspunkt des zuletzt akzeptierten Punkts auf der Soll-Fährte — Kontinuität
   // der Referenzsegment-Auswahl (P0 Live-Cursor/Self-Crossing, siehe searchGeometry
   // projectForwardCandidates/pickContinuousProjection). null = kein Vorgänger.
@@ -409,6 +421,8 @@ export function useSearchRecorder(opts: {
       if (__DEV__) console.log('[searchFix] anchor_reset', { jumpM: decision.jumpM != null ? Math.round(decision.jumpM) : null });
       pointsRef.current = [];
       pointsTimeRef.current = [];
+      replayDenseRef.current = [];
+      replayEmaRef.current = null;
       prevFootRef.current = null;
       distRef.current = 0;
     }
@@ -558,6 +572,25 @@ export function useSearchRecorder(opts: {
       return;
     }
 
+    // Replay-/Display-Geometrie: dichter Strom VOR dem Liniendichte-Gate, nach
+    // Fix-Akzeptanz und Fusion-Schutzschicht (Outlier/Stillstand haben oben
+    // bereits returned). Reiner Schreibzugriff auf eine eigene Ref — kein
+    // Einfluss auf pointsRef, distRef, Cursor, Score oder Analytics.
+    // Eigene, leichte Glättung (EMA 0,7 wie der Lege-Detektor) statt der trägen
+    // Metrik-Glättung (0,4): sie rundet eine Ecke über mehrere Meter ab und wäre
+    // genau der Grund, warum der Scheitel in der Darstellung fehlt. Die Kette
+    // läuft nur über bereits akzeptierte Fixes; `smoothRef`/`sm` bleiben unberührt.
+    {
+      const pe = replayEmaRef.current;
+      const re: LatLng = pe
+        ? { latitude: pe.latitude + REPLAY_GEOMETRY.emaAlpha * (raw.latitude - pe.latitude),
+            longitude: pe.longitude + REPLAY_GEOMETRY.emaAlpha * (raw.longitude - pe.longitude) }
+        : { latitude: raw.latitude, longitude: raw.longitude };
+      replayEmaRef.current = re;
+      if (!replayDisabledRef.current && replayDenseRef.current.length < REPLAY_GEOMETRY.maxDensePoints) {
+        replayDenseRef.current.push({ lat: re.latitude, lng: re.longitude, t: Math.round(((tNow - startMsRef.current) / 1000) * 10) / 10 });
+      }
+    }
     const pts = pointsRef.current;
     if (pts.length > 0) {
       const d = distM(pts[pts.length - 1], sm);
@@ -830,6 +863,9 @@ export function useSearchRecorder(opts: {
     // resultierende Längen-Differenz zu pointsRef ist das Signal für "Replay
     // für diese Session nicht verfügbar" (siehe SearchResult.pointsTimeSec).
     pointsTimeRef.current = [];
+    replayDenseRef.current = [];
+    replayEmaRef.current = null;
+    replayDisabledRef.current = resumePts.length > 0;
     smoothRef.current = resumePts.length ? resumePts[resumePts.length - 1] : null;
     prevFixRef.current = null;   // Zeitlücke → nächster Fix ist neuer Referenzpunkt (kein Speed-Gate gegen alten Fix)
     recentRejectedRef.current = [];
@@ -910,7 +946,9 @@ export function useSearchRecorder(opts: {
     // ausserhalb einer aktiven Absuche).
     void motionClient.stop();
     const durationS = Math.floor((Date.now() - startMsRef.current) / 1000);
+    const replay = replayDisabledRef.current ? null : replayGeometryArrays(replayDenseRef.current);
     return {
+      ...(replay ? { replayPoints: replay.points, replayPointsTimeSec: replay.timeSec } : {}),
       points: pointsRef.current.slice(),
       breaks: breaksRef.current.slice(),
       foundObjects: foundRef.current.size,

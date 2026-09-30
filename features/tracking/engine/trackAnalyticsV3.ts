@@ -15,6 +15,7 @@ import {
   type ReacquisitionStats,
   type TrackAnalyticsInput,
 } from '@/features/tracking/engine/trackAnalytics';
+import { computeReferenceQuality, type ReferenceQuality } from '@/features/tracking/engine/referenceQuality';
 import {
   computeTrackAnalyticsV2,
   type TrackAnalyticsV2,
@@ -188,6 +189,12 @@ export interface TrackAnalyticsV3 extends Omit<TrackAnalyticsV2, 'analyticsVersi
   assessableDistance: AssessableDistance;
   deviationEvents: DeviationEvent[];
   scoreBreakdown: AnalysisScoreBreakdown;
+  /**
+   * Belastbarkeit der GELEGTEN Referenz (nicht der Absuche). Senkt nur
+   * `analysisConfidence`, nie `trackScore`. Fehlt bei älteren Analysen und wenn
+   * keine gelegte Linie übergeben wurde.
+   */
+  referenceQuality?: ReferenceQuality;
 }
 
 function clamp01(value: number): number { return Math.max(0, Math.min(1, value)); }
@@ -662,11 +669,18 @@ export function computeTrackAnalyticsV3(input: TrackAnalyticsInput): TrackAnalyt
   const objects = analyzeObjectContacts(classified, input.objects, input.handlerDistanceHintM ?? 0);
   const reacquisition = reacquisitionFromEvents(deviationEvents);
   const pace = computePaceV3(classified, base.pace);
-  const confidence = input.samples.length
+  // SCORE ≠ CONFIDENCE: der Score wird weiter aus der Sample-Konfidenz der
+  // Absuche berechnet; die Referenz-Qualität der gelegten Fährte skaliert nur
+  // die ausgewiesene Analyse-Konfidenz (Band/Hinweis), nie die Hundeleistung.
+  const sampleConfidence = input.samples.length
     ? round2(clamp01((assessableDistance.percent / 100) * mean(input.samples.map(sample => sample.confidence))))
     : 0;
+  const referenceQuality = input.referenceLine
+    ? computeReferenceQuality({ line: input.referenceLine, cornerAtM: input.corners.map(corner => corner.atM) })
+    : undefined;
+  const confidence = referenceQuality ? round2(clamp01(sampleConfidence * referenceQuality.confidenceFactor)) : sampleConfidence;
   const band: ConfidenceBand = confidenceBand(confidence);
-  const { score, breakdown } = computeScore(deviationEvents, corners, pace, assessableDistance, confidence);
+  const { score, breakdown } = computeScore(deviationEvents, corners, pace, assessableDistance, sampleConfidence);
   return {
     ...base,
     analyticsVersion: ANALYTICS_VERSION_V3,
@@ -682,6 +696,7 @@ export function computeTrackAnalyticsV3(input: TrackAnalyticsInput): TrackAnalyt
     assessableDistance,
     deviationEvents,
     scoreBreakdown: breakdown,
+    ...(referenceQuality ? { referenceQuality } : {}),
     trackScore: input.samples.length >= TRACK_ANALYSIS_THRESHOLDS.minSamplesForAssessment ? score : 0,
     // V3 zeigt keine irreführende „niedrigste Abweichung“ und wertet einen
     // automatischen Kontaktstatus nie als bestätigtes Verweisen.

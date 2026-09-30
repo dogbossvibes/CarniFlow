@@ -108,6 +108,12 @@ export interface TrackAnalyticsInput {
   durationS: number;
   /** Nur v3: optionaler Hinweis auf den möglichen Führer-Hund-Versatz; niemals eine Positionskorrektur. */
   handlerDistanceHintM?: number | null;
+  /**
+   * Nur v3: die persistierte GELEGTE Linie (mit Accuracy). Daraus wird die
+   * Referenz-Qualität abgeleitet (referenceQuality.ts). Fehlt sie, bleibt die
+   * Analyse-Konfidenz exakt wie bisher.
+   */
+  referenceLine?: { latitude: number; longitude: number; accuracy: number | null }[];
 }
 
 // ── Ausgaben ──────────────────────────────────────────────────────────────

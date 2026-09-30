@@ -20,8 +20,11 @@ import {
 import { logConfirmEvent, logConfirmedCornerMetrics, logGpsQualityChange } from '@/features/tracking/utils/angleDiagnostics';
 import { legacyDetectCorner, type LegacyAcceptedPoint } from '@/features/tracking/utils/legacyCornerDetection';
 import {
-  detectShortLegCorners, DETECTOR_INPUT, type ShortLegPoint,
+  DETECTOR_INPUT, CORNER_GAP_M, type ShortLegPoint,
 } from '@/features/tracking/utils/shortLegCornerDetection';
+import { fuseTurns } from '@/features/tracking/utils/turnFusion';
+import { lineGateStepM, lineEmaAlpha, inTurnZone } from '@/features/tracking/utils/turnAwareLineGate';
+import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDistance';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
 import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
@@ -29,7 +32,7 @@ import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsM
 import { markWarmupStarted, markReportedSource, markWarmupStopped, markMotionStarted, markMotionSample } from '@/features/tracking/utils/trackingWarmupState';
 import { pushQaCandidateLine, clearQaCandidateLog } from '@/features/tracking/utils/qaCandidateLog';
 import {
-  saveQaSessionCapture, pathLength, QA_MOTION_CONTEXT_MS,
+  saveQaSessionCapture, pathLength, QA_MOTION_CONTEXT_MS, toQaTurnFusion, toQaImuOnlyEvent,
   type QaCapturePoint, type QaMarkerMeta, type QaAutoDiagnostic,
   type QaMarkerSource, type QaDistanceScale, type QaCandidateMotion,
 } from '@/features/tracking/utils/qaSessionCapture';
@@ -128,10 +131,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   // Track-Zustand in Refs → kein Stale-Closure im Fix-Handler.
   const pointsRef     = useRef<AcceptedPoint[]>([]);   // akzeptierte, geglättete Linie
-  const emaRef        = useRef<LatLng | null>(null);   // geglättete Position für die LINIE
+  const emaRef        = useRef<LatLng | null>(null);   // EMA 0,4 — bisherige Linien-Kette; speist Start-Lock + kanonische Distanz (unverändert)
+  const lineEmaRef    = useRef<LatLng | null>(null);   // Linien-Geometrie: EMA 0,4, in Kurvenzonen 0,7 (turn-aware)
+  const canonDistRef  = useRef(createCanonicalDistance());   // Distanz unabhängig von der Punktdichte
   const puckRef       = useRef<LatLng | null>(null);   // schneller geglättete Position für den LIVE-Puck
   const lastRawRef    = useRef<Raw | null>(null);      // letzter (akzeptierter) Rohfix
   const lastCornerAtRef = useRef<number>(-Infinity);   // cumDist des letzten Winkels
+  const lineTurnZoneRef = useRef(false);               // Kurvenzone laut Detektor-Puffer (turn-aware Linien-Gate)
+  const lastCornerRescuedRef = useRef(false);          // war der letzte Winkel eine Split-Apex-Paarung?
   // ── Eigener, dichterer Punktstrom NUR für die Winkel-Erkennung ──
   // Die aufgezeichnete LINIE bleibt unverändert (EMA_ALPHA 0,4 / MIN_STEP_M 2 m).
   // Für kurze Schenkel (Feldschema: ~3,75 m) reicht dieser Strom nicht: er
@@ -341,7 +348,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     const turnEvidenceAt = motionActiveRef.current
       ? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceForTrailing(t))
       : undefined;
-    const { corners, diagnostics } = detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt);
+    // Turn-Fusion (GPS ∪ IMU): Regelpfad des Detektors + Split-Apex-Paarung +
+    // Schärfe-Auflösbarkeit. Ohne Motion (Normalfall) rein GPS-basiert.
+    const { corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt });
 
     // ── QA v2.1: Motion-Evidenz LIVE je Kandidat festhalten ────────────────
     // Rein beobachtend. Greift nur im QA-Diagnosemodus und nur, solange Core
@@ -431,6 +440,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     }
     for (const c of corners) {
       if (c.atM <= lastCornerAtRef.current) continue;   // schon gemeldet
+      const fused = turns.find(t => t.apexIndex === c.apexIndex) ?? null;
+      // Eine gepaarte (Split-Apex-)Ecke wird früh gemeldet; entdeckt der Regelpfad
+      // mit mehr Punkten einen Nachbarscheitel in derselben Ecke, darf daraus keine
+      // zweite Markierung werden.
+      if (lastCornerRescuedRef.current && c.atM - lastCornerAtRef.current < CORNER_GAP_M) continue;
+      lastCornerRescuedRef.current = fused?.source === 'gps_split_apex';
       lastCornerAtRef.current = c.atM;
       // ── QA: JEDE automatisch akzeptierte Ecke bekommt genau EINE Zeile ──
       // Zuordnung über den stabilen `apexIndex` der Diagnose, nicht mehr über
@@ -447,7 +462,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         const dir = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
         pushQaCandidateLine(
           `AUTO ${new Date(d?.t ?? Date.now()).toISOString().slice(11, 19)} ` +
-          `idx=${c.apexIndex} ${c.kind} (${dir}) innen=${d?.interiorAngleDeg?.toFixed(1) ?? '—'}° ` +
+          `idx=${c.apexIndex} ${c.kind} (${dir}) src=${fused?.source ?? 'gps'} sharp=${fused?.sharpness ?? '—'} ` +
+          `geo=${fused?.geometryQualityLevel ?? '—'}/${fused?.accuracyToLegRatio ?? '—'} ` +
+          `innen=${d?.interiorAngleDeg?.toFixed(1) ?? '—'}° ` +
           `acc=${d?.accuracyM?.toFixed(1) ?? '—'}m ${trail} → accepted` +
           (ev ? ` | turnEvidence=${ev.evidence?.toFixed(3) ?? '—'} locomotion=${ev.locomotionSource} ` +
             `steps=${ev.steps} accelFraction=${ev.gaitAccelFraction.toFixed(2)} ` +
@@ -467,7 +484,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         lat: p.lat, lng: p.lng, accuracy: p.accuracy,
         distance_from_start: Math.round(c.atM * 10) / 10,
         note: null, audio_url: null, found: false, t: now,
-      }, { source: 'auto', scale: 'detector', apexIndex: c.apexIndex });
+      }, { source: fused?.source === 'gps_split_apex' ? 'auto_split_apex' : 'auto', scale: 'detector', apexIndex: c.apexIndex });
       onAngleRef.current?.(c.kind);
     }
   }, [commitMarker]);
@@ -542,6 +559,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     s.setStartLockActive(false);
     const p0: AcceptedPoint = { lat: a.lat, lng: a.lng, t: now, accuracy: startAnchorAccRef.current, cumDist: 0 };
     pointsRef.current = [p0];
+    canonDistRef.current.start({ lat: p0.lat, lng: p0.lng });
     lastRawRef.current = raw;
     s.addTrackPoint({ lat: p0.lat, lng: p0.lng, accuracy: p0.accuracy, altitude: null, speed: null, heading: null, t: now });
     ptBuffer.current.push({
@@ -572,11 +590,21 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // EMA-Glättung der Position — IMMER (Warmup wie Aufnahme). So folgt der
     // Live-Puck stets der echten Position und friert NIE ein, auch bei mässigem
     // GPS. Der Genauigkeits-/Speed-Filter blockt nur das Setzen von LINIEN-Punkten.
+    // Turn-aware: in einer Kurvenzone (CURRENT) glättet die Linie leichter, damit
+    // eine Ecke nicht über ~2 m abgerundet wird; sonst unverändert EMA_ALPHA.
+    const lineAlpha = getTrackingEngineMode() === 'build40' ? EMA_ALPHA : lineEmaAlpha(lineTurnZoneRef.current);
+    // Kanonische Kette (Start-Lock + Distanz): unverändert EMA_ALPHA.
     const prevEma = emaRef.current;
     const ema: LatLng = prevEma
       ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
       : { lat: raw.lat, lng: raw.lng };
     emaRef.current = ema;
+    // Geometrie-Kette der LINIE (turn-aware, s. o.).
+    const prevLine = lineEmaRef.current;
+    const lineEma: LatLng = prevLine
+      ? { lat: prevLine.lat + (raw.lat - prevLine.lat) * lineAlpha, lng: prevLine.lng + (raw.lng - prevLine.lng) * lineAlpha }
+      : { lat: raw.lat, lng: raw.lng };
+    lineEmaRef.current = lineEma;
 
     // Live-Puck getrennt und LEICHTER glätten (PUCK_ALPHA > EMA_ALPHA): er folgt
     // der echten Position deutlich flotter (weniger „hinkt nach"), während die
@@ -648,16 +676,28 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       const rStep = rLast ? calculateDistance(rLast, { lat: raw.lat, lng: raw.lng }) : 0;
       rt.push({ lat: raw.lat, lng: raw.lng, cumDist: (rLast?.cumDist ?? 0) + rStep, accuracy: raw.accuracy, t: raw.t });
       if (rt.length > 60) rt.splice(0, rt.length - 60);
+      // Kurvenzone für Linien-Gate (dieser Fix) und Linien-Glättung (nächster Fix).
+      lineTurnZoneRef.current = inTurnZone(dPts, lastCornerAtRef.current);
     }
 
     // 3) Distanz-Gate: erst ab MIN_STEP_M einen neuen Linienpunkt setzen.
+    // Kanonische Distanz: exakt die bisherige Semantik (EMA 0,4 / Gate 2,0 m),
+    // unabhängig davon, wie dicht die Geometrie unten persistiert wird.
+    {
+      const before = canonDistRef.current.total;
+      const total = canonDistRef.current.push(ema);
+      if (total !== before) store.getState().setDistanceMeters(total);
+    }
     const pts = pointsRef.current;
     const last = pts[pts.length - 1];
-    const step = last ? calculateDistance(last, ema) : 0;
-    if (last && step < MIN_STEP_M) return;
+    const step = last ? calculateDistance(last, lineEma) : 0;
+    // Turn-aware Gate (CURRENT): 2,0 m auf gerader Strecke wie bisher, in der
+    // Kurvenzone dichter (turnAwareLineGate.ts). BUILD40 bleibt beim festen Gate.
+    const gateM = getTrackingEngineMode() === 'build40' ? MIN_STEP_M : lineGateStepM(detectPointsRef.current, lastCornerAtRef.current);
+    if (last && step < gateM) return;
 
     const accepted: AcceptedPoint = {
-      lat: ema.lat, lng: ema.lng, t: raw.t, accuracy: raw.accuracy,
+      lat: lineEma.lat, lng: lineEma.lng, t: raw.t, accuracy: raw.accuracy,
       cumDist: (last?.cumDist ?? 0) + step,
     };
     pts.push(accepted);
@@ -666,7 +706,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       lat: accepted.lat, lng: accepted.lng, accuracy: accepted.accuracy,
       altitude: raw.altitude, speed: raw.speed, heading: null, t: accepted.t,
     };
-    s.addTrackPoint(sample);   // Store rechnet Distanz fort + aktualisiert Qualität
+    s.addTrackPoint(sample, { skipDistance: true });   // Distanz kommt aus canonDistRef (Punktdichte-unabhängig); Store aktualisiert Qualität
     ptBuffer.current.push({
       latitude: sample.lat, longitude: sample.lng, accuracy: sample.accuracy ?? null,
       altitude: sample.altitude ?? null, speed: sample.speed ?? null, heading: null,
@@ -764,10 +804,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // hier in die Linie, der Timer läuft sofort.
     pointsRef.current = [];
     emaRef.current = null;
+    lineEmaRef.current = null;
+    canonDistRef.current.reset();
     puckRef.current = null;
     lastRawRef.current = null;
     rejectedRef.current = 0;
     lastCornerAtRef.current = -Infinity;
+    lastCornerRescuedRef.current = false;
+    lineTurnZoneRef.current = false;
     detectPointsRef.current = [];
     detectEmaRef.current = null;
     rawTailRef.current = [];
@@ -961,13 +1005,15 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       try {
         const detectPts = detectPointsRef.current;
         const linePts = pointsRef.current;
-        const sweep = detectShortLegCorners(
-          detectPts,
-          null,
-          motionActiveRef.current
+        const originMs = qaOriginRef.current?.t ?? detectPts[0]?.t ?? 0;
+        // Hinweis: der Motion-Ringpuffer hält nur die letzten ~20 s — IMU-only-Ereignisse
+        // decken deshalb nur das Ende der Aufnahme ab.
+        const sweep = fuseTurns(detectPts, {
+          turnEvidenceAt: motionActiveRef.current
             ? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceForTrailing(t))
             : undefined,
-        );
+          motionSamples: motionActiveRef.current ? motionBufRef.current.samplesIn(-Infinity, Infinity) : undefined,
+        });
         const acceptedIdx = new Set(sweep.corners.map(c => c.apexIndex));
         const autoDiagnostics: QaAutoDiagnostic[] = sweep.diagnostics.map(d => ({
           apexIndex: d.apexIndex,
@@ -1009,6 +1055,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           markers: qaMarkerMetaRef.current.slice(),
           autoDiagnostics,
           candidateMotionEvidence: qaCandidateMotionRef.current.slice(),
+          turnFusion: sweep.turns.map(t => toQaTurnFusion(t, originMs)),
+          imuOnlyEvents: sweep.imuOnly.map(e => toQaImuOnlyEvent(e, originMs)),
         });
       } catch (e) {
         console.warn('[trackRecorder] QA-Mitschnitt', e);

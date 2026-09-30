@@ -2,8 +2,10 @@
 // verbindlichen Golden-Field-Route.
 //
 // Die Drehungen liegen exakt auf den wahren Eckzeitpunkten der Route
-// (Weglänge / Gehtempo). Vorzeichen existieren nur INNERHALB des Generators —
-// die Turn-Evidenz gibt sie nie zurück, und der Detector liest sie nie.
+// (Weglänge / Gehtempo). Vorzeichen-Konvention wie am realen Gerät gemessen
+// (9/9 Feldereignisse, siehe motionTurnEvidence.MOTION_YAW_LEFT_SIGN):
+// LINKS = positive Yaw-Summe, RECHTS = negative. Die Turn-Evidenz (`evidence`)
+// bleibt vorzeichenfrei; nur die Fusion liest `signedNetYawDeg`.
 
 import { FIELD_LEG_M } from './goldenRoute';
 import { simulate, pulse, ZERO, WALK, HAND, type Program } from './motionScenarioSim';
@@ -12,8 +14,8 @@ import type { MotionWindowSample } from '@/features/tracking/utils/motionTurnEvi
 export const SPEED_MPS = 1.3;
 export const TURN_DUR_S = 1.2;
 
-/** L, R, SR, SL — nur intern für die Simulation. */
-const TURNS_DEG = [-90, +90, +135, -135];
+/** L, R, SR, SL — Sensor-Konvention: links positiv, rechts negativ. */
+const TURNS_DEG = [+90, -90, -135, +135];
 
 /** Wahre Eckzeitpunkte der Golden-Route (Sekunden seit Start). */
 export function cornerTimesS(): number[] {

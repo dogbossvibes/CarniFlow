@@ -36,9 +36,16 @@ export function buildRunResultPayload(args: {
   // bisher nur {lat,lng}; Replay ist dann für diese Session schlicht nicht
   // verfügbar (Punkt 18/19 — kein Crash, kein erfundener Zeitstempel).
   pointsTimeSec?: number[];
+  // Turn-aware Replay-/Display-Geometrie (rein darstellend). Additiv im
+  // schemalosen payload_json.run — `run_points` (Metriken/Analyse-Vertrag) bleibt
+  // UNVERÄNDERT. Nur gesetzt, wenn Punkte und Zeiten gleich lang sind (≥ 2).
+  replayPoints?: { latitude: number; longitude: number }[];
+  replayPointsTimeSec?: number[];
 }): Record<string, unknown> {
   const r = args.result;
   const hasReplayTimestamps = !!args.pointsTimeSec && args.pointsTimeSec.length === r.points.length && r.points.length > 0;
+  const hasReplayGeometry = !!args.replayPoints && !!args.replayPointsTimeSec
+    && args.replayPoints.length >= 2 && args.replayPoints.length === args.replayPointsTimeSec.length;
   return {
     run_id:                    args.runId,
     session_id:                args.sessionId,
@@ -56,5 +63,8 @@ export function buildRunResultPayload(args: {
       ? r.points.map((p, i) => ({ lat: p.latitude, lng: p.longitude, t: args.pointsTimeSec![i] }))
       : r.points.map(p => ({ lat: p.latitude, lng: p.longitude })),
     ...(args.analytics ? { analytics: args.analytics } : {}),
+    ...(hasReplayGeometry
+      ? { replay_points: args.replayPoints!.map((p, i) => ({ lat: p.latitude, lng: p.longitude, t: args.replayPointsTimeSec![i] })) }
+      : {}),
   };
 }

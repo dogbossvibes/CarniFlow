@@ -43,7 +43,8 @@
 // ──────────────────────────────────────────────────────────────────────────
 import { calculateHeading, calculateDistance } from '@/features/tracking/utils/gpsFilter';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
-import { applyMotionToConfidence, type TurnEvidence } from '@/features/tracking/utils/motionTurnEvidence';
+import { applyMotionToConfidence, motionTurnDirection, type TurnEvidence } from '@/features/tracking/utils/motionTurnEvidence';
+import { turnGeometryQuality, type GeometryQualityLevel } from '@/features/tracking/utils/turnGeometryQuality';
 
 /**
  * Nachschlagefunktion für die Core-Motion-Turn-Evidenz zu einem Kandidaten-
@@ -144,6 +145,7 @@ export const ACCEPT_SCORE = 0.62;
  */
 export const MIN_TURN_TO_NOISE = 2.2;
 
+
 /**
  * ROBUSTE LOKALE RICHTUNGSSCHÄTZUNG (gewichtete Regression mit Huber-Gewichten).
  *
@@ -211,8 +213,8 @@ export function robustBearing(
   return { deg, residualM: residual, samples: n };
 }
 
-const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-function normalizeDeg(d: number): number {
+export const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+export function normalizeDeg(d: number): number {
   while (d > 180) d -= 360;
   while (d < -180) d += 360;
   return d;
@@ -225,7 +227,7 @@ function normalizeDeg(d: number): number {
  * jeden Heading-Delta um 180° verfälschen: gerade Strecken landeten dann im
  * Spitzwinkel-Band und erzeugten massenhaft Falscherkennungen.)
  */
-function meanBearing(points: readonly ShortLegPoint[], from: number, to: number): { deg: number; spreadDeg: number; segments: number } | null {
+export function meanBearing(points: readonly ShortLegPoint[], from: number, to: number): { deg: number; spreadDeg: number; segments: number } | null {
   let sx = 0, sy = 0, n = 0;
   const bearings: number[] = [];
   const lo = Math.min(from, to), hi = Math.max(from, to);
@@ -245,7 +247,7 @@ function meanBearing(points: readonly ShortLegPoint[], from: number, to: number)
 }
 
 /** Index in Laufrichtung (forward) bzw. zurück, höchstens `maxDistM` entfernt. */
-function nearIndex(points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, maxDistM: number): number {
+export function nearIndex(points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, maxDistM: number): number {
   const apex = points[apexIndex];
   let idx = apexIndex;
   for (;;) {
@@ -374,6 +376,28 @@ export interface ShortLegDiagnostics {
   motionAdjustment: number | null;
   /** Turn-Evidenz, die zur Verschiebung geführt hat (0..1, null = keine Daten). */
   motionTurnEvidence: number | null;
+  // ── Turn-Fusion (T-TRACK-FUSION-QUALITY-2026-09-30) ──
+  /** Richtung (aus dem GPS-Vorzeichen) — unabhängig von der Schärfe. */
+  direction: 'links' | 'rechts' | null;
+  /** Schärfe: 'unresolved' = GPS-Geometrie löst sie nicht auf (→ persistiert als normal). */
+  sharpness: 'normal' | 'spitz' | 'unresolved' | null;
+  /** Geometrie-Qualität 0..1 (turnGeometryQuality) — Auflösbarkeit der Schärfe. */
+  geometryQuality: number | null;
+  geometryQualityLevel: GeometryQualityLevel | null;
+  /** Median-Accuracy im Fenster ÷ kürzester Schenkel. */
+  accuracyToLegRatio: number | null;
+  /** true = GPS-Klasse war „spitz", die Geometrie belegt das aber nicht. */
+  sharpnessDemoted: boolean;
+  /** Richtung laut Motion (Vorzeichen-Yaw), null = keine/zu schwache Daten. */
+  motionDirection: 'links' | 'rechts' | null;
+  /** true/false = Motion bestätigt/widerspricht der GPS-Richtung; null = unbekannt. */
+  motionDirectionAgrees: boolean | null;
+  /** |netYaw| ÷ |GPS-Winkel|. Netto-Yaw unterschätzt systematisch (Fenster) — nur weiche Plausibilität. */
+  motionMagnitudeRatio: number | null;
+  /** true = der Motion-Zuschlag wurde unterdrückt (Motion-Richtung widerspricht GPS). */
+  motionBoostSuppressed: boolean;
+  /** Woher die Ecke stammt. Der Detektor setzt 'gps'; die Fusionsstufe kann 'gps_split_apex' setzen. */
+  fusionSource: 'gps' | 'gps_split_apex' | null;
 }
 
 export interface ShortLegCandidate {
@@ -395,7 +419,39 @@ function emptyDiag(p: ShortLegPoint, apexIndex: number, reason: ShortLegRejectRe
     fitResidualBeforeM: null, fitResidualAfterM: null,
     accuracyWeightedConfidence: null, chosenScaleM: null,
     confidenceBeforeMotion: null, motionAdjustment: null, motionTurnEvidence: null,
+    direction: null, sharpness: null, geometryQuality: null, geometryQualityLevel: null,
+    accuracyToLegRatio: null, sharpnessDemoted: false, motionDirection: null,
+    motionDirectionAgrees: null, motionMagnitudeRatio: null, motionBoostSuppressed: false,
+    fusionSource: null,
   };
+}
+
+/**
+ * Mehrfaktorielle Erkennungs-Confidence (0..1). Einzige Quelle der Formel —
+ * auch die Fusionsstufe (turnFusion.ts) bewertet damit ihre Kandidaten.
+ * Bewertet, OB eine Ecke existiert; die Auflösbarkeit ihrer Schärfe steckt in
+ * turnGeometryQuality.
+ */
+export function cornerConfidence(a: {
+  before: LegWindow; after: LegWindow; magnitude: number; concentration: number;
+  accuracyM: number | null; motionBonus?: number;
+}): { confidence: number; accScore: number } {
+  const { before, after, magnitude, concentration } = a;
+  const lengthScore = clamp01((Math.min(before.lengthM, after.lengthM) - MIN_LEG_M) / (4.5 - MIN_LEG_M)) * 0.75 + 0.25;
+  const sampleScore = clamp01((Math.min(before.sampleCount, after.sampleCount) - 1) / 3);
+  const straightScore = clamp01(1 - Math.max(before.spreadDeg, after.spreadDeg) / STRAIGHT_TOL_DEG);
+  const turnScore = clamp01((magnitude - MIN_TURN_DEG) / 55);
+  const concScore = clamp01((concentration - MIN_TURN_CONCENTRATION) / (1 - MIN_TURN_CONCENTRATION));
+  const acc = a.accuracyM;
+  const accScore = acc == null ? 0.5 : clamp01((ACC_BAD_M - acc) / (ACC_BAD_M - ACC_GOOD_M));
+  // (Die Sättigung dieses Faktors bei ≤ 10 m ist bekannt; die eigentliche
+  // Auflösbarkeit — Accuracy ÷ Schenkel — steckt in turnGeometryQuality und
+  // wirkt auf die SCHÄRFE, nicht auf die Existenz der Ecke.)
+  const confidence = clamp01(
+    0.24 * lengthScore + 0.22 * sampleScore + 0.22 * straightScore +
+    0.16 * turnScore + 0.10 * concScore + 0.06 * accScore + (a.motionBonus ?? 0),
+  );
+  return { confidence, accScore };
 }
 
 /**
@@ -446,6 +502,10 @@ export function evaluateShortLegCorner(
     accuracyWeightedConfidence: null,
     chosenScaleM: Math.max(before.scaleM, after.scaleM),
     confidenceBeforeMotion: null, motionAdjustment: null, motionTurnEvidence: null,
+    direction: null, sharpness: null, geometryQuality: null, geometryQualityLevel: null,
+    accuracyToLegRatio: null, sharpnessDemoted: false, motionDirection: null,
+    motionDirectionAgrees: null, motionMagnitudeRatio: null, motionBoostSuppressed: false,
+    fusionSource: null,
   };
 
   if (magnitude < MIN_TURN_DEG) { diag.rejectReason = 'no_turn'; return { accepted: false, kind: null, apexIndex, diagnostics: diag }; }
@@ -483,33 +543,49 @@ export function evaluateShortLegCorner(
     before.residualM <= 0.6 && after.residualM <= 0.6 &&
     concentration >= 0.75;
   const dir: 'links' | 'rechts' = headingDelta > 0 ? 'rechts' : 'links';
+  diag.direction = dir;
+
+  // Geometrie-Qualität: darf die SCHÄRFE dieses Winkels überhaupt belegt werden?
+  // Beeinflusst weder Existenz noch Richtung der Ecke (siehe turnGeometryQuality).
+  const windowAcc: (number | null)[] = [];
+  for (let i = Math.min(before.endIndex, after.endIndex, apexIndex); i <= Math.max(before.endIndex, after.endIndex); i++) {
+    windowAcc.push(points[i].accuracy);
+  }
+  const geo = turnGeometryQuality({
+    legBeforeM: before.lengthM, legAfterM: after.lengthM,
+    sampleCountBefore: before.sampleCount, sampleCountAfter: after.sampleCount,
+    spreadBeforeDeg: before.spreadDeg, spreadAfterDeg: after.spreadDeg,
+    windowAccuraciesM: windowAcc, straightTolDeg: STRAIGHT_TOL_DEG,
+  });
+  diag.geometryQuality = geo.score;
+  diag.geometryQualityLevel = geo.level;
+  diag.accuracyToLegRatio = geo.accuracyToLegRatio;
+
   let kind: AngleKind | null = null;
+  let sharpness: 'normal' | 'spitz' | 'unresolved' = 'normal';
+  const spitzKind: AngleKind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';
   if (interior >= NORMAL_MIN && interior <= NORMAL_MAX) kind = dir;
-  else if (interior >= SPITZ_MIN && interior <= SPITZ_MAX) kind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';
-  else if (geometryStrong) {
+  else if (interior >= SPITZ_MIN && interior <= SPITZ_MAX) {
+    // „spitz" ist eine BEHAUPTUNG über den Winkel. Lässt die Geometrie sie
+    // nicht zu (Accuracy ≳ Schenkel), bleibt die Richtung erhalten und die
+    // Schärfe wird als nicht aufgelöst ausgewiesen → persistiert als normal.
+    if (geo.sharpnessResolvable) { kind = spitzKind; sharpness = 'spitz'; }
+    else { kind = dir; sharpness = 'unresolved'; diag.sharpnessDemoted = true; }
+  } else if (geometryStrong && geo.sharpnessResolvable) {
     // Do not widen SPITZ_MIN globally: this branch is gated by stable legs,
     // concentrated multi-sample geometry and (when available) delayed motion.
-    kind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';
+    kind = spitzKind; sharpness = 'spitz';
   }
-  if (!kind) { diag.rejectReason = 'angle_unclear'; return { accepted: false, kind: null, apexIndex, diagnostics: diag }; }
+  diag.sharpness = kind ? sharpness : null;
   diag.classification = kind;
 
   // ── Mehrfaktorielle Evidenz — keine einzelne Grösse entscheidet allein ──
-  const lengthScore = clamp01((Math.min(before.lengthM, after.lengthM) - MIN_LEG_M) / (4.5 - MIN_LEG_M)) * 0.75 + 0.25;
-  const sampleScore = clamp01((Math.min(before.sampleCount, after.sampleCount) - 1) / 3);
-  const straightScore = clamp01(1 - Math.max(before.spreadDeg, after.spreadDeg) / STRAIGHT_TOL_DEG);
-  const turnScore = clamp01((magnitude - MIN_TURN_DEG) / 55);
-  const concScore = clamp01((concentration - MIN_TURN_CONCENTRATION) / (1 - MIN_TURN_CONCENTRATION));
-  const acc = apex.accuracy;
-  const accScore = acc == null ? 0.5 : clamp01((ACC_BAD_M - acc) / (ACC_BAD_M - ACC_GOOD_M));
-  // Motion ist reine ZUSATZ-Evidenz: sie kann einen knappen Kandidaten stützen,
-  // aber niemals allein einen Winkel erzwingen (max. +0.06).
-  const motionBonus = diag.motionSupported ? 0.06 : 0;
-
-  const confidence = clamp01(
-    0.24 * lengthScore + 0.22 * sampleScore + 0.22 * straightScore +
-    0.16 * turnScore + 0.10 * concScore + 0.06 * accScore + motionBonus,
-  );
+  const { confidence, accScore } = cornerConfidence({
+    before, after, magnitude, concentration, accuracyM: apex.accuracy,
+    // Motion ist reine ZUSATZ-Evidenz: sie kann einen knappen Kandidaten stützen,
+    // aber niemals allein einen Winkel erzwingen (max. +0.06).
+    motionBonus: diag.motionSupported ? 0.06 : 0,
+  });
   diag.accuracyWeightedConfidence = Math.round(accScore * 1000) / 1000;
 
   // ── MOTION-CONFIDENCE-KOPPLUNG (±0,12) ─────────────────────────────────
@@ -525,12 +601,29 @@ export function evaluateShortLegCorner(
   // Turn-Evidenz hebt leicht an, klar widersprüchliche senkt leicht ab,
   // starke Geometrie wird nie gesenkt. Ohne Motion-Daten passiert nichts.
   const confidenceBefore = confidence;
-  const adjusted = ev ? applyMotionToConfidence(confidence, ev) : confidence;
+  let adjusted = ev ? applyMotionToConfidence(confidence, ev) : confidence;
+  // RICHTUNGS-KONSISTENZ (RC-3): ein Zuschlag ist nur dann eine Bestätigung,
+  // wenn Motion dieselbe Drehrichtung beschreibt. Widerspricht die Yaw-
+  // Richtung der GPS-Richtung, wird der Zuschlag unterdrückt (nie ein Abzug —
+  // starke Geometrie wird von Motion weiterhin nicht gesenkt).
+  // Die GRÖSSE (netYaw ÷ GPS-Winkel) wird nur protokolliert: sie unterschätzt
+  // im ±1-s-Fenster systematisch und ist bei Drift auf der GPS-Seite ebenso
+  // unzuverlässig — als Zuschlags-Gate hat sie in der Golden-Matrix Gewinn
+  // vernichtet (Drift ±5 m: 0,5 → 0,2). Sie wirkt erst in der Fusionsstufe
+  // auf die SCHÄRFE-Confidence (turnFusion.ts).
+  if (ev && ev.available) {
+    const md = motionTurnDirection(ev);
+    diag.motionDirection = md;
+    diag.motionDirectionAgrees = md == null ? null : md === dir;
+    diag.motionMagnitudeRatio = magnitude > 0 ? Math.round((ev.netYawDeg / magnitude) * 1000) / 1000 : null;
+    if (diag.motionDirectionAgrees === false && adjusted > confidenceBefore) { adjusted = confidenceBefore; diag.motionBoostSuppressed = true; }
+  }
   diag.confidenceBeforeMotion = Math.round(confidenceBefore * 1000) / 1000;
   diag.motionAdjustment = Math.round((adjusted - confidenceBefore) * 1000) / 1000;
   diag.motionTurnEvidence = ev?.evidence ?? null;
   diag.confidence = Math.round(adjusted * 1000) / 1000;
 
+  diag.fusionSource = 'gps';
   if (adjusted < ACCEPT_SCORE) { diag.rejectReason = 'low_evidence'; return { accepted: false, kind: null, apexIndex, diagnostics: diag }; }
   return { accepted: true, kind, apexIndex, diagnostics: diag };
 }

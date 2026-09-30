@@ -14,7 +14,7 @@
 // Klassen, keine Fenster, keine Fusion. Sie liest nur.
 
 import type {
-  QaSessionCapture, QaCapturePoint, QaMarkerSource, QaDistanceScale, QaAutoDiagnostic,
+  QaSessionCapture, QaCapturePoint, QaMarkerSource, QaDistanceScale, QaAutoDiagnostic, QaTurnFusion, QaImuOnlyEvent,
   QaCandidateMotion,
 } from '@/features/tracking/utils/qaSessionCapture';
 
@@ -94,7 +94,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1;
+  schemaMinor?: 0 | 1 | 2;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -157,6 +157,12 @@ export interface QaTrackExport {
   candidateMotionEvidence?: QaCandidateMotion[];
   /** true, wenn Core Motion während der Aufnahme überhaupt lief. */
   motionCaptureAvailable: boolean;
+
+  // ── QA v2.2 (schemaMinor 2) ─────────────────────────────────────────────
+  /** Turn-Fusion je Ecke: Quelle, Richtung/Schärfe getrennt, Geometrie-Qualität, Motion. */
+  turnFusion?: QaTurnFusion[];
+  /** Gerichtete Drehungen ohne GPS-Ecke — protokolliert, nie persistiert. */
+  imuOnlyEvents?: QaImuOnlyEvent[];
 }
 
 export function toMs(t: string | number | null | undefined): number {
@@ -250,7 +256,7 @@ export function buildQaTrackExport(
   const motion = capture?.candidateMotionEvidence;
   return {
     schemaVersion: 2,
-    schemaMinor: capture?.captureVersion === 2 ? 1 : 0,
+    schemaMinor: capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0,
     sessionId: hashSessionId(sessionLocalId),
     pointType: 'lay',
     pointCount: anon.length,
@@ -288,6 +294,8 @@ export function buildQaTrackExport(
     autoDiagnostics: capture?.autoDiagnostics ?? [],
     candidateMotionEvidence: motion,
     motionCaptureAvailable: !!motion && motion.length > 0,
+    ...(capture?.turnFusion ? { turnFusion: capture.turnFusion } : {}),
+    ...(capture?.imuOnlyEvents ? { imuOnlyEvents: capture.imuOnlyEvents } : {}),
   };
 }
 
@@ -350,6 +358,13 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
   }
   for (const m of e.markers) {
     if (m.tMs != null && Math.abs(m.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Marker-Zeitstempel.');
+  }
+  // QA v2.2: Turn-Fusion und IMU-only-Ereignisse tragen nur relative Zeiten.
+  for (const t of e.turnFusion ?? []) {
+    if (t.tMs != null && Math.abs(t.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Fusions-Zeitstempel.');
+  }
+  for (const v of e.imuOnlyEvents ?? []) {
+    if (Math.abs(v.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten IMU-Zeitstempel.');
   }
   // Der erste Punkt MUSS der Ursprung sein.
   if (e.points.length && (e.points[0].x !== 0 || e.points[0].y !== 0 || e.points[0].tMs !== 0)) {

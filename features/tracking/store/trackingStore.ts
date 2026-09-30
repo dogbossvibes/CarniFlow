@@ -116,7 +116,9 @@ interface TrackingState {
   pauseRecording: () => void;
   resumeRecording: () => void;
   stopRecording: () => void;
-  addTrackPoint: (p: TrackPointSample) => void;
+  /** `skipDistance`: die Distanz kommt aus dem kanonischen Akkumulator (setDistanceMeters), nicht aus der Punktdichte. */
+  addTrackPoint: (p: TrackPointSample, opts?: { skipDistance?: boolean }) => void;
+  setDistanceMeters: (m: number) => void;
   addRawTrackPoint: (p: TrackPointSample) => void;
   addRejectedTrackPoint: (p: TrackPointSample) => void;
   setGpsStats: (s: GpsStats) => void;
@@ -237,10 +239,12 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   resumeRecording: () => { set({ isPaused: false }); persistNow(get); },
   stopRecording: () => set({ isRecording: false, isPaused: false }),
 
-  addTrackPoint: (p) => {
+  setDistanceMeters: (m) => { set({ distanceMeters: m }); persist(get); },
+
+  addTrackPoint: (p, opts) => {
     const { trackPoints, distanceMeters } = get();
     const last = trackPoints[trackPoints.length - 1];
-    const add  = last ? calculateDistance(last, p) : 0;
+    const add  = last && !opts?.skipDistance ? calculateDistance(last, p) : 0;
     set({
       trackPoints:     [...trackPoints, p],
       distanceMeters:  distanceMeters + add,

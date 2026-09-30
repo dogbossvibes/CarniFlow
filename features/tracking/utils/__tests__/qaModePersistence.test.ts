@@ -175,7 +175,7 @@ describe('Motion beim Legen ist QA-only und CURRENT-only', () => {
     // motionConfidenceCoupling.test.ts). Der alte ShortLegMotion-Parameter
     // bleibt bewusst ungenutzt (`null`), damit sich der dortige +0,06-Bonus
     // NICHT zusätzlich aufaddiert.
-    expect(rec).toContain('detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt)');
+    expect(rec).toContain('fuseTurns(detectPointsRef.current, { turnEvidenceAt })');
     expect(rec).toContain('const turnEvidenceAt = motionActiveRef.current');
     // Ohne laufenden Motion-Mitschnitt wird gar nichts übergeben.
     expect(rec).toContain("? (t: number | null) => (t == null ? null : motionBufRef.current.evidenceForTrailing(t))");

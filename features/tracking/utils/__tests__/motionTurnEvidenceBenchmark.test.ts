@@ -24,7 +24,7 @@
 
 import {
   computeTurnEvidence, applyMotionToConfidence, MotionEvidenceBuffer,
-  formatCandidateEvidenceLog, TURN_EVIDENCE_DEFAULTS, COUPLING_DEFAULTS,
+  formatCandidateEvidenceLog, TURN_EVIDENCE_DEFAULTS, COUPLING_DEFAULTS, motionTurnDirection,
   type MotionWindowSample, type TurnEvidenceParams,
 } from '@/features/tracking/utils/motionTurnEvidence';
 import {
@@ -419,13 +419,17 @@ describe('Struktur: Motion liefert keine Richtung', () => {
     expect(Math.abs(el - er)).toBeLessThan(0.05);
   });
 
-  it('kein Feld des Ergebnisses trägt ein Vorzeichen der Drehrichtung', () => {
+  it('nur `signedNetYawDeg` trägt ein Vorzeichen — `evidence` und alle übrigen Felder bleiben vorzeichenfrei', () => {
     const { samples, candidateT } = SCENARIOS.find(s => s.name === '90° rechts (normal, 1,2 s)')!.build(11);
     const ev = computeTurnEvidence(samples, candidateT);
     for (const [k, v] of Object.entries(ev)) {
-      if (typeof v === 'number') expect(v).toBeGreaterThanOrEqual(0);
+      if (typeof v === 'number' && k !== 'signedNetYawDeg') expect(v).toBeGreaterThanOrEqual(0);
       expect(k).not.toMatch(/left|right|links|rechts|direction|bearing/i);
     }
+    // Betrag stimmt überein, und rechts = negative Yaw-Summe (Feld-Konvention).
+    expect(Math.abs(ev.signedNetYawDeg)).toBeCloseTo(ev.netYawDeg, 9);
+    expect(ev.signedNetYawDeg).toBeLessThan(0);
+    expect(motionTurnDirection(ev)).toBe('rechts');
   });
 });
 

@@ -1398,6 +1398,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.analysisScoreTitle": "Score d'analyse ANYVO",
   "track.analysisScoreHelp": "Évalue automatiquement les caractéristiques mesurables de la piste enregistrée. Ce n'est pas une note d'examen.",
   "track.analysisQualityHint": "La qualité des données GPS/capteurs limite les conclusions fiables; les sections incertaines ne sont pas notées comme des erreurs certaines.",
+  "track.analysisReferenceHint": "La piste posée n'est que partiellement fiable (faible précision GPS ou virages marqués sans marqueur d'angle). La base d'analyse a été réduite en conséquence ; le score reste inchangé.",
   "track.analysisLineDeviation": "Écart moyen à la ligne",
   "track.analysisAssessableDistance": "Distance évaluable",
   "track.analysisFoundation": "Qualité de l'analyse",

@@ -1093,6 +1093,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.analysisScoreTitle": "Punteggio analisi ANYVO",
   "track.analysisScoreHelp": "Valuta automaticamente caratteristiche misurabili della traccia registrata. Non è una valutazione di gara.",
   "track.analysisQualityHint": "La qualità dei dati GPS/sensori limita le conclusioni affidabili; i tratti incerti non sono valutati come errori certi.",
+  "track.analysisReferenceHint": "La traccia posata è affidabile solo in parte (bassa precisione GPS o curve nette senza marcatore d'angolo). La base di analisi è stata ridotta di conseguenza; il punteggio resta invariato.",
   "track.analysisLineDeviation": "Deviazione media dalla linea",
   "track.analysisAssessableDistance": "Tratto valutabile",
   "track.analysisFoundation": "Qualità dell'analisi",

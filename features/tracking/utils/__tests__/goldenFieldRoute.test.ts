@@ -164,12 +164,15 @@ describe('CURRENT gegen die Golden-Field-Route', () => {
     }
     console.log('\n[GOLDEN FIELD · CURRENT Driftband] 1 Hz\n' + rows.join('\n') + '\n');
     // Im real gemeldeten Accuracy-Band (±4–8 m im Modell) liegt CURRENT bei
-    // 0,0–0,3 von 4. Das ist der Stand, nicht ein Ziel.
+    // 0,0–0,5 von 4. Das ist der Stand, nicht ein Ziel. (Vorher 0,0–0,3: seit
+    // der Schärfe-Auflösbarkeitsprüfung wird ein nicht belegbares „spitz" zur
+    // Richtung-only-Ecke und trifft in einzelnen Seeds die Sollfolge — ein
+    // Seed = 0,1. 4/4 bleibt ausgeschlossen.)
     for (const spacing of FIELD_FIX_SPACINGS_M) {
       for (const drift of [4, 5, 6, 8]) {
         const c = measure(spacing, drift);
         expect(c.currentFull).toBe(0);
-        expect(c.current).toBeLessThanOrEqual(0.3);
+        expect(c.current).toBeLessThanOrEqual(0.5);
       }
     }
   });

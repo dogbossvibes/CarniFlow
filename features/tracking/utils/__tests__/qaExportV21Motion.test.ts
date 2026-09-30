@@ -254,7 +254,7 @@ describe('6. Keine algorithmische Änderung', () => {
     // Die Aggregate stammen aus derselben Auswertung, die der Detektor nutzt.
     expect(s).toContain('const ev = motionBufRef.current.evidenceForTrailing(tCand);');
     // Der Detektoraufruf selbst ist unverändert.
-    expect(s).toContain('detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt)');
+    expect(s).toContain('fuseTurns(detectPointsRef.current, { turnEvidenceAt })');
   });
 
   it('bei QA AUS entsteht kein einziger Motion-Eintrag', () => {

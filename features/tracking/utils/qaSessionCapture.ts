@@ -21,6 +21,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MovementState } from '@/modules/anyvo-motion';
+import type { FusedTurn, ImuOnlyEvent } from '@/features/tracking/utils/turnFusion';
 
 const KEY_PREFIX = 'anyvo.qa.trackCapture.';
 const INDEX_KEY = 'anyvo.qa.trackCapture.index';
@@ -37,7 +38,7 @@ export interface QaCapturePoint {
   cumDistM?: number;
 }
 
-export type QaMarkerSource = 'auto' | 'manual' | 'stop_flush' | 'build40' | 'unknown';
+export type QaMarkerSource = 'auto' | 'auto_split_apex' | 'manual' | 'stop_flush' | 'build40' | 'unknown';
 export type QaDistanceScale = 'detector' | 'line' | 'unknown';
 
 /** Woher stammt die `distance_from_start` eines Markers? */
@@ -64,6 +65,73 @@ export interface QaAutoDiagnostic {
   rejectReason: string | null;
   /** Wurde dieser Kandidat im Lauf tatsächlich als Winkel bestätigt? */
   accepted: boolean;
+}
+
+/**
+ * QA v2.2 — Turn-Fusion je Ecke (T-TRACK-FUSION-QUALITY-2026-09-30, Vorgabe §17).
+ * Eine Zeile pro fusionierter Ecke: woher sie stammt, wie Richtung und Schärfe
+ * getrennt entschieden wurden, wie belastbar die Geometrie ist und was Motion
+ * dazu sagte. Zeiten relativ zum Aufnahmebeginn.
+ */
+export interface QaTurnFusion {
+  apexIndex: number;
+  atM: number;
+  tMs: number | null;
+  source: 'gps' | 'gps_split_apex';
+  direction: 'links' | 'rechts';
+  sharpness: 'normal' | 'spitz' | 'unresolved';
+  /** Persistierter angleKind. */
+  kind: string;
+  confidence: number;
+  confidenceBeforeMotion: number | null;
+  motionAdjustment: number | null;
+  sharpnessConfidence: number;
+  headingDeltaDeg: number | null;
+  interiorAngleDeg: number | null;
+  accuracyM: number | null;
+  legBeforeM: number | null;
+  legAfterM: number | null;
+  geometryQuality: number | null;
+  geometryQualityLevel: 'high' | 'medium' | 'low' | null;
+  accuracyToLegRatio: number | null;
+  motion: {
+    available: boolean;
+    signedNetYawDeg: number | null;
+    netYawDeg: number | null;
+    evidence: number | null;
+    direction: 'links' | 'rechts' | null;
+    directionAgrees: boolean | null;
+    magnitudeRatio: number | null;
+  };
+  flags: string[];
+}
+
+/** QA v2.2 — gerichtete Drehung ohne GPS-Ecke: nur protokolliert, nie persistiert. */
+export interface QaImuOnlyEvent {
+  tMs: number;
+  direction: 'links' | 'rechts' | null;
+  signedNetYawDeg: number;
+  evidence: number;
+  persisted: false;
+  reason: 'imu_only_no_gps_corner';
+}
+
+/** Fusionierte Ecke → QA-Zeile (Zeiten relativ zu `originMs`). */
+export function toQaTurnFusion(t: FusedTurn, originMs: number): QaTurnFusion {
+  return {
+    apexIndex: t.apexIndex, atM: Math.round(t.atM * 100) / 100,
+    tMs: t.t == null ? null : Math.round(t.t - originMs),
+    source: t.source, direction: t.direction, sharpness: t.sharpness, kind: t.kind,
+    confidence: t.confidence, confidenceBeforeMotion: t.confidenceBeforeMotion, motionAdjustment: t.motionAdjustment,
+    sharpnessConfidence: t.sharpnessConfidence, headingDeltaDeg: t.headingDeltaDeg, interiorAngleDeg: t.interiorAngleDeg,
+    accuracyM: t.accuracyM, legBeforeM: t.legBeforeM, legAfterM: t.legAfterM,
+    geometryQuality: t.geometryQuality, geometryQualityLevel: t.geometryQualityLevel, accuracyToLegRatio: t.accuracyToLegRatio,
+    motion: { ...t.motion }, flags: [...t.flags],
+  };
+}
+
+export function toQaImuOnlyEvent(e: ImuOnlyEvent, originMs: number): QaImuOnlyEvent {
+  return { tMs: Math.round(e.t - originMs), direction: e.direction, signedNetYawDeg: e.signedNetYawDeg, evidence: e.evidence, persisted: false, reason: e.reason };
 }
 
 /**
@@ -170,6 +238,10 @@ export interface QaSessionCapture {
   autoDiagnostics: QaAutoDiagnostic[];
   /** LIVE RECORDED + DERIVED — QA v2.1. Fehlt bei captureVersion 1. */
   candidateMotionEvidence?: QaCandidateMotion[];
+  /** QA v2.2 — Turn-Fusion je Ecke (FINISH RECONSTRUCTED, mit Motion, falls sie lief). */
+  turnFusion?: QaTurnFusion[];
+  /** QA v2.2 — IMU-only-Ereignisse (nie persistiert). */
+  imuOnlyEvents?: QaImuOnlyEvent[];
 }
 
 const keyFor = (sessionLocalId: string) => `${KEY_PREFIX}${sessionLocalId}`;

@@ -85,6 +85,7 @@ function RecDot() {
 const EMPTY_SNAP_CONST = {
   laidLatLng: [] as { lat: number; lng: number }[],
   laidPoints: [] as { latitude: number; longitude: number }[],
+  laidAccuracies: [] as (number | null)[],
   laidObjects: [] as { at: { latitude: number; longitude: number }; index: number; material: string }[],
   laidMarkers: [] as ReturnType<typeof useTrackingStore.getState>['markers'],
   eventArcs: {} as Record<string, CanonicalArc>,
@@ -141,6 +142,7 @@ export default function TrackRunScreen() {
     return {
       laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),
       laidPoints,
+      laidAccuracies: st.trackPoints.map(p => p.accuracy ?? null),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number }, index: i, material: m.material ?? '', id: m.id })),
       laidMarkers: st.markers,
       eventArcs,
@@ -717,6 +719,8 @@ export default function TrackRunScreen() {
       trackLengthM: s.trackLengthM,
       durationS: res.durationS,
       handlerDistanceHintM: searchHandlerDistanceM,
+      // Referenz-Qualität der gelegten Fährte (Accuracy + scharfe Knicke ohne Winkel-Marker).
+      referenceLine: snapData.laidPoints.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, accuracy: snapData.laidAccuracies[i] ?? null })),
     }) : undefined;
 
     // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.
@@ -734,6 +738,8 @@ export default function TrackRunScreen() {
           searchHandlerDistanceM,
           analytics,
           pointsTimeSec: res.pointsTimeSec,
+          replayPoints: res.replayPoints,
+          replayPointsTimeSec: res.replayPointsTimeSec,
         }));
       } catch (e) {
         console.warn('[trackRun] local finalize', e);

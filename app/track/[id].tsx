@@ -500,6 +500,9 @@ export default function TrackAuswertungScreen() {
                 {analyticsV3 && (analyticsV3.analysisConfidenceBand === 'limited' || analyticsV3.analysisConfidenceBand === 'unreliable') && (
                   <View style={s.analyseHintBox}><Text style={s.analyseHintText}>{t('track.analysisQualityHint')}</Text></View>
                 )}
+                {analyticsV3?.referenceQuality && analyticsV3.referenceQuality.level !== 'good' && (
+                  <View style={s.analyseHintBox}><Text style={s.analyseHintText}>{t('track.analysisReferenceHint')}</Text></View>
+                )}
 
                 {/* Track Replay (Segmentanalyse-Nachbesserung, Punkt 7) — nur
                     sichtbar, wenn wirklich genug Daten vorhanden sind (Analytics

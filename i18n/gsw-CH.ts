@@ -1106,6 +1106,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.analysisScoreTitle': 'ANYVO Analyse-Score',
   'track.analysisScoreHelp': 'Bewärtet automatisch messbari Merkmal vom ufzeichnete Fährteverlauf. Kei Prüfungsbewärtig.',
   'track.analysisQualityHint': 'GPS-/Sensor-Daten schränked belastbari Ussage ii; unsicheri Streckene sind nöd hart bewärtet worde.',
+  'track.analysisReferenceHint': 'D gläget Fährte isch nume iigschränkt zueverlässig (tiefi GPS-Gnauigkeit oder scharfi Chnick ohni Winkel-Markierig). D Analyse-Grundlag isch entsprächend reduziert worde; dr Score blibt glich.',
   'track.analysisLineDeviation': 'Ø Linieabwiichig',
   'track.analysisAssessableDistance': 'Bewärtbari Strecki',
   'track.analysisFoundation': 'Analyse-Grundlag',

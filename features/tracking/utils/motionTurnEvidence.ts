@@ -4,10 +4,11 @@
 //   "Hat in diesem Zeitfenster eine reale, gerichtete Drehbewegung des
 //    Handlers stattgefunden?"  →  turnEvidence 0..1
 //
-// Ausdrücklich NICHT beantwortet (und strukturell nicht beantwortbar, weil die
-// Vorzeichen intern verworfen und nie zurückgegeben werden):
-//   links/rechts, Winkelgrösse, Spitzwinkel, absolute/geografische Richtung,
-//   Position. Das bleibt vollständig Aufgabe der GPS-Geometrie.
+// `evidence` beantwortet bewusst NICHT: links/rechts, Winkelgrösse, Spitzwinkel,
+// absolute/geografische Richtung, Position. Das bleibt Aufgabe der GPS-Geometrie.
+// Das vorzeichenbehaftete Netto-Yaw (`signedNetYawDeg`) wird seit der
+// Turn-Fusion exportiert, damit die Fusionsstufe (turnFusion.ts) eine GPS-
+// Richtung bestätigen oder ihr widersprechen kann — der Detektor liest es nicht.
 //
 // Hintergrund: langsam korrelierter GNSS-Bias ist aus Positionsdaten allein
 // nicht von echter langsamer Bewegung unterscheidbar (gemessen — Alpha-Beta,
@@ -104,8 +105,16 @@ export interface TurnEvidence {
   evidence: number | null;
 
   // ── Rohmasse (Diagnose/QA) ──────────────────────────────────────────────
-  /** |Σ headingDelta| — Betrag der Netto-Drehung. Ohne Vorzeichen, bewusst. */
+  /** |Σ headingDelta| — Betrag der Netto-Drehung. Ohne Vorzeichen. */
   netYawDeg: number;
+  /**
+   * Σ headingDelta MIT Vorzeichen, in der Sensor-Konvention (CoreMotion: gegen
+   * den Uhrzeigersinn positiv). Nur zusammen mit `motionTurnDirection()`
+   * benutzen — die Abbildung auf links/rechts ist dort gekapselt und an realen
+   * Feldläufen verifiziert. Der Detektor liest dieses Feld NICHT; Richtung
+   * bleibt GPS-Aufgabe, Motion darf sie nur bestätigen oder widersprechen.
+   */
+  signedNetYawDeg: number;
   /** Σ |headingDelta| — Gesamtdrehung inkl. Hin-und-Her. */
   grossYawDeg: number;
   /** netto/brutto ∈ 0..1. Eine echte Ecke dreht monoton (→1), Gerätegewackel
@@ -146,6 +155,21 @@ export interface TurnEvidence {
   gates: { netYaw: number; monotonicity: number; locomotion: number; yawShare: number };
 }
 
+/**
+ * Abbildung Sensor-Yaw → Laufrichtung. GEMESSEN an 9 realen Feld-Ereignissen
+ * (QA v2.1: F1T, FT2, Lauf 1/2/9/10, Spitz-QA; jeweils |GPS-Delta| ≥ 60°):
+ * das Vorzeichen der Yaw-Summe ist in 9/9 Fällen das NEGATIVE des GPS-
+ * `headingDelta` (Rechtskurve → negative Yaw-Summe). Positive Yaw = links.
+ */
+export const MOTION_YAW_LEFT_SIGN = 1;
+/** Mindest-Netto-Yaw (Grad), ab dem Motion überhaupt eine Richtung nennt. */
+export const MOTION_DIRECTION_MIN_YAW_DEG = 20;
+
+export function motionTurnDirection(ev: Pick<TurnEvidence, 'available' | 'signedNetYawDeg'> | null | undefined): 'links' | 'rechts' | null {
+  if (!ev || !ev.available || !Number.isFinite(ev.signedNetYawDeg) || Math.abs(ev.signedNetYawDeg) < MOTION_DIRECTION_MIN_YAW_DEG) return null;
+  return ev.signedNetYawDeg * MOTION_YAW_LEFT_SIGN > 0 ? 'links' : 'rechts';
+}
+
 // Weiche Rampe: 0 unterhalb lo, 1 oberhalb hi, linear dazwischen.
 function ramp(v: number, lo: number, hi: number): number {
   if (!(hi > lo)) return v >= hi ? 1 : 0;
@@ -157,7 +181,7 @@ function ramp(v: number, lo: number, hi: number): number {
 function emptyEvidence(tc: number, params: TurnEvidenceParams): TurnEvidence {
   return {
     available: false, evidence: null,
-    netYawDeg: 0, grossYawDeg: 0, monotonicity: 0, concentration: 0,
+    netYawDeg: 0, signedNetYawDeg: 0, grossYawDeg: 0, monotonicity: 0, concentration: 0,
     peakYawRateDps: 0, rotationDurationS: 0, yawShare: 0, totalRotationDeg: 0,
     peakRotationRateRadS: 0, steps: 0, stepRate: 0, cadence: null,
     gaitAccelFraction: 0, gaitAccelThreshold: params.gaitAccelThresholdG,
@@ -244,8 +268,9 @@ export function computeTurnEvidence(
     stateCount.set(s.movementState, (stateCount.get(s.movementState) ?? 0) + 1);
   }
 
-  // Vorzeichen wird hier verworfen und nie exportiert — Regel: Motion darf
-  // links/rechts nicht entscheiden.
+  // Das Vorzeichen wird als `signedNetYawDeg` exportiert, damit die Fusion
+  // Richtung bestätigen/widerlegen kann. `evidence` bleibt vorzeichenfrei —
+  // Motion allein entscheidet weiterhin keine Ecke.
   const netYawDeg = Math.abs(signedYaw);
   const monotonicity = grossYaw > 0 ? netYawDeg / grossYaw : 0;
   const yawShare = totalRotDeg > 0 ? Math.min(1, grossYaw / totalRotDeg) : 0;
@@ -321,7 +346,7 @@ export function computeTurnEvidence(
   return {
     available: true,
     evidence,
-    netYawDeg, grossYawDeg: grossYaw, monotonicity, concentration,
+    netYawDeg, signedNetYawDeg: signedYaw, grossYawDeg: grossYaw, monotonicity, concentration,
     peakYawRateDps: peakYawRate, rotationDurationS: bestRun, yawShare,
     totalRotationDeg: totalRotDeg, peakRotationRateRadS: peakRotRate,
     steps, stepRate, cadence,

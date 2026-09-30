@@ -114,11 +114,12 @@ describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
   });
 
   it('alle vier Herkünfte sind verdrahtet', () => {
-    for (const s of ['build40', 'auto', 'stop_flush', 'manual']) {
+    for (const s of ['build40', 'stop_flush', 'manual']) {
       expect(src).toContain(`{ source: '${s}', scale:`);
     }
+    // AUTO trägt seit der Turn-Fusion zwei Herkünfte: Regelpfad und Split-Apex-Paarung.
+    expect(src).toContain("? 'auto_split_apex' : 'auto', scale: 'detector'");
     // Und jeweils mit dem richtigen Massstab.
-    expect(src).toContain("{ source: 'auto', scale: 'detector'");
     expect(src).toContain("{ source: 'stop_flush', scale: 'detector'");
     expect(src).toContain("{ source: 'build40', scale: 'line'");
     expect(src).toContain("{ source: 'manual', scale: 'line'");

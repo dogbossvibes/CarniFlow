@@ -1,3 +1,4 @@
+import { selectDisplayRunPoints } from '@/features/tracking/utils/searchDisplayGeometry';
 import type { AngleKind, MarkerType, MarkerMaterial } from '@/features/tracking/store/trackingStore';
 
 // Reine, testbare Zusammensetzung des Logbuch-/Detail-Kartenmodells aus einer
@@ -51,7 +52,8 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
     .filter((p) => (p.point_type ?? 'lay') === 'lay')
     .map((p) => ({ lat: p.latitude, lng: p.longitude }));
 
-  const run: DetailLatLng[] = ((d.runs ?? [])[0]?.run_points ?? [])
+  // Darstellung der Absuche: turn-aware `replay_points`, sonst `run_points` (Legacy).
+  const run: DetailLatLng[] = selectDisplayRunPoints(data).points
     .map((p) => ({ lat: p.lat, lng: p.lng }));
 
   const sourceMarkers = d.markers ?? [];

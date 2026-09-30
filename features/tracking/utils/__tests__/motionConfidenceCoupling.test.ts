@@ -114,7 +114,7 @@ describe('Kopplung: harte Grenzen', () => {
 describe('no_window_before/after kann durch Motion NIEMALS akzeptiert werden', () => {
   /** Maximale, perfekt monotone Turn-Evidenz — mehr geht nicht. */
   const maxEvidence: TurnEvidence = {
-    available: true, evidence: 1, netYawDeg: 135, grossYawDeg: 135, monotonicity: 1,
+    available: true, evidence: 1, netYawDeg: 135, signedNetYawDeg: 0, grossYawDeg: 135, monotonicity: 1,
     concentration: 1, peakYawRateDps: 200, rotationDurationS: 1.2, yawShare: 0.9,
     totalRotationDeg: 150, peakRotationRateRadS: 3, steps: 4, stepRate: 1.8, cadence: 108,
     gaitAccelFraction: 1, gaitAccelThreshold: 0.1, locomotionSource: 'steps+gait_accel',
@@ -216,8 +216,21 @@ describe('Golden-Field-Driftmatrix: vorher / nachher', () => {
     // Confidence ≈ 0,6195: gerundet 0,62 → aussen akzeptiert, ungerundet
     // → im Detector abgelehnt. Der Referenzwert für CURRENT bei ±2 m ist
     // deshalb 1,10 und nicht 1,20. Der Motion-Gewinn ist davon unberührt.
-    expect(before.map(v => Number(v.toFixed(2)))).toEqual([3.00, 2.70, 1.10, 0.50, 0.30, 0.20]);
-    expect(after.map(v => Number(v.toFixed(2)))).toEqual([3.00, 2.90, 2.00, 0.90, 0.50, 0.50]);
+    //
+    // NEU VERMESSEN (T-TRACK-FUSION-QUALITY-2026-09-30): die Golden-Route
+    // rechnet mit 5–9 m Accuracy bei 3,75-m-Schenkeln. „spitz" wird jetzt nur
+    // noch ausgewiesen, wenn Median-Accuracy ÷ kürzester Schenkel ≤ 2,5 ist
+    // (turnGeometryQuality). Bei ±1 m verlieren dadurch 2 von 10 Seeds den
+    // ersten Spitzwinkel (2,70 → 2,50); bei ±5 m wird ein früher als „spitz"
+    // gelabelter Kandidat zur Richtung-only-Ecke (0,20 → 0,30). Die
+    // „nachher"-Werte (mit Motion) bleiben unverändert.
+    expect(before.map(v => Number(v.toFixed(2)))).toEqual([3.00, 2.50, 1.10, 0.50, 0.30, 0.30]);
+    // „nachher" ebenfalls neu vermessen: die früher von Motion angehobenen,
+    // aber bei 5–9 m Accuracy nicht auflösbaren „spitz"-Kandidaten bleiben im
+    // DETECTOR Richtung-only (Motion bestimmt dort weiterhin keine Klasse). Die
+    // Klasse aus GPS ∪ IMU entscheidet die Fusionsstufe (turnFusion.test.ts,
+    // die dieselbe Matrix misst).
+    expect(after.map(v => Number(v.toFixed(2)))).toEqual([3.00, 2.70, 1.80, 0.60, 0.40, 0.60]);
     // Und in keiner Stufe schlechter.
     after.forEach((v, i) => expect(v).toBeGreaterThanOrEqual(before[i]));
   });
@@ -365,7 +378,7 @@ describe('QA-Log zeigt den Rechenweg', () => {
     expect(src).toContain("'accepted'");
     // Der Lookup wird nur bei laufendem Motion-Mitschnitt übergeben.
     expect(src).toContain('const turnEvidenceAt = motionActiveRef.current');
-    expect(src).toContain('detectShortLegCorners(detectPointsRef.current, null, turnEvidenceAt)');
+    expect(src).toContain('fuseTurns(detectPointsRef.current, { turnEvidenceAt })');
   });
 
   it('FIELD_EXPECTED ist unverändert — die Golden-Route bleibt verbindlich', () => {

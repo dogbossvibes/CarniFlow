@@ -1063,6 +1063,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.analysisScoreTitle": "ANYVO Analysis Score",
   "track.analysisScoreHelp": "Automatically evaluates measurable features of the recorded track. Not a trial score.",
   "track.analysisQualityHint": "GPS/sensor quality limits reliable conclusions; uncertain sections were not scored as hard errors.",
+  "track.analysisReferenceHint": "The laid track is only partly reliable (low GPS accuracy or sharp bends without an angle marker). The analysis foundation was reduced accordingly; the score is unchanged.",
   "track.analysisLineDeviation": "Avg. line deviation",
   "track.analysisAssessableDistance": "Assessable distance",
   "track.analysisFoundation": "Analysis quality",

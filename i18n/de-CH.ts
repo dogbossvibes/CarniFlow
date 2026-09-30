@@ -1119,6 +1119,7 @@ export const deCH = {
   'track.analysisScoreTitle': 'ANYVO Analyse-Score',
   'track.analysisScoreHelp': 'Bewertet automatisch messbare Merkmale des aufgezeichneten Fährtenverlaufs. Keine Prüfungsbewertung.',
   'track.analysisQualityHint': 'Die GPS-/Sensor-Grundlage schränkt belastbare Aussagen ein; unsichere Abschnitte wurden nicht hart bewertet.',
+  'track.analysisReferenceHint': 'Die gelegte Fährte ist nur eingeschränkt belastbar (geringe GPS-Genauigkeit oder scharfe Knicke ohne Winkel-Markierung). Die Analyse-Grundlage wurde entsprechend reduziert; der Score bleibt unverändert.',
   'track.analysisLineDeviation': 'Ø Linienabweichung',
   'track.analysisAssessableDistance': 'Bewertbare Strecke',
   'track.analysisFoundation': 'Analyse-Grundlage',
