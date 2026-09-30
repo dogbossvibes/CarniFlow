@@ -569,9 +569,12 @@ export default function LegenScreen() {
     // Registry: Übergang laying → resting. Liegezeit-Start = jetzt (deckt sich mit
     // dem Store-Übergang in setLayFinishedAt). Kennzahlen für die Karten mitgeben.
     if (activeDog) {
+      const finalMarkers = useTrackingStore.getState().markers;
       useActiveFaehrten.getState().upsert(activeDog.id, {
         status: 'resting', sessionId: id, layStartedAt: Date.now(),
-        distanceMeters: Math.round(distanceMeters), winkelCount: winkel, objektCount: gegenstaende,
+        distanceMeters: Math.round(distanceMeters),
+        winkelCount: finalMarkers.filter(m => m.type === 'winkel').length,
+        objektCount: finalMarkers.filter(m => m.type === 'gegenstand').length,
       });
     }
     const dq = activeDog ? `&dogId=${activeDog.id}` : '';

@@ -34,7 +34,7 @@ describe('Recovery-Kurzpfad (endSearch) — Analytics-Lücke dokumentiert (Punkt
     const src = source();
     const handleFinishStart = src.indexOf('const handleFinish = async');
     expect(handleFinishStart).toBeGreaterThan(-1);
-    const handleFinishBody = src.slice(handleFinishStart, handleFinishStart + 5000);
+    const handleFinishBody = src.slice(handleFinishStart, handleFinishStart + 7000);
     // Version 3 erweitert denselben v1/v2-Kern; Recovery-Kurzpfad bleibt unverändert.
     expect(handleFinishBody).toContain('computeTrackAnalyticsV3');
     expect(handleFinishBody).toMatch(/analytics,/);

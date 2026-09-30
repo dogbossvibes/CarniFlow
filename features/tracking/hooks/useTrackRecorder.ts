@@ -37,6 +37,7 @@ import {
   type QaMarkerSource, type QaDistanceScale, type QaCandidateMotion,
 } from '@/features/tracking/utils/qaSessionCapture';
 import { evaluateStopFlush } from '@/features/tracking/utils/stopFlushCorner';
+import { createMarkerWriteBarrier } from '@/features/tracking/utils/markerWriteBarrier';
 import { motionClient } from '@/features/tracking/native/motionClient';
 import { MotionEvidenceBuffer, TURN_EVIDENCE_DEFAULTS } from '@/features/tracking/utils/motionTurnEvidence';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
@@ -169,6 +170,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const qaRawCountRef = useRef(0);
   const qaAcceptedCountRef = useRef(0);
   const qaMarkerMetaRef = useRef<QaMarkerMeta[]>([]);
+  // Ein unmittelbar vor Finish bestätigter Marker ist synchron im Store,
+  // sein SQLite-Insert kann aber noch laufen. Finish wartet nur auf diese
+  // lokalen Writes, bevor QA-Snapshot und Session-Finalisierung gespeichert werden.
+  const markerWritesRef = useRef(createMarkerWriteBarrier());
   /** QA v2.1: Motion-Evidenz je bewertetem Kandidaten, LIVE mitgeschnitten. */
   const qaCandidateMotionRef = useRef<QaCandidateMotion[]>([]);
   /** Verhindert Doppel-Einträge: je apexIndex genau ein Mitschnitt. */
@@ -275,12 +280,17 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   ) => {
     const s = store.getState();
     s.addMarker(marker);
-    if (localSessionId.current) {
-      try {
-        const dbId = await createLocalTrackMarker(localSessionId.current, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null });
-        if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qa.apexIndex);
-      }
-      catch (e) { console.warn('[trackRecorder] marker', e); }
+    const markerSessionId = localSessionId.current;
+    if (markerSessionId) {
+      const localWrite = (async () => {
+        try {
+          const dbId = await createLocalTrackMarker(markerSessionId, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null });
+          if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qa.apexIndex);
+          return true;
+        } catch (e) { console.warn('[trackRecorder] marker', e); return false; }
+      })();
+      markerWritesRef.current.track(localWrite);
+      await localWrite;
     }
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker);
   }, [store, qaNoteMarker]);
@@ -822,6 +832,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaRawCountRef.current = 0;
     qaAcceptedCountRef.current = 0;
     qaMarkerMetaRef.current = [];
+    markerWritesRef.current = createMarkerWriteBarrier();
     qaCandidateMotionRef.current = [];
     qaMotionSeenRef.current.clear();
     if (qaRef.current) { clearQaCandidateLog(); motionBufRef.current.clear(); }
@@ -997,6 +1008,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         onAngleRef.current?.(flush.corner.kind);
       }
     }
+    const pendingLocalMarkers = markerWritesRef.current.snapshot();
     // ── QA-Mitschnitt schreiben (nur Diagnosemodus) ──────────────────────
     // Muss VOR stopAll() laufen: danach sind Detektor-Puffer und Rohring leer.
     // Rein lesend gegenüber der Erkennung — die Winkel dieses Durchlaufs werden
@@ -1032,8 +1044,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         const detectorPoints = detectPts.map(p => qaRel(p.lat, p.lng, p.t ?? 0, p.accuracy, p.cumDist));
         const linePoints = linePts.map(p => qaRel(p.lat, p.lng, p.t, p.accuracy, p.cumDist));
         const rawFixes = qaRawFixesRef.current;
-        void saveQaSessionCapture({
-          captureVersion: 2,
+        const capture = {
+          captureVersion: 2 as const,
           sessionLocalId: localSessionId.current,
           durationMs: rawFixes.length ? rawFixes[rawFixes.length - 1].tMs : 0,
           counts: {
@@ -1057,6 +1069,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           candidateMotionEvidence: qaCandidateMotionRef.current.slice(),
           turnFusion: sweep.turns.map(t => toQaTurnFusion(t, originMs)),
           imuOnlyEvents: sweep.imuOnly.map(e => toQaImuOnlyEvent(e, originMs)),
+        };
+        void pendingLocalMarkers.then(markersSaved => {
+          if (markersSaved) void saveQaSessionCapture({ ...capture, markers: qaMarkerMetaRef.current.slice() });
         });
       } catch (e) {
         console.warn('[trackRecorder] QA-Mitschnitt', e);
@@ -1085,6 +1100,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       //    (ensure-create, falls Start-Insert fehlschlug) und finalisieren.
       const lid = localSessionId.current;
       try {
+        if (!(await pendingLocalMarkers)) throw new Error('Lokale Marker konnten nicht vollständig gespeichert werden.');
         await flushPoints();
         if (localSessionInputRef.current) await createLocalTrainingSession(localSessionInputRef.current);   // idempotent
         if (lid) {

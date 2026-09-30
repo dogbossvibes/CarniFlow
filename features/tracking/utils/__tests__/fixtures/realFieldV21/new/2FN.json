@@ -1,0 +1,4506 @@
+{
+  "schemaVersion": 2,
+  "schemaMinor": 1,
+  "sessionId": "qa-14e02e74",
+  "pointType": "lay",
+  "pointCount": 12,
+  "durationMs": 49000,
+  "totalDistanceM": 26.62,
+  "samplingIntervalMs": 5000,
+  "accuracy": {
+    "min": 4.75,
+    "median": 8.065,
+    "max": 9.7
+  },
+  "markerTypes": [
+    "gegenstand",
+    "winkel"
+  ],
+  "points": [
+    {
+      "x": 0,
+      "y": 0,
+      "accuracy": 4.75,
+      "tMs": 0
+    },
+    {
+      "x": -0.711,
+      "y": 1.987,
+      "accuracy": 4.75,
+      "tMs": 5000
+    },
+    {
+      "x": -1.406,
+      "y": 3.905,
+      "accuracy": 9.01,
+      "tMs": 12000
+    },
+    {
+      "x": 0.379,
+      "y": 2.828,
+      "accuracy": 7.61,
+      "tMs": 17000
+    },
+    {
+      "x": 1.891,
+      "y": 0.182,
+      "accuracy": 7,
+      "tMs": 20000
+    },
+    {
+      "x": 3.266,
+      "y": -1.855,
+      "accuracy": 6.55,
+      "tMs": 22000
+    },
+    {
+      "x": 3.102,
+      "y": 0.391,
+      "accuracy": 6.1,
+      "tMs": 28000
+    },
+    {
+      "x": 2.306,
+      "y": 2.576,
+      "accuracy": 9.17,
+      "tMs": 35000
+    },
+    {
+      "x": 3.805,
+      "y": 4.592,
+      "accuracy": 9.66,
+      "tMs": 39000
+    },
+    {
+      "x": 6.276,
+      "y": 4.794,
+      "accuracy": 9.7,
+      "tMs": 41000
+    },
+    {
+      "x": 6.179,
+      "y": 7.724,
+      "accuracy": 8.77,
+      "tMs": 47000
+    },
+    {
+      "x": 5.618,
+      "y": 10.037,
+      "accuracy": 8.52,
+      "tMs": 49000
+    }
+  ],
+  "markers": [
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "stoff",
+      "x": -1.921,
+      "y": 2.393,
+      "atM": 2.1,
+      "tMs": 7398,
+      "source": "manual",
+      "scale": "line",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "spitz_rechts",
+      "material": null,
+      "x": -1.531,
+      "y": 5.435,
+      "atM": 11,
+      "tMs": 17101,
+      "source": "auto",
+      "scale": "detector",
+      "apexIndex": 10
+    },
+    {
+      "type": "winkel",
+      "angleKind": "spitz_links",
+      "material": null,
+      "x": 4.035,
+      "y": -2.924,
+      "atM": 21.2,
+      "tMs": 28101,
+      "source": "auto",
+      "scale": "detector",
+      "apexIndex": 19
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "stoff",
+      "x": 2.53,
+      "y": 1.269,
+      "atM": 14,
+      "tMs": 31209,
+      "source": "manual",
+      "scale": "line",
+      "apexIndex": null
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": 2.639,
+      "y": 5.008,
+      "atM": 30.2,
+      "tMs": 41103,
+      "source": "auto",
+      "scale": "detector",
+      "apexIndex": 28
+    }
+  ],
+  "qaCaptureAvailable": true,
+  "distances": {
+    "rawPathM": 55.07,
+    "detectorPathM": 44.27,
+    "recordedLineM": 26.59,
+    "storeDistanceM": 26.59
+  },
+  "counts": {
+    "rawFixes": 66,
+    "acceptedFixes": 53,
+    "rejectedFixes": 0,
+    "detectorPoints": 41,
+    "linePoints": 12,
+    "persistedPoints": 12
+  },
+  "rawFixes": [
+    {
+      "x": 0,
+      "y": 0,
+      "accuracy": 4.748651530191761,
+      "tMs": 0
+    },
+    {
+      "x": -0.002,
+      "y": 0.063,
+      "accuracy": 4.748651530191761,
+      "tMs": 999.98291015625
+    },
+    {
+      "x": -0.015,
+      "y": 0.023,
+      "accuracy": 4.748651530191761,
+      "tMs": 1999.967529296875
+    },
+    {
+      "x": 0.068,
+      "y": -0.042,
+      "accuracy": 4.748651530191761,
+      "tMs": 2999.956298828125
+    },
+    {
+      "x": -0.375,
+      "y": 0.267,
+      "accuracy": 4.748651530191763,
+      "tMs": 3999.934814453125
+    },
+    {
+      "x": -0.704,
+      "y": 0.119,
+      "accuracy": 4.748651530191761,
+      "tMs": 4999.91943359375
+    },
+    {
+      "x": -0.652,
+      "y": -0.259,
+      "accuracy": 4.748651530191761,
+      "tMs": 5999.906005859375
+    },
+    {
+      "x": -0.615,
+      "y": -0.47,
+      "accuracy": 4.748651530191761,
+      "tMs": 6999.886474609375
+    },
+    {
+      "x": -0.511,
+      "y": -0.508,
+      "accuracy": 4.748651530191762,
+      "tMs": 7999.86572265625
+    },
+    {
+      "x": -0.519,
+      "y": -0.507,
+      "accuracy": 4.748651530191761,
+      "tMs": 8999.845703125
+    },
+    {
+      "x": -0.537,
+      "y": -0.437,
+      "accuracy": 4.748651530191762,
+      "tMs": 9999.826416015625
+    },
+    {
+      "x": -0.473,
+      "y": -0.376,
+      "accuracy": 4.748651530191761,
+      "tMs": 10999.809814453125
+    },
+    {
+      "x": -0.237,
+      "y": -0.594,
+      "accuracy": 4.748651530191761,
+      "tMs": 11999.793701171875
+    },
+    {
+      "x": -0.419,
+      "y": -0.397,
+      "accuracy": 4.748651530191761,
+      "tMs": 12999.78271484375
+    },
+    {
+      "x": -0.605,
+      "y": -0.225,
+      "accuracy": 4.748651530191761,
+      "tMs": 13999.763427734375
+    },
+    {
+      "x": -0.75,
+      "y": -0.123,
+      "accuracy": 4.748651530191761,
+      "tMs": 14999.749755859375
+    },
+    {
+      "x": -0.799,
+      "y": 0.197,
+      "accuracy": 4.748651530191761,
+      "tMs": 15999.73681640625
+    },
+    {
+      "x": -0.55,
+      "y": 2.414,
+      "accuracy": 4.748651530191822,
+      "tMs": 16999.725341796875
+    },
+    {
+      "x": -0.842,
+      "y": 3.62,
+      "accuracy": 4.748651530191859,
+      "tMs": 17999.714111328125
+    },
+    {
+      "x": -0.986,
+      "y": 4.127,
+      "accuracy": 4.74865153019186,
+      "tMs": 18999.703125
+    },
+    {
+      "x": -2.608,
+      "y": 1.623,
+      "accuracy": 9.740651745527092,
+      "tMs": 19999.69287109375
+    },
+    {
+      "x": -1.426,
+      "y": 1.597,
+      "accuracy": 7.887747977014804,
+      "tMs": 20999.683837890625
+    },
+    {
+      "x": -0.976,
+      "y": 1.861,
+      "accuracy": 7.887747977014804,
+      "tMs": 21999.6748046875
+    },
+    {
+      "x": -0.776,
+      "y": 2.818,
+      "accuracy": 8.970760509437845,
+      "tMs": 22999.66650390625
+    },
+    {
+      "x": -1.238,
+      "y": 4.138,
+      "accuracy": 8.48405779969027,
+      "tMs": 23999.65869140625
+    },
+    {
+      "x": -1.801,
+      "y": 5.227,
+      "accuracy": 9.005469025444835,
+      "tMs": 24999.651123046875
+    },
+    {
+      "x": -1.503,
+      "y": 5.743,
+      "accuracy": 7.942396387304493,
+      "tMs": 25999.6435546875
+    },
+    {
+      "x": -0.323,
+      "y": 4.62,
+      "accuracy": 7.224642718101893,
+      "tMs": 26999.6376953125
+    },
+    {
+      "x": 0.014,
+      "y": 3.798,
+      "accuracy": 6.591853838110505,
+      "tMs": 27999.63134765625
+    },
+    {
+      "x": 0.472,
+      "y": 2.803,
+      "accuracy": 7.540903210361568,
+      "tMs": 28999.625732421875
+    },
+    {
+      "x": 1.195,
+      "y": 1.546,
+      "accuracy": 7.612837502641078,
+      "tMs": 29999.62060546875
+    },
+    {
+      "x": 1.658,
+      "y": 0.998,
+      "accuracy": 7.61283751418626,
+      "tMs": 30999.614990234375
+    },
+    {
+      "x": 2.245,
+      "y": -0.039,
+      "accuracy": 7.28767364302132,
+      "tMs": 31999.610595703125
+    },
+    {
+      "x": 2.577,
+      "y": -1.385,
+      "accuracy": 6.997232335785099,
+      "tMs": 32999.605712890625
+    },
+    {
+      "x": 3.364,
+      "y": -2.438,
+      "accuracy": 6.685330274034601,
+      "tMs": 33999.6005859375
+    },
+    {
+      "x": 4.444,
+      "y": -3.318,
+      "accuracy": 6.551620222065434,
+      "tMs": 34999.59716796875
+    },
+    {
+      "x": 4.626,
+      "y": -3.037,
+      "accuracy": 6.402038214254924,
+      "tMs": 35999.593017578125
+    },
+    {
+      "x": 3.744,
+      "y": -2.252,
+      "accuracy": 6.287374373346737,
+      "tMs": 36999.58935546875
+    },
+    {
+      "x": 3.71,
+      "y": -1.887,
+      "accuracy": 6.287374373346738,
+      "tMs": 37999.586181640625
+    },
+    {
+      "x": 3.176,
+      "y": -0.603,
+      "accuracy": 6.1811372092788375,
+      "tMs": 38999.581787109375
+    },
+    {
+      "x": 2.992,
+      "y": 0.975,
+      "accuracy": 6.18113721927301,
+      "tMs": 39999.5791015625
+    },
+    {
+      "x": 2.785,
+      "y": 1.789,
+      "accuracy": 6.101859458412582,
+      "tMs": 40999.576171875
+    },
+    {
+      "x": 3.059,
+      "y": 1.545,
+      "accuracy": 7.007184321782993,
+      "tMs": 41999.572998046875
+    },
+    {
+      "x": 2.802,
+      "y": 1.467,
+      "accuracy": 8.016922722040817,
+      "tMs": 42999.570556640625
+    },
+    {
+      "x": 2.292,
+      "y": 1.181,
+      "accuracy": 8.57947005619016,
+      "tMs": 43999.568359375
+    },
+    {
+      "x": 2.138,
+      "y": 1.172,
+      "accuracy": 8.755612678029111,
+      "tMs": 44999.566162109375
+    },
+    {
+      "x": 2.09,
+      "y": 1.436,
+      "accuracy": 9.345043517998745,
+      "tMs": 45999.5634765625
+    },
+    {
+      "x": 2.198,
+      "y": 2.472,
+      "accuracy": 9.34504347625416,
+      "tMs": 46999.56103515625
+    },
+    {
+      "x": 2.355,
+      "y": 3.847,
+      "accuracy": 9.172415223449116,
+      "tMs": 47999.55908203125
+    },
+    {
+      "x": 2.514,
+      "y": 4.978,
+      "accuracy": 9.180861358419536,
+      "tMs": 48999.5576171875
+    },
+    {
+      "x": 2.718,
+      "y": 5.249,
+      "accuracy": 9.321002278840217,
+      "tMs": 49999.555419921875
+    },
+    {
+      "x": 3.508,
+      "y": 4.844,
+      "accuracy": 9.657030956164474,
+      "tMs": 50999.55322265625
+    },
+    {
+      "x": 5.137,
+      "y": 4.8,
+      "accuracy": 9.657030952592628,
+      "tMs": 51999.5517578125
+    },
+    {
+      "x": 6.898,
+      "y": 4.86,
+      "accuracy": 9.704857147497359,
+      "tMs": 52999.55029296875
+    },
+    {
+      "x": 8.125,
+      "y": 4.954,
+      "accuracy": 9.70485713856257,
+      "tMs": 53999.548828125
+    },
+    {
+      "x": 8.688,
+      "y": 4.772,
+      "accuracy": 9.70485713660939,
+      "tMs": 54999.547119140625
+    },
+    {
+      "x": 7.568,
+      "y": 4.122,
+      "accuracy": 9.718878659698909,
+      "tMs": 55999.54541015625
+    },
+    {
+      "x": 6.772,
+      "y": 4.734,
+      "accuracy": 9.373588248344497,
+      "tMs": 56999.544189453125
+    },
+    {
+      "x": 6.289,
+      "y": 6.254,
+      "accuracy": 9.061362466797679,
+      "tMs": 57999.54248046875
+    },
+    {
+      "x": 6.183,
+      "y": 8.108,
+      "accuracy": 8.724334658543452,
+      "tMs": 58999.540771484375
+    },
+    {
+      "x": 5.619,
+      "y": 9.736,
+      "accuracy": 8.766325492477815,
+      "tMs": 59999.540283203125
+    },
+    {
+      "x": 5.162,
+      "y": 11.011,
+      "accuracy": 8.859747394446975,
+      "tMs": 60999.53857421875
+    },
+    {
+      "x": 5.385,
+      "y": 11.552,
+      "accuracy": 8.516760037422685,
+      "tMs": 61999.53662109375
+    },
+    {
+      "x": 5.213,
+      "y": 11.389,
+      "accuracy": 8.516760079941976,
+      "tMs": 62999.5361328125
+    },
+    {
+      "x": 5.167,
+      "y": 11.502,
+      "accuracy": 8.203510683674041,
+      "tMs": 63999.53466796875
+    },
+    {
+      "x": 5.822,
+      "y": 11.389,
+      "accuracy": 7.994226735650196,
+      "tMs": 64999.53466796875
+    }
+  ],
+  "detectorPoints": [
+    {
+      "x": -0.419,
+      "y": -0.397,
+      "accuracy": 4.748651530191761,
+      "tMs": 12999.78271484375,
+      "cumDistM": 0
+    },
+    {
+      "x": -0.766,
+      "y": 0.087,
+      "accuracy": 4.748651530191761,
+      "tMs": 15999.73681640625,
+      "cumDistM": 0.6
+    },
+    {
+      "x": -0.615,
+      "y": 1.716,
+      "accuracy": 4.748651530191822,
+      "tMs": 16999.725341796875,
+      "cumDistM": 2.23
+    },
+    {
+      "x": -0.774,
+      "y": 3.049,
+      "accuracy": 4.748651530191859,
+      "tMs": 17999.714111328125,
+      "cumDistM": 3.57
+    },
+    {
+      "x": -0.922,
+      "y": 3.803,
+      "accuracy": 4.74865153019186,
+      "tMs": 18999.703125,
+      "cumDistM": 4.34
+    },
+    {
+      "x": -2.102,
+      "y": 2.277,
+      "accuracy": 9.740651745527092,
+      "tMs": 19999.69287109375,
+      "cumDistM": 6.27
+    },
+    {
+      "x": -1.629,
+      "y": 1.801,
+      "accuracy": 7.887747977014804,
+      "tMs": 20999.683837890625,
+      "cumDistM": 6.94
+    },
+    {
+      "x": -0.895,
+      "y": 2.525,
+      "accuracy": 8.970760509437845,
+      "tMs": 22999.66650390625,
+      "cumDistM": 7.97
+    },
+    {
+      "x": -1.135,
+      "y": 3.654,
+      "accuracy": 8.48405779969027,
+      "tMs": 23999.65869140625,
+      "cumDistM": 9.12
+    },
+    {
+      "x": -1.601,
+      "y": 4.755,
+      "accuracy": 9.005469025444835,
+      "tMs": 24999.651123046875,
+      "cumDistM": 10.31
+    },
+    {
+      "x": -1.532,
+      "y": 5.446,
+      "accuracy": 7.942396387304493,
+      "tMs": 25999.6435546875,
+      "cumDistM": 11.01
+    },
+    {
+      "x": -0.686,
+      "y": 4.868,
+      "accuracy": 7.224642718101893,
+      "tMs": 26999.6376953125,
+      "cumDistM": 12.03
+    },
+    {
+      "x": -0.196,
+      "y": 4.119,
+      "accuracy": 6.591853838110505,
+      "tMs": 27999.63134765625,
+      "cumDistM": 12.93
+    },
+    {
+      "x": 0.271,
+      "y": 3.198,
+      "accuracy": 7.540903210361568,
+      "tMs": 28999.625732421875,
+      "cumDistM": 13.96
+    },
+    {
+      "x": 0.918,
+      "y": 2.042,
+      "accuracy": 7.612837502641078,
+      "tMs": 29999.62060546875,
+      "cumDistM": 15.28
+    },
+    {
+      "x": 1.436,
+      "y": 1.311,
+      "accuracy": 7.61283751418626,
+      "tMs": 30999.614990234375,
+      "cumDistM": 16.17
+    },
+    {
+      "x": 2.002,
+      "y": 0.366,
+      "accuracy": 7.28767364302132,
+      "tMs": 31999.610595703125,
+      "cumDistM": 17.27
+    },
+    {
+      "x": 2.404,
+      "y": -0.86,
+      "accuracy": 6.997232335785099,
+      "tMs": 32999.605712890625,
+      "cumDistM": 18.56
+    },
+    {
+      "x": 3.076,
+      "y": -1.965,
+      "accuracy": 6.685330274034601,
+      "tMs": 33999.6005859375,
+      "cumDistM": 19.86
+    },
+    {
+      "x": 4.034,
+      "y": -2.912,
+      "accuracy": 6.551620222065434,
+      "tMs": 34999.59716796875,
+      "cumDistM": 21.2
+    },
+    {
+      "x": 3.784,
+      "y": -2.064,
+      "accuracy": 6.287374373346738,
+      "tMs": 37999.586181640625,
+      "cumDistM": 22.08
+    },
+    {
+      "x": 3.358,
+      "y": -1.041,
+      "accuracy": 6.1811372092788375,
+      "tMs": 38999.581787109375,
+      "cumDistM": 23.19
+    },
+    {
+      "x": 3.102,
+      "y": 0.37,
+      "accuracy": 6.18113721927301,
+      "tMs": 39999.5791015625,
+      "cumDistM": 24.62
+    },
+    {
+      "x": 2.88,
+      "y": 1.363,
+      "accuracy": 6.101859458412582,
+      "tMs": 40999.576171875,
+      "cumDistM": 25.64
+    },
+    {
+      "x": 2.235,
+      "y": 1.201,
+      "accuracy": 8.755612678029111,
+      "tMs": 44999.566162109375,
+      "cumDistM": 26.3
+    },
+    {
+      "x": 2.178,
+      "y": 2.14,
+      "accuracy": 9.34504347625416,
+      "tMs": 46999.56103515625,
+      "cumDistM": 27.24
+    },
+    {
+      "x": 2.302,
+      "y": 3.335,
+      "accuracy": 9.172415223449116,
+      "tMs": 47999.55908203125,
+      "cumDistM": 28.44
+    },
+    {
+      "x": 2.451,
+      "y": 4.485,
+      "accuracy": 9.180861358419536,
+      "tMs": 48999.5576171875,
+      "cumDistM": 29.6
+    },
+    {
+      "x": 2.638,
+      "y": 5.02,
+      "accuracy": 9.321002278840217,
+      "tMs": 49999.555419921875,
+      "cumDistM": 30.17
+    },
+    {
+      "x": 3.247,
+      "y": 4.897,
+      "accuracy": 9.657030956164474,
+      "tMs": 50999.55322265625,
+      "cumDistM": 30.79
+    },
+    {
+      "x": 4.57,
+      "y": 4.829,
+      "accuracy": 9.657030952592628,
+      "tMs": 51999.5517578125,
+      "cumDistM": 32.11
+    },
+    {
+      "x": 6.2,
+      "y": 4.851,
+      "accuracy": 9.704857147497359,
+      "tMs": 52999.55029296875,
+      "cumDistM": 33.74
+    },
+    {
+      "x": 7.547,
+      "y": 4.923,
+      "accuracy": 9.70485713856257,
+      "tMs": 53999.548828125,
+      "cumDistM": 35.09
+    },
+    {
+      "x": 8.346,
+      "y": 4.817,
+      "accuracy": 9.70485713660939,
+      "tMs": 54999.547119140625,
+      "cumDistM": 35.89
+    },
+    {
+      "x": 7.801,
+      "y": 4.33,
+      "accuracy": 9.718878659698909,
+      "tMs": 55999.54541015625,
+      "cumDistM": 36.62
+    },
+    {
+      "x": 7.081,
+      "y": 4.613,
+      "accuracy": 9.373588248344497,
+      "tMs": 56999.544189453125,
+      "cumDistM": 37.4
+    },
+    {
+      "x": 6.527,
+      "y": 5.761,
+      "accuracy": 9.061362466797679,
+      "tMs": 57999.54248046875,
+      "cumDistM": 38.67
+    },
+    {
+      "x": 6.286,
+      "y": 7.404,
+      "accuracy": 8.724334658543452,
+      "tMs": 58999.540771484375,
+      "cumDistM": 40.33
+    },
+    {
+      "x": 5.819,
+      "y": 9.036,
+      "accuracy": 8.766325492477815,
+      "tMs": 59999.540283203125,
+      "cumDistM": 42.02
+    },
+    {
+      "x": 5.359,
+      "y": 10.419,
+      "accuracy": 8.859747394446975,
+      "tMs": 60999.53857421875,
+      "cumDistM": 43.48
+    },
+    {
+      "x": 5.378,
+      "y": 11.212,
+      "accuracy": 8.516760037422685,
+      "tMs": 61999.53662109375,
+      "cumDistM": 44.27
+    }
+  ],
+  "linePoints": [
+    {
+      "x": -0.001,
+      "y": 0.012,
+      "accuracy": 4.748651530191761,
+      "tMs": 12999.78271484375,
+      "cumDistM": 0
+    },
+    {
+      "x": -0.712,
+      "y": 1.999,
+      "accuracy": 4.748651530191859,
+      "tMs": 17999.714111328125,
+      "cumDistM": 2.11
+    },
+    {
+      "x": -1.407,
+      "y": 3.917,
+      "accuracy": 9.005469025444835,
+      "tMs": 24999.651123046875,
+      "cumDistM": 4.15
+    },
+    {
+      "x": 0.378,
+      "y": 2.84,
+      "accuracy": 7.612837502641078,
+      "tMs": 29999.62060546875,
+      "cumDistM": 6.23
+    },
+    {
+      "x": 1.89,
+      "y": 0.193,
+      "accuracy": 6.997232335785099,
+      "tMs": 32999.605712890625,
+      "cumDistM": 9.27
+    },
+    {
+      "x": 3.265,
+      "y": -1.843,
+      "accuracy": 6.551620222065434,
+      "tMs": 34999.59716796875,
+      "cumDistM": 11.73
+    },
+    {
+      "x": 3.1,
+      "y": 0.402,
+      "accuracy": 6.101859458412582,
+      "tMs": 40999.576171875,
+      "cumDistM": 13.98
+    },
+    {
+      "x": 2.305,
+      "y": 2.587,
+      "accuracy": 9.172415223449116,
+      "tMs": 47999.55908203125,
+      "cumDistM": 16.3
+    },
+    {
+      "x": 3.804,
+      "y": 4.604,
+      "accuracy": 9.657030952592628,
+      "tMs": 51999.5517578125,
+      "cumDistM": 18.81
+    },
+    {
+      "x": 6.275,
+      "y": 4.805,
+      "accuracy": 9.70485713856257,
+      "tMs": 53999.548828125,
+      "cumDistM": 21.28
+    },
+    {
+      "x": 6.178,
+      "y": 7.736,
+      "accuracy": 8.766325492477815,
+      "tMs": 59999.540283203125,
+      "cumDistM": 24.21
+    },
+    {
+      "x": 5.617,
+      "y": 10.048,
+      "accuracy": 8.516760037422685,
+      "tMs": 61999.53662109375,
+      "cumDistM": 26.59
+    }
+  ],
+  "autoDiagnostics": [
+    {
+      "apexIndex": 1,
+      "tMs": 15999.73681640625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 2,
+      "tMs": 16999.725341796875,
+      "bearingBefore": 357.3,
+      "bearingAfter": 351.8,
+      "headingDeltaDeg": -5.5,
+      "interiorAngleDeg": 174.5,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 3,
+      "tMs": 17999.714111328125,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 4,
+      "tMs": 18999.703125,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 5,
+      "tMs": 19999.69287109375,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 6,
+      "tMs": 20999.683837890625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 7,
+      "tMs": 22999.66650390625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 8,
+      "tMs": 23999.65869140625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 9,
+      "tMs": 24999.651123046875,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 10,
+      "tMs": 25999.6435546875,
+      "bearingBefore": 346,
+      "bearingAfter": 148.7,
+      "headingDeltaDeg": 162.8,
+      "interiorAngleDeg": 17.2,
+      "classification": "spitz_rechts",
+      "confidenceBeforeMotion": 0.678,
+      "motionAdjustment": 0,
+      "confidence": 0.678,
+      "rejectReason": null,
+      "accepted": true
+    },
+    {
+      "apexIndex": 11,
+      "tMs": 26999.6376953125,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 12,
+      "tMs": 27999.63134765625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 13,
+      "tMs": 28999.625732421875,
+      "bearingBefore": 141.8,
+      "bearingAfter": 149.8,
+      "headingDeltaDeg": 8,
+      "interiorAngleDeg": 172,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 14,
+      "tMs": 29999.62060546875,
+      "bearingBefore": 145.6,
+      "bearingAfter": 149.7,
+      "headingDeltaDeg": 4.1,
+      "interiorAngleDeg": 175.9,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 15,
+      "tMs": 30999.614990234375,
+      "bearingBefore": 149.8,
+      "bearingAfter": 154.3,
+      "headingDeltaDeg": 4.5,
+      "interiorAngleDeg": 175.5,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 16,
+      "tMs": 31999.610595703125,
+      "bearingBefore": 149.4,
+      "bearingAfter": 148.2,
+      "headingDeltaDeg": -1.2,
+      "interiorAngleDeg": 178.8,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 17,
+      "tMs": 32999.605712890625,
+      "bearingBefore": 148.7,
+      "bearingAfter": 141.5,
+      "headingDeltaDeg": -7.2,
+      "interiorAngleDeg": 172.8,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 18,
+      "tMs": 33999.6005859375,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 19,
+      "tMs": 34999.59716796875,
+      "bearingBefore": 149.8,
+      "bearingAfter": 344.9,
+      "headingDeltaDeg": -164.9,
+      "interiorAngleDeg": 15.1,
+      "classification": "spitz_links",
+      "confidenceBeforeMotion": 0.868,
+      "motionAdjustment": 0,
+      "confidence": 0.868,
+      "rejectReason": null,
+      "accepted": true
+    },
+    {
+      "apexIndex": 20,
+      "tMs": 37999.586181640625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 21,
+      "tMs": 38999.581787109375,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 22,
+      "tMs": 39999.5791015625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 23,
+      "tMs": 40999.576171875,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 24,
+      "tMs": 44999.566162109375,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 25,
+      "tMs": 46999.56103515625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 26,
+      "tMs": 47999.55908203125,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 27,
+      "tMs": 48999.5576171875,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 28,
+      "tMs": 49999.555419921875,
+      "bearingBefore": 6,
+      "bearingAfter": 91.1,
+      "headingDeltaDeg": 85.1,
+      "interiorAngleDeg": 94.9,
+      "classification": "rechts",
+      "confidenceBeforeMotion": 0.835,
+      "motionAdjustment": 0.12,
+      "confidence": 0.955,
+      "rejectReason": null,
+      "accepted": true
+    },
+    {
+      "apexIndex": 29,
+      "tMs": 50999.55322265625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 30,
+      "tMs": 51999.5517578125,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 31,
+      "tMs": 52999.55029296875,
+      "bearingBefore": 90.8,
+      "bearingAfter": 90.5,
+      "headingDeltaDeg": -0.4,
+      "interiorAngleDeg": 179.6,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 32,
+      "tMs": 53999.548828125,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 33,
+      "tMs": 54999.547119140625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    },
+    {
+      "apexIndex": 34,
+      "tMs": 55999.54541015625,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 35,
+      "tMs": 56999.544189453125,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_before",
+      "accepted": false
+    },
+    {
+      "apexIndex": 36,
+      "tMs": 57999.54248046875,
+      "bearingBefore": 320.3,
+      "bearingAfter": 346.8,
+      "headingDeltaDeg": 26.5,
+      "interiorAngleDeg": 153.5,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 37,
+      "tMs": 58999.540771484375,
+      "bearingBefore": 344.5,
+      "bearingAfter": 345.6,
+      "headingDeltaDeg": 1.1,
+      "interiorAngleDeg": 178.9,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 38,
+      "tMs": 59999.540283203125,
+      "bearingBefore": 347.8,
+      "bearingAfter": 347.6,
+      "headingDeltaDeg": -0.2,
+      "interiorAngleDeg": 179.8,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_turn",
+      "accepted": false
+    },
+    {
+      "apexIndex": 39,
+      "tMs": 60999.53857421875,
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null,
+      "classification": null,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "confidence": 0,
+      "rejectReason": "no_window_after",
+      "accepted": false
+    }
+  ],
+  "candidateMotionEvidence": [
+    {
+      "apexIndex": 2,
+      "evaluatedAtMs": 17000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 7.72,
+      "grossYawDeg": 21.06,
+      "monotonicity": 0.367,
+      "yawShare": 0.271,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking",
+      "locomotionEvidence": "gait_accel",
+      "turnEvidence": 0,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": 1.76,
+          "rotationMagnitude": 0.449,
+          "accelerationMagnitude": 0.071,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": 0.85,
+          "rotationMagnitude": 0.472,
+          "accelerationMagnitude": 0.077,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": -0.99,
+          "rotationMagnitude": 0.365,
+          "accelerationMagnitude": 0.167,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": -0.1,
+          "rotationMagnitude": 0.815,
+          "accelerationMagnitude": 0.307,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -3.29,
+          "rotationMagnitude": 0.836,
+          "accelerationMagnitude": 0.265,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": -0.8,
+          "rotationMagnitude": 0.657,
+          "accelerationMagnitude": 0.183,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": -0.37,
+          "rotationMagnitude": 0.695,
+          "accelerationMagnitude": 0.165,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1201,
+          "headingDelta": 4.88,
+          "rotationMagnitude": 0.632,
+          "accelerationMagnitude": 0.272,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": -2.4,
+          "rotationMagnitude": 0.498,
+          "accelerationMagnitude": 0.26,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": -0.49,
+          "rotationMagnitude": 0.827,
+          "accelerationMagnitude": 0.249,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -1.13,
+          "rotationMagnitude": 0.638,
+          "accelerationMagnitude": 0.227,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": 3.29,
+          "rotationMagnitude": 0.627,
+          "accelerationMagnitude": 0.184,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 3.38,
+          "rotationMagnitude": 0.799,
+          "accelerationMagnitude": 0.187,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": -4.11,
+          "rotationMagnitude": 0.584,
+          "accelerationMagnitude": 0.147,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": -5.31,
+          "rotationMagnitude": 0.707,
+          "accelerationMagnitude": 0.167,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": -0.95,
+          "rotationMagnitude": 0.743,
+          "accelerationMagnitude": 0.157,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": -2.08,
+          "rotationMagnitude": 0.398,
+          "accelerationMagnitude": 0.192,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": -1.01,
+          "rotationMagnitude": 0.588,
+          "accelerationMagnitude": 0.154,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": 3.26,
+          "rotationMagnitude": 0.582,
+          "accelerationMagnitude": 0.105,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": 0.38,
+          "rotationMagnitude": 0.408,
+          "accelerationMagnitude": 0.068,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": -0.47,
+          "rotationMagnitude": 0.244,
+          "accelerationMagnitude": 0.05,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": -1.08,
+          "rotationMagnitude": 0.462,
+          "accelerationMagnitude": 0.076,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": -0.71,
+          "rotationMagnitude": 0.138,
+          "accelerationMagnitude": 0.052,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": -0.13,
+          "rotationMagnitude": 0.358,
+          "accelerationMagnitude": 0.067,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 10,
+      "evaluatedAtMs": 26000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 119.11,
+      "grossYawDeg": 119.11,
+      "monotonicity": 1,
+      "yawShare": 0.736,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 8,
+      "cadence": null,
+      "movementState": "walking",
+      "locomotionEvidence": "steps+gait_accel",
+      "turnEvidence": 1,
+      "adjustmentApplied": 0.12,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": 3.04,
+          "rotationMagnitude": 0.893,
+          "accelerationMagnitude": 0.214,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2701,
+          "headingDelta": -0.74,
+          "rotationMagnitude": 1.006,
+          "accelerationMagnitude": 0.253,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": -0.27,
+          "rotationMagnitude": 0.471,
+          "accelerationMagnitude": 0.227,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": -2.68,
+          "rotationMagnitude": 0.542,
+          "accelerationMagnitude": 0.149,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -1.28,
+          "rotationMagnitude": 0.51,
+          "accelerationMagnitude": 0.237,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": -1.8,
+          "rotationMagnitude": 0.49,
+          "accelerationMagnitude": 0.179,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1451,
+          "headingDelta": 0.18,
+          "rotationMagnitude": 0.482,
+          "accelerationMagnitude": 0.115,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": -9.75,
+          "rotationMagnitude": 0.851,
+          "accelerationMagnitude": 0.211,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": -17.02,
+          "rotationMagnitude": 1.492,
+          "accelerationMagnitude": 0.199,
+          "stepDelta": 8,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": -32,
+          "rotationMagnitude": 2.833,
+          "accelerationMagnitude": 0.299,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -29.08,
+          "rotationMagnitude": 2.733,
+          "accelerationMagnitude": 0.328,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": -23.3,
+          "rotationMagnitude": 2.121,
+          "accelerationMagnitude": 0.096,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": -12.52,
+          "rotationMagnitude": 1.088,
+          "accelerationMagnitude": 0.137,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": -2.65,
+          "rotationMagnitude": 0.344,
+          "accelerationMagnitude": 0.125,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": -2.11,
+          "rotationMagnitude": 0.3,
+          "accelerationMagnitude": 0.14,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": -0.43,
+          "rotationMagnitude": 0.389,
+          "accelerationMagnitude": 0.146,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": -1.32,
+          "rotationMagnitude": 0.409,
+          "accelerationMagnitude": 0.203,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": -1.03,
+          "rotationMagnitude": 0.211,
+          "accelerationMagnitude": 0.139,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": -1.97,
+          "rotationMagnitude": 0.35,
+          "accelerationMagnitude": 0.138,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": -1.07,
+          "rotationMagnitude": 0.425,
+          "accelerationMagnitude": 0.197,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": -1.03,
+          "rotationMagnitude": 0.197,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.342,
+          "accelerationMagnitude": 0.217,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": -2.56,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": 0.83,
+          "rotationMagnitude": 0.258,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 13,
+      "evaluatedAtMs": 29000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 1,
+      "grossYawDeg": 8.26,
+      "monotonicity": 0.121,
+      "yawShare": 0.19,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking",
+      "locomotionEvidence": "gait_accel",
+      "turnEvidence": 0,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": -12.52,
+          "rotationMagnitude": 1.088,
+          "accelerationMagnitude": 0.137,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": -2.65,
+          "rotationMagnitude": 0.344,
+          "accelerationMagnitude": 0.125,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": -2.11,
+          "rotationMagnitude": 0.3,
+          "accelerationMagnitude": 0.14,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": -0.43,
+          "rotationMagnitude": 0.389,
+          "accelerationMagnitude": 0.146,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -1.32,
+          "rotationMagnitude": 0.409,
+          "accelerationMagnitude": 0.203,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": -1.03,
+          "rotationMagnitude": 0.211,
+          "accelerationMagnitude": 0.139,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": -1.97,
+          "rotationMagnitude": 0.35,
+          "accelerationMagnitude": 0.138,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": -1.07,
+          "rotationMagnitude": 0.425,
+          "accelerationMagnitude": 0.197,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": -1.03,
+          "rotationMagnitude": 0.197,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.342,
+          "accelerationMagnitude": 0.217,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -2.56,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": 0.83,
+          "rotationMagnitude": 0.258,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 0,
+          "rotationMagnitude": 0.769,
+          "accelerationMagnitude": 0.243,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": 3.2,
+          "rotationMagnitude": 0.388,
+          "accelerationMagnitude": 0.157,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": 0.33,
+          "rotationMagnitude": 0.284,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": -0.04,
+          "rotationMagnitude": 0.337,
+          "accelerationMagnitude": 0.153,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": -0.53,
+          "rotationMagnitude": 0.333,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 4,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": -0.14,
+          "rotationMagnitude": 0.256,
+          "accelerationMagnitude": 0.095,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.182,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": -1.31,
+          "rotationMagnitude": 0.564,
+          "accelerationMagnitude": 0.167,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": -3.15,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.11,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": -0.05,
+          "rotationMagnitude": 0.205,
+          "accelerationMagnitude": 0.139,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.638,
+          "accelerationMagnitude": 0.237,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 14,
+      "evaluatedAtMs": 30000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 4.26,
+      "grossYawDeg": 5.67,
+      "monotonicity": 0.751,
+      "yawShare": 0.135,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 4,
+      "cadence": null,
+      "movementState": "walking",
+      "locomotionEvidence": "steps+gait_accel",
+      "turnEvidence": 0,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": -1.32,
+          "rotationMagnitude": 0.409,
+          "accelerationMagnitude": 0.203,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": -1.03,
+          "rotationMagnitude": 0.211,
+          "accelerationMagnitude": 0.139,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": -1.97,
+          "rotationMagnitude": 0.35,
+          "accelerationMagnitude": 0.138,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": -1.07,
+          "rotationMagnitude": 0.425,
+          "accelerationMagnitude": 0.197,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -1.03,
+          "rotationMagnitude": 0.197,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.342,
+          "accelerationMagnitude": 0.217,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": -2.56,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": 0.83,
+          "rotationMagnitude": 0.258,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": 0,
+          "rotationMagnitude": 0.769,
+          "accelerationMagnitude": 0.243,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": 3.2,
+          "rotationMagnitude": 0.388,
+          "accelerationMagnitude": 0.157,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": 0.33,
+          "rotationMagnitude": 0.284,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": -0.04,
+          "rotationMagnitude": 0.337,
+          "accelerationMagnitude": 0.153,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": -0.53,
+          "rotationMagnitude": 0.333,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 4,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": -0.14,
+          "rotationMagnitude": 0.256,
+          "accelerationMagnitude": 0.095,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.182,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": -1.31,
+          "rotationMagnitude": 0.564,
+          "accelerationMagnitude": 0.167,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": -3.15,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.11,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": -0.05,
+          "rotationMagnitude": 0.205,
+          "accelerationMagnitude": 0.139,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.638,
+          "accelerationMagnitude": 0.237,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": 1.66,
+          "rotationMagnitude": 0.261,
+          "accelerationMagnitude": 0.117,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": 1.64,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.12,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": 0.37,
+          "rotationMagnitude": 0.479,
+          "accelerationMagnitude": 0.173,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": -1.1,
+          "rotationMagnitude": 0.307,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 15,
+      "evaluatedAtMs": 31000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2048,
+      "motionAvailable": true,
+      "netYawDeg": 2.58,
+      "grossYawDeg": 7.77,
+      "monotonicity": 0.332,
+      "yawShare": 0.185,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 4,
+      "cadence": null,
+      "movementState": "walking",
+      "locomotionEvidence": "steps+gait_accel",
+      "turnEvidence": 0,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": -1.03,
+          "rotationMagnitude": 0.197,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.342,
+          "accelerationMagnitude": 0.217,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": -2.56,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": 0.83,
+          "rotationMagnitude": 0.258,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": 0,
+          "rotationMagnitude": 0.769,
+          "accelerationMagnitude": 0.243,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": 3.2,
+          "rotationMagnitude": 0.388,
+          "accelerationMagnitude": 0.157,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": 0.33,
+          "rotationMagnitude": 0.284,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": -0.04,
+          "rotationMagnitude": 0.337,
+          "accelerationMagnitude": 0.153,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": -0.53,
+          "rotationMagnitude": 0.333,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 4,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": -0.14,
+          "rotationMagnitude": 0.256,
+          "accelerationMagnitude": 0.095,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.182,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": -1.31,
+          "rotationMagnitude": 0.564,
+          "accelerationMagnitude": 0.167,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": -3.15,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.11,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": -0.05,
+          "rotationMagnitude": 0.205,
+          "accelerationMagnitude": 0.139,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.638,
+          "accelerationMagnitude": 0.237,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": 1.66,
+          "rotationMagnitude": 0.261,
+          "accelerationMagnitude": 0.117,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": 1.64,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.12,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": 0.37,
+          "rotationMagnitude": 0.479,
+          "accelerationMagnitude": 0.173,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": -1.1,
+          "rotationMagnitude": 0.307,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": 1.7,
+          "rotationMagnitude": 0.569,
+          "accelerationMagnitude": 0.175,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 16,
+      "evaluatedAtMs": 32000,
+      "windowStartMs": 1048,
+      "windowEndMs": 2798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 57.17,
+      "grossYawDeg": 57.17,
+      "monotonicity": 1,
+      "yawShare": 0.638,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking",
+      "locomotionEvidence": "gait_accel",
+      "turnEvidence": 1,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": 0,
+          "rotationMagnitude": 0.769,
+          "accelerationMagnitude": 0.243,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": 3.2,
+          "rotationMagnitude": 0.388,
+          "accelerationMagnitude": 0.157,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": 0.33,
+          "rotationMagnitude": 0.284,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": -0.04,
+          "rotationMagnitude": 0.337,
+          "accelerationMagnitude": 0.153,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -0.53,
+          "rotationMagnitude": 0.333,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 4,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": -0.14,
+          "rotationMagnitude": 0.256,
+          "accelerationMagnitude": 0.095,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.182,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": -1.31,
+          "rotationMagnitude": 0.564,
+          "accelerationMagnitude": 0.167,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": -3.15,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.11,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -0.05,
+          "rotationMagnitude": 0.205,
+          "accelerationMagnitude": 0.139,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.638,
+          "accelerationMagnitude": 0.237,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 1.66,
+          "rotationMagnitude": 0.261,
+          "accelerationMagnitude": 0.117,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": 1.64,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.12,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": 0.37,
+          "rotationMagnitude": 0.479,
+          "accelerationMagnitude": 0.173,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": -1.1,
+          "rotationMagnitude": 0.307,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": 1.7,
+          "rotationMagnitude": 0.569,
+          "accelerationMagnitude": 0.175,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": 3.09,
+          "rotationMagnitude": 0.462,
+          "accelerationMagnitude": 0.144,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": 0.48,
+          "rotationMagnitude": 0.246,
+          "accelerationMagnitude": 0.095,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": 3.97,
+          "rotationMagnitude": 0.409,
+          "accelerationMagnitude": 0.142,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": 4.4,
+          "rotationMagnitude": 0.506,
+          "accelerationMagnitude": 0.189,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": 14.74,
+          "rotationMagnitude": 1.313,
+          "accelerationMagnitude": 0.163,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": 16.49,
+          "rotationMagnitude": 1.579,
+          "accelerationMagnitude": 0.105,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": 12.29,
+          "rotationMagnitude": 1.173,
+          "accelerationMagnitude": 0.109,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 17,
+      "evaluatedAtMs": 33000,
+      "windowStartMs": 48,
+      "windowEndMs": 1798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2048,
+      "motionAvailable": true,
+      "netYawDeg": 57.17,
+      "grossYawDeg": 57.17,
+      "monotonicity": 1,
+      "yawShare": 0.638,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking",
+      "locomotionEvidence": "gait_accel",
+      "turnEvidence": 1,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": -0.53,
+          "rotationMagnitude": 0.333,
+          "accelerationMagnitude": 0.182,
+          "stepDelta": 4,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": -0.14,
+          "rotationMagnitude": 0.256,
+          "accelerationMagnitude": 0.095,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": 0.26,
+          "rotationMagnitude": 0.182,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -1.31,
+          "rotationMagnitude": 0.564,
+          "accelerationMagnitude": 0.167,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": -3.15,
+          "rotationMagnitude": 0.382,
+          "accelerationMagnitude": 0.11,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": -0.05,
+          "rotationMagnitude": 0.205,
+          "accelerationMagnitude": 0.139,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": 1.17,
+          "rotationMagnitude": 0.638,
+          "accelerationMagnitude": 0.237,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": 1.66,
+          "rotationMagnitude": 0.261,
+          "accelerationMagnitude": 0.117,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": 1.64,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.12,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": 0.37,
+          "rotationMagnitude": 0.479,
+          "accelerationMagnitude": 0.173,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": -1.1,
+          "rotationMagnitude": 0.307,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 1.7,
+          "rotationMagnitude": 0.569,
+          "accelerationMagnitude": 0.175,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": 3.09,
+          "rotationMagnitude": 0.462,
+          "accelerationMagnitude": 0.144,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": 0.48,
+          "rotationMagnitude": 0.246,
+          "accelerationMagnitude": 0.095,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": 3.97,
+          "rotationMagnitude": 0.409,
+          "accelerationMagnitude": 0.142,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": 4.4,
+          "rotationMagnitude": 0.506,
+          "accelerationMagnitude": 0.189,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": 14.74,
+          "rotationMagnitude": 1.313,
+          "accelerationMagnitude": 0.163,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": 16.49,
+          "rotationMagnitude": 1.579,
+          "accelerationMagnitude": 0.105,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": 12.29,
+          "rotationMagnitude": 1.173,
+          "accelerationMagnitude": 0.109,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": 14.76,
+          "rotationMagnitude": 1.33,
+          "accelerationMagnitude": 0.148,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 19,
+      "evaluatedAtMs": 35000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 103.18,
+      "grossYawDeg": 103.18,
+      "monotonicity": 1,
+      "yawShare": 0.742,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 4,
+      "cadence": 84.35237646102905,
+      "movementState": "walking",
+      "locomotionEvidence": "steps+gait_accel",
+      "turnEvidence": 1,
+      "adjustmentApplied": 0.12,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": 1.66,
+          "rotationMagnitude": 0.261,
+          "accelerationMagnitude": 0.117,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": 1.64,
+          "rotationMagnitude": 0.463,
+          "accelerationMagnitude": 0.12,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": 0.37,
+          "rotationMagnitude": 0.479,
+          "accelerationMagnitude": 0.173,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": -1.1,
+          "rotationMagnitude": 0.307,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": 1.7,
+          "rotationMagnitude": 0.569,
+          "accelerationMagnitude": 0.175,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": 3.09,
+          "rotationMagnitude": 0.462,
+          "accelerationMagnitude": 0.144,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": 0.48,
+          "rotationMagnitude": 0.246,
+          "accelerationMagnitude": 0.095,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": 3.97,
+          "rotationMagnitude": 0.409,
+          "accelerationMagnitude": 0.142,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": 4.4,
+          "rotationMagnitude": 0.506,
+          "accelerationMagnitude": 0.189,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": 14.74,
+          "rotationMagnitude": 1.313,
+          "accelerationMagnitude": 0.163,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": 16.49,
+          "rotationMagnitude": 1.579,
+          "accelerationMagnitude": 0.105,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": 12.29,
+          "rotationMagnitude": 1.173,
+          "accelerationMagnitude": 0.109,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 14.76,
+          "rotationMagnitude": 1.33,
+          "accelerationMagnitude": 0.148,
+          "stepDelta": 0,
+          "cadence": null,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": 18.42,
+          "rotationMagnitude": 1.799,
+          "accelerationMagnitude": 0.16,
+          "stepDelta": 4,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": 11.3,
+          "rotationMagnitude": 1.066,
+          "accelerationMagnitude": 0.213,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": 10.78,
+          "rotationMagnitude": 0.937,
+          "accelerationMagnitude": 0.061,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": 3.47,
+          "rotationMagnitude": 0.428,
+          "accelerationMagnitude": 0.071,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": 0.28,
+          "rotationMagnitude": 0.183,
+          "accelerationMagnitude": 0.067,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": -0.17,
+          "rotationMagnitude": 0.225,
+          "accelerationMagnitude": 0.081,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": 2.56,
+          "rotationMagnitude": 0.207,
+          "accelerationMagnitude": 0.129,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": 2.31,
+          "rotationMagnitude": 0.276,
+          "accelerationMagnitude": 0.184,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": 2.13,
+          "rotationMagnitude": 0.277,
+          "accelerationMagnitude": 0.168,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": -1.9,
+          "rotationMagnitude": 0.337,
+          "accelerationMagnitude": 0.124,
+          "stepDelta": 0,
+          "cadence": 84.35237646102905,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": -0.13,
+          "rotationMagnitude": 0.179,
+          "accelerationMagnitude": 0.159,
+          "stepDelta": 3,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 28,
+      "evaluatedAtMs": 50000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 60.02,
+      "grossYawDeg": 67.73,
+      "monotonicity": 0.886,
+      "yawShare": 0.604,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 0,
+      "cadence": 84.83750581741333,
+      "movementState": "walking",
+      "locomotionEvidence": "gait_accel",
+      "turnEvidence": 1,
+      "adjustmentApplied": 0.12,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": -4.9,
+          "rotationMagnitude": 0.663,
+          "accelerationMagnitude": 0.17,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": 1.91,
+          "rotationMagnitude": 0.277,
+          "accelerationMagnitude": 0.096,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": 2.77,
+          "rotationMagnitude": 0.616,
+          "accelerationMagnitude": 0.201,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": 2.5,
+          "rotationMagnitude": 0.303,
+          "accelerationMagnitude": 0.132,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1951,
+          "headingDelta": -0.66,
+          "rotationMagnitude": 0.293,
+          "accelerationMagnitude": 0.142,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": -1.38,
+          "rotationMagnitude": 0.415,
+          "accelerationMagnitude": 0.259,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": -0.54,
+          "rotationMagnitude": 0.219,
+          "accelerationMagnitude": 0.156,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": -8.15,
+          "rotationMagnitude": 0.791,
+          "accelerationMagnitude": 0.104,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": -15.08,
+          "rotationMagnitude": 1.441,
+          "accelerationMagnitude": 0.107,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -701,
+          "headingDelta": -23.97,
+          "rotationMagnitude": 2.13,
+          "accelerationMagnitude": 0.176,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -18.24,
+          "rotationMagnitude": 1.682,
+          "accelerationMagnitude": 0.072,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": -5.33,
+          "rotationMagnitude": 0.59,
+          "accelerationMagnitude": 0.119,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 1.09,
+          "rotationMagnitude": 0.393,
+          "accelerationMagnitude": 0.188,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": 1.45,
+          "rotationMagnitude": 0.478,
+          "accelerationMagnitude": 0.195,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": 1.32,
+          "rotationMagnitude": 0.672,
+          "accelerationMagnitude": 0.231,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": -1.26,
+          "rotationMagnitude": 0.443,
+          "accelerationMagnitude": 0.224,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": -1.66,
+          "rotationMagnitude": 0.259,
+          "accelerationMagnitude": 0.119,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": 0.13,
+          "rotationMagnitude": 0.506,
+          "accelerationMagnitude": 0.152,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1549,
+          "headingDelta": 2.39,
+          "rotationMagnitude": 0.237,
+          "accelerationMagnitude": 0.181,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": -2.49,
+          "rotationMagnitude": 0.574,
+          "accelerationMagnitude": 0.186,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": -0.19,
+          "rotationMagnitude": 0.47,
+          "accelerationMagnitude": 0.219,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": 1.11,
+          "rotationMagnitude": 0.58,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": -1.22,
+          "rotationMagnitude": 0.966,
+          "accelerationMagnitude": 0.267,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": 0.1,
+          "rotationMagnitude": 0.414,
+          "accelerationMagnitude": 0.153,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 31,
+      "evaluatedAtMs": 53000,
+      "windowStartMs": -452,
+      "windowEndMs": 1298,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 46.05,
+      "grossYawDeg": 48.48,
+      "monotonicity": 0.95,
+      "yawShare": 0.52,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 0,
+      "cadence": 84.83750581741333,
+      "movementState": "walking",
+      "locomotionEvidence": "gait_accel",
+      "turnEvidence": 1,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": 1.09,
+          "rotationMagnitude": 0.393,
+          "accelerationMagnitude": 0.188,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": 1.45,
+          "rotationMagnitude": 0.478,
+          "accelerationMagnitude": 0.195,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": 1.32,
+          "rotationMagnitude": 0.672,
+          "accelerationMagnitude": 0.231,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": -1.26,
+          "rotationMagnitude": 0.443,
+          "accelerationMagnitude": 0.224,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -1.66,
+          "rotationMagnitude": 0.259,
+          "accelerationMagnitude": 0.119,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": 0.13,
+          "rotationMagnitude": 0.506,
+          "accelerationMagnitude": 0.152,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1451,
+          "headingDelta": 2.39,
+          "rotationMagnitude": 0.237,
+          "accelerationMagnitude": 0.181,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": -2.49,
+          "rotationMagnitude": 0.574,
+          "accelerationMagnitude": 0.186,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -951,
+          "headingDelta": -0.19,
+          "rotationMagnitude": 0.47,
+          "accelerationMagnitude": 0.219,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": 1.11,
+          "rotationMagnitude": 0.58,
+          "accelerationMagnitude": 0.141,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -1.22,
+          "rotationMagnitude": 0.966,
+          "accelerationMagnitude": 0.267,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": 0.1,
+          "rotationMagnitude": 0.414,
+          "accelerationMagnitude": 0.153,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 1.32,
+          "rotationMagnitude": 0.486,
+          "accelerationMagnitude": 0.201,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": 2.87,
+          "rotationMagnitude": 0.377,
+          "accelerationMagnitude": 0.189,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": 8.56,
+          "rotationMagnitude": 0.873,
+          "accelerationMagnitude": 0.071,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": 8.37,
+          "rotationMagnitude": 1.026,
+          "accelerationMagnitude": 0.326,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": 14.3,
+          "rotationMagnitude": 1.348,
+          "accelerationMagnitude": 0.188,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": 11.75,
+          "rotationMagnitude": 1.016,
+          "accelerationMagnitude": 0.116,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": 10.41,
+          "rotationMagnitude": 0.98,
+          "accelerationMagnitude": 0.097,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": 7.33,
+          "rotationMagnitude": 0.732,
+          "accelerationMagnitude": 0.135,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": 5.01,
+          "rotationMagnitude": 0.459,
+          "accelerationMagnitude": 0.085,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": 3.45,
+          "rotationMagnitude": 0.374,
+          "accelerationMagnitude": 0.122,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": 4.01,
+          "rotationMagnitude": 0.368,
+          "accelerationMagnitude": 0.23,
+          "stepDelta": 4,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": -0.72,
+          "rotationMagnitude": 0.479,
+          "accelerationMagnitude": 0.277,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 36,
+      "evaluatedAtMs": 58000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2048,
+      "motionAvailable": true,
+      "netYawDeg": 6.46,
+      "grossYawDeg": 25.12,
+      "monotonicity": 0.257,
+      "yawShare": 0.348,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "cadence": 84.83750581741333,
+      "movementState": "walking",
+      "locomotionEvidence": "gait_accel",
+      "turnEvidence": 0,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": 5.01,
+          "rotationMagnitude": 0.459,
+          "accelerationMagnitude": 0.085,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": 3.45,
+          "rotationMagnitude": 0.374,
+          "accelerationMagnitude": 0.122,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": 4.01,
+          "rotationMagnitude": 0.368,
+          "accelerationMagnitude": 0.23,
+          "stepDelta": 4,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": -0.72,
+          "rotationMagnitude": 0.479,
+          "accelerationMagnitude": 0.277,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -1.04,
+          "rotationMagnitude": 0.675,
+          "accelerationMagnitude": 0.217,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": 1.13,
+          "rotationMagnitude": 0.42,
+          "accelerationMagnitude": 0.265,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": 2.55,
+          "rotationMagnitude": 0.636,
+          "accelerationMagnitude": 0.206,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": 2.21,
+          "rotationMagnitude": 0.495,
+          "accelerationMagnitude": 0.228,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": -0.12,
+          "rotationMagnitude": 0.505,
+          "accelerationMagnitude": 0.154,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": -4.78,
+          "rotationMagnitude": 0.778,
+          "accelerationMagnitude": 0.221,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -2.37,
+          "rotationMagnitude": 0.563,
+          "accelerationMagnitude": 0.234,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": 3.08,
+          "rotationMagnitude": 0.746,
+          "accelerationMagnitude": 0.187,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 4.63,
+          "rotationMagnitude": 0.445,
+          "accelerationMagnitude": 0.223,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": -3.16,
+          "rotationMagnitude": 0.674,
+          "accelerationMagnitude": 0.209,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": -5.36,
+          "rotationMagnitude": 0.794,
+          "accelerationMagnitude": 0.215,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": 1.62,
+          "rotationMagnitude": 0.529,
+          "accelerationMagnitude": 0.244,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": 0.63,
+          "rotationMagnitude": 1.069,
+          "accelerationMagnitude": 0.255,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": 5.63,
+          "rotationMagnitude": 0.586,
+          "accelerationMagnitude": 0.195,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": -0.37,
+          "rotationMagnitude": 0.516,
+          "accelerationMagnitude": 0.21,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": -1.94,
+          "rotationMagnitude": 0.543,
+          "accelerationMagnitude": 0.149,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": 1.22,
+          "rotationMagnitude": 0.271,
+          "accelerationMagnitude": 0.186,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 37,
+      "evaluatedAtMs": 59000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2798,
+      "motionAvailable": true,
+      "netYawDeg": 1.68,
+      "grossYawDeg": 23.35,
+      "monotonicity": 0.072,
+      "yawShare": 0.316,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "cadence": 84.83750581741333,
+      "movementState": "walking",
+      "locomotionEvidence": "gait_accel",
+      "turnEvidence": 0,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": -1.04,
+          "rotationMagnitude": 0.675,
+          "accelerationMagnitude": 0.217,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": 1.13,
+          "rotationMagnitude": 0.42,
+          "accelerationMagnitude": 0.265,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": 2.55,
+          "rotationMagnitude": 0.636,
+          "accelerationMagnitude": 0.206,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": 2.21,
+          "rotationMagnitude": 0.495,
+          "accelerationMagnitude": 0.228,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": -0.12,
+          "rotationMagnitude": 0.505,
+          "accelerationMagnitude": 0.154,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": -4.78,
+          "rotationMagnitude": 0.778,
+          "accelerationMagnitude": 0.221,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": -2.37,
+          "rotationMagnitude": 0.563,
+          "accelerationMagnitude": 0.234,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": 3.08,
+          "rotationMagnitude": 0.746,
+          "accelerationMagnitude": 0.187,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": 4.63,
+          "rotationMagnitude": 0.445,
+          "accelerationMagnitude": 0.223,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": -3.16,
+          "rotationMagnitude": 0.674,
+          "accelerationMagnitude": 0.209,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -5.36,
+          "rotationMagnitude": 0.794,
+          "accelerationMagnitude": 0.215,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": 1.62,
+          "rotationMagnitude": 0.529,
+          "accelerationMagnitude": 0.244,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 0.63,
+          "rotationMagnitude": 1.069,
+          "accelerationMagnitude": 0.255,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": 5.63,
+          "rotationMagnitude": 0.586,
+          "accelerationMagnitude": 0.195,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": -0.37,
+          "rotationMagnitude": 0.516,
+          "accelerationMagnitude": 0.21,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": -1.94,
+          "rotationMagnitude": 0.543,
+          "accelerationMagnitude": 0.149,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": 1.22,
+          "rotationMagnitude": 0.271,
+          "accelerationMagnitude": 0.186,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": -1.69,
+          "rotationMagnitude": 0.785,
+          "accelerationMagnitude": 0.267,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": 3.6,
+          "rotationMagnitude": 0.408,
+          "accelerationMagnitude": 0.132,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": 2.27,
+          "rotationMagnitude": 0.527,
+          "accelerationMagnitude": 0.209,
+          "stepDelta": 4,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2048,
+          "headingDelta": -0.6,
+          "rotationMagnitude": 0.419,
+          "accelerationMagnitude": 0.209,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2298,
+          "headingDelta": 4.87,
+          "rotationMagnitude": 0.582,
+          "accelerationMagnitude": 0.089,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2548,
+          "headingDelta": 1.73,
+          "rotationMagnitude": 0.905,
+          "accelerationMagnitude": 0.145,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2798,
+          "headingDelta": -2.28,
+          "rotationMagnitude": 0.608,
+          "accelerationMagnitude": 0.087,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    },
+    {
+      "apexIndex": 38,
+      "evaluatedAtMs": 60000,
+      "windowStartMs": -952,
+      "windowEndMs": 798,
+      "sampleCount": 8,
+      "firstSampleAgeMs": -2952,
+      "lastSampleAgeMs": 2047,
+      "motionAvailable": true,
+      "netYawDeg": 9.35,
+      "grossYawDeg": 17.36,
+      "monotonicity": 0.539,
+      "yawShare": 0.258,
+      "accelerationEvidence": 1,
+      "stepDelta": 4,
+      "cadence": 98.06718349456787,
+      "movementState": "walking",
+      "locomotionEvidence": "steps+gait_accel",
+      "turnEvidence": 0,
+      "adjustmentApplied": 0,
+      "samples": [
+        {
+          "dtMs": -2952,
+          "headingDelta": -0.12,
+          "rotationMagnitude": 0.505,
+          "accelerationMagnitude": 0.154,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2702,
+          "headingDelta": -4.78,
+          "rotationMagnitude": 0.778,
+          "accelerationMagnitude": 0.221,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2452,
+          "headingDelta": -2.37,
+          "rotationMagnitude": 0.563,
+          "accelerationMagnitude": 0.234,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -2202,
+          "headingDelta": 3.08,
+          "rotationMagnitude": 0.746,
+          "accelerationMagnitude": 0.187,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1952,
+          "headingDelta": 4.63,
+          "rotationMagnitude": 0.445,
+          "accelerationMagnitude": 0.223,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1702,
+          "headingDelta": -3.16,
+          "rotationMagnitude": 0.674,
+          "accelerationMagnitude": 0.209,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1452,
+          "headingDelta": -5.36,
+          "rotationMagnitude": 0.794,
+          "accelerationMagnitude": 0.215,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -1202,
+          "headingDelta": 1.62,
+          "rotationMagnitude": 0.529,
+          "accelerationMagnitude": 0.244,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -952,
+          "headingDelta": 0.63,
+          "rotationMagnitude": 1.069,
+          "accelerationMagnitude": 0.255,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": -702,
+          "headingDelta": 5.63,
+          "rotationMagnitude": 0.586,
+          "accelerationMagnitude": 0.195,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -452,
+          "headingDelta": -0.37,
+          "rotationMagnitude": 0.516,
+          "accelerationMagnitude": 0.21,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": -202,
+          "headingDelta": -1.94,
+          "rotationMagnitude": 0.543,
+          "accelerationMagnitude": 0.149,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 48,
+          "headingDelta": 1.22,
+          "rotationMagnitude": 0.271,
+          "accelerationMagnitude": 0.186,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 298,
+          "headingDelta": -1.69,
+          "rotationMagnitude": 0.785,
+          "accelerationMagnitude": 0.267,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "running"
+        },
+        {
+          "dtMs": 548,
+          "headingDelta": 3.6,
+          "rotationMagnitude": 0.408,
+          "accelerationMagnitude": 0.132,
+          "stepDelta": 0,
+          "cadence": 84.83750581741333,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 798,
+          "headingDelta": 2.27,
+          "rotationMagnitude": 0.527,
+          "accelerationMagnitude": 0.209,
+          "stepDelta": 4,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1048,
+          "headingDelta": -0.6,
+          "rotationMagnitude": 0.419,
+          "accelerationMagnitude": 0.209,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1298,
+          "headingDelta": 4.87,
+          "rotationMagnitude": 0.582,
+          "accelerationMagnitude": 0.089,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1548,
+          "headingDelta": 1.73,
+          "rotationMagnitude": 0.905,
+          "accelerationMagnitude": 0.145,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 1798,
+          "headingDelta": -2.28,
+          "rotationMagnitude": 0.608,
+          "accelerationMagnitude": 0.087,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        },
+        {
+          "dtMs": 2047,
+          "headingDelta": -1.72,
+          "rotationMagnitude": 0.446,
+          "accelerationMagnitude": 0.136,
+          "stepDelta": 0,
+          "cadence": 98.06718349456787,
+          "movementState": "walking"
+        }
+      ],
+      "source": "live"
+    }
+  ],
+  "motionCaptureAvailable": true
+}

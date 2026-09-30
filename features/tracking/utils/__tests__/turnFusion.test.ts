@@ -20,6 +20,7 @@ import {
   fuseTurns, RESCUE_CONFIDENCE_FACTOR,
 } from '@/features/tracking/utils/turnFusion';
 import { capturedDetectorBuffer } from './helpers/realSessionFixture';
+import { evaluateStopFlush } from '@/features/tracking/utils/stopFlushCorner';
 import { FIELD_TAIL_M, SEEDS, fieldRouteCoords, withDrift, fieldFixes, detectorBuffer, scoreSequence } from './helpers/goldenRoute';
 import { routeMotion } from './helpers/goldenMotion';
 import { simulate, pulse, ZERO, WALK, HAND, T0 } from './helpers/motionScenarioSim';
@@ -330,6 +331,41 @@ describe('IMU-only-Ereignisse werden protokolliert, aber NIE persistiert', () =>
     const r = fuseTurns(buf, { motionSamples: samples });
     const cornerTimes = r.turns.map(t => t.t!);
     for (const e of r.imuOnly) expect(cornerTimes.every(ct => Math.abs(ct - e.t) > 3000)).toBe(true);
+  });
+});
+
+describe('Tail-Safety bei Ende und Stop', () => {
+  const straight = makePoints(east(0, 30, 0.8));
+  const drift = makePoints([...east(0, 30, 0.8), [23.5, 0.3], [23.8, -0.2], [24.1, 0.1]]);
+
+  it('gerade Strecke, Ende, Stop, starke Handyrotation: kein persistierter Winkel', () => {
+    const motion = simulate(35, { yawRateDps: s => pulse(s, 27, 28.2, 110), offAxisRadS: ZERO, stepRate: WALK }, HAND, 9);
+    const r = fuseTurns(straight, { motionSamples: motion });
+    expect(r.corners).toEqual([]);
+    expect(r.turns).toEqual([]);
+    expect(r.imuOnly.every(e => e.persisted === false)).toBe(true);
+    expect(evaluateStopFlush(straight, -Infinity).corner).toBeNull();
+  });
+
+  it('gerade Strecke, Ende, GPS-Drift: weder Fusion noch Stop-Flush erzeugen eine Ecke', () => {
+    expect(fuseTurns(drift).corners).toEqual([]);
+    expect(evaluateStopFlush(drift, -Infinity).corner).toBeNull();
+  });
+
+  it('IMU-only nach Ende bleibt QA-Ereignis, nie Marker; Stop-Flush nutzt den strengen Regelpfad', () => {
+    const motion = simulate(35, { yawRateDps: s => pulse(s, 27, 28.2, 110), offAxisRadS: ZERO, stepRate: WALK }, HAND, 9);
+    const r = fuseTurns(straight, { motionSamples: motion });
+    expect(r.imuOnly.length).toBeGreaterThan(0);
+    expect(r.imuOnly.every(e => e.persisted === false)).toBe(true);
+    const flush = fs.readFileSync('features/tracking/utils/stopFlushCorner.ts', 'utf8');
+    expect(flush).toContain('detectShortLegCorners(points, null, turnEvidenceAt)');
+    expect(flush).not.toContain('fuseTurns(');
+  });
+
+  it('Fixe nach stopAll() durchlaufen den Recorder-Gate nicht', () => {
+    const source = fs.readFileSync('features/tracking/hooks/useTrackRecorder.ts', 'utf8');
+    expect(source).toContain('recordingRef.current = false;');
+    expect(source).toContain('if (!recordingRef.current || s.isPaused) return;');
   });
 });
 

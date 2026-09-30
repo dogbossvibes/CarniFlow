@@ -124,6 +124,12 @@ export interface QaSearchDiagnostics {
   geometry: { run: QaRelPoint[]; replay: QaRelPoint[]; raw: QaRelPoint[]; filtered: QaRelPoint[] };
   cursor: {
     trackLengthM: number;
+    /** Rein lesende Längen-Diagnose; bei schemaMinor <= 3 fehlen diese Felder. */
+    referenceGeometryLengthM?: number;
+    referenceCanonicalLengthM?: number | null;
+    referenceLengthDeltaM?: number | null;
+    referenceLengthDeltaPct?: number | null;
+    cursorTrackLengthM?: number;
     samples: { tSec: number; progressM: number; normalizedProgress: number; segmentIndex: number; distanceToReferenceM: number; x: number; y: number }[];
     truncated: boolean;
   };
@@ -214,6 +220,8 @@ export interface BuildSearchDiagnosticsInput {
   analyticsSampleCount: number;
   resumed: boolean;
   laid: { total: number; end: { latitude: number; longitude: number } | null };
+  /** Bereits beim Legen ermittelte kanonische Distanz; nie Cursor-Eingabe. */
+  referenceCanonicalLengthM?: number | null;
   objects: { index: number; at: { latitude: number; longitude: number }; atM: number | null; found: boolean | null; legIndex: number | null }[];
   cornerAtM: readonly number[];
   end: { fired: { tSec: number; progressM: number; searchDistanceM: number } | null; hapticFired: boolean | null; voiceFired: boolean | null };
@@ -282,6 +290,7 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
 
   const endRel = input.laid.end ? rel(input.laid.end.latitude, input.laid.end.longitude) : null;
   const total = input.laid.total;
+  const canonical = input.referenceCanonicalLengthM;
   const runGap = streams.run, repGap = streams.replay;
 
   return {
@@ -312,6 +321,11 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
     },
     cursor: {
       trackLengthM: round(total),
+      referenceGeometryLengthM: round(total),
+      referenceCanonicalLengthM: canonical == null ? null : round(canonical),
+      referenceLengthDeltaM: canonical == null ? null : round(total - canonical),
+      referenceLengthDeltaPct: canonical == null || canonical === 0 ? null : round((total - canonical) / canonical * 100),
+      cursorTrackLengthM: round(total),
       samples: tel.cursorSamples.map(s => {
         const p = rel(s.lat, s.lng);
         return {
@@ -337,6 +351,34 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
     },
     replayRole: 'display_only',
     truncated: tel.truncated,
+  };
+}
+
+/** Kompakte, rein lesende Auswertung eines künftigen Search-QA-Exports. */
+export function summarizeSearchDiagnostics(d: QaSearchDiagnostics) {
+  const deviations = d.cursor.samples.map(s => s.distanceToReferenceM).sort((a, b) => a - b);
+  const mid = Math.floor(deviations.length / 2);
+  const monotonicProgressViolations = d.cursor.samples.reduce((n, s, i, all) =>
+    n + (i > 0 && s.progressM < all[i - 1].progressM ? 1 : 0), 0);
+  return {
+    streams: d.streams,
+    parity: d.parity,
+    cursor: {
+      trackLengthM: d.cursor.trackLengthM,
+      referenceGeometryLengthM: d.cursor.referenceGeometryLengthM ?? d.cursor.trackLengthM,
+      referenceCanonicalLengthM: d.cursor.referenceCanonicalLengthM ?? null,
+      referenceLengthDeltaM: d.cursor.referenceLengthDeltaM ?? null,
+      referenceLengthDeltaPct: d.cursor.referenceLengthDeltaPct ?? null,
+      cursorTrackLengthM: d.cursor.cursorTrackLengthM ?? d.cursor.trackLengthM,
+      maxDistanceToReferenceM: deviations.length ? deviations[deviations.length - 1] : null,
+      medianDistanceToReferenceM: deviations.length
+        ? deviations.length % 2 ? deviations[mid] : round((deviations[mid - 1] + deviations[mid]) / 2)
+        : null,
+      monotonicProgressViolations,
+      finalNormalizedProgress: d.cursor.samples.at(-1)?.normalizedProgress ?? null,
+    },
+    objects: { referenceCount: d.objects.length, items: d.objects },
+    end: d.end,
   };
 }
 

@@ -92,6 +92,7 @@ const EMPTY_SNAP_CONST = {
   laidMarkers: [] as ReturnType<typeof useTrackingStore.getState>['markers'],
   eventArcs: {} as Record<string, CanonicalArc>,
   segments: [] as ReturnType<typeof useTrackingStore.getState>['segments'],
+  referenceCanonicalLengthM: null as number | null,
   level: 'training' as Level,
   recovery: null as SearchRunState | null,
 };
@@ -149,6 +150,7 @@ export default function TrackRunScreen() {
       laidMarkers: st.markers,
       eventArcs,
       segments: st.segments,
+      referenceCanonicalLengthM: st.distanceMeters,
       level: 'training' as Level,
       recovery: withRecovery ? st.searchRunState : null,
     };
@@ -740,6 +742,7 @@ export default function TrackRunScreen() {
           analyticsSampleCount: res.analyticsSamples.length,
           resumed: res.qa.resumed,
           laid: { total: s.trackLengthM, end: snapData.laidPoints[snapData.laidPoints.length - 1] },
+          referenceCanonicalLengthM: snapData.referenceCanonicalLengthM,
           objects: objectInputs.map((o, i) => ({
             index: i, at: { latitude: objectMarkers[i].lat as number, longitude: objectMarkers[i].lng as number },
             atM: o.atM ?? null, found: o.found ?? null, legIndex: o.legIndex ?? null,

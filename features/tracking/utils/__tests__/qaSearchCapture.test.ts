@@ -1,7 +1,7 @@
 // QA-Search-Diagnose: Builder, Export-Schema (schemaMinor 3), Privacy, Legacy.
 import * as fs from 'fs';
 import {
-  buildSearchDiagnostics, SEARCH_QA_LIMITS, type SearchQaTelemetry, type BuildSearchDiagnosticsInput, type QaSearchDiagnostics,
+  buildSearchDiagnostics, summarizeSearchDiagnostics, SEARCH_QA_LIMITS, type SearchQaTelemetry, type BuildSearchDiagnosticsInput, type QaSearchDiagnostics,
 } from '@/features/tracking/utils/qaSearchCapture';
 import { findTurnVertices, buildReplayGeometry } from '@/features/tracking/utils/searchReplayGeometry';
 import {
@@ -41,7 +41,7 @@ function fixture(withReplay = true) {
   };
   const input: BuildSearchDiagnosticsInput = {
     origin: ll(0, 0), telemetry: tel, run, replay, analyticsSampleCount: 14, resumed: false,
-    laid: { total: 24, end: ll(12, 12) },
+    laid: { total: 24, end: ll(12, 12) }, referenceCanonicalLengthM: 20,
     objects: [{ index: 0, at: ll(12.4, 6), atM: 18, found: true, legIndex: 2 }],
     cornerAtM: [12],
     end: { fired: { tSec: 19, progressM: 23.5, searchDistanceM: 22.9 }, hapticFired: true, voiceFired: true },
@@ -93,11 +93,48 @@ describe('buildSearchDiagnostics', () => {
   it('Cursor-Samples: relative Zeit, normalisierter Fortschritt, Segment, Abstand zur Referenz, Handler-Position relativ', () => {
     const d = buildSearchDiagnostics(fixture().input);
     expect(d.cursor.trackLengthM).toBe(24);
+    expect(d.cursor).toMatchObject({ referenceGeometryLengthM: 24, referenceCanonicalLengthM: 20,
+      referenceLengthDeltaM: 4, referenceLengthDeltaPct: 20, cursorTrackLengthM: 24 });
     const s = d.cursor.samples[1];
     expect(s.normalizedProgress).toBeCloseTo(11.8 / 24, 3);
     expect(s).toMatchObject({ tSec: 9, segmentIndex: 4, distanceToReferenceM: 1.1 });
     expect(Math.abs(s.x - 11.7)).toBeLessThan(0.05);
     expect(Math.abs(s.y - 1)).toBeLessThan(0.05);
+  });
+
+  it('Analyzer fasst schemaMinor 3/4 rein lesend zusammen', () => {
+    const d = buildSearchDiagnostics(fixture().input);
+    const before = JSON.stringify(d);
+    const summary = summarizeSearchDiagnostics(d);
+    expect(JSON.stringify(d)).toBe(before);
+    expect(summary.streams).toEqual(d.streams);
+    expect(summary.parity).toEqual(d.parity);
+    expect(summary.cursor).toMatchObject({ trackLengthM: 24, cursorTrackLengthM: 24,
+      referenceGeometryLengthM: 24, referenceCanonicalLengthM: 20,
+      monotonicProgressViolations: 0, maxDistanceToReferenceM: 1.1,
+      medianDistanceToReferenceM: 0.95 });
+    expect(summary.objects.referenceCount).toBe(1);
+    expect(summary.end).toEqual(d.end);
+    const legacy: QaSearchDiagnostics = { ...d, cursor: { trackLengthM: 24, samples: d.cursor.samples, truncated: false } };
+    expect(summarizeSearchDiagnostics(legacy).cursor).toMatchObject({ cursorTrackLengthM: 24,
+      referenceGeometryLengthM: 24, referenceCanonicalLengthM: null });
+  });
+
+  it('Längen-Telemetrie ändert weder Cursor noch run/replay noch Search-Metriken', () => {
+    const { input } = fixture();
+    const before = JSON.stringify(input);
+    const without = buildSearchDiagnostics({ ...input, referenceCanonicalLengthM: null });
+    const withLength = buildSearchDiagnostics(input);
+    expect(JSON.stringify(input)).toBe(before);
+    expect(withLength.cursor.trackLengthM).toBe(without.cursor.trackLengthM);
+    expect(withLength.cursor.samples).toEqual(without.cursor.samples);
+    expect(withLength.geometry).toEqual(without.geometry);
+    expect(withLength.streams).toEqual(without.streams);
+    expect(withLength.parity).toEqual(without.parity);
+    expect(withLength.objects).toEqual(without.objects);
+    expect(withLength.end).toEqual(without.end);
+    expect(withLength.runPathM).toBe(without.runPathM);
+    expect(withLength.replayPathM).toBe(without.replayPathM);
   });
 
   it('Gegenstände: Referenz, Mindestabstände, Fortschritt, gefunden, Kontext', () => {
@@ -167,18 +204,26 @@ describe('QA-Export schemaMinor 3', () => {
     expect(e2).toEqual(e);
   });
 
-  it('mit Search-Daten: schemaMinor 3, alle Felder, bestehende Felder unverändert', () => {
+  it('mit Längen-Diagnostik: schemaMinor 4, alle bisherigen Felder unverändert', () => {
     const d = buildSearchDiagnostics(fixture().input);
     const base = buildQaTrackExport('ts_1', points, markers, null);
     const e = buildQaTrackExport('ts_1', points, markers, null, d);
     expect(e.schemaVersion).toBe(2);
-    expect(e.schemaMinor).toBe(3);
+    expect(e.schemaMinor).toBe(4);
     const { searchDiagnostics, schemaMinor, ...rest } = e;
     const { schemaMinor: _m, ...baseRest } = base;
     expect(rest).toEqual(baseRest);
     void schemaMinor;
     for (const k of REQUIRED_KEYS) expect(searchDiagnostics).toHaveProperty(k);
     for (const k of ['streams', 'geometry', 'cursor', 'objects', 'end', 'parity', 'replayRole', 'truncated', 'partial']) expect(searchDiagnostics).toHaveProperty(k);
+  });
+
+  it('alte schemaMinor-3-Diagnostik bleibt exportierbar', () => {
+    const d = buildSearchDiagnostics(fixture().input);
+    const old: QaSearchDiagnostics = { ...d, cursor: { trackLengthM: d.cursor.trackLengthM, samples: d.cursor.samples, truncated: false } };
+    const e = buildQaTrackExport('ts_1', points, markers, null, old);
+    expect(e.schemaMinor).toBe(3);
+    expect(() => assertNoAbsoluteData(e)).not.toThrow();
   });
 
   it('Privacy: keine absoluten Koordinaten/Zeiten; Export überlebt JSON', () => {

@@ -95,7 +95,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -267,7 +267,8 @@ export function buildQaTrackExport(
   const motion = capture?.candidateMotionEvidence;
   return {
     schemaVersion: 2,
-    schemaMinor: search ? 3 : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0,
+    schemaMinor: search ? (search.cursor.referenceGeometryLengthM == null ? 3 : 4)
+      : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0,
     sessionId: hashSessionId(sessionLocalId),
     pointType: 'lay',
     pointCount: anon.length,
