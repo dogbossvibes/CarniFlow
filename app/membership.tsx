@@ -21,7 +21,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type VisiblePlan = 'newbie' | 'active' | 'founder_active' | 'trainer' | 'permanent';
 
 const PLAN_NAME_KEY: Record<VisiblePlan, TranslationKey> = {
-  newbie:         'membership.free',
+  newbie:         'membership.newbie',   // öffentlicher Planname; „Kostenlos" ist nur Badge/Preis
   active:         'membership.active',
   founder_active: 'membership.founder',
   trainer:        'membership.trainer',
@@ -30,42 +30,44 @@ const PLAN_NAME_KEY: Record<VisiblePlan, TranslationKey> = {
 
 // Vorteils-Listen = echte Capabilities des bestehenden Modells (keine erfundenen Features).
 const BENEFITS: Record<VisiblePlan, TranslationKey[]> = {
+  // NEWBIE-Modell (serverautoritativ): 1 Hund · 2 Trainings/Monat · 1 Fährte/Monat.
   newbie: [
-    'membership.benefit.oneDog', 'membership.benefit.oneTraining',
-    'membership.benefit.journal', 'membership.benefit.generalHealth',
+    'membership.benefit.oneDog', 'membership.benefit.twoTrainings', 'membership.benefit.oneTrack',
+    'membership.benefit.journal', 'membership.benefit.trainerConnect', 'membership.benefit.generalHealth',
   ],
   active: [
     'membership.benefit.unlimitedDogs', 'membership.benefit.unlimitedTraining',
     'membership.benefit.journal', 'membership.benefit.generalHealth',
-    'membership.benefit.heat', 'membership.benefit.tracks', 'membership.benefit.backpack',
+    'membership.benefit.heat', 'membership.benefit.unlimitedTracks', 'membership.benefit.backpack',
     'membership.benefit.commands', 'membership.benefit.goal', 'membership.benefit.smartAnalysis',
   ],
   founder_active: [
     'membership.benefit.unlimitedDogs', 'membership.benefit.unlimitedTraining',
     'membership.benefit.journal', 'membership.benefit.generalHealth',
-    'membership.benefit.heat', 'membership.benefit.tracks', 'membership.benefit.backpack',
+    'membership.benefit.heat', 'membership.benefit.unlimitedTracks', 'membership.benefit.backpack',
     'membership.benefit.commands', 'membership.benefit.goal', 'membership.benefit.smartAnalysis',
   ],
   trainer: [
     'membership.benefit.unlimitedDogs', 'membership.benefit.unlimitedTraining',
     'membership.benefit.journal', 'membership.benefit.generalHealth',
-    'membership.benefit.heat', 'membership.benefit.tracks', 'membership.benefit.backpack',
+    'membership.benefit.heat', 'membership.benefit.unlimitedTracks', 'membership.benefit.backpack',
     'membership.benefit.commands', 'membership.benefit.goal', 'membership.benefit.smartAnalysis',
     'membership.benefit.trainerModule',
   ],
   permanent: [
     'membership.benefit.unlimitedDogs', 'membership.benefit.unlimitedTraining',
     'membership.benefit.journal', 'membership.benefit.generalHealth',
-    'membership.benefit.heat', 'membership.benefit.tracks', 'membership.benefit.backpack',
+    'membership.benefit.heat', 'membership.benefit.unlimitedTracks', 'membership.benefit.backpack',
     'membership.benefit.commands', 'membership.benefit.goal', 'membership.benefit.smartAnalysis',
     'membership.benefit.trainerModule',
   ],
 };
 
-// Was NEWBIE NICHT hat (Premium) → dezente Upgrade-Hinweise (echte gesperrte Features).
+// Was NEWBIE NICHT hat (Premium-only) → dezente Upgrade-Hinweise (echte gesperrte
+// Features, siehe PREMIUM_CAPABILITIES). Fährten sind NICHT Active-only (NEWBIE: 1/Monat,
+// ACTIVE unbegrenzt); Backpack und Kommandos sind BASIS (BASE_CAPABILITIES).
 const NEWBIE_LOCKED: TranslationKey[] = [
-  'membership.benefit.heat', 'membership.benefit.tracks', 'membership.benefit.backpack',
-  'membership.benefit.commands', 'membership.benefit.goal', 'membership.benefit.smartAnalysis',
+  'membership.benefit.heat', 'membership.benefit.goal', 'membership.benefit.smartAnalysis',
 ];
 
 export default function MembershipScreen() {
@@ -80,6 +82,7 @@ export default function MembershipScreen() {
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
   const [slots, setSlots] = useState<{ used: number; remaining: number }>({ used: 0, remaining: FOUNDER_SLOT_LIMIT });
   const [trainingUsage, setTrainingUsage] = useState<{ used: number; limit: number } | null>(null);
+  const [trackUsage, setTrackUsage] = useState<{ used: number; limit: number } | null>(null);
   const [dogUsage, setDogUsage] = useState<{ used: number; limit: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -116,6 +119,7 @@ export default function MembershipScreen() {
     if (!isNewbie || !uid) return;
     (async () => {
       setTrainingUsage(await newbieQuotaStatus('training'));
+      setTrackUsage(await newbieQuotaStatus('track'));
       setDogUsage(await newbieQuotaStatus('dog'));
     })();
   }, [isNewbie, uid]);
@@ -166,7 +170,7 @@ export default function MembershipScreen() {
   // mehr angeboten → nur noch für einen (aktuell nicht existierenden) Founder-Bestand
   // sichtbar, damit dessen aktueller Plan als „Aktiv" erscheint — nie als Kaufziel.
   const compareCards: { plan: SubscriptionPlan; nameKey: TranslationKey; price: string; show: boolean }[] = [
-    { plan: 'newbie', nameKey: 'membership.free', price: t('membership.free'), show: true },
+    { plan: 'newbie', nameKey: 'membership.newbie', price: t('membership.free'), show: true },
     { plan: 'active', nameKey: 'membership.active', price: priceFor('active'), show: true },
     { plan: 'founder_active', nameKey: 'membership.founder', price: priceFor('founder_active'), show: visiblePlan === 'founder_active' },
     { plan: 'trainer', nameKey: 'membership.trainer', price: priceFor('trainer'), show: true },
@@ -214,15 +218,19 @@ export default function MembershipScreen() {
               </View>
               <View style={s.usageDivider} />
               <View style={s.usageItem}>
+                <Ionicons name="footsteps-outline" size={18} color={C.accent} />
+                <Text style={s.usageLabel}>{t('membership.trackUsage')}</Text>
+                <Text style={s.usageValue}>{trackUsage ? `${trackUsage.used} / ${trackUsage.limit}` : '–'}</Text>
+              </View>
+              <View style={s.usageDivider} />
+              <View style={s.usageItem}>
                 <Ionicons name="paw-outline" size={18} color={C.accent} />
                 <Text style={s.usageLabel}>{t('membership.dogUsage')}</Text>
                 <Text style={s.usageValue}>{dogUsage ? `${dogUsage.used} / ${dogUsage.limit}` : '–'}</Text>
               </View>
             </View>
-            {trainingUsage && (
-              <Text style={s.usageHint}>
-                {trainingUsage.used >= trainingUsage.limit ? t('membership.limitReached') : t('membership.trainingAvailable')}
-              </Text>
+            {((trainingUsage && trainingUsage.used >= trainingUsage.limit) || (trackUsage && trackUsage.used >= trackUsage.limit)) && (
+              <Text style={s.usageHint}>{t('membership.limitReached')}</Text>
             )}
           </View>
         )}

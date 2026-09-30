@@ -64,7 +64,7 @@ describe('Membership i18n (de-CH)', () => {
       'membership.usage', 'membership.trainingUsage', 'membership.dogUsage',
       'membership.benefits', 'membership.compare', 'membership.upgradeActive',
       'membership.manage', 'membership.restore', 'membership.permanentAccess',
-      'membership.limitReached', 'membership.trainingAvailable',
+      'membership.limitReached', 'membership.trackUsage', 'membership.newbie',
     ]) {
       expect(keys).toContain(k);
     }
