@@ -48,7 +48,10 @@ export function assertProductionSupabase({ cwd = process.cwd(), log = console } 
   }
   if (process.env[KEY]?.includes(STAGING_REF)) problems.push(`${KEY} zeigt auf STAGING in process.env`);
 
-  // Leer ist erlaubt: der Code-Fallback in lib/supabase.ts ist Production.
+  // Lokal leer ist erlaubt — die Werte kommen aus der EAS-Environment `production`
+  // (--environment production). ACHTUNG: lib/supabase.ts hat KEINEN Code-Fallback mehr und
+  // wirft beim Start ohne EXPO_PUBLIC_BACKEND_ENV/_SUPABASE_URL/_SUPABASE_ANON_KEY;
+  // deren Vorhandensein in der EAS-Environment prüft scripts/update-production.mjs.
   if (effective && !effective.includes(PROD_REF)) {
     problems.push(`effektive ${KEY}=${effective} ist nicht Production (${PROD_REF})`);
   }
@@ -61,7 +64,7 @@ export function assertProductionSupabase({ cwd = process.cwd(), log = console } 
     return false;
   }
   log.log(`✅ PROD-GUARD OK: keine Staging-Ref (${STAGING_REF}); `
-    + `Supabase ${effective ? 'Production' : '(Env leer → Code-Fallback Production)'}.`);
+    + `Supabase ${effective ? 'Production' : '(lokal leer → Werte kommen aus der EAS-Environment production)'}.`);
   return true;
 }
 
