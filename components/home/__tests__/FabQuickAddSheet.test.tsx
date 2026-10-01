@@ -50,6 +50,8 @@ jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 
 jest.mock('expo-image', () => ({ Image: 'ExpoImage' }));
 
+jest.mock('react-native-svg', () => ({ __esModule: true, default: 'Svg', Path: 'Path' }));
+
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');
   return {
@@ -393,13 +395,17 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     expect(mockPush).toHaveBeenCalledWith('/training-hub');
   });
 
-  it('2) Button zeigt IMMER das anyvologo-Bild, nie ein Icon (Kalender/Plus)', () => {
+  it('2) Der globale FAB zeigt das ANYVO-A und kein Wolf-Logo', () => {
     mockDogs = dogs([{ id: 'd1', name: 'Malu' }]);
     for (const id of ALL_SINGLE_ACTIONS) {
       setup(deCH as unknown as Record<string, string>, { quickButtonActions: [id] });
       const node = render();
-      const logos = logoNodes(node);
-      expect(logos.length).toBeGreaterThanOrEqual(1);
+      const mark = inst(node).findAll((n) => n.props.testID === 'quick-fab-anyvo-a');
+      expect(mark.length).toBeGreaterThanOrEqual(1);
+      expect(logoNodes(node)).toHaveLength(0);
+      expect(inst(node).findAll((n) => n.type === 'Path').map((n) => n.props.fill)).toEqual(['#00FFCC', '#00FFCC']);
+      const styles = fab(node).props.style as { backgroundColor?: string; borderColor?: string; borderWidth?: number }[];
+      expect(styles).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: '#111111', borderColor: '#00FFCC', borderWidth: 1 })]));
       const icons = iconNames(node);
       expect(icons).not.toContain('calendar');
       expect(icons).not.toContain('add');

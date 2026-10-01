@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert, Animated, PanResponder, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions,
 } from 'react-native';
-import { Image } from 'expo-image';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFabBottom } from '@/hooks/useFabBottom';
 import { Ionicons } from '@expo/vector-icons';
@@ -163,8 +163,7 @@ function actionLabel(id: QuickActionId, t: TFunc, dogs: Dog[]): string {
 // Live-Priorität (nie zwei primäre Elemente gleichzeitig):
 //   (1) laufendes Training  → LiveTrainingBar
 //   (2) offene GPS-Fährte(n) → GlobalActiveFaehrtenBar
-//   (3) sonst der Schnellbutton (immer anyvologo.png auf grünem/tealem Kreis —
-//       nie Kalender/Plus).
+//   (3) sonst der Schnellbutton (ANYVO-A im globalen FAB; nie Kalender/Plus).
 export function QuickAddSheet() {
   const router = useRouter();
   const active = useActiveTraining();
@@ -396,8 +395,10 @@ export function QuickAddSheet() {
         }}
         testID="quick-fab"
       >
-        {/* Grüner/tealer runder Hintergrund: das ANYVO-Logo ist weiss → klar lesbar. */}
-        <Image source={require('@/assets/images/anyvologo.png')} style={s.logo} contentFit="contain" />
+        <Svg width={38} height={38} viewBox="0 0 40 40" fill="none" pointerEvents="none" testID="quick-fab-anyvo-a">
+          <Path d="M5 34 18.2 6h3.6L35 34h-5.8L20 13.9 10.8 34H5Z" fill={C.accent} />
+          <Path d="M13.4 25.5h13.2V29H13.4z" fill={C.accent} />
+        </Svg>
       </View>
 
       {fanOpen && (
@@ -614,20 +615,14 @@ const s = StyleSheet.create({
     borderRadius:   FAB_SIZE / 2,
     alignItems:     'center',
     justifyContent: 'center',
-    // Grün/teal (C.accent) als runder Hintergrund — Logo weiß → gut lesbar.
-    backgroundColor: C.accent,
-    shadowColor:    '#00FFCC',
-    shadowOffset:   { width: 0, height: 4 },
-    shadowOpacity:  0.45,
-    shadowRadius:   14,
-    elevation:      10,
-  },
-  logo: {
-    // Fast volle FAB-Fläche (85–90 % des Durchmessers) mit kleinem, gleichmäßigem
-    // Innenabstand; `contentFit="contain"` erhält das Seitenverhältnis, die
-    // Zentrierung übernimmt der FAB-Container (alignItems/justifyContent center).
-    width:  FAB_SIZE - 8,
-    height: FAB_SIZE - 8,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.accent,
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    elevation: 6,
   },
   trackWrap: {
     position: 'absolute',
