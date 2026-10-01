@@ -161,11 +161,11 @@ describe('Moduswechsel bei laufendem Warmup', () => {
   });
 });
 
-describe('Motion beim Legen ist QA-only und CURRENT-only', () => {
+describe('Motion beim Legen unterstützt den Start und bleibt CURRENT-only', () => {
   const rec = read('features/tracking/hooks/useTrackRecorder.ts');
 
-  it('startet nur im QA-Modus und nur mit ENGINE=CURRENT', () => {
-    expect(rec).toContain("if (qaRef.current && activeEngine === 'current' && !motionActiveRef.current)");
+  it('startet für ENGINE=CURRENT auch ohne QA-Modus', () => {
+    expect(rec).toContain("if (activeEngine === 'current' && !motionActiveRef.current)");
   });
 
   it('Motion wirkt AUSSCHLIESSLICH als Confidence-Nachschlagefunktion', () => {

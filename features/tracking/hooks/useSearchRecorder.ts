@@ -29,6 +29,7 @@ import { stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackStat
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
 import { INITIAL_OBJECT_DWELL, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
+import { statusAfterProgress, statusAtConfirmedEnd, type ReferenceObjectStatus } from '@/features/tracking/utils/referenceObjectStatus';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
 import { motionClient } from '@/features/tracking/native/motionClient';
@@ -60,7 +61,7 @@ export interface GpsDebug {
 
 export type LatLng = { latitude: number; longitude: number };
 // `id` = stabile Marker-ID (Recovery-Identität der Funde); fehlt sie, gilt der Index.
-export type SearchObject = { at: LatLng; index: number; material: string; id?: string };
+export type SearchObject = { at: LatLng; index: number; material: string; id?: string; atM?: number | null };
 export type Break = {
   at: LatLng;
   t: number;               // Sekunden seit Start, wann der Abriss BESTÄTIGT wurde (Konvention unverändert, z. B. Map-Marker-Zeitpunkt)
@@ -139,6 +140,8 @@ export interface SearchRecorder {
   paused: boolean;
   points: LatLng[];
   position: LatLng | null;
+  /** Last GPS-accepted, fusion-safe handler fix for end eligibility. */
+  endHandlerFix: { position: LatLng; accuracyM: number | null; tMs: number } | null;
   /** Ungeglätteter Live-Fix für die Annäherung, auch vor start(); nur lesend. */
   liveFix: Readonly<Pick<PositionSourceSample, 'lat' | 'lng' | 'accuracy' | 't'>> | null;
   deviationM: number;
@@ -177,6 +180,7 @@ export interface SearchRecorder {
   setPaused: (p: boolean) => void;
   markObject: () => void;
   dismissAutoObject: (id: string) => void;
+  confirmEnd: () => void;
 }
 export type SearchResult = {
   points: LatLng[]; breaks: Break[]; foundObjects: number; totalObjects: number;
@@ -191,6 +195,7 @@ export type SearchResult = {
   // statt es aus Distanzwerten zu schätzen.
   foundObjectIndices: number[];
   autoDwellObjectIds: string[];
+  objectStatuses: ReferenceObjectStatus[];
   // Punkt 17 (Track-Replay): Sekunden-seit-Start je Eintrag in `points`,
   // gleiche Länge/Reihenfolge wie `points` — additiv, KEINE zweite Geometrie.
   // Kürzer als `points` (Resume, ältere Sessions vor dieser Erweiterung) =
@@ -237,6 +242,7 @@ export function useSearchRecorder(opts: {
   const [paused, setPausedState] = useState(false);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [position, setPosition] = useState<LatLng | null>(null);
+  const [endHandlerFix, setEndHandlerFix] = useState<SearchRecorder['endHandlerFix']>(null);
   const [liveFix, setLiveFix] = useState<SearchRecorder['liveFix']>(null);
   const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, progressM: 0, score: 0, offTrackState: 'on_track' as OffTrackState });
   const [elapsedS, setElapsedS] = useState(0);
@@ -295,6 +301,7 @@ export function useSearchRecorder(opts: {
   // halten/exponieren — KEIN Voice/Haptik/Banner/Recorder-Freeze/Auto-Pause hier.
   const offTrackRef = useRef<OffTrackSnapshot>(initialOffTrack());
   const foundRef = useRef<Set<number>>(new Set());
+  const objectStatusesRef = useRef<ReferenceObjectStatus[]>(laidObjects.map(() => 'pending'));
   const autoDwellRef = useRef<Map<number, ObjectDwellState>>(new Map());
   const autoDwellStartRef = useRef<Map<number, LatLng>>(new Map());
   const autoDwellIdsRef = useRef<Set<string>>(new Set());
@@ -496,6 +503,7 @@ export function useSearchRecorder(opts: {
     // Der historische Stand (82bd17c) kannte trackFusionEngine.ts gar nicht.
     const fusionBlocksGeometry = getTrackingEngineMode() !== 'build40'
       && (fusion.classification === 'gps_outlier' || fusion.classification === 'stationary');
+    if (!fusionBlocksGeometry) setEndHandlerFix({ position: sm, accuracyM: accRaw, tMs: tNow });
     if (fusionBlocksGeometry && prev) {
       sm = prev;
       smoothRef.current = sm;
@@ -585,6 +593,7 @@ export function useSearchRecorder(opts: {
         else autoDwellStartRef.current.delete(i);
         if (next.acceptedNow) {
           foundRef.current.add(i); autoDwellIdsRef.current.add(key);
+          objectStatusesRef.current[i] = 'auto_dwell_found';
           useTrackingStore.getState().noteSearchAutoDwell(key);
           pushSnapshot();
         }
@@ -732,6 +741,11 @@ export function useSearchRecorder(opts: {
     } else {
       dev = 0;
     }
+    laidObjects.forEach((object, i) => {
+      objectStatusesRef.current[i] = statusAfterProgress({ status: objectStatusesRef.current[i] ?? 'pending',
+        referenceArcM: object.atM ?? null, handlerProgressM: maxCursorMRef.current,
+        accuracyM: accRaw, isFinalObject: i === laidObjects.length - 1 });
+    });
     devEmaRef.current = devEmaRef.current ? devEmaRef.current + DEV_EMA * (dev - devEmaRef.current) : dev;
     devSumRef.current += dev; devCountRef.current += 1;
 
@@ -1014,10 +1028,17 @@ export function useSearchRecorder(opts: {
     setSearchStartState(searchStartRef.current.state);
     // Funde: stabile Marker-IDs (Fallback Index) zurück auf laidObjects abbilden.
     foundRef.current = new Set();
+    objectStatusesRef.current = laidObjects.map(() => 'pending');
     autoDwellRef.current.clear(); autoDwellStartRef.current.clear();
     autoDwellIdsRef.current = new Set(rs?.autoDwellObjectIds ?? []);
     dismissedDwellIdsRef.current = new Set(rs?.dismissedAutoDwellIds ?? []);
-    if (rs) laidObjects.forEach((o, i) => { if (rs.foundObjectIds.includes(searchObjectKey(o, i))) foundRef.current.add(i); });
+    if (rs) laidObjects.forEach((o, i) => {
+      const key = searchObjectKey(o, i);
+      if (rs.foundObjectIds.includes(key)) {
+        foundRef.current.add(i);
+        objectStatusesRef.current[i] = rs.autoDwellObjectIds.includes(key) ? 'auto_dwell_found' : 'manual_found';
+      } else if (rs.dismissedAutoDwellIds.includes(key)) objectStatusesRef.current[i] = 'user_removed';
+    });
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
     // QA-Search-Telemetrie nur im QA-Diagnosemodus; sonst null → kein Overhead.
     qaTelRef.current = isQaDiagnosticsEnabled()
@@ -1033,6 +1054,7 @@ export function useSearchRecorder(opts: {
     // SQLite-Gruppe an; bereits gespeicherte Punkte werden NICHT erneut geschrieben.
     resetSearchBuffer(sessionIdRef.current ?? `local-search-${Date.now()}`);
     recordingRef.current = true; setRecording(true);
+    setEndHandlerFix(null);
     if (__DEV__) console.log('[searchRecorder] recording started', { resume: !!resume, resumePts: resumePts.length });
     pushSnapshot();
   }, [pushSnapshot, hasTrack, arc.total, laidObjects]);
@@ -1047,7 +1069,9 @@ export function useSearchRecorder(opts: {
     const durationS = Math.floor((Date.now() - startMsRef.current) / 1000);
     const replay = replayDisabledRef.current ? null : replayGeometryArrays(replayDenseRef.current);
     const qaTel = qaTelRef.current
-      ? { ...qaTelRef.current, display: replayDisabledRef.current ? [] : replayDenseRef.current.map(p => ({ lat: p.lat, lng: p.lng, tSec: p.t })) }
+      ? { ...qaTelRef.current, display: replayDisabledRef.current ? [] : replayDenseRef.current.map(p => ({ lat: p.lat, lng: p.lng, tSec: p.t })),
+          replayInsertedForGap: replay?.insertedForGap ?? [],
+          replayUnfillableGaps: replay?.unfillableGaps ?? [] }
       : undefined;
     return {
       ...(qaTel ? { qa: qaTel } : {}),
@@ -1059,6 +1083,7 @@ export function useSearchRecorder(opts: {
       analyticsSamples: analyticsSamplesRef.current.slice(),
       foundObjectIndices: Array.from(foundRef.current),
       autoDwellObjectIds: Array.from(autoDwellIdsRef.current),
+      objectStatuses: objectStatusesRef.current.slice(),
       pointsTimeSec: pointsTimeRef.current.slice(),
       deviationAvgM: devCountRef.current ? Math.round((devSumRef.current / devCountRef.current) * 10) / 10 : 0,
       distanceM: distRef.current,
@@ -1079,6 +1104,7 @@ export function useSearchRecorder(opts: {
     });
     if (bestI >= 0) {
       foundRef.current.add(bestI);
+      objectStatusesRef.current[bestI] = 'manual_found';
       useTrackingStore.getState().noteSearchObjectFound(searchObjectKey(laidObjects[bestI], bestI));
       pushSnapshot();
     }
@@ -1089,11 +1115,16 @@ export function useSearchRecorder(opts: {
     const i = laidObjects.findIndex((o, index) => searchObjectKey(o, index) === id);
     if (i < 0) return;
     autoDwellIdsRef.current.delete(id); dismissedDwellIdsRef.current.add(id); foundRef.current.delete(i);
+    objectStatusesRef.current[i] = 'user_removed';
     const qaCandidate = qaTelRef.current?.objectDwellCandidates?.find(c => c.referenceIndex === i && c.accepted);
     if (qaCandidate) qaCandidate.userOverride = true;
     useTrackingStore.getState().dismissSearchAutoDwell(id);
     pushSnapshot();
   }, [laidObjects, pushSnapshot]);
+
+  const confirmEnd = useCallback(() => {
+    objectStatusesRef.current = objectStatusesRef.current.map(statusAtConfirmedEnd);
+  }, []);
 
   // Virtueller Hundefortschritt (Bogenlänge) + geschätzte Hundeposition — reine
   // Runtime-Ableitung aus dem bestehenden progressM (Handler). Kein GPS-Rohpunkt.
@@ -1105,7 +1136,7 @@ export function useSearchRecorder(opts: {
 
   return {
     ready, recording, paused,
-    points: snap.points, position, liveFix, deviationM: snap.deviationM, onTrack: snap.onTrack,
+    points: snap.points, position, endHandlerFix, liveFix, deviationM: snap.deviationM, onTrack: snap.onTrack,
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
     autoDwellObjectIds: Array.from(autoDwellIdsRef.current), activeObjectWait,
     distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,
@@ -1113,6 +1144,6 @@ export function useSearchRecorder(opts: {
     elapsedS, score: snap.score, accuracy,
     gpsDebug, gpsQuality,
     searchStartState,
-    start, stop, setPaused, markObject, dismissAutoObject,
+    start, stop, setPaused, markObject, dismissAutoObject, confirmEnd,
   };
 }

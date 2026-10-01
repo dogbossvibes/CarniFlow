@@ -34,7 +34,19 @@ export const REPLAY_GEOMETRY = {
   minSpacingM: 1.5,
   /** Sicherheitsgrenze: darüber keine Replay-Geometrie (Fallback = bisherige Punkte). */
   maxDensePoints: 6000,
+  maxReplayGapM: 2.5,
+  maxReplayGapSec: 5,
 } as const;
+
+export interface ReplayGapInsertion { sourceIndex: number; reason: 'spatial_gap' | 'temporal_gap' | 'both' }
+export interface ReplayUnfillableGap {
+  startSourceIndex: number;
+  endSourceIndex: number;
+  spatialGapM: number;
+  temporalGapSec: number;
+  reason: 'no_observed_intermediate_sample';
+}
+export interface ReplayGeometryDetail { points: ReplayGeoPoint[]; insertedForGap: ReplayGapInsertion[]; unfillableGaps: ReplayUnfillableGap[] }
 
 const M_PER_DEG = 111320;
 
@@ -94,7 +106,7 @@ function angleDiffDeg(a: number, b: number): number {
  * `null`, wenn keine sinnvolle Geometrie entsteht (< 2 Punkte oder über der
  * Sicherheitsgrenze) — der Aufrufer nimmt dann die bisherigen Suchpunkte.
  */
-export function buildReplayGeometry(dense: readonly ReplayGeoPoint[]): ReplayGeoPoint[] | null {
+export function buildReplayGeometryDetailed(dense: readonly ReplayGeoPoint[]): ReplayGeometryDetail | null {
   const n = dense.length;
   if (n < 2 || n > REPLAY_GEOMETRY.maxDensePoints) return null;
   const { x, y, cum } = toXY(dense);
@@ -123,23 +135,64 @@ export function buildReplayGeometry(dense: readonly ReplayGeoPoint[]): ReplayGeo
 
   // Gerade Strecken dünnen: nicht geschützte Punkte nur ab minSpacingM Abstand
   // zum letzten behaltenen.
-  const out: ReplayGeoPoint[] = [];
+  const selected: number[] = [];
   let lastCum = -Infinity;
   for (let i = 0; i < n; i++) {
     if (!keep[i]) continue;
     if (!protectedIdx[i] && cum[i] - lastCum < REPLAY_GEOMETRY.minSpacingM) continue;
-    out.push({ lat: dense[i].lat, lng: dense[i].lng, t: dense[i].t });
+    selected.push(i);
     lastCum = cum[i];
   }
-  return out.length >= 2 ? out : null;
+  if (selected.length < 2) return null;
+
+  // Restore only observed display samples. A source gap with no intermediate
+  // sample remains measurable; no coordinate or time is interpolated.
+  const insertedForGap: ReplayGapInsertion[] = [];
+  for (let k = 0; k < selected.length - 1;) {
+    const a = selected[k], b = selected[k + 1];
+    const spatialM = Math.hypot(x[b] - x[a], y[b] - y[a]);
+    const temporalSec = Math.abs(dense[b].t - dense[a].t);
+    const spatial = spatialM > REPLAY_GEOMETRY.maxReplayGapM;
+    const temporal = temporalSec > REPLAY_GEOMETRY.maxReplayGapSec;
+    if ((!spatial && !temporal) || b - a <= 1) { k++; continue; }
+    const bySpatial = spatialM / REPLAY_GEOMETRY.maxReplayGapM >= temporalSec / REPLAY_GEOMETRY.maxReplayGapSec;
+    const target = bySpatial ? (cum[a] + cum[b]) / 2 : (dense[a].t + dense[b].t) / 2;
+    let chosen = a + 1;
+    for (let i = a + 2; i < b; i++) {
+      const candidate = bySpatial ? cum[i] : dense[i].t;
+      const current = bySpatial ? cum[chosen] : dense[chosen].t;
+      if (Math.abs(candidate - target) < Math.abs(current - target)) chosen = i;
+    }
+    selected.splice(k + 1, 0, chosen);
+    insertedForGap.push({ sourceIndex: chosen, reason: spatial && temporal ? 'both' : spatial ? 'spatial_gap' : 'temporal_gap' });
+  }
+  const unfillableGaps: ReplayUnfillableGap[] = [];
+  for (let k = 0; k < selected.length - 1; k++) {
+    const a = selected[k], b = selected[k + 1];
+    const spatialGapM = Math.hypot(x[b] - x[a], y[b] - y[a]);
+    const temporalGapSec = Math.abs(dense[b].t - dense[a].t);
+    if (spatialGapM > REPLAY_GEOMETRY.maxReplayGapM || temporalGapSec > REPLAY_GEOMETRY.maxReplayGapSec)
+      unfillableGaps.push({ startSourceIndex: a, endSourceIndex: b,
+        spatialGapM: Math.round(spatialGapM * 100) / 100,
+        temporalGapSec: Math.round(temporalGapSec * 100) / 100,
+        reason: 'no_observed_intermediate_sample' });
+  }
+  return { points: selected.map(i => ({ lat: dense[i].lat, lng: dense[i].lng, t: dense[i].t })), insertedForGap, unfillableGaps };
+}
+
+export function buildReplayGeometry(dense: readonly ReplayGeoPoint[]): ReplayGeoPoint[] | null {
+  return buildReplayGeometryDetailed(dense)?.points ?? null;
 }
 
 /** Bequem für den Recorder: getrennte Arrays wie `run_points` + `pointsTimeSec`. */
 export function replayGeometryArrays(dense: readonly ReplayGeoPoint[]):
-  { points: { latitude: number; longitude: number }[]; timeSec: number[] } | null {
-  const g = buildReplayGeometry(dense);
-  if (!g) return null;
-  return { points: g.map(p => ({ latitude: p.lat, longitude: p.lng })), timeSec: g.map(p => p.t) };
+  { points: { latitude: number; longitude: number }[]; timeSec: number[];
+    insertedForGap: ReplayGapInsertion[]; unfillableGaps: ReplayUnfillableGap[] } | null {
+  const detail = buildReplayGeometryDetailed(dense);
+  if (!detail) return null;
+  return { points: detail.points.map(p => ({ latitude: p.lat, longitude: p.lng })),
+    timeSec: detail.points.map(p => p.t), insertedForGap: detail.insertedForGap,
+    unfillableGaps: detail.unfillableGaps };
 }
 
 /**

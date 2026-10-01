@@ -79,6 +79,12 @@ export interface QaTurnFusion {
   tMs: number | null;
   source: 'gps' | 'gps_split_apex';
   direction: 'links' | 'rechts';
+  directionSource?: 'gps' | 'motion_override_low_geometry';
+  motionAssociationSource?: 'live_cached' | 'accepted_live_turn' | 'current_ring' | 'none';
+  signedNetYawDeg?: number | null;
+  motionDirection?: 'links' | 'rechts' | null;
+  motionEvidence?: number | null;
+  sharpnessSource?: 'geometry';
   sharpness: 'normal' | 'spitz' | 'unresolved';
   /** Persistierter angleKind. */
   kind: string;
@@ -121,7 +127,11 @@ export function toQaTurnFusion(t: FusedTurn, originMs: number): QaTurnFusion {
   return {
     apexIndex: t.apexIndex, atM: Math.round(t.atM * 100) / 100,
     tMs: t.t == null ? null : Math.round(t.t - originMs),
-    source: t.source, direction: t.direction, sharpness: t.sharpness, kind: t.kind,
+    source: t.source, direction: t.direction, directionSource: t.directionSource,
+    motionAssociationSource: t.motionAssociationSource,
+    signedNetYawDeg: t.motion.signedNetYawDeg, motionDirection: t.motion.direction,
+    motionEvidence: t.motion.evidence, sharpnessSource: 'geometry',
+    sharpness: t.sharpness, kind: t.kind,
     confidence: t.confidence, confidenceBeforeMotion: t.confidenceBeforeMotion, motionAdjustment: t.motionAdjustment,
     sharpnessConfidence: t.sharpnessConfidence, headingDeltaDeg: t.headingDeltaDeg, interiorAngleDeg: t.interiorAngleDeg,
     accuracyM: t.accuracyM, legBeforeM: t.legBeforeM, legAfterM: t.legAfterM,
@@ -185,6 +195,8 @@ export interface QaCandidateMotion {
 
   // ── DERIVED: Aggregate der bestehenden Variante-E-Logik ──────────────────
   netYawDeg: number;
+  signedNetYawDeg?: number;
+  direction?: 'links' | 'rechts' | null;
   grossYawDeg: number;
   monotonicity: number;
   yawShare: number;
@@ -251,6 +263,23 @@ export interface QaSessionCapture {
     recordingSessionStartedTSec: number | null; geometryStartedTSec: number | null;
     startupUiDelayMs: number | null; geometryLockDelayMs: number | null;
     movementConfirmedTSec: number | null; fallbackUsed: boolean;
+    movementConfirmationSource?: 'pedometer' | 'gps_displacement' | 'motion_gps' | 'fallback' | null;
+    movementConfirmationConfidence?: number | null;
+    movementGpsDisplacementM?: number | null;
+    movementStepDelta?: number;
+    movementMotionState?: string | null;
+  };
+  startupMovementDiagnostics?: {
+    samples: { tSec: number; accuracyM: number | null; acceptedFix: boolean;
+      displacementFromAnchorM: number | null; cumulativeStepDelta: number;
+      motionState: string | null; locomotionEvidence: 'steps' | 'gait_accel' | 'none';
+      accelerationEvidence: number; candidateSource: 'pedometer' | 'gps_displacement' | 'motion_gps' | 'fallback' | null;
+      confirmed: boolean; rejectionReason: string | null }[];
+    confirmationTSec: number | null;
+    confirmationSource: 'pedometer' | 'gps_displacement' | 'motion_gps' | 'fallback' | null;
+    confirmationConfidence: number | null;
+    fallbackUsed: boolean;
+    truncated: boolean;
   };
   manualAngleGeometryDiagnostics?: {
     markers: { manualMarkerType: 'ow' | 'bw' | 'gw'; geometryDirection: 'links' | 'rechts' | 'unresolved';

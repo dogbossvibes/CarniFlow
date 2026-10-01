@@ -39,7 +39,7 @@ describe('run.tsx: Search-Guidance verwendet ausschliesslich kanonische arcM', (
 
   it('useTrackVoiceGuidance / useTrackHapticGuidance bekommen weiterhin dieselben Listen (dogProgressM + arcM)', () => {
     // (6. Argument = Search-Recovery-Seeds/Callbacks; 4. Haptik-Argument = Activation Guard; Listen und dogProgressM unverändert)
-    expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery);');
+    expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery,');
     expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);');
   });
 });
@@ -74,9 +74,9 @@ describe('14. Objekt-Fundlogik per Handler-Dwell', () => {
   });
 });
 
-describe('15. Enderkennung unverändert', () => {
+describe('15. Handler-basierte Enderkennung', () => {
   it('Track-End-Defaults', () => {
-    expect(DEFAULT_TRACK_END_OPTIONS).toEqual({ reachedProgressRatio: 0.97, reachedGeomM: 3.0, approachingRemainingM: 10 });
+    expect(DEFAULT_TRACK_END_OPTIONS).toEqual({ reachedProgressRatio: 0.90, reachedGeomM: 3.0, approachingRemainingM: 10 });
   });
   it('useTrackEndGuidance arbeitet weiter auf laidPoints[last] + dogProgress + Geometrie', () => {
     expect(endHook).not.toContain('canonicalArc');

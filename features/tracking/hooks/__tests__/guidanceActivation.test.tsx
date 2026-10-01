@@ -34,12 +34,34 @@ function Haptic({ dog, enabled, seed, onFired }: { dog: number; enabled: boolean
   return null;
 }
 const END = { latitude: 0, longitude: 0 };
-function End({ recording, initialFired, onFired }: { recording: boolean; initialFired: boolean; onFired: () => void }) {
-  useTrackEndGuidance({ recording, dogProgressM: 100, trackLengthM: 100, estimatedDogPosition: END, endPoint: END, openMandatoryObjects: 0, voiceOn: true, initialFired, onFired });
+function End({ recording, initialFired, onFired, fix = 0 }: { recording: boolean; initialFired: boolean; onFired: () => void; fix?: number }) {
+  useTrackEndGuidance({ recording, dogProgressM: 100, handlerProgressM: 95, trackLengthM: 100,
+    estimatedDogPosition: END, endPoint: END, openMandatoryObjects: 0, voiceOn: true, initialFired, onFired,
+    lastSegmentReached: true,
+    endHandlerFix: recording ? { position: fix === 0 ? { latitude: 0.000045, longitude: 0 } : END,
+      accuracyM: 4, tMs: 1000 + fix * 900 } : null });
   return null;
 }
 
 describe('Voice — Activation Guard', () => {
+  it('waits for physical handler proximity and an ended object wait before a feature voice', () => {
+    jest.useFakeTimers({ now: 5_000_000 });
+    const angle: GuidanceAngle[] = [{ id: 'physical-angle', arcM: 5, angleKind: 'rechts', lat: 0, lng: 0.0001 }];
+    const fired: string[] = [];
+    function Physical({ lng, waiting }: { lng: number; waiting: boolean }) {
+      useTrackVoiceGuidance(0, angle, true, 0.75, [], { onAnnounced: id => fired.push(id) },
+        { handlerPosition: { latitude: 0, longitude: lng }, configuredDogLeadM: 5, activeObjectWait: waiting });
+      return null;
+    }
+    act(() => { renderer = TestRenderer.create(<Physical lng={0} waiting={false} />); });
+    expect(speak).not.toHaveBeenCalled();
+    act(() => { rerender(<Physical lng={0.00006} waiting />); });
+    expect(speak).not.toHaveBeenCalled();
+    act(() => { rerender(<Physical lng={0.00006} waiting={false} />); });
+    expect(speak).toHaveBeenCalledTimes(1);
+    expect(fired).toEqual(['physical-angle']);
+  });
+
   it('1./2./3. Winkel 5 m vor dem Hund: disabled → kein Voice, NICHT verbraucht; enabled → normale Ansage genau einmal', () => {
     jest.useFakeTimers({ now: 1_000_000 });
     const fired: string[] = [];
@@ -118,7 +140,10 @@ describe('Ende — Activation Guard', () => {
     expect(speak).not.toHaveBeenCalled();
     expect(hapticSuccess).not.toHaveBeenCalled();
     expect(fired).not.toHaveBeenCalled();
-    act(() => { rerender(<End recording initialFired={false} onFired={fired} />); });
+    act(() => { rerender(<End recording initialFired={false} onFired={fired} fix={0} />); });
+    act(() => { rerender(<End recording initialFired={false} onFired={fired} fix={1} />); });
+    expect(fired).not.toHaveBeenCalled();
+    act(() => { rerender(<End recording initialFired={false} onFired={fired} fix={2} />); });
     expect(speak).toHaveBeenCalledTimes(1);
     expect(hapticSuccess).toHaveBeenCalledTimes(1);
     expect(fired).toHaveBeenCalledTimes(1);

@@ -108,7 +108,7 @@ describe('Verdrahtung im Recorder', () => {
     expect(rec).not.toContain('detectShortLegCorners(');   // der Recorder ruft den Regelpfad nicht mehr direkt
   });
   it('der Mitschnitt schreibt turnFusion und imuOnlyEvents', () => {
-    expect(rec).toContain('turnFusion: sweep.turns.map(t => toQaTurnFusion(t, originMs))');
+    expect(rec).toContain('turnFusion: associatedTurns.map(t => toQaTurnFusion(t, originMs))');
     expect(rec).toContain('imuOnlyEvents: sweep.imuOnly.map(e => toQaImuOnlyEvent(e, originMs))');
   });
   it('gepaarte Ecken tragen ihre eigene Marker-Herkunft und dürfen keine Doppelmarkierung erzeugen', () => {

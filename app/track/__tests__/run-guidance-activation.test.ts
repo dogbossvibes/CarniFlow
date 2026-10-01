@@ -90,7 +90,7 @@ describe('Pins: Canonical Reference + Search Recovery State unverändert', () =>
   });
   it('Schwellen unverändert', () => {
     expect(DEFAULT_GUIDANCE_OPTIONS).toEqual({ announceAheadM: 10, reachedM: 1.5, passedM: 2.5 });
-    expect(DEFAULT_TRACK_END_OPTIONS).toEqual({ reachedProgressRatio: 0.97, reachedGeomM: 3.0, approachingRemainingM: 10 });
+    expect(DEFAULT_TRACK_END_OPTIONS).toEqual({ reachedProgressRatio: 0.90, reachedGeomM: 3.0, approachingRemainingM: 10 });
     expect(OFF_TRACK).toEqual({ MIN_WARNING_M: 3, ACCURACY_WARN_FACTOR: 1.5, OFF_EXTRA_M: 2, RECOVERY_FACTOR: 0.6, MAX_RELIABLE_ACCURACY_M: 20, WARN_CONSECUTIVE: 2, OFF_CONSECUTIVE: 3, RECOVER_CONSECUTIVE: 3 });
     expect(voice).toContain('const SPEAK_GAP_MS     = 3500;');
     expect(haptic).toContain('const ANGLE_AHEAD_M  = 6;');

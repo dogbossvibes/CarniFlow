@@ -88,6 +88,8 @@ export interface FusedTurn {
   t: number | null;
   source: TurnSource;
   direction: 'links' | 'rechts';
+  directionSource?: 'gps' | 'motion_override_low_geometry';
+  motionAssociationSource?: 'live_cached' | 'accepted_live_turn' | 'current_ring' | 'none';
   sharpness: TurnSharpness;
   /** Persistierter Wert (`angleKind`); `unresolved` wird als normale Ecke gespeichert. */
   kind: AngleKind;
@@ -131,6 +133,20 @@ export interface FusionResult {
   rescued: number;
 }
 
+/** Finish reconstruction may outlive the 20-second Motion ring. Prefer the
+ * actual live fusion for the same GPS apex; a unique close timestamp is only
+ * a fallback. Never creates an additional corner. */
+export function associateLiveTurn(reconstructed: FusedTurn, live: readonly FusedTurn[]): FusedTurn {
+  const exact = live.find(t => t.apexIndex === reconstructed.apexIndex);
+  const close = reconstructed.t == null ? []
+    : live.filter(t => t.t != null && Math.abs(t.t - reconstructed.t!) <= 750);
+  const associated = exact ?? (close.length === 1 ? close[0] : null);
+  if (!associated?.motion.available || reconstructed.motion.available) return reconstructed;
+  // Restore only evidence lost from the bounded Motion ring. The GPS corner,
+  // geometry and persisted kind remain those of the finish reconstruction.
+  return { ...reconstructed, motion: associated.motion };
+}
+
 export interface FuseOptions {
   /** Turn-Evidenz-Lookup (wie im Detektor) — bestätigt/widerspricht Richtung, stützt Schärfe. */
   turnEvidenceAt?: TurnEvidenceLookup;
@@ -166,26 +182,31 @@ function kindFor(dir: 'links' | 'rechts', sharpness: TurnSharpness): AngleKind {
  * Belastbarkeit der Schärfe (0..1): Geometrie-Qualität, gestützt bzw. gedämpft
  * durch Motion. Nie ein Beleg für die Existenz der Ecke.
  */
-function sharpnessConfidence(quality: number | null, motion: FusedTurnMotion, sharpness: TurnSharpness): number {
+function sharpnessConfidence(quality: number | null, sharpness: TurnSharpness): number {
   if (sharpness === 'unresolved') return 0.25;
-  let c = quality ?? 0.5;
-  if (motion.available && motion.directionAgrees === true && motion.magnitudeRatio != null) {
-    // Yaw erklärt einen grossen Teil des Winkels → Schärfe plausibel; sehr wenig → dämpfen.
-    if (motion.magnitudeRatio >= 0.5) c += 0.1;
-    else if (motion.magnitudeRatio < 0.35) c -= 0.15;
-  }
-  return Math.round(clamp01(c) * 1000) / 1000;
+  return Math.round(clamp01(quality ?? 0.5) * 1000) / 1000;
 }
 
 function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | null): FusedTurn {
-  const dir = d.direction ?? ((d.headingDeltaDeg ?? 0) > 0 ? 'rechts' : 'links');
+  const gpsDir = d.direction ?? ((d.headingDeltaDeg ?? 0) > 0 ? 'rechts' : 'links');
   const magnitude = Math.abs(d.headingDeltaDeg ?? 0);
   const flags: string[] = [];
   const sharpness: TurnSharpness = d.sharpness ?? 'normal';
-  const motion = motionView(ev, dir, magnitude);
+  const motion = motionView(ev, gpsDir, magnitude);
+  // Only an existing GPS corner may be corrected. Poor geometry plus strong,
+  // directional motion can resolve a sign conflict; GPS still sets sharpness.
+  const override = d.geometryQualityLevel === 'low' && (d.geometryQuality ?? 1) < 0.4
+    && (d.accuracyToLegRatio ?? 0) >= 2 && motion.available
+    && motion.direction != null && motion.direction !== gpsDir
+    && (ev?.evidence ?? 0) >= 0.95 && (ev?.monotonicity ?? 0) >= 0.9
+    && (ev?.yawShare ?? 0) >= 0.7
+    && (ev?.movementState === 'walking' || ev?.movementState === 'running');
+  const dir = override ? motion.direction! : gpsDir;
+  const directionSource = override ? 'motion_override_low_geometry' : 'gps';
 
   if (d.sharpnessDemoted) flags.push('sharpness_demoted_low_geometry');
   if (motion.directionAgrees === false) flags.push('motion_direction_conflict');
+  if (override) flags.push('motion_direction_override_low_geometry');
   if (d.motionBoostSuppressed) flags.push('motion_boost_suppressed');
 
   // Motion bestimmt die SCHÄRFE nie: Netto-Yaw ist kein Winkelmass (reale
@@ -194,9 +215,9 @@ function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | nu
   const finalKind = kindFor(dir, sharpness === 'unresolved' ? 'normal' : sharpness);
   return {
     apexIndex: d.apexIndex, atM, t: d.t, source: d.fusionSource === 'gps_split_apex' ? 'gps_split_apex' : 'gps',
-    direction: dir, sharpness, kind: finalKind,
+    direction: dir, directionSource, sharpness, kind: finalKind,
     confidence: d.confidence, confidenceBeforeMotion: d.confidenceBeforeMotion, motionAdjustment: d.motionAdjustment,
-    sharpnessConfidence: sharpnessConfidence(d.geometryQuality, motion, sharpness),
+    sharpnessConfidence: sharpnessConfidence(d.geometryQuality, sharpness),
     headingDeltaDeg: d.headingDeltaDeg, interiorAngleDeg: d.interiorAngleDeg, accuracyM: d.accuracyM,
     legBeforeM: d.legBeforeM, legAfterM: d.legAfterM,
     geometryQuality: d.geometryQuality, geometryQualityLevel: d.geometryQualityLevel, accuracyToLegRatio: d.accuracyToLegRatio,

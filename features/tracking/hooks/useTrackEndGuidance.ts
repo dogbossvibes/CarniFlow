@@ -7,6 +7,7 @@ import {
   stepTrackEnd, DEFAULT_TRACK_END_OPTIONS, type TrackEndState,
   trackEndBlocker,
 } from '@/features/tracking/utils/guidanceEngine';
+import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracking/utils/endFixConfirmation';
 
 type LL = { latitude: number; longitude: number };
 
@@ -31,6 +32,8 @@ export function useTrackEndGuidance(input: {
   dogProgressM: number | null;
   handlerProgressM?: number;
   handlerPosition?: LL | null;
+  endHandlerFix?: { position: LL; accuracyM: number | null; tMs: number } | null;
+  lastSegmentReached?: boolean;
   activeObjectWait?: boolean;
   trackLengthM: number;
   estimatedDogPosition: LL | null;
@@ -47,13 +50,14 @@ export function useTrackEndGuidance(input: {
   const [endState, setEndState] = useState<TrackEndState>('unseen');
   const onFiredRef = useRef(input.onFired);
   const latestInputRef = useRef(input);
+  const endFixHistoryRef = useRef(INITIAL_END_FIX_HISTORY);
   latestInputRef.current = input;
   onFiredRef.current = input.onFired;
 
   // Neue Absuche / neue Fährte → Once-only-Status zurücksetzen; Recovery mit
   // bereits angesagtem Ende → 'completed' (once-only bleibt gewahrt).
   useEffect(() => {
-    if (!input.recording) { stateRef.current = 'unseen'; setEndState('unseen'); return; }
+    if (!input.recording) { stateRef.current = 'unseen'; endFixHistoryRef.current = INITIAL_END_FIX_HISTORY; setEndState('unseen'); return; }
     if (input.initialFired && stateRef.current === 'unseen') { stateRef.current = 'completed'; setEndState('completed'); }
   }, [input.recording, input.endPoint, input.initialFired]);
 
@@ -62,14 +66,26 @@ export function useTrackEndGuidance(input: {
     const geomDistanceM = input.estimatedDogPosition && input.endPoint
       ? distM(input.estimatedDogPosition, input.endPoint)
       : null;
-    const handlerDistanceToEndM = input.handlerPosition === undefined ? undefined
-      : input.handlerPosition && input.endPoint ? distM(input.handlerPosition, input.endPoint) : null;
+    const handlerFix = input.endHandlerFix;
+    const handlerDistanceToEndM = handlerFix && input.endPoint ? distM(handlerFix.position, input.endPoint) : null;
+    if (handlerFix && handlerDistanceToEndM != null) {
+      endFixHistoryRef.current = advanceEndFixHistory(endFixHistoryRef.current, {
+        tMs: handlerFix.tMs, distanceToEndM: handlerDistanceToEndM, accuracyM: handlerFix.accuracyM,
+        lastSegmentReached: input.lastSegmentReached ?? false,
+        handlerProgressRatio: input.trackLengthM > 0 ? (input.handlerProgressM ?? 0) / input.trackLengthM : 0,
+      });
+    }
+    const history = endFixHistoryRef.current;
 
     const { state, justReached } = stepTrackEnd(
       {
         dogProgressM: input.dogProgressM,
         handlerProgressM: input.handlerProgressM,
         handlerDistanceToEndM,
+        accuracyM: handlerFix?.accuracyM ?? null,
+        lastSegmentReached: input.lastSegmentReached,
+        approachSeen: history.approachSeen, stableEndFixCount: history.insideCount,
+        stableEndFixSpanMs: history.firstInsideMs == null || handlerFix == null ? 0 : handlerFix.tMs - history.firstInsideMs,
         activeObjectWait: input.activeObjectWait,
         searchActive: input.recording,
         trackLengthM: input.trackLengthM,
@@ -90,11 +106,15 @@ export function useTrackEndGuidance(input: {
         valid: () => {
           const now = latestInputRef.current;
           const dogDistance = now.estimatedDogPosition && now.endPoint ? distM(now.estimatedDogPosition, now.endPoint) : null;
-          const handlerDistance = now.handlerPosition === undefined ? undefined
-            : now.handlerPosition && now.endPoint ? distM(now.handlerPosition, now.endPoint) : null;
+          const handlerDistance = now.endHandlerFix && now.endPoint ? distM(now.endHandlerFix.position, now.endPoint) : null;
+          const currentHistory = endFixHistoryRef.current;
           return now.recording && now.voiceOn && now.dogProgressM != null && trackEndBlocker({
             dogProgressM: now.dogProgressM, handlerProgressM: now.handlerProgressM,
             handlerDistanceToEndM: handlerDistance, geomDistanceM: dogDistance,
+            accuracyM: now.endHandlerFix?.accuracyM ?? null, lastSegmentReached: now.lastSegmentReached,
+            approachSeen: currentHistory.approachSeen, stableEndFixCount: currentHistory.insideCount,
+            stableEndFixSpanMs: currentHistory.firstInsideMs == null || now.endHandlerFix == null ? 0
+              : now.endHandlerFix.tMs - currentHistory.firstInsideMs,
             trackLengthM: now.trackLengthM, openMandatoryObjects: now.openMandatoryObjects,
             activeObjectWait: now.activeObjectWait, searchActive: now.recording,
           }) == null;
@@ -103,7 +123,8 @@ export function useTrackEndGuidance(input: {
     }
   }, [
     input.recording, input.dogProgressM, input.trackLengthM,
-    input.estimatedDogPosition, input.handlerProgressM, input.handlerPosition,
+    input.estimatedDogPosition, input.handlerProgressM, input.handlerPosition, input.endHandlerFix,
+    input.lastSegmentReached,
     input.activeObjectWait, input.endPoint, input.openMandatoryObjects, input.voiceOn,
   ]);
 

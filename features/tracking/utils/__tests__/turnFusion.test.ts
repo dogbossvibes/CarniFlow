@@ -17,7 +17,7 @@ import {
   computeTurnEvidence, MotionEvidenceBuffer, type MotionWindowSample, type TurnEvidence,
 } from '@/features/tracking/utils/motionTurnEvidence';
 import {
-  fuseTurns, RESCUE_CONFIDENCE_FACTOR,
+  fuseTurns, associateLiveTurn, RESCUE_CONFIDENCE_FACTOR,
 } from '@/features/tracking/utils/turnFusion';
 import { capturedDetectorBuffer } from './helpers/realSessionFixture';
 import { evaluateStopFlush } from '@/features/tracking/utils/stopFlushCorner';
@@ -48,6 +48,19 @@ function load(file: string): Loaded {
 
 // ── Reale Läufe ───────────────────────────────────────────────────────────
 describe('reale Läufe — GPS-only (Normalfall ausserhalb des QA-Modus)', () => {
+  it('finish-QA restores live Motion only at the same apex without rewriting GPS geometry or kind', () => {
+    const { buf } = load('f1t-qa-1616e65f.json');
+    const reconstructed = fuseTurns(buf).turns[0];
+    const live = { ...reconstructed, kind: 'spitz_links' as const,
+      headingDeltaDeg: 170, motion: { ...reconstructed.motion, available: true,
+        signedNetYawDeg: -70, direction: 'links' as const, evidence: 1 } };
+    const associated = associateLiveTurn(reconstructed, [live]);
+    expect(associated.motion).toEqual(live.motion);
+    expect(associated.kind).toBe(reconstructed.kind);
+    expect(associated.headingDeltaDeg).toBe(reconstructed.headingDeltaDeg);
+    expect(associateLiveTurn(reconstructed, [{ ...live, apexIndex: live.apexIndex + 20,
+      t: (live.t ?? 0) + 1000 }])).toEqual(reconstructed);
+  });
   it('F1T (qa-1616e65f): der verlorene L-Turn wird über den Split-Apex-Paarungspfad gefunden', () => {
     const { buf } = load('f1t-qa-1616e65f.json');
     // Regelpfad allein: nur der Rechts-Winkel (Punkt 11) — der L-Turn scheitert an no_window_*.
@@ -268,6 +281,20 @@ describe('Richtung vs. Schärfe — Fusion', () => {
     return { ...base, available: true, evidence: 1, netYawDeg: Math.abs(signedYaw), signedNetYawDeg: signedYaw, grossYawDeg: Math.abs(signedYaw), monotonicity: 1 };
   };
 
+  it('corrects a low-quality GPS direction only with sustained directional walking evidence', () => {
+    const { buf } = ft2();
+    const strong = { ...fakeEv(-102.68), yawShare: 0.758,
+      movementState: 'walking' as const };
+    const r = fuseTurns(buf, { turnEvidenceAt: t => t == null ? null : strong });
+    const second = r.turns[1];
+    expect(second.geometryQualityLevel).toBe('low');
+    expect(second.direction).toBe('rechts');
+    expect(second.directionSource).toBe('motion_override_low_geometry');
+    expect(second.sharpness).toBe('unresolved');
+    expect(r.corners[1].kind).toBe('rechts');
+    expect(fuseTurns(buf).corners[1].kind).toBe('links');
+  });
+
   it('Motion bestimmt die Schärfe NIE: auch maximal starke, gleichgerichtete IMU (200° links) hebt „unresolved" nicht auf', () => {
     const { buf } = ft2();
     for (const yaw of [+100, +130, +200]) {
@@ -378,18 +405,20 @@ describe('Golden-Field-Matrix (5–9 m Accuracy, 3,75-m-Schenkel): Fusion ≥ De
   const pts = (seed: number, drift: number) =>
     detectorBuffer(fieldFixes(withDrift(fieldRouteCoords(1.0, FIELD_TAIL_M), drift, seed), seed));
 
-  it('mit Motion: mittlere Trefferzahl der Fusion ≥ Detektor bei jedem Drift', () => {
+  it('mit Motion: Fusion erhält alle GPS-Kandidaten bei jedem Drift', () => {
     const rows: string[] = ['Drift | Detektor+M | Fusion+M | Rescue'];
     for (const drift of [0, 1, 2, 3, 4, 5]) {
-      let det = 0, fus = 0, resc = 0;
+      let det = 0, fus = 0, resc = 0, detectorCorners = 0, fusedCorners = 0;
       for (const seed of SEEDS) {
         const p = pts(seed, drift), l = look(seed);
-        det += scoreSequence(detectShortLegCorners(p, null, l).corners.map(c => c.kind));
+        const detected = detectShortLegCorners(p, null, l).corners;
+        det += scoreSequence(detected.map(c => c.kind)); detectorCorners += detected.length;
         const f = fuseTurns(p, { turnEvidenceAt: l });
-        fus += scoreSequence(f.corners.map(c => c.kind)); resc += f.rescued;
+        fus += scoreSequence(f.corners.map(c => c.kind)); resc += f.rescued; fusedCorners += f.corners.length;
       }
       rows.push(`±${drift} m | ${(det / 10).toFixed(2)} | ${(fus / 10).toFixed(2)} | ${resc}`);
-      expect(fus).toBeGreaterThanOrEqual(det);
+      // Direction can change at a weak GPS apex; the existing turn must stay.
+      expect(fusedCorners).toBeGreaterThanOrEqual(detectorCorners);
     }
     console.log('\n[FUSION · Golden-Matrix]\n' + rows.join('\n') + '\n');
   });

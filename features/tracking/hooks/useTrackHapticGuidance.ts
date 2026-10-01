@@ -8,7 +8,7 @@ try { Haptics = require('expo-haptics'); } catch { Haptics = null; }
 
 // arcM = Bogenlänge des Gegenstands entlang der Fährte (= marker.distance_from_start).
 // material optional (nur für die Voice-Ansage „Dübel"/„Gegenstand"; Haptik ignoriert es).
-export interface GuidanceObject { id: string; arcM: number; material?: string | null }
+export interface GuidanceObject { id: string; arcM: number; material?: string | null; lat?: number | null; lng?: number | null }
 
 const ANGLE_AHEAD_M  = 6;    // Winkel etwas voraus (~8 Schritte)
 const OBJECT_AHEAD_M = 4;    // Gegenstände etwas enger

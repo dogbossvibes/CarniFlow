@@ -95,7 +95,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -174,6 +174,7 @@ export interface QaTrackExport {
    */
   searchDiagnostics?: QaSearchDiagnostics;
   startupDiagnostics?: QaSessionCapture['startupDiagnostics'];
+  startupMovementDiagnostics?: QaSessionCapture['startupMovementDiagnostics'];
   manualAngleGeometryDiagnostics?: QaSessionCapture['manualAngleGeometryDiagnostics'];
   voiceDiagnostics?: QaSessionCapture['voiceDiagnostics'];
 }
@@ -268,11 +269,19 @@ export function buildQaTrackExport(
   }
   const accs = anon.map(p => p.accuracy).filter((a): a is number => a != null);
   const motion = capture?.candidateMotionEvidence;
+  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 = capture?.startupMovementDiagnostics
+    || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
+    : capture?.startupDiagnostics || capture?.manualAngleGeometryDiagnostics || capture?.voiceDiagnostics ? 5
+    : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0;
+  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 = !search ? 0
+    : search.approachFixDiagnostics || search.endConfirmationDiagnostics
+      || search.replayInsertedForGapCount != null || search.replayUnfillableGapCount != null
+      || search.objects?.some(o => o.status != null) ? 6
+      : search.voiceDiagnostics || search.startApproachDiagnostics || search.endEligibilityDiagnostics || search.objectDwellDiagnostics ? 5
+      : search.cursor.referenceGeometryLengthM == null ? 3 : 4;
   return {
     schemaVersion: 2,
-    schemaMinor: search ? (search.voiceDiagnostics || search.startApproachDiagnostics || search.endEligibilityDiagnostics || search.objectDwellDiagnostics ? 5 : search.cursor.referenceGeometryLengthM == null ? 3 : 4)
-      : capture?.startupDiagnostics || capture?.manualAngleGeometryDiagnostics || capture?.voiceDiagnostics ? 5
-      : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0,
+    schemaMinor: captureSchemaMinor >= searchSchemaMinor ? captureSchemaMinor : searchSchemaMinor,
     sessionId: hashSessionId(sessionLocalId),
     pointType: 'lay',
     pointCount: anon.length,
@@ -314,6 +323,7 @@ export function buildQaTrackExport(
     ...(capture?.imuOnlyEvents ? { imuOnlyEvents: capture.imuOnlyEvents } : {}),
     ...(search ? { searchDiagnostics: search } : {}),
     ...(capture?.startupDiagnostics ? { startupDiagnostics: capture.startupDiagnostics } : {}),
+    ...(capture?.startupMovementDiagnostics ? { startupMovementDiagnostics: capture.startupMovementDiagnostics } : {}),
     ...(capture?.manualAngleGeometryDiagnostics ? { manualAngleGeometryDiagnostics: capture.manualAngleGeometryDiagnostics } : {}),
     ...(capture?.voiceDiagnostics ? { voiceDiagnostics: capture.voiceDiagnostics } : {}),
   };
@@ -398,6 +408,8 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
       sd.startApproachDiagnostics?.startZoneEnteredTSec, sd.startApproachDiagnostics?.voiceTriggerTSec,
       sd.startApproachDiagnostics?.voiceQueuedTSec, sd.startApproachDiagnostics?.voiceSpokenTSec,
       sd.startApproachDiagnostics?.departedStartTSec, sd.startApproachDiagnostics?.searchStartedTSec,
+      ...((sd.approachFixDiagnostics?.samples ?? []).map(v => v.tSec)),
+      sd.endConfirmationDiagnostics?.candidateStartedTSec, sd.endConfirmationDiagnostics?.confirmationTSec,
       ...((sd.endEligibilityDiagnostics?.samples ?? []).flatMap(v => [v.tSec, v.eventFiredTSec])),
       ...((sd.objectDwellDiagnostics?.candidates ?? []).flatMap(v => [v.dwellStartedTSec, v.dwellDurationSec])),
     ];
@@ -409,6 +421,12 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
   if (startup) for (const [key, value] of Object.entries(startup)) {
     if (typeof value === 'number' && Math.abs(value) >= (key === 'startupDelayMs' ? 1e11 : 1e8))
       throw new Error('QA-Export enthält einen absoluten Startup-Zeitstempel.');
+  }
+  const movement = e.startupMovementDiagnostics;
+  if (movement) {
+    for (const t of [movement.confirmationTSec, ...movement.samples.map(s => s.tSec)])
+      if (t != null && (!Number.isFinite(t) || Math.abs(t) >= 1e8))
+        throw new Error('QA-Export enthält einen absoluten Startup-Movement-Zeitstempel.');
   }
   for (const v of e.voiceDiagnostics?.events ?? []) {
     if ([v.triggerTSec, v.queuedTSec, v.spokenTSec].some(t => t != null && Math.abs(t) >= 1e8))

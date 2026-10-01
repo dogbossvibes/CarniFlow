@@ -20,12 +20,13 @@ import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { useTrackEndGuidance } from '@/features/tracking/hooks/useTrackEndGuidance';
+import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracking/utils/endFixConfirmation';
 import { buildSearchDiagnostics, saveQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
-import { trackEndBlocker } from '@/features/tracking/utils/guidanceEngine';
-import { TRACKING_UX_QA_LIMITS } from '@/features/tracking/utils/trackingUxDiagnostics';
-import type { QaEndEligibilitySample, QaStartApproachDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
+import { endRadiusM, trackEndBlocker } from '@/features/tracking/utils/guidanceEngine';
+import { boundedPush, TRACKING_UX_QA_LIMITS } from '@/features/tracking/utils/trackingUxDiagnostics';
+import type { QaApproachFixDiagnostics, QaEndConfirmationDiagnostics, QaEndEligibilitySample, QaStartApproachDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
 import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
@@ -149,7 +150,8 @@ export default function TrackRunScreen() {
       laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),
       laidPoints,
       laidAccuracies: st.trackPoints.map(p => p.accuracy ?? null),
-      laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number }, index: i, material: m.material ?? '', id: m.id })),
+      laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number },
+        index: i, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null })),
       laidMarkers: st.markers,
       eventArcs,
       segments: st.segments,
@@ -218,20 +220,37 @@ export default function TrackRunScreen() {
   //   2) persistierter startAnchor als Fallback (nach App-Neustart),
   //   3) sonst null → kontrollierte Recovery (kein stiller Sofortstart).
   const startPoint = (snap && snap.laidLatLng.length > 0 ? snap.laidLatLng[0] : null) ?? anchorFallback;
-  const approach = useStartPointApproach({ active: arming, start: startPoint, liveFix: s.liveFix });
   const approachOriginRef = useRef<number | null>(null);
   const approachQaRef = useRef<QaStartApproachDiagnostics | null>(null);
+  const approachFixQaRef = useRef<QaApproachFixDiagnostics>({ samples: [], truncated: false });
   const endQaRef = useRef<QaEndEligibilitySample[]>([]);
   const endQaTruncatedRef = useRef(false);
+  const endConfirmationRef = useRef<QaEndConfirmationDiagnostics | null>(null);
+  const recordApproachFix = useCallback((event: import('@/features/tracking/hooks/useStartPointApproach').ApproachFixEvent) => {
+    if (!isQaDiagnosticsEnabled()) return;
+    approachOriginRef.current ??= event.tMs;
+    const recorded = boundedPush(approachFixQaRef.current.samples, {
+      tSec: Math.max(0, (event.tMs - approachOriginRef.current) / 1000),
+      distanceToStartM: event.distanceToStartM, accuracyM: event.accuracyM,
+      stable: event.stable, stableCount: event.stableCount, zone: event.zone,
+      transition: event.transition,
+    }, 100);
+    if (!recorded) approachFixQaRef.current.truncated = true;
+  }, []);
+  const approach = useStartPointApproach({ active: arming, start: startPoint, liveFix: s.liveFix,
+    onDiagnostic: recordApproachFix });
   useEffect(() => {
     if (arming) {
-      approachOriginRef.current = Date.now(); approachQaRef.current = null;
+      approachOriginRef.current ??= Date.now(); approachQaRef.current = null;
       endQaRef.current = []; endQaTruncatedRef.current = false;
+      endConfirmationRef.current = null;
       resetVoiceEvents(approachOriginRef.current);
     }
   }, [arming]);
   const approachPhaseRef = useRef(approach.phase);
   approachPhaseRef.current = approach.phase;
+  const approachArmedRef = useRef(approach.armed);
+  approachArmedRef.current = approach.armed;
   const approachDistanceRef = useRef(approach.distanceM);
   approachDistanceRef.current = approach.distanceM;
   if (arming && isQaDiagnosticsEnabled() && approachOriginRef.current != null) {
@@ -240,19 +259,20 @@ export default function TrackRunScreen() {
       startDistanceM: approachQaRef.current?.startDistanceM ?? approach.distanceM,
       firstStableFixTSec: rel(approach.firstStableFixAtMs), armedTSec: rel(approach.armedAtMs),
       startZoneEnteredTSec: rel(approach.startZoneEnteredAtMs),
-      voiceTriggerTSec: rel(approach.startZoneEnteredAtMs), voiceQueuedTSec: null, voiceSpokenTSec: null,
+      voiceTriggerTSec: rel(approach.startReachedAtMs), voiceQueuedTSec: null, voiceSpokenTSec: null,
+      startReachedTSec: rel(approach.startReachedAtMs),
       departedStartTSec: rel(approach.departedStartAtMs), searchStartedTSec: null,
       reason: approach.reason,
     };
   }
   useEffect(() => {
-    if (!arming || !voiceOn || approach.startZoneEnteredAtMs == null) return;
+    if (!arming || !voiceOn || approach.startReachedAtMs == null) return;
     requestVoice({ eventType: 'approach', text: t('track.voiceApproachReached'),
       language: speechLanguage(i18n.language as never), priority: 3,
       onceKey: 'approach-reached', phase: 'approach', distanceM: approachDistanceRef.current,
-      valid: () => approachPhaseRef.current === 'start_zone_entered' || approachPhaseRef.current === 'at_start',
+      valid: () => approachPhaseRef.current === 'at_start' && approachArmedRef.current,
     });
-  }, [arming, voiceOn, approach.startZoneEnteredAtMs, t]);
+  }, [arming, voiceOn, approach.startReachedAtMs, t]);
 
   // Bisher im Approach: präzise Ortung nur während der Annäherung anfragen.
   // Die Berechtigung kommt vom Recorder; kein zweiter Location-Start/Stop.
@@ -315,6 +335,18 @@ export default function TrackRunScreen() {
     approachPhaseRef.current = nextStartZonePhase(approachPhaseRef.current, false, false, true);
     if (approachQaRef.current && approachOriginRef.current != null)
       approachQaRef.current.searchStartedTSec = (Date.now() - approachOriginRef.current) / 1000;
+    if (approachQaRef.current) approachQaRef.current.searchStartReason = mode;
+    if (isQaDiagnosticsEnabled() && approachOriginRef.current != null) {
+      const last = approachFixQaRef.current.samples.at(-1);
+      const recorded = boundedPush(approachFixQaRef.current.samples, {
+        tSec: (Date.now() - approachOriginRef.current) / 1000,
+        distanceToStartM: approachDistanceRef.current ?? last?.distanceToStartM ?? 0,
+        accuracyM: last?.accuracyM ?? null, stable: approachArmedRef.current,
+        stableCount: last?.stableCount ?? 0, zone: last?.zone ?? 'outside',
+        transition: 'search_started',
+      }, 100);
+      if (!recorded) approachFixQaRef.current.truncated = true;
+    }
     startModeRef.current = mode;   // Runtime-Info (manual-at-start | manual-override)
     setArming(false);
     hapticSuccess();   // haptisches Feedback beim Erreichen des Ansatzes
@@ -346,6 +378,13 @@ export default function TrackRunScreen() {
     // Kein direkter Remote-Start mehr (RUN-SAVE2): track_runs wird beim Stop über die
     // Sync-Queue idempotent per runUuid upserted. runUuid ist bereits lokal geführt.
   }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM, t]);
+
+  // Nach bestätigtem Ansatz und echter Abbewegung beginnt die Absuche ohne
+  // weitere Zeit-Sperre. Der manuelle Override bleibt für GPS-Probleme erhalten.
+  useEffect(() => {
+    if (arming && approach.phase === 'departed_start' && approach.startReachedAtMs != null)
+      beginSearchNow('automatic-departure');
+  }, [arming, approach.phase, approach.startReachedAtMs, beginSearchNow]);
 
   // Manueller „Jetzt starten": EINE einzige Definition von "Ansatz erreicht" —
   // exakt dasselbe `approach.armed`, das auch das Banner oben zeigt (Root-
@@ -555,14 +594,14 @@ export default function TrackRunScreen() {
   const guidanceAngles = useMemo<GuidanceAngle[]>(
     () => snapData.laidMarkers
       .filter(m => m.type === 'winkel')
-      .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, angleKind: m.angleKind }]; }),
+      .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, angleKind: m.angleKind, lat: m.lat, lng: m.lng }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
   // Gegenstände (inkl. material für die Voice-Ansage „Dübel"/„Gegenstand").
   const guidanceObjects = useMemo<GuidanceObject[]>(
     () => snapData.laidMarkers
       .filter(m => m.type === 'gegenstand')
-      .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, material: m.material }]; }),
+      .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, material: m.material, lat: m.lat, lng: m.lng }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
   // ── Search-Guidance Activation Guard ─────────────────────────────────────
@@ -596,17 +635,21 @@ export default function TrackRunScreen() {
     initialFiredIds: snapData.recovery?.hapticFiredIds,
     onFired: (id: string) => useTrackingStore.getState().noteSearchHapticFired(id),
   }), [snapData.recovery]);
-  useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery);
+  useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery,
+    { handlerPosition: s.position, configuredDogLeadM: searchHandlerDistanceM, activeObjectWait: s.activeObjectWait });
 
   // Haptische Führung: 1× bei Gegenstand voraus, 2× bei Winkel voraus — dieselbe
   // Bogenlängendistanz (dogProgressM) wie die Sprachführung.
   useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);
 
   // Fährtenende-Erkennung + Voice („Ende der Fährte erreicht."), Once-only, auf Basis
-  // der VIRTUELLEN Hundeposition (dogProgressM/estimatedDogPosition, order-aware) und
-  // des gespeicherten Endpunkts (letzter Punkt der gelegten Fährte). Beendet die
+  // akzeptierter Handler-Fixes und des gespeicherten Endpunkts (letzter Punkt
+  // der gelegten Fährte). DogLead bleibt nur eine Projektion. Beendet die
   // Absuche NICHT — nur Anzeige/Voice/Haptik; der Nutzer beendet weiterhin selbst.
   const endPoint = snapData.laidPoints.length ? snapData.laidPoints[snapData.laidPoints.length - 1] : null;
+  const acceptedHandlerDistanceToEndM = s.endHandlerFix && endPoint ? haversineM(s.endHandlerFix.position, endPoint) : null;
+  const lastSegmentReached = s.trackLengthM > 0 && s.progressM / s.trackLengthM >= 0.75
+    && acceptedHandlerDistanceToEndM != null && acceptedHandlerDistanceToEndM <= 5;
   // QA (rein beobachtend): Zustand beim einmaligen Ende-Ereignis festhalten. Die
   // Ende-Logik selbst (useTrackEndGuidance/stepTrackEnd) bleibt unverändert; Haptik
   // und Voice feuern im selben Tick wie `onFired` (siehe useTrackEndGuidance).
@@ -617,12 +660,14 @@ export default function TrackRunScreen() {
   const qaEndRef = useRef<{ tSec: number; progressM: number; searchDistanceM: number; voice: boolean } | null>(null);
   const noteEndFired = useCallback(() => {
     useTrackingStore.getState().noteSearchEndFired();
+    sLatestRef.current.confirmEnd();
     if (isQaDiagnosticsEnabled() && !qaEndRef.current) {
       const st = sLatestRef.current;
       qaEndRef.current = {
         tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
         progressM: st.dogProgressM, searchDistanceM: st.distanceM, voice: voiceOnRef.current,
       };
+      if (endConfirmationRef.current) endConfirmationRef.current.confirmationTSec = qaEndRef.current.tSec;
     }
   }, []);
   const openMandatoryObjects = Math.max(0, s.totalObjects - s.foundObjects);
@@ -631,6 +676,8 @@ export default function TrackRunScreen() {
     dogProgressM: s.dogProgressM,
     handlerProgressM: s.progressM,
     handlerPosition: s.position,
+    endHandlerFix: s.endHandlerFix,
+    lastSegmentReached,
     trackLengthM: s.trackLengthM,
     estimatedDogPosition: s.estimatedDogPosition,
     endPoint,
@@ -641,21 +688,44 @@ export default function TrackRunScreen() {
     onFired: noteEndFired,
   });
   const trackEndReached = trackEndState === 'reached' || trackEndState === 'completed';
+  const endQaHistoryRef = useRef(INITIAL_END_FIX_HISTORY);
   useEffect(() => {
     if (!isQaDiagnosticsEnabled() || !searchGuidanceActive || !endPoint) return;
-    if (endQaRef.current.length >= TRACKING_UX_QA_LIMITS.end) { endQaTruncatedRef.current = true; return; }
-    const handlerDistanceToEndM = s.position ? haversineM(s.position, endPoint) : null;
+    const handlerDistanceToEndM = acceptedHandlerDistanceToEndM;
     const dogDistanceToEndM = s.estimatedDogPosition ? haversineM(s.estimatedDogPosition, endPoint) : null;
+    if (s.endHandlerFix && handlerDistanceToEndM != null)
+      endQaHistoryRef.current = advanceEndFixHistory(endQaHistoryRef.current, {
+        tMs: s.endHandlerFix.tMs, distanceToEndM: handlerDistanceToEndM,
+        accuracyM: s.endHandlerFix.accuracyM, lastSegmentReached,
+        handlerProgressRatio: s.trackLengthM > 0 ? s.progressM / s.trackLengthM : 0,
+      });
+    const history = endQaHistoryRef.current;
     const blockerReason = trackEndBlocker({ dogProgressM: s.dogProgressM, handlerProgressM: s.progressM,
       handlerDistanceToEndM, geomDistanceM: dogDistanceToEndM, trackLengthM: s.trackLengthM,
-      openMandatoryObjects, activeObjectWait: s.activeObjectWait, searchActive: searchGuidanceActive });
-    endQaRef.current.push({ tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
+      openMandatoryObjects, activeObjectWait: s.activeObjectWait, searchActive: searchGuidanceActive,
+      accuracyM: s.endHandlerFix?.accuracyM ?? null, lastSegmentReached,
+      approachSeen: history.approachSeen, stableEndFixCount: history.insideCount,
+      stableEndFixSpanMs: history.firstInsideMs == null || s.endHandlerFix == null ? 0
+        : s.endHandlerFix.tMs - history.firstInsideMs });
+    endConfirmationRef.current = {
+      candidateStartedTSec: history.firstInsideMs == null || searchStartMsRef.current == null ? null
+        : Math.max(0, (history.firstInsideMs - searchStartMsRef.current) / 1000),
+      stableFixCount: history.insideCount, requiredStableFixCount: 2,
+      handlerDistanceM: handlerDistanceToEndM,
+      effectiveEndRadiusM: endRadiusM(s.endHandlerFix?.accuracyM ?? null),
+      lastSegmentReached, activeObjectWait: s.activeObjectWait,
+      confirmationTSec: endConfirmationRef.current?.confirmationTSec ?? qaEndRef.current?.tSec ?? null,
+      rejectionReason: blockerReason,
+    };
+    const recorded = boundedPush(endQaRef.current, { tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
       handlerProgressM: s.progressM, dogProjectedProgressM: s.dogProgressM,
       configuredDogLeadM: searchHandlerDistanceM, handlerDistanceToEndM, dogDistanceToEndM,
       activeObjectWait: s.activeObjectWait, endEligible: blockerReason == null, blockerReason,
-      eventFiredTSec: qaEndRef.current?.tSec ?? null });
-  }, [searchGuidanceActive, s.progressM, s.dogProgressM, s.position, s.estimatedDogPosition,
-    s.trackLengthM, endPoint, openMandatoryObjects, s.activeObjectWait, searchHandlerDistanceM]);
+      eventFiredTSec: qaEndRef.current?.tSec ?? null }, TRACKING_UX_QA_LIMITS.end);
+    if (!recorded) endQaTruncatedRef.current = true;
+  }, [searchGuidanceActive, s.progressM, s.dogProgressM, s.endHandlerFix, s.estimatedDogPosition,
+    s.trackLengthM, endPoint, openMandatoryObjects, s.activeObjectWait, searchHandlerDistanceM,
+    acceptedHandlerDistanceToEndM, lastSegmentReached]);
 
   // Karten-/Skizzen-Marker (Koordinaten) — getrennt von den Bogenlängen-basierten
   // Guidance-Listen (die tragen arcM statt lat/lng).
@@ -814,7 +884,10 @@ export default function TrackRunScreen() {
               approachQa.voiceSpokenTSec = approachVoice.spokenTSec;
             }
             return { voiceDiagnostics: voice, startApproachDiagnostics: approachQa,
-              endEligibilityDiagnostics: { samples: endQaRef.current.slice(), truncated: endQaTruncatedRef.current } };
+              approachFixDiagnostics: { samples: approachFixQaRef.current.samples.slice(),
+                truncated: approachFixQaRef.current.truncated },
+              endEligibilityDiagnostics: { samples: endQaRef.current.slice(), truncated: endQaTruncatedRef.current },
+              endConfirmationDiagnostics: endConfirmationRef.current ?? undefined };
           })(),
           origin: snapData.laidPoints[0],
           telemetry: res.qa,
@@ -826,7 +899,7 @@ export default function TrackRunScreen() {
           referenceCanonicalLengthM: snapData.referenceCanonicalLengthM,
           objects: objectInputs.map((o, i) => ({
             index: i, at: { latitude: objectMarkers[i].lat as number, longitude: objectMarkers[i].lng as number },
-            atM: o.atM ?? null, found: o.found ?? null, legIndex: o.legIndex ?? null,
+            atM: o.atM ?? null, found: o.found ?? null, status: res.objectStatuses[i], legIndex: o.legIndex ?? null,
           })),
           cornerAtM: cornerInputs.map(c => c.atM),
           end: { fired: qaEndRef.current, hapticFired: qaEndRef.current ? true : null, voiceFired: qaEndRef.current ? qaEndRef.current.voice : null },

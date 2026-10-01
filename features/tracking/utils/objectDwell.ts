@@ -17,8 +17,8 @@ export function stepObjectDwell(state: ObjectDwellState, sample: ObjectDwellSamp
     : sample.gpsOutlier ? 'gps_outlier'
     : sample.accuracyM == null || sample.accuracyM > OBJECT_DWELL.maxAccuracyM ? 'accuracy'
     : sample.progressM <= OBJECT_DWELL.boundaryM ? 'near_start'
-    : sample.trackLengthM - sample.progressM <= OBJECT_DWELL.boundaryM ? 'near_end'
-    : sample.nearAngle ? 'near_angle'
+    // A laid reference object may itself be at a turn or at the end. Proximity
+    // to that actual object remains mandatory; only the start is excluded.
     : sample.distanceToReferenceM > OBJECT_DWELL.maxReferenceM ? 'far_from_reference'
     : sample.speedMps != null && sample.speedMps > OBJECT_DWELL.maxSpeedMps ? 'moving'
     : sample.driftFromStartM > OBJECT_DWELL.maxDriftM ? 'position_drift'

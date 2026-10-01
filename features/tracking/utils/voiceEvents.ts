@@ -45,6 +45,11 @@ export function resetVoiceEvents(startMs = Date.now()) {
 
 export function voiceDiagnostics() { return { events: records.slice(), truncated }; }
 
+/** Record a feature suppressed before it reaches the native speech queue. */
+export function noteSuppressedVoice(request: VoiceRequest, reason: string): void {
+  note(request, Date.now(), null, null, reason);
+}
+
 /** Priority-aware native speech; old messages are stopped and validated onStart. */
 export function requestVoice(request: VoiceRequest): boolean {
   const trigger = Date.now();

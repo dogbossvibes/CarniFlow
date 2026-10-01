@@ -36,11 +36,14 @@ function HapticHarness({ dog, seed, onFired }: { dog: number; seed?: readonly st
   return null;
 }
 const END = { latitude: 0, longitude: 0 };
-function EndHarness({ recording, dog, initialFired, onFired, geomAtEnd }: { recording: boolean; dog: number; initialFired: boolean; onFired: () => void; geomAtEnd: boolean }) {
+function EndHarness({ recording, dog, initialFired, onFired, geomAtEnd, fix = 0 }: { recording: boolean; dog: number; initialFired: boolean; onFired: () => void; geomAtEnd: boolean; fix?: number }) {
   useTrackEndGuidance({
     recording, dogProgressM: dog, trackLengthM: 100,
     estimatedDogPosition: geomAtEnd ? END : { latitude: 0.001, longitude: 0 },
     endPoint: END, openMandatoryObjects: 0, voiceOn: true, initialFired, onFired,
+    handlerProgressM: dog, lastSegmentReached: dog >= 90,
+    endHandlerFix: dog >= 90 ? { position: fix === 0 ? { latitude: 0.000045, longitude: 0 } : END,
+      accuracyM: 4, tMs: 1000 + fix * 900 } : null,
   });
   return null;
 }
@@ -111,10 +114,13 @@ describe('useTrackEndGuidance — Recovery', () => {
     const fired = jest.fn();
     act(() => { renderer = TestRenderer.create(<EndHarness recording dog={50} initialFired={false} onFired={fired} geomAtEnd={false} />); });
     expect(speak).not.toHaveBeenCalled();
-    act(() => { rerender(<EndHarness recording dog={99} initialFired={false} onFired={fired} geomAtEnd />); });
+    act(() => { rerender(<EndHarness recording dog={92} initialFired={false} onFired={fired} geomAtEnd={false} fix={0} />); });
+    act(() => { rerender(<EndHarness recording dog={99} initialFired={false} onFired={fired} geomAtEnd fix={1} />); });
+    expect(fired).not.toHaveBeenCalled();
+    act(() => { rerender(<EndHarness recording dog={99} initialFired={false} onFired={fired} geomAtEnd fix={2} />); });
     expect(speak).toHaveBeenCalledTimes(1);
     expect(fired).toHaveBeenCalledTimes(1);
-    act(() => { rerender(<EndHarness recording dog={100} initialFired={false} onFired={fired} geomAtEnd />); });
+    act(() => { rerender(<EndHarness recording dog={100} initialFired={false} onFired={fired} geomAtEnd fix={3} />); });
     expect(speak).toHaveBeenCalledTimes(1);   // once-only unverändert
   });
 });

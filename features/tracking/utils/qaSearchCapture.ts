@@ -21,6 +21,8 @@
 // ──────────────────────────────────────────────────────────────────────────
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { findTurnVertices } from '@/features/tracking/utils/searchReplayGeometry';
+import type { ReplayGapInsertion, ReplayUnfillableGap } from '@/features/tracking/utils/searchReplayGeometry';
+import type { ReferenceObjectStatus } from '@/features/tracking/utils/referenceObjectStatus';
 import type { VoiceDiagnostic } from '@/features/tracking/utils/trackingUxDiagnostics';
 
 export interface QaStartApproachDiagnostics {
@@ -28,6 +30,25 @@ export interface QaStartApproachDiagnostics {
   startZoneEnteredTSec: number | null; voiceTriggerTSec: number | null;
   voiceQueuedTSec: number | null; voiceSpokenTSec: number | null;
   departedStartTSec: number | null; searchStartedTSec: number | null; reason: string | null;
+  startReachedTSec?: number | null;
+  searchStartReason?: string | null;
+}
+export interface QaApproachFixDiagnostics {
+  samples: { tSec: number; distanceToStartM: number; accuracyM: number | null;
+    stable: boolean; stableCount: number; zone: 'outside' | 'near' | 'reached';
+    transition: 'entered_near' | 'entered_reached' | 'departed_reached' | 'search_started' | null }[];
+  truncated: boolean;
+}
+export interface QaEndConfirmationDiagnostics {
+  candidateStartedTSec: number | null;
+  stableFixCount: number;
+  requiredStableFixCount: number;
+  handlerDistanceM: number | null;
+  effectiveEndRadiusM: number;
+  lastSegmentReached: boolean;
+  activeObjectWait: boolean;
+  confirmationTSec: number | null;
+  rejectionReason: string | null;
 }
 export interface QaEndEligibilitySample {
   tSec: number; handlerProgressM: number; dogProjectedProgressM: number;
@@ -61,6 +82,8 @@ export interface SearchQaTelemetry {
     speedMps: number | null; stationaryConfidence: number; progressM: number;
     distanceToNearestReferenceObjectM: number; nearStart: boolean; nearAngle: boolean; nearEnd: boolean;
     accepted: boolean; rejectReason: string | null; userOverride: boolean }[];
+  replayInsertedForGap?: ReplayGapInsertion[];
+  replayUnfillableGaps?: ReplayUnfillableGap[];
   /** Kleinste Luftlinie einer akzeptierten Suchposition zum Endpunkt der Soll-Fährte. */
   minDistToEndM: number | null;
   progressAtMinEndM: number | null;
@@ -100,6 +123,7 @@ export interface QaSearchObject {
   progressAtClosestApproachM: number | null;
   /** Vom bestehenden Recorder als gefunden erkannt (foundRef) — keine neue Erkennung. */
   found: boolean | null;
+  status?: ReferenceObjectStatus;
   /** Aus Referenzdaten abgeleiteter Kontext; keine Objekterkennung. */
   context: { legIndex: number | null; nearAngle: boolean; nearEnd: boolean };
 }
@@ -116,8 +140,16 @@ export interface QaSearchDiagnostics {
   /** QA v2.5: additive UX diagnostics. */
   voiceDiagnostics?: { events: VoiceDiagnostic[]; truncated: boolean };
   startApproachDiagnostics?: QaStartApproachDiagnostics;
+  approachFixDiagnostics?: QaApproachFixDiagnostics;
   endEligibilityDiagnostics?: { samples: QaEndEligibilitySample[]; truncated: boolean };
+  endConfirmationDiagnostics?: QaEndConfirmationDiagnostics;
   objectDwellDiagnostics?: { candidates: NonNullable<SearchQaTelemetry['objectDwellCandidates']>; truncated: boolean };
+  replayInsertedForGapCount?: number;
+  replayInsertedForGap?: ReplayGapInsertion[];
+  replayInsertedForGapTruncated?: boolean;
+  replayUnfillableGapCount?: number;
+  replayUnfillableGaps?: ReplayUnfillableGap[];
+  replayUnfillableGapsTruncated?: boolean;
   /** true = Lauf wurde mit Resume/Recovery gestartet: Ströme decken nur den Teil nach dem Neustart ab. */
   partial: boolean;
   rawSearchPointCount: number;
@@ -234,7 +266,8 @@ function thin<T>(arr: readonly T[], max: number): T[] {
 
 // ── Builder ──────────────────────────────────────────────────────────────
 export interface BuildSearchDiagnosticsInput {
-  ux?: Pick<QaSearchDiagnostics, 'voiceDiagnostics' | 'startApproachDiagnostics' | 'endEligibilityDiagnostics' | 'objectDwellDiagnostics'>;
+  ux?: Pick<QaSearchDiagnostics, 'voiceDiagnostics' | 'startApproachDiagnostics' | 'approachFixDiagnostics'
+    | 'endEligibilityDiagnostics' | 'endConfirmationDiagnostics' | 'objectDwellDiagnostics'>;
   /** Ursprung der relativen Koordinaten: erster gelegter Punkt (wie im Lay-Export). */
   origin: { latitude: number; longitude: number };
   telemetry: SearchQaTelemetry;
@@ -246,7 +279,8 @@ export interface BuildSearchDiagnosticsInput {
   laid: { total: number; end: { latitude: number; longitude: number } | null };
   /** Bereits beim Legen ermittelte kanonische Distanz; nie Cursor-Eingabe. */
   referenceCanonicalLengthM?: number | null;
-  objects: { index: number; at: { latitude: number; longitude: number }; atM: number | null; found: boolean | null; legIndex: number | null }[];
+  objects: { index: number; at: { latitude: number; longitude: number }; atM: number | null; found: boolean | null;
+    status?: ReferenceObjectStatus; legIndex: number | null }[];
   cornerAtM: readonly number[];
   end: { fired: { tSec: number; progressM: number; searchDistanceM: number } | null; hapticFired: boolean | null; voiceFired: boolean | null };
   manualStopTSec: number;
@@ -304,6 +338,7 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
       minReplayRouteDistM: dReplay == null ? null : round(dReplay),
       progressAtClosestApproachM: a?.progressAtClosestM == null ? null : round(a.progressAtClosestM),
       found: obj.found,
+      ...(obj.status ? { status: obj.status } : {}),
       context: {
         legIndex: obj.legIndex,
         nearAngle: atM != null && input.cornerAtM.some(c => Math.abs(c - atM) <= 3),
@@ -322,6 +357,12 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
     ...(tel.objectDwellCandidates ? { objectDwellDiagnostics: {
       candidates: tel.objectDwellCandidates.slice(), truncated: tel.objectDwellCandidates.length >= 100,
     } } : {}),
+    ...(tel.replayInsertedForGap ? { replayInsertedForGapCount: tel.replayInsertedForGap.length,
+      replayInsertedForGap: tel.replayInsertedForGap.slice(0, 100),
+      replayInsertedForGapTruncated: tel.replayInsertedForGap.length > 100 } : {}),
+    ...(tel.replayUnfillableGaps ? { replayUnfillableGapCount: tel.replayUnfillableGaps.length,
+      replayUnfillableGaps: tel.replayUnfillableGaps.slice(0, 100),
+      replayUnfillableGapsTruncated: tel.replayUnfillableGaps.length > 100 } : {}),
     partial: input.resumed || tel.resumed,
     rawSearchPointCount: tel.raw.length,
     acceptedSearchPointCount: tel.raw.filter(r => r.accepted).length,

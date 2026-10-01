@@ -5,7 +5,7 @@ import { DEFAULT_GUIDANCE_OPTIONS, stepGuidanceEngine, type GuidanceFeature, typ
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import i18n, { type AppLocale } from '@/i18n/config';
 import type { TranslationKey } from '@/i18n/de-CH';
-import { requestVoice, cancelVoiceEvents } from '@/features/tracking/utils/voiceEvents';
+import { requestVoice, cancelVoiceEvents, noteSuppressedVoice } from '@/features/tracking/utils/voiceEvents';
 
 // expo-speech defensiv laden (nativ; kein Crash, wenn das Modul fehlt).
 let Speech: typeof import('expo-speech') | null = null;
@@ -15,7 +15,20 @@ export const SPEECH_AVAILABLE = Speech != null;
 const SPEAK_GAP_MS     = 3500;   // Entprellung zwischen zwei Ansagen
 
 // arcM = Bogenlänge des Winkels entlang der gelegten Fährte (= marker.distance_from_start).
-export interface GuidanceAngle { id: string; arcM: number; angleKind: AngleKind | null }
+export interface GuidanceAngle { id: string; arcM: number; angleKind: AngleKind | null; lat?: number | null; lng?: number | null }
+export interface VoicePhysicalContext {
+  handlerPosition: { latitude: number; longitude: number } | null;
+  configuredDogLeadM: number;
+  activeObjectWait: boolean;
+}
+
+export const maxVoiceDistanceM = (dogLeadM: number) => Math.min(8, Math.max(3, dogLeadM + 2.5));
+function handlerDistanceM(a: NonNullable<VoicePhysicalContext['handlerPosition']>, b: { lat: number; lng: number }): number {
+  const rad = Math.PI / 180;
+  const dy = (a.latitude - b.lat) * 111_320;
+  const dx = (a.longitude - b.lng) * 111_320 * Math.cos(a.latitude * rad);
+  return Math.hypot(dx, dy);
+}
 
 export function speechLanguage(locale: AppLocale) {
   if (locale === 'fr') return 'fr-CH';
@@ -81,17 +94,19 @@ export function useTrackVoiceGuidance(
   angles: GuidanceAngle[],
   voiceOn: boolean,
   stepLengthM?: number,
-  objects: { id: string; arcM: number; material?: string | null }[] = [],
+  objects: { id: string; arcM: number; material?: string | null; lat?: number | null; lng?: number | null }[] = [],
   recovery?: VoiceGuidanceRecovery,
+  physical?: VoicePhysicalContext,
 ) {
   const stateRef     = useRef<Record<string, GuidanceFeatureState>>({});
   const lastSpeakRef = useRef(0);
   const onAnnouncedRef = useRef(recovery?.onAnnounced);
+  const suppressedRef = useRef<Set<string>>(new Set());
   onAnnouncedRef.current = recovery?.onAnnounced;
   const initialIds = recovery?.initialAnnouncedIds;
   const enabled = recovery?.enabled ?? true;
-  const latestRef = useRef({ enabled, voiceOn, dogProgressM });
-  latestRef.current = { enabled, voiceOn, dogProgressM };
+  const latestRef = useRef({ enabled, voiceOn, dogProgressM, physical });
+  latestRef.current = { enabled, voiceOn, dogProgressM, physical };
 
   // Bei neuem Lauf (neue Listen) die „schon angesagt"-Menge zurücksetzen — bzw.
   // aus dem Recovery-State desselben Runs seeden ('announced' → nie wieder).
@@ -99,6 +114,7 @@ export function useTrackVoiceGuidance(
     const seeded: Record<string, GuidanceFeatureState> = {};
     for (const id of initialIds ?? []) seeded[id] = 'announced';
     stateRef.current = seeded;
+    suppressedRef.current.clear();
   }, [angles, objects, initialIds]);
 
   useEffect(() => {
@@ -107,10 +123,28 @@ export function useTrackVoiceGuidance(
     const now = Date.now();
     if (now - lastSpeakRef.current < SPEAK_GAP_MS) return;
 
-    const candidates: GuidanceFeature[] = [
-      ...angles.map(a => ({ id: a.id, arcM: a.arcM, kind: 'angle' as const, angleKind: a.angleKind })),
-      ...objects.map(o => ({ id: o.id, arcM: o.arcM, kind: 'object' as const, material: o.material })),
+    const all = [
+      ...angles.map(a => ({ ...a, kind: 'angle' as const })),
+      ...objects.map(o => ({ ...o, kind: 'object' as const })),
     ];
+    const candidates: GuidanceFeature[] = all.filter(feature => {
+      const aheadM = feature.arcM - dogProgressM;
+      if (aheadM < 0 || aheadM > DEFAULT_GUIDANCE_OPTIONS.announceAheadM) return true;
+      const reason = physical?.activeObjectWait ? 'active_object_wait'
+        : physical && (!physical.handlerPosition || feature.lat == null || feature.lng == null) ? 'physical_position_missing'
+        : physical?.handlerPosition && feature.lat != null && feature.lng != null
+          && handlerDistanceM(physical.handlerPosition, { lat: feature.lat, lng: feature.lng })
+            > maxVoiceDistanceM(physical.configuredDogLeadM) ? 'physical_distance' : null;
+      if (reason) {
+        const key = `${feature.id}:${reason}`;
+        if (!suppressedRef.current.has(key)) {
+          suppressedRef.current.add(key);
+          noteSuppressedVoice({ eventType: feature.kind, text: '', language: '', priority: 4,
+            onceKey: `feature:${feature.id}`, phase: 'search', progressM: dogProgressM, distanceM: aheadM }, reason);
+        }
+      }
+      return !reason;
+    });
     const result = stepGuidanceEngine(candidates, dogProgressM, stateRef.current, DEFAULT_GUIDANCE_OPTIONS);
     stateRef.current = result.state;
     if (result.announcement) {
@@ -125,13 +159,18 @@ export function useTrackVoiceGuidance(
         language: speechLanguage(locale), priority: 4, onceKey: `feature:${best.id}`, phase: 'search',
         progressM: dogProgressM, distanceM: bestD,
         valid: () => { const latest = latestRef.current;
+          const nowPhysical = latest.physical;
           return latest.enabled && latest.voiceOn && latest.dogProgressM != null
+            && !nowPhysical?.activeObjectWait
+            && (!(nowPhysical?.handlerPosition && best.lat != null && best.lng != null)
+              || handlerDistanceM(nowPhysical.handlerPosition, { lat: best.lat, lng: best.lng })
+                <= maxVoiceDistanceM(nowPhysical.configuredDogLeadM))
             && best.arcM - latest.dogProgressM >= -DEFAULT_GUIDANCE_OPTIONS.passedM
             && best.arcM - latest.dogProgressM <= DEFAULT_GUIDANCE_OPTIONS.announceAheadM; },
       });
       onAnnouncedRef.current?.(best.id);
     }
-  }, [enabled, dogProgressM, angles, objects, voiceOn, stepLengthM]);
+  }, [enabled, dogProgressM, angles, objects, voiceOn, stepLengthM, physical]);
 
   // Beim Verlassen / Stummschalten laufende Ansage stoppen.
   useEffect(() => { if (!voiceOn) cancelVoiceEvents(); }, [voiceOn]);

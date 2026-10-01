@@ -4,8 +4,8 @@ import { forwardDistanceFromDog } from '@/features/tracking/utils/searchGeometry
 export type GuidanceFeatureState = 'unseen' | 'approaching' | 'announced' | 'reached' | 'passed';
 
 export type GuidanceFeature =
-  | { id: string; arcM: number; kind: 'angle'; angleKind: AngleKind | null }
-  | { id: string; arcM: number; kind: 'object'; material?: string | null };
+  | { id: string; arcM: number; kind: 'angle'; angleKind: AngleKind | null; lat?: number | null; lng?: number | null }
+  | { id: string; arcM: number; kind: 'object'; material?: string | null; lat?: number | null; lng?: number | null };
 
 export interface GuidanceEngineOptions {
   announceAheadM: number;
@@ -81,6 +81,11 @@ export interface TrackEndInput {
   trackLengthM: number;         // Gesamtlänge der gelegten Fährte
   geomDistanceM: number | null; // Distanz virtuelle Hundeposition → gespeicherter Endpunkt
   openMandatoryObjects: number; // noch nicht gefundene Pflicht-Gegenstände
+  accuracyM?: number | null;
+  lastSegmentReached?: boolean;
+  approachSeen?: boolean;
+  stableEndFixCount?: number;
+  stableEndFixSpanMs?: number;
 }
 
 export interface TrackEndOptions {
@@ -96,21 +101,25 @@ export interface TrackEndOptions {
 //    unter BREAK_THRESHOLD_M (6.0): „am Endpunkt auf der Fährte".
 //  • approachingRemainingM 10 → wie announceAheadM der Guidance-Engine.
 export const DEFAULT_TRACK_END_OPTIONS: TrackEndOptions = {
-  reachedProgressRatio: 0.97,
+  reachedProgressRatio: 0.90,
   reachedGeomM: 3.0,
   approachingRemainingM: 10,
 };
+
+export function endRadiusM(accuracyM: number | null | undefined): number {
+  return Math.min(3, Math.max(1.5, 0.5 * (accuracyM ?? 6)));
+}
 
 export function trackEndBlocker(input: TrackEndInput, options: TrackEndOptions = DEFAULT_TRACK_END_OPTIONS): string | null {
   if (!(input.trackLengthM > 1)) return 'no_reference_track';
   if (input.searchActive === false) return 'search_inactive';
   if (input.activeObjectWait) return 'object_wait';
-  if ((input.handlerProgressM ?? input.dogProgressM) / input.trackLengthM < options.reachedProgressRatio) return 'handler_progress';
-  const handlerDist = input.handlerDistanceToEndM === undefined ? input.geomDistanceM : input.handlerDistanceToEndM;
-  if (handlerDist == null || handlerDist > options.reachedGeomM) return 'handler_distance';
-  if (input.dogProgressM / input.trackLengthM < options.reachedProgressRatio) return 'dog_progress';
-  if (input.geomDistanceM == null || input.geomDistanceM > options.reachedGeomM) return 'dog_distance';
-  if (input.openMandatoryObjects > 0) return 'open_objects';
+  if (!input.lastSegmentReached && (input.handlerProgressM ?? 0) / input.trackLengthM < options.reachedProgressRatio)
+    return 'handler_progress';
+  const handlerDist = input.handlerDistanceToEndM ?? null;
+  if (handlerDist == null || handlerDist > endRadiusM(input.accuracyM)) return 'handler_distance';
+  if (!input.approachSeen) return 'approach_history';
+  if ((input.stableEndFixCount ?? 0) < 2 || (input.stableEndFixSpanMs ?? 0) < 800) return 'end_hysteresis';
   return null;
 }
 
@@ -128,7 +137,7 @@ export function stepTrackEnd(
   // Ohne gelegte Fährte gibt es kein Ende.
   if (!(input.trackLengthM > 1)) return { state: previous, justReached: false };
 
-  const remainingM = Math.max(0, input.trackLengthM - input.dogProgressM);
+  const remainingM = Math.max(0, input.trackLengthM - (input.handlerProgressM ?? 0));
 
   const reached = trackEndBlocker(input, options) == null;
 

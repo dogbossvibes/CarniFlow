@@ -3,7 +3,7 @@ import { AppState, DeviceEventEmitter } from 'react-native';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import type { LocationObject } from 'expo-location';
 import { useSearchRecorder, type SearchRecorder, type SearchResult } from '../useSearchRecorder';
-import { useStartPointApproach, type StartApproach } from '../useStartPointApproach';
+import { useStartPointApproach, type StartApproach, type ApproachFixEvent } from '../useStartPointApproach';
 import { setLocationSourceMode, type LocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { enqueueSearchPoint } from '@/features/tracking/store/searchPersist';
@@ -76,9 +76,11 @@ let recorder: SearchRecorder;
 let approach: StartApproach;
 let renderer: ReactTestRenderer | null;
 let clockMs: number;
+let approachEvents: ApproachFixEvent[] = [];
 
 function Approach({ active, fix }: { active: boolean; fix: SearchRecorder['liveFix'] }) {
-  approach = useStartPointApproach({ active, start: START, liveFix: fix });
+  approach = useStartPointApproach({ active, start: START, liveFix: fix,
+    onDiagnostic: event => { approachEvents.push(event); } });
   return null;
 }
 
@@ -134,6 +136,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockNativeListeners.clear(); mockExpoListeners.clear(); mockNativeRunning = false;
   renderer = null;
+  approachEvents = [];
   useTrackingStore.getState().reset();
   useTrackingStore.getState().startRecording('session-search', 'dog-search');
 });
@@ -145,6 +148,17 @@ afterEach(() => {
 
 describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search location owner — %s', mode => {
   beforeEach(() => { setLocationSourceMode(mode); });
+
+  it('reports near, stable reached, and departure transitions without absolute coordinates', async () => {
+    await mount();
+    feed(8.49); feed(2); feed(2); feed(5); feed(5);
+    expect(approachEvents[0]).toMatchObject({ zone: 'outside', transition: null });
+    expect(approachEvents.some(e => e.zone === 'near' && e.transition === 'entered_near')).toBe(true);
+    expect(approachEvents.some(e => e.transition === 'entered_reached')).toBe(true);
+    expect(approachEvents.some(e => e.transition === 'departed_reached')).toBe(true);
+    expect(approachEvents.every(e => e.tMs >= 1e12)).toBe(true); // callback origin is normalized by run.tsx
+    expect(JSON.stringify(approachEvents)).not.toMatch(/"(?:lat|lng|latitude|longitude)"/);
+  });
 
   it('arming=false keeps the source alive; subsequent fixes reach memory, run payload, analysis and replay', async () => {
     await mount();
@@ -204,9 +218,9 @@ describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search locati
     expect(approach.position).toEqual({ lat: 2 / 111320, lng: 0 });
     expect(approach.accuracy).toBe(4.4);
     expect(approach.radiusM).toBeCloseTo(6.6);
-    expect(approach.fixesRemaining).toBe(2);
+    expect(approach.fixesRemaining).toBe(1);
     act(() => { rerender(<Harness arming />); });
-    expect(approach.fixesRemaining).toBe(2); // no duplicate counting on render
+    expect(approach.fixesRemaining).toBe(1); // no duplicate counting on render
     feed(3, 4.4);
     expect(approach.position!.lat).toBe(3 / 111320);
     expect(approach.position!.lat).not.toBe(recorder.position!.latitude); // not EMA
@@ -215,7 +229,7 @@ describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search locati
     feed(3, 4.4, 6000);
     expect(approach.armed).toBe(false);
     feed(3, 13); // accuracy cap unchanged
-    expect(approach.fixesRemaining).toBe(3);
+    expect(approach.fixesRemaining).toBe(2);
     feed(100); // implausible jump / outside radius
     expect(approach.armed).toBe(false);
     expectSourceAlive(mode);

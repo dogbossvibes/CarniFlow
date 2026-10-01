@@ -50,12 +50,12 @@ describe('run.tsx — Search-Recovery-State', () => {
     expect(run).toContain('initialFired: snapData.recovery?.endFired ?? false');
     expect(run).toContain('noteSearchEndFired()');
     expect(run).toContain('setSearchSegmentAnnouncements(result.state)');
-    expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery);');
+    expect(run).toContain('useTrackVoiceGuidance(s.dogProgressM, guidanceAngles, voiceOn, stepLengthM, guidanceObjects, voiceRecovery,');
     expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);');
   });
 
   it('laidObjects tragen die Marker-ID (stabile Fund-Identität)', () => {
-    expect(run).toContain("index: i, material: m.material ?? '', id: m.id }))");
+    expect(run).toContain("index: i, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null }))");
   });
 
   it('Completed/„Beenden": Store-Reset (clearPending) bleibt der Cleanup-Pfad', () => {
@@ -83,7 +83,7 @@ describe('18. Canonical-Arc-Regression (7cc2cc6 unverändert)', () => {
 describe('Schwellen unverändert', () => {
   it('Voice-/Haptik-/Ende-/Off-Track-Konstanten', () => {
     expect(DEFAULT_GUIDANCE_OPTIONS).toEqual({ announceAheadM: 10, reachedM: 1.5, passedM: 2.5 });
-    expect(DEFAULT_TRACK_END_OPTIONS).toEqual({ reachedProgressRatio: 0.97, reachedGeomM: 3.0, approachingRemainingM: 10 });
+    expect(DEFAULT_TRACK_END_OPTIONS).toEqual({ reachedProgressRatio: 0.90, reachedGeomM: 3.0, approachingRemainingM: 10 });
     expect(OFF_TRACK).toEqual({ MIN_WARNING_M: 3, ACCURACY_WARN_FACTOR: 1.5, OFF_EXTRA_M: 2, RECOVERY_FACTOR: 0.6, MAX_RELIABLE_ACCURACY_M: 20, WARN_CONSECUTIVE: 2, OFF_CONSECUTIVE: 3, RECOVER_CONSECUTIVE: 3 });
     const voice = strip(read('features/tracking/hooks/useTrackVoiceGuidance.ts'));
     const haptic = strip(read('features/tracking/hooks/useTrackHapticGuidance.ts'));

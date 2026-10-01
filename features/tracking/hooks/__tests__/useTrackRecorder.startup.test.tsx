@@ -92,9 +92,9 @@ async function start(onSessionStarted?: () => void) {
     expect((await current.beginRecording({ localId: 'local', ownerId: 'owner', onSessionStarted })).error).toBeNull();
   });
 }
-function feed(afterTapMs: number, accuracy: number, northM: number, speed = 0) {
+function feed(afterTapMs: number, accuracy: number, northM: number, speed = 0, ageMs = 0) {
   clockMs = 1_000_000 + afterTapMs;
-  act(() => { feedFix?.({ lat: metersToLatitude(northM), lng: 0, accuracy, speed, t: clockMs }); });
+  act(() => { feedFix?.({ lat: metersToLatitude(northM), lng: 0, accuracy, speed, t: clockMs - ageMs }); });
 }
 beforeEach(() => {
   clockMs = 1_000_000;
@@ -118,7 +118,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-it('good fixes and confirmed movement start geometry at 600 ms without a minimum timer', async () => {
+it('good fixes and plausible movement start geometry at 2.5 seconds without a minimum timer', async () => {
   mockQaEnabled = true;
   const visible = jest.fn();
   await start(visible);
@@ -126,19 +126,40 @@ it('good fixes and confirmed movement start geometry at 600 ms without a minimum
   for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
   const state = useTrackingStore.getState();
   expect(state.trackPoints).toHaveLength(0);
-  feed(500, 5, 10);
+  feed(1500, 5, 10);
   expect(state.trackPoints).toHaveLength(0);
-  feed(600, 5, 12);
+  feed(2500, 5, 12);
   expect(state.startLockActive).toBe(false);
   expect(state.trackPoints.length).toBeGreaterThan(0);
-  expect(clockMs - 1_000_000).toBe(600);
+  expect(clockMs - 1_000_000).toBe(2500);
   await act(async () => { current.finish(); await Promise.resolve(); });
   const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
   expect(capture.startupDiagnostics).toMatchObject({
-    recordingSessionStartedTSec: 0, geometryStartedTSec: 0.6,
-    startupUiDelayMs: 0, geometryLockDelayMs: 600,
-    movementConfirmedTSec: 0.6, fallbackUsed: false,
+    recordingSessionStartedTSec: 0, geometryStartedTSec: 2.5,
+    startupUiDelayMs: 0, geometryLockDelayMs: 2500,
+    movementConfirmedTSec: 2.5, movementConfirmationSource: 'gps_displacement', fallbackUsed: false,
   });
+  expect(capture.startupMovementDiagnostics).toMatchObject({
+    confirmationTSec: 2.5, confirmationSource: 'gps_displacement', fallbackUsed: false, truncated: false,
+  });
+  expect(capture.startupMovementDiagnostics.samples.at(-1)).toMatchObject({
+    tSec: 2.5, acceptedFix: true, candidateSource: 'gps_displacement', confirmed: true,
+  });
+  expect(JSON.stringify(capture.startupMovementDiagnostics)).not.toMatch(/"(?:lat|lng|latitude|longitude|timestamp)"/);
+});
+
+it('bounds pre-geometry movement QA while retaining the final confirmation summary', async () => {
+  mockQaEnabled = true;
+  await start();
+  for (let i = 1; i <= 120; i++) feed(i * 50, 5, 0);
+  expect(useTrackingStore.getState().startLockActive).toBe(true);
+  feed(12000, 5, 0);
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const movement = (saveQaSessionCapture as jest.Mock).mock.calls[0][0].startupMovementDiagnostics;
+  expect(movement.samples).toHaveLength(100);
+  expect(movement.samples[0].tSec).toBe(0.05);
+  expect(movement.truncated).toBe(true);
+  expect(movement).toMatchObject({ confirmationTSec: 12, confirmationSource: 'fallback', fallbackUsed: true });
 });
 
 it('at one fix per second, the fourth anchor fix and second movement fix release at 6 seconds', async () => {
@@ -158,12 +179,12 @@ it('bad fixes stay out of geometry; a later usable fix has no extra 12-second de
   expect(state.trackPoints).toHaveLength(0);
   expect(state.startLockActive).toBe(true);
   for (const ms of [2100, 2200, 2300, 2400]) feed(ms, 5, 0);
-  feed(2500, 5, 10);
-  feed(2600, 5, 12);
+  feed(3400, 5, 10);
+  feed(4400, 5, 12);
   expect(state.startLockActive).toBe(false);
   expect(state.trackPoints.length).toBeGreaterThan(0);
   expect(state.trackPoints[0].lat).toBeCloseTo(0, 5);
-  expect(clockMs - 1_000_000).toBe(2600);
+  expect(clockMs - 1_000_000).toBe(4400);
 });
 
 it('a queued voice event does not await native TTS before arming the recorder', async () => {
@@ -171,10 +192,10 @@ it('a queued voice event does not await native TTS before arming the recorder', 
     priority: 1, onceKey: 'startup-test', phase: 'lay' })).toBe(true);
   await start();
   for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
-  feed(500, 5, 10);
-  feed(600, 5, 12);
+  feed(1500, 5, 10);
+  feed(2500, 5, 12);
   expect(useTrackingStore.getState().startLockActive).toBe(false);
-  expect(clockMs - 1_000_000).toBe(600);
+  expect(clockMs - 1_000_000).toBe(2500);
 });
 
 it('keeps an inaccurate early fix in QA while geometry and distance remain empty', async () => {
@@ -190,6 +211,17 @@ it('keeps an inaccurate early fix in QA while geometry and distance remain empty
   expect(capture.linePoints).toHaveLength(0);
   expect(capture.detectorPoints).toHaveLength(0);
   expect(capture.startupDiagnostics.blockingReason).toBe('waiting_for_stable_anchor');
+});
+
+it('does not use stale cached fixes or repeated timestamps as movement/anchor samples', async () => {
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0, 0, 10_000);
+  expect(useTrackingStore.getState().startLockActive).toBe(true);
+  for (const ms of [1000, 2000, 3000, 4000]) feed(ms, 5, 0);
+  feed(5000, 5, 0); // distinct source time, no displacement
+  feed(6000, 5, 0, 0, 1000); // repeats the prior source timestamp
+  expect(useTrackingStore.getState().startLockActive).toBe(true);
+  expect(useTrackingStore.getState().trackPoints).toHaveLength(0);
 });
 
 it('shows the session and starts its timer before SQLite resolves; geometry fallback remains separate', async () => {

@@ -19,7 +19,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 // Wie der Startpunkt bestätigt wurde (Runtime-Info; keine DB-Persistenz nötig).
-export type StartMode = 'manual-at-start' | 'manual-override';
+export type StartMode = 'manual-at-start' | 'manual-override' | 'automatic-departure';
 
 export interface ApproachConfig {
   /** Untergrenze des dynamischen Startradius (m). */
@@ -105,6 +105,19 @@ export interface ApproachState {
 
 export const INITIAL_APPROACH: ApproachState = { consecutive: 0, armed: false };
 
+/** The broad accuracy-based approach zone is UI-only; spoken "reached" is tighter. */
+export function reachedRadiusM(accuracyM: number | null): number | null {
+  if (accuracyM == null) return null;
+  return Math.min(4, Math.max(2.5, 2.5 + 0.2 * accuracyM));
+}
+
+export function isStableReachedFix(sample: ApproachSample, cfg: ApproachConfig): boolean {
+  const radius = reachedRadiusM(sample.accuracy);
+  return radius != null && sample.accuracy != null && sample.accuracy <= cfg.maxAccuracyM
+    && sample.distanceM != null && sample.distanceM <= radius
+    && isFreshFix(sample.ageMs, cfg) && isPlausibleSpeed(sample.jumpSpeedMps, cfg);
+}
+
 // Root-Cause-Fix (echtes iPhone, Build 43 — "'Ansatz erreicht' bei ca. 5,9 m,
 // unmittelbar danach 'Noch nicht am Startpunkt — ca. 6 m entfernt'"): `armed`
 // war bisher ein EINWEG-LATCH ("einmal armed → bleibt armed, kein
@@ -140,7 +153,10 @@ export type StartZonePhase = 'approaching' | 'start_zone_entered' | 'at_start' |
 export function nextStartZonePhase(previous: StartZonePhase, eligible: boolean, armed: boolean, searchStarted = false): StartZonePhase {
   if (searchStarted) return 'search_started';
   if (previous === 'search_started' || previous === 'departed_start') return previous;
-  if (previous !== 'approaching' && !eligible) return 'departed_start';
+  // Departure needs two stable fixes beyond the reached zone; the hook records
+  // those separately. A single GPS outlier must not start the search.
+  if (previous === 'at_start' && !eligible) return 'at_start';
+  if (previous === 'start_zone_entered' && !eligible) return 'approaching';
   if (armed) return 'at_start';
   if (previous === 'approaching' && eligible) return 'start_zone_entered';
   return previous;

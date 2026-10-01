@@ -1,6 +1,6 @@
 // Search-Replay-/Display-Geometrie: Kontrakt, Legacy-Kompatibilität, Payload.
 import {
-  buildReplayGeometry, replayGeometryArrays, REPLAY_GEOMETRY, type ReplayGeoPoint,
+  buildReplayGeometry, buildReplayGeometryDetailed, replayGeometryArrays, REPLAY_GEOMETRY, type ReplayGeoPoint,
 } from '@/features/tracking/utils/searchReplayGeometry';
 import { selectDisplayRunPoints } from '@/features/tracking/utils/searchDisplayGeometry';
 import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
@@ -73,6 +73,26 @@ describe('buildReplayGeometry', () => {
     const a = replayGeometryArrays(sharpL())!;
     expect(a.points.length).toBe(a.timeSec.length);
     expect(a.points[0]).toHaveProperty('latitude');
+  });
+
+  it('restores only observed samples until spatial and temporal gaps satisfy the limits', () => {
+    const dense = Array.from({ length: 20 }, (_, i) => P(i, 0, i * 2));
+    const detail = buildReplayGeometryDetailed(dense)!;
+    expect(detail.insertedForGap.length).toBeGreaterThan(0);
+    for (const p of detail.points) expect(dense).toContainEqual(p);
+    for (let i = 1; i < detail.points.length; i++) {
+      const a = detail.points[i - 1], b = detail.points[i];
+      expect(Math.hypot(xy(b).x - xy(a).x, xy(b).y - xy(a).y)).toBeLessThanOrEqual(REPLAY_GEOMETRY.maxReplayGapM);
+      expect(b.t - a.t).toBeLessThanOrEqual(REPLAY_GEOMETRY.maxReplayGapSec);
+    }
+    expect(detail.insertedForGap.every(x => dense[x.sourceIndex] != null)).toBe(true);
+  });
+
+  it('leaves a genuine source-data gap visible instead of fabricating a point', () => {
+    const dense = [P(0, 0, 0), P(8, 0, 8)];
+    expect(buildReplayGeometryDetailed(dense)).toEqual({ points: dense, insertedForGap: [],
+      unfillableGaps: [{ startSourceIndex: 0, endSourceIndex: 1, spatialGapM: 8,
+        temporalGapSec: 8, reason: 'no_observed_intermediate_sample' }] });
   });
 });
 
