@@ -42,6 +42,16 @@ describe('positionSource — LEGACY/PRECISION-QA-Schalter', () => {
     expect(handle.info.isNativeAvailable).toBe(true);
   });
 
+  it('PRECISION forwards the native stream source and provider from the emitted fix', async () => {
+    const received: any[] = [];
+    await startPositionSource(s => received.push(s), { timeInterval: 1000 });
+    const [emit] = mockStartPositionStream.mock.calls[0];
+    emit({ lat: 1, lng: 2, accuracy: 4, t: 1234, source: 'native', provider: 'ios-core-location' });
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({ source: 'native', provider: 'ios-core-location' });
+    expect(mockWatchPositionAsync).not.toHaveBeenCalled();
+  });
+
   it('LEGACY: startPositionStream/AnyvoPrecisionLocation wird komplett umgangen, reines expo-location mit den alten Optionen', async () => {
     setLocationSourceMode('legacy');
     const handle = await startPositionSource(() => {}, { timeInterval: 1000 });

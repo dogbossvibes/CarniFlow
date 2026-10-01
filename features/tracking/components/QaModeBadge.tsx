@@ -15,10 +15,10 @@ import {
   getActiveTrackingModes, subscribeActiveTrackingModes, type ActiveTrackingModes,
 } from '@/features/tracking/utils/trackingWarmupState';
 import { getLocationSourceMode, subscribeLocationSourceMode, type LocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
-import { getTrackingEngineMode, subscribeTrackingEngineMode, type TrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
+import { getTrackingEngineMode, subscribeTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { motionClient } from '@/features/tracking/native/motionClient';
+import { trackingEngineDisplayLabel } from '@/features/tracking/utils/trackingDiagnosticDisplay';
 
-const engineLabel = (m: TrackingEngineMode | null) => (m === 'build40' ? 'BUILD40' : m === 'current' ? 'CURRENT' : '—');
 const sourceLabel = (m: LocationSourceMode | null) => (m === 'legacy' ? 'EXPO' : m === 'precision' ? 'PRECISION' : '—');
 
 export function QaModeBadge() {
@@ -47,7 +47,7 @@ export function QaModeBadge() {
     <View style={s.wrap}>
       <View style={[s.dot, active.warmupActive ? s.dotLive : s.dotIdle]} />
       <Text style={s.txt}>
-        {engineLabel(shownEngine)} · {sourceLabel(shownSource)}
+        {trackingEngineDisplayLabel(shownEngine)} · {sourceLabel(shownSource)}
         {active.warmupActive ? ` · ${active.reportedSource ?? 'wartet'}` : ' · bereit'}
       </Text>
       <Text style={s.motion}>
@@ -59,7 +59,7 @@ export function QaModeBadge() {
       {drifted && (
         <Text style={s.warn}>
           Änderung wird beim nächsten Fährtenstart aktiv
-          {` (${engineLabel(prefEngine)} · ${sourceLabel(prefSource)})`}
+          {` (${trackingEngineDisplayLabel(prefEngine)} · ${sourceLabel(prefSource)})`}
         </Text>
       )}
     </View>

@@ -37,6 +37,7 @@ import {
 } from '@/features/tracking/services/qaTrackExportService';
 import { useQaLaySessions } from '@/features/tracking/hooks/useQaLaySessions';
 import { FIELD_TEST_PROFILES, getFieldTestProfile } from '@/features/tracking/utils/fieldTestProfiles';
+import { trackingEngineDisplayLabel, trackingLocationDiagnosticDisplay } from '@/features/tracking/utils/trackingDiagnosticDisplay';
 import type { MotionStatus } from '@/modules/anyvo-motion';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
@@ -171,20 +172,22 @@ function PrecisionLocationTestContent() {
   const pendingChange = warmupRunning &&
     (activeModes.engine !== engineMode || activeModes.source !== sourceMode);
   const activeCombi = warmupRunning
-    ? `${activeModes.engine === 'build40' ? 'BUILD40' : 'CURRENT'} · ${activeModes.source === 'legacy' ? 'EXPO' : 'PRECISION'}`
+    ? `${trackingEngineDisplayLabel(activeModes.engine)} · ${activeModes.source === 'legacy' ? 'EXPO' : 'PRECISION'}`
     : null;
   // Klartext des aktuell aktiven Zustands — der Feldtest vergleicht
   // A = BUILD40 + EXPO gegen B = CURRENT + EXPO.
-  const engineLabel = engineMode === 'build40' ? 'BUILD40' : 'CURRENT';
+  const engineLabel = trackingEngineDisplayLabel(engineMode);
   const sourceLabel = sourceMode === 'legacy' ? 'EXPO' : 'PRECISION';
   const combiLabel = `${engineLabel} + ${sourceLabel}`;
   const combiHint = engineMode === 'build40' && sourceMode === 'legacy' ? 'Test A (Golden Reference)'
     : engineMode === 'current' && sourceMode === 'legacy' ? 'Test B (neue Engine, ohne Precision)'
-    : sourceMode === 'precision' ? 'Precision — auf Build 43 noch NICHT als Vergleich verwenden' : '';
+    : sourceMode === 'precision' ? 'Nativer Pfad mit Expo-Fallback, falls nötig' : '';
 
   const native = isNativeModuleAvailable();
+  const locationDisplay = trackingLocationDiagnosticDisplay({ selected: sourceMode, active: activeModes,
+    nativeModuleAvailable: native, platform: Platform.OS as 'ios' | 'android' | 'web' });
   const [support] = useState<RawGnssSupportStatus>(() => isRawGnssSupported());
-  const precise = status?.preciseLocationEnabled !== false; // undefined → unbekannt = ok behandeln
+  const precise = status?.preciseLocationEnabled;
 
   useEffect(() => {
     getProviderStatus().then(setStatus).catch(() => {});
@@ -244,17 +247,16 @@ function PrecisionLocationTestContent() {
       </View>
 
       <ScrollView contentContainerStyle={s.body}>
-        <Section title="Aktiv für die echte Fährtenaufnahme">
+        <Section title="Auswahl für den nächsten Fährtenstart">
           <View style={s.activeBox}>
             <Text style={s.activeVal}>{combiLabel}</Text>
             {combiHint ? <Text style={s.activeHint}>{combiHint}</Text> : null}
           </View>
           <Text style={s.note}>
-            Gilt für Legen, Ansatz und Absuche (useTrackRecorder/
-            useSearchRecorder/useStartPointApproach/Schrittkalibrierung) —
-            nicht nur für den Modul-Test weiter unten. Beide Einstellungen
-            werden beim App-Start rehydriert und gelten damit auch ohne diesen
-            Screen.
+            Legen, Ansatz und Absuche lesen diese Einstellungen beim Start
+            ihres GPS-Streams. Ein laufender Stream behält seine bereits
+            gestartete Quelle. Beide Einstellungen werden beim App-Start
+            rehydriert.
           </Text>
           {warmupRunning && (
             <>
@@ -300,7 +302,7 @@ function PrecisionLocationTestContent() {
               <Text style={s.activeHint}>
                 {activeModes.motion === 'live' ? `Motion · aktiv (${activeModes.motionSamples} Samples)`
                   : activeModes.motion === 'waiting' ? 'Motion · keine Samples'
-                    : 'Motion · nicht mitgeschnitten (QA aus oder ENGINE=BUILD40)'}
+                    : 'Motion · nicht mitgeschnitten (QA aus oder Legacy · Build 40)'}
               </Text>
             )}
           </View>
@@ -320,9 +322,8 @@ function PrecisionLocationTestContent() {
 
         <Section title="Tracking Engine">
           <Text style={s.note}>
-            BUILD40 = die auf Build 40 nachweislich funktionierende Logik
-            (historische Winkelerkennung, kein Such-Start-Lock, Core Motion
-            nur beobachtend). CURRENT = heutige Engine.
+            Legacy · Build 40 = historischer Vergleichspfad der auf Build 40
+            verwendeten Tracking-Logik. CURRENT = aktuelle Tracking-Engine.
           </Text>
           <View style={s.abRow}>
             <TouchableOpacity
@@ -330,7 +331,7 @@ function PrecisionLocationTestContent() {
               onPress={() => chooseEngineMode('build40')}
               activeOpacity={0.85}
             >
-              <Text style={[s.abBtnTxt, engineMode === 'build40' && s.abBtnTxtActive]}>BUILD40</Text>
+              <Text style={[s.abBtnTxt, engineMode === 'build40' && s.abBtnTxtActive]}>Legacy · Build 40</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.abBtn, engineMode === 'current' && s.abBtnActive]}
@@ -344,11 +345,10 @@ function PrecisionLocationTestContent() {
 
         <Section title="Location Source">
           <Text style={s.note}>
-            EXPO = exakt der alte, auf Build 40 funktionierende
-            expo-location-Pfad (AnyvoPrecisionLocation wird gar nicht
-            gestartet). PRECISION = natives Modul. Hinweis: auf Build 43
-            enthält das native Modul noch die alte 1-Hz-Drosselung —
-            PRECISION daher vorerst NICHT als Vergleichsmassstab verwenden.
+            EXPO = direkter expo-location-Pfad; AnyvoPrecisionLocation wird
+            für die Fährte nicht gestartet. PRECISION = nativer
+            AnyvoPrecisionLocation-Pfad mit Expo-Fallback bei fehlendem Modul
+            oder Startfehler.
           </Text>
           <View style={s.abRow}>
             <TouchableOpacity
@@ -368,10 +368,18 @@ function PrecisionLocationTestContent() {
           </View>
         </Section>
 
-        <Section title="Engine">
-          <Row label="Engine" value={native ? 'Native Precision' : 'Fallback (expo-location)'} good={native} />
-          <Row label="Provider" value={IS_IOS ? 'iOS Core Location' : 'Android LocationManager'} />
-          <Row label="Berechtigung" value={perm} good={perm === 'erteilt'} />
+        <Section title="Aktive Location Source">
+          <Row label="Ausgewählt" value={locationDisplay.selected} />
+          <Row label="Lege-Stream gestartet mit" value={locationDisplay.streamSelection} />
+          <Row label="Tatsächlich gemeldete Quelle" value={locationDisplay.active} />
+          <Row label="Runtime-Provider" value={locationDisplay.runtimeProvider} lines={2} />
+          <Text style={s.note}>Die Laufzeitquelle erscheint erst nach einem echten GPS-Fix. Änderungen an der Auswahl gelten ab dem nächsten Stream.</Text>
+        </Section>
+
+        <Section title="Native Precision Modul">
+          <Row label="Im Build" value={locationDisplay.nativeModule} good={native} />
+          <Row label="App-Berechtigung" value={perm} good={perm === 'erteilt'} />
+          <Text style={s.note}>Modulverfügbarkeit und iOS-Core-Location-Status sagen nicht aus, welche Quelle die Fährtenaufnahme nutzt.</Text>
         </Section>
 
         {IS_ANDROID && (
@@ -390,8 +398,8 @@ function PrecisionLocationTestContent() {
         )}
 
         {IS_IOS && (
-          <Section title="iOS Core Location (Phase 3)">
-            <Row label="Precise Location" value={precise ? 'Aktiv' : 'Inaktiv'} good={precise} />
+          <Section title="iOS Core Location · Modulstatus">
+            <Row label="Precise Location" value={precise == null ? 'Unbekannt' : precise ? 'Aktiv' : 'Inaktiv'} good={precise === true} />
             <Row label="Authorization" value={status?.authorizationStatus ?? '–'} />
             <Row label="Accuracy Auth" value={status?.accuracyAuthorization ?? '–'} />
             <Row label="Heading verfügbar" value={status?.headingAvailable ? 'Ja' : 'Nein'} good={status?.headingAvailable} />
@@ -402,15 +410,15 @@ function PrecisionLocationTestContent() {
             <Row label="Letztes Location-Event" value={secsAgo(status?.lastLocationAt ?? last?.timestamp ?? null)} />
             <Row label="Letztes Heading-Event" value={secsAgo(heading?.timestamp ?? null)} />
             <Row label="rawGnssAvailable" value="Nein" />
-            <Text style={s.note}>Raw GNSS ist auf iOS nicht verfügbar. Anyvo nutzt Core Location Precision + Heading.</Text>
-            {!precise && (
+            <Text style={s.note}>Raw GNSS ist auf iOS nicht verfügbar. Dieser Modulstatus ist unabhängig von der ausgewählten Fährtenquelle.</Text>
+            {precise === false && (
               <Text style={s.warn}>Präziser Standort ist deaktiviert. Für genaue Fährten bitte in iOS Standortfreigabe aktivieren.</Text>
             )}
             {accReqMsg ? <Text style={s.note}>{accReqMsg}</Text> : null}
           </Section>
         )}
 
-        <Section title={`Letzte Position  ·  ${count} Updates`}>
+        <Section title={`Separater Modultest · ${count} Updates`}>
           {last ? (
             <>
               <Row label="Lat" value={last.latitude.toFixed(6)} />
@@ -521,6 +529,7 @@ function PrecisionLocationTestContent() {
           </Section>
         )}
 
+        <Text style={s.note}>Der folgende separate Modultest startet AnyvoPrecisionLocation unabhängig vom EXPO/PRECISION-Schalter der Fährtenaufnahme.</Text>
         <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={requestPermission} activeOpacity={0.85}>
           <Ionicons name="key-outline" size={18} color={C.white} />
           <Text style={s.btnTxt}>GPS-Berechtigung anfragen</Text>
@@ -542,7 +551,7 @@ function PrecisionLocationTestContent() {
           <TouchableOpacity style={[s.btn, s.btnStart]} onPress={start} activeOpacity={0.85}>
             <Ionicons name="play" size={18} color={C.accentText} />
             <Text style={[s.btnTxt, { color: C.accentText }]}>
-              Start{IS_ANDROID ? ' (+ Raw GNSS)' : ' (+ Heading)'}
+              Native-Modultest starten{IS_ANDROID ? ' (+ Raw GNSS)' : ' (+ Heading)'}
             </Text>
           </TouchableOpacity>
         )}
@@ -560,12 +569,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, value, good }: { label: string; value: string; good?: boolean }) {
+function Row({ label, value, good, lines = 1 }: { label: string; value: string; good?: boolean; lines?: number }) {
   const color = good === undefined ? C.white : good ? C.accent : C.muted;
   return (
     <View style={s.row}>
       <Text style={s.rowLabel}>{label}</Text>
-      <Text style={[s.rowValue, { color }]} numberOfLines={1}>{value}</Text>
+      <Text style={[s.rowValue, { color }]} numberOfLines={lines}>{value}</Text>
     </View>
   );
 }
