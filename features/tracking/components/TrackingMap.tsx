@@ -31,7 +31,7 @@ export function markerColor(m: MapMarker): string {
   return MARKER_COLOR[m.type];
 }
 
-export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null; distanceFromStart?: number | null; note?: string | null; objectIndex?: number | null; legIndex?: number | null }
+export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null; distanceFromStart?: number | null; note?: string | null; objectIndex?: number | null; legIndex?: number | null; geometryDirection?: 'links' | 'rechts' | 'unresolved'; geometrySharpness?: 'normal' | 'sharp' | 'unresolved' }
 
 // Persistenter Marker: verhindert das „Verschwinden". react-native-maps verwirft
 // bei tracksViewChanges=false und häufigen Re-Renders/Region-Wechseln sonst das

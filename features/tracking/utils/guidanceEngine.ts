@@ -74,6 +74,10 @@ export type TrackEndState = 'unseen' | 'approaching' | 'reached' | 'completed';
 
 export interface TrackEndInput {
   dogProgressM: number;         // virtueller Hundefortschritt (Bogenlänge, order-aware)
+  handlerProgressM?: number;     // tatsächlicher Fortschritt des Telefons; bei Legacy-Aufrufern = dogProgressM
+  handlerDistanceToEndM?: number | null;
+  activeObjectWait?: boolean;
+  searchActive?: boolean;
   trackLengthM: number;         // Gesamtlänge der gelegten Fährte
   geomDistanceM: number | null; // Distanz virtuelle Hundeposition → gespeicherter Endpunkt
   openMandatoryObjects: number; // noch nicht gefundene Pflicht-Gegenstände
@@ -97,6 +101,19 @@ export const DEFAULT_TRACK_END_OPTIONS: TrackEndOptions = {
   approachingRemainingM: 10,
 };
 
+export function trackEndBlocker(input: TrackEndInput, options: TrackEndOptions = DEFAULT_TRACK_END_OPTIONS): string | null {
+  if (!(input.trackLengthM > 1)) return 'no_reference_track';
+  if (input.searchActive === false) return 'search_inactive';
+  if (input.activeObjectWait) return 'object_wait';
+  if ((input.handlerProgressM ?? input.dogProgressM) / input.trackLengthM < options.reachedProgressRatio) return 'handler_progress';
+  const handlerDist = input.handlerDistanceToEndM === undefined ? input.geomDistanceM : input.handlerDistanceToEndM;
+  if (handlerDist == null || handlerDist > options.reachedGeomM) return 'handler_distance';
+  if (input.dogProgressM / input.trackLengthM < options.reachedProgressRatio) return 'dog_progress';
+  if (input.geomDistanceM == null || input.geomDistanceM > options.reachedGeomM) return 'dog_distance';
+  if (input.openMandatoryObjects > 0) return 'open_objects';
+  return null;
+}
+
 // Ein Schritt der Ende-Zustandsmaschine. Einmal `reached`/`completed` bleibt es
 // `completed` (Once-only; GPS-Jitter kann nicht erneut auslösen). `justReached` ist
 // genau im Übergangs-Tick true → Ansage/Haptik genau einmal.
@@ -111,14 +128,9 @@ export function stepTrackEnd(
   // Ohne gelegte Fährte gibt es kein Ende.
   if (!(input.trackLengthM > 1)) return { state: previous, justReached: false };
 
-  const ratio = input.dogProgressM / input.trackLengthM;
   const remainingM = Math.max(0, input.trackLengthM - input.dogProgressM);
 
-  const reached =
-    ratio >= options.reachedProgressRatio          // order-aware fast komplett abgearbeitet
-    && input.geomDistanceM != null
-    && input.geomDistanceM <= options.reachedGeomM // virtuelle Hundeposition wirklich am Endpunkt
-    && input.openMandatoryObjects <= 0;            // keine offenen Pflicht-Gegenstände davor
+  const reached = trackEndBlocker(input, options) == null;
 
   if (reached) return { state: 'reached', justReached: true };
 

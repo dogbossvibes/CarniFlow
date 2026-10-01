@@ -38,6 +38,8 @@ export interface SearchRunState {
   devCount: number;
   /** PERSIST: gefundene Gegenstände/Dübel als stabile Marker-IDs (foundRef). */
   foundObjectIds: string[];
+  autoDwellObjectIds: string[];
+  dismissedAutoDwellIds: string[];
   /** PERSIST: Voice-Guidance bereits angesagte Feature-IDs (stateRef announced/reached/passed). */
   voiceFiredIds: string[];
   /** PERSIST: Haptik bereits ausgelöste Feature-IDs (firedRef) — eigene Triggerdistanz, daher getrennt. */
@@ -55,7 +57,7 @@ export interface SearchRunState {
 export function freshSearchRunState(): SearchRunState {
   return {
     maxCursorM: 0, devSumM: 0, devCount: 0,
-    foundObjectIds: [], voiceFiredIds: [], hapticFiredIds: [],
+    foundObjectIds: [], autoDwellObjectIds: [], dismissedAutoDwellIds: [], voiceFiredIds: [], hapticFiredIds: [],
     endFired: false, segmentAnnouncements: {}, breaks: [], offTrackState: 'on_track',
   };
 }
@@ -103,6 +105,8 @@ export function sanitizeSearchRunState(raw: unknown): SearchRunState {
     devSumM: Math.max(0, num(r.devSumM, 0)),
     devCount: Math.max(0, Math.floor(num(r.devCount, 0))),
     foundObjectIds: strList(r.foundObjectIds),
+    autoDwellObjectIds: strList(r.autoDwellObjectIds),
+    dismissedAutoDwellIds: strList(r.dismissedAutoDwellIds),
     voiceFiredIds: strList(r.voiceFiredIds),
     hapticFiredIds: strList(r.hapticFiredIds),
     endFired: r.endFired === true,

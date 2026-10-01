@@ -242,6 +242,24 @@ export interface QaSessionCapture {
   turnFusion?: QaTurnFusion[];
   /** QA v2.2 — IMU-only-Ereignisse (nie persistiert). */
   imuOnlyEvents?: QaImuOnlyEvent[];
+  startupDiagnostics?: {
+    userTapStartTSec: number | null; permissionStartTSec: number | null; permissionEndTSec: number | null;
+    warmupStartTSec: number | null; firstRawFixTSec: number | null; firstStableFixTSec: number | null;
+    firstAcceptedFixTSec: number | null; motionReadyTSec: number | null;
+    recorderArmedTSec: number | null; actualRecordingStartTSec: number | null;
+    startupDelayMs: number | null; blockingReason: string | null; accuracyAtStartM: number | null;
+    recordingSessionStartedTSec: number | null; geometryStartedTSec: number | null;
+    startupUiDelayMs: number | null; geometryLockDelayMs: number | null;
+    movementConfirmedTSec: number | null; fallbackUsed: boolean;
+  };
+  manualAngleGeometryDiagnostics?: {
+    markers: { manualMarkerType: 'ow' | 'bw' | 'gw'; geometryDirection: 'links' | 'rechts' | 'unresolved';
+      geometrySharpness: 'normal' | 'sharp' | 'unresolved'; geometryQuality: number | null;
+      confidence: number | null; motionDirection: 'links' | 'rechts' | null;
+      directionAgrees: boolean | null; classificationSource: string | null }[];
+    truncated: boolean;
+  };
+  voiceDiagnostics?: { events: import('./trackingUxDiagnostics').VoiceDiagnostic[]; truncated: boolean };
 }
 
 const keyFor = (sessionLocalId: string) => `${KEY_PREFIX}${sessionLocalId}`;

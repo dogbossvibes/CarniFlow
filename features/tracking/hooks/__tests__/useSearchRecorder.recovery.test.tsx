@@ -98,9 +98,12 @@ describe('useSearchRecorder — Search-Recovery-State', () => {
     expect(maxima.length).toBeGreaterThan(10);
     for (let i = 1; i < maxima.length; i++) expect(maxima[i]).toBeGreaterThanOrEqual(maxima[i - 1]);
     expect(maxima[maxima.length - 1]).toBeCloseTo(r.progressM, 5);
-    // Gegenstand bei 20 m wurde beim Vorbeilaufen gefunden → stabile Marker-ID an den Store.
+    // Vorbeilaufen allein ist kein bestätigter Gegenstand-Dwell.
+    expect(storeCalls.found).toEqual([]);
+    expect(r.foundObjects).toBe(0);
+    act(() => { getRecorder().markObject(); });
     expect(storeCalls.found).toEqual(['gegenstand-20']);
-    expect(r.foundObjects).toBe(1);
+    expect(getRecorder().foundObjects).toBe(1);
   });
 
   it('3./4. Resume mit runState.maxCursorM=40: Cursor startet bei 40, Handler bei ~42 m arbeitet sofort weiter (nicht 0)', async () => {

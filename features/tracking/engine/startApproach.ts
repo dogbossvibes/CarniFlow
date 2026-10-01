@@ -135,3 +135,13 @@ export function fixesRemaining(state: ApproachState, cfg: ApproachConfig): numbe
 }
 
 export const APPROACH_HINT = 'Bitte zum Fährtenansatz gehen. Wähle den Abstand zum Hund und tippe auf Jetzt starten.';
+
+export type StartZonePhase = 'approaching' | 'start_zone_entered' | 'at_start' | 'departed_start' | 'search_started';
+export function nextStartZonePhase(previous: StartZonePhase, eligible: boolean, armed: boolean, searchStarted = false): StartZonePhase {
+  if (searchStarted) return 'search_started';
+  if (previous === 'search_started' || previous === 'departed_start') return previous;
+  if (previous !== 'approaching' && !eligible) return 'departed_start';
+  if (armed) return 'at_start';
+  if (previous === 'approaching' && eligible) return 'start_zone_entered';
+  return previous;
+}

@@ -5,6 +5,7 @@ import { DEFAULT_GUIDANCE_OPTIONS, stepGuidanceEngine, type GuidanceFeature, typ
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import i18n, { type AppLocale } from '@/i18n/config';
 import type { TranslationKey } from '@/i18n/de-CH';
+import { requestVoice, cancelVoiceEvents } from '@/features/tracking/utils/voiceEvents';
 
 // expo-speech defensiv laden (nativ; kein Crash, wenn das Modul fehlt).
 let Speech: typeof import('expo-speech') | null = null;
@@ -16,7 +17,7 @@ const SPEAK_GAP_MS     = 3500;   // Entprellung zwischen zwei Ansagen
 // arcM = Bogenlänge des Winkels entlang der gelegten Fährte (= marker.distance_from_start).
 export interface GuidanceAngle { id: string; arcM: number; angleKind: AngleKind | null }
 
-function speechLanguage(locale: AppLocale) {
+export function speechLanguage(locale: AppLocale) {
   if (locale === 'fr') return 'fr-CH';
   if (locale === 'it') return 'it-IT';
   if (locale === 'en') return 'en-GB';
@@ -32,7 +33,8 @@ function translateKey(key: TranslationKey, params: Record<string, string | numbe
 }
 
 export function say(msg: string, locale: AppLocale = getCurrentLocale()) {
-  try { Speech?.stop(); Speech?.speak(msg, { language: speechLanguage(locale), rate: 1.0 }); } catch { /* ignore */ }
+  requestVoice({ eventType: 'status', text: msg, language: speechLanguage(locale),
+    priority: 1, onceKey: `status:${msg}:${Date.now()}`, phase: 'search' });
 }
 
 function inStepsText(steps: number, locale: AppLocale) {
@@ -88,6 +90,8 @@ export function useTrackVoiceGuidance(
   onAnnouncedRef.current = recovery?.onAnnounced;
   const initialIds = recovery?.initialAnnouncedIds;
   const enabled = recovery?.enabled ?? true;
+  const latestRef = useRef({ enabled, voiceOn, dogProgressM });
+  latestRef.current = { enabled, voiceOn, dogProgressM };
 
   // Bei neuem Lauf (neue Listen) die „schon angesagt"-Menge zurücksetzen — bzw.
   // aus dem Recovery-State desselben Runs seeden ('announced' → nie wieder).
@@ -116,12 +120,20 @@ export function useTrackVoiceGuidance(
       lastSpeakRef.current = now;
       // Distanz → geschätzte Schritte über die zentrale Utility (persönliche Schrittlänge optional).
       const steps = Math.max(1, metersToSteps(bestD, stepLengthM));
-      say(best.kind === 'angle' ? phraseFor(best.angleKind, steps, locale) : objectPhrase(best.material, steps, locale), locale);
+      requestVoice({
+        eventType: best.kind, text: best.kind === 'angle' ? phraseFor(best.angleKind, steps, locale) : objectPhrase(best.material, steps, locale),
+        language: speechLanguage(locale), priority: 4, onceKey: `feature:${best.id}`, phase: 'search',
+        progressM: dogProgressM, distanceM: bestD,
+        valid: () => { const latest = latestRef.current;
+          return latest.enabled && latest.voiceOn && latest.dogProgressM != null
+            && best.arcM - latest.dogProgressM >= -DEFAULT_GUIDANCE_OPTIONS.passedM
+            && best.arcM - latest.dogProgressM <= DEFAULT_GUIDANCE_OPTIONS.announceAheadM; },
+      });
       onAnnouncedRef.current?.(best.id);
     }
   }, [enabled, dogProgressM, angles, objects, voiceOn, stepLengthM]);
 
   // Beim Verlassen / Stummschalten laufende Ansage stoppen.
-  useEffect(() => { if (!voiceOn) { try { Speech?.stop(); } catch { /* ignore */ } } }, [voiceOn]);
-  useEffect(() => () => { try { Speech?.stop(); } catch { /* ignore */ } }, []);
+  useEffect(() => { if (!voiceOn) cancelVoiceEvents(); }, [voiceOn]);
+  useEffect(() => () => cancelVoiceEvents(), []);
 }

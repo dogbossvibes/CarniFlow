@@ -53,9 +53,14 @@ export function describeSelection(
   const m = sel.marker;
   if (m.type === 'winkel') {
     const label = t(trackEventLabelKey(angleEvent(m.angleKind ?? null)));
+    const geometry = m.geometryDirection && m.geometryDirection !== 'unresolved'
+      ? m.geometrySharpness === 'sharp'
+        ? t(m.geometryDirection === 'links' ? 'track.detailSharpLeft' : 'track.detailSharpRight')
+        : t(m.geometryDirection === 'links' ? 'track.detailLeft' : 'track.detailRight')
+      : null;
     return {
       icon: 'git-branch',
-      title: label,
+      title: geometry ? `${label} · ${geometry}` : label,
       rows: [...distRow(m.distanceFromStart)],
     };
   }

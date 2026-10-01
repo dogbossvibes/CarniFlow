@@ -13,29 +13,31 @@ import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { fmtClock } from '@/features/tracking/components/LiveChrome';
 import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSearchRecorder';
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
-import { useTrackVoiceGuidance, say, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
+import { useTrackVoiceGuidance, say, speechLanguage, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
+import { requestVoice, resetVoiceEvents, voiceDiagnostics } from '@/features/tracking/utils/voiceEvents';
+import i18n from '@/i18n/config';
 import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/utils/offTrackFeedback';
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking/hooks/useTrackHapticGuidance';
 import { useTrackEndGuidance } from '@/features/tracking/hooks/useTrackEndGuidance';
 import { buildSearchDiagnostics, saveQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
-import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
+import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
+import { trackEndBlocker } from '@/features/tracking/utils/guidanceEngine';
+import { TRACKING_UX_QA_LIMITS } from '@/features/tracking/utils/trackingUxDiagnostics';
+import type { QaEndEligibilitySample, QaStartApproachDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
 import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/utils/haptics';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
 import {
-  DEFAULT_APPROACH_CONFIG, type StartMode,
+  DEFAULT_APPROACH_CONFIG, nextStartZonePhase, type StartMode,
 } from '@/features/tracking/engine/startApproach';
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import { buildSearchEventArcs, type CanonicalArc } from '@/features/tracking/utils/canonicalArc';
 import type { SearchRunState } from '@/features/tracking/store/searchRunState';
 
-// expo-speech defensiv laden (nativ; kein Crash, wenn Modul fehlt).
-let Speech: typeof import('expo-speech') | null = null;
-try { Speech = require('expo-speech'); } catch { Speech = null; }
 import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
 import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
 import { getSearchPointsBySession, deleteSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
@@ -50,8 +52,6 @@ import {
   type SearchSegmentAnnouncementState,
 } from '@/features/tracking/utils/trackSegments';
 
-// GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Absuche nicht).
-const SHOW_GPS_DEBUG = __DEV__;
 import { getTrackSessionDogName } from '@/features/tracking/services/trackService';
 import { finalizeLocalTrackRun } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -64,6 +64,9 @@ import { computeTrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyti
 import * as Crypto from 'expo-crypto';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
+
+// GPS-Debug-Overlay nur im Dev-Build (nur lesend, beeinflusst die Absuche nicht).
+const SHOW_GPS_DEBUG = __DEV__;
 
 // Blinkender LIVE-Punkt.
 function RecDot() {
@@ -177,11 +180,22 @@ export default function TrackRunScreen() {
   const [searchHandlerDistanceM, setSearchHandlerDistanceM] = useState<SearchHandlerDistanceM>(DEFAULT_HANDLER_DISTANCE_M);
   const { stepLengthM } = useStepLengthSetting();   // optionale persönliche Schrittlänge (Default 0,75 m)
 
-  const s = useSearchRecorder({ laidPoints: snapData.laidPoints, laidObjects: snapData.laidObjects, level: snapData.level, sessionId: effectiveId, handlerDistanceM: searchHandlerDistanceM });
+  const laidAngleArcM = useMemo(() => snapData.laidMarkers.filter(m => m.type === 'winkel')
+    .flatMap(m => { const at = snapData.eventArcs[m.id]?.arcM; return at == null ? [] : [at]; }), [snapData]);
+  const s = useSearchRecorder({ laidPoints: snapData.laidPoints, laidObjects: snapData.laidObjects,
+    level: snapData.level, sessionId: effectiveId, handlerDistanceM: searchHandlerDistanceM,
+    angleArcM: laidAngleArcM });
 
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
   const [voiceOn, setVoiceOn] = useState(true);
+  const autoDwellVoiceKey = s.autoDwellObjectIds.join('|');
+  useEffect(() => {
+    if (!voiceOn || !s.recording) return;
+    autoDwellVoiceKey.split('|').filter(Boolean).forEach(id => requestVoice({ eventType: 'object',
+      text: t('track.voiceObjectDetected'), language: speechLanguage(i18n.language as never),
+      priority: 6, onceKey: `auto_dwell:${id}`, phase: 'search' }));
+  }, [voiceOn, s.recording, autoDwellVoiceKey, t]);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
   const [pendingExit, setPendingExit] = useState<string | null>(null);
@@ -205,6 +219,40 @@ export default function TrackRunScreen() {
   //   3) sonst null → kontrollierte Recovery (kein stiller Sofortstart).
   const startPoint = (snap && snap.laidLatLng.length > 0 ? snap.laidLatLng[0] : null) ?? anchorFallback;
   const approach = useStartPointApproach({ active: arming, start: startPoint, liveFix: s.liveFix });
+  const approachOriginRef = useRef<number | null>(null);
+  const approachQaRef = useRef<QaStartApproachDiagnostics | null>(null);
+  const endQaRef = useRef<QaEndEligibilitySample[]>([]);
+  const endQaTruncatedRef = useRef(false);
+  useEffect(() => {
+    if (arming) {
+      approachOriginRef.current = Date.now(); approachQaRef.current = null;
+      endQaRef.current = []; endQaTruncatedRef.current = false;
+      resetVoiceEvents(approachOriginRef.current);
+    }
+  }, [arming]);
+  const approachPhaseRef = useRef(approach.phase);
+  approachPhaseRef.current = approach.phase;
+  const approachDistanceRef = useRef(approach.distanceM);
+  approachDistanceRef.current = approach.distanceM;
+  if (arming && isQaDiagnosticsEnabled() && approachOriginRef.current != null) {
+    const rel = (ms: number | null) => ms == null ? null : Math.max(0, (ms - approachOriginRef.current!) / 1000);
+    approachQaRef.current = {
+      startDistanceM: approachQaRef.current?.startDistanceM ?? approach.distanceM,
+      firstStableFixTSec: rel(approach.firstStableFixAtMs), armedTSec: rel(approach.armedAtMs),
+      startZoneEnteredTSec: rel(approach.startZoneEnteredAtMs),
+      voiceTriggerTSec: rel(approach.startZoneEnteredAtMs), voiceQueuedTSec: null, voiceSpokenTSec: null,
+      departedStartTSec: rel(approach.departedStartAtMs), searchStartedTSec: null,
+      reason: approach.reason,
+    };
+  }
+  useEffect(() => {
+    if (!arming || !voiceOn || approach.startZoneEnteredAtMs == null) return;
+    requestVoice({ eventType: 'approach', text: t('track.voiceApproachReached'),
+      language: speechLanguage(i18n.language as never), priority: 3,
+      onceKey: 'approach-reached', phase: 'approach', distanceM: approachDistanceRef.current,
+      valid: () => approachPhaseRef.current === 'start_zone_entered' || approachPhaseRef.current === 'at_start',
+    });
+  }, [arming, voiceOn, approach.startZoneEnteredAtMs, t]);
 
   // Bisher im Approach: präzise Ortung nur während der Annäherung anfragen.
   // Die Berechtigung kommt vom Recorder; kein zweiter Location-Start/Stop.
@@ -264,10 +312,15 @@ export default function TrackRunScreen() {
   const beginSearchNow = useCallback((mode: StartMode = 'manual-at-start') => {
     if (startedRef.current) return;
     startedRef.current = true;
+    approachPhaseRef.current = nextStartZonePhase(approachPhaseRef.current, false, false, true);
+    if (approachQaRef.current && approachOriginRef.current != null)
+      approachQaRef.current.searchStartedTSec = (Date.now() - approachOriginRef.current) / 1000;
     startModeRef.current = mode;   // Runtime-Info (manual-at-start | manual-override)
     setArming(false);
     hapticSuccess();   // haptisches Feedback beim Erreichen des Ansatzes
-    if (voiceOn && Speech) { try { Speech.speak('Suche läuft', { language: 'de-DE' }); } catch { /* best-effort */ } }
+    if (voiceOn) requestVoice({ eventType: 'search_start', text: t('track.voiceSearchStarted'),
+      language: speechLanguage(i18n.language as never), priority: 2,
+      onceKey: 'search-started', phase: 'search' });
     const startMs = Date.now();
     searchStartMsRef.current = startMs;
     // Stabile client-Run-UUID SOFORT (führende Run-ID, kein Warten auf Supabase).
@@ -292,7 +345,7 @@ export default function TrackRunScreen() {
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
     // Kein direkter Remote-Start mehr (RUN-SAVE2): track_runs wird beim Stop über die
     // Sync-Queue idempotent per runUuid upserted. runUuid ist bereits lokal geführt.
-  }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM]);
+  }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM, t]);
 
   // Manueller „Jetzt starten": EINE einzige Definition von "Ansatz erreicht" —
   // exakt dasselbe `approach.armed`, das auch das Banner oben zeigt (Root-
@@ -576,15 +629,33 @@ export default function TrackRunScreen() {
   const trackEndState = useTrackEndGuidance({
     recording: searchGuidanceActive,
     dogProgressM: s.dogProgressM,
+    handlerProgressM: s.progressM,
+    handlerPosition: s.position,
     trackLengthM: s.trackLengthM,
     estimatedDogPosition: s.estimatedDogPosition,
     endPoint,
     openMandatoryObjects,
+    activeObjectWait: s.activeObjectWait,
     voiceOn,
     initialFired: snapData.recovery?.endFired ?? false,
     onFired: noteEndFired,
   });
   const trackEndReached = trackEndState === 'reached' || trackEndState === 'completed';
+  useEffect(() => {
+    if (!isQaDiagnosticsEnabled() || !searchGuidanceActive || !endPoint) return;
+    if (endQaRef.current.length >= TRACKING_UX_QA_LIMITS.end) { endQaTruncatedRef.current = true; return; }
+    const handlerDistanceToEndM = s.position ? haversineM(s.position, endPoint) : null;
+    const dogDistanceToEndM = s.estimatedDogPosition ? haversineM(s.estimatedDogPosition, endPoint) : null;
+    const blockerReason = trackEndBlocker({ dogProgressM: s.dogProgressM, handlerProgressM: s.progressM,
+      handlerDistanceToEndM, geomDistanceM: dogDistanceToEndM, trackLengthM: s.trackLengthM,
+      openMandatoryObjects, activeObjectWait: s.activeObjectWait, searchActive: searchGuidanceActive });
+    endQaRef.current.push({ tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
+      handlerProgressM: s.progressM, dogProjectedProgressM: s.dogProgressM,
+      configuredDogLeadM: searchHandlerDistanceM, handlerDistanceToEndM, dogDistanceToEndM,
+      activeObjectWait: s.activeObjectWait, endEligible: blockerReason == null, blockerReason,
+      eventFiredTSec: qaEndRef.current?.tSec ?? null });
+  }, [searchGuidanceActive, s.progressM, s.dogProgressM, s.position, s.estimatedDogPosition,
+    s.trackLengthM, endPoint, openMandatoryObjects, s.activeObjectWait, searchHandlerDistanceM]);
 
   // Karten-/Skizzen-Marker (Koordinaten) — getrennt von den Bogenlängen-basierten
   // Guidance-Listen (die tragen arcM statt lat/lng).
@@ -607,9 +678,8 @@ export default function TrackRunScreen() {
     segmentAnnouncementRef.current = result.state;
     if (result.messages.length) useTrackingStore.getState().setSearchSegmentAnnouncements(result.state);   // Recovery-State
     result.messages.forEach(message => {
-      if (Speech) {
-        try { Speech.speak(message, { language: 'de-CH', pitch: 1.0, rate: 0.95 }); } catch { /* best-effort */ }
-      }
+      requestVoice({ eventType: 'segment', text: message, language: speechLanguage(i18n.language as never),
+        priority: 2, onceKey: `segment:${message}`, phase: 'search' });
     });
   }, [searchGuidanceActive, s.dogProgressM, snapData.segments, voiceOn, stepLengthM]);
 
@@ -665,7 +735,6 @@ export default function TrackRunScreen() {
     if (!s.recording || arming) return;
     if (prev !== 'START_LOCKED' && s.searchStartState === 'START_LOCKED') {
       hapticSuccess();
-      if (voiceOn) say(t('track.searchStartLocked'));
       setStartLockedBannerVisible(true);
       if (startLockedTimerRef.current) clearTimeout(startLockedTimerRef.current);
       startLockedTimerRef.current = setTimeout(() => { setStartLockedBannerVisible(false); startLockedTimerRef.current = null; }, 1800);
@@ -735,6 +804,18 @@ export default function TrackRunScreen() {
       try {
         const stopSec = (Date.now() - (searchStartMsRef.current ?? res.qa.startedAtMs)) / 1000;
         const diag = buildSearchDiagnostics({
+          ux: (() => {
+            const voice = voiceDiagnostics();
+            const approachQa = approachQaRef.current ? { ...approachQaRef.current } : undefined;
+            const approachVoice = voice.events.find(e => e.eventType === 'approach');
+            if (approachQa && approachVoice) {
+              approachQa.voiceTriggerTSec = approachVoice.triggerTSec;
+              approachQa.voiceQueuedTSec = approachVoice.queuedTSec;
+              approachQa.voiceSpokenTSec = approachVoice.spokenTSec;
+            }
+            return { voiceDiagnostics: voice, startApproachDiagnostics: approachQa,
+              endEligibilityDiagnostics: { samples: endQaRef.current.slice(), truncated: endQaTruncatedRef.current } };
+          })(),
           origin: snapData.laidPoints[0],
           telemetry: res.qa,
           run: { points: res.points, pointsTimeSec: res.pointsTimeSec },
@@ -783,6 +864,7 @@ export default function TrackRunScreen() {
             breaks: res.breaks, points: res.points,
           },
           searchHandlerDistanceM,
+          autoDwellObjectIds: res.autoDwellObjectIds,
           analytics,
           pointsTimeSec: res.pointsTimeSec,
           replayPoints: res.replayPoints,

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import i18n from '@/i18n/config';
 import { hapticSuccess } from '@/features/tracking/utils/haptics';
-import { say } from '@/features/tracking/hooks/useTrackVoiceGuidance';
+import { speechLanguage } from '@/features/tracking/hooks/useTrackVoiceGuidance';
+import { requestVoice } from '@/features/tracking/utils/voiceEvents';
 import {
   stepTrackEnd, DEFAULT_TRACK_END_OPTIONS, type TrackEndState,
+  trackEndBlocker,
 } from '@/features/tracking/utils/guidanceEngine';
 
 type LL = { latitude: number; longitude: number };
@@ -19,14 +21,17 @@ function distM(a: LL, b: LL): number {
 }
 
 /**
- * Fährtenende-Guidance beim Absuchen. Nutzt die bestehende virtuelle Hundeposition
- * (dogProgressM / estimatedDogPosition, order-aware) und den gespeicherten Endpunkt.
+ * Fährtenende-Guidance beim Absuchen. Handler-Fortschritt und echte Telefonposition
+ * sind harte Voraussetzungen; die virtuelle Hundeposition bleibt Zusatzsignal.
  * Sagt „Ende der Fährte erreicht." GENAU EINMAL an, löst einmal Haptik aus und liefert
  * den Ende-Status für die UI. Beendet die Absuche NICHT (bewusste Nutzeraktion bleibt).
  */
 export function useTrackEndGuidance(input: {
   recording: boolean;
   dogProgressM: number | null;
+  handlerProgressM?: number;
+  handlerPosition?: LL | null;
+  activeObjectWait?: boolean;
   trackLengthM: number;
   estimatedDogPosition: LL | null;
   endPoint: LL | null;
@@ -41,6 +46,8 @@ export function useTrackEndGuidance(input: {
   const stateRef = useRef<TrackEndState>('unseen');
   const [endState, setEndState] = useState<TrackEndState>('unseen');
   const onFiredRef = useRef(input.onFired);
+  const latestInputRef = useRef(input);
+  latestInputRef.current = input;
   onFiredRef.current = input.onFired;
 
   // Neue Absuche / neue Fährte → Once-only-Status zurücksetzen; Recovery mit
@@ -55,10 +62,16 @@ export function useTrackEndGuidance(input: {
     const geomDistanceM = input.estimatedDogPosition && input.endPoint
       ? distM(input.estimatedDogPosition, input.endPoint)
       : null;
+    const handlerDistanceToEndM = input.handlerPosition === undefined ? undefined
+      : input.handlerPosition && input.endPoint ? distM(input.handlerPosition, input.endPoint) : null;
 
     const { state, justReached } = stepTrackEnd(
       {
         dogProgressM: input.dogProgressM,
+        handlerProgressM: input.handlerProgressM,
+        handlerDistanceToEndM,
+        activeObjectWait: input.activeObjectWait,
+        searchActive: input.recording,
         trackLengthM: input.trackLengthM,
         geomDistanceM,
         openMandatoryObjects: input.openMandatoryObjects,
@@ -70,12 +83,28 @@ export function useTrackEndGuidance(input: {
     if (state !== stateRef.current) { stateRef.current = state; setEndState(state); }
     if (justReached) {
       hapticSuccess();
-      if (input.voiceOn) say(i18n.t('track.voiceTrackEnd') as string);
+      if (input.voiceOn) requestVoice({ eventType: 'end', text: i18n.t('track.voiceTrackEnd') as string,
+        language: speechLanguage(i18n.language as never), priority: 10,
+        onceKey: 'track-end', phase: 'search', progressM: input.handlerProgressM,
+        distanceM: handlerDistanceToEndM,
+        valid: () => {
+          const now = latestInputRef.current;
+          const dogDistance = now.estimatedDogPosition && now.endPoint ? distM(now.estimatedDogPosition, now.endPoint) : null;
+          const handlerDistance = now.handlerPosition === undefined ? undefined
+            : now.handlerPosition && now.endPoint ? distM(now.handlerPosition, now.endPoint) : null;
+          return now.recording && now.voiceOn && now.dogProgressM != null && trackEndBlocker({
+            dogProgressM: now.dogProgressM, handlerProgressM: now.handlerProgressM,
+            handlerDistanceToEndM: handlerDistance, geomDistanceM: dogDistance,
+            trackLengthM: now.trackLengthM, openMandatoryObjects: now.openMandatoryObjects,
+            activeObjectWait: now.activeObjectWait, searchActive: now.recording,
+          }) == null;
+        } });
       onFiredRef.current?.();
     }
   }, [
     input.recording, input.dogProgressM, input.trackLengthM,
-    input.estimatedDogPosition, input.endPoint, input.openMandatoryObjects, input.voiceOn,
+    input.estimatedDogPosition, input.handlerProgressM, input.handlerPosition,
+    input.activeObjectWait, input.endPoint, input.openMandatoryObjects, input.voiceOn,
   ]);
 
   return endState;

@@ -1,3 +1,5 @@
+import { finalizeLocalTrackRun, dismissLocalAutoDwellDetection } from '@/features/training/repositories/localTrainingRepository';
+
 // SQLite mocken (getFirstAsync = payload lesen, runAsync = update). Mock-präfixiert.
 const mockGetFirst = jest.fn();
 const mockRunAsync = jest.fn(async (..._a: any[]) => {});
@@ -5,8 +7,6 @@ jest.mock('@/lib/localDb/client', () => ({
   getLocalDb: async () => ({ getFirstAsync: (...a: any[]) => mockGetFirst(...a), runAsync: (...a: any[]) => mockRunAsync(...a) }),
 }));
 jest.mock('@/lib/localDb/ids', () => ({ newLocalId: () => 'x', nowIso: () => '2026-08-12T00:00:00.000Z' }));
-
-import { finalizeLocalTrackRun } from '@/features/training/repositories/localTrainingRepository';
 
 beforeEach(() => { mockGetFirst.mockReset(); mockRunAsync.mockReset(); });
 
@@ -37,5 +37,26 @@ describe('finalizeLocalTrackRun — Run in payload_json, Lay-Summary bleibt erha
     await finalizeLocalTrackRun('sess-1', { run_id: 'run-1' });
     const payload = JSON.parse((mockRunAsync.mock.calls[0] as any[])[1]);
     expect(payload.run).toEqual({ run_id: 'run-1' });
+  });
+});
+
+describe('auto_dwell user override', () => {
+  it('removes only the automatic detection and preserves laid summary', async () => {
+    const payload = { articlesTotal: 3, run: { object_detections: [
+      { id: 'object-3', source: 'auto_dwell' }, { id: 'object-2', source: 'manual' },
+    ] } };
+    mockGetFirst.mockResolvedValue({ payload_json: JSON.stringify(payload) });
+    expect(await dismissLocalAutoDwellDetection('sess-1', 'object-3')).toBe(true);
+    const saved = JSON.parse((mockRunAsync.mock.calls[0] as any[])[1]);
+    expect(saved.articlesTotal).toBe(3);
+    expect(saved.run.object_detections).toEqual([
+      { id: 'object-3', source: 'auto_dwell', user_override: true },
+      { id: 'object-2', source: 'manual' },
+    ]);
+  });
+  it('does not alter an unknown/manual detection', async () => {
+    mockGetFirst.mockResolvedValue({ payload_json: JSON.stringify({ run: { object_detections: [{ id: 'm', source: 'manual' }] } }) });
+    expect(await dismissLocalAutoDwellDetection('sess-1', 'm')).toBe(false);
+    expect(mockRunAsync).not.toHaveBeenCalled();
   });
 });

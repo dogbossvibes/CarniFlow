@@ -21,7 +21,9 @@ import { pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
-import { retryFailedSyncForSession } from '@/features/sync/services/syncEngine';
+import { retryFailedSyncForSession, syncNow } from '@/features/sync/services/syncEngine';
+import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
+import { dismissLocalAutoDwellDetection } from '@/features/training/repositories/localTrainingRepository';
 import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
@@ -76,6 +78,21 @@ export default function TrackAuswertungScreen() {
   const [legs, setLegs]   = useState<LegRow[]>([]);
   const [notes, setNotes] = useState('');
   const [isLocalOnly, setIsLocalOnly] = useState(false);
+  const [removingAutoId, setRemovingAutoId] = useState<string | null>(null);
+  const removeAutoDetection = useCallback(async (objectId: string) => {
+    if (!id || removingAutoId) return;
+    setRemovingAutoId(objectId);
+    try {
+      const saved = await dismissLocalAutoDwellDetection(String(id), objectId);
+      if (!saved) throw new Error('local run unavailable');
+      setData((previous: any) => ({ ...previous, track_data: { ...previous.track_data,
+        run: { ...previous.track_data?.run, object_detections: (previous.track_data?.run?.object_detections ?? [])
+          .map((d: any) => d.id === objectId && d.source === 'auto_dwell' ? { ...d, user_override: true } : d) } } }));
+      await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: String(id), operation: 'create', priority: 1 });
+      void syncNow().catch(() => {});
+    } catch { Alert.alert(t('track.autoDetected'), t('track.autoRemoveFailed')); }
+    finally { setRemovingAutoId(null); }
+  }, [id, removingAutoId, t]);
 
   useEffect(() => {
     useTrackingStore.getState().reset();   // Flow abgeschlossen → Store leeren
@@ -142,11 +159,16 @@ export default function TrackAuswertungScreen() {
     // Logbuch-Kartenmodell ausschließlich aus gespeicherten Daten (keine Winkel-/
     // Marker-Neuberechnung); reine Funktion buildTrackDetailMap.
     const detail = buildTrackDetailMap(data);
+    let manualAngleOrdinal = 0;
+    const manualGeometry = (data.track_data?.manualAngleGeometry ?? []) as { geometryDirection: MapMarker['geometryDirection']; geometrySharpness: MapMarker['geometrySharpness'] }[];
     const markers: MapMarker[] = detail.markers.map(m => ({
       id: m.id, type: m.type, lat: m.lat, lng: m.lng,
       angleKind: m.angleKind, material: m.material,
       distanceFromStart: m.distanceFromStart, note: m.note,
       objectIndex: m.objectIndex, legIndex: m.legIndex,
+      ...(['ow', 'bw', 'gw'].includes(m.angleKind ?? '')
+        ? { geometryDirection: manualGeometry[manualAngleOrdinal]?.geometryDirection,
+            geometrySharpness: manualGeometry[manualAngleOrdinal++]?.geometrySharpness } : {}),
     }));
     const segments = coerceTrackSegments(data.track_data?.segments);
     const fitPoints = [
@@ -674,8 +696,9 @@ export default function TrackAuswertungScreen() {
                 {map.markers.filter(marker => marker.type === 'gegenstand').map((marker, index) => {
                   const material = marker.material && MATERIAL_LABEL_KEYS[marker.material] ? t(MATERIAL_LABEL_KEYS[marker.material]) : t('track.analysisMaterialUnknown');
                   const label = marker.material === 'duebel' ? material : `G${marker.objectIndex ?? index + 1}`;
+                  const autoDetection = (data?.track_data?.run?.object_detections ?? []).find((d: any) => d.id === marker.id && d.source === 'auto_dwell' && !d.user_override);
                   return (
-                    <Pressable key={marker.id ?? index} style={s.objectLogRow} onPress={() => setDetailSel({ kind: 'marker', marker })}>
+                    <View key={marker.id ?? index}><Pressable style={s.objectLogRow} onPress={() => setDetailSel({ kind: 'marker', marker })}>
                       <Text style={s.objectLogTitle}>{label} · {material}</Text>
                       <Text style={s.objectLogMeta}>
                         {marker.distanceFromStart != null ? `${Math.round(marker.distanceFromStart)} m` : 'Entfernung unbekannt'}
@@ -683,6 +706,12 @@ export default function TrackAuswertungScreen() {
                       </Text>
                       <Ionicons name="chevron-forward" size={15} color={C.trackTextMut} />
                     </Pressable>
+                    {!!autoDetection && <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 }}>
+                      <Text style={s.objectLogMeta}>{t('track.autoDetected')}</Text>
+                      <Pressable disabled={removingAutoId === marker.id} onPress={() => void removeAutoDetection(marker.id!)}>
+                        <Text style={s.objectLogMeta}>{t('track.autoRemove')}</Text>
+                      </Pressable>
+                    </View>}</View>
                   );
                 })}
               </View>

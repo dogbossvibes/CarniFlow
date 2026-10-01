@@ -21,6 +21,20 @@
 // ──────────────────────────────────────────────────────────────────────────
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { findTurnVertices } from '@/features/tracking/utils/searchReplayGeometry';
+import type { VoiceDiagnostic } from '@/features/tracking/utils/trackingUxDiagnostics';
+
+export interface QaStartApproachDiagnostics {
+  startDistanceM: number | null; firstStableFixTSec: number | null; armedTSec: number | null;
+  startZoneEnteredTSec: number | null; voiceTriggerTSec: number | null;
+  voiceQueuedTSec: number | null; voiceSpokenTSec: number | null;
+  departedStartTSec: number | null; searchStartedTSec: number | null; reason: string | null;
+}
+export interface QaEndEligibilitySample {
+  tSec: number; handlerProgressM: number; dogProjectedProgressM: number;
+  configuredDogLeadM: number; handlerDistanceToEndM: number | null; dogDistanceToEndM: number | null;
+  activeObjectWait: boolean; endEligible: boolean; blockerReason: string | null;
+  eventFiredTSec: number | null;
+}
 
 // ── Recorder-Telemetrie (nur im Speicher, absolute Werte) ────────────────
 export interface SearchQaRawFix { lat: number; lng: number; accuracy: number | null; t: number; accepted: boolean; reason: string | null }
@@ -43,6 +57,10 @@ export interface SearchQaTelemetry {
   display: SearchQaPoint[];
   cursorSamples: SearchQaCursorSample[];
   objectApproach: SearchQaObjectApproach[];
+  objectDwellCandidates?: { referenceIndex: number; dwellStartedTSec: number; dwellDurationSec: number;
+    speedMps: number | null; stationaryConfidence: number; progressM: number;
+    distanceToNearestReferenceObjectM: number; nearStart: boolean; nearAngle: boolean; nearEnd: boolean;
+    accepted: boolean; rejectReason: string | null; userOverride: boolean }[];
   /** Kleinste Luftlinie einer akzeptierten Suchposition zum Endpunkt der Soll-Fährte. */
   minDistToEndM: number | null;
   progressAtMinEndM: number | null;
@@ -95,6 +113,11 @@ export interface QaSearchTurnParity {
 }
 
 export interface QaSearchDiagnostics {
+  /** QA v2.5: additive UX diagnostics. */
+  voiceDiagnostics?: { events: VoiceDiagnostic[]; truncated: boolean };
+  startApproachDiagnostics?: QaStartApproachDiagnostics;
+  endEligibilityDiagnostics?: { samples: QaEndEligibilitySample[]; truncated: boolean };
+  objectDwellDiagnostics?: { candidates: NonNullable<SearchQaTelemetry['objectDwellCandidates']>; truncated: boolean };
   /** true = Lauf wurde mit Resume/Recovery gestartet: Ströme decken nur den Teil nach dem Neustart ab. */
   partial: boolean;
   rawSearchPointCount: number;
@@ -211,6 +234,7 @@ function thin<T>(arr: readonly T[], max: number): T[] {
 
 // ── Builder ──────────────────────────────────────────────────────────────
 export interface BuildSearchDiagnosticsInput {
+  ux?: Pick<QaSearchDiagnostics, 'voiceDiagnostics' | 'startApproachDiagnostics' | 'endEligibilityDiagnostics' | 'objectDwellDiagnostics'>;
   /** Ursprung der relativen Koordinaten: erster gelegter Punkt (wie im Lay-Export). */
   origin: { latitude: number; longitude: number };
   telemetry: SearchQaTelemetry;
@@ -294,6 +318,10 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
   const runGap = streams.run, repGap = streams.replay;
 
   return {
+    ...input.ux,
+    ...(tel.objectDwellCandidates ? { objectDwellDiagnostics: {
+      candidates: tel.objectDwellCandidates.slice(), truncated: tel.objectDwellCandidates.length >= 100,
+    } } : {}),
     partial: input.resumed || tel.resumed,
     rawSearchPointCount: tel.raw.length,
     acceptedSearchPointCount: tel.raw.filter(r => r.accepted).length,

@@ -95,7 +95,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -173,6 +173,9 @@ export interface QaTrackExport {
    * erster gelegter Punkt) und relative Zeit.
    */
   searchDiagnostics?: QaSearchDiagnostics;
+  startupDiagnostics?: QaSessionCapture['startupDiagnostics'];
+  manualAngleGeometryDiagnostics?: QaSessionCapture['manualAngleGeometryDiagnostics'];
+  voiceDiagnostics?: QaSessionCapture['voiceDiagnostics'];
 }
 
 export function toMs(t: string | number | null | undefined): number {
@@ -267,7 +270,8 @@ export function buildQaTrackExport(
   const motion = capture?.candidateMotionEvidence;
   return {
     schemaVersion: 2,
-    schemaMinor: search ? (search.cursor.referenceGeometryLengthM == null ? 3 : 4)
+    schemaMinor: search ? (search.voiceDiagnostics || search.startApproachDiagnostics || search.endEligibilityDiagnostics || search.objectDwellDiagnostics ? 5 : search.cursor.referenceGeometryLengthM == null ? 3 : 4)
+      : capture?.startupDiagnostics || capture?.manualAngleGeometryDiagnostics || capture?.voiceDiagnostics ? 5
       : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0,
     sessionId: hashSessionId(sessionLocalId),
     pointType: 'lay',
@@ -309,6 +313,9 @@ export function buildQaTrackExport(
     ...(capture?.turnFusion ? { turnFusion: capture.turnFusion } : {}),
     ...(capture?.imuOnlyEvents ? { imuOnlyEvents: capture.imuOnlyEvents } : {}),
     ...(search ? { searchDiagnostics: search } : {}),
+    ...(capture?.startupDiagnostics ? { startupDiagnostics: capture.startupDiagnostics } : {}),
+    ...(capture?.manualAngleGeometryDiagnostics ? { manualAngleGeometryDiagnostics: capture.manualAngleGeometryDiagnostics } : {}),
+    ...(capture?.voiceDiagnostics ? { voiceDiagnostics: capture.voiceDiagnostics } : {}),
   };
 }
 
@@ -386,10 +393,26 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
       ...sd.geometry.run.map(p => p.tSec), ...sd.geometry.replay.map(p => p.tSec),
       ...sd.geometry.raw.map(p => p.tSec), ...sd.geometry.filtered.map(p => p.tSec),
       sd.maxRunGapSec, sd.maxReplayGapSec,
+      ...((sd.voiceDiagnostics?.events ?? []).flatMap(v => [v.triggerTSec, v.queuedTSec, v.spokenTSec])),
+      sd.startApproachDiagnostics?.firstStableFixTSec, sd.startApproachDiagnostics?.armedTSec,
+      sd.startApproachDiagnostics?.startZoneEnteredTSec, sd.startApproachDiagnostics?.voiceTriggerTSec,
+      sd.startApproachDiagnostics?.voiceQueuedTSec, sd.startApproachDiagnostics?.voiceSpokenTSec,
+      sd.startApproachDiagnostics?.departedStartTSec, sd.startApproachDiagnostics?.searchStartedTSec,
+      ...((sd.endEligibilityDiagnostics?.samples ?? []).flatMap(v => [v.tSec, v.eventFiredTSec])),
+      ...((sd.objectDwellDiagnostics?.candidates ?? []).flatMap(v => [v.dwellStartedTSec, v.dwellDurationSec])),
     ];
     for (const v of secs) if (v != null && Math.abs(v) >= 1e8) throw new Error('QA-Export enthält einen absoluten Search-Zeitstempel.');
     const coords = [...sd.geometry.run, ...sd.geometry.replay, ...sd.geometry.raw, ...sd.geometry.filtered, ...sd.cursor.samples];
     for (const c of coords) if (Math.abs(c.x) >= 1e6 || Math.abs(c.y) >= 1e6) throw new Error('QA-Export enthält absolute Search-Koordinaten.');
+  }
+  const startup = e.startupDiagnostics;
+  if (startup) for (const [key, value] of Object.entries(startup)) {
+    if (typeof value === 'number' && Math.abs(value) >= (key === 'startupDelayMs' ? 1e11 : 1e8))
+      throw new Error('QA-Export enthält einen absoluten Startup-Zeitstempel.');
+  }
+  for (const v of e.voiceDiagnostics?.events ?? []) {
+    if ([v.triggerTSec, v.queuedTSec, v.spokenTSec].some(t => t != null && Math.abs(t) >= 1e8))
+      throw new Error('QA-Export enthält einen absoluten Voice-Zeitstempel.');
   }
   for (const v of e.imuOnlyEvents ?? []) {
     if (Math.abs(v.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten IMU-Zeitstempel.');

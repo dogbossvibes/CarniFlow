@@ -24,6 +24,7 @@ export function buildRunResultPayload(args: {
   endedAtMs:             number;
   result:                RunResultSource;
   searchHandlerDistanceM?: number;
+  autoDwellObjectIds?: string[];
   // Punkt 10/12/13: additiv, KEINE Migration nötig — payload_json ist schemalos
   // (JSONB). Fehlt sie (z. B. Freilauf ohne Soll-Fährte, Recovery-Kurzpfad ohne
   // laufenden Recorder), bleibt das Feld schlicht weg — bestehende Konsumenten
@@ -59,6 +60,7 @@ export function buildRunResultPayload(args: {
     distance_meters:           r.distanceM,
     breaks:                    r.breaks.length,
     search_handler_distance_m: args.searchHandlerDistanceM ?? null,
+    ...(args.autoDwellObjectIds?.length ? { object_detections: args.autoDwellObjectIds.map(id => ({ id, source: 'auto_dwell' })) } : {}),
     run_points:                hasReplayTimestamps
       ? r.points.map((p, i) => ({ lat: p.latitude, lng: p.longitude, t: args.pointsTimeSec![i] }))
       : r.points.map(p => ({ lat: p.latitude, lng: p.longitude })),

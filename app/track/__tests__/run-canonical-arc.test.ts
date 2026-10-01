@@ -61,12 +61,10 @@ describe('13. Voice-/Haptik-Schwellen unverändert', () => {
   });
 });
 
-describe('14. Objekt-Fundlogik unverändert (koordinatenbasiert)', () => {
-  it('OBJECT_HIT_M und der Fund-Block sind unverändert', () => {
-    expect(recorder).toContain('const OBJECT_HIT_M = 2.5;');
-    expect(recorder).toContain("const dogProgress = startLocked ? estimateDogProgressM(maxCursorMRef.current, handlerDistanceM, arc.total) : maxCursorMRef.current;");
-    expect(recorder).toContain('const objectReference = dogPos ?? sm;');
-    expect(recorder).toContain('if (!foundRef.current.has(i) && distM(objectReference, o.at) <= OBJECT_HIT_M) {');
+describe('14. Objekt-Fundlogik per Handler-Dwell', () => {
+  it('proximity allein markiert keinen Fund', () => {
+    expect(recorder).toContain('stepObjectDwell(previous, {');
+    expect(recorder).not.toContain('distM(objectReference, o.at) <= OBJECT_HIT_M');
     expect(recorder).not.toContain('canonicalArc');
   });
   it('Recorder nutzt die zentrale buildArc aus searchGeometry (ein Maßstab)', () => {

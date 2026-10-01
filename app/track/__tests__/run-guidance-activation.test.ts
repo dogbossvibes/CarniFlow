@@ -39,15 +39,15 @@ describe('zentraler Guard', () => {
 });
 
 describe('Pre-Search-Feedback bewusst NICHT gegated (Klasse A)', () => {
-  it('„Suche läuft" + Start-Haptik in beginSearchNow unverändert', () => {
+  it('lokalisierter Suchstart + Start-Haptik in beginSearchNow', () => {
     const begin = block('const beginSearchNow', 'const handleManualStart');
     expect(begin).toContain('hapticSuccess();');
-    expect(begin).toContain("Speech.speak('Suche läuft', { language: 'de-DE' })");
+    expect(begin).toContain("eventType: 'search_start', text: t('track.voiceSearchStarted')");
   });
-  it('„Fährtenansatz erkannt" (START_LOCKED-Übergang) unverändert', () => {
+  it('START_LOCKED meldet keine zweite verspätete Ansatz-Ansage', () => {
     const lock = block('const prevSearchStartRef', 'const searchStartBanner');
     expect(lock).toContain("if (prev !== 'START_LOCKED' && s.searchStartState === 'START_LOCKED') {");
-    expect(lock).toContain("if (voiceOn) say(t('track.searchStartLocked'));");
+    expect(lock).not.toContain("say(t('track.searchStartLocked'))");
     expect(lock).not.toContain('searchGuidanceActive');
   });
   it('Resume-Haptik unverändert', () => {
@@ -95,7 +95,7 @@ describe('Pins: Canonical Reference + Search Recovery State unverändert', () =>
     expect(voice).toContain('const SPEAK_GAP_MS     = 3500;');
     expect(haptic).toContain('const ANGLE_AHEAD_M  = 6;');
     expect(haptic).toContain('const OBJECT_AHEAD_M = 4;');
-    expect(rec).toContain('const OBJECT_HIT_M = 2.5;');
+    expect(rec).toContain('stepObjectDwell(previous, {');
     expect(rec).toContain('const LOOKAHEAD_M = 20;');
   });
 });

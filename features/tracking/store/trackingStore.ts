@@ -140,6 +140,8 @@ interface TrackingState {
   // ── Search-Recovery-State (gehört zur aktiven searchRunId) ──
   noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
   noteSearchObjectFound: (objectKey: string) => void;      // sofort persistiert
+  noteSearchAutoDwell: (objectKey: string) => void;
+  dismissSearchAutoDwell: (objectKey: string) => void;
   noteSearchVoiceFired: (featureId: string) => void;       // sofort persistiert
   noteSearchHapticFired: (featureId: string) => void;      // sofort persistiert
   noteSearchEndFired: () => void;                          // sofort persistiert
@@ -332,6 +334,21 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   noteSearchObjectFound: (key) => {
     if (get().searchRunState.foundObjectIds.includes(key)) return;
     set(s => ({ searchRunState: { ...s.searchRunState, foundObjectIds: [...s.searchRunState.foundObjectIds, key] } }));
+    persistNow(get);
+  },
+  noteSearchAutoDwell: (key) => {
+    set(s => ({ searchRunState: { ...s.searchRunState,
+      foundObjectIds: s.searchRunState.foundObjectIds.includes(key) ? s.searchRunState.foundObjectIds : [...s.searchRunState.foundObjectIds, key],
+      autoDwellObjectIds: s.searchRunState.autoDwellObjectIds.includes(key) ? s.searchRunState.autoDwellObjectIds : [...s.searchRunState.autoDwellObjectIds, key],
+    } }));
+    persistNow(get);
+  },
+  dismissSearchAutoDwell: (key) => {
+    set(s => ({ searchRunState: { ...s.searchRunState,
+      foundObjectIds: s.searchRunState.foundObjectIds.filter(id => id !== key),
+      autoDwellObjectIds: s.searchRunState.autoDwellObjectIds.filter(id => id !== key),
+      dismissedAutoDwellIds: s.searchRunState.dismissedAutoDwellIds.includes(key) ? s.searchRunState.dismissedAutoDwellIds : [...s.searchRunState.dismissedAutoDwellIds, key],
+    } }));
     persistNow(get);
   },
   noteSearchVoiceFired: (id) => {

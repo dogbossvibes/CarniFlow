@@ -89,6 +89,7 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
   cornersTotal?: number | null;
   gpsQualityAverage?: number | null;
   segments?: unknown;
+  manualAngleGeometry?: unknown;
   status?: string;
 }): Promise<void> {
   const db = await getLocalDb();
@@ -98,6 +99,7 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
     cornersTotal:      input.cornersTotal ?? null,
     gpsQualityAverage: input.gpsQualityAverage ?? null,
     segments:          input.segments ?? null,
+    ...(input.manualAngleGeometry ? { manualAngleGeometry: input.manualAngleGeometry } : {}),
   });
   await db.runAsync(
     `update local_training_sessions set status=?, ended_at=?, duration_seconds=?, payload_json=?, updated_at=? where local_id=?`,
@@ -123,6 +125,27 @@ export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<
     `update local_training_sessions set payload_json=?, updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
     JSON.stringify(payload), nowIso(), sessionLocalId,
   );
+}
+
+/** Remove only the automatic search detection, never the laid reference marker. */
+export async function dismissLocalAutoDwellDetection(sessionLocalId: string, objectId: string): Promise<boolean> {
+  const db = await getLocalDb();
+  const row = await db.getFirstAsync<{ payload_json: string | null }>(
+    `select payload_json from local_training_sessions where local_id=?`, sessionLocalId,
+  );
+  if (!row?.payload_json) return false;
+  let payload: Record<string, any>;
+  try { payload = JSON.parse(row.payload_json); } catch { return false; }
+  const run = payload.run;
+  if (!run || !Array.isArray(run.object_detections)) return false;
+  const detection = run.object_detections.find((d: any) => d?.id === objectId && d?.source === 'auto_dwell');
+  if (!detection) return false;
+  detection.user_override = true;
+  await db.runAsync(
+    `update local_training_sessions set payload_json=?, updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
+    JSON.stringify(payload), nowIso(), sessionLocalId,
+  );
+  return true;
 }
 
 export async function updateLocalTrackEvaluation(localId: string, input: {

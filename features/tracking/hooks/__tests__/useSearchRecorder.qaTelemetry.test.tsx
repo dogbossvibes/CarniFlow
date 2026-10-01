@@ -184,7 +184,7 @@ describe('Cursor / Score / Search-Distanz / Analytics durch QA unverändert', ()
   it('QA-Ref wird von Cursor/Distanz/Score-Code nie gelesen (nur Schreiben + stop)', () => {
     const src = fs.readFileSync('features/tracking/hooks/useSearchRecorder.ts', 'utf8');
     const uses = src.split('\n').filter(l => l.includes('qaTelRef') || l.includes('qaLastCursorSampleSecRef'));
-    for (const l of uses) expect(l).toMatch(/useRef|qaTelRef\.current\)? *(\?|&&|\{|\.raw|\.filtered|=)|const tel = qaTelRef|qaTelRef\.current = |\.\.\.qaTelRef|qaLastCursorSampleSecRef\.current|const qaTel = qaTelRef|qaTelRef\.current\s*$|qaTelRef\.current \?|if \(qaTelRef/);
+    for (const l of uses) expect(l).toMatch(/useRef|qaTelRef\.current\)? *(\?|&&|\{|\.raw|\.filtered|=)|const tel = qaTelRef|qaTelRef\.current = |\.\.\.qaTelRef|qaLastCursorSampleSecRef\.current|const qaTel = qaTelRef|qaTelRef\.current\s*$|qaTelRef\.current \?|if \(qaTelRef|objectDwellCandidates/);
     expect(src).not.toMatch(/(maxCursorMRef|cursorMRef|distRef|devSumRef|foundRef)\.current\s*(=|\+=)[^;]*qaTelRef/);
   });
 });

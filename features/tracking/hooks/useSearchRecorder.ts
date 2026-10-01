@@ -28,6 +28,7 @@ import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import { stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
+import { INITIAL_OBJECT_DWELL, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
 import { motionClient } from '@/features/tracking/native/motionClient';
@@ -106,7 +107,6 @@ const ON_TRACK_M = 3.0;          // m — innerhalb = "auf der Fährte"
 const BREAK_THRESHOLD_M = 6.0;   // m — darüber für BREAK_HOLD = Abriss
 const BREAK_HOLD_MS = 4000;      // ms — so lange muss die Abweichung halten
 const RECOVER_M = 3.0;           // m — wieder unter diesem Wert = Neuansatz/erholt
-const OBJECT_HIT_M = 2.5;        // m — so nah an einem Gegenstand = verwiesen/gefunden
 const DEV_EMA = 0.25;            // Glättung der angezeigten Abweichung
 
 // ── Reihenfolge-bewusste Projektion (Fortschritt entlang der Soll-Fährte) ──
@@ -145,6 +145,8 @@ export interface SearchRecorder {
   onTrack: boolean;
   breaks: Break[];
   foundObjects: number;
+  autoDwellObjectIds: string[];
+  activeObjectWait: boolean;
   totalObjects: number;
   distanceM: number;
   offTrackState: OffTrackState;   // Phase-1 Off-Track-Status (on_track|warning|off_track) für UI/Recorder
@@ -174,6 +176,7 @@ export interface SearchRecorder {
   stop: () => SearchResult;
   setPaused: (p: boolean) => void;
   markObject: () => void;
+  dismissAutoObject: (id: string) => void;
 }
 export type SearchResult = {
   points: LatLng[]; breaks: Break[]; foundObjects: number; totalObjects: number;
@@ -187,6 +190,7 @@ export type SearchResult = {
   // die Analytics-Engine "found" konsistent mit dem echten Score ableiten kann,
   // statt es aus Distanzwerten zu schätzen.
   foundObjectIndices: number[];
+  autoDwellObjectIds: string[];
   // Punkt 17 (Track-Replay): Sekunden-seit-Start je Eintrag in `points`,
   // gleiche Länge/Reihenfolge wie `points` — additiv, KEINE zweite Geometrie.
   // Kürzer als `points` (Resume, ältere Sessions vor dieser Erweiterung) =
@@ -208,6 +212,7 @@ export type { Level };
 
 export function useSearchRecorder(opts: {
   laidPoints: LatLng[]; laidObjects: SearchObject[]; level: Level; sessionId?: string | null; handlerDistanceM?: number;
+  angleArcM?: readonly number[];
   /** QA-Diagnose: pro eingehendem Fix genau ein Endstatus (siehe searchFixDiag.ts). Rein beobachtend. */
   onFixDiag?: (d: SearchFixDiag) => void;
 }): SearchRecorder {
@@ -290,6 +295,11 @@ export function useSearchRecorder(opts: {
   // halten/exponieren — KEIN Voice/Haptik/Banner/Recorder-Freeze/Auto-Pause hier.
   const offTrackRef = useRef<OffTrackSnapshot>(initialOffTrack());
   const foundRef = useRef<Set<number>>(new Set());
+  const autoDwellRef = useRef<Map<number, ObjectDwellState>>(new Map());
+  const autoDwellStartRef = useRef<Map<number, LatLng>>(new Map());
+  const autoDwellIdsRef = useRef<Set<string>>(new Set());
+  const dismissedDwellIdsRef = useRef<Set<string>>(new Set());
+  const [activeObjectWait, setActiveObjectWait] = useState(false);
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const startMsRef = useRef(0);
   const cursorMRef = useRef(0);      // aktueller Fortschritt entlang der Soll-Fährte (m)
@@ -553,6 +563,47 @@ export function useSearchRecorder(opts: {
       }
     }
 
+    // Referenznahe, stationäre Gegenstandsarbeit: nur ein bestätigtes Dwell
+    // erzeugt einen auto_dwell-Fund. Die gelegten Marker bleiben unverändert.
+    let waitingAtObject = false;
+    if (searchStartRef.current.state === 'START_LOCKED' && !pausedRef.current) {
+      const dwellSpeed = fusion.classification === 'stationary' ? 0 : speed;
+      laidObjects.forEach((object, i) => {
+        const key = searchObjectKey(object, i);
+        if (foundRef.current.has(i) || dismissedDwellIdsRef.current.has(key)) return;
+        const previous = autoDwellRef.current.get(i) ?? INITIAL_OBJECT_DWELL;
+        const origin = autoDwellStartRef.current.get(i) ?? sm;
+        const next = stepObjectDwell(previous, {
+          tMs: tNow, speedMps: dwellSpeed, accuracyM: accRaw,
+          progressM: maxCursorMRef.current, trackLengthM: arc.total,
+          distanceToReferenceM: distM(sm, object.at), driftFromStartM: distM(sm, origin),
+          nearAngle: (opts.angleArcM ?? []).some(a => Math.abs(a - maxCursorMRef.current) <= 3),
+          searchActive: recordingRef.current, gpsOutlier: fusion.classification === 'gps_outlier',
+        });
+        autoDwellRef.current.set(i, next.state);
+        if (next.state.startedMs != null) { waitingAtObject = true; autoDwellStartRef.current.set(i, origin); }
+        else autoDwellStartRef.current.delete(i);
+        if (next.acceptedNow) {
+          foundRef.current.add(i); autoDwellIdsRef.current.add(key);
+          useTrackingStore.getState().noteSearchAutoDwell(key);
+          pushSnapshot();
+        }
+        if (qaTelRef.current?.objectDwellCandidates && (next.acceptedNow || previous.startedMs != null && next.rejectReason)
+          && qaTelRef.current.objectDwellCandidates.length < 100) {
+          qaTelRef.current.objectDwellCandidates.push({ referenceIndex: i,
+            dwellStartedTSec: ((previous.startedMs ?? tNow) - startMsRef.current) / 1000,
+            dwellDurationSec: (tNow - (previous.startedMs ?? tNow)) / 1000,
+            speedMps: dwellSpeed, stationaryConfidence: fusion.classification === 'stationary' ? 1 : dwellSpeed == null ? 0.5 : dwellSpeed <= 0.4 ? 0.75 : 0,
+            progressM: maxCursorMRef.current, distanceToNearestReferenceObjectM: distM(sm, object.at),
+            nearStart: maxCursorMRef.current <= 3,
+            nearAngle: (opts.angleArcM ?? []).some(a => Math.abs(a - maxCursorMRef.current) <= 3),
+            nearEnd: arc.total - maxCursorMRef.current <= 3,
+            accepted: next.acceptedNow, rejectReason: next.rejectReason, userOverride: false });
+        }
+      });
+    }
+    setActiveObjectWait(waitingAtObject);
+
     // ── Fusion-Outlier/Stillstand: Distanz/Cursor/Abweichung/Linie bleiben
     // komplett unverändert — dieser Fix trägt NICHTS zur geometrischen Fährte
     // bei (siehe Kommentar oben). Trotzdem ein Analytics-Sample mit
@@ -753,20 +804,7 @@ export function useSearchRecorder(opts: {
       }
     }
 
-    // ── Gegenstand verwiesen? ──
-    // Vor START_LOCKED ausschliesslich anhand der Handlerposition (Punkt 4) —
-    // der gewählte Hundabstand darf die virtuelle Hundeposition nicht schon
-    // vorschieben, bevor der Start eindeutig feststeht.
-    const dogProgress = startLocked ? estimateDogProgressM(maxCursorMRef.current, handlerDistanceM, arc.total) : maxCursorMRef.current;
-    const dogPos = startLocked ? pointAtDistance(laidPoints, arc.cum, dogProgress) : null;
-    const objectReference = dogPos ?? sm;
-    laidObjects.forEach((o, i) => {
-      if (!foundRef.current.has(i) && distM(objectReference, o.at) <= OBJECT_HIT_M) {
-        foundRef.current.add(i);
-        // Recovery-State: Fund sofort persistieren (stabile Marker-ID, sonst Index).
-        useTrackingStore.getState().noteSearchObjectFound(searchObjectKey(o, i));
-      }
-    });
+    // Gegenstände werden oben als auto_dwell oder per markObject bestätigt.
 
     // ── QA-Search-Telemetrie (rein beobachtend; nach allen Metrik-Updates) ──
     if (qaTelRef.current) {
@@ -976,11 +1014,14 @@ export function useSearchRecorder(opts: {
     setSearchStartState(searchStartRef.current.state);
     // Funde: stabile Marker-IDs (Fallback Index) zurück auf laidObjects abbilden.
     foundRef.current = new Set();
+    autoDwellRef.current.clear(); autoDwellStartRef.current.clear();
+    autoDwellIdsRef.current = new Set(rs?.autoDwellObjectIds ?? []);
+    dismissedDwellIdsRef.current = new Set(rs?.dismissedAutoDwellIds ?? []);
     if (rs) laidObjects.forEach((o, i) => { if (rs.foundObjectIds.includes(searchObjectKey(o, i))) foundRef.current.add(i); });
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
     // QA-Search-Telemetrie nur im QA-Diagnosemodus; sonst null → kein Overhead.
     qaTelRef.current = isQaDiagnosticsEnabled()
-      ? { startedAtMs: startMsRef.current, resumed: resumePts.length > 0, raw: [], filtered: [], display: [], cursorSamples: [], objectApproach: [],
+      ? { startedAtMs: startMsRef.current, resumed: resumePts.length > 0, raw: [], filtered: [], display: [], cursorSamples: [], objectApproach: [], objectDwellCandidates: [],
           minDistToEndM: null, progressAtMinEndM: null, truncated: { raw: false, cursor: false } }
       : null;
     setElapsedS(resume ? Math.max(0, Math.floor((Date.now() - resume.startedAtMs) / 1000)) : 0);
@@ -1017,6 +1058,7 @@ export function useSearchRecorder(opts: {
       totalObjects,
       analyticsSamples: analyticsSamplesRef.current.slice(),
       foundObjectIndices: Array.from(foundRef.current),
+      autoDwellObjectIds: Array.from(autoDwellIdsRef.current),
       pointsTimeSec: pointsTimeRef.current.slice(),
       deviationAvgM: devCountRef.current ? Math.round((devSumRef.current / devCountRef.current) * 10) / 10 : 0,
       distanceM: distRef.current,
@@ -1042,6 +1084,17 @@ export function useSearchRecorder(opts: {
     }
   }, [laidObjects, pushSnapshot]);
 
+  const dismissAutoObject = useCallback((id: string) => {
+    if (!autoDwellIdsRef.current.has(id)) return;
+    const i = laidObjects.findIndex((o, index) => searchObjectKey(o, index) === id);
+    if (i < 0) return;
+    autoDwellIdsRef.current.delete(id); dismissedDwellIdsRef.current.add(id); foundRef.current.delete(i);
+    const qaCandidate = qaTelRef.current?.objectDwellCandidates?.find(c => c.referenceIndex === i && c.accepted);
+    if (qaCandidate) qaCandidate.userOverride = true;
+    useTrackingStore.getState().dismissSearchAutoDwell(id);
+    pushSnapshot();
+  }, [laidObjects, pushSnapshot]);
+
   // Virtueller Hundefortschritt (Bogenlänge) + geschätzte Hundeposition — reine
   // Runtime-Ableitung aus dem bestehenden progressM (Handler). Kein GPS-Rohpunkt.
   // Vor START_LOCKED (Punkt 4): kein Hundabstand-Offset, kein Marker — nur die
@@ -1054,11 +1107,12 @@ export function useSearchRecorder(opts: {
     ready, recording, paused,
     points: snap.points, position, liveFix, deviationM: snap.deviationM, onTrack: snap.onTrack,
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
+    autoDwellObjectIds: Array.from(autoDwellIdsRef.current), activeObjectWait,
     distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,
     dogProgressM, trackLengthM: arc.total, estimatedDogPosition,
     elapsedS, score: snap.score, accuracy,
     gpsDebug, gpsQuality,
     searchStartState,
-    start, stop, setPaused, markObject,
+    start, stop, setPaused, markObject, dismissAutoObject,
   };
 }

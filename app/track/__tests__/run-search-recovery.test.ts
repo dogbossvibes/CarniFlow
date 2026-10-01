@@ -91,11 +91,11 @@ describe('Schwellen unverändert', () => {
     expect(voice).toContain('const SPEAK_GAP_MS     = 3500;');
     expect(haptic).toContain('const ANGLE_AHEAD_M  = 6;');
     expect(haptic).toContain('const OBJECT_AHEAD_M = 4;');
-    expect(rec).toContain('const OBJECT_HIT_M = 2.5;');
+    expect(rec).toContain('stepObjectDwell(previous, {');
     expect(rec).toContain('const LOOKAHEAD_M = 20;');
     expect(rec).toContain('const BACK_M = 4;');
     expect(rec).toContain('const BREAK_THRESHOLD_M = 6.0;');
-    expect(rec).toContain('if (!foundRef.current.has(i) && distM(objectReference, o.at) <= OBJECT_HIT_M) {');
+    expect(rec).not.toContain('distM(objectReference, o.at) <= OBJECT_HIT_M');
   });
   it('Cursor-Seed läuft über den normalen Fenster-Projektionspfad (kein Voll-Linien-Workaround)', () => {
     const rec = strip(read('features/tracking/hooks/useSearchRecorder.ts'));

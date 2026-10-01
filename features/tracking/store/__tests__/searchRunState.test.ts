@@ -21,7 +21,8 @@ describe('sanitizeSearchRunState — legacy-sicher (17.)', () => {
   it('vollständiger State wird 1:1 übernommen', () => {
     const full = {
       maxCursorM: 40.5, devSumM: 12.3, devCount: 7,
-      foundObjectIds: ['gegenstand-1', 'gegenstand-2'], voiceFiredIds: ['angle-1-rechts'], hapticFiredIds: ['angle-1-rechts', 'gegenstand-1'],
+      foundObjectIds: ['gegenstand-1', 'gegenstand-2'], autoDwellObjectIds: [], dismissedAutoDwellIds: [],
+      voiceFiredIds: ['angle-1-rechts'], hapticFiredIds: ['angle-1-rechts', 'gegenstand-1'],
       endFired: true, segmentAnnouncements: { seg1: { announcedApproach: true, announcedStart: true, announcedEnd: false } },
       breaks: [{ at: { latitude: 47, longitude: 8 }, t: 12, startedAtSec: 9.5, recoveredAfterM: 30, recoveredAtSec: 20, durationSec: 10.5 }],
       offTrackState: 'warning',
@@ -100,7 +101,8 @@ describe('Store — Search-Recovery-State im PendingTrack', () => {
     const rs = useTrackingStore.getState().searchRunState;
     expect(rs).toEqual({
       maxCursorM: 30, devSumM: 4, devCount: 3,
-      foundObjectIds: ['gegenstand-1'], voiceFiredIds: ['angle-10-rechts'], hapticFiredIds: ['angle-10-rechts', 'gegenstand-1'],
+      foundObjectIds: ['gegenstand-1'], autoDwellObjectIds: [], dismissedAutoDwellIds: [],
+      voiceFiredIds: ['angle-10-rechts'], hapticFiredIds: ['angle-10-rechts', 'gegenstand-1'],
       endFired: true, segmentAnnouncements: { seg1: { announcedApproach: true, announcedStart: true, announcedEnd: false } },
       breaks: [{ at: { latitude: 47, longitude: 8 }, t: 10, startedAtSec: 6 }], offTrackState: 'off_track',
     });

@@ -6,7 +6,7 @@ import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } fr
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
-import * as Speech from 'expo-speech';
+import { requestVoice, resetVoiceEvents } from '@/features/tracking/utils/voiceEvents';
 import { FT } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
@@ -16,6 +16,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { useTrackRecorder } from '@/features/tracking/hooks/useTrackRecorder';
+import { isLaySessionWarmupReady } from '@/features/tracking/utils/layStartLock';
 import { BackgroundLocationDisclosure } from '@/features/tracking/components/BackgroundLocationDisclosure';
 import { useAutoDetectSetting } from '@/hooks/useAutoDetectSetting';
 import { useLayVoiceSetting } from '@/hooks/useLayVoiceSetting';
@@ -100,21 +101,18 @@ const SEGMENT_ICONS: Record<TrackSegmentType, MatIcon> = {
 };
 
 function speakTrackSegment(text: string) {
-  try {
-    Speech.stop();
-    Speech.speak(text, { language: 'de-CH', pitch: 1.0, rate: 0.95 });
-  } catch { /* best-effort */ }
+  requestVoice({ eventType: 'segment', text, language: getSpeechLocale(), priority: 2,
+    onceKey: `lay-segment:${Date.now()}:${++layVoiceSequence}`, phase: 'lay' });
 }
+let layVoiceSequence = 0;
 
 // Sprachbestätigung eines TATSÄCHLICH gesetzten/erkannten Events beim Legen.
 // Bewusst nur die Kurzform („Winkel links", „Dübel", „Absatz") — keine
 // Vorhersage, keine Distanz. Die Zuordnung liegt zentral in
 // trackEventVoice.ts und ist damit identisch zur Absuche.
-function speakTrackEvent(label: string) {
-  try {
-    Speech.stop();
-    Speech.speak(label, { language: getSpeechLocale(), pitch: 1.0, rate: 0.95 });
-  } catch { /* best-effort */ }
+function speakTrackEvent(label: string, eventType: 'angle' | 'object') {
+  requestVoice({ eventType, text: label, language: getSpeechLocale(), priority: 5,
+    onceKey: `lay:${eventType}:${Date.now()}:${++layVoiceSequence}`, phase: 'lay' });
 }
 
 function localizedSegmentLabel(type: TrackSegmentType, t: (key: TranslationKey) => string): string {
@@ -166,7 +164,6 @@ export default function LegenScreen() {
   const [weatherState, setWeatherState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const weatherFetchedRef = useRef(false);
   const [lastAngle, setLastAngle] = useState<AngleKind | null>(null);
-  const [warmupElapsed, setWarmupElapsed] = useState(0);
   const [gsPicker, setGsPicker] = useState(false);   // Gegenstand-Schnellauswahl (Inline, kein Sheet)
   const [winkelSheet, setWinkelSheet] = useState(false);       // Winkeltyp wählen (GW/OW/BW/Abriss)
   const [segmentSheet, setSegmentSheet] = useState(false);
@@ -198,7 +195,7 @@ export default function LegenScreen() {
     // Toast IMMER — das Gate sitzt ausschliesslich vor der Sprachausgabe.
     // Marker (Recorder) und Haptik laufen ohnehin ausserhalb dieser Funktion.
     showToast(t(mode === 'detected' ? 'track.eventDetected' : 'track.eventSet', { label }));
-    if (layVoiceRef.current) speakTrackEvent(label);
+    if (layVoiceRef.current) speakTrackEvent(label, event.kind === 'object' ? 'object' : 'angle');
   }, [showToast, t]);
 
   const onAngle = useCallback((kind: AngleKind) => {
@@ -316,11 +313,12 @@ export default function LegenScreen() {
 
   // Start-Taste: erst prüfen, ob der gewählte Hund bereits eine aktive Fährte hat.
   const handleStartPress = useCallback(() => {
+    rec.noteUserTapStart();
     const dId = activeDog?.id ?? null;
     const entry = dId ? useActiveFaehrten.getState().get(dId) : null;
     if (dId && entry) { showConflict(dId, entry); return; }   // KEINE zweite Fährte
     proceedToStart();
-  }, [activeDog?.id, showConflict, proceedToStart]);
+  }, [activeDog?.id, showConflict, proceedToStart, rec]);
 
   // Beim Betreten mit einem Hund, der bereits eine aktive Fährte hat, sofort den
   // Dialog zeigen (einmalig) — statt still eine zweite Aufnahme vorzubereiten.
@@ -345,9 +343,9 @@ export default function LegenScreen() {
   const activeSegment = activeOrPlannedSegment(segments);
   const currentStep = metersToSteps(distanceMeters, stepLengthM);
 
-  // GPS wirklich bereit (gute Genauigkeit) vs. nur manuell freigegeben (nach 15 s).
-  const gpsReady = gpsAccuracy != null && gpsAccuracy <= 15;
-  const canStart = gpsReady || warmupElapsed >= 15;
+  // Ein brauchbarer Fix ist Pflicht; langes Warten ersetzt keine Genauigkeit.
+  const gpsReady = isLaySessionWarmupReady(gpsAccuracy);
+  const canStart = gpsReady;
 
   // EINEN GPS-Stream beim Öffnen starten (Warmup). Genau einmal.
   useEffect(() => {
@@ -355,13 +353,6 @@ export default function LegenScreen() {
     warmupStartedRef.current = true;
     rec.startWarmup().then(r => { if (r.error) showToast(r.error); });
   }, [rec, showToast]);
-
-  // Warmup-Sekundenzähler (für die 15-s-Freigabe).
-  useEffect(() => {
-    if (phase !== 'warmup') return;
-    const t = setInterval(() => setWarmupElapsed(e => e + 1), 1000);
-    return () => clearInterval(t);
-  }, [phase]);
 
   // Echtes Wetter zur GPS-Position holen — einmalig, sobald eine Position vorliegt.
   useEffect(() => {
@@ -376,13 +367,12 @@ export default function LegenScreen() {
 
   // Aufnahme scharf schalten — wird ERST nach Bestätigung der Hintergrundstandort-
   // Disclosure („Weiter") aufgerufen. Vorher startet weder GPS-Aufnahme noch Timer.
-  // LOKAL ZUERST: die Aufnahme darf NIE an Login/Netz hängen. Erst sofort recorden
-  // (Timer + Linie laufen), dann die Remote-Session best-effort im Hintergrund
-  // anlegen und ihre ID nachreichen.
+  // LOKAL ZUERST: nach Entitlement und brauchbarem Warmup laufen Timer und UI
+  // sofort; die Linie beginnt erst mit einem stabilen Median-Anker.
   const begin = useCallback(async () => {
     if (beganRef.current) return;
     beganRef.current = true;
-    hapticSuccess();   // SOFORT beim Start-Tap — vor jedem await/GPS/Netz
+    resetVoiceEvents();
 
     // NEWBIE-Quota: max. 1 neue Fährte/Kalendermonat. Claim VOR dem Recorder-Start.
     // Idempotent auf trackClaimRef → ein Retry nach Fehler (beganRef zurückgesetzt)
@@ -408,6 +398,24 @@ export default function LegenScreen() {
       localId: clientUuid,
       ownerId: uid,
       dogId:   activeDog?.id ?? null,
+      onSessionStarted: () => {
+        setPhase('recording');
+        sessionIdRef.current = clientUuid;
+        hapticSuccess();
+        showToast(t('toast.trackRunning'));
+        if (layVoiceRef.current) requestVoice({ eventType: 'status', text: t('track.voiceRecordingStarted'),
+          language: getSpeechLocale(), priority: 3, onceKey: 'lay-recording-start', phase: 'lay',
+          valid: () => useTrackingStore.getState().isRecording });
+        if (activeDog) {
+          const snap = weather
+            ? { temperature: weather.temperature, windSpeed: weather.windSpeed, humidity: weather.humidity, condition: weather.weatherCondition }
+            : null;
+          useActiveFaehrten.getState().upsert(activeDog.id, {
+            status: 'laying', sessionId: clientUuid, startedAt: Date.now(),
+            gpsAccuracy: useTrackingStore.getState().gpsAccuracy, weather: snap,
+          });
+        }
+      },
       meta: {
         surfaceTypes:      [surface],
         terrainConditions: condition ? [condition] : [],
@@ -418,34 +426,15 @@ export default function LegenScreen() {
         latitude:          currentPosition?.lat ?? null,
         longitude:         currentPosition?.lng ?? null,
       },
-    });   // sofort scharf (recording=true, Timer); lokale Session ist angelegt
-    if (r.error) { beganRef.current = false; showToast(r.error); return; }
-    setPhase('recording');
-    showToast(t('toast.trackRunning'));
-
-    // Führende Session-ID = clientUuid (deterministisch, kein Warten auf Remote).
-    // Navigation/Registry/Downstream nutzen sie sofort; der Remote-Upload passiert
-    // ausschliesslich über die Sync-Queue nach dem Stop (single source, kein Race).
-    sessionIdRef.current = clientUuid;
-
-    // Registry: Fährte gehört ab jetzt dem Hund (dog_id) — bleibt bei Navigation/
-    // Hundewechsel erhalten. Sofort persistiert, damit ein Kill nichts verliert.
-    // Wetter-Snapshot + Start-Uhrzeit + GPS werden EINMALIG hier festgehalten.
-    if (activeDog) {
-      const snap = weather
-        ? { temperature: weather.temperature, windSpeed: weather.windSpeed, humidity: weather.humidity, condition: weather.weatherCondition }
-        : null;
-      useActiveFaehrten.getState().upsert(activeDog.id, {
-        status: 'laying', sessionId: clientUuid, startedAt: Date.now(),
-        gpsAccuracy: useTrackingStore.getState().gpsAccuracy, weather: snap,
-      });
-    }
+    });   // UI/Timer wurden per Callback gestartet; lokale Session ist jetzt angelegt
+    if (r.error) { beganRef.current = false; showToast(r.error === 'gps_not_ready' ? t('track.gpsPreparing') : r.error); return; }
   }, [session, activeDog, rec, showToast, t, surface, condition, weather, currentPosition, isPro, router]);
 
   // Aufnahme erst starten, NACHDEM der Disclosure-Dialog geschlossen ist:
   // „Weiter" setzt startAfterClose + schliesst den Dialog (showBgDisclosure=false).
   // Dieser Effect feuert im Render NACH dem Schliessen → dann erst begin().
-  // Kein künstliches Delay; begin() awaitet intern die Berechtigung vor GPS/Timer.
+  // Kein künstliches Delay; GPS-Warmup läuft bereits seit Öffnen des Screens.
+  // Die optionale Hintergrundberechtigung blockiert den Recorder nicht.
   useEffect(() => {
     if (startAfterClose && !showBgDisclosure) {
       setStartAfterClose(false);
@@ -770,12 +759,12 @@ export default function LegenScreen() {
             ))}
           </View>
 
-          {/* Start-Lock: Hinweis während der Stabilisierungsphase (keine Linie/Distanz). */}
+          {/* Session läuft bereits; nur der erste Geometriepunkt wartet noch. */}
           {phase === 'recording' && startLockActive && (
             <View className="absolute top-[64px] left-0 right-0 items-center px-4" pointerEvents="none">
               <View className="flex-row items-center gap-2 px-3 py-1.5 rounded-full bg-ft-glass border border-ft-glass-line">
                 <ActivityIndicator size="small" color={FT.acc} />
-                <Text className="text-[11px] font-bold text-ft-text">{t('track.startPointSetting')}</Text>
+                <Text className="text-[11px] font-bold text-ft-text">{t('track.recordingGpsStabilizing')}</Text>
               </View>
             </View>
           )}
@@ -954,7 +943,12 @@ export default function LegenScreen() {
                     )}
                   </View>
 
-                  {/* Start (frei ab GPS bereit; nach 15 s manuell trotz Ungenauigkeit) */}
+                  <Text className="text-[12px] font-semibold text-ft-muted mt-3 self-start">
+                    {gpsAccuracy == null ? t('track.gpsPreparing') :
+                      canStart ? t('track.gpsReadyAccuracy', { accuracy: Math.round(gpsAccuracy) }) :
+                        t('track.gpsWaitingAccuracy', { accuracy: Math.round(gpsAccuracy) })}
+                  </Text>
+                  {/* Start mit brauchbarem Fix; unbrauchbare Warmup-Fixes bleiben Diagnose. */}
                   <Pressable
                     className={`flex-row items-center justify-center gap-2 mt-4 rounded-[16px] px-[20px] py-3 self-stretch ${canStart ? 'bg-ft-acc' : 'bg-white/10'}`}
                     onPress={() => { if (canStart) handleStartPress(); }}
