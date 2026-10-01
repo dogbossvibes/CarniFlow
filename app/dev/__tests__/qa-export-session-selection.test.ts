@@ -37,11 +37,12 @@ describe('Diagnose-Screen: Sessionliste fokus-aktuell', () => {
     expect(screen).toContain("onPress={() => void runExport(q.localId, 'share')}");
     expect(screen).toContain('qaSelected === q.localId && s.qaSessionBoxSelected');
   });
-  it('10. buildExportForSession unverändert (drei Loader mit derselben localId, hashSessionId im Export-Builder)', () => {
+  it('10. buildExportForSession lädt Lay- und Search-QA mit derselben localId', () => {
     expect(service).toContain('getLayTrackPointsBySession(localId),');
     expect(service).toContain('getTrackMarkersBySession(localId).catch(() => []),');
     expect(service).toContain('loadQaSessionCapture(localId).catch(() => null),');
-    expect(service).toContain('const exported = buildQaTrackExport(localId, points, markers, capture);');
+    expect(service).toContain('loadQaSearchCapture(localId).catch(() => null),');
+    expect(service).toContain('const exported = buildQaTrackExport(localId, points, markers, capture, search);');
     expect(service).toContain('assertNoAbsoluteData(exported);');
   });
 });

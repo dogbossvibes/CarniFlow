@@ -1929,4 +1929,9 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "premium.feature7Days": "7 jours gratuits",
   "premium.featureActive": "Toutes les fonctions Active",
   "premium.featureThenActive": "Puis Active CHF 9.00/mois",
+  "updates.whatsNewTitle": "Nouveau dans ANYVO",
+  "updates.whatsNewTrackingStart": "L'enregistrement démarre plus vite pendant que le GPS stabilise le début de la piste.",
+  "updates.whatsNewTrackingGuidance": "Des indications vocales plus claires au départ, aux objets et à l'arrivée.",
+  "updates.whatsNewTrackingObjects": "Les objets trouvés et les angles manuels sont plus faciles à reconnaître et à analyser.",
+  "updates.understood": "Compris",
 };

@@ -1910,4 +1910,9 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "premium.feature7Days": "7 days free",
   "premium.featureActive": "All Active features",
   "premium.featureThenActive": "Then Active CHF 9.00/month",
+  "updates.whatsNewTitle": "What's new in ANYVO",
+  "updates.whatsNewTrackingStart": "Track recording starts sooner while GPS stabilizes the start of the route.",
+  "updates.whatsNewTrackingGuidance": "Clearer voice guidance at the start, at objects, and at the end.",
+  "updates.whatsNewTrackingObjects": "Object finds and manual corners are easier to recognize and review.",
+  "updates.understood": "Got it",
 };

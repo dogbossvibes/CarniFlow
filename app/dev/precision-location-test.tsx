@@ -36,6 +36,7 @@ import {
   buildExportForSession, shareQaExport, copyQaExport, formatQaSessionRow, reconcileQaSelection,
 } from '@/features/tracking/services/qaTrackExportService';
 import { useQaLaySessions } from '@/features/tracking/hooks/useQaLaySessions';
+import { FIELD_TEST_PROFILES, getFieldTestProfile } from '@/features/tracking/utils/fieldTestProfiles';
 import type { MotionStatus } from '@/modules/anyvo-motion';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
@@ -105,6 +106,8 @@ function PrecisionLocationTestContent() {
   useEffect(() => { setQaSelected(prev => reconcileQaSelection(prev, qaSessions)); }, [qaSessions]);
   const [qaBusy, setQaBusy] = useState<string | null>(null);
   const [qaResult, setQaResult] = useState<string | null>(null);
+  const [fieldTestProfileId, setFieldTestProfileId] = useState<string | null>(null);
+  const fieldTestProfile = getFieldTestProfile(fieldTestProfileId);
 
   useEffect(() => {
     // Die persistierten Werte werden inzwischen bereits beim App-Start geladen
@@ -496,22 +499,25 @@ function PrecisionLocationTestContent() {
 
         {qaOn && (
           <Section title="Feldprotokoll">
-            <Text style={s.note}>
-              Golden-Field-Route (verbindlich):{'\n'}
-              Start → L → 3,75 m → R → 3,75 m → SR → 3,75 m → SL → ca. 1,25 m → Ende{'\n'}
-              Erwartet: 90 L → 90 R → SR → SL. Schrittlänge 75 cm, je 5 Schritte.
-            </Text>
-            <Text style={s.note}>
-              Anschliessend als Gegenprobe je einmal, jeweils ohne Richtungswechsel:{'\n'}
-              1. gerade gehen{'\n'}
-              2. Handy ansehen{'\n'}
-              3. Handy beim Gehen um 90° drehen{'\n'}
-              4. bücken{'\n'}
-              5. Gegenstand setzen{'\n'}
-              6. Dübel setzen{'\n'}
-              7. im Stand drehen{'\n'}
-              Erwartung: kein zusätzlicher Winkel.
-            </Text>
+            <Text style={s.note}>Testprofil auswählen. Die Ground Truth stammt aus dem Feldprotokoll und ist unabhängig von der automatischen Erkennung. Die Auswahl gilt nur für diese Ansicht.</Text>
+            <View style={s.abRow}>
+              {FIELD_TEST_PROFILES.map(profile => (
+                <TouchableOpacity key={profile.id}
+                  style={[s.abBtn, fieldTestProfileId === profile.id && s.abBtnActive]}
+                  onPress={() => setFieldTestProfileId(profile.id)} activeOpacity={0.85}>
+                  <Text style={[s.abBtnTxt, fieldTestProfileId === profile.id && s.abBtnTxtActive]}>{profile.id.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {fieldTestProfile ? (
+              <>
+                <Text style={s.note}>{fieldTestProfile.name}</Text>
+                <Text style={s.note}>Ablauf: {fieldTestProfile.route}</Text>
+                <Row label="Ground Truth · Winkel" value={fieldTestProfile.expectedAngles} />
+                <Row label="Ground Truth · Gegenstände" value={String(fieldTestProfile.expectedObjects)} />
+                <Text style={s.note}>{fieldTestProfile.note}</Text>
+              </>
+            ) : <Text style={s.note}>Noch kein Testprofil ausgewählt.</Text>}
           </Section>
         )}
 

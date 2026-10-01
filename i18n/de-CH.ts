@@ -1954,6 +1954,11 @@ export const deCH = {
   'dash.heat':               'Läufigkeit',
   'dash.heatInDays':         'In ca. {count} Tagen',
   'dash.heatActive':         'Aktuell läufig',
+  'updates.whatsNewTitle':   'Neu in ANYVO',
+  'updates.whatsNewTrackingStart': 'Fährtenaufnahme startet schneller, während GPS die Startlinie stabilisiert.',
+  'updates.whatsNewTrackingGuidance': 'Bessere Sprachführung bei Ansatz, Gegenständen und Fährtenende.',
+  'updates.whatsNewTrackingObjects': 'Gegenstandsfunde und manuelle Winkel lassen sich besser erkennen und auswerten.',
+  'updates.understood':     'Verstanden',
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

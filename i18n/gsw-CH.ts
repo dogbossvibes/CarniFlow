@@ -1938,4 +1938,9 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'dash.heat':               'Läufigkeit',
   'dash.heatInDays':         'I öppe {count} Täg',
   'dash.heatActive':         'Aktuell läufig',
+  'updates.whatsNewTitle':   'Neu i ANYVO',
+  'updates.whatsNewTrackingStart': 'D Fährteufnahm startet schnäller, während s GPS d Startlinie stabilisiert.',
+  'updates.whatsNewTrackingGuidance': 'Besseri Sprachfüehrig bi Aasatz, Gägeständ und Fährteändi.',
+  'updates.whatsNewTrackingObjects': 'Gägestandsfund und manuell Winkel lönd sich besser erkenne und uswerte.',
+  'updates.understood':     'Verstande',
 };
