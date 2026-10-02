@@ -4,6 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import * as Application from 'expo-application';
+import * as Clipboard from 'expo-clipboard';
+import { useUpdates } from 'expo-updates';
 import { C } from '@/constants/colors';
 import {
   isNativeModuleAvailable, isRawGnssSupported, getProviderStatus,
@@ -39,6 +42,7 @@ import { useQaLaySessions } from '@/features/tracking/hooks/useQaLaySessions';
 import { FIELD_TEST_PROFILES, getFieldTestProfile } from '@/features/tracking/utils/fieldTestProfiles';
 import { trackingEngineDisplayLabel, trackingLocationDiagnosticDisplay } from '@/features/tracking/utils/trackingDiagnosticDisplay';
 import type { MotionStatus } from '@/modules/anyvo-motion';
+import { buildOtaIdentity } from '@/features/tracking/utils/buildOtaIdentity';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
 // QA-Golden-Reference-A/B-Schalter (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/
@@ -247,6 +251,8 @@ function PrecisionLocationTestContent() {
       </View>
 
       <ScrollView contentContainerStyle={s.body}>
+        <BuildOtaSection />
+
         <Section title="Auswahl für den nächsten Fährtenstart">
           <View style={s.activeBox}>
             <Text style={s.activeVal}>{combiLabel}</Text>
@@ -557,6 +563,51 @@ function PrecisionLocationTestContent() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// Zeigt, welcher App-/Runtime-/OTA-Code gerade LÄUFT. Nur lesend: kein
+// Update-Check, kein Fetch, kein Reload. Der Commit stammt aus dem Wrapper
+// (EXPO_PUBLIC_RELEASE_GIT_COMMIT) und ist nur Zusatzdiagnostik.
+function BuildOtaSection() {
+  const { currentlyRunning } = useUpdates();
+  const [copied, setCopied] = useState(false);
+  const id = buildOtaIdentity({
+    nativeApplicationVersion: Application.nativeApplicationVersion,
+    nativeBuildVersion: Application.nativeBuildVersion,
+    running: currentlyRunning,
+    releaseGitCommit: process.env.EXPO_PUBLIC_RELEASE_GIT_COMMIT,
+  });
+  const copyId = async () => {
+    if (!id.otaUpdateFull) return;
+    try {
+      await Clipboard.setStringAsync(id.otaUpdateFull);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* Kopieren ist Komfort, kein Pflichtpfad */ }
+  };
+  return (
+    <Section title="Build & OTA">
+      <View style={s.activeBox}>
+        <Text style={[s.activeVal, id.status === 'embedded' && s.activeValBad, id.status === 'emergency' && { color: C.trackWarning }]}>{id.statusLabel}</Text>
+      </View>
+      <Row label="App" value={id.app} />
+      <Row label="Runtime" value={id.runtime} />
+      <Row label="Channel" value={id.channel} />
+      <Row label="Quelle" value={id.source} />
+      <TouchableOpacity
+        onPress={copyId}
+        disabled={!id.otaUpdateFull}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={id.otaUpdateFull ? `OTA Update ID ${id.otaUpdateFull}, tippen zum Kopieren` : 'Keine OTA Update ID, Embedded'}
+      >
+        <Row label="OTA Update" value={copied ? 'Kopiert ✓' : id.otaUpdate} />
+      </TouchableOpacity>
+      <Row label="Git Commit" value={id.gitCommit} />
+      <Row label="Veröffentlicht" value={id.published} />
+      <Row label="Emergency Fallback" value={id.emergency} lines={2} />
+    </Section>
   );
 }
 

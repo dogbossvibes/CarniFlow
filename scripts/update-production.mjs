@@ -68,6 +68,14 @@ export function checkProductionEnv(listOutput) {
   return { ok: missing.length === 0 && problems.length === 0, missing, problems, present: REQUIRED_PRODUCTION_ENV.filter(k => values.get(k)) };
 }
 
+/** Env für `eas update`: setzt EXPO_PUBLIC_RELEASE_GIT_COMMIT auf den geprüften HEAD (nur gültige SHA). */
+export function buildPublishEnv(baseEnv, head) {
+  const env = { ...baseEnv };
+  if (/^[0-9a-f]{40}$/.test(head ?? '')) env.EXPO_PUBLIC_RELEASE_GIT_COMMIT = head;
+  else delete env.EXPO_PUBLIC_RELEASE_GIT_COMMIT;
+  return env;
+}
+
 function argValue(args, flag) {
   const i = args.indexOf(flag);
   return i >= 0 ? args[i + 1] : undefined;
@@ -143,7 +151,8 @@ function main() {
   if (dryRun) { console.log('--dry-run: nichts veröffentlicht.'); process.exit(0); }
 
   console.log(`Bestätigt. Veröffentliche Production-Update (${platform}): "${message}"`);
-  execFileSync('eas', easArgs, { stdio: 'inherit' });
+  // Release-Commit als NICHT geheimer Build-Metadatenwert ins OTA-Bundle (nur Anzeige in der Fährten-Diagnose).
+  execFileSync('eas', easArgs, { stdio: 'inherit', env: buildPublishEnv(process.env, head) });
 
   // 4. Nachkontrolle (best-effort, keine Secrets): Channel-Kopf gegen Pflichtfelder prüfen.
   try {

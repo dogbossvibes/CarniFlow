@@ -135,6 +135,13 @@ describe('`--environment production` kann nicht entfallen', () => {
     expect(src).toContain('Do not replace this with a direct production `eas update` command.');
     expect(src).toContain('ANYVO production OTA requires --environment production.');
   });
+  it('buildPublishEnv setzt EXPO_PUBLIC_RELEASE_GIT_COMMIT nur für eine gültige HEAD-SHA', () => {
+    const sha = '1f791707dd838983a324f72d32c61f786bbbf642';
+    const ok = JSON.parse(lib(`console.log(JSON.stringify(m.buildPublishEnv({A:'1'},'${sha}')))`).stdout);
+    expect(ok).toEqual({ A: '1', EXPO_PUBLIC_RELEASE_GIT_COMMIT: sha });
+    const bad = JSON.parse(lib(`console.log(JSON.stringify(m.buildPublishEnv({A:'1',EXPO_PUBLIC_RELEASE_GIT_COMMIT:'stale'},'(unbekannt)')))`).stdout);
+    expect(bad).toEqual({ A: '1' });
+  });
   it('package.json enthält keinen direkten Production-`eas update`', () => {
     const pkg = readFileSync('package.json', 'utf8');
     expect(pkg).not.toMatch(/eas update[^"]*--channel production/);
