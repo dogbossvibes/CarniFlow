@@ -39,6 +39,7 @@ import {
 } from '@/features/tracking/engine/trackFusionEngine';
 import type { AnalyticsSample } from '@/features/tracking/engine/trackAnalytics';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
+import { admitsEndHandlerFix } from '@/features/tracking/utils/endFixConfirmation';
 import { formatSearchFixDiag, type SearchFixDiag, type SearchFixStatus } from '@/features/tracking/utils/searchFixDiag';
 
 // Core-Motion-Sensor-Fusion (rein additiv, Punkt 2/3): NUR ein Zusatzsignal
@@ -244,6 +245,7 @@ export function useSearchRecorder(opts: {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [position, setPosition] = useState<LatLng | null>(null);
   const [endHandlerFix, setEndHandlerFix] = useState<SearchRecorder['endHandlerFix']>(null);
+  const endSmoothRef = useRef<LatLng | null>(null);
   const [liveFix, setLiveFix] = useState<SearchRecorder['liveFix']>(null);
   const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0,
     objectStatuses: [] as ReferenceObjectStatus[], deviationM: 0, onTrack: true, distanceM: 0,
@@ -507,7 +509,20 @@ export function useSearchRecorder(opts: {
     // Der historische Stand (82bd17c) kannte trackFusionEngine.ts gar nicht.
     const fusionBlocksGeometry = getTrackingEngineMode() !== 'build40'
       && (fusion.classification === 'gps_outlier' || fusion.classification === 'stationary');
-    if (!fusionBlocksGeometry) setEndHandlerFix({ position: sm, accuracyM: accRaw, tMs: tNow });
+    // Ende-Bestätigung: nur belastbare Fixes zählen (siehe admitsEndHandlerFix) — auch Stillstands-Fixes.
+    // Bei Stillstand wird `sm` unten auf den Puck-Stand zurückgesetzt; ein einzelnes Teil-Update davon
+    // konvergiert nie zur echten Position. Die Ende-Position führt deshalb einen eigenen EMA
+    // (gleiches SMOOTH_ALPHA) über die zugelassenen Fixes mit; der Puck bleibt unberührt.
+    if (admitsEndHandlerFix(fusion, getTrackingEngineMode())) {
+      let endPosition = sm;
+      if (fusionBlocksGeometry && prev) {
+        const base = endSmoothRef.current ?? prev;
+        endPosition = { latitude: base.latitude + SMOOTH_ALPHA * (raw.latitude - base.latitude),
+          longitude: base.longitude + SMOOTH_ALPHA * (raw.longitude - base.longitude) };
+      }
+      endSmoothRef.current = endPosition;
+      setEndHandlerFix({ position: endPosition, accuracyM: accRaw, tMs: tNow });
+    }
     if (fusionBlocksGeometry && prev) {
       sm = prev;
       smoothRef.current = sm;
@@ -1059,6 +1074,7 @@ export function useSearchRecorder(opts: {
     resetSearchBuffer(sessionIdRef.current ?? `local-search-${Date.now()}`);
     recordingRef.current = true; setRecording(true);
     setEndHandlerFix(null);
+    endSmoothRef.current = null;
     if (__DEV__) console.log('[searchRecorder] recording started', { resume: !!resume, resumePts: resumePts.length });
     pushSnapshot();
   }, [pushSnapshot, hasTrack, arc.total, laidObjects]);

@@ -292,6 +292,8 @@ function recoverAmbiguousGpsCorner(d: ShortLegDiagnostics, ev: TurnEvidence | nu
 interface SplitApexHit {
   apexIndex: number;
   pairIndex: number;
+  /** Segmente zwischen Vorher- und Nachher-Scheitel: 1 = klassischer Split-Apex (Golden Path), 2 = Zwei-Segment-Episode. */
+  span: number;
   kind: AngleKind;
   direction: 'links' | 'rechts';
   sharpness: TurnSharpness;
@@ -310,17 +312,72 @@ interface SplitApexHit {
   ev: TurnEvidence | null;
 }
 
+/**
+ * Paarungen für den Rescue, engste zuerst:
+ *   • 1 Segment  (p → p+1, ≤ SPLIT_APEX_MAX_GAP_M): ein einzelnes Wackel-Segment am Scheitel.
+ *   • 2 Segmente (p → p+2, ≤ TURN_CONCENTRATION_M): eine abgerundete Ecke, deren Drehung auf
+ *     zwei Segmente verteilt ist (reales F1-02: 41° → 78° → 103° → 147°). Kein einzelner
+ *     Scheitel hat dann beide sauberen Fenster. Zusätzlich muss die Drehung im Übergang
+ *     monoton in eine Richtung laufen — Wackeln/Drift erfüllt das nicht.
+ * Je Paarung zuerst die regulären Fenster (26°), danach Fenster mit der STRENGEREN
+ * Rescue-Toleranz: ein langes Fenster, das hinten in einen Nachbarbogen läuft, darf ein
+ * kürzeres sauberes Fenster nicht verdecken. Es kommt nie etwas hinzu, was die
+ * Rescue-Gates (Spread/Residuum/Drehung/Konzentration) nicht selbst bestehen.
+ */
+/**
+ * NEUER Rescue-Bound (V6.2): grösste Wegstrecke zwischen Vorher- und Nachher-Scheitel einer
+ * Zwei-Segment-Ecke. Bewusst KEINE freie Zahl, sondern TURN_CONCENTRATION_M (2,5 m) — dieselbe
+ * Strecke, in der der Detektor überall sonst verlangt, dass eine echte Ecke ihre Drehung
+ * konzentriert. Bei 0,6–1,4 m Fix-Abstand (Gehen, 1 Hz) sind das höchstens zwei Segmente; mehr
+ * Verteilung wäre von Drift nicht mehr zu trennen. Der Bound hängt weder an einem Lauf noch an
+ * einer Seite; Grenzfälle (knapp darunter/darüber, monoton/Zickzack, IMU stimmt/widerspricht):
+ * __tests__/turnEpisodeBound.test.ts.
+ */
+export const EPISODE_MAX_SPAN_M = TURN_CONCENTRATION_M;
+
 function evaluateSplitApex(
   points: readonly ShortLegPoint[], i: number, turnEvidenceAt?: TurnEvidenceLookup,
   turnEvidenceForDirection?: DirectionalTurnEvidenceLookup,
 ): SplitApexHit | null {
-  if (i < 1 || i + 1 > points.length - 2) return null;
-  const a = points[i], b = points[i + 1];
-  const gap = b.cumDist - a.cumDist;
-  if (!(gap > 0) || gap > SPLIT_APEX_MAX_GAP_M) return null;
+  if (i < 1) return null;
+  for (const span of [1, 2]) {
+    for (const tolDeg of [STRAIGHT_TOL_DEG, RESCUE_MAX_SPREAD_DEG]) {
+      const hit = evaluateApexPair(points, i, i + span, tolDeg, turnEvidenceAt, turnEvidenceForDirection);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
 
-  const before = stableLegWindow(points, i, false);
-  const after = stableLegWindow(points, i + 1, true);
+/** Die Segmente zwischen p und q drehen monoton in Richtung der Gesamtdrehung. */
+function monotoneTransition(points: readonly ShortLegPoint[], p: number, q: number, beforeDeg: number, headingDelta: number): boolean {
+  const sign = headingDelta >= 0 ? 1 : -1;
+  const total = Math.abs(headingDelta);
+  let previous = -RESCUE_MAX_SPREAD_DEG;
+  for (let k = p; k < q; k++) {
+    const seg = meanBearing(points, k, k + 1);
+    if (!seg) continue;
+    const progress = normalizeDeg(seg.deg - beforeDeg) * sign;
+    if (progress < previous || progress > total + RESCUE_MAX_SPREAD_DEG) return false;
+    previous = progress;
+  }
+  return true;
+}
+
+function evaluateApexPair(
+  points: readonly ShortLegPoint[], p: number, q: number, tolDeg: number, turnEvidenceAt?: TurnEvidenceLookup,
+  turnEvidenceForDirection?: DirectionalTurnEvidenceLookup,
+): SplitApexHit | null {
+  if (q > points.length - 2) return null;
+  const span = q - p;
+  const gap = points[q].cumDist - points[p].cumDist;
+  if (!(gap > 0) || gap > (span === 1 ? SPLIT_APEX_MAX_GAP_M : EPISODE_MAX_SPAN_M)) return null;
+  // Scheitel: bei einem Segment der Vorher-Punkt (unverändert), bei zwei der Mittelpunkt.
+  const apexIndex = span === 1 ? p : p + 1;
+  const a = points[apexIndex];
+
+  const before = stableLegWindow(points, p, false, tolDeg);
+  const after = stableLegWindow(points, q, true, tolDeg);
   if (!before || !after) return null;
   if (before.sampleCount < RESCUE_MIN_SAMPLES || after.sampleCount < RESCUE_MIN_SAMPLES) return null;
   if (Math.max(before.spreadDeg, after.spreadDeg) > RESCUE_MAX_SPREAD_DEG) return null;
@@ -330,11 +387,12 @@ function evaluateSplitApex(
   const magnitude = Math.abs(headingDelta);
   if (magnitude < Math.max(RESCUE_MIN_TURN_DEG, MIN_TURN_DEG)) return null;
   if (magnitude < Math.max(before.spreadDeg, after.spreadDeg, 4) * MIN_TURN_TO_NOISE) return null;
+  if (span > 1 && !monotoneTransition(points, p, q, before.bearingDeg, headingDelta)) return null;
 
   // Konzentration: die Änderung muss unmittelbar an der Scheitel-NAHT liegen
   // (Vorher-Kurzfenster endet bei i, Nachher-Kurzfenster beginnt bei i+1).
-  const shortBefore = meanBearing(points, nearIndex(points, i, false, TURN_CONCENTRATION_M), i);
-  const shortAfter = meanBearing(points, i + 1, nearIndex(points, i + 1, true, TURN_CONCENTRATION_M));
+  const shortBefore = meanBearing(points, nearIndex(points, p, false, TURN_CONCENTRATION_M), p);
+  const shortAfter = meanBearing(points, q, nearIndex(points, q, true, TURN_CONCENTRATION_M));
   const shortTurn = shortBefore && shortAfter ? Math.abs(normalizeDeg(shortAfter.deg - shortBefore.deg)) : 0;
   const concentration = clamp01(shortTurn / magnitude);
   if (concentration < RESCUE_MIN_CONCENTRATION) return null;
@@ -355,7 +413,12 @@ function evaluateSplitApex(
   if (interior >= NORMAL_MIN && interior <= NORMAL_MAX) sharpness = 'normal';
   else if (interior >= SPITZ_MIN && interior <= SPITZ_MAX) {
     if (geo.sharpnessResolvable) sharpness = 'spitz'; else { sharpness = 'unresolved'; demoted = true; }
-  } else return null;   // Bänder identisch zum Regelpfad: sonst „angle_unclear"
+  } else if (interior > SPITZ_MAX && interior < NORMAL_MIN) {
+    // Lücke zwischen den Bändern (Richtungsänderung ≈ 115–120°): weder „normal" noch „spitz"
+    // belegbar. Die GPS-Ecke und ihre Richtung sind bewiesen — die Schärfe wird nicht behauptet
+    // (unresolved → als normale Ecke gespeichert), statt eine belegte Ecke zu verwerfen.
+    sharpness = 'unresolved';
+  } else return null;   // sonst „angle_unclear": Beinahe-Umkehr oder fast gerade
 
   // IMU: widerspricht sie der GPS-Richtung, ist der Paarungs-Scheitel kein
   // hinreichender Beleg → verwerfen. Fehlt IMU, bleibt es beim GPS-Indiz.
@@ -363,6 +426,11 @@ function evaluateSplitApex(
   const md = ev && ev.available ? motionTurnDirection(ev) : null;
   if (md != null && md !== dir) return null;
   const agrees = md != null && md === dir && (ev?.evidence ?? 0) >= 0.5;
+  // Zwei-Segment-Ecke: der Scheitel ist unschärfer als bei einem einzelnen Wackel-Segment (nur GPS
+  // wäre von Start-Wackeln nicht zu trennen, real: r1 bei 4,7 m). Alle GPS-Gates oben müssen
+  // bestanden sein; zusätzlich muss die IMU die Richtung unabhängig BESTÄTIGEN. Motion erzeugt
+  // hier keine Ecke — sie schaltet nur einen bereits GPS-belegten, schwächeren Kandidaten frei.
+  if (span > 1 && !agrees) return null;
 
   const { confidence: base } = cornerConfidence({
     before, after, magnitude, concentration, accuracyM: a.accuracy,
@@ -372,7 +440,7 @@ function evaluateSplitApex(
   if (confidence < ACCEPT_SCORE) return null;
 
   return {
-    apexIndex: i, pairIndex: i + 1,
+    apexIndex, pairIndex: q, span,
     kind: kindFor(dir, sharpness === 'unresolved' ? 'normal' : sharpness),
     direction: dir, sharpness, confidence,
     confidenceBeforeMotion: scaled, motionAdjustment: confidence - scaled,
@@ -450,7 +518,9 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
       const h = evaluateSplitApex(points, i, lookup, opts.turnEvidenceForDirection);
       if (h) hits.push(h);
     }
-    hits.sort((x, y) => y.confidence - x.confidence || x.apexIndex - y.apexIndex);
+    // Deterministische Reihenfolge: der klassische Ein-Segment-Split-Apex (Golden Path) ist IMMER
+    // bevorzugt; eine Zwei-Segment-Episode kommt nur zum Zug, wo er keine Ecke in CORNER_GAP_M liefert.
+    hits.sort((x, y) => x.span - y.span || y.confidence - x.confidence || x.apexIndex - y.apexIndex);
     for (const h of hits) {
       const atM = points[h.apexIndex].cumDist;
       if (corners.some(c => Math.abs(c.atM - atM) < CORNER_GAP_M)) continue;
@@ -472,7 +542,7 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
         fusionSource: 'gps_split_apex' as const,
       });
       const t = turnFromDiag(d, atM, h.ev, opts.turnEvidenceForDirection != null);
-      t.flags.unshift('split_apex_pair');
+      t.flags.unshift(h.span > 1 ? 'turn_episode_pair' : 'split_apex_pair');
       turns.push(t);
     }
   }

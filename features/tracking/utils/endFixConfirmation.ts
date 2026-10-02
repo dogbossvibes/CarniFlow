@@ -43,3 +43,30 @@ export function advanceEndFixHistory(previous: EndFixHistory, fix: {
     firstInsideMs: inside ? previous.firstInsideMs ?? fix.tMs : null,
   };
 }
+
+/**
+ * Darf ein GPS-akzeptierter Handler-Fix die Ende-Bestätigung speisen?
+ *
+ * Es zählen nur Fixes, die die Sensor-Fusion selbst als belastbar einstuft:
+ *   • `gps_outlier`    → NEIN (Sprung + schlechte Accuracy/Geschwindigkeit + Motion-Widerspruch)
+ *   • `low_confidence` → NEIN (die Fusion hält den Fix selbst für unsicher)
+ *   • Flag `stale_fix` → NEIN (zu alt; `stationary` wird in der Fusion VOR der Altersprüfung
+ *                         zurückgegeben und würde ihn sonst durchlassen)
+ *   • `stationary`     → JA: genau das erwartete Signal, wenn der Handler am Ziel steht.
+ *   • `accepted`       → JA.
+ * Wurden Stillstands-Fixes ausgeschlossen, blieb `endHandlerFix` beim ersten Fix im Radius
+ * eingefroren (stableFixCount = 1, end_hysteresis bis zum manuellen Stop).
+ *
+ * Es entsteht KEINE neue Schwelle: weitere Absicherung bleibt unverändert bestehen —
+ * evaluateSearchFix (Accuracy ≤ 45 m, Speed ≤ 12 m/s) vorgelagert, Fix-Identität über den
+ * Zeitstempel (advanceEndFixHistory), Radius endRadiusM, ≥ 2 Fixes UND ≥ 800 ms Spanne
+ * (trackEndBlocker). BUILD40 blockierte vorher nie und bleibt so.
+ */
+export function admitsEndHandlerFix(
+  fusion: { classification: string; reasonFlags?: readonly string[] },
+  engineMode: string,
+): boolean {
+  if (engineMode === 'build40') return true;
+  if (fusion.classification === 'gps_outlier' || fusion.classification === 'low_confidence') return false;
+  return !(fusion.reasonFlags ?? []).includes('stale_fix');
+}

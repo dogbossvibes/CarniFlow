@@ -278,7 +278,9 @@ export interface LegWindow {
  * Richtungsstreuung im Fenster unter der Toleranz bleibt. Dadurch endet das
  * Fenster von selbst am Nachbarwinkel — ohne feste Obergrenze.
  */
-export function stableLegWindow(points: readonly ShortLegPoint[], apexIndex: number, forward: boolean): LegWindow | null {
+export function stableLegWindow(
+  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number = STRAIGHT_TOL_DEG,
+): LegWindow | null {
   const apex = points[apexIndex];
   let best: LegWindow | null = null;
 
@@ -307,7 +309,7 @@ export function stableLegWindow(points: readonly ShortLegPoint[], apexIndex: num
     // Die Segment-Streuung wird nur noch als Diagnosewert mitgeführt.
     const mb = meanBearing(points, apexIndex, end);
     const spread = mb ? mb.spreadDeg : 0;
-    if (spread > STRAIGHT_TOL_DEG) {
+    if (spread > straightTolDeg) {
       // WICHTIG: nur abbrechen, wenn bereits ein gültiges (kleineres) Fenster
       // gefunden wurde. Bricht schon die kleinste Skala, hiess das früher
       // „gar kein Fenster" — genau daran scheiterten bei 10 Hz 27 von 29
