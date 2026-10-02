@@ -1,0 +1,2830 @@
+{
+  "source": "V6-F1-1FN-01",
+  "sourceSchemaMinor": 6,
+  "durationMs": 37000,
+  "counts": {
+    "rawFixes": 50,
+    "acceptedFixes": 40,
+    "rejectedFixes": 0,
+    "detectorPoints": 27,
+    "linePoints": 11,
+    "persistedPoints": 11
+  },
+  "accuracy": {
+    "min": 2,
+    "median": 3.32,
+    "max": 4.92
+  },
+  "distances": {
+    "rawPathM": 35.81,
+    "detectorPathM": 27.73,
+    "recordedLineM": 19.48,
+    "storeDistanceM": 20.04
+  },
+  "detectorPoints": [
+    {
+      "x": 0,
+      "y": 0,
+      "tMs": 0,
+      "accuracy": 4.748651530191761,
+      "cumDistM": 0
+    },
+    {
+      "x": 0.012,
+      "y": -0.527,
+      "tMs": 3000,
+      "accuracy": 4.7486515301917995,
+      "cumDistM": 0.53
+    },
+    {
+      "x": -0.048,
+      "y": 1.843,
+      "tMs": 5000,
+      "accuracy": 4.748651530191894,
+      "cumDistM": 2.9
+    },
+    {
+      "x": 0.089,
+      "y": 3.184,
+      "tMs": 6000,
+      "accuracy": 4.748651530191928,
+      "cumDistM": 4.24
+    },
+    {
+      "x": -0.484,
+      "y": 3.216,
+      "tMs": 11000,
+      "accuracy": 4.748651530191761,
+      "cumDistM": 4.82
+    },
+    {
+      "x": -0.773,
+      "y": 4.181,
+      "tMs": 13000,
+      "accuracy": 2,
+      "cumDistM": 5.82
+    },
+    {
+      "x": -0.677,
+      "y": 5.53,
+      "tMs": 14000,
+      "accuracy": 1.9999999967024924,
+      "cumDistM": 7.17
+    },
+    {
+      "x": -0.851,
+      "y": 6.489,
+      "tMs": 15000,
+      "accuracy": 1.999999996814072,
+      "cumDistM": 8.15
+    },
+    {
+      "x": -0.298,
+      "y": 7.032,
+      "tMs": 16000,
+      "accuracy": 1.9999999967771958,
+      "cumDistM": 8.92
+    },
+    {
+      "x": 1.073,
+      "y": 6.765,
+      "tMs": 17000,
+      "accuracy": 1.9999999977929632,
+      "cumDistM": 10.32
+    },
+    {
+      "x": 2.792,
+      "y": 6.944,
+      "tMs": 18000,
+      "accuracy": 1.9999999976250706,
+      "cumDistM": 12.04
+    },
+    {
+      "x": 4.454,
+      "y": 7.161,
+      "tMs": 19000,
+      "accuracy": 1.999999997781761,
+      "cumDistM": 13.72
+    },
+    {
+      "x": 5.527,
+      "y": 7.544,
+      "tMs": 20000,
+      "accuracy": 1.999999999381332,
+      "cumDistM": 14.85
+    },
+    {
+      "x": 5.827,
+      "y": 7.996,
+      "tMs": 21000,
+      "accuracy": 2.0218812781766795,
+      "cumDistM": 15.4
+    },
+    {
+      "x": 6.444,
+      "y": 8.573,
+      "tMs": 22000,
+      "accuracy": 2.0196931502968685,
+      "cumDistM": 16.24
+    },
+    {
+      "x": 6.983,
+      "y": 8.876,
+      "tMs": 23000,
+      "accuracy": 2.0179028639062446,
+      "cumDistM": 16.86
+    },
+    {
+      "x": 7.434,
+      "y": 9.209,
+      "tMs": 25000,
+      "accuracy": 2.490964946514437,
+      "cumDistM": 17.42
+    },
+    {
+      "x": 8.152,
+      "y": 9.028,
+      "tMs": 26000,
+      "accuracy": 2.9041015516739193,
+      "cumDistM": 18.16
+    },
+    {
+      "x": 8.871,
+      "y": 8.565,
+      "tMs": 27000,
+      "accuracy": 3.318016883178614,
+      "cumDistM": 19.01
+    },
+    {
+      "x": 9.649,
+      "y": 8.246,
+      "tMs": 28000,
+      "accuracy": 3.472840055966563,
+      "cumDistM": 19.85
+    },
+    {
+      "x": 8.152,
+      "y": 8.16,
+      "tMs": 30000,
+      "accuracy": 3.9276723972554017,
+      "cumDistM": 21.35
+    },
+    {
+      "x": 7.442,
+      "y": 8.945,
+      "tMs": 31000,
+      "accuracy": 4.059079475789367,
+      "cumDistM": 22.41
+    },
+    {
+      "x": 6.96,
+      "y": 9.939,
+      "tMs": 32000,
+      "accuracy": 4.287567882657979,
+      "cumDistM": 23.51
+    },
+    {
+      "x": 6.805,
+      "y": 11.156,
+      "tMs": 33000,
+      "accuracy": 4.3137388041948785,
+      "cumDistM": 24.73
+    },
+    {
+      "x": 6.777,
+      "y": 12.183,
+      "tMs": 34000,
+      "accuracy": 4.271800184181745,
+      "cumDistM": 25.76
+    },
+    {
+      "x": 6.567,
+      "y": 12.852,
+      "tMs": 35000,
+      "accuracy": 4.168187987688219,
+      "cumDistM": 26.46
+    },
+    {
+      "x": 7.805,
+      "y": 13.116,
+      "tMs": 37000,
+      "accuracy": 4.0374161075869,
+      "cumDistM": 27.73
+    }
+  ],
+  "candidateMotionEvidence": [
+    {
+      "apexIndex": 7,
+      "evaluatedAtMs": 15000,
+      "windowStartMs": -796,
+      "windowEndMs": 953,
+      "signedNetYawDeg": -92.51,
+      "direction": "rechts",
+      "movementState": "walking",
+      "turnEvidence": 1,
+      "monotonicity": 1,
+      "yawShare": 0.758,
+      "accelerationEvidence": 0.875,
+      "stepDelta": 0,
+      "source": "live"
+    },
+    {
+      "apexIndex": 10,
+      "evaluatedAtMs": 18000,
+      "windowStartMs": -796,
+      "windowEndMs": 956,
+      "signedNetYawDeg": -11.68,
+      "direction": null,
+      "movementState": "walking",
+      "turnEvidence": 0,
+      "monotonicity": 0.488,
+      "yawShare": 0.372,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "source": "live"
+    },
+    {
+      "apexIndex": 11,
+      "evaluatedAtMs": 19000,
+      "windowStartMs": -796,
+      "windowEndMs": 954,
+      "signedNetYawDeg": -10.33,
+      "direction": null,
+      "movementState": "walking",
+      "turnEvidence": 0,
+      "monotonicity": 0.557,
+      "yawShare": 0.297,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "source": "live"
+    },
+    {
+      "apexIndex": 12,
+      "evaluatedAtMs": 20000,
+      "windowStartMs": -796,
+      "windowEndMs": 954,
+      "signedNetYawDeg": 3.55,
+      "direction": null,
+      "movementState": "walking",
+      "turnEvidence": 0,
+      "monotonicity": 0.688,
+      "yawShare": 0.132,
+      "accelerationEvidence": 0.5,
+      "stepDelta": 16,
+      "source": "live"
+    },
+    {
+      "apexIndex": 16,
+      "evaluatedAtMs": 25000,
+      "windowStartMs": 1206,
+      "windowEndMs": 2956,
+      "signedNetYawDeg": 50.87,
+      "direction": "links",
+      "movementState": "unknown",
+      "turnEvidence": 1,
+      "monotonicity": 0.839,
+      "yawShare": 0.651,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "source": "live"
+    },
+    {
+      "apexIndex": 19,
+      "evaluatedAtMs": 28000,
+      "windowStartMs": -794,
+      "windowEndMs": 956,
+      "signedNetYawDeg": 58.51,
+      "direction": "links",
+      "movementState": "unknown",
+      "turnEvidence": 1,
+      "monotonicity": 0.933,
+      "yawShare": 0.708,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "source": "live"
+    },
+    {
+      "apexIndex": 21,
+      "evaluatedAtMs": 31000,
+      "windowStartMs": -793,
+      "windowEndMs": 956,
+      "signedNetYawDeg": 1.54,
+      "direction": null,
+      "movementState": "unknown",
+      "turnEvidence": 0,
+      "monotonicity": 0.136,
+      "yawShare": 0.247,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "source": "live"
+    },
+    {
+      "apexIndex": 22,
+      "evaluatedAtMs": 32000,
+      "windowStartMs": -794,
+      "windowEndMs": 959,
+      "signedNetYawDeg": 2.32,
+      "direction": null,
+      "movementState": "unknown",
+      "turnEvidence": 0,
+      "monotonicity": 0.157,
+      "yawShare": 0.293,
+      "accelerationEvidence": 1,
+      "stepDelta": 0,
+      "source": "live"
+    }
+  ],
+  "motionSamples": [
+    {
+      "tMs": 12196.6376953125,
+      "headingDelta": 1.88,
+      "rotationMagnitude": 0.511,
+      "accelerationMagnitude": 0.226,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 12446.6376953125,
+      "headingDelta": 2.27,
+      "rotationMagnitude": 0.279,
+      "accelerationMagnitude": 0.173,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 12696.6376953125,
+      "headingDelta": -0.34,
+      "rotationMagnitude": 0.352,
+      "accelerationMagnitude": 0.198,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 12946.6376953125,
+      "headingDelta": -2.79,
+      "rotationMagnitude": 0.379,
+      "accelerationMagnitude": 0.176,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 13202.6376953125,
+      "headingDelta": -1.93,
+      "rotationMagnitude": 0.362,
+      "accelerationMagnitude": 0.157,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 13452.6376953125,
+      "headingDelta": -0.14,
+      "rotationMagnitude": 0.584,
+      "accelerationMagnitude": 0.211,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 13702.6376953125,
+      "headingDelta": 3.22,
+      "rotationMagnitude": 0.45,
+      "accelerationMagnitude": 0.206,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 13946.6376953125,
+      "headingDelta": -1.18,
+      "rotationMagnitude": 0.426,
+      "accelerationMagnitude": 0.148,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 14203.6376953125,
+      "headingDelta": -9.15,
+      "rotationMagnitude": 0.822,
+      "accelerationMagnitude": 0.22,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 14453.6376953125,
+      "headingDelta": -13.71,
+      "rotationMagnitude": 1.308,
+      "accelerationMagnitude": 0.175,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 14703.6376953125,
+      "headingDelta": -25.67,
+      "rotationMagnitude": 1.711,
+      "accelerationMagnitude": 0.214,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 14953.6376953125,
+      "headingDelta": -16.81,
+      "rotationMagnitude": 1.564,
+      "accelerationMagnitude": 0.16,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 15203.6376953125,
+      "headingDelta": -10.09,
+      "rotationMagnitude": 1.292,
+      "accelerationMagnitude": 0.116,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 15452.6376953125,
+      "headingDelta": -10.92,
+      "rotationMagnitude": 1.116,
+      "accelerationMagnitude": 0.157,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 15703.6376953125,
+      "headingDelta": -4.79,
+      "rotationMagnitude": 0.459,
+      "accelerationMagnitude": 0.129,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 15952.6376953125,
+      "headingDelta": -1.37,
+      "rotationMagnitude": 0.25,
+      "accelerationMagnitude": 0.083,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 16202.6376953125,
+      "headingDelta": -0.51,
+      "rotationMagnitude": 0.265,
+      "accelerationMagnitude": 0.134,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 16454.6376953125,
+      "headingDelta": 4.19,
+      "rotationMagnitude": 0.587,
+      "accelerationMagnitude": 0.199,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 16695.6376953125,
+      "headingDelta": 2.74,
+      "rotationMagnitude": 0.405,
+      "accelerationMagnitude": 0.227,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 16946.6376953125,
+      "headingDelta": 4.68,
+      "rotationMagnitude": 0.377,
+      "accelerationMagnitude": 0.261,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "running"
+    },
+    {
+      "tMs": 17203.6376953125,
+      "headingDelta": -1.77,
+      "rotationMagnitude": 0.481,
+      "accelerationMagnitude": 0.137,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 17453.6376953125,
+      "headingDelta": 0.43,
+      "rotationMagnitude": 0.427,
+      "accelerationMagnitude": 0.133,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 17703.6376953125,
+      "headingDelta": -2.11,
+      "rotationMagnitude": 0.525,
+      "accelerationMagnitude": 0.168,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 17953.6376953125,
+      "headingDelta": 3.83,
+      "rotationMagnitude": 0.387,
+      "accelerationMagnitude": 0.167,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 18203.6376953125,
+      "headingDelta": -6.05,
+      "rotationMagnitude": 0.594,
+      "accelerationMagnitude": 0.196,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 18453.6376953125,
+      "headingDelta": -7.91,
+      "rotationMagnitude": 0.829,
+      "accelerationMagnitude": 0.268,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "running"
+    },
+    {
+      "tMs": 18703.6376953125,
+      "headingDelta": 1.78,
+      "rotationMagnitude": 0.804,
+      "accelerationMagnitude": 0.238,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 18955.6376953125,
+      "headingDelta": 0.1,
+      "rotationMagnitude": 0.444,
+      "accelerationMagnitude": 0.183,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 19203.6376953125,
+      "headingDelta": 1.28,
+      "rotationMagnitude": 0.254,
+      "accelerationMagnitude": 0.315,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "running"
+    },
+    {
+      "tMs": 19453.6376953125,
+      "headingDelta": 0.2,
+      "rotationMagnitude": 0.408,
+      "accelerationMagnitude": 0.102,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 19703.6376953125,
+      "headingDelta": 0.75,
+      "rotationMagnitude": 0.476,
+      "accelerationMagnitude": 0.134,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 19953.6376953125,
+      "headingDelta": -0.49,
+      "rotationMagnitude": 0.557,
+      "accelerationMagnitude": 0.111,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 20203.6376953125,
+      "headingDelta": -0.16,
+      "rotationMagnitude": 0.386,
+      "accelerationMagnitude": 0.057,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 20453.6376953125,
+      "headingDelta": 0.84,
+      "rotationMagnitude": 0.238,
+      "accelerationMagnitude": 0.043,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 20703.6376953125,
+      "headingDelta": 1.28,
+      "rotationMagnitude": 0.194,
+      "accelerationMagnitude": 0.069,
+      "stepDelta": 16,
+      "cadence": null,
+      "movementState": "walking"
+    },
+    {
+      "tMs": 20953.6376953125,
+      "headingDelta": -0.15,
+      "rotationMagnitude": 0.217,
+      "accelerationMagnitude": 0.023,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "stationary"
+    },
+    {
+      "tMs": 21204.6376953125,
+      "headingDelta": -0.82,
+      "rotationMagnitude": 0.144,
+      "accelerationMagnitude": 0.027,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "stationary"
+    },
+    {
+      "tMs": 21453.6376953125,
+      "headingDelta": -0.06,
+      "rotationMagnitude": 0.049,
+      "accelerationMagnitude": 0.012,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "stationary"
+    },
+    {
+      "tMs": 21703.6376953125,
+      "headingDelta": 0.06,
+      "rotationMagnitude": 0.037,
+      "accelerationMagnitude": 0.013,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "stationary"
+    },
+    {
+      "tMs": 21953.6376953125,
+      "headingDelta": 0.09,
+      "rotationMagnitude": 0.047,
+      "accelerationMagnitude": 0.014,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "stationary"
+    },
+    {
+      "tMs": 22203.6376953125,
+      "headingDelta": -0.62,
+      "rotationMagnitude": 0.128,
+      "accelerationMagnitude": 0.018,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "automotive"
+    },
+    {
+      "tMs": 22453.6376953125,
+      "headingDelta": 0.1,
+      "rotationMagnitude": 0.051,
+      "accelerationMagnitude": 0.016,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "automotive"
+    },
+    {
+      "tMs": 22696.6376953125,
+      "headingDelta": 0.65,
+      "rotationMagnitude": 0.192,
+      "accelerationMagnitude": 0.036,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "automotive"
+    },
+    {
+      "tMs": 22954.6376953125,
+      "headingDelta": 1.34,
+      "rotationMagnitude": 0.306,
+      "accelerationMagnitude": 0.078,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "automotive"
+    },
+    {
+      "tMs": 23204.6376953125,
+      "headingDelta": 3.98,
+      "rotationMagnitude": 0.36,
+      "accelerationMagnitude": 0.094,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 23455.6376953125,
+      "headingDelta": 2.75,
+      "rotationMagnitude": 0.272,
+      "accelerationMagnitude": 0.046,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 23704.6376953125,
+      "headingDelta": -0.15,
+      "rotationMagnitude": 0.271,
+      "accelerationMagnitude": 0.097,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 23954.6376953125,
+      "headingDelta": 0.12,
+      "rotationMagnitude": 0.135,
+      "accelerationMagnitude": 0.138,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 24204.6376953125,
+      "headingDelta": -1.25,
+      "rotationMagnitude": 0.348,
+      "accelerationMagnitude": 0.136,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 24454.6376953125,
+      "headingDelta": 5.61,
+      "rotationMagnitude": 0.645,
+      "accelerationMagnitude": 0.215,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 24705.6376953125,
+      "headingDelta": 2.45,
+      "rotationMagnitude": 0.328,
+      "accelerationMagnitude": 0.203,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 24954.6376953125,
+      "headingDelta": -0.49,
+      "rotationMagnitude": 0.653,
+      "accelerationMagnitude": 0.227,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 25204.6376953125,
+      "headingDelta": -3.19,
+      "rotationMagnitude": 0.455,
+      "accelerationMagnitude": 0.171,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 25454.6376953125,
+      "headingDelta": 0.65,
+      "rotationMagnitude": 0.333,
+      "accelerationMagnitude": 0.124,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 25696.6376953125,
+      "headingDelta": 1.66,
+      "rotationMagnitude": 0.743,
+      "accelerationMagnitude": 0.214,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 25946.6376953125,
+      "headingDelta": 1.3,
+      "rotationMagnitude": 0.27,
+      "accelerationMagnitude": 0.201,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 26205.6376953125,
+      "headingDelta": -0.36,
+      "rotationMagnitude": 0.428,
+      "accelerationMagnitude": 0.178,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 26454.6376953125,
+      "headingDelta": -4.51,
+      "rotationMagnitude": 0.423,
+      "accelerationMagnitude": 0.19,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 26704.6376953125,
+      "headingDelta": 1.4,
+      "rotationMagnitude": 0.367,
+      "accelerationMagnitude": 0.11,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 26954.6376953125,
+      "headingDelta": 4.41,
+      "rotationMagnitude": 0.706,
+      "accelerationMagnitude": 0.195,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 27205.6376953125,
+      "headingDelta": 6.48,
+      "rotationMagnitude": 0.634,
+      "accelerationMagnitude": 0.144,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 27455.6376953125,
+      "headingDelta": 7.24,
+      "rotationMagnitude": 0.729,
+      "accelerationMagnitude": 0.21,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 27705.6376953125,
+      "headingDelta": 16.76,
+      "rotationMagnitude": 1.535,
+      "accelerationMagnitude": 0.23,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 27955.6376953125,
+      "headingDelta": 19.46,
+      "rotationMagnitude": 1.675,
+      "accelerationMagnitude": 0.152,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 28205.6376953125,
+      "headingDelta": 9.29,
+      "rotationMagnitude": 0.811,
+      "accelerationMagnitude": 0.121,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 28455.6376953125,
+      "headingDelta": 1.21,
+      "rotationMagnitude": 0.21,
+      "accelerationMagnitude": 0.205,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 28705.6376953125,
+      "headingDelta": 0.18,
+      "rotationMagnitude": 0.29,
+      "accelerationMagnitude": 0.233,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 28955.6376953125,
+      "headingDelta": -2.11,
+      "rotationMagnitude": 0.304,
+      "accelerationMagnitude": 0.169,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 29205.6376953125,
+      "headingDelta": 0.26,
+      "rotationMagnitude": 0.223,
+      "accelerationMagnitude": 0.133,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 29455.6376953125,
+      "headingDelta": 1.03,
+      "rotationMagnitude": 0.526,
+      "accelerationMagnitude": 0.115,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 29705.6376953125,
+      "headingDelta": 3.47,
+      "rotationMagnitude": 0.453,
+      "accelerationMagnitude": 0.249,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 29955.6376953125,
+      "headingDelta": 1.74,
+      "rotationMagnitude": 0.421,
+      "accelerationMagnitude": 0.181,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 30206.6376953125,
+      "headingDelta": -2.6,
+      "rotationMagnitude": 0.433,
+      "accelerationMagnitude": 0.171,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 30455.6376953125,
+      "headingDelta": -1.12,
+      "rotationMagnitude": 0.389,
+      "accelerationMagnitude": 0.16,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 30708.6376953125,
+      "headingDelta": 2.56,
+      "rotationMagnitude": 0.5,
+      "accelerationMagnitude": 0.128,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 30955.6376953125,
+      "headingDelta": -0.02,
+      "rotationMagnitude": 0.285,
+      "accelerationMagnitude": 0.232,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 31205.6376953125,
+      "headingDelta": 0.61,
+      "rotationMagnitude": 0.276,
+      "accelerationMagnitude": 0.241,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 31455.6376953125,
+      "headingDelta": -1.11,
+      "rotationMagnitude": 0.406,
+      "accelerationMagnitude": 0.158,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 31705.6376953125,
+      "headingDelta": 2.32,
+      "rotationMagnitude": 0.439,
+      "accelerationMagnitude": 0.142,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 31955.6376953125,
+      "headingDelta": 0.9,
+      "rotationMagnitude": 0.458,
+      "accelerationMagnitude": 0.105,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 32205.6376953125,
+      "headingDelta": 2.92,
+      "rotationMagnitude": 0.564,
+      "accelerationMagnitude": 0.225,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 32455.6376953125,
+      "headingDelta": 1.8,
+      "rotationMagnitude": 0.26,
+      "accelerationMagnitude": 0.185,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 32705.6376953125,
+      "headingDelta": -2.97,
+      "rotationMagnitude": 0.753,
+      "accelerationMagnitude": 0.221,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 32958.6376953125,
+      "headingDelta": -2.14,
+      "rotationMagnitude": 0.361,
+      "accelerationMagnitude": 0.126,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 33207.6376953125,
+      "headingDelta": 0.83,
+      "rotationMagnitude": 0.403,
+      "accelerationMagnitude": 0.124,
+      "stepDelta": 11,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 33455.6376953125,
+      "headingDelta": 2.97,
+      "rotationMagnitude": 0.459,
+      "accelerationMagnitude": 0.174,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 33705.6376953125,
+      "headingDelta": 0.09,
+      "rotationMagnitude": 0.266,
+      "accelerationMagnitude": 0.176,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 33959.6376953125,
+      "headingDelta": -4.38,
+      "rotationMagnitude": 0.465,
+      "accelerationMagnitude": 0.144,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 34205.6376953125,
+      "headingDelta": 3.91,
+      "rotationMagnitude": 0.684,
+      "accelerationMagnitude": 0.197,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 34455.6376953125,
+      "headingDelta": 3.36,
+      "rotationMagnitude": 0.61,
+      "accelerationMagnitude": 0.155,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 34706.6376953125,
+      "headingDelta": 0.62,
+      "rotationMagnitude": 0.262,
+      "accelerationMagnitude": 0.132,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    },
+    {
+      "tMs": 34956.6376953125,
+      "headingDelta": -0.2,
+      "rotationMagnitude": 0.153,
+      "accelerationMagnitude": 0.102,
+      "stepDelta": 0,
+      "cadence": null,
+      "movementState": "unknown"
+    }
+  ],
+  "imuOnlyEvents": [
+    {
+      "tMs": 27954,
+      "direction": "links",
+      "signedNetYawDeg": 65,
+      "evidence": 1,
+      "persisted": false,
+      "reason": "imu_only_no_gps_corner"
+    }
+  ],
+  "autoDiagnostics": [
+    {
+      "apexIndex": 1,
+      "tMs": 3000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 2,
+      "tMs": 5000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 3,
+      "tMs": 6000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 4,
+      "tMs": 11000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 5,
+      "tMs": 13000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 6,
+      "tMs": 14000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_after",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 7,
+      "tMs": 15000,
+      "accepted": true,
+      "classification": "rechts",
+      "confidence": 0.757,
+      "confidenceBeforeMotion": 0.697,
+      "motionAdjustment": 0.06,
+      "rejectReason": null,
+      "bearingBefore": 355.1,
+      "bearingAfter": 84.7,
+      "headingDeltaDeg": 89.6,
+      "interiorAngleDeg": 90.4
+    },
+    {
+      "apexIndex": 8,
+      "tMs": 16000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 9,
+      "tMs": 17000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 10,
+      "tMs": 18000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_turn",
+      "bearingBefore": 91.3,
+      "bearingAfter": 62,
+      "headingDeltaDeg": -29.3,
+      "interiorAngleDeg": 150.7
+    },
+    {
+      "apexIndex": 11,
+      "tMs": 19000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_turn",
+      "bearingBefore": 83.3,
+      "bearingAfter": 53.8,
+      "headingDeltaDeg": -29.5,
+      "interiorAngleDeg": 150.5
+    },
+    {
+      "apexIndex": 12,
+      "tMs": 20000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_turn",
+      "bearingBefore": 84.7,
+      "bearingAfter": 49.7,
+      "headingDeltaDeg": -35,
+      "interiorAngleDeg": 145
+    },
+    {
+      "apexIndex": 13,
+      "tMs": 21000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 14,
+      "tMs": 22000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_after",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 15,
+      "tMs": 23000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_after",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 16,
+      "tMs": 25000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "turn_below_noise",
+      "bearingBefore": 62,
+      "bearingAfter": 114.6,
+      "headingDeltaDeg": 52.5,
+      "interiorAngleDeg": 127.5
+    },
+    {
+      "apexIndex": 17,
+      "tMs": 26000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 18,
+      "tMs": 27000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 19,
+      "tMs": 28000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0.541,
+      "confidenceBeforeMotion": 0.541,
+      "motionAdjustment": 0,
+      "rejectReason": "low_evidence",
+      "bearingBefore": 114.6,
+      "bearingAfter": 285.6,
+      "headingDeltaDeg": 171,
+      "interiorAngleDeg": 9
+    },
+    {
+      "apexIndex": 20,
+      "tMs": 30000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_before",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 21,
+      "tMs": 31000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "turn_not_concentrated",
+      "bearingBefore": 285.6,
+      "bearingAfter": 349.1,
+      "headingDeltaDeg": 63.5,
+      "interiorAngleDeg": 116.5
+    },
+    {
+      "apexIndex": 22,
+      "tMs": 32000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_turn",
+      "bearingBefore": 326.2,
+      "bearingAfter": 353.2,
+      "headingDeltaDeg": 27,
+      "interiorAngleDeg": 153
+    },
+    {
+      "apexIndex": 23,
+      "tMs": 33000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_after",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 24,
+      "tMs": 34000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_after",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    },
+    {
+      "apexIndex": 25,
+      "tMs": 35000,
+      "accepted": false,
+      "classification": null,
+      "confidence": 0,
+      "confidenceBeforeMotion": null,
+      "motionAdjustment": null,
+      "rejectReason": "no_window_after",
+      "bearingBefore": null,
+      "bearingAfter": null,
+      "headingDeltaDeg": null,
+      "interiorAngleDeg": null
+    }
+  ],
+  "turnFusion": [
+    {
+      "apexIndex": 7,
+      "tMs": 15000,
+      "direction": "rechts",
+      "sharpness": "normal",
+      "kind": "rechts",
+      "confidence": 0.757,
+      "geometryQuality": 0.706,
+      "accuracyToLegRatio": 0.6,
+      "directionSource": "gps",
+      "signedNetYawDeg": -92.5,
+      "motionDirection": "rechts",
+      "motionEvidence": 1,
+      "motionAssociationSource": "live_cached",
+      "sharpnessSource": "geometry"
+    }
+  ],
+  "markers": [
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "apexIndex": null,
+      "tMs": 9639,
+      "atM": 2,
+      "source": "manual"
+    },
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "apexIndex": 7,
+      "tMs": 18124,
+      "atM": 8.1,
+      "source": "auto_split_apex"
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "apexIndex": null,
+      "tMs": 22501,
+      "atM": 10.1,
+      "source": "manual"
+    }
+  ],
+  "startupDiagnostics": {
+    "userTapStartTSec": 7.681,
+    "permissionStartTSec": 0.014,
+    "permissionEndTSec": 0.023,
+    "warmupStartTSec": 0,
+    "firstRawFixTSec": 0.139,
+    "firstStableFixTSec": 3.475,
+    "firstAcceptedFixTSec": 31.773,
+    "motionReadyTSec": 0.139,
+    "recorderArmedTSec": 8.577,
+    "actualRecordingStartTSec": 22.774,
+    "startupDelayMs": 15093,
+    "blockingReason": null,
+    "accuracyAtStartM": 4.919950538436509,
+    "recordingSessionStartedTSec": 8.577,
+    "geometryStartedTSec": 22.774,
+    "startupUiDelayMs": 896,
+    "geometryLockDelayMs": 14197,
+    "movementConfirmedTSec": null,
+    "fallbackUsed": true,
+    "movementConfirmationSource": "fallback",
+    "movementConfirmationConfidence": 0.35,
+    "movementGpsDisplacementM": 1.7905827678326494,
+    "movementStepDelta": 0,
+    "movementMotionState": "stationary"
+  },
+  "startupMovementDiagnostics": {
+    "samples": [
+      {
+        "tSec": 0,
+        "accuracyM": 5.543613129919076,
+        "acceptedFix": true,
+        "displacementFromAnchorM": null,
+        "cumulativeStepDelta": 0,
+        "motionState": null,
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_stable_anchor"
+      },
+      {
+        "tSec": 1.110503662109375,
+        "accuracyM": 5.186397498055213,
+        "acceptedFix": true,
+        "displacementFromAnchorM": null,
+        "cumulativeStepDelta": 0,
+        "motionState": "stationary",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_stable_anchor"
+      },
+      {
+        "tSec": 2.110512451171875,
+        "accuracyM": 4.686025087073356,
+        "acceptedFix": true,
+        "displacementFromAnchorM": null,
+        "cumulativeStepDelta": 0,
+        "motionState": "stationary",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_stable_anchor"
+      },
+      {
+        "tSec": 3.110525146484375,
+        "accuracyM": 4.263766438698389,
+        "acceptedFix": true,
+        "displacementFromAnchorM": 0.30831652682720173,
+        "cumulativeStepDelta": 0,
+        "motionState": "automotive",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_movement_confirmation"
+      },
+      {
+        "tSec": 4.1105283203125,
+        "accuracyM": 3.8136684956161555,
+        "acceptedFix": true,
+        "displacementFromAnchorM": 0.5783857234190214,
+        "cumulativeStepDelta": 0,
+        "motionState": "automotive",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_movement_confirmation"
+      },
+      {
+        "tSec": 5.110539306640625,
+        "accuracyM": 3.3282245590552386,
+        "acceptedFix": true,
+        "displacementFromAnchorM": 1.0362535313132786,
+        "cumulativeStepDelta": 0,
+        "motionState": "automotive",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_movement_confirmation"
+      },
+      {
+        "tSec": 6.1105517578125,
+        "accuracyM": 3.0393305583863155,
+        "acceptedFix": true,
+        "displacementFromAnchorM": 1.2642870359928442,
+        "cumulativeStepDelta": 0,
+        "motionState": "automotive",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_movement_confirmation"
+      },
+      {
+        "tSec": 7.1105556640625,
+        "accuracyM": 4.748651530191762,
+        "acceptedFix": true,
+        "displacementFromAnchorM": 1.2642870143441016,
+        "cumulativeStepDelta": 0,
+        "motionState": "automotive",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_movement_confirmation"
+      },
+      {
+        "tSec": 8.110565673828125,
+        "accuracyM": 4.748651530191762,
+        "acceptedFix": true,
+        "displacementFromAnchorM": 1.4134031855594522,
+        "cumulativeStepDelta": 0,
+        "motionState": "stationary",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_movement_confirmation"
+      },
+      {
+        "tSec": 9.110575439453125,
+        "accuracyM": 4.748651530191761,
+        "acceptedFix": true,
+        "displacementFromAnchorM": 1.4134031855594522,
+        "cumulativeStepDelta": 0,
+        "motionState": "stationary",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": null,
+        "confirmed": false,
+        "rejectionReason": "waiting_for_movement_confirmation"
+      },
+      {
+        "tSec": 14.1106025390625,
+        "accuracyM": 4.748651530191761,
+        "acceptedFix": true,
+        "displacementFromAnchorM": 1.7905827678326494,
+        "cumulativeStepDelta": 0,
+        "motionState": "stationary",
+        "locomotionEvidence": "none",
+        "accelerationEvidence": 0,
+        "candidateSource": "fallback",
+        "confirmed": true,
+        "rejectionReason": null
+      }
+    ],
+    "confirmationTSec": 14.1106025390625,
+    "confirmationSource": "fallback",
+    "confirmationConfidence": 0.35,
+    "fallbackUsed": true,
+    "truncated": false
+  },
+  "rawFixes": [
+    {
+      "x": -1.46,
+      "y": 1.25,
+      "tMs": -14253,
+      "accuracy": 5.543613129919076
+    },
+    {
+      "x": -1.587,
+      "y": 1.231,
+      "tMs": -13000,
+      "accuracy": 5.186397498055213
+    },
+    {
+      "x": -1.244,
+      "y": 1.123,
+      "tMs": -12000,
+      "accuracy": 4.686025087073356
+    },
+    {
+      "x": -1.103,
+      "y": 0.994,
+      "tMs": -11000,
+      "accuracy": 4.263766438698389
+    },
+    {
+      "x": -0.908,
+      "y": 0.805,
+      "tMs": -10000,
+      "accuracy": 3.8136684956161555
+    },
+    {
+      "x": -0.552,
+      "y": 0.517,
+      "tMs": -9000,
+      "accuracy": 3.3282245590552386
+    },
+    {
+      "x": -0.394,
+      "y": 0.349,
+      "tMs": -8000,
+      "accuracy": 3.0393305583863155
+    },
+    {
+      "x": -0.394,
+      "y": 0.349,
+      "tMs": -7000,
+      "accuracy": 4.748651530191762
+    },
+    {
+      "x": -0.247,
+      "y": 0.294,
+      "tMs": -6000,
+      "accuracy": 4.748651530191762
+    },
+    {
+      "x": -0.247,
+      "y": 0.294,
+      "tMs": -5000,
+      "accuracy": 4.748651530191761
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "tMs": 0,
+      "accuracy": 4.748651530191761
+    },
+    {
+      "x": -0.032,
+      "y": -0.058,
+      "tMs": 1000,
+      "accuracy": 4.748651530191761
+    },
+    {
+      "x": -0.099,
+      "y": -0.115,
+      "tMs": 2000,
+      "accuracy": 4.748651530191761
+    },
+    {
+      "x": 0.05,
+      "y": -0.714,
+      "tMs": 3000,
+      "accuracy": 4.7486515301917995
+    },
+    {
+      "x": 0.115,
+      "y": -0.01,
+      "tMs": 4000,
+      "accuracy": 4.748651530191863
+    },
+    {
+      "x": -0.104,
+      "y": 2.703,
+      "tMs": 5000,
+      "accuracy": 4.748651530191894
+    },
+    {
+      "x": 0.148,
+      "y": 3.759,
+      "tMs": 6000,
+      "accuracy": 4.748651530191928
+    },
+    {
+      "x": 0.053,
+      "y": 2.853,
+      "tMs": 7000,
+      "accuracy": 4.748651530191766
+    },
+    {
+      "x": -0.163,
+      "y": 2.969,
+      "tMs": 8000,
+      "accuracy": 4.748651530191766
+    }
+  ],
+  "search": {
+    "stats": {
+      "raw": 60,
+      "accepted": 34,
+      "display": 34,
+      "run": 10,
+      "replay": 24,
+      "maxReplayGapM": 2.15,
+      "maxReplayGapSec": 12,
+      "replayInsertedForGapCount": 9,
+      "replayUnfillableGaps": [
+        {
+          "startSourceIndex": 9,
+          "endSourceIndex": 10,
+          "spatialGapM": 0.19,
+          "temporalGapSec": 10,
+          "reason": "no_observed_intermediate_sample"
+        },
+        {
+          "startSourceIndex": 20,
+          "endSourceIndex": 21,
+          "spatialGapM": 1.51,
+          "temporalGapSec": 12,
+          "reason": "no_observed_intermediate_sample"
+        }
+      ]
+    },
+    "approachFixDiagnostics": {
+      "samples": [
+        {
+          "tSec": 0.024,
+          "distanceToStartM": 11.928448246999142,
+          "accuracyM": 5.834576204090386,
+          "stable": false,
+          "stableCount": 0,
+          "zone": "outside",
+          "transition": null
+        },
+        {
+          "tSec": 3.511,
+          "distanceToStartM": 12.23907276836347,
+          "accuracyM": 9.453420206873941,
+          "stable": false,
+          "stableCount": 0,
+          "zone": "outside",
+          "transition": null
+        },
+        {
+          "tSec": 4.532,
+          "distanceToStartM": 7.699225919719193,
+          "accuracyM": 14,
+          "stable": false,
+          "stableCount": 0,
+          "zone": "outside",
+          "transition": null
+        },
+        {
+          "tSec": 5.535,
+          "distanceToStartM": 6.70181195262087,
+          "accuracyM": 9.337770102884905,
+          "stable": false,
+          "stableCount": 0,
+          "zone": "near",
+          "transition": "entered_near"
+        },
+        {
+          "tSec": 6.553,
+          "distanceToStartM": 7.02517800426367,
+          "accuracyM": 8.131434609562431,
+          "stable": false,
+          "stableCount": 0,
+          "zone": "near",
+          "transition": null
+        },
+        {
+          "tSec": 7.543,
+          "distanceToStartM": 5.047525935660284,
+          "accuracyM": 5.413807754764202,
+          "stable": false,
+          "stableCount": 0,
+          "zone": "near",
+          "transition": null
+        },
+        {
+          "tSec": 8.551,
+          "distanceToStartM": 2.217363459463699,
+          "accuracyM": 5.260035818252872,
+          "stable": true,
+          "stableCount": 1,
+          "zone": "near",
+          "transition": null
+        },
+        {
+          "tSec": 9.54,
+          "distanceToStartM": 1.2509984733880748,
+          "accuracyM": 4.744126045619399,
+          "stable": true,
+          "stableCount": 2,
+          "zone": "reached",
+          "transition": "entered_reached"
+        },
+        {
+          "tSec": 10.519,
+          "distanceToStartM": 1.3342507620034771,
+          "accuracyM": 4.510925875998139,
+          "stable": true,
+          "stableCount": 3,
+          "zone": "reached",
+          "transition": null
+        },
+        {
+          "tSec": 11.536,
+          "distanceToStartM": 1.5572166138933687,
+          "accuracyM": 4.191758296241145,
+          "stable": true,
+          "stableCount": 4,
+          "zone": "reached",
+          "transition": null
+        },
+        {
+          "tSec": 12.533,
+          "distanceToStartM": 1.6845904491348984,
+          "accuracyM": 3.8260956727999837,
+          "stable": true,
+          "stableCount": 5,
+          "zone": "reached",
+          "transition": null
+        },
+        {
+          "tSec": 13.542,
+          "distanceToStartM": 1.7095650526508952,
+          "accuracyM": 3.4923130659809045,
+          "stable": true,
+          "stableCount": 6,
+          "zone": "reached",
+          "transition": null
+        },
+        {
+          "tSec": 13.879,
+          "distanceToStartM": 1.7095650526508952,
+          "accuracyM": 3.4923130659809045,
+          "stable": true,
+          "stableCount": 6,
+          "zone": "reached",
+          "transition": "search_started"
+        }
+      ],
+      "truncated": false
+    },
+    "endConfirmationDiagnostics": {
+      "candidateStartedTSec": 54.55981958007813,
+      "stableFixCount": 3,
+      "requiredStableFixCount": 2,
+      "handlerDistanceM": 1.8299660449974258,
+      "effectiveEndRadiusM": 3,
+      "lastSegmentReached": true,
+      "activeObjectWait": false,
+      "confirmationTSec": null,
+      "rejectionReason": "approach_history"
+    },
+    "endEligibilitySamples": [
+      {
+        "tSec": 27.134,
+        "handlerProgressM": 4.062657164572753,
+        "dogProjectedProgressM": 5.062657164572753,
+        "handlerDistanceToEndM": 10.323704306579051,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 27.676,
+        "handlerProgressM": 4.062657164572753,
+        "dogProjectedProgressM": 5.062657164572753,
+        "handlerDistanceToEndM": 9.519574852336216,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 28.132,
+        "handlerProgressM": 4.062657164572753,
+        "dogProjectedProgressM": 5.062657164572753,
+        "handlerDistanceToEndM": 9.519574852336216,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 28.678,
+        "handlerProgressM": 7.314278720370226,
+        "dogProjectedProgressM": 8.314278720370226,
+        "handlerDistanceToEndM": 8.607651828796758,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 29.135,
+        "handlerProgressM": 7.314278720370226,
+        "dogProjectedProgressM": 8.314278720370226,
+        "handlerDistanceToEndM": 8.607651828796758,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 29.665,
+        "handlerProgressM": 7.314278720370226,
+        "dogProjectedProgressM": 8.314278720370226,
+        "handlerDistanceToEndM": 7.576323650134969,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 30.15,
+        "handlerProgressM": 7.314278720370226,
+        "dogProjectedProgressM": 8.314278720370226,
+        "handlerDistanceToEndM": 7.576323650134969,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 30.67,
+        "handlerProgressM": 9.732595711392479,
+        "dogProjectedProgressM": 10.732595711392479,
+        "handlerDistanceToEndM": 6.558639762307635,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 30.684,
+        "handlerProgressM": 9.732595711392479,
+        "dogProjectedProgressM": 10.732595711392479,
+        "handlerDistanceToEndM": 6.558639762307635,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 31.15,
+        "handlerProgressM": 9.732595711392479,
+        "dogProjectedProgressM": 10.732595711392479,
+        "handlerDistanceToEndM": 6.558639762307635,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 31.667,
+        "handlerProgressM": 9.732595711392479,
+        "dogProjectedProgressM": 10.732595711392479,
+        "handlerDistanceToEndM": 5.9460671524383555,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 32.15,
+        "handlerProgressM": 9.732595711392479,
+        "dogProjectedProgressM": 10.732595711392479,
+        "handlerDistanceToEndM": 5.9460671524383555,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 32.677,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 33.15,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 33.67,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 34.15,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 34.664,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 35.153,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 35.663,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 36.151,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 36.669,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 37.154,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 37.667,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 38.152,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 38.67,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 39.153,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 39.669,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 40.152,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 40.671,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 41.15,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 42.15,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 43.155,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": true,
+        "endEligible": false,
+        "blockerReason": "object_wait",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 43.671,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 44.153,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.47971045993627,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 44.668,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.858865588990488,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 45.155,
+        "handlerProgressM": 11.391170984296494,
+        "dogProjectedProgressM": 12.391170984296494,
+        "handlerDistanceToEndM": 5.858865588990488,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 45.681,
+        "handlerProgressM": 11.939169788179658,
+        "dogProjectedProgressM": 12.939169788179658,
+        "handlerDistanceToEndM": 6.1013430329271525,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 46.153,
+        "handlerProgressM": 11.939169788179658,
+        "dogProjectedProgressM": 12.939169788179658,
+        "handlerDistanceToEndM": 6.1013430329271525,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 46.67,
+        "handlerProgressM": 11.939169788179658,
+        "dogProjectedProgressM": 12.939169788179658,
+        "handlerDistanceToEndM": 6.217711375190191,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 47.153,
+        "handlerProgressM": 11.939169788179658,
+        "dogProjectedProgressM": 12.939169788179658,
+        "handlerDistanceToEndM": 6.217711375190191,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 47.682,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 6.231252889556479,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 48.156,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 6.231252889556479,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 48.666,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 6.28193453748107,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 49.154,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 6.28193453748107,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 49.669,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 6.360691071724338,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 50.157,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 6.360691071724338,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 50.672,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 5.963675283850249,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 51.154,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 5.963675283850249,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 51.67,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 5.364014828338816,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 52.155,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 5.364014828338816,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 52.667,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 4.598526617513569,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 53.153,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 4.598526617513569,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 53.669,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 3.612483009663837,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 54.153,
+        "handlerProgressM": 14.237520129702581,
+        "dogProjectedProgressM": 15.237520129702581,
+        "handlerDistanceToEndM": 3.612483009663837,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "handler_progress",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 54.67,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 2.687383587366467,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 55.156,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 2.687383587366467,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 55.667,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 2.0034118046842244,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 56.17,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 2.0034118046842244,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 56.668,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 57.174,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 57.668,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 58.172,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 58.674,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 59.172,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 59.669,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 60.175,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 60.667,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 61.173,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 61.671,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 62.176,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 62.666,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 63.173,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 63.669,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      },
+      {
+        "tSec": 64.189,
+        "handlerProgressM": 16.099216377551134,
+        "dogProjectedProgressM": 17.099216377551134,
+        "handlerDistanceToEndM": 1.8299660449974258,
+        "activeObjectWait": false,
+        "endEligible": false,
+        "blockerReason": "approach_history",
+        "eventFiredTSec": null
+      }
+    ],
+    "objectDwellDiagnostics": {
+      "candidates": [
+        {
+          "referenceIndex": 1,
+          "dwellStartedTSec": 33.55886962890625,
+          "dwellDurationSec": 6.9999775390625,
+          "speedMps": 0,
+          "stationaryConfidence": 1,
+          "progressM": 11.391170984296494,
+          "distanceToNearestReferenceObjectM": 1.2117964467146818,
+          "nearStart": false,
+          "nearAngle": false,
+          "nearEnd": false,
+          "accepted": true,
+          "rejectReason": null,
+          "userOverride": false
+        }
+      ],
+      "truncated": false
+    },
+    "objects": [
+      {
+        "referenceIndex": 0,
+        "referenceAtM": 2.04,
+        "minHandlerDistM": 0.81,
+        "minSearchRouteDistM": 0.77,
+        "minReplayRouteDistM": 0.77,
+        "progressAtClosestApproachM": 2.04,
+        "found": false,
+        "status": "missed",
+        "context": {
+          "legIndex": 1,
+          "nearAngle": false,
+          "nearEnd": false
+        }
+      },
+      {
+        "referenceIndex": 1,
+        "referenceAtM": 12.59,
+        "minHandlerDistM": 1.21,
+        "minSearchRouteDistM": 1.19,
+        "minReplayRouteDistM": 0.58,
+        "progressAtClosestApproachM": 11.39,
+        "found": true,
+        "status": "auto_dwell_found",
+        "context": {
+          "legIndex": 2,
+          "nearAngle": false,
+          "nearEnd": false
+        }
+      }
+    ],
+    "end": {
+      "eventCount": 0,
+      "eventFired": null,
+      "hapticFired": null,
+      "voiceFired": null,
+      "manualStopTSec": 64.4,
+      "minSearchDistToEndM": 2.69
+    }
+  }
+}

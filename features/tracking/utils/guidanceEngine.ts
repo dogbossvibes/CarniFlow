@@ -77,6 +77,7 @@ export interface TrackEndInput {
   handlerProgressM?: number;     // tatsächlicher Fortschritt des Telefons; bei Legacy-Aufrufern = dogProgressM
   handlerDistanceToEndM?: number | null;
   activeObjectWait?: boolean;
+  finalObjectGraceActive?: boolean;
   searchActive?: boolean;
   trackLengthM: number;         // Gesamtlänge der gelegten Fährte
   geomDistanceM: number | null; // Distanz virtuelle Hundeposition → gespeicherter Endpunkt
@@ -114,6 +115,7 @@ export function trackEndBlocker(input: TrackEndInput, options: TrackEndOptions =
   if (!(input.trackLengthM > 1)) return 'no_reference_track';
   if (input.searchActive === false) return 'search_inactive';
   if (input.activeObjectWait) return 'object_wait';
+  if (input.finalObjectGraceActive) return 'final_object_grace';
   if (!input.lastSegmentReached && (input.handlerProgressM ?? 0) / input.trackLengthM < options.reachedProgressRatio)
     return 'handler_progress';
   const handlerDist = input.handlerDistanceToEndM ?? null;

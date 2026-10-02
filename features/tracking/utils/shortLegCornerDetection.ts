@@ -53,6 +53,7 @@ import { turnGeometryQuality, type GeometryQualityLevel } from '@/features/track
  * exakt wie zuvor — der gesamte bisherige Pfad ist damit unverändert.
  */
 export type TurnEvidenceLookup = (tMs: number | null) => TurnEvidence | null | undefined;
+export type DirectionalTurnEvidenceLookup = (tMs: number | null, gpsDirection: 'links' | 'rechts') => TurnEvidence | null | undefined;
 
 export interface ShortLegPoint {
   lat: number; lng: number;
@@ -396,6 +397,8 @@ export interface ShortLegDiagnostics {
   motionMagnitudeRatio: number | null;
   /** true = der Motion-Zuschlag wurde unterdrückt (Motion-Richtung widerspricht GPS). */
   motionBoostSuppressed: boolean;
+  /** Direction was resolved from a compatible Motion episode after GPS proved the corner. */
+  motionDirectionOverride?: boolean;
   /** Woher die Ecke stammt. Der Detektor setzt 'gps'; die Fusionsstufe kann 'gps_split_apex' setzen. */
   fusionSource: 'gps' | 'gps_split_apex' | null;
 }
@@ -422,6 +425,7 @@ function emptyDiag(p: ShortLegPoint, apexIndex: number, reason: ShortLegRejectRe
     direction: null, sharpness: null, geometryQuality: null, geometryQualityLevel: null,
     accuracyToLegRatio: null, sharpnessDemoted: false, motionDirection: null,
     motionDirectionAgrees: null, motionMagnitudeRatio: null, motionBoostSuppressed: false,
+    motionDirectionOverride: false,
     fusionSource: null,
   };
 }
@@ -460,7 +464,7 @@ export function cornerConfidence(a: {
  */
 export function evaluateShortLegCorner(
   points: readonly ShortLegPoint[], apexIndex: number, lastCornerAtM: number, motion?: ShortLegMotion | null,
-  turnEvidenceAt?: TurnEvidenceLookup,
+  turnEvidenceAt?: TurnEvidenceLookup, turnEvidenceForDirection?: DirectionalTurnEvidenceLookup,
 ): ShortLegCandidate {
   const apex = points[apexIndex];
   const reject = (r: ShortLegRejectReason): ShortLegCandidate =>
@@ -505,6 +509,7 @@ export function evaluateShortLegCorner(
     direction: null, sharpness: null, geometryQuality: null, geometryQualityLevel: null,
     accuracyToLegRatio: null, sharpnessDemoted: false, motionDirection: null,
     motionDirectionAgrees: null, motionMagnitudeRatio: null, motionBoostSuppressed: false,
+    motionDirectionOverride: false,
     fusionSource: null,
   };
 
@@ -535,7 +540,6 @@ export function evaluateShortLegCorner(
 
   // Motion is looked up before classification so a delayed, but still
   // causally related, turn can support an already-robust GPS candidate.
-  const ev = turnEvidenceAt?.(apex.t ?? null) ?? null;
   const geometryStrong =
     interior >= EXTREME_SPITZ_MIN_INTERIOR && interior < SPITZ_MIN &&
     before.sampleCount >= MIN_SAMPLES_SHORT && after.sampleCount >= MIN_SAMPLES_SHORT &&
@@ -543,6 +547,7 @@ export function evaluateShortLegCorner(
     before.residualM <= 0.6 && after.residualM <= 0.6 &&
     concentration >= 0.75;
   const dir: 'links' | 'rechts' = headingDelta > 0 ? 'rechts' : 'links';
+  const ev = turnEvidenceForDirection?.(apex.t ?? null, dir) ?? turnEvidenceAt?.(apex.t ?? null) ?? null;
   diag.direction = dir;
 
   // Geometrie-Qualität: darf die SCHÄRFE dieses Winkels überhaupt belegt werden?
@@ -635,7 +640,7 @@ export function evaluateShortLegCorner(
  */
 export function detectShortLegCorners(
   rawPoints: readonly ShortLegPoint[], motion?: ShortLegMotion | null,
-  turnEvidenceAt?: TurnEvidenceLookup,
+  turnEvidenceAt?: TurnEvidenceLookup, turnEvidenceForDirection?: DirectionalTurnEvidenceLookup,
 ): { corners: { kind: AngleKind; apexIndex: number; atM: number }[]; diagnostics: ShortLegDiagnostics[]; detectorPointCount: number } {
   // Räumliche Normalisierung ZUERST: ab hier ist die Punktfolge unabhängig
   // von der Fixrate (siehe resampleBySpacing).
@@ -658,7 +663,7 @@ export function detectShortLegCorners(
   // echte Ecken, ohne sie überhaupt zu bewerten (belegt bei 4 Hz).
   const scored: { c: ShortLegCandidate; kind: AngleKind; atM: number; conf: number }[] = [];
   for (let i = 1; i < points.length - 1; i++) {
-    const c = evaluateShortLegCorner(points, i, -Infinity, motion, turnEvidenceAt);
+    const c = evaluateShortLegCorner(points, i, -Infinity, motion, turnEvidenceAt, turnEvidenceForDirection);
     diagnostics.push(c.diagnostics);
     if (c.accepted && c.kind) scored.push({ c, kind: c.kind, atM: points[i].cumDist, conf: c.diagnostics.confidence });
   }

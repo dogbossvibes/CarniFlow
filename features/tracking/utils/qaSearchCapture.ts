@@ -49,6 +49,13 @@ export interface QaEndConfirmationDiagnostics {
   activeObjectWait: boolean;
   confirmationTSec: number | null;
   rejectionReason: string | null;
+  approachHistorySampleCount?: number;
+  approachHistoryStartDistanceM?: number | null;
+  approachHistoryEndDistanceM?: number | null;
+  approachHistoryNetDeltaM?: number | null;
+  finalObjectGraceStartedTSec?: number | null;
+  finalObjectGraceEndedTSec?: number | null;
+  finalObjectGraceReason?: string | null;
 }
 export interface QaEndEligibilitySample {
   tSec: number; handlerProgressM: number; dogProjectedProgressM: number;

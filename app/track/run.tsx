@@ -226,6 +226,7 @@ export default function TrackRunScreen() {
   const endQaRef = useRef<QaEndEligibilitySample[]>([]);
   const endQaTruncatedRef = useRef(false);
   const endConfirmationRef = useRef<QaEndConfirmationDiagnostics | null>(null);
+  const finalObjectGraceQaRef = useRef({ startedAtMs: null as number | null, endedAtMs: null as number | null, reason: null as string | null });
   const recordApproachFix = useCallback((event: import('@/features/tracking/hooks/useStartPointApproach').ApproachFixEvent) => {
     if (!isQaDiagnosticsEnabled()) return;
     approachOriginRef.current ??= event.tMs;
@@ -244,6 +245,7 @@ export default function TrackRunScreen() {
       approachOriginRef.current ??= Date.now(); approachQaRef.current = null;
       endQaRef.current = []; endQaTruncatedRef.current = false;
       endConfirmationRef.current = null;
+      finalObjectGraceQaRef.current = { startedAtMs: null, endedAtMs: null, reason: null };
       resetVoiceEvents(approachOriginRef.current);
     }
   }, [arming]);
@@ -647,6 +649,10 @@ export default function TrackRunScreen() {
   // der gelegten Fährte). DogLead bleibt nur eine Projektion. Beendet die
   // Absuche NICHT — nur Anzeige/Voice/Haptik; der Nutzer beendet weiterhin selbst.
   const endPoint = snapData.laidPoints.length ? snapData.laidPoints[snapData.laidPoints.length - 1] : null;
+  const finalObjectIndex = snapData.laidObjects.length - 1;
+  const finalObject = finalObjectIndex >= 0 ? snapData.laidObjects[finalObjectIndex] : null;
+  const finalObjectPendingNearEnd = !!(finalObject && endPoint && s.objectStatuses[finalObjectIndex] === 'pending'
+    && haversineM(finalObject.at, endPoint) <= 3);
   const acceptedHandlerDistanceToEndM = s.endHandlerFix && endPoint ? haversineM(s.endHandlerFix.position, endPoint) : null;
   const lastSegmentReached = s.trackLengthM > 0 && s.progressM / s.trackLengthM >= 0.75
     && acceptedHandlerDistanceToEndM != null && acceptedHandlerDistanceToEndM <= 5;
@@ -671,6 +677,15 @@ export default function TrackRunScreen() {
     }
   }, []);
   const openMandatoryObjects = Math.max(0, s.totalObjects - s.foundObjects);
+  const noteFinalObjectGrace = useCallback((grace: { startedAtMs: number | null; endedAtMs: number | null; reason: string | null }) => {
+    finalObjectGraceQaRef.current = grace;
+    if (!endConfirmationRef.current || searchStartMsRef.current == null) return;
+    endConfirmationRef.current.finalObjectGraceStartedTSec = grace.startedAtMs == null ? null
+      : Math.max(0, (grace.startedAtMs - searchStartMsRef.current) / 1000);
+    endConfirmationRef.current.finalObjectGraceEndedTSec = grace.endedAtMs == null ? null
+      : Math.max(0, (grace.endedAtMs - searchStartMsRef.current) / 1000);
+    endConfirmationRef.current.finalObjectGraceReason = grace.reason;
+  }, []);
   const trackEndState = useTrackEndGuidance({
     recording: searchGuidanceActive,
     dogProgressM: s.dogProgressM,
@@ -683,6 +698,8 @@ export default function TrackRunScreen() {
     endPoint,
     openMandatoryObjects,
     activeObjectWait: s.activeObjectWait,
+    finalObjectPendingNearEnd,
+    onFinalObjectGraceChange: noteFinalObjectGrace,
     voiceOn,
     initialFired: snapData.recovery?.endFired ?? false,
     onFired: noteEndFired,
@@ -704,6 +721,9 @@ export default function TrackRunScreen() {
       handlerDistanceToEndM, geomDistanceM: dogDistanceToEndM, trackLengthM: s.trackLengthM,
       openMandatoryObjects, activeObjectWait: s.activeObjectWait, searchActive: searchGuidanceActive,
       accuracyM: s.endHandlerFix?.accuracyM ?? null, lastSegmentReached,
+      finalObjectGraceActive: finalObjectGraceQaRef.current.startedAtMs != null
+        && finalObjectGraceQaRef.current.endedAtMs == null
+        && finalObjectGraceQaRef.current.reason !== 'active_dwell',
       approachSeen: history.approachSeen, stableEndFixCount: history.insideCount,
       stableEndFixSpanMs: history.firstInsideMs == null || s.endHandlerFix == null ? 0
         : s.endHandlerFix.tMs - history.firstInsideMs });
@@ -714,6 +734,16 @@ export default function TrackRunScreen() {
       handlerDistanceM: handlerDistanceToEndM,
       effectiveEndRadiusM: endRadiusM(s.endHandlerFix?.accuracyM ?? null),
       lastSegmentReached, activeObjectWait: s.activeObjectWait,
+      approachHistorySampleCount: history.approachSampleCount,
+      approachHistoryStartDistanceM: history.approachStartDistanceM,
+      approachHistoryEndDistanceM: history.approachEndDistanceM,
+      approachHistoryNetDeltaM: history.approachStartDistanceM == null || handlerDistanceToEndM == null
+        ? null : Math.round((history.approachStartDistanceM - handlerDistanceToEndM) * 100) / 100,
+      finalObjectGraceStartedTSec: finalObjectGraceQaRef.current.startedAtMs == null || searchStartMsRef.current == null ? null
+        : Math.max(0, (finalObjectGraceQaRef.current.startedAtMs - searchStartMsRef.current) / 1000),
+      finalObjectGraceEndedTSec: finalObjectGraceQaRef.current.endedAtMs == null || searchStartMsRef.current == null ? null
+        : Math.max(0, (finalObjectGraceQaRef.current.endedAtMs - searchStartMsRef.current) / 1000),
+      finalObjectGraceReason: finalObjectGraceQaRef.current.reason,
       confirmationTSec: endConfirmationRef.current?.confirmationTSec ?? qaEndRef.current?.tSec ?? null,
       rejectionReason: blockerReason,
     };

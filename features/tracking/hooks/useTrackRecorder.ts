@@ -22,7 +22,7 @@ import { legacyDetectCorner, type LegacyAcceptedPoint } from '@/features/trackin
 import {
   DETECTOR_INPUT, CORNER_GAP_M, type ShortLegPoint,
 } from '@/features/tracking/utils/shortLegCornerDetection';
-import { fuseTurns, associateLiveTurn, type FusedTurn } from '@/features/tracking/utils/turnFusion';
+import { fuseTurns, associateLiveTurn, nearestCompatibleTurnEvidence, type FusedTurn } from '@/features/tracking/utils/turnFusion';
 import { lineGateStepM, lineEmaAlpha, inTurnZone } from '@/features/tracking/utils/turnAwareLineGate';
 import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDistance';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
@@ -183,6 +183,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     userTapStartTSec: null, permissionStartTSec: null, permissionEndTSec: null,
     warmupStartTSec: null, firstRawFixTSec: null, firstStableFixTSec: null,
     firstAcceptedFixTSec: null, motionReadyTSec: null, recorderArmedTSec: null,
+    motionSubscriptionStartedTSec: null, pedometerSubscriptionStartedTSec: null,
+    motionFirstCallbackTSec: null, pedometerFirstCallbackTSec: null, firstNonZeroStepTSec: null,
     actualRecordingStartTSec: null, startupDelayMs: null, blockingReason: null,
     accuracyAtStartM: null,
     recordingSessionStartedTSec: null, geometryStartedTSec: null,
@@ -391,9 +393,15 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         return turnEvidenceRef.current.get(t) ?? current;
       }
       : undefined;
+    const turnEvidenceForDirection = motionActiveRef.current
+      ? (t: number | null, direction: 'links' | 'rechts') => t == null ? null : nearestCompatibleTurnEvidence(t, direction, queryT => {
+        if (queryT == null) return null;
+        return motionBufRef.current.evidenceFor(queryT);
+      })
+      : undefined;
     // Turn-Fusion (GPS ∪ IMU): Regelpfad des Detektors + Split-Apex-Paarung +
     // Schärfe-Auflösbarkeit. Ohne Motion rein GPS-basiert.
-    let { corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt });
+    let { corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection });
     // Some candidates are inspected before the GPS corner is accepted. Save
     // their available evidence and re-evaluate the same GPS candidates once.
     let newlyAssociated = false;
@@ -402,7 +410,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       const ev = motionBufRef.current.evidenceForTrailing(d.t);
       if (ev.available) { turnEvidenceRef.current.set(d.t, ev); newlyAssociated = true; }
     }
-    if (newlyAssociated) ({ corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt }));
+    if (newlyAssociated) ({ corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection }));
 
     // ── QA v2.1: Motion-Evidenz LIVE je Kandidat festhalten ────────────────
     // Rein beobachtend. Greift nur im QA-Diagnosemodus und nur, solange Core
@@ -619,7 +627,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         acceptedFix: !!(raw.accuracy != null && raw.accuracy <= START_ANCHOR_MAX_ACC_M && fresh && distinct && plausibleSpeed),
         displacementFromAnchorM: movement.displacementM,
         cumulativeStepDelta: movement.stepDelta, motionState: movement.motionState,
-        locomotionEvidence: movement.stepDelta > 0 ? 'steps' : walking.length ? 'gait_accel' : 'none',
+        locomotionEvidence: movement.stepDelta > 0 ? 'steps'
+          : accelEvidence >= TURN_EVIDENCE_DEFAULTS.gaitAccelMinFraction ? 'gait_accel' : 'none',
         accelerationEvidence: Math.round(accelEvidence * 1000) / 1000,
         candidateSource: movement.source, confirmed: movement.confirmed,
         rejectionReason: blocker ?? (!anchor ? 'anchor_unavailable' : !movement.confirmed ? 'movement_unconfirmed' : null),
@@ -866,14 +875,20 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         motionActiveRef.current = true;
         motionBufRef.current.clear();
         markMotionStarted();
+        startupRef.current!.motionSubscriptionStartedTSec ??= startupSec();
         motionSubRef.current = motionClient.onSample((m) => {
           markMotionSample();
+          const callbackTime = startupSec();
+          startupRef.current!.motionFirstCallbackTSec ??= callbackTime;
+          startupRef.current!.pedometerFirstCallbackTSec ??= callbackTime;
+          if (m.stepDelta > 0) startupRef.current!.firstNonZeroStepTSec ??= callbackTime;
           motionBufRef.current.push({
             t: m.timestamp, headingDelta: m.headingDelta,
             rotationMagnitude: m.rotationMagnitude, accelerationMagnitude: m.accelerationMagnitude,
             stepDelta: m.stepDelta, cadence: m.cadence, movementState: m.movementState,
           });
         });
+        startupRef.current!.pedometerSubscriptionStartedTSec ??= startupSec();
         void motionClient.start().then(() => { startupRef.current!.motionReadyTSec ??= startupSec(); })
           .catch(() => { /* Motion ist optional; GPS-Aufnahme läuft weiter. */ });
       }
@@ -1140,11 +1155,18 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
             ? (t: number | null) => (t == null ? null : turnEvidenceRef.current.get(t)
               ?? motionBufRef.current.evidenceForTrailing(t))
             : undefined,
+          turnEvidenceForDirection: motionActiveRef.current
+            ? (t: number | null, direction: 'links' | 'rechts') => t == null ? null : nearestCompatibleTurnEvidence(t, direction, queryT => {
+              if (queryT == null) return null;
+              return motionBufRef.current.evidenceFor(queryT);
+            })
+            : undefined,
           motionSamples: motionActiveRef.current ? motionBufRef.current.samplesIn(-Infinity, Infinity) : undefined,
         });
         const associatedTurns = sweep.turns.map(t => {
           const associated = associateLiveTurn(t, Array.from(liveTurnsRef.current.values()));
-          return { ...associated, motionAssociationSource: !associated.motion.available ? 'none' as const
+          return { ...associated, motionAssociationSource: associated.motionAssociationSource === 'nearest_episode' ? 'nearest_episode' as const
+            : !associated.motion.available ? 'none' as const
             : !t.motion.available ? 'accepted_live_turn' as const
             : t.t != null && turnEvidenceRef.current.has(t.t) ? 'live_cached' as const : 'current_ring' as const };
         });

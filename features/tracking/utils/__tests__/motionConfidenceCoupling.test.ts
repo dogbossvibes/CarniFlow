@@ -378,7 +378,8 @@ describe('QA-Log zeigt den Rechenweg', () => {
     expect(src).toContain("'accepted'");
     // Der Lookup wird nur bei laufendem Motion-Mitschnitt übergeben.
     expect(src).toContain('const turnEvidenceAt = motionActiveRef.current');
-    expect(src).toContain('fuseTurns(detectPointsRef.current, { turnEvidenceAt })');
+    expect(src).toContain('const turnEvidenceForDirection = motionActiveRef.current');
+    expect(src).toContain('fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection })');
   });
 
   it('FIELD_EXPECTED ist unverändert — die Golden-Route bleibt verbindlich', () => {

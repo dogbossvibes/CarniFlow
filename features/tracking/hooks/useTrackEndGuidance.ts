@@ -8,6 +8,7 @@ import {
   trackEndBlocker,
 } from '@/features/tracking/utils/guidanceEngine';
 import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracking/utils/endFixConfirmation';
+import { advanceFinalObjectEndGrace, finalObjectEndGraceActive, INITIAL_FINAL_OBJECT_END_GRACE } from '@/features/tracking/utils/finalObjectEndGrace';
 
 type LL = { latitude: number; longitude: number };
 
@@ -35,6 +36,8 @@ export function useTrackEndGuidance(input: {
   endHandlerFix?: { position: LL; accuracyM: number | null; tMs: number } | null;
   lastSegmentReached?: boolean;
   activeObjectWait?: boolean;
+  finalObjectPendingNearEnd?: boolean;
+  onFinalObjectGraceChange?: (state: { startedAtMs: number | null; endedAtMs: number | null; reason: string | null }) => void;
   trackLengthM: number;
   estimatedDogPosition: LL | null;
   endPoint: LL | null;
@@ -49,15 +52,19 @@ export function useTrackEndGuidance(input: {
   const stateRef = useRef<TrackEndState>('unseen');
   const [endState, setEndState] = useState<TrackEndState>('unseen');
   const onFiredRef = useRef(input.onFired);
+  const onGraceChangeRef = useRef(input.onFinalObjectGraceChange);
   const latestInputRef = useRef(input);
   const endFixHistoryRef = useRef(INITIAL_END_FIX_HISTORY);
+  const finalObjectGraceRef = useRef(INITIAL_FINAL_OBJECT_END_GRACE);
   latestInputRef.current = input;
   onFiredRef.current = input.onFired;
+  onGraceChangeRef.current = input.onFinalObjectGraceChange;
 
   // Neue Absuche / neue Fährte → Once-only-Status zurücksetzen; Recovery mit
   // bereits angesagtem Ende → 'completed' (once-only bleibt gewahrt).
   useEffect(() => {
-    if (!input.recording) { stateRef.current = 'unseen'; endFixHistoryRef.current = INITIAL_END_FIX_HISTORY; setEndState('unseen'); return; }
+    if (!input.recording) { stateRef.current = 'unseen'; endFixHistoryRef.current = INITIAL_END_FIX_HISTORY;
+      finalObjectGraceRef.current = INITIAL_FINAL_OBJECT_END_GRACE; setEndState('unseen'); return; }
     if (input.initialFired && stateRef.current === 'unseen') { stateRef.current = 'completed'; setEndState('completed'); }
   }, [input.recording, input.endPoint, input.initialFired]);
 
@@ -77,8 +84,7 @@ export function useTrackEndGuidance(input: {
     }
     const history = endFixHistoryRef.current;
 
-    const { state, justReached } = stepTrackEnd(
-      {
+    const endInput = {
         dogProgressM: input.dogProgressM,
         handlerProgressM: input.handlerProgressM,
         handlerDistanceToEndM,
@@ -91,7 +97,16 @@ export function useTrackEndGuidance(input: {
         trackLengthM: input.trackLengthM,
         geomDistanceM,
         openMandatoryObjects: input.openMandatoryObjects,
-      },
+      };
+    const eligibleWithoutDwell = trackEndBlocker({ ...endInput, activeObjectWait: false }) == null;
+    finalObjectGraceRef.current = advanceFinalObjectEndGrace(finalObjectGraceRef.current, {
+      nowMs: handlerFix?.tMs ?? Date.now(), eligible: eligibleWithoutDwell,
+      pendingFinalObjectNearEnd: input.finalObjectPendingNearEnd ?? false,
+      activeObjectWait: input.activeObjectWait ?? false,
+    });
+    onGraceChangeRef.current?.(finalObjectGraceRef.current);
+    const { state, justReached } = stepTrackEnd(
+      { ...endInput, finalObjectGraceActive: finalObjectEndGraceActive(finalObjectGraceRef.current) },
       stateRef.current,
       DEFAULT_TRACK_END_OPTIONS,
     );
@@ -117,6 +132,7 @@ export function useTrackEndGuidance(input: {
               : now.endHandlerFix.tMs - currentHistory.firstInsideMs,
             trackLengthM: now.trackLengthM, openMandatoryObjects: now.openMandatoryObjects,
             activeObjectWait: now.activeObjectWait, searchActive: now.recording,
+            finalObjectGraceActive: finalObjectEndGraceActive(finalObjectGraceRef.current),
           }) == null;
         } });
       onFiredRef.current?.();
@@ -125,7 +141,7 @@ export function useTrackEndGuidance(input: {
     input.recording, input.dogProgressM, input.trackLengthM,
     input.estimatedDogPosition, input.handlerProgressM, input.handlerPosition, input.endHandlerFix,
     input.lastSegmentReached,
-    input.activeObjectWait, input.endPoint, input.openMandatoryObjects, input.voiceOn,
+    input.activeObjectWait, input.finalObjectPendingNearEnd, input.endPoint, input.openMandatoryObjects, input.voiceOn,
   ]);
 
   return endState;

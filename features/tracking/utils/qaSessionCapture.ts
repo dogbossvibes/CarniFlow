@@ -80,7 +80,7 @@ export interface QaTurnFusion {
   source: 'gps' | 'gps_split_apex';
   direction: 'links' | 'rechts';
   directionSource?: 'gps' | 'motion_override_low_geometry';
-  motionAssociationSource?: 'live_cached' | 'accepted_live_turn' | 'current_ring' | 'none';
+  motionAssociationSource?: 'live_cached' | 'accepted_live_turn' | 'current_ring' | 'nearest_episode' | 'none';
   signedNetYawDeg?: number | null;
   motionDirection?: 'links' | 'rechts' | null;
   motionEvidence?: number | null;
@@ -258,6 +258,9 @@ export interface QaSessionCapture {
     userTapStartTSec: number | null; permissionStartTSec: number | null; permissionEndTSec: number | null;
     warmupStartTSec: number | null; firstRawFixTSec: number | null; firstStableFixTSec: number | null;
     firstAcceptedFixTSec: number | null; motionReadyTSec: number | null;
+    motionSubscriptionStartedTSec?: number | null; pedometerSubscriptionStartedTSec?: number | null;
+    motionFirstCallbackTSec?: number | null; pedometerFirstCallbackTSec?: number | null;
+    firstNonZeroStepTSec?: number | null;
     recorderArmedTSec: number | null; actualRecordingStartTSec: number | null;
     startupDelayMs: number | null; blockingReason: string | null; accuracyAtStartM: number | null;
     recordingSessionStartedTSec: number | null; geometryStartedTSec: number | null;

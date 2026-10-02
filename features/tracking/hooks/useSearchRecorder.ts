@@ -150,6 +150,7 @@ export interface SearchRecorder {
   foundObjects: number;
   autoDwellObjectIds: string[];
   activeObjectWait: boolean;
+  objectStatuses: ReferenceObjectStatus[];
   totalObjects: number;
   distanceM: number;
   offTrackState: OffTrackState;   // Phase-1 Off-Track-Status (on_track|warning|off_track) für UI/Recorder
@@ -244,7 +245,9 @@ export function useSearchRecorder(opts: {
   const [position, setPosition] = useState<LatLng | null>(null);
   const [endHandlerFix, setEndHandlerFix] = useState<SearchRecorder['endHandlerFix']>(null);
   const [liveFix, setLiveFix] = useState<SearchRecorder['liveFix']>(null);
-  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0, deviationM: 0, onTrack: true, distanceM: 0, progressM: 0, score: 0, offTrackState: 'on_track' as OffTrackState });
+  const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0,
+    objectStatuses: [] as ReferenceObjectStatus[], deviationM: 0, onTrack: true, distanceM: 0,
+    progressM: 0, score: 0, offTrackState: 'on_track' as OffTrackState });
   const [elapsedS, setElapsedS] = useState(0);
   const [gpsDebug, setGpsDebug] = useState<GpsDebug>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
   // Aktuelle Quelle zusätzlich als Ref: `onFix` liest gpsDebug bewusst NICHT
@@ -352,6 +355,7 @@ export function useSearchRecorder(opts: {
       points: pointsRef.current.slice(),
       breaks: breaksRef.current.slice(),
       found: foundRef.current.size,
+      objectStatuses: objectStatusesRef.current.slice(),
       deviationM: Math.round(devEmaRef.current * 10) / 10,
       onTrack: devEmaRef.current <= ON_TRACK_M,
       distanceM: distRef.current,
@@ -1136,6 +1140,7 @@ export function useSearchRecorder(opts: {
 
   return {
     ready, recording, paused,
+    objectStatuses: snap.objectStatuses,
     points: snap.points, position, endHandlerFix, liveFix, deviationM: snap.deviationM, onTrack: snap.onTrack,
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
     autoDwellObjectIds: Array.from(autoDwellIdsRef.current), activeObjectWait,

@@ -41,6 +41,7 @@ import {
   ACCEPT_SCORE, CORNER_GAP_M, MIN_TURN_DEG, MIN_TURN_TO_NOISE, NORMAL_MIN, NORMAL_MAX, SPITZ_MIN, SPITZ_MAX,
   TURN_CONCENTRATION_M, STRAIGHT_TOL_DEG,
   type ShortLegPoint, type ShortLegDiagnostics, type TurnEvidenceLookup, type LegWindow,
+  type DirectionalTurnEvidenceLookup,
 } from '@/features/tracking/utils/shortLegCornerDetection';
 import {
   computeTurnEvidence, motionTurnDirection, TURN_EVIDENCE_DEFAULTS,
@@ -65,6 +66,8 @@ export const RESCUE_MOTION_BONUS = 0.06;
 export const IMU_ONLY_MATCH_S = 3.0;
 /** Mindest-Evidenz, ab der ein IMU-Ereignis überhaupt protokolliert wird. */
 export const IMU_EVENT_MIN_EVIDENCE = 0.5;
+export const MOTION_EPISODE_ASSOCIATION_OFFSETS_MS = [0, -500, 500, -1000, 1000, -1500, 1500] as const;
+export const MOTION_EVENT_REUSE_GUARD_MS = 1_500;
 
 export type TurnSharpness = 'normal' | 'spitz' | 'unresolved';
 export type TurnSource = 'gps' | 'gps_split_apex';
@@ -89,7 +92,9 @@ export interface FusedTurn {
   source: TurnSource;
   direction: 'links' | 'rechts';
   directionSource?: 'gps' | 'motion_override_low_geometry';
-  motionAssociationSource?: 'live_cached' | 'accepted_live_turn' | 'current_ring' | 'none';
+  motionAssociationSource?: 'live_cached' | 'accepted_live_turn' | 'current_ring' | 'nearest_episode' | 'none';
+  /** Internal time anchor for enforcing one GPS association per Motion episode. */
+  motionAssociationTimeMs?: number | null;
   sharpness: TurnSharpness;
   /** Persistierter Wert (`angleKind`); `unresolved` wird als normale Ecke gespeichert. */
   kind: AngleKind;
@@ -150,10 +155,33 @@ export function associateLiveTurn(reconstructed: FusedTurn, live: readonly Fused
 export interface FuseOptions {
   /** Turn-Evidenz-Lookup (wie im Detektor) — bestätigt/widerspricht Richtung, stützt Schärfe. */
   turnEvidenceAt?: TurnEvidenceLookup;
+  /** A bounded nearest-episode lookup; compatible GPS direction is required. */
+  turnEvidenceForDirection?: DirectionalTurnEvidenceLookup;
   /** Rohe Motion-Samples für IMU-only-Protokollierung. Optional. */
   motionSamples?: readonly MotionWindowSample[];
   /** Split-Apex-Rescue. Default: an. */
   splitApexRescue?: boolean;
+}
+
+/** Choose the strongest direction-compatible motion window in a bounded
+ * ±1.5 s episode around an existing GPS candidate. Motion remains a lookup;
+ * this helper cannot create a GPS candidate. */
+export function nearestCompatibleTurnEvidence(
+  tMs: number | null, gpsDirection: 'links' | 'rechts', lookup?: TurnEvidenceLookup,
+): TurnEvidence | null {
+  if (tMs == null || !lookup) return null;
+  const windows: { offset: number; ev: TurnEvidence }[] = [];
+  for (const offset of MOTION_EPISODE_ASSOCIATION_OFFSETS_MS) {
+    const ev = lookup(tMs + offset);
+    if (ev?.available && (ev.evidence ?? 0) >= 0.5
+      && (ev.locomotionSource !== 'none' || ev.steps > 0)) windows.push({ offset, ev });
+  }
+  windows.sort((a, b) => {
+    const aMatch = motionTurnDirection(a.ev) === gpsDirection ? 1 : 0;
+    const bMatch = motionTurnDirection(b.ev) === gpsDirection ? 1 : 0;
+    return bMatch - aMatch || (b.ev.evidence ?? 0) - (a.ev.evidence ?? 0) || Math.abs(a.offset) - Math.abs(b.offset);
+  });
+  return windows[0]?.ev ?? null;
 }
 
 // ── Hilfen ────────────────────────────────────────────────────────────────
@@ -187,7 +215,7 @@ function sharpnessConfidence(quality: number | null, sharpness: TurnSharpness): 
   return Math.round(clamp01(quality ?? 0.5) * 1000) / 1000;
 }
 
-function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | null): FusedTurn {
+function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | null, nearestEpisodeLookup = false): FusedTurn {
   const gpsDir = d.direction ?? ((d.headingDeltaDeg ?? 0) > 0 ? 'rechts' : 'links');
   const magnitude = Math.abs(d.headingDeltaDeg ?? 0);
   const flags: string[] = [];
@@ -195,12 +223,12 @@ function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | nu
   const motion = motionView(ev, gpsDir, magnitude);
   // Only an existing GPS corner may be corrected. Poor geometry plus strong,
   // directional motion can resolve a sign conflict; GPS still sets sharpness.
-  const override = d.geometryQualityLevel === 'low' && (d.geometryQuality ?? 1) < 0.4
+  const override = !!d.motionDirectionOverride || (d.geometryQualityLevel === 'low' && (d.geometryQuality ?? 1) < 0.4
     && (d.accuracyToLegRatio ?? 0) >= 2 && motion.available
     && motion.direction != null && motion.direction !== gpsDir
     && (ev?.evidence ?? 0) >= 0.95 && (ev?.monotonicity ?? 0) >= 0.9
     && (ev?.yawShare ?? 0) >= 0.7
-    && (ev?.movementState === 'walking' || ev?.movementState === 'running');
+    && (ev?.movementState === 'walking' || ev?.movementState === 'running'));
   const dir = override ? motion.direction! : gpsDir;
   const directionSource = override ? 'motion_override_low_geometry' : 'gps';
 
@@ -215,7 +243,12 @@ function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | nu
   const finalKind = kindFor(dir, sharpness === 'unresolved' ? 'normal' : sharpness);
   return {
     apexIndex: d.apexIndex, atM, t: d.t, source: d.fusionSource === 'gps_split_apex' ? 'gps_split_apex' : 'gps',
-    direction: dir, directionSource, sharpness, kind: finalKind,
+    direction: dir, directionSource,
+    motionAssociationSource: nearestEpisodeLookup && ev?.available && d.t != null
+      && Math.abs((ev.windowStartMs + ev.windowEndMs) / 2 - d.t) >= 250 ? 'nearest_episode'
+      : ev?.available ? 'current_ring' : 'none',
+    motionAssociationTimeMs: ev?.available ? (ev.windowStartMs + ev.windowEndMs) / 2 : null,
+    sharpness, kind: finalKind,
     confidence: d.confidence, confidenceBeforeMotion: d.confidenceBeforeMotion, motionAdjustment: d.motionAdjustment,
     sharpnessConfidence: sharpnessConfidence(d.geometryQuality, sharpness),
     headingDeltaDeg: d.headingDeltaDeg, interiorAngleDeg: d.interiorAngleDeg, accuracyM: d.accuracyM,
@@ -223,6 +256,36 @@ function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | nu
     geometryQuality: d.geometryQuality, geometryQualityLevel: d.geometryQualityLevel, accuracyToLegRatio: d.accuracyToLegRatio,
     motion, flags,
   };
+}
+
+/** Recover an already-measured GPS corner when its unstable near-reversal sign
+ * is contradicted by strong, direction-specific walking Motion. GPS must have
+ * passed the full candidate geometry gates; Motion only resolves direction.
+ * The angle remains unresolved because this path has no supported sharpness
+ * band. */
+function recoverAmbiguousGpsCorner(d: ShortLegDiagnostics, ev: TurnEvidence | null): boolean {
+  const gpsCandidateExists = d.rejectReason === 'low_evidence'
+    || (d.rejectReason == null && d.classification == null && d.confidence >= ACCEPT_SCORE);
+  if (!gpsCandidateExists || d.classification != null || d.direction == null
+    || d.headingDeltaDeg == null || d.interiorAngleDeg == null || d.geometryQuality == null
+    || d.geometryQuality >= 0.65 || (d.turnConcentrationM ?? 0) < 0.75
+    || Math.abs(d.headingDeltaDeg) < 60 || (d.confidence ?? 0) < 0.5
+    || !ev?.available || (ev.evidence ?? 0) < 0.95 || ev.monotonicity < 0.9 || ev.yawShare < 0.65
+    || motionTurnDirection(ev) == null || motionTurnDirection(ev) === d.direction
+    || (ev.locomotionSource === 'none' && ev.steps <= 0)) return false;
+  // This route has no defensible geometry class. In particular, near 180° GPS
+  // heading deltas are not converted into a sharp turn by Motion magnitude.
+  d.direction = motionTurnDirection(ev);
+  d.motionDirectionOverride = true;
+  d.classification = d.direction;
+  d.sharpness = 'unresolved';
+  d.sharpnessDemoted = true;
+  d.motionDirection = motionTurnDirection(ev);
+  d.motionDirectionAgrees = true;
+  d.motionBoostSuppressed = false;
+  d.fusionSource = 'gps';
+  d.rejectReason = null;
+  return true;
 }
 
 // ── Split-Apex ────────────────────────────────────────────────────────────
@@ -249,6 +312,7 @@ interface SplitApexHit {
 
 function evaluateSplitApex(
   points: readonly ShortLegPoint[], i: number, turnEvidenceAt?: TurnEvidenceLookup,
+  turnEvidenceForDirection?: DirectionalTurnEvidenceLookup,
 ): SplitApexHit | null {
   if (i < 1 || i + 1 > points.length - 2) return null;
   const a = points[i], b = points[i + 1];
@@ -295,7 +359,7 @@ function evaluateSplitApex(
 
   // IMU: widerspricht sie der GPS-Richtung, ist der Paarungs-Scheitel kein
   // hinreichender Beleg → verwerfen. Fehlt IMU, bleibt es beim GPS-Indiz.
-  const ev = turnEvidenceAt?.(a.t ?? null) ?? null;
+  const ev = turnEvidenceForDirection?.(a.t ?? null, dir) ?? turnEvidenceAt?.(a.t ?? null) ?? null;
   const md = ev && ev.available ? motionTurnDirection(ev) : null;
   if (md != null && md !== dir) return null;
   const agrees = md != null && md === dir && (ev?.evidence ?? 0) >= 0.5;
@@ -347,30 +411,43 @@ function detectImuEvents(samples: readonly MotionWindowSample[]): ImuOnlyEvent[]
  * die Funktion `turns` (QA-Telemetrie je Ecke) und `imuOnly`.
  */
 export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = {}): FusionResult {
-  const base = detectShortLegCorners(points, null, opts.turnEvidenceAt);
+  const base = detectShortLegCorners(points, null, opts.turnEvidenceAt, opts.turnEvidenceForDirection);
   const diagnostics = base.diagnostics.map(d => ({ ...d }));
   const byApex = new Map(diagnostics.map(d => [d.apexIndex, d]));
   const corners = base.corners.map(c => ({ ...c }));
   const turns: FusedTurn[] = [];
+  let rescued = 0;
   const lookup = opts.turnEvidenceAt;
+
+  // GPS-confirmed but sign-ambiguous near-reversals can be recovered only when
+  // strong same-episode walking Motion supplies the opposite direction. This
+  // does not widen the regular confidence threshold or infer sharpness.
+  for (const d of diagnostics) {
+    if (corners.some(c => Math.abs(c.atM - points[d.apexIndex].cumDist) < CORNER_GAP_M)) continue;
+    const ev = opts.turnEvidenceForDirection?.(d.t ?? null, d.direction ?? 'rechts') ?? lookup?.(d.t ?? null) ?? null;
+    if (!recoverAmbiguousGpsCorner(d, ev)) continue;
+    const atM = points[d.apexIndex].cumDist;
+    d.motionAdjustment = 0;
+    corners.push({ kind: d.direction!, apexIndex: d.apexIndex, atM });
+    rescued++;
+  }
 
   // 1. Regelpfad-Ecken → fusionierte Ecken (Schärfe ggf. durch IMU belegt).
   for (const c of corners) {
     const d = byApex.get(c.apexIndex)!;
-    const ev = lookup?.(d.t ?? null) ?? null;
-    const t = turnFromDiag(d, c.atM, ev);
+    const ev = opts.turnEvidenceForDirection?.(d.t ?? null, d.direction ?? 'rechts') ?? lookup?.(d.t ?? null) ?? null;
+    const t = turnFromDiag(d, c.atM, ev, opts.turnEvidenceForDirection != null);
     c.kind = t.kind;   // spitz durch Motion belegt → persistierte Klasse folgt
     turns.push(t);
   }
 
   // 2. Split-Apex-Rescue.
-  let rescued = 0;
   if (opts.splitApexRescue !== false) {
     const hits: SplitApexHit[] = [];
     for (let i = 1; i < points.length - 2; i++) {
       const atM = points[i].cumDist;
       if (corners.some(c => Math.abs(c.atM - atM) < CORNER_GAP_M)) continue;
-      const h = evaluateSplitApex(points, i, lookup);
+      const h = evaluateSplitApex(points, i, lookup, opts.turnEvidenceForDirection);
       if (h) hits.push(h);
     }
     hits.sort((x, y) => y.confidence - x.confidence || x.apexIndex - y.apexIndex);
@@ -394,13 +471,34 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
         geometryQuality: h.geoScore, geometryQualityLevel: h.geoLevel, accuracyToLegRatio: h.ratio,
         fusionSource: 'gps_split_apex' as const,
       });
-      const t = turnFromDiag(d, atM, h.ev);
+      const t = turnFromDiag(d, atM, h.ev, opts.turnEvidenceForDirection != null);
       t.flags.unshift('split_apex_pair');
       turns.push(t);
     }
   }
   corners.sort((x, y) => x.atM - y.atM);
   turns.sort((x, y) => x.atM - y.atM);
+
+  // A single Core Motion episode may support one GPS corner only. If adjacent
+  // candidate windows picked the same delayed event, retain the closest GPS
+  // apex (then stronger GPS confidence) and drop the duplicate association.
+  const usedEpisodes: { timeMs: number; turn: FusedTurn }[] = [];
+  const duplicateApexes = new Set<number>();
+  for (const turn of turns.filter(t => t.motionAssociationSource === 'nearest_episode'
+    && t.motion.available && t.motionAssociationTimeMs != null).sort((a, b) => {
+      const at = a.motionAssociationTimeMs! - (a.t ?? a.motionAssociationTimeMs!);
+      const bt = b.motionAssociationTimeMs! - (b.t ?? b.motionAssociationTimeMs!);
+      return Math.abs(at) - Math.abs(bt) || b.confidence - a.confidence;
+    })) {
+    const timeMs = turn.motionAssociationTimeMs!;
+    if (usedEpisodes.some(episode => Math.abs(episode.timeMs - timeMs) <= MOTION_EVENT_REUSE_GUARD_MS)) {
+      duplicateApexes.add(turn.apexIndex);
+    } else usedEpisodes.push({ timeMs, turn });
+  }
+  if (duplicateApexes.size) {
+    for (let i = turns.length - 1; i >= 0; i--) if (duplicateApexes.has(turns[i].apexIndex)) turns.splice(i, 1);
+    for (let i = corners.length - 1; i >= 0; i--) if (duplicateApexes.has(corners[i].apexIndex)) corners.splice(i, 1);
+  }
 
   // 3. IMU-only: nur Telemetrie.
   let imuOnly: ImuOnlyEvent[] = [];
