@@ -256,8 +256,12 @@ describe('Datenquelle: ausschliesslich gelegte Punkte', () => {
     expect(src).toContain('Clipboard.setStringAsync(json)');
     // Die Datei wird erst NACH der Sharing-Prüfung geschrieben — kein
     // verwaister Schreibvorgang, wenn Teilen gar nicht möglich ist.
-    const shareFn = src.slice(src.indexOf('export async function shareQaExport'));
+    // Die Prüf-vor-Schreiben-Logik liegt im gemeinsamen Helfer shareJsonFile (QA-Export UND Support-Diagnose);
+    // shareQaExport delegiert unverändert dorthin.
+    const shareFn = src.slice(src.indexOf('export async function shareJsonFile'));
+    expect(shareFn.indexOf('Sharing.isAvailableAsync')).toBeGreaterThan(-1);
     expect(shareFn.indexOf('Sharing.isAvailableAsync')).toBeLessThan(shareFn.indexOf('writeAsStringAsync'));
+    expect(src).toContain("await shareJsonFile(json, name, 'Fährten-QA-Export');");
   });
 
   it('der Export markiert seinen Inhalt explizit als lay', () => {

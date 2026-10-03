@@ -48,6 +48,12 @@ jest.mock('@/features/tracking/store/searchPersist', () => ({
 // QA-Schalter (mock-präfixiert für jest.mock-Factory).
 let mockQaOn = true;
 jest.mock('@/features/tracking/utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQaOn }));
+// Support-Capture für normale Kunden (Standard AN, wie in Produktion).
+let mockSupportOn = true;
+jest.mock('@/features/tracking/utils/supportDiagnostics', () => ({
+  ...jest.requireActual('@/features/tracking/utils/supportDiagnostics'),
+  isSupportCaptureEnabled: () => mockSupportOn,
+}));
 
 const M = 111320, LAT0 = 47, LNG0 = 8, M_LNG = M * Math.cos((LAT0 * Math.PI) / 180);
 const ll = (x: number, y: number): LatLng => ({ latitude: LAT0 + y / M, longitude: LNG0 + x / M_LNG });
@@ -63,7 +69,7 @@ function Harness({ onReady, line }: { onReady: (s: SearchRecorder) => void; line
   return null;
 }
 let activeRenderer: ReactTestRenderer | null = null;
-afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; mockQaOn = true; });
+afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; mockQaOn = true; mockSupportOn = true; });
 
 function walkL(): { x: number; y: number }[] {
   const pts: { x: number; y: number }[] = []; const v = 1.3;
@@ -119,8 +125,8 @@ describe('QA-Telemetrie: Inhalt', () => {
     expect(q.truncated).toEqual({ raw: false, cursor: false });
   });
 
-  it('QA aus: keine Telemetrie, kein Overhead-Feld', async () => {
-    mockQaOn = false;
+  it('QA aus UND Support aus: keine Telemetrie, kein Overhead-Feld', async () => {
+    mockQaOn = false; mockSupportOn = false;
     const { res } = await runScenario(LAID, fixesL());
     expect(res.qa).toBeUndefined();
     expect(Object.keys(res)).not.toContain('qa');
@@ -164,7 +170,7 @@ describe('Cursor / Score / Search-Distanz / Analytics durch QA unverändert', ()
   };
   it('synthetischer L-Turn mit Objekt: QA an ≡ QA aus', async () => {
     mockQaOn = true;  const on = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4));
-    mockQaOn = false; const off = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4));
+    mockQaOn = false; mockSupportOn = false; const off = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4));
     expect(on.res.qa).toBeDefined(); expect(off.res.qa).toBeUndefined();
     same(on, off);
   });
@@ -175,7 +181,7 @@ describe('Cursor / Score / Search-Distanz / Analytics durch QA unverändert', ()
     const line: LatLng[] = lay.points.map((p: { x: number; y: number }) => ll(p.x, p.y));
     const fixes = (run.runPoints as { x: number; y: number; t: number }[]).map(p => ({ x: p.x, y: p.y, t: T0 + p.t * 1000 }));
     mockQaOn = true;  const on = await runScenario(line, fixes);
-    mockQaOn = false; const off = await runScenario(line, fixes);
+    mockQaOn = false; mockSupportOn = false; const off = await runScenario(line, fixes);
     same(on, off);
     // Self-Crossing: kein Rückweg-Sprung — QA-Samples zeigen monotonen Fortschritt.
     const ps = on.res.qa!.cursorSamples.map(s => s.progressM);
@@ -186,5 +192,85 @@ describe('Cursor / Score / Search-Distanz / Analytics durch QA unverändert', ()
     const uses = src.split('\n').filter(l => l.includes('qaTelRef') || l.includes('qaLastCursorSampleSecRef'));
     for (const l of uses) expect(l).toMatch(/useRef|qaTelRef\.current\)? *(\?|&&|\{|\.raw|\.filtered|=)|const tel = qaTelRef|qaTelRef\.current = |\.\.\.qaTelRef|qaLastCursorSampleSecRef\.current|const qaTel = qaTelRef|qaTelRef\.current\s*$|qaTelRef\.current \?|if \(qaTelRef|objectDwellCandidates/);
     expect(src).not.toMatch(/(maxCursorMRef|cursorMRef|distRef|devSumRef|foundRef)\.current\s*(=|\+=)[^;]*qaTelRef/);
+  });
+});
+
+
+// ── Support-Capture für normale Kunden (QA-Modus AUS) ─────────────────────────────────────
+describe('Support-Capture (normale Kunden, kein QA-Schalter)', () => {
+  const prod = (a: Awaited<ReturnType<typeof runScenario>>, b: Awaited<ReturnType<typeof runScenario>>) => {
+    expect(a.res.points).toEqual(b.res.points);
+    expect(a.res.pointsTimeSec).toEqual(b.res.pointsTimeSec);
+    expect(a.res.replayPoints).toEqual(b.res.replayPoints);
+    expect(a.res.replayPointsTimeSec).toEqual(b.res.replayPointsTimeSec);
+    expect(a.res.distanceM).toBe(b.res.distanceM);
+    expect(a.res.score).toBe(b.res.score);
+    expect(a.res.deviationAvgM).toBe(b.res.deviationAvgM);
+    expect(a.res.analyticsSamples).toEqual(b.res.analyticsSamples);
+    expect(a.res.breaks).toEqual(b.res.breaks);
+    expect(a.res.foundObjectIndices).toEqual(b.res.foundObjectIndices);
+    expect(a.res.objectStatuses).toEqual(b.res.objectStatuses);
+    expect(a.progress).toEqual(b.progress);
+    expect(a.rec.trackLengthM).toBe(b.rec.trackLengthM);
+  };
+
+  it('A: QA-Modus AUS → Support-Telemetrie wird trotzdem erzeugt (Minimal-Level, ohne Dwell-Mitschnitt)', async () => {
+    mockQaOn = false; mockSupportOn = true;
+    const { res } = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4.37));
+    const q = res.qa!;
+    expect(q).toBeDefined();
+    expect(q.captureLevel).toBe('support');
+    expect(q.objectDwellCandidates).toBeUndefined();
+    expect(q.raw).toHaveLength(fixesL().length);
+  });
+
+  it('B: QA-Modus AN → bisheriger Vollumfang bleibt (captureLevel qa, Dwell-Mitschnitt vorhanden)', async () => {
+    mockQaOn = true; mockSupportOn = true;
+    const { res } = await runScenario(LAID, fixesL());
+    expect(res.qa!.captureLevel).toBe('qa');
+    expect(Array.isArray(res.qa!.objectDwellCandidates)).toBe(true);
+  });
+
+  it('Support-Capture erhält die Accuracy jedes Fixes (accepted und rejected) und den Ablehnungsgrund', async () => {
+    mockQaOn = false; mockSupportOn = true;
+    const { res } = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4.37));
+    const q = res.qa!;
+    const accepted = q.raw.filter(r => r.accepted);
+    const rejected = q.raw.filter(r => !r.accepted);
+    expect(accepted.every(r => r.accuracy === 4.37)).toBe(true);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]).toMatchObject({ accuracy: 80, reason: 'accuracy' });
+  });
+
+  it('C: Support-Capture an ≡ komplett aus — identische Produktionsergebnisse (Punkte, Replay, Distanz, Score, Cursor, Objekte)', async () => {
+    mockQaOn = false; mockSupportOn = true;  const on = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4));
+    mockQaOn = false; mockSupportOn = false; const off = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4));
+    expect(on.res.qa).toBeDefined(); expect(off.res.qa).toBeUndefined();
+    prod(on, off);
+  });
+
+  it('C (real, Self-Crossing-Route qa-0ec8c4ca): Support-Capture an ≡ komplett aus', async () => {
+    const FIX = path.join(__dirname, '..', '..', 'utils', '__tests__', 'fixtures', 'realFieldV21');
+    const lay = JSON.parse(fs.readFileSync(path.join(FIX, 'spitz-qa-0ec8c4ca.json'), 'utf8'));
+    const run = JSON.parse(fs.readFileSync(path.join(FIX, 'spitz-qa-0ec8c4ca-search.json'), 'utf8'));
+    const line: LatLng[] = lay.points.map((p: { x: number; y: number }) => ll(p.x, p.y));
+    const fixes = (run.runPoints as { x: number; y: number; t: number }[]).map(p => ({ x: p.x, y: p.y, t: T0 + p.t * 1000 }));
+    mockQaOn = false; mockSupportOn = true;  const on = await runScenario(line, fixes);
+    mockQaOn = false; mockSupportOn = false; const off = await runScenario(line, fixes);
+    prod(on, off);
+  });
+
+  it('C (QA an ≡ Support an): auch der Vollumfang ändert die Produktion nicht', async () => {
+    mockQaOn = true;  mockSupportOn = true;  const qa = await runScenario(LAID, fixesL());
+    mockQaOn = false; mockSupportOn = true;  const sup = await runScenario(LAID, fixesL());
+    prod(qa, sup);
+  });
+
+  it('Einbahnstrasse: der Recorder liest `captureLevel` nie (nur Anlegen); Support-Modul importiert kein Tracking', () => {
+    const rec = fs.readFileSync('features/tracking/hooks/useSearchRecorder.ts', 'utf8');
+    expect(rec.match(/captureLevel/g)).toHaveLength(1);                      // genau die Zuweisung beim Anlegen
+    const sup = fs.readFileSync('features/tracking/utils/supportDiagnostics.ts', 'utf8');
+    const imports = sup.split('\n').filter(l => l.startsWith('import '));
+    for (const l of imports) expect(l).not.toMatch(/useSearchRecorder|searchFix|trackFusionEngine|turnFusion|shortLeg|guidance|replay|voice|cursor/i);
   });
 });

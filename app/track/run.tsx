@@ -22,6 +22,7 @@ import { useTrackHapticGuidance, type GuidanceObject } from '@/features/tracking
 import { useTrackEndGuidance } from '@/features/tracking/hooks/useTrackEndGuidance';
 import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracking/utils/endFixConfirmation';
 import { buildSearchDiagnostics, saveQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
+import { toSupportCapture } from '@/features/tracking/utils/supportDiagnostics';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { DEFAULT_HANDLER_DISTANCE_M, HANDLER_DISTANCES_M, isHandlerDistance, haversineM, type SearchHandlerDistanceM } from '@/features/tracking/utils/searchGeometry';
 import { endRadiusM, trackEndBlocker } from '@/features/tracking/utils/guidanceEngine';
@@ -903,8 +904,10 @@ export default function TrackRunScreen() {
     if (res.qa && sessId && snapData.laidPoints.length) {
       try {
         const stopSec = (Date.now() - (searchStartMsRef.current ?? res.qa.startedAtMs)) / 1000;
+        // Support-Level (normale Kunden): Minimal-Capture — keine Voice-/Approach-/Ende-Sample-Diagnosen.
+        const isSupportLevel = res.qa.captureLevel === 'support';
         const diag = buildSearchDiagnostics({
-          ux: (() => {
+          ux: isSupportLevel ? undefined : (() => {
             const voice = voiceDiagnostics();
             const approachQa = approachQaRef.current ? { ...approachQaRef.current } : undefined;
             const approachVoice = voice.events.find(e => e.eventType === 'approach');
@@ -935,7 +938,11 @@ export default function TrackRunScreen() {
           end: { fired: qaEndRef.current, hapticFired: qaEndRef.current ? true : null, voiceFired: qaEndRef.current ? qaEndRef.current.voice : null },
           manualStopTSec: stopSec,
         });
-        void saveQaSearchCapture(sessId, diag);
+        // Interner QA-Speicher nur im QA-Modus (unverändert); die privacy-reduced Support-Diagnose
+        // wird für jede Absuche lokal abgelegt (eigener Namespace, gleiche Retention). Beides
+        // best-effort und NICHT awaited: ein Diagnosefehler blockiert das Speichern der Fährte nie.
+        if (!isSupportLevel) void saveQaSearchCapture(sessId, diag);
+        void saveQaSearchCapture(sessId, toSupportCapture(diag), 'support');
       } catch (e) { console.warn('[trackRun] QA search capture', e); }
     }
     const analytics = res.analyticsSamples.length ? computeTrackAnalyticsV3({

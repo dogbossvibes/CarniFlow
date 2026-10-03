@@ -77,6 +77,11 @@ export interface SearchQaCursorSample {
 }
 export interface SearchQaObjectApproach { index: number; minHandlerDistM: number | null; progressAtClosestM: number | null }
 export interface SearchQaTelemetry {
+  /**
+   * 'qa' = interner QA-Modus (Vollumfang). 'support' = Minimal-Capture für normale Kunden
+   * (nur Beobachtung: kein Dwell-Mitschnitt, keine UX-Diagnosen). Fehlt = 'qa' (Altbestand).
+   */
+  captureLevel?: 'qa' | 'support';
   startedAtMs: number;
   /** Start mit Resume/Recovery: Ströme decken nur den Teil nach dem Neustart ab. */
   resumed: boolean;
@@ -470,27 +475,44 @@ export function summarizeSearchDiagnostics(d: QaSearchDiagnostics) {
 }
 
 // ── Speicher (eigener QA-Bereich, wie qaSessionCapture) ──────────────────
-const KEY_PREFIX = 'anyvo.qa.searchCapture.';
-const INDEX_KEY = 'anyvo.qa.searchCapture.index';
+// Eine Implementierung, zwei getrennte Namespaces mit DERSELBEN Retention (letzte 5):
+//   'qa'      interner QA-Modus (unverändert, Schlüssel wie bisher)
+//   'support' privacy-reduced Support-Diagnose für normale Kunden
+// Support-Daten verdrängen nie QA-Daten und umgekehrt.
+export type SearchCaptureKind = 'qa' | 'support';
+const NAMESPACE: Record<SearchCaptureKind, { prefix: string; index: string }> = {
+  qa: { prefix: 'anyvo.qa.searchCapture.', index: 'anyvo.qa.searchCapture.index' },
+  support: { prefix: 'anyvo.support.searchCapture.', index: 'anyvo.support.searchCapture.index' },
+};
 export const QA_SEARCH_RETENTION = 5;
-const keyFor = (id: string) => `${KEY_PREFIX}${id}`;
+const keyFor = (id: string, kind: SearchCaptureKind) => `${NAMESPACE[kind].prefix}${id}`;
 
-export async function saveQaSearchCapture(sessionLocalId: string, d: QaSearchDiagnostics): Promise<void> {
+export async function saveQaSearchCapture(sessionLocalId: string, d: QaSearchDiagnostics, kind: SearchCaptureKind = 'qa'): Promise<void> {
   try {
-    await AsyncStorage.setItem(keyFor(sessionLocalId), JSON.stringify(d));
-    const raw = await AsyncStorage.getItem(INDEX_KEY);
+    const { index } = NAMESPACE[kind];
+    await AsyncStorage.setItem(keyFor(sessionLocalId, kind), JSON.stringify(d));
+    const raw = await AsyncStorage.getItem(index);
     const ids: string[] = raw ? JSON.parse(raw) : [];
     const next = [sessionLocalId, ...ids.filter(id => id !== sessionLocalId)];
-    await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(next.slice(0, QA_SEARCH_RETENTION)));
-    for (const id of next.slice(QA_SEARCH_RETENTION)) await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
-  } catch { /* best-effort: QA darf die Absuche nie beeinträchtigen */ }
+    await AsyncStorage.setItem(index, JSON.stringify(next.slice(0, QA_SEARCH_RETENTION)));
+    for (const id of next.slice(QA_SEARCH_RETENTION)) await AsyncStorage.removeItem(keyFor(id, kind)).catch(() => {});
+  } catch { /* best-effort: Diagnose darf die Absuche nie beeinträchtigen */ }
 }
 
-export async function loadQaSearchCapture(sessionLocalId: string): Promise<QaSearchDiagnostics | null> {
+export async function loadQaSearchCapture(sessionLocalId: string, kind: SearchCaptureKind = 'qa'): Promise<QaSearchDiagnostics | null> {
   try {
-    const raw = await AsyncStorage.getItem(keyFor(sessionLocalId));
+    const raw = await AsyncStorage.getItem(keyFor(sessionLocalId, kind));
     if (!raw) return null;
     const p = JSON.parse(raw) as QaSearchDiagnostics;
     return p && typeof p.rawSearchPointCount === 'number' ? p : null;
   } catch { return null; }
+}
+
+/** Leichte Verfügbarkeitsprüfung über den Index (lädt NICHT das ganze Payload). */
+export async function hasQaSearchCapture(sessionLocalId: string, kind: SearchCaptureKind = 'qa'): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(NAMESPACE[kind].index);
+    const ids: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(ids) && ids.includes(sessionLocalId);
+  } catch { return false; }
 }

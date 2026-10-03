@@ -9,6 +9,7 @@
  * (Haversine auf {latitude,longitude}) ist hier lokal definiert.
  */
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { isSupportCaptureEnabled } from '@/features/tracking/utils/supportDiagnostics';
 import { SEARCH_QA_LIMITS, type SearchQaTelemetry, type SearchQaRawFix } from '@/features/tracking/utils/qaSearchCapture';
 import { replayGeometryArrays, REPLAY_GEOMETRY, type ReplayGeoPoint } from '@/features/tracking/utils/searchReplayGeometry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1059,9 +1060,16 @@ export function useSearchRecorder(opts: {
       } else if (rs.dismissedAutoDwellIds.includes(key)) objectStatusesRef.current[i] = 'user_removed';
     });
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
-    // QA-Search-Telemetrie nur im QA-Diagnosemodus; sonst null → kein Overhead.
-    qaTelRef.current = isQaDiagnosticsEnabled()
-      ? { startedAtMs: startMsRef.current, resumed: resumePts.length > 0, raw: [], filtered: [], display: [], cursorSamples: [], objectApproach: [], objectDwellCandidates: [],
+    // Search-Telemetrie — rein BEOBACHTEND (nur Schreiben, nie von Cursor/Distanz/Score/Ende gelesen):
+    //   • interner QA-Modus: Vollumfang inkl. Dwell-Mitschnitt,
+    //   • sonst Support-Minimal-Capture für normale Kunden (ohne Dwell-Mitschnitt; kein neuer
+    //     GPS-/Sensor-Zugriff, nur dieselben Fixes, die ohnehin verarbeitet werden),
+    //   • beides aus → null → kein Overhead.
+    const qaOn = isQaDiagnosticsEnabled();
+    qaTelRef.current = (qaOn || isSupportCaptureEnabled())
+      ? { captureLevel: qaOn ? 'qa' : 'support',
+          startedAtMs: startMsRef.current, resumed: resumePts.length > 0, raw: [], filtered: [], display: [], cursorSamples: [], objectApproach: [],
+          ...(qaOn ? { objectDwellCandidates: [] } : {}),
           minDistToEndM: null, progressAtMinEndM: null, truncated: { raw: false, cursor: false } }
       : null;
     setElapsedS(resume ? Math.max(0, Math.floor((Date.now() - resume.startedAtMs) / 1000)) : 0);

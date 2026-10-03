@@ -20,6 +20,7 @@ import { getLocalTrackDetail, getLocalRunSupplement, saveLocalTrackEvaluation } 
 import { pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
+import { SupportDiagnosticsRow } from '@/features/tracking/components/SupportDiagnosticsRow';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { retryFailedSyncForSession, syncNow } from '@/features/sync/services/syncEngine';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -792,6 +793,9 @@ export default function TrackAuswertungScreen() {
               </View>
             </>
           )}
+
+          {/* Sekundär: privacy-reduced Support-Diagnose teilen (nur wenn für diese Fährte vorhanden). */}
+          <SupportDiagnosticsRow sessionLocalId={String(id)} />
 
           <View style={{ height: 24 }} />
         </ScrollView>

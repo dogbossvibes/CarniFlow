@@ -5,6 +5,7 @@
 // geschrieben und nichts gelöscht.
 
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
   getLayTrackPointsBySession, getTrackMarkersBySession,
 } from '@/features/tracking/repositories/localTrackRepository';
@@ -117,12 +118,11 @@ export async function buildExportForSession(localId: string): Promise<QaTrackExp
 }
 
 /**
- * Schreibt den Export in eine temporäre Datei und öffnet das native
- * Teilen-Menü. Gibt den Dateinamen zurück.
+ * Schreibt JSON in eine temporäre Datei (Cache-Verzeichnis, vom System bereinigt) und öffnet das
+ * native Teilen-Menü. Gemeinsamer Helfer für QA-Export UND Support-Diagnose — kein zweiter Share-Pfad.
+ * Funktioniert offline: es wird nur lokal geschrieben.
  */
-export async function shareQaExport(exported: QaTrackExport, opts?: { startedAt?: string | null }): Promise<string> {
-  assertNoAbsoluteData(exported);
-
+export async function shareJsonFile(json: string, name: string, dialogTitle: string): Promise<void> {
   // expo-sharing exportiert AUSSCHLIESSLICH benannte Funktionen
   // (`isAvailableAsync`, `shareAsync`) — es gibt keinen Default-Export.
   // Ein `const { default: Sharing } = await import('expo-sharing')` liefert
@@ -141,21 +141,29 @@ export async function shareQaExport(exported: QaTrackExport, opts?: { startedAt?
     throw new Error('Teilen ist auf diesem Gerät nicht verfügbar. Nutze stattdessen „Kopieren".');
   }
 
-  // Dateiname mit Sessionstart (Datum/Uhrzeit) aus der Listenzeile — der JSON-Inhalt bleibt identisch.
-  const name = qaExportFileName(exported, opts?.startedAt);
-  const json = serializeQaTrackExport(exported);
-
-  const FileSystem = await import('expo-file-system/legacy');
   const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
   if (!dir) throw new Error('Kein beschreibbares Verzeichnis verfügbar.');
   const uri = `${dir}${name}`;
   await FileSystem.writeAsStringAsync(uri, json);
 
   await Sharing.shareAsync(uri, {
-    dialogTitle: 'Fährten-QA-Export',
+    dialogTitle,
     mimeType: 'application/json',
     UTI: 'public.json',
   });
+}
+
+/**
+ * Schreibt den Export in eine temporäre Datei und öffnet das native
+ * Teilen-Menü. Gibt den Dateinamen zurück.
+ */
+export async function shareQaExport(exported: QaTrackExport, opts?: { startedAt?: string | null }): Promise<string> {
+  assertNoAbsoluteData(exported);
+
+  // Dateiname mit Sessionstart (Datum/Uhrzeit) aus der Listenzeile — der JSON-Inhalt bleibt identisch.
+  const name = qaExportFileName(exported, opts?.startedAt);
+  const json = serializeQaTrackExport(exported);
+  await shareJsonFile(json, name, 'Fährten-QA-Export');
   return name;
 }
 
