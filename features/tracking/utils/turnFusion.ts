@@ -37,7 +37,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
 import {
-  detectShortLegCorners, stableLegWindow, meanBearing, nearIndex, normalizeDeg, clamp01, cornerConfidence,
+  detectShortLegCorners, stableLegWindow, spitzConsensus, meanBearing, nearIndex, normalizeDeg, clamp01, cornerConfidence,
   ACCEPT_SCORE, CORNER_GAP_M, MIN_TURN_DEG, MIN_TURN_TO_NOISE, NORMAL_MIN, NORMAL_MAX, SPITZ_MIN, SPITZ_MAX,
   TURN_CONCENTRATION_M, STRAIGHT_TOL_DEG,
   type ShortLegPoint, type ShortLegDiagnostics, type TurnEvidenceLookup, type LegWindow,
@@ -233,6 +233,7 @@ function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | nu
   const directionSource = override ? 'motion_override_low_geometry' : 'gps';
 
   if (d.sharpnessDemoted) flags.push('sharpness_demoted_low_geometry');
+  if (d.sharpnessNoConsensus) flags.push('sharpness_no_consensus');
   if (motion.directionAgrees === false) flags.push('motion_direction_conflict');
   if (override) flags.push('motion_direction_override_low_geometry');
   if (d.motionBoostSuppressed) flags.push('motion_boost_suppressed');
@@ -309,6 +310,9 @@ interface SplitApexHit {
   geoLevel: GeometryQualityLevel;
   ratio: number | null;
   demoted: boolean;
+  consensusPairs: number | null;
+  consensusMaxInterior: number | null;
+  noConsensus: boolean;
   ev: TurnEvidence | null;
 }
 
@@ -401,6 +405,9 @@ function evaluateApexPair(
   const dir: 'links' | 'rechts' = headingDelta > 0 ? 'rechts' : 'links';
   let sharpness: TurnSharpness;
   let demoted = false;
+  let consensusPairs: number | null = null;
+  let consensusMaxInterior: number | null = null;
+  let noConsensus = false;
 
   const windowAcc: (number | null)[] = [];
   for (let k = before.endIndex; k <= after.endIndex; k++) windowAcc.push(points[k].accuracy);
@@ -412,7 +419,11 @@ function evaluateApexPair(
   });
   if (interior >= NORMAL_MIN && interior <= NORMAL_MAX) sharpness = 'normal';
   else if (interior >= SPITZ_MIN && interior <= SPITZ_MAX) {
-    if (geo.sharpnessResolvable) sharpness = 'spitz'; else { sharpness = 'unresolved'; demoted = true; }
+    // Wie im Regelpfad: „spitz" braucht Auflösbarkeit UND Multi-Scale-Konsens über (p, q).
+    const consensus = spitzConsensus(points, p, q);
+    consensusPairs = consensus.pairs; consensusMaxInterior = consensus.maxInteriorDeg;
+    if (geo.sharpnessResolvable && consensus.supported) sharpness = 'spitz';
+    else { sharpness = 'unresolved'; demoted = true; noConsensus = geo.sharpnessResolvable; }
   } else if (interior > SPITZ_MAX && interior < NORMAL_MIN) {
     // Lücke zwischen den Bändern (Richtungsänderung ≈ 115–120°): weder „normal" noch „spitz"
     // belegbar. Die GPS-Ecke und ihre Richtung sind bewiesen — die Schärfe wird nicht behauptet
@@ -446,7 +457,7 @@ function evaluateApexPair(
     confidenceBeforeMotion: scaled, motionAdjustment: confidence - scaled,
     headingDeltaDeg: headingDelta, interiorAngleDeg: interior,
     before, after, concentration, geoScore: geo.score, geoLevel: geo.level, ratio: geo.accuracyToLegRatio,
-    demoted, ev,
+    demoted, consensusPairs, consensusMaxInterior, noConsensus, ev,
   };
 }
 
@@ -538,6 +549,7 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
         spreadBeforeDeg: Math.round(h.before.spreadDeg * 10) / 10, spreadAfterDeg: Math.round(h.after.spreadDeg * 10) / 10,
         turnConcentrationM: Math.round(h.concentration * 1000) / 1000,
         direction: h.direction, sharpness: h.sharpness, sharpnessDemoted: h.demoted,
+        sharpnessConsensusPairs: h.consensusPairs, sharpnessMaxInteriorDeg: h.consensusMaxInterior, sharpnessNoConsensus: h.noConsensus,
         geometryQuality: h.geoScore, geometryQualityLevel: h.geoLevel, accuracyToLegRatio: h.ratio,
         fusionSource: 'gps_split_apex' as const,
       });

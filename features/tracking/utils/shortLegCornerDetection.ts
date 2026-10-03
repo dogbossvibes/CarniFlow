@@ -281,8 +281,16 @@ export interface LegWindow {
 export function stableLegWindow(
   points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number = STRAIGHT_TOL_DEG,
 ): LegWindow | null {
+  const all = collectLegWindows(points, apexIndex, forward, straightTolDeg);
+  return all.length ? all[all.length - 1] : null;
+}
+
+/** Alle gültigen Fenster je Skala (aufsteigend) — dieselbe Schleife wie früher in stableLegWindow. */
+function collectLegWindows(
+  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number,
+): LegWindow[] {
   const apex = points[apexIndex];
-  let best: LegWindow | null = null;
+  const found: LegWindow[] = [];
 
   for (const scale of SCALES_M) {
     // Punkte innerhalb dieser Skala einsammeln.
@@ -316,13 +324,58 @@ export function stableLegWindow(
       // Kandidaten (`no_window_before/after`), obwohl ein kürzeres, sauberes
       // Fenster verfügbar gewesen wäre. Ohne Treffer wird deshalb die nächste
       // Skala geprüft statt die Suche zu beenden.
-      if (best) break;
+      if (found.length) break;
       continue;
     }
 
-    best = { endIndex: end, lengthM, sampleCount, bearingDeg: fit.deg, spreadDeg: spread, scaleM: scale, residualM: fit.residualM };
+    found.push({ endIndex: end, lengthM, sampleCount, bearingDeg: fit.deg, spreadDeg: spread, scaleM: scale, residualM: fit.residualM });
   }
-  return best;
+  return found;
+}
+
+/** Alle gültigen Schenkelfenster eines Scheitels, ohne Duplikate (gleicher Endpunkt = gleiche Evidenz). */
+export function legWindows(
+  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number = STRAIGHT_TOL_DEG,
+): LegWindow[] {
+  return collectLegWindows(points, apexIndex, forward, straightTolDeg)
+    .filter((w, i, all) => all.findIndex(x => x.endIndex === w.endIndex) === i);
+}
+
+/**
+ * Mindestzahl gültiger, verschiedener Fensterpaare, damit eine Schärfe-Aussage überhaupt
+ * einen Konsens haben KANN. Ein einzelnes Paar hat keinen Querschnitt über Skalen: es ist
+ * nicht prüfbar, ob die Klasse von der Fensterwahl abhängt.
+ */
+export const SHARPNESS_MIN_PAIRS = 2;
+
+export interface SpitzConsensus {
+  /** Anzahl verschiedener gültiger Vorher×Nachher-Fensterpaare (über alle Skalen). */
+  pairs: number;
+  /** Grösster Innenwinkel über alle Paare (Grad); null ohne Paar. */
+  maxInteriorDeg: number | null;
+  /** true = mehrere Paare, und JEDES liegt im Spitz-Band oder schärfer (≤ SPITZ_MAX). */
+  supported: boolean;
+}
+
+/**
+ * Multi-Scale-Konsens für die Behauptung „spitz": die Klasse darf nicht von einem einzelnen
+ * Fensterpaar abhängen. Reine GPS-Geometrie — keine Motion, keine Referenz, keine Ground Truth.
+ * Gilt nur für „spitz": „normal" und „unresolved" werden gleich gespeichert (siehe kindFor),
+ * nur „spitz" ändert die persistierte Klasse.
+ */
+export function spitzConsensus(
+  points: readonly ShortLegPoint[], beforeIndex: number, afterIndex: number,
+): SpitzConsensus {
+  const before = legWindows(points, beforeIndex, false);
+  const after = legWindows(points, afterIndex, true);
+  const interiors: number[] = [];
+  for (const b of before) for (const a of after) interiors.push(180 - Math.abs(normalizeDeg(a.bearingDeg - b.bearingDeg)));
+  const maxInteriorDeg = interiors.length ? Math.max(...interiors) : null;
+  return {
+    pairs: interiors.length,
+    maxInteriorDeg: maxInteriorDeg == null ? null : Math.round(maxInteriorDeg * 10) / 10,
+    supported: interiors.length >= SHARPNESS_MIN_PAIRS && maxInteriorDeg != null && maxInteriorDeg <= SPITZ_MAX,
+  };
 }
 
 export type ShortLegRejectReason =
@@ -391,6 +444,12 @@ export interface ShortLegDiagnostics {
   accuracyToLegRatio: number | null;
   /** true = GPS-Klasse war „spitz", die Geometrie belegt das aber nicht. */
   sharpnessDemoted: boolean;
+  /** Multi-Scale-Konsens für „spitz": Anzahl gültiger Fensterpaare (nur gesetzt, wenn „spitz" geprüft wurde). */
+  sharpnessConsensusPairs?: number | null;
+  /** Grösster Innenwinkel über alle gültigen Paare (Grad). */
+  sharpnessMaxInteriorDeg?: number | null;
+  /** true = „spitz" wurde wegen fehlendem Konsens auf „unresolved" gesetzt. */
+  sharpnessNoConsensus?: boolean;
   /** Richtung laut Motion (Vorzeichen-Yaw), null = keine/zu schwache Daten. */
   motionDirection: 'links' | 'rechts' | null;
   /** true/false = Motion bestätigt/widerspricht der GPS-Richtung; null = unbekannt. */
@@ -571,14 +630,26 @@ export function evaluateShortLegCorner(
   let kind: AngleKind | null = null;
   let sharpness: 'normal' | 'spitz' | 'unresolved' = 'normal';
   const spitzKind: AngleKind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';
+  // Multi-Scale-Konsens: nur berechnet, wenn „spitz" überhaupt in Frage kommt.
+  const consensusFor = () => {
+    const c = spitzConsensus(points, apexIndex, apexIndex);
+    diag.sharpnessConsensusPairs = c.pairs;
+    diag.sharpnessMaxInteriorDeg = c.maxInteriorDeg;
+    return c.supported;
+  };
   if (interior >= NORMAL_MIN && interior <= NORMAL_MAX) kind = dir;
   else if (interior >= SPITZ_MIN && interior <= SPITZ_MAX) {
     // „spitz" ist eine BEHAUPTUNG über den Winkel. Lässt die Geometrie sie
-    // nicht zu (Accuracy ≳ Schenkel), bleibt die Richtung erhalten und die
-    // Schärfe wird als nicht aufgelöst ausgewiesen → persistiert als normal.
-    if (geo.sharpnessResolvable) { kind = spitzKind; sharpness = 'spitz'; }
-    else { kind = dir; sharpness = 'unresolved'; diag.sharpnessDemoted = true; }
-  } else if (geometryStrong && geo.sharpnessResolvable) {
+    // nicht zu (Accuracy ≳ Schenkel) oder trägt sie kein Multi-Scale-Konsens
+    // (ein einzelnes Fensterpaar / Paare in verschiedenen Klassen), bleibt die
+    // Richtung erhalten und die Schärfe wird als nicht aufgelöst ausgewiesen
+    // → persistiert als normal.
+    if (geo.sharpnessResolvable && consensusFor()) { kind = spitzKind; sharpness = 'spitz'; }
+    else {
+      kind = dir; sharpness = 'unresolved'; diag.sharpnessDemoted = true;
+      if (geo.sharpnessResolvable) diag.sharpnessNoConsensus = true;
+    }
+  } else if (geometryStrong && geo.sharpnessResolvable && consensusFor()) {
     // Do not widen SPITZ_MIN globally: this branch is gated by stable legs,
     // concentrated multi-sample geometry and (when available) delayed motion.
     kind = spitzKind; sharpness = 'spitz';

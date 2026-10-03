@@ -230,7 +230,13 @@ describe('Golden-Field-Driftmatrix: vorher / nachher', () => {
     // DETECTOR Richtung-only (Motion bestimmt dort weiterhin keine Klasse). Die
     // Klasse aus GPS ∪ IMU entscheidet die Fusionsstufe (turnFusion.test.ts,
     // die dieselbe Matrix misst).
-    expect(after.map(v => Number(v.toFixed(2)))).toEqual([3.00, 2.70, 1.80, 0.60, 0.40, 0.60]);
+    //
+    // V6.2.1 (Multi-Scale-Sharpness-Konsens): bei ±2 m steigt „nachher" 1,80 → 1,90. Verglichen über die
+    // gesamte Matrix (6 Drifts × mit/ohne Motion × 10 Seeds, alter gegen neuen Detector) ändert sich GENAU
+    // EIN Lauf je Stufe: Seed 5 behauptete aus einem einzigen Fensterpaar (Accuracy 6,7 m) ein
+    // „spitz_rechts"; jetzt bleibt es die Richtung-only-Ecke „rechts", die die Sollfolge an dieser Stelle
+    // erwartet. Alle übrigen Läufe sind identisch — eine falsche Spitz-Behauptung entfällt, nichts wird schlechter.
+    expect(after.map(v => Number(v.toFixed(2)))).toEqual([3.00, 2.70, 1.90, 0.60, 0.40, 0.60]);
     // Und in keiner Stufe schlechter.
     after.forEach((v, i) => expect(v).toBeGreaterThanOrEqual(before[i]));
   });
