@@ -1,5 +1,13 @@
 # ANYVO — Current State
 
+> [!IMPORTANT]
+> This document is not the canonical source for the current ANYVO project status.
+> See `docs/agent/ANYVO_MASTER_STATUS.md` for the current production baseline,
+> active work, completed work and open work.
+>
+> This file is retained as historical technical context and may describe
+> an older runtime, branch or implementation state.
+
 > Länger gültiger, technischer Projektzustand für Agenten (OpenCode & OpenAI Codex).
 > **Kein Session-Log** (dafür `SESSION_HANDOFF.md` / `WORK_LOG.md`).
 > Jede Aussage ist als **Verified / Assumed / Unknown** markiert.

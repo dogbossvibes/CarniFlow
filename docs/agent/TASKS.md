@@ -1,5 +1,12 @@
 # ANYVO — Task-Liste (Agent-Handoff)
 
+> [!IMPORTANT]
+> This document is not the canonical source for the current ANYVO project status.
+> See `docs/agent/ANYVO_MASTER_STATUS.md` for the current production baseline,
+> active work, completed work and open work.
+>
+> This file remains the historical task-ID ledger.
+
 > IDs stabil, chronologisch. Status: DONE · DONE(committed) · DONE(deployed) · BLOCKED · OPEN.
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).

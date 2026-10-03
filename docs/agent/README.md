@@ -1,5 +1,27 @@
 # ANYVO — Agent Handoff (Claude Code ↔ Codex)
 
+## Start here
+
+For the current ANYVO production baseline, completed work,
+active work and open work, read:
+
+`docs/agent/ANYVO_MASTER_STATUS.md`
+
+This is the canonical project status source.
+
+Then use the other files as supporting detail:
+
+- `TASKS.md` → historical task-ID ledger
+- `CURRENT_STATE.md` → historical technical snapshot
+- `DECISIONS.md` → technical/product decisions
+- `WORK_LOG.md` → chronological work history
+- `WORKTREES.md` → worktree references
+- `SESSION_HANDOFF.md` → handoff/session context
+- `tasks/` → detailed task reports and root-cause analyses
+
+If an older file conflicts with `ANYVO_MASTER_STATUS.md`,
+the master status is authoritative for current project state.
+
 Kurzanleitung für den täglichen Wechsel zwischen den Agenten. Das **Repository**
 ist die gemeinsame technische Wahrheit.
 

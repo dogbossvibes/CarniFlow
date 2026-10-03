@@ -2,6 +2,24 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
+## ANYVO project status
+
+Before substantial ANYVO work, read:
+
+`docs/agent/ANYVO_MASTER_STATUS.md`
+
+It is the canonical source for current production baseline, completed work,
+active work and open work.
+
+Detailed task files under `docs/agent/tasks` are historical/technical sources
+and must not override the current master status.
+
+Do not update the master status unless the task explicitly includes a verified
+status change.
+
+Do not publish a Production OTA from a branch that does not contain the
+documented current Production baseline.
+
 # Agent Handoff Protocol (Claude Code ↔ Codex)
 
 This repository is the shared source of truth for both agents. Full guide:

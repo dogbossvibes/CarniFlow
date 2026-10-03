@@ -1,5 +1,12 @@
 @AGENTS.md
 
+## ANYVO project status
+
+Before substantial ANYVO work, Claude reads `docs/agent/ANYVO_MASTER_STATUS.md`
+(canonical production baseline and open work; see "ANYVO project status" in the
+imported `AGENTS.md`). Task files under `docs/agent/tasks` do not override it.
+Claude changes the master status only for an explicitly verified status change.
+
 ## Agent Handoff Protocol
 
 This project shares a repository-based handoff system with OpenAI Codex.
