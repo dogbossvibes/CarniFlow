@@ -6,8 +6,13 @@ import {
   getBackpack, addItem, updateItem, deleteItem,
   setActive, setPacked, togglePacked, moveItem, resetPacked,
   sanitize, getSuggestions, DEFAULT_SUGGESTIONS,
+  BackpackLimitError,
   type DogBackpackItem,
 } from '@/features/dogs/backpack';
+import {
+  BASE_CAPABILITIES, PREMIUM_CAPABILITIES, NEWBIE_BACKPACK_ITEM_LIMIT,
+  NEWBIE_COMMAND_LIMIT, NEWBIE_QUOTA, planToCapabilities, resolveEffectiveCapabilities,
+} from '@/features/subscription/plans';
 
 const U1 = 'user-1';
 const U2 = 'user-2';
@@ -17,6 +22,66 @@ const D2 = 'dog-b';
 beforeEach(async () => { await AsyncStorage.clear(); });
 
 const labels = (list: DogBackpackItem[]) => list.map(i => i.label);
+
+describe('NEWBIE Backpack limit pro Hund', () => {
+  it('erlaubt Eintrag 1 und 2, blockiert Eintrag 3 beim selben Hund', async () => {
+    expect(NEWBIE_BACKPACK_ITEM_LIMIT).toBe(2);
+    await addItem(U1, D1, { label: 'Leine' });
+    await addItem(U1, D1, { label: 'Wasser' });
+    await expect(addItem(U1, D1, { label: 'Napf' })).rejects.toBeInstanceOf(BackpackLimitError);
+    expect(labels(await getBackpack(U1, D1))).toEqual(['Leine', 'Wasser']);
+  });
+
+  it('blockiert auch bei nahezu gleichzeitigen Add-Aufrufen den dritten Eintrag', async () => {
+    const results = await Promise.allSettled(['A', 'B', 'C'].map(label => addItem(U1, D1, { label })));
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(2);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    expect(await getBackpack(U1, D1)).toHaveLength(2);
+  });
+
+  it('zählt je Hund und erlaubt nach Löschen wieder einen neuen Eintrag', async () => {
+    const first = await addItem(U1, D1, { label: 'Leine' });
+    await addItem(U1, D1, { label: 'Wasser' });
+    await addItem(U1, D2, { label: 'Napf' });
+    expect(await getBackpack(U1, D2)).toHaveLength(1);
+    await deleteItem(U1, D1, first.id);
+    await addItem(U1, D1, { label: 'Geschirr' });
+    expect(labels(await getBackpack(U1, D1))).toEqual(['Wasser', 'Geschirr']);
+  });
+
+  it('erlaubt Bearbeiten, Aktivierung, Packen und Reihenfolge bei 2/2', async () => {
+    const first = await addItem(U1, D1, { label: 'Leine' });
+    await addItem(U1, D1, { label: 'Wasser' });
+    await updateItem(U1, D1, first.id, { label: 'Lange Leine' });
+    await setActive(U1, D1, first.id, false);
+    await setPacked(U1, D1, first.id, true);
+    await moveItem(U1, D1, first.id, 'down');
+    await expect(addItem(U1, D1, { label: 'Napf' })).rejects.toBeInstanceOf(BackpackLimitError);
+    expect(labels(await getBackpack(U1, D1))).toEqual(['Wasser', 'Lange Leine']);
+  });
+
+  it.each(['active', 'founder_active', 'trainer'] as const)('%s hat unbegrenzt Einträge', async plan => {
+    const { pro_member } = planToCapabilities(plan);
+    for (const label of ['A', 'B', 'C']) await addItem(U1, D1, { label }, { isPro: pro_member });
+    expect(await getBackpack(U1, D1)).toHaveLength(3);
+  });
+
+  it('Lifetime hat unbegrenzt Einträge', async () => {
+    const effective = resolveEffectiveCapabilities({
+      subscription: { plan: 'newbie', status: 'active' },
+      entitlements: [{ id: 'lifetime', userId: U1, entitlement: 'lifetime', grantedAt: '2026-01-01', expiresAt: null, revokedAt: null }],
+    });
+    for (const label of ['A', 'B', 'C']) await addItem(U1, D1, { label }, { isPro: effective.pro_member });
+    expect(await getBackpack(U1, D1)).toHaveLength(3);
+  });
+
+  it('behält Backpack als Basis, Kommando- und Monatsquoten unverändert', () => {
+    expect(BASE_CAPABILITIES).toContain('dogs.backpack');
+    expect(PREMIUM_CAPABILITIES).not.toContain('dogs.backpack');
+    expect(NEWBIE_COMMAND_LIMIT).toBe(5);
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1 });
+  });
+});
 
 describe('Nutzertrennung (dog_backpack:<userId>:<dogId>)', () => {
   it('Nutzer A und Nutzer B teilen sich beim SELBEN Hund keine Liste', async () => {
@@ -99,7 +164,7 @@ describe('CRUD', () => {
   it('deleteItem: entfernt genau einen Eintrag und normalisiert sortOrder', async () => {
     const a = await addItem(U1, D1, { label: 'A' });
     await addItem(U1, D1, { label: 'B' });
-    await addItem(U1, D1, { label: 'C' });
+    await addItem(U1, D1, { label: 'C' }, { isPro: true });
     await deleteItem(U1, D1, a.id);
     const list = await getBackpack(U1, D1);
     expect(labels(list)).toEqual(['B', 'C']);
@@ -130,7 +195,7 @@ describe('Reihenfolge per ↑/↓', () => {
   it('moveItem up/down vertauscht Nachbarn und hält sortOrder lückenlos', async () => {
     await addItem(U1, D1, { label: 'A' });
     const b = await addItem(U1, D1, { label: 'B' });
-    await addItem(U1, D1, { label: 'C' });
+    await addItem(U1, D1, { label: 'C' }, { isPro: true });
 
     let list = await moveItem(U1, D1, b.id, 'up');
     expect(labels(list)).toEqual(['B', 'A', 'C']);

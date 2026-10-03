@@ -8,15 +8,16 @@
 // covers everything that IS reliably testable: the modal opens, the input
 // accepts and retains text, validation still works, a valid submit adds
 // exactly once (no duplicate from keyboard-submit + button-submit), and
-// Backpack stays gate-free for every plan.
+// Backpack remains available for every plan.
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
-import { Text, TextInput } from 'react-native';
+import { Alert, Text, TextInput } from 'react-native';
 import DogBackpackScreen from '@/app/dog-backpack/[id]';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
+import { BackpackLimitError } from '@/features/dogs/backpack';
 
 const mockGetBackpack = jest.fn();
 const mockAddItem = jest.fn();
@@ -44,6 +45,7 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 jest.mock('@/lib/session-context', () => ({ useSession: () => ({ user: { id: 'owner-1' } }) }));
+jest.mock('@/hooks/useCapabilities', () => ({ useCapabilities: () => ({ isPro: false, loading: false }) }));
 jest.mock('@/lib/haptics', () => ({ haptic: { light: jest.fn(), success: jest.fn(), error: jest.fn(), warning: jest.fn() } }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
 jest.mock('@/features/dogs/backpack', () => {
@@ -129,7 +131,21 @@ describe('Backpack "Gegenstand hinzufügen": modal, input, validation, submit', 
     act(() => { labelInput(node).props.onChangeText('Leine'); });
     await act(async () => { await findByText(node, 'backpack.add').props.onPress(); });
     expect(mockAddItem).toHaveBeenCalledTimes(1);
-    expect(mockAddItem).toHaveBeenCalledWith('owner-1', 'dog-1', { label: 'Leine', category: undefined });
+    expect(mockAddItem).toHaveBeenCalledWith('owner-1', 'dog-1', { label: 'Leine', category: undefined }, { isPro: false });
+  });
+
+  it('zeigt beim Limit die ACTIVE-Upgrade-Meldung', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockAddItem.mockRejectedValueOnce(new BackpackLimitError());
+    const node = render();
+    await act(async () => { await Promise.resolve(); });
+    act(() => { labelInput(node).props.onChangeText('Napf'); });
+    await act(async () => { await findByText(node, 'backpack.add').props.onPress(); });
+    expect(alert).toHaveBeenCalledWith('backpack.limitTitle', 'backpack.limitBody', expect.arrayContaining([
+      expect.objectContaining({ text: 'common.cancel' }),
+      expect.objectContaining({ text: 'backpack.viewActive' }),
+    ]));
+    alert.mockRestore();
   });
 
   it('keyboard submit (onSubmitEditing) and the Hinzufügen button firing for the same intent never duplicate the item', async () => {
@@ -159,10 +175,11 @@ describe('Backpack "Gegenstand hinzufügen": modal, input, validation, submit', 
   });
 });
 
-describe('Backpack: no subscription gate anywhere in this screen (NEWBIE/ACTIVE/TRAINER all allowed)', () => {
+describe('Backpack: available for every plan with a NEWBIE item limit', () => {
   const content = readFileSync('app/dog-backpack/[id].tsx', 'utf8');
-  it('does not import or check useCapabilities/isPro/trainer_module', () => {
-    expect(content).not.toMatch(/useCapabilities|\bisPro\b|pro_member|trainer_module/);
+  it('passes effective premium access to the domain service', () => {
+    expect(content).toContain('useCapabilities()');
+    expect(content).toContain('{ isPro }');
   });
 });
 

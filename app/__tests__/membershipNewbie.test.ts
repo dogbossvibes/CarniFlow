@@ -58,11 +58,11 @@ describe('Dein Plan → Deine Vorteile (NEWBIE)', () => {
     expect(keys).toEqual([
       'membership.benefit.oneDog', 'membership.benefit.twoTrainings', 'membership.benefit.oneTrack',
       'membership.benefit.journal', 'membership.benefit.trainerConnect', 'membership.benefit.generalHealth',
-      'membership.benefit.backpack', 'membership.benefit.commandsLimit',
+      'membership.benefit.backpackNewbie', 'membership.benefit.commandsLimit',
     ]);
   });
   it('Backpack und Kommandoerfassung sind NEWBIE-Vorteile (BASE_CAPABILITIES), nicht Active-only', () => {
-    expect(newbie).toContain('membership.benefit.backpack');
+    expect(newbie).toContain('membership.benefit.backpackNewbie');
     expect(newbie).toContain('membership.benefit.commandsLimit');
     expect(BASE_CAPABILITIES).toEqual(expect.arrayContaining(['dogs.backpack', 'dogs.commands']));
     expect(PREMIUM_CAPABILITIES).not.toContain('dogs.backpack');
@@ -75,6 +75,11 @@ describe('Dein Plan → Deine Vorteile (NEWBIE)', () => {
     expect(newbie).toContain('membership.benefit.twoTrainings');
     expect(newbie).toContain('membership.benefit.oneTrack');
     expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1 });
+  });
+  it.each(Object.keys(FULL))('%s nennt 2 Backpack-Einträge pro Hund nur für NEWBIE', name => {
+    expect(FULL[name]['membership.benefit.backpackNewbie']).toMatch(/2/);
+    expect(FULL[name]['membership.benefit.backpackNewbie']).toMatch(/Backpack/);
+    expect(FULL[name]['membership.benefit.backpack']).not.toMatch(/2/);
   });
   it('Fährten stehen NICHT unter „In Active enthalten" (nicht Active-only)', () => {
     const locked = block(/const NEWBIE_LOCKED: TranslationKey\[\] = \[/, '];');

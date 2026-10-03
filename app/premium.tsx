@@ -42,7 +42,7 @@ const CARDS: CardDef[] = [
   // TRAINER (featureTrainerConnect) ist von BE A TRAINER (Trainer-Plan,
   // Trainerbereich/Kundenverwaltung/Trainer-Code) strikt getrennt; siehe
   // Customer Release Phase 8.
-  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.featureOneDog', 'premium.featureTwoTrainingsMonth', 'premium.featureOneTrackMonth', 'premium.featureTrainerConnect', 'premium.featureHealthRecord', 'premium.featureHealthSharing', 'premium.featureBackpack', 'premium.featureFiveCommands', 'premium.featureCalendarTimer'] },
+  { plan: 'newbie', badgeKey: 'premium.badgeStart', features: ['premium.featureOneDog', 'premium.featureTwoTrainingsMonth', 'premium.featureOneTrackMonth', 'premium.featureTrainerConnect', 'premium.featureHealthRecord', 'premium.featureHealthSharing', 'premium.featureBackpackNewbie', 'premium.featureFiveCommands', 'premium.featureCalendarTimer'] },
   // ACTIVE bekommt dieselbe Trainerverbindung wie NEWBIE (kein Trainer-Plan
   // nötig) — NIE mehr „Kein Trainerzugang". Der professionelle Trainerbereich
   // bleibt ausschliesslich dem Trainer-Plan vorbehalten (trainer-hub.tsx,

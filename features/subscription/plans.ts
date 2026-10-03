@@ -23,7 +23,7 @@ export type Capability =
 // Funktions-Capabilities, die auch NEWBIE (kostenlos) hat. Die ANZAHL neuer
 // Aktionen ist zusätzlich durch Monats-Quotas begrenzt (siehe quotaLimit).
 // Release-Korrektur (Customer Release Phase 8): dogs.backpack und
-// dogs.commands sind jetzt BASIS — NEWBIE bekommt Backpack voll und
+// dogs.commands sind jetzt BASIS — NEWBIE bekommt Backpack mit Bestandslimit und
 // Kommandoerfassung bis zu NEWBIE_COMMAND_LIMIT (siehe unten; das ist eine
 // gleichzeitige Obergrenze, keine Monats-Quota, und wird NICHT über dieses
 // Capability-System durchgesetzt, sondern in features/dogs/dogCommands.ts).
@@ -60,6 +60,8 @@ export const TRAINER_CAPABILITIES: Capability[] = [
 // keine Monats-Quota — löschen eines Kommandos gibt sofort einen Slot frei.
 // Durchgesetzt in features/dogs/dogCommands.ts (addCommand), nicht nur in der UI.
 export const NEWBIE_COMMAND_LIMIT = 5;
+// Gleichzeitige Einträge pro Hund, unabhängig von aktiv/gepackt.
+export const NEWBIE_BACKPACK_ITEM_LIMIT = 2;
 
 export type UserEntitlement =
   | 'lifetime'

@@ -35,7 +35,7 @@ const BENEFITS: Record<VisiblePlan, TranslationKey[]> = {
   newbie: [
     'membership.benefit.oneDog', 'membership.benefit.twoTrainings', 'membership.benefit.oneTrack',
     'membership.benefit.journal', 'membership.benefit.trainerConnect', 'membership.benefit.generalHealth',
-    'membership.benefit.backpack', 'membership.benefit.commandsLimit',
+    'membership.benefit.backpackNewbie', 'membership.benefit.commandsLimit',
   ],
   active: [
     'membership.benefit.unlimitedDogs', 'membership.benefit.unlimitedTraining',

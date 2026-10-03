@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NEWBIE_BACKPACK_ITEM_LIMIT } from '@/features/subscription/plans';
 
 // Hunde-„Rucksack" (Ausrüstungs-/Packliste) — pro NUTZER und pro HUND, LOKAL auf
 // dem Gerät (AsyncStorage). Kein Supabase, keine Migration: der Rucksack ist eine
@@ -40,6 +41,12 @@ export interface DogBackpackItem {
 
 // Nur diese Felder darf der Aufrufer beim Anlegen/Bearbeiten setzen.
 export type NewBackpackItem = { label: string; category?: EquipmentCategory };
+export class BackpackLimitError extends Error {
+  constructor() {
+    super('NEWBIE_BACKPACK_ITEM_LIMIT');
+    this.name = 'BackpackLimitError';
+  }
+}
 
 // Reine Statuslogik für kompakte Backpack-Darstellungen.
 export type BackpackStatus = 'empty' | 'none_packed' | 'all_ready' | 'partial';
@@ -52,6 +59,7 @@ export function backpackStatus(active: number, packed: number): BackpackStatus {
 
 const PREFIX = 'dog_backpack';
 const keyFor = (userId: string, dogId: string) => `${PREFIX}:${userId}:${dogId}`;
+const pendingAdds = new Map<string, Promise<void>>();
 
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -118,21 +126,41 @@ export async function getBackpack(userId: string, dogId: string): Promise<DogBac
 }
 
 // ── CRUD ────────────────────────────────────────────────────────────────────
-export async function addItem(userId: string, dogId: string, input: NewBackpackItem): Promise<DogBackpackItem> {
+export async function addItem(
+  userId: string, dogId: string, input: NewBackpackItem, access?: { isPro: boolean },
+): Promise<DogBackpackItem> {
   const label = (input.label ?? '').trim();
   if (!label) throw new Error('Label darf nicht leer sein');
-  const list = await getBackpack(userId, dogId);
-  const item: DogBackpackItem = {
-    id: newId(),
-    label,
-    category: input.category && CATEGORY_SET.has(input.category) ? input.category : undefined,
-    isActive: true,
-    isPacked: false,
-    sortOrder: list.length,             // ans Ende
-    createdAt: new Date().toISOString(),
-  };
-  await writeAll(userId, dogId, [...list, item]);
-  return item;
+  // Zwei nahezu gleichzeitige Add-Aufrufe für denselben Hund müssen den Bestand
+  // nacheinander lesen, sonst könnten beide denselben freien Slot sehen.
+  const key = keyFor(userId, dogId);
+  const previous = pendingAdds.get(key);
+  let release!: () => void;
+  const current = new Promise<void>(resolve => { release = resolve; });
+  pendingAdds.set(key, current);
+  await previous;
+  try {
+    const list = await getBackpack(userId, dogId);
+    // Fehlende Berechtigung wird als NEWBIE behandelt. Alle Einträge zählen,
+    // auch inaktive und bereits gepackte.
+    if (access?.isPro !== true && list.length >= NEWBIE_BACKPACK_ITEM_LIMIT) {
+      throw new BackpackLimitError();
+    }
+    const item: DogBackpackItem = {
+      id: newId(),
+      label,
+      category: input.category && CATEGORY_SET.has(input.category) ? input.category : undefined,
+      isActive: true,
+      isPacked: false,
+      sortOrder: list.length,             // ans Ende
+      createdAt: new Date().toISOString(),
+    };
+    await writeAll(userId, dogId, [...list, item]);
+    return item;
+  } finally {
+    release();
+    if (pendingAdds.get(key) === current) pendingAdds.delete(key);
+  }
 }
 
 export async function updateItem(

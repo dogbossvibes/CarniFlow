@@ -1,4 +1,9 @@
 import { readFileSync } from 'fs';
+import { deCH } from '@/i18n/de-CH';
+import { gswCH } from '@/i18n/gsw-CH';
+import { en } from '@/i18n/locales/en';
+import { fr } from '@/i18n/locales/fr';
+import { it as itLocale } from '@/i18n/locales/it';
 
 // NEWBIE ist dauerhaft kostenlos (CHF 0), kein Trial, kein Ablaufdatum. Diese Suite
 // belegt statisch (analog app/__tests__/membership.test.ts), dass die alte
@@ -11,6 +16,11 @@ const subscriptionService = readFileSync('services/subscriptionService.ts', 'utf
 const plans = readFileSync('features/subscription/plans.ts', 'utf8');
 
 describe('NEWBIE ist kein Trial — Paywall (app/premium.tsx)', () => {
+  it.each([deCH, gswCH, en, fr, itLocale])('zeigt Backpack bis 2 Einträge pro Hund auf der NEWBIE-Karte', locale => {
+    expect(locale['premium.featureBackpackNewbie']).toContain('Backpack');
+    expect(locale['premium.featureBackpackNewbie']).toContain('2');
+    expect(locale['premium.featureBackpackNewbie']).toEqual(locale['membership.benefit.backpackNewbie']);
+  });
   it('aktiviert NEWBIE ohne trialing-Status und ohne trial_ends_at', () => {
     expect(premium).toMatch(/activatePlan\(\{ userId: user\.id, plan, status: 'active' \}\)/);
     expect(premium).not.toMatch(/status: 'trialing'/);
@@ -31,7 +41,7 @@ describe('NEWBIE ist kein Trial — Paywall (app/premium.tsx)', () => {
 
   it('NEWBIE-Karte wirbt nicht mehr mit 7 Tagen / „Alle Active-Funktionen" / Auto-Wechsel zu Active', () => {
     expect(premium).not.toMatch(/features: \['premium\.feature7Days', 'premium\.featureActive', 'premium\.featureThenActive'/);
-    expect(premium).toMatch(/features: \['premium\.featureOneDog', 'premium\.featureTwoTrainingsMonth', 'premium\.featureOneTrackMonth', 'premium\.featureTrainerConnect', 'premium\.featureHealthRecord', 'premium\.featureHealthSharing', 'premium\.featureBackpack', 'premium\.featureFiveCommands', 'premium\.featureCalendarTimer'\]/);
+    expect(premium).toMatch(/features: \['premium\.featureOneDog', 'premium\.featureTwoTrainingsMonth', 'premium\.featureOneTrackMonth', 'premium\.featureTrainerConnect', 'premium\.featureHealthRecord', 'premium\.featureHealthSharing', 'premium\.featureBackpackNewbie', 'premium\.featureFiveCommands', 'premium\.featureCalendarTimer'\]/);
   });
 
   it('Customer Release Phase 8: weder NEWBIE- noch ACTIVE-Karte behaupten „Kein Trainerzugang" — beide connecten ungegatet', () => {

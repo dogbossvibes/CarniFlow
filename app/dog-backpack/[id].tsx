@@ -7,11 +7,13 @@ import { C } from '@/constants/colors';
 import { haptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
 import { useSession } from '@/lib/session-context';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import {
   getBackpack, addItem, updateItem, deleteItem, setActive, togglePacked, moveItem, resetPacked,
   getSuggestions, filterNewSuggestions, EQUIPMENT_CATEGORIES, CATEGORY_I18N_KEY, SUGGESTION_GROUPS,
+  BackpackLimitError,
   type DogBackpackItem, type EquipmentCategory,
 } from '@/features/dogs/backpack';
 
@@ -24,6 +26,7 @@ export default function DogBackpackScreen() {
   const { user } = useSession();
   const { id: dogId, name, openAdd: openAddParam } = useLocalSearchParams<{ id: string; name?: string; openAdd?: string }>();
   const userId = user?.id ?? '';
+  const { isPro, loading: capabilitiesLoading } = useCapabilities();
   const dogName = (name ?? '').trim();
 
   const [items, setItems] = useState<DogBackpackItem[]>([]);
@@ -53,6 +56,10 @@ export default function DogBackpackScreen() {
   const submittingRef = useRef(false);
 
   const openAdd = () => { setEditId(null); setDraftLabel(''); setDraftCat(undefined); setLabelError(false); setEditorOpen(true); };
+  const showLimit = () => Alert.alert(t('backpack.limitTitle'), t('backpack.limitBody'), [
+    { text: t('common.cancel'), style: 'cancel' },
+    { text: t('backpack.viewActive'), onPress: () => router.push('/premium') },
+  ]);
   const openEdit = (it: DogBackpackItem) => { setEditId(it.id); setDraftLabel(it.label); setDraftCat(it.category); setLabelError(false); setEditorOpen(true); };
 
   useEffect(() => {
@@ -63,7 +70,7 @@ export default function DogBackpackScreen() {
     // Guard against a duplicate item from keyboard-submit (onSubmitEditing)
     // and the "Hinzufügen" button firing for the same intent — checked via a
     // ref so it is effective immediately, not only after the next re-render.
-    if (!userId || !dogId || submittingRef.current) return;
+    if (!userId || !dogId || capabilitiesLoading || submittingRef.current) return;
     const label = draftLabel.trim();
     if (!label) { setLabelError(true); haptic.error(); return; }
     submittingRef.current = true;
@@ -71,10 +78,18 @@ export default function DogBackpackScreen() {
     Keyboard.dismiss();
     try {
       if (editId) await updateItem(userId, dogId, editId, { label, category: draftCat });
-      else        await addItem(userId, dogId, { label, category: draftCat });
+      else        await addItem(userId, dogId, { label, category: draftCat }, { isPro });
       haptic.success();
       setEditorOpen(false);
       reload();
+    } catch (error) {
+      if (error instanceof BackpackLimitError) {
+        setEditorOpen(false);
+        reload();
+        showLimit();
+      } else {
+        throw error;
+      }
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -134,16 +149,29 @@ export default function DogBackpackScreen() {
   const toggleSug = (key: string) => setSugSelected(s => { const n = { ...s }; if (n[key]) delete n[key]; else n[key] = true; return n; });
 
   const applySuggestions = async () => {
-    if (!userId || !dogId) return;
+    if (!userId || !dogId || capabilitiesLoading || submittingRef.current) return;
+    submittingRef.current = true;
     // Aus allen Gruppen die ausgewählten Vorschläge einsammeln …
     const chosen = SUGGESTION_GROUPS.flatMap(g =>
       getSuggestions(g.discipline).filter(sug => sugSelected[`${g.discipline}:${sug.label}`]));
     // … und gegen den Bestand entdoppeln (getrimmt, case-insensitive).
     const toAdd = filterNewSuggestions(existingLabels, chosen);
-    for (const sug of toAdd) await addItem(userId, dogId, { label: sug.label, category: sug.category });
-    haptic.success();
-    setSugOpen(false);
-    reload();
+    try {
+      for (const sug of toAdd) await addItem(userId, dogId, { label: sug.label, category: sug.category }, { isPro });
+      haptic.success();
+      setSugOpen(false);
+      reload();
+    } catch (error) {
+      if (error instanceof BackpackLimitError) {
+        setSugOpen(false);
+        reload();
+        showLimit();
+      } else {
+        throw error;
+      }
+    } finally {
+      submittingRef.current = false;
+    }
   };
 
   const catLabel = (c?: EquipmentCategory) => c ? t(CATEGORY_I18N_KEY[c] as never) : null;
@@ -225,9 +253,9 @@ export default function DogBackpackScreen() {
           ) : null}
 
           {/* Aktionen oben */}
-          <AnyvoButton label={t('backpack.addItem')} icon="add" onPress={openAdd} />
+          <AnyvoButton label={t('backpack.addItem')} icon="add" onPress={openAdd} disabled={capabilitiesLoading} />
           <View style={{ height: 8 }} />
-          <AnyvoButton label={t('backpack.suggestions')} icon="sparkles-outline" variant="secondary" onPress={openSuggestions} />
+          <AnyvoButton label={t('backpack.suggestions')} icon="sparkles-outline" variant="secondary" onPress={openSuggestions} disabled={capabilitiesLoading} />
 
           {items.length === 0 ? (
             <View style={s.empty}>
@@ -296,7 +324,7 @@ export default function DogBackpackScreen() {
 
         </ScrollView>
         <View style={s.editorFooter}>
-          <AnyvoButton label={t(editId ? 'backpack.save' : 'backpack.add')} icon="checkmark" onPress={submitEditor} disabled={submitting} />
+          <AnyvoButton label={t(editId ? 'backpack.save' : 'backpack.add')} icon="checkmark" onPress={submitEditor} disabled={submitting || capabilitiesLoading} />
         </View>
       </AnyvoBottomSheet>
 
