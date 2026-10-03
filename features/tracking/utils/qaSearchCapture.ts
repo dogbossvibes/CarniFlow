@@ -112,6 +112,12 @@ export const SEARCH_QA_LIMITS = Object.freeze({
 
 // ── Export-Struktur (relativ) ────────────────────────────────────────────
 export interface QaRelPoint { x: number; y: number; tSec: number }
+/**
+ * Roh-Suchfix im Export (schemaMinor 8): relative Position + die horizontale GPS-Accuracy dieses Fixes
+ * (Meter, rein diagnostisch) + das Ergebnis von evaluateSearchFix. `accepted: true` markiert die akzeptierten
+ * Fixes — es gibt bewusst keinen zweiten Strom. `rejectReason` nur bei abgelehnten Fixes.
+ */
+export interface QaRawSearchPoint extends QaRelPoint { accuracyM: number | null; accepted: boolean; rejectReason?: string }
 export interface QaGapStats { max: number | null; mean: number | null; p95: number | null }
 
 export interface QaSearchStreamStats {
@@ -183,7 +189,7 @@ export interface QaSearchDiagnostics {
   /** Ausführlich je Strom (Obermenge der flachen Felder oben). */
   streams: { raw: QaSearchStreamStats; filtered: QaSearchStreamStats; display: QaSearchStreamStats; run: QaSearchStreamStats; replay: QaSearchStreamStats };
   /** Persistierte Geometrie relativ (für Überlagerung); ausgedünnt auf maxExportedPoints. */
-  geometry: { run: QaRelPoint[]; replay: QaRelPoint[]; raw: QaRelPoint[]; filtered: QaRelPoint[] };
+  geometry: { run: QaRelPoint[]; replay: QaRelPoint[]; raw: QaRawSearchPoint[]; filtered: QaRelPoint[] };
   cursor: {
     trackLengthM: number;
     /** Rein lesende Längen-Diagnose; bei schemaMinor <= 3 fehlen diese Felder. */
@@ -392,7 +398,12 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
     geometry: {
       run: thin(runXY, SEARCH_QA_LIMITS.maxExportedPoints).map(p => ({ x: round(p.x, 3), y: round(p.y, 3), tSec: p.tSec ?? -1 })),
       replay: thin(replayXY, SEARCH_QA_LIMITS.maxExportedPoints).map(p => ({ x: round(p.x, 3), y: round(p.y, 3), tSec: p.tSec ?? -1 })),
-      raw: thin(rawXY, SEARCH_QA_LIMITS.maxExportedPoints).map(p => ({ x: round(p.x, 3), y: round(p.y, 3), tSec: round(p.tSec ?? 0, 1) })),
+      raw: thin(rawXY.map((p, i) => ({ ...p, meta: tel.raw[i] })), SEARCH_QA_LIMITS.maxExportedPoints).map(p => ({
+        x: round(p.x, 3), y: round(p.y, 3), tSec: round(p.tSec ?? 0, 1),
+        accuracyM: p.meta.accuracy == null ? null : round(p.meta.accuracy, 2),
+        accepted: p.meta.accepted,
+        ...(p.meta.accepted || !p.meta.reason ? {} : { rejectReason: p.meta.reason }),
+      })),
       filtered: thin(filteredXY, SEARCH_QA_LIMITS.maxExportedPoints).map(p => ({ x: round(p.x, 3), y: round(p.y, 3), tSec: round(p.tSec ?? 0, 1) })),
     },
     cursor: {

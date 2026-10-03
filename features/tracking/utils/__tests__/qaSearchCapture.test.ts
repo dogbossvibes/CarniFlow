@@ -50,6 +50,11 @@ function fixture(withReplay = true) {
   return { input, path };
 }
 
+/** Altformat vor schemaMinor 8: geometry.raw ohne accuracyM/accepted/rejectReason. */
+const legacyShape = (d: QaSearchDiagnostics): QaSearchDiagnostics => ({
+  ...d, geometry: { ...d.geometry, raw: d.geometry.raw.map(({ x, y, tSec }) => ({ x, y, tSec })) as QaSearchDiagnostics['geometry']['raw'] },
+});
+
 const REQUIRED_KEYS = [
   'rawSearchPointCount', 'filteredSearchPointCount', 'runPointCount', 'replayPointCount',
   'rawSearchPathM', 'filteredSearchPathM', 'runPathM', 'replayPathM',
@@ -204,8 +209,8 @@ describe('QA-Export schemaMinor 3', () => {
     expect(e2).toEqual(e);
   });
 
-  it('mit Längen-Diagnostik: schemaMinor 4, alle bisherigen Felder unverändert', () => {
-    const d = buildSearchDiagnostics(fixture().input);
+  it('mit Längen-Diagnostik (Altformat ohne Accuracy-Felder): schemaMinor 4, alle bisherigen Felder unverändert', () => {
+    const d = legacyShape(buildSearchDiagnostics(fixture().input));
     const base = buildQaTrackExport('ts_1', points, markers, null);
     const e = buildQaTrackExport('ts_1', points, markers, null, d);
     expect(e.schemaVersion).toBe(2);
@@ -219,7 +224,7 @@ describe('QA-Export schemaMinor 3', () => {
   });
 
   it('alte schemaMinor-3-Diagnostik bleibt exportierbar', () => {
-    const d = buildSearchDiagnostics(fixture().input);
+    const d = legacyShape(buildSearchDiagnostics(fixture().input));
     const old: QaSearchDiagnostics = { ...d, cursor: { trackLengthM: d.cursor.trackLengthM, samples: d.cursor.samples, truncated: false } };
     const e = buildQaTrackExport('ts_1', points, markers, null, old);
     expect(e.schemaMinor).toBe(3);
@@ -256,5 +261,110 @@ describe('Verdrahtung (Source)', () => {
   it('Export-Service lädt die Search-Diagnose derselben Session', () => {
     expect(svc).toContain('loadQaSearchCapture(localId)');
     expect(svc).toContain('buildQaTrackExport(localId, points, markers, capture, search)');
+  });
+});
+
+
+// ── schemaMinor 8: Accuracy je Roh-Suchfix (rein diagnostisch) ─────────────────────────────
+describe('QA-Export schemaMinor 8 — Accuracy pro Search-Fix', () => {
+  const withAccuracies = (acc: (number | null)[]) => {
+    const f = fixture();
+    f.input.telemetry.raw = f.input.telemetry.raw.map((r, i) => ({ ...r, accuracy: acc[i % acc.length] }));
+    return f;
+  };
+  const stripRaw = (d: QaSearchDiagnostics) => ({ ...d, geometry: { ...d.geometry, raw: d.geometry.raw.map(({ x, y, tSec }) => ({ x, y, tSec })) } });
+  const strip = (g: QaSearchDiagnostics['geometry']) => ({ ...g, raw: g.raw.map(({ x, y, tSec }) => ({ x, y, tSec })) });
+
+  it('A: der Roh-Fix exportiert seine horizontale Accuracy in Metern (accuracyM)', () => {
+    const d = buildSearchDiagnostics(withAccuracies([4.37, null, 12.5, 3.07]).input);
+    expect(d.geometry.raw[0].accuracyM).toBe(4.37);
+    expect(d.geometry.raw[1].accuracyM).toBeNull();
+    expect(d.geometry.raw[2].accuracyM).toBe(12.5);
+    expect(d.geometry.raw[3].accuracyM).toBe(3.07);
+  });
+
+  it('B: akzeptierte Fixes behalten ihre Accuracy und sind per accepted:true markiert (kein zweiter Strom)', () => {
+    const d = buildSearchDiagnostics(withAccuracies([4.37]).input);
+    const accepted = d.geometry.raw.filter(p => p.accepted);
+    expect(accepted.length).toBe(d.acceptedSearchPointCount);
+    expect(accepted.every(p => p.accuracyM === 4.37)).toBe(true);
+    expect(accepted.every(p => !('rejectReason' in p))).toBe(true);
+  });
+
+  it('C: abgelehnte Fixes behalten Accuracy und Ablehnungsgrund', () => {
+    const d = buildSearchDiagnostics(withAccuracies([61.2]).input);
+    const rejected = d.geometry.raw.filter(p => !p.accepted);
+    expect(rejected.length).toBe(d.rejectedSearchPointCount);
+    expect(rejected[0]).toMatchObject({ accepted: false, accuracyM: 61.2, rejectReason: 'speed' });
+  });
+
+  it('D/E/F: Accuracy verändert nichts anderes — Zählungen, Pfade, filtered/run/replay/Cursor/Ende sind identisch', () => {
+    const a = buildSearchDiagnostics(withAccuracies([4.37]).input);
+    const b = buildSearchDiagnostics(withAccuracies([null]).input);
+    expect(stripRaw(a)).toEqual(stripRaw(b));
+    expect(a.geometry.replay).toEqual(b.geometry.replay);
+    expect(a.geometry.run).toEqual(b.geometry.run);
+    expect(a.geometry.filtered).toEqual(b.geometry.filtered);
+    expect(strip(a.geometry).raw).toEqual(strip(b.geometry).raw);
+    expect([a.rawSearchPointCount, a.filteredSearchPointCount, a.displaySearchPointCount, a.runPointCount, a.replayPointCount])
+      .toEqual([b.rawSearchPointCount, b.filteredSearchPointCount, b.displaySearchPointCount, b.runPointCount, b.replayPointCount]);
+  });
+
+  it('Ausdünnung hält Accuracy und Position synchron', () => {
+    const f = fixture();
+    const n = SEARCH_QA_LIMITS.maxExportedPoints + 40;
+    f.input.telemetry.raw = Array.from({ length: n }, (_, i) => ({
+      lat: ll(i * 0.1, 0).latitude, lng: ll(i * 0.1, 0).longitude, accuracy: 1 + i, t: T0 + i * 1000, accepted: true, reason: null }));
+    const d = buildSearchDiagnostics(f.input);
+    expect(d.geometry.raw.length).toBe(SEARCH_QA_LIMITS.maxExportedPoints);
+    for (const p of d.geometry.raw) expect(p.accuracyM).toBe(Math.round(p.x / 0.1) + 1);   // x = i·0,1 ⇒ Accuracy = 1 + i
+  });
+
+  it('Schema: der aktuelle Builder-Export ist schemaMinor 8, Altformate bleiben 4 und 3 (rückwärtskompatibel)', () => {
+    const d = buildSearchDiagnostics(fixture().input);
+    expect(buildQaTrackExport('ts_1', [] as RawLayPoint[], [] as RawTrackMarker[], null, d).schemaMinor).toBe(8);
+    expect(buildQaTrackExport('ts_1', [] as RawLayPoint[], [] as RawTrackMarker[], null, legacyShape(d)).schemaMinor).toBe(4);
+    // Ein gespeicherter Altbestand ohne Accuracy-Felder bleibt les- und zusammenfassbar.
+    expect(() => summarizeSearchDiagnostics(legacyShape(d))).not.toThrow();
+  });
+
+  it('Privacy: die neuen Felder sind rein relativ/technisch — nur x, y, tSec, accuracyM, accepted, rejectReason', () => {
+    const d = buildSearchDiagnostics(withAccuracies([4.37]).input);
+    const e = buildQaTrackExport('ts_1', [] as RawLayPoint[], [] as RawTrackMarker[], null, d);
+    expect(() => assertNoAbsoluteData(e)).not.toThrow();
+    const allowed = new Set(['x', 'y', 'tSec', 'accuracyM', 'accepted', 'rejectReason']);
+    for (const p of d.geometry.raw) for (const k of Object.keys(p)) expect(allowed.has(k)).toBe(true);
+    const json = serializeQaTrackExport(e);
+    for (const forbidden of ['latitude', 'longitude', '"lat"', '"lng"', String(T0)]) expect(json).not.toContain(forbidden);
+  });
+
+  it('G: Roundtrip mit dem echten V6.2-F2-Export: Zählungen, Pfadlängen und Replay-Geometrie bleiben exakt', () => {
+    const j = JSON.parse(fs.readFileSync(`${__dirname}/fixtures/fieldV62/V6.2-F2-01.json`, 'utf8'));
+    const g = j.search.geometry; const s = j.search.stats;
+    const origin = ll(0, 0);
+    const keep = new Set(g.filtered.map((f: any) => f.tSec));
+    const toLL = (p: { x: number; y: number }) => ll(p.x, p.y);
+    const tel: SearchQaTelemetry = {
+      startedAtMs: T0, resumed: false,
+      raw: g.raw.map((p: any) => ({ lat: toLL(p).latitude, lng: toLL(p).longitude, accuracy: 3.2, t: T0 + p.tSec * 1000, accepted: keep.has(p.tSec), reason: keep.has(p.tSec) ? null : 'speed' })),
+      filtered: g.filtered.map((p: any) => ({ lat: toLL(p).latitude, lng: toLL(p).longitude, tSec: p.tSec })),
+      display: [], cursorSamples: [], objectApproach: [], minDistToEndM: null, progressAtMinEndM: null, truncated: { raw: false, cursor: false },
+    };
+    const d = buildSearchDiagnostics({
+      origin, telemetry: tel, resumed: false, analyticsSampleCount: 0, laid: { total: 27.04, end: null }, objects: [], cornerAtM: [],
+      end: { fired: null, hapticFired: null, voiceFired: null }, manualStopTSec: 50,
+      run: { points: g.run.map(toLL), pointsTimeSec: g.run.map((p: any) => p.tSec) },
+      replay: { points: g.replay.map(toLL), timeSec: g.replay.map((p: any) => p.tSec) },
+    });
+    expect([d.rawSearchPointCount, d.acceptedSearchPointCount, d.rejectedSearchPointCount, d.filteredSearchPointCount, d.runPointCount, d.replayPointCount])
+      .toEqual([s.rawSearchPointCount, s.acceptedSearchPointCount, s.rejectedSearchPointCount, s.filteredSearchPointCount, s.runPointCount, s.replayPointCount]);
+    for (const k of ['rawSearchPathM', 'filteredSearchPathM', 'runPathM', 'replayPathM', 'maxRunGapM', 'maxReplayGapM'] as const)
+      expect(Math.abs((d[k] as number) - s[k])).toBeLessThan(0.05);
+    g.replay.forEach((p: any, i: number) => {
+      expect(Math.abs(d.geometry.replay[i].x - p.x)).toBeLessThan(0.01);
+      expect(Math.abs(d.geometry.replay[i].y - p.y)).toBeLessThan(0.01);
+    });
+    // die Roh-Geometrie bleibt identisch, nur additive Felder kommen dazu
+    g.raw.forEach((p: any, i: number) => { expect(d.geometry.raw[i].x).toBeCloseTo(p.x, 2); expect(d.geometry.raw[i].accuracyM).toBe(3.2); });
   });
 });

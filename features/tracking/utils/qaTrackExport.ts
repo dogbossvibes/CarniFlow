@@ -95,7 +95,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -275,7 +275,9 @@ export function buildQaTrackExport(
     || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
     : capture?.startupDiagnostics || capture?.manualAngleGeometryDiagnostics || capture?.voiceDiagnostics ? 5
     : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0;
-  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 | 7 = !search ? 0
+  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 | 7 | 8 = !search ? 0
+    // 8: additive Roh-Suchfix-Felder (accuracyM/accepted je Fix in geometry.raw); ältere Captures bleiben bei ihrer Stufe.
+    : search.geometry?.raw?.some(p => p.accuracyM !== undefined) ? 8
     : search.endConfirmationDiagnostics?.finalObjectGraceStartedTSec !== undefined ? 7
     : search.approachFixDiagnostics || search.endConfirmationDiagnostics
       || search.replayInsertedForGapCount != null || search.replayUnfillableGapCount != null
