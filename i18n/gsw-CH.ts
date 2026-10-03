@@ -1713,6 +1713,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'membership.benefit.heat': 'Läufigkeitsufzeichnig',
   'membership.benefit.backpack': 'Backpack',
   'membership.benefit.commands': 'Kommando-Erfassig',
+  'membership.benefit.commandsLimit': 'Kommando-Erfassig (bis 5 Kommandos)',
   'membership.benefit.goal': 'Persönlichs Trainingsziel',
   'membership.benefit.smartAnalysis': 'Smart Analyse',
   'membership.benefit.trainerModule': 'Trainer-Funktione',

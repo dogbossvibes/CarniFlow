@@ -10,7 +10,9 @@ import { gsw } from '@/i18n/locales/gsw';
 import { en } from '@/i18n/locales/en';
 import { fr } from '@/i18n/locales/fr';
 import { it as itLocale } from '@/i18n/locales/it';
-import { NEWBIE_QUOTA, quotaLimit, quotaAllowsNew } from '@/features/subscription/plans';
+import {
+  NEWBIE_QUOTA, quotaLimit, quotaAllowsNew, BASE_CAPABILITIES, PREMIUM_CAPABILITIES, NEWBIE_COMMAND_LIMIT,
+} from '@/features/subscription/plans';
 
 const src = readFileSync('app/membership.tsx', 'utf8');
 type Dict = Record<string, string | undefined>;
@@ -51,12 +53,28 @@ describe('NEWBIE-Nutzung (Quota-Status)', () => {
 
 describe('Dein Plan → Deine Vorteile (NEWBIE)', () => {
   const newbie = block(/newbie:\s*\[\s*\n\s*'membership\.benefit\.oneDog'/);
-  it('enthält genau: 1 Hund · 2 Trainings/Monat · 1 Fährte/Monat · Journal · Trainer verbinden · Gesundheitsdaten', () => {
+  it('enthält genau: 1 Hund · 2 Trainings/Monat · 1 Fährte/Monat · Journal · Trainer verbinden · Gesundheitsdaten · Backpack · Kommandoerfassung (bis 5)', () => {
     const keys = [...newbie.matchAll(/'(membership\.benefit\.[A-Za-z]+)'/g)].map(m => m[1]);
     expect(keys).toEqual([
       'membership.benefit.oneDog', 'membership.benefit.twoTrainings', 'membership.benefit.oneTrack',
       'membership.benefit.journal', 'membership.benefit.trainerConnect', 'membership.benefit.generalHealth',
+      'membership.benefit.backpack', 'membership.benefit.commandsLimit',
     ]);
+  });
+  it('Backpack und Kommandoerfassung sind NEWBIE-Vorteile (BASE_CAPABILITIES), nicht Active-only', () => {
+    expect(newbie).toContain('membership.benefit.backpack');
+    expect(newbie).toContain('membership.benefit.commandsLimit');
+    expect(BASE_CAPABILITIES).toEqual(expect.arrayContaining(['dogs.backpack', 'dogs.commands']));
+    expect(PREMIUM_CAPABILITIES).not.toContain('dogs.backpack');
+    expect(PREMIUM_CAPABILITIES).not.toContain('dogs.commands');
+    const locked = block(/const NEWBIE_LOCKED: TranslationKey\[\] = \[/, '];');
+    for (const k of ['backpack', 'commands', 'tracks', 'oneTrack', 'unlimitedTracks']) expect(locked).not.toContain(`membership.benefit.${k}`);
+    expect(NEWBIE_COMMAND_LIMIT).toBe(5);
+  });
+  it('Training 2/Monat und Fährte 1/Monat bleiben', () => {
+    expect(newbie).toContain('membership.benefit.twoTrainings');
+    expect(newbie).toContain('membership.benefit.oneTrack');
+    expect(NEWBIE_QUOTA).toEqual({ dog: 1, training: 2, track: 1 });
   });
   it('Fährten stehen NICHT unter „In Active enthalten" (nicht Active-only)', () => {
     const locked = block(/const NEWBIE_LOCKED: TranslationKey\[\] = \[/, '];');
@@ -100,6 +118,7 @@ describe('i18n: alle Sprachen konsistent, keine veralteten Strings', () => {
   const NEW_KEYS = [
     'membership.newbie', 'membership.trackUsage', 'membership.benefit.twoTrainings',
     'membership.benefit.oneTrack', 'membership.benefit.unlimitedTracks', 'membership.benefit.trainerConnect',
+    'membership.benefit.commandsLimit',
   ];
   it.each(Object.keys(FULL))('%s: alle neuen Keys vorhanden und nicht leer', name => {
     for (const k of NEW_KEYS) expect((FULL[name][k] ?? '').length).toBeGreaterThan(0);

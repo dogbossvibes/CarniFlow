@@ -1729,6 +1729,7 @@ export const deCH = {
   'membership.benefit.heat': 'Läufigkeitsaufzeichnung',
   'membership.benefit.backpack': 'Backpack',
   'membership.benefit.commands': 'Kommandoerfassung',
+  'membership.benefit.commandsLimit': 'Kommandoerfassung (bis 5 Kommandos)',
   'membership.benefit.goal': 'Persönliches Trainingsziel',
   'membership.benefit.smartAnalysis': 'Smart Analyse',
   'membership.benefit.trainerModule': 'Trainer-Funktionen',

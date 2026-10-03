@@ -1591,6 +1591,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "membership.benefit.heat": "Heat cycle logging",
   "membership.benefit.backpack": "Backpack",
   "membership.benefit.commands": "Command logging",
+  "membership.benefit.commandsLimit": "Command logging (up to 5 commands)",
   "membership.benefit.goal": "Goal",
   "membership.benefit.smartAnalysis": "Smart Analyse",
   "membership.benefit.trainerModule": "Trainer features",

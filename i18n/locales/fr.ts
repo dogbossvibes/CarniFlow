@@ -721,6 +721,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "membership.benefit.heat": "Suivi des chaleurs",
   "membership.benefit.backpack": "Backpack",
   "membership.benefit.commands": "Saisie des ordres",
+  "membership.benefit.commandsLimit": "Saisie des ordres (jusqu'à 5 commandes)",
   "membership.benefit.goal": "Objectif d'entraînement personnel",
   "membership.benefit.smartAnalysis": "Smart Analyse",
   "membership.benefit.trainerModule": "Fonctions Trainer",

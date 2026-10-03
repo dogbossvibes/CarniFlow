@@ -30,10 +30,12 @@ const PLAN_NAME_KEY: Record<VisiblePlan, TranslationKey> = {
 
 // Vorteils-Listen = echte Capabilities des bestehenden Modells (keine erfundenen Features).
 const BENEFITS: Record<VisiblePlan, TranslationKey[]> = {
-  // NEWBIE-Modell (serverautoritativ): 1 Hund · 2 Trainings/Monat · 1 Fährte/Monat.
+  // NEWBIE-Modell (serverautoritativ): 1 Hund · 2 Trainings/Monat · 1 Fährte/Monat; dazu die
+  // BASE_CAPABILITIES Backpack und Kommandoerfassung (bis NEWBIE_COMMAND_LIMIT = 5).
   newbie: [
     'membership.benefit.oneDog', 'membership.benefit.twoTrainings', 'membership.benefit.oneTrack',
     'membership.benefit.journal', 'membership.benefit.trainerConnect', 'membership.benefit.generalHealth',
+    'membership.benefit.backpack', 'membership.benefit.commandsLimit',
   ],
   active: [
     'membership.benefit.unlimitedDogs', 'membership.benefit.unlimitedTraining',
