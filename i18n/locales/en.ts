@@ -1921,4 +1921,12 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "updates.whatsNewTrackingGuidance": "Clearer voice guidance at the start, at objects, and at the end.",
   "updates.whatsNewTrackingObjects": "Object finds and manual corners are easier to recognize and review.",
   "updates.understood": "Got it",
+  "updates.storeTitle": "New ANYVO version available",
+  "updates.storeBody": "A new version of ANYVO is available in the App Store.",
+  "updates.openAppStore": "Open App Store",
+  "updates.current": "Up to date",
+  "updates.available": "New version available",
+  "updates.status": "Update status",
+  "updates.version": "Version {version}",
+  "updates.build": "Build {build}",
 };

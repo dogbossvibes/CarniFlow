@@ -9,6 +9,8 @@ import { useAccess } from "@/hooks/useAccess";
 import { reportScroll } from "@/stores/liveBarScroll";
 import { useNotificationSetting } from "@/hooks/useNotificationSetting";
 import { useAppLockSetting } from "@/hooks/useAppLockSetting";
+import { getInstalledBuild, getInstalledVersion, getStoreUpdateStatus, subscribeStoreUpdateStatus } from "@/features/updates/storeVersion";
+import { useEffect, useState, useSyncExternalStore } from "react";
 // expo-local-authentication defensiv laden (nativ; ohne Modul kein Crash).
 const LocalAuth: typeof import("expo-local-authentication") | null =
   (() => { try { return require("expo-local-authentication"); } catch { return null; } })();
@@ -28,7 +30,6 @@ import { supabase, SUPABASE_BACKEND_ENV } from "@/lib/supabase";
 import { queryClient } from "@/lib/queryClient";
 import { ALLE_SPARTEN, DEFAULT_SPARTEN } from "@/constants/sparten";
 import { useT, NATIVE_NAME } from "@/i18n";
-import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -96,6 +97,7 @@ export default function ProfilScreen() {
   };
 
   const { t, locale } = useT();
+  const storeUpdateStatus = useSyncExternalStore(subscribeStoreUpdateStatus, getStoreUpdateStatus, getStoreUpdateStatus);
   const spracheLabel = NATIVE_NAME[locale];
 
   const benachrichtigungen = useNotificationSetting(user?.id);
@@ -775,7 +777,16 @@ export default function ProfilScreen() {
           />
         </View>
 
-        <Text style={s.version}>ANYVO v1.0.3</Text>
+        <View style={s.versionBlock}>
+          <Text style={s.version}>ANYVO</Text>
+          <Text style={s.versionDetail}>{t('updates.version', { version: getInstalledVersion() ?? '–' })}</Text>
+          <Text style={s.versionDetail}>{t('updates.build', { build: getInstalledBuild() ?? '–' })}</Text>
+          {storeUpdateStatus !== 'unknown' && (
+            <Text style={s.versionDetail}>
+              {t('updates.status')}: {t(storeUpdateStatus === 'available' ? 'updates.available' : 'updates.current')}
+            </Text>
+          )}
+        </View>
         {SUPABASE_BACKEND_ENV === 'staging' && (
           <Text style={s.backendIndicator}>Backend: STAGING</Text>
         )}
@@ -972,11 +983,13 @@ const s = StyleSheet.create({
   zeileWert: { fontSize: 13, color: C.muted },
   trenner: { height: 1, backgroundColor: C.border, marginLeft: 64 },
 
+  versionBlock: { alignItems: 'center', gap: 4, marginTop: 20 },
+  versionDetail: { textAlign: 'center', fontSize: 11, color: C.subtle },
   version: {
     textAlign: "center",
     fontSize: 12,
     color: C.subtle,
-    marginTop: 20,
+    fontWeight: '800',
   },
   backendIndicator: {
     textAlign: "center",

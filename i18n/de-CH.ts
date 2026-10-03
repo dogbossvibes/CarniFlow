@@ -1965,6 +1965,14 @@ export const deCH = {
   'updates.whatsNewTrackingGuidance': 'Bessere Sprachführung bei Ansatz, Gegenständen und Fährtenende.',
   'updates.whatsNewTrackingObjects': 'Gegenstandsfunde und manuelle Winkel lassen sich besser erkennen und auswerten.',
   'updates.understood':     'Verstanden',
+  'updates.storeTitle':     'Neue ANYVO Version verfügbar',
+  'updates.storeBody':      'Eine neue Version von ANYVO ist im App Store verfügbar.',
+  'updates.openAppStore':   'Zum App Store',
+  'updates.current':        'Aktuell',
+  'updates.available':      'Neue Version verfügbar',
+  'updates.status':         'Update-Status',
+  'updates.version':        'Version {version}',
+  'updates.build':          'Build {build}',
 } as const;
 
 // Alle gültigen Text-Keys leiten sich aus dem Basis-Dictionary ab. Andere

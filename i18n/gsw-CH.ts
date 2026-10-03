@@ -1949,4 +1949,12 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'updates.whatsNewTrackingGuidance': 'Besseri Sprachfüehrig bi Aasatz, Gägeständ und Fährteändi.',
   'updates.whatsNewTrackingObjects': 'Gägestandsfund und manuell Winkel lönd sich besser erkenne und uswerte.',
   'updates.understood':     'Verstande',
+  'updates.storeTitle':     'Neui ANYVO-Version verfügbar',
+  'updates.storeBody':      'E neui Version vo ANYVO isch im App Store verfügbar.',
+  'updates.openAppStore':   'Zum App Store',
+  'updates.current':        'Aktuell',
+  'updates.available':      'Neui Version verfügbar',
+  'updates.status':         'Update-Status',
+  'updates.version':        'Version {version}',
+  'updates.build':          'Build {build}',
 };

@@ -17,7 +17,7 @@ import { useSession } from '@/hooks/useSession';
 import { registerForPush } from '@/lib/push';
 import { configurePurchases } from '@/lib/purchases';
 import { QuickAddSheet } from '@/components/QuickAddSheet';
-import { WhatsNewExperience } from '@/features/updates/WhatsNewExperience';
+import { UpdateExperience } from '@/features/updates/UpdateExperience';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -200,7 +200,7 @@ export default function TabLayout() {
           Training oder offener GPS-Fährte rendert die Komponente stattdessen die
           jeweilige Live-Leiste (Priorität Live > Button, nie beides). */}
       <QuickAddSheet />
-      <WhatsNewExperience />
+      <UpdateExperience />
     </BottomTabBarHeightContext.Provider>
   );
 }
