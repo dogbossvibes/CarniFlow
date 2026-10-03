@@ -1948,6 +1948,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'updates.whatsNewTrackingStart': 'D Fährteufnahm startet schnäller, während s GPS d Startlinie stabilisiert.',
   'updates.whatsNewTrackingGuidance': 'Besseri Sprachfüehrig bi Aasatz, Gägeständ und Fährteändi.',
   'updates.whatsNewTrackingObjects': 'Gägestandsfund und manuell Winkel lönd sich besser erkenne und uswerte.',
+  'updates.whatsNewTrackingAngles': 'Verbesserti Fährtenerkennig und robuschteri Winkelanalyse.',
   'updates.understood':     'Verstande',
   'updates.storeTitle':     'Neui ANYVO-Version verfügbar',
   'updates.storeBody':      'E neui Version vo ANYVO isch im App Store verfügbar.',

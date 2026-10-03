@@ -1939,6 +1939,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "updates.whatsNewTrackingStart": "L'enregistrement démarre plus vite pendant que le GPS stabilise le début de la piste.",
   "updates.whatsNewTrackingGuidance": "Des indications vocales plus claires au départ, aux objets et à l'arrivée.",
   "updates.whatsNewTrackingObjects": "Les objets trouvés et les angles manuels sont plus faciles à reconnaître et à analyser.",
+  "updates.whatsNewTrackingAngles": "Détection de piste améliorée et analyse des angles plus robuste.",
   "updates.understood": "Compris",
   "updates.storeTitle": "Nouvelle version d'ANYVO disponible",
   "updates.storeBody": "Une nouvelle version d'ANYVO est disponible sur l'App Store.",

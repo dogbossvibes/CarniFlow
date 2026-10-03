@@ -12,12 +12,10 @@ export interface WhatsNewRelease {
 
 // Set to null for releases without a customer-facing announcement.
 export const CURRENT_WHATS_NEW_RELEASE: WhatsNewRelease | null = {
-  id: '2026-10-tracking-ux',
+  id: '2026-10-tracking-angle-analysis',
   titleKey: 'updates.whatsNewTitle',
   itemKeys: [
-    'updates.whatsNewTrackingStart',
-    'updates.whatsNewTrackingGuidance',
-    'updates.whatsNewTrackingObjects',
+    'updates.whatsNewTrackingAngles',
   ],
 };
 

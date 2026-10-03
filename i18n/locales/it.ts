@@ -1920,6 +1920,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "updates.whatsNewTrackingStart": "La registrazione parte prima mentre il GPS stabilizza l'inizio della traccia.",
   "updates.whatsNewTrackingGuidance": "Indicazioni vocali più chiare alla partenza, agli oggetti e all'arrivo.",
   "updates.whatsNewTrackingObjects": "Gli oggetti trovati e gli angoli manuali sono più facili da riconoscere e analizzare.",
+  "updates.whatsNewTrackingAngles": "Rilevamento della pista migliorato e analisi degli angoli più robusta.",
   "updates.understood": "Ho capito",
   "updates.storeTitle": "Nuova versione di ANYVO disponibile",
   "updates.storeBody": "Una nuova versione di ANYVO è disponibile nell'App Store.",

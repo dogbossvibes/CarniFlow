@@ -1964,6 +1964,7 @@ export const deCH = {
   'updates.whatsNewTrackingStart': 'Fährtenaufnahme startet schneller, während GPS die Startlinie stabilisiert.',
   'updates.whatsNewTrackingGuidance': 'Bessere Sprachführung bei Ansatz, Gegenständen und Fährtenende.',
   'updates.whatsNewTrackingObjects': 'Gegenstandsfunde und manuelle Winkel lassen sich besser erkennen und auswerten.',
+  'updates.whatsNewTrackingAngles': 'Verbesserte Fährtenerkennung und robustere Winkelanalyse.',
   'updates.understood':     'Verstanden',
   'updates.storeTitle':     'Neue ANYVO Version verfügbar',
   'updates.storeBody':      'Eine neue Version von ANYVO ist im App Store verfügbar.',
