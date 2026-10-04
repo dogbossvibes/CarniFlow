@@ -115,6 +115,11 @@ Vor jeder Production-OTA muss der Agent prüfen:
 7. Bei fehlender Environment-Konfiguration:
    STOP.
    Keine OTA veröffentlichen.
+8. Aktiven Production-Stand unmittelbar vor dem Publish FRISCH aus EAS lesen
+   (nie aus `ANYVO_MASTER_STATUS.md`, Erinnerung oder einem früheren Preflight).
+   Dessen gitCommitHash muss Vorfahre des Release-HEAD sein — sonst STOP, keine OTA.
+   Der Wrapper erzwingt das (gemeinsamer Release-Lock im git-common-dir, Ancestry-Guard,
+   zweiter EAS-Check direkt vor `eas update`, Nachkontrolle ohne Auto-Rollback).
 
 ### Nach jeder Production-OTA verifizieren
 

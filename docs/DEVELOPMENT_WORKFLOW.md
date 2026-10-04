@@ -33,9 +33,21 @@ Ziel: **möglichst wenige kostenpflichtige EAS-Cloud-Builds**. Alles Lokale (Dev
 - Submit getrennt: `eas submit --platform ios|android` (iOS→TestFlight, Android→Play Internal).
 
 ## 8. EAS Updates (OTA)
-**Aktuell nicht verfügbar — `expo-updates` ist NICHT installiert.** Solange das so ist, erzwingt jede JS-Änderung einen nativen Build. Empfehlung: `expo-updates` einrichten (siehe §10/§16) → danach:
+`expo-updates` ist installiert (Runtime-Policy `appVersion`).
 - `npm run update:development -- "msg"` / `update:preview -- "msg"`
-- `node scripts/update-production.mjs --confirm --message "msg"` (bewusst bestätigt)
+- Production ausschliesslich über den Wrapper:
+  `npm run update:production:ios -- --message "msg"` (bzw. `node scripts/update-production.mjs --platform ios --confirm --message "msg"`)
+- Vorab alle Guards ohne Veröffentlichung: `npm run update:production:ios -- --message "msg" --dry-run`
+
+**Race-Schutz des Production-Wrappers** (Vorfall 2026-10-04: eine OTA überschrieb einen parallel veröffentlichten Production-Fix):
+1. Gemeinsamer Release-Lock `<git-common-dir>/anyvo-production-ota.lock` (atomar per `mkdir`, gilt für alle Worktrees dieses Repos). Zweite Session → HARD STOP. Ein Stale-Lock wird nie automatisch gelöscht; nur bewusst per `node scripts/update-production.mjs --clear-stale-lock` und nur, wenn der Halter-Prozess auf diesem Rechner nachweislich beendet ist.
+2. EAS ist die einzige Quelle für den Live-Stand (nie `ANYVO_MASTER_STATUS.md`).
+3. Ancestry-Guard: aktiver Production-gitCommitHash muss Vorfahre des Release-HEAD sein. Kein Auto-Rebase/-Merge.
+4. Runtime (aus `app.json`, Erwartung = aktive Production-Runtime bzw. `--runtime`), Channel→Branch `production` (kein Rollout, nicht pausiert), explizite Plattform, sauberer Worktree.
+5. Zweiter EAS-Check direkt vor `eas update`; geänderte Production → „Production changed during release preparation." → HARD STOP.
+6. Nachkontrolle: neue Group, Plattform, Runtime, gitCommitHash = Release-HEAD. Abweichung → Exit 2, **kein** automatischer Rollback, **keine** zweite OTA.
+
+**Grenze:** Der Lock serialisiert nur Releases aus Worktrees dieses lokalen Repositorys. Andere Rechner, CI oder manuelle `eas update`-Aufrufe erfasst er nicht; dafür bleibt der zweite EAS-Check Pflicht (Restfenster: Bundle-Export innerhalb von `eas update`). Vollständige Cross-Machine-Serialisierung bräuchte künftig einen zentralen Release-Runner/CI mit globaler Concurrency-Control.
 
 ## 9. Entscheidung: neuer Build oder Update?
 `npm run native:check` →

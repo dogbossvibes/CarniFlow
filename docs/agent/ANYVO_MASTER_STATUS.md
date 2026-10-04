@@ -4,7 +4,7 @@
 Canonical source of truth for current ANYVO product, engineering, release and
 open-work status.
 
-**Last verified:** 2026-10-03 · created from the verified Production-Continuity state.
+**Last verified:** 2026-10-04 · iOS Production `34e6185` per fresh EAS query (update group `e3be2717…`).
 
 ## Rules
 
@@ -35,7 +35,21 @@ full GPS / motion / corner diagnostics behind it.
 
 ---
 
+## Source of truth for the LIVE Production state
+
+**EAS is the only binding source for what is live right now.** This file is a
+documented snapshot. It must **never** be used on its own as a release source
+(neither for "what is in Production" nor as the base for a Production OTA).
+
+Before every Production OTA, read EAS fresh
+(`eas update:list --branch production --json` + `eas update:view <group> --json`).
+The wrapper `scripts/update-production.mjs` enforces this: shared release lock,
+fresh EAS read, ancestry guard, second EAS check directly before `eas update`,
+post-publish verification (see `docs/DEVELOPMENT_WORKFLOW.md` §8).
+
 ## Current Production Baseline
+
+Snapshot as of 2026-10-04 — verify against EAS before relying on it.
 
 | Item | Value |
 |---|---|
@@ -44,16 +58,16 @@ full GPS / motion / corner diagnostics behind it.
 | iOS Build | 48 |
 | Runtime | 1.0.3 (`runtimeVersion.policy = appVersion`) |
 | Channel / Environment / Platform | `production` / `production` / iOS only |
-| Canonical current production/integration branch | `fix/production-continuity-1.0.3` |
-| Production HEAD | `b780603fe18f723a7f577c6e2bf2126c22a3b69a` |
-| Verified iOS OTA (update ID) | `01a10074-223b-76f4-813c-8740a1f402d2` |
-| Update Group | `ae879d82-e274-4adf-85e1-f7330f1d4194` |
-| OTA message | `fix(production): restore continuity with tracking v6.2` |
-| Device verification | **PASS — 2026-10-03** (iPhone, confirmed by the project owner) |
+| Release branch of this state | `release/customer-track-diagnosis-1.0.3` |
+| Production HEAD (iOS) | `34e618519b2da670fc5e7efd4ec43e08afc4ed53` |
+| iOS OTA (update ID) | `01a10749-4051-7700-be7d-4495600d6544` |
+| Update Group | `e3be2717-5f31-4a22-ba23-ed370566c2eb` |
+| OTA message | `feat(tracking): add customer track diagnosis and sharing` |
+| Published | 2026-10-04 14:20:03 UTC |
+| EAS verification | **PASS** — fresh EAS query: newest group on `production`, iOS only, runtime 1.0.3, gitCommitHash = HEAD |
+| Device verification | not yet documented for `34e6185` (last device PASS: `b780603`, 2026-10-03) |
 
-**iOS Production Verification = DONE.** It is not an open item.
-
-Commit chain of the baseline (oldest → newest, all contained in the Production HEAD):
+Commit chain (oldest → newest, linear, all contained in the Production HEAD):
 
 | Commit | Content |
 |---|---|
@@ -61,7 +75,18 @@ Commit chain of the baseline (oldest → newest, all contained in the Production
 | `15c9f46` | Global ANYVO-A quick action (cherry-pick of `997115f`) |
 | `716e2d4` | Restore NEWBIE membership state (`8dcce2b`) |
 | `962e7c8` | Restore NEWBIE backpack limit (`25ffd82`) |
-| `b780603` | Restore customer update experience (`0bac025`) |
+| `b780603` | Restore customer update experience (`0bac025`) — previous verified baseline |
+| `8ada75c` | V6.2.1 sharpness consensus |
+| `3ae505c` | Search fix accuracy in QA export |
+| `0b24e7d` | "Neu in ANYVO": tracking improvements |
+| `1f6d7dc` | Customer support diagnostics |
+| `94dd576` | Resilient track recovery |
+| `34b4b4c` | Search lifecycle recovery |
+| `1d9b0d2` | Customer track diagnosis + reliable sharing |
+| `34e6185` | Customer track diagnosis i18n (DE/GSW/EN/FR/IT) |
+
+**Not in Production:** Multi-Dog Track Overlays (`78322cfe65a3d5a95bf59edc33b651a896f6c9f8`,
+branch `feat/multi-dog-track-overlays-1.0.3`) — not device/field tested.
 
 Android is **not** part of this baseline. No Android OTA, build or store release
 belongs to the state above.
@@ -171,6 +196,10 @@ Evidence for the rest is the commit chain above and the task reports.
 ### Release Engineering
 - kanonische Production-/Release-Linie definieren
 - keine wechselnden Feature-Branches mehr direkt auf Production
+- race-sicherer Production-OTA-Wrapper (Lock im git-common-dir, Ancestry-Guard,
+  zweiter EAS-Check) — Branch `chore/production-ota-guard`, lokal, nicht integriert
+- Grenze: Lock serialisiert nur lokale Worktrees; volle Cross-Machine-Serialisierung
+  bräuchte einen zentralen Release-Runner/CI mit globaler Concurrency-Control
 
 ---
 
@@ -256,3 +285,4 @@ Keine Schwellenänderung ohne neue Feldbelege.
 | Date | Change | Evidence |
 |---|---|---|
 | 2026-10-03 | Master status created. Production baseline set to `b780603`; iOS OTA `01a10074…` device-verified (PASS). | OTA group `ae879d82…`; commit chain above; owner device verification |
+| 2026-10-04 | iOS Production baseline → `34e6185` (customer track diagnosis + i18n on top of `34b4b4c`). Incident: OTA `fce1c140` (base `94dd576`) briefly superseded `34b4b4c`; restored via republish `3492bf85`, then `e3be2717` from a base containing `34b4b4c`. EAS declared the binding live source. | Fresh EAS query of group `e3be2717…` (gitCommitHash `34e6185`, iOS only, runtime 1.0.3) |

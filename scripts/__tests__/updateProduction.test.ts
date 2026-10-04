@@ -1,52 +1,21 @@
 // Production-OTA-Guardrail: der kanonische Wrapper lässt `--environment production`
 // nie entfallen und veröffentlicht nie ohne explizite Plattform / Message / Environment.
-// Die Tests starten den Wrapper als Prozess mit einem FALSCHEN `eas` im PATH, das jeden
-// Aufruf protokolliert — in keinem der Tests darf `eas` je aufgerufen werden.
+// Die Prozess-Tests laufen in einem Fixture-Git-Repo mit einem FALSCHEN `eas` im PATH,
+// das jeden Aufruf protokolliert (siehe otaReleaseHarness.ts) — es gibt nie eine echte OTA.
 import { spawnSync } from 'child_process';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, chmodSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { readFileSync } from 'fs';
+import { createHarness, destroyHarness, FULL_ENV, PROD_URL, SECRET } from './otaReleaseHarness';
 
-const SECRET = 'SECRETVALUE-do-not-print-123';
-const PROD_URL = 'https://axkkhyqrjrtbkumaulta.supabase.co';
-const FULL_ENV = [
-  'EXPO_PUBLIC_BACKEND_ENV=production',
-  `EXPO_PUBLIC_SUPABASE_URL=${PROD_URL}`,
-  `EXPO_PUBLIC_SUPABASE_ANON_KEY=${SECRET}`,
-  'SENTRY_AUTH_TOKEN=' + SECRET,
-].join('\n');
+const h = createHarness();
+const envFileWith = h.envFileWith;
+const FULL_FILE = h.fullEnvFile;
+const easCalls = h.calls;
+const updateCalls = h.updateCalls;
+beforeEach(() => { h.resetCalls(); h.setState(h.defaultState()); });
+afterAll(() => destroyHarness(h));
 
-const dir = mkdtempSync(join(tmpdir(), 'anyvo-ota-test-'));
-const callLog = join(dir, 'eas-calls.jsonl');
-const fakeEas = join(dir, 'eas');
-// Falsches `eas`: protokolliert jeden Aufruf als JSON-argv. `env:list` liefert FAKE_ENV_FILE, `update` nur Protokoll.
-writeFileSync(fakeEas, `#!/usr/bin/env node
-const fs = require('fs');
-const a = process.argv.slice(2);
-fs.appendFileSync(${JSON.stringify(callLog)}, JSON.stringify(a) + '\\n');
-if (a[0] === 'env:list') process.stdout.write(fs.readFileSync(process.env.FAKE_ENV_FILE, 'utf8'));
-else if (a[0] === 'channel:view') process.stdout.write('{}');
-`);
-chmodSync(fakeEas, 0o755);
-
-function envFileWith(content: string) {
-  const f = join(dir, `env-${Math.random().toString(36).slice(2)}.txt`);
-  writeFileSync(f, content);
-  return f;
-}
-const FULL_FILE = envFileWith(FULL_ENV);
-const easCalls = (): string[][] => (existsSync(callLog) ? readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : []);
-const updateCalls = () => easCalls().filter(a => a[0] === 'update');
-beforeEach(() => { rmSync(callLog, { force: true }); });
-
-function run(args: string[], envFile?: string, cmd: string[] = ['node', 'scripts/update-production.mjs']) {
-  const a = [...cmd.slice(1), ...args];
-  if (envFile) a.push('--env-list-file', envFile);
-  const r = spawnSync(cmd[0], a, {
-    encoding: 'utf8',
-    env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FAKE_ENV_FILE: FULL_FILE },
-  });
-  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+function run(args: string[], envFile?: string, cmd?: string[]) {
+  return h.run(args, { envFile, cmd });
 }
 const argvLine = (out: string): string[] => JSON.parse((out.match(/^argv: (.*)$/m) ?? [])[1] ?? 'null');
 
@@ -190,7 +159,7 @@ describe('Verschärft: argv, Dry-Run == echte Ausführung, npm-Script', () => {
     for (const name of ['EXPO_PUBLIC_BACKEND_ENV', 'EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_ANON_KEY']) {
       const f = envFileWith(FULL_ENV.split('\n').filter(l => !l.startsWith(`${name}=`)).join('\n'));
       const r = spawnSync('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'x'], {
-        encoding: 'utf8', env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FAKE_ENV_FILE: f },
+        cwd: h.repo, encoding: 'utf8', env: h.baseEnv({ FAKE_ENV_FILE: f }),
       });
       expect(r.status).toBe(1);
     }
@@ -200,7 +169,7 @@ describe('Verschärft: argv, Dry-Run == echte Ausführung, npm-Script', () => {
   it('falsches BACKEND_ENV bzw. nicht-Production-Supabase-URL → eas update wird NICHT aufgerufen (echte Ausführung, --confirm)', () => {
     for (const bad of [FULL_ENV.replace('BACKEND_ENV=production', 'BACKEND_ENV=staging'), FULL_ENV.replace('axkkhyqrjrtbkumaulta', 'cbhrxkjclakzlvajyvfn')]) {
       const r = spawnSync('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'x'], {
-        encoding: 'utf8', env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, FAKE_ENV_FILE: envFileWith(bad) },
+        cwd: h.repo, encoding: 'utf8', env: h.baseEnv({ FAKE_ENV_FILE: envFileWith(bad) }),
       });
       expect(r.status).toBe(1);
       expect(`${r.stdout}${r.stderr}`).not.toContain(SECRET);
