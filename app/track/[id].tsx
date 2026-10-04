@@ -20,7 +20,7 @@ import { getLocalTrackDetail, getLocalRunSupplement, saveLocalTrackEvaluation } 
 import { pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
 import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingEmbeddingService';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
-import { SupportDiagnosticsRow } from '@/features/tracking/components/SupportDiagnosticsRow';
+import { CustomerTrackDiagnosisCard } from '@/features/tracking/components/CustomerTrackDiagnosisCard';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { retryFailedSyncForSession, syncNow } from '@/features/sync/services/syncEngine';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -819,8 +819,9 @@ export default function TrackAuswertungScreen() {
             </>
           )}
 
-          {/* Sekundär: privacy-reduced Support-Diagnose teilen (nur wenn für diese Fährte vorhanden). */}
-          <SupportDiagnosticsRow sessionLocalId={String(id)} />
+          {/* Kunden-Fährtendiagnose: Zusammenfassung der gespeicherten Daten + privacy-reduced
+              „Diagnosedaten teilen" (Capture bevorzugt, sonst aus gespeicherten Daten). */}
+          {data && <CustomerTrackDiagnosisCard sessionLocalId={String(id)} detail={data} />}
 
           <View style={{ height: 24 }} />
         </ScrollView>

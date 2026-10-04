@@ -11,6 +11,12 @@ import {
   type SupportExport,
 } from '@/features/tracking/utils/supportDiagnostics';
 import { shareJsonFile } from '@/features/tracking/services/qaTrackExportService';
+import {
+  buildPersistedSupportExport, layPointsFromDetail, markersFromDetail, runFromDetail,
+  type PersistedSupportExport,
+} from '@/features/tracking/utils/customerTrackDiagnosis';
+import { getLocalTrainingSessionById } from '@/features/training/repositories/localTrainingRepository';
+import { buildLocalTrackDetail } from '@/features/tracking/utils/localTrackDetail';
 
 /** Gibt es für diese gespeicherte Fährte eine Support-Diagnose? (Index-Prüfung, lädt das Payload nicht.) */
 export function hasSupportDiagnostics(sessionLocalId: string): Promise<boolean> {
@@ -43,6 +49,77 @@ export async function shareSupportDiagnostics(sessionLocalId: string): Promise<S
     return { ok: true, fileName };
   } catch (e) {
     console.warn('[supportDiagnostics] share failed', e);
+    return { ok: false, reason: 'failed' };
+  }
+}
+
+// ── Kunden-Diagnose: Capture bevorzugt, sonst aus gespeicherten Daten (on-demand) ──
+//
+// Die Support-Capture (Retention: letzte 5 Absuchen) ist nur noch eine Anreicherung,
+// KEIN UI-Gate mehr: fehlt sie, wird der Export aus den dauerhaft gespeicherten Daten
+// derselben Fährte gebaut (lokale SQLite-Session bevorzugt, sonst der bereits geladene
+// Detail-Datensatz). Rein lesend — nichts wird geschrieben, nichts neu berechnet.
+
+export type CustomerDiagnosticsSource = 'capture' | 'persisted';
+export type CustomerDiagnosticsAvailability = CustomerDiagnosticsSource | 'none';
+
+/** Export aus gespeicherten Daten: lokale Session (SQLite) zuerst, sonst `detail`. */
+export async function buildPersistedExportForSession(
+  sessionLocalId: string, detail?: Record<string, any> | null,
+): Promise<PersistedSupportExport | null> {
+  const local = await getLocalTrainingSessionById(sessionLocalId).catch(() => null);
+  if (local) {
+    const [points, markers] = await Promise.all([
+      getLayTrackPointsBySession(sessionLocalId).catch(() => []),
+      getTrackMarkersBySession(sessionLocalId).catch(() => []),
+    ]);
+    const localDetail = buildLocalTrackDetail(local, points, markers);
+    const fromLocal = buildPersistedSupportExport({
+      layPoints: layPointsFromDetail(localDetail), markers: markersFromDetail(localDetail), run: runFromDetail(localDetail),
+    });
+    if (fromLocal) return fromLocal;
+  }
+  if (!detail) return null;
+  return buildPersistedSupportExport({ layPoints: layPointsFromDetail(detail), markers: markersFromDetail(detail), run: runFromDetail(detail) });
+}
+
+/** Was kann geteilt werden? Capture → `capture`; sonst verwertbare gelegte Linie → `persisted`; sonst `none`. */
+export async function customerDiagnosticsAvailability(
+  sessionLocalId: string, detail?: Record<string, any> | null,
+): Promise<CustomerDiagnosticsAvailability> {
+  try {
+    if (await hasSupportDiagnostics(sessionLocalId).catch(() => false)) {
+      // Index kann auf ein korruptes/entferntes Payload zeigen → dann nicht als Capture zählen.
+      if (await buildSupportExportForSession(sessionLocalId).catch(() => null)) return 'capture';
+    }
+    return (await buildPersistedExportForSession(sessionLocalId, detail)) ? 'persisted' : 'none';
+  } catch (e) {
+    console.warn('[supportDiagnostics] availability', e);
+    return 'none';
+  }
+}
+
+export type ShareCustomerResult =
+  | { ok: true; fileName: string; source: CustomerDiagnosticsSource }
+  | { ok: false; reason: 'missing' | 'failed' };
+
+/**
+ * Teilen für Kunden: vorhandene Capture unverändert (bestehender Pfad), sonst Export aus
+ * gespeicherten Daten. Schliesst der Nutzer das Share-Sheet, ist das kein Fehler. Gibt nie
+ * eine Exception an die UI weiter.
+ */
+export async function shareCustomerDiagnostics(
+  sessionLocalId: string, detail?: Record<string, any> | null,
+): Promise<ShareCustomerResult> {
+  try {
+    const capture = await buildSupportExportForSession(sessionLocalId).catch(() => null);
+    const exported: SupportExport | PersistedSupportExport | null = capture ?? await buildPersistedExportForSession(sessionLocalId, detail);
+    if (!exported) return { ok: false, reason: 'missing' };
+    const fileName = supportExportFileName();
+    await shareJsonFile(serializeSupportExport(exported), fileName, 'Diagnosedaten teilen');
+    return { ok: true, fileName, source: capture ? 'capture' : 'persisted' };
+  } catch (e) {
+    console.warn('[supportDiagnostics] customer share failed', e);
     return { ok: false, reason: 'failed' };
   }
 }

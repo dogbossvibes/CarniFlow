@@ -244,13 +244,18 @@ describe('Verdrahtung (Source)', () => {
   });
   it('Auswertung: Aktion unterhalb des Inhalts, vor den Footer-Buttons — kein Primary-CTA, kein Trainer-Share-Mix', () => {
     const src = fs.readFileSync('app/track/[id].tsx', 'utf8');
-    expect(src).toContain('<SupportDiagnosticsRow sessionLocalId={String(id)} />');
-    expect(src.indexOf('<SupportDiagnosticsRow')).toBeLessThan(src.indexOf('{/* Footer */}'));
+    // Kunden-Fährtendiagnose (Karte) enthält die Teilen-Zeile — weiterhin unterhalb des Inhalts, vor dem Footer.
+    expect(src).toContain('{data && <CustomerTrackDiagnosisCard sessionLocalId={String(id)} detail={data} />}');
+    expect(src.indexOf('<CustomerTrackDiagnosisCard')).toBeLessThan(src.indexOf('{/* Footer */}'));
+    const card = fs.readFileSync('features/tracking/components/CustomerTrackDiagnosisCard.tsx', 'utf8');
+    expect(card).toContain('<SupportDiagnosticsRow sessionLocalId={sessionLocalId} detail={detail} />');
     const row = fs.readFileSync('features/tracking/components/SupportDiagnosticsRow.tsx', 'utf8');
     expect(row).toContain('Diagnosedaten teilen');
     expect(row).toContain('Technische Fährtendaten für Support und Fehleranalyse teilen.');
     expect(row).toContain('accessibilityLabel={TITLE}');
     expect(row).not.toContain('AnyvoButton');                // bewusst dezent, kein Primary-Button
-    expect(row).toMatch(/if \(!available\) return null;/);   // alte Fährten: kein Button
+    // Ohne Daten: kein Button (Legacy: nichts; Kunden-Karte: verständlicher Hinweis statt Button).
+    expect(row).toMatch(/if \(availability === 'none'\) \{/);
+    expect(row).toContain('Für diese ältere Fährte liegen keine vollständigen Diagnosedaten vor.');
   });
 });

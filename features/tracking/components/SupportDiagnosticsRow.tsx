@@ -2,34 +2,50 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
-import { hasSupportDiagnostics, shareSupportDiagnostics } from '@/features/tracking/services/supportDiagnosticsService';
+import {
+  customerDiagnosticsAvailability, hasSupportDiagnostics, shareCustomerDiagnostics, shareSupportDiagnostics,
+  type CustomerDiagnosticsAvailability,
+} from '@/features/tracking/services/supportDiagnosticsService';
 
 const TITLE = 'Diagnosedaten teilen';
 const SUBTITLE = 'Technische Fährtendaten für Support und Fehleranalyse teilen.';
+const SUBTITLE_PERSISTED = 'Aus den gespeicherten Fährtendaten erstellt (ohne Live-Mitschnitt der Absuche).';
+const UNAVAILABLE = 'Für diese ältere Fährte liegen keine vollständigen Diagnosedaten vor.';
 
 /**
- * Dezente Sekundär-Aktion der Auswertung: teilt die lokal gespeicherte, privacy-reduced
- * Support-Diagnose dieser Fährte über das native Share-Sheet. Wird NUR gezeigt, wenn für die
- * Fährte eine Diagnose vorliegt (alte Fährten: kein Button, kein Fehler). Kein Primary-CTA.
+ * Dezente Sekundär-Aktion der Auswertung: teilt die privacy-reduced Support-Diagnose dieser
+ * Fährte über das native Share-Sheet. Kein Primary-CTA.
+ *
+ * Ohne `detail` (bisheriges Verhalten): nur sichtbar, wenn eine Support-Capture vorliegt.
+ * Mit `detail` (Kunden-Fährtendiagnose): die Capture ist nur noch Anreicherung — fehlt sie,
+ * wird aus den gespeicherten Daten der Fährte geteilt; geht auch das nicht, erscheint ein
+ * verständlicher Hinweis statt eines Buttons.
  */
-export function SupportDiagnosticsRow({ sessionLocalId }: { sessionLocalId: string }) {
-  const [available, setAvailable] = useState(false);
+export function SupportDiagnosticsRow({ sessionLocalId, detail }: { sessionLocalId: string; detail?: Record<string, any> | null }) {
+  const customer = detail !== undefined;
+  const [availability, setAvailability] = useState<CustomerDiagnosticsAvailability | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    setAvailable(false);
-    hasSupportDiagnostics(sessionLocalId).then(v => { if (alive) setAvailable(v); }).catch(() => {});
+    setAvailability(null);
+    const check: Promise<CustomerDiagnosticsAvailability> = customer
+      ? customerDiagnosticsAvailability(sessionLocalId, detail)
+      : hasSupportDiagnostics(sessionLocalId).then(v => (v ? 'capture' : 'none'));
+    check.then(v => { if (alive) setAvailability(v); }).catch(() => { if (alive) setAvailability('none'); });
     return () => { alive = false; };
-  }, [sessionLocalId]);
+  }, [sessionLocalId, detail, customer]);
 
-  if (!available) return null;
+  if (availability == null) return null;
+  if (availability === 'none') {
+    return customer ? <Text style={s.unavailable} testID="support-diagnostics-unavailable">{UNAVAILABLE}</Text> : null;
+  }
 
   const onPress = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      const result = await shareSupportDiagnostics(sessionLocalId);
+      const result = customer ? await shareCustomerDiagnostics(sessionLocalId, detail) : await shareSupportDiagnostics(sessionLocalId);
       if (!result.ok) {
         Alert.alert(TITLE, result.reason === 'missing'
           ? 'Für diese Fährte liegen keine Diagnosedaten vor.'
@@ -56,7 +72,7 @@ export function SupportDiagnosticsRow({ sessionLocalId }: { sessionLocalId: stri
       </View>
       <View style={s.texts}>
         <Text style={s.title}>{TITLE}</Text>
-        <Text style={s.subtitle}>{SUBTITLE}</Text>
+        <Text style={s.subtitle}>{availability === 'persisted' ? SUBTITLE_PERSISTED : SUBTITLE}</Text>
       </View>
     </Pressable>
   );
@@ -72,4 +88,5 @@ const s = StyleSheet.create({
   texts: { flex: 1, gap: 2 },
   title: { color: C.trackText, fontSize: 15, fontWeight: '700' },
   subtitle: { color: C.trackTextSec, fontSize: 12, lineHeight: 17 },
+  unavailable: { color: C.trackTextSec, fontSize: 12, lineHeight: 17, marginTop: 14 },
 });
