@@ -36,6 +36,10 @@ jest.mock('@/features/tracking/services/trackService', () => ({
   getTrackSessionDogName: jest.fn(async () => ({ data: 'Amoun' })),
 }));
 const mockRecordCancelled = jest.fn(async (..._a: unknown[]) => true);
+const mockSessionRow = jest.fn(async (..._a: unknown[]) => ({ local_id: 'sess-A', dog_id: 'dog-A' }));
+jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
+  getLocalTrainingSessionById: (...a: unknown[]) => mockSessionRow(...a),
+}));
 jest.mock('@/features/tracking/services/trackRecoveryService', () => ({
   recordTrackCancelled: (...a: unknown[]) => mockRecordCancelled(...a),
 }));
@@ -44,7 +48,10 @@ jest.mock('@/features/tracking/services/trackRecoveryService', () => ({
 import LiegenScreen from '@/app/track/liegen';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import i18n from '@/i18n/config';
 /* eslint-enable import/first */
+
+beforeAll(async () => { await i18n.changeLanguage('de'); });
 
 type Btn = { text: string; style?: string; onPress?: () => void };
 let alertSpy: jest.SpyInstance;
@@ -66,6 +73,7 @@ beforeEach(async () => {
   useActiveFaehrten.setState({ byDog: {}, hydrated: true });
   useActiveFaehrten.getState().upsert('dog-A', { status: 'resting', sessionId: 'sess-A' });
   await act(async () => { renderer = TestRenderer.create(<LiegenScreen />); });
+  await act(async () => { await Promise.resolve(); });   // Identität (lokale Session) aufgelöst
 });
 afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
 

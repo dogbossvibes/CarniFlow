@@ -8,27 +8,10 @@ import {
 } from '@/features/tracking/services/trackRecoveryService';
 import { canCompleteWithoutApp, type RecoveryDecision } from '@/features/tracking/store/trackRecovery';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { useT } from '@/i18n';
 
-const TITLE = 'Fährte fortsetzen';
-const SUBTITLE = 'Die gelegte Fährte kann weitergeführt werden.';
-const SEARCH_TITLE = 'Absuche fortsetzen';
-const SEARCH_SUBTITLE = 'Die unterbrochene Absuche kann weitergeführt werden.';
-const CARD_TITLE = 'Diese Fährte ist noch offen';
-const CARD_TEXT_RESUME = 'Du kannst sie in ANYVO weiterführen oder als ohne App abgesucht abschliessen.';
-const CARD_TITLE_SEARCH = 'Absuche unterbrochen';
-const CARD_TEXT_SEARCH = 'Du kannst die Absuche in ANYVO weiterführen oder die Fährte als ohne App abgesucht abschliessen.';
-const CARD_TITLE_INCOMPLETE = 'Unvollständige Absuche erkannt';
-const CARD_TEXT_INCOMPLETE = 'Eine Absuche wurde begonnen, aber nicht in ANYVO beendet. Wähle, wie es weitergehen soll.';
-const DISCARD_TITLE = 'Absuche verwerfen und Fährte wieder freigeben';
-const DISCARD_CONFIRM_TITLE = 'Absuche verwerfen?';
-const DISCARD_CONFIRM_TEXT = 'Die Suchpunkte dieses unvollständigen Versuchs werden gelöscht. Die gelegte Fährte bleibt erhalten und kann neu abgesucht werden.';
-const CARD_TITLE_CANCELLED = 'Diese Fährte wurde abgebrochen';
-const CARD_TEXT_CANCELLED = 'Die gelegte Fährte ist weiterhin gespeichert. Du kannst sie wieder öffnen und danach fortsetzen oder abschliessen.';
-const REOPEN_TITLE = 'Fährte wieder öffnen';
-const DONE_TITLE = 'Ohne App abgeschlossen';
-const DONE_HINT = 'Markiert die Fährte als beendet, wenn du sie ohne ANYVO abgesucht hast.';
-const CONFIRM_TITLE = 'Fährte als abgeschlossen markieren?';
-const CONFIRM_TEXT = 'Die Fährte bleibt im Journal. Eine Absuche wird nicht nachträglich erfunden oder aufgezeichnet. Danach kann diese Fährte nicht mehr fortgesetzt werden.';
+// Alle Kundentexte aus i18n (track.continuation.*); nur die QA-Zeile bleibt technisch.
+const K = 'track.continuation.' as const;
 
 /**
  * Recovery-Karte der Auswertung (direkt unter dem Header), ausschliesslich aus der
@@ -56,6 +39,16 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
   onVisibleChange?: (visible: boolean) => void;
 }) {
   const router = useRouter();
+  const { t } = useT();
+  const tx = (k: string) => t(`${K}${k}` as never);
+  const TITLE = tx('resume');
+  const SUBTITLE = tx('resumeHint');
+  const SEARCH_TITLE = tx('searchResume');
+  const SEARCH_SUBTITLE = tx('searchResumeHint');
+  const REOPEN_TITLE = tx('reopen');
+  const DISCARD_TITLE = tx('discard');
+  const DONE_TITLE = tx('done');
+  const DONE_HINT = tx('doneHint');
   const [decision, setDecision] = useState<RecoveryDecision | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState<null | 'resume' | 'complete' | 'discard' | 'reopen'>(null);
@@ -99,7 +92,7 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
       if (d.ok) router.push(d.target as never);
       else {
         setDecision(d);
-        Alert.alert(TITLE, 'Diese Fährte kann nicht mehr fortgesetzt werden.');
+        Alert.alert(TITLE, tx('resumeFailed'));
       }
     } finally { setBusy(null); }
   };
@@ -110,7 +103,7 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
     try {
       const r = await reopenCancelledTrack(sessionId, dogId, { hasRemoteSearchRun });
       if (r.ok) setDecision(r.decision);   // → normale Karte mit „Fährte fortsetzen"
-      else Alert.alert(REOPEN_TITLE, 'Diese Fährte kann nicht wieder geöffnet werden.');
+      else Alert.alert(REOPEN_TITLE, tx('reopenFailed'));
     } finally { setBusy(null); }
   };
 
@@ -119,7 +112,7 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
     try {
       const r = await completeTrackWithoutApp(sessionId, dogId);
       if (r.ok) setDone(true);
-      else Alert.alert(DONE_TITLE, 'Die Fährte konnte nicht als abgeschlossen markiert werden. Bitte versuche es erneut.');
+      else Alert.alert(DONE_TITLE, tx('completeFailed'));
     } finally { setBusy(null); }
   };
 
@@ -128,23 +121,23 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
     try {
       const r = await discardSearchAttempt(sessionId, dogId, { hasRemoteSearchRun });
       if (r.ok) router.push(r.target as never);
-      else Alert.alert(DISCARD_TITLE, 'Die Absuche konnte nicht verworfen werden.');
+      else Alert.alert(DISCARD_TITLE, tx('discardFailed'));
     } finally { setBusy(null); }
   };
 
   const onDiscard = () => {
     if (busy) return;
-    Alert.alert(DISCARD_CONFIRM_TITLE, DISCARD_CONFIRM_TEXT, [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Absuche verwerfen', style: 'destructive', onPress: () => { void discardNow(); } },
+    Alert.alert(tx('discardConfirmTitle'), tx('discardConfirmText'), [
+      { text: tx('cancel'), style: 'cancel' },
+      { text: tx('discardConfirm'), style: 'destructive', onPress: () => { void discardNow(); } },
     ]);
   };
 
   const onComplete = () => {
     if (busy) return;
-    Alert.alert(CONFIRM_TITLE, CONFIRM_TEXT, [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Als abgeschlossen markieren', style: 'destructive', onPress: () => { void completeNow(); } },
+    Alert.alert(tx('completeConfirmTitle'), tx('completeConfirmText'), [
+      { text: tx('cancel'), style: 'cancel' },
+      { text: tx('completeConfirm'), style: 'destructive', onPress: () => { void completeNow(); } },
     ]);
   };
 
@@ -152,9 +145,9 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
     <View style={s.card} testID="track-recovery-card">
       <View style={s.head}>
         <Ionicons name="hourglass-outline" size={18} color={C.trackPrimary} />
-        <Text style={s.cardTitle}>{cancelled ? CARD_TITLE_CANCELLED : incomplete ? CARD_TITLE_INCOMPLETE : searching ? CARD_TITLE_SEARCH : CARD_TITLE}</Text>
+        <Text style={s.cardTitle}>{tx(cancelled ? 'cardTitleCancelled' : incomplete ? 'cardTitleIncomplete' : searching ? 'cardTitleSearch' : 'cardTitle')}</Text>
       </View>
-      <Text style={s.cardText}>{cancelled ? CARD_TEXT_CANCELLED : incomplete ? CARD_TEXT_INCOMPLETE : searching ? CARD_TEXT_SEARCH : CARD_TEXT_RESUME}</Text>
+      <Text style={s.cardText}>{tx(cancelled ? 'cardTextCancelled' : incomplete ? 'cardTextIncomplete' : searching ? 'cardTextSearch' : 'cardTextResume')}</Text>
 
       {cancelled && (
         <Pressable

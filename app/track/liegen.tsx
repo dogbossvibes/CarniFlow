@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
@@ -14,6 +14,8 @@ import { startLiegezeitNotification, updateLiegezeitNotification, endLiegezeitNo
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 import { recordTrackCancelled } from '@/features/tracking/services/trackRecoveryService';
 import { resolveRestingCancelTarget } from '@/features/tracking/store/trackRecovery';
+import { matchesRestingIdentity, resolveRestingIdentity, type RestingIdentity } from '@/features/tracking/store/restingIdentity';
+import { getLocalTrainingSessionById } from '@/features/training/repositories/localTrainingRepository';
 import {
   TRACK_SEGMENT_COLORS,
   actualSegmentSteps,
@@ -60,8 +62,53 @@ function summarize(st: { distanceMeters: number; markers: { type: string; materi
   };
 }
 
+// Identität ZUERST eindeutig auflösen (Benachrichtigung/Live Activity liefern nur die sessionId):
+// nie den „jüngsten" Puffer irgendeines Hundes. Unklar → verständlicher Hinweis statt falscher Fährte.
 export default function TrackLiegenScreen() {
-  const { id, dogId } = useLocalSearchParams<{ id: string; dogId?: string }>();
+  const { id, dogId } = useLocalSearchParams<{ id?: string; dogId?: string }>();
+  const [identity, setIdentity] = useState<RestingIdentity | null>(() =>
+    id ? null : resolveRestingIdentity({ routeSessionId: id, routeDogId: dogId, sessionDogId: undefined }));
+  useEffect(() => {
+    if (!id) { setIdentity(resolveRestingIdentity({ routeSessionId: id, routeDogId: dogId, sessionDogId: undefined })); return; }
+    let alive = true;
+    setIdentity(null);
+    getLocalTrainingSessionById(id)
+      .then(row => { if (alive) setIdentity(resolveRestingIdentity({ routeSessionId: id, routeDogId: dogId, sessionDogId: row?.dog_id ?? null })); })
+      .catch(() => { if (alive) setIdentity(resolveRestingIdentity({ routeSessionId: id, routeDogId: dogId, sessionDogId: null })); });
+    return () => { alive = false; };
+  }, [id, dogId]);
+  if (!identity) {
+    return (
+      <View className="flex-1 bg-ft-bg items-center justify-center" testID="resting-identity-loading">
+        <ActivityIndicator color={FT.acc} />
+      </View>
+    );
+  }
+  if (!identity.ok) return <RestingIdentityMissing />;
+  return <TrackLiegenContent id={identity.sessionId ?? undefined} dogId={identity.dogId} />;
+}
+
+function RestingIdentityMissing() {
+  const router = useRouter();
+  const { t } = useT();
+  return (
+    <View className="flex-1 bg-ft-bg items-center justify-center px-8 gap-4" testID="resting-identity-missing">
+      <Ionicons name="help-circle-outline" size={40} color={FT.muted} />
+      <Text className="text-[18px] text-ft-text font-extrabold text-center">{t('track.continuation.identityTitle')}</Text>
+      <Text className="text-[14px] text-ft-muted text-center">{t('track.continuation.identityText')}</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.replace('/track' as never)}
+        className="mt-2 px-5 py-3 rounded-[14px] bg-ft-acc"
+        testID="resting-identity-overview"
+      >
+        <Text className="text-[15px] font-extrabold text-ft-acc-text">{t('track.continuation.toOverview')}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   const router = useRouter();
   const { t } = useT();
   useKeepAwake();   // Timer/Anzeige während der Liegezeit anlassen (Bildschirm nicht sperren)
@@ -75,8 +122,14 @@ export default function TrackLiegenScreen() {
   // Registry-Eintrag dieses Hundes (falls die Fährte gezielt wiederöffnet wird):
   // liefert die korrekte Liegezeit-Basis auch dann, wenn der Aufnahme-Store gerade
   // einen ANDEREN Hund hält (mehrere gleichzeitig liegende Fährten).
-  const regEntry = dogId ? useActiveFaehrten.getState().get(dogId) : null;
-  const hasStore = useTrackingStore.getState().trackPoints.length > 0 || useTrackingStore.getState().layStartedAt != null;
+  const identity = { sessionId: id ?? null, dogId };
+  const regCandidate = useActiveFaehrten.getState().get(dogId);
+  const regEntry = matchesRestingIdentity(identity, regCandidate) ? regCandidate : null;
+  // Store nur, wenn er GENAU diese Fährte hält (sonst zeigte die erste Anzeige kurz einen anderen Hund).
+  const st0 = useTrackingStore.getState();
+  const hasStore = matchesRestingIdentity(identity, { dogId: st0.dogId, sessionId: st0.currentSessionId })
+    && (st0.trackPoints.length > 0 || st0.layStartedAt != null);
+  const [unresolved, setUnresolved] = useState(false);   // vorgegebene Session lokal nicht ladbar → keine Ersatzanzeige
   const [startMs, setStartMs] = useState<number | null>(() =>
     regEntry?.layStartedAt != null ? regEntry.layStartedAt
     : hasStore ? (useTrackingStore.getState().layStartedAt ?? useTrackingStore.getState().layFinishedAt ?? Date.now())
@@ -98,10 +151,13 @@ export default function TrackLiegenScreen() {
   useEffect(() => {
     let alive = true;
     const st = useTrackingStore.getState();
-    const storeHasThisDog = dogId ? st.dogId === dogId : (st.trackPoints.length > 0 || st.layStartedAt != null);
-    if (storeHasThisDog && (st.trackPoints.length > 0 || st.layStartedAt != null)) return;   // (a)
+    const storeHasThisTrack = matchesRestingIdentity(identity, { dogId: st.dogId, sessionId: st.currentSessionId });
+    if (storeHasThisTrack && (st.trackPoints.length > 0 || st.layStartedAt != null)) return;   // (a)
+    // Nur der EIGENE Slot dieses Hundes (dogId ist jetzt immer eindeutig) — nie der jüngste
+    // Puffer eines anderen Hundes; bei vorgegebener Session nur genau diese Session.
     loadPending(dogId).then(p => {
       if (!alive) return;
+      if (id && !matchesRestingIdentity(identity, p)) { setUnresolved(true); return; }
       if (p && (isRestingRecovery(p) || p.trackPoints.length > 0)) {
         useTrackingStore.getState().restorePending(p);   // KEINE neue sessionId, Status bleibt; setzt dogId
         setStartMs(p.layStartedAt ?? p.layFinishedAt ?? Date.now());
@@ -157,7 +213,7 @@ export default function TrackLiegenScreen() {
     if (id) await setTrackLyingTime(id, minutes).catch(() => {});
     // Bewusst KEIN Statuswechsel auf 'searching' hier: die Suchzeit startet erst am
     // Fährtenansatz (Arming im Run-Screen). Bis dahin bleibt die Fährte 'resting'.
-    router.replace((id ? `/track/run?id=${id}${dogId ? `&dogId=${dogId}` : ''}` : `/track/run${dogId ? `?dogId=${dogId}` : ''}`) as never);
+    router.replace((id ? `/track/run?id=${id}&dogId=${dogId}` : `/track/run?dogId=${dogId}`) as never);
   };
 
   // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
@@ -172,15 +228,17 @@ export default function TrackLiegenScreen() {
   };
   // Endgültiger Abbruch: separate, destruktive Aktion mit eigener Bestätigung und ehrlicher Folge.
   const confirmFinalAbort = (action: unknown) => {
-    Alert.alert('Fährte endgültig abbrechen?', 'Die Fährte wird beendet. Sie bleibt im Journal, kann danach aber nicht mehr fortgesetzt oder abgesucht werden.', [
-      { text: 'Nein', style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
-      { text: 'Endgültig abbrechen', style: 'destructive', onPress: () => {
+    Alert.alert(t('track.continuation.finalAbortTitle'), t('track.continuation.finalAbortText'), [
+      { text: t('track.continuation.no'), style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
+      { text: t('track.continuation.finalAbortConfirm'), style: 'destructive', onPress: () => {
         // Nur die Fährte DIESES Screens beenden: der Store wird nur mitgeändert, wenn er zu ihr
         // gehört (Deep-Link ohne dogId kann die Fährte eines anderen Hundes im Store halten).
         const st = useTrackingStore.getState();
         const target = resolveRestingCancelTarget({ routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId });
         if (target.cancelStore) st.setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
-        if (dogId) useActiveFaehrten.getState().remove(dogId);   // Registry: Fährte des Hundes entfernen
+        // Registry: nur den Eintrag DIESER Fährte entfernen (nie eine andere offene Fährte des Hundes).
+        const reg = useActiveFaehrten.getState().get(dogId);
+        if (reg && (!target.sessionId || reg.sessionId === target.sessionId)) useActiveFaehrten.getState().remove(dogId);
         // Abbruch dauerhaft lokal vermerken (best-effort, offline, nicht blockierend):
         // die Recovery bietet diese Fährte danach nur noch über „Fährte wieder öffnen" an.
         void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');
@@ -196,13 +254,13 @@ export default function TrackLiegenScreen() {
       if (allowLeaveRef.current) return;   // erlaubte Navigation → durchlassen
       e.preventDefault();                   // Standard-Back/Swipe/Header-Back blocken
       Alert.alert(
-        'Liegezeit läuft',
-        'Die Liegezeit läuft weiter, auch wenn du die App verlässt. Beendest du die Liegezeit, bleibt die Fährte offen und kann später fortgesetzt werden.',
+        t('track.continuation.leaveTitle'),
+        t('track.continuation.leaveText'),
         [
-          { text: 'Zurück', style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
-          { text: 'Weiterlaufen lassen', onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },
-          { text: 'Liegezeit beenden', onPress: () => endLyingTime(e.data.action) },
-          { text: 'Fährte endgültig abbrechen', style: 'destructive', onPress: () => confirmFinalAbort(e.data.action) },
+          { text: t('track.continuation.leaveStay'), style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
+          { text: t('track.continuation.leaveKeepRunning'), onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },
+          { text: t('track.continuation.leaveEndLyingTime'), onPress: () => endLyingTime(e.data.action) },
+          { text: t('track.continuation.leaveFinalAbort'), style: 'destructive', onPress: () => confirmFinalAbort(e.data.action) },
         ],
       );
     });
@@ -210,6 +268,10 @@ export default function TrackLiegenScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
 
+
+  // Vorgegebene Session nicht (mehr) lokal ladbar: keine Ersatzanzeige, Verlassen ohne Abbruch-Dialog.
+  useEffect(() => { if (unresolved) allowLeaveRef.current = true; }, [unresolved]);
+  if (unresolved) return <RestingIdentityMissing />;
 
   return (
     <View className="flex-1 bg-ft-bg">

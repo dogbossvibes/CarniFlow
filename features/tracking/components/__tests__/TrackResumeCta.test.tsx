@@ -3,6 +3,10 @@ import React from 'react';
 import { Alert } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
+import i18n from '@/i18n/config';
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 const mockEvaluate = jest.fn();
 const mockApply = jest.fn();
@@ -34,6 +38,7 @@ const byId = (r: Rendered, id: string) => r.root.findAll((n: Rendered) => n.prop
 const texts = (r: Rendered) => r.root.findAllByType('Text' as never).map((n: Rendered) => n.props.children).flat().join('|');
 
 let alertSpy: jest.SpyInstance;
+beforeAll(async () => { await i18n.changeLanguage('de'); });   // Kundentexte kommen aus i18n (de)
 beforeEach(() => {
   mockQa = false;
   [mockEvaluate, mockApply, mockComplete, mockPush, mockDiscard, mockReopen].forEach(m => m.mockReset());

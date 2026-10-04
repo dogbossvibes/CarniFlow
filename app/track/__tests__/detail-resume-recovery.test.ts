@@ -74,14 +74,15 @@ describe('Bewusster Abbruch wird dauerhaft vermerkt', () => {
     expect(marker).toBeGreaterThan(cancel);
     // Dialog nennt die echte Folge (endgültig) statt „bleibt gespeichert, nur Liegezeit endet".
     expect(liegen).not.toContain('Nur die Liegezeit wird beendet.');
-    expect(liegen).toContain('kann danach aber nicht mehr fortgesetzt oder abgesucht werden.');
+    expect(liegen).toContain("t('track.continuation.finalAbortText')");
+    expect(readFileSync(join(__dirname, '..', '..', '..', 'i18n', 'de-CH.ts'), 'utf8')).toContain('kann danach aber nicht mehr fortgesetzt oder abgesucht werden.');
   });
 
   it('Konflikt-Dialog „Fährte abbrechen" beim Legen vermerkt den Abbruch der bestehenden Fährte', () => {
     expect(legen).toContain("void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');");
     // Endgültig nur nach zweiter, ausdrücklicher Bestätigung (nie per Ein-Tipp neben „Abbrechen").
-    const first = legen.indexOf("{ text: 'Fährte abbrechen', style: 'destructive', onPress: () => Alert.alert(");
-    const confirm = legen.indexOf("'Bestehende Fährte endgültig abbrechen?'");
+    const first = legen.indexOf("{ text: t('track.continuation.conflictAbort'), style: 'destructive', onPress: () => Alert.alert(");
+    const confirm = legen.indexOf("t('track.continuation.conflictFinalTitle')");
     const marker = legen.indexOf("void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');");
     expect(first).toBeGreaterThan(-1);
     expect(confirm).toBeGreaterThan(first);

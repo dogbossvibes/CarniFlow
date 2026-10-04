@@ -169,10 +169,14 @@ describe('Quellen des Markers (Source-Vertrag)', () => {
   });
   it('beide Dialoge setzen den Marker erst nach ausdrücklicher Bestätigung mit ehrlicher Folge', () => {
     const liegen = read('app/track/liegen.tsx');
-    expect(liegen.indexOf("'Endgültig abbrechen'")).toBeLessThan(liegen.indexOf('recordTrackCancelled('));
-    expect(liegen).toContain('kann danach aber nicht mehr fortgesetzt oder abgesucht werden.');
+    expect(liegen.indexOf("t('track.continuation.finalAbortConfirm')")).toBeLessThan(liegen.indexOf('recordTrackCancelled('));
+    expect(liegen).toContain("t('track.continuation.finalAbortText')");
     const legen = read('app/track/legen.tsx');
-    expect(legen.indexOf("'Endgültig abbrechen'")).toBeLessThan(legen.indexOf('recordTrackCancelled('));
-    expect(legen).toContain('kann danach aber nicht mehr fortgesetzt oder abgesucht werden.');
+    expect(legen.indexOf("t('track.continuation.finalAbortConfirm')")).toBeLessThan(legen.indexOf('recordTrackCancelled('));
+    expect(legen).toContain("t('track.continuation.conflictFinalText')");
+    // Ehrliche Folge im Text (de-CH; alle Sprachen prüft liegen-leave-semantics/continuationI18n).
+    const de = readFileSync('i18n/de-CH.ts', 'utf8');
+    expect(de).toContain("'track.continuation.finalAbortText': 'Die Fährte wird beendet. Sie bleibt im Journal, kann danach aber nicht mehr fortgesetzt oder abgesucht werden.'");
+    expect(de).toContain("'track.continuation.conflictFinalText': 'Die offene Fährte dieses Hundes wird abgebrochen. Sie bleibt im Journal, kann danach aber nicht mehr fortgesetzt oder abgesucht werden.'");
   });
 });
