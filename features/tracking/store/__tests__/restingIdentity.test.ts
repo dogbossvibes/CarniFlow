@@ -1,5 +1,5 @@
 // Liegezeit-Identität (rein): fail closed, nie „jüngster Puffer eines anderen Hundes".
-import { matchesRestingIdentity, resolveRestingIdentity } from '@/features/tracking/store/restingIdentity';
+import { belongsToSession, matchesRestingIdentity, resolveRestingIdentity } from '@/features/tracking/store/restingIdentity';
 
 describe('resolveRestingIdentity', () => {
   it('1. sessionId + dogId → genau diese (auch ohne lokale Zeile)', () => {
@@ -27,5 +27,28 @@ describe('matchesRestingIdentity', () => {
     expect(matchesRestingIdentity(id, { dogId: 'dog-B', sessionId: 's-A' })).toBe(false);
     expect(matchesRestingIdentity(id, null)).toBe(false);
     expect(matchesRestingIdentity({ sessionId: null, dogId: 'dog-A' }, { dogId: 'dog-A', sessionId: 'beliebig' })).toBe(true);
+  });
+});
+
+describe('belongsToSession — Puffer/Store ohne eigene sessionId (Recorder hält currentSessionId=null)', () => {
+  const t = { dogId: 'dog-A', sessionId: 's-A' };
+  it('gleiche sessionId → ja; andere sessionId → nein (auch mit Registry-Beleg)', () => {
+    expect(belongsToSession({ dogId: 'dog-A', sessionId: 's-A' }, t)).toBe(true);
+    expect(belongsToSession({ dogId: 'dog-A', sessionId: 's-OLD' }, t, 's-A')).toBe(false);
+  });
+  it('sessionId fehlt → nur mit Registry-Beleg derselben Session und desselben Hundes', () => {
+    expect(belongsToSession({ dogId: 'dog-A', sessionId: null }, t, 's-A')).toBe(true);
+    expect(belongsToSession({ dogId: 'dog-A', sessionId: null }, t, 's-B')).toBe(false);
+    expect(belongsToSession({ dogId: 'dog-A', sessionId: null }, t, null)).toBe(false);   // fail closed
+    expect(belongsToSession({ dogId: 'dog-A', sessionId: null }, t)).toBe(false);
+  });
+  it('fremder Hund → nie, egal was die Registry sagt', () => {
+    expect(belongsToSession({ dogId: 'dog-B', sessionId: null }, t, 's-A')).toBe(false);
+    expect(belongsToSession({ dogId: 'dog-B', sessionId: 's-A' }, t, 's-A')).toBe(false);
+    expect(belongsToSession(null, t, 's-A')).toBe(false);
+  });
+  it('matchesRestingIdentity nutzt denselben Registry-Beleg', () => {
+    expect(matchesRestingIdentity({ sessionId: 's-A', dogId: 'dog-A' }, { dogId: 'dog-A', sessionId: null }, 's-A')).toBe(true);
+    expect(matchesRestingIdentity({ sessionId: 's-A', dogId: 'dog-A' }, { dogId: 'dog-A', sessionId: null })).toBe(false);
   });
 });

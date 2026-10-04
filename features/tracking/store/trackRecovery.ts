@@ -4,6 +4,7 @@ import {
   type ActiveFaehrte, type ActiveFaehrtenMap, isValidEntry, reopenTarget, upsertEntry,
 } from '@/features/tracking/store/activeFaehrtenModel';
 import { coerceTrackSegments } from '@/features/tracking/utils/trackSegments';
+import { belongsToSession } from '@/features/tracking/store/restingIdentity';
 import type { LocalTrackMarker, LocalTrackPoint, LocalTrainingSession } from '@/features/sync/types/sync';
 
 /** Lokaler Lifecycle-Hinweis einer Fährte in payload_json (nur lokal, der Remote-Sync liest ihn nicht). */
@@ -316,7 +317,8 @@ export function decideTrackRecovery(input: {
     return { ok: true, source, mode, registryPatch: patch, pendingToWrite: write, target: reopenTarget(entry) };
   };
 
-  const samePending = !!pending && pending.sessionId === sessionId && (pending.dogId == null || pending.dogId === dogId);
+  // Puffer frisch gelegter Fährten tragen sessionId=null (Recorder) → Zuordnung über den Registry-Beleg.
+  const samePending = belongsToSession(pending, { dogId, sessionId }, reg?.sessionId ?? null);
   if (pending && !samePending && isOpenPending(pending)) return { ok: false, reason: 'other_pending' };
   if (samePending && pendingStatus(pending!) === 'laying') return { ok: false, reason: 'laying_not_supported' };
   if (samePending && !RECOVERABLE_PENDING.includes(pendingStatus(pending!))) return { ok: false, reason: 'pending_closed' };
@@ -423,7 +425,8 @@ export function decideSearchDiscard(input: {
   if (reg && reg.sessionId !== sessionId) return { ok: false, reason: 'other_active' };
   if (reg?.status === 'laying') return { ok: false, reason: 'laying_not_supported' };
 
-  const samePending = !!pending && pending.sessionId === sessionId && (pending.dogId == null || pending.dogId === dogId);
+  // Puffer frisch gelegter Fährten tragen sessionId=null (Recorder) → Zuordnung über den Registry-Beleg.
+  const samePending = belongsToSession(pending, { dogId, sessionId }, reg?.sessionId ?? null);
   if (pending && !samePending && isOpenPending(pending)) return { ok: false, reason: 'other_pending' };
   if (samePending && pendingStatus(pending!) === 'laying') return { ok: false, reason: 'laying_not_supported' };
   if (samePending && !RECOVERABLE_PENDING.includes(pendingStatus(pending!))) return { ok: false, reason: 'pending_closed' };
@@ -454,9 +457,16 @@ export function resolveRestingCancelTarget(input: {
   routeDogId: string | null | undefined;
   storeSessionId: string | null | undefined;
   storeDogId: string | null | undefined;
+  /** Registry-Session des Route-Hundes: Beleg für einen Store OHNE eigene sessionId (frisch gelegt). */
+  registrySessionId?: string | null;
 }): { sessionId: string | null; dogId: string | null; cancelStore: boolean } {
   const sessionId = input.routeSessionId ?? input.storeSessionId ?? null;
-  const cancelStore = !input.routeSessionId || input.storeSessionId === input.routeSessionId;
+  const cancelStore = !input.routeSessionId || input.storeSessionId === input.routeSessionId
+    || (!!input.routeDogId && belongsToSession(
+      { dogId: input.storeDogId, sessionId: input.storeSessionId },
+      { dogId: input.routeDogId, sessionId: input.routeSessionId },
+      input.registrySessionId,
+    ));
   const dogId = input.routeDogId ?? (cancelStore ? input.storeDogId ?? null : null);
   return { sessionId, dogId, cancelStore };
 }

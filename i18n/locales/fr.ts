@@ -170,7 +170,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.continuation.cardTitleIncomplete": "Recherche incomplète détectée",
   "track.continuation.cardTextIncomplete": "Une recherche a été commencée mais pas terminée dans ANYVO. Choisis comment continuer.",
   "track.continuation.cardTitleCancelled": "Cette piste a été interrompue",
-  "track.continuation.cardTextCancelled": "La piste posée est toujours enregistrée. Tu peux la rouvrir puis la poursuivre ou la clôturer.",
+  "track.continuation.cardTextCancelled": "La piste est toujours enregistrée. Tu peux la rouvrir et la poursuivre.",
   "track.continuation.reopen": "Rouvrir la piste",
   "track.continuation.reopenFailed": "Cette piste ne peut pas être rouverte.",
   "track.continuation.resumeFailed": "Cette piste ne peut plus être poursuivie.",

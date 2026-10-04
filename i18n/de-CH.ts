@@ -280,7 +280,7 @@ export const deCH = {
   'track.continuation.cardTitleIncomplete': 'Unvollständige Absuche erkannt',
   'track.continuation.cardTextIncomplete': 'Eine Absuche wurde begonnen, aber nicht in ANYVO beendet. Wähle, wie es weitergehen soll.',
   'track.continuation.cardTitleCancelled': 'Diese Fährte wurde abgebrochen',
-  'track.continuation.cardTextCancelled': 'Die gelegte Fährte ist weiterhin gespeichert. Du kannst sie wieder öffnen und danach fortsetzen oder abschliessen.',
+  'track.continuation.cardTextCancelled': 'Die Fährte ist weiterhin gespeichert. Du kannst sie wieder öffnen und fortsetzen.',
   'track.continuation.reopen': 'Fährte wieder öffnen',
   'track.continuation.reopenFailed': 'Diese Fährte kann nicht wieder geöffnet werden.',
   'track.continuation.resumeFailed': 'Diese Fährte kann nicht mehr fortgesetzt werden.',

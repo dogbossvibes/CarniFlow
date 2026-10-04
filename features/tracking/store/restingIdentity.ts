@@ -35,14 +35,37 @@ export function resolveRestingIdentity(input: {
 }
 
 /**
+ * Gehört ein Puffer bzw. der Aufnahme-Store zu Session `target.sessionId` von Hund `target.dogId`?
+ * Der Recorder hält die lokale Session-ID bewusst NICHT im Aufnahme-Store (currentSessionId bleibt
+ * null, siehe useTrackRecorder) — Puffer frisch gelegter Fährten tragen daher `sessionId: null`.
+ * Die verbindliche Zuordnung Hund → offene Session steht in der Aktive-Fährten-Registry (beim
+ * Lege-Ende mit der lokalen Session-ID gesetzt). Deshalb:
+ *   • gleiche sessionId (und kein fremder Hund) → ja
+ *   • sessionId fehlt → NUR mit Registry-Beleg: derselbe Hund UND Registry(Hund).sessionId === Ziel
+ *   • sonst → nein (nie ein anderer Hund, nie „irgendein" Puffer)
+ */
+export function belongsToSession(
+  candidate: { dogId?: string | null; sessionId?: string | null } | null | undefined,
+  target: { dogId: string; sessionId: string },
+  registrySessionId?: string | null,
+): boolean {
+  if (!candidate) return false;
+  if (candidate.dogId != null && candidate.dogId !== target.dogId) return false;
+  if (candidate.sessionId != null) return candidate.sessionId === target.sessionId;
+  return registrySessionId != null && registrySessionId === target.sessionId;
+}
+
+/**
  * Darf ein geladener Puffer bzw. der Store für diese Identität angezeigt werden? Nur derselbe Hund
- * und — wenn eine Session vorgegeben ist — genau diese Session (nie eine andere desselben Hundes).
+ * und — wenn eine Session vorgegeben ist — genau diese Session (ohne eigene sessionId nur mit
+ * Registry-Beleg, siehe belongsToSession).
  */
 export function matchesRestingIdentity(
   identity: { sessionId: string | null; dogId: string },
   candidate: { dogId?: string | null; sessionId?: string | null } | null | undefined,
+  registrySessionId?: string | null,
 ): boolean {
   if (!candidate) return false;
-  if (candidate.dogId != null && candidate.dogId !== identity.dogId) return false;
-  return !identity.sessionId || candidate.sessionId === identity.sessionId;
+  if (!identity.sessionId) return candidate.dogId == null || candidate.dogId === identity.dogId;
+  return belongsToSession(candidate, { dogId: identity.dogId, sessionId: identity.sessionId }, registrySessionId);
 }

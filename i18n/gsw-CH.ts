@@ -280,7 +280,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.continuation.cardTitleIncomplete': 'Unvollständigi Absuechi erkannt',
   'track.continuation.cardTextIncomplete': 'Ä Absuechi isch agfange, aber nöd in ANYVO beendet worde. Wähl, wie’s wiitergaht.',
   'track.continuation.cardTitleCancelled': 'Die Fährte isch abbroche worde',
-  'track.continuation.cardTextCancelled': 'Di gleiti Fährte isch wiiterhin gspeicheret. Du chasch si wieder ufmache und dänn wiiterfüehre oder abschliesse.',
+  'track.continuation.cardTextCancelled': 'D Fährte isch wiiterhin gspeicheret. Du chasch si wieder ufmache und wiitermache.',
   'track.continuation.reopen': 'Fährte wieder ufmache',
   'track.continuation.reopenFailed': 'Die Fährte cha nöd wieder ufgmacht werde.',
   'track.continuation.resumeFailed': 'Die Fährte cha nüme wiitergmacht werde.',

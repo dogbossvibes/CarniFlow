@@ -69,7 +69,8 @@ describe('Bewusster Abbruch wird dauerhaft vermerkt', () => {
   it('Liegezeit „Fährte abbrechen": Marker nach Status/Registry, nicht awaited', () => {
     const cancel = liegen.indexOf("if (target.cancelStore) st.setSessionStatus('cancelled');");
     const marker = liegen.indexOf("void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');");
-    expect(liegen).toContain('const target = resolveRestingCancelTarget({ routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId });');
+    expect(liegen).toContain('routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId,');
+    expect(liegen).toContain('registrySessionId: useActiveFaehrten.getState().get(dogId)?.sessionId ?? null,');
     expect(cancel).toBeGreaterThan(-1);
     expect(marker).toBeGreaterThan(cancel);
     // Dialog nennt die echte Folge (endgültig) statt „bleibt gespeichert, nur Liegezeit endet".

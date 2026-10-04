@@ -1,6 +1,6 @@
 // „Fährte fortsetzen" + „Ohne App abgeschlossen": Sichtbarkeit, Bestätigung, Wirkung.
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
 import i18n from '@/i18n/config';
@@ -157,11 +157,37 @@ describe('TrackResumeCta', () => {
     expect(mockPush).toHaveBeenCalledWith('/track/liegen?dogId=dog-A&id=sess-A');
   });
 
-  it('QA-Modus: „cancelled" nennt Quelle und Zeitpunkt des Abbruchs (wodurch beendet)', async () => {
+  it('QA-Modus: Quelle/Zeitpunkt NUR über zugeklappte „Diagnosedetails", menschenlesbar (keine Recovery:/source=/ISO-Zeit)', async () => {
     mockQa = true;
-    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled', detail: { lifecycleSource: 'resting_abort', lifecycleAt: '2026-10-04T09:00:00.000Z' } });
+    const at = new Date(2026, 9, 4, 16, 6).toISOString();   // lokale Zeit → „04.10.2026, 16:06"
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled', detail: { lifecycleSource: 'resting_abort', lifecycleAt: at } });
     const r = await mount();
-    expect(texts(r)).toContain('Recovery: cancelled · resting_abort · 2026-10-04T09:00:00.000Z');
+    expect(texts(r)).not.toMatch(/Recovery:|source=|resting_abort|\d{4}-\d{2}-\d{2}T/);
+    expect(byId(r, 'track-recovery-diag')).toBeUndefined();   // standardmässig zu
+    await act(async () => { byId(r, 'track-recovery-diag-toggle').props.onPress(); });
+    const t = texts(r);
+    expect(t).toContain('Status: Abgebrochen');
+    expect(t).toContain('Quelle: Liegezeit endgültig abgebrochen');
+    expect(t).toContain('Zeitpunkt: 04.10.2026, 16:06');
+    expect(t).not.toMatch(/Recovery:|source=|\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('QA-Modus, Altbestand ohne Quelle → „Quelle: Altbestand / unbekannt"', async () => {
+    mockQa = true;
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled', detail: { lifecycleSource: null, lifecycleAt: null } });
+    const r = await mount();
+    await act(async () => { byId(r, 'track-recovery-diag-toggle').props.onPress(); });
+    expect(texts(r)).toContain('Quelle: Altbestand / unbekannt');
+    expect(texts(r)).toContain('Zeitpunkt: unbekannt');
+  });
+
+  it('normaler Kunde (kein QA-Modus): keine technische Zeile, keine Diagnosedetails in der Karte', async () => {
+    mockQa = false;
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled', detail: { lifecycleSource: null, lifecycleAt: '2026-10-04T14:06:00.000Z' } });
+    const r = await mount();
+    expect(texts(r)).not.toMatch(/Recovery|Diagnosedetails|source=|Altbestand|\d{4}-\d{2}-\d{2}/);
+    expect(byId(r, 'track-recovery-diag-toggle')).toBeUndefined();
+    expect(byId(r, 'track-recovery-reason')).toBeUndefined();
   });
 
   it('10. Mount/Unmount/Remount der Karte schreibt nichts (kein Apply/Complete/Discard) und bleibt verfügbar', async () => {
@@ -178,7 +204,9 @@ describe('TrackResumeCta', () => {
   it('2. „Fährte fortsetzen" nutzt den bestehenden Mint-Primärstil (C.trackPrimary), grosses Touch-Target', async () => {
     mockEvaluate.mockResolvedValue({ ok: true, source: 'session', mode: 'resting', registryPatch: {}, pendingToWrite: null, target: '/t' });
     const r = await mount();
-    const style = [].concat(byId(r, 'track-resume-cta').props.style({ pressed: false })).filter(Boolean).reduce((a: object, b: object) => ({ ...a, ...b }), {}) as { backgroundColor: string; minHeight: number };
+    const raw = byId(r, 'track-resume-cta').props.style;
+    expect(typeof raw).not.toBe('function');   // statischer Style: greift sicher auch unter NativeWind-Interop
+    const style = StyleSheet.flatten(raw) as { backgroundColor: string; minHeight: number };
     const { C } = jest.requireActual('@/constants/colors');
     expect(style.backgroundColor).toBe(C.trackPrimary);
     expect(style.minHeight).toBeGreaterThanOrEqual(56);
@@ -215,5 +243,60 @@ describe('TrackResumeCta', () => {
     await act(async () => { await byId(r, 'track-reopen-cancelled').props.onPress(); });
     expect(alertSpy).toHaveBeenCalledWith('Fährte wieder öffnen', 'Diese Fährte kann nicht wieder geöffnet werden.');
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  describe('Abgebrochene Fährte: Mint-Action „Fährte wieder öffnen"', () => {
+    const { C } = jest.requireActual('@/constants/colors');
+    const hex = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+    const lum = (h: string) => { const [r, g, b] = hex(h).map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const contrast = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+    const mountCancelled = async () => { mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled' }); return mount(); };
+
+    it('Theme-Mint für Text, Icon, Rahmen und getönte Fläche; Touch-Höhe ≥ 48; statischer Style', async () => {
+      const r = await mountCancelled();
+      const btn = byId(r, 'track-reopen-cancelled');
+      expect(typeof btn.props.style).not.toBe('function');
+      const st = StyleSheet.flatten(btn.props.style) as { minHeight: number; borderColor: string; backgroundColor: string };
+      expect(st.minHeight).toBeGreaterThanOrEqual(48);
+      expect(st.borderColor.startsWith(C.trackPrimary)).toBe(true);
+      expect(st.backgroundColor.startsWith(C.trackPrimary)).toBe(true);
+      const label = btn.findAll((n: Rendered) => n.type === 'Text' && [].concat(n.props.children).join('') === 'Fährte wieder öffnen')[0];
+      expect(StyleSheet.flatten(label.props.style).color).toBe(C.trackPrimary);
+      const icon = btn.findAll((n: Rendered) => n.props.name === 'refresh')[0];
+      expect(icon.props.color).toBe(C.trackPrimary);
+    });
+
+    it('gut sichtbar: Mint-Text auf Karten-Hintergrund mit Kontrast ≥ 4.5:1 (WCAG AA)', () => {
+      expect(contrast(C.trackPrimary, C.trackCard)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('Dark/Light: App erzwingt Dark-UI, Karten-Tokens sind statisch → identische Darstellung in beiden System-Modi', async () => {
+      const app = JSON.parse(jest.requireActual('fs').readFileSync('app.json', 'utf8'));
+      expect(app.expo.userInterfaceStyle).toBe('dark');
+      const RN = jest.requireActual('react-native');
+      const styles: string[] = [];
+      for (const scheme of ['dark', 'light'] as const) {
+        const spy = jest.spyOn(RN.Appearance, 'getColorScheme').mockReturnValue(scheme);
+        const r = await mountCancelled();
+        styles.push(JSON.stringify(StyleSheet.flatten(byId(r, 'track-reopen-cancelled').props.style)));
+        act(() => { r.unmount(); }); renderer = null;
+        spy.mockRestore();
+      }
+      expect(styles[0]).toBe(styles[1]);
+    });
+
+    it('alle Karten-Buttons ohne Style-Funktion (NativeWind-sicher)', async () => {
+      mockEvaluate.mockResolvedValue({ ok: false, reason: 'search_started' });
+      const r = await mount();
+      for (const id of ['track-discard-search', 'track-complete-without-app']) expect(typeof byId(r, id).props.style).not.toBe('function');
+    });
+
+    it('Reopen-Action funktioniert unverändert', async () => {
+      mockReopen.mockResolvedValue({ ok: true, decision: { ok: true, source: 'session', mode: 'resting', registryPatch: {}, pendingToWrite: null, target: '/t' } });
+      const r = await mountCancelled();
+      await act(async () => { await byId(r, 'track-reopen-cancelled').props.onPress(); });
+      expect(mockReopen).toHaveBeenCalledWith('sess-A', 'dog-A', { hasRemoteSearchRun: false });
+      expect(byId(r, 'track-resume-cta')).toBeDefined();
+    });
   });
 });

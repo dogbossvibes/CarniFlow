@@ -46,6 +46,13 @@ import { deCH } from '@/i18n/de-CH';
 type Btn = { text: string; onPress?: () => void };
 type Rendered = any;
 const LANGS = ['de', 'gsw', 'en', 'fr', 'it'] as const;
+const CANCELLED_TEXT: Record<string, string> = {
+  de: 'Die Fährte ist weiterhin gespeichert. Du kannst sie wieder öffnen und fortsetzen.',
+  gsw: 'D Fährte isch wiiterhin gspeicheret. Du chasch si wieder ufmache und wiitermache.',
+  en: 'The track is still saved. You can reopen it and continue.',
+  fr: 'La piste est toujours enregistrée. Tu peux la rouvrir et la poursuivre.',
+  it: 'La pista è ancora salvata. Puoi riaprirla e riprenderla.',
+};
 const EXPECT: Record<typeof LANGS[number], { leave: string; end: string; abort: string; confirm: string; resume: string; reopen: string; cancelledTitle: string }> = {
   de:  { leave: 'Liegezeit läuft', end: 'Liegezeit beenden', abort: 'Fährte endgültig abbrechen', confirm: 'Endgültig abbrechen', resume: 'Fährte fortsetzen', reopen: 'Fährte wieder öffnen', cancelledTitle: 'Diese Fährte wurde abgebrochen' },
   gsw: { leave: 'Liegeziit lauft', end: 'Liegeziit beende', abort: 'Fährte endgültig abbreche', confirm: 'Endgültig abbreche', resume: 'Fährte wiitermache', reopen: 'Fährte wieder ufmache', cancelledTitle: 'Die Fährte isch abbroche worde' },
@@ -106,6 +113,7 @@ describe.each(LANGS)('Sprache %s', lng => {
     const t = texts(b);
     expect(t).toContain(e.reopen);
     expect(t).toContain(e.cancelledTitle);
+    expect(t).toContain(CANCELLED_TEXT[lng]);   // gekürzter Kurztext
     // Keine rohen Keys / technische Reason-Zeile / interne Begriffe (das englische Kundenwort „cancelled" ist erlaubt).
     expect(t).not.toMatch(/track\.continuation\.|Recovery:|lifecycle|pending|resting_abort/i);
     if (lng === 'en' || lng === 'fr' || lng === 'it') expect(t).not.toMatch(GERMAN_WORDS);

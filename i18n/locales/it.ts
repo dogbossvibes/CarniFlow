@@ -318,7 +318,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.continuation.cardTitleIncomplete": "Ricerca incompleta rilevata",
   "track.continuation.cardTextIncomplete": "Una ricerca è stata iniziata ma non conclusa in ANYVO. Scegli come procedere.",
   "track.continuation.cardTitleCancelled": "Questa pista è stata interrotta",
-  "track.continuation.cardTextCancelled": "La pista posata è ancora salvata. Puoi riaprirla e poi riprenderla o chiuderla.",
+  "track.continuation.cardTextCancelled": "La pista è ancora salvata. Puoi riaprirla e riprenderla.",
   "track.continuation.reopen": "Riapri la pista",
   "track.continuation.reopenFailed": "Questa pista non può essere riaperta.",
   "track.continuation.resumeFailed": "Questa pista non può più essere ripresa.",

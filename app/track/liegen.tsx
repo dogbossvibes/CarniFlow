@@ -125,9 +125,11 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   const identity = { sessionId: id ?? null, dogId };
   const regCandidate = useActiveFaehrten.getState().get(dogId);
   const regEntry = matchesRestingIdentity(identity, regCandidate) ? regCandidate : null;
+  // Registry-Beleg für Puffer/Store ohne eigene sessionId (frisch gelegte Fährte, siehe belongsToSession).
+  const regSessionId = regEntry?.sessionId ?? null;
   // Store nur, wenn er GENAU diese Fährte hält (sonst zeigte die erste Anzeige kurz einen anderen Hund).
   const st0 = useTrackingStore.getState();
-  const hasStore = matchesRestingIdentity(identity, { dogId: st0.dogId, sessionId: st0.currentSessionId })
+  const hasStore = matchesRestingIdentity(identity, { dogId: st0.dogId, sessionId: st0.currentSessionId }, regSessionId)
     && (st0.trackPoints.length > 0 || st0.layStartedAt != null);
   const [unresolved, setUnresolved] = useState(false);   // vorgegebene Session lokal nicht ladbar → keine Ersatzanzeige
   const [startMs, setStartMs] = useState<number | null>(() =>
@@ -151,13 +153,13 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   useEffect(() => {
     let alive = true;
     const st = useTrackingStore.getState();
-    const storeHasThisTrack = matchesRestingIdentity(identity, { dogId: st.dogId, sessionId: st.currentSessionId });
+    const storeHasThisTrack = matchesRestingIdentity(identity, { dogId: st.dogId, sessionId: st.currentSessionId }, regSessionId);
     if (storeHasThisTrack && (st.trackPoints.length > 0 || st.layStartedAt != null)) return;   // (a)
     // Nur der EIGENE Slot dieses Hundes (dogId ist jetzt immer eindeutig) — nie der jüngste
     // Puffer eines anderen Hundes; bei vorgegebener Session nur genau diese Session.
     loadPending(dogId).then(p => {
       if (!alive) return;
-      if (id && !matchesRestingIdentity(identity, p)) { setUnresolved(true); return; }
+      if (id && !matchesRestingIdentity(identity, p, regSessionId)) { setUnresolved(true); return; }
       if (p && (isRestingRecovery(p) || p.trackPoints.length > 0)) {
         useTrackingStore.getState().restorePending(p);   // KEINE neue sessionId, Status bleibt; setzt dogId
         setStartMs(p.layStartedAt ?? p.layFinishedAt ?? Date.now());
@@ -234,7 +236,10 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
         // Nur die Fährte DIESES Screens beenden: der Store wird nur mitgeändert, wenn er zu ihr
         // gehört (Deep-Link ohne dogId kann die Fährte eines anderen Hundes im Store halten).
         const st = useTrackingStore.getState();
-        const target = resolveRestingCancelTarget({ routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId });
+        const target = resolveRestingCancelTarget({
+          routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId,
+          registrySessionId: useActiveFaehrten.getState().get(dogId)?.sessionId ?? null,
+        });
         if (target.cancelStore) st.setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
         // Registry: nur den Eintrag DIESER Fährte entfernen (nie eine andere offene Fährte des Hundes).
         const reg = useActiveFaehrten.getState().get(dogId);

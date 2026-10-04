@@ -318,7 +318,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.continuation.cardTitleIncomplete": "Incomplete search detected",
   "track.continuation.cardTextIncomplete": "A search was started but not finished in ANYVO. Choose how to continue.",
   "track.continuation.cardTitleCancelled": "This track was cancelled",
-  "track.continuation.cardTextCancelled": "The laid track is still saved. You can reopen it and then continue or close it.",
+  "track.continuation.cardTextCancelled": "The track is still saved. You can reopen it and continue.",
   "track.continuation.reopen": "Reopen track",
   "track.continuation.reopenFailed": "This track cannot be reopened.",
   "track.continuation.resumeFailed": "This track can no longer be continued.",
