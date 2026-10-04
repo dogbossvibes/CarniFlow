@@ -54,6 +54,11 @@ import {
 import { getTrackQuickPickerLayout } from '@/features/tracking/utils/quickPickerLayout';
 import { PocketLockOverlay } from '@/features/tracking/components/PocketLockOverlay';
 import { HoldToStopButton } from '@/features/tracking/components/HoldToStopButton';
+import { useActiveTrackOverlays } from '@/features/tracking/hooks/useActiveTrackOverlays';
+import { TrackReferenceOverlayControl } from '@/features/tracking/components/TrackReferenceOverlayControl';
+import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
+
+const NO_REFERENCE_OVERLAYS: TrackReferenceOverlay[] = [];
 
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
@@ -341,9 +346,22 @@ export default function LegenScreen() {
     trackPoints, markers, currentPosition, heading, gpsAccuracy,
     distanceMeters, durationSeconds, isPaused, mapFollowMode, setMapFollowMode,
     startAnchor, startLockActive, startDriftRejectedCount, segments,
+    dogId: storeDogId, currentSessionId: storeSessionId,
   } = useTrackingStore();
   const activeSegment = activeOrPlannedSegment(segments);
   const currentStep = metersToSteps(distanceMeters, stepLengthM);
+
+  // Andere offene Fährten der eigenen Hunde als read-only Referenz (nur Karte).
+  // Die Store-Session zählt nur, wenn sie zum gewählten Hund gehört — sonst würde
+  // eine noch geladene Fährte eines anderen Hundes fälschlich ausgeblendet.
+  // Default AN, kontextuell (kein globales Setting). Lädt nie pro GPS-Fix.
+  const referenceOverlays = useActiveTrackOverlays({
+    userId:           session?.user?.id ?? null,
+    currentUserDogs:  dogs,
+    currentDogId:     activeDog?.id ?? null,
+    currentSessionId: activeDog && storeDogId === activeDog.id ? storeSessionId : null,
+  });
+  const [showReferenceTracks, setShowReferenceTracks] = useState(true);
 
   // Ein brauchbarer Fix ist Pflicht; langes Warten ersetzt keine Genauigkeit.
   const gpsReady = isLaySessionWarmupReady(gpsAccuracy);
@@ -713,6 +731,7 @@ export default function LegenScreen() {
           {view === 'map' ? (
             <TrackingMap
               layPoints={trackPoints}
+              referenceOverlays={showReferenceTracks ? referenceOverlays : NO_REFERENCE_OVERLAYS}
               markers={mapMarkers}
               segments={segments}
               startAnchor={startAnchor}
@@ -745,6 +764,16 @@ export default function LegenScreen() {
               </View>
               <Text className="text-[12.5px] font-bold text-ft-text">{activeDog.name}</Text>
             </View>
+          )}
+
+          {/* Andere Fährten (read-only Referenz) — nur mit mindestens einer Referenz. */}
+          {view === 'map' && phase === 'recording' && (
+            <TrackReferenceOverlayControl
+              overlays={referenceOverlays}
+              visible={showReferenceTracks}
+              onVisibleChange={setShowReferenceTracks}
+              style={{ position: 'absolute', top: 100, left: 14, zIndex: 20 }}
+            />
           )}
 
           {/* Metrik-Leiste (unten) */}

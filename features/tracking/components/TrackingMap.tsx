@@ -12,6 +12,8 @@ import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
 import { buildTrackSegmentPolylines, laidTrackStroke } from '@/features/tracking/utils/trackSegments';
 import { useSmartTrackCamera } from '@/features/tracking/hooks/useSmartTrackCamera';
+import { TrackReferenceOverlayLayer } from '@/features/tracking/components/TrackReferenceOverlayLayer';
+import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
@@ -75,6 +77,9 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
 
 interface Props {
   layPoints:        LatLng[];
+  // Read-only Referenz-Fährten anderer eigener Hunde (nur Linie + Start-Label).
+  // Reine Darstellung: fliessen in KEINE Kamera-/Fit-/Recenter-Logik ein.
+  referenceOverlays?: readonly TrackReferenceOverlay[];
   runPoints?:       LatLng[];
   rawPoints?:       LatLng[];   // ungefilterte Rohspur (Debug) — grau, ungeglättet
   rejectedPoints?:  LatLng[];   // verworfene Punkte (Debug) — kleine rote Punkte
@@ -114,7 +119,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  layPoints, referenceOverlays, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -254,6 +259,11 @@ export function TrackingMap({
           latitudeDelta: 0.0016, longitudeDelta: 0.0016,
         }}
       >
+        {/* Referenz-Fährten anderer eigener Hunde: zuerst + zIndex 1 → immer unter
+            der aktuellen Lay-Linie (zIndex 2/3). */}
+        {referenceOverlays && referenceOverlays.length > 0 && (
+          <TrackReferenceOverlayLayer overlays={referenceOverlays} Polyline={Polyline} Marker={Marker} />
+        )}
         {/* Rohspur (Debug): grau, dünn, ungeglättet — zeigt GPS-Drift */}
         {rawCoords.length > 1 && (
           <Polyline coordinates={rawCoords} strokeColor="rgba(255,255,255,0.35)" strokeWidth={2} />

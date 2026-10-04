@@ -104,6 +104,14 @@ export async function loadPending(dogId?: string | null): Promise<PendingTrack |
   return loadMostRecentPending();
 }
 
+// Reiner Lesezugriff auf den Hunde-Slot — OHNE Legacy-Migration und ohne jeden
+// Schreibzugriff (für read-only Ansichten wie die Referenz-Fährten beim Legen).
+export async function peekPending(dogId: string): Promise<PendingTrack | null> {
+  if (!dogId) return null;
+  const own = await readKey(keyFor(dogId));
+  return own ? { ...own, dogId: own.dogId ?? dogId } : null;
+}
+
 // Jüngsten Hunde-Puffer über alle Slots hinweg (Fallback ohne bekannte dogId).
 export async function loadMostRecentPending(): Promise<PendingTrack | null> {
   try {
