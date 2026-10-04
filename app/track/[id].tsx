@@ -28,6 +28,7 @@ import { dismissLocalAutoDwellDetection } from '@/features/training/repositories
 import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
 import { isOpenStatus } from '@/features/tracking/store/activeFaehrtenModel';
 import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
+import { hasFinalSearchRun } from '@/features/tracking/store/trackRecovery';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
@@ -154,7 +155,7 @@ export default function TrackAuswertungScreen() {
         // Eine gelegte, noch liegende Fährte (oder eine andere Fährte desselben
         // Hundes) bleibt aktiv; sonst verschwindet sie aus „Fährte fortsetzen".
         const reg = d.dog_id ? useActiveFaehrten.getState().get(d.dog_id) : null;
-        const searched = trackAnalysisAvailability(d).state !== 'pending_search';   // = Suchlauf vorhanden (hasSearchRun)
+        const searched = hasFinalSearchRun(d);   // nur ein TATSÄCHLICH final abgeschlossener Suchlauf
         if (d.dog_id && reg?.sessionId === String(id) && searched) useActiveFaehrten.getState().remove(d.dog_id);
       }
       setLoading(false);
@@ -215,8 +216,10 @@ export default function TrackAuswertungScreen() {
   // gelaufen, aber ohne Analyse". Bisher sahen beide Fälle identisch aus —
   // nämlich gar nicht.
   const analysisState = availability.state;
-  // „Fährte fortsetzen" nur bei ausstehender Absuche (Eindeutigkeit prüft TrackResumeCta).
-  const canOfferResume = analysisState === 'pending_search';
+  // Recovery nur ohne TATSÄCHLICH finalen Suchlauf (hasFinalSearchRun) — ein unvollständiger
+  // Run (remote track_runs ohne ended_at) blockiert nicht. Die Eindeutigkeit prüft TrackResumeCta.
+  const canOfferResume = !hasFinalSearchRun(data);
+  const [recoveryCardVisible, setRecoveryCardVisible] = useState(false);
   const qaDiagnostics = isQaDiagnosticsEnabled();
   const isReplayEligible = useMemo(() => isTrackReplayEligible(data), [data]);
   const [analyseExpanded, setAnalyseExpanded] = useState(false);
@@ -360,10 +363,9 @@ export default function TrackAuswertungScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Gelegte, noch nicht abgesuchte Fährte → zurück in die Liegezeit (nur wenn eindeutig fortsetzbar). */}
-          {canOfferResume && (
-            <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} hasRemoteSearchRun={!canOfferResume} />
-          )}
+          {/* Recovery-Karte direkt unter dem Header: offene Fährte fortsetzen oder „Ohne App
+              abgeschlossen". Ohne Karte zeigt der QA-Diagnosemodus den konkreten Grund. */}
+          <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />
 
           {/* Hero — links Ring (nur Zahl + /100), Beschriftung „Manuelle
               Bewertung" UNTER dem Ring (ausserhalb der Kreisgrafik), rechts die
@@ -415,6 +417,9 @@ export default function TrackAuswertungScreen() {
               erzeugt (0 m Distanz) — automatische Aussage klar von der
               manuellen Bewertung trennen, kein stiller "100 Punkte"-Anschein.
               Per Konstruktion nie neben einer verwertbaren Analyse (Helfer). */}
+          {/* Bei offener Fährte ersetzt die Recovery-Karte diesen Hinweis — es gab keine
+              (beendete) Absuche, „keine verwertbare Suchspur aufgezeichnet" wäre irreführend. */}
+          {!recoveryCardVisible && (<>
           {availability.showNoSearchTrackWarning && (
             <View style={[s.card, { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, marginBottom: 16, backgroundColor: C.trackWarning + '14', borderColor: C.trackWarning + '55', borderWidth: 1 }]}>
               <Ionicons name="information-circle" size={18} color={C.trackWarning} />
@@ -423,6 +428,7 @@ export default function TrackAuswertungScreen() {
               </Text>
             </View>
           )}
+          </>)}
 
           {/* Highlights */}
           <View style={s.highlightRow}>

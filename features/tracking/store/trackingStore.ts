@@ -136,6 +136,7 @@ interface TrackingState {
   setSearchRunId: (runId: string | null) => void;  // runId nachreichen (startTrackRun ist async)
   setSearchHandlerDistanceM: (v: SearchHandlerDistanceM) => void;  // 5/10-m-Auswahl (vor Absuche)
   setSessionStatus: (status: SessionStatus) => void;
+  clearSearchSession: () => void;                  // Suchversuch verworfen: Such-Felder zurück, Fährte wieder 'resting' (Lay-Daten bleiben)
   restoreSearchSession: (p: PendingTrack) => void; // Recovery: Absuche-Metadaten + Punkte aus dem Puffer zurückspielen (P2)
   // ── Search-Recovery-State (gehört zur aktiven searchRunId) ──
   noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
@@ -298,6 +299,16 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setSearchRunId: (runId) => { set({ searchRunId: runId }); persistNow(get); },
   setSearchHandlerDistanceM: (v) => { set({ searchHandlerDistanceM: v }); persistNow(get); },
   setSessionStatus: (status) => { set({ sessionStatus: status }); persistNow(get); },
+  // „Absuche verwerfen": NUR den Suchversuch zurücknehmen — gelegte Punkte/Marker/
+  // Segmente, Session-ID, Hund und Liegezeit-Basis bleiben; kein 'cancelled'. Sofort persistiert.
+  clearSearchSession: () => {
+    set({
+      sessionStatus: 'resting', isPaused: false,
+      searchRunId: null, searchStartedAt: null, searchUpdatedAt: null,
+      searchTrackPoints: [], searchRunState: freshSearchRunState(),
+    });
+    persistNow(get);
+  },
   // Recovery (P2): Absuche-Metadaten + Punkte aus dem Puffer in den Store spielen
   // (nach App-Kill). Legacy-sicher (Felder optional). Setzt NICHT auf Aufnahme.
   restoreSearchSession: (p) => set({

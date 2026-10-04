@@ -131,6 +131,33 @@ function parseObj(json: string | null | undefined): Record<string, any> | null {
   try { const v = JSON.parse(json); return v && typeof v === 'object' ? v : null; } catch { return null; }
 }
 
+/**
+ * Gibt es einen TATSÄCHLICH final abgeschlossenen Suchlauf? Nur der darf Recovery blockieren.
+ * Nach dem aktuellen Datenmodell:
+ *   • `track_data.run` (lokal payload_json.run bzw. remote training_sessions.track_data.run)
+ *     entsteht ausschliesslich beim Beenden der Absuche (run.tsx handleFinish/endSearch →
+ *     finalizeLocalTrackRun) → final, auch mit 0 m Suchspur (Nutzer hat beendet).
+ *   • remote `track_runs`-Zeile: nur final mit `ended_at`. Eine Zeile OHNE `ended_at`
+ *     stammt aus dem alten Startpfad (startTrackRun legte sie beim START an) → unvollständig,
+ *     blockiert nicht.
+ * Bewusst getrennt von trackAnalysisState.hasSearchRun (Analyse-Anzeige bleibt unverändert).
+ */
+export function hasFinalSearchRun(data: { track_data?: { run?: unknown; [key: string]: unknown } | null; runs?: unknown[] | null } | null | undefined): boolean {
+  if (!data) return false;
+  if (data.track_data?.run) return true;
+  return Array.isArray(data.runs) && data.runs.some(r => !!r && typeof r === 'object' && (r as { ended_at?: unknown }).ended_at != null);
+}
+
+/**
+ * Darf „Ohne App abgeschlossen" angeboten werden? Immer, wenn Fortsetzen möglich ist —
+ * zusätzlich bei `search_started`: eigene, nicht final abgeschlossene Fährte mit begonnener
+ * Absuche, die nicht eindeutig fortsetzbar ist (keine Rekonstruktion einer Absuche aus SQLite).
+ * Schliessen erfindet nichts und ist damit auch dann sicher.
+ */
+export function canCompleteWithoutApp(d: RecoveryDecision): boolean {
+  return d.ok || d.reason === 'search_started';
+}
+
 /** Dauerhafter lokaler Lifecycle-Abschluss einer Session (null = keiner / Altbestand). */
 export function durableLifecycle(session: Pick<LocalTrainingSession, 'payload_json'> | null | undefined): TrackLifecycleStatus | null {
   const v = parseObj(session?.payload_json)?.[TRACK_LIFECYCLE_KEY];
@@ -211,6 +238,25 @@ export function reconstructPendingFromSession(
 }
 
 /**
+ * Harte Sperren, die für JEDE Quelle gelten (Registry, Puffer, SQLite), sobald die lokale
+ * Session bekannt ist: Nutzerabsicht (dauerhafter Marker), Löschung, Zugehörigkeit und ein
+ * FINALER Suchlauf (lokal payload_json.run, remote laut hasFinalSearchRun).
+ */
+function hardBlock(
+  local: LocalSessionSnapshot | null, dogId: string, userId: string | null | undefined, finalRemoteRun: boolean | undefined,
+): RecoveryRejectReason | null {
+  if (local) {
+    const lifecycle = durableLifecycle(local.session);
+    if (lifecycle) return lifecycle;
+    if (local.session.deleted_at) return 'deleted';
+    if (local.session.dog_id !== dogId) return 'wrong_dog';
+    if (userId && local.session.user_id !== userId) return 'wrong_user';
+    if (parseObj(local.session.payload_json)?.run) return 'search_completed';
+  }
+  return finalRemoteRun ? 'search_completed' : null;
+}
+
+/**
  * Zentrale Entscheidung für „Fährte fortsetzen" einer konkreten Session.
  * Eindeutigkeit vor Komfort: jede Mehrdeutigkeit → kein Recovery.
  */
@@ -221,6 +267,7 @@ export function decideTrackRecovery(input: {
   pending: PendingTrack | null;
   local: LocalSessionSnapshot | null;
   userId?: string | null;
+  /** Remote belegter FINALER Suchlauf (hasFinalSearchRun der Detail-Daten). */
   hasRemoteSearchRun?: boolean;
   now: number;
 }): RecoveryDecision {
@@ -228,17 +275,8 @@ export function decideTrackRecovery(input: {
   if (!dogId) return { ok: false, reason: 'no_dog' };
   if (!sessionId) return { ok: false, reason: 'no_session' };
 
-  // Harte Sperren, die für JEDE Quelle gelten (Registry, Puffer, SQLite), sobald die
-  // lokale Session bekannt ist: Nutzerabsicht, Abschluss, Zugehörigkeit.
-  if (local) {
-    const lifecycle = durableLifecycle(local.session);
-    if (lifecycle) return { ok: false, reason: lifecycle };
-    if (local.session.deleted_at) return { ok: false, reason: 'deleted' };
-    if (local.session.dog_id !== dogId) return { ok: false, reason: 'wrong_dog' };
-    if (input.userId && local.session.user_id !== input.userId) return { ok: false, reason: 'wrong_user' };
-    if (parseObj(local.session.payload_json)?.run) return { ok: false, reason: 'search_completed' };
-  }
-  if (input.hasRemoteSearchRun) return { ok: false, reason: 'search_completed' };
+  const blocked = hardBlock(local, dogId, input.userId, input.hasRemoteSearchRun);
+  if (blocked) return { ok: false, reason: blocked };
 
   const reg = isValidEntry(registry[dogId]) ? registry[dogId] : null;
   if (reg && reg.sessionId !== sessionId) return { ok: false, reason: 'other_active' };
@@ -303,4 +341,74 @@ export function selfHealPatches(
     out.push({ dogId, patch: registryPatchFromPending(p, now) });
   }
   return out;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Suchversuch verwerfen („Absuche verwerfen") — NUR die Absuche, nicht die Fährte.
+// Die gelegte Fährte (Punkte, Marker, Segmente, Session-ID, Hund, Liegezeit-Basis)
+// bleibt erhalten und wird wieder 'resting'. Kein 'cancelled', kein dauerhafter
+// Marker, keine neue Session, kein Quota-Claim. Nur „Fährte abbrechen" ist ein Abbruch.
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Puffer nach verworfenem Suchversuch: alle Such-Felder zurück, Lay-Daten unverändert. */
+export function searchDiscardPending(p: PendingTrack, now: number): PendingTrack {
+  return {
+    ...p,
+    status: 'resting',
+    searchPoints: [],
+    runId: null,
+    paused: false,
+    searchStartedAt: null,
+    searchUpdatedAt: null,
+    searchRun: undefined,   // Legacy-Semantik „frisch" (siehe searchRunState.ts)
+    savedAt: now,
+  };
+}
+
+export type SearchDiscardDecision =
+  | { ok: true; pending: PendingTrack; registryPatch: Partial<ActiveFaehrte>; target: string }
+  | { ok: false; reason: RecoveryRejectReason };
+
+/**
+ * Darf der Suchversuch dieser Session verworfen und die Fährte wieder freigegeben werden?
+ * Gleiche harte Sperren wie die Recovery; eine fremde offene Fährte wird nie berührt.
+ * Quelle der Lay-Daten: eigener Puffer (resting/laid/searching), sonst die lokale
+ * SQLite-Session (die zu löschenden Suchpunkte zählen dabei nicht).
+ */
+export function decideSearchDiscard(input: {
+  registry: ActiveFaehrtenMap;
+  dogId: string | null | undefined;
+  sessionId: string | null | undefined;
+  pending: PendingTrack | null;
+  local: LocalSessionSnapshot | null;
+  userId?: string | null;
+  hasRemoteSearchRun?: boolean;
+  now: number;
+}): SearchDiscardDecision {
+  const { registry, dogId, sessionId, pending, local, now } = input;
+  if (!dogId) return { ok: false, reason: 'no_dog' };
+  if (!sessionId) return { ok: false, reason: 'no_session' };
+  const blocked = hardBlock(local, dogId, input.userId, input.hasRemoteSearchRun);
+  if (blocked) return { ok: false, reason: blocked };
+
+  const reg = isValidEntry(registry[dogId]) ? registry[dogId] : null;
+  if (reg && reg.sessionId !== sessionId) return { ok: false, reason: 'other_active' };
+  if (reg?.status === 'laying') return { ok: false, reason: 'laying_not_supported' };
+
+  const samePending = !!pending && pending.sessionId === sessionId && (pending.dogId == null || pending.dogId === dogId);
+  if (pending && !samePending && isOpenPending(pending)) return { ok: false, reason: 'other_pending' };
+  if (samePending && pendingStatus(pending!) === 'laying') return { ok: false, reason: 'laying_not_supported' };
+  if (samePending && !RECOVERABLE_PENDING.includes(pendingStatus(pending!))) return { ok: false, reason: 'pending_closed' };
+
+  let next: PendingTrack;
+  if (samePending && hasValidLayGeometry(pending!.trackPoints)) {
+    next = searchDiscardPending(pending!, now);
+  } else {
+    if (!local) return { ok: false, reason: 'unknown_session' };
+    const rebuilt = reconstructPendingFromSession({ ...local, searchPointCount: 0 }, dogId, { now, userId: input.userId });
+    if (!rebuilt.ok) return { ok: false, reason: rebuilt.reason };
+    next = rebuilt.pending;
+  }
+  const registryPatch = registryPatchFromPending(next, now);
+  return { ok: true, pending: next, registryPatch, target: reopenTarget(upsertEntry({}, dogId, registryPatch)[dogId]) };
 }

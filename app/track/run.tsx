@@ -42,7 +42,8 @@ import type { SearchRunState } from '@/features/tracking/store/searchRunState';
 
 import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
 import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
-import { getSearchPointsBySession, deleteSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
+import { getSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
+import { discardSearchAttempt } from '@/features/tracking/services/trackRecoveryService';
 import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
@@ -564,16 +565,20 @@ export default function TrackRunScreen() {
       { text: 'Abbrechen', style: 'cancel', onPress: () => showRecoveryDialog(pending) },
       { text: 'Verwerfen', style: 'destructive', onPress: async () => {
         const sessId = pending.sessionId ?? effectiveId;
-        if (sessId) await deleteSearchPointsBySession(sessId).catch(() => {});
+        // NUR den Suchversuch verwerfen (wie der Dialog sagt): Suchpunkte dieser Session
+        // löschen, Fährte wieder 'resting' (Puffer + Registry), Lay-Daten/Session/Hund
+        // bleiben. Kein 'cancelled', kein dauerhafter Abbruch-Marker — das ist allein
+        // „Fährte abbrechen" vorbehalten. Danach zurück in die Liegezeit.
+        const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null);
+        if (!released.ok) useTrackingStore.getState().clearSearchSession();   // lokal trotzdem nie 'cancelled'
         useTrackingStore.getState().resetSearchPoints();   // leert auch den Run-State
-        useTrackingStore.getState().setSessionStatus('cancelled');
-        clearRegistry();
         startedRef.current = false;   // erlaubt einen frischen Start (neue Absuche, neue runId)
         // Kein State des verworfenen Runs darf in den neuen Search überlaufen.
         segmentAnnouncementRef.current = {};
         prevOffTrackRef.current = 'on_track';
         setSnap(buildSnap(false));
         setRecovery(null);
+        if (released.ok) setPendingExit(released.target);
       } },
     ]);
   };

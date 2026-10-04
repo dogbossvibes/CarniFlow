@@ -7,19 +7,24 @@ import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
 const mockEvaluate = jest.fn();
 const mockApply = jest.fn();
 const mockComplete = jest.fn();
+const mockDiscard = jest.fn();
 const mockPush = jest.fn();
 jest.mock('@/features/tracking/services/trackRecoveryService', () => ({
   evaluateTrackRecovery: (...a: unknown[]) => mockEvaluate(...a),
   applyTrackRecovery: (...a: unknown[]) => mockApply(...a),
   completeTrackWithoutApp: (...a: unknown[]) => mockComplete(...a),
+  discardSearchAttempt: (...a: unknown[]) => mockDiscard(...a),
 }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+let mockQa = false;
+jest.mock('@/features/tracking/utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQa }));
 
 // Typings von react-test-renderer sind im Projekt unvollständig → bewusst lose typisiert.
 type Rendered = any;
 let renderer: Rendered = null;
+const mockVisible = jest.fn();
 const mount = async () => {
-  await act(async () => { renderer = TestRenderer.create(<TrackResumeCta sessionId="sess-A" dogId="dog-A" hasRemoteSearchRun={false} />); });
+  await act(async () => { renderer = TestRenderer.create(<TrackResumeCta sessionId="sess-A" dogId="dog-A" hasRemoteSearchRun={false} onVisibleChange={mockVisible} />); });
   await act(async () => { await Promise.resolve(); });
   return renderer;
 };
@@ -28,7 +33,8 @@ const texts = (r: Rendered) => r.root.findAllByType('Text' as never).map((n: Ren
 
 let alertSpy: jest.SpyInstance;
 beforeEach(() => {
-  [mockEvaluate, mockApply, mockComplete, mockPush].forEach(m => m.mockReset());
+  mockQa = false;
+  [mockEvaluate, mockApply, mockComplete, mockPush, mockDiscard].forEach(m => m.mockReset());
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
@@ -83,5 +89,64 @@ describe('TrackResumeCta', () => {
     await act(async () => { buttons[1].onPress!(); await Promise.resolve(); });
     expect(alertSpy).toHaveBeenLastCalledWith('Ohne App abgeschlossen', expect.stringContaining('nicht als abgeschlossen markiert'));
     expect(byId(r, 'track-resume-cta')).toBeDefined();
+  });
+
+  it('Feldfall: recoverable → grosse Karte mit Mint-Primär „Fährte fortsetzen" und Sekundär „Ohne App abgeschlossen"; meldet sichtbar', async () => {
+    mockEvaluate.mockResolvedValue({ ok: true, source: 'session', mode: 'resting', target: '/track/liegen?dogId=dog-A&id=sess-A' });
+    const r = await mount();
+    expect(byId(r, 'track-recovery-card')).toBeDefined();
+    expect(texts(r)).toContain('Diese Fährte ist noch offen');
+    expect(byId(r, 'track-resume-cta')).toBeDefined();
+    expect(byId(r, 'track-complete-without-app')).toBeDefined();
+    expect(mockVisible).toHaveBeenLastCalledWith(true);
+  });
+
+  it('begonnene, nicht beendete Absuche (search_started) → nur „Ohne App abgeschlossen", kein Fortsetzen', async () => {
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'search_started' });
+    const r = await mount();
+    expect(byId(r, 'track-resume-cta')).toBeUndefined();
+    expect(byId(r, 'track-complete-without-app')).toBeDefined();
+    expect(texts(r)).toContain('nicht in ANYVO beendet');
+  });
+
+  it('nicht fortsetzbar: normal nichts sichtbar; im QA-Diagnosemodus der konkrete Reason', async () => {
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'search_completed' });
+    let r = await mount();
+    expect(r.toJSON()).toBeNull();
+    expect(mockVisible).toHaveBeenLastCalledWith(false);
+    act(() => { r.unmount(); }); renderer = null;
+    mockQa = true;
+    r = await mount();
+    expect(byId(r, 'track-recovery-reason')).toBeDefined();
+    expect(texts(r)).toContain('Recovery: search_completed');
+    expect(byId(r, 'track-resume-cta')).toBeUndefined();
+  });
+
+  it('recovery searching → „Absuche fortsetzen" + „Ohne App abgeschlossen"', async () => {
+    mockEvaluate.mockResolvedValue({ ok: true, mode: 'searching', source: 'pending', target: '/track/run?dogId=dog-A&id=sess-A' });
+    const r = await mount();
+    expect(texts(r)).toContain('Absuche unterbrochen');
+    expect(texts(r)).toContain('Absuche fortsetzen');
+    expect(byId(r, 'track-resume-cta').props.accessibilityLabel).toBe('Absuche fortsetzen');
+    expect(byId(r, 'track-complete-without-app')).toBeDefined();
+    expect(byId(r, 'track-discard-search')).toBeUndefined();
+  });
+
+  it('unvollständige Absuche → „Unvollständige Absuche erkannt" mit Verwerfen/Freigeben und Ohne-App; kein Fortsetzen', async () => {
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'search_started' });
+    mockDiscard.mockResolvedValue({ ok: true, target: '/track/liegen?dogId=dog-A&id=sess-A' });
+    const r = await mount();
+    expect(texts(r)).toContain('Unvollständige Absuche erkannt');
+    expect(byId(r, 'track-resume-cta')).toBeUndefined();
+    expect(texts(r)).toContain('Absuche verwerfen und Fährte wieder freigeben');
+    expect(byId(r, 'track-complete-without-app')).toBeDefined();
+    await act(async () => { byId(r, 'track-discard-search').props.onPress(); });
+    const [title, message, buttons] = alertSpy.mock.calls[0] as [string, string, { text: string; onPress?: () => void }[]];
+    expect(title).toBe('Absuche verwerfen?');
+    expect(message).toContain('Die gelegte Fährte bleibt erhalten');
+    expect(mockDiscard).not.toHaveBeenCalled();   // keine Auto-Entscheidung
+    await act(async () => { buttons[1].onPress!(); await Promise.resolve(); });
+    expect(mockDiscard).toHaveBeenCalledWith('sess-A', 'dog-A', { hasRemoteSearchRun: false });
+    expect(mockPush).toHaveBeenCalledWith('/track/liegen?dogId=dog-A&id=sess-A');
   });
 });

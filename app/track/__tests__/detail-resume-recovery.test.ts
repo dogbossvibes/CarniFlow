@@ -16,14 +16,30 @@ describe('Track-Detail: Lifecycle schützt liegende Fährten', () => {
   });
 
   it('Registry-Eintrag wird nur für DIESE, tatsächlich abgesuchte Session entfernt', () => {
-    expect(detail).toContain("const searched = trackAnalysisAvailability(d).state !== 'pending_search';");
+    expect(detail).toContain('const searched = hasFinalSearchRun(d);');
     expect(detail).toContain('if (d.dog_id && reg?.sessionId === String(id) && searched) useActiveFaehrten.getState().remove(d.dog_id);');
     expect(detail).not.toMatch(/if \(d\.dog_id\) useActiveFaehrten\.getState\(\)\.remove\(d\.dog_id\);/);
   });
 
-  it('„Fährte fortsetzen" nur bei ausstehender Absuche', () => {
-    expect(detail).toContain("const canOfferResume = analysisState === 'pending_search';");
-    expect(detail).toMatch(/\{canOfferResume && \(\s*<TrackResumeCta sessionId=\{String\(id\)\} dogId=\{data\.dog_id\}/);
+  it('Recovery-Karte direkt unter dem Header; gesperrt nur durch einen FINALEN Suchlauf', () => {
+    expect(detail).toContain('const canOfferResume = !hasFinalSearchRun(data);');
+    expect(detail).toContain('<TrackResumeCta sessionId={String(id)} dogId={data.dog_id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />');
+    const scroll = detail.indexOf('<ScrollView contentContainerStyle={s.content}');
+    const card = detail.indexOf('<TrackResumeCta ');
+    const hero = detail.indexOf('<View style={[s.card, s.cardGlow, s.hero]}>');
+    expect(scroll).toBeGreaterThan(-1);
+    expect(card).toBeGreaterThan(scroll);
+    expect(card).toBeLessThan(hero);   // vor allem anderen Inhalt
+  });
+
+  it('Recovery-Karte hängt NICHT am Analyse-Zustand', () => {
+    const line = detail.split('\n').find(l => l.includes('const canOfferResume'))!;
+    expect(line).not.toContain('analysisState');
+    expect(detail).not.toMatch(/analysisState === 'pending_search' && \(\s*<TrackResumeCta/);
+  });
+
+  it('der irreführende Hinweis „keine verwertbare Suchspur aufgezeichnet" weicht der Recovery-Karte', () => {
+    expect(detail).toMatch(/\{!recoveryCardVisible && \(<>\s*\{availability\.showNoSearchTrackWarning && \(/);
   });
 
   it('Detail erzeugt weder Session noch Quota-Claim', () => {
@@ -59,5 +75,28 @@ describe('Bewusster Abbruch wird dauerhaft vermerkt', () => {
 
   it('Konflikt-Dialog „Fährte abbrechen" beim Legen vermerkt den Abbruch der bestehenden Fährte', () => {
     expect(legen).toContain('void recordTrackCancelled(entry.sessionId, dId);');
+  });
+});
+
+describe('run.tsx „Absuche verwerfen": nur der Suchversuch, kein Abbruch der Fährte', () => {
+  const run = readFileSync(join(__dirname, '..', 'run.tsx'), 'utf8');
+  const discard = run.slice(run.indexOf('const discardSearch'), run.indexOf('const runPoints'));
+
+  it('ruft discardSearchAttempt, setzt NICHT cancelled und entfernt die Fährte nicht aus der Registry', () => {
+    expect(discard).toContain('const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null);');
+    expect(discard).not.toContain("setSessionStatus('cancelled')");
+    expect(discard).not.toContain('clearRegistry()');
+    expect(discard).not.toMatch(/recordTrackCancelled|setLocalTrackLifecycle/);
+  });
+
+  it('zurück in die Liegezeit; Fallback ohne Freigabe bleibt lokal resting', () => {
+    expect(discard).toContain('if (released.ok) setPendingExit(released.target);');
+    expect(discard).toContain('if (!released.ok) useTrackingStore.getState().clearSearchSession();');
+  });
+
+  it('echtes „Fährte abbrechen" (Liegezeit) bleibt cancelled + dauerhafter Marker', () => {
+    const liegen = readFileSync(join(__dirname, '..', 'liegen.tsx'), 'utf8');
+    expect(liegen).toContain("useTrackingStore.getState().setSessionStatus('cancelled');");
+    expect(liegen).toContain('void recordTrackCancelled(');
   });
 });

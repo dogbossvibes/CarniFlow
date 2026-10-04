@@ -8,14 +8,15 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { clearPending, listPendingDogIds, loadPending, writePendingNow } from '@/features/tracking/store/trackPersist';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import {
-  decideTrackRecovery, durableLifecycle, selfHealPatches, type LocalSessionSnapshot, type RecoveryDecision,
+  decideSearchDiscard, decideTrackRecovery, durableLifecycle, selfHealPatches,
+  type LocalSessionSnapshot, type RecoveryDecision, type RecoveryRejectReason,
 } from '@/features/tracking/store/trackRecovery';
 import {
   getLocalTrainingSessionById, markLocalTrackCancelled, setLocalTrackLifecycle,
 } from '@/features/training/repositories/localTrainingRepository';
 import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import {
-  getLayTrackPointsBySession, getSearchPointsBySession, getTrackMarkersBySession,
+  deleteSearchPointsBySession, getLayTrackPointsBySession, getSearchPointsBySession, getTrackMarkersBySession,
 } from '@/features/tracking/repositories/localTrackRepository';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
 
@@ -91,6 +92,43 @@ export async function recordTrackCancelled(sessionId: string | null | undefined,
   if (!sessionId || !dogId) return false;
   try { return await markLocalTrackCancelled(sessionId, dogId); }
   catch (e) { console.warn('[trackRecovery] cancel marker', e); return false; }
+}
+
+export type DiscardSearchResult = { ok: true; target: string } | { ok: false; reason: RecoveryRejectReason | 'failed' };
+
+/**
+ * „Absuche verwerfen": NUR den Suchversuch verwerfen und die gelegte Fährte wieder freigeben
+ * (resting → /track/liegen). Löscht ausschliesslich die Suchpunkte dieser Session
+ * (point_type='search'); Lay-Punkte, Marker, Segmente, Session-ID und Hund bleiben. Kein
+ * 'cancelled', kein dauerhafter Marker, keine neue Session, kein Quota-Claim. Eine fremde
+ * offene Fährte desselben Hundes wird nie berührt. Offline-fähig.
+ */
+export async function discardSearchAttempt(sessionId: string | null | undefined, dogId: string | null | undefined, opts: { hasRemoteSearchRun?: boolean } = {}): Promise<DiscardSearchResult> {
+  try {
+    if (!sessionId) return { ok: false, reason: 'no_session' };
+    if (!dogId) return { ok: false, reason: 'no_dog' };
+    await ensureHydrated();
+    const [pending, local] = await Promise.all([loadPending(dogId).catch(() => null), loadLocalSnapshot(sessionId)]);
+    const d = decideSearchDiscard({
+      registry: useActiveFaehrten.getState().byDog, dogId, sessionId, pending, local,
+      hasRemoteSearchRun: opts.hasRemoteSearchRun, now: Date.now(),
+    });
+    if (!d.ok) return d;
+    await deleteSearchPointsBySession(sessionId);   // nur point_type='search'
+    await writePendingNow(dogId, d.pending);
+    const reg = useActiveFaehrten.getState().get(dogId);
+    if (reg?.sessionId === sessionId) useActiveFaehrten.getState().remove(dogId);   // alten Such-Eintrag ersetzen
+    useActiveFaehrten.getState().upsert(dogId, d.registryPatch);
+    const st = useTrackingStore.getState();
+    if (st.dogId === dogId && !st.isRecording && (st.currentSessionId === sessionId || st.currentSessionId == null)) {
+      st.restorePending(d.pending);
+      st.clearSearchSession();
+    }
+    return { ok: true, target: d.target };
+  } catch (e) {
+    console.warn('[trackRecovery] discard search', e);
+    return { ok: false, reason: 'failed' };
+  }
 }
 
 export type CompleteWithoutAppResult = { ok: true } | { ok: false; reason: 'no_session' | 'not_found' | 'failed' };

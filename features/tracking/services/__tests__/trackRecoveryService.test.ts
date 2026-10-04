@@ -6,7 +6,7 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { loadPending, writePendingNow, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import {
-  applyTrackRecovery, completeTrackWithoutApp, evaluateTrackRecovery, healActiveFaehrtenFromPending, recordTrackCancelled,
+  applyTrackRecovery, completeTrackWithoutApp, discardSearchAttempt, evaluateTrackRecovery, healActiveFaehrtenFromPending, recordTrackCancelled,
 } from '@/features/tracking/services/trackRecoveryService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -16,6 +16,7 @@ const mockSession = jest.fn();
 const mockLay = jest.fn();
 const mockMarkers = jest.fn();
 const mockSearch = jest.fn();
+const mockDeleteSearch = jest.fn(async (..._a: unknown[]) => undefined);
 const mockCreateSession = jest.fn();
 const mockClaimQuota = jest.fn();
 const mockRemote = jest.fn();
@@ -36,6 +37,7 @@ jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
   getLayTrackPointsBySession: (...a: unknown[]) => mockLay(...a),
   getTrackMarkersBySession: (...a: unknown[]) => mockMarkers(...a),
   getSearchPointsBySession: (...a: unknown[]) => mockSearch(...a),
+  deleteSearchPointsBySession: (...a: unknown[]) => mockDeleteSearch(...a),
 }));
 jest.mock('@/services/quotaService', () => ({ claimNewbieQuota: (...a: unknown[]) => mockClaimQuota(...a) }));
 jest.mock('@/features/tracking/services/trackService', () => ({ getTrackSessionById: (...a: unknown[]) => mockRemote(...a) }));
@@ -61,7 +63,7 @@ beforeEach(async () => {
   await AsyncStorage.clear();
   useActiveFaehrten.setState({ byDog: {}, hydrated: true });
   useTrackingStore.setState({ dogId: null, currentSessionId: null, trackPoints: [], isRecording: false });
-  [mockSession, mockLay, mockMarkers, mockSearch, mockCreateSession, mockClaimQuota, mockRemote, mockMarkCancelled, mockSetLifecycle, mockDeleteSession, mockEndNotification].forEach(m => m.mockReset());
+  [mockSession, mockLay, mockMarkers, mockSearch, mockCreateSession, mockClaimQuota, mockRemote, mockMarkCancelled, mockSetLifecycle, mockDeleteSession, mockEndNotification, mockDeleteSearch].forEach(m => m.mockReset());
   mockSession.mockResolvedValue(sessionRow);
   mockLay.mockResolvedValue([layRow(0), layRow(1), layRow(2)]);
   mockMarkers.mockResolvedValue([]);
@@ -286,5 +288,77 @@ describe('Searching über die zentrale Entscheidung', () => {
     expect(d).toMatchObject({ ok: true, mode: 'searching', target: '/track/run?dogId=dog-A&id=sess-A' });
     expect(useActiveFaehrten.getState().get('dog-A')).toMatchObject({ status: 'searching', runId: 'run-1' });
     noSideEffects();
+  });
+});
+
+describe('Feldfall: OFFEN + Lay-Geometrie + ended_at + keine verwertbare Suchspur', () => {
+  it('Puffer + Registry verloren, kein Run, keine Suchpunkte → Resume aus SQLite sichtbar', async () => {
+    expect(await evaluateTrackRecovery({ sessionId: 'sess-A', dogId: 'dog-A', hasRemoteSearchRun: false }))
+      .toMatchObject({ ok: true, source: 'session', mode: 'resting', target: '/track/liegen?dogId=dog-A&id=sess-A' });
+    noSideEffects();
+  });
+
+  it('Suchpunkte ohne beendeten Lauf → Reason search_started (kein Resume, aber schliessbar)', async () => {
+    mockSearch.mockResolvedValue([{}, {}]);
+    expect(await evaluateTrackRecovery({ sessionId: 'sess-A', dogId: 'dog-A' })).toEqual({ ok: false, reason: 'search_started' });
+  });
+
+  it('„Ohne App abgeschlossen" funktioniert auch bei search_started (Marker + Aufräumen, nichts erfunden)', async () => {
+    mockSearch.mockResolvedValue([{}, {}]);
+    mockSetLifecycle.mockResolvedValue(true);
+    expect(await completeTrackWithoutApp('sess-A', 'dog-A')).toEqual({ ok: true });
+    expect(mockSetLifecycle).toHaveBeenCalledWith('sess-A', 'dog-A', 'completed_without_app');
+    noSideEffects();
+  });
+});
+
+describe('discardSearchAttempt („Absuche verwerfen")', () => {
+  it('Puffer searching → Suchpunkte gelöscht, Puffer + Registry resting, Store zurückgesetzt; kein cancelled/Marker/Quota/Session', async () => {
+    await writePendingNow('dog-A', pending({ status: 'searching', runId: 'run-1', searchStartedAt: LAY_END + 1000, searchPoints: [{ lat: 1, lng: 1, t: 1 }] }));
+    useActiveFaehrten.getState().upsert('dog-A', { status: 'searching', sessionId: 'sess-A', runId: 'run-1', searchStartedAt: LAY_END + 1000 });
+    useTrackingStore.setState({ dogId: 'dog-A', currentSessionId: 'sess-A', trackPoints: [{ lat: 1, lng: 1, t: 1 }], isRecording: false, sessionStatus: 'searching', searchRunId: 'run-1', searchStartedAt: LAY_END + 1000 });
+    const r = await discardSearchAttempt('sess-A', 'dog-A');
+    expect(r).toEqual({ ok: true, target: '/track/liegen?dogId=dog-A&id=sess-A' });
+    expect(mockDeleteSearch).toHaveBeenCalledWith('sess-A');
+    const p = await loadPending('dog-A');
+    expect(p).toMatchObject({ sessionId: 'sess-A', status: 'resting', runId: null, searchStartedAt: null });
+    expect(p!.trackPoints).toHaveLength(3);
+    expect(useActiveFaehrten.getState().get('dog-A')).toMatchObject({ status: 'resting', sessionId: 'sess-A', runId: null, searchStartedAt: null, layStartedAt: LAY_END });
+    expect(useTrackingStore.getState()).toMatchObject({ sessionStatus: 'resting', searchRunId: null, searchStartedAt: null, currentSessionId: 'sess-A' });
+    expect(mockMarkCancelled).not.toHaveBeenCalled();
+    expect(mockSetLifecycle).not.toHaveBeenCalled();
+    noSideEffects();
+  });
+
+  it('Puffer verloren + Suchpunkte (unvollständige Absuche) → aus SQLite freigegeben, danach fortsetzbar', async () => {
+    mockSearch.mockResolvedValue([{}, {}, {}]);
+    expect(await discardSearchAttempt('sess-A', 'dog-A')).toEqual({ ok: true, target: '/track/liegen?dogId=dog-A&id=sess-A' });
+    expect(mockDeleteSearch).toHaveBeenCalledWith('sess-A');
+    expect(await loadPending('dog-A')).toMatchObject({ status: 'resting', sessionId: 'sess-A' });
+    mockSearch.mockResolvedValue([]);   // nach dem Löschen
+    expect(await evaluateTrackRecovery({ sessionId: 'sess-A', dogId: 'dog-A' })).toMatchObject({ ok: true, mode: 'resting' });
+  });
+
+  it('fremde offene Fährte desselben Hundes → nichts gelöscht, nichts überschrieben', async () => {
+    await writePendingNow('dog-A', pending({ sessionId: 'sess-OTHER', status: 'searching' }));
+    const before = await AsyncStorage.getItem('anyvo_track_pending_v1::dog-A');
+    expect(await discardSearchAttempt('sess-A', 'dog-A')).toEqual({ ok: false, reason: 'other_pending' });
+    expect(mockDeleteSearch).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem('anyvo_track_pending_v1::dog-A')).toBe(before);
+  });
+
+  it('finaler Suchlauf → nicht verwerfbar, nichts gelöscht', async () => {
+    mockSession.mockResolvedValue({ ...sessionRow, payload_json: JSON.stringify({ run: { ended_at: LAY_END_ISO } }) });
+    expect(await discardSearchAttempt('sess-A', 'dog-A')).toEqual({ ok: false, reason: 'search_completed' });
+    expect(mockDeleteSearch).not.toHaveBeenCalled();
+  });
+
+  it('Löschfehler → failed, kein Crash, Puffer/Registry unverändert', async () => {
+    await writePendingNow('dog-A', pending({ status: 'searching' }));
+    mockDeleteSearch.mockRejectedValueOnce(new Error('db'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await discardSearchAttempt('sess-A', 'dog-A')).toEqual({ ok: false, reason: 'failed' });
+    warn.mockRestore();
+    expect((await loadPending('dog-A'))?.status).toBe('searching');
   });
 });
