@@ -15,6 +15,7 @@
 import { buildQaTrackExport, assertNoAbsoluteData, toMs, type RawLayPoint, type RawTrackMarker } from '@/features/tracking/utils/qaTrackExport';
 import { assertSupportPrivacy, type SupportExport } from '@/features/tracking/utils/supportDiagnostics';
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
+import type { TranslationKey } from '@/i18n/de-CH';
 
 const M_PER_DEG = 111320;
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -69,7 +70,12 @@ export function runFromDetail(data: Record<string, any> | null | undefined): Per
 
 export type CustomerDiagnosisKind = 'searched' | 'lay_only';
 
-export interface CustomerDiagnosisRow { key: string; label: string; value: string }
+/** Anzeigewert: übersetzbarer Text (Key + Parameter, Parameter ggf. selbst Keys) oder neutrale Zahl/Dauer. */
+export type CustomerDiagnosisValue =
+  | { textKey: TranslationKey; params?: Record<string, string | number>; paramKeys?: Record<string, TranslationKey> }
+  | { text: string };
+
+export interface CustomerDiagnosisRow { key: string; labelKey: TranslationKey; value: CustomerDiagnosisValue }
 
 export interface CustomerDiagnosisSummary {
   kind: CustomerDiagnosisKind;
@@ -78,8 +84,9 @@ export interface CustomerDiagnosisSummary {
   hasLayGeometry: boolean;
 }
 
-const QUALITY_LABEL: Record<ReturnType<typeof getGpsQuality>, string> = {
-  'sehr-gut': 'Sehr gut', 'gut': 'Gut', 'mittel': 'Mittel', 'schwach': 'Schwach',
+// Bestehende GPS-Qualitätsbegriffe (wie im Lege-Screen) — keine zweite Terminologie.
+const QUALITY_KEY: Record<ReturnType<typeof getGpsQuality>, TranslationKey> = {
+  'sehr-gut': 'track.gpsVeryGood', 'gut': 'track.gpsGood', 'mittel': 'track.gpsMedium', 'schwach': 'track.gpsPoor',
 };
 
 export function medianAccuracy(points: readonly RawLayPoint[]): number | null {
@@ -89,14 +96,18 @@ export function medianAccuracy(points: readonly RawLayPoint[]): number | null {
   return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
 }
 
+/** Sprachneutrale Dauer „m:ss min". */
 function clock(sec: number): string {
   const s = Math.max(0, Math.round(sec));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} min`;
 }
 
+const meters = (m: number): CustomerDiagnosisValue => ({ textKey: 'track.customerDiagnosis.meters', params: { meters: m } });
+
 /**
  * Verständliche Zusammenfassung — jede Zeile nur, wenn der Wert im Datensatz steht.
  * `searched` richtet sich nach dem gespeicherten Suchlauf (track_data.run / track_runs).
+ * Liefert ausschliesslich i18n-Keys/Parameter; übersetzt wird in der UI.
  */
 export function buildCustomerDiagnosisSummary(data: Record<string, any> | null | undefined): CustomerDiagnosisSummary {
   const lay = layPointsFromDetail(data);
@@ -104,28 +115,43 @@ export function buildCustomerDiagnosisSummary(data: Record<string, any> | null |
   const run = runFromDetail(data);
   const kind: CustomerDiagnosisKind = run ? 'searched' : 'lay_only';
   const rows: CustomerDiagnosisRow[] = [];
+  const P = 'track.customerDiagnosis.';
 
   const acc = medianAccuracy(lay);
-  if (acc != null) rows.push({ key: 'gps', label: 'GPS-Qualität beim Legen', value: `${QUALITY_LABEL[getGpsQuality(acc)]} · ±${Math.round(acc)} m` });
-  if (lay.length) rows.push({ key: 'layPoints', label: 'Aufgezeichnete Punkte', value: String(lay.length) });
-  if (isNum(data?.distance_meters)) rows.push({ key: 'distance', label: 'Gelegte Strecke', value: `${Math.round(data!.distance_meters)} m` });
+  if (acc != null) rows.push({ key: 'gps', labelKey: `${P}gps` as TranslationKey, value: {
+    textKey: `${P}gpsValue` as TranslationKey, params: { meters: Math.round(acc) }, paramKeys: { quality: QUALITY_KEY[getGpsQuality(acc)] },
+  } });
+  if (lay.length) rows.push({ key: 'layPoints', labelKey: `${P}layPoints` as TranslationKey, value: { text: String(lay.length) } });
+  if (isNum(data?.distance_meters)) rows.push({ key: 'distance', labelKey: `${P}distance` as TranslationKey, value: meters(Math.round(data!.distance_meters)) });
 
   const corners = isNum(data?.corners_total) ? data!.corners_total : markers.length ? markers.filter(m => m.marker_type === 'winkel').length : null;
-  if (corners != null) rows.push({ key: 'corners', label: 'Winkel', value: String(corners) });
+  if (corners != null) rows.push({ key: 'corners', labelKey: `${P}corners` as TranslationKey, value: { text: String(corners) } });
   const objects = isNum(data?.articles_total) ? data!.articles_total : markers.length ? markers.filter(m => m.marker_type === 'gegenstand').length : null;
   if (objects != null) {
     const found = run?.articlesFound;
-    rows.push({ key: 'objects', label: 'Gegenstände', value: kind === 'searched' && isNum(found) ? `${found} von ${objects} gefunden` : String(objects) });
+    rows.push({ key: 'objects', labelKey: `${P}objects` as TranslationKey, value: kind === 'searched' && isNum(found)
+      ? { textKey: `${P}objectsFound` as TranslationKey, params: { found, total: objects } }
+      : { text: String(objects) } });
   }
 
-  rows.push({ key: 'search', label: 'Absuche', value: kind === 'searched' ? 'Abgesucht' : 'Noch nicht abgesucht' });
+  rows.push({ key: 'search', labelKey: `${P}search` as TranslationKey, value: { textKey: (kind === 'searched' ? `${P}searched` : `${P}notSearched`) as TranslationKey } });
   if (run) {
-    if (isNum(run.durationSeconds)) rows.push({ key: 'searchDuration', label: 'Suchdauer', value: clock(run.durationSeconds) });
-    rows.push({ key: 'searchTrack', label: 'Suchspur', value: run.runPoints.length > 1 ? `Aufgezeichnet · ${run.runPoints.length} Punkte` : 'Keine verwertbare Suchspur' });
-    if (isNum(run.averageDeviationMeters)) rows.push({ key: 'deviation', label: 'Mittlere Abweichung', value: `${run.averageDeviationMeters.toFixed(1)} m` });
-    rows.push({ key: 'analysis', label: 'Detailanalyse', value: data?.track_data?.run?.analytics ? 'Vorhanden' : 'Nicht vorhanden' });
+    if (isNum(run.durationSeconds)) rows.push({ key: 'searchDuration', labelKey: 'track.searchDuration', value: { text: clock(run.durationSeconds) } });
+    rows.push({ key: 'searchTrack', labelKey: `${P}searchTrack` as TranslationKey, value: run.runPoints.length > 1
+      ? { textKey: `${P}searchTrackRecorded` as TranslationKey, params: { count: run.runPoints.length } }
+      : { textKey: `${P}searchTrackNone` as TranslationKey } });
+    if (isNum(run.averageDeviationMeters)) rows.push({ key: 'deviation', labelKey: `${P}deviation` as TranslationKey, value: meters(Number(run.averageDeviationMeters.toFixed(1))) });
+    rows.push({ key: 'analysis', labelKey: `${P}analysis` as TranslationKey, value: { textKey: (data?.track_data?.run?.analytics ? `${P}available` : `${P}notAvailable`) as TranslationKey } });
   }
   return { kind, rows, hasLayGeometry: lay.length >= 2 };
+}
+
+/** Übersetzt einen Anzeigewert mit der übergebenen `t`-Funktion (UI-Grenze). */
+export function formatDiagnosisValue(v: CustomerDiagnosisValue, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+  if ('text' in v) return v.text;
+  const params: Record<string, string | number> = { ...(v.params ?? {}) };
+  for (const [name, key] of Object.entries(v.paramKeys ?? {})) params[name] = t(key);
+  return t(v.textKey, params);
 }
 
 // ── 2. Support-Export aus gespeicherten Daten (ohne Live-Mitschnitt) ──

@@ -5,6 +5,10 @@ import React from 'react';
 import { Alert } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { CustomerTrackDiagnosisCard } from '@/features/tracking/components/CustomerTrackDiagnosisCard';
+import i18n from '@/i18n/config';
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 const mockAvailability = jest.fn();
 const mockShareCustomer = jest.fn();
@@ -31,6 +35,8 @@ const mount = async (d: Record<string, any> = detail) => {
 const texts = (r: Rendered) => r.root.findAllByType('Text' as never).map((n: Rendered) => [].concat(n.props.children).join('')).join('|');
 const button = (r: Rendered) => r.root.findAll((n: Rendered) => n.props.testID === 'support-diagnostics-share' && typeof n.props.onPress === 'function')[0];
 
+beforeAll(async () => { await i18n.changeLanguage('de'); });
+afterAll(async () => { await i18n.changeLanguage('de'); });
 beforeEach(() => { mockAvailability.mockReset(); mockShareCustomer.mockReset(); jest.spyOn(Alert, 'alert').mockImplementation(() => {}); });
 afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
 
@@ -81,5 +87,28 @@ describe('CustomerTrackDiagnosisCard', () => {
     const profile = fs.readFileSync('app/(tabs)/profile.tsx', 'utf8');
     expect(profile).toContain('{diagnosticsAccess.allowed && (');
     expect(fs.readFileSync('app/dev/precision-location-test.tsx', 'utf8')).toContain('<DiagnosticsRouteGate>');
+  });
+
+  it.each([
+    ['de',  'Fährtendiagnose',          'Diagnosedaten teilen',               'GPS-Qualität beim Legen'],
+    ['gsw', 'Fährte-Diagnose',          'Diagnosedate teile',                 'GPS-Qualität bim Lege'],
+    ['en',  'Track diagnosis',          'Share diagnostic data',              'GPS quality while laying'],
+    ['fr',  'Diagnostic de piste',      'Partager les données de diagnostic', 'Qualité GPS lors de la pose'],
+    ['it',  'Diagnostica della pista',  'Condividi dati diagnostici',         'Qualità GPS durante la posa'],
+  ])('%s: Titel, Teilen und Zeilen übersetzt, keine rohen Keys', async (lng, title, share, gps) => {
+    await act(async () => { await i18n.changeLanguage(lng); });
+    mockAvailability.mockResolvedValue('capture');
+    const r = await mount();
+    const t = texts(r);
+    expect(t).toContain(title);
+    expect(t).toContain(share);
+    expect(t).toContain(gps);
+    expect(t).not.toMatch(/track\.customerDiagnosis|\{\w+\}/);
+    expect(button(r).props.accessibilityLabel).toBe(share);
+    act(() => { renderer.unmount(); }); renderer = null;
+    mockAvailability.mockResolvedValue('none');
+    const r2 = await mount({ points: [] });
+    expect(texts(r2)).not.toMatch(/track\.customerDiagnosis/);
+    await act(async () => { await i18n.changeLanguage('de'); });
   });
 });

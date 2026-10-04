@@ -1,9 +1,15 @@
 // Kunden-Fährtendiagnose (rein): Zusammenfassung nur aus vorhandenen Werten, Export aus
 // gespeicherten Daten ohne Live-Mitschnitt, Datenschutz wie der bestehende Support-Export.
 import {
-  buildCustomerDiagnosisSummary, buildPersistedSupportExport, layPointsFromDetail, markersFromDetail, runFromDetail,
+  buildCustomerDiagnosisSummary, buildPersistedSupportExport, formatDiagnosisValue, layPointsFromDetail, markersFromDetail, runFromDetail,
 } from '@/features/tracking/utils/customerTrackDiagnosis';
+import { translate, type AppLocale } from '@/i18n';
+import type { TranslationKey } from '@/i18n/de-CH';
 import { assertSupportPrivacy } from '@/features/tracking/utils/supportDiagnostics';
+
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 const T0 = Date.parse('2026-10-04T08:00:00.000Z');
 const lay = (n = 5, acc = 4) => Array.from({ length: n }, (_, i) => ({
@@ -25,7 +31,16 @@ const searched = (over: Record<string, unknown> = {}) => layOnly({
   track_data: { run: { analytics: { version: 3 }, total_objects: 1, started_at: '2026-10-04T08:01:00Z' } },
   ...over,
 });
-const row = (s: ReturnType<typeof buildCustomerDiagnosisSummary>, key: string) => s.rows.find(r => r.key === key)?.value;
+// Werte werden wie in der UI übersetzt (Standard: Deutsch).
+const tFor = (locale: AppLocale) => (k: TranslationKey, p?: Record<string, string | number>) => translate(k, p, locale);
+const row = (s: ReturnType<typeof buildCustomerDiagnosisSummary>, key: string, locale: AppLocale = 'de') => {
+  const r = s.rows.find(x => x.key === key);
+  return r ? formatDiagnosisValue(r.value, tFor(locale)) : undefined;
+};
+const label = (s: ReturnType<typeof buildCustomerDiagnosisSummary>, key: string, locale: AppLocale = 'de') => {
+  const r = s.rows.find(x => x.key === key);
+  return r ? translate(r.labelKey, undefined, locale) : undefined;
+};
 
 describe('buildCustomerDiagnosisSummary', () => {
   it('Lay-only: GPS-Qualität, Strecke, Winkel, Gegenstände, „Noch nicht abgesucht" — keine Suchzeilen', () => {
@@ -33,6 +48,7 @@ describe('buildCustomerDiagnosisSummary', () => {
     expect(s.kind).toBe('lay_only');
     expect(s.hasLayGeometry).toBe(true);
     expect(row(s, 'gps')).toBe('Gut · ±4 m');
+    expect(label(s, 'gps')).toBe('GPS-Qualität beim Legen');
     expect(row(s, 'distance')).toBe('48 m');
     expect(row(s, 'corners')).toBe('1');
     expect(row(s, 'objects')).toBe('1');
@@ -105,5 +121,28 @@ describe('buildPersistedSupportExport', () => {
     const d = searched({ runs: [{ duration_seconds: 10, run_points: [{ lat: 47.3, lng: 8.5 }, { lat: 47.3001, lng: 8.5 }] }] });
     const e = buildPersistedSupportExport({ layPoints: layPointsFromDetail(d), markers: [], run: runFromDetail(d) })!;
     expect(e.persistedSearch!.points.map(p => p.tMs)).toEqual([null, null]);
+  });
+});
+
+describe('Übersetzung der Zusammenfassung (alle App-Sprachen)', () => {
+  const EXPECT: Record<AppLocale, { gpsLabel: string; gps: string; objects: string; search: string; track: string }> = {
+    de:  { gpsLabel: 'GPS-Qualität beim Legen', gps: 'Gut · ±4 m', objects: '1 von 1 gefunden', search: 'Abgesucht', track: 'Aufgezeichnet · 3 Punkte' },
+    gsw: { gpsLabel: 'GPS-Qualität bim Lege', gps: 'Guet · ±4 m', objects: '1 vo 1 gfunde', search: 'Abgsuecht', track: 'Ufzeichnet · 3 Pünkt' },
+    en:  { gpsLabel: 'GPS quality while laying', gps: 'Good · ±4 m', objects: '1 of 1 found', search: 'Searched', track: 'Recorded · 3 points' },
+    fr:  { gpsLabel: 'Qualité GPS lors de la pose', gps: 'Bon · ±4 m', objects: '1 sur 1 trouvés', search: 'Recherchée', track: 'Enregistrée · 3 points' },
+    it:  { gpsLabel: 'Qualità GPS durante la posa', gps: 'Buono · ±4 m', objects: '1 di 1 trovati', search: 'Ricercata', track: 'Registrata · 3 punti' },
+  };
+  it.each(Object.keys(EXPECT) as AppLocale[])('%s: Labels und Werte übersetzt, keine rohen Keys', locale => {
+    const s = buildCustomerDiagnosisSummary(searched());
+    const e = EXPECT[locale];
+    expect(label(s, 'gps', locale)).toBe(e.gpsLabel);
+    expect(row(s, 'gps', locale)).toBe(e.gps);
+    expect(row(s, 'objects', locale)).toBe(e.objects);
+    expect(row(s, 'search', locale)).toBe(e.search);
+    expect(row(s, 'searchTrack', locale)).toBe(e.track);
+    for (const r of s.rows) {
+      expect(translate(r.labelKey, undefined, locale)).not.toMatch(/^track\./);
+      expect(formatDiagnosisValue(r.value, tFor(locale))).not.toMatch(/track\.|\{\w+\}/);
+    }
   });
 });

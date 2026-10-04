@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
-import { buildCustomerDiagnosisSummary } from '@/features/tracking/utils/customerTrackDiagnosis';
+import { useT } from '@/i18n';
+import { buildCustomerDiagnosisSummary, formatDiagnosisValue } from '@/features/tracking/utils/customerTrackDiagnosis';
 import { SupportDiagnosticsRow } from '@/features/tracking/components/SupportDiagnosticsRow';
 
 /**
@@ -11,17 +12,18 @@ import { SupportDiagnosticsRow } from '@/features/tracking/components/SupportDia
  * Rein lesend; getrennt von der internen QA-Diagnose (/dev, nur interne Tester).
  */
 export function CustomerTrackDiagnosisCard({ sessionLocalId, detail }: { sessionLocalId: string; detail: Record<string, any> }) {
+  const { t } = useT();
   const summary = useMemo(() => buildCustomerDiagnosisSummary(detail), [detail]);
   return (
     <View style={s.card} testID="customer-track-diagnosis">
       <View style={s.header}>
         <Ionicons name="pulse-outline" size={18} color={C.trackTextSec} />
-        <Text style={s.title}>Fährtendiagnose</Text>
+        <Text style={s.title}>{t('track.customerDiagnosis.title')}</Text>
       </View>
       {summary.rows.map(r => (
         <View key={r.key} style={s.row}>
-          <Text style={s.label}>{r.label}</Text>
-          <Text style={s.value} numberOfLines={1}>{r.value}</Text>
+          <Text style={s.label}>{t(r.labelKey)}</Text>
+          <Text style={s.value} numberOfLines={1}>{formatDiagnosisValue(r.value, t)}</Text>
         </View>
       ))}
       <SupportDiagnosticsRow sessionLocalId={sessionLocalId} detail={detail} />

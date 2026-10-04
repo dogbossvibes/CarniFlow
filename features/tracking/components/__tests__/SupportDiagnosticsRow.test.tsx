@@ -3,6 +3,10 @@ import React from 'react';
 import { Alert } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { SupportDiagnosticsRow } from '@/features/tracking/components/SupportDiagnosticsRow';
+import i18n from '@/i18n/config';
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 const mockHas = jest.fn();
 const mockShare = jest.fn();
@@ -22,6 +26,7 @@ const mount = async () => {
 const button = (r: Rendered) => r.root.findAll((n: Rendered) => n.props.testID === 'support-diagnostics-share')[0];
 const texts = (r: Rendered) => r.root.findAllByType('Text' as never).map((n: Rendered) => n.props.children).flat().join('|');
 
+beforeAll(async () => { await i18n.changeLanguage('de'); });   // Texte kommen aus i18n (de)
 beforeEach(() => { mockHas.mockReset(); mockShare.mockReset(); jest.spyOn(Alert, 'alert').mockImplementation(() => {}); });
 afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
 

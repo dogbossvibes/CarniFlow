@@ -250,12 +250,17 @@ describe('Verdrahtung (Source)', () => {
     const card = fs.readFileSync('features/tracking/components/CustomerTrackDiagnosisCard.tsx', 'utf8');
     expect(card).toContain('<SupportDiagnosticsRow sessionLocalId={sessionLocalId} detail={detail} />');
     const row = fs.readFileSync('features/tracking/components/SupportDiagnosticsRow.tsx', 'utf8');
-    expect(row).toContain('Diagnosedaten teilen');
-    expect(row).toContain('Technische Fährtendaten für Support und Fehleranalyse teilen.');
+    // Texte kommen aus i18n (alle App-Sprachen); der deutsche Wortlaut bleibt unverändert.
+    expect(row).toContain("const TITLE = t('track.customerDiagnosis.shareTitle');");
+    expect(row).toContain("t('track.customerDiagnosis.shareSubtitle')");
     expect(row).toContain('accessibilityLabel={TITLE}');
     expect(row).not.toContain('AnyvoButton');                // bewusst dezent, kein Primary-Button
     // Ohne Daten: kein Button (Legacy: nichts; Kunden-Karte: verständlicher Hinweis statt Button).
     expect(row).toMatch(/if \(availability === 'none'\) \{/);
-    expect(row).toContain('Für diese ältere Fährte liegen keine vollständigen Diagnosedaten vor.');
+    expect(row).toContain("t('track.customerDiagnosis.unavailable')");
+    const de = fs.readFileSync('i18n/de-CH.ts', 'utf8');
+    expect(de).toContain("'track.customerDiagnosis.shareTitle': 'Diagnosedaten teilen'");
+    expect(de).toContain("'track.customerDiagnosis.shareSubtitle': 'Technische Fährtendaten für Support und Fehleranalyse teilen.'");
+    expect(de).toContain("'track.customerDiagnosis.unavailable': 'Für diese ältere Fährte liegen keine vollständigen Diagnosedaten vor.'");
   });
 });

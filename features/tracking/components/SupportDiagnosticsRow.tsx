@@ -2,15 +2,12 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
 import {
   customerDiagnosticsAvailability, hasSupportDiagnostics, shareCustomerDiagnostics, shareSupportDiagnostics,
   type CustomerDiagnosticsAvailability,
 } from '@/features/tracking/services/supportDiagnosticsService';
 
-const TITLE = 'Diagnosedaten teilen';
-const SUBTITLE = 'Technische Fährtendaten für Support und Fehleranalyse teilen.';
-const SUBTITLE_PERSISTED = 'Aus den gespeicherten Fährtendaten erstellt (ohne Live-Mitschnitt der Absuche).';
-const UNAVAILABLE = 'Für diese ältere Fährte liegen keine vollständigen Diagnosedaten vor.';
 
 /**
  * Dezente Sekundär-Aktion der Auswertung: teilt die privacy-reduced Support-Diagnose dieser
@@ -22,6 +19,8 @@ const UNAVAILABLE = 'Für diese ältere Fährte liegen keine vollständigen Diag
  * verständlicher Hinweis statt eines Buttons.
  */
 export function SupportDiagnosticsRow({ sessionLocalId, detail }: { sessionLocalId: string; detail?: Record<string, any> | null }) {
+  const { t } = useT();
+  const TITLE = t('track.customerDiagnosis.shareTitle');
   const customer = detail !== undefined;
   const [availability, setAvailability] = useState<CustomerDiagnosticsAvailability | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,7 +37,7 @@ export function SupportDiagnosticsRow({ sessionLocalId, detail }: { sessionLocal
 
   if (availability == null) return null;
   if (availability === 'none') {
-    return customer ? <Text style={s.unavailable} testID="support-diagnostics-unavailable">{UNAVAILABLE}</Text> : null;
+    return customer ? <Text style={s.unavailable} testID="support-diagnostics-unavailable">{t('track.customerDiagnosis.unavailable')}</Text> : null;
   }
 
   const onPress = async () => {
@@ -48,8 +47,8 @@ export function SupportDiagnosticsRow({ sessionLocalId, detail }: { sessionLocal
       const result = customer ? await shareCustomerDiagnostics(sessionLocalId, detail) : await shareSupportDiagnostics(sessionLocalId);
       if (!result.ok) {
         Alert.alert(TITLE, result.reason === 'missing'
-          ? 'Für diese Fährte liegen keine Diagnosedaten vor.'
-          : 'Diagnosedaten konnten nicht vorbereitet werden.');
+          ? t('track.customerDiagnosis.shareMissing')
+          : t('track.customerDiagnosis.shareFailed'));
       }
     } finally { setBusy(false); }
   };
@@ -60,7 +59,7 @@ export function SupportDiagnosticsRow({ sessionLocalId, detail }: { sessionLocal
       disabled={busy}
       accessibilityRole="button"
       accessibilityLabel={TITLE}
-      accessibilityHint={SUBTITLE}
+      accessibilityHint={t('track.customerDiagnosis.shareSubtitle')}
       accessibilityState={{ disabled: busy, busy }}
       style={({ pressed }) => [s.row, pressed && { opacity: 0.7 }]}
       testID="support-diagnostics-share"
@@ -72,7 +71,7 @@ export function SupportDiagnosticsRow({ sessionLocalId, detail }: { sessionLocal
       </View>
       <View style={s.texts}>
         <Text style={s.title}>{TITLE}</Text>
-        <Text style={s.subtitle}>{availability === 'persisted' ? SUBTITLE_PERSISTED : SUBTITLE}</Text>
+        <Text style={s.subtitle}>{t(availability === 'persisted' ? 'track.customerDiagnosis.shareSubtitlePersisted' : 'track.customerDiagnosis.shareSubtitle')}</Text>
       </View>
     </Pressable>
   );
