@@ -15,7 +15,8 @@ export const TRACK_LIFECYCLE_SOURCE_KEY = 'trackLifecycleSource';
 export type TrackLifecycleStatus = 'cancelled' | 'completed_without_app';
 /**
  * Bewusster Nutzer-Abbruch — genau zwei Stellen setzen den Marker 'cancelled':
- *   'resting_abort' Liegezeit-Screen „Fährte abbrechen" (liegen.tsx)
+ *   'resting_abort' Liegezeit-Screen „Fährte endgültig abbrechen" (liegen.tsx) — NICHT „Liegezeit beenden",
+ *                   das die Fährte offen lässt
  *   'lay_conflict'  Konfliktdialog beim Legen „bestehende Fährte beenden" (legen.tsx)
  */
 export type TrackCancelSource = 'resting_abort' | 'lay_conflict';

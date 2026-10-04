@@ -161,12 +161,20 @@ export default function TrackLiegenScreen() {
   };
 
   // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
-  const confirmCancel = (action: unknown) => {
-    // Wahrheitsgemäss: seit dem dauerhaften Abbruch-Marker ist „abbrechen" endgültig (die
-    // Fährte bleibt im Journal, wird aber nie wieder zum Fortsetzen/Absuchen angeboten).
-    Alert.alert('Fährte abbrechen?', 'Die Liegezeit endet und die Fährte wird beendet. Sie bleibt im Journal, kann danach aber nicht mehr fortgesetzt oder abgesucht werden.', [
+  // „Liegezeit beenden" ist NICHT „Fährte abbrechen": es verlässt den Screen und beendet nur die
+  // Liegezeit-Anzeige (Benachrichtigung/Live Activity). Kein 'cancelled', keine Registry-Änderung,
+  // kein dauerhafter Marker — die Fährte bleibt offen und über „Fährte fortsetzen" erreichbar.
+  const endLyingTime = (action: unknown) => {
+    void endLiegezeitNotification();   // nur die System-Anzeige beenden
+    allowLeaveRef.current = true;
+    // @ts-expect-error react-navigation action aus dem beforeRemove-Event
+    navigation.dispatch(action);
+  };
+  // Endgültiger Abbruch: separate, destruktive Aktion mit eigener Bestätigung und ehrlicher Folge.
+  const confirmFinalAbort = (action: unknown) => {
+    Alert.alert('Fährte endgültig abbrechen?', 'Die Fährte wird beendet. Sie bleibt im Journal, kann danach aber nicht mehr fortgesetzt oder abgesucht werden.', [
       { text: 'Nein', style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
-      { text: 'Ja, abbrechen', style: 'destructive', onPress: () => {
+      { text: 'Endgültig abbrechen', style: 'destructive', onPress: () => {
         // Nur die Fährte DIESES Screens beenden: der Store wird nur mitgeändert, wenn er zu ihr
         // gehört (Deep-Link ohne dogId kann die Fährte eines anderen Hundes im Store halten).
         const st = useTrackingStore.getState();
@@ -174,7 +182,7 @@ export default function TrackLiegenScreen() {
         if (target.cancelStore) st.setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
         if (dogId) useActiveFaehrten.getState().remove(dogId);   // Registry: Fährte des Hundes entfernen
         // Abbruch dauerhaft lokal vermerken (best-effort, offline, nicht blockierend):
-        // die Recovery bietet diese Fährte danach nie wieder zum Fortsetzen an.
+        // die Recovery bietet diese Fährte danach nur noch über „Fährte wieder öffnen" an.
         void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');
         void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
         allowLeaveRef.current = true;
@@ -189,11 +197,12 @@ export default function TrackLiegenScreen() {
       e.preventDefault();                   // Standard-Back/Swipe/Header-Back blocken
       Alert.alert(
         'Liegezeit läuft',
-        'Die Liegezeit läuft weiter, auch wenn du die App verlässt. Möchtest du zur App zurückkehren oder die Fährte wirklich abbrechen?',
+        'Die Liegezeit läuft weiter, auch wenn du die App verlässt. Beendest du die Liegezeit, bleibt die Fährte offen und kann später fortgesetzt werden.',
         [
           { text: 'Zurück', style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
           { text: 'Weiterlaufen lassen', onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },
-          { text: 'Fährte abbrechen', style: 'destructive', onPress: () => confirmCancel(e.data.action) },
+          { text: 'Liegezeit beenden', onPress: () => endLyingTime(e.data.action) },
+          { text: 'Fährte endgültig abbrechen', style: 'destructive', onPress: () => confirmFinalAbort(e.data.action) },
         ],
       );
     });

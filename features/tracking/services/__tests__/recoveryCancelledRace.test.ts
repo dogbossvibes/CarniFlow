@@ -169,7 +169,7 @@ describe('Quellen des Markers (Source-Vertrag)', () => {
   });
   it('beide Dialoge setzen den Marker erst nach ausdrücklicher Bestätigung mit ehrlicher Folge', () => {
     const liegen = read('app/track/liegen.tsx');
-    expect(liegen.indexOf("'Ja, abbrechen'")).toBeLessThan(liegen.indexOf('recordTrackCancelled('));
+    expect(liegen.indexOf("'Endgültig abbrechen'")).toBeLessThan(liegen.indexOf('recordTrackCancelled('));
     expect(liegen).toContain('kann danach aber nicht mehr fortgesetzt oder abgesucht werden.');
     const legen = read('app/track/legen.tsx');
     expect(legen.indexOf("'Endgültig abbrechen'")).toBeLessThan(legen.indexOf('recordTrackCancelled('));
