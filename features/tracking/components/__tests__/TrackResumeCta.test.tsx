@@ -149,4 +149,22 @@ describe('TrackResumeCta', () => {
     expect(mockDiscard).toHaveBeenCalledWith('sess-A', 'dog-A', { hasRemoteSearchRun: false });
     expect(mockPush).toHaveBeenCalledWith('/track/liegen?dogId=dog-A&id=sess-A');
   });
+
+  it('QA-Modus: „cancelled" nennt Quelle und Zeitpunkt des Abbruchs (wodurch beendet)', async () => {
+    mockQa = true;
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled', detail: { lifecycleSource: 'resting_abort', lifecycleAt: '2026-10-04T09:00:00.000Z' } });
+    const r = await mount();
+    expect(texts(r)).toContain('Recovery: cancelled · resting_abort · 2026-10-04T09:00:00.000Z');
+  });
+
+  it('10. Mount/Unmount/Remount der Karte schreibt nichts (kein Apply/Complete/Discard) und bleibt verfügbar', async () => {
+    mockEvaluate.mockResolvedValue({ ok: true, source: 'session', mode: 'resting', registryPatch: {}, pendingToWrite: null, target: '/track/liegen?dogId=dog-A&id=sess-A' });
+    await mount();
+    act(() => { renderer.unmount(); }); renderer = null;
+    const r = await mount();
+    expect(byId(r, 'track-resume-cta')).toBeDefined();
+    expect(mockApply).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
+    expect(mockDiscard).not.toHaveBeenCalled();
+  });
 });

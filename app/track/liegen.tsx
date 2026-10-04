@@ -13,6 +13,7 @@ import { restingElapsedSeconds, isRestingRecovery } from '@/features/tracking/st
 import { startLiegezeitNotification, updateLiegezeitNotification, endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 import { recordTrackCancelled } from '@/features/tracking/services/trackRecoveryService';
+import { resolveRestingCancelTarget } from '@/features/tracking/store/trackRecovery';
 import {
   TRACK_SEGMENT_COLORS,
   actualSegmentSteps,
@@ -161,14 +162,20 @@ export default function TrackLiegenScreen() {
 
   // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
   const confirmCancel = (action: unknown) => {
-    Alert.alert('Fährte abbrechen?', 'Die gelegte Fährte bleibt lokal gespeichert. Nur die Liegezeit wird beendet.', [
+    // Wahrheitsgemäss: seit dem dauerhaften Abbruch-Marker ist „abbrechen" endgültig (die
+    // Fährte bleibt im Journal, wird aber nie wieder zum Fortsetzen/Absuchen angeboten).
+    Alert.alert('Fährte abbrechen?', 'Die Liegezeit endet und die Fährte wird beendet. Sie bleibt im Journal, kann danach aber nicht mehr fortgesetzt oder abgesucht werden.', [
       { text: 'Nein', style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
       { text: 'Ja, abbrechen', style: 'destructive', onPress: () => {
-        useTrackingStore.getState().setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
+        // Nur die Fährte DIESES Screens beenden: der Store wird nur mitgeändert, wenn er zu ihr
+        // gehört (Deep-Link ohne dogId kann die Fährte eines anderen Hundes im Store halten).
+        const st = useTrackingStore.getState();
+        const target = resolveRestingCancelTarget({ routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId });
+        if (target.cancelStore) st.setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
         if (dogId) useActiveFaehrten.getState().remove(dogId);   // Registry: Fährte des Hundes entfernen
         // Abbruch dauerhaft lokal vermerken (best-effort, offline, nicht blockierend):
         // die Recovery bietet diese Fährte danach nie wieder zum Fortsetzen an.
-        void recordTrackCancelled(id ?? useTrackingStore.getState().currentSessionId, dogId ?? useTrackingStore.getState().dogId);
+        void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');
         void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
         allowLeaveRef.current = true;
         // @ts-expect-error react-navigation action aus dem beforeRemove-Event

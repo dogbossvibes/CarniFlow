@@ -1,15 +1,23 @@
 import { getLocalDb } from '@/lib/localDb/client';
 import { newLocalId, nowIso } from '@/lib/localDb/ids';
 import type { LocalTrainingSession, SyncStatus } from '@/features/sync/types/sync';
-import { TRACK_LIFECYCLE_KEY, TRACK_LIFECYCLE_UPDATED_KEY, type TrackLifecycleStatus } from '@/features/tracking/store/trackRecovery';
+import {
+  TRACK_LIFECYCLE_KEY, TRACK_LIFECYCLE_SOURCE_KEY, TRACK_LIFECYCLE_UPDATED_KEY, type TrackCancelSource, type TrackLifecycleStatus,
+} from '@/features/tracking/store/trackRecovery';
 
 // payload_json = neuer Wert (Parameter 1), aber ein vorhandener lokaler Lifecycle-Marker der
 // Zeile wird übernommen (Parameter 2 = derselbe neue Wert, falls keiner vorhanden). Ungültiges
 // altes JSON wird nie ausgewertet (json_valid-Schutz) — kein Fehler beim Finalisieren.
+// Eine vorhandene Abbruch-Quelle (nur Diagnose) wird mit übernommen; ohne Quelle bleibt das
+// Ergebnis identisch zu vorher (kein zusätzlicher Key). Parameter: 3× derselbe neue Wert.
 const PRESERVE_LIFECYCLE_SQL =
   `case when json_valid(payload_json) and json_extract(payload_json, '$.${TRACK_LIFECYCLE_KEY}') is not null ` +
+  `then case when json_extract(payload_json, '$.${TRACK_LIFECYCLE_SOURCE_KEY}') is not null ` +
   `then json_set(?, '$.${TRACK_LIFECYCLE_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_KEY}'), ` +
-  `'$.${TRACK_LIFECYCLE_UPDATED_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_UPDATED_KEY}')) else ? end`;
+  `'$.${TRACK_LIFECYCLE_UPDATED_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_UPDATED_KEY}'), ` +
+  `'$.${TRACK_LIFECYCLE_SOURCE_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_SOURCE_KEY}')) ` +
+  `else json_set(?, '$.${TRACK_LIFECYCLE_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_KEY}'), ` +
+  `'$.${TRACK_LIFECYCLE_UPDATED_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_UPDATED_KEY}')) end else ? end`;
 
 // Lokales Repository für Trainingseinheiten/Fährten-Sessions (SQLite = primäre Quelle).
 
@@ -117,7 +125,7 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
   // Lay-Summary wird vollständig gesetzt.
   await db.runAsync(
     `update local_training_sessions set status=?, ended_at=?, duration_seconds=?, payload_json=${PRESERVE_LIFECYCLE_SQL}, updated_at=? where local_id=?`,
-    input.status ?? 'completed', input.endedAt, input.durationSeconds ?? null, payload, payload, nowIso(), localId,
+    input.status ?? 'completed', input.endedAt, input.durationSeconds ?? null, payload, payload, payload, nowIso(), localId,
   );
 }
 
@@ -150,17 +158,24 @@ export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<
 // Segmente); sync_status bleibt unberührt (der Remote-Sync liest diese Felder nicht).
 // Atomar in EINER Anweisung, nur für genau diese Session UND diesen Hund; idempotent.
 // false, wenn keine Zeile passt (Session fehlt oder anderer Hund).
-export async function setLocalTrackLifecycle(sessionLocalId: string, dogId: string, status: TrackLifecycleStatus): Promise<boolean> {
+// `source` (optional, nur Diagnose) hält fest, WODURCH der Abschluss gesetzt wurde.
+export async function setLocalTrackLifecycle(sessionLocalId: string, dogId: string, status: TrackLifecycleStatus, source: string | null = null): Promise<boolean> {
   const db = await getLocalDb();
-  const res = await db.runAsync(
-    `update local_training_sessions set payload_json=json_set(case when json_valid(payload_json) then payload_json else '{}' end, '$.${TRACK_LIFECYCLE_KEY}', ?, '$.${TRACK_LIFECYCLE_UPDATED_KEY}', ?) where local_id=? and dog_id=?`,
-    status, nowIso(), sessionLocalId, dogId,
-  );
+  const base = `case when json_valid(payload_json) then payload_json else '{}' end`;
+  const res = source
+    ? await db.runAsync(
+      `update local_training_sessions set payload_json=json_set(${base}, '$.${TRACK_LIFECYCLE_KEY}', ?, '$.${TRACK_LIFECYCLE_UPDATED_KEY}', ?, '$.${TRACK_LIFECYCLE_SOURCE_KEY}', ?) where local_id=? and dog_id=?`,
+      status, nowIso(), source, sessionLocalId, dogId,
+    )
+    : await db.runAsync(
+      `update local_training_sessions set payload_json=json_set(${base}, '$.${TRACK_LIFECYCLE_KEY}', ?, '$.${TRACK_LIFECYCLE_UPDATED_KEY}', ?) where local_id=? and dog_id=?`,
+      status, nowIso(), sessionLocalId, dogId,
+    );
   return (res?.changes ?? 0) > 0;
 }
 
-export function markLocalTrackCancelled(sessionLocalId: string, dogId: string): Promise<boolean> {
-  return setLocalTrackLifecycle(sessionLocalId, dogId, 'cancelled');
+export function markLocalTrackCancelled(sessionLocalId: string, dogId: string, source: TrackCancelSource | null = null): Promise<boolean> {
+  return setLocalTrackLifecycle(sessionLocalId, dogId, 'cancelled', source);
 }
 
 /** Remove only the automatic search detection, never the laid reference marker. */

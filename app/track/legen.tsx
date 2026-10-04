@@ -305,14 +305,23 @@ export default function LegenScreen() {
       'Für diesen Hund existiert bereits eine aktive Fährte. Was möchtest du tun?',
       [
         { text: 'Fährte fortsetzen', onPress: () => router.replace(reopenTarget(entry) as never) },
-        { text: 'Fährte abbrechen', style: 'destructive', onPress: () => {
-            // Bestehende Fährte DIESES Hundes verwerfen (keine Fremdfährte berühren).
-            useActiveFaehrten.getState().remove(dId);
-            void clearPending(dId);
-            void recordTrackCancelled(entry.sessionId, dId);   // dauerhaft: nie wieder „Fährte fortsetzen"
-            if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');
-            proceedToStart();   // erst danach darf eine neue Fährte entstehen
-          } },
+        // Endgültig (dauerhafter Abbruch-Marker + Puffer weg) → nie per Ein-Tipp neben „Abbrechen":
+        // zweite, ausdrückliche Bestätigung mit ehrlicher Folge.
+        { text: 'Fährte abbrechen', style: 'destructive', onPress: () => Alert.alert(
+            'Bestehende Fährte endgültig abbrechen?',
+            'Die offene Fährte dieses Hundes wird abgebrochen. Sie bleibt im Journal, kann danach aber nicht mehr fortgesetzt oder abgesucht werden.',
+            [
+              { text: 'Abbrechen', style: 'cancel' },
+              { text: 'Endgültig abbrechen', style: 'destructive', onPress: () => {
+                  // Bestehende Fährte DIESES Hundes verwerfen (keine Fremdfährte berühren).
+                  useActiveFaehrten.getState().remove(dId);
+                  void clearPending(dId);
+                  void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');   // dauerhaft: nie wieder „Fährte fortsetzen"
+                  if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');
+                  proceedToStart();   // erst danach darf eine neue Fährte entstehen
+                } },
+            ],
+          ) },
         { text: 'Abbrechen', style: 'cancel' },
       ],
     );

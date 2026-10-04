@@ -9,8 +9,16 @@ import type { LocalTrackMarker, LocalTrackPoint, LocalTrainingSession } from '@/
 /** Lokaler Lifecycle-Hinweis einer Fährte in payload_json (nur lokal, der Remote-Sync liest ihn nicht). */
 export const TRACK_LIFECYCLE_KEY = 'trackLifecycleStatus';
 export const TRACK_LIFECYCLE_UPDATED_KEY = 'trackLifecycleUpdatedAt';
+/** Wodurch der Abschluss gesetzt wurde (nur Diagnose; ändert keine Entscheidung). */
+export const TRACK_LIFECYCLE_SOURCE_KEY = 'trackLifecycleSource';
 /** Endgültige, vom Nutzer gesetzte lokale Lifecycle-Abschlüsse. */
 export type TrackLifecycleStatus = 'cancelled' | 'completed_without_app';
+/**
+ * Bewusster Nutzer-Abbruch — genau zwei Stellen setzen den Marker 'cancelled':
+ *   'resting_abort' Liegezeit-Screen „Fährte abbrechen" (liegen.tsx)
+ *   'lay_conflict'  Konfliktdialog beim Legen „bestehende Fährte beenden" (legen.tsx)
+ */
+export type TrackCancelSource = 'resting_abort' | 'lay_conflict';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Recovery einer gelegten, noch nicht abgesuchten Fährte — REINE, testbare Logik.
@@ -82,7 +90,13 @@ export type RecoveryDecision =
       /** Ziel-Route über das bestehende reopenTarget(). */
       target: string;
     }
-  | { ok: false; reason: RecoveryRejectReason };
+  | { ok: false; reason: RecoveryRejectReason; detail?: RecoveryRejectDetail };
+
+/** Diagnose zu einem dauerhaften Lifecycle-Abschluss (wodurch/wann) — nur Anzeige im QA-Modus. */
+export interface RecoveryRejectDetail {
+  lifecycleSource: string | null;
+  lifecycleAt: string | null;
+}
 
 export interface LocalSessionSnapshot {
   session: LocalTrainingSession;
@@ -156,6 +170,14 @@ export function hasFinalSearchRun(data: { track_data?: { run?: unknown; [key: st
  */
 export function canCompleteWithoutApp(d: RecoveryDecision): boolean {
   return d.ok || d.reason === 'search_started';
+}
+
+/** Quelle/Zeitpunkt eines dauerhaften Lifecycle-Abschlusses (Altbestand ohne Quelle → null). */
+export function lifecycleDetail(session: Pick<LocalTrainingSession, 'payload_json'> | null | undefined): RecoveryRejectDetail {
+  const p = parseObj(session?.payload_json);
+  const src = p?.[TRACK_LIFECYCLE_SOURCE_KEY];
+  const at = p?.[TRACK_LIFECYCLE_UPDATED_KEY];
+  return { lifecycleSource: typeof src === 'string' ? src : null, lifecycleAt: typeof at === 'string' ? at : null };
 }
 
 /** Dauerhafter lokaler Lifecycle-Abschluss einer Session (null = keiner / Altbestand). */
@@ -276,7 +298,12 @@ export function decideTrackRecovery(input: {
   if (!sessionId) return { ok: false, reason: 'no_session' };
 
   const blocked = hardBlock(local, dogId, input.userId, input.hasRemoteSearchRun);
-  if (blocked) return { ok: false, reason: blocked };
+  if (blocked) {
+    // Dauerhafter Abschluss: Quelle/Zeitpunkt mitgeben, damit „cancelled" künftig erklärbar ist.
+    // Rein additiv: `detail` nur, wenn die Session Quelle/Zeitpunkt trägt (Altbestand unverändert).
+    const detail = blocked === 'cancelled' || blocked === 'completed_without_app' ? lifecycleDetail(local?.session) : null;
+    return detail && (detail.lifecycleSource || detail.lifecycleAt) ? { ok: false, reason: blocked, detail } : { ok: false, reason: blocked };
+  }
 
   const reg = isValidEntry(registry[dogId]) ? registry[dogId] : null;
   if (reg && reg.sessionId !== sessionId) return { ok: false, reason: 'other_active' };
@@ -411,4 +438,24 @@ export function decideSearchDiscard(input: {
   }
   const registryPatch = registryPatchFromPending(next, now);
   return { ok: true, pending: next, registryPatch, target: reopenTarget(upsertEntry({}, dogId, registryPatch)[dogId]) };
+}
+
+/**
+ * Liegezeit-Abbruch: WELCHE Session wird beendet und darf der Aufnahme-Store mitgeändert werden?
+ * Rein. Der Store gehört nur dann zur abgebrochenen Fährte, wenn keine Route-Session vorliegt
+ * oder sie mit der Store-Session übereinstimmt — sonst (z. B. Deep-Link aus der Liegezeit-
+ * Benachrichtigung ohne dogId, Store hält die Fährte eines ANDEREN Hundes) bleibt der Store
+ * unangetastet. Hund: Route, sonst nur der Store-Hund der passenden Session (sonst null →
+ * der Service bestimmt ihn aus der lokalen Session).
+ */
+export function resolveRestingCancelTarget(input: {
+  routeSessionId: string | null | undefined;
+  routeDogId: string | null | undefined;
+  storeSessionId: string | null | undefined;
+  storeDogId: string | null | undefined;
+}): { sessionId: string | null; dogId: string | null; cancelStore: boolean } {
+  const sessionId = input.routeSessionId ?? input.storeSessionId ?? null;
+  const cancelStore = !input.routeSessionId || input.storeSessionId === input.routeSessionId;
+  const dogId = input.routeDogId ?? (cancelStore ? input.storeDogId ?? null : null);
+  return { sessionId, dogId, cancelStore };
 }

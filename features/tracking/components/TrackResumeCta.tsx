@@ -37,6 +37,17 @@ const CONFIRM_TEXT = 'Die Fährte bleibt im Journal. Eine Absuche wird nicht nac
  *  • sonst keine Karte. Im QA-Diagnosemodus steht dann der konkrete Recovery-Reason da.
  * Keine neue Session, kein Quota-Claim, kein erfundener Suchlauf.
  */
+/** QA-Zeile: Grund + (bei dauerhaftem Abschluss) wodurch/wann — z. B. „Recovery: cancelled · resting_abort · 2026-…". */
+export function recoveryReasonLine(d: RecoveryDecision): string {
+  if (d.ok) return 'Recovery: ok';
+  const parts = [`Recovery: ${d.reason}`];
+  if (d.detail) {
+    parts.push(d.detail.lifecycleSource ?? 'source=unbekannt (Altbestand)');
+    if (d.detail.lifecycleAt) parts.push(d.detail.lifecycleAt);
+  }
+  return parts.join(' · ');
+}
+
 export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisibleChange }: {
   sessionId: string; dogId: string | null | undefined; hasRemoteSearchRun: boolean;
   onVisibleChange?: (visible: boolean) => void;
@@ -68,7 +79,7 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
     if (decision && !decision.ok && isQaDiagnosticsEnabled()) {
       return (
         <View style={s.qa} testID="track-recovery-reason">
-          <Text style={s.qaText}>{`Recovery: ${decision.reason}`}</Text>
+          <Text style={s.qaText}>{recoveryReasonLine(decision)}</Text>
         </View>
       );
     }

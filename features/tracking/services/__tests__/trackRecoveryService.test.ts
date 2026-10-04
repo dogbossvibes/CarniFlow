@@ -174,21 +174,33 @@ describe('Account-Wechsel: Selbstheilung nur für Hunde des angemeldeten Nutzers
 describe('Dauerhafter Abbruch', () => {
   it('1: recordTrackCancelled schreibt den Marker für genau diese Session und diesen Hund', async () => {
     mockMarkCancelled.mockResolvedValue(true);
-    expect(await recordTrackCancelled('sess-A', 'dog-A')).toBe(true);
-    expect(mockMarkCancelled).toHaveBeenCalledWith('sess-A', 'dog-A');
+    expect(await recordTrackCancelled('sess-A', 'dog-A', 'resting_abort')).toBe(true);
+    expect(mockMarkCancelled).toHaveBeenCalledWith('sess-A', 'dog-A', 'resting_abort');
     noSideEffects();
   });
 
-  it('ohne Session/Hund wird nichts geschrieben', async () => {
-    expect(await recordTrackCancelled(null, 'dog-A')).toBe(false);
-    expect(await recordTrackCancelled('sess-A', undefined)).toBe(false);
+  it('ohne Session wird nichts geschrieben; ohne Hund und ohne lokale Session ebenfalls nicht', async () => {
+    expect(await recordTrackCancelled(null, 'dog-A', 'resting_abort')).toBe(false);
+    mockSession.mockResolvedValue(null);
+    expect(await recordTrackCancelled('sess-A', undefined, 'resting_abort')).toBe(false);
     expect(mockMarkCancelled).not.toHaveBeenCalled();
+  });
+
+  it('ohne Hund (Deep-Link): Hund aus der lokalen Session; Registry-Eintrag nur dieser Session entfernt', async () => {
+    mockMarkCancelled.mockResolvedValue(true);
+    useActiveFaehrten.getState().upsert('dog-A', { status: 'resting', sessionId: 'sess-A' });
+    useActiveFaehrten.getState().upsert('dog-B', { status: 'resting', sessionId: 'sess-B' });
+    expect(await recordTrackCancelled('sess-A', undefined, 'resting_abort')).toBe(true);
+    expect(mockMarkCancelled).toHaveBeenCalledWith('sess-A', 'dog-A', 'resting_abort');
+    expect(useActiveFaehrten.getState().get('dog-A')).toBeNull();
+    expect(useActiveFaehrten.getState().get('dog-B')?.sessionId).toBe('sess-B');   // fremder Hund unberührt
+    noSideEffects();
   });
 
   it('5: Persistenzfehler → kein Crash, liefert false', async () => {
     mockMarkCancelled.mockRejectedValue(new Error('db locked'));
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    await expect(recordTrackCancelled('sess-A', 'dog-A')).resolves.toBe(false);
+    await expect(recordTrackCancelled('sess-A', 'dog-A', 'lay_conflict')).resolves.toBe(false);
     warn.mockRestore();
   });
 

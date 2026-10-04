@@ -8,7 +8,7 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { clearPending, listPendingDogIds, loadPending, writePendingNow } from '@/features/tracking/store/trackPersist';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import {
-  decideSearchDiscard, decideTrackRecovery, durableLifecycle, selfHealPatches,
+  decideSearchDiscard, decideTrackRecovery, durableLifecycle, selfHealPatches, type TrackCancelSource,
   type LocalSessionSnapshot, type RecoveryDecision, type RecoveryRejectReason,
 } from '@/features/tracking/store/trackRecovery';
 import {
@@ -85,13 +85,26 @@ export async function applyTrackRecovery(args: TrackRecoveryArgs): Promise<Recov
 
 /**
  * Bewussten Abbruch einer gelegten Fährte dauerhaft lokal vermerken (SQLite,
- * payload_json). Best-effort, offline, nie werfend — der Abbruch-Flow wird davon
- * nicht blockiert. Ohne sessionId/dogId (Legacy/offline ohne Session) nichts zu tun.
+ * payload_json) — NUR aus den zwei bestätigten Nutzer-Dialogen (`source`). Best-effort,
+ * offline, nie werfend — der Abbruch-Flow wird davon nicht blockiert. Fehlt der Hund
+ * (Deep-Link ohne dogId), wird er aus der lokalen Session bestimmt. Danach wird ein
+ * Registry-Eintrag entfernt, der GENAU zu dieser Session gehört (nie ein fremder).
+ * Löscht keine Punkte/Marker/Puffer. Ohne sessionId nichts zu tun.
  */
-export async function recordTrackCancelled(sessionId: string | null | undefined, dogId: string | null | undefined): Promise<boolean> {
-  if (!sessionId || !dogId) return false;
-  try { return await markLocalTrackCancelled(sessionId, dogId); }
-  catch (e) { console.warn('[trackRecovery] cancel marker', e); return false; }
+export async function recordTrackCancelled(
+  sessionId: string | null | undefined, dogId: string | null | undefined, source: TrackCancelSource,
+): Promise<boolean> {
+  if (!sessionId) return false;
+  try {
+    const dog = dogId ?? (await getLocalTrainingSessionById(sessionId).catch(() => null))?.dog_id ?? null;
+    if (!dog) return false;
+    const marked = await markLocalTrackCancelled(sessionId, dog, source);
+    if (marked) {
+      await ensureHydrated();
+      if (useActiveFaehrten.getState().get(dog)?.sessionId === sessionId) useActiveFaehrten.getState().remove(dog);
+    }
+    return marked;
+  } catch (e) { console.warn('[trackRecovery] cancel marker', e); return false; }
 }
 
 export type DiscardSearchResult = { ok: true; target: string } | { ok: false; reason: RecoveryRejectReason | 'failed' };

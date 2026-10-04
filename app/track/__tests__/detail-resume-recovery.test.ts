@@ -67,14 +67,25 @@ describe('Bewusster Abbruch wird dauerhaft vermerkt', () => {
   const legen = readFileSync(join(__dirname, '..', 'legen.tsx'), 'utf8');
 
   it('Liegezeit „Fährte abbrechen": Marker nach Status/Registry, nicht awaited', () => {
-    const cancel = liegen.indexOf("setSessionStatus('cancelled')");
-    const marker = liegen.indexOf('void recordTrackCancelled(id ?? useTrackingStore.getState().currentSessionId, dogId ?? useTrackingStore.getState().dogId);');
+    const cancel = liegen.indexOf("if (target.cancelStore) st.setSessionStatus('cancelled');");
+    const marker = liegen.indexOf("void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');");
+    expect(liegen).toContain('const target = resolveRestingCancelTarget({ routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId });');
     expect(cancel).toBeGreaterThan(-1);
     expect(marker).toBeGreaterThan(cancel);
+    // Dialog nennt die echte Folge (endgültig) statt „bleibt gespeichert, nur Liegezeit endet".
+    expect(liegen).not.toContain('Nur die Liegezeit wird beendet.');
+    expect(liegen).toContain('kann danach aber nicht mehr fortgesetzt oder abgesucht werden.');
   });
 
   it('Konflikt-Dialog „Fährte abbrechen" beim Legen vermerkt den Abbruch der bestehenden Fährte', () => {
-    expect(legen).toContain('void recordTrackCancelled(entry.sessionId, dId);');
+    expect(legen).toContain("void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');");
+    // Endgültig nur nach zweiter, ausdrücklicher Bestätigung (nie per Ein-Tipp neben „Abbrechen").
+    const first = legen.indexOf("{ text: 'Fährte abbrechen', style: 'destructive', onPress: () => Alert.alert(");
+    const confirm = legen.indexOf("'Bestehende Fährte endgültig abbrechen?'");
+    const marker = legen.indexOf("void recordTrackCancelled(entry.sessionId, dId, 'lay_conflict');");
+    expect(first).toBeGreaterThan(-1);
+    expect(confirm).toBeGreaterThan(first);
+    expect(marker).toBeGreaterThan(confirm);
   });
 });
 
@@ -96,7 +107,7 @@ describe('run.tsx „Absuche verwerfen": nur der Suchversuch, kein Abbruch der F
 
   it('echtes „Fährte abbrechen" (Liegezeit) bleibt cancelled + dauerhafter Marker', () => {
     const liegen = readFileSync(join(__dirname, '..', 'liegen.tsx'), 'utf8');
-    expect(liegen).toContain("useTrackingStore.getState().setSessionStatus('cancelled');");
+    expect(liegen).toContain("if (target.cancelStore) st.setSessionStatus('cancelled');");
     expect(liegen).toContain('void recordTrackCancelled(');
   });
 });

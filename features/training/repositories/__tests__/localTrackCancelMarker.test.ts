@@ -98,3 +98,16 @@ describe('Race mit der asynchronen Lay-Finalisierung (finish())', () => {
     expect(payload()).toEqual({ distanceMeters: 123, articlesTotal: 1, cornersTotal: 2, gpsQualityAverage: 4, segments: [{ id: 's1' }] });
   });
 });
+
+describe('Abbruch-Quelle (nur Diagnose)', () => {
+  it('Quelle wird mit dem Marker gespeichert und übersteht eine spätere Lay-Finalisierung', async () => {
+    expect(await markLocalTrackCancelled('sess-A', 'dog-A', 'resting_abort')).toBe(true);
+    expect(payload()).toMatchObject({ trackLifecycleStatus: 'cancelled', trackLifecycleSource: 'resting_abort' });
+    await finalizeLocalTrainingSession('sess-A', LAY);   // finish() schreibt danach asynchron
+    expect(payload()).toMatchObject({ trackLifecycleStatus: 'cancelled', trackLifecycleSource: 'resting_abort', distanceMeters: 123 });
+  });
+  it('ohne Quelle bleibt das Payload exakt wie bisher (kein zusätzlicher Key)', async () => {
+    await markLocalTrackCancelled('sess-A', 'dog-A');
+    expect(Object.keys(payload()).sort()).toEqual(['trackLifecycleStatus', 'trackLifecycleUpdatedAt']);
+  });
+});
