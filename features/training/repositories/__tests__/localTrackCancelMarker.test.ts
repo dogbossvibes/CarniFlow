@@ -4,7 +4,7 @@
 // mit der asynchronen Lay-Finalisierung (finish()).
 import { DatabaseSync } from 'node:sqlite';
 import {
-  finalizeLocalTrainingSession, markLocalTrackCancelled, setLocalTrackLifecycle,
+  clearLocalTrackCancelled, finalizeLocalTrainingSession, markLocalTrackCancelled, setLocalTrackLifecycle,
 } from '@/features/training/repositories/localTrainingRepository';
 import { TRACK_LIFECYCLE_KEY } from '@/features/tracking/store/trackRecovery';
 
@@ -109,5 +109,31 @@ describe('Abbruch-Quelle (nur Diagnose)', () => {
   it('ohne Quelle bleibt das Payload exakt wie bisher (kein zusätzlicher Key)', async () => {
     await markLocalTrackCancelled('sess-A', 'dog-A');
     expect(Object.keys(payload()).sort()).toEqual(['trackLifecycleStatus', 'trackLifecycleUpdatedAt']);
+  });
+});
+
+describe('clearLocalTrackCancelled („Fährte wieder öffnen")', () => {
+  it('entfernt NUR den Abbruch-Marker (Status/Zeit/Quelle); Lay-Summary, Status und sync_status bleiben', async () => {
+    await finalizeLocalTrainingSession('sess-A', LAY);
+    await markLocalTrackCancelled('sess-A', 'dog-A', 'resting_abort');
+    const before = row();
+    expect(await clearLocalTrackCancelled('sess-A', 'dog-A')).toBe(true);
+    expect(payload()).toEqual({ distanceMeters: 123, articlesTotal: 1, cornersTotal: 2, gpsQualityAverage: 4, segments: [{ id: 's1' }] });
+    expect(row().status).toBe(before.status);
+    expect(row().sync_status).toBe(before.sync_status);
+  });
+  it('lässt „Ohne App abgeschlossen" unberührt und arbeitet nur für denselben Hund', async () => {
+    await setLocalTrackLifecycle('sess-A', 'dog-A', 'completed_without_app');
+    expect(await clearLocalTrackCancelled('sess-A', 'dog-A')).toBe(false);
+    expect(payload().trackLifecycleStatus).toBe('completed_without_app');
+    await markLocalTrackCancelled('sess-A', 'dog-A');
+    expect(await clearLocalTrackCancelled('sess-A', 'dog-B')).toBe(false);
+    expect(payload().trackLifecycleStatus).toBe('cancelled');
+  });
+  it('ohne Marker / kaputtes JSON → false, keine Änderung', async () => {
+    expect(await clearLocalTrackCancelled('sess-A', 'dog-A')).toBe(false);
+    mockDb.prepare(`update local_training_sessions set payload_json='{kaputt' where local_id='sess-A'`).run();
+    expect(await clearLocalTrackCancelled('sess-A', 'dog-A')).toBe(false);
+    expect(row().payload_json).toBe('{kaputt');
   });
 });

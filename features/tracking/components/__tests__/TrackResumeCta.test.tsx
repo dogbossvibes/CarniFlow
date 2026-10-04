@@ -8,12 +8,14 @@ const mockEvaluate = jest.fn();
 const mockApply = jest.fn();
 const mockComplete = jest.fn();
 const mockDiscard = jest.fn();
+const mockReopen = jest.fn();
 const mockPush = jest.fn();
 jest.mock('@/features/tracking/services/trackRecoveryService', () => ({
   evaluateTrackRecovery: (...a: unknown[]) => mockEvaluate(...a),
   applyTrackRecovery: (...a: unknown[]) => mockApply(...a),
   completeTrackWithoutApp: (...a: unknown[]) => mockComplete(...a),
   discardSearchAttempt: (...a: unknown[]) => mockDiscard(...a),
+  reopenCancelledTrack: (...a: unknown[]) => mockReopen(...a),
 }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 let mockQa = false;
@@ -34,7 +36,7 @@ const texts = (r: Rendered) => r.root.findAllByType('Text' as never).map((n: Ren
 let alertSpy: jest.SpyInstance;
 beforeEach(() => {
   mockQa = false;
-  [mockEvaluate, mockApply, mockComplete, mockPush, mockDiscard].forEach(m => m.mockReset());
+  [mockEvaluate, mockApply, mockComplete, mockPush, mockDiscard, mockReopen].forEach(m => m.mockReset());
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
@@ -166,5 +168,47 @@ describe('TrackResumeCta', () => {
     expect(mockApply).not.toHaveBeenCalled();
     expect(mockComplete).not.toHaveBeenCalled();
     expect(mockDiscard).not.toHaveBeenCalled();
+  });
+
+  it('2. „Fährte fortsetzen" nutzt den bestehenden Mint-Primärstil (C.trackPrimary), grosses Touch-Target', async () => {
+    mockEvaluate.mockResolvedValue({ ok: true, source: 'session', mode: 'resting', registryPatch: {}, pendingToWrite: null, target: '/t' });
+    const r = await mount();
+    const style = [].concat(byId(r, 'track-resume-cta').props.style({ pressed: false })).filter(Boolean).reduce((a: object, b: object) => ({ ...a, ...b }), {}) as { backgroundColor: string; minHeight: number };
+    const { C } = jest.requireActual('@/constants/colors');
+    expect(style.backgroundColor).toBe(C.trackPrimary);
+    expect(style.minHeight).toBeGreaterThanOrEqual(56);
+    expect(texts(r)).toContain('Fährte fortsetzen');
+  });
+
+  it('abgebrochene Fährte: verständliche Karte + Mint „Fährte wieder öffnen" statt Sackgasse; kein Entwicklerbegriff', async () => {
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled', detail: { lifecycleSource: 'resting_abort', lifecycleAt: 'x' } });
+    const r = await mount();
+    const t = texts(r);
+    expect(t).toContain('Diese Fährte wurde abgebrochen');
+    expect(byId(r, 'track-reopen-cancelled')).toBeDefined();
+    expect(byId(r, 'track-complete-without-app')).toBeUndefined();
+    expect(t).not.toMatch(/recovery|cancelled|lifecycle|pending/i);
+    expect(mockVisible).toHaveBeenLastCalledWith(true);
+  });
+
+  it('„Fährte wieder öffnen" → danach normale Karte mit „Fährte fortsetzen"; kein Fortsetzen ohne Nutzertipp', async () => {
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled' });
+    mockReopen.mockResolvedValue({ ok: true, decision: { ok: true, source: 'session', mode: 'resting', registryPatch: {}, pendingToWrite: null, target: '/t' } });
+    const r = await mount();
+    expect(mockReopen).not.toHaveBeenCalled();
+    await act(async () => { await byId(r, 'track-reopen-cancelled').props.onPress(); });
+    expect(mockReopen).toHaveBeenCalledWith('sess-A', 'dog-A', { hasRemoteSearchRun: false });
+    expect(byId(r, 'track-resume-cta')).toBeDefined();
+    expect(byId(r, 'track-reopen-cancelled')).toBeUndefined();
+    expect(mockApply).not.toHaveBeenCalled();
+  });
+
+  it('Wiederöffnen nicht möglich → freundliche Meldung, Karte bleibt, nichts navigiert', async () => {
+    mockEvaluate.mockResolvedValue({ ok: false, reason: 'cancelled' });
+    mockReopen.mockResolvedValue({ ok: false, reason: 'search_completed' });
+    const r = await mount();
+    await act(async () => { await byId(r, 'track-reopen-cancelled').props.onPress(); });
+    expect(alertSpy).toHaveBeenCalledWith('Fährte wieder öffnen', 'Diese Fährte kann nicht wieder geöffnet werden.');
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

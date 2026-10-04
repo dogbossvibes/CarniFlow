@@ -174,6 +174,20 @@ export async function setLocalTrackLifecycle(sessionLocalId: string, dogId: stri
   return (res?.changes ?? 0) > 0;
 }
 
+// „Fährte wieder öffnen" (bewusste Nutzeraktion): entfernt AUSSCHLIESSLICH den Abbruch-Marker
+// 'cancelled' (Status, Zeitpunkt, Quelle) dieser Session UND dieses Hundes. Ein anderer Abschluss
+// (completed_without_app) bleibt unberührt; Punkte, Marker, Bewertung, Lay-Summary bleiben.
+// Atomar in EINER Anweisung; false, wenn kein passender Abbruch vorliegt.
+export async function clearLocalTrackCancelled(sessionLocalId: string, dogId: string): Promise<boolean> {
+  const db = await getLocalDb();
+  const res = await db.runAsync(
+    `update local_training_sessions set payload_json=json_remove(payload_json, '$.${TRACK_LIFECYCLE_KEY}', '$.${TRACK_LIFECYCLE_UPDATED_KEY}', '$.${TRACK_LIFECYCLE_SOURCE_KEY}') ` +
+    `where local_id=? and dog_id=? and json_valid(payload_json) and json_extract(payload_json, '$.${TRACK_LIFECYCLE_KEY}')='cancelled'`,
+    sessionLocalId, dogId,
+  );
+  return (res?.changes ?? 0) > 0;
+}
+
 export function markLocalTrackCancelled(sessionLocalId: string, dogId: string, source: TrackCancelSource | null = null): Promise<boolean> {
   return setLocalTrackLifecycle(sessionLocalId, dogId, 'cancelled', source);
 }

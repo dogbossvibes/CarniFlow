@@ -8,11 +8,11 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { clearPending, listPendingDogIds, loadPending, writePendingNow } from '@/features/tracking/store/trackPersist';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import {
-  decideSearchDiscard, decideTrackRecovery, durableLifecycle, selfHealPatches, type TrackCancelSource,
+  decideSearchDiscard, decideTrackRecovery, durableLifecycle, planReopenCancelled, selfHealPatches, type TrackCancelSource,
   type LocalSessionSnapshot, type RecoveryDecision, type RecoveryRejectReason,
 } from '@/features/tracking/store/trackRecovery';
 import {
-  getLocalTrainingSessionById, markLocalTrackCancelled, setLocalTrackLifecycle,
+  clearLocalTrackCancelled, getLocalTrainingSessionById, markLocalTrackCancelled, setLocalTrackLifecycle,
 } from '@/features/training/repositories/localTrainingRepository';
 import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import {
@@ -105,6 +105,45 @@ export async function recordTrackCancelled(
     }
     return marked;
   } catch (e) { console.warn('[trackRecovery] cancel marker', e); return false; }
+}
+
+export type ReopenCancelledResult =
+  | { ok: true; decision: RecoveryDecision }
+  | { ok: false; reason: 'no_session' | 'no_dog' | 'not_cancelled' | 'failed' | RecoveryRejectReason };
+
+/**
+ * „Fährte wieder öffnen": bewusste Nutzeraktion für eine abgebrochene Fährte. Entfernt nur den
+ * Abbruch-Marker (SQLite) und setzt einen durch den Abbruch geschlossenen EIGENEN Puffer wieder auf
+ * 'resting' — erst, nachdem die reine Planung belegt hat, dass die Fährte danach regulär fortsetzbar
+ * ist. Keine neue Session, kein Quota-Claim, keine Punkt-/Marker-Änderung, kein Registry-Write (das
+ * übernimmt danach „Fährte fortsetzen"). Liefert die neue Recovery-Entscheidung zurück.
+ */
+export async function reopenCancelledTrack(
+  sessionId: string | null | undefined, dogId: string | null | undefined, opts: { hasRemoteSearchRun?: boolean; userId?: string | null } = {},
+): Promise<ReopenCancelledResult> {
+  if (!sessionId) return { ok: false, reason: 'no_session' };
+  try {
+    await ensureHydrated();
+    const local = await loadLocalSnapshot(sessionId);
+    const dog = dogId ?? local?.session.dog_id ?? null;
+    if (!dog) return { ok: false, reason: 'no_dog' };
+    const pending = await loadPending(dog).catch(() => null);
+    const plan = planReopenCancelled({
+      registry: useActiveFaehrten.getState().byDog, dogId: dog, sessionId, pending, local,
+      userId: opts.userId, hasRemoteSearchRun: opts.hasRemoteSearchRun, now: Date.now(),
+    });
+    if (!plan.ok) return { ok: false, reason: plan.reason };
+    if (!(await clearLocalTrackCancelled(sessionId, dog))) return { ok: false, reason: 'not_cancelled' };
+    if (plan.pendingToWrite) {
+      await writePendingNow(dog, plan.pendingToWrite);
+      const st = useTrackingStore.getState();
+      if (st.dogId === dog && st.currentSessionId === sessionId && !st.isRecording) st.restorePending(plan.pendingToWrite);
+    }
+    return { ok: true, decision: await evaluateTrackRecovery({ sessionId, dogId: dog, hasRemoteSearchRun: opts.hasRemoteSearchRun, userId: opts.userId }) };
+  } catch (e) {
+    console.warn('[trackRecovery] reopen cancelled', e);
+    return { ok: false, reason: 'failed' };
+  }
 }
 
 export type DiscardSearchResult = { ok: true; target: string } | { ok: false; reason: RecoveryRejectReason | 'failed' };

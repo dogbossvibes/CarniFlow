@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import {
-  applyTrackRecovery, completeTrackWithoutApp, discardSearchAttempt, evaluateTrackRecovery,
+  applyTrackRecovery, completeTrackWithoutApp, discardSearchAttempt, evaluateTrackRecovery, reopenCancelledTrack,
 } from '@/features/tracking/services/trackRecoveryService';
 import { canCompleteWithoutApp, type RecoveryDecision } from '@/features/tracking/store/trackRecovery';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
@@ -22,6 +22,9 @@ const CARD_TEXT_INCOMPLETE = 'Eine Absuche wurde begonnen, aber nicht in ANYVO b
 const DISCARD_TITLE = 'Absuche verwerfen und Fährte wieder freigeben';
 const DISCARD_CONFIRM_TITLE = 'Absuche verwerfen?';
 const DISCARD_CONFIRM_TEXT = 'Die Suchpunkte dieses unvollständigen Versuchs werden gelöscht. Die gelegte Fährte bleibt erhalten und kann neu abgesucht werden.';
+const CARD_TITLE_CANCELLED = 'Diese Fährte wurde abgebrochen';
+const CARD_TEXT_CANCELLED = 'Die gelegte Fährte ist weiterhin gespeichert. Du kannst sie wieder öffnen und danach fortsetzen oder abschliessen.';
+const REOPEN_TITLE = 'Fährte wieder öffnen';
 const DONE_TITLE = 'Ohne App abgeschlossen';
 const DONE_HINT = 'Markiert die Fährte als beendet, wenn du sie ohne ANYVO abgesucht hast.';
 const CONFIRM_TITLE = 'Fährte als abgeschlossen markieren?';
@@ -55,7 +58,7 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
   const router = useRouter();
   const [decision, setDecision] = useState<RecoveryDecision | null>(null);
   const [done, setDone] = useState(false);
-  const [busy, setBusy] = useState<null | 'resume' | 'complete' | 'discard'>(null);
+  const [busy, setBusy] = useState<null | 'resume' | 'complete' | 'discard' | 'reopen'>(null);
 
   useEffect(() => {
     let alive = true;
@@ -71,7 +74,9 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
   const searching = !!decision?.ok && decision.mode === 'searching';
   const incomplete = !done && !!decision && !decision.ok && decision.reason === 'search_started';
   const canClose = !done && !!decision && canCompleteWithoutApp(decision);
-  const visible = canResume || canClose;
+  // Bewusst abgebrochene Fährte: kein Sackgassen-„cancelled", sondern ausdrückliches Wiederöffnen.
+  const cancelled = !done && !!decision && !decision.ok && decision.reason === 'cancelled';
+  const visible = canResume || canClose || cancelled;
   useEffect(() => { onVisibleChange?.(visible); }, [visible, onVisibleChange]);
 
   if (!visible) {
@@ -96,6 +101,16 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
         setDecision(d);
         Alert.alert(TITLE, 'Diese Fährte kann nicht mehr fortgesetzt werden.');
       }
+    } finally { setBusy(null); }
+  };
+
+  const onReopen = async () => {
+    if (busy) return;
+    setBusy('reopen');
+    try {
+      const r = await reopenCancelledTrack(sessionId, dogId, { hasRemoteSearchRun });
+      if (r.ok) setDecision(r.decision);   // → normale Karte mit „Fährte fortsetzen"
+      else Alert.alert(REOPEN_TITLE, 'Diese Fährte kann nicht wieder geöffnet werden.');
     } finally { setBusy(null); }
   };
 
@@ -137,9 +152,29 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
     <View style={s.card} testID="track-recovery-card">
       <View style={s.head}>
         <Ionicons name="hourglass-outline" size={18} color={C.trackPrimary} />
-        <Text style={s.cardTitle}>{incomplete ? CARD_TITLE_INCOMPLETE : searching ? CARD_TITLE_SEARCH : CARD_TITLE}</Text>
+        <Text style={s.cardTitle}>{cancelled ? CARD_TITLE_CANCELLED : incomplete ? CARD_TITLE_INCOMPLETE : searching ? CARD_TITLE_SEARCH : CARD_TITLE}</Text>
       </View>
-      <Text style={s.cardText}>{incomplete ? CARD_TEXT_INCOMPLETE : searching ? CARD_TEXT_SEARCH : CARD_TEXT_RESUME}</Text>
+      <Text style={s.cardText}>{cancelled ? CARD_TEXT_CANCELLED : incomplete ? CARD_TEXT_INCOMPLETE : searching ? CARD_TEXT_SEARCH : CARD_TEXT_RESUME}</Text>
+
+      {cancelled && (
+        <Pressable
+          onPress={onReopen}
+          disabled={!!busy}
+          accessibilityRole="button"
+          accessibilityLabel={REOPEN_TITLE}
+          accessibilityState={{ disabled: !!busy, busy: busy === 'reopen' }}
+          style={({ pressed }) => [s.primary, pressed && { opacity: 0.85 }]}
+          testID="track-reopen-cancelled"
+        >
+          {busy === 'reopen'
+            ? <ActivityIndicator size="small" color={C.trackBg} />
+            : <Ionicons name="refresh" size={20} color={C.trackBg} />}
+          <Text style={s.primaryText}>{REOPEN_TITLE}</Text>
+        </Pressable>
+      )}
+      {cancelled && decision && !decision.ok && isQaDiagnosticsEnabled() && (
+        <Text style={s.qaText} testID="track-recovery-reason">{recoveryReasonLine(decision)}</Text>
+      )}
 
       {canResume && (
         <Pressable
@@ -176,6 +211,7 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
         </Pressable>
       )}
 
+      {canClose && (<>
       <Pressable
         onPress={onComplete}
         disabled={!!busy}
@@ -192,6 +228,7 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
         <Text style={s.secondaryText}>{DONE_TITLE}</Text>
       </Pressable>
       <Text style={s.hint}>{DONE_HINT}</Text>
+      </>)}
     </View>
   );
 }

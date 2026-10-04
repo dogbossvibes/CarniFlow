@@ -459,3 +459,46 @@ export function resolveRestingCancelTarget(input: {
   const dogId = input.routeDogId ?? (cancelStore ? input.storeDogId ?? null : null);
   return { sessionId, dogId, cancelStore };
 }
+
+export type ReopenPlan =
+  | { ok: true; pendingToWrite: PendingTrack | null; decision: Extract<RecoveryDecision, { ok: true }> }
+  | { ok: false; reason: 'not_cancelled' | RecoveryRejectReason };
+
+function withoutLifecycle(payloadJson: string | null): string | null {
+  const p = parseObj(payloadJson);
+  if (!p) return payloadJson;
+  const { [TRACK_LIFECYCLE_KEY]: _s, [TRACK_LIFECYCLE_UPDATED_KEY]: _u, [TRACK_LIFECYCLE_SOURCE_KEY]: _q, ...rest } = p;
+  void _s; void _u; void _q;
+  return JSON.stringify(rest);
+}
+
+/**
+ * „Fährte wieder öffnen" — REIN. Nur für einen dauerhaften Abbruch ('cancelled'). Simuliert die
+ * Recovery-Entscheidung OHNE Marker (und mit einem durch den Abbruch auf 'cancelled' gesetzten,
+ * eigenen Puffer wieder 'resting'). Nur wenn die Fährte dann regulär fortsetzbar wäre, ist das
+ * Wiederöffnen erlaubt — ein finaler Suchlauf, Löschung, fremder Hund/Nutzer oder eine andere
+ * offene Fährte desselben Hundes bleiben gesperrt. Erfindet nichts, keine neue Session.
+ */
+export function planReopenCancelled(input: {
+  registry: ActiveFaehrtenMap;
+  dogId: string;
+  sessionId: string;
+  pending: PendingTrack | null;
+  local: LocalSessionSnapshot | null;
+  userId?: string | null;
+  hasRemoteSearchRun?: boolean;
+  now: number;
+}): ReopenPlan {
+  const { local, pending, sessionId } = input;
+  if (!local || durableLifecycle(local.session) !== 'cancelled') return { ok: false, reason: 'not_cancelled' };
+  const reopenedPending = pending && pending.sessionId === sessionId && pendingStatus(pending) === 'cancelled'
+    ? { ...pending, status: 'resting' as SessionStatus, paused: false }
+    : null;
+  const decision = decideTrackRecovery({
+    ...input,
+    pending: reopenedPending ?? pending,
+    local: { ...local, session: { ...local.session, payload_json: withoutLifecycle(local.session.payload_json) } },
+  });
+  if (!decision.ok) return { ok: false, reason: decision.reason };
+  return { ok: true, pendingToWrite: reopenedPending, decision };
+}
