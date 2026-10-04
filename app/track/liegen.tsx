@@ -12,6 +12,7 @@ import { loadPending } from '@/features/tracking/store/trackPersist';
 import { restingElapsedSeconds, isRestingRecovery } from '@/features/tracking/store/restingTime';
 import { startLiegezeitNotification, updateLiegezeitNotification, endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
+import { recordTrackCancelled } from '@/features/tracking/services/trackRecoveryService';
 import {
   TRACK_SEGMENT_COLORS,
   actualSegmentSteps,
@@ -165,6 +166,9 @@ export default function TrackLiegenScreen() {
       { text: 'Ja, abbrechen', style: 'destructive', onPress: () => {
         useTrackingStore.getState().setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
         if (dogId) useActiveFaehrten.getState().remove(dogId);   // Registry: Fährte des Hundes entfernen
+        // Abbruch dauerhaft lokal vermerken (best-effort, offline, nicht blockierend):
+        // die Recovery bietet diese Fährte danach nie wieder zum Fortsetzen an.
+        void recordTrackCancelled(id ?? useTrackingStore.getState().currentSessionId, dogId ?? useTrackingStore.getState().dogId);
         void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
         allowLeaveRef.current = true;
         // @ts-expect-error react-navigation action aus dem beforeRemove-Event

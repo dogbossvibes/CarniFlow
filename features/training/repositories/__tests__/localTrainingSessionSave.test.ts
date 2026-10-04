@@ -29,7 +29,9 @@ describe('localTrainingRepository — P-SAVE1 local-first', () => {
       distanceMeters: 250, articlesTotal: 2, cornersTotal: 3, gpsQualityAverage: 4.5, segments: [{ x: 1 }],
     });
     const [sql, ...args] = mockRunAsync.mock.calls[0] as [string, ...any[]];
-    expect(sql).toMatch(/update local_training_sessions set status=\?, ended_at=\?, duration_seconds=\?, payload_json=\?/i);
+    // payload_json = neuer Wert; ein vorhandener lokaler Lifecycle-Marker wird atomar übernommen.
+    expect(sql).toMatch(/update local_training_sessions set status=\?, ended_at=\?, duration_seconds=\?, payload_json=case when json_valid\(payload_json\)/i);
+    expect(args[4]).toBe(args[3]);   // derselbe neue Wert in beiden Zweigen (mit / ohne Marker)
     expect(sql).not.toMatch(/sync_status/);   // Finalisierung ändert Sync-Status NICHT
     expect(args[0]).toBe('completed');
     expect(args[1]).toBe('2026-08-11T11:00:00.000Z');

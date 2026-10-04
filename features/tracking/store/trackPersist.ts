@@ -141,6 +141,8 @@ export async function clearPending(dogId?: string | null): Promise<void> {
   try { await AsyncStorage.removeItem(key); } catch { /* best-effort */ }
 }
 
-// TODO(P3+): „Aufnahme fortsetzen?"-Dialog beim App-Start, wenn listPendingDogIds()
-// unbeendete Sessions liefert. TODO: Server-Sync nachgelagert, falls beim Beenden
-// offline → Pending behalten und bei Reconnect hochladen.
+// Recovery: offene, liegende Puffer ohne Registry-Eintrag werden beim App-Start
+// selbstheilend registriert (trackRecoveryService.healActiveFaehrtenFromPending);
+// „Fährte fortsetzen" in der Auswertung rekonstruiert einen fehlenden Puffer aus der
+// lokalen Lege-Session (trackRecovery.ts). TODO: Server-Sync nachgelagert, falls beim
+// Beenden offline → Pending behalten und bei Reconnect hochladen.

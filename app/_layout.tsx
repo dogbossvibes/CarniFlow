@@ -20,6 +20,7 @@ import { initMonitoring, captureError } from '@/lib/monitoring';
 import { SyncProvider } from '@/features/sync/components/SyncProvider';
 import { AppLockGate } from '@/components/AppLockGate';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
+import { ActiveFaehrtenSelfHeal } from '@/features/tracking/components/ActiveFaehrtenSelfHeal';
 import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
 import { useT } from '@/i18n';
 
@@ -28,6 +29,8 @@ void initMonitoring();
 
 // Aktive-Fährten-Registry aus dem lokalen Speicher laden (offene Fährten pro Hund
 // überleben App-Neustart). Einmalig, unabhängig vom Login — rein lokal, kein Netz.
+// Die Selbstheilung aus Pending-Puffern läuft NICHT hier, sondern erst mit bekannter
+// Session + Hunden (ActiveFaehrtenSelfHeal im SessionProvider).
 void useActiveFaehrten.getState().hydrate();
 
 // QA-Einstellungen (Location-Source, Tracking-Engine, Diagnosemodus) aus dem
@@ -70,6 +73,7 @@ export default function RootLayout() {
     <SessionProvider>
       <StatusBar style="light" />
       <SyncProvider />
+      <ActiveFaehrtenSelfHeal />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />

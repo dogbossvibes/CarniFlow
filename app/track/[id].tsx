@@ -26,6 +26,8 @@ import { retryFailedSyncForSession, syncNow } from '@/features/sync/services/syn
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
 import { dismissLocalAutoDwellDetection } from '@/features/training/repositories/localTrainingRepository';
 import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
+import { isOpenStatus } from '@/features/tracking/store/activeFaehrtenModel';
+import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { extractTags, legsFromSession, overallScore, scoreVerdict } from '@/features/tracking/utils/trackEvaluation';
@@ -96,7 +98,12 @@ export default function TrackAuswertungScreen() {
   }, [id, removingAutoId, t]);
 
   useEffect(() => {
-    useTrackingStore.getState().reset();   // Flow abgeschlossen → Store leeren
+    // Flow abgeschlossen → Store leeren. NICHT, wenn der Store noch eine offene
+    // (gelegte/liegende/laufende) Fährte hält — reset() löscht auch deren Pending-
+    // Puffer; das Öffnen einer Journal-Fährte darf eine liegende Fährte nie verwerfen.
+    const st = useTrackingStore.getState();
+    const holdsOpenTrack = isOpenStatus(st.sessionStatus) && (st.trackPoints.length > 0 || st.isRecording);
+    if (!holdsOpenTrack) st.reset();
     if (!id) return;
     (async () => {
       const r = await getTrackSessionById(id);
@@ -142,8 +149,13 @@ export default function TrackAuswertungScreen() {
         // Dieselbe Quelle wie Warnhinweis/Analyse unten (trackAnalysisState.ts).
         setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0, hasSearchGeometry(d)));
         setNotes(d.notes ?? '');
-        // Abschluss-Ansicht → die Fährte dieses Hundes ist nicht mehr „offen".
-        if (d.dog_id) useActiveFaehrten.getState().remove(d.dog_id);
+        // Abschluss-Ansicht → die Fährte ist nicht mehr „offen" — aber nur, wenn
+        // DIESE Session wirklich abgesucht wurde und der Registry-Eintrag zu ihr gehört.
+        // Eine gelegte, noch liegende Fährte (oder eine andere Fährte desselben
+        // Hundes) bleibt aktiv; sonst verschwindet sie aus „Fährte fortsetzen".
+        const reg = d.dog_id ? useActiveFaehrten.getState().get(d.dog_id) : null;
+        const searched = trackAnalysisAvailability(d).state !== 'pending_search';   // = Suchlauf vorhanden (hasSearchRun)
+        if (d.dog_id && reg?.sessionId === String(id) && searched) useActiveFaehrten.getState().remove(d.dog_id);
       }
       setLoading(false);
     })();
@@ -203,6 +215,8 @@ export default function TrackAuswertungScreen() {
   // gelaufen, aber ohne Analyse". Bisher sahen beide Fälle identisch aus —
   // nämlich gar nicht.
   const analysisState = availability.state;
+  // „Fährte fortsetzen" nur bei ausstehender Absuche (Eindeutigkeit prüft TrackResumeCta).
+  const canOfferResume = analysisState === 'pending_search';
   const qaDiagnostics = isQaDiagnosticsEnabled();
   const isReplayEligible = useMemo(() => isTrackReplayEligible(data), [data]);
   const [analyseExpanded, setAnalyseExpanded] = useState(false);
@@ -346,6 +360,11 @@ export default function TrackAuswertungScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* Gelegte, noch nicht abgesuchte Fährte → zurück in die Liegezeit (nur wenn eindeutig fortsetzbar). */}
+          {canOfferResume && (
+            <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} hasRemoteSearchRun={!canOfferResume} />
+          )}
+
           {/* Hero — links Ring (nur Zahl + /100), Beschriftung „Manuelle
               Bewertung" UNTER dem Ring (ausserhalb der Kreisgrafik), rechts die
               Notenstufe genau EINMAL prominent. Vorher lagen Label und Notenstufe

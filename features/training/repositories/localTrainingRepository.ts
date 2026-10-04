@@ -1,6 +1,15 @@
 import { getLocalDb } from '@/lib/localDb/client';
 import { newLocalId, nowIso } from '@/lib/localDb/ids';
 import type { LocalTrainingSession, SyncStatus } from '@/features/sync/types/sync';
+import { TRACK_LIFECYCLE_KEY, TRACK_LIFECYCLE_UPDATED_KEY, type TrackLifecycleStatus } from '@/features/tracking/store/trackRecovery';
+
+// payload_json = neuer Wert (Parameter 1), aber ein vorhandener lokaler Lifecycle-Marker der
+// Zeile wird übernommen (Parameter 2 = derselbe neue Wert, falls keiner vorhanden). Ungültiges
+// altes JSON wird nie ausgewertet (json_valid-Schutz) — kein Fehler beim Finalisieren.
+const PRESERVE_LIFECYCLE_SQL =
+  `case when json_valid(payload_json) and json_extract(payload_json, '$.${TRACK_LIFECYCLE_KEY}') is not null ` +
+  `then json_set(?, '$.${TRACK_LIFECYCLE_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_KEY}'), ` +
+  `'$.${TRACK_LIFECYCLE_UPDATED_KEY}', json_extract(payload_json, '$.${TRACK_LIFECYCLE_UPDATED_KEY}')) else ? end`;
 
 // Lokales Repository für Trainingseinheiten/Fährten-Sessions (SQLite = primäre Quelle).
 
@@ -101,9 +110,14 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
     segments:          input.segments ?? null,
     ...(input.manualAngleGeometry ? { manualAngleGeometry: input.manualAngleGeometry } : {}),
   });
+  // Ein inzwischen gesetzter lokaler Lifecycle-Marker (Abbruch / „Ohne App abgeschlossen")
+  // darf durch diese Lay-Finalisierung nicht verloren gehen — finish() läuft asynchron und
+  // kann NACH einem schnellen Abbruch schreiben. Die Übernahme passiert ATOMAR in derselben
+  // UPDATE-Anweisung (kein Lese-/Schreibfenster). Sonst bleibt alles wie bisher: die
+  // Lay-Summary wird vollständig gesetzt.
   await db.runAsync(
-    `update local_training_sessions set status=?, ended_at=?, duration_seconds=?, payload_json=?, updated_at=? where local_id=?`,
-    input.status ?? 'completed', input.endedAt, input.durationSeconds ?? null, payload, nowIso(), localId,
+    `update local_training_sessions set status=?, ended_at=?, duration_seconds=?, payload_json=${PRESERVE_LIFECYCLE_SQL}, updated_at=? where local_id=?`,
+    input.status ?? 'completed', input.endedAt, input.durationSeconds ?? null, payload, payload, nowIso(), localId,
   );
 }
 
@@ -125,6 +139,28 @@ export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<
     `update local_training_sessions set payload_json=?, updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
     JSON.stringify(payload), nowIso(), sessionLocalId,
   );
+}
+
+// Endgültigen lokalen Lifecycle einer gelegten Fährte dauerhaft vermerken:
+//   'cancelled'             bewusst abgebrochen
+//   'completed_without_app' ohne ANYVO abgesucht („Ohne App abgeschlossen")
+// Damit bietet die Recovery (trackRecovery.ts) sie nie wieder zum Fortsetzen an, auch
+// wenn der Pending-Puffer fehlt. `status` bleibt unverändert ('completed' = Lege-Session
+// gespeichert); json_set erhält ALLE übrigen payload-Felder (Lay-Summary/Run/Bewertung/
+// Segmente); sync_status bleibt unberührt (der Remote-Sync liest diese Felder nicht).
+// Atomar in EINER Anweisung, nur für genau diese Session UND diesen Hund; idempotent.
+// false, wenn keine Zeile passt (Session fehlt oder anderer Hund).
+export async function setLocalTrackLifecycle(sessionLocalId: string, dogId: string, status: TrackLifecycleStatus): Promise<boolean> {
+  const db = await getLocalDb();
+  const res = await db.runAsync(
+    `update local_training_sessions set payload_json=json_set(case when json_valid(payload_json) then payload_json else '{}' end, '$.${TRACK_LIFECYCLE_KEY}', ?, '$.${TRACK_LIFECYCLE_UPDATED_KEY}', ?) where local_id=? and dog_id=?`,
+    status, nowIso(), sessionLocalId, dogId,
+  );
+  return (res?.changes ?? 0) > 0;
+}
+
+export function markLocalTrackCancelled(sessionLocalId: string, dogId: string): Promise<boolean> {
+  return setLocalTrackLifecycle(sessionLocalId, dogId, 'cancelled');
 }
 
 /** Remove only the automatic search detection, never the laid reference marker. */

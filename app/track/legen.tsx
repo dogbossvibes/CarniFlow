@@ -29,6 +29,7 @@ import { reopenTarget, shouldShowActiveFaehrteConflict, type ActiveFaehrte } fro
 import { clearPending } from '@/features/tracking/store/trackPersist';
 import * as Crypto from 'expo-crypto';
 import { claimNewbieQuota, quotaBlock } from '@/services/quotaService';
+import { recordTrackCancelled } from '@/features/tracking/services/trackRecoveryService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherService';
 import { angleEvent, objectEvent, trackEventLabelKey, type TrackEvent } from '@/features/tracking/utils/trackEventVoice';
@@ -303,6 +304,7 @@ export default function LegenScreen() {
             // Bestehende Fährte DIESES Hundes verwerfen (keine Fremdfährte berühren).
             useActiveFaehrten.getState().remove(dId);
             void clearPending(dId);
+            void recordTrackCancelled(entry.sessionId, dId);   // dauerhaft: nie wieder „Fährte fortsetzen"
             if (useTrackingStore.getState().dogId === dId) useTrackingStore.getState().setSessionStatus('cancelled');
             proceedToStart();   // erst danach darf eine neue Fährte entstehen
           } },
