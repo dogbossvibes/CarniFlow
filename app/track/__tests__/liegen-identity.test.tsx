@@ -150,10 +150,11 @@ describe('Liegezeit-Identität (Benachrichtigung / Live Activity)', () => {
     expect(useTrackingStore.getState().currentSessionId).toBe(viaNotification.currentSessionId);
     expect(useTrackingStore.getState().dogId).toBe(viaNotification.dogId);
   });
-  it('9. „Liegezeit beenden" nach Deep-Link bleibt write-safe (kein cancelled, kein Marker, Registry unverändert)', async () => {
+  it('9. „Im Hintergrund weiterlaufen" nach Deep-Link bleibt write-safe (kein cancelled, kein Marker, Registry unverändert)', async () => {
     await mount({ id: 'sess-A' });
     act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } }); });
-    press('Liegezeit beenden');
+    press('Im Hintergrund weiterlaufen');
+    expect(mockEndNotification).not.toHaveBeenCalled();
     expect(mockRecordCancelled).not.toHaveBeenCalled();
     expect(useTrackingStore.getState().sessionStatus).not.toBe('cancelled');
     expect(useActiveFaehrten.getState().get('dog-A')?.status).toBe('resting');

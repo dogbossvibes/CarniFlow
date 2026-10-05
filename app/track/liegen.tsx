@@ -219,15 +219,8 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   };
 
   // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
-  // „Liegezeit beenden" ist NICHT „Fährte abbrechen": es verlässt den Screen und beendet nur die
-  // Liegezeit-Anzeige (Benachrichtigung/Live Activity). Kein 'cancelled', keine Registry-Änderung,
-  // kein dauerhafter Marker — die Fährte bleibt offen und über „Fährte fortsetzen" erreichbar.
-  const endLyingTime = (action: unknown) => {
-    void endLiegezeitNotification();   // nur die System-Anzeige beenden
-    allowLeaveRef.current = true;
-    // @ts-expect-error react-navigation action aus dem beforeRemove-Event
-    navigation.dispatch(action);
-  };
+  // „Im Hintergrund weiterlaufen" verlässt nur den Screen: Liegezeit, Benachrichtigung/Live Activity,
+  // Registry und Puffer bleiben unverändert — die Fährte bleibt offen und über „Fährte fortsetzen" erreichbar.
   // Endgültiger Abbruch: separate, destruktive Aktion mit eigener Bestätigung und ehrlicher Folge.
   const confirmFinalAbort = (action: unknown) => {
     Alert.alert(t('track.continuation.finalAbortTitle'), t('track.continuation.finalAbortText'), [
@@ -262,10 +255,9 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
         t('track.continuation.leaveTitle'),
         t('track.continuation.leaveText'),
         [
-          { text: t('track.continuation.leaveStay'), style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
           { text: t('track.continuation.leaveKeepRunning'), onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },
-          { text: t('track.continuation.leaveEndLyingTime'), onPress: () => endLyingTime(e.data.action) },
           { text: t('track.continuation.leaveFinalAbort'), style: 'destructive', onPress: () => confirmFinalAbort(e.data.action) },
+          { text: t('track.continuation.leaveStay'), style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
         ],
       );
     });

@@ -104,10 +104,10 @@ describe('Normaler Fortsetzen-Flow mit realistischem Zustand (sessionId=null in 
     expect(texts()).toContain('111');
   });
 
-  it('1/3/4/5. Legen → Liegezeit beenden → Übersicht → Fortsetzen (Karte/Logbuch/DogHub = reopenTarget) → dieselbe Session/derselbe Hund', async () => {
+  it('1/3/4/5. Legen → Im Hintergrund weiterlaufen → Übersicht → Fortsetzen (Karte/Logbuch/DogHub = reopenTarget) → dieselbe Session/derselbe Hund', async () => {
     await afterLaying();
     await mount({ id: 'sess-A', dogId: 'dog-A' });
-    leave(); press('Liegezeit beenden');
+    leave(); press('Im Hintergrund weiterlaufen');
     expect(mockRecordCancelled).not.toHaveBeenCalled();                                   // 14. schreibfrei
     expect(useActiveFaehrten.getState().get('dog-A')).toMatchObject({ status: 'resting', sessionId: 'sess-A' });
     act(() => { renderer.unmount(); }); renderer = null;

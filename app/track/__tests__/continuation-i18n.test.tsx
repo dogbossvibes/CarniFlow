@@ -53,12 +53,12 @@ const CANCELLED_TEXT: Record<string, string> = {
   fr: 'La piste est toujours enregistrée. Tu peux la rouvrir et la poursuivre.',
   it: 'La pista è ancora salvata. Puoi riaprirla e riprenderla.',
 };
-const EXPECT: Record<typeof LANGS[number], { leave: string; end: string; abort: string; confirm: string; resume: string; reopen: string; cancelledTitle: string }> = {
-  de:  { leave: 'Liegezeit läuft', end: 'Liegezeit beenden', abort: 'Fährte endgültig abbrechen', confirm: 'Endgültig abbrechen', resume: 'Fährte fortsetzen', reopen: 'Fährte wieder öffnen', cancelledTitle: 'Diese Fährte wurde abgebrochen' },
-  gsw: { leave: 'Liegeziit lauft', end: 'Liegeziit beende', abort: 'Fährte endgültig abbreche', confirm: 'Endgültig abbreche', resume: 'Fährte wiitermache', reopen: 'Fährte wieder ufmache', cancelledTitle: 'Die Fährte isch abbroche worde' },
-  en:  { leave: 'Aging time running', end: 'End aging time', abort: 'Cancel track permanently', confirm: 'Cancel permanently', resume: 'Continue track', reopen: 'Reopen track', cancelledTitle: 'This track was cancelled' },
-  fr:  { leave: 'Temps de repos en cours', end: 'Terminer le temps de repos', abort: 'Interrompre définitivement la piste', confirm: 'Interrompre définitivement', resume: 'Reprendre la piste', reopen: 'Rouvrir la piste', cancelledTitle: 'Cette piste a été interrompue' },
-  it:  { leave: 'Tempo di posa in corso', end: 'Termina il tempo di posa', abort: 'Interrompi definitivamente la pista', confirm: 'Interrompi definitivamente', resume: 'Riprendi la pista', reopen: 'Riapri la pista', cancelledTitle: 'Questa pista è stata interrotta' },
+const EXPECT: Record<typeof LANGS[number], { leave: string; bg: string; old: string[]; abort: string; confirm: string; resume: string; reopen: string; cancelledTitle: string }> = {
+  de:  { leave: 'Liegezeit läuft', bg: 'Im Hintergrund weiterlaufen', old: ['Weiterlaufen lassen', 'Liegezeit beenden'], abort: 'Fährte endgültig abbrechen', confirm: 'Endgültig abbrechen', resume: 'Fährte fortsetzen', reopen: 'Fährte wieder öffnen', cancelledTitle: 'Diese Fährte wurde abgebrochen' },
+  gsw: { leave: 'Liegeziit lauft', bg: 'Im Hintergrund wiiterlaufe', old: ['Wiiterlaufe lah', 'Liegeziit beende'], abort: 'Fährte endgültig abbreche', confirm: 'Endgültig abbreche', resume: 'Fährte wiitermache', reopen: 'Fährte wieder ufmache', cancelledTitle: 'Die Fährte isch abbroche worde' },
+  en:  { leave: 'Aging time running', bg: 'Continue in background', old: ['Keep running', 'End aging time'], abort: 'Cancel track permanently', confirm: 'Cancel permanently', resume: 'Continue track', reopen: 'Reopen track', cancelledTitle: 'This track was cancelled' },
+  fr:  { leave: 'Temps de repos en cours', bg: 'Continuer en arrière-plan', old: ['Laisser continuer', 'Terminer le temps de repos'], abort: 'Interrompre définitivement la piste', confirm: 'Interrompre définitivement', resume: 'Reprendre la piste', reopen: 'Rouvrir la piste', cancelledTitle: 'Cette piste a été interrompue' },
+  it:  { leave: 'Tempo di posa in corso', bg: 'Continua in background', old: ['Lascia continuare', 'Termina il tempo di posa'], abort: 'Interrompi definitivamente la pista', confirm: 'Interrompi definitivamente', resume: 'Riprendi la pista', reopen: 'Riapri la pista', cancelledTitle: 'Questa pista è stata interrotta' },
 };
 const GERMAN_WORDS = /Fährte|Liegezeit|Absuche|abbrechen|fortsetzen|öffnen|Zurück|Nein\b/;
 let alertSpy: jest.SpyInstance;
@@ -93,7 +93,9 @@ describe.each(LANGS)('Sprache %s', lng => {
     act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: {} } }); });
     const [title, msg, buttons] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1] as [string, string, Btn[]];
     expect(title).toBe(e.leave);
-    expect(buttons.map(b => b.text)).toEqual(expect.arrayContaining([e.end, e.abort]));
+    expect(buttons).toHaveLength(3);
+    expect(buttons.map(b => b.text)).toEqual(expect.arrayContaining([e.bg, e.abort]));
+    for (const o of e.old) expect(buttons.map(b => b.text)).not.toContain(o);
     act(() => { buttons.find(b => b.text === e.abort)!.onPress!(); });
     const [t2, m2, b2] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1] as [string, string, Btn[]];
     expect(b2.map(b => b.text)).toContain(e.confirm);
