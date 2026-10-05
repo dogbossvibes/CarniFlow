@@ -1,4 +1,5 @@
 import type { TesterLevel } from '@/features/subscription/internalTester';
+import type { TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
 
 export type Plan = 'free' | 'premium';
 
@@ -73,6 +74,10 @@ export type Dog = {
   vet:         string | null;  // Tierarzt
   vaccination: string | null;  // Impfung (Datum/Notiz)
   food:        string | null;  // Futter
+  // Darstellung: Fährtenfarbe für Referenz-Fährten auf der Karte (semantischer Key,
+  // null = Automatisch). Optional, weil die Spalte erst mit der Migration
+  // 20261005120000_dogs_track_overlay_color_key existiert.
+  track_overlay_color_key?: TrackOverlayColorKey | null;
   created_at: string;
 };
 
@@ -83,7 +88,7 @@ export type NewDog = Pick<Dog,
   | 'registry_country_code' | 'registry_type' | 'registry_name' | 'registry_number'
   | 'discipline'
   | 'vet' | 'food'
-> & { vaccination?: Dog['vaccination'] };
+> & { vaccination?: Dog['vaccination']; track_overlay_color_key?: Dog['track_overlay_color_key'] };
 
 export type TrainingCategory = 'IGP' | 'IBGH' | 'Mondioring' | 'Alltagstraining';
 export type TrainingType     = 'privat' | 'trainer';

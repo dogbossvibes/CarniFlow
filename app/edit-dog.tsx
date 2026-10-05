@@ -24,6 +24,8 @@ import { toISODate, fromISODate } from '@/features/dogs/dateInput';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { DisciplinePicker, disciplineToStored } from '@/components/dogs/DisciplinePicker';
 import { OfficialRegistrySection } from '@/components/dogs/OfficialRegistrySection';
+import { TrackColorPicker } from '@/components/dogs/TrackColorPicker';
+import { isTrackOverlayColorKey, type TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
 import { draftFromDog, draftToColumns, validateRegistry, EMPTY_REGISTRY_DRAFT, type RegistryDraft } from '@/features/dogs/registry';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { getDogById, updateDog, deleteDogWithDependents } from '@/services/dogs';
@@ -58,6 +60,11 @@ export default function HundBearbeitenScreen() {
   const [farbe,         setFarbe]         = useState('');
   const [mikrochip,     setMikrochip]     = useState('');
   const [registry,      setRegistry]      = useState<RegistryDraft>(EMPTY_REGISTRY_DRAFT);
+  // Darstellung: Fährtenfarbe (null = Automatisch). Nur verfügbar, wenn die Spalte
+  // dogs.track_overlay_color_key existiert (Migration) — sonst bleibt der Abschnitt
+  // ausgeblendet und das Feld wird nie gesendet (der übrige Profil-Save bleibt intakt).
+  const [trackColor,    setTrackColor]    = useState<TrackOverlayColorKey | null>(null);
+  const [trackColorSupported, setTrackColorSupported] = useState(false);
   // Gesundheit
   const [tierarzt,      setTierarzt]      = useState('');
   const [impfung,       setImpfung]       = useState('');
@@ -89,6 +96,8 @@ export default function HundBearbeitenScreen() {
       setFarbe(d.color ?? '');
       setMikrochip(d.microchip_number ?? '');
       setRegistry(draftFromDog(d));
+      setTrackColorSupported(Object.prototype.hasOwnProperty.call(d, 'track_overlay_color_key'));
+      setTrackColor(isTrackOverlayColorKey(d.track_overlay_color_key) ? d.track_overlay_color_key : null);
       setTierarzt(d.vet ?? '');
       setImpfung(d.vaccination ?? '');
       setFutter(d.food ?? '');
@@ -168,6 +177,9 @@ export default function HundBearbeitenScreen() {
       vet:              tierarzt.trim()  || null,
       vaccination:      impfung.trim()   || null,
       food:             futter.trim()    || null,
+      // Fährtenfarbe nur senden, wenn die Spalte existiert UND sich der Wert geändert hat.
+      ...(trackColorSupported && trackColor !== (isTrackOverlayColorKey(hund.track_overlay_color_key) ? hund.track_overlay_color_key : null)
+        ? { track_overlay_color_key: trackColor } : {}),
     });
 
     setSpeichern(false);
@@ -388,6 +400,15 @@ export default function HundBearbeitenScreen() {
           </View>
 
           <OfficialRegistrySection value={registry} onChange={setRegistry} />
+
+          {trackColorSupported && hund ? (
+            <>
+              <Text style={s.gruppeLabel}>{t('dog.trackColor.section')}</Text>
+              <View style={s.felder}>
+                <TrackColorPicker dogId={hund.id} value={trackColor} onChange={setTrackColor} disabled={speichern} />
+              </View>
+            </>
+          ) : null}
 
           <Text style={s.gruppeLabel}>{t('dog.health')}</Text>
           <View style={s.felder}>

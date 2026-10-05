@@ -17,7 +17,7 @@ jest.mock('@/features/tracking/services/trackReferenceOverlayService', () => ({
 
 const DOGS = [{ id: 'amoun', name: 'Amoun', owner_id: 'user-1' }, { id: 'baily', name: 'Baily', owner_id: 'user-1' }, { id: 'doran', name: 'Doran', owner_id: 'user-1' }];
 const toOverlay = (c: TrackReferenceCandidate): TrackReferenceOverlay =>
-  ({ dogId: c.dogId, sessionId: c.sessionId, dogName: c.dogName, status: c.status, points: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8 }] });
+  ({ dogId: c.dogId, sessionId: c.sessionId, dogName: c.dogName, colorKey: c.colorKey, status: c.status, points: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8 }] });
 
 let latest: TrackReferenceOverlay[] = [];
 function Probe(props: UseActiveTrackOverlaysArgs) {

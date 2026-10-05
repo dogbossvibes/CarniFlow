@@ -31,7 +31,7 @@ const row = (dogId: string, over: Record<string, unknown> = {}) => ({
   payload_json: JSON.stringify({ distanceMeters: 50 }), ...over,
 });
 const cand = (dogId: string, order: number): TrackReferenceCandidate =>
-  ({ dogId, sessionId: `sess-${dogId}`, dogName: dogId, status: 'resting', order });
+  ({ dogId, sessionId: `sess-${dogId}`, dogName: dogId, colorKey: 'orange', status: 'resting', order });
 
 beforeEach(async () => {
   await AsyncStorage.clear();

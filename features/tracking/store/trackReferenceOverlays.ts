@@ -4,6 +4,7 @@ import { type ActiveFaehrtenMap, isValidEntry } from '@/features/tracking/store/
 import { durableLifecycle, hasValidLayGeometry, isOpenPending } from '@/features/tracking/store/trackRecovery';
 import type { LocalTrackPoint, LocalTrainingSession } from '@/features/sync/types/sync';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
+import { resolveTrackOverlayColorKey, type TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Referenz-Fährten beim Legen — REINE, testbare Logik (kein React/Expo/Native).
@@ -28,6 +29,8 @@ export interface TrackReferenceOverlay {
   dogId:     string;
   sessionId: string;
   dogName:   string;
+  /** Fährtenfarbe DIESES Hundes (aus seiner dogId aufgelöst, nie vom aktuellen Hund). */
+  colorKey:  TrackOverlayColorKey;
   status:    TrackReferenceStatus;
   points:    LatLng[];
 }
@@ -37,6 +40,7 @@ export interface TrackReferenceCandidate {
   dogId:     string;
   sessionId: string;
   dogName:   string;
+  colorKey:  TrackOverlayColorKey;
   status:    TrackReferenceStatus;
   /** Sortierbasis (Beginn des Legens) — stabile Reihenfolge, unabhängig von updatedAt. */
   order:     number;
@@ -45,7 +49,7 @@ export interface TrackReferenceCandidate {
 export interface TrackReferenceScope {
   /** Hunde aus useDogs() (serverseitig `owner_id = user`). Zusätzlich clientseitig
    *  fail-closed: nur Hunde mit `owner_id === ownerUserId` zählen als eigene Hunde. */
-  currentUserDogs:   readonly { id: string; name?: string | null; owner_id?: string | null }[];
+  currentUserDogs:   readonly { id: string; name?: string | null; owner_id?: string | null; track_overlay_color_key?: string | null }[];
   /** Angemeldeter Nutzer. Ohne Nutzer → keine Referenzen (fail-closed). */
   ownerUserId:       string | null | undefined;
   /** Hund der aktuell gelegten Fährte — wird nie als Referenz geliefert. */
@@ -73,8 +77,18 @@ export function ownedDogNames(scope: Pick<TrackReferenceScope, 'currentUserDogs'
     .map(d => [d.id, d.name ?? ''] as const));
 }
 
+/** Gespeicherte Fährtenfarbe je eigenem Hund (id → Key oder null). Gleiche Ownership-Regel wie ownedDogNames. */
+export function ownedDogColorKeys(scope: Pick<TrackReferenceScope, 'currentUserDogs' | 'ownerUserId'>): Map<string, string | null> {
+  const owner = scope.ownerUserId;
+  if (!owner) return new Map();
+  return new Map(scope.currentUserDogs
+    .filter(d => !!d?.id && d.owner_id === owner)
+    .map(d => [d.id, d.track_overlay_color_key ?? null] as const));
+}
+
 export function selectReferenceCandidates(registry: ActiveFaehrtenMap, scope: TrackReferenceScope): TrackReferenceCandidate[] {
   const names = ownedDogNames(scope);
+  const colors = ownedDogColorKeys(scope);
   const out: TrackReferenceCandidate[] = [];
   for (const [key, e] of Object.entries(registry)) {
     if (!isValidEntry(e) || e.dogId !== key) continue;
@@ -84,7 +98,8 @@ export function selectReferenceCandidates(registry: ActiveFaehrtenMap, scope: Tr
     if (scope.currentSessionId && e.sessionId === scope.currentSessionId) continue;
     if (!isReferenceStatus(e.status)) continue;
     out.push({
-      dogId: e.dogId, sessionId: e.sessionId, dogName: names.get(e.dogId) || '', status: e.status,
+      dogId: e.dogId, sessionId: e.sessionId, dogName: names.get(e.dogId) || '',
+      colorKey: resolveTrackOverlayColorKey(e.dogId, colors.get(e.dogId)), status: e.status,
       order: e.startedAt ?? e.layStartedAt ?? e.searchStartedAt ?? Number.MAX_SAFE_INTEGER,
     });
   }
@@ -94,10 +109,10 @@ export function selectReferenceCandidates(registry: ActiveFaehrtenMap, scope: Tr
 /**
  * Stabiler Schlüssel der für Overlays relevanten Registry-Teile. Ändert sich NICHT
  * bei Kennzahl-Updates (Distanz/GPS-Genauigkeit alle 4 s) — nur bei Hund/Session/
- * Status. Der Hook lädt Geometrie ausschliesslich bei Änderung dieses Schlüssels.
+ * Status/Name/Fährtenfarbe. Der Hook lädt Geometrie ausschliesslich bei Änderung dieses Schlüssels.
  */
 export function referenceCandidatesKey(candidates: readonly TrackReferenceCandidate[]): string {
-  return candidates.map(c => `${c.dogId}:${c.sessionId}:${c.status}:${c.dogName}`).join('|');
+  return candidates.map(c => `${c.dogId}:${c.sessionId}:${c.status}:${c.dogName}:${c.colorKey}`).join('|');
 }
 
 /** Lokal gelesene Quellen für EINEN Kandidaten (alle optional, alle nur gelesen). */
@@ -175,7 +190,7 @@ export function resolveReferenceOverlay(
     points = src.layPoints.map(p => ({ lat: p.latitude, lng: p.longitude }));
   }
   if (!points || !hasValidLayGeometry(points)) return null;
-  return { dogId: c.dogId, sessionId: c.sessionId, dogName: c.dogName, status: c.status, points };
+  return { dogId: c.dogId, sessionId: c.sessionId, dogName: c.dogName, colorKey: c.colorKey, status: c.status, points };
 }
 
 /** Anzahl für die Kartensteuerung („Andere Fährten · n"). */

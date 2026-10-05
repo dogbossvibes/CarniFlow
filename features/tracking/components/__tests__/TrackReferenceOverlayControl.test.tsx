@@ -26,7 +26,7 @@ jest.mock('@/components/ui/AnyvoBottomSheet', () => {
 });
 
 const ov = (dogId: string, dogName: string, status: TrackReferenceOverlay['status'] = 'resting'): TrackReferenceOverlay =>
-  ({ dogId, dogName, sessionId: `sess-${dogId}`, status, points: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8 }] });
+  ({ dogId, dogName, sessionId: `sess-${dogId}`, colorKey: 'orange', status, points: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8 }] });
 
 type Rendered = any;
 let renderer: Rendered = null;

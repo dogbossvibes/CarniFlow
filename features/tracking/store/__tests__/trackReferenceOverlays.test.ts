@@ -7,6 +7,7 @@ import {
   type TrackReferenceCandidate, type TrackReferenceSources,
 } from '@/features/tracking/store/trackReferenceOverlays';
 import type { SessionStatus } from '@/features/tracking/store/trackingStore';
+import { autoTrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
 
 const DOGS = [
   { id: 'amoun', name: 'Amoun', owner_id: 'user-1' }, { id: 'baily', name: 'Baily', owner_id: 'user-1' },
@@ -37,7 +38,7 @@ const sessionRow = (dogId: string, over: Partial<NonNullable<TrackReferenceSourc
 });
 const layRows = (n = 3) => Array.from({ length: n }, (_, i) => ({ latitude: 47.1 + i * 1e-4, longitude: 8.1 + i * 1e-4 }));
 const cand = (dogId: string, status: TrackReferenceCandidate['status'] = 'resting'): TrackReferenceCandidate =>
-  ({ dogId, sessionId: `sess-${dogId}`, dogName: dogId, status, order: START[dogId] ?? 0 });
+  ({ dogId, sessionId: `sess-${dogId}`, dogName: dogId, colorKey: autoTrackOverlayColorKey(dogId), status, order: START[dogId] ?? 0 });
 
 describe('selectReferenceCandidates — Amoun/Doran/Clay/Baily', () => {
   it('1. current Amoun, Doran resting → Doran', () => {
@@ -114,7 +115,7 @@ describe('selectReferenceCandidates — Amoun/Doran/Clay/Baily', () => {
 describe('resolveReferenceOverlay — Geometrie & Sperren', () => {
   it('12. Pending vorhanden → Geometrie 1:1 aus dem Pending (SQLite nicht nötig)', () => {
     const o = resolveReferenceOverlay(cand('amoun'), { pending: pending('amoun'), session: null, layPoints: null }, 'user-1');
-    expect(o).toEqual({ dogId: 'amoun', sessionId: 'sess-amoun', dogName: 'amoun', status: 'resting', points: pts().map(p => ({ lat: p.lat, lng: p.lng })) });
+    expect(o).toEqual({ dogId: 'amoun', sessionId: 'sess-amoun', dogName: 'amoun', colorKey: autoTrackOverlayColorKey('amoun'), status: 'resting', points: pts().map(p => ({ lat: p.lat, lng: p.lng })) });
   });
   it('13. Pending fehlt + SQLite vorhanden → Geometrie aus SQLite-Lay-Punkten', () => {
     const o = resolveReferenceOverlay(cand('amoun'), { pending: null, session: sessionRow('amoun'), layPoints: layRows(4) }, 'user-1');
@@ -166,7 +167,7 @@ describe('resolveReferenceOverlay — Geometrie & Sperren', () => {
   });
   it('Overlay enthält ausschliesslich Anzeige-Felder (keine Marker/Run/Analyse)', () => {
     const o = resolveReferenceOverlay(cand('amoun'), { pending: pending('amoun', { markers: [{ id: 'm', type: 'winkel' } as never] }), session: null, layPoints: null }, 'user-1');
-    expect(Object.keys(o!).sort()).toEqual(['dogId', 'dogName', 'points', 'sessionId', 'status']);
+    expect(Object.keys(o!).sort()).toEqual(['colorKey', 'dogId', 'dogName', 'points', 'sessionId', 'status']);
     expect(referenceOverlayCount([o!])).toBe(1);
     expect(referenceOverlayCount(undefined)).toBe(0);
   });
@@ -185,7 +186,7 @@ describe('Härtung — Pending defekt / Anzeige-Filter', () => {
     expect(resolveReferenceOverlay(cand('amoun'), { pending: broken, session: sessionRow('amoun'), layPoints: [{ latitude: Number.NaN, longitude: 8 }, { latitude: 47, longitude: 8 }] }, 'user-1')).toBeNull();
   });
   it('filterVisibleReferenceOverlays: nie aktueller Hund/aktuelle Session, nur eigene Hunde', () => {
-    const o = (dogId: string) => ({ dogId, sessionId: `sess-${dogId}`, dogName: dogId, status: 'resting' as const, points: [] });
+    const o = (dogId: string) => ({ dogId, sessionId: `sess-${dogId}`, dogName: dogId, colorKey: 'orange' as const, status: 'resting' as const, points: [] });
     const all = [o('amoun'), o('doran'), o('fremd')];
     expect(filterVisibleReferenceOverlays(all, scope('doran')).map(x => x.dogId)).toEqual(['amoun']);
     expect(filterVisibleReferenceOverlays(all, scope('baily', 'sess-amoun')).map(x => x.dogId)).toEqual(['doran']);

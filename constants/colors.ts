@@ -71,6 +71,20 @@ export type ColorKey = keyof typeof C;
 // ── Fährten-Tab Design-Tokens (1:1 aus design_handoff_faehrten/anyvo.css) ──
 // Eigenes Token-Set für das neue Fährten-Design (Mint #15e6c3), damit der
 // Redesign-Flow konsistent ist, ohne bestehende C.track*-Screens zu verändern.
+// Fährtenfarben je Hund für Referenz-Fährten auf der Karte (Multi-Dog-Overlays).
+// In der DB steht nur der semantische Key (dogs.track_overlay_color_key), die Werte
+// liegen zentral hier. Bewusst OHNE Mint (= aktuelle Fährte) und OHNE Rot (= Fehler/
+// destruktiv); Blau deutlich anders als die blaue Ist-Suchspur (trackBlue #4DA3FF).
+export const TRACK_OVERLAY_COLORS = {
+  orange: '#ffb547',   // = FT.warn / trackWarning (bisherige Referenzfarbe)
+  violet: '#b07cff',
+  pink:   '#ff6fb5',
+  yellow: '#ffe14d',
+  blue:   '#5b7cff',
+  cyan:   '#4fd8ff',
+  lime:   '#b8f04a',
+} as const;
+
 export const FT = {
   bg:         '#000000',
   surface:    '#0d0e10',
