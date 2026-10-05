@@ -18,6 +18,7 @@ import {
   startLiegezeitNotification, endLiegezeitNotification, LIEGEZEIT_NOTIFICATION_TYPE,
 } from '@/features/tracking/native/liegezeitNotification';
 
+const LABELS = { lying: 'Liegezeit', since: 'seit', fallbackTitle: 'Fährte' };
 const sched = Notifications.scheduleNotificationAsync as jest.Mock;
 const dismiss = Notifications.dismissNotificationAsync as jest.Mock;
 const perms = Notifications.getPermissionsAsync as jest.Mock;
@@ -33,7 +34,7 @@ describe('P4 — Liegezeit-Anzeige: reine Logik', () => {
     expect(liegezeitShouldBeActive('cancelled')).toBe(false);
   });
   it('6. Deep-Link-Inhalt enthält type=liegezeit + sessionId', () => {
-    const c = buildLiegezeitContent({ sessionId: 'sess-42', dogName: 'Malu', startedAt: 0 }, 65_000);
+    const c = buildLiegezeitContent({ dogId: 'dog-1', sessionId: 'sess-42', dogName: 'Malu', startedAt: 0 }, 65_000);
     expect(c.data.type).toBe(LIEGEZEIT_NOTIFICATION_TYPE);
     expect(c.data.sessionId).toBe('sess-42');
     expect(c.sticky).toBe(true);
@@ -48,23 +49,23 @@ describe('P4 — Liegezeit-Anzeige: reine Logik', () => {
 describe('P4 — Liegezeit-Anzeige: native (best-effort)', () => {
   it('8. fehlende Notification-Permission → kein Crash, keine Notification', async () => {
     perms.mockResolvedValue({ granted: false, status: 'denied' });
-    await expect(startLiegezeitNotification({ sessionId: 's', startedAt: 0 })).resolves.toBeUndefined();
+    await expect(startLiegezeitNotification({ dogId: 'dog-1', sessionId: 's', startedAt: 0 }, LABELS)).resolves.toBeUndefined();
     expect(sched).not.toHaveBeenCalled();
   });
 
   it('startet Notification mit type=liegezeit; end entfernt sie', async () => {
-    await startLiegezeitNotification({ sessionId: 's1', dogName: 'Rex', startedAt: Date.now() });
+    await startLiegezeitNotification({ dogId: 'dog-1', sessionId: 's1', dogName: 'Rex', startedAt: Date.now() }, LABELS);
     expect(sched).toHaveBeenCalledTimes(1);
     const content = sched.mock.calls[0][0].content;
     expect(content.data.type).toBe('liegezeit');
     expect(content.data.sessionId).toBe('s1');
 
-    await endLiegezeitNotification();
+    await endLiegezeitNotification({ dogId: 'dog-1', sessionId: 's1' });
     expect(dismiss).toHaveBeenCalled();
   });
 
   it('endLiegezeitNotification ohne aktive Notification wirft nicht', async () => {
-    await expect(endLiegezeitNotification()).resolves.toBeUndefined();
+    await expect(endLiegezeitNotification({ dogId: 'dog-1', sessionId: 's1' })).resolves.toBeUndefined();
   });
 });
 

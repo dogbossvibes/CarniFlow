@@ -286,7 +286,9 @@ export default function TrackRunScreen() {
   }, [arming, s.ready]);
 
   // P4: Beim Betreten der Absuche ist die Liegezeit vorbei → System-Anzeige entfernen.
-  useEffect(() => { void endLiegezeitNotification(); }, []);
+  // Nur die Live Activity GENAU dieser Fährte (dogId + sessionId) — andere Hunde behalten ihre.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void endLiegezeitNotification({ dogId: dogId ?? '', sessionId: id ?? null }); }, []);
 
   // 1) Beim Betreten entscheiden: frische Absuche oder unterbrochene fortsetzen (P2).
   useEffect(() => {

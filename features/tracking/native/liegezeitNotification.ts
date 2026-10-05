@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import {
   startLiegezeitActivity, endLiegezeitActivity, liegezeitActivityAvailable,
+  type LiegezeitActivityIdentity, type LiegezeitActivityLabels,
 } from '@/features/tracking/native/liegezeitLiveActivity';
 import type { SessionStatus } from '@/features/tracking/store/trackingStore';
 
@@ -10,7 +11,7 @@ import type { SessionStatus } from '@/features/tracking/store/trackingStore';
 //
 // Android: ONGOING lokale Notification (Option A) — KEIN Foreground-Service,
 //          KEINE Standort-/Audio-Berechtigung, Play-konform. Eigener Channel.
-// iOS:     Live Activity, sonst lokale Notification als Fallback.
+// iOS:     Live Activity (je dogId + sessionId, Multi-Dog), sonst lokale Notification als Fallback.
 //
 // Strikt: startet NIE GPS/Standort/Background-Audio. Läuft nur bei status='resting'.
 // Fehlende POST_NOTIFICATIONS → still übersprungen (interne Liegezeit läuft weiter).
@@ -19,7 +20,7 @@ import type { SessionStatus } from '@/features/tracking/store/trackingStore';
 export const LIEGEZEIT_CHANNEL_ID = 'liegezeit';
 export const LIEGEZEIT_NOTIFICATION_TYPE = 'liegezeit';
 
-export interface LiegezeitMeta { sessionId: string | null; dogName?: string | null; startedAt: number }
+export interface LiegezeitMeta { dogId: string; sessionId: string | null; dogName?: string | null; startedAt: number }
 
 // ── Reine, testbare Logik ──
 // Die Anzeige ist genau dann aktiv, wenn die Session in der Liegezeit ist.
@@ -68,10 +69,11 @@ async function hasNotificationPermission(): Promise<boolean> {
 }
 
 // Liegezeit-Anzeige starten (idempotent). Startet KEIN GPS/Standort.
-export async function startLiegezeitNotification(meta: LiegezeitMeta): Promise<void> {
+// `labels`: lokalisierte Live-Activity-Beschriftungen (ANYVO-i18n) — nur iOS.
+export async function startLiegezeitNotification(meta: LiegezeitMeta, labels: LiegezeitActivityLabels): Promise<void> {
   try {
     if (Platform.OS === 'ios' && liegezeitActivityAvailable()) {
-      startLiegezeitActivity(meta);   // Live Activity
+      startLiegezeitActivity(meta, labels);   // Live Activity GENAU dieser Fährte
       return;
     }
     // Android + iOS-Fallback: ongoing lokale Notification.
@@ -87,17 +89,18 @@ export async function startLiegezeitNotification(meta: LiegezeitMeta): Promise<v
 }
 
 // Anzeige aktualisieren (gedrosselt aufrufen, z. B. bei App-Rückkehr). Kein Ton.
-export async function updateLiegezeitNotification(meta: LiegezeitMeta): Promise<void> {
-  if (Platform.OS === 'ios' && liegezeitActivityAvailable()) return;   // Live Activity: kein JS-Tick nötig
+export async function updateLiegezeitNotification(meta: LiegezeitMeta, labels: LiegezeitActivityLabels): Promise<void> {
+  if (Platform.OS === 'ios' && liegezeitActivityAvailable()) return;   // Live Activity: Timer rendert SwiftUI, kein JS-Tick
   if (!androidId && !iosFallbackId) return;                            // nichts aktiv
-  await endLiegezeitNotification();
-  await startLiegezeitNotification(meta);
+  await endLiegezeitNotification(meta);
+  await startLiegezeitNotification(meta, labels);
 }
 
 // Anzeige beenden (searching/completed/cancelled). Idempotent, wirft nie.
-export async function endLiegezeitNotification(): Promise<void> {
+// iOS: nur die Live Activity GENAU dieser Fährte (dogId + sessionId) — andere Hunde bleiben.
+export async function endLiegezeitNotification(identity: LiegezeitActivityIdentity): Promise<void> {
   try {
-    if (Platform.OS === 'ios') endLiegezeitActivity();
+    if (Platform.OS === 'ios') await endLiegezeitActivity(identity);
     if (androidId) { await Notifications.dismissNotificationAsync(androidId); androidId = null; }
     if (iosFallbackId) { await Notifications.dismissNotificationAsync(iosFallbackId); iosFallbackId = null; }
   } catch { /* best-effort */ }

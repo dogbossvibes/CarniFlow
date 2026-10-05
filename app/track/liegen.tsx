@@ -17,6 +17,7 @@ import { resolveRestingCancelTarget } from '@/features/tracking/store/trackRecov
 import { RestingLeaveDialog } from '@/features/tracking/components/RestingLeaveDialog';
 import { matchesRestingIdentity, resolveRestingIdentity, type RestingIdentity } from '@/features/tracking/store/restingIdentity';
 import { getLocalTrainingSessionById } from '@/features/training/repositories/localTrainingRepository';
+import { resolveDogDisplayName } from '@/features/tracking/services/dogDisplayName';
 import {
   TRACK_SEGMENT_COLORS,
   actualSegmentSteps,
@@ -141,6 +142,14 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
     : null);
   const [now, setNow] = useState(Date.now());
   const [dogName, setDogName] = useState('Hund');
+  // Live Activity: Name GENAU dieses Hundes (über dogId). undefined = noch nicht aufgelöst → Activity
+  // wartet (kurz), damit sie nicht mit einem Platzhalter startet; null = unbekannt → neutrale Beschriftung.
+  const [activityDogName, setActivityDogName] = useState<string | null | undefined>(undefined);
+  // Identität der Live Activity DIESER Fährte (Start und Ende nutzen exakt dieselbe dogId + sessionId).
+  const activityIdentity = () => ({ dogId, sessionId: id ?? regSessionId ?? useTrackingStore.getState().currentSessionId ?? null });
+  const activityLabels = () => ({
+    lying: t('track.liveActivity.lying'), since: t('track.liveActivity.since'), fallbackTitle: t('track.liveActivity.fallbackTitle'),
+  });
   const [starting, setStarting] = useState(false);
   const saveState = useTrackingStore(s => s.saveState);   // Hintergrund-Speicherung nach „Stoppen"
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(() =>
@@ -191,21 +200,29 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
       if (s !== 'active') return;
       setNow(Date.now());
       if (startMs != null && useTrackingStore.getState().sessionStatus === 'resting') {
-        void updateLiegezeitNotification({ sessionId: id ?? useTrackingStore.getState().currentSessionId, dogName, startedAt: startMs });
+        void updateLiegezeitNotification({ ...activityIdentity(), dogName: activityDogName ?? null, startedAt: startMs }, activityLabels());
       }
     });
     return () => sub.remove();
-  }, [startMs, dogName, id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startMs, activityDogName, id]);
 
+  useEffect(() => {
+    let alive = true;
+    resolveDogDisplayName(dogId).then(n => { if (!alive) return; setActivityDogName(n); if (n) setDogName(n); });
+    return () => { alive = false; };
+  }, [dogId]);
   useEffect(() => { if (id) getTrackSessionDogName(id).then(r => { if (r.data) setDogName(r.data); }); }, [id]);
 
   // P4: systemnahe Liegezeit-Anzeige (Android-Notification / iOS Live Activity) starten,
   // solange status='resting'. Kein GPS/Standort. Beendet wird sie bei Absuche/Abbruch.
   const sessionStatus = useTrackingStore(s => s.sessionStatus);
+  // Zeitbasis = startMs (derselbe persistierte Liegezeit-Beginn wie die Anzeige oben), nie „jetzt" beim Start.
   useEffect(() => {
-    if (startMs == null || sessionStatus !== 'resting') return;
-    void startLiegezeitNotification({ sessionId: id ?? useTrackingStore.getState().currentSessionId, dogName, startedAt: startMs });
-  }, [startMs, sessionStatus, dogName, id]);
+    if (startMs == null || sessionStatus !== 'resting' || activityDogName === undefined) return;
+    void startLiegezeitNotification({ ...activityIdentity(), dogName: activityDogName, startedAt: startMs }, activityLabels());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startMs, sessionStatus, activityDogName, id]);
 
   const elapsedS = restingElapsedSeconds(startMs, now);
 
@@ -213,7 +230,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
     if (starting || startMs == null) return;   // erst starten, wenn Liegezeit-Start feststeht
     setStarting(true);
     allowLeaveRef.current = true;   // beabsichtigte Navigation → kein Abbruch-Dialog
-    void endLiegezeitNotification();   // Liegezeit-Anzeige entfernen (Übergang → Absuche)
+    void endLiegezeitNotification(activityIdentity());   // Liegezeit-Anzeige DIESER Fährte entfernen (Übergang → Absuche)
     const minutes = Math.max(0, Math.round((Date.now() - startMs) / 60000));
     if (id) await setTrackLyingTime(id, minutes).catch(() => {});
     // Bewusst KEIN Statuswechsel auf 'searching' hier: die Suchzeit startet erst am
@@ -257,7 +274,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
     // Abbruch dauerhaft lokal vermerken (best-effort, offline, nicht blockierend):
     // die Recovery bietet diese Fährte danach nur noch über „Fährte wieder öffnen" an.
     void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');
-    void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
+    void endLiegezeitNotification({ dogId: target.dogId ?? dogId, sessionId: target.sessionId });   // nur DIESE Activity (cancelled)
     allowLeaveRef.current = true;
     // @ts-expect-error react-navigation action aus dem beforeRemove-Event
     navigation.dispatch(action);

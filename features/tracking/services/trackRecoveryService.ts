@@ -206,7 +206,7 @@ export async function completeTrackWithoutApp(sessionId: string | null | undefin
     const st = useTrackingStore.getState();
     if (st.dogId === dogId && st.currentSessionId === sessionId && !st.isRecording) {
       st.reset();   // leert nur diesen (bereits geräumten) Hunde-Slot
-      void endLiegezeitNotification().catch(() => {});
+      void endLiegezeitNotification({ dogId, sessionId }).catch(() => {});
     }
     return { ok: true };
   } catch (e) {
