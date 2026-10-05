@@ -13,8 +13,11 @@ import {
 //   • die laufende Zeit rendert SwiftUI selbst (Text-Timer) — KEIN JS-Timer, KEIN
 //     sekündliches Update, KEIN Polling über die Bridge
 //   • Deep-Link exakt auf diese Fährte (anyvo://track/liegen?dogId=…&id=…)
-// V1-Fallback (nur ohne V2-Modul, z. B. älterer Build): expo-live-activity, ebenfalls
-//   je dogId + sessionId verwaltet; ohne Timer (das V1-Widget kann nicht hochzählen).
+// V1-Fallback (nur ohne V2-Modul, z. B. OTA auf ein älteres Binary): expo-live-activity.
+//   KEINE Multi-Dog-Garantie: V1 kann Activities nicht auflisten. Innerhalb eines Prozesses
+//   merkt sich JS die V1-ID je dogId + sessionId (Ende trifft nur genau diese — nie Hund A/B
+//   vertauscht); nach einem App-Neustart ist das Wissen weg → Ende tut nichts (verwaist wie
+//   bisher in V1), es wird nie geraten. Ohne Timer (das V1-Widget kann nicht hochzählen).
 //
 // Die Activity ist NUR Darstellung — nie Source of Truth für offen/abgebrochen/Hund.
 // iOS-only, Android/ältere iOS = no-op. KEIN GPS, KEIN Standort.

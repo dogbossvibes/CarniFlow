@@ -221,3 +221,32 @@ describe('Deep-Link der Activity → bestehende fail-closed-Identität', () => {
     expect(useTrackingStore.getState().dogId).toBe('dog-B');
   });
 });
+
+describe('Zeitbasis = Lege-ENDE (nicht Aufnahmestart) — Production-Datenfluss', () => {
+  it('10:00 Legen gestartet → 10:10 Lege-Ende → 10:20 Prüfung: Screen UND Activity ≈ 10 min, nicht 20', async () => {
+    const t1000 = Date.parse('2026-10-05T10:00:00.000Z');
+    const t1010 = t1000 + 10 * 60_000;
+    const t1020 = t1000 + 20 * 60_000;
+    const now = jest.spyOn(Date, 'now');
+    await AsyncStorage.clear();
+    useActiveFaehrten.setState({ byDog: {}, hydrated: true });
+    // 10:00 — Aufnahme startet (Registry hält den Aufnahmestart separat in startedAt)
+    now.mockReturnValue(t1000);
+    useActiveFaehrten.getState().upsert('dog-A', { status: 'laying', sessionId: 'sess-A', startedAt: t1000 });
+    useTrackingStore.setState({ dogId: 'dog-A', currentSessionId: null, sessionStatus: 'laying', trackPoints: pending('A', t1010).trackPoints, isRecording: true } as never);
+    // 10:10 — exakt die Production-Übergänge beim Lege-Ende:
+    now.mockReturnValue(t1010);
+    useTrackingStore.getState().setLayFinishedAt(Date.now());   // useTrackRecorder.finish()
+    useActiveFaehrten.getState().upsert('dog-A', { status: 'resting', sessionId: 'sess-A', layStartedAt: Date.now() });   // legen.finishTrack()
+    expect(useTrackingStore.getState().layStartedAt).toBe(t1010);
+    expect(useActiveFaehrten.getState().get('dog-A')).toMatchObject({ startedAt: t1000, layStartedAt: t1010 });
+    // 10:20 — Liegezeit-Screen + Live Activity
+    now.mockReturnValue(t1020);
+    await mount({ id: 'sess-A', dogId: 'dog-A' });
+    const shown = renderer.root.findAllByType('Text' as never).map((n: Rendered) => [].concat(n.props.children).join(''));
+    expect(shown).toContain('10:00');       // fmtAge(600 s)
+    expect(shown).not.toContain('20:00');
+    expect(mockActs[0].input.lyingStartedAtMs).toBe(t1010);
+    expect((t1020 - mockActs[0].input.lyingStartedAtMs) / 60_000).toBe(10);
+  });
+});

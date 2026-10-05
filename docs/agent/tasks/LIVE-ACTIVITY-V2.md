@@ -20,7 +20,11 @@
 - **Native API V1:** `startActivity`, `updateActivity` und `stopActivity(id)`. Das Paket kann Activities nicht
   auflisten.
 - **JS V1 (`liegezeitLiveActivity.ts`):**
-  - Singleton `activityId`: Ein zweiter Hund bekommt keine Activity, und ein Ende beendet die einzige.
+  - Singleton `activityId` im **ANYVO-Wrapper**: Ein zweiter Hund bekommt keine Activity, und ein Ende beendet
+    die einzige.
+  - Das Paket selbst kann mehrere Activities gleichzeitig: `startActivity` ruft jedes Mal
+    `Activity.request` auf und liefert eine eigene ID; `stopActivity(id)` beendet genau diese ID. Es kann sie
+    aber **nicht auflisten**.
   - Titel `Liegezeit – ${dogName}`, Untertitel fest „Fährte reift …“.
   - Deep-Link nur `/track/liegen?id=`.
   - **Kein Timer**, weil `timerEndDateInMilliseconds` nie gesetzt wird. Das V1-Widget kann ohnehin nur
@@ -68,7 +72,45 @@
   - Der Hundename wird über die `dogId` aufgelöst (`getDogById`, 4 s Timeout). Ist er nicht auflösbar, erscheint
     eine neutrale i18n-Beschriftung.
   - Die Rehydration (`RestingLiveActivitySync`, Fälle A–E) folgt der Registry.
-  - Ohne V2-Modul (älterer Build) greift ein V1-Fallback je Hund.
+  - **Altes Binary ohne V2-Modul (z. B. bei einer OTA auf 1.0.3-Binaries ohne V2):** Es greift ein
+    V1-Fallback. **Er bietet keine Multi-Dog-Garantie.**
+    - Innerhalb eines App-Prozesses merkt sich JS die V1-ID je `dogId` + `sessionId`. Ein Ende trifft deshalb
+      nur genau diese ID, und Hund A und Hund B werden nie vertauscht.
+    - Nach einem App-Neustart ist dieses Wissen weg, und V1 kann nicht auflisten. Ein Ende beendet dann
+      **nichts**, die alte Activity bleibt verwaist, so wie bisher in V1 (das System beendet sie spätestens
+      nach 8 h). Es wird nicht geraten und kein „latest“ verwendet.
+    - Auf altem Binary gibt es keine Rehydration.
+  - **Neues Binary mit V2:** Die echte Multi-Dog-Zuordnung läuft über
+    `Activity<AnyvoRestingActivityAttributes>.activities` mit `dogId` + `sessionId`, inklusive Rehydration.
+  - **Runtime-Hinweis:** `runtimeVersion.policy = appVersion`. Behält der V2-Build die Version 1.0.3, laufen
+    spätere OTAs mit diesem JS auch auf alten 1.0.3-Binaries im Fallback. Das ist sicher, aber ohne V2-Darstellung.
+    Ob die App-Version erhöht wird, ist eine Release-Entscheidung.
+
+## Pre-Build-Review
+
+- **Zeitbasis:** `layStartedAt` ist das **Lege-Ende**, nicht der Aufnahmestart.
+  - `useTrackRecorder.finish()` ruft `setLayFinishedAt(Date.now())` auf, das setzt
+    `layStartedAt = layFinishedAt = Lege-Ende`.
+  - `legen.finishTrack()` schreibt `upsert(resting, layStartedAt: Date.now())`.
+  - Der Aufnahmestart steht separat in `startedAt`.
+  - Test: 10:00 Start, 10:10 Lege-Ende, 10:20 → Screen und Activity zeigen 10:00 min.
+- **Kompakter Timer:** Die Breite von `Text(timerInterval:)` wurde mit dem SF-Font gemessen (CoreText,
+  semibold, Monospace-Ziffern).
+
+  | Darstellung | Breite | Hinweis |
+  |---|---|---|
+  | „7:59:59“ bei 12 pt | 47,3 pt | |
+  | `caption`, xxxLarge | 57,4 pt | dynamisch |
+  | `caption`, AX2 | 81,1 pt | dynamisch |
+
+  - Laut HIG ist die gesamte Pille 230 bzw. 250 pt breit, inklusive Kamerabereich (≈ 126 pt), also etwa
+    50 pt je Seite.
+  - → Die vorherigen 56 pt mit Dynamic Type waren nicht robust.
+  - Jetzt gilt: feste 12 pt semibold mit Monospace-Ziffern in einer 48-pt-Box. Der Timer im aufgeklappten
+    Zustand ist bei Dynamic Type auf xxLarge begrenzt (93,4 pt ≤ 96 pt).
+  - Eine SwiftUI-Wiedergabe (macOS, `ImageRenderer`, gleiche Views und Schrift) zeigte für 00:05:00, 00:59:59,
+    01:05:00 und 07:59:59 kein Abschneiden, keine Ellipse und keine Überlappung.
+  - Bestätigung auf dem Gerät steht noch aus.
 
 ## Offene Punkte
 

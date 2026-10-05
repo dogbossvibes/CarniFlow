@@ -17,6 +17,11 @@ private enum RestingStyle {
   static let mint = Color(red: 21 / 255, green: 230 / 255, blue: 195 / 255)        // ANYVO Mint #15E6C3
   static let background = Color(red: 15 / 255, green: 17 / 255, blue: 21 / 255)    // #0F1115 (wie V1)
   static let symbol = "hourglass"                                                    // = Liegezeit-Symbol der App
+  /// Kompakter Timer: feste 12 pt (semibold, Monospace-Ziffern). Gemessen (SF, CoreText):
+  /// „7:59:59" = 47,3 pt → passt in 48 pt; die kompakte Seite der Dynamic Island hat nur ≈ 50 pt.
+  /// Mit Dynamic Type (caption) wären es ab xxxLarge > 56 pt bzw. AX2 81 pt → abgeschnitten.
+  static let compactTimerFontSize: CGFloat = 12
+  static let compactTimerWidth: CGFloat = 48
 }
 
 @available(iOS 16.2, *)
@@ -128,6 +133,8 @@ struct AnyvoRestingActivityWidget: Widget {
             .frame(maxWidth: 96, alignment: .trailing)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
+            // „7:59:59" in title3 rounded bold: xxLarge ≈ 95 pt passt in 96 pt; grösser würde abgeschnitten.
+            .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         }
         DynamicIslandExpandedRegion(.bottom) {
           RestingSinceText(attributes: attributes)
@@ -142,12 +149,11 @@ struct AnyvoRestingActivityWidget: Widget {
       } compactTrailing: {
         // Nur die Zeit (kein Name): Text-Timer sind horizontal flexibel → feste Breite.
         RestingTimerText(attributes: attributes)
-          .font(.caption.weight(.semibold))
+          .font(.system(size: RestingStyle.compactTimerFontSize, weight: .semibold))
           .foregroundStyle(RestingStyle.mint)
           .multilineTextAlignment(.trailing)
-          .frame(width: 56, alignment: .trailing)
+          .frame(width: RestingStyle.compactTimerWidth, alignment: .trailing)
           .lineLimit(1)
-          .minimumScaleFactor(0.7)
       } minimal: {
         Image(systemName: RestingStyle.symbol)
           .foregroundStyle(RestingStyle.mint)

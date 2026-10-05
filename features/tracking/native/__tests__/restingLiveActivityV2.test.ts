@@ -211,6 +211,51 @@ describe('V1-Fallback (nur ohne V2-Modul): ebenfalls je Hund, kein Singleton', (
   });
 });
 
+describe('Altes Binary (ohne V2-Modul): KEINE Multi-Dog-Garantie, aber nie Cross-Zuordnung', () => {
+  beforeEach(() => { mockV2 = false; });
+  it('nach App-Neustart kennt JS keine V1-Activity mehr → Ende A beendet NICHTS (verwaist wie bisher in V1), B wird nie getroffen', async () => {
+    startLiegezeitActivity({ dogId: 'dog-A', sessionId: 's-A', dogName: 'Skadi', startedAt: NOW }, LABELS);
+    startLiegezeitActivity({ dogId: 'dog-B', sessionId: 's-B', dogName: 'Yam', startedAt: NOW }, LABELS);
+    const idB = mockV1Start.mock.results[1].value;
+    let fresh!: typeof import('@/features/tracking/native/liegezeitLiveActivity');
+    jest.isolateModules(() => {   // simulierter App-Neustart: frischer JS-Speicher
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      fresh = require('@/features/tracking/native/liegezeitLiveActivity');
+    });
+    await fresh.endLiegezeitActivity({ dogId: 'dog-A', sessionId: 's-A' });
+    expect(mockV1Stop).not.toHaveBeenCalled();   // keine Auflistung in V1 → kein Raten, kein „latest"
+    await endLiegezeitActivity({ dogId: 'dog-B', sessionId: 's-B' });
+    expect(mockV1Stop.mock.calls.map(c => c[0])).toEqual([idB]);
+    await endLiegezeitActivity({ dogId: 'dog-A', sessionId: 's-A' });
+  });
+  it('ohne V2-Modul keine Rehydration (V1 kann nicht auflisten) — nichts wird beendet oder zugeordnet', async () => {
+    useActiveFaehrten.setState({ byDog: { A: entry('A'), B: entry('B') }, hydrated: true });
+    expect(await reconcileRestingActivities({ ownDogs: [{ id: 'A' }, { id: 'B' }], labels: LABELS })).toBeNull();
+    expect(mockV1Start).not.toHaveBeenCalled();
+    expect(mockV1Stop).not.toHaveBeenCalled();
+  });
+});
+
+describe('V1 → V2 Migration (fail closed)', () => {
+  it('zwei offene Hunde + V1-Rest: V1 wird beendet (nie umgehängt), jeder Hund bekommt seine V2 aus SEINEM Registry-Eintrag — kein „latest"', async () => {
+    useActiveFaehrten.setState({ byDog: {
+      A: entry('A', { layStartedAt: NOW - 40 * 60_000, updatedAt: NOW - 1000 }),
+      B: entry('B', { layStartedAt: NOW - 5 * 60_000, updatedAt: NOW }),
+    }, hydrated: true });
+    await reconcileRestingActivities({ ownDogs: [{ id: 'A', name: 'Skadi' }, { id: 'B', name: 'Yam' }], labels: LABELS });
+    expect(mockNativeCalls[0]).toBe('endLegacy');
+    expect(mockActs.map(a => [a.dogId, a.sessionId, a.input.dogName, a.lyingStartedAtMs])).toEqual([
+      ['A', 's-A', 'Skadi', NOW - 40 * 60_000], ['B', 's-B', 'Yam', NOW - 5 * 60_000],
+    ]);
+  });
+  it('V1-Erkennung beendet nur Liegezeit-Activities (/track/liegen…), nicht die Lege-Activity (/track/legen)', () => {
+    const c = fs.readFileSync('modules/anyvo-resting-activity/ios/RestingActivityController.swift', 'utf8');
+    expect(c).toMatch(/legacyRestingDeepLinkPrefix = "\/track\/liegen"/);
+    expect(c).toMatch(/hasPrefix\(legacyRestingDeepLinkPrefix\)/);
+    expect(c).not.toMatch(/LiveActivityAttributes>\.activities\.(first|last)/);
+  });
+});
+
 describe('Privacy / Schema (Source-Vertrag)', () => {
   const attrs = fs.readFileSync('modules/anyvo-resting-activity/ios/AnyvoRestingActivityAttributes.swift', 'utf8');
   const fields = [...attrs.matchAll(/^\s*var (\w+):/gm)].map(m => m[1]);
@@ -230,6 +275,12 @@ describe('Privacy / Schema (Source-Vertrag)', () => {
     expect(w).toMatch(/\.widgetURL\(context\.attributes\.url\)/);
     expect(w).toMatch(/\.widgetURL\(attributes\.url\)/);
     expect(w).not.toMatch(/Text\("(Liegezeit|seit|Hund)/);   // keine hartcodierten deutschen Texte
+    // Kompakter Timer: feste 12 pt in 48 pt („7:59:59" = 47,3 pt gemessen), keine Dynamic-Type-Abhängigkeit.
+    expect(w).toMatch(/compactTimerFontSize: CGFloat = 12/);
+    expect(w).toMatch(/compactTimerWidth: CGFloat = 48/);
+    expect(w).toMatch(/\.font\(\.system\(size: RestingStyle\.compactTimerFontSize, weight: \.semibold\)\)/);
+    expect(w).not.toMatch(/frame\(width: 56/);
+    expect(w).toMatch(/\.dynamicTypeSize\(\.\.\.DynamicTypeSize\.xxLarge\)/);
   });
   it('relevanceScore = Liegezeit-Beginn (jüngere Liegezeit zuerst), nur UI', () => {
     const c = fs.readFileSync('modules/anyvo-resting-activity/ios/RestingActivityController.swift', 'utf8');
