@@ -53,12 +53,12 @@ const CANCELLED_TEXT: Record<string, string> = {
   fr: 'La piste est toujours enregistrée. Tu peux la rouvrir et la poursuivre.',
   it: 'La pista è ancora salvata. Puoi riaprirla e riprenderla.',
 };
-const EXPECT: Record<typeof LANGS[number], { leave: string; bg: string; old: string[]; abort: string; confirm: string; resume: string; reopen: string; cancelledTitle: string }> = {
-  de:  { leave: 'Liegezeit läuft', bg: 'Im Hintergrund weiterlaufen', old: ['Weiterlaufen lassen', 'Liegezeit beenden'], abort: 'Fährte endgültig abbrechen', confirm: 'Endgültig abbrechen', resume: 'Fährte fortsetzen', reopen: 'Fährte wieder öffnen', cancelledTitle: 'Diese Fährte wurde abgebrochen' },
-  gsw: { leave: 'Liegeziit lauft', bg: 'Im Hintergrund wiiterlaufe', old: ['Wiiterlaufe lah', 'Liegeziit beende'], abort: 'Fährte endgültig abbreche', confirm: 'Endgültig abbreche', resume: 'Fährte wiitermache', reopen: 'Fährte wieder ufmache', cancelledTitle: 'Die Fährte isch abbroche worde' },
-  en:  { leave: 'Aging time running', bg: 'Continue in background', old: ['Keep running', 'End aging time'], abort: 'Cancel track permanently', confirm: 'Cancel permanently', resume: 'Continue track', reopen: 'Reopen track', cancelledTitle: 'This track was cancelled' },
-  fr:  { leave: 'Temps de repos en cours', bg: 'Continuer en arrière-plan', old: ['Laisser continuer', 'Terminer le temps de repos'], abort: 'Interrompre définitivement la piste', confirm: 'Interrompre définitivement', resume: 'Reprendre la piste', reopen: 'Rouvrir la piste', cancelledTitle: 'Cette piste a été interrompue' },
-  it:  { leave: 'Tempo di posa in corso', bg: 'Continua in background', old: ['Lascia continuare', 'Termina il tempo di posa'], abort: 'Interrompi definitivamente la pista', confirm: 'Interrompi definitivamente', resume: 'Riprendi la pista', reopen: 'Riapri la pista', cancelledTitle: 'Questa pista è stata interrotta' },
+const EXPECT: Record<typeof LANGS[number], { leave: string; bg: string; hold: string; back: string; old: string[]; abort: string; confirm: string; resume: string; reopen: string; cancelledTitle: string }> = {
+  de:  { leave: 'Liegezeit läuft', bg: 'Im Hintergrund weiterlaufen', hold: 'Zum endgültigen Abbrechen gedrückt halten', back: 'Zurück', old: ['Weiterlaufen lassen', 'Liegezeit beenden'], abort: 'Fährte endgültig abbrechen', confirm: 'Endgültig abbrechen', resume: 'Fährte fortsetzen', reopen: 'Fährte wieder öffnen', cancelledTitle: 'Diese Fährte wurde abgebrochen' },
+  gsw: { leave: 'Liegeziit lauft', bg: 'Im Hintergrund wiiterlaufe', hold: 'Zum endgültige Abbreche drückt halte', back: 'Zrugg', old: ['Wiiterlaufe lah', 'Liegeziit beende'], abort: 'Fährte endgültig abbreche', confirm: 'Endgültig abbreche', resume: 'Fährte wiitermache', reopen: 'Fährte wieder ufmache', cancelledTitle: 'Die Fährte isch abbroche worde' },
+  en:  { leave: 'Aging time running', bg: 'Continue in background', hold: 'Hold to cancel track permanently', back: 'Back', old: ['Keep running', 'End aging time'], abort: 'Cancel track permanently', confirm: 'Cancel permanently', resume: 'Continue track', reopen: 'Reopen track', cancelledTitle: 'This track was cancelled' },
+  fr:  { leave: 'Temps de repos en cours', bg: 'Continuer en arrière-plan', hold: 'Maintenir pour interrompre définitivement la piste', back: 'Retour', old: ['Laisser continuer', 'Terminer le temps de repos'], abort: 'Interrompre définitivement la piste', confirm: 'Interrompre définitivement', resume: 'Reprendre la piste', reopen: 'Rouvrir la piste', cancelledTitle: 'Cette piste a été interrompue' },
+  it:  { leave: 'Tempo di posa in corso', bg: 'Continua in background', hold: 'Tieni premuto per interrompere definitivamente la pista', back: 'Indietro', old: ['Lascia continuare', 'Termina il tempo di posa'], abort: 'Interrompi definitivamente la pista', confirm: 'Interrompi definitivamente', resume: 'Riprendi la pista', reopen: 'Riapri la pista', cancelledTitle: 'Questa pista è stata interrotta' },
 };
 const GERMAN_WORDS = /Fährte|Liegezeit|Absuche|abbrechen|fortsetzen|öffnen|Zurück|Nein\b/;
 let alertSpy: jest.SpyInstance;
@@ -87,21 +87,25 @@ describe.each(LANGS)('Sprache %s', lng => {
   };
   const texts = (r: Rendered) => r.root.findAllByType('Text' as never).map((n: Rendered) => [].concat(n.props.children).join('')).join('|');
 
-  it('Liegezeit-Dialog + endgültiger Abbruchdialog übersetzt, keine rohen Keys', async () => {
+  it('Liegezeit-Dialog (Hold-to-Abort) + Bestätigung für Bedienungshilfen übersetzt, keine rohen Keys', async () => {
     useTrackingStore.setState({ dogId: 'dog-A', currentSessionId: 'sess-A', sessionStatus: 'resting', trackPoints: [{ lat: 47, lng: 8, t: 1 } as never], layStartedAt: Date.now() } as never);
     const r = await render(<LiegenScreen />);
     act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: {} } }); });
-    const [title, msg, buttons] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1] as [string, string, Btn[]];
-    expect(title).toBe(e.leave);
-    expect(buttons).toHaveLength(3);
-    expect(buttons.map(b => b.text)).toEqual(expect.arrayContaining([e.bg, e.abort]));
-    for (const o of e.old) expect(buttons.map(b => b.text)).not.toContain(o);
-    act(() => { buttons.find(b => b.text === e.abort)!.onPress!(); });
+    const dialog = r.root.findAll((n: Rendered) => n.props.testID === 'resting-leave-dialog')[0];
+    const dTexts: string[] = dialog.findAllByType('Text' as never).map((n: Rendered) => [].concat(n.props.children).join(''));
+    expect(dTexts[0]).toBe(e.leave);
+    expect(dTexts.slice(2)).toEqual([e.bg, e.hold, e.back]);
+    for (const o of e.old) expect(dTexts).not.toContain(o);
+    const holdBtn = r.root.findAll((n: Rendered) => n.props.testID === 'resting-leave-abort-hold')[0];
+    expect(holdBtn.props.accessibilityLabel).toBe(e.abort);
+    const a11y = [holdBtn.props.accessibilityLabel, holdBtn.props.accessibilityHint];
+    // Bedienungshilfen-Weg: ausdrückliche Bestätigung (übersetzt).
+    act(() => { holdBtn.props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }); });
     const [t2, m2, b2] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1] as [string, string, Btn[]];
     expect(b2.map(b => b.text)).toContain(e.confirm);
-    const all = [title, msg, ...buttons.map(b => b.text), t2, m2, ...b2.map(b => b.text), texts(r)].join('|');
+    const all = [...dTexts, ...a11y, t2, m2, ...b2.map(b => b.text), texts(r)].join('|');
     expect(all).not.toMatch(/track\.continuation\.|\{\w+\}/);
-    if (lng === 'en' || lng === 'fr' || lng === 'it') expect([title, msg, ...buttons.map(b => b.text), t2, m2, ...b2.map(b => b.text)].join('|')).not.toMatch(GERMAN_WORDS);
+    if (lng === 'en' || lng === 'fr' || lng === 'it') expect([...dTexts, ...a11y, t2, m2, ...b2.map(b => b.text)].join('|')).not.toMatch(GERMAN_WORDS);
     act(() => { r.unmount(); });
   });
 

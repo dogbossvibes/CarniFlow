@@ -338,6 +338,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.continuation.leaveStay": "Indietro",
   "track.continuation.leaveKeepRunning": "Continua in background",
   "track.continuation.leaveFinalAbort": "Interrompi definitivamente la pista",
+  "track.continuation.leaveHoldToAbort": "Tieni premuto per interrompere definitivamente la pista",
+  "track.continuation.leaveFinalAbortA11yHint": "Apre una conferma per interrompere definitivamente la pista.",
   "track.continuation.finalAbortTitle": "Interrompere definitivamente la pista?",
   "track.continuation.finalAbortText": "La pista verrà conclusa. Resta nel diario, ma non potrà più essere ripresa né ricercata.",
   "track.continuation.no": "No",

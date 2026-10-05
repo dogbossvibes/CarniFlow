@@ -46,6 +46,7 @@ jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
 /* eslint-disable import/first -- Mocks müssen vor den Imports registriert sein */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LiegenScreen from '@/app/track/liegen';
+import { HOLD_TO_ABORT_MS } from '@/features/tracking/components/RestingLeaveDialog';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
@@ -74,8 +75,16 @@ const texts = () => renderer.root.findAllByType('Text' as never).map((n: Rendere
 const missing = () => !!byId('resting-identity-missing');
 const routeParams = (href: string) => Object.fromEntries(new URLSearchParams(href.split('?')[1] ?? ''));
 let alertSpy: jest.SpyInstance;
-const lastAlert = () => alertSpy.mock.calls[alertSpy.mock.calls.length - 1] as [string, string, { text: string; onPress?: () => void }[]];
-const press = (title: string) => act(() => { lastAlert()[2].find(b => b.text === title)!.onPress!(); });
+const byTestId = (id: string) => renderer.root.findAll((n: Rendered) => n.props.testID === id)[0];
+const tapDialog = (id: string) => act(() => { byTestId(id).props.onPress(); });
+/** „Fährte endgültig abbrechen" per Touch: 1,5 s gedrückt halten (Fake-Timer nur für den Hold). */
+const holdAbort = () => {
+  jest.useFakeTimers();
+  try {
+    act(() => { byTestId('resting-leave-abort-hold').props.onPressIn(); });
+    act(() => { jest.advanceTimersByTime(HOLD_TO_ABORT_MS); });
+  } finally { jest.useRealTimers(); }
+};
 const leave = () => act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } }); });
 
 beforeAll(async () => { await i18n.changeLanguage('de'); });
@@ -107,7 +116,7 @@ describe('Normaler Fortsetzen-Flow mit realistischem Zustand (sessionId=null in 
   it('1/3/4/5. Legen → Im Hintergrund weiterlaufen → Übersicht → Fortsetzen (Karte/Logbuch/DogHub = reopenTarget) → dieselbe Session/derselbe Hund', async () => {
     await afterLaying();
     await mount({ id: 'sess-A', dogId: 'dog-A' });
-    leave(); press('Im Hintergrund weiterlaufen');
+    leave(); tapDialog('resting-leave-background');
     expect(mockRecordCancelled).not.toHaveBeenCalled();                                   // 14. schreibfrei
     expect(useActiveFaehrten.getState().get('dog-A')).toMatchObject({ status: 'resting', sessionId: 'sess-A' });
     act(() => { renderer.unmount(); }); renderer = null;
@@ -173,7 +182,9 @@ describe('Normaler Fortsetzen-Flow mit realistischem Zustand (sessionId=null in 
     await writePendingNow('dog-B', realPending('B'));
     useActiveFaehrten.getState().upsert('dog-B', { status: 'resting', sessionId: 'sess-B' });
     await mount({ id: 'sess-A', dogId: 'dog-A' });
-    leave(); press('Fährte endgültig abbrechen'); press('Endgültig abbrechen');
+    leave(); holdAbort();
+    expect(alertSpy).not.toHaveBeenCalled();   // Hold ist die Bestätigung
+    expect(mockRecordCancelled).toHaveBeenCalledTimes(1);
     expect(useTrackingStore.getState().sessionStatus).toBe('cancelled');
     expect(mockRecordCancelled).toHaveBeenCalledWith('sess-A', 'dog-A', 'resting_abort');
     expect(useActiveFaehrten.getState().get('dog-A')).toBeNull();

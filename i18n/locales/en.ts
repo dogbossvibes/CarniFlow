@@ -338,6 +338,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.continuation.leaveStay": "Back",
   "track.continuation.leaveKeepRunning": "Continue in background",
   "track.continuation.leaveFinalAbort": "Cancel track permanently",
+  "track.continuation.leaveHoldToAbort": "Hold to cancel track permanently",
+  "track.continuation.leaveFinalAbortA11yHint": "Opens a confirmation to cancel the track permanently.",
   "track.continuation.finalAbortTitle": "Cancel track permanently?",
   "track.continuation.finalAbortText": "The track will be ended. It stays in the journal but can no longer be continued or searched.",
   "track.continuation.no": "No",

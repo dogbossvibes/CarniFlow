@@ -50,6 +50,7 @@ jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
 /* eslint-disable import/first -- Mocks müssen vor den Imports registriert sein */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LiegenScreen from '@/app/track/liegen';
+import { HOLD_TO_ABORT_MS } from '@/features/tracking/components/RestingLeaveDialog';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { loadPending, writePendingNow, type PendingTrack } from '@/features/tracking/store/trackPersist';
@@ -74,8 +75,16 @@ const mount = async (params: Record<string, string | undefined>) => {
 const byId = (id: string) => renderer.root.findAll((n: Rendered) => n.props.testID === id)[0];
 const texts = () => renderer.root.findAllByType('Text' as never).map((n: Rendered) => [].concat(n.props.children).join('')).join('|');
 let alertSpy: jest.SpyInstance;
-const lastAlert = () => alertSpy.mock.calls[alertSpy.mock.calls.length - 1] as [string, string, { text: string; onPress?: () => void }[]];
-const press = (title: string) => act(() => { lastAlert()[2].find(b => b.text === title)!.onPress!(); });
+const byTestId = (id: string) => renderer.root.findAll((n: Rendered) => n.props.testID === id)[0];
+const tapDialog = (id: string) => act(() => { byTestId(id).props.onPress(); });
+/** „Fährte endgültig abbrechen" per Touch: 1,5 s gedrückt halten (Fake-Timer nur für den Hold). */
+const holdAbort = () => {
+  jest.useFakeTimers();
+  try {
+    act(() => { byTestId('resting-leave-abort-hold').props.onPressIn(); });
+    act(() => { jest.advanceTimersByTime(HOLD_TO_ABORT_MS); });
+  } finally { jest.useRealTimers(); }
+};
 
 beforeAll(async () => { await i18n.changeLanguage('de'); });
 beforeEach(async () => {
@@ -153,18 +162,19 @@ describe('Liegezeit-Identität (Benachrichtigung / Live Activity)', () => {
   it('9. „Im Hintergrund weiterlaufen" nach Deep-Link bleibt write-safe (kein cancelled, kein Marker, Registry unverändert)', async () => {
     await mount({ id: 'sess-A' });
     act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } }); });
-    press('Im Hintergrund weiterlaufen');
+    tapDialog('resting-leave-background');
     expect(mockEndNotification).not.toHaveBeenCalled();
     expect(mockRecordCancelled).not.toHaveBeenCalled();
     expect(useTrackingStore.getState().sessionStatus).not.toBe('cancelled');
     expect(useActiveFaehrten.getState().get('dog-A')?.status).toBe('resting');
     expect((await loadPending('dog-A'))?.status).toBe('resting');
   });
-  it('10. endgültiger Abbruch nach Deep-Link betrifft NUR die richtige Session (A), nie B', async () => {
+  it('10/H. endgültiger Abbruch (Hold) nach Deep-Link betrifft NUR die richtige Session (A), nie B', async () => {
     await mount({ id: 'sess-A' });
     act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } }); });
-    press('Fährte endgültig abbrechen');
-    press('Endgültig abbrechen');
+    holdAbort();
+    expect(alertSpy).not.toHaveBeenCalled();   // Hold ist die Bestätigung
+    expect(mockRecordCancelled).toHaveBeenCalledTimes(1);
     expect(mockRecordCancelled).toHaveBeenCalledWith('sess-A', 'dog-A', 'resting_abort');
     expect(useActiveFaehrten.getState().get('dog-A')).toBeNull();
     expect(useActiveFaehrten.getState().get('dog-B')).toMatchObject({ status: 'resting', sessionId: 'sess-B' });

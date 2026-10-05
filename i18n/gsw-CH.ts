@@ -300,6 +300,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.continuation.leaveStay': 'Zrugg',
   'track.continuation.leaveKeepRunning': 'Im Hintergrund wiiterlaufe',
   'track.continuation.leaveFinalAbort': 'Fährte endgültig abbreche',
+  'track.continuation.leaveHoldToAbort': 'Zum endgültige Abbreche drückt halte',
+  'track.continuation.leaveFinalAbortA11yHint': 'Öffnet e Bestätigung zum endgültige Abbreche vo de Fährte.',
   'track.continuation.finalAbortTitle': 'Fährte endgültig abbreche?',
   'track.continuation.finalAbortText': 'D Fährte wird beendet. Si bliibt im Journal, cha aber dänn nüme wiitergmacht oder abgsuecht werde.',
   'track.continuation.no': 'Nei',

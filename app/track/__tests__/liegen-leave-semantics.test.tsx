@@ -1,8 +1,9 @@
 // Liegezeit verlassen — Semantik (gerendert, echter beforeRemove-Ablauf mit Dialog-Buttons):
 // • „Im Hintergrund weiterlaufen" (früher „Weiterlaufen lassen", gleicher Handler) verlässt nur den Screen:
 //   Liegezeit + Anzeige laufen weiter, KEIN 'cancelled', keine Registry-/Puffer-Änderung, kein Marker.
+// • „Fährte endgültig abbrechen" löst per Touch NUR nach 1,5 s Gedrückthalten aus (der Hold ist die
+//   Bestätigung); Bedienungshilfen öffnen stattdessen die ausdrückliche Bestätigung „Fährte endgültig abbrechen?".
 // • „Liegezeit beenden" gibt es in diesem Dialog nicht mehr.
-// • „Fährte endgültig abbrechen" ist eine separate destruktive Aktion mit eigener Bestätigung.
 import React from 'react';
 import { Alert } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -52,6 +53,7 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import i18n from '@/i18n/config';
 import { loadPending, writePendingNow, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import fs from 'fs';
+import { HOLD_TO_ABORT_MS } from '@/features/tracking/components/RestingLeaveDialog';
 /* eslint-enable import/first */
 
 beforeAll(async () => { await i18n.changeLanguage('de'); });
@@ -61,11 +63,40 @@ let alertSpy: jest.SpyInstance;
 type Rendered = any;
 let renderer: Rendered = null;
 const lastAlert = () => alertSpy.mock.calls[alertSpy.mock.calls.length - 1] as [string, string, Btn[]];
-const press = (title: string) => act(() => { lastAlert()[2].find(b => b.text === title)!.onPress!(); });
+const pressAlert = (title: string) => act(() => { lastAlert()[2].find(b => b.text === title)!.onPress!(); });
 const leave = () => {
   const e = { preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } };
   act(() => { mockBeforeRemove!(e); });
   return e;
+};
+const byId = (id: string) => renderer.root.findAll((n: Rendered) => n.props.testID === id)[0];
+const dialogOpen = () => !!byId('resting-leave-dialog');
+const dialogTexts = () => byId('resting-leave-dialog').findAllByType('Text' as never).map((n: Rendered) => [].concat(n.props.children).join(''));
+const tap = (id: string) => act(() => { byId(id).props.onPress(); });
+/** Touch auf „Fährte endgültig abbrechen": Press-In, `ms` halten, Press-Out (Fake-Timer nur für den Hold). */
+const holdAbort = (ms: number) => {
+  jest.useFakeTimers();
+  try {
+    act(() => { byId('resting-leave-abort-hold').props.onPressIn(); });
+    act(() => { jest.advanceTimersByTime(ms); });
+    const btn = byId('resting-leave-abort-hold');
+    if (btn) act(() => { btn.props.onPressOut(); btn.props.onPress(); });
+    act(() => { jest.advanceTimersByTime(3000); });
+  } finally { jest.useRealTimers(); }
+};
+const writePending = async (): Promise<PendingTrack> => {
+  const p: PendingTrack = {
+    sessionId: null, dogId: 'dog-A', trackPoints: [{ lat: 47, lng: 8, accuracy: 4, t: 1 }], markers: [], runPoints: [],
+    distanceMeters: 42, durationSeconds: 60, layFinishedAt: 1, layStartedAt: 1, startAnchor: null, savedAt: 1, status: 'resting',
+  };
+  await writePendingNow('dog-A', p);
+  return p;
+};
+const expectUntouched = async (pending: PendingTrack) => {
+  expect(mockRecordCancelled).not.toHaveBeenCalled();
+  expect(useTrackingStore.getState().sessionStatus).toBe('resting');
+  expect(useActiveFaehrten.getState().get('dog-A')).toMatchObject({ status: 'resting', sessionId: 'sess-A' });
+  expect(await loadPending('dog-A')).toEqual(pending);
 };
 
 beforeEach(async () => {
@@ -81,79 +112,131 @@ beforeEach(async () => {
 afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
 
 describe('Liegezeit verlassen', () => {
-  it('1–5. Dialog bietet Im Hintergrund weiterlaufen · Fährte endgültig abbrechen · Zurück (nur Abbruch destruktiv)', () => {
+  it('1–5. Dialog: Im Hintergrund weiterlaufen · Zum endgültigen Abbrechen gedrückt halten · Zurück (kein nativer Alert)', () => {
     const e = leave();
     expect(e.preventDefault).toHaveBeenCalled();
-    const [title, msg, buttons] = lastAlert();
-    expect(title).toBe('Liegezeit läuft');
-    expect(msg).toBe('Die Liegezeit läuft weiter, auch wenn du diesen Bildschirm verlässt. Du kannst später jederzeit zu dieser Fährte zurückkehren.');
-    expect(buttons.map(b => b.text)).toEqual(['Im Hintergrund weiterlaufen', 'Fährte endgültig abbrechen', 'Zurück']);
-    expect(buttons.map(b => b.text)).not.toContain('Weiterlaufen lassen');
-    expect(buttons.map(b => b.text)).not.toContain('Liegezeit beenden');
-    expect(buttons.map(b => b.text)).not.toContain('Fährte abbrechen');
-    expect(buttons.filter(b => b.style === 'destructive').map(b => b.text)).toEqual(['Fährte endgültig abbrechen']);
-    expect(buttons.find(b => b.text === 'Zurück')!.style).toBe('cancel');
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(dialogOpen()).toBe(true);
+    const t = dialogTexts();
+    expect(t).toEqual(['Liegezeit läuft',
+      'Die Liegezeit läuft weiter, auch wenn du diesen Bildschirm verlässt. Du kannst später jederzeit zu dieser Fährte zurückkehren.',
+      'Im Hintergrund weiterlaufen', 'Zum endgültigen Abbrechen gedrückt halten', 'Zurück']);
+    for (const old of ['Weiterlaufen lassen', 'Liegezeit beenden', 'Fährte abbrechen']) expect(t).not.toContain(old);
+    expect(byId('resting-leave-abort-hold').props.accessibilityLabel).toBe('Fährte endgültig abbrechen');
   });
 
-  it('6. „Im Hintergrund weiterlaufen" nutzt exakt den bisherigen „Weiterlaufen lassen"-Handler', () => {
+  it('6. „Im Hintergrund weiterlaufen" nutzt den bisherigen „Weiterlaufen lassen"-Handler (nur verlassen, keine Seiteneffekte)', () => {
     const src = fs.readFileSync('app/track/liegen.tsx', 'utf8');
-    expect(src).toContain("{ text: t('track.continuation.leaveKeepRunning'), onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },");
+    const body = src.match(/const keepRunningInBackground = \(action: unknown\) => \{([\s\S]*?)\n  \};/)![1];
+    expect(body).toContain('allowLeaveRef.current = true;');
+    expect(body).toContain('navigation.dispatch(action);');
+    expect(body).not.toMatch(/endLiegezeitNotification|recordTrackCancelled|setSessionStatus|remove\(|writePending|clearPending/);
     expect(src).not.toContain('leaveEndLyingTime');
     expect(src).not.toContain('endLyingTime');
   });
 
-  it('„Fährte endgültig abbrechen": erst nach separater Bestätigung endgültig (cancelled + Marker resting_abort)', () => {
+  it('6. „Im Hintergrund weiterlaufen": verlässt den Screen; Liegezeit + Anzeige laufen weiter; kein cancelled, Registry + Puffer unverändert', async () => {
+    const pending = await writePending();
+    const regBefore = JSON.stringify(useActiveFaehrten.getState().byDog);
+    const layStartedAt = useTrackingStore.getState().layStartedAt;
     leave();
-    press('Fährte endgültig abbrechen');
+    tap('resting-leave-background');
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockEndNotification).not.toHaveBeenCalled();                       // Benachrichtigung/Live Activity läuft weiter
+    expect(useTrackingStore.getState().layStartedAt).toBe(layStartedAt);     // Liegezeit läuft weiter (Start unverändert)
+    expect(JSON.stringify(useActiveFaehrten.getState().byDog)).toBe(regBefore);
+    await expectUntouched(pending);
+    expect(dialogOpen()).toBe(false);
+  });
+
+  it('8. „Zurück" schliesst nur den Dialog: auf dem Liegezeit-Screen bleiben, nichts geschrieben', async () => {
+    const pending = await writePending();
+    leave();
+    tap('resting-leave-back');
+    expect(dialogOpen()).toBe(false);
+    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockEndNotification).not.toHaveBeenCalled();
+    expect(byId('resting-identity-missing')).toBeUndefined();
+    await expectUntouched(pending);
+  });
+
+  it('A. kurzer Tap auf „Fährte endgültig abbrechen" → kein Abbruch, keine Navigation, Puffer bleibt', async () => {
+    const pending = await writePending();
+    leave();
+    holdAbort(150);
+    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockEndNotification).not.toHaveBeenCalled();
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(dialogOpen()).toBe(true);
+    await expectUntouched(pending);
+  });
+
+  it('B. Hold knapp unter der Grenze (1490 ms) → kein Abbruch', async () => {
+    const pending = await writePending();
+    leave();
+    holdAbort(HOLD_TO_ABORT_MS - 10);
+    expect(mockDispatch).not.toHaveBeenCalled();
+    await expectUntouched(pending);
+  });
+
+  it('C. vollständiger Hold (1500 ms) → bestehender Abbruch genau einmal: richtige Session/Hund, cancelled, Marker, Navigation; keine zweite Box', () => {
+    leave();
+    holdAbort(HOLD_TO_ABORT_MS);
+    expect(mockRecordCancelled).toHaveBeenCalledTimes(1);
+    expect(mockRecordCancelled).toHaveBeenCalledWith('sess-A', 'dog-A', 'resting_abort');
+    expect(useTrackingStore.getState().sessionStatus).toBe('cancelled');
+    expect(useActiveFaehrten.getState().get('dog-A')).toBeNull();
+    expect(mockEndNotification).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    expect(alertSpy).not.toHaveBeenCalled();                                  // Hold IST die Bestätigung
+    expect(dialogOpen()).toBe(false);
+  });
+
+  it('D. langer Hold (3000 ms) → trotzdem nur EIN Abbruch / EINE Navigation', () => {
+    leave();
+    holdAbort(3000);
+    expect(mockRecordCancelled).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('K. Bedienungshilfen: „Aktivieren" bricht nicht direkt ab, sondern zeigt die ausdrückliche Bestätigung; „Nein" ändert nichts', async () => {
+    const pending = await writePending();
+    leave();
+    act(() => { byId('resting-leave-abort-hold').props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }); });
+    expect(mockRecordCancelled).not.toHaveBeenCalled();
     const [title, msg, buttons] = lastAlert();
     expect(title).toBe('Fährte endgültig abbrechen?');
     expect(msg).toContain('kann danach aber nicht mehr fortgesetzt oder abgesucht werden.');
-    expect(mockRecordCancelled).not.toHaveBeenCalled();             // noch nichts passiert
-    expect(useTrackingStore.getState().sessionStatus).toBe('resting');
     expect(buttons.map(b => b.text)).toEqual(['Nein', 'Endgültig abbrechen']);
-    press('Endgültig abbrechen');
+    expect(buttons.find(b => b.text === 'Nein')!.onPress).toBeUndefined();   // reines Schliessen
+    expect(mockDispatch).not.toHaveBeenCalled();
+    await expectUntouched(pending);
+  });
+
+  it('K. Bedienungshilfen: erst „Endgültig abbrechen" in der Bestätigung bricht ab (cancelled + Marker resting_abort)', () => {
+    leave();
+    act(() => { byId('resting-leave-abort-hold').props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }); });
+    expect(useTrackingStore.getState().sessionStatus).toBe('resting');
+    pressAlert('Endgültig abbrechen');
     expect(useTrackingStore.getState().sessionStatus).toBe('cancelled');
     expect(useActiveFaehrten.getState().get('dog-A')).toBeNull();
     expect(mockRecordCancelled).toHaveBeenCalledWith('sess-A', 'dog-A', 'resting_abort');
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
   });
 
-  it('„Nein" in der Bestätigung → nichts verändert, Screen bleibt', () => {
+  it('Navigation/Unmount während des Haltens → kein verzögerter Abbruch', () => {
     leave();
-    press('Fährte endgültig abbrechen');
-    expect(lastAlert()[2].find(b => b.text === 'Nein')!.onPress).toBeUndefined();   // reines Schliessen
-    expect(mockDispatch).not.toHaveBeenCalled();
+    jest.useFakeTimers();
+    try {
+      act(() => { byId('resting-leave-abort-hold').props.onPressIn(); });
+      act(() => { jest.advanceTimersByTime(700); });
+      act(() => { renderer.unmount(); }); renderer = null;
+      act(() => { jest.advanceTimersByTime(5000); });
+    } finally { jest.useRealTimers(); }
     expect(mockRecordCancelled).not.toHaveBeenCalled();
-    expect(useTrackingStore.getState().sessionStatus).toBe('resting');
-  });
-
-  it('6. „Im Hintergrund weiterlaufen": verlässt den Screen; Liegezeit + Anzeige laufen weiter; kein cancelled, Registry + Puffer unverändert', async () => {
-    const pending: PendingTrack = {
-      sessionId: null, dogId: 'dog-A', trackPoints: [{ lat: 47, lng: 8, accuracy: 4, t: 1 }], markers: [], runPoints: [],
-      distanceMeters: 42, durationSeconds: 60, layFinishedAt: 1, layStartedAt: 1, startAnchor: null, savedAt: 1, status: 'resting',
-    };
-    await writePendingNow('dog-A', pending);
-    const regBefore = JSON.stringify(useActiveFaehrten.getState().byDog);
-    const layStartedAt = useTrackingStore.getState().layStartedAt;
-    leave();
-    press('Im Hintergrund weiterlaufen');
-    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
-    expect(mockEndNotification).not.toHaveBeenCalled();                       // Benachrichtigung/Live Activity läuft weiter
-    expect(mockRecordCancelled).not.toHaveBeenCalled();                       // kein Abbruch-Marker
-    expect(useTrackingStore.getState().sessionStatus).toBe('resting');       // Fährte bleibt offen
-    expect(useTrackingStore.getState().layStartedAt).toBe(layStartedAt);     // Liegezeit läuft weiter (Start unverändert)
-    expect(JSON.stringify(useActiveFaehrten.getState().byDog)).toBe(regBefore);   // Registry unverändert
-    expect(await loadPending('dog-A')).toEqual(pending);                      // Puffer unverändert
-  });
-
-  it('8. „Zurück" schliesst nur den Dialog: auf dem Liegezeit-Screen bleiben, nichts geschrieben', () => {
-    leave();
-    const back = lastAlert()[2].find(b => b.text === 'Zurück')!;
-    expect(back.onPress).toBeUndefined();                                     // reines Schliessen, Event bleibt verhindert
     expect(mockDispatch).not.toHaveBeenCalled();
-    expect(mockEndNotification).not.toHaveBeenCalled();
-    expect(mockRecordCancelled).not.toHaveBeenCalled();
     expect(useTrackingStore.getState().sessionStatus).toBe('resting');
-    expect(renderer.root.findAll((n: { props: { testID?: string } }) => n.props.testID === 'resting-identity-missing')).toHaveLength(0);
   });
 });

@@ -300,6 +300,8 @@ export const deCH = {
   'track.continuation.leaveStay': 'Zurück',
   'track.continuation.leaveKeepRunning': 'Im Hintergrund weiterlaufen',
   'track.continuation.leaveFinalAbort': 'Fährte endgültig abbrechen',
+  'track.continuation.leaveHoldToAbort': 'Zum endgültigen Abbrechen gedrückt halten',
+  'track.continuation.leaveFinalAbortA11yHint': 'Öffnet eine Bestätigung zum endgültigen Abbrechen der Fährte.',
   'track.continuation.finalAbortTitle': 'Fährte endgültig abbrechen?',
   'track.continuation.finalAbortText': 'Die Fährte wird beendet. Sie bleibt im Journal, kann danach aber nicht mehr fortgesetzt oder abgesucht werden.',
   'track.continuation.no': 'Nein',

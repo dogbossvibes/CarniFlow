@@ -14,6 +14,7 @@ import { startLiegezeitNotification, updateLiegezeitNotification, endLiegezeitNo
 import { setTrackLyingTime, getTrackSessionDogName } from '@/features/tracking/services/trackService';
 import { recordTrackCancelled } from '@/features/tracking/services/trackRecoveryService';
 import { resolveRestingCancelTarget } from '@/features/tracking/store/trackRecovery';
+import { RestingLeaveDialog } from '@/features/tracking/components/RestingLeaveDialog';
 import { matchesRestingIdentity, resolveRestingIdentity, type RestingIdentity } from '@/features/tracking/store/restingIdentity';
 import { getLocalTrainingSessionById } from '@/features/training/repositories/localTrainingRepository';
 import {
@@ -115,6 +116,8 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
 
   const navigation = useNavigation();
   const allowLeaveRef = useRef(false);   // true ⇒ erlaubte Navigation (Absuche / bestätigt) — kein Abbruch-Dialog
+  // Offener Verlassen-Dialog mit der zurückgehaltenen Navigation aus dem beforeRemove-Event (null = zu).
+  const [leave, setLeave] = useState<{ action: unknown } | null>(null);
 
   // Store hat die gelegte Fährte noch → sofort die zeitstempelbasierte Liegezeit-
   // Basis (layStartedAt, Fallback layFinishedAt) nutzen. Sonst (App wurde in der
@@ -221,48 +224,51 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
   // „Im Hintergrund weiterlaufen" verlässt nur den Screen: Liegezeit, Benachrichtigung/Live Activity,
   // Registry und Puffer bleiben unverändert — die Fährte bleibt offen und über „Fährte fortsetzen" erreichbar.
-  // Endgültiger Abbruch: separate, destruktive Aktion mit eigener Bestätigung und ehrlicher Folge.
+  const keepRunningInBackground = (action: unknown) => {
+    setLeave(null);
+    allowLeaveRef.current = true;
+    // @ts-expect-error react-navigation action aus dem beforeRemove-Event
+    navigation.dispatch(action);
+  };
+  // Endgültiger Abbruch: separate, destruktive Aktion mit ehrlicher Folge. Auslösung per Touch nur über
+  // 1,5-s-Hold im Dialog (der Hold IST die bewusste Bestätigung). Bedienungshilfen (VoiceOver/TalkBack)
+  // können nicht halten → „Aktivieren" öffnet stattdessen diese ausdrückliche Bestätigung.
   const confirmFinalAbort = (action: unknown) => {
+    setLeave(null);
     Alert.alert(t('track.continuation.finalAbortTitle'), t('track.continuation.finalAbortText'), [
       { text: t('track.continuation.no'), style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
-      { text: t('track.continuation.finalAbortConfirm'), style: 'destructive', onPress: () => {
-        // Nur die Fährte DIESES Screens beenden: der Store wird nur mitgeändert, wenn er zu ihr
-        // gehört (Deep-Link ohne dogId kann die Fährte eines anderen Hundes im Store halten).
-        const st = useTrackingStore.getState();
-        const target = resolveRestingCancelTarget({
-          routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId,
-          registrySessionId: useActiveFaehrten.getState().get(dogId)?.sessionId ?? null,
-        });
-        if (target.cancelStore) st.setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
-        // Registry: nur den Eintrag DIESER Fährte entfernen (nie eine andere offene Fährte des Hundes).
-        const reg = useActiveFaehrten.getState().get(dogId);
-        if (reg && (!target.sessionId || reg.sessionId === target.sessionId)) useActiveFaehrten.getState().remove(dogId);
-        // Abbruch dauerhaft lokal vermerken (best-effort, offline, nicht blockierend):
-        // die Recovery bietet diese Fährte danach nur noch über „Fährte wieder öffnen" an.
-        void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');
-        void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
-        allowLeaveRef.current = true;
-        // @ts-expect-error react-navigation action aus dem beforeRemove-Event
-        navigation.dispatch(action);
-      } },
+      { text: t('track.continuation.finalAbortConfirm'), style: 'destructive', onPress: () => performFinalAbort(action) },
     ]);
   };
+  // Die bestehende endgültige Abbruchlogik (unverändert) — nur noch nach Hold bzw. Bestätigung erreichbar.
+  function performFinalAbort(action: unknown) {
+    setLeave(null);
+    // Nur die Fährte DIESES Screens beenden: der Store wird nur mitgeändert, wenn er zu ihr
+    // gehört (Deep-Link ohne dogId kann die Fährte eines anderen Hundes im Store halten).
+    const st = useTrackingStore.getState();
+    const target = resolveRestingCancelTarget({
+      routeSessionId: id, routeDogId: dogId, storeSessionId: st.currentSessionId, storeDogId: st.dogId,
+      registrySessionId: useActiveFaehrten.getState().get(dogId)?.sessionId ?? null,
+    });
+    if (target.cancelStore) st.setSessionStatus('cancelled');   // status='cancelled', sofort persistiert
+    // Registry: nur den Eintrag DIESER Fährte entfernen (nie eine andere offene Fährte des Hundes).
+    const reg = useActiveFaehrten.getState().get(dogId);
+    if (reg && (!target.sessionId || reg.sessionId === target.sessionId)) useActiveFaehrten.getState().remove(dogId);
+    // Abbruch dauerhaft lokal vermerken (best-effort, offline, nicht blockierend):
+    // die Recovery bietet diese Fährte danach nur noch über „Fährte wieder öffnen" an.
+    void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');
+    void endLiegezeitNotification();   // Anzeige entfernen (cancelled)
+    allowLeaveRef.current = true;
+    // @ts-expect-error react-navigation action aus dem beforeRemove-Event
+    navigation.dispatch(action);
+  }
   useEffect(() => {
     const unsub = navigation.addListener('beforeRemove', (e: any) => {
       if (allowLeaveRef.current) return;   // erlaubte Navigation → durchlassen
       e.preventDefault();                   // Standard-Back/Swipe/Header-Back blocken
-      Alert.alert(
-        t('track.continuation.leaveTitle'),
-        t('track.continuation.leaveText'),
-        [
-          { text: t('track.continuation.leaveKeepRunning'), onPress: () => { allowLeaveRef.current = true; navigation.dispatch(e.data.action); } },
-          { text: t('track.continuation.leaveFinalAbort'), style: 'destructive', onPress: () => confirmFinalAbort(e.data.action) },
-          { text: t('track.continuation.leaveStay'), style: 'cancel' },   // Dialog schliessen, auf dem Screen bleiben
-        ],
-      );
+      setLeave({ action: e.data.action });  // Verlassen-Dialog öffnen
     });
     return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
 
 
@@ -384,6 +390,14 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
           </Pressable>
         </View>
       </SafeAreaView>
+
+      <RestingLeaveDialog
+        visible={leave !== null}
+        onBackground={() => { if (leave) keepRunningInBackground(leave.action); }}
+        onHoldAbort={() => { if (leave) performFinalAbort(leave.action); }}
+        onAccessibleAbort={() => { if (leave) confirmFinalAbort(leave.action); }}
+        onBack={() => setLeave(null)}   // Dialog schliessen, auf dem Liegezeit-Screen bleiben
+      />
     </View>
   );
 }
