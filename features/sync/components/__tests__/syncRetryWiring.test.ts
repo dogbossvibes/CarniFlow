@@ -24,7 +24,7 @@ describe('SyncProvider', () => {
 describe('Detail-Screen Track-Open', () => {
   const src = readFileSync('app/track/[id].tsx', 'utf8');
   it('öffnet Retry über retryFailedSyncForSession(id), nicht blockierend', () => {
-    expect(src).toContain("import { retryFailedSyncForSession } from '@/features/sync/services/syncEngine';");
+    expect(src).toMatch(/import\s*\{[^}]*\bretryFailedSyncForSession\b[^}]*\}\s*from\s*['"]@\/features\/sync\/services\/syncEngine['"]/);
     expect(src).toContain('void retryFailedSyncForSession(id).catch(() => {});');
   });
 });

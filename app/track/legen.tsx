@@ -180,7 +180,9 @@ export default function LegenScreen() {
   const [selectedDogId, setSelectedDogId] = useState<string | null>((params.dogId as string) ?? null);
   const beganRef = useRef(false);
   const trackClaimRef = useRef<string | null>(null);   // stabile Fährten-ID für den idempotenten NEWBIE-Quota-Claim
-  const [showBgDisclosure, setShowBgDisclosure] = useState(false);   // Play-Disclosure VOR Aufnahmestart
+  const [showBgDisclosure, setShowBgDisclosure] = useState(Platform.OS === 'android');    // Play-Disclosure VOR erster Location-Permission
+  const [disclosurePurpose, setDisclosurePurpose] = useState<'permission' | 'recording'>('permission');
+  const [permissionFlowStarted, setPermissionFlowStarted] = useState(Platform.OS !== 'android');
   const [startAfterClose, setStartAfterClose] = useState(false);     // begin() erst NACH Schliessen des Dialogs
   const warmupStartedRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
@@ -296,7 +298,11 @@ export default function LegenScreen() {
   // Regel 4: pro Hund max. EINE aktive Fährte. Der eigentliche Aufnahmestart
   // (Disclosure → begin). Ausgelagert, da ihn sowohl der normale Pfad als auch
   // „Fährte abbrechen" im Konflikt-Dialog aufrufen.
-  const proceedToStart = useCallback(() => { hapticTap(); setShowBgDisclosure(true); }, []);
+  const proceedToStart = useCallback(() => {
+    hapticTap();
+    setDisclosurePurpose(permissionFlowStarted ? 'recording' : 'permission');
+    setShowBgDisclosure(true);
+  }, [permissionFlowStarted]);
 
   // Konflikt-Dialog: eine aktive Fährte dieses Hundes existiert bereits.
   const showConflict = useCallback((dId: string, entry: ActiveFaehrte) => {
@@ -376,12 +382,14 @@ export default function LegenScreen() {
   const gpsReady = isLaySessionWarmupReady(gpsAccuracy);
   const canStart = gpsReady;
 
-  // EINEN GPS-Stream beim Öffnen starten (Warmup). Genau einmal.
+  // Erst nach bestätigter Disclosure die erste Android-Location-Permission und
+  // danach den bestehenden GPS-Warmup starten. „Nicht jetzt" lässt beides aus.
   useEffect(() => {
+    if (!permissionFlowStarted) return;
     if (warmupStartedRef.current) return;
     warmupStartedRef.current = true;
     rec.startWarmup().then(r => { if (r.error) showToast(r.error); });
-  }, [rec, showToast]);
+  }, [permissionFlowStarted, rec, showToast]);
 
   // Echtes Wetter zur GPS-Position holen — einmalig, sobald eine Position vorliegt.
   useEffect(() => {
@@ -1202,12 +1210,16 @@ export default function LegenScreen() {
         </View>
       </AnyvoBottomSheet>
 
-      {/* Play-Pflicht: Hintergrundstandort-Disclosure VOR Aufnahmestart.
-          „Weiter" → Aufnahme (Berechtigung → GPS → Timer). „Abbrechen" → nichts. */}
+      {/* Play-Pflicht: Hintergrundstandort-Disclosure VOR der ersten Location-
+          Permission. „Weiter" → Berechtigung/Warmup; „Nicht jetzt" → nichts. */}
       <BackgroundLocationDisclosure
         visible={showBgDisclosure}
         onCancel={() => setShowBgDisclosure(false)}
-        onContinue={() => { setStartAfterClose(true); setShowBgDisclosure(false); }}
+        onContinue={() => {
+          if (disclosurePurpose === 'permission') setPermissionFlowStarted(true);
+          else setStartAfterClose(true);
+          setShowBgDisclosure(false);
+        }}
       />
 
       {SHOW_GPS_DEBUG && (

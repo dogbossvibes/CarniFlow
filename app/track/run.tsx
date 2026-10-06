@@ -38,6 +38,7 @@ import {
 } from '@/features/tracking/engine/startApproach';
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import { buildSearchEventArcs, type CanonicalArc } from '@/features/tracking/utils/canonicalArc';
+import { nextObjectDistance, searchDistanceReadout } from '@/features/tracking/utils/distanceScale';
 import type { SearchRunState } from '@/features/tracking/store/searchRunState';
 
 import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
@@ -1071,6 +1072,15 @@ export default function TrackRunScreen() {
     : approachQualityBand === 'schwach' ? FT.warn : FT.muted;
   const approachGpsLabel = approachQualityBand ? `GPS · ${t(approachQualityKey[approachQualityBand] as any)}` : 'GPS';
 
+  // Fährten-Maßstab (reine Anzeige): Fortschritt des (virtuellen) Hundes entlang
+  // der Referenz — derselbe dogProgressM wie Hundemarker, Sprachführung und
+  // Haptik — gegen die Referenzlänge; nächster offener Gegenstand über seine
+  // kanonische Bogenlänge (atM). Keine Luftlinie, keine Rohspur.
+  const scaleReadout = !arming && s.recording ? searchDistanceReadout(s.dogProgressM, s.trackLengthM) : null;
+  const nextObject = scaleReadout
+    ? nextObjectDistance(snapData.laidObjects.map((o, i) => ({ atM: o.atM, status: s.objectStatuses[i] })), s.dogProgressM)
+    : null;
+
   const metrics: { value: string; label: string; warn?: boolean }[] = [
     { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
     { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
@@ -1156,6 +1166,7 @@ export default function TrackRunScreen() {
           {view === 'map' ? (
             <TrackingMap
               layPoints={snapData.laidLatLng} dimLay
+              distanceScaleLine={snapData.laidPoints}
               runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
               smartFollow={!arming}
@@ -1222,8 +1233,10 @@ export default function TrackRunScreen() {
             </View>
           )}
 
+          {/* Teilstrecke + Fährten-Maßstab gestapelt über der Metrik-Leiste. */}
+          <View className="absolute left-[14px] right-[14px] bottom-[88px] gap-2" pointerEvents="none">
           {!arming && currentRunSegment && (
-            <View className="absolute left-[14px] right-[14px] bottom-[88px] rounded-[16px] px-4 py-3 bg-ft-glass border border-ft-glass-line">
+            <View className="rounded-[16px] px-4 py-3 bg-ft-glass border border-ft-glass-line">
               <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">Teilstrecke</Text>
               <Text className="text-[14px] text-ft-text font-black mt-0.5">{segmentDisplayLabel(currentRunSegment)}</Text>
               <Text className="text-[11px] text-ft-muted font-semibold mt-1">
@@ -1231,6 +1244,20 @@ export default function TrackRunScreen() {
               </Text>
             </View>
           )}
+          {scaleReadout && (
+            <View testID="distance-scale-readout" className="self-start flex-row items-center gap-2 rounded-full px-3 py-1.5 bg-ft-glass border border-ft-glass-line">
+              <Ionicons name="resize-outline" size={13} color={FT.acc} />
+              <Text className="text-[12.5px] font-black text-ft-text" style={{ fontVariant: ['tabular-nums'] }}>
+                {t('track.scale.progress', { current: String(scaleReadout.currentM), total: String(scaleReadout.totalM) })}
+              </Text>
+              {nextObject && (
+                <Text className="text-[12px] font-bold text-ft-muted" style={{ fontVariant: ['tabular-nums'] }}>
+                  {`· ${t('track.scale.nextObject', { meters: String(Math.max(1, Math.round(nextObject.distanceM))) })}`}
+                </Text>
+              )}
+            </View>
+          )}
+          </View>
 
           {/* Hunde-Pill (oben rechts) */}
           <View className="absolute top-[14px] right-[14px] flex-row items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 bg-ft-glass border border-ft-glass-line">

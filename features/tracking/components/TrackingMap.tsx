@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -14,6 +14,9 @@ import { buildTrackSegmentPolylines, laidTrackStroke } from '@/features/tracking
 import { useSmartTrackCamera } from '@/features/tracking/hooks/useSmartTrackCamera';
 import { TrackReferenceOverlayLayer } from '@/features/tracking/components/TrackReferenceOverlayLayer';
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
+import { DistanceScaleLayer, type ScaleRegion } from '@/features/tracking/components/DistanceScaleLayer';
+import { buildDistanceTicks, pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
+import type { LL } from '@/features/tracking/utils/searchGeometry';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
@@ -80,6 +83,11 @@ interface Props {
   // Read-only Referenz-Fährten anderer eigener Hunde (nur Linie + Start-Label).
   // Reine Darstellung: fliessen in KEINE Kamera-/Fit-/Recenter-Logik ein.
   referenceOverlays?: readonly TrackReferenceOverlay[];
+  // Fährten-Maßstab (1/5/10-m-Distanzmarkierungen, adaptiv nach Zoom) entlang
+  // GENAU dieser Referenzlinie — die Search-Referenz (laidPoints), auf der auch
+  // Cursor/Progress und die kanonischen Ereignispositionen gemessen werden.
+  // Fehlt die Prop, bleibt die Karte unverändert (kein Region-Tracking).
+  distanceScaleLine?: readonly LL[];
   runPoints?:       LatLng[];
   rawPoints?:       LatLng[];   // ungefilterte Rohspur (Debug) — grau, ungeglättet
   rejectedPoints?:  LatLng[];   // verworfene Punkte (Debug) — kleine rote Punkte
@@ -119,7 +127,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, referenceOverlays, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  layPoints, referenceOverlays, distanceScaleLine, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -190,6 +198,25 @@ export function TrackingMap({
   // Fortlaufende Nummer je Gegenstand (G1, G2, …) — nach Index in markerList.
   // Dübel bekommt KEINE G-Nummer (roter Zylinder) → zählt nicht mit (objectNumbers).
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
+  // Maßstab: Ticks EINMAL je Referenzlinie (nicht pro GPS-Fix / Zoom); Zoom nur
+  // aus der gemeldeten Region (latitudeDelta) + Kartenhöhe, gedrosselt.
+  const scaleTicks = useMemo(
+    () => (distanceScaleLine && distanceScaleLine.length > 1 ? buildDistanceTicks(distanceScaleLine) : null),
+    [distanceScaleLine],
+  );
+  const [scaleRegion, setScaleRegion] = useState<ScaleRegion | null>(null);
+  const [mapHeightPt, setMapHeightPt] = useState(0);
+  const onScaleRegion = useCallback((r: ScaleRegion) => {
+    setScaleRegion(prev => (scaleRegionChanged(prev, r) ? r : prev));
+  }, []);
+  // Zahlen weichen Winkeln/Gegenständen/Start/Ende aus (Marker bleiben lesbar).
+  const scaleAvoid = useMemo<LL[]>(() => {
+    if (!scaleTicks) return [];
+    const pts: LL[] = markerList.map(m => ({ latitude: m.lat as number, longitude: m.lng as number }));
+    if (startAnchor) pts.push({ latitude: startAnchor.lat, longitude: startAnchor.lng });
+    if (endPoint) pts.push({ latitude: endPoint.lat, longitude: endPoint.lng });
+    return pts;
+  }, [scaleTicks, markerList, startAnchor, endPoint]);
   const initialFitCoords = useMemo(
     () => (fitToPoints ?? [])
       .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
@@ -233,7 +260,10 @@ export function TrackingMap({
   const initial = currentPosition ?? start;
 
   return (
-    <View style={[StyleSheet.absoluteFill, style]}>
+    <View
+      style={[StyleSheet.absoluteFill, style]}
+      onLayout={scaleTicks ? e => setMapHeightPt(e.nativeEvent.layout.height) : undefined}
+    >
       <MapView
         ref={mapRef}
         provider={RNMaps.PROVIDER_DEFAULT}
@@ -247,6 +277,7 @@ export function TrackingMap({
         rotateEnabled
         pitchEnabled
         onMapReady={() => setMapReady(true)}
+        onRegionChangeComplete={scaleTicks ? onScaleRegion : undefined}
         onPanDrag={() => {
           // Eigene Kartengeste ⇒ Auto-Follow SOFORT pausieren (kein
           // automatisches Zurückspringen). Der Recenter-Button holt sie zurück.
@@ -287,6 +318,18 @@ export function TrackingMap({
           );
         }) : layCoords.length > 1 && (
           <Polyline coordinates={layCoords} strokeColor={C.trackPrimary} strokeWidth={4} lineCap="round" lineJoin="round" />
+        )}
+        {/* Fährten-Maßstab: dezente Querstriche über der gelegten Linie (zIndex 4),
+            Zahlen nur alle 10 m (bzw. ausgedünnt). Standard-Delta wie initialRegion. */}
+        {scaleTicks && scaleTicks.ticks.length > 0 && (
+          <DistanceScaleLayer
+            Polyline={Polyline}
+            Marker={Marker}
+            ticks={scaleTicks}
+            ptPerM={pointsPerMeter(scaleRegion?.latitudeDelta ?? 0.0016, mapHeightPt)}
+            region={scaleRegion}
+            avoid={scaleAvoid}
+          />
         )}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
         {runCoords.length > 1 && (

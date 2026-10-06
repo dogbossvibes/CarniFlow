@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import { Platform } from 'react-native';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Hintergrundfähige GPS-Quelle für die Fährtenaufnahme.
@@ -51,6 +52,11 @@ export async function startBackgroundUpdates(opts: {
     accuracy:                  Location.Accuracy.BestForNavigation,
     timeInterval:              1000,
     distanceInterval:          0,
+    // Android's headless JS may acknowledge location jobs slowly after the
+    // screen turns off. Batch every 30 s while backgrounded; all raw fixes
+    // remain in the batch, while the native job queue stays bounded.
+    deferredUpdatesInterval:   Platform.OS === 'android' ? 30_000 : 0,
+    deferredUpdatesDistance:   0,
     pausesUpdatesAutomatically: false,            // iOS: nie automatisch pausieren
     activityType:              Location.ActivityType.Fitness,
     showsBackgroundLocationIndicator: true,        // iOS: blaue Pille
