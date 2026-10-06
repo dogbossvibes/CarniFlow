@@ -72,11 +72,12 @@ describe('Ancestry-Guard (EAS-Stand ⊆ Release-HEAD)', () => {
 });
 
 describe('Runtime-, Channel-, Plattform-, Clean-Tree-Guard', () => {
-  it('3. Runtime-Mismatch (aktive Production auf anderer Runtime) → STOP', () => {
+  it('3. Production nur auf anderer Runtime → keine Baseline für die Release-Runtime → STOP (fail closed)', () => {
     withState({ groups: iosOnly(h.base, '1.0.2') });
     const r = confirmIos();
     expect(r.code).toBe(1);
-    expect(r.out).toContain('Runtime-Mismatch: Release 1.0.3, erwartet 1.0.2');
+    expect(r.out).toContain('Kein aktiver Production-Stand für ios / Runtime 1.0.3 in EAS gefunden');
+    expect(r.out).toContain('fail closed');
     expect(h.updateCalls()).toEqual([]);
   });
   it('3b. --runtime muss zur Release-Runtime passen', () => {
@@ -252,10 +253,14 @@ describe('Dry-Run (Preflight) und Quellen', () => {
       expect(r.out).not.toContain(`gitCommitHash ${h.other}`);
     } finally { spawnSync('rm', ['-f', doc]); }
   });
-  it('Reihenfolge: Lock → EAS-Check 1 → (Guards) → EAS-Check 2 → update → EAS-Nachkontrolle', () => {
+  it('Reihenfolge: Lock → EAS-Check 1 (+ andere Plattform) → (Guards) → EAS-Check 2 → update → EAS-Nachkontrolle (+ andere Plattform)', () => {
     expect(confirmIos().code).toBe(0);
     const seq = h.calls().map(a => a[0]).filter(c => c !== 'env:list');
-    expect(seq).toEqual(['channel:view', 'update:list', 'update:view', 'update:list', 'update:view', 'update', 'update:list', 'update:view']);
+    expect(seq).toEqual([
+      'channel:view', 'update:list', 'update:view', 'update:list', 'update:view',
+      'update:list', 'update:view', 'update',
+      'update:list', 'update:view', 'update:list', 'update:view',
+    ]);
   });
   it('12b. Doku: Master-Status ist nur Snapshot, EAS ist die Live-Quelle; Multi-Dog ist NICHT Production', () => {
     const ms = readFileSync('docs/agent/ANYVO_MASTER_STATUS.md', 'utf8');
