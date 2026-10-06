@@ -48,6 +48,38 @@ describe('Target-Zuordnung (Source of Truth im Repo)', () => {
   });
 });
 
+describe('Dateipfade wie Xcode (Regression EAS-Build beb81dfe: „Build input file cannot be found")', () => {
+  const fakeProject = (groupPath?: string) => {
+    let n = 0;
+    const objects: any = {
+      PBXNativeTarget: { T: { name: 'ANYVO', buildPhases: [{ value: 'S' }, { value: 'R' }] } },
+      PBXSourcesBuildPhase: { S: { files: [] } },
+      PBXResourcesBuildPhase: { R: { files: [] } },
+      PBXGroup: { G: { children: [], ...(groupPath ? { path: groupPath } : { name: 'ANYVO' }) } },
+      PBXFileReference: {},
+      PBXBuildFile: {},
+    };
+    return { hash: { project: { objects } }, generateUuid: () => `U${++n}` } as any;
+  };
+  it('App-Gruppe ohne path (Expo-Template: name = ANYVO) → Referenz „ANYVO/<Datei>" wie AppDelegate.swift', () => {
+    const p = fakeProject();
+    plugin.addFileToTarget(p, { name: 'AnyvoAppIntents.swift', dirName: 'ANYVO', groupKey: 'G', targetKey: 'T', isa: 'PBXSourcesBuildPhase' });
+    plugin.addFileToTarget(p, { name: 'AppShortcuts.xcstrings', dirName: 'ANYVO', groupKey: 'G', targetKey: 'T', isa: 'PBXResourcesBuildPhase' });
+    const paths = Object.entries(p.hash.project.objects.PBXFileReference).filter(([k]) => !k.endsWith('_comment')).map(([, r]: any) => r.path);
+    expect(paths).toEqual(['"ANYVO/AnyvoAppIntents.swift"', '"ANYVO/AppShortcuts.xcstrings"']);
+  });
+  it('Gruppe mit eigenem path (Widget: path = LiveActivity) → Referenz nur „<Datei>"', () => {
+    expect(plugin.fileRefPath({ path: 'LiveActivity' }, 'LiveActivity', 'AnyvoQuickStartWidget.swift')).toBe('AnyvoQuickStartWidget.swift');
+    expect(plugin.fileRefPath({ name: 'ANYVO' }, 'ANYVO', 'AnyvoAppIntents.swift')).toBe('ANYVO/AnyvoAppIntents.swift');
+  });
+  it('idempotent: zweiter Aufruf erzeugt weder Referenz noch Build-Datei doppelt', () => {
+    const p = fakeProject();
+    for (let i = 0; i < 2; i++) plugin.addFileToTarget(p, { name: 'AnyvoAppIntents.swift', dirName: 'ANYVO', groupKey: 'G', targetKey: 'T', isa: 'PBXSourcesBuildPhase' });
+    expect(p.hash.project.objects.PBXSourcesBuildPhase.S.files).toHaveLength(1);
+    expect(p.hash.project.objects.PBXGroup.G.children).toHaveLength(1);
+  });
+});
+
 describe('Prebuild-Guard (wiederholter Prebuild ohne --clean)', () => {
   const project = (targets: string[]) => ({
     hash: { project: { objects: { PBXNativeTarget: Object.fromEntries(targets.map((n, i) => [`T${i}`, { name: n }])) } } },

@@ -88,21 +88,32 @@ function findPhase(project, targetKey, isa) {
 const FILE_TYPES = { '.swift': 'sourcecode.swift', '.xcstrings': 'text.json.xcstrings' };
 
 /**
+ * Pfad der Dateireferenz relativ zur Gruppe. Gruppen OHNE eigenen `path` (die App-Gruppe des
+ * Expo-Templates: nur `name = ANYVO`) lösen relativ zum Projektordner auf — ihre Dateien
+ * tragen deshalb das Verzeichnis im Pfad (wie `ANYVO/AppDelegate.swift`). Exportiert für Tests.
+ */
+function fileRefPath(group, dirName, name) {
+  return group.path ? name : `${dirName}/${name}`;
+}
+
+/**
  * Datei in GENAU diese Gruppe + GENAU diese Phase des Targets aufnehmen (idempotent).
  * Gruppengenau, weil App und Widget je einen „Localizable.xcstrings" haben.
  */
-function addFileToTarget(project, { name, groupKey, targetKey, isa }) {
+function addFileToTarget(project, { name, dirName, groupKey, targetKey, isa }) {
   const objects = project.hash.project.objects;
   const phase = findPhase(project, targetKey, isa);
   if (!phase) throw new Error(`[withAnyvoRestingLiveActivity] ${isa} des Targets fehlt (${name}).`);
   const group = objects.PBXGroup[groupKey];
   const refs = objects.PBXFileReference;
-  let fileRef = (group.children ?? []).map(c => c.value).find(k => refs[k] && (refs[k].path === name || refs[k].path === `"${name}"`));
+  const relPath = fileRefPath(group, dirName, name);
+  const unq = v => String(v ?? '').replace(/^"|"$/g, '');
+  let fileRef = (group.children ?? []).map(c => c.value).find(k => refs[k] && unq(refs[k].path) === relPath);
   if (fileRef && phase.files.some(f => objects.PBXBuildFile[f.value]?.fileRef === fileRef)) return;   // bereits Mitglied
   if (!fileRef) {
     fileRef = project.generateUuid();
     const type = FILE_TYPES[path.extname(name)] ?? 'text';
-    refs[fileRef] = { isa: 'PBXFileReference', lastKnownFileType: type, name: `"${name}"`, path: `"${name}"`, sourceTree: '"<group>"' };
+    refs[fileRef] = { isa: 'PBXFileReference', lastKnownFileType: type, name: `"${name}"`, path: `"${relPath}"`, sourceTree: '"<group>"' };
     refs[`${fileRef}_comment`] = name;
     group.children.push({ value: fileRef, comment: name });
   }
@@ -172,13 +183,13 @@ const withAnyvoRestingLiveActivity = config =>
     if (!appKey || !appGroup) throw new Error('[withAnyvoRestingLiveActivity] App-Target/-Gruppe nicht gefunden.');
 
     copyInto(projectRoot, [...WIDGET_SOURCES, ...WIDGET_RESOURCES], widgetDir);
-    for (const rel of WIDGET_SOURCES) addFileToTarget(project, { name: path.basename(rel), groupKey: widgetGroup, targetKey: widgetKeys[0], isa: 'PBXSourcesBuildPhase' });
-    for (const rel of WIDGET_RESOURCES) addFileToTarget(project, { name: path.basename(rel), groupKey: widgetGroup, targetKey: widgetKeys[0], isa: 'PBXResourcesBuildPhase' });
+    for (const rel of WIDGET_SOURCES) addFileToTarget(project, { name: path.basename(rel), dirName: WIDGET_TARGET, groupKey: widgetGroup, targetKey: widgetKeys[0], isa: 'PBXSourcesBuildPhase' });
+    for (const rel of WIDGET_RESOURCES) addFileToTarget(project, { name: path.basename(rel), dirName: WIDGET_TARGET, groupKey: widgetGroup, targetKey: widgetKeys[0], isa: 'PBXResourcesBuildPhase' });
 
     const appDir = path.join(platformProjectRoot, appName);
     copyInto(projectRoot, [...APP_SOURCES, ...APP_RESOURCES], appDir);
-    for (const rel of APP_SOURCES) addFileToTarget(project, { name: path.basename(rel), groupKey: appGroup, targetKey: appKey, isa: 'PBXSourcesBuildPhase' });
-    for (const rel of APP_RESOURCES) addFileToTarget(project, { name: path.basename(rel), groupKey: appGroup, targetKey: appKey, isa: 'PBXResourcesBuildPhase' });
+    for (const rel of APP_SOURCES) addFileToTarget(project, { name: path.basename(rel), dirName: appName, groupKey: appGroup, targetKey: appKey, isa: 'PBXSourcesBuildPhase' });
+    for (const rel of APP_RESOURCES) addFileToTarget(project, { name: path.basename(rel), dirName: appName, groupKey: appGroup, targetKey: appKey, isa: 'PBXResourcesBuildPhase' });
 
     syncWidgetVersions(project, widgetKeys[0], cfg.version, cfg.ios?.buildNumber);
     addKnownRegions(project, KNOWN_REGIONS);
@@ -197,6 +208,7 @@ module.exports = withAnyvoRestingLiveActivity;
 module.exports.withAnyvoLiveActivityPrebuildGuard = withAnyvoLiveActivityPrebuildGuard;
 module.exports.patchWidgetBundle = patchWidgetBundle;
 module.exports.addFileToTarget = addFileToTarget;
+module.exports.fileRefPath = fileRefPath;
 module.exports.snapshotIfTargetExists = snapshotIfTargetExists;
 module.exports.restoreSnapshotIfAny = restoreSnapshotIfAny;
 module.exports.syncWidgetVersions = syncWidgetVersions;
