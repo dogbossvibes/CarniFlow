@@ -1,6 +1,6 @@
 # Canonical tracking integration parity
 
-Basis: `c3c67dda8d2b6e8a0ba549f8802a13439b573c37`  
+Basis: `c3c67dda8d2b6e8a0ba549f8802a13439b573c37`\
 Branch: `release/tracking-canonical-runtime-1.0.2`
 
 | Funktion | c3c67dd | Integrationsstand | Erhalten | Test/Beweis |
