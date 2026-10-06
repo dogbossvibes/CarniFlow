@@ -21,6 +21,7 @@ import { SyncProvider } from '@/features/sync/components/SyncProvider';
 import { AppLockGate } from '@/components/AppLockGate';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { ActiveFaehrtenSelfHeal } from '@/features/tracking/components/ActiveFaehrtenSelfHeal';
+import { AppIntentRouteHandler } from '@/features/appIntents/AppIntentRouteHandler';
 import { RestingLiveActivitySync } from '@/features/tracking/components/RestingLiveActivitySync';
 import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
 import { useT } from '@/i18n';
@@ -75,6 +76,7 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <SyncProvider />
       <ActiveFaehrtenSelfHeal />
+      <AppIntentRouteHandler />
       <RestingLiveActivitySync />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />

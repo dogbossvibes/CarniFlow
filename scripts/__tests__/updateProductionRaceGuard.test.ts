@@ -7,13 +7,13 @@ import { spawn, spawnSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'fs';
 import { hostname } from 'os';
 import { join } from 'path';
-import { createHarness, destroyHarness, type FakeState } from './otaReleaseHarness';
+import { NEWER_RUNTIME, OLDER_RUNTIME, RELEASE_RUNTIME, createHarness, destroyHarness, type FakeState } from './otaReleaseHarness';
 
 const h = createHarness();
 const confirmIos = (extra: string[] = []) => h.run(['--platform', 'ios', '--confirm', '--message', 'race test', ...extra]);
 const dryIos = (extra: string[] = []) => h.run(['--platform', 'ios', '--dry-run', '--message', 'race test', ...extra], { envFile: h.fullEnvFile });
 const withState = (patch: Partial<FakeState>) => h.setState({ ...h.defaultState(), ...patch });
-const iosOnly = (gitCommitHash: string | null, runtimeVersion = '1.0.3', group = 'g-prod'): FakeState['groups'] =>
+const iosOnly = (gitCommitHash: string | null, runtimeVersion = RELEASE_RUNTIME, group = 'g-prod'): FakeState['groups'] =>
   [{ group, entries: [{ platform: 'ios', id: 'u-ios', gitCommitHash, runtimeVersion }] }];
 const writeLock = (meta: Record<string, unknown>) => {
   mkdirSync(h.lockPath);
@@ -54,7 +54,7 @@ describe('Ancestry-Guard (EAS-Stand ⊆ Release-HEAD)', () => {
     expect(h.updateCalls()).toEqual([]);
   });
   it('kein aktiver Stand für die Plattform / ohne gitCommitHash → STOP', () => {
-    withState({ groups: [{ group: 'g-a', entries: [{ platform: 'android', id: 'a', gitCommitHash: h.base, runtimeVersion: '1.0.3' }] }] });
+    withState({ groups: [{ group: 'g-a', entries: [{ platform: 'android', id: 'a', gitCommitHash: h.base, runtimeVersion: RELEASE_RUNTIME }] }] });
     expect(confirmIos().code).toBe(1);
     withState({ groups: iosOnly(null) });
     expect(confirmIos().code).toBe(1);
@@ -62,7 +62,7 @@ describe('Ancestry-Guard (EAS-Stand ⊆ Release-HEAD)', () => {
   });
   it('iOS-Release wird gegen die neueste iOS-Group geprüft, auch wenn danach nur Android veröffentlicht wurde', () => {
     withState({ groups: [
-      { group: 'g-android-newer', entries: [{ platform: 'android', id: 'a', gitCommitHash: h.other, runtimeVersion: '1.0.3' }] },
+      { group: 'g-android-newer', entries: [{ platform: 'android', id: 'a', gitCommitHash: h.other, runtimeVersion: RELEASE_RUNTIME }] },
       ...iosOnly(h.base),
     ] });
     const r = confirmIos();
@@ -73,16 +73,16 @@ describe('Ancestry-Guard (EAS-Stand ⊆ Release-HEAD)', () => {
 
 describe('Runtime-, Channel-, Plattform-, Clean-Tree-Guard', () => {
   it('3. Runtime-Mismatch (aktive Production auf anderer Runtime) → STOP', () => {
-    withState({ groups: iosOnly(h.base, '1.0.2') });
+    withState({ groups: iosOnly(h.base, OLDER_RUNTIME) });
     const r = confirmIos();
     expect(r.code).toBe(1);
-    expect(r.out).toContain('Runtime-Mismatch: Release 1.0.3, erwartet 1.0.2');
+    expect(r.out).toContain(`Runtime-Mismatch: Release ${RELEASE_RUNTIME}, erwartet ${OLDER_RUNTIME}`);
     expect(h.updateCalls()).toEqual([]);
   });
   it('3b. --runtime muss zur Release-Runtime passen', () => {
-    const r = confirmIos(['--runtime', '1.0.4']);
+    const r = confirmIos(['--runtime', NEWER_RUNTIME]);
     expect(r.code).toBe(1);
-    expect(r.out).toContain('Runtime-Mismatch: Release 1.0.3, erwartet 1.0.4');
+    expect(r.out).toContain(`Runtime-Mismatch: Release ${RELEASE_RUNTIME}, erwartet ${NEWER_RUNTIME}`);
   });
   it('4. falscher Channel / falscher Branch / Rollout / pausiert → STOP', () => {
     for (const patch of [{ channelName: 'preview' }, { branches: ['preview'] }, { branches: ['production', 'x'] }, { rollout: true }, { paused: true }] as Partial<FakeState>[]) {
@@ -186,7 +186,7 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
 
 describe('Zweiter EAS-Check & Nachkontrolle', () => {
   it('9. Production ändert sich zwischen erstem und zweitem Check → HARD STOP, keine OTA', () => {
-    withState({ raceAtList: 2, raceGroup: { group: 'g-foreign', entries: [{ platform: 'ios', id: 'u-f', gitCommitHash: h.release, runtimeVersion: '1.0.3' }] } });
+    withState({ raceAtList: 2, raceGroup: { group: 'g-foreign', entries: [{ platform: 'ios', id: 'u-f', gitCommitHash: h.release, runtimeVersion: RELEASE_RUNTIME }] } });
     const r = confirmIos();
     expect(r.code).toBe(1);
     expect(r.out).toContain('HARD STOP: Production changed during release preparation.');
@@ -208,8 +208,8 @@ describe('Zweiter EAS-Check & Nachkontrolle', () => {
   it('10b. neue Group mit weiterer Plattform oder falscher Runtime → Nachkontrolle schlägt fehl', () => {
     withState({ publishExtraPlatform: 'android' });
     expect(confirmIos().out).toContain('Neue Group enthält weitere Plattformen');
-    withState({ publishRuntime: '1.0.4' });
-    expect(confirmIos().out).toContain('POST-PUBLISH: Runtime 1.0.4 ≠ 1.0.3');
+    withState({ publishRuntime: NEWER_RUNTIME });
+    expect(confirmIos().out).toContain(`POST-PUBLISH: Runtime ${NEWER_RUNTIME} ≠ ${RELEASE_RUNTIME}`);
   });
 });
 
@@ -218,7 +218,7 @@ describe('Dry-Run (Preflight) und Quellen', () => {
     const r = dryIos();
     expect(r.code).toBe(0);
     for (const needle of [`RELEASE HEAD: ${h.release}`, `gitCommitHash ${h.base}`, 'Ancestry (aktiver Production-Commit ⊆ Release-HEAD): PASS',
-      'Runtime: Release 1.0.3 · erwartet 1.0.3', 'Platform: ios only · Channel/Branch: production/production', 'Release-Lock (', ': frei', 'Publish würde ERLAUBT.', '--dry-run: nichts veröffentlicht.']) {
+      `Runtime: Release ${RELEASE_RUNTIME} · erwartet ${RELEASE_RUNTIME}`, 'Platform: ios only · Channel/Branch: production/production', 'Release-Lock (', ': frei', 'Publish würde ERLAUBT.', '--dry-run: nichts veröffentlicht.']) {
       expect(r.out).toContain(needle);
     }
     expect(h.updateCalls()).toEqual([]);

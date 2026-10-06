@@ -10,6 +10,16 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+// Runtime-Vertrag aus der ECHTEN Production-Konfiguration (app.json, policy appVersion →
+// expo.version). Kein fester Wert: eine Versionsanhebung (z. B. 1.0.4) hält die Guard-Tests
+// gültig, die Mismatch-Fälle nutzen abgeleitete Nachbar-Runtimes.
+const APP_EXPO = JSON.parse(readFileSync('app.json', 'utf8')).expo;
+export const RELEASE_RUNTIME: string =
+  APP_EXPO.runtimeVersion?.policy === 'appVersion' ? APP_EXPO.version : String(APP_EXPO.runtimeVersion);
+const bumpPatch = (v: string, d: number) => { const p = v.split('.').map(Number); p[2] += d; return p.join('.'); };
+export const OLDER_RUNTIME = bumpPatch(RELEASE_RUNTIME, -1);
+export const NEWER_RUNTIME = bumpPatch(RELEASE_RUNTIME, +1);
+
 export const SECRET = 'SECRETVALUE-do-not-print-123';
 export const PROD_URL = 'https://axkkhyqrjrtbkumaulta.supabase.co';
 export const FULL_ENV = [
@@ -69,7 +79,7 @@ else if (a[0] === 'channel:view') {
   s = load();
   const p = a[a.indexOf('--platform') + 1];
   const hash = s.publishHash || process.env.EXPO_PUBLIC_RELEASE_GIT_COMMIT || null;
-  const rt = s.publishRuntime || '1.0.3';
+  const rt = s.publishRuntime || process.env.FAKE_RELEASE_RUNTIME;
   const entries = [{ platform: p, id: 'u-new-' + p, gitCommitHash: hash, runtimeVersion: rt }];
   if (s.publishExtraPlatform) entries.push({ platform: s.publishExtraPlatform, id: 'u-new-x', gitCommitHash: hash, runtimeVersion: rt });
   s.groups.unshift({ group: 'g-new-' + (s.groups.length + 1), entries });
@@ -127,8 +137,8 @@ export function createHarness(): Harness {
   const fullEnvFile = envFileWith(FULL_ENV);
   const defaultState = (): FakeState => ({
     groups: [{ group: 'g-prod', createdAt: '2026-10-04T14:20:03.537Z', entries: [
-      { platform: 'ios', id: 'u-ios', gitCommitHash: base, runtimeVersion: '1.0.3' },
-      { platform: 'android', id: 'u-android', gitCommitHash: base, runtimeVersion: '1.0.3' },
+      { platform: 'ios', id: 'u-ios', gitCommitHash: base, runtimeVersion: RELEASE_RUNTIME },
+      { platform: 'android', id: 'u-android', gitCommitHash: base, runtimeVersion: RELEASE_RUNTIME },
     ] }],
   });
   const setState = (s: FakeState) => writeFileSync(stateFile, JSON.stringify(s));
@@ -137,7 +147,7 @@ export function createHarness(): Harness {
   const calls = (): string[][] => (existsSync(callLog) ? readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : []);
   const baseEnv = (extra: Record<string, string> = {}) => ({
     ...process.env, PATH: `${dir}:${process.env.PATH}`,
-    FAKE_ENV_FILE: fullEnvFile, FAKE_EAS_LOG: callLog, FAKE_EAS_STATE: stateFile, ...extra,
+    FAKE_ENV_FILE: fullEnvFile, FAKE_EAS_LOG: callLog, FAKE_EAS_STATE: stateFile, FAKE_RELEASE_RUNTIME: RELEASE_RUNTIME, ...extra,
   });
   const run: Harness['run'] = (args, opts = {}) => {
     const cmd = opts.cmd ?? ['node', 'scripts/update-production.mjs'];
