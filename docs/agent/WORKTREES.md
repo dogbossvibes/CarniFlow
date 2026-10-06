@@ -101,13 +101,18 @@ npm run agent:wt:remove -- <slug>     # entfernt Worktree NUR wenn clean (nie --
 stillen Default (kein automatisches `HEAD`). So entsteht keine versteckte oder falsche
 Ausgangsbasis. Regel:
 
-- **Normalfall:** vom **aktuell freigegebenen Integrations-/Entwicklungsbranch** ausgehen.
-  Solange `feat/track-module-rewrite` der führende ANYVO-Integrationsstand ist:
-  `--base feat/track-module-rewrite`.
-- **`--base main`** nur **bewusst**, wenn ein Task ausdrücklich vom stabilen Hauptbranch
-  ausgehen soll (z. B. isolierter Hotfix).
-- Der führende Integrationsbranch kann sich ändern; im Zweifel den aktuell freigegebenen
-  Stand erfragen. Der Helper zeigt bei fehlendem `--base` den aktuellen Branch als Hinweis.
+- **Normalfall (verbindlich seit 2026-10-06):** `--base main`. `main` ist die kanonische
+  ANYVO Production-/Release-Linie (siehe `docs/agent/ANYVO_MASTER_STATUS.md`,
+  „Canonical Git line"). Neue Production-/Release-Branches zweigen von `main` ab; nach
+  erfolgreichem Device-/Release-Test kommen legitime Änderungen zurück nach `main`.
+- **`feat/track-module-rewrite` ist NICHT mehr der Integrationsbranch** (bis 2026-08-18 so
+  dokumentiert). Er ist seit `3de67c0` von Production getrennt; seine 30 eigenen Commits
+  werden nur über einen eigenen Audit-/Integrationsauftrag übernommen.
+- **Hotfix für eine ältere Runtime** (z. B. 1.0.3): vom zuletzt produktiven Commit dieser
+  Runtime abzweigen **und** den runtime-isolierten Guard (`23e5df6` + `54a74c4`) enthalten;
+  ältere Worktrees/Branches gelten nie automatisch als Release-Source-of-Truth.
+- **Android:** Paritätsarbeit von `main` bzw. einem explizit darauf basierenden Branch.
+- Der EAS-Branch/-Channel `production` ist nicht Git `main`.
 
 - `create` schreibt den Task-Report **in den neuen Worktree** (Task-Branch), nicht in den Haupt-Tree.
 - `remove` verweigert das Entfernen bei uncommitteten/untracked Änderungen.

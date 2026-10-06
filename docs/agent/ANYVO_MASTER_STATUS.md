@@ -4,7 +4,7 @@
 Canonical source of truth for current ANYVO product, engineering, release and
 open-work status.
 
-**Last verified:** 2026-10-04 · iOS Production `34e6185` per fresh EAS query (update group `e3be2717…`).
+**Last verified:** 2026-10-06 · fresh EAS query: iOS Runtime 1.0.3 → `968884f` (group `455dc249…`), iOS Runtime 1.0.4 → `04cad8d` (group `fcd879d9…`).
 
 ## Rules
 
@@ -35,6 +35,29 @@ full GPS / motion / corner diagnostics behind it.
 
 ---
 
+## Canonical Git line (binding since 2026-10-06)
+
+- **`main` is the canonical ANYVO Production/Release line.** It was fast-forwarded on
+  2026-10-06 from `e90df20` to `54a74c4` (`release/ios-production-native-next`): no merge
+  commit, no rebase, no rewritten SHAs — Build 49 (`3f7c2e7`) and OTA 1.0.4 (`04cad8d`)
+  are contained unchanged.
+- New Production/Release branches **must branch off `main`**.
+- After a successful device/release test, legitimate changes are integrated back into
+  `main` (fast-forward or reviewed merge; no history rewrite of built/published commits).
+- Feature branches must not permanently replace `main` as the de-facto Production line.
+- The EAS branch/channel `production` is **not** the same thing as Git `main`. EAS stays the
+  binding source for what is live; `main` is the binding source for code and release tooling.
+- OTA/release tooling on `main` (`scripts/update-production.mjs`) is the source of truth.
+- `feat/track-module-rewrite` is **not** canonical (despite older wording in `WORKTREES.md`
+  up to 2026-08-18). It diverged on 2026-08-18 (`3de67c0`): 30 own commits that are not in
+  Production (i18n quality fixes, heat calendar, command cards, obedience cone exercise,
+  CTA/button polish, docs) and it lacks 154+ newer Production commits. These 30 commits are
+  **not** integrated automatically — separate audit/integration task.
+- Android parity work continues from `main` or a branch explicitly based on it. Old
+  worktrees are never automatically a release source of truth.
+- A future **1.0.3 hotfix branch must contain the runtime-aware guard** (`23e5df6` + `54a74c4`);
+  branches of the old 1.0.3 line (e.g. `968884f`) still carry the old guard.
+
 ## Source of truth for the LIVE Production state
 
 **EAS is the only binding source for what is live right now.** This file is a
@@ -49,7 +72,43 @@ post-publish verification (see `docs/DEVELOPMENT_WORKFLOW.md` §8).
 
 ## Current Production Baseline
 
-Snapshot as of 2026-10-04 — verify against EAS before relying on it.
+Snapshot as of 2026-10-06 — verify against EAS before relying on it. Two iOS runtimes are
+live in parallel on the EAS branch `production`; each runtime only receives its own OTAs.
+
+### iOS Runtime 1.0.3 (Store build 1.0.3 (48)) — unchanged
+
+| Item | Value |
+|---|---|
+| Version / iOS Build / Runtime | 1.0.3 / 48 / 1.0.3 |
+| Production HEAD (iOS, runtime 1.0.3) | `968884f712544f45b35ebf8900ab64332b45ff7d` (`feat(tracking): add dog colors to track overlays`) |
+| Update Group / iOS update ID | `455dc249-fb4f-4868-a646-67d88c1ae7cb` / `01a10cd3-9696-7554-976d-442010037a09` |
+| Published | 2026-10-05 16:09:15 UTC |
+| EAS verification | **PASS** 2026-10-06 — newest runtime-1.0.3 group, iOS only, gitCommitHash `968884f` |
+
+Contains, on top of `34e6185`: open-track continuation/recovery fixes, resting background
+UX, hold-to-abort, Live Activity V2 JS (V1 fallback on 1.0.3 binaries), Multi-Dog track
+overlays (`c904955`) and per-dog overlay colors (`968884f`).
+
+### iOS Runtime 1.0.4 (Build 1.0.4 (49))
+
+| Item | Value |
+|---|---|
+| Native build | EAS build `994f04ba-0e1e-4cba-9888-79059a225213` from `3f7c2e746fd064d1b103aa67f926c514a52eed44` — **Build SUCCESS** (store, `com.anyvo.app`, channel `production`) |
+| App Store Connect | Upload **SUCCESS** (submission `02ea21d2-1804-4dcd-97a0-7b5c42dc7a92`) — **not yet released in the App Store** |
+| Native content | Live Activity V2 + Dynamic Island (multi-dog resting activities), quick-start widget, App Intents / App Shortcuts (de/fr/it), prebuild idempotency hardening, version/runtime contract 1.0.4 |
+| OTA (iOS only, runtime 1.0.4) | `04cad8da58c7b86ee0b808d0e01964e3341cca2a` — adaptive track distance scale, live distance, distance to next article |
+| Update Group / iOS update ID | `fcd879d9-b307-4cac-87e8-2a90f3d7f727` / `01a1114f-b484-724d-864f-87cebe27f239` (published 2026-10-06 13:03:18 UTC via guard) |
+| Device verification | **PASS** (owner, 1.0.4 (49) + OTA): quick-start widget, Live Activity V2, Dynamic Island, track distance scale |
+
+### Production OTA guard (on `main`)
+
+- Runtime isolation **PASS** (`23e5df6`): baseline = newest group with exactly platform + runtime; fail closed otherwise.
+- Initial runtime hardening **PASS** (`54a74c4`): `--initial-runtime-release` only with `--confirm`, only without an existing group for that runtime, same-platform fallback baseline, "FIRST OTA FOR RUNTIME" block, post-publish runtime mapping check.
+- **103/103** guard tests PASS; real dry-runs 1.0.3 (baseline `968884f`) and 1.0.4 (baseline `04cad8d`) PASS.
+
+Android is unchanged and **not** part of this baseline (parity analysis separate).
+
+### Historical snapshot 2026-10-04 (superseded by the tables above)
 
 | Item | Value |
 |---|---|
@@ -87,11 +146,12 @@ Commit chain (oldest → newest, linear, all contained in the Production HEAD):
 
 **Not in Production:** Multi-Dog Track Overlays (`78322cfe65a3d5a95bf59edc33b651a896f6c9f8`,
 branch `feat/multi-dog-track-overlays-1.0.3`) — not device/field tested.
+*(Superseded 2026-10-05: Multi-Dog overlays reached Production via `c904955`, contained in `968884f`.)*
 
 Android is **not** part of this baseline. No Android OTA, build or store release
 belongs to the state above.
 
-### CRITICAL RELEASE RULE
+## CRITICAL RELEASE RULE (still binding)
 
 **Never publish a Production OTA from an isolated feature branch that does not
 contain the complete current Production baseline.**
@@ -115,6 +175,17 @@ Before any Production OTA, additionally follow the mandatory rules in
 Items that predate 2026-10-02 (Website, Digital Health Record) are taken from the
 project owner's status and were not re-verified when this file was created.
 Evidence for the rest is the commit chain above and the task reports.
+
+### iOS 1.0.4 (Build 49) — device PASS, not yet store-released
+- native Build SUCCESS, App Store Connect Upload SUCCESS
+- Schnellstart-Widget PASS
+- Live Activity V2 PASS
+- Dynamic Island PASS
+- Fährten-Maßstab (OTA 1.0.4, `04cad8d`) PASS
+
+### Release Tooling
+- `main` als kanonische Production-/Release-Linie (Fast-Forward auf `54a74c4`)
+- Production-OTA-Guard runtime-isoliert + Initial-Runtime-Hardening, 103/103 Tests PASS
 
 ### Tracking V6.2
 - Golden `gps_split_apex` erhalten
@@ -194,10 +265,11 @@ Evidence for the rest is the commit chain above and the task reports.
    belastbar hergibt.
 
 ### Release Engineering
-- kanonische Production-/Release-Linie definieren
-- keine wechselnden Feature-Branches mehr direkt auf Production
-- race-sicherer Production-OTA-Wrapper (Lock im git-common-dir, Ancestry-Guard,
-  zweiter EAS-Check) — Branch `chore/production-ota-guard`, lokal, nicht integriert
+- ✅ kanonische Production-/Release-Linie definiert: `main` (2026-10-06, siehe oben)
+- ✅ race-sicherer, runtime-isolierter Production-OTA-Wrapper auf `main` (`23e5df6`, `54a74c4`)
+- `main` ist lokal integriert, **noch nicht gepusht** (Push nur mit Freigabe)
+- iOS 1.0.4 (49): App-Store-Release offen (Freigabeentscheidung)
+- Audit/Integration der 30 nicht-produktiven Commits von `feat/track-module-rewrite`
 - Grenze: Lock serialisiert nur lokale Worktrees; volle Cross-Machine-Serialisierung
   bräuchte einen zentralen Release-Runner/CI mit globaler Concurrency-Control
 
@@ -208,6 +280,9 @@ Evidence for the rest is the commit chain above and the task reports.
 ### Android
 - erneute Google-Play-Ablehnung vollständig analysieren
 - Android Production-Stand danach separat prüfen
+- Paritätsarbeit nur von `main` bzw. einem explizit darauf basierenden Branch weiterführen
+  (Android Production 1.0.3 (44) stammt aus `5a0610b` + uncommitteten Änderungen im Worktree
+  `anyvo-android-parity-1.0.3`; dieser Stand muss vor jeder Android-OTA in den Zielstand)
 
 ### Tracking / Training
 - Schrittlängen-Kalibrierung
@@ -225,7 +300,7 @@ Evidence for the rest is the commit chain above and the task reports.
 ### Engineering
 - Ordner-/Dateistruktur Audit und Bereinigung
 - Dependency-/Security-Audit separat
-- Production-Release-Branch-Strategie finalisieren
+- Production-Release-Branch-Strategie: `main` kanonisch (erledigt); Folgeregeln für Hotfix-Branches pro Runtime dokumentiert
 
 ### Gesture UX
 - bestehenden Pilot bewerten
@@ -285,4 +360,5 @@ Keine Schwellenänderung ohne neue Feldbelege.
 | Date | Change | Evidence |
 |---|---|---|
 | 2026-10-03 | Master status created. Production baseline set to `b780603`; iOS OTA `01a10074…` device-verified (PASS). | OTA group `ae879d82…`; commit chain above; owner device verification |
+| 2026-10-06 | `main` defined as canonical Production/Release line (fast-forward `e90df20` → `54a74c4`, no merge commit). iOS 1.0.4 (49) built + uploaded (not store-released); device PASS widget / Live Activity V2 / Dynamic Island / distance scale; OTA 1.0.4 `fcd879d9` (`04cad8d`). Runtime 1.0.3 unchanged on `968884f`. Guard runtime isolation + initial-runtime hardening (103/103). | Fresh EAS queries of groups `455dc249…` and `fcd879d9…`; EAS build `994f04ba…`; submission `02ea21d2…`; owner device test |
 | 2026-10-04 | iOS Production baseline → `34e6185` (customer track diagnosis + i18n on top of `34b4b4c`). Incident: OTA `fce1c140` (base `94dd576`) briefly superseded `34b4b4c`; restored via republish `3492bf85`, then `e3be2717` from a base containing `34b4b4c`. EAS declared the binding live source. | Fresh EAS query of group `e3be2717…` (gitCommitHash `34e6185`, iOS only, runtime 1.0.3) |

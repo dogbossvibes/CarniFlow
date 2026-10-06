@@ -11,6 +11,27 @@
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).
 
+## Update 2026-10-06 (Claude Code) — `main` kanonisch; iOS 1.0.4 (49) + OTA 1.0.4; Guard runtime-isoliert
+
+> Aktueller Gesamtstatus: `docs/agent/ANYVO_MASTER_STATUS.md`. Keine neue TASK-ID vergeben.
+> **Kein Push, kein Store-Release, kein Android-Vorgang.**
+
+- **`main` = kanonische Production-/Release-Linie.** Lokaler Fast-Forward `e90df20` → `54a74c4`
+  (`release/ios-production-native-next`), kein Merge-Commit, keine geänderten SHAs.
+  Neue Production-/Release-Branches zweigen von `main` ab (Regeln: Master-Status, `WORKTREES.md`).
+- **iOS 1.0.4 (49)** · DONE(built + uploaded) — EAS-Build `994f04ba…` aus `3f7c2e7`, Upload zu
+  App Store Connect (`02ea21d2…`); **noch nicht im App Store released**. Device PASS: Schnellstart-
+  Widget, Live Activity V2, Dynamic Island.
+- **Fährten-Maßstab** · DONE(deployed, device PASS) — OTA iOS-only, Runtime 1.0.4, Group
+  `fcd879d9-b307-4cac-87e8-2a90f3d7f727`, Commit `04cad8d`.
+- **Production-OTA-Guard** · DONE(committed) — Runtime-Isolation `23e5df6`, Initial-Runtime-Hardening
+  `54a74c4`; 103/103 Guard-Tests, Dry-Runs 1.0.3 + 1.0.4 PASS.
+- **Production 1.0.3** unverändert auf `968884f` (Group `455dc249…`). **Android** unverändert.
+- OPEN: Audit der 30 nicht-produktiven Commits auf `feat/track-module-rewrite`; Push von `main` (Freigabe);
+  App-Store-Release 1.0.4 (Freigabe); Android-Parität (separat).
+- Hinweis Ledger: Die ID **T-61** ist doppelt belegt (committet: NEWBIE-Backpack; uncommittet im
+  Android-Worktree: Android-OOM) — vor neuer Vergabe bereinigen.
+
 ## Update 2026-08-17 (Codex) — T-57 Trainer-Keyboard-Fix releaseverifiziert `0e7aaba`
 
 > Verifiziert gegen git/Code/Production (read-only). Diese Sektion ist die neueste maßgebliche.
