@@ -90,7 +90,7 @@ extension AnyvoOpenLogbookIntent {
 }
 
 /// Veröffentlicht die Intents für Siri, Kurzbefehle und die Action-Button-Auswahl.
-/// Phrasen enthalten den App-Namen; Übersetzungen in AppShortcuts.xcstrings (de/fr/it).
+/// Phrasen enthalten den App-Namen; Übersetzungen in <lang>.lproj/AppShortcuts.strings (de/fr/it).
 @available(iOS 16.0, *)
 struct AnyvoAppShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {

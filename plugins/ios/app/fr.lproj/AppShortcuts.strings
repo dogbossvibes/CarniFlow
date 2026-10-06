@@ -1,0 +1,8 @@
+/* ANYVO App Shortcuts (Siri-Phrasen) — fr. Schlüssel = englische Basisphrase aus AnyvoAppIntents.swift. */
+
+"Open tracks with ${applicationName}" = "Ouvrir les pistes avec ${applicationName}";
+"Show my tracks in ${applicationName}" = "Affiche mes pistes dans ${applicationName}";
+"Lay a track with ${applicationName}" = "Poser une piste avec ${applicationName}";
+"Start laying a track in ${applicationName}" = "Commencer une piste dans ${applicationName}";
+"Open ${applicationName} logbook" = "Ouvrir le journal ${applicationName}";
+"Show my logbook in ${applicationName}" = "Affiche mon journal dans ${applicationName}";

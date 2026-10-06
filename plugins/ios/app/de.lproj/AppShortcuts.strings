@@ -1,0 +1,8 @@
+/* ANYVO App Shortcuts (Siri-Phrasen) — de. Schlüssel = englische Basisphrase aus AnyvoAppIntents.swift. */
+
+"Open tracks with ${applicationName}" = "Fährten mit ${applicationName} öffnen";
+"Show my tracks in ${applicationName}" = "Zeige meine Fährten in ${applicationName}";
+"Lay a track with ${applicationName}" = "Fährte mit ${applicationName} legen";
+"Start laying a track in ${applicationName}" = "Neue Fährte in ${applicationName} legen";
+"Open ${applicationName} logbook" = "${applicationName} Logbuch öffnen";
+"Show my logbook in ${applicationName}" = "Zeige mein Logbuch in ${applicationName}";

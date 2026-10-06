@@ -13,6 +13,10 @@ const swiftWidget = readFileSync('plugins/ios/widget/AnyvoQuickStartWidget.swift
 const swiftIntents = readFileSync('plugins/ios/app/AnyvoAppIntents.swift', 'utf8');
 /** Swift ohne Kommentare (Verbote dürfen in Kommentaren erklärt werden). */
 const code = (s: string) => s.split('\n').map(l => l.replace(/\/\/.*$/, '').replace(/\/\/\/.*$/, '')).join('\n');
+/** .strings-Datei → { Schlüssel: Wert } (JSON-kompatible Stringliterale). */
+const stringsFile = (p: string) => Object.fromEntries(
+  [...readFileSync(p, 'utf8').matchAll(/^("(?:[^"\\]|\\.)*") = ("(?:[^"\\]|\\.)*");$/gm)].map(m => [JSON.parse(m[1]), JSON.parse(m[2])]),
+) as Record<string, string>;
 const catalog = (p: string) => JSON.parse(readFileSync(p, 'utf8')).strings as Record<string, { localizations: Record<string, unknown> }>;
 
 describe('Target-Zuordnung (Source of Truth im Repo)', () => {
@@ -22,8 +26,10 @@ describe('Target-Zuordnung (Source of Truth im Repo)', () => {
     ]);
     expect(plugin.WIDGET_RESOURCES.map((p: string) => p.split('/').pop())).toEqual(['Localizable.xcstrings']);
     expect(plugin.APP_SOURCES.map((p: string) => p.split('/').pop())).toEqual(['AnyvoAppIntents.swift']);
-    expect(plugin.APP_RESOURCES.map((p: string) => p.split('/').pop())).toEqual(['AppShortcuts.xcstrings', 'Localizable.xcstrings']);
+    expect(plugin.APP_RESOURCES.map((p: string) => p.split('/').pop())).toEqual(['Localizable.xcstrings']);
     for (const p of [...plugin.WIDGET_SOURCES, ...plugin.WIDGET_RESOURCES, ...plugin.APP_SOURCES, ...plugin.APP_RESOURCES]) expect(existsSync(p)).toBe(true);
+    expect(plugin.APP_LOCALIZED_STRINGS).toEqual([{ name: 'AppShortcuts.strings', srcDir: 'plugins/ios/app', languages: ['de', 'fr', 'it'] }]);
+    for (const lng of ['de', 'fr', 'it']) expect(existsSync(`plugins/ios/app/${lng}.lproj/AppShortcuts.strings`)).toBe(true);
     // keine Widget-Datei im App-Target, keine Intent-Datei im Widget-Target
     expect(plugin.APP_SOURCES.some((p: string) => /Widget/.test(p))).toBe(false);
     expect(plugin.WIDGET_SOURCES.some((p: string) => /Intent/.test(p))).toBe(false);
@@ -64,9 +70,27 @@ describe('Dateipfade wie Xcode (Regression EAS-Build beb81dfe: „Build input fi
   it('App-Gruppe ohne path (Expo-Template: name = ANYVO) → Referenz „ANYVO/<Datei>" wie AppDelegate.swift', () => {
     const p = fakeProject();
     plugin.addFileToTarget(p, { name: 'AnyvoAppIntents.swift', dirName: 'ANYVO', groupKey: 'G', targetKey: 'T', isa: 'PBXSourcesBuildPhase' });
-    plugin.addFileToTarget(p, { name: 'AppShortcuts.xcstrings', dirName: 'ANYVO', groupKey: 'G', targetKey: 'T', isa: 'PBXResourcesBuildPhase' });
+    plugin.addFileToTarget(p, { name: 'Localizable.xcstrings', dirName: 'ANYVO', groupKey: 'G', targetKey: 'T', isa: 'PBXResourcesBuildPhase' });
     const paths = Object.entries(p.hash.project.objects.PBXFileReference).filter(([k]) => !k.endsWith('_comment')).map(([, r]: any) => r.path);
-    expect(paths).toEqual(['"ANYVO/AnyvoAppIntents.swift"', '"ANYVO/AppShortcuts.xcstrings"']);
+    expect(paths).toEqual(['"ANYVO/AnyvoAppIntents.swift"', '"ANYVO/Localizable.xcstrings"']);
+  });
+  it('AppShortcuts.strings: EINE Variant-Group (de/fr/it, „ANYVO/<lang>.lproj/…") in Resources, idempotent', () => {
+    const p = fakeProject();
+    const args = { name: 'AppShortcuts.strings', languages: ['de', 'fr', 'it'], dirName: 'ANYVO', groupKey: 'G', targetKey: 'T' };
+    for (let i = 0; i < 2; i++) plugin.addVariantGroupToTarget(p, args);
+    const o = p.hash.project.objects;
+    const variants = Object.entries(o.PBXVariantGroup).filter(([k]) => !k.endsWith('_comment'));
+    expect(variants).toHaveLength(1);
+    const [vKey, v]: [string, any] = variants[0] as never;
+    expect(v.name).toBe('"AppShortcuts.strings"');
+    expect(v.children.map((c: any) => [o.PBXFileReference[c.value].name, o.PBXFileReference[c.value].path, o.PBXFileReference[c.value].lastKnownFileType])).toEqual([
+      ['de', '"ANYVO/de.lproj/AppShortcuts.strings"', 'text.plist.strings'],
+      ['fr', '"ANYVO/fr.lproj/AppShortcuts.strings"', 'text.plist.strings'],
+      ['it', '"ANYVO/it.lproj/AppShortcuts.strings"', 'text.plist.strings'],
+    ]);
+    expect(o.PBXGroup.G.children.map((c: any) => c.value)).toEqual([vKey]);
+    expect(o.PBXResourcesBuildPhase.R.files.map((f: any) => o.PBXBuildFile[f.value].fileRef)).toEqual([vKey]);
+    expect(o.PBXSourcesBuildPhase.S.files).toHaveLength(0);
   });
   it('Gruppe mit eigenem path (Widget: path = LiveActivity) → Referenz nur „<Datei>"', () => {
     expect(plugin.fileRefPath({ path: 'LiveActivity' }, 'LiveActivity', 'AnyvoQuickStartWidget.swift')).toBe('AnyvoQuickStartWidget.swift');
@@ -147,17 +171,18 @@ describe('App Intents / App Shortcuts (Swift-Vertrag)', () => {
     expect(swiftIntents).toMatch(/UserDefaults\.standard\.set\(/);
     expect(code(swiftIntents)).not.toMatch(/dogId|sessionId|beginRecording|startRecording/);
   });
-  it('jede Phrase enthält den App-Namen und ist für de/fr/it übersetzt', () => {
+  it('jede Phrase enthält den App-Namen und ist in <lang>.lproj/AppShortcuts.strings für de/fr/it übersetzt', () => {
     const phrases = [...swiftIntents.matchAll(/"([^"]*\\\(\.applicationName\)[^"]*)"/g)].map(m => m[1].replace('\\(.applicationName)', '${applicationName}'));
     expect(phrases).toHaveLength(6);
-    const cat = catalog('plugins/ios/app/AppShortcuts.xcstrings');
-    for (const p of phrases) {
-      expect(cat[p]).toBeDefined();
-      for (const lng of ['de', 'fr', 'it']) {
-        const v = (cat[p].localizations[lng] as { stringUnit: { value: string } }).stringUnit.value;
-        expect(v.split('${applicationName}').length - 1).toBe(1);
-      }
+    for (const lng of ['de', 'fr', 'it']) {
+      const t = stringsFile(`plugins/ios/app/${lng}.lproj/AppShortcuts.strings`);
+      expect(Object.keys(t).sort()).toEqual([...phrases].sort());   // keine fehlenden, keine verwaisten Phrasen
+      for (const p of phrases) expect(t[p].split('${applicationName}').length - 1).toBe(1);
     }
+  });
+  it('kein AppShortcuts.xcstrings (erst ab iOS 17; App-Deployment-Target 15.1 → Build-Fehler)', () => {
+    expect(existsSync('plugins/ios/app/AppShortcuts.xcstrings')).toBe(false);
+    expect(JSON.stringify([...plugin.APP_RESOURCES, ...plugin.WIDGET_RESOURCES])).not.toMatch(/AppShortcuts\.xcstrings/);
   });
   it('Intent-Titel/Beschreibungen im App-Katalog für de/en/fr/it', () => {
     const keys = [...new Set([...swiftIntents.matchAll(/"(intent\.[a-zA-Z.]+)"/g)].map(m => m[1]))];

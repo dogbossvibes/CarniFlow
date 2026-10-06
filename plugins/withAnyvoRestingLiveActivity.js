@@ -10,7 +10,9 @@
 //   • Registrierung beider Widgets im WidgetBundle (LiveActivityWidgetBundle.swift)
 // App-Target (ANYVO):
 //   • AnyvoAppIntents.swift                  (App Intents + App Shortcuts, feste Routen)
-//   • AppShortcuts.xcstrings / Localizable.xcstrings (Siri-Phrasen + Intent-Texte)
+//   • <lang>.lproj/AppShortcuts.strings      (Siri-Phrasen de/fr/it; .xcstrings erst ab iOS 17,
+//                                             App-Deployment-Target ist 15.1)
+//   • Localizable.xcstrings                  (Intent-Titel/-Beschreibungen)
 //
 // REIHENFOLGE: Xcode-Mods laufen in UMGEKEHRTER Plugin-Reihenfolge.
 //   • withAnyvoRestingLiveActivity steht in app.json VOR "expo-live-activity" → läuft NACH dessen Mod.
@@ -37,12 +39,15 @@ const WIDGET_SOURCES = [
 ];
 const WIDGET_RESOURCES = [path.join(IOS_SRC, 'widget', 'Localizable.xcstrings')];
 const APP_SOURCES = [path.join(IOS_SRC, 'app', 'AnyvoAppIntents.swift')];
-const APP_RESOURCES = [
-  path.join(IOS_SRC, 'app', 'AppShortcuts.xcstrings'),
-  path.join(IOS_SRC, 'app', 'Localizable.xcstrings'),
-];
+const APP_RESOURCES = [path.join(IOS_SRC, 'app', 'Localizable.xcstrings')];
 /** Sprachen der String-Kataloge (Entwicklungssprache en). */
 const KNOWN_REGIONS = ['de', 'fr', 'it'];
+/**
+ * Lokalisierte .strings-Dateien des App-Targets (Variant-Group, eine Datei je Sprache unter
+ * plugins/ios/app/<lang>.lproj/). AppShortcuts.xcstrings verlangt iOS 17 — die englischen
+ * Basisphrasen stehen im Code, die Übersetzungen hier.
+ */
+const APP_LOCALIZED_STRINGS = [{ name: 'AppShortcuts.strings', srcDir: path.join(IOS_SRC, 'app'), languages: KNOWN_REGIONS }];
 
 const BUNDLE_FILE = 'LiveActivityWidgetBundle.swift';
 const V1_WIDGET = 'LiveActivityWidget()';
@@ -124,6 +129,41 @@ function addFileToTarget(project, { name, dirName, groupKey, targetKey, isa }) {
   phase.files.push({ value: buildKey, comment: `${name} in ${phaseName}` });
 }
 
+/**
+ * Lokalisierte Datei als PBXVariantGroup in die Gruppe + Resources-Phase des Targets (idempotent).
+ * Variant-Groups haben keinen eigenen Pfad: Kinder lösen wie Dateien der Gruppe auf.
+ */
+function addVariantGroupToTarget(project, { name, languages, dirName, groupKey, targetKey }) {
+  const objects = project.hash.project.objects;
+  const phase = findPhase(project, targetKey, 'PBXResourcesBuildPhase');
+  if (!phase) throw new Error(`[withAnyvoRestingLiveActivity] PBXResourcesBuildPhase des Targets fehlt (${name}).`);
+  const group = objects.PBXGroup[groupKey];
+  const variants = (objects.PBXVariantGroup = objects.PBXVariantGroup ?? {});
+  const refs = objects.PBXFileReference;
+  const unq = v => String(v ?? '').replace(/^"|"$/g, '');
+  let variantKey = (group.children ?? []).map(c => c.value).find(k => variants[k] && unq(variants[k].name) === name);
+  if (!variantKey) {
+    variantKey = project.generateUuid();
+    variants[variantKey] = { isa: 'PBXVariantGroup', children: [], name: `"${name}"`, sourceTree: '"<group>"' };
+    variants[`${variantKey}_comment`] = name;
+    group.children.push({ value: variantKey, comment: name });
+  }
+  const variant = variants[variantKey];
+  for (const lang of languages) {
+    const relPath = fileRefPath(group, dirName, `${lang}.lproj/${name}`);
+    if (variant.children.some(c => refs[c.value] && unq(refs[c.value].path) === relPath)) continue;
+    const ref = project.generateUuid();
+    refs[ref] = { isa: 'PBXFileReference', lastKnownFileType: 'text.plist.strings', name: lang, path: `"${relPath}"`, sourceTree: '"<group>"' };
+    refs[`${ref}_comment`] = lang;
+    variant.children.push({ value: ref, comment: lang });
+  }
+  if (phase.files.some(f => objects.PBXBuildFile[f.value]?.fileRef === variantKey)) return;   // bereits Mitglied
+  const buildKey = project.generateUuid();
+  objects.PBXBuildFile[buildKey] = { isa: 'PBXBuildFile', fileRef: variantKey, fileRef_comment: name };
+  objects.PBXBuildFile[`${buildKey}_comment`] = `${name} in Resources`;
+  phase.files.push({ value: buildKey, comment: `${name} in Resources` });
+}
+
 function addKnownRegions(project, regions) {
   const proj = real(project.hash.project.objects.PBXProject)[0]?.[1];
   if (!proj) return;
@@ -190,6 +230,14 @@ const withAnyvoRestingLiveActivity = config =>
     copyInto(projectRoot, [...APP_SOURCES, ...APP_RESOURCES], appDir);
     for (const rel of APP_SOURCES) addFileToTarget(project, { name: path.basename(rel), dirName: appName, groupKey: appGroup, targetKey: appKey, isa: 'PBXSourcesBuildPhase' });
     for (const rel of APP_RESOURCES) addFileToTarget(project, { name: path.basename(rel), dirName: appName, groupKey: appGroup, targetKey: appKey, isa: 'PBXResourcesBuildPhase' });
+    for (const { name, srcDir, languages } of APP_LOCALIZED_STRINGS) {
+      for (const lang of languages) {
+        const dest = path.join(appDir, `${lang}.lproj`);
+        fs.mkdirSync(dest, { recursive: true });
+        fs.copyFileSync(path.join(projectRoot, srcDir, `${lang}.lproj`, name), path.join(dest, name));
+      }
+      addVariantGroupToTarget(project, { name, languages, dirName: appName, groupKey: appGroup, targetKey: appKey });
+    }
 
     syncWidgetVersions(project, widgetKeys[0], cfg.version, cfg.ios?.buildNumber);
     addKnownRegions(project, KNOWN_REGIONS);
@@ -208,6 +256,7 @@ module.exports = withAnyvoRestingLiveActivity;
 module.exports.withAnyvoLiveActivityPrebuildGuard = withAnyvoLiveActivityPrebuildGuard;
 module.exports.patchWidgetBundle = patchWidgetBundle;
 module.exports.addFileToTarget = addFileToTarget;
+module.exports.addVariantGroupToTarget = addVariantGroupToTarget;
 module.exports.fileRefPath = fileRefPath;
 module.exports.snapshotIfTargetExists = snapshotIfTargetExists;
 module.exports.restoreSnapshotIfAny = restoreSnapshotIfAny;
@@ -216,3 +265,4 @@ module.exports.WIDGET_SOURCES = WIDGET_SOURCES;
 module.exports.WIDGET_RESOURCES = WIDGET_RESOURCES;
 module.exports.APP_SOURCES = APP_SOURCES;
 module.exports.APP_RESOURCES = APP_RESOURCES;
+module.exports.APP_LOCALIZED_STRINGS = APP_LOCALIZED_STRINGS;
