@@ -1,13 +1,13 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Prominente In-App-Offenlegung (Google-Play-Pflicht) für den Hintergrund-
-// standort. Wird ZWINGEND VOR dem Start einer Fährtenaufnahme gezeigt und
-// VOR der Android-Berechtigungsanfrage. Die Aufnahme (GPS + Timer) startet
-// erst nach „Weiter". Bei „Abbrechen" passiert nichts.
+// standort. Wird ZWINGEND VOR der ersten Location-Permission und vor dem
+// Aufnahmestart gezeigt. Die Aufnahme (GPS + Timer) startet
+// erst nach „Weiter". Bei „Nicht jetzt" passiert nichts.
 //
 // Der Dialog schliesst ausschliesslich über die beiden Buttons:
 //   • Hardware-Back (Android) wird bewusst ignoriert (onRequestClose = no-op).
@@ -42,17 +42,17 @@ export function BackgroundLocationDisclosure({
               <Ionicons name="paw" size={26} color={FT.acc} />
             </View>
 
-            <Text style={s.title} accessibilityRole="header">{t('track.backgroundTitle')}</Text>
+            <Text style={s.title} accessibilityRole="header">{t(Platform.OS === 'android' ? 'track.locationDisclosureTitle' : 'track.backgroundTitle')}</Text>
 
-            <Text style={s.body}>
-              {t('track.backgroundBody1')}
-            </Text>
-            <Text style={s.body}>
-              {t('track.backgroundBody2')}
-            </Text>
-            <Text style={s.body}>
-              {t('track.backgroundBody3')}
-            </Text>
+            {Platform.OS === 'android' ? (
+              <Text style={s.body}>{t('track.locationDisclosureBody')}</Text>
+            ) : (
+              <>
+                <Text style={s.body}>{t('track.backgroundBody1')}</Text>
+                <Text style={s.body}>{t('track.backgroundBody2')}</Text>
+                <Text style={s.body}>{t('track.backgroundBody3')}</Text>
+              </>
+            )}
           </ScrollView>
 
           <View style={s.actions}>
@@ -61,18 +61,18 @@ export function BackgroundLocationDisclosure({
               onPress={onCancel}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel={t('common.cancel')}
+              accessibilityLabel={t(Platform.OS === 'android' ? 'track.locationDisclosureNotNow' : 'common.cancel')}
             >
-              <Text style={s.btnGhostText}>{t('common.cancel')}</Text>
+              <Text style={s.btnGhostText}>{t(Platform.OS === 'android' ? 'track.locationDisclosureNotNow' : 'common.cancel')}</Text>
             </Pressable>
             <Pressable
               style={[s.btn, s.btnPrimary]}
               onPress={onContinue}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel={t('common.next')}
+              accessibilityLabel={t(Platform.OS === 'android' ? 'track.locationDisclosureContinue' : 'common.next')}
             >
-              <Text style={s.btnPrimaryText}>{t('common.next')}</Text>
+              <Text style={s.btnPrimaryText}>{t(Platform.OS === 'android' ? 'track.locationDisclosureContinue' : 'common.next')}</Text>
             </Pressable>
           </View>
         </View>
