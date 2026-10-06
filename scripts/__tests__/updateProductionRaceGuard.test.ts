@@ -256,7 +256,8 @@ describe('Dry-Run (Preflight) und Quellen', () => {
   it('Reihenfolge: Lock → EAS-Check 1 → (Guards) → EAS-Check 2 → update → EAS-Nachkontrolle', () => {
     expect(confirmIos().code).toBe(0);
     const seq = h.calls().map(a => a[0]).filter(c => c !== 'env:list');
-    expect(seq).toEqual(['channel:view', 'update:list', 'update:view', 'update:list', 'update:view', 'update', 'update:list', 'update:view']);
+    // Nachkontrolle: neueste Plattform-Group + aktive Group der Release-Runtime (Production-Zuordnung)
+    expect(seq).toEqual(['channel:view', 'update:list', 'update:view', 'update:list', 'update:view', 'update', 'update:list', 'update:view', 'update:list', 'update:view']);
   });
   it('12b. Doku: Master-Status ist nur Snapshot, EAS ist die Live-Quelle; Multi-Dog ist NICHT Production', () => {
     const ms = readFileSync('docs/agent/ANYVO_MASTER_STATUS.md', 'utf8');

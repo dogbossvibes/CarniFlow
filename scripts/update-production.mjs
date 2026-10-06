@@ -211,12 +211,19 @@ export function evaluatePublishGuards({ platform, active, releaseHead, releaseRu
   if (!/^[0-9a-f]{40}$/.test(releaseHead ?? '')) problems.push('Release-HEAD unbekannt');
   if (dirty) problems.push('Worktree nicht sauber (uncommittete Änderungen würden ins Bundle gelangen; gitCommitHash wäre falsch)');
   if (!releaseRuntime) problems.push('Release-Runtime nicht bestimmbar (app.json runtimeVersion)');
-  if (!active) problems.push(`Kein aktiver Production-Stand für ${platform} / Runtime ${expectedRuntime ?? '—'} in EAS gefunden — keine Baseline (fail closed; erste OTA einer neuen Runtime nur bewusst mit --initial-runtime-release)`);
-  else {
+  if (!active) {
+    problems.push(initialRuntimeRelease
+      ? `Keine Production-Group der Plattform ${platform} vorhanden — keine Fallback-Baseline für die erste OTA von Runtime ${expectedRuntime ?? '—'} (fail closed; nie eine plattformfremde Baseline)`
+      : `Kein aktiver Production-Stand für ${platform} / Runtime ${expectedRuntime ?? '—'} in EAS gefunden — keine Baseline (fail closed; erste OTA einer neuen Runtime nur bewusst mit --initial-runtime-release)`);
+  } else {
     if (!active.gitCommitHash) problems.push('Aktiver Production-Stand hat keinen gitCommitHash');
     if (active.platform !== platform) problems.push(`Aktiver Stand gehört zu Plattform ${active.platform}, erwartet ${platform}`);
     if (!initialRuntimeRelease && expectedRuntime && active.runtimeVersion !== expectedRuntime) {
       problems.push(`Baseline-Runtime ${active.runtimeVersion ?? '—'} ≠ Ziel-Runtime ${expectedRuntime}`);
+    }
+    // Erste OTA: Fallback-Baseline gehört per Definition zu einer ANDEREN Runtime derselben Plattform.
+    if (initialRuntimeRelease && expectedRuntime && active.runtimeVersion === expectedRuntime) {
+      problems.push(`--initial-runtime-release unzulässig: Baseline ist bereits eine Group der Ziel-Runtime ${expectedRuntime}`);
     }
     if (isAncestor === false) {
       problems.push(`Release basiert NICHT auf aktuellem Production: aktiver Production-Commit ${active.gitCommitHash} ist kein Vorfahre von ${releaseHead}. Veröffentlichung würde bestehende Production-Fixes zurücksetzen.`);
@@ -228,8 +235,33 @@ export function evaluatePublishGuards({ platform, active, releaseHead, releaseRu
   return problems;
 }
 
-/** Nachkontrolle nach dem Publish. Leere Liste = verifiziert. */
-export function verifyPostPublish({ before, after, platform, releaseHead, releaseRuntime }) {
+/**
+ * Unübersehbarer Hinweis für die erste OTA einer Runtime (--initial-runtime-release):
+ * Ziel und die plattformgleiche Fallback-Baseline, gegen die die Ancestry geprüft wird.
+ */
+export function formatFirstRuntimeBanner({ platform, targetRuntime, targetCommit, baseline }) {
+  const bar = '='.repeat(66);
+  return [
+    bar,
+    'FIRST OTA FOR RUNTIME',
+    `Platform: ${platform}`,
+    `Target Runtime: ${targetRuntime}`,
+    `Target Commit: ${targetCommit}`,
+    `No existing production group for ${platform} / runtime ${targetRuntime}.`,
+    'Fallback ancestry baseline (newest production group of the SAME platform):',
+    `  Group: ${baseline?.group ?? '—'}`,
+    `  Runtime: ${baseline?.runtimeVersion ?? '—'}`,
+    `  Commit: ${baseline?.gitCommitHash ?? '—'}`,
+    bar,
+  ].join('\n');
+}
+
+/**
+ * Nachkontrolle nach dem Publish. Leere Liste = verifiziert. `afterForRuntime`: aktive Group
+ * für (Plattform, Release-Runtime) frisch aus EAS — muss GENAU die neue Group sein
+ * (Production-Zuordnung, auch für die erste OTA einer Runtime).
+ */
+export function verifyPostPublish({ before, after, platform, releaseHead, releaseRuntime, afterForRuntime }) {
   const problems = [];
   if (!after) return ['Kein aktiver Production-Stand nach dem Publish lesbar'];
   if (before && after.group === before.group) problems.push('Keine neue Update-Group auf production aktiv');
@@ -237,6 +269,9 @@ export function verifyPostPublish({ before, after, platform, releaseHead, releas
   if ((after.platforms ?? []).some(p => p !== platform)) problems.push(`Neue Group enthält weitere Plattformen: ${after.platforms.join(', ')}`);
   if (after.runtimeVersion !== releaseRuntime) problems.push(`Runtime ${after.runtimeVersion} ≠ ${releaseRuntime}`);
   if (after.gitCommitHash !== releaseHead) problems.push(`gitCommitHash ${after.gitCommitHash} ≠ Release-HEAD ${releaseHead}`);
+  if (afterForRuntime !== undefined && afterForRuntime?.group !== after.group) {
+    problems.push(`Neue Group ${after.group} ist nicht die aktive Production-Group für ${platform} / Runtime ${releaseRuntime} (gefunden: ${afterForRuntime?.group ?? '—'})`);
+  }
   return problems;
 }
 
@@ -404,6 +439,12 @@ function main() {
   }
   if (envListFile && !dryRun) { console.log('❌ --env-list-file ist nur mit --dry-run erlaubt. Kein Update veröffentlicht.'); process.exit(1); }
   if (!confirmed && !dryRun) {
+    if (args.includes('--initial-runtime-release')) {
+      // Erste OTA einer Runtime: nie durch bloßes Setzen des Schalters — nur mit --confirm.
+      console.log('❌ STOP: --initial-runtime-release ohne --confirm. Kein Update veröffentlicht.');
+      console.log('Vorab prüfen:  … --initial-runtime-release --dry-run   ·   Veröffentlichen nur mit:  … --initial-runtime-release --confirm');
+      process.exit(1);
+    }
     console.log('Kein Update veröffentlicht.');
     console.log('Bewusst bestätigen mit:  node scripts/update-production.mjs --platform ios --confirm --message "…"');
     process.exit(0);
@@ -492,6 +533,9 @@ function main() {
   console.log(`Ziel: ${platform} · Runtime ${target.runtime} (${target.source})${initialRuntimeRelease ? ' · ERSTE OTA dieser Runtime (--initial-runtime-release)' : ''}`);
   console.log(`Baseline-Auswahl: neueste Production-Group mit Plattform ${platform} UND ${initialRuntimeRelease ? 'beliebiger Runtime (erste OTA der Ziel-Runtime)' : `Runtime ${target.runtime}`}`);
   printActive('ACTIVE PRODUCTION (EAS, frisch)', active);
+  if (initialRuntimeRelease && active && !baseline.problem) {
+    console.log(`\n${formatFirstRuntimeBanner({ platform, targetRuntime: target.runtime, targetCommit: head, baseline: active })}\n`);
+  }
   const expectedRuntime = target.runtime;
   const isAncestor = active?.gitCommitHash ? gitIsAncestor(active.gitCommitHash, head) : null;
   const problems = [
@@ -544,7 +588,9 @@ function main() {
   let after = null;
   // Bewusst die neueste Group der PLATTFORM (jede Runtime): genau das, was eben veröffentlicht
   // wurde — so fällt auch eine falsche Runtime der neuen Group explizit auf.
+  let afterForRuntime = null;
   try { after = readNewestPlatformProduction(platform); } catch { /* unten als Fehler gemeldet */ }
+  try { afterForRuntime = readActiveProduction(platform, target.runtime); } catch { /* unten als Fehler gemeldet */ }
   console.log('\n── Verifikation ──');
   console.log(`Channel: ${PRODUCTION_CHANNEL}   Branch: ${PRODUCTION_BRANCH}   Environment: production`);
   if (after) {
@@ -552,7 +598,7 @@ function main() {
     console.log(`Update Group ID: ${after.group}   Platform Update ID: ${after.id}`);
     console.log(`gitCommitHash: ${after.gitCommitHash}   Message: ${message}`);
   }
-  const post = verifyPostPublish({ before: active, after, platform, releaseHead: head, releaseRuntime });
+  const post = verifyPostPublish({ before: active, after, platform, releaseHead: head, releaseRuntime, afterForRuntime });
   if (post.length) {
     for (const p of post) console.log(`❌ POST-PUBLISH: ${p}`);
     console.log('❌ Nachkontrolle FEHLGESCHLAGEN. Kein automatischer Rollback und keine zweite OTA — Rollback ist eine bewusste Freigabeentscheidung.');
