@@ -67,7 +67,16 @@ else if (a[0] === 'channel:view') {
   s.listCalls = (s.listCalls || 0) + 1;
   if (s.raceAtList && s.listCalls === s.raceAtList && s.raceGroup) s.groups.unshift(s.raceGroup);
   save(s);
-  out({ name: 'production', currentPage: s.groups.map(g => ({ group: g.group, platforms: g.entries.map(e => e.platform).join(', '), runtimeVersion: g.entries[0] && g.entries[0].runtimeVersion })) });
+  // Wie die echte CLI: optionale Serverfilter --platform / --runtime-version (neueste zuerst).
+  const pf = a.includes('--platform') ? a[a.indexOf('--platform') + 1] : null;
+  const rv = a.includes('--runtime-version') ? a[a.indexOf('--runtime-version') + 1] : null;
+  const rows = [];
+  for (const g of s.groups) {
+    const match = g.entries.filter(e => (!pf || e.platform === pf) && (!rv || e.runtimeVersion === rv));
+    if (!match.length) continue;
+    rows.push({ group: g.group, platforms: g.entries.map(e => e.platform).join(', '), runtimeVersion: match[0].runtimeVersion });
+  }
+  out({ name: 'production', currentPage: rows });
 } else if (a[0] === 'update:view') {
   const s = load();
   const g = s.groups.find(x => x.group === a[1]);
@@ -109,12 +118,24 @@ export interface Harness {
   defaultState(): FakeState;
 }
 
-/** Baut Fixture-Repo + falsches `eas`. Quelle: die echten Wrapper-Dateien dieses Repos. */
-export function createHarness(): Harness {
+/**
+ * Baut Fixture-Repo + falsches `eas`. Quelle: die echten Wrapper-Dateien dieses Repos.
+ * `appVersion`: Release-Runtime des Fixture-Repos überschreiben (policy appVersion → version),
+ * z. B. um einen Hotfix für eine ältere, parallel aktive Runtime zu modellieren.
+ * `appJson`: komplett eigene app.json (z. B. nicht bestimmbare Runtime).
+ */
+export function createHarness(opts: { appVersion?: string; appJson?: unknown } = {}): Harness {
   const dir = mkdtempSync(join(tmpdir(), 'anyvo-ota-test-'));
   const repo = join(dir, 'repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
   for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
+  if (opts.appJson !== undefined) writeFileSync(join(repo, 'app.json'), JSON.stringify(opts.appJson, null, 2));
+  else if (opts.appVersion) {
+    const app = JSON.parse(readFileSync('app.json', 'utf8'));
+    app.expo.version = opts.appVersion;
+    writeFileSync(join(repo, 'app.json'), JSON.stringify(app, null, 2));
+  }
+  const releaseRuntime = opts.appVersion ?? RELEASE_RUNTIME;
   writeFileSync(join(repo, '.gitignore'), 'node_modules/\n');
   git(repo, 'init', '-q', '-b', 'main');
   git(repo, 'add', '-A');
@@ -137,8 +158,8 @@ export function createHarness(): Harness {
   const fullEnvFile = envFileWith(FULL_ENV);
   const defaultState = (): FakeState => ({
     groups: [{ group: 'g-prod', createdAt: '2026-10-04T14:20:03.537Z', entries: [
-      { platform: 'ios', id: 'u-ios', gitCommitHash: base, runtimeVersion: RELEASE_RUNTIME },
-      { platform: 'android', id: 'u-android', gitCommitHash: base, runtimeVersion: RELEASE_RUNTIME },
+      { platform: 'ios', id: 'u-ios', gitCommitHash: base, runtimeVersion: releaseRuntime },
+      { platform: 'android', id: 'u-android', gitCommitHash: base, runtimeVersion: releaseRuntime },
     ] }],
   });
   const setState = (s: FakeState) => writeFileSync(stateFile, JSON.stringify(s));
@@ -147,7 +168,7 @@ export function createHarness(): Harness {
   const calls = (): string[][] => (existsSync(callLog) ? readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : []);
   const baseEnv = (extra: Record<string, string> = {}) => ({
     ...process.env, PATH: `${dir}:${process.env.PATH}`,
-    FAKE_ENV_FILE: fullEnvFile, FAKE_EAS_LOG: callLog, FAKE_EAS_STATE: stateFile, FAKE_RELEASE_RUNTIME: RELEASE_RUNTIME, ...extra,
+    FAKE_ENV_FILE: fullEnvFile, FAKE_EAS_LOG: callLog, FAKE_EAS_STATE: stateFile, FAKE_RELEASE_RUNTIME: releaseRuntime, ...extra,
   });
   const run: Harness['run'] = (args, opts = {}) => {
     const cmd = opts.cmd ?? ['node', 'scripts/update-production.mjs'];

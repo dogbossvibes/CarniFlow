@@ -37,6 +37,12 @@
 //   3. Ancestry-Guard: aktiver Production-gitCommitHash MUSS Vorfahre des Release-HEAD
 //      sein — sonst würde die OTA Production-Fixes zurückrollen. Kein Auto-Rebase.
 //   4. Runtime-/Channel-/Plattform-/Clean-Tree-Guard.
+//      Runtime-Isolation (mehrere Production-Runtimes gleichzeitig aktiv, z. B. 1.0.3 + 1.0.4):
+//      Ziel-Runtime = --runtime bzw. eindeutig aus app.json (sonst STOP). Baseline ist die
+//      neueste Production-Group mit GENAU dieser Plattform UND Runtime — nie die global
+//      neueste Group. Fehlt sie → STOP (fail closed). Die erste OTA einer neuen Runtime
+//      nur ausdrücklich per --initial-runtime-release (nur ohne vorhandene Baseline dieser
+//      Runtime; Baseline dann die neueste Group der Plattform, Ancestry bleibt Pflicht).
 //   5. ZWEITER EAS-Check unmittelbar vor `eas update`; Änderung → HARD STOP.
 //   6. Nachkontrolle: neue Group live, Plattform/Runtime/gitCommitHash exakt — sonst
 //      Fehler (Exit 2). KEIN automatischer Rollback, KEINE zweite OTA.
@@ -136,14 +142,47 @@ export function checkChannelMapping(channelJson) {
   return { ok: problems.length === 0, problems };
 }
 
-/** Neueste Update-Group des Branches, die die Zielplattform enthält (aus `eas update:list --json`). */
+const groupPlatforms = g => String(g?.platforms ?? '').split(',').map(s => s.trim()).filter(Boolean);
+
+/**
+ * Neueste Update-Group des Branches, die die Zielplattform enthält (aus `eas update:list --json`,
+ * neueste zuerst). NUR für --initial-runtime-release; sonst selectBaselineGroupId (runtime-genau).
+ */
 export function pickActiveGroupId(updateListJson, platform) {
   const page = updateListJson?.currentPage ?? [];
   for (const g of page) {
-    const platforms = String(g.platforms ?? '').split(',').map(s => s.trim());
-    if (platforms.includes(platform)) return g.group ?? null;
+    if (groupPlatforms(g).includes(platform)) return g.group ?? null;
   }
   return null;
+}
+
+/**
+ * Baseline-Group für (Plattform, Ziel-Runtime): die neueste Group (Liste ist neueste zuerst),
+ * die die Plattform enthält UND exakt diese runtimeVersion trägt. Andere Plattformen und
+ * andere Runtimes werden nie gewählt — auch wenn sie global neuer sind. Keine → null.
+ */
+export function selectBaselineGroupId(updateListJson, { platform, runtime }) {
+  if (!ALLOWED_PLATFORMS.includes(platform) || typeof runtime !== 'string' || !runtime) return null;
+  const page = updateListJson?.currentPage ?? [];
+  for (const g of page) {
+    if (groupPlatforms(g).includes(platform) && g.runtimeVersion === runtime) return g.group ?? null;
+  }
+  return null;
+}
+
+/**
+ * Ziel-Runtime des Releases. Die Bundle-Runtime kommt aus app.json (resolveReleaseRuntime);
+ * --runtime darf sie nur bestätigen, nie ersetzen. Nicht bestimmbar oder widersprüchlich
+ * → problems (fail closed) — nie die global neueste Runtime raten.
+ */
+export function resolveTargetRuntime({ runtimeFlag, releaseRuntime }) {
+  const problems = [];
+  if (!releaseRuntime) problems.push('Release-Runtime nicht bestimmbar (app.json runtimeVersion) — Ziel-Runtime unklar');
+  if (runtimeFlag != null && (typeof runtimeFlag !== 'string' || !runtimeFlag.trim())) problems.push('--runtime ohne Wert');
+  else if (runtimeFlag != null && releaseRuntime && runtimeFlag.trim() !== releaseRuntime) {
+    problems.push(`Runtime-Mismatch: Release ${releaseRuntime}, erwartet ${runtimeFlag.trim()}`);
+  }
+  return { runtime: problems.length ? null : releaseRuntime, source: runtimeFlag != null ? '--runtime' : 'app.json', problems };
 }
 
 /** Plattform-Eintrag einer Group (aus `eas update:view <group> --json`). */
@@ -166,16 +205,19 @@ export function productionChanged(before, after) {
 }
 
 /** Alle Publish-Guards auf einen Blick. Leere Liste = Publish erlaubt. */
-export function evaluatePublishGuards({ platform, active, releaseHead, releaseRuntime, expectedRuntime, isAncestor, dirty }) {
+export function evaluatePublishGuards({ platform, active, releaseHead, releaseRuntime, expectedRuntime, isAncestor, dirty, initialRuntimeRelease = false }) {
   const problems = [];
   if (!ALLOWED_PLATFORMS.includes(platform)) problems.push('Plattform nicht explizit ios/android');
   if (!/^[0-9a-f]{40}$/.test(releaseHead ?? '')) problems.push('Release-HEAD unbekannt');
   if (dirty) problems.push('Worktree nicht sauber (uncommittete Änderungen würden ins Bundle gelangen; gitCommitHash wäre falsch)');
   if (!releaseRuntime) problems.push('Release-Runtime nicht bestimmbar (app.json runtimeVersion)');
-  if (!active) problems.push(`Kein aktiver Production-Stand für ${platform} in EAS gefunden`);
+  if (!active) problems.push(`Kein aktiver Production-Stand für ${platform} / Runtime ${expectedRuntime ?? '—'} in EAS gefunden — keine Baseline (fail closed; erste OTA einer neuen Runtime nur bewusst mit --initial-runtime-release)`);
   else {
     if (!active.gitCommitHash) problems.push('Aktiver Production-Stand hat keinen gitCommitHash');
     if (active.platform !== platform) problems.push(`Aktiver Stand gehört zu Plattform ${active.platform}, erwartet ${platform}`);
+    if (!initialRuntimeRelease && expectedRuntime && active.runtimeVersion !== expectedRuntime) {
+      problems.push(`Baseline-Runtime ${active.runtimeVersion ?? '—'} ≠ Ziel-Runtime ${expectedRuntime}`);
+    }
     if (isAncestor === false) {
       problems.push(`Release basiert NICHT auf aktuellem Production: aktiver Production-Commit ${active.gitCommitHash} ist kein Vorfahre von ${releaseHead}. Veröffentlichung würde bestehende Production-Fixes zurücksetzen.`);
     } else if (isAncestor == null) problems.push(`Aktiver Production-Commit ${active.gitCommitHash ?? '—'} ist lokal nicht vorhanden (git fetch?) — Ancestry nicht prüfbar`);
@@ -274,13 +316,41 @@ function gitIsAncestor(ancestor, head) {
   try { sh('git', ['merge-base', '--is-ancestor', ancestor, head]); return true; } catch { return false; }
 }
 
-/** Frisch aus EAS: aktiver Production-Stand der Zielplattform (nie aus Doku/Erinnerung). */
-function readActiveProduction(platform) {
-  const list = parseJsonOutput(sh('eas', ['update:list', '--branch', PRODUCTION_BRANCH, '--limit', '50', '--json', '--non-interactive']));
-  const group = pickActiveGroupId(list, platform);
-  if (!group) return null;
+function viewActive(group, platform) {
   const view = parseJsonOutput(sh('eas', ['update:view', group, '--json']));
   return parseActiveFromView(view, platform);
+}
+
+/**
+ * Frisch aus EAS: aktiver Production-Stand für GENAU (Plattform, Runtime) — nie aus
+ * Doku/Erinnerung, nie die global neueste Group. EAS filtert serverseitig (--platform,
+ * --runtime-version, damit ältere Runtimes nicht aus der 50er-Seite fallen); zusätzlich
+ * wird clientseitig gefiltert und der Plattform-Eintrag der Group nachgeprüft.
+ */
+function readActiveProduction(platform, runtime) {
+  const list = parseJsonOutput(sh('eas', ['update:list', '--branch', PRODUCTION_BRANCH, '--platform', platform, '--runtime-version', runtime, '--limit', '50', '--json', '--non-interactive']));
+  const group = selectBaselineGroupId(list, { platform, runtime });
+  if (!group) return null;
+  const active = viewActive(group, platform);
+  return active && active.platform === platform && active.runtimeVersion === runtime ? active : null;
+}
+
+/** Nur --initial-runtime-release: neueste Production-Group der Plattform (beliebige Runtime). */
+function readNewestPlatformProduction(platform) {
+  const list = parseJsonOutput(sh('eas', ['update:list', '--branch', PRODUCTION_BRANCH, '--platform', platform, '--limit', '50', '--json', '--non-interactive']));
+  const group = pickActiveGroupId(list, platform);
+  return group ? viewActive(group, platform) : null;
+}
+
+/**
+ * Baseline für den Release. Normal: runtime-genau. Initial: nur zulässig, solange für die
+ * Ziel-Runtime KEINE Group existiert; dann Vergleich gegen die neueste Group der Plattform.
+ */
+function readBaseline(platform, runtime, initial) {
+  const own = readActiveProduction(platform, runtime);
+  if (!initial) return { active: own, problem: null };
+  if (own) return { active: own, problem: `--initial-runtime-release unzulässig: für ${platform} / Runtime ${runtime} existiert bereits Production-Group ${own.group}` };
+  return { active: readNewestPlatformProduction(platform), problem: null };
 }
 
 function readChannel() {
@@ -300,6 +370,7 @@ function main() {
   const message = argValue(args, '--message') ?? '';
   const platform = argValue(args, '--platform');
   const runtimeFlag = argValue(args, '--runtime');
+  const initialRuntimeRelease = args.includes('--initial-runtime-release');
   // Nur für Tests/Dry-Run: Env-Liste aus Datei statt aus EAS. Nie zusammen mit einer echten Veröffentlichung.
   const envListFile = argValue(args, '--env-list-file');
 
@@ -400,26 +471,37 @@ function main() {
     console.log(`Release-Lock erworben: ${lockPath}`);
   }
 
-  // 5. EAS = Source of Truth: frischer Live-Stand nach Lock-Erwerb.
-  let channel, active;
+  // 5. Ziel-Runtime (fail closed) + EAS = Source of Truth: frischer Live-Stand nach Lock-Erwerb,
+  //    runtime-genau für (Plattform, Ziel-Runtime).
+  const releaseRuntime = resolveReleaseRuntime(existsSync('app.json') ? JSON.parse(readFileSync('app.json', 'utf8')) : null);
+  const target = resolveTargetRuntime({ runtimeFlag, releaseRuntime });
+  if (!target.runtime) {
+    for (const p of target.problems) console.log(`❌ ${p}`);
+    console.log(dryRun ? 'Publish würde VERWEIGERT. --dry-run: nichts veröffentlicht.' : 'HARD STOP. Kein Update veröffentlicht.');
+    process.exit(1);
+  }
+  let channel, baseline;
   try {
     channel = readChannel();
-    active = readActiveProduction(platform);
+    baseline = readBaseline(platform, target.runtime, initialRuntimeRelease);
   } catch {
     console.log('❌ Aktiver Production-Stand konnte nicht aus EAS gelesen werden (eas login / Netz?). Kein Update veröffentlicht.');
     process.exit(1);
   }
+  const active = baseline.active;
+  console.log(`Ziel: ${platform} · Runtime ${target.runtime} (${target.source})${initialRuntimeRelease ? ' · ERSTE OTA dieser Runtime (--initial-runtime-release)' : ''}`);
+  console.log(`Baseline-Auswahl: neueste Production-Group mit Plattform ${platform} UND ${initialRuntimeRelease ? 'beliebiger Runtime (erste OTA der Ziel-Runtime)' : `Runtime ${target.runtime}`}`);
   printActive('ACTIVE PRODUCTION (EAS, frisch)', active);
-  const releaseRuntime = resolveReleaseRuntime(existsSync('app.json') ? JSON.parse(readFileSync('app.json', 'utf8')) : null);
-  const expectedRuntime = runtimeFlag ?? active?.runtimeVersion ?? null;
+  const expectedRuntime = target.runtime;
   const isAncestor = active?.gitCommitHash ? gitIsAncestor(active.gitCommitHash, head) : null;
   const problems = [
     ...channel.problems,
-    ...evaluatePublishGuards({ platform, active, releaseHead: head, releaseRuntime, expectedRuntime, isAncestor, dirty: !!dirty }),
+    ...(baseline.problem ? [baseline.problem] : []),
+    ...evaluatePublishGuards({ platform, active, releaseHead: head, releaseRuntime, expectedRuntime, isAncestor, dirty: !!dirty, initialRuntimeRelease }),
   ];
   console.log(`RELEASE HEAD: ${head}`);
   console.log(`Ancestry (aktiver Production-Commit ⊆ Release-HEAD): ${isAncestor === true ? 'PASS' : isAncestor === false ? 'FAIL' : 'NICHT PRÜFBAR'}`);
-  console.log(`Runtime: Release ${releaseRuntime ?? '—'} · erwartet ${expectedRuntime ?? '—'}${runtimeFlag ? ' (--runtime)' : ' (aktiver Production-Stand)'}`);
+  console.log(`Runtime: Release ${releaseRuntime ?? '—'} · erwartet ${expectedRuntime ?? '—'} (${target.source})`);
   console.log(`Platform: ${platform} only · Channel/Branch: ${PRODUCTION_CHANNEL}/${PRODUCTION_BRANCH} · Environment: production`);
 
   const easArgs = buildProductionUpdateArgs({ platform, message });
@@ -436,7 +518,10 @@ function main() {
 
   // 6. Zweiter EAS-Check DIREKT vor dem Publish — Production darf sich nicht verändert haben.
   let recheck;
-  try { recheck = readActiveProduction(platform); } catch { recheck = null; }
+  try {
+    const rb = readBaseline(platform, target.runtime, initialRuntimeRelease);
+    recheck = rb.problem ? null : rb.active;
+  } catch { recheck = null; }
   if (productionChanged(active, recheck)) {
     console.log(`❌ HARD STOP: ${PRODUCTION_CHANGED_MESSAGE}`);
     printActive('   vorher', active);
@@ -457,7 +542,9 @@ function main() {
 
   // 7. Nachkontrolle: frisch aus EAS. Bei Abweichung Fehler — KEIN automatischer Rollback, KEINE zweite OTA.
   let after = null;
-  try { after = readActiveProduction(platform); } catch { /* unten als Fehler gemeldet */ }
+  // Bewusst die neueste Group der PLATTFORM (jede Runtime): genau das, was eben veröffentlicht
+  // wurde — so fällt auch eine falsche Runtime der neuen Group explizit auf.
+  try { after = readNewestPlatformProduction(platform); } catch { /* unten als Fehler gemeldet */ }
   console.log('\n── Verifikation ──');
   console.log(`Channel: ${PRODUCTION_CHANNEL}   Branch: ${PRODUCTION_BRANCH}   Environment: production`);
   if (after) {

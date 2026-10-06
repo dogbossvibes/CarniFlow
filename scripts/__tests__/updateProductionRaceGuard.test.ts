@@ -72,11 +72,12 @@ describe('Ancestry-Guard (EAS-Stand ⊆ Release-HEAD)', () => {
 });
 
 describe('Runtime-, Channel-, Plattform-, Clean-Tree-Guard', () => {
-  it('3. Runtime-Mismatch (aktive Production auf anderer Runtime) → STOP', () => {
+  it('3. Production nur auf anderer Runtime → keine Baseline für die Release-Runtime → STOP (fail closed)', () => {
     withState({ groups: iosOnly(h.base, OLDER_RUNTIME) });
     const r = confirmIos();
     expect(r.code).toBe(1);
-    expect(r.out).toContain(`Runtime-Mismatch: Release ${RELEASE_RUNTIME}, erwartet ${OLDER_RUNTIME}`);
+    expect(r.out).toContain(`Kein aktiver Production-Stand für ios / Runtime ${RELEASE_RUNTIME} in EAS gefunden`);
+    expect(r.out).toContain('fail closed');
     expect(h.updateCalls()).toEqual([]);
   });
   it('3b. --runtime muss zur Release-Runtime passen', () => {
