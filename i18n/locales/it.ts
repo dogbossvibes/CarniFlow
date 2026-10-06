@@ -385,6 +385,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.searchApproachHint": "Vai all’inizio della pista. Scegli la distanza dal cane e tocca Avvia ora.",
   "track.searchApproachReached": "Inizio raggiunto",
   "track.searchHandlerDistanceLabel": "Distanza dal cane",
+  "track.scale.progress": "{current} m / {total} m",
+  "track.scale.nextObject": "Prossimo oggetto · {meters} m",
   "track.searchHandlerDistanceOption": "Distanza: {meters} metri",
   "track.searchStartNow": "Avvia ora",
   "track.searchStartHint": "La ricerca inizia solo dopo il tuo tocco. Fuori dall’area di partenza è richiesta una conferma.",

@@ -347,6 +347,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.searchApproachHint': 'Gang zum Fährteasatz. Wähl de Abstand zum Hund und tipp uf Jetzt starte.',
   'track.searchApproachReached': 'Asatz erreicht',
   'track.searchHandlerDistanceLabel': 'Abstand zum Hund',
+  'track.scale.progress': '{current} m / {total} m',
+  'track.scale.nextObject': 'Nächschte Gegestand · {meters} m',
   'track.searchHandlerDistanceOption': 'Abstand {meters} Meter',
   'track.searchStartNow': 'Jetzt starte',
   'track.searchStartHint': 'Startet d Absuechi erst nach dim Tippe. Usserhalb vom Startbereich wird e Bestätigung verlangt.',

@@ -965,6 +965,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.searchApproachHint": "Va au départ de la piste. Choisis la distance au chien, puis touche Démarrer maintenant.",
   "track.searchApproachReached": "Départ atteint",
   "track.searchHandlerDistanceLabel": "Distance au chien",
+  "track.scale.progress": "{current} m / {total} m",
+  "track.scale.nextObject": "Prochain objet · {meters} m",
   "track.searchHandlerDistanceOption": "Distance : {meters} mètres",
   "track.searchStartNow": "Démarrer maintenant",
   "track.searchStartHint": "La recherche démarre après ton appui. Hors de la zone de départ, une confirmation est requise.",
