@@ -45,6 +45,8 @@ export interface FakeState {
   publishRuntime?: string;
   publishExtraPlatform?: string;       // simulierte fremde Plattform in der neuen Group
   listCalls?: number;
+  ignoreListFilters?: boolean;         // update:list ignoriert --platform/--runtime-version (Fail-safe-Test)
+  builds?: Record<string, unknown>;    // build:view <id> --json → Eintrag; fehlt → Fehler (Build unbekannt)
 }
 
 const FAKE_EAS = `#!/usr/bin/env node
@@ -72,11 +74,15 @@ else if (a[0] === 'channel:view') {
   const rv = a.includes('--runtime-version') ? a[a.indexOf('--runtime-version') + 1] : null;
   const rows = [];
   for (const g of s.groups) {
-    const match = g.entries.filter(e => (!pf || e.platform === pf) && (!rv || e.runtimeVersion === rv));
+    const match = s.ignoreListFilters ? g.entries : g.entries.filter(e => (!pf || e.platform === pf) && (!rv || e.runtimeVersion === rv));
     if (!match.length) continue;
     rows.push({ group: g.group, platforms: g.entries.map(e => e.platform).join(', '), runtimeVersion: match[0].runtimeVersion });
   }
   out({ name: 'production', currentPage: rows });
+} else if (a[0] === 'build:view') {
+  const b = (load().builds || {})[a[1]];
+  if (!b) { process.stderr.write('Build not found'); process.exit(1); }
+  out(b);
 } else if (a[0] === 'update:view') {
   const s = load();
   const g = s.groups.find(x => x.group === a[1]);

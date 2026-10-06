@@ -202,6 +202,15 @@ describe('E2E: Release auf der neueren Runtime (aus app.json)', () => {
   });
 });
 
+// Erste OTA einer Runtime: Basis ist der NATIVE Production-Build derselben Plattform+Runtime
+// (--initial-runtime-build-id), nie die OTA einer anderen Runtime. Fixture: Build b-ios-105 ≙ base.
+const IOS_BUILD = 'b-ios-105';
+const iosBuild = (h: Harness, patch: Record<string, unknown> = {}) => ({
+  id: IOS_BUILD, status: 'FINISHED', platform: 'IOS', runtime: { version: '1.0.5' }, appVersion: '1.0.5', appBuildVersion: '50',
+  updateChannel: { name: 'production' }, buildProfile: 'production', gitCommitHash: h.base, ...patch,
+});
+const INITIAL_IOS = ['--platform', 'ios', '--initial-runtime-release', '--initial-runtime-build-id', IOS_BUILD];
+
 describe('E2E: erste OTA einer neuen Runtime (--initial-runtime-release, ausdrücklich)', () => {
   let h: Harness;
   beforeAll(() => { h = createHarness({ appVersion: '1.0.5' }); });
@@ -209,33 +218,34 @@ describe('E2E: erste OTA einer neuen Runtime (--initial-runtime-release, ausdrü
   beforeEach(() => h.resetCalls());
 
   it('ohne Flag: noch keine 1.0.5-Group → fail closed', () => {
-    h.setState({ groups: [ios('g-104', h.base, '1.0.4')] });
+    h.setState({ groups: [ios('g-104', h.base, '1.0.4')], builds: { [IOS_BUILD]: iosBuild(h) } });
     const r = h.run(['--platform', 'ios', '--confirm', '--message', 'x']);
     expect(r.code).toBe(1);
     expect(r.out).toContain('Kein aktiver Production-Stand für ios / Runtime 1.0.5');
     expect(h.updateCalls()).toEqual([]);
   });
-  it('mit Flag: Baseline = neueste iOS-Group, Ancestry Pflicht → Publish, Nachkontrolle auf 1.0.5', () => {
-    h.setState({ groups: [android('g-a', h.other, '1.0.5'), ios('g-104', h.base, '1.0.4')] });
-    const r = h.run(['--platform', 'ios', '--initial-runtime-release', '--confirm', '--message', 'x']);
+  it('mit Flag + Build-ID: Basis = nativer 1.0.5-Build (nicht die neueste iOS-Group), Ancestry Pflicht → Publish, Nachkontrolle auf 1.0.5', () => {
+    h.setState({ groups: [android('g-a', h.other, '1.0.5'), ios('g-104', h.other, '1.0.4')], builds: { [IOS_BUILD]: iosBuild(h) } });
+    const r = h.run([...INITIAL_IOS, '--confirm', '--message', 'x']);
     expect(r.code).toBe(0);
-    expect(r.out).toContain('ERSTE OTA dieser Runtime (--initial-runtime-release)');
-    expect(r.out).toContain('ACTIVE PRODUCTION (EAS, frisch): Group g-104');
+    expect(r.out).toContain(`ERSTE OTA dieser Runtime (--initial-runtime-release, Basis-Build ${IOS_BUILD})`);
+    expect(r.out).toContain(`ACTIVE PRODUCTION (EAS, frisch): NATIVER BUILD ${IOS_BUILD} · ios · gitCommitHash ${h.base} · Runtime 1.0.5`);
+    expect(r.out).not.toMatch(/ACTIVE PRODUCTION[^\n]*g-104/);
     expect(r.out).toContain('✅ Nachkontrolle');
     expect(h.state().groups[0].entries[0]).toMatchObject({ platform: 'ios', runtimeVersion: '1.0.5' });
   });
   it('mit Flag, aber 1.0.5-Group existiert bereits → unzulässig, STOP', () => {
-    h.setState({ groups: [ios('g-105', h.base, '1.0.5'), ios('g-104', h.base, '1.0.4')] });
-    const r = h.run(['--platform', 'ios', '--initial-runtime-release', '--confirm', '--message', 'x']);
+    h.setState({ groups: [ios('g-105', h.base, '1.0.5'), ios('g-104', h.base, '1.0.4')], builds: { [IOS_BUILD]: iosBuild(h) } });
+    const r = h.run([...INITIAL_IOS, '--confirm', '--message', 'x']);
     expect(r.code).toBe(1);
     expect(r.out).toContain('--initial-runtime-release unzulässig');
     expect(h.updateCalls()).toEqual([]);
   });
-  it('mit Flag: Ancestry gegen die neueste Plattform-Group bleibt Pflicht', () => {
-    h.setState({ groups: [ios('g-104', h.other, '1.0.4')] });
-    const r = h.run(['--platform', 'ios', '--initial-runtime-release', '--confirm', '--message', 'x']);
+  it('mit Flag: Ancestry gegen den nativen Basis-Build bleibt Pflicht', () => {
+    h.setState({ groups: [ios('g-104', h.base, '1.0.4')], builds: { [IOS_BUILD]: iosBuild(h, { gitCommitHash: h.other }) } });
+    const r = h.run([...INITIAL_IOS, '--confirm', '--message', 'x']);
     expect(r.code).toBe(1);
-    expect(r.out).toContain('Ancestry (aktiver Production-Commit ⊆ Release-HEAD): FAIL');
+    expect(r.out).toContain('Ancestry (nativer Basis-Build-Commit ⊆ Release-HEAD): FAIL');
     expect(h.updateCalls()).toEqual([]);
   });
 });
@@ -262,33 +272,35 @@ describe('Härtung: erste OTA einer Runtime (--initial-runtime-release)', () => 
   beforeAll(() => { h = createHarness({ appVersion: '1.0.5' }); });
   afterAll(() => destroyHarness(h));
   beforeEach(() => h.resetCalls());
-  const confirm = (extra: string[] = []) => h.run(['--platform', 'ios', '--initial-runtime-release', '--confirm', '--message', 'first 1.0.5', ...extra]);
-  const dry = () => h.run(['--platform', 'ios', '--initial-runtime-release', '--dry-run', '--message', 'first 1.0.5'], { envFile: h.fullEnvFile });
+  const setup = (groups: FakeGroup[], build: Record<string, unknown> | null = iosBuild(h)) =>
+    h.setState({ groups, builds: build ? { [IOS_BUILD]: build } : {} });
+  const confirm = (extra: string[] = []) => h.run([...INITIAL_IOS, '--confirm', '--message', 'first 1.0.5', ...extra]);
+  const dry = () => h.run([...INITIAL_IOS, '--dry-run', '--message', 'first 1.0.5'], { envFile: h.fullEnvFile });
 
   it('A. keine 1.0.5-Group + Schalter OHNE --confirm → STOP (Exit 1), keinerlei EAS-Aufruf', () => {
-    h.setState({ groups: [ios('g-104', h.base, '1.0.4')] });
-    const r = h.run(['--platform', 'ios', '--initial-runtime-release', '--message', 'x']);
+    setup([ios('g-104', h.base, '1.0.4')]);
+    const r = h.run([...INITIAL_IOS, '--message', 'x']);
     expect(r.code).toBe(1);
     expect(r.out).toContain('STOP: --initial-runtime-release ohne --confirm. Kein Update veröffentlicht.');
     expect(h.calls()).toEqual([]);
   });
-  it('B. + --confirm + Ancestry PASS → Publish erlaubt, Nachkontrolle grün', () => {
-    h.setState({ groups: [ios('g-104', h.base, '1.0.4')] });
+  it('B. + --confirm + Build gültig + Ancestry PASS → Publish erlaubt, Nachkontrolle grün', () => {
+    setup([ios('g-104', h.base, '1.0.4')]);
     const r = confirm();
     expect(r.code).toBe(0);
-    expect(r.out).toContain('Ancestry (aktiver Production-Commit ⊆ Release-HEAD): PASS');
+    expect(r.out).toContain('Ancestry (nativer Basis-Build-Commit ⊆ Release-HEAD): PASS');
     expect(h.updateCalls()).toHaveLength(1);
     expect(r.out).toContain('✅ Nachkontrolle');
   });
   it('C. + --confirm + Ancestry FAIL → BLOCK (kein „erste Runtime, also egal")', () => {
-    h.setState({ groups: [ios('g-104', h.other, '1.0.4')] });
+    setup([ios('g-104', h.base, '1.0.4')], iosBuild(h, { gitCommitHash: h.other }));
     const r = confirm();
     expect(r.code).toBe(1);
     expect(r.out).toContain('ist kein Vorfahre');
     expect(h.updateCalls()).toEqual([]);
   });
   it('D. Ziel-Runtime-Group existiert bereits → BLOCK (nicht still ignoriert)', () => {
-    h.setState({ groups: [ios('g-105', h.base, '1.0.5'), ios('g-104', h.base, '1.0.4')] });
+    setup([ios('g-105', h.base, '1.0.5'), ios('g-104', h.base, '1.0.4')]);
     const r = confirm();
     expect(r.code).toBe(1);
     expect(r.out).toContain('--initial-runtime-release unzulässig: für ios / Runtime 1.0.5 existiert bereits Production-Group g-105');
@@ -296,49 +308,54 @@ describe('Härtung: erste OTA einer Runtime (--initial-runtime-release)', () => 
     expect(h.updateCalls()).toEqual([]);
   });
   it('E. keine Ziel-Runtime-Group und KEIN Schalter → fail closed', () => {
-    h.setState({ groups: [ios('g-104', h.base, '1.0.4')] });
+    setup([ios('g-104', h.base, '1.0.4')]);
     const r = h.run(['--platform', 'ios', '--confirm', '--message', 'x']);
     expect(r.code).toBe(1);
     expect(r.out).toContain('Kein aktiver Production-Stand für ios / Runtime 1.0.5');
     expect(h.updateCalls()).toEqual([]);
   });
-  it('F. Fallback = genau die neueste Group DERSELBEN Plattform (nicht die global neueste Android-Group)', () => {
-    h.setState({ groups: [android('g-android-104', h.other, '1.0.4'), ios('g-ios-104', h.base, '1.0.4'), ios('g-ios-103', h.base, '1.0.3')] });
+  it('F. Basis = nativer Build der Ziel-Runtime — weder die neueste iOS-Group noch eine Android-Group', () => {
+    setup([android('g-android-104', h.other, '1.0.4'), ios('g-ios-104', h.other, '1.0.4'), ios('g-ios-103', h.other, '1.0.3')]);
     const r = dry();
     expect(r.code).toBe(0);
-    expect(r.out).toContain(`ACTIVE PRODUCTION (EAS, frisch): Group g-ios-104 · ios Update u-g-ios-104 · gitCommitHash ${h.base} · Runtime 1.0.4`);
-    expect(r.out).not.toMatch(/ACTIVE PRODUCTION[^\n]*g-android/);
+    expect(r.out).toContain(`ACTIVE PRODUCTION (EAS, frisch): NATIVER BUILD ${IOS_BUILD} · ios · gitCommitHash ${h.base} · Runtime 1.0.5`);
+    expect(r.out).not.toMatch(/ACTIVE PRODUCTION[^\n]*g-(android|ios)-/);
     expect(r.out).toContain('Publish würde ERLAUBT.');
     expect(h.updateCalls()).toEqual([]);
   });
-  it('G. keine Group derselben Plattform (nur Android) → fail closed, keine plattformfremde Baseline', () => {
-    h.setState({ groups: [android('g-android-104', h.base, '1.0.4')] });
+  it('G. kein gültiger nativer Basis-Build (unbekannt / andere Plattform) → fail closed, keine Ersatz-Basis', () => {
+    setup([ios('g-ios-104', h.base, '1.0.4')], null);
     const r = confirm();
     expect(r.code).toBe(1);
-    expect(r.out).toContain('Keine Production-Group der Plattform ios vorhanden — keine Fallback-Baseline');
+    expect(r.out).toContain(`EAS-Build ${IOS_BUILD} nicht gefunden/lesbar`);
+    expect(r.out).toContain('Kein gültiger nativer Basis-Build für die erste OTA von ios / Runtime 1.0.5');
     expect(r.out).not.toContain('FIRST OTA FOR RUNTIME');
+    h.resetCalls();
+    setup([ios('g-ios-104', h.base, '1.0.4')], iosBuild(h, { platform: 'ANDROID' }));
+    expect(confirm().out).toContain('Plattform android ≠ Ziel ios');
     expect(h.updateCalls()).toEqual([]);
   });
-  it('H. Logging: FIRST OTA FOR RUNTIME mit Plattform, Ziel-Runtime/-Commit und Fallback-Runtime/-Commit', () => {
-    h.setState({ groups: [ios('g-ios-104', h.base, '1.0.4')] });
+  it('H. Logging: FIRST OTA FOR RUNTIME mit Plattform, Ziel-Runtime/-Commit und nativem Basis-Build', () => {
+    setup([ios('g-ios-104', h.other, '1.0.4')]);
     const r = dry();
     const banner = r.out.slice(r.out.indexOf('FIRST OTA FOR RUNTIME'));
     for (const needle of ['FIRST OTA FOR RUNTIME', 'Platform: ios', 'Target Runtime: 1.0.5', `Target Commit: ${h.release}`,
-      'No existing production group for ios / runtime 1.0.5.', 'Group: g-ios-104', 'Runtime: 1.0.4', `Commit: ${h.base}`]) {
+      'No existing production group for ios / runtime 1.0.5.', `Build: ${IOS_BUILD}`, 'Runtime: 1.0.5', `Commit: ${h.base}`]) {
       expect(banner).toContain(needle);
     }
     expect(r.out).toMatch(/={66}\nFIRST OTA FOR RUNTIME/);
   });
   it('I. Nachkontrolle akzeptiert nur die neue Group mit korrekter Runtime UND Production-Zuordnung', () => {
-    h.setState({ groups: [ios('g-104', h.base, '1.0.4')] });
+    setup([ios('g-104', h.base, '1.0.4')]);
     const r = confirm();
     expect(r.code).toBe(0);
     const seq = h.calls().map(a => a[0]).filter(c => c !== 'env:list');
-    expect(seq.slice(seq.indexOf('update') + 1)).toEqual(['update:list', 'update:view', 'update:list', 'update:view']);
+    // neueste Plattform-Group, aktive Group der Release-Runtime, neueste Group der anderen Plattform
+    expect(seq.slice(seq.indexOf('update') + 1)).toEqual(['update:list', 'update:view', 'update:list', 'update:view', 'update:list']);
     expect(h.state().groups[0].entries[0]).toMatchObject({ runtimeVersion: '1.0.5', gitCommitHash: h.release });
   });
   it('J. Nachkontrolle blockiert falsche Runtime der neuen Group (Exit 2, kein Rollback, keine zweite OTA)', () => {
-    h.setState({ groups: [ios('g-104', h.base, '1.0.4')], publishRuntime: '1.0.6' });
+    h.setState({ groups: [ios('g-104', h.base, '1.0.4')], builds: { [IOS_BUILD]: iosBuild(h) }, publishRuntime: '1.0.6' });
     const r = confirm();
     expect(r.code).toBe(2);
     expect(r.out).toContain('POST-PUBLISH: Runtime 1.0.6 ≠ 1.0.5');
@@ -347,10 +364,10 @@ describe('Härtung: erste OTA einer Runtime (--initial-runtime-release)', () => 
   });
 });
 
-describe('Härtung (rein): Banner, Zuordnungs-Nachkontrolle, Fallback-Runtime', () => {
+describe('Härtung (rein): Banner, Zuordnungs-Nachkontrolle, Initial-Basis', () => {
   it('formatFirstRuntimeBanner enthält alle Pflichtangaben', () => {
-    const b: string = call('formatFirstRuntimeBanner', { platform: 'ios', targetRuntime: '1.0.5', targetCommit: 'abc123', baseline: { group: 'g', runtimeVersion: '1.0.4', gitCommitHash: 'def456' } });
-    expect(b.split('\n')).toEqual(expect.arrayContaining(['FIRST OTA FOR RUNTIME', 'Platform: ios', 'Target Runtime: 1.0.5', 'Target Commit: abc123', '  Runtime: 1.0.4', '  Commit: def456']));
+    const b: string = call('formatFirstRuntimeBanner', { platform: 'ios', targetRuntime: '1.0.5', targetCommit: 'abc123', baseline: { buildId: 'b-1', runtimeVersion: '1.0.5', gitCommitHash: 'def456' } });
+    expect(b.split('\n')).toEqual(expect.arrayContaining(['FIRST OTA FOR RUNTIME', 'Platform: ios', 'Target Runtime: 1.0.5', 'Target Commit: abc123', '  Build: b-1', '  Runtime: 1.0.5', '  Commit: def456']));
   });
   it('verifyPostPublish: neue Group muss die aktive Group der Release-Runtime sein', () => {
     const after = { group: 'g-new', platform: 'ios', platforms: ['ios'], runtimeVersion: '1.0.5', gitCommitHash: 'a'.repeat(40) };
@@ -359,9 +376,12 @@ describe('Härtung (rein): Banner, Zuordnungs-Nachkontrolle, Fallback-Runtime', 
     expect((call('verifyPostPublish', { ...base, afterForRuntime: null }) as string[]).join('\n')).toContain('nicht die aktive Production-Group');
     expect((call('verifyPostPublish', { ...base, afterForRuntime: { group: 'g-other' } }) as string[]).join('\n')).toContain('gefunden: g-other');
   });
-  it('erste OTA: eine Fallback-Baseline mit der Ziel-Runtime selbst ist unzulässig', () => {
-    const p = evaluatePublishGuards({ platform: 'ios', active: { group: 'g', platform: 'ios', gitCommitHash: 'b'.repeat(40), runtimeVersion: '1.0.5' },
-      releaseHead: 'a'.repeat(40), releaseRuntime: '1.0.5', expectedRuntime: '1.0.5', isAncestor: true, dirty: false, initialRuntimeRelease: true });
-    expect(p.join('\n')).toContain('--initial-runtime-release unzulässig: Baseline ist bereits eine Group der Ziel-Runtime 1.0.5');
+  it('erste OTA: Basis muss der native Build der Ziel-Runtime sein — nie eine OTA-Group, nie eine fremde Runtime', () => {
+    const base = { platform: 'ios', releaseHead: 'a'.repeat(40), releaseRuntime: '1.0.5', expectedRuntime: '1.0.5', isAncestor: true, dirty: false, initialRuntimeRelease: true };
+    const ota = evaluatePublishGuards({ ...base, active: { group: 'g', platform: 'ios', gitCommitHash: 'b'.repeat(40), runtimeVersion: '1.0.5' } });
+    expect(ota.join('\n')).toContain('--initial-runtime-release unzulässig: Basis ist eine OTA-Group (g)');
+    const foreign = evaluatePublishGuards({ ...base, active: { source: 'native-build', buildId: 'b', group: null, platform: 'ios', gitCommitHash: 'b'.repeat(40), runtimeVersion: '1.0.4' } });
+    expect(foreign.join('\n')).toContain('Baseline-Runtime 1.0.4 ≠ Ziel-Runtime 1.0.5');
+    expect(evaluatePublishGuards({ ...base, active: { source: 'native-build', buildId: 'b', group: null, platform: 'ios', gitCommitHash: 'b'.repeat(40), runtimeVersion: '1.0.5' } })).toEqual([]);
   });
 });
