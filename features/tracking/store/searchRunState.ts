@@ -33,9 +33,14 @@ export interface SearchSegmentAnnounced {
 export interface SearchRunState {
   /** PERSIST (P0): monotoner Referenzfortschritt entlang laidPoints (= maxCursorMRef). Ohne handlerDistance. */
   maxCursorM: number;
-  /** PERSIST: Abweichungs-Summe/-Zähler → deviationAvgM/Score bleiben run-bezogen (nicht rekonstruierbar). */
+  /** PERSIST: rohe Abweichungssumme/-zahl → deviationAvgM bleibt run-bezogen (Messwert, nicht Score). */
   devSumM: number;
   devCount: number;
+  /** Accuracy-/Fusion-reliable score samples. Versioned so legacy recovery keeps its old score semantics. */
+  scoreQualityVersion: 1 | 0;
+  reliableDeviationExcessSumM: number;
+  reliableDeviationCount: number;
+  reliableCursorM: number;
   /** PERSIST: gefundene Gegenstände/Dübel als stabile Marker-IDs (foundRef). */
   foundObjectIds: string[];
   autoDwellObjectIds: string[];
@@ -56,7 +61,8 @@ export interface SearchRunState {
 
 export function freshSearchRunState(): SearchRunState {
   return {
-    maxCursorM: 0, devSumM: 0, devCount: 0,
+    maxCursorM: 0, devSumM: 0, devCount: 0, scoreQualityVersion: 1,
+    reliableDeviationExcessSumM: 0, reliableDeviationCount: 0, reliableCursorM: 0,
     foundObjectIds: [], autoDwellObjectIds: [], dismissedAutoDwellIds: [], voiceFiredIds: [], hapticFiredIds: [],
     endFired: false, segmentAnnouncements: {}, breaks: [], offTrackState: 'on_track',
   };
@@ -75,7 +81,7 @@ const OFF_STATES: readonly OffTrackState[] = ['on_track', 'warning', 'off_track'
  */
 export function sanitizeSearchRunState(raw: unknown): SearchRunState {
   const f = freshSearchRunState();
-  if (!raw || typeof raw !== 'object') return f;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return f;
   const r = raw as Record<string, unknown>;
   const seg: Record<string, SearchSegmentAnnounced> = {};
   if (r.segmentAnnouncements && typeof r.segmentAnnouncements === 'object') {
@@ -104,6 +110,10 @@ export function sanitizeSearchRunState(raw: unknown): SearchRunState {
     maxCursorM: Math.max(0, num(r.maxCursorM, 0)),
     devSumM: Math.max(0, num(r.devSumM, 0)),
     devCount: Math.max(0, Math.floor(num(r.devCount, 0))),
+    scoreQualityVersion: r.scoreQualityVersion === 1 ? 1 : 0,
+    reliableDeviationExcessSumM: Math.max(0, num(r.reliableDeviationExcessSumM, 0)),
+    reliableDeviationCount: Math.max(0, Math.floor(num(r.reliableDeviationCount, 0))),
+    reliableCursorM: Math.max(0, num(r.reliableCursorM, 0)),
     foundObjectIds: strList(r.foundObjectIds),
     autoDwellObjectIds: strList(r.autoDwellObjectIds),
     dismissedAutoDwellIds: strList(r.dismissedAutoDwellIds),

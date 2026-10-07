@@ -42,6 +42,7 @@ import {
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
+import { formatApproxDeviationM } from '@/features/tracking/utils/formatDeviation';
 import { useT, type TranslationKey } from '@/i18n';
 import {
   addTrackFeedback, deleteTrackFeedback, getTrackShare, listAcceptedTrainers, listTrackFeedback,
@@ -602,7 +603,7 @@ export default function TrackAuswertungScreen() {
                 <View style={[s.highlightRow, { marginTop: 14, marginBottom: 0 }]}>
                   <View style={[s.card, s.highlight]}>
                     <Ionicons name="analytics-outline" size={18} color={C.trackPrimary} />
-                    <Text style={s.highlightVal}>{analyticsV3 ? `${analyticsV3.deviationEvents.length}` : `${analytics.deviation.meanM.toFixed(1)} m`}</Text>
+                    <Text style={s.highlightVal}>{analyticsV3 ? `${analyticsV3.deviationEvents.length}` : formatApproxDeviationM(analytics.deviation.meanM)}</Text>
                     <Text style={s.highlightLabel}>{analyticsV3 ? t('track.analysisDeviationEvents') : t('track.analysisLineDeviation')}</Text>
                   </View>
                   <View style={[s.card, s.highlight]}>
@@ -630,11 +631,11 @@ export default function TrackAuswertungScreen() {
 
                 {analyseExpanded && (
                   <View style={{ marginTop: 10, gap: 10 }}>
-                    {analyticsV3 && <Text style={s.analyseDetailLabel}>{t('track.analysisTechnical')} · {t('track.analysisLineDeviation')}: {analytics.deviation.meanM.toFixed(1)} m · Median {analytics.deviation.medianM.toFixed(1)} m · P95 {analytics.deviation.p95M.toFixed(1)} m</Text>}
+                    {analyticsV3 && <Text style={s.analyseDetailLabel}>{t('track.analysisTechnical')} · {t('track.analysisLineDeviation')}: {formatApproxDeviationM(analytics.deviation.meanM)} · Median {formatApproxDeviationM(analytics.deviation.medianM)} · P95 {formatApproxDeviationM(analytics.deviation.p95M)}</Text>}
                     {analyticsV3?.deviationEvents.map(event => (
                       <View key={event.id} style={s.analyseDetailRow}>
                         <Text style={s.analyseDetailLabel}>{t('track.analysisDeviationEvents')} · {event.startAlongTrackM.toFixed(0)} m</Text>
-                        <Text style={s.analyseDetailValue}>{event.durationSec.toFixed(1)} s · max. {event.maxLineDeviationM.toFixed(1)} m · Confidence {Math.round(event.confidence * 100)} %</Text>
+                        <Text style={s.analyseDetailValue}>{event.durationSec.toFixed(1)} s · max. {formatApproxDeviationM(event.maxLineDeviationM)} · Confidence {Math.round(event.confidence * 100)} %</Text>
                       </View>
                     ))}
                     {/* Re-Acquisition-Zeit (Punkt 1/9 der Nachbesserung) — nur wenn
@@ -660,8 +661,8 @@ export default function TrackAuswertungScreen() {
                       <View key={`corner-${i}`} style={s.analyseDetailRow}>
                         <Text style={s.analyseDetailLabel}>Winkel {i + 1} ({c.side === 'links' ? 'links' : c.side === 'rechts' ? 'rechts' : 'Fachwinkel'})</Text>
                         <Text style={s.analyseDetailValue}>
-                          {c.maxLateralDeviationM != null ? `max. ${c.maxLateralDeviationM.toFixed(1)} m` : 'nicht erreicht'}
-                          {c.overshootM != null && c.overshootM > 0 ? ` · Überschuss ${c.overshootM.toFixed(1)} m` : ''}
+                          {c.maxLateralDeviationM != null ? `max. ${formatApproxDeviationM(c.maxLateralDeviationM)}` : 'nicht erreicht'}
+                          {c.overshootM != null && c.overshootM > 0 ? ` · Überschuss ${formatApproxDeviationM(c.overshootM)}` : ''}
                           {'interpretation' in c ? ` · ${t(CORNER_INTERPRETATION_KEYS[c.interpretation])}` : ''}
                           {'stabilizationTimeSec' in c ? c.stabilizationTimeSec != null
                             ? ` · ${t('track.analysisStabilizedAfter')} ${c.stabilizationTimeSec.toFixed(1)} s / ${c.stabilizationDistanceM?.toFixed(1) ?? '—'} m`

@@ -14,13 +14,15 @@ const flush = () => new Promise(r => setTimeout(r, 0));
 
 describe('sanitizeSearchRunState — legacy-sicher (17.)', () => {
   it('undefined/null/garbage → FRESH (dokumentierte Legacy-Degradation, kein Crash)', () => {
-    for (const raw of [undefined, null, 'x', 42, [], {}]) {
+    for (const raw of [undefined, null, 'x', 42, []]) {
       expect(sanitizeSearchRunState(raw)).toEqual(freshSearchRunState());
     }
+    expect(sanitizeSearchRunState({}).scoreQualityVersion).toBe(0); // alter Bestand: keine Accuracy-Historie
   });
   it('vollständiger State wird 1:1 übernommen', () => {
     const full = {
-      maxCursorM: 40.5, devSumM: 12.3, devCount: 7,
+      maxCursorM: 40.5, devSumM: 12.3, devCount: 7, scoreQualityVersion: 1,
+      reliableDeviationExcessSumM: 3.2, reliableDeviationCount: 4, reliableCursorM: 18,
       foundObjectIds: ['gegenstand-1', 'gegenstand-2'], autoDwellObjectIds: [], dismissedAutoDwellIds: [],
       voiceFiredIds: ['angle-1-rechts'], hapticFiredIds: ['angle-1-rechts', 'gegenstand-1'],
       endFired: true, segmentAnnouncements: { seg1: { announcedApproach: true, announcedStart: true, announcedEnd: false } },
@@ -100,7 +102,8 @@ describe('Store — Search-Recovery-State im PendingTrack', () => {
     useTrackingStore.getState().restoreSearchSession(p as PendingTrack);
     const rs = useTrackingStore.getState().searchRunState;
     expect(rs).toEqual({
-      maxCursorM: 30, devSumM: 4, devCount: 3,
+      maxCursorM: 30, devSumM: 4, devCount: 3, scoreQualityVersion: 1,
+      reliableDeviationExcessSumM: 0, reliableDeviationCount: 0, reliableCursorM: 0,
       foundObjectIds: ['gegenstand-1'], autoDwellObjectIds: [], dismissedAutoDwellIds: [],
       voiceFiredIds: ['angle-10-rechts'], hapticFiredIds: ['angle-10-rechts', 'gegenstand-1'],
       endFired: true, segmentAnnouncements: { seg1: { announcedApproach: true, announcedStart: true, announcedEnd: false } },

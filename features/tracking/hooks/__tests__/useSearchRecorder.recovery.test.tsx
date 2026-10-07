@@ -28,12 +28,12 @@ jest.mock('@/features/tracking/utils/positionSource', () => ({
 }));
 
 // Store-Mock mit MITSCHRIFT: was der Recorder in den Run-State spiegelt.
-const storeCalls = { progress: [] as { maxCursorM: number; devCount: number; breaks: unknown[] }[], found: [] as string[], offTrack: [] as string[] };
+const storeCalls = { progress: [] as { maxCursorM: number; devCount: number; reliableDeviationCount?: number; reliableCursorM?: number; breaks: unknown[] }[], found: [] as string[], offTrack: [] as string[] };
 const storeState = { searchRunState: { offTrackState: 'on_track' as string } };
 jest.mock('@/features/tracking/store/trackingStore', () => ({
   useTrackingStore: { getState: () => ({
     addSearchPoint: jest.fn(), resetSearchPoints: jest.fn(),
-    noteSearchRunProgress: (p: any) => storeCalls.progress.push({ maxCursorM: p.maxCursorM, devCount: p.devCount, breaks: p.breaks }),
+    noteSearchRunProgress: (p: any) => storeCalls.progress.push({ maxCursorM: p.maxCursorM, devCount: p.devCount, reliableDeviationCount: p.reliableDeviationCount, reliableCursorM: p.reliableCursorM, breaks: p.breaks }),
     noteSearchObjectFound: (k: string) => storeCalls.found.push(k),
     noteSearchOffTrackState: (s: string) => { storeCalls.offTrack.push(s); storeState.searchRunState.offTrackState = s; },
     searchRunState: storeState.searchRunState,
@@ -68,7 +68,7 @@ function mount(objects: SearchObject[] = OBJECTS): { getRecorder: () => SearchRe
 let simClockMs = 0;
 function feed(yNorthM: number, xEastM = 0.2, accuracy = 4) {
   if (!feedSample) throw new Error('positionSource callback not captured yet');
-  simClockMs += 1000;
+  simClockMs = simClockMs > 0 ? simClockMs + 1000 : Date.now();
   act(() => { feedSample!({ lat: yNorthM / M_PER_DEG, lng: xEastM / M_PER_DEG, accuracy, speed: 1, course: null, t: simClockMs }); });
 }
 const flushMicrotasks = async () => { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); };
@@ -209,5 +209,220 @@ describe('useSearchRecorder — Search-Recovery-State', () => {
     expect(r.foundObjects).toBe(0);
     expect(r.breaks).toHaveLength(0);
     expect(r.offTrackState).toBe('on_track');
+  });
+
+  it('Accuracy-aware: 2 m bei Accuracy 2 m und 10 m bleibt on-track und bewertet die Messung gleich', async () => {
+    const record = async (accuracy: number) => {
+      simClockMs = 0;
+      const { getRecorder } = mount();
+      await flushMicrotasks();
+      act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+      for (let y = 0; y <= 30; y += 2) feed(y, 2, accuracy);
+      const result = { score: getRecorder().score, onTrack: getRecorder().onTrack, state: getRecorder().offTrackState };
+      act(() => { activeRenderer?.unmount(); }); activeRenderer = null; feedSample = null;
+      return result;
+    };
+    const precise = await record(2);
+    const uncertain = await record(10);
+    expect(precise.onTrack).toBe(true);
+    expect(uncertain.onTrack).toBe(true);
+    expect(precise.state).toBe('on_track');
+    expect(uncertain.state).toBe('on_track');
+    expect(uncertain.score).toBe(precise.score);
+  });
+
+  it('Accuracy-aware: 7 m bei 2 m Accuracy bestätigt einen Break; bei 15 m Accuracy nicht', async () => {
+    const record = async (accuracy: number) => {
+      simClockMs = 0;
+      const { getRecorder } = mount();
+      await flushMicrotasks();
+      act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+      for (let y = 0; y <= 32; y += 2) feed(y, 7, accuracy);
+      const result = { score: getRecorder().score, state: getRecorder().offTrackState, breaks: getRecorder().breaks };
+      act(() => { activeRenderer?.unmount(); }); activeRenderer = null; feedSample = null;
+      return result;
+    };
+    const precise = await record(2);
+    const uncertain = await record(15);
+    expect(precise.state).toBe('off_track');
+    expect(precise.breaks).toHaveLength(1);
+    expect(uncertain.state).toBe('on_track');
+    expect(uncertain.breaks).toHaveLength(0);
+    expect(uncertain.score).toBeGreaterThanOrEqual(precise.score);
+  });
+
+  it('Accuracy über MAX_RELIABLE_ACCURACY_M kann weder Off-Track bestätigen noch Score-Coverage erhöhen', async () => {
+    const { getRecorder } = mount();
+    await flushMicrotasks();
+    act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+    for (let y = 0; y <= 40; y += 2) feed(y, 12, 25);
+    expect(getRecorder().offTrackState).toBe('on_track');
+    expect(getRecorder().onTrack).toBe(false); // boolean compatibility: false = nicht belastbar bestätigt
+    expect(getRecorder().breaks).toHaveLength(0);
+    expect(storeCalls.progress.at(-1)?.reliableCursorM).toBe(0);
+  });
+
+  it('Objektpunkte bleiben bei präzisen und unzuverlässigen GPS-Fixes identisch', async () => {
+    const foundObjectScore = async (accuracy: number) => {
+      simClockMs = 0;
+      const { getRecorder } = mount();
+      await flushMicrotasks();
+      act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+      feed(0, 0.2, accuracy);
+      const before = getRecorder().score;
+      act(() => { getRecorder().markObject(); });
+      const after = getRecorder().score;
+      act(() => { activeRenderer?.unmount(); }); activeRenderer = null; feedSample = null;
+      return after - before;
+    };
+    expect(await foundObjectScore(2)).toBe(11); // 21 Punkte / 2 Objekte, gerundet
+    expect(await foundObjectScore(25)).toBe(11);
+  });
+
+  it('bestätigt einen Break genau einmal, schliesst ihn nach Recovery und erzeugt nach Resume keinen Duplikat-Break', async () => {
+    const openBreak = { at: toLL(7, 20), t: 10, startedAtSec: 8 };
+    const runState: SearchRunState = {
+      ...freshSearchRunState(), maxCursorM: 20, offTrackState: 'off_track',
+      breaks: [openBreak], reliableCursorM: 20, reliableDeviationCount: 3,
+    };
+    const { getRecorder } = mount();
+    await flushMicrotasks();
+    act(() => { getRecorder().start({ points: [toLL(7, 18), toLL(7, 20)], startedAtMs: 1, runState }); });
+    for (let y = 22; y <= 30; y += 2) feed(y, 7, 2);
+    expect(getRecorder().breaks).toHaveLength(1);
+    for (let y = 32; y <= 70; y += 2) feed(y, 0.2, 2);
+    const result = getRecorder().stop();
+    expect(result.breaks).toHaveLength(1);
+    expect(result.breaks[0].recoveredAtSec).toBeDefined();
+  });
+
+  // ── Edge-Cases auf Hook-Ebene (reine Tests, keine Logikänderung) ──────────
+  const unmountRun = () => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; feedSample = null; };
+
+  it('Edge A: zuverlässige Coverage wird NICHT über eine unzuverlässige GPS-Lücke hinweg verbunden', async () => {
+    const run = async (gapAccuracy: number) => {
+      simClockMs = 0; storeCalls.progress = [];
+      const { getRecorder } = mount();
+      await flushMicrotasks();
+      act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+      for (let y = 0; y <= 20; y += 2) feed(y, 0.2, 3);             // guter Fix
+      for (let y = 22; y <= 40; y += 2) feed(y, 0.2, gapAccuracy);  // Lücke (25 m = unzuverlässig)
+      for (let y = 42; y <= 60; y += 2) feed(y, 0.2, 3);            // wieder guter Fix
+      const last = storeCalls.progress.at(-1)!;
+      const out = { reliable: last.reliableCursorM!, max: last.maxCursorM, score: getRecorder().score };
+      unmountRun();
+      return out;
+    };
+    const control = await run(3);
+    const gap = await run(25);
+    // Ohne Lücke deckt sich die zuverlässige Coverage mit dem Fortschritt.
+    expect(control.max - control.reliable).toBeLessThan(3);
+    // Mit Lücke: der ~20 m lange unzuverlässige Abschnitt wird nicht überbrückt.
+    expect(gap.max - gap.reliable).toBeGreaterThanOrEqual(15);
+    expect(gap.reliable).toBeLessThan(control.reliable);
+    // Weniger belegte Coverage → weniger Fährtenpunkte, nie mehr.
+    expect(gap.score).toBeLessThan(control.score);
+  });
+
+  it('Edge A2: auch eine KURZE unzuverlässige Lücke (< 5 s, unter der Zeitlücken-Grenze) wird nicht überbrückt', async () => {
+    const run = async (gapAccuracy: number) => {
+      simClockMs = 0; storeCalls.progress = [];
+      const { getRecorder } = mount();
+      await flushMicrotasks();
+      act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+      for (let y = 0; y <= 20; y += 2) feed(y, 0.2, 3);
+      for (let y = 22; y <= 26; y += 2) feed(y, 0.2, gapAccuracy);   // 3 Fixes = 3 s, ~6 m
+      for (let y = 28; y <= 44; y += 2) feed(y, 0.2, 3);
+      const last = storeCalls.progress.at(-1)!;
+      const out = { reliable: last.reliableCursorM!, max: last.maxCursorM };
+      unmountRun();
+      return out;
+    };
+    const control = await run(3);
+    const gap = await run(25);
+    expect(control.max - control.reliable).toBeLessThan(3);
+    // Die Lücke selbst (~6–8 m) zählt nicht als zuverlässig belegte Strecke.
+    expect(gap.max - gap.reliable).toBeGreaterThanOrEqual(5);
+  });
+
+  it('Edge B: nach unzuverlässigen Fixes baut die Off-Track-State-Machine ihre Bestätigung neu auf (Warning)', async () => {
+    const run = async (withGap: boolean) => {
+      simClockMs = 0;
+      const { getRecorder } = mount();
+      await flushMicrotasks();
+      act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+      for (let y = 0; y <= 10; y += 2) feed(y, 0.2, 2);              // sauber auf der Spur
+      const seq: string[] = [];
+      feed(12, 9, 2); seq.push(getRecorder().offTrackState);           // 1. zuverlässiger Warn-Fix
+      if (withGap) for (let y = 14; y <= 18; y += 2) feed(y, 9, 25);   // unzuverlässige Phase
+      const y0 = withGap ? 20 : 14;
+      for (let k = 0; k < 5; k++) { feed(y0 + 2 * k, 9, 2); seq.push(getRecorder().offTrackState); }
+      const out = { seq, breaks: getRecorder().breaks.length };
+      unmountRun();
+      return out;
+    };
+    const control = await run(false);
+    const gap = await run(true);
+    // Ohne Lücke: zweiter zuverlässiger Warn-Fix → warning, drei Off-Fixes → off_track.
+    expect(control.seq).toEqual(['on_track', 'warning', 'warning', 'off_track', 'off_track', 'off_track']);
+    // Mit Lücke: die Serie vor der Lücke zählt nicht weiter — erst ZWEI frische
+    // zuverlässige Fixes führen zu warning, die Off-Bestätigung startet neu.
+    expect(gap.seq).toEqual(['on_track', 'on_track', 'warning', 'warning', 'off_track', 'off_track']);
+    expect(control.breaks).toBe(1);
+    expect(gap.breaks).toBe(1);
+  });
+
+  it('Edge B2: eine laufende Off-Bestätigung wird durch unzuverlässige Fixes unterbrochen und braucht drei frische Fixes', async () => {
+    const run = async (withGap: boolean) => {
+      simClockMs = 0;
+      const { getRecorder } = mount();
+      await flushMicrotasks();
+      act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+      for (let y = 0; y <= 10; y += 2) feed(y, 0.2, 2);
+      feed(12, 9, 2); feed(14, 9, 2);                                   // warning (offStreak 1)
+      feed(16, 9, 2);                                                   // offStreak 2
+      expect(getRecorder().offTrackState).toBe('warning');
+      if (withGap) for (let y = 18; y <= 22; y += 2) feed(y, 9, 25);    // unzuverlässig
+      const y0 = withGap ? 24 : 18;
+      const seq: string[] = [];
+      for (let k = 0; k < 3; k++) { feed(y0 + 2 * k, 9, 2); seq.push(getRecorder().offTrackState); }
+      const out = { seq, breaks: getRecorder().breaks.length };
+      unmountRun();
+      return out;
+    };
+    const control = await run(false);
+    const gap = await run(true);
+    expect(control.seq).toEqual(['off_track', 'off_track', 'off_track']);   // dritter Off-Fix in Serie
+    expect(gap.seq).toEqual(['warning', 'warning', 'off_track']);           // Serie neu: drei frische Fixes
+    expect(control.breaks).toBe(1);
+    expect(gap.breaks).toBe(1);
+  });
+
+  it('Edge C: fortgesetzte Legacy-Session (scoreQualityVersion 0) behält im Recorder die alte Score-Semantik, Version 1 die neue', async () => {
+    const scoreAfterResume = async (rs: Partial<SearchRunState>) => {
+      simClockMs = 0;
+      const runState: SearchRunState = { ...freshSearchRunState(), maxCursorM: 40, devSumM: 40, devCount: 10, ...rs };
+      const { getRecorder } = mount();
+      await flushMicrotasks();
+      act(() => { getRecorder().start({ points: [toLL(2, 38), toLL(2, 40)], startedAtMs: 1, runState }); });
+      for (let y = 42; y <= 60; y += 2) feed(y, 2, 2);   // 2 m neben der Spur, innerhalb des Warnkorridors (3 m)
+      const score = getRecorder().score;
+      unmountRun();
+      return score;
+    };
+    // Version 0 (Legacy): rohe Abweichung + maxCursor zählen; die neuen reliable*-Felder sind irrelevant.
+    const v0 = await scoreAfterResume({ scoreQualityVersion: 0, reliableDeviationExcessSumM: 0, reliableDeviationCount: 10, reliableCursorM: 40 });
+    const v0OtherReliable = await scoreAfterResume({ scoreQualityVersion: 0, reliableDeviationExcessSumM: 500, reliableDeviationCount: 1, reliableCursorM: 0 });
+    const v0MoreRawDeviation = await scoreAfterResume({ scoreQualityVersion: 0, devSumM: 90, reliableDeviationCount: 10, reliableCursorM: 40 });
+    expect(v0OtherReliable).toBe(v0);
+    expect(v0MoreRawDeviation).toBeLessThan(v0);
+    // Version 1 (neu): nur der zuverlässige Restabstand jenseits des Korridors und die zuverlässige Coverage zählen.
+    const v1 = await scoreAfterResume({ scoreQualityVersion: 1, reliableDeviationExcessSumM: 0, reliableDeviationCount: 10, reliableCursorM: 40 });
+    const v1MoreRawDeviation = await scoreAfterResume({ scoreQualityVersion: 1, devSumM: 90, reliableDeviationExcessSumM: 0, reliableDeviationCount: 10, reliableCursorM: 40 });
+    const v1LessReliableCoverage = await scoreAfterResume({ scoreQualityVersion: 1, reliableDeviationExcessSumM: 0, reliableDeviationCount: 10, reliableCursorM: 0 });
+    expect(v1MoreRawDeviation).toBe(v1);                 // rohe Abweichung belastet die neue Wertung nicht
+    expect(v1LessReliableCoverage).toBeLessThan(v1);     // Coverage kommt aus reliableCursorM
+    // Gleiche Messung, unterschiedliche Semantik: Legacy bestraft die rohe 2-m-Abweichung, Version 1 nicht.
+    expect(v1).toBeGreaterThan(v0);
   });
 });

@@ -15,6 +15,7 @@
 import { buildQaTrackExport, assertNoAbsoluteData, toMs, type RawLayPoint, type RawTrackMarker } from '@/features/tracking/utils/qaTrackExport';
 import { assertSupportPrivacy, type SupportExport } from '@/features/tracking/utils/supportDiagnostics';
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
+import { formatApproxDeviationM } from '@/features/tracking/utils/formatDeviation';
 import type { TranslationKey } from '@/i18n/de-CH';
 
 const M_PER_DEG = 111320;
@@ -140,7 +141,7 @@ export function buildCustomerDiagnosisSummary(data: Record<string, any> | null |
     rows.push({ key: 'searchTrack', labelKey: `${P}searchTrack` as TranslationKey, value: run.runPoints.length > 1
       ? { textKey: `${P}searchTrackRecorded` as TranslationKey, params: { count: run.runPoints.length } }
       : { textKey: `${P}searchTrackNone` as TranslationKey } });
-    if (isNum(run.averageDeviationMeters)) rows.push({ key: 'deviation', labelKey: `${P}deviation` as TranslationKey, value: meters(Number(run.averageDeviationMeters.toFixed(1))) });
+    if (isNum(run.averageDeviationMeters)) rows.push({ key: 'deviation', labelKey: `${P}deviation` as TranslationKey, value: { text: formatApproxDeviationM(run.averageDeviationMeters) } });
     rows.push({ key: 'analysis', labelKey: `${P}analysis` as TranslationKey, value: { textKey: (data?.track_data?.run?.analytics ? `${P}available` : `${P}notAvailable`) as TranslationKey } });
   }
   return { kind, rows, hasLayGeometry: lay.length >= 2 };

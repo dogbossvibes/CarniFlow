@@ -4,6 +4,7 @@ import { C } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
 import type { AnalyticsSegment, TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
+import { formatApproxDeviationM } from '@/features/tracking/utils/formatDeviation';
 
 // Bestehende ANYVO-Card/Bottom-Sheet (Punkt 15) — bewusst NUR eine kleine,
 // kuratierte Auswahl an Werten je Segmenttyp, nicht alle Rohwerte gleichzeitig.
@@ -76,9 +77,9 @@ export function SegmentDetailSheet({ segment, analytics, visible, onClose }: Pro
 
         {segment.type === 'corner' && corner ? (
           <>
-            {corner.overshootM != null && <Row label={t('track.segments.detail.overshoot')} value={`${corner.overshootM.toFixed(1)} m`} />}
+            {corner.overshootM != null && <Row label={t('track.segments.detail.overshoot')} value={formatApproxDeviationM(corner.overshootM)} />}
             {corner.reacquisitionSec != null && <Row label={t('track.segments.detail.reacquisitionTime')} value={`${corner.reacquisitionSec.toFixed(1)} s`} />}
-            {corner.maxLateralDeviationM != null && <Row label={t('track.segments.detail.maxDeviation')} value={`${corner.maxLateralDeviationM.toFixed(1)} m`} />}
+            {corner.maxLateralDeviationM != null && <Row label={t('track.segments.detail.maxDeviation')} value={formatApproxDeviationM(corner.maxLateralDeviationM)} />}
             {v3Corner && <Row label={t('track.analysisStabilization')} value={v3Corner.stabilizationTimeSec != null
               ? `${v3Corner.stabilizationTimeSec.toFixed(1)} s · ${v3Corner.stabilizationDistanceM?.toFixed(1) ?? '—'} m`
               : t('track.analysisNotReliable')} />}
@@ -96,12 +97,12 @@ export function SegmentDetailSheet({ segment, analytics, visible, onClose }: Pro
                 <Row label={t('track.analysisObjectStay')} value={`${v3Object.stopDurationSec.toFixed(1)} s`} />
                 <Row label={t('track.segments.detail.quality')} value={t(CONFIDENCE_LEGEND_KEY[v3Object.contactConfidence >= 0.9 ? 'excellent' : v3Object.contactConfidence >= 0.75 ? 'good' : v3Object.contactConfidence >= 0.5 ? 'limited' : 'unreliable'])} />
               </>
-            ) : legacyObject && 'minDistanceM' in legacyObject && legacyObject.minDistanceM != null ? <Row label={t('track.segments.detail.maxDeviation')} value={`${legacyObject.minDistanceM.toFixed(1)} m`} /> : null}
+            ) : legacyObject && 'minDistanceM' in legacyObject && legacyObject.minDistanceM != null ? <Row label={t('track.segments.detail.maxDeviation')} value={formatApproxDeviationM(legacyObject.minDistanceM)} /> : null}
           </>
         ) : (
           <>
-            {segment.meanDeviationM != null && <Row label={t('track.segments.detail.meanDeviation')} value={`${segment.meanDeviationM.toFixed(1)} m`} />}
-            {segment.p95DeviationM != null && <Row label={t('track.segments.detail.p95Deviation')} value={`${segment.p95DeviationM.toFixed(1)} m`} />}
+            {segment.meanDeviationM != null && <Row label={t('track.segments.detail.meanDeviation')} value={formatApproxDeviationM(segment.meanDeviationM)} />}
+            {segment.p95DeviationM != null && <Row label={t('track.segments.detail.p95Deviation')} value={formatApproxDeviationM(segment.p95DeviationM)} />}
             {segment.averageSpeedMps != null && <Row label={t('track.segments.detail.pace')} value={`${segment.averageSpeedMps.toFixed(2)} m/s`} />}
           </>
         )}

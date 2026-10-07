@@ -26,7 +26,7 @@ import {
   stepSearchStart, type SearchStartAcqState, type SearchStartState,
 } from '@/features/tracking/engine/searchStartAcquisition';
 import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
-import { stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
+import { getOffTrackThreshold, stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
 import { INITIAL_OBJECT_DWELL, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
@@ -38,8 +38,9 @@ import {
   evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand,
   type MotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
 } from '@/features/tracking/engine/trackFusionEngine';
-import type { AnalyticsSample } from '@/features/tracking/engine/trackAnalytics';
+import { RELIABLE_CONFIDENCE_FLOOR, type AnalyticsSample } from '@/features/tracking/engine/trackAnalytics';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
+import { TRACK_ANALYSIS_THRESHOLDS } from '@/features/tracking/engine/trackAnalyticsV3';
 import { admitsEndHandlerFix } from '@/features/tracking/utils/endFixConfirmation';
 import { formatSearchFixDiag, type SearchFixDiag, type SearchFixStatus } from '@/features/tracking/utils/searchFixDiag';
 
@@ -70,11 +71,9 @@ export type Break = {
   recoveredAfterM?: number;
   // Punkt 1 (Re-Acquisition-Zeit): zusätzlich zur bestehenden Distanz-Metrik
   // (recoveredAfterM) jetzt auch echte Zeitstempel. startedAtSec ist bewusst
-  // NICHT identisch mit `t` — es ist der Moment, in dem der Hund/die virtuelle
-  // Position den äusseren Korridor (BREAK_THRESHOLD_M) tatsächlich verlassen
-  // hat, `t` dagegen erst der spätere, um BREAK_HOLD_MS verzögerte
-  // Bestätigungs-Zeitpunkt. Für die Re-Acquisition-DAUER zählt der echte
-  // Verlassenszeitpunkt, nicht die Bestätigungsverzögerung.
+  // NICHT identisch mit `t`: es markiert den Beginn der bestätigten
+  // Warning-Phase aus der accuracy-aware State-Machine. Der exakte erste
+  // Grenzübertritt ist aus diskreten GPS-Fixes nicht verlässlich bestimmbar.
   startedAtSec: number;
   // undefined/null = noch offen (Session endete im Abriss) — geht NICHT in
   // meanSec/maxSec ein (siehe trackAnalytics.computeReacquisitionStats).
@@ -106,17 +105,13 @@ function logSearchFix(d: SearchFixDecision): void {
 // unter realem GPS fast alle Suchfixes verworfen). useTrackRecorder bleibt unberührt.
 const MIN_SEGMENT = 1.5;         // m — Distanz-Gate (Liniendichte, unverändert)
 const SMOOTH_ALPHA = 0.4;        // EMA
-const ON_TRACK_M = 3.0;          // m — innerhalb = "auf der Fährte"
-const BREAK_THRESHOLD_M = 6.0;   // m — darüber für BREAK_HOLD = Abriss
-const BREAK_HOLD_MS = 4000;      // ms — so lange muss die Abweichung halten
-const RECOVER_M = 3.0;           // m — wieder unter diesem Wert = Neuansatz/erholt
 const DEV_EMA = 0.25;            // Glättung der angezeigten Abweichung
 
 // ── Reihenfolge-bewusste Projektion (Fortschritt entlang der Soll-Fährte) ──
 const LOOKAHEAD_M = 20;          // m — so weit voraus wird auf die Soll-Fährte projiziert
 const BACK_M = 4;                // m — kleine Toleranz nach hinten (Jitter)
 const ADVANCE_DEV_M = 12;        // m — nur bei Abweichung darunter rückt der Fortschritt vor
-// Strenge Abweichungs-Skala für die Wertung: volle Punkte bis FULL_DEV_M, 0 ab ZERO_DEV_M.
+// Score-Skala für den zuverlässigen Restabstand jenseits des GPS-adaptiven Warnkorridors.
 const FULL_DEV_M = 1.5;
 const ZERO_DEV_M = 10;
 
@@ -249,7 +244,7 @@ export function useSearchRecorder(opts: {
   const endSmoothRef = useRef<LatLng | null>(null);
   const [liveFix, setLiveFix] = useState<SearchRecorder['liveFix']>(null);
   const [snap, setSnap] = useState({ points: [] as LatLng[], breaks: [] as Break[], found: 0,
-    objectStatuses: [] as ReferenceObjectStatus[], deviationM: 0, onTrack: true, distanceM: 0,
+    objectStatuses: [] as ReferenceObjectStatus[], deviationM: 0, onTrack: !hasTrack, distanceM: 0,
     progressM: 0, score: 0, offTrackState: 'on_track' as OffTrackState });
   const [elapsedS, setElapsedS] = useState(0);
   const [gpsDebug, setGpsDebug] = useState<GpsDebug>({ source: null, provider: null, isNativeAvailable: false, rawGnssSupported: false, rejectedCount: 0 });
@@ -301,8 +296,14 @@ export function useSearchRecorder(opts: {
   const devEmaRef = useRef(0);
   const devSumRef = useRef(0);
   const devCountRef = useRef(0);
-  const offTrackSinceRef = useRef<number | null>(null);
-  const inBreakRef = useRef(false);
+  const reliableDeviationExcessSumRef = useRef(0);
+  const reliableDeviationCountRef = useRef(0);
+  const reliableCursorMRef = useRef(0);
+  const lastReliableCursorMRef = useRef<number | null>(null);
+  const lastReliableAtSecRef = useRef<number | null>(null);
+  const scoreQualityVersionRef = useRef<0 | 1>(1);
+  const offTrackReliableRef = useRef(false);
+  const offTrackWarningSinceRef = useRef<number | null>(null);
   // Phase-1 Off-Track-State-Machine (features/tracking/utils/offTrack). NUR Status
   // halten/exponieren — KEIN Voice/Haptik/Banner/Recorder-Freeze/Auto-Pause hier.
   const offTrackRef = useRef<OffTrackSnapshot>(initialOffTrack());
@@ -340,13 +341,19 @@ export function useSearchRecorder(opts: {
 
   const computeScore = useCallback(() => {
     // Ohne Soll-Fährte (Freilauf-Training) gibt es nichts zu bewerten → neutral.
-    const avgDev = devCountRef.current ? devSumRef.current / devCountRef.current : Infinity;
-    // Strenge Abweichungs-Skala: volle Punkte bis FULL_DEV_M, linear auf 0 bis ZERO_DEV_M.
+    const qualityVersion = scoreQualityVersionRef.current;
+    const scoreCount = qualityVersion === 1 ? reliableDeviationCountRef.current : devCountRef.current;
+    const avgDev = qualityVersion === 1
+      ? (scoreCount ? reliableDeviationExcessSumRef.current / scoreCount : Infinity)
+      : (scoreCount ? devSumRef.current / scoreCount : Infinity);
+    // Nur der reliable Restabstand ausserhalb des accuracy-adaptiven Warnkorridors
+    // belastet die Fährtenpunkte; rohe Abweichung bleibt separat als Messwert erhalten.
     const onTrackRatio = !hasTrack
       ? 1
-      : (devCountRef.current ? Math.max(0, Math.min(1, (ZERO_DEV_M - avgDev) / (ZERO_DEV_M - FULL_DEV_M))) : 0);
+      : (scoreCount ? Math.max(0, Math.min(1, (ZERO_DEV_M - avgDev) / (ZERO_DEV_M - FULL_DEV_M))) : 0);
     // Coverage: wie viel der Fährte in richtiger Reihenfolge abgelaufen wurde.
-    const coverage = !hasTrack ? 1 : Math.max(0, Math.min(1, maxCursorMRef.current / arc.total));
+    const scoreCursorM = qualityVersion === 1 ? reliableCursorMRef.current : maxCursorMRef.current;
+    const coverage = !hasTrack ? 1 : Math.max(0, Math.min(1, scoreCursorM / arc.total));
     const breakPenalty = breaksRef.current.length * 4;
     const trackScore = Math.max(0, model.trackPts * onTrackRatio * coverage - breakPenalty);
     const objScore = totalObjects ? (foundRef.current.size / totalObjects) * model.objectPts : model.objectPts;
@@ -360,13 +367,15 @@ export function useSearchRecorder(opts: {
       found: foundRef.current.size,
       objectStatuses: objectStatusesRef.current.slice(),
       deviationM: Math.round(devEmaRef.current * 10) / 10,
-      onTrack: devEmaRef.current <= ON_TRACK_M,
+      // Boolean compatibility: true means a reliable, current on_track assessment.
+      // false includes warning/off_track and an unassessable latest fix.
+      onTrack: !hasTrack || (offTrackReliableRef.current && offTrackRef.current.state === 'on_track'),
       distanceM: distRef.current,
       progressM: maxCursorMRef.current,
       score: computeScore(),
       offTrackState: offTrackRef.current.state,
     });
-  }, [computeScore]);
+  }, [computeScore, hasTrack]);
 
   // ── Kernlogik ──
   const onFix = useCallback((loc: Location.LocationObject) => {
@@ -777,13 +786,64 @@ export function useSearchRecorder(opts: {
     // während der Handler nachweislich noch am Ansatz steht/ankommt.
     const startLocked = !hasTrack || searchStartRef.current.state === 'START_LOCKED';
 
-    // Phase-1 Off-Track: State-Machine mit dem bereits berechneten seitlichen Abstand
-    // (dev = projectForward().devM) + GPS-Genauigkeit füttern. NUR Status halten —
-    // keine UI/Voice/Haptik/Freeze-/Pause-Aktion (bewusst separate Phase 2+).
+    let assessmentReliable = false;
     if (hasTrack && startLocked) {
-      offTrackRef.current = stepOffTrack(offTrackRef.current, {
-        crossTrackM: dev, accuracyM: accRaw, accepted: true, nowMs: now,
-      }).snap;
+      const assessment = stepOffTrack(offTrackRef.current, {
+        crossTrackM: dev, accuracyM: accRaw,
+        accepted: fusion.confidence >= RELIABLE_CONFIDENCE_FLOOR, nowMs: now,
+      });
+      offTrackRef.current = assessment.snap;
+      assessmentReliable = assessment.reliable;
+      offTrackReliableRef.current = assessment.reliable;
+
+      if (assessment.transition === 'warning') offTrackWarningSinceRef.current = now;
+      else if (assessment.transition === 'recovered') offTrackWarningSinceRef.current = null;
+      else if (assessment.reliable && assessment.snap.state === 'warning' && offTrackWarningSinceRef.current == null) {
+        // Resume or an unreliable interval starts a fresh, continuous evidence window.
+        offTrackWarningSinceRef.current = now;
+      } else if (!assessment.reliable && assessment.snap.state !== 'off_track') {
+        offTrackWarningSinceRef.current = null;
+      }
+      if (assessment.transition === 'off_track') {
+        const lastBreak = breaksRef.current[breaksRef.current.length - 1];
+        if (!lastBreak || lastBreak.recoveredAtSec != null) {
+          breaksRef.current.push({
+            at: sm,
+            t: Math.floor((now - startMsRef.current) / 1000),
+            startedAtSec: Math.max(0, ((offTrackWarningSinceRef.current ?? now) - startMsRef.current) / 1000),
+          });
+        }
+      } else if (assessment.transition === 'recovered') {
+        const lastBreak = breaksRef.current[breaksRef.current.length - 1];
+        if (lastBreak && lastBreak.recoveredAtSec == null) {
+          lastBreak.recoveredAfterM = Math.round(distRef.current);
+          const recoveredAtSec = (now - startMsRef.current) / 1000;
+          lastBreak.recoveredAtSec = recoveredAtSec;
+          lastBreak.durationSec = Math.round(Math.max(0, recoveredAtSec - lastBreak.startedAtSec) * 10) / 10;
+        }
+      }
+    }
+
+    if (assessmentReliable && fusion.confidence >= RELIABLE_CONFIDENCE_FLOOR) {
+      const warningM = getOffTrackThreshold({ accuracyM: accRaw }).warningM;
+      reliableDeviationExcessSumRef.current += Math.max(0, dev - warningM);
+      reliableDeviationCountRef.current += 1;
+      const atSec = (tNow - startMsRef.current) / 1000;
+      const previousAtM = lastReliableCursorMRef.current;
+      const previousAtSec = lastReliableAtSecRef.current;
+      if (previousAtM != null && previousAtSec != null) {
+        const dt = atSec - previousAtSec;
+        const deltaM = cursorMRef.current - previousAtM;
+        if (dt > 0 && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec && deltaM >= 0) {
+          reliableCursorMRef.current += deltaM;
+        }
+      }
+      lastReliableCursorMRef.current = cursorMRef.current;
+      lastReliableAtSecRef.current = atSec;
+    } else {
+      // Unreliable fixes do not bridge score coverage across a data gap.
+      lastReliableCursorMRef.current = null;
+      lastReliableAtSecRef.current = null;
     }
 
     // ── Analytics-Sample (Punkt 10/13) — nur nach Start-Lock: vor dem Lock
@@ -802,40 +862,6 @@ export function useSearchRecorder(opts: {
         fusionClassification: fusion.classification,
         motionConfidence: motionLatestRef.current?.motionConfidence ?? null,
       });
-    }
-
-    if (startLocked) {
-      if (!inBreakRef.current) {
-        if (dev > BREAK_THRESHOLD_M) {
-          if (offTrackSinceRef.current == null) offTrackSinceRef.current = now;
-          else if (now - offTrackSinceRef.current >= BREAK_HOLD_MS) {
-            inBreakRef.current = true;
-            // startedAtSec = der TATSÄCHLICHE Verlassenszeitpunkt des äusseren
-            // Korridors (offTrackSinceRef), nicht der um BREAK_HOLD_MS spätere
-            // Bestätigungszeitpunkt `t` — sonst würde jede Re-Acquisition-Dauer
-            // systematisch um die Bestätigungsverzögerung verkürzt gemessen.
-            breaksRef.current.push({
-              at: sm,
-              t: Math.floor((now - startMsRef.current) / 1000),
-              startedAtSec: Math.max(0, (offTrackSinceRef.current - startMsRef.current) / 1000),
-            });
-          }
-        } else {
-          offTrackSinceRef.current = null;
-        }
-      } else {
-        if (dev <= RECOVER_M) {
-          inBreakRef.current = false;
-          offTrackSinceRef.current = null;
-          const b = breaksRef.current[breaksRef.current.length - 1];
-          if (b) {
-            b.recoveredAfterM = Math.round(distRef.current);
-            const recoveredAtSec = (now - startMsRef.current) / 1000;
-            b.recoveredAtSec = recoveredAtSec;
-            b.durationSec = Math.round(Math.max(0, recoveredAtSec - b.startedAtSec) * 10) / 10;
-          }
-        }
-      }
     }
 
     // Gegenstände werden oben als auto_dwell oder per markObject bestätigt.
@@ -880,6 +906,9 @@ export function useSearchRecorder(opts: {
       const st = useTrackingStore.getState();
       st.noteSearchRunProgress({
         maxCursorM: maxCursorMRef.current, devSumM: devSumRef.current, devCount: devCountRef.current,
+        reliableDeviationExcessSumM: reliableDeviationExcessSumRef.current,
+        reliableDeviationCount: reliableDeviationCountRef.current,
+        reliableCursorM: reliableCursorMRef.current,
         breaks: breaksRef.current.slice(),
       });
       if (st.searchRunState.offTrackState !== offTrackRef.current.state) st.noteSearchOffTrackState(offTrackRef.current.state);
@@ -1009,8 +1038,15 @@ export function useSearchRecorder(opts: {
     // Fehlt runState (Legacy-Puffer) → Fortschritt 0 wie bisher (Degradation).
     const rs = resume?.runState ?? null;
     devEmaRef.current = 0; devSumRef.current = rs?.devSumM ?? 0; devCountRef.current = rs?.devCount ?? 0;
+    scoreQualityVersionRef.current = resume ? (rs?.scoreQualityVersion ?? 0) : 1;
+    reliableDeviationExcessSumRef.current = rs?.reliableDeviationExcessSumM ?? 0;
+    reliableDeviationCountRef.current = rs?.reliableDeviationCount ?? 0;
+    reliableCursorMRef.current = rs?.reliableCursorM ?? 0;
+    lastReliableCursorMRef.current = null;
+    lastReliableAtSecRef.current = null;
     breaksRef.current = rs ? rs.breaks.map(b => ({ ...b, at: { ...b.at } })) : [];
-    offTrackSinceRef.current = null; inBreakRef.current = false;
+    offTrackWarningSinceRef.current = null;
+    offTrackReliableRef.current = false;
     offTrackRef.current = { ...initialOffTrack(), state: rs?.offTrackState ?? 'on_track' };
     const seedCursorM = rs ? Math.max(0, Math.min(arc.total, rs.maxCursorM)) : 0;
     cursorMRef.current = seedCursorM; maxCursorMRef.current = seedCursorM;
@@ -1165,7 +1201,8 @@ export function useSearchRecorder(opts: {
   return {
     ready, recording, paused,
     objectStatuses: snap.objectStatuses,
-    points: snap.points, position, endHandlerFix, liveFix, deviationM: snap.deviationM, onTrack: snap.onTrack,
+    points: snap.points, position, endHandlerFix, liveFix, deviationM: snap.deviationM,
+    onTrack: !hasTrack || (offTrackReliableRef.current && offTrackRef.current.state === 'on_track'),
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
     autoDwellObjectIds: Array.from(autoDwellIdsRef.current), activeObjectWait,
     distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,

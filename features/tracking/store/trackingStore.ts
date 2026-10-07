@@ -139,7 +139,7 @@ interface TrackingState {
   clearSearchSession: () => void;                  // Suchversuch verworfen: Such-Felder zurück, Fährte wieder 'resting' (Lay-Daten bleiben)
   restoreSearchSession: (p: PendingTrack) => void; // Recovery: Absuche-Metadaten + Punkte aus dem Puffer zurückspielen (P2)
   // ── Search-Recovery-State (gehört zur aktiven searchRunId) ──
-  noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
+  noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; reliableDeviationExcessSumM?: number; reliableDeviationCount?: number; reliableCursorM?: number; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
   noteSearchObjectFound: (objectKey: string) => void;      // sofort persistiert
   noteSearchAutoDwell: (objectKey: string) => void;
   dismissSearchAutoDwell: (objectKey: string) => void;
@@ -338,7 +338,11 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
     set(s => ({ searchRunState: {
       ...s.searchRunState,
       maxCursorM: Math.max(s.searchRunState.maxCursorM, p.maxCursorM),
-      devSumM: p.devSumM, devCount: p.devCount, breaks: p.breaks,
+      devSumM: p.devSumM, devCount: p.devCount,
+      reliableDeviationExcessSumM: p.reliableDeviationExcessSumM ?? s.searchRunState.reliableDeviationExcessSumM,
+      reliableDeviationCount: p.reliableDeviationCount ?? s.searchRunState.reliableDeviationCount,
+      reliableCursorM: Math.max(s.searchRunState.reliableCursorM, p.reliableCursorM ?? s.searchRunState.reliableCursorM),
+      breaks: p.breaks,
     } }));
     persist(get);
   },

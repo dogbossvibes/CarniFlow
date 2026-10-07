@@ -47,6 +47,7 @@ import { getSearchPointsBySession } from '@/features/tracking/repositories/local
 import { discardSearchAttempt } from '@/features/tracking/services/trackRecoveryService';
 import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { formatApproxDeviationM } from '@/features/tracking/utils/formatDeviation';
 import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import type { GpsStats } from '@/features/tracking/engine/types';
@@ -863,7 +864,7 @@ export default function TrackRunScreen() {
 
   const hasLaid = snapData.laidPoints.length > 1;
   const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
-  const devOff = devShown != null && devShown > 8;
+  const devOff = s.offTrackState !== 'on_track';
 
   const handleCancel = () => {
     Alert.alert('Fährte läuft noch', 'Die Absuche bleibt aktiv. Zum Beenden bitte den Stop-Button antippen.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
@@ -1084,7 +1085,7 @@ export default function TrackRunScreen() {
   const metrics: { value: string; label: string; warn?: boolean }[] = [
     { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
     { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
-    { value: devShown != null ? `${devOff ? '+' : ''}${devShown.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
+    { value: devShown != null ? `${devOff ? '+' : ''}${formatApproxDeviationM(devShown)}` : '—', label: 'Abweich.', warn: devOff },
     { value: s.accuracy != null ? `±${Math.round(s.accuracy)} m` : '—', label: gpsLabel },
   ];
 

@@ -87,6 +87,19 @@ describe('Off-Track State Machine', () => {
     expect(held.snap.state).toBe(r.snap.state);
   });
 
+  it('unzuverlässige Fixes unterbrechen die Bestätigungsserie, ohne den sichtbaren Zustand zu ändern', () => {
+    let r = feed(initialOffTrack(), 7);
+    r = feed(r.snap, 7); // warning + erster bestätigter Off-Fix
+    expect(r.snap.state).toBe('warning');
+    expect(r.snap.offStreak).toBe(1);
+    const held = feed(r.snap, 7, { accuracyM: 25 });
+    expect(held.snap.state).toBe('warning');
+    expect(held.snap.offStreak).toBe(0);
+    r = feed(held.snap, 7);
+    expect(r.snap.state).toBe('warning');
+    expect(r.snap.events).toBe(0);
+  });
+
   it('17) Hysterese: Totzone zwischen recovery und warning hält WARNING (kein Flattern)', () => {
     let r = drive(initialOffTrack(), 5, 2);      // → warning
     expect(r.snap.state).toBe('warning');

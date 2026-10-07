@@ -366,7 +366,7 @@ export interface SegmentHighlight {
     | 'track.segments.highlights.mostUncertain';
   segmentId: string;
   segmentIndex: number;
-  valueText: string;  // bereits formatierter Wert (z. B. "1.3 m", "4.6 s") — reine Zahl, keine Bewertung
+  valueText: string;  // formatierter Messwert (Abweichung approximativ), keine Bewertung
 }
 
 export function computeSegmentHighlights(segments: AnalyticsSegment[]): SegmentHighlight[] {
@@ -375,13 +375,13 @@ export function computeSegmentHighlights(segments: AnalyticsSegment[]): SegmentH
   const straightLike = segments.filter(s => s.meanDeviationM != null && (s.type === 'straight' || s.type === 'start' || s.type === 'finish'));
   if (straightLike.length) {
     const best = straightLike.reduce((a, b) => (a.meanDeviationM! <= b.meanDeviationM! ? a : b));
-    highlights.push({ labelKey: 'track.segments.highlights.lowestDeviation', segmentId: best.id, segmentIndex: best.index, valueText: `${best.meanDeviationM!.toFixed(1)} m` });
+    highlights.push({ labelKey: 'track.segments.highlights.lowestDeviation', segmentId: best.id, segmentIndex: best.index, valueText: `≈${Math.round(best.meanDeviationM!)} m` });
   }
 
   const withMaxDev = segments.filter(s => s.maxDeviationM != null);
   if (withMaxDev.length) {
     const worst = withMaxDev.reduce((a, b) => (a.maxDeviationM! >= b.maxDeviationM! ? a : b));
-    highlights.push({ labelKey: 'track.segments.highlights.highestDeviation', segmentId: worst.id, segmentIndex: worst.index, valueText: `${worst.maxDeviationM!.toFixed(1)} m` });
+    highlights.push({ labelKey: 'track.segments.highlights.highestDeviation', segmentId: worst.id, segmentIndex: worst.index, valueText: `≈${Math.round(worst.maxDeviationM!)} m` });
   }
 
   const corners = segments.filter(s => s.type === 'corner' && s.durationSec != null);

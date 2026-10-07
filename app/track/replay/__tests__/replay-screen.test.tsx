@@ -176,7 +176,8 @@ describe('TrackReplayScreen — Rendering & Interaktion (Punkt 22)', () => {
     // Segmenttitel + kuratierte Detailwerte (Punkt 15) erscheinen tatsächlich.
     expect(textNodesWith(root, 'Corner 1 · right').length).toBeGreaterThan(0);
     expect(textNodesWith(root, 'Overshoot').length).toBeGreaterThan(0);
-    expect(textNodesWith(root, '2.1 m').length).toBeGreaterThan(0);
+    // Abweichungen werden bewusst als Näherung angezeigt (formatApproxDeviationM): 2.1 m → "≈2 m".
+    expect(textNodesWith(root, '≈2 m').length).toBeGreaterThan(0);
   });
 
   it('v3: G1-Karten-Tap öffnet Kontaktphase mit Material und vorsichtiger Statusbezeichnung', async () => {

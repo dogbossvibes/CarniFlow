@@ -94,7 +94,9 @@ describe('Schwellen unverändert', () => {
     expect(rec).toContain('stepObjectDwell(previous, {');
     expect(rec).toContain('const LOOKAHEAD_M = 20;');
     expect(rec).toContain('const BACK_M = 4;');
-    expect(rec).toContain('const BREAK_THRESHOLD_M = 6.0;');
+    expect(rec).toContain('const assessment = stepOffTrack(offTrackRef.current');
+    expect(rec).toContain("if (assessment.transition === 'off_track')");
+    expect(rec).not.toContain('const BREAK_THRESHOLD_M = 6.0;');
     expect(rec).not.toContain('distM(objectReference, o.at) <= OBJECT_HIT_M');
   });
   it('Cursor-Seed läuft über den normalen Fenster-Projektionspfad (kein Voll-Linien-Workaround)', () => {
@@ -106,5 +108,14 @@ describe('Schwellen unverändert', () => {
     expect(rec).toContain(': projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);');
     expect(rec).toContain('cursorMRef.current = seedCursorM; maxCursorMRef.current = seedCursorM;');
     expect(rec).toContain('lockedAtM: seedCursorM');
+  });
+});
+
+describe('Abweichungsanzeige respektiert GNSS-Messauflösung', () => {
+  it('zeigt eine ganze Näherung und färbt nach dem zentralen Off-Track-State', () => {
+    const screen = strip(read('app/track/run.tsx'));
+    expect(screen).toContain('formatApproxDeviationM(devShown)');
+    expect(screen).toContain('const devOff = s.offTrackState !== \'on_track\';');
+    expect(screen).not.toContain('devShown.toFixed(1)');
   });
 });

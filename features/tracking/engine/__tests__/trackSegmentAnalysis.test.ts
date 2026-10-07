@@ -203,7 +203,7 @@ describe('trackSegmentAnalysis — Highlights (Punkt 16)', () => {
     expect(highlights.length).toBeGreaterThanOrEqual(2);
     expect(highlights.length).toBeLessThanOrEqual(4);
     for (const h of highlights) {
-      expect(h.valueText).toMatch(/^[\d.]+\s*(m|s|%)$/);   // reine Zahl + Einheit, kein Fliesstext
+      expect(h.valueText).toMatch(/^(≈)?[\d.]+\s*(m|s|%)$/);   // Messwerte sind ausdrücklich approximativ
       expect(typeof h.labelKey).toBe('string');
     }
   });

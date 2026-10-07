@@ -81,14 +81,18 @@ export interface OffTrackResult {
 
 // Reiner Reducer: ein Fix → nächster State. State-Transitions berücksichtigen
 // mehrere plausible Fixes (Debounce) und Hysterese (Entwarnung deutlich unter der
-// Warngrenze). Unzuverlässige/verworfene Fixes halten den State (keine Eskalation).
+// Warngrenze). Unzuverlässige/verworfene Fixes halten den State und unterbrechen
+// Bestätigungsserien, damit Evidenz vor einer Datenlücke nicht weiter eskaliert.
 export function stepOffTrack(prev: OffTrackSnapshot, input: OffTrackInput): OffTrackResult {
   const th = getOffTrackThreshold({ accuracyM: input.accuracyM });
   const reliable = input.accepted && th.reliable && Number.isFinite(input.crossTrackM);
 
   // Unzuverlässig → State halten, Streaks nicht hochzählen, off-Dauer aber weiter mitzählen.
   if (!reliable) {
-    const held = accrueDuration(prev, input.nowMs);
+    // Ein Accuracy-/Filter-Ausfall unterbricht die Evidenzkette. Ein späterer
+    // Fix darf eine Warnung/Bestätigung nicht mit vor der Lücke gesammelten
+    // Streaks auslösen; der bereits bestätigte Zustand bleibt erhalten.
+    const held = accrueDuration({ ...prev, warnStreak: 0, offStreak: 0, recoverStreak: 0 }, input.nowMs);
     return { snap: held, transition: null, thresholds: th, reliable: false, freezeProgress: prev.state === 'off_track' };
   }
 

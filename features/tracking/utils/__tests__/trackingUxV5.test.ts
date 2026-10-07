@@ -122,7 +122,8 @@ describe('QA v5 legacy compatibility', () => {
     expect(buildQaTrackExport('id', [], [], null, search).schemaMinor).toBe(4);
     const v5 = { cursor: { referenceGeometryLengthM: 20 }, voiceDiagnostics: { events: [], truncated: false } } as never;
     expect(buildQaTrackExport('id', [], [], null, v5).schemaMinor).toBe(5);
-    expect(sanitizeSearchRunState({ foundObjectIds: ['legacy'] })).toEqual({ ...freshSearchRunState(), foundObjectIds: ['legacy'] });
+    // Legacy-Recovery ohne scoreQualityVersion behält ausdrücklich die alte Score-Semantik (Version 0).
+    expect(sanitizeSearchRunState({ foundObjectIds: ['legacy'] })).toEqual({ ...freshSearchRunState(), foundObjectIds: ['legacy'], scoreQualityVersion: 0 });
   });
   it('rejects absolute timestamps in the new diagnostics', () => {
     const clean = buildQaTrackExport('id', [], [], {

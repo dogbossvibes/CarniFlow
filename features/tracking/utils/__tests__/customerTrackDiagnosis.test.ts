@@ -62,7 +62,7 @@ describe('buildCustomerDiagnosisSummary', () => {
     expect(row(s, 'searchDuration')).toBe('2:05 min');
     expect(row(s, 'searchTrack')).toBe('Aufgezeichnet · 3 Punkte');
     expect(row(s, 'objects')).toBe('1 von 1 gefunden');
-    expect(row(s, 'deviation')).toBe('1.2 m');
+    expect(row(s, 'deviation')).toBe('≈1 m');
     expect(row(s, 'analysis')).toBe('Vorhanden');
   });
   it('fehlende optionale Felder: kein Crash, keine erfundenen Werte', () => {
