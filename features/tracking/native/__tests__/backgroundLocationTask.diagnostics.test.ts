@@ -8,6 +8,7 @@ const mockStop = jest.fn(async (..._args: unknown[]) => {});
 const mockHasStarted = jest.fn(async (..._args: unknown[]) => true);
 
 jest.mock('expo-task-manager', () => ({ defineTask: jest.fn() }));
+jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('expo-location', () => ({
   Accuracy: { BestForNavigation: 6 }, ActivityType: { Fitness: 3 },
   startLocationUpdatesAsync: (...args: unknown[]) => mockStart(args[0], args[1]),

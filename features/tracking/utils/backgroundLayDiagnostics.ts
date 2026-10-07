@@ -17,7 +17,10 @@ export type BackgroundLayEvent =
   | 'taskStartAttempt' | 'taskStartSuccess' | 'taskStartFailure'
   | 'taskStopAttempt' | 'taskStopSuccess' | 'taskStopFailure'
   | 'taskRegistered' | 'foregroundPermission' | 'backgroundPermission'
-  | 'foreground' | 'background' | 'inactive' | 'resume';
+  | 'foreground' | 'background' | 'inactive' | 'resume'
+  // Hintergrund-Verarbeitung über die Lay-Session-Runtime (Phase 2).
+  | 'backgroundProcessedWithoutHandler' | 'backgroundDuplicateDropped' | 'backgroundSessionMismatch'
+  | 'backgroundFinalizedSessionDropped' | 'backgroundPersistAwaitFailure';
 
 type Event = { name: BackgroundLayEvent; at: number; count: number; reason?: string };
 type Context = { sessionId: string; startedAt: number };
@@ -65,6 +68,8 @@ const COUNT_NAMES = [
   'persistAttempt', 'persistSuccess', 'persistFailure', 'flushAttempt', 'flushSuccess', 'flushFailure',
   'taskStartAttempt', 'taskStartSuccess', 'taskStartFailure', 'taskStopAttempt', 'taskStopSuccess', 'taskStopFailure',
   'foreground', 'background', 'inactive', 'resume',
+  'backgroundProcessedWithoutHandler', 'backgroundDuplicateDropped', 'backgroundSessionMismatch',
+  'backgroundFinalizedSessionDropped', 'backgroundPersistAwaitFailure',
 ] as const;
 
 export type BackgroundLayDiagnostics = {

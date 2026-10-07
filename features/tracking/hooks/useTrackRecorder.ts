@@ -48,6 +48,10 @@ import { isLaySessionWarmupReady } from '@/features/tracking/utils/layStartLock'
 import {
   createLayProcessingState, createLayProcessor, type LayProcessingState,
 } from '@/features/tracking/engine/layProcessingSession';
+import {
+  registerLaySession, getLaySessionStatus, deliverLayFix, stopLaySession, beginFinalizeLaySession,
+  bindBackgroundLaySession, unbindBackgroundLaySession,
+} from '@/features/tracking/engine/laySessionRuntime';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Robuste Live-Aufnahme der Fährte. Bewusst eigenständig und einfach gehalten,
@@ -206,9 +210,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaMarkerMetaRef.current.push({ markerId, source, scale, apexIndex });
   }, []);
 
-  const flushPoints = useCallback(async () => {
+  // true = alles Gepufferte ist dauerhaft geschrieben (oder nichts offen); false = Write fehlgeschlagen
+  // (Batch bleibt für den nächsten Versuch im Puffer). Die Hintergrund-Verarbeitung wartet darauf.
+  const flushPoints = useCallback(async (): Promise<boolean> => {
     const sid = localSessionId.current;
-    if (!sid || ptBuffer.current.length === 0) return;
+    if (!sid || ptBuffer.current.length === 0) return true;
     const batch = ptBuffer.current; ptBuffer.current = [];
     void recordBackgroundLayEvent(sid, 'flushAttempt').catch(() => {});
     void recordBackgroundLayEvent(sid, 'persistAttempt', batch.length).catch(() => {});
@@ -216,15 +222,18 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       await createLocalTrackPointsBatch(sid, batch);
       void recordBackgroundLayEvent(sid, 'flushSuccess').catch(() => {});
       void recordBackgroundLayEvent(sid, 'persistSuccess', batch.length).catch(() => {});
+      return true;
     } catch (e) {
       void recordBackgroundLayEvent(sid, 'flushFailure').catch(() => {});
       void recordBackgroundLayEvent(sid, 'persistFailure', batch.length).catch(() => {});
       console.warn('[trackRecorder] flush', e); ptBuffer.current.unshift(...batch);
+      return false;
     }
   }, []);
 
   const stopAll = useCallback(() => {
     recordingRef.current = false;
+    stopLaySession(localSessionId.current);   // Runtime: keine weiteren Fixes; Bindung des Hintergrund-Tasks lösen
     startLockRef.current = false;
     watchRef.current?.remove(); watchRef.current = null;
     headRef.current?.remove();  headRef.current = null;
@@ -328,7 +337,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // er erzeugt die Session, reicht Fixes durch und hält UI, Persistenz,
   // Hintergrund-Task und Lifecycle.
   const processor = useMemo(() => createLayProcessor(laySession, {
-    store, localSessionId, ptBuffer, flushPoints, commitMarker, onAngleRef, recordingRef, qaRef,
+    store, localSessionId, ptBuffer, flushPoints: async () => { await flushPoints(); }, commitMarker, onAngleRef, recordingRef, qaRef,
     motionActiveRef, motionBufRef, autoDetectRef, startupRef, startupMovementRef, startupSec,
   }), [laySession, store, flushPoints, commitMarker]);
   const qaRel = processor.qaRel;
@@ -336,7 +345,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // EIN Fix-Handler für Warmup UND Aufnahme.
   const onFix = useCallback((loc: Location.LocationObject) => {
     warmupAccuracyRef.current = loc.coords.accuracy ?? null;
-    processor.processFix(loc);
+    // Aktive Aufnahme: über die Lay-Session-Runtime (kanalübergreifende Dedup,
+    // Serialisierung mit Hintergrund-Fixes). Ohne laufende Arbeit synchron wie bisher.
+    const sid = localSessionId.current;
+    if (sid && getLaySessionStatus(sid) === 'active') { void deliverLayFix(sid, loc, 'foreground'); return; }
+    processor.processFix(loc);   // Warmup / keine aktive Session: unverändert direkt
   }, [processor]);
   onFixRef.current = onFix;
 
@@ -467,6 +480,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     angleDbgRef.current = { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null };
     ptBuffer.current = [];
     // Führende lokale Session-ID SOFORT deterministisch setzen (kein Warten auf Remote/Netz).
+    stopLaySession(localSessionId.current);   // eine evtl. vorherige Runtime-Session nimmt keine Fixes mehr an
     localSessionId.current = input.localId;
     const diagnosticsReady = beginBackgroundLayDiagnostics(input.localId).catch(() => {});
     diagnosticsReadyRef.current = diagnosticsReady;
@@ -505,6 +519,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (sec % 3 === 0) updateFaehrteActivity({ elapsedS: sec, distanceM: st.distanceMeters, paused: st.isPaused });
     }, 1000);
     recordingRef.current = true;   // ← ab jetzt akzeptiert onFix die Fixes
+    // Fachliche Ownership: dieselbe Session (Processor + State) für Vordergrund UND Hintergrund-Task.
+    // persist schreibt nur in GENAU diese Session (fail closed, falls der Hook inzwischen eine andere führt).
+    registerLaySession({
+      sessionId: input.localId, dogId, startedAtMs: startLockBeganRef.current,
+      processFix: processor.processFix,
+      persist: async () => (localSessionId.current === input.localId ? flushPoints() : false),
+    });
     startupRef.current!.recorderArmedTSec = startupSec();
     startupRef.current!.recordingSessionStartedTSec = startupRef.current!.recorderArmedTSec;
     const tap = startupRef.current!.userTapStartTSec;
@@ -541,14 +562,17 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         const bg = await Location.requestBackgroundPermissionsAsync();
         void recordBackgroundLayEvent(input.localId, 'backgroundPermission', 1, bg.status).catch(() => {});
         if (bg.status === 'granted' && recordingRef.current) {
-          setTrackFixHandler(loc => onFixRef.current(loc), input.localId);
+          // Hintergrund-Task an GENAU diese Session binden; die Verarbeitung macht die Session-Runtime.
+          // Der Handler ist nur noch die optionale UI-Brücke (Live-Genauigkeit), kein Verarbeitungspfad.
+          bindBackgroundLaySession(input.localId, dogId);
+          setTrackFixHandler(loc => { warmupAccuracyRef.current = loc.coords.accuracy ?? null; }, input.localId);
           await startBackgroundUpdates({
             notificationTitle: '🐾 Fährte läuft',
             notificationBody:  'Aufnahme aktiv – tippen, um ANYVO zu öffnen',
             notificationColor: '#15E6C3',
             diagnosticSessionId: input.localId,
           });
-          if (!recordingRef.current) { setTrackFixHandler(null, input.localId); await stopBackgroundUpdates(input.localId); return; }
+          if (!recordingRef.current) { unbindBackgroundLaySession(input.localId); setTrackFixHandler(null, input.localId); await stopBackgroundUpdates(input.localId); return; }
           watchRef.current?.remove(); watchRef.current = null;   // Warmup-Watch ablösen
           bgActiveRef.current = true;
         }
@@ -567,7 +591,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     await localSessionCreationRef.current;
 
     return { error: null };
-  }, [startWarmup, store, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaCandidateMotionRef, qaLastRejectRef, qaMotionSeenRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
+  }, [startWarmup, store, flushPoints, processor, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaCandidateMotionRef, qaLastRejectRef, qaMotionSeenRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
 
   const pause  = useCallback(() => store.getState().pauseRecording(), [store]);
   const resume = useCallback(() => store.getState().resumeRecording(), [store]);
@@ -612,6 +636,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Transport läuft AUSSCHLIESSLICH über die persistente Sync-Queue (P-SAVE2) — kein
   // direkter finishTrackRecording-Pfad mehr (eine einzige Remote-Sync-Quelle).
   const finish = useCallback((): void => {
+    // Ab jetzt nimmt die Session keine Fixes mehr an; bereits laufende Verarbeitung
+    // (inkl. awaited Persistenz) wird vor Flush/Finalize abgewartet.
+    const processingDrained = beginFinalizeLaySession(localSessionId.current);
     // Letzten noch offenen (bestätigungswürdigen) Winkel best-effort retten, BEVOR
     // gestoppt wird — sonst ginge ein Winkel am Track-Ende ohne Auslauf verloren.
     for (const ev of confirmerRef.current.flush(Date.now())) {
@@ -769,6 +796,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       const lid = localSessionId.current;
       try {
         if (!(await pendingLocalMarkers)) throw new Error('Lokale Marker konnten nicht vollständig gespeichert werden.');
+        await processingDrained;
         await localSessionCreationRef.current;
         await flushPoints();
         if (localSessionInputRef.current) await createLocalTrainingSession(localSessionInputRef.current);   // idempotent
