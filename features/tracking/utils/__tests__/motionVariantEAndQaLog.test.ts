@@ -268,7 +268,7 @@ describe('Negativfälle: Motion erzeugt weiterhin nie einen Kandidaten', () => {
 
 // ── 6. QA-Logging ────────────────────────────────────────────────────────
 describe('QA-Logging: AUTO und MANUAL vollständig und getrennt', () => {
-  const rec = readFileSync('features/tracking/hooks/useTrackRecorder.ts', 'utf8');
+  const rec = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(f => readFileSync(f, 'utf8')).join('\n');
 
   it('jede akzeptierte Ecke wird über den stabilen apexIndex zugeordnet', () => {
     // Die Fehlzuordnung über diagnostics[length-1] ist beseitigt.

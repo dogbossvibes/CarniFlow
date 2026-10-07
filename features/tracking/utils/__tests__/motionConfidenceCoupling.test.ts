@@ -161,6 +161,7 @@ describe('no_window_before/after kann durch Motion NIEMALS akzeptiert werden', (
     const { readFileSync } = require('fs');
     for (const f of [
       'features/tracking/hooks/useTrackRecorder.ts',
+      'features/tracking/engine/layProcessingSession.ts',
       'features/tracking/utils/shortLegCornerDetection.ts',
       'features/tracking/utils/stopFlushCorner.ts',
     ]) {
@@ -377,7 +378,7 @@ describe('QA-Log zeigt den Rechenweg', () => {
 
   it('der Recorder schreibt den Rechenweg ins QA-Log', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const src = require('fs').readFileSync('features/tracking/hooks/useTrackRecorder.ts', 'utf8');
+    const src = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(f => require('fs').readFileSync(f, 'utf8')).join('\n');
     expect(src).toContain('last.confidenceBeforeMotion');
     expect(src).toContain('last.motionAdjustment');
     expect(src).toContain('rejected (');

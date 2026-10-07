@@ -390,7 +390,7 @@ describe('Tail-Safety bei Ende und Stop', () => {
   });
 
   it('Fixe nach stopAll() durchlaufen den Recorder-Gate nicht', () => {
-    const source = fs.readFileSync('features/tracking/hooks/useTrackRecorder.ts', 'utf8');
+    const source = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(f => fs.readFileSync(f, 'utf8')).join('\n');
     expect(source).toContain('recordingRef.current = false;');
     expect(source).toContain('if (!recordingRef.current || s.isPaused) return;');
   });

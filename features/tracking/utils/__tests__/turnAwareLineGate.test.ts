@@ -69,7 +69,7 @@ describe('Kontrakt', () => {
   });
 
   it('der Recorder benutzt das Gate nur für CURRENT — BUILD40 bleibt beim festen Gate', () => {
-    const src = fs.readFileSync('features/tracking/hooks/useTrackRecorder.ts', 'utf8');
+    const src = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(f => fs.readFileSync(f, 'utf8')).join('\n');
     expect(src).toContain("getTrackingEngineMode() === 'build40' ? MIN_STEP_M : lineGateStepM(detectPointsRef.current, lastCornerAtRef.current)");
     expect(src).toContain("getTrackingEngineMode() === 'build40' ? EMA_ALPHA : lineEmaAlpha(lineTurnZoneRef.current)");
     // Die Diagnose zählt den Gate-Ausschluss, bevor derselbe unveränderte Return greift.

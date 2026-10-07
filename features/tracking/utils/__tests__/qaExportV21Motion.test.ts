@@ -249,7 +249,7 @@ describe('6. Keine algorithmische Änderung', () => {
   });
 
   it('der Mitschnitt ist rein beobachtend und nur im QA-Modus', () => {
-    const s = src('features/tracking/hooks/useTrackRecorder.ts');
+    const s = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(src).join('\n');
     expect(s).toContain('if (qaRef.current && motionActiveRef.current) {');
     // Die Aggregate stammen aus derselben Auswertung, die der Detektor nutzt.
     expect(s).toContain('const ev = motionBufRef.current.evidenceForTrailing(tCand);');
@@ -258,7 +258,7 @@ describe('6. Keine algorithmische Änderung', () => {
   });
 
   it('bei QA AUS entsteht kein einziger Motion-Eintrag', () => {
-    const s = src('features/tracking/hooks/useTrackRecorder.ts');
+    const s = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(src).join('\n');
     const block = s.slice(s.indexOf('if (qaRef.current && motionActiveRef.current) {'));
     expect(block.slice(0, 200)).toContain('for (const d of diagnostics)');
     // Kein Schreibpfad ausserhalb des Gates.

@@ -101,7 +101,7 @@ describe('pathLength', () => {
 
 // ── Verdrahtung im Recorder ──────────────────────────────────────────────
 describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
-  const src = readFileSync('features/tracking/hooks/useTrackRecorder.ts', 'utf8');
+  const src = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(f => readFileSync(f, 'utf8')).join('\n');
 
   it('die Herkunft wird mit der von createLocalTrackMarker vergebenen ID notiert', () => {
     // Die Store-ID (`angle-<ts>-<kind>`) taucht in der Datenbank NICHT auf —

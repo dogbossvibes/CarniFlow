@@ -56,7 +56,7 @@ describe('Kontrakt', () => {
     c.reset(); expect(c.total).toBe(0);
   });
   it('der Recorder speist die Distanz nur aus dem Akkumulator', () => {
-    const rec = fs.readFileSync('features/tracking/hooks/useTrackRecorder.ts', 'utf8');
+    const rec = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(f => fs.readFileSync(f, 'utf8')).join('\n');
     expect(rec).toContain('canonDistRef.current.push(ema)');
     expect(rec).toContain('setDistanceMeters(total)');
     expect(rec).toContain('s.addTrackPoint(sample, { skipDistance: true })');

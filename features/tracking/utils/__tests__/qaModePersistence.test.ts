@@ -97,7 +97,7 @@ describe('QA-Modi werden beim App-Start rehydriert', () => {
     expect(layout).toContain('hydrateQaModes');
     // Der Recorder wartet zusätzlich darauf, bevor er die Quelle liest — sonst
     // gäbe es ein Rennen zwischen App-Start und sofortigem Fährtenstart.
-    const rec = read('features/tracking/hooks/useTrackRecorder.ts');
+    const rec = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(read).join('\n');
     expect(rec).toContain('await hydrateQaModes();');
   });
 });
@@ -111,7 +111,7 @@ describe('Der Lege-Recorder liest den Modus beim GPS-Start', () => {
   });
 
   it('der Recorder holt sein GPS über dieselbe Quelle und startet den Stream nur einmal', () => {
-    const rec = read('features/tracking/hooks/useTrackRecorder.ts');
+    const rec = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(read).join('\n');
     expect(rec).toContain('startPositionSource');
     expect(rec).toContain('if (watchRef.current) return { error: null };');
     // Und er hält fest, was er dabei tatsächlich gelesen hat.
@@ -155,14 +155,14 @@ describe('Moduswechsel bei laufendem Warmup', () => {
     const badge = read('features/tracking/components/QaModeBadge.tsx');
     expect(badge).toContain('beim nächsten Fährtenstart aktiv');
     // Nirgends wird eine laufende Subscription für einen Moduswechsel neu gestartet.
-    const rec = read('features/tracking/hooks/useTrackRecorder.ts');
+    const rec = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(read).join('\n');
     expect(rec).not.toContain('subscribeLocationSourceMode');
     expect(rec).not.toContain('subscribeTrackingEngineMode');
   });
 });
 
 describe('Motion beim Legen unterstützt den Start und bleibt CURRENT-only', () => {
-  const rec = read('features/tracking/hooks/useTrackRecorder.ts');
+  const rec = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(read).join('\n');
 
   it('startet für ENGINE=CURRENT auch ohne QA-Modus', () => {
     expect(rec).toContain("if (activeEngine === 'current' && !motionActiveRef.current)");
@@ -258,7 +258,7 @@ describe('Motion-Status ist im QA-Bereich sichtbar', () => {
 
 describe('Stop-Flush bleibt QA-only und unverändert kalibriert', () => {
   it('ist im Recorder an QA-Modus UND ENGINE=CURRENT gebunden', () => {
-    const rec = read('features/tracking/hooks/useTrackRecorder.ts');
+    const rec = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(read).join('\n');
     expect(rec).toContain("if (qaRef.current && getTrackingEngineMode() === 'current' && autoDetectRef.current)");
   });
 

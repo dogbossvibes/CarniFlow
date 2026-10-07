@@ -101,7 +101,7 @@ describe('Export-Schema', () => {
 });
 
 describe('Verdrahtung im Recorder', () => {
-  const rec = fs.readFileSync('features/tracking/hooks/useTrackRecorder.ts', 'utf8');
+  const rec = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(f => fs.readFileSync(f, 'utf8')).join('\n');
   it('Live-Erkennung und Stop-Sweep laufen über die Fusion', () => {
     expect(rec).toContain("fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection })");
     expect(rec).toContain('const sweep = fuseTurns(detectPts, {');
