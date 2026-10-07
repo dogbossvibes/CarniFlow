@@ -204,6 +204,10 @@ export function TrackingMap({
     () => (distanceScaleLine && distanceScaleLine.length > 1 ? buildDistanceTicks(distanceScaleLine) : null),
     [distanceScaleLine],
   );
+  // Höhe/Region ab Mount messen, sobald der Maßstab angefordert ist — auch wenn die
+  // Referenzlinie erst später kommt (run.tsx lädt den Snapshot nach dem Mount; ein
+  // erst dann angehängtes onLayout feuert nie → Höhe 0 → Maßstab dauerhaft 'off').
+  const scaleRequested = distanceScaleLine !== undefined;
   const [scaleRegion, setScaleRegion] = useState<ScaleRegion | null>(null);
   const [mapHeightPt, setMapHeightPt] = useState(0);
   const onScaleRegion = useCallback((r: ScaleRegion) => {
@@ -262,7 +266,7 @@ export function TrackingMap({
   return (
     <View
       style={[StyleSheet.absoluteFill, style]}
-      onLayout={scaleTicks ? e => setMapHeightPt(e.nativeEvent.layout.height) : undefined}
+      onLayout={scaleRequested ? e => setMapHeightPt(e.nativeEvent.layout.height) : undefined}
     >
       <MapView
         ref={mapRef}
@@ -277,7 +281,7 @@ export function TrackingMap({
         rotateEnabled
         pitchEnabled
         onMapReady={() => setMapReady(true)}
-        onRegionChangeComplete={scaleTicks ? onScaleRegion : undefined}
+        onRegionChangeComplete={scaleRequested ? onScaleRegion : undefined}
         onPanDrag={() => {
           // Eigene Kartengeste ⇒ Auto-Follow SOFORT pausieren (kein
           // automatisches Zurückspringen). Der Recenter-Button holt sie zurück.
