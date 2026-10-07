@@ -110,6 +110,19 @@ export const PRODUCT_IDS = {
   trainerMonthly:       'anyvo_trainer_monthly_30.00',
 } as const;
 
+// Google Play identifiers may include the base plan after a colon. Keep the
+// original identifier for SDK calls; normalize known products only for matching.
+export function canonicalStoreProductId(id: string | null | undefined): string | null {
+  if (!id) return null;
+  const [product, basePlan, ...extra] = id.split(':');
+  const known = (Object.values(PRODUCT_IDS) as string[]).includes(product);
+  return known && basePlan && extra.length === 0 ? product : id;
+}
+
+export function matchesStoreProduct(id: string | null | undefined, expected: string | null | undefined): boolean {
+  return !!id && !!expected && canonicalStoreProductId(id) === expected;
+}
+
 export interface PlanMeta {
   id:        SubscriptionPlan;
   name:      string;
@@ -120,15 +133,10 @@ export interface PlanMeta {
 }
 
 export const PLAN_META: Record<SubscriptionPlan, PlanMeta> = {
-  // WICHTIG: Der Store-/RevenueCat-Preis ist die Quelle der Wahrheit und hat in der
-  // UI Vorrang. priceLabel ist nur der Fallback, wenn das Store-Paket (noch) nicht
-  // geladen ist. Für Pläne ohne aktuell gepflegten Preis bleibt priceLabel bewusst
-  // NEUTRAL ('—') statt eines veralteten hardcodierten Preises; ACTIVE spiegelt den
-  // aktuellen Produktstand (CHF 9.00/Mt.). priceChf ist NICHT autoritativ (nur interne
-  // Sortierung).
+  // Paid prices come exclusively from the store; no stale numeric fallback.
   newbie:         { id: 'newbie',         name: 'Newbie',         priceChf: 0,  priceLabel: 'Gratis', productId: null,                           trainer: false },
   founder_active: { id: 'founder_active', name: 'Founder Active', priceChf: 4,  priceLabel: '—',      productId: PRODUCT_IDS.founderActiveMonthly,  trainer: false },
-  active:         { id: 'active',         name: 'Active',         priceChf: 9,  priceLabel: 'CHF 9.00/Mt.', productId: PRODUCT_IDS.activeMonthly,         trainer: false },
+  active:         { id: 'active',         name: 'Active',         priceChf: 9,  priceLabel: '—', productId: PRODUCT_IDS.activeMonthly,         trainer: false },
   trainer:        { id: 'trainer',        name: 'Trainer',        priceChf: 15, priceLabel: '—',      productId: PRODUCT_IDS.trainerMonthly,        trainer: true },
 };
 
@@ -334,6 +342,7 @@ export function isTrialLapsed(
 
 // Product-ID → Plan (für Restore / Provider-Bestätigung).
 export function planOfProduct(productId: string | null | undefined): SubscriptionPlan {
+  productId = canonicalStoreProductId(productId);
   if (productId === 'anyvo_newbie_monthly_0') return 'newbie';
   if (productId === PRODUCT_IDS.founderActiveMonthly) return 'founder_active';
   if (productId === PRODUCT_IDS.trainerMonthly) return 'trainer';

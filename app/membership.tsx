@@ -12,7 +12,7 @@ import { queryClient } from '@/lib/queryClient';
 import { getPackages, restorePurchases, restorePlanFromResult, getManagementURL, type PurchasePackage } from '@/lib/purchases';
 import { getPlanSubscription, getFounderSlots, activatePlan } from '@/services/subscriptionService';
 import { newbieQuotaStatus } from '@/services/quotaService';
-import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
+import { PLAN_META, matchesStoreProduct, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -128,7 +128,7 @@ export default function MembershipScreen() {
 
   const priceFor = (plan: SubscriptionPlan): string => {
     const pid = PLAN_META[plan].productId;
-    const pkg = pid ? packages.find(p => p.productId === pid) : null;
+    const pkg = pid ? packages.find(p => matchesStoreProduct(p.productId, pid)) : null;
     return pkg?.priceString ?? PLAN_META[plan].priceLabel;   // '—' neutraler Fallback, nie erfundener Preis
   };
 

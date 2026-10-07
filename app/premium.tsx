@@ -15,7 +15,7 @@ import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePack
 import {
   activatePlan, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
-import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
+import { PLAN_META, matchesStoreProduct, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
 import { useT } from '@/i18n';
 import type { TranslationKey } from '@/i18n/de-CH';
 
@@ -112,10 +112,10 @@ export default function PremiumScreen() {
   const visibleCards = CARDS.filter(c => c.plan === 'newbie' ? !currentPlan : true);
   // Preis-Anker für die Founder-Ersparnis: echter Active-Preis aus dem Store
   // (gleiche Währung wie die angezeigten Preise), sonst Fallback auf die CHF-Angabe.
-  const activePriceStr = packages.find(p => p.productId === PLAN_META.active.productId)?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
+  const activePriceStr = packages.find(p => matchesStoreProduct(p.productId, PLAN_META.active.productId))?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
   const packageForPlan = (plan: SubscriptionPlan) => {
     const productId = PLAN_META[plan].productId;
-    return productId ? packages.find(p => p.productId === productId) ?? null : null;
+    return productId ? packages.find(p => matchesStoreProduct(p.productId, productId)) ?? null : null;
   };
 
   const finish = (plan: SubscriptionPlan) => {
