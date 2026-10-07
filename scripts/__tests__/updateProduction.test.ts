@@ -228,7 +228,8 @@ describe('Agentenregeln (AGENTS.md = CLAUDE.md)', () => {
   });
   it('bestehende Regeln blieben erhalten', () => {
     const a = readFileSync('AGENTS.md', 'utf8');
-    expect(a).toContain('# Agent Handoff Protocol (Claude Code ↔ Codex)');
+    expect(a).toMatch(/^# Agent Handoff Protocol\b/m);
+    expect(a).toContain('publish an OTA, start a build, or release to a store without explicit user permission');
     expect(a).toContain('## NEVER');
     expect(readFileSync('CLAUDE.md', 'utf8')).toContain('@AGENTS.md');
   });
