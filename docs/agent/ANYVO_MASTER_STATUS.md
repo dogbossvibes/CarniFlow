@@ -4,7 +4,7 @@
 Canonical source of truth for current ANYVO product, engineering, release and
 open-work status.
 
-**Last verified:** 2026-10-06 · fresh EAS query: iOS Runtime 1.0.3 → `968884f` (group `455dc249…`), iOS Runtime 1.0.4 → `04cad8d` (group `fcd879d9…`).
+**Last verified:** 2026-10-07 · fresh EAS query: iOS Runtime 1.0.3 → `968884f` (group `455dc249…`, unchanged), iOS Runtime 1.0.4 → `fd0c727` (group `79175057…`), Android Runtime 1.0.3 → `68b23f1` (group `917f8312…`, unchanged).
 
 ## Rules
 
@@ -99,6 +99,9 @@ overlays (`c904955`) and per-dog overlay colors (`968884f`).
 | OTA (iOS only, runtime 1.0.4) | `04cad8da58c7b86ee0b808d0e01964e3341cca2a` — adaptive track distance scale, live distance, distance to next article |
 | Update Group / iOS update ID | `fcd879d9-b307-4cac-87e8-2a90f3d7f727` / `01a1114f-b484-724d-864f-87cebe27f239` (published 2026-10-06 13:03:18 UTC via guard) |
 | Device verification | **PASS** (owner, 1.0.4 (49) + OTA): quick-start widget, Live Activity V2, Dynamic Island, track distance scale |
+| OTA (iOS only, runtime 1.0.4) — **current since 2026-10-07** | `fd0c727a4d252e531dc95ad9592040265cf12418` — background lay hotfix: lay recording keeps processing/persisting with screen off (`b6bc114` diagnostics, `43ab3a9` session-scoped lay processor, `fd0c727` background lay fixes by session); supersedes `04cad8d` (contains it) |
+| Update Group / iOS update ID (current) | `79175057-4da7-4314-bf7f-ae7f0ccd738b` / `01a115cd-3e88-7611-b4bd-8321716cba59` (published 2026-10-07 via guard, baseline `fcd879d9…` ancestry PASS) |
+| Background screen-off device QA | **PASS** (owner-reported, pre-integration on hotfix build; screen off / pocket). Post-OTA smoke test on Build 49: pending |
 
 ### Production OTA guard (on `main`)
 
@@ -205,6 +208,12 @@ Evidence for the rest is the commit chain above and the task reports.
 - Git Commit Injection vorhanden
 - Emergency-Fallback-Anzeige vorhanden
 - aktuelle iOS Production OTA auf realem iPhone verifiziert
+
+### Background Lay Screen-Off Fix (2026-10-07)
+- Background-Task verarbeitet Lay-Fixes über denselben session-scoped Processor (ohne Screen/Handler)
+- eindeutige Session-Bindung (fail closed), Dedup, Serialisierung, awaited Persistenz, Finalize-Race
+- Device QA Screen-Off / Hosentasche PASS (Owner); main `fd0c727`; Full Suite 333/4122 PASS
+- Production OTA iOS Runtime 1.0.4 `79175057…` — Runtime 1.0.3 und Android unverändert
 
 ### Production Continuity
 - 24 bekannte Runtime-1.0.3 Production-Stände auditiert
@@ -361,4 +370,5 @@ Keine Schwellenänderung ohne neue Feldbelege.
 |---|---|---|
 | 2026-10-03 | Master status created. Production baseline set to `b780603`; iOS OTA `01a10074…` device-verified (PASS). | OTA group `ae879d82…`; commit chain above; owner device verification |
 | 2026-10-06 | `main` defined as canonical Production/Release line (fast-forward `e90df20` → `54a74c4`, no merge commit). iOS 1.0.4 (49) built + uploaded (not store-released); device PASS widget / Live Activity V2 / Dynamic Island / distance scale; OTA 1.0.4 `fcd879d9` (`04cad8d`). Runtime 1.0.3 unchanged on `968884f`. Guard runtime isolation + initial-runtime hardening (103/103). | Fresh EAS queries of groups `455dc249…` and `fcd879d9…`; EAS build `994f04ba…`; submission `02ea21d2…`; owner device test |
+| 2026-10-07 | Background lay screen-off hotfix integrated into `main` by fast-forward `8f0a497` → `fd0c727` (pushed). iOS-only Production OTA runtime 1.0.4: group `79175057-4da7-4314-bf7f-ae7f0ccd738b`, iOS update `01a115cd-3e88-7611-b4bd-8321716cba59`, commit `fd0c727`. Runtime 1.0.3 (iOS `455dc249…`) and Android (`917f8312…`) unchanged. Device QA screen-off PASS (owner, pre-integration). | Guard dry-run + publish + post-check PASS; fresh EAS queries before/after publish; Full Suite 333/333 · 4122/4122 on `main` |
 | 2026-10-04 | iOS Production baseline → `34e6185` (customer track diagnosis + i18n on top of `34b4b4c`). Incident: OTA `fce1c140` (base `94dd576`) briefly superseded `34b4b4c`; restored via republish `3492bf85`, then `e3be2717` from a base containing `34b4b4c`. EAS declared the binding live source. | Fresh EAS query of group `e3be2717…` (gitCommitHash `34e6185`, iOS only, runtime 1.0.3) |

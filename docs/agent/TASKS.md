@@ -11,6 +11,19 @@
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).
 
+## Update 2026-10-07 (Claude Code) — Background-Lay Screen-Off Hotfix integriert + iOS OTA 1.0.4
+
+> Aktueller Gesamtstatus: `docs/agent/ANYVO_MASTER_STATUS.md`. Keine neue TASK-ID vergeben.
+
+- **Integration:** `main` Fast-Forward `8f0a497` → `fd0c727` (`fix/background-lay-persistence-1.0.5`:
+  `b6bc114` Diagnose, `43ab3a9` session-scoped Lay-Processor, `fd0c727` Background-Lay-Fixes by Session), gepusht.
+- **Tests auf main:** Full Suite 333/333 Suites, 4122/4122 Tests; tsc, ESLint (0 Fehler), `git diff --check` PASS.
+- **Device QA Screen-Off / Hosentasche:** PASS (Owner, vor Integration).
+- **Production OTA iOS only, Runtime 1.0.4:** Group `79175057-4da7-4314-bf7f-ae7f0ccd738b`,
+  iOS Update `01a115cd-3e88-7611-b4bd-8321716cba59`, Commit `fd0c727`; Guard-Baseline `fcd879d9…` (`04cad8d`), Ancestry PASS.
+- **Unverändert:** Runtime 1.0.3 (iOS `455dc249…`), Android (`917f8312…`). Kein Build, kein Store-Vorgang.
+- **Offen:** Smoke-Test der OTA auf Build 49 (Screen-Off, Session, Persistenz, Resume).
+
 ## Update 2026-10-06 (Claude Code) — `main` kanonisch; iOS 1.0.4 (49) + OTA 1.0.4; Guard runtime-isoliert
 
 > Aktueller Gesamtstatus: `docs/agent/ANYVO_MASTER_STATUS.md`. Keine neue TASK-ID vergeben.
