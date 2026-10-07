@@ -4,7 +4,7 @@
 Canonical source of truth for current ANYVO product, engineering, release and
 open-work status.
 
-**Last verified:** 2026-10-07 · fresh EAS query: iOS Runtime 1.0.3 → `968884f` (group `455dc249…`, unchanged), iOS Runtime 1.0.4 → `fd0c727` (group `79175057…`), Android Runtime 1.0.3 → `68b23f1` (group `917f8312…`, unchanged).
+**Last verified:** 2026-10-07 · fresh EAS query: iOS Runtime 1.0.3 → `968884f` (group `455dc249…`, unchanged), iOS Runtime 1.0.4 → `fd0c727` (group `79175057…`), Android Runtime 1.0.3 → `e88371d` (group `168ae23f…`, subscription hotfix; guarded post-check PASS).
 
 ## Rules
 
@@ -71,6 +71,13 @@ inventory, **not** a Production release or a decision to integrate them.
 | 4 | `fix/integrate-heat-schema-restore` | `d00b8f1` | parent `e30297a` |
 | 6 | `chore/integrate-track-module-repo-hygiene` | `9ba2ec3` | parent `e30297a` |
 
+**Coordination update 2026-10-07 (T-63):** the other chat's clean
+`integration/production-points-2026-10-07` branch at `570bd1e` was based on `7d43db9`.
+Canonical main now also contains `3979246` (subscription fix) and `c302bce` (agent-heading
+test repair). Its older planned fast-forward is no longer valid. Preserve the four
+integration changes and reconcile with current main without dropping T-63; never reset
+main to the older integration branch. Those four changes were not published by T-63.
+
 Pending decisions from the production audit, preserved for the Codex handoff:
 
 - **Phase 3: HARD STOP.** No commit; explicit continuity semantics are missing.
@@ -96,8 +103,25 @@ post-publish verification (see `docs/DEVELOPMENT_WORKFLOW.md` §8).
 
 ## Current Production Baseline
 
-Snapshot as of 2026-10-06 — verify against EAS before relying on it. Two iOS runtimes are
-live in parallel on the EAS branch `production`; each runtime only receives its own OTAs.
+Snapshot as of 2026-10-07 — verify against EAS before relying on it. Two iOS runtimes and
+Android runtime 1.0.3 are live in parallel on EAS branch `production`; each platform/runtime receives its own OTAs.
+
+### Android Runtime 1.0.3 — subscription hotfix (T-63)
+
+| Item | Value |
+|---|---|
+| Production commit / branch | `e88371dc49233853162e87d8114c9f9d38a112d9` / `codex/android-subscription-release-1.0.3` |
+| Channel / EAS branch / environment | `production` / `production` / `production` |
+| Update Group / Android Update ID | `168ae23f-676f-455c-8f15-bb475910d83e` / `01a117b7-e024-7a59-9d60-ade29e2b6b01` |
+| Previous Android OTA | `68b23f1`, group `917f8312-8085-4d9a-ba64-d3f8972a9d21` |
+| Product change | Recognize subscription:base-plan identifiers in paywall, membership, trial selection and restore; remove stale CHF9 paid-price fallback |
+| Scope | Existing Android production app/features/plugins/config snapshot preserved; six product/test paths differ from previous Android baseline |
+| Canonical main | Feature `3979246`, workflow-approval test repair `c302bce`; runtime compatibility snapshot is release-only and must never be merged into main |
+| Verification | Full run + repaired-suite rerun: all 326 suites / 3968 distinct tests verified; tsc PASS; ESLint 0 errors (one preexisting membership warning); Android export/actual-bundle checks and guarded publish/post-check PASS |
+| Device acceptance | **OPEN** — verify displayed store prices, enabled purchase buttons, Google purchase sheet and subscription access |
+| Native / store release | No new build or submission. User reports the Google Play app is newly live; exact store versionCode/rollout was not independently checked (other chat login blocked) |
+
+Report: `docs/agent/tasks/T-63.md`. iOS runtime 1.0.4/latest group was unchanged in the guarded post-check.
 
 ### iOS Runtime 1.0.3 (Store build 1.0.3 (48)) — unchanged
 
@@ -311,11 +335,10 @@ Evidence for the rest is the commit chain above and the task reports.
 ## 🔴 Offen
 
 ### Android
-- erneute Google-Play-Ablehnung vollständig analysieren
-- Android Production-Stand danach separat prüfen
-- Paritätsarbeit nur von `main` bzw. einem explizit darauf basierenden Branch weiterführen
-  (Android Production 1.0.3 (44) stammt aus `5a0610b` + uncommitteten Änderungen im Worktree
-  `anyvo-android-parity-1.0.3`; dieser Stand muss vor jeder Android-OTA in den Zielstand)
+- T-63 subscription hotfix is **published**, but device purchase/restore acceptance is still OPEN.
+- Google Play store publication is owner-reported; precise versionCode, rollout, countries and policy state remain to be verified in the Console (other chat was login-blocked).
+- Future native parity/build work is separate; the T-63 OTA does not submit a new binary.
+- Release work must preserve the active EAS Android baseline and use canonical main tooling; runtime-specific compatibility snapshots must not be merged back into main.
 
 ### Tracking / Training
 - Schrittlängen-Kalibrierung
@@ -392,6 +415,7 @@ Keine Schwellenänderung ohne neue Feldbelege.
 
 | Date | Change | Evidence |
 |---|---|---|
+| 2026-10-07 | T-63 Android-only subscription hotfix published for runtime 1.0.3; canonical main contains the feature fix and workflow-test repair. Device purchase QA open. | Group `168ae23f-676f-455c-8f15-bb475910d83e`, Android update `01a117b7-e024-7a59-9d60-ade29e2b6b01`, release `e88371dc49233853162e87d8114c9f9d38a112d9`; guarded publish/post-check PASS; report T-63 |
 | 2026-10-03 | Master status created. Production baseline set to `b780603`; iOS OTA `01a10074…` device-verified (PASS). | OTA group `ae879d82…`; commit chain above; owner device verification |
 | 2026-10-06 | `main` defined as canonical Production/Release line (fast-forward `e90df20` → `54a74c4`, no merge commit). iOS 1.0.4 (49) built + uploaded (not store-released); device PASS widget / Live Activity V2 / Dynamic Island / distance scale; OTA 1.0.4 `fcd879d9` (`04cad8d`). Runtime 1.0.3 unchanged on `968884f`. Guard runtime isolation + initial-runtime hardening (103/103). | Fresh EAS queries of groups `455dc249…` and `fcd879d9…`; EAS build `994f04ba…`; submission `02ea21d2…`; owner device test |
 | 2026-10-07 | Background lay screen-off hotfix integrated into `main` by fast-forward `8f0a497` → `fd0c727` (pushed). iOS-only Production OTA runtime 1.0.4: group `79175057-4da7-4314-bf7f-ae7f0ccd738b`, iOS update `01a115cd-3e88-7611-b4bd-8321716cba59`, commit `fd0c727`. Runtime 1.0.3 (iOS `455dc249…`) and Android (`917f8312…`) unchanged. Device QA screen-off PASS (owner, pre-integration). | Guard dry-run + publish + post-check PASS; fresh EAS queries before/after publish; Full Suite 333/333 · 4122/4122 on `main` |

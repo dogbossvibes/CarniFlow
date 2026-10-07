@@ -11,6 +11,15 @@
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).
 
+## Update 2026-10-07 (Codex) — T-63 Android subscription hotfix PUBLISHED
+
+- **T-63:** DONE(published), device purchase acceptance OPEN. Report: `docs/agent/tasks/T-63.md`.
+- Android-only runtime 1.0.3, production channel/branch/environment. Release `e88371dc49233853162e87d8114c9f9d38a112d9`.
+- Group `168ae23f-676f-455c-8f15-bb475910d83e`; Android update `01a117b7-e024-7a59-9d60-ade29e2b6b01`. Guard and post-check PASS.
+- Canonical main feature `3979246`, workflow-test repair `c302bce`. No new native build, store submission, DB action or Git push.
+- Other chat's integration branch `570bd1e` must reconcile with current main; do not drop T-63.
+- **Next free general TASK-ID: T-64.** T-59–T-62 already exist as reports; older next-ID sections below are historical.
+
 ## Update 2026-10-07 (Claude Code) — Background-Lay Screen-Off Hotfix integriert + iOS OTA 1.0.4
 
 > Aktueller Gesamtstatus: `docs/agent/ANYVO_MASTER_STATUS.md`. Keine neue TASK-ID vergeben.
