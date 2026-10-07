@@ -9,15 +9,23 @@ Stand: **2026-10-07 (Europe/Zurich)**. Kanonische Übersicht für Code-, Native-
 
 **Verifikationsgrenze:** In dieser Prüfung wurden nur lokales Git, Config und Repo-Dokumentation gelesen. Kein frischer Remote-, EAS-, Store- oder Geräteabruf. `LOKAL VERIFIZIERT` = hier direkt geprüft; `DOKUMENTIERT` = lokaler Bericht mit Datum, hier nicht unabhängig erneut geprüft; `UNKNOWN` = kein ausreichender aktueller Beleg; `OPEN` = ausstehende Prüfung/Arbeit; `BLOCKED` = explizite Voraussetzung fehlt. Dokumentierte Releases sind immer **nicht frisch verifiziert**.
 
+## Android Native-Vorbereitung — Update 2026-10-07
+
+T-64-Produktcommit `2316e7cfd06149f0b0a7a1b2baa04430b88b867f` nach ausdrücklicher Freigabe in main integriert.
+Android 1.0.4 (45) vorbereitet, BLE optional und TaskManager-Patch im EAS-Postinstall-Hook geprüft.
+4 Suites / 32 Tests, Typecheck, ESLint und Introspection PASS. iOS-ModResults unverändert.
+**Nur Code-Integration:** kein neuer Build, keine OTA oder Store-Veröffentlichung; Native-/Geräteabnahme weiterhin OPEN.
+VersionCode 45 vor Build gegen dann aktuelle Play-/EAS-Werte prüfen. Details: [T-64](tasks/T-64.md).
+
 ## Canonical Git
 
 | Feld | Stand / Beleg |
 |---|---|
 | Branch | `main` — LOKAL VERIFIZIERT |
 | Worktree | `/Users/moyo/canisflow-worktrees/anyvo-main` — LOKAL VERIFIZIERT |
-| HEAD | `41e51734053fbc9c04c5de527edd6bf464cce66e` — LOKAL VERIFIZIERT |
+| Code-Integration | `2316e7cfd06149f0b0a7a1b2baa04430b88b867f` — T-64, LOKAL VERIFIZIERT; nachfolgender Status-Doku-Commit separat, aktuelles HEAD per Git abfragen |
 | Working tree vor Erstellung | Nur `?? docs/agent/ACTIVE_WORK.md`; vorhandene fremde Doku, unverändert erhalten |
-| Lokaler Remote-Tracking-Ref | `origin/main` = obiger HEAD, lokal 0 ahead / 0 behind |
+| Lokaler Remote-Tracking-Ref | `origin/main` = `41e51734053fbc9c04c5de527edd6bf464cce66e` — lokal gelesen; main enthält weitere lokale Commits. Kein Fetch oder Push in T-64 |
 | Tatsächlicher Remote-Stand | **UNKNOWN / nicht frisch verifiziert**; kein Fetch oder Remote-Abruf. Der lokale Ref beweist keinen aktuellen Serverstand |
 | Doku-Drift | Master-Status nennt einige Integrationen noch als ausstehend und `main` noch als ungepusht. Tatsächliches lokales Git enthält Search-, Maßstab-, Heat- und Hygiene-Integration; der Remote-Tracking-Ref ist gleichauf. Ältere Doku ersetzt diesen Git-Beleg nicht |
 
@@ -60,7 +68,7 @@ Alle folgenden Stände: EAS Branch/Channel `production`; hier nicht frisch abgef
 
 | Feld | Stand / Beleg |
 |---|---|
-| Aktuelle Repo-Config | App-Version `1.0.4`, versionCode **`40`**, Package `com.anyvo.app` — app.json, LOKAL VERIFIZIERT; kein Beleg für ein veröffentlichtes 1.0.4-Binary |
+| Aktuelle Repo-Config | App-Version `1.0.4`, versionCode **`45`**, Package `com.anyvo.app` — app.json, LOKAL VERIFIZIERT; kein Beleg für ein veröffentlichtes 1.0.4-Binary |
 | Runtime-Config | Policy `appVersion`; Repo-Ziel `1.0.4`, dokumentierte installierte Production-Linie `1.0.3` |
 | Letzter bekannter nativer Play-Build | **44**, Runtime `1.0.3` — [DEVELOPMENT_WORKFLOW.md §8](../DEVELOPMENT_WORKFLOW.md); aktueller Store-versionCode laut T-63 nicht unabhängig geprüft |
 | Native Source-Commit | `5a0610b6afc40625c768e5930e6c67fa4e25c6f2` — Workflow nennt Build 44 / Build-ID-Präfix `c2b7ef45` / `5a0610b`; voller Commit lokal aufgelöst. Zuordnung nicht frisch aus EAS geprüft |
@@ -69,7 +77,7 @@ Alle folgenden Stände: EAS Branch/Channel `production`; hier nicht frisch abgef
 | Native Config auf main | Background Location + Location-Foreground-Service aktiviert; BLE-Plugin, Motion/Sensor-Abhängigkeiten und Manifest-Cleanup vorhanden. Config/Paketbestand belegt nicht deren Funktion im installierten Binary |
 | Native Parität | **OPEN**: älterer dokumentierter Binary-Source-Stand; kein neuer nativer Build durch T-63. Aktuelle native Abhängigkeiten, Permissions, Services und Verhalten gegenüber Build 44 separat abgleichen; iOS-Widget/Live-Activity-Funktionen nicht als Android-Funktion voraussetzen |
 
-EAS-Config: `appVersionSource = local`, Production `autoIncrement = false` — [eas.json](../../eas.json). Vor einem später ausdrücklich beauftragten Build muss versionCode über dem dann frisch geprüften höchsten relevanten Play-/Build-Wert liegen; bei bestätigter 44 also **> 44**. Config hier nicht geändert.
+EAS-Config: `appVersionSource = local`, Production `autoIncrement = false` — [eas.json](../../eas.json). Vor einem später ausdrücklich beauftragten Build muss versionCode über dem dann frisch geprüften höchsten relevanten Play-/Build-Wert liegen; bei bestätigter 44 also **> 44**. T-64 bereitet 45 vor; vor Build erneut frisch prüfen.
 
 ### OTA
 
@@ -106,7 +114,7 @@ T-63 bewahrt den bestehenden Android-1.0.3-Bundle-/Config-Stand und übernimmt g
 
 ## Known Gaps
 
-- **Android Native — OPEN:** Build-44-Linie hinter aktuellem main; neuer Build-Preflight und versionCode-Korrektur erforderlich. Kein einzelnes fehlendes natives Modul ohne Binary-Abgleich behauptet.
+- **Android Native — OPEN:** Build-44-Linie hinter aktuellem main; versionCode 45 vorbereitet (T-64); frischer Build-Preflight und nativer Build erforderlich. Kein einzelnes fehlendes natives Modul ohne Binary-Abgleich behauptet.
 - **Runtimes — OPEN:** unterschiedliche dokumentierte installierte Runtimes; Repo-1.0.4 darf nicht mit Android-Store-1.0.3 verwechselt werden.
 - **Release-Belege — OPEN:** iOS Build-49-Storestatus widersprüchlich zum Auftragshinweis; Android Store-versionCode/Rollout unbekannt; alle Live-Stände frisch prüfen.
 - **Heat schema restore — DB-Thema:** Migration und Test auf main in `9417ec04d60bfdae1f34e5a0319779a1d9c6b993`; Commit dokumentiert Schema-Leseprüfung vom 2026-10-06 und keine Ausführung der Migration. Keine Plattformparitätslücke und keine DB-Write-Freigabe; aktueller DB-Zustand hier nicht geprüft.

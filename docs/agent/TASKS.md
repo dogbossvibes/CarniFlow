@@ -11,6 +11,15 @@
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).
 
+## Update 2026-10-07 (Codex) — T-64 Android Native-Vorbereitung integriert
+
+- **T-64:** DONE(code integrated), nativer Build/Store-/Geräteabnahme OPEN. Report: `docs/agent/tasks/T-64.md`.
+- Produktcommit `2316e7cfd06149f0b0a7a1b2baa04430b88b867f`, ausdrücklich freigegeben und per Fast-forward in main integriert.
+- Android 1.0.4 / versionCode 45 vorbereitet; BLE optional, TaskManager-Patch-Verifikation im EAS-Hook.
+- 4 relevante Suites / 32 Tests, Typecheck, ESLint und Config-Introspection PASS; iOS-ModResults unverändert.
+- Keine OTA, kein Build/Submit/Store-Rollout, kein Push und kein DB-Write.
+- **Next free general TASK-ID: T-65.** Ältere Next-ID-Angaben unten sind historische Snapshots.
+
 ## Update 2026-10-07 (Codex) — T-63 Android subscription hotfix PUBLISHED
 
 - **T-63:** DONE(published), device purchase acceptance OPEN. Report: `docs/agent/tasks/T-63.md`.

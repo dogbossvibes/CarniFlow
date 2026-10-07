@@ -3,7 +3,7 @@
 ## Canonical
 - Branch `main`
 - Worktree `/Users/moyo/canisflow-worktrees/anyvo-main`
-- HEAD `41e51734053fbc9c04c5de527edd6bf464cce66e` (lokal geprüft am 2026-10-07)
+- Produktintegration `2316e7cfd06149f0b0a7a1b2baa04430b88b867f` (T-64, lokal geprüft am 2026-10-07); nachfolgende Doku-Commits separat, HEAD frisch per Git abfragen
 - `main` = kanonische Code-/Production-Linie.
 - EAS `production` != Git `main`; der tatsächlich live veröffentlichte Stand wird in EAS geprüft.
 - Produkt-/Release-Gesamtstatus: `docs/agent/ANYVO_MASTER_STATUS.md`.
@@ -34,7 +34,7 @@ Konservativ aktuell nur im täglichen Workspace:
 PLAN – keine angelegten oder freigegebenen Branches/Worktrees:
 - Tracking UI: Marker Collision Winkel/Gegenstand/Ende
 - Tracking Continuity/Gaps: BLOCKED bis explizite Continuity-Semantik beschlossen
-- Android: nächster nativer Build / versionCode
+- Android: T-64 Native-Vorbereitung 1.0.4 (45) in main integriert; nativer Build und interner Play-Test separat freizugeben, Geräte-QA OPEN
 
 ## Worktree naming
 - Feature: `anyvo-feature-<topic>` / `feat/<topic>`

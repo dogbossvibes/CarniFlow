@@ -3,6 +3,14 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-10-07 — Codex (T-64 Android Native-Vorbereitung integriert)
+
+- Nutzer hat Commit und Integration ausdrücklich freigegeben. Produktcommit `2316e7cfd06149f0b0a7a1b2baa04430b88b867f`; main per Fast-forward von `cd8cd827` integriert.
+- Android-VersionCode 45 für 1.0.4; vorhandener TaskManager-Java-Patch per EAS-Postinstall-Prüfung abgesichert; BLE-Manifest-Feature zuverlässig optional.
+- Relevante Tests: 4 Suites / 32 Tests PASS; Typecheck, ESLint, diff-check und Config-Introspection PASS. Native Introspection vor/nach BLE-Fix: nur required true → false, iOS unverändert.
+- Buildnummer-Belege aus frischer Prüfung des Release-Chats übernommen: EAS/Play höchster gefundener Wert 44. Vor späterem Build erneut prüfen.
+- Keine native Kompilierung, Geräteabnahme, OTA, Store-Aktion, Git-Push oder DB-Änderung. Release-Baselines bleiben unverändert.
+
 ## 2026-10-07 — Codex (T-63 Android subscription publication)
 
 - User authorized publication and clean shared-file management. Relevant Play Store, internal iOS and integration chats were read; foreign work preserved.

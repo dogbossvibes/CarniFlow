@@ -58,6 +58,14 @@ full GPS / motion / corner diagnostics behind it.
 - A future **1.0.3 hotfix branch must contain the runtime-aware guard** (`23e5df6` + `54a74c4`);
   branches of the old 1.0.3 line (e.g. `968884f`) still carry the old guard.
 
+## Android Native preparation integrated — T-64 (2026-10-07)
+
+- User explicitly authorized commit and integration. Product commit `2316e7cfd06149f0b0a7a1b2baa04430b88b867f` fast-forwarded into canonical main from `cd8cd827`.
+- Android app/runtime 1.0.4, versionCode 45 prepared; optional BLE hardware feature fixed; EAS post-install verification checks the existing TaskManager Java patch without mutation.
+- Local verification PASS: 4 relevant suites / 32 tests, TypeScript, ESLint, diff-check and Expo config introspection. BLE required true → false is the only native mod result change from the fix; iOS results unchanged.
+- **Code integrated, not built or released.** Store/OTA baselines unchanged. Native compilation, final merged manifest and Android device purchase/tracking QA OPEN. No push, OTA, build, submission or DB write.
+- Before a separately authorized build, recheck highest relevant Play/EAS versionCode and Production environment. Report: `docs/agent/tasks/T-64.md`.
+
 ## Local integration candidates (verified locally 2026-10-07; NOT in `main`)
 
 These commits exist on their named local branches and in clean worktrees. None is

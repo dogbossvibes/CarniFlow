@@ -1,6 +1,6 @@
 # Agent Session Handoff
 
-> Aktuellster Handoff: **Codex (2026-10-07), T-63 Android subscription hotfix**. Shared production state: `docs/agent/ANYVO_MASTER_STATUS.md`.
+> Aktuellster Handoff: **Codex (2026-10-07), T-64 Android Native-Vorbereitung integriert**. Shared production state: `docs/agent/ANYVO_MASTER_STATUS.md`.
 > Der Block zwischen den AUTO-GENERATED-Markern wird von `scripts/agent-handoff.mjs` erzeugt —
 > **nicht manuell** bearbeiten. Alles ausserhalb der Marker wird von den Agenten **manuell** gepflegt.
 >
@@ -8,7 +8,17 @@
 > **Repository state > Git state > Handoff documentation > Agent assumptions.**
 > Der tatsächliche Repository-Zustand hat immer Vorrang vor dieser Doku.
 
-## Current task — T-63 (2026-10-07)
+## Current task — T-64 (2026-10-07)
+
+- **Completed:** Android-Native-Vorbereitung 1.0.4 (45), optionales BLE-Feature und TaskManager-Patch-Verifikation; Produktcommit `2316e7cfd06149f0b0a7a1b2baa04430b88b867f` in main per freigegebenem Fast-forward integriert.
+- **Tests:** 4 Suites / 32 Tests PASS, Typecheck und ESLint PASS, Config-Introspection PASS; vor/nach BLE-Fix nur BLE-required true → false, iOS-ModResults identisch.
+- **Scope:** Keine Tracking-/GNSS-Algorithmusänderung, kein Runtime-Downgrade, keine Dependency-Änderung.
+- **Do not touch:** fremde Worktrees, aktive Production-OTAs, DB. Kein Push, Build, Submit oder Store-Release freigegeben. T-63-Runtime-Snapshot nicht in main übernehmen.
+- **Next:** Build-Preflight mit frischen Versions-/Environment-Belegen; nativen Android-Build und internen Play-Test separat freigeben. Danach Screen-off/Resume/Offline/Permissions/GNSS und Kauf/Restore am konkreten Binary prüfen.
+- **Release:** Android Production bleibt 1.0.3 mit dokumentierter T-63-OTA; keine neue Auslieferung durch die Integration.
+- **Report:** `docs/agent/tasks/T-64.md`; nächster allgemeiner TASK-ID T-65.
+
+## Historical handoff — T-63 (2026-10-07)
 
 - **Goal/completed:** publish Android subscription identifier/price fix and document coordinated release state. Android Production runtime 1.0.3 is live from `e88371dc49233853162e87d8114c9f9d38a112d9`; group `168ae23f-676f-455c-8f15-bb475910d83e`, update `01a117b7-e024-7a59-9d60-ade29e2b6b01`.
 - **Validation:** full release run 325 PASS/1 stale agent-heading assertion; repaired-suite + native-contract rerun 2/36 PASS. All 326 suites/3968 distinct tests verified, tsc PASS, lint 0 errors (one existing warning), export/bundle and wrapper checks PASS.
@@ -20,51 +30,56 @@
 
 <!-- AUTO-GENERATED:START -->
 
-Generated: 2026-10-07T18:56:23.219Z
+Generated: 2026-10-07T21:45:59.151Z
 Agent: codex
 Branch: main
 
 ### Git status
 ```
-M docs/agent/ANYVO_MASTER_STATUS.md
+M docs/agent/ACTIVE_WORK.md
+ M docs/agent/ANYVO_MASTER_STATUS.md
+ M docs/agent/PLATFORM_STATUS.md
  M docs/agent/SESSION_HANDOFF.md
  M docs/agent/TASKS.md
  M docs/agent/WORK_LOG.md
- D docs/agent/tasks/ANDROID_SUBSCRIPTION_PRODUCT_MATCHING_2026-10-07.md
-?? docs/agent/tasks/T-63.md
+ M docs/agent/tasks/T-64.md
 ```
 
 ### Diff stat
 ```
-docs/agent/ANYVO_MASTER_STATUS.md                  | 40 +++++++++++++++++-----
- docs/agent/SESSION_HANDOFF.md                      | 12 ++++++-
- docs/agent/TASKS.md                                |  9 +++++
- docs/agent/WORK_LOG.md                             |  9 +++++
- ...OID_SUBSCRIPTION_PRODUCT_MATCHING_2026-10-07.md | 16 ---------
- 5 files changed, 61 insertions(+), 25 deletions(-)
+docs/agent/ACTIVE_WORK.md         |  4 ++--
+ docs/agent/ANYVO_MASTER_STATUS.md |  8 ++++++++
+ docs/agent/PLATFORM_STATUS.md     | 16 ++++++++++++----
+ docs/agent/SESSION_HANDOFF.md     | 14 ++++++++++++--
+ docs/agent/TASKS.md               |  9 +++++++++
+ docs/agent/WORK_LOG.md            |  8 ++++++++
+ docs/agent/tasks/T-64.md          |  5 ++---
+ 7 files changed, 53 insertions(+), 11 deletions(-)
 ```
 
 ### Modified files
 ```
+docs/agent/ACTIVE_WORK.md
 docs/agent/ANYVO_MASTER_STATUS.md
+docs/agent/PLATFORM_STATUS.md
 docs/agent/SESSION_HANDOFF.md
 docs/agent/TASKS.md
 docs/agent/WORK_LOG.md
-docs/agent/tasks/ANDROID_SUBSCRIPTION_PRODUCT_MATCHING_2026-10-07.md
+docs/agent/tasks/T-64.md
 ```
 
 ### Untracked files
 ```
-docs/agent/tasks/T-63.md
+(leer)
 ```
 
 ### Recent commits
 ```
-c302bce test(release): preserve approval checks across agent workflow names
-3979246 fix(subscription): match Android base plan product identifiers
-7d43db9 docs(agent): make ChatGPT and Codex the primary workflow
-e30297a docs(agent): record background lay hotfix and iOS OTA 1.0.4
-fd0c727 fix(tracking): process background lay fixes by session
+2316e7c fix(android): prepare native 1.0.4 build with optional BLE
+cd8cd82 docs(agent): add active work and platform parity overview
+41e5173 chore(repo): ignore local workspaces and QA artifacts
+9417ec0 fix(db): restore canonical heat schema migration
+f74ec87 fix(tracking): render adaptive distance scale reliably
 ```
 
 ### Runtime
