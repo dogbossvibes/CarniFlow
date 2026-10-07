@@ -43,8 +43,16 @@ function withAndroidCleanup(config) {
       }
     }
 
-    // 3) BLE-Feature nicht erzwingen.
-    for (const f of manifest['uses-feature'] || []) {
+    // 3) BLE ist optional. Mods laufen in umgekehrter Plugin-Reihenfolge:
+    // existiert das Feature noch nicht, deklarieren wir es selbst. Das später
+    // ausgeführte BLE-Plugin übernimmt vorhandene Deklarationen unverändert.
+    manifest['uses-feature'] = manifest['uses-feature'] || [];
+    if (!manifest['uses-feature'].some((f) => f.$ && f.$['android:name'] === 'android.hardware.bluetooth_le')) {
+      manifest['uses-feature'].push({
+        $: { 'android:name': 'android.hardware.bluetooth_le', 'android:required': 'false' },
+      });
+    }
+    for (const f of manifest['uses-feature']) {
       if (f.$ && f.$['android:name'] === 'android.hardware.bluetooth_le') {
         f.$['android:required'] = 'false';
       }

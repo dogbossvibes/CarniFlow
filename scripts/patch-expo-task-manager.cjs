@@ -4,6 +4,17 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Verification never writes to node_modules; EAS runs it after installation.
+const args = process.argv.slice(2);
+if (args.length > 1 || (args.length === 1 && args[0] !== '--check')) {
+  throw new Error('Usage: node scripts/patch-expo-task-manager.cjs [--check]');
+}
+const checkOnly = args[0] === '--check';
+if (checkOnly && process.env.EAS_BUILD_PLATFORM === 'ios') {
+  console.log('Android callback verification skipped for iOS build');
+  process.exit(0);
+}
+
 const packageFile = require.resolve('expo-task-manager/package.json');
 const { version } = require(packageFile);
 if (version !== '14.0.9') {
@@ -49,7 +60,9 @@ patchOnce(
   'expired callback cleanup',
 );
 
-if (changed) {
+if (checkOnly && changed) {
+  throw new Error('expo-task-manager Android callback patch is missing or incomplete; run the postinstall script before building');
+} else if (changed) {
   fs.writeFileSync(sourceFile, source);
   console.log('Patched expo-task-manager Android callback lifecycle');
 } else {
