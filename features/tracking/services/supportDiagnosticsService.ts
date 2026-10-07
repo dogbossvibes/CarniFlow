@@ -7,7 +7,7 @@ import {
 } from '@/features/tracking/repositories/localTrackRepository';
 import { hasQaSearchCapture, loadQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
 import {
-  buildSupportExport, isUsableSupportCapture, serializeSupportExport, supportExportFileName,
+  attachBackgroundLayDiagnostics, buildSupportExport, isUsableSupportCapture, serializeSupportExport, supportExportFileName,
   type SupportExport,
 } from '@/features/tracking/utils/supportDiagnostics';
 import { shareJsonFile } from '@/features/tracking/services/qaTrackExportService';
@@ -17,6 +17,12 @@ import {
 } from '@/features/tracking/utils/customerTrackDiagnosis';
 import { getLocalTrainingSessionById } from '@/features/training/repositories/localTrainingRepository';
 import { buildLocalTrackDetail } from '@/features/tracking/utils/localTrackDetail';
+import { loadBackgroundLayDiagnostics } from '@/features/tracking/utils/backgroundLayDiagnostics';
+
+async function withBackgroundLayDiagnostics<T extends SupportExport>(sessionLocalId: string, exported: T): Promise<T> {
+  const diagnostics = await loadBackgroundLayDiagnostics(sessionLocalId).catch(() => null);
+  return attachBackgroundLayDiagnostics(exported, diagnostics);
+}
 
 /** Gibt es für diese gespeicherte Fährte eine Support-Diagnose? (Index-Prüfung, lädt das Payload nicht.) */
 export function hasSupportDiagnostics(sessionLocalId: string): Promise<boolean> {
@@ -31,7 +37,7 @@ export async function buildSupportExportForSession(sessionLocalId: string): Prom
     getLayTrackPointsBySession(sessionLocalId).catch(() => []),
     getTrackMarkersBySession(sessionLocalId).catch(() => []),
   ]);
-  return buildSupportExport(points, markers, search);
+  return withBackgroundLayDiagnostics(sessionLocalId, buildSupportExport(points, markers, search));
 }
 
 export type ShareSupportResult = { ok: true; fileName: string } | { ok: false; reason: 'missing' | 'failed' };
@@ -77,10 +83,11 @@ export async function buildPersistedExportForSession(
     const fromLocal = buildPersistedSupportExport({
       layPoints: layPointsFromDetail(localDetail), markers: markersFromDetail(localDetail), run: runFromDetail(localDetail),
     });
-    if (fromLocal) return fromLocal;
+    if (fromLocal) return withBackgroundLayDiagnostics(sessionLocalId, fromLocal);
   }
   if (!detail) return null;
-  return buildPersistedSupportExport({ layPoints: layPointsFromDetail(detail), markers: markersFromDetail(detail), run: runFromDetail(detail) });
+  const fromDetail = buildPersistedSupportExport({ layPoints: layPointsFromDetail(detail), markers: markersFromDetail(detail), run: runFromDetail(detail) });
+  return fromDetail ? withBackgroundLayDiagnostics(sessionLocalId, fromDetail) : null;
 }
 
 /** Was kann geteilt werden? Capture → `capture`; sonst verwertbare gelegte Linie → `persisted`; sonst `none`. */

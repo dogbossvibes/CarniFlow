@@ -5,8 +5,10 @@ import { useTrackingStore } from '../../store/trackingStore';
 import { requestVoice, resetVoiceEvents } from '../../utils/voiceEvents';
 import { saveQaSessionCapture } from '../../utils/qaSessionCapture';
 import { createLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
-import { createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
+import { createLocalTrackMarker, createLocalTrackPointsBatch } from '@/features/tracking/repositories/localTrackRepository';
 import * as Speech from 'expo-speech';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 
 jest.mock('expo-speech', () => ({ speak: jest.fn(), stop: jest.fn() }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -15,6 +17,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 jest.mock('expo-location', () => ({
   Accuracy: { BestForNavigation: 6 },
   requestForegroundPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
+  getForegroundPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
+  hasStartedLocationUpdatesAsync: jest.fn(async () => false),
   getBackgroundPermissionsAsync: jest.fn(() => new Promise(() => {})),
   getLastKnownPositionAsync: jest.fn(async () => null),
   watchHeadingAsync: jest.fn(() => new Promise(() => {})),
@@ -103,6 +107,8 @@ beforeEach(() => {
   (saveQaSessionCapture as jest.Mock).mockClear();
   (createLocalTrainingSession as jest.Mock).mockReset().mockResolvedValue(undefined);
   (createLocalTrackMarker as jest.Mock).mockClear();
+  (createLocalTrackPointsBatch as jest.Mock).mockReset().mockResolvedValue(undefined);
+  (AsyncStorage.setItem as jest.Mock).mockClear();
   (Speech.speak as jest.Mock).mockClear();
   jest.spyOn(Date, 'now').mockImplementation(() => clockMs);
   const state = useTrackingStore.getState();
@@ -111,6 +117,45 @@ beforeEach(() => {
   state.distanceMeters = 0;
   state.startLockActive = false;
   resetVoiceEvents(clockMs);
+});
+function diagnosticEvents(): { name: string; count: number; reason?: string }[] {
+  return (AsyncStorage.setItem as jest.Mock).mock.calls
+    .filter(([key]) => typeof key === 'string' && key.includes('::event::'))
+    .map(([, value]) => JSON.parse(value));
+}
+
+it('counts accepted fixes, existing rejects and successful point flush without changing geometry', async () => {
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  feed(3000, 70, 13);
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const events = diagnosticEvents();
+  expect(events.some(e => e.name === 'onFixAccepted')).toBe(true);
+  expect(events.some(e => e.name === 'onFixRejected' && e.reason === 'accuracy')).toBe(true);
+  expect(events.some(e => e.name === 'persistAttempt' && e.count > 0)).toBe(true);
+  expect(events.some(e => e.name === 'persistSuccess' && e.count > 0)).toBe(true);
+  expect(events.some(e => e.name === 'flushSuccess')).toBe(true);
+});
+
+it('counts a failed existing flush and AppState background/foreground resume without restarting the recorder', async () => {
+  let appState: ((state: 'inactive' | 'background' | 'active') => void) | null = null;
+  jest.spyOn(AppState, 'addEventListener').mockImplementation(((_type: string, cb: typeof appState) => {
+    appState = cb;
+    return { remove: jest.fn() };
+  }) as never);
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  (createLocalTrackPointsBatch as jest.Mock).mockRejectedValueOnce(new Error('disk failure'));
+  await act(async () => { appState?.('inactive'); appState?.('background'); appState?.('active'); current.finish(); await Promise.resolve(); });
+  const events = diagnosticEvents();
+  expect(events.some(e => e.name === 'inactive')).toBe(true);
+  expect(events.some(e => e.name === 'background')).toBe(true);
+  expect(events.some(e => e.name === 'foreground')).toBe(true);
+  expect(events.some(e => e.name === 'resume')).toBe(true);
+  expect(events.some(e => e.name === 'flushFailure')).toBe(true);
+  expect(events.some(e => e.name === 'persistFailure')).toBe(true);
 });
 afterEach(() => {
   act(() => { renderer?.unmount(); });

@@ -13,8 +13,11 @@ import {
 } from '@/features/tracking/utils/supportDiagnostics';
 import { assertNoAbsoluteData, type RawLayPoint, type RawTrackMarker } from '@/features/tracking/utils/qaTrackExport';
 import { buildExportForSession } from '@/features/tracking/services/qaTrackExportService';
-import { shareSupportDiagnostics, hasSupportDiagnostics, buildSupportExportForSession } from '@/features/tracking/services/supportDiagnosticsService';
+import { shareSupportDiagnostics, hasSupportDiagnostics, buildSupportExportForSession, buildPersistedExportForSession } from '@/features/tracking/services/supportDiagnosticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { beginBackgroundLayDiagnostics, recordBackgroundLayEvent } from '@/features/tracking/utils/backgroundLayDiagnostics';
+let mockDiagnosticId = 0;
+jest.mock('expo-crypto', () => ({ randomUUID: () => `diag-${++mockDiagnosticId}` }));
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -32,7 +35,9 @@ jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
   getLayTrackPointsBySession: jest.fn(async () => mockLay),
   getTrackMarkersBySession: jest.fn(async () => mockMarkers),
 }));
-jest.mock('@/features/training/repositories/localTrainingRepository', () => ({ getLocalTrainingSessions: jest.fn(async () => []) }));
+jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
+  getLocalTrainingSessions: jest.fn(async () => []), getLocalTrainingSessionById: jest.fn(async () => null),
+}));
 
 // Native Share-Sheet + Datei (Cache-Verzeichnis).
 const mockShareAsync = jest.fn(async () => undefined);
@@ -188,6 +193,28 @@ describe('Persistenz und Retention', () => {
 describe('Teilen', () => {
   const savedNetwork = (global as any).fetch;
   afterEach(() => { (global as any).fetch = savedNetwork; });
+
+  it('adds session-scoped background lay counters to the existing privacy-safe support export', async () => {
+    await beginBackgroundLayDiagnostics('sess-diag');
+    await recordBackgroundLayEvent('sess-diag', 'taskCallback');
+    await recordBackgroundLayEvent('sess-diag', 'handlerMissing');
+    await saveQaSearchCapture('sess-diag', toSupportCapture(diagFromField('F1')), 'support');
+    const exported = await buildSupportExportForSession('sess-diag');
+    expect(exported?.schemaMinor).toBe(9);
+    expect(exported?.backgroundLayDiagnostics?.counts.taskCallback).toBe(1);
+    expect(exported?.backgroundLayDiagnostics?.counts.handlerMissing).toBe(1);
+    expect(() => assertSupportPrivacy(exported)).not.toThrow();
+    expect(JSON.stringify(exported?.backgroundLayDiagnostics)).not.toMatch(/latitude|longitude|sess-diag/);
+  });
+
+  it('also enriches the persisted-only customer export for the exact session', async () => {
+    await beginBackgroundLayDiagnostics('sess-persisted');
+    await recordBackgroundLayEvent('sess-persisted', 'taskCallback');
+    const exported = await buildPersistedExportForSession('sess-persisted', { points: mockLay });
+    expect(exported?.diagnosticsSource).toBe('persisted');
+    expect(exported?.backgroundLayDiagnostics?.counts.taskCallback).toBe(1);
+    expect(() => assertSupportPrivacy(exported)).not.toThrow();
+  });
 
   it('A: Fährte mit Diagnose → JSON valide, Datei im Cache, Share-Sheet genau einmal, offline (kein Netzwerk)', async () => {
     const fetchSpy = jest.fn(() => { throw new Error('network must not be used'); });

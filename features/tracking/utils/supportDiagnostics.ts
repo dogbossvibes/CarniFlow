@@ -14,6 +14,7 @@ import {
   buildQaTrackExport, assertNoAbsoluteData, type QaTrackExport, type RawLayPoint, type RawTrackMarker,
 } from '@/features/tracking/utils/qaTrackExport';
 import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
+import type { BackgroundLayDiagnostics } from '@/features/tracking/utils/backgroundLayDiagnostics';
 
 /**
  * Not-Aus für den Support-Capture (z. B. falls ein Performance-Problem im Feld auftaucht).
@@ -22,7 +23,19 @@ import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapt
 export const SUPPORT_DIAGNOSTICS_CAPTURE = true;
 export const isSupportCaptureEnabled = (): boolean => SUPPORT_DIAGNOSTICS_CAPTURE;
 
-export type SupportExport = Omit<QaTrackExport, 'sessionId'> & { exportType: 'support' };
+export type SupportExport = Omit<QaTrackExport, 'sessionId'> & {
+  exportType: 'support';
+  /** v2.9: optional session-scoped lifecycle counters; no coordinates or absolute times. */
+  backgroundLayDiagnostics?: BackgroundLayDiagnostics;
+};
+
+/** Additive v2.9 support field. The privacy gate also checks every diagnostic value. */
+export function attachBackgroundLayDiagnostics<T extends SupportExport>(exported: T, diagnostics: BackgroundLayDiagnostics | null): T {
+  if (!diagnostics) return exported;
+  const enriched = { ...exported, schemaMinor: 9 as const, backgroundLayDiagnostics: diagnostics };
+  assertSupportPrivacy(enriched);
+  return enriched as T;
+}
 
 /** Schlüsselnamen, die in einem Kunden-Export NIE vorkommen dürfen (Vergleich ohne Gross/Klein, ohne _ und -). */
 export const SUPPORT_FORBIDDEN_KEYS = [
