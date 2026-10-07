@@ -1,4 +1,4 @@
-# ANYVO — Agent Handoff (Claude Code ↔ Codex)
+# ANYVO — Agent Handoff (ChatGPT + Codex; optional Claude fallback)
 
 ## Start here
 
@@ -22,8 +22,9 @@ Then use the other files as supporting detail:
 If an older file conflicts with `ANYVO_MASTER_STATUS.md`,
 the master status is authoritative for current project state.
 
-Kurzanleitung für den täglichen Wechsel zwischen den Agenten. Das **Repository**
-ist die gemeinsame technische Wahrheit.
+ChatGPT + Codex sind der primäre Entwicklungsworkflow. Claude Code bleibt ein
+optionaler Fallback; die folgenden Claude-Handoff-Schritte sind historische, weiterhin
+nutzbare Übergabeverfahren. Das **Repository** ist die gemeinsame technische Wahrheit.
 
 ## Dateien
 | Datei | Zweck |
@@ -38,14 +39,14 @@ ist die gemeinsame technische Wahrheit.
 | `../../scripts/agent-status.mjs` | Read-only Statusübersicht + Stale-Warnung. |
 | `../../scripts/agent-start.mjs` | Read-only Kompaktübersicht beim Session-Start. |
 
-## CLAUDE → CODEX
+## Optional: CLAUDE → CODEX
 1. In Claude: `/handoff`  _(oder ohne Slash-Command:)_ `npm run agent:handoff -- --agent=claude`
    - Vorher die **manuellen** Abschnitte in `SESSION_HANDOFF.md` pflegen (Current task, Work completed, …).
 2. Claude schliessen.
 3. Im gleichen Projektordner starten: `codex`
 4. Codex liest `AGENTS.md` → `docs/agent/CURRENT_STATE.md` → `SESSION_HANDOFF.md` → `TASKS.md` und vergleicht mit `git status`.
 
-## CODEX → CLAUDE
+## Optional: CODEX → CLAUDE
 1. In Codex die manuellen Handoff-Abschnitte aktualisieren.
 2. `npm run agent:handoff -- --agent=codex`
 3. Codex schliessen.

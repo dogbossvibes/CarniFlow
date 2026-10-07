@@ -20,9 +20,11 @@ status change.
 Do not publish a Production OTA from a branch that does not contain the
 documented current Production baseline.
 
-# Agent Handoff Protocol (Claude Code ↔ Codex)
+# Agent Handoff Protocol (ChatGPT + Codex; optional Claude fallback)
 
-This repository is the shared source of truth for both agents. Full guide:
+ChatGPT + Codex are the primary ANYVO development workflow. Claude Code and
+OpenCode remain optional historical fallbacks. This repository is the shared
+source of truth for all agents. Full guide:
 `docs/agent/README.md`.
 
 ## On start (Codex MUST do this, in order)
@@ -30,8 +32,8 @@ This repository is the shared source of truth for both agents. Full guide:
 2. Read `docs/agent/SESSION_HANDOFF.md`.
 3. Read `docs/agent/TASKS.md` — the active task IDs, their status, and the **next TASK-ID**.
 4. Skim relevant entries in `docs/agent/DECISIONS.md`.
-5. Run `git status --short`.
-6. Check the current branch (`git branch --show-current`).
+5. Check the worktree path and root (`pwd`; `git rev-parse --show-toplevel`).
+6. Run `git status --short`, `git branch --show-current`, and `git rev-parse HEAD`.
 7. Compare the repository state against the handoff: does the branch match? Do the
    listed changed files actually exist? Are there additional local changes? Is the
    handoff possibly stale (`npm run agent:status`)?
@@ -50,19 +52,21 @@ The actual repository state always wins over handoff documentation.
 - `git reset`
 - `git checkout` modified files
 - `git clean`
-- push without explicit user permission
-- commit without explicit user permission
-- run destructive SQL
-- alter production Supabase schema without explicit user permission
+- push, merge, or commit without explicit user permission
+- publish an OTA, start a build, or release to a store without explicit user permission
+- run destructive SQL or write to Production Supabase/DB without explicit user permission
 
 ## ALWAYS
 - inspect `git status` before editing
 - preserve unrelated work
-- verify relevant tests
+- preserve working tracking/GPS behavior; review field evidence and continuity
+  before replacing tracking logic
+- for product-code changes, run relevant tests, TypeScript typecheck, ESLint,
+  and `git diff --check` (report any justified limitation)
 - document remaining issues
 - update the handoff before stopping when appropriate
 
-## When handing off to Claude
+## When handing off to Claude (optional fallback)
 1. Update the **manual** sections of `docs/agent/SESSION_HANDOFF.md`
    (Current task, Goal, Work completed, Tests, Known issues, Important context,
    Do not touch, Next recommended step, Relevant files, Open questions).
@@ -92,8 +96,8 @@ Core rule:
 - Helper: `npm run agent:wt:create|list|finish|remove`. `remove` refuses to delete a
   **dirty** worktree and never uses `--force`.
 - Tool-neutral roles: Primary Agent, Implementation Agent, Review Agent, QA Agent,
-  Subagent. OpenCode is the default Primary Agent (`.opencode/`); OpenAI Codex reads
-  this `AGENTS.md` natively for review/QA. Claude Code is **legacy** and not required.
+  Subagent. ChatGPT + Codex are the primary workflow. Claude Code and OpenCode
+  may be used as optional fallbacks; their historical configuration is retained.
 
 The NEVER/ALWAYS rules above apply unchanged in every worktree. In addition, a parallel
 agent must never delete or reset another worktree's or the main tree's uncommitted work,

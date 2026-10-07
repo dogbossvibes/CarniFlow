@@ -58,6 +58,30 @@ full GPS / motion / corner diagnostics behind it.
 - A future **1.0.3 hotfix branch must contain the runtime-aware guard** (`23e5df6` + `54a74c4`);
   branches of the old 1.0.3 line (e.g. `968884f`) still carry the old guard.
 
+## Local integration candidates (verified locally 2026-10-07; NOT in `main`)
+
+These commits exist on their named local branches and in clean worktrees. None is
+an ancestor of `main`; no local remote-tracking ref contains them. This is a Git
+inventory, **not** a Production release or a decision to integrate them.
+
+| Phase | Branch | Commit | Base / dependency |
+|---|---|---|---|
+| 1 | `feat/integrate-accuracy-aware-search` | `4b11825` | parent `e30297a` |
+| 2 | `fix/tracking-distance-scale-visible` | `d3037b1` | parent `4b11825`; requires Phase 1 |
+| 4 | `fix/integrate-heat-schema-restore` | `d00b8f1` | parent `e30297a` |
+| 6 | `chore/integrate-track-module-repo-hygiene` | `9ba2ec3` | parent `e30297a` |
+
+Pending decisions from the production audit, preserved for the Codex handoff:
+
+- **Phase 3: HARD STOP.** No commit; explicit continuity semantics are missing.
+- **Phase 5:** No missing Android code was identified in that audit; Android still
+  needs a native build and a new `versionCode` before release. Reverify before action.
+- **Phase 6:** 16 older commits from `feat/track-module-rewrite` still need manual
+  review. The branch has 30 commits not in `main` by Git ancestry; do not equate
+  that raw count with the 16-item audit list or integrate automatically.
+
+---
+
 ## Source of truth for the LIVE Production state
 
 **EAS is the only binding source for what is live right now.** This file is a

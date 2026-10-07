@@ -26,8 +26,8 @@
 Worktrees sind **Geschwister-Ordner** des Haupt-Repos:
 
 ```
-canisflow/            → Haupt-/Integrations-Working-Tree (aktueller Branch)
-../anyvo-<slug>       → je ein Worktree pro Task, Branch = <slug> (oder --branch)
+/Users/moyo/canisflow-worktrees/anyvo-main → kanonischer main-Worktree
+/Users/moyo/canisflow-worktrees/anyvo-<slug> → Task-Worktree (oder --branch)
 ```
 
 Beispiele: `../anyvo-track-fix`, `../anyvo-health-weight`, `../anyvo-review`.
@@ -36,18 +36,18 @@ Beispiele: `../anyvo-track-fix`, `../anyvo-health-weight`, `../anyvo-review`.
 
 - Worktrees teilen dieselbe Git-Historie (Commits), aber **jeder hat seinen eigenen Working Tree**.
 - **Uncommittete** Änderungen des Haupt-Trees wandern **nicht** in einen neuen Worktree.
-- **Untracked** Dateien wandern ebenfalls **nicht** mit. Deshalb ist die OpenCode-Konfiguration
-  (`.opencode/agent`, `.opencode/agents`, `.opencode/commands`, `opencode.json`) jetzt **versioniert** —
-  nur so steht sie in jedem Worktree bereit.
+- **Untracked** Dateien wandern ebenfalls **nicht** mit. Historische, versionierte
+  OpenCode-Konfiguration kann in Worktrees vorhanden sein; sie ist nicht der
+  aktuelle Primary-Workflow.
 - Zwei Worktrees können **nicht denselben Branch** auschecken. Jeder Task braucht einen eigenen Branch.
 
 ## Rollen (tool-neutral)
 
 | Rolle | Aufgabe | Umsetzung |
 |---|---|---|
-| **Primary Agent** | verantwortlich für **einen** Task/Worktree | OpenCode `primary` bzw. `anyvo-engineering-lead` |
+| **Primary Agent** | verantwortlich für **einen** Task/Worktree | ChatGPT + Codex |
 | **Implementation Agent** | schreibt Code im Task-Scope | Primary selbst oder delegierter Subagent |
-| **Review Agent** | prüft einen abgeschlossenen Task | OpenAI **Codex** oder `anyvo-analyst` (read-only) |
+| **Review Agent** | prüft einen abgeschlossenen Task | separater Codex-Review oder menschliches Review |
 | **QA Agent** | Tests/Device-QA | Subagent / Codex |
 | **Integrations-Agent** | merged Task-Branch, pflegt **globale** Doku | ein dafür bestimmter Primary Agent |
 
@@ -57,13 +57,14 @@ Beispiele: `../anyvo-track-fix`, `../anyvo-health-weight`, `../anyvo-review`.
 2. **Worktree + Branch anlegen**: `npm run agent:wt:create -- <slug> --base <integrationsbranch>`
    (siehe „Basis (`--base`)" unten). Legt Branch `<slug>`, Worktree `../anyvo-<slug>`
    und `docs/agent/tasks/<TASK-ID>.md` an.
-3. **Primary Agent** startet **im Worktree** (`cd ../anyvo-<slug>`; `opencode`), liest
+3. **Primary Agent** startet **im Worktree** (ChatGPT + Codex), liest
    `AGENTS.md` + `docs/agent/` + den eigenen Task-Report.
 4. **Implementieren** (ggf. mit Subagenten), **Tests** ausführen, Report pflegen.
 5. **Task-Commit** (nur nach Freigabe): committe **nur** die Dateien im Task-Scope.
-6. **Review** durch Codex/Analyst gegen den Task-Report.
+6. **Review** durch einen separaten Reviewer gegen den Task-Report.
 7. **Fix** falls nötig.
-8. **Integration**: Integrations-Agent merged den Branch und aktualisiert **erst dann** die
+8. **Integration nur nach ausdrücklicher Freigabe**: Integrations-Agent merged den Branch
+   und aktualisiert **erst dann** die
    globalen Dateien (`TASKS.md`, `SESSION_HANDOFF.md`, `WORK_LOG.md`, ggf. `CURRENT_STATE.md`).
 
 ## Was parallel Konflikte vermeidet
