@@ -59,6 +59,19 @@ describe('buyPackage — Android Product-Change Wiring', () => {
     expect(mockPP.mock.calls[0]).toHaveLength(1);
   });
 
+  it('keeps Google base plan identifiers intact in purchase and upgrade calls', async () => {
+    setPlatform('android');
+    const id = 'anyvo_trainer_monthly_30.00:anyvo-trainer-monthly-3000';
+    const raw = { product: { identifier: id } };
+    const androidPkg = { ...pkg, productId: id, raw };
+    const old = 'anyvo_active_monthly_10:anyvo-active-monthly-400';
+    await buyPackage(androidPkg, { oldProductIdentifier: old });
+    expect(mockPP).toHaveBeenCalledWith(raw, null, {
+      oldProductIdentifier: old,
+      replacementMode: 'WITH_TIME_PRORATION',
+    });
+  });
+
   it('iOS-Wechsel: KEINE Change-Info (unverändert), auch wenn oldProductIdentifier gesetzt', async () => {
     setPlatform('ios');
     await buyPackage(pkg, { oldProductIdentifier: 'anyvo_active_monthly_10' });

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { PRODUCT_IDS, type SubscriptionPlan } from '@/features/subscription/plans';
+import { PRODUCT_IDS, canonicalStoreProductId, matchesStoreProduct, type SubscriptionPlan } from '@/features/subscription/plans';
 import type { StoreTrialOffer } from '@/features/subscription/activeTrial';
 
 // RevenueCat (Apple/Google In-App-Purchase). Nativ → defensiv laden, damit Expo
@@ -92,7 +92,7 @@ export interface EntitlementResult {
 }
 
 export function hasStorePackageForProduct(packages: PurchasePackage[], productId: string | null | undefined): boolean {
-  return !!productId && packages.some(p => p.productId === productId);
+  return !!productId && packages.some(p => matchesStoreProduct(p.productId, productId));
 }
 
 const TRAINER_IDS = new Set(['trainer', 'anyvo_trainer_monthly_30.00']);
@@ -101,6 +101,7 @@ const ACTIVE_IDS = new Set(['pro', 'active', 'anyvo_active_monthly_10']);
 const NEWBIE_IDS = new Set(['newbie', 'anyvo_newbie_monthly_0']);
 
 function rankIdentifier(id: string | null | undefined): RestorablePlan | null {
+  id = canonicalStoreProductId(id);
   if (!id) return null;
   if (NEWBIE_IDS.has(id)) return null;
   if (TRAINER_IDS.has(id)) return 'trainer';
@@ -331,7 +332,7 @@ export async function getActiveTrialOffer(): Promise<StoreTrialOffer> {
   if (!purchasesReady()) return empty;
   try {
     const pkgs = await getPackages();
-    const pkg = pkgs.find(p => p.productId === PRODUCT_IDS.activeMonthly) ?? pkgs.find(p => p.tier === 'pro');
+    const pkg = pkgs.find(p => matchesStoreProduct(p.productId, PRODUCT_IDS.activeMonthly)) ?? pkgs.find(p => p.tier === 'pro');
     if (!pkg) return empty;
     const product = (pkg.raw as any)?.product;
     const freeTrialDays = freeTrialDaysFromProduct(product);
@@ -363,7 +364,7 @@ export async function getActiveTrialOffer(): Promise<StoreTrialOffer> {
 export async function buyActiveTrial(): Promise<EntitlementResult> {
   if (!purchasesReady()) return { ok: false, tier: null, plan: null, expiration: null, error: 'IAP nicht verfügbar' };
   const pkgs = await getPackages();
-  const pkg = pkgs.find(p => p.productId === PRODUCT_IDS.activeMonthly) ?? pkgs.find(p => p.tier === 'pro');
+  const pkg = pkgs.find(p => matchesStoreProduct(p.productId, PRODUCT_IDS.activeMonthly)) ?? pkgs.find(p => p.tier === 'pro');
   if (!pkg) return { ok: false, tier: null, plan: null, expiration: null, error: 'ACTIVE-Paket nicht verfügbar' };
   return buyPackage(pkg);
 }
