@@ -1,6 +1,6 @@
 /**
- * Production-Native-Vertrag 1.0.4 (Live Activity V2, Schnellstart-Widget, App Intents):
- * eigener Runtime-Vertrag ggü. Store-Binary 1.0.3 (48). Keine Internal-Werte.
+ * Android hotfix release contract: preserve the existing 1.0.3 binary runtime.
+ * The canonical main retains its independent iOS 1.0.4 / Build 49 contract.
  */
 import { readFileSync } from 'fs';
 
@@ -8,10 +8,11 @@ const app = JSON.parse(readFileSync('app.json', 'utf8')).expo;
 const eas = JSON.parse(readFileSync('eas.json', 'utf8'));
 
 describe('Production-Native-Vertrag', () => {
-  it('Version 1.0.4 → Runtime 1.0.4 (policy appVersion), iOS-Build 49', () => {
-    expect(app.version).toBe('1.0.4');
+  it('Android hotfix uses Runtime 1.0.3 and the unchanged production app identity', () => {
+    expect(app.version).toBe('1.0.3');
     expect(app.runtimeVersion).toEqual({ policy: 'appVersion' });
-    expect(app.ios.buildNumber).toBe('49');
+    expect(app.ios.buildNumber).toBe('48');
+    expect(app.android.package).toBe('com.anyvo.app');
     expect(eas.cli.appVersionSource).toBe('local');
     expect(eas.build.production.autoIncrement).toBe(false);
   });
