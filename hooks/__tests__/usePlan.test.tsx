@@ -2,6 +2,9 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { usePlan } from '../usePlan';
 
+// The repo's minimal renderer declaration omits the public update method.
+type UpdatingRenderer = ReturnType<typeof TestRenderer.create> & { update(element: React.ReactElement): void };
+
 const mockProfile = jest.fn();
 const mockCaps = jest.fn();
 jest.mock('@/hooks/useProfile', () => ({ useProfile: () => mockProfile() }));
@@ -12,8 +15,8 @@ it('Legacy AI-Gate folgt ACTIVE-lifetime und verliert Rechte bei Accountwechsel'
   mockCaps.mockReturnValue({ isPro: true, hasActiveLifetimeAccess: true, loading: false });
   let result: ReturnType<typeof usePlan>;
   function Probe() { result = usePlan(); return null; }
-  let renderer: TestRenderer.ReactTestRenderer;
-  act(() => { renderer = TestRenderer.create(<Probe />); });
+  let renderer: UpdatingRenderer;
+  act(() => { renderer = TestRenderer.create(<Probe />) as UpdatingRenderer; });
   expect(result!).toMatchObject({ plan: 'premium', isPremium: true, expiresAt: null });
   mockCaps.mockReturnValue({ isPro: false, hasActiveLifetimeAccess: false, loading: false });
   act(() => { renderer!.update(<Probe />); });
