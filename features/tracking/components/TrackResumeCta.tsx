@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -61,7 +61,9 @@ export function recoveryReasonLine(d: RecoveryDecision): string {
   return parts.join(' · ');
 }
 
-export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisibleChange }: {
+export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, userId, showUnavailable = false, onVisibleChange }: {
+  userId?: string | null;
+  showUnavailable?: boolean;
   sessionId: string; dogId: string | null | undefined; hasRemoteSearchRun: boolean;
   onVisibleChange?: (visible: boolean) => void;
 }) {
@@ -79,17 +81,22 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
   const [decision, setDecision] = useState<RecoveryDecision | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState<null | 'resume' | 'complete' | 'discard' | 'reopen'>(null);
+  const actionLock = useRef(false);
+  const generation = useRef(0);
   const [diagOpen, setDiagOpen] = useState(false);   // interne Diagnosedetails (nur QA-Modus), standardmässig zu
 
   useEffect(() => {
     let alive = true;
+    const token = ++generation.current;
+    actionLock.current = false;
+    setBusy(null);
     setDecision(null);
     setDone(false);
-    evaluateTrackRecovery({ sessionId, dogId, hasRemoteSearchRun })
+    evaluateTrackRecovery({ sessionId, dogId, hasRemoteSearchRun, ...(userId ? { userId } : {}) })
       .then(d => { if (alive) setDecision(d); })
       .catch(() => {});
-    return () => { alive = false; };
-  }, [sessionId, dogId, hasRemoteSearchRun]);
+    return () => { alive = false; generation.current = token + 1; };
+  }, [sessionId, dogId, hasRemoteSearchRun, userId]);
 
   const canResume = !done && !!decision?.ok;
   const searching = !!decision?.ok && decision.mode === 'searching';
@@ -101,6 +108,9 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
   useEffect(() => { onVisibleChange?.(visible); }, [visible, onVisibleChange]);
 
   if (!visible) {
+    if (showUnavailable && !done && decision && !decision.ok) {
+      return <View style={s.card} testID="track-recovery-unavailable"><Text style={s.cardText}>{t('track.profile.unavailable')}</Text></View>;
+    }
     // Entwicklungs-/Testpfad: konkreter Grund statt stillem Verstecken (nur QA-Diagnosemodus).
     if (decision && !decision.ok && isQaDiagnosticsEnabled()) {
       return (
@@ -113,59 +123,75 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, onVisible
   }
 
   const onResume = async () => {
-    if (busy) return;
+    if (actionLock.current) return;
+    actionLock.current = true; const token = generation.current;
     setBusy('resume');
     try {
-      const d = await applyTrackRecovery({ sessionId, dogId, hasRemoteSearchRun });
+      const d = await applyTrackRecovery({ sessionId, dogId, hasRemoteSearchRun, ...(userId ? { userId } : {}) });
+      if (token !== generation.current) return;
       if (d.ok) router.push(d.target as never);
       else {
         setDecision(d);
         Alert.alert(TITLE, tx('resumeFailed'));
       }
-    } finally { setBusy(null); }
+    } catch { if (token === generation.current) Alert.alert(TITLE, tx('resumeFailed')); }
+    finally { if (token === generation.current) { actionLock.current = false; setBusy(null); } }
   };
 
   const onReopen = async () => {
-    if (busy) return;
+    if (actionLock.current) return;
+    actionLock.current = true; const token = generation.current;
     setBusy('reopen');
     try {
-      const r = await reopenCancelledTrack(sessionId, dogId, { hasRemoteSearchRun });
+      const r = await reopenCancelledTrack(sessionId, dogId, { hasRemoteSearchRun, ...(userId ? { userId } : {}) });
+      if (token !== generation.current) return;
       if (r.ok) setDecision(r.decision);   // → normale Karte mit „Fährte fortsetzen"
       else Alert.alert(REOPEN_TITLE, tx('reopenFailed'));
-    } finally { setBusy(null); }
+    } catch { if (token === generation.current) Alert.alert(REOPEN_TITLE, tx('reopenFailed')); }
+    finally { if (token === generation.current) { actionLock.current = false; setBusy(null); } }
   };
 
   const completeNow = async () => {
+    if (actionLock.current) return;
+    actionLock.current = true; const token = generation.current;
     setBusy('complete');
     try {
-      const r = await completeTrackWithoutApp(sessionId, dogId);
+      const r = await (userId ? completeTrackWithoutApp(sessionId, dogId, userId) : completeTrackWithoutApp(sessionId, dogId));
+      if (token !== generation.current) return;
       if (r.ok) setDone(true);
       else Alert.alert(DONE_TITLE, tx('completeFailed'));
-    } finally { setBusy(null); }
+    } catch { if (token === generation.current) Alert.alert(DONE_TITLE, tx('completeFailed')); }
+    finally { if (token === generation.current) { actionLock.current = false; setBusy(null); } }
   };
 
   const discardNow = async () => {
+    if (actionLock.current) return;
+    actionLock.current = true; const token = generation.current;
     setBusy('discard');
     try {
-      const r = await discardSearchAttempt(sessionId, dogId, { hasRemoteSearchRun });
+      const r = await discardSearchAttempt(sessionId, dogId, { hasRemoteSearchRun, ...(userId ? { userId } : {}) });
+      if (token !== generation.current) return;
       if (r.ok) router.push(r.target as never);
       else Alert.alert(DISCARD_TITLE, tx('discardFailed'));
-    } finally { setBusy(null); }
+    } catch { if (token === generation.current) Alert.alert(DISCARD_TITLE, tx('discardFailed')); }
+    finally { if (token === generation.current) { actionLock.current = false; setBusy(null); } }
   };
 
   const onDiscard = () => {
     if (busy) return;
+    const confirmation = generation.current;
     Alert.alert(tx('discardConfirmTitle'), tx('discardConfirmText'), [
       { text: tx('cancel'), style: 'cancel' },
-      { text: tx('discardConfirm'), style: 'destructive', onPress: () => { void discardNow(); } },
+      { text: tx('discardConfirm'), style: 'destructive', onPress: () => { if (confirmation === generation.current) void discardNow(); } },
     ]);
   };
 
   const onComplete = () => {
     if (busy) return;
+    const confirmation = generation.current;
     Alert.alert(tx('completeConfirmTitle'), tx('completeConfirmText'), [
       { text: tx('cancel'), style: 'cancel' },
-      { text: tx('completeConfirm'), style: 'destructive', onPress: () => { void completeNow(); } },
+      { text: tx('completeConfirm'), style: 'destructive', onPress: () => { if (confirmation === generation.current) void completeNow(); } },
     ]);
   };
 

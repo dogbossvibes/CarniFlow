@@ -1,6 +1,7 @@
 import { dogPaceReference, currentPaceReference } from '@/features/tracking/utils/paceReference';
 import { getDogPaceHistory } from '@/features/tracking/services/dogPaceHistoryService';
 import { supabase } from '@/lib/supabase';
+import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +40,7 @@ export default function TrackReplayScreen() {
   const router = useRouter();
   const { t } = useT();
   const [data, setData] = useState<any | null>(null);
+  const { color: layColor } = useDogTrackColor(data?.dog_id);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -198,6 +200,7 @@ export default function TrackReplayScreen() {
 
       <View style={s.mapWrap}>
         <TrackReplayMap
+          layColor={layColor}
           layPoints={layPoints} markers={markers} heatmapParts={heatmapParts} puckPosition={puckPosition}
           runPoints={fullRoutePoints} playedPoints={playedRoutePoints}
           startAnchor={detailMap?.start ?? null}

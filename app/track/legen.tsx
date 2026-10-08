@@ -1,9 +1,10 @@
+import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { requestVoice, resetVoiceEvents } from '@/features/tracking/utils/voiceEvents';
@@ -157,7 +158,8 @@ export default function LegenScreen() {
   useKeepAwake();   // Display während des Legens anlassen (Bildschirm nicht sperren)
   const params = useLocalSearchParams<{ dogId?: string; id?: string }>();
   const { session } = useSession();
-  const { dogs } = useDogs();
+  const { dogs, refresh: refreshDogs } = useDogs();
+  useFocusEffect(useCallback(() => { void refreshDogs(); }, [refreshDogs]));
   const { isPro } = useCapabilities();
   const { showToast, toast } = useToast();
 
@@ -370,6 +372,7 @@ export default function LegenScreen() {
   // Die Store-Session zählt nur, wenn sie zum gewählten Hund gehört — sonst würde
   // eine noch geladene Fährte eines anderen Hundes fälschlich ausgeblendet.
   // Default AN, kontextuell (kein globales Setting). Lädt nie pro GPS-Fix.
+  const { color: layColor } = useDogTrackColor(activeDog?.id ?? params.dogId ?? storeDogId);
   const referenceOverlays = useActiveTrackOverlays({
     userId:           session?.user?.id ?? null,
     currentUserDogs:  dogs,
@@ -747,6 +750,7 @@ export default function LegenScreen() {
           )}
           {view === 'map' ? (
             <TrackingMap
+                  layColor={layColor}
               layPoints={trackPoints}
               referenceOverlays={showReferenceTracks ? referenceOverlays : NO_REFERENCE_OVERLAYS}
               markers={mapMarkers}
@@ -763,7 +767,7 @@ export default function LegenScreen() {
             />
           ) : (
             <View className="flex-1 bg-[#08100e]">
-              <TrackSketch points={trackPoints} angleMarkers={angleMarkers} objectMarkers={objectMarkers} legs={winkel} objects={gegenstaende} w={340} h={520} progress={1} />
+              <TrackSketch accent={layColor} points={trackPoints} angleMarkers={angleMarkers} objectMarkers={objectMarkers} legs={winkel} objects={gegenstaende} w={340} h={520} progress={1} />
             </View>
           )}
 

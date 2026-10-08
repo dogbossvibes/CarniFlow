@@ -401,11 +401,12 @@ export default function HundBearbeitenScreen() {
 
           <OfficialRegistrySection value={registry} onChange={setRegistry} />
 
-          {trackColorSupported && hund ? (
+          {hund ? (
             <>
               <Text style={s.gruppeLabel}>{t('dog.trackColor.section')}</Text>
               <View style={s.felder}>
-                <TrackColorPicker dogId={hund.id} value={trackColor} onChange={setTrackColor} disabled={speichern} />
+                {!trackColorSupported && <Text style={{ color: C.muted }}>{t('dog.trackColor.unavailable')}</Text>}
+                <TrackColorPicker dogId={hund.id} value={trackColor} onChange={setTrackColor} disabled={speichern || !trackColorSupported} />
               </View>
             </>
           ) : null}

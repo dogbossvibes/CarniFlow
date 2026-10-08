@@ -155,7 +155,7 @@ export type DiscardSearchResult = { ok: true; target: string } | { ok: false; re
  * 'cancelled', kein dauerhafter Marker, keine neue Session, kein Quota-Claim. Eine fremde
  * offene Fährte desselben Hundes wird nie berührt. Offline-fähig.
  */
-export async function discardSearchAttempt(sessionId: string | null | undefined, dogId: string | null | undefined, opts: { hasRemoteSearchRun?: boolean } = {}): Promise<DiscardSearchResult> {
+export async function discardSearchAttempt(sessionId: string | null | undefined, dogId: string | null | undefined, opts: { hasRemoteSearchRun?: boolean; userId?: string | null } = {}): Promise<DiscardSearchResult> {
   try {
     if (!sessionId) return { ok: false, reason: 'no_session' };
     if (!dogId) return { ok: false, reason: 'no_dog' };
@@ -163,7 +163,7 @@ export async function discardSearchAttempt(sessionId: string | null | undefined,
     const [pending, local] = await Promise.all([loadPending(dogId).catch(() => null), loadLocalSnapshot(sessionId)]);
     const d = decideSearchDiscard({
       registry: useActiveFaehrten.getState().byDog, dogId, sessionId, pending, local,
-      hasRemoteSearchRun: opts.hasRemoteSearchRun, now: Date.now(),
+      hasRemoteSearchRun: opts.hasRemoteSearchRun, userId: opts.userId, now: Date.now(),
     });
     if (!d.ok) return d;
     await deleteSearchPointsBySession(sessionId);   // nur point_type='search'
@@ -194,9 +194,10 @@ export type CompleteWithoutAppResult = { ok: true } | { ok: false; reason: 'no_s
  * Marker und Bewertung bleiben. Idempotent. Ohne erfolgreichen Marker wird nichts
  * aufgeräumt (sonst könnte die Recovery die Fährte später wieder anbieten).
  */
-export async function completeTrackWithoutApp(sessionId: string | null | undefined, dogId: string | null | undefined): Promise<CompleteWithoutAppResult> {
+export async function completeTrackWithoutApp(sessionId: string | null | undefined, dogId: string | null | undefined, userId?: string | null): Promise<CompleteWithoutAppResult> {
   if (!sessionId || !dogId) return { ok: false, reason: 'no_session' };
   try {
+    if (userId && (await getLocalTrainingSessionById(sessionId))?.user_id !== userId) return { ok: false, reason: 'not_found' };
     const marked = await setLocalTrackLifecycle(sessionId, dogId, 'completed_without_app');
     if (!marked) return { ok: false, reason: 'not_found' };
     await ensureHydrated();

@@ -1,3 +1,4 @@
+import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -116,6 +117,8 @@ export default function TrackRunScreen() {
   // Registry aufräumen: eine abgeschlossene/abgebrochene Fährte gehört dem Hund
   // nicht mehr als „offen". Ein no-op ohne dogId (Legacy-Deeplinks).
   const clearRegistry = useCallback(() => { if (dogId) useActiveFaehrten.getState().remove(dogId); }, [dogId]);
+  const storedColorDogId = useTrackingStore(st => id && st.currentSessionId === id ? st.dogId : null);
+  const { color: layColor } = useDogTrackColor(dogId ?? storedColorDogId);
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
 
   // Snapshot der gelegten Fährte (aus dem Store — nach Recovery via restoreSearchSession
@@ -1168,6 +1171,7 @@ export default function TrackRunScreen() {
           )}
           {view === 'map' ? (
             <TrackingMap
+                  layColor={layColor}
               layPoints={snapData.laidLatLng} dimLay
               distanceScaleLine={snapData.laidPoints}
               runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
@@ -1180,7 +1184,7 @@ export default function TrackRunScreen() {
               controlsTop={124}
             />
           ) : (
-            <View className="flex-1 bg-[#08100e]"><TrackSketch points={snapData.laidLatLng} angleMarkers={sketchAngleMarkers} objectMarkers={sketchObjectMarkers} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
+            <View className="flex-1 bg-[#08100e]"><TrackSketch accent={layColor} points={snapData.laidLatLng} angleMarkers={sketchAngleMarkers} objectMarkers={sketchObjectMarkers} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
           )}
 
           {/* Timer (oben links) */}
