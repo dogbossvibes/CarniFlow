@@ -27,6 +27,8 @@ describe('zentraler Guard', () => {
     expect(block('const voiceRecovery = useMemo', 'const hapticRecovery')).toContain('enabled: searchGuidanceActive,');
     expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);');
     expect(block('const trackEndState = useTrackEndGuidance', 'const trackEndReached')).toContain('recording: searchGuidanceActive,');
+    for (const field of ['paused: s.paused,', 'sessionId: effectiveId,', 'runId: runIdRef.current,'])
+      expect(block('const trackEndState = useTrackEndGuidance', 'const trackEndReached')).toContain(field);
     expect(run).toContain('if (!voiceOn || !searchGuidanceActive || snapData.segments.length === 0) return;');
     const off = block('const fb = offTrackTransitionFeedback', 'const offBanner');
     expect(run).toMatch(/if \(!searchGuidanceActive\) return;\s*const fb = offTrackTransitionFeedback\(prevOffTrackRef\.current, s\.offTrackState\);\s*prevOffTrackRef\.current = s\.offTrackState;/);
@@ -61,7 +63,7 @@ describe('Hooks: disabled verbraucht nichts', () => {
     expect(voice.indexOf('if (!enabled ||')).toBeLessThan(voice.indexOf('stepGuidanceEngine(candidates'));
     expect(haptic).toContain('if (!enabled || dogProgressM == null || !Haptics) return;');
     expect(haptic.indexOf('if (!enabled ||')).toBeLessThan(haptic.indexOf('firedRef.current.add(bestId)'));
-    expect(end).toContain('if (!input.recording || input.dogProgressM == null) return;');
+    expect(end).toContain('if (!input.recording || input.paused || input.dogProgressM == null) return;');
     expect(end.indexOf('if (!input.recording ||')).toBeLessThan(end.indexOf('stepTrackEnd('));
   });
   it('Off-Track wird vom Recorder erst ab recording bewertet (kein Feedback vor Search-Start möglich)', () => {

@@ -22,7 +22,8 @@ export function advanceEndFixHistory(previous: EndFixHistory, fix: {
   lastSegmentReached: boolean;
   handlerProgressRatio: number;
 }): EndFixHistory {
-  if (previous.lastFixMs === fix.tMs) return previous;
+  // Delayed re-delivery must not rebuild a streak that a newer outside fix reset.
+  if (previous.lastFixMs != null && fix.tMs <= previous.lastFixMs) return previous;
   const radius = endRadiusM(fix.accuracyM);
   // Keep the approach observation independently of the final last-segment
   // gate. Real accepted fixes can pass 4–5 m before progress crosses 90%;

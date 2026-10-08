@@ -618,7 +618,7 @@ export function useSearchRecorder(opts: {
           searchActive: recordingRef.current, gpsOutlier: fusion.classification === 'gps_outlier',
         });
         autoDwellRef.current.set(i, next.state);
-        if (next.state.startedMs != null) { waitingAtObject = true; autoDwellStartRef.current.set(i, origin); }
+        if (next.state.startedMs != null && !next.state.accepted) { waitingAtObject = true; autoDwellStartRef.current.set(i, origin); }
         else autoDwellStartRef.current.delete(i);
         if (next.acceptedNow) {
           foundRef.current.add(i); autoDwellIdsRef.current.add(key);
@@ -1095,6 +1095,8 @@ export function useSearchRecorder(opts: {
         objectStatusesRef.current[i] = rs.autoDwellObjectIds.includes(key) ? 'auto_dwell_found' : 'manual_found';
       } else if (rs.dismissedAutoDwellIds.includes(key)) objectStatusesRef.current[i] = 'user_removed';
     });
+    if (rs?.endFired) objectStatusesRef.current = objectStatusesRef.current.map(statusAtConfirmedEnd);
+    setActiveObjectWait(false);
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
     // Search-Telemetrie — rein BEOBACHTEND (nur Schreiben, nie von Cursor/Distanz/Score/Ende gelesen):
     //   • interner QA-Modus: Vollumfang inkl. Dwell-Mitschnitt,
@@ -1169,6 +1171,12 @@ export function useSearchRecorder(opts: {
     if (bestI >= 0) {
       foundRef.current.add(bestI);
       objectStatusesRef.current[bestI] = 'manual_found';
+      autoDwellRef.current.delete(bestI);
+      autoDwellStartRef.current.delete(bestI);
+      // Resolving this object must release its blocker even without another fix.
+      // Any other unfinished dwell still blocks the end.
+      setActiveObjectWait(Array.from(autoDwellRef.current).some(([i, dwell]) =>
+        dwell.startedMs != null && !dwell.accepted && !foundRef.current.has(i)));
       useTrackingStore.getState().noteSearchObjectFound(searchObjectKey(laidObjects[bestI], bestI));
       pushSnapshot();
     }
@@ -1188,7 +1196,8 @@ export function useSearchRecorder(opts: {
 
   const confirmEnd = useCallback(() => {
     objectStatusesRef.current = objectStatusesRef.current.map(statusAtConfirmedEnd);
-  }, []);
+    pushSnapshot();
+  }, [pushSnapshot]);
 
   // Virtueller Hundefortschritt (Bogenlänge) + geschätzte Hundeposition — reine
   // Runtime-Ableitung aus dem bestehenden progressM (Handler). Kein GPS-Rohpunkt.
