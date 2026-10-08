@@ -697,6 +697,9 @@ export default function TrackRunScreen() {
   }, []);
   const trackEndState = useTrackEndGuidance({
     recording: searchGuidanceActive,
+    paused: s.paused,
+    sessionId: effectiveId,
+    runId: runIdRef.current,
     dogProgressM: s.dogProgressM,
     handlerProgressM: s.progressM,
     handlerPosition: s.position,

@@ -8,7 +8,8 @@ import {
   trackEndBlocker,
 } from '@/features/tracking/utils/guidanceEngine';
 import { advanceEndFixHistory, INITIAL_END_FIX_HISTORY } from '@/features/tracking/utils/endFixConfirmation';
-import { advanceFinalObjectEndGrace, finalObjectEndGraceActive, INITIAL_FINAL_OBJECT_END_GRACE } from '@/features/tracking/utils/finalObjectEndGrace';
+import { advanceFinalObjectEndGrace, finalObjectEndGraceActive, FINAL_OBJECT_END_GRACE_MS, INITIAL_FINAL_OBJECT_END_GRACE } from '@/features/tracking/utils/finalObjectEndGrace';
+import { DEFAULT_FUSION_CONFIG } from '@/features/tracking/engine/trackFusionEngine';
 
 type LL = { latitude: number; longitude: number };
 
@@ -30,6 +31,9 @@ function distM(a: LL, b: LL): number {
  */
 export function useTrackEndGuidance(input: {
   recording: boolean;
+  paused?: boolean;
+  sessionId?: string | null;
+  runId?: string | null;
   dogProgressM: number | null;
   handlerProgressM?: number;
   handlerPosition?: LL | null;
@@ -56,20 +60,32 @@ export function useTrackEndGuidance(input: {
   const latestInputRef = useRef(input);
   const endFixHistoryRef = useRef(INITIAL_END_FIX_HISTORY);
   const finalObjectGraceRef = useRef(INITIAL_FINAL_OBJECT_END_GRACE);
+  const mountedRef = useRef(false);
+  const generationRef = useRef(0);
+  const [graceClock, setGraceClock] = useState(0);
   latestInputRef.current = input;
   onFiredRef.current = input.onFired;
   onGraceChangeRef.current = input.onFinalObjectGraceChange;
 
-  // Neue Absuche / neue Fährte → Once-only-Status zurücksetzen; Recovery mit
-  // bereits angesagtem Ende → 'completed' (once-only bleibt gewahrt).
   useEffect(() => {
-    if (!input.recording) { stateRef.current = 'unseen'; endFixHistoryRef.current = INITIAL_END_FIX_HISTORY;
-      finalObjectGraceRef.current = INITIAL_FINAL_OBJECT_END_GRACE; setEndState('unseen'); return; }
-    if (input.initialFired && stateRef.current === 'unseen') { stateRef.current = 'completed'; setEndState('completed'); }
-  }, [input.recording, input.endPoint, input.initialFired]);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // Explicit run identity also handles a batched stop/start or a different dog
+  // at the same endpoint. Pause is not a new run and retains existing evidence.
+  useEffect(() => {
+    generationRef.current++;
+    stateRef.current = 'unseen'; endFixHistoryRef.current = INITIAL_END_FIX_HISTORY;
+    finalObjectGraceRef.current = INITIAL_FINAL_OBJECT_END_GRACE; setEndState('unseen');
+  }, [input.recording, input.sessionId, input.runId, input.endPoint?.latitude, input.endPoint?.longitude]);
 
   useEffect(() => {
-    if (!input.recording || input.dogProgressM == null) return;
+    if (input.recording && input.initialFired && stateRef.current === 'unseen') { stateRef.current = 'completed'; setEndState('completed'); }
+  }, [input.recording, input.sessionId, input.runId, input.endPoint?.latitude, input.endPoint?.longitude, input.initialFired]);
+
+  useEffect(() => {
+    if (!input.recording || input.paused || input.dogProgressM == null) return;
     const geomDistanceM = input.estimatedDogPosition && input.endPoint
       ? distM(input.estimatedDogPosition, input.endPoint)
       : null;
@@ -99,8 +115,12 @@ export function useTrackEndGuidance(input: {
         openMandatoryObjects: input.openMandatoryObjects,
       };
     const eligibleWithoutDwell = trackEndBlocker({ ...endInput, activeObjectWait: false }) == null;
+    const nowMs = Date.now();
+    const graceFixFresh = handlerFix != null && nowMs - handlerFix.tMs <= DEFAULT_FUSION_CONFIG.maxFixAgeMs;
     finalObjectGraceRef.current = advanceFinalObjectEndGrace(finalObjectGraceRef.current, {
-      nowMs: handlerFix?.tMs ?? Date.now(), eligible: eligibleWithoutDwell,
+      // Screen re-renders cannot expire the grace using stale location evidence.
+      nowMs: graceFixFresh ? nowMs : finalObjectGraceRef.current.startedAtMs ?? nowMs,
+      eligible: eligibleWithoutDwell,
       pendingFinalObjectNearEnd: input.finalObjectPendingNearEnd ?? false,
       activeObjectWait: input.activeObjectWait ?? false,
     });
@@ -113,17 +133,21 @@ export function useTrackEndGuidance(input: {
 
     if (state !== stateRef.current) { stateRef.current = state; setEndState(state); }
     if (justReached) {
+      const generation = generationRef.current;
       hapticSuccess();
       if (input.voiceOn) requestVoice({ eventType: 'end', text: i18n.t('track.voiceTrackEnd') as string,
         language: speechLanguage(i18n.language as never), priority: 10,
-        onceKey: 'track-end', phase: 'search', progressM: input.handlerProgressM,
+        onceKey: input.runId || input.sessionId ? `track-end:${input.sessionId ?? ''}:${input.runId ?? ''}` : 'track-end',
+        phase: 'search', progressM: input.handlerProgressM,
         distanceM: handlerDistanceToEndM,
         valid: () => {
           const now = latestInputRef.current;
           const dogDistance = now.estimatedDogPosition && now.endPoint ? distM(now.estimatedDogPosition, now.endPoint) : null;
           const handlerDistance = now.endHandlerFix && now.endPoint ? distM(now.endHandlerFix.position, now.endPoint) : null;
           const currentHistory = endFixHistoryRef.current;
-          return now.recording && now.voiceOn && now.dogProgressM != null && trackEndBlocker({
+          return mountedRef.current && generationRef.current === generation
+            && now.sessionId === input.sessionId && now.runId === input.runId
+            && now.recording && !now.paused && now.voiceOn && now.dogProgressM != null && trackEndBlocker({
             dogProgressM: now.dogProgressM, handlerProgressM: now.handlerProgressM,
             handlerDistanceToEndM: handlerDistance, geomDistanceM: dogDistance,
             accuracyM: now.endHandlerFix?.accuracyM ?? null, lastSegmentReached: now.lastSegmentReached,
@@ -137,11 +161,24 @@ export function useTrackEndGuidance(input: {
         } });
       onFiredRef.current?.();
     }
+    // A bounded grace must expire even if the admitted GPS fix and props stay
+    // unchanged. The wakeup re-evaluates the same evidence; it adds no end fix.
+    // A late native/JS delivery after an unknown gap cannot use a stale fix:
+    // reuse the fusion's existing freshness limit, without a new gap threshold.
+    if (!justReached && state !== 'completed' && graceFixFresh && finalObjectEndGraceActive(finalObjectGraceRef.current)) {
+      const remainingMs = Math.max(0, FINAL_OBJECT_END_GRACE_MS
+        - (Date.now() - finalObjectGraceRef.current.startedAtMs!));
+      const timer = setTimeout(() => {
+        const fix = latestInputRef.current.endHandlerFix;
+        if (fix && Date.now() - fix.tMs <= DEFAULT_FUSION_CONFIG.maxFixAgeMs) setGraceClock(clock => clock + 1);
+      }, remainingMs);
+      return () => clearTimeout(timer);
+    }
   }, [
-    input.recording, input.dogProgressM, input.trackLengthM,
+    input.recording, input.paused, input.sessionId, input.runId, input.dogProgressM, input.trackLengthM,
     input.estimatedDogPosition, input.handlerProgressM, input.handlerPosition, input.endHandlerFix,
     input.lastSegmentReached,
-    input.activeObjectWait, input.finalObjectPendingNearEnd, input.endPoint, input.openMandatoryObjects, input.voiceOn,
+    input.activeObjectWait, input.finalObjectPendingNearEnd, input.endPoint, input.openMandatoryObjects, input.voiceOn, graceClock,
   ]);
 
   return endState;
