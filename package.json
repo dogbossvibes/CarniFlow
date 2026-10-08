@@ -61,6 +61,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.3",
+    "@pdf-lib/fontkit": "1.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-community/netinfo": "11.4.1",
@@ -118,6 +119,7 @@
     "i18next": "^26.3.6",
     "jest-expo": "~54.0.17",
     "nativewind": "^4.2.4",
+    "pdf-lib": "1.17.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-i18next": "^17.0.9",

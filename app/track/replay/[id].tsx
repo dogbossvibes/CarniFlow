@@ -1,3 +1,6 @@
+import { dogPaceReference, currentPaceReference } from '@/features/tracking/utils/paceReference';
+import { getDogPaceHistory } from '@/features/tracking/services/dogPaceHistoryService';
+import { supabase } from '@/lib/supabase';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +20,7 @@ import {
   replayProgress, formatReplayClock, replayPositionAt, replayTraveledPoints, replayEventsFromSegments, segmentAtTime,
   REPLAY_SPEEDS, type ReplaySpeed, type ReplayEvent,
 } from '@/features/tracking/engine/trackReplay';
-import { buildHeatmapParts, type HeatmapMetric } from '@/features/tracking/engine/trackHeatmap';
+import { buildHeatmapParts, PACE_BAND_COLORS, type HeatmapMetric } from '@/features/tracking/engine/trackHeatmap';
 import type { AnalyticsSegment } from '@/features/tracking/engine/trackSegmentAnalysis';
 import { isTrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 
@@ -55,6 +58,18 @@ export default function TrackReplayScreen() {
   }, [id]);
 
   const replayData = useMemo(() => extractTrackReplayData(data), [data]);
+  const [paceHistory,setPaceHistory]=useState<unknown[]>([]);
+  useEffect(()=>{let active=true;setPaceHistory([]);
+    if(data?.dog_id)void (async()=>{
+      try {const {data:{session}}=await supabase.auth.getSession();
+        if(!session?.user)return;
+        const rows=await getDogPaceHistory(session.user.id, data.dog_id);
+        if(active)setPaceHistory(rows);
+      } catch { /* Offline: retain the explicit current-search fallback. */ }
+    })();
+    return()=>{active=false;};
+  },[data?.id,data?.dog_id]);
+  const paceReference=useMemo(()=>dogPaceReference(data,paceHistory) ?? currentPaceReference(replayData?.analytics.segments ?? []),[data,paceHistory,replayData]);
   const detailMap = useMemo(() => (data ? buildTrackDetailMap(data) : null), [data]);
   const markers: MapMarker[] = useMemo(
     () => (detailMap ? detailMap.markers.map(m => ({ id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material, distanceFromStart: m.distanceFromStart, objectIndex: m.objectIndex, legIndex: m.legIndex })) : []),
@@ -92,8 +107,8 @@ export default function TrackReplayScreen() {
   }, [state.playing, replayData]);
 
   const heatmapParts = useMemo(
-    () => (replayData ? buildHeatmapParts(replayData.geometry, replayData.analytics.segments, metric) : []),
-    [replayData, metric],
+    () => (replayData ? buildHeatmapParts(replayData.geometry, replayData.analytics.segments, metric, paceReference) : []),
+    [replayData, metric, paceReference],
   );
   const puckPosition = useMemo(
     () => (replayData ? replayPositionAt(replayData.geometry, state.elapsedSec) : null),
@@ -192,6 +207,7 @@ export default function TrackReplayScreen() {
       </View>
 
       {/* Heatmap-Modus-Umschalter (Punkt 10/11) */}
+      <ScrollView style={{flex:1}} contentContainerStyle={{paddingBottom:16}}>
       <View style={s.metricRow}>
         <Text style={s.metricLabel}>{t('track.replay.heatmapModeLabel')}</Text>
         <View style={s.metricChips}>
@@ -204,6 +220,18 @@ export default function TrackReplayScreen() {
           ))}
         </View>
       </View>
+
+      {metric==='pace'&&<View style={{paddingHorizontal:16,paddingTop:8,gap:4}}>
+        <Text style={s.metricChipTxt}>{paceReference?.source==='dog_history'?t('track.pace.history',{count:paceReference.sessionCount}):paceReference?t('track.pace.session'):t('track.pace.missing')}</Text>
+        {paceReference && <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}>
+          {(['slow','normal','fast'] as const).map((band,index)=><View key={band} style={{flexDirection:'row',alignItems:'center',gap:5}}>
+            <View style={{width:12,height:4,backgroundColor:PACE_BAND_COLORS[band]}} />
+            <Text style={s.metricChipTxt}>{t((['track.replay.legend.paceSlow','track.replay.legend.paceNormal','track.replay.legend.paceFast'] as const)[index])}</Text>
+          </View>)}
+        </View>}
+        {paceReference && <Text style={s.metricChipTxt}>{t('track.pace.legend')}</Text>}
+        <Text style={s.metricChipTxt}>{t('track.pace.meaning')}</Text>
+      </View>}
 
       {/* Play/Pause + Zeit + Fortschritt (Punkt 7) */}
       <View style={s.controlsRow}>
@@ -283,6 +311,8 @@ export default function TrackReplayScreen() {
           ))}
         </ScrollView>
       )}
+
+      </ScrollView>
 
       <SegmentDetailSheet segment={selectedSegment} analytics={replayData.analytics} visible={!!selectedSegment} onClose={() => setSelectedSegment(null)} />
     </SafeAreaView>

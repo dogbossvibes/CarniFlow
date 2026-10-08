@@ -1,3 +1,4 @@
+import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
@@ -770,6 +771,8 @@ export default function TrackAuswertungScreen() {
               </View>
             </>
           )}
+
+          <TrackExportActions data={data} />
 
           {/* Notiz */}
           <SectionLabel>Notiz</SectionLabel>
