@@ -1,3 +1,5 @@
+import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot } from '@/lib/diagnosticsAccessState';
+import { loadQaPreferences } from '@/features/tracking/utils/qaPreferences';
 // Golden-Reference-A/B-Matrix (Punkt 3/8 des Audits): BUILD40 vs. CURRENT
 // (trackingEngineMode) über den ECHTEN useSearchRecorder-Hook, jeweils mit
 // einem langsamen (EXPO-artigen, ~1 Hz) und einem dichten (PRECISION-
@@ -9,7 +11,7 @@
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { useSearchRecorder, type SearchRecorder, type LatLng } from '@/features/tracking/hooks/useSearchRecorder';
-import { setTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
+import { setTrackingEngineMode, getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -90,8 +92,15 @@ describe.each([
   ['BUILD40', 'build40'] as const,
   ['CURRENT', 'current'] as const,
 ])('useSearchRecorder — ENGINE=%s, EXPO-artiger Fixstrom (~1 Hz)', (_label, engine) => {
-  beforeEach(() => { feedSample = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null; setTrackingEngineMode(engine); });
-  afterEach(() => { act(() => { activeRenderer?.unmount(); }); setTrackingEngineMode('current'); });
+  beforeEach(async () => {
+    setDiagnosticsSession('engine-matrix-qa');
+    resolveDiagnosticsAccess('engine-matrix-qa', getDiagnosticsAccessSnapshot().generation, true);
+    await loadQaPreferences();
+    feedSample = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null;
+    setTrackingEngineMode(engine);
+    expect(getTrackingEngineMode()).toBe(engine);
+  });
+  afterEach(() => { act(() => { activeRenderer?.unmount(); }); setTrackingEngineMode('current'); setDiagnosticsSession(null); });
 
   it('Start funktioniert, Timer/Recorder starten zusammen, 20 Bewegungsfixe → points wachsen, Distanz wächst, Abweichung wird berechnet', async () => {
     const laidPoints = denseLeg(0, 60, 0);
@@ -114,8 +123,15 @@ describe.each([
   ['BUILD40', 'build40'] as const,
   ['CURRENT', 'current'] as const,
 ])('useSearchRecorder — ENGINE=%s, PRECISION-artiger Fixstrom (dicht/ungedrosselt, mehrere Fixe/Sekunde)', (_label, engine) => {
-  beforeEach(() => { feedSample = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null; setTrackingEngineMode(engine); });
-  afterEach(() => { act(() => { activeRenderer?.unmount(); }); setTrackingEngineMode('current'); });
+  beforeEach(async () => {
+    setDiagnosticsSession('engine-matrix-qa');
+    resolveDiagnosticsAccess('engine-matrix-qa', getDiagnosticsAccessSnapshot().generation, true);
+    await loadQaPreferences();
+    feedSample = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null;
+    setTrackingEngineMode(engine);
+    expect(getTrackingEngineMode()).toBe(engine);
+  });
+  afterEach(() => { act(() => { activeRenderer?.unmount(); }); setTrackingEngineMode('current'); setDiagnosticsSession(null); });
 
   it('dichter Fixstrom (250 ms Abstand, wie AnyvoPrecisionLocation nach Throttle-Entfernung) verarbeitet sich normal, Distanz wächst', async () => {
     const laidPoints = denseLeg(0, 60, 0);
