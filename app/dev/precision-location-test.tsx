@@ -43,6 +43,8 @@ import { FIELD_TEST_PROFILES, getFieldTestProfile } from '@/features/tracking/ut
 import { trackingEngineDisplayLabel, trackingLocationDiagnosticDisplay } from '@/features/tracking/utils/trackingDiagnosticDisplay';
 import type { MotionStatus } from '@/modules/anyvo-motion';
 import { buildOtaIdentity } from '@/features/tracking/utils/buildOtaIdentity';
+import { PositionQualityDiagnostics } from '@/features/tracking/components/PositionQualityDiagnostics';
+import { ShellyDiagnosticsPanel } from '@/features/tracking/components/ShellyDiagnosticsPanel';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
 // QA-Golden-Reference-A/B-Schalter (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/
@@ -423,6 +425,9 @@ function PrecisionLocationTestContent() {
             {accReqMsg ? <Text style={s.note}>{accReqMsg}</Text> : null}
           </Section>
         )}
+
+        <PositionQualityDiagnostics />
+        <ShellyDiagnosticsPanel />
 
         <Section title={`Separater Modultest · ${count} Updates`}>
           {last ? (
