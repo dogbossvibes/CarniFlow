@@ -5,7 +5,7 @@ import { loadQaPreferences } from '@/features/tracking/utils/qaPreferences';
 // und exakt den alten expo-location-Pfad (Build 40, 82bd17c) nimmt — mit
 // denselben Optionen ({accuracy: BestForNavigation, distanceInterval: 0}) —
 // während PRECISION (Default) weiterhin über positionStream läuft.
-import { setLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
+import { getLocationSourceMode, setLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
 import { startPositionSource as startActualPositionSource } from '@/features/tracking/utils/positionSource';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -36,7 +36,11 @@ async function startPositionSource(...args: Parameters<typeof startActualPositio
   handles.push(handle);
   return handle;
 }
-afterEach(() => { handles.splice(0).forEach(handle => handle.stop()); setDiagnosticsSession(null); });
+afterEach(() => {
+  handles.splice(0).forEach(handle => handle.stop());
+  setDiagnosticsSession(null);
+  expect(getLocationSourceMode()).toBe('precision');
+});
 
 describe('positionSource — LEGACY/PRECISION-QA-Schalter', () => {
   beforeEach(async () => {
@@ -46,11 +50,13 @@ describe('positionSource — LEGACY/PRECISION-QA-Schalter', () => {
     mockWatchPositionAsync.mockClear();
     mockStartPositionStream.mockClear();
     setLocationSourceMode('precision');
+    expect(getLocationSourceMode()).toBe('precision');
   });
 
   it('denies an unauthorised legacy override and uses the ordinary precision source', async () => {
     setDiagnosticsSession(null);
     setLocationSourceMode('legacy');
+    expect(getLocationSourceMode()).toBe('precision');
     await startPositionSource(() => {}, {});
     expect(mockStartPositionStream).toHaveBeenCalledTimes(1);
     expect(mockWatchPositionAsync).not.toHaveBeenCalled();
@@ -75,12 +81,14 @@ describe('positionSource — LEGACY/PRECISION-QA-Schalter', () => {
 
   it('LEGACY: startPositionStream/AnyvoPrecisionLocation wird komplett umgangen, reines expo-location mit den alten Optionen', async () => {
     setLocationSourceMode('legacy');
+    expect(getLocationSourceMode()).toBe('legacy');
     const handle = await startPositionSource(() => {}, { timeInterval: 1000 });
     expect(mockStartPositionStream).not.toHaveBeenCalled();
     expect(mockWatchPositionAsync).toHaveBeenCalledTimes(1);
     const [opts] = mockWatchPositionAsync.mock.calls[0];
     // Exakt die alten Build-40-Optionen (82bd17c) — kein neu erfundener Wert.
     expect(opts).toEqual({ accuracy: 6, timeInterval: 1000, distanceInterval: 0 });
+    expect(getLocationSourceMode()).toBe('legacy');
     expect(handle.info.source).toBe('expo');
     expect(handle.info.provider).toBe('expo-location-legacy');
     expect(handle.info.isNativeAvailable).toBe(false);
@@ -88,8 +96,10 @@ describe('positionSource — LEGACY/PRECISION-QA-Schalter', () => {
 
   it('LEGACY liefert Samples mit source="expo" an den Aufrufer weiter', async () => {
     setLocationSourceMode('legacy');
+    expect(getLocationSourceMode()).toBe('legacy');
     const received: any[] = [];
     await startPositionSource((s: any) => received.push(s), {});
+    expect(getLocationSourceMode()).toBe('legacy');
     const [, cb] = mockWatchPositionAsync.mock.calls[0];
     cb({ coords: { latitude: 1, longitude: 2, accuracy: 5, altitude: null, heading: null, speed: null }, timestamp: 1234 });
     expect(received).toHaveLength(1);

@@ -10,6 +10,7 @@ import { createLocalTrackMarker, createLocalTrackPointsBatch } from '@/features/
 import * as Speech from 'expo-speech';
 import { Platform } from 'react-native';
 import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, revokeDiagnosticsAccess, DIAGNOSTICS_ACCESS_TTL_MS } from '@/lib/diagnosticsAccessState';
+import { getTrackingEngineMode } from '../../utils/trackingEngineMode';
 import { loadQaPreferences, setQaPreference, getQaPreferences } from '../../utils/qaPreferences';
 import { startPositionSource } from '../../utils/positionSource';
 import { evaluateStopFlush } from '../../utils/stopFlushCorner';
@@ -208,8 +209,11 @@ it('retains a selected legacy engine across background handoff and revocation un
   setQaPreference('engine', 'build40');
   setQaPreference('source', 'legacy');
   setQaPreference('diagnostics', true);
+  expect(getTrackingEngineMode()).toBe('build40');
   await start();
+  expect(getTrackingEngineMode()).toBe('build40');
   revokeDiagnosticsAccess();
+  expect(getTrackingEngineMode()).toBe('build40');
   expect(getQaPreferences()).toMatchObject({ engine: 'build40', source: 'legacy', diagnostics: false });
   await act(async () => { await current.finish(); });
   expect(getQaPreferences()).toMatchObject({ engine: 'current', source: 'precision', diagnostics: false });

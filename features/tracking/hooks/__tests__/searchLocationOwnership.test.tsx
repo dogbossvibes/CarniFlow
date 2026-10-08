@@ -6,7 +6,7 @@ import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import type { LocationObject } from 'expo-location';
 import { useSearchRecorder, type SearchRecorder, type SearchResult } from '../useSearchRecorder';
 import { useStartPointApproach, type StartApproach, type ApproachFixEvent } from '../useStartPointApproach';
-import { setLocationSourceMode, type LocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
+import { getLocationSourceMode, setLocationSourceMode, type LocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { enqueueSearchPoint } from '@/features/tracking/store/searchPersist';
 import { computeTrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
@@ -124,6 +124,7 @@ function startSearch() {
 }
 
 function expectSourceAlive(mode: LocationSourceMode) {
+  expect(getLocationSourceMode()).toBe(mode);
   expect(mockNativeStop).not.toHaveBeenCalled();
   expect(mockExpoRemove).not.toHaveBeenCalled();
   expect(mockNativeStart).toHaveBeenCalledTimes(mode === 'precision' ? 1 : 0);
@@ -153,7 +154,7 @@ afterEach(() => {
 });
 
 describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search location owner — %s', mode => {
-  beforeEach(() => { setLocationSourceMode(mode); });
+  beforeEach(() => { setLocationSourceMode(mode); expect(getLocationSourceMode()).toBe(mode); });
 
   it('revocation removes internal capture while the running GPS source keeps delivering', async () => {
     setQaPreference('diagnostics', true);

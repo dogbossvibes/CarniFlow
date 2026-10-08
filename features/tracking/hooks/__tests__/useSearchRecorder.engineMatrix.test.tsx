@@ -6,10 +6,12 @@
 // Location-Source-Auswahl selbst ab (das prüft positionSource.legacyMode.
 // test.ts) — hier zählt nur: wächst points/distanceM/deviation korrekt,
 // unabhängig von ENGINE und Fixdichte.
+import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, hasDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
+import { loadQaPreferences } from '@/features/tracking/utils/qaPreferences';
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { useSearchRecorder, type SearchRecorder, type LatLng } from '@/features/tracking/hooks/useSearchRecorder';
-import { setTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
+import { getTrackingEngineMode, setTrackingEngineMode, type TrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -86,23 +88,43 @@ function feed(accuracy: number, xEastM: number, yNorthM: number, dtMs: number) {
   act(() => { feedSample!({ lat: yNorthM / M_PER_DEG, lng: xEastM / M_PER_DEG, accuracy, speed: 1.4, course: null, t: simClockMs }); });
 }
 
+async function prepareMode(engine: TrackingEngineMode, authorized = true) {
+  feedSample = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null;
+  setDiagnosticsSession(null);
+  setDiagnosticsSession('matrix-owner');
+  resolveDiagnosticsAccess('matrix-owner', getDiagnosticsAccessSnapshot().generation, authorized);
+  await loadQaPreferences();
+  expect(hasDiagnosticsAccess()).toBe(authorized);
+  setTrackingEngineMode(engine);
+  expect(getTrackingEngineMode()).toBe(authorized ? engine : 'current');
+}
+afterEach(() => {
+  act(() => { activeRenderer?.unmount(); });
+  expect(mockStop).toHaveBeenCalledTimes(1);
+  activeRenderer = null; feedSample = null;
+  setDiagnosticsSession(null);
+  expect(getTrackingEngineMode()).toBe('current');
+});
+
 describe.each([
   ['BUILD40', 'build40'] as const,
   ['CURRENT', 'current'] as const,
 ])('useSearchRecorder — ENGINE=%s, EXPO-artiger Fixstrom (~1 Hz)', (_label, engine) => {
-  beforeEach(() => { feedSample = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null; setTrackingEngineMode(engine); });
-  afterEach(() => { act(() => { activeRenderer?.unmount(); }); setTrackingEngineMode('current'); });
+  beforeEach(async () => { await prepareMode(engine); });
 
   it('Start funktioniert, Timer/Recorder starten zusammen, 20 Bewegungsfixe → points wachsen, Distanz wächst, Abweichung wird berechnet', async () => {
     const laidPoints = denseLeg(0, 60, 0);
     const { getRecorder } = mount(laidPoints);
     await act(async () => { await Promise.resolve(); });
     act(() => { getRecorder().start(); });
+    expect(getTrackingEngineMode()).toBe(engine);
+    expect(getRecorder().searchStartState).toBe(engine === 'build40' ? 'START_LOCKED' : 'SEEKING_START');
     expect(getRecorder().recording).toBe(true);
 
     let y = 0;
     for (let i = 0; i < 20; i++) { y += 2; feed(5, 0, y, 1000); }
 
+    expect(getTrackingEngineMode()).toBe(engine);
     expect(getRecorder().points.length).toBeGreaterThan(5);
     expect(getRecorder().distanceM).toBeGreaterThan(10);
     expect(typeof getRecorder().deviationM).toBe('number');
@@ -114,19 +136,36 @@ describe.each([
   ['BUILD40', 'build40'] as const,
   ['CURRENT', 'current'] as const,
 ])('useSearchRecorder — ENGINE=%s, PRECISION-artiger Fixstrom (dicht/ungedrosselt, mehrere Fixe/Sekunde)', (_label, engine) => {
-  beforeEach(() => { feedSample = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null; setTrackingEngineMode(engine); });
-  afterEach(() => { act(() => { activeRenderer?.unmount(); }); setTrackingEngineMode('current'); });
+  beforeEach(async () => { await prepareMode(engine); });
 
   it('dichter Fixstrom (250 ms Abstand, wie AnyvoPrecisionLocation nach Throttle-Entfernung) verarbeitet sich normal, Distanz wächst', async () => {
     const laidPoints = denseLeg(0, 60, 0);
     const { getRecorder } = mount(laidPoints);
     await act(async () => { await Promise.resolve(); });
     act(() => { getRecorder().start(); });
+    expect(getTrackingEngineMode()).toBe(engine);
+    expect(getRecorder().searchStartState).toBe(engine === 'build40' ? 'START_LOCKED' : 'SEEKING_START');
 
     let y = 0;
     for (let i = 0; i < 60; i++) { y += 0.5; feed(5, 0, y, 250); }   // 60 Fixe in 15s "Echtzeit", ~0.5 m/Fix
 
+    expect(getTrackingEngineMode()).toBe(engine);
     expect(getRecorder().points.length).toBeGreaterThan(3);
     expect(getRecorder().distanceM).toBeGreaterThan(8);
   });
+});
+
+it.each([1000, 250])('without the personal grant, a BUILD40 request remains CURRENT at %i ms/fix', async intervalMs => {
+  await prepareMode('build40', false);
+  const { getRecorder } = mount(denseLeg(0, 60, 0));
+  await act(async () => { await Promise.resolve(); });
+  act(() => { getRecorder().start(); });
+  expect(getTrackingEngineMode()).toBe('current');
+  expect(getRecorder().searchStartState).toBe('SEEKING_START');
+  const steps = intervalMs === 1000 ? 20 : 60;
+  const stepM = intervalMs === 1000 ? 2 : 0.5;
+  for (let i = 1; i <= steps; i++) feed(5, 0, i * stepM, intervalMs);
+  expect(getTrackingEngineMode()).toBe('current');
+  expect(getRecorder().points.length).toBeGreaterThan(3);
+  expect(getRecorder().distanceM).toBeGreaterThan(8);
 });
