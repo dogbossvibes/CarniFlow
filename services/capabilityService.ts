@@ -76,6 +76,7 @@ export async function getMyCapabilities(userId: string): Promise<UserCapabilitie
     pro_member: pro,
     trainer_module: trainer,
     hasLifetimeAccess: effective.hasLifetimeAccess,
+    hasActiveLifetimeAccess: effective.hasActiveLifetimeAccess,
     entitlements: effective.activeEntitlements,
   };
 }

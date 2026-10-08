@@ -78,7 +78,7 @@ export default function MembershipScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useSession();
   const uid = session?.user.id;
-  const { hasLifetimeAccess } = useCapabilities();
+  const { hasLifetimeAccess, hasActiveLifetimeAccess, isTrainerModule } = useCapabilities();
 
   const [dbPlan, setDbPlan] = useState<SubscriptionPlan | null>(null);
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
@@ -97,10 +97,12 @@ export default function MembershipScreen() {
   // Sichtbarer Plan: Store-Plan aus der DB hat Vorrang; sonst intern dauerhaft
   // freigeschaltet (Sonderrecht) → neutral 'permanent'; sonst Newbie/Kostenlos.
   const visiblePlan: VisiblePlan =
-    dbPlan === 'active' || dbPlan === 'founder_active' || dbPlan === 'trainer' ? dbPlan
+    hasActiveLifetimeAccess && !hasLifetimeAccess ? (isTrainerModule ? 'trainer' : 'active')
+    : dbPlan === 'active' || dbPlan === 'founder_active' || dbPlan === 'trainer' ? dbPlan
     : hasLifetimeAccess ? 'permanent'   // NUR internes Sonderrecht/Lifetime, NICHT allein isPro
     : 'newbie';
   const isNewbie = visiblePlan === 'newbie';
+  const isPermanentActive = hasActiveLifetimeAccess && !hasLifetimeAccess && !isTrainerModule;
 
   // Offerings/Slots/Plan defensiv laden — getPackages() wirft nie, liefert [] bei Fehler.
   const loadPlanState = useCallback(async () => {
@@ -205,7 +207,7 @@ export default function MembershipScreen() {
             </View>
           </View>
           <Text style={s.heroPlan}>{t(PLAN_NAME_KEY[visiblePlan])}</Text>
-          <Text style={s.heroStatus}>{isNewbie ? t('membership.freeHint') : t('membership.activeHint')}</Text>
+          <Text style={s.heroStatus}>{isPermanentActive ? t('membership.permanentAccess') : isNewbie ? t('membership.freeHint') : t('membership.activeHint')}</Text>
         </View>
 
         {/* NEWBIE: Nutzung diesen Monat (bestehende Quota-Status-RPC) */}
@@ -269,6 +271,11 @@ export default function MembershipScreen() {
             <TouchableOpacity style={s.ctaPrimary} onPress={goUpgrade} activeOpacity={0.9}>
               <Ionicons name="star" size={16} color={C.accentText} />
               <Text style={s.ctaPrimaryTxt}>{t('membership.upgradeActive')}</Text>
+            </TouchableOpacity>
+          ) : isPermanentActive ? (
+            <TouchableOpacity style={s.ctaSecondary} onPress={goUpgrade} activeOpacity={0.85}>
+              <Ionicons name="star" size={16} color={C.white} />
+              <Text style={s.ctaSecondaryTxt}>{t('premium.choosePlan', { plan: PLAN_META.trainer.name })}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={s.ctaSecondary} onPress={handleManage} activeOpacity={0.85}>

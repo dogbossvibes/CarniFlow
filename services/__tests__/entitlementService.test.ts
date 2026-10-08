@@ -2,7 +2,7 @@
 jest.mock('@/lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
 import { supabase } from '@/lib/supabase';
-import { getActiveEntitlements } from '@/services/entitlementService';
+import { entitlementGrantsPro, entitlementGrantsTrainer, getActiveEntitlements } from '@/services/entitlementService';
 
 const from = supabase.from as unknown as jest.Mock;
 
@@ -17,6 +17,14 @@ function queryResult(result: unknown) {
 
 describe('getActiveEntitlements', () => {
   afterEach(() => from.mockReset());
+
+  it('mappt ACTIVE-lifetime ohne Trainer-Freischaltung', async () => {
+    queryResult({ data: [{ id: 'ent-active', user_id: 'user-1', entitlement: 'active_lifetime', granted_at: '2026-08-01T00:00:00Z', expires_at: null, revoked_at: null, notes: null }], error: null });
+    const grants = await getActiveEntitlements('user-1');
+    expect(grants).toHaveLength(1);
+    expect(entitlementGrantsPro(grants[0])).toBe(true);
+    expect(entitlementGrantsTrainer(grants[0])).toBe(false);
+  });
 
   it('lädt nur eigene aktive Spalten aus user_entitlements', async () => {
     const chain = queryResult({

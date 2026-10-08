@@ -1,6 +1,8 @@
 import { readFileSync } from 'fs';
 import {
   hasActiveUserEntitlement,
+  ACTIVE_CAPABILITIES,
+  TRAINER_CAPABILITIES,
   hasEffectiveCapability,
   isActiveUserEntitlement,
   isKnownUserEntitlement,
@@ -47,6 +49,37 @@ describe('User-Entitlements', () => {
 });
 
 describe('resolveEffectiveCapabilities', () => {
+  it('lebenslang ACTIVE gewährt nur ACTIVE, auch bei abgelaufenem Store-Abo', () => {
+    const effective = resolveEffectiveCapabilities({
+      subscription: { plan: 'active', status: 'expired' },
+      subscriptionCapabilities: { pro_member: false, trainer_module: false },
+      entitlements: [entitlement({ entitlement: 'active_lifetime' })],
+    }, now);
+    expect(effective).toMatchObject({ pro_member: true, trainer_module: false, hasLifetimeAccess: false, hasActiveLifetimeAccess: true });
+    expect(effective.capabilities).toEqual(ACTIVE_CAPABILITIES);
+    for (const cap of TRAINER_CAPABILITIES) expect(hasEffectiveCapability(effective, cap)).toBe(false);
+    expect(hasEffectiveCapability(effective, 'debug.tools')).toBe(false);
+  });
+
+  it('widerrufene und fehlerhaft befristete ACTIVE-lifetime-Grants sperren', () => {
+    for (const grant of [
+      entitlement({ entitlement: 'active_lifetime', revokedAt: '2026-08-02T00:00:00Z' }),
+      entitlement({ entitlement: 'active_lifetime', expiresAt: '2099-01-01T00:00:00Z' }),
+      entitlement({ entitlement: 'active_lifetime', expiresAt: 'invalid-date' }),
+    ]) {
+      const effective = resolveEffectiveCapabilities({ subscription: null, entitlements: [grant] }, now);
+      expect(effective).toMatchObject({ pro_member: false, trainer_module: false, hasActiveLifetimeAccess: false });
+    }
+  });
+
+  it('ACTIVE-lifetime entzieht keine bestehenden Trainer-/Lifetime-Rechte', () => {
+    const grant = entitlement({ entitlement: 'active_lifetime' });
+    const paid = resolveEffectiveCapabilities({ subscription: { plan: 'trainer', status: 'active' }, entitlements: [grant] }, now);
+    expect(paid.trainer_module).toBe(true);
+    const full = resolveEffectiveCapabilities({ subscription: null, entitlements: [grant, entitlement()] }, now);
+    expect(full).toMatchObject({ trainer_module: true, hasLifetimeAccess: true });
+  });
+
   it('NEWBIE ohne Entitlement erhält keine Premiumrechte', () => {
     const effective = resolveEffectiveCapabilities({
       subscription: { plan: 'newbie', status: 'trialing' },

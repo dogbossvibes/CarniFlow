@@ -63,6 +63,7 @@ export default function PremiumScreen() {
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const { access } = useAccess();
+  const activeLifetime = access.planType === 'active_lifetime';
   const { isInternalTester } = useInternalTester();
 
   const [iapLoading, setIapLoading] = useState(true);
@@ -109,7 +110,8 @@ export default function PremiumScreen() {
   const recommendedPlan: SubscriptionPlan = 'active';
   // Newbie-Trial-Karte nur ohne bestehendes Abo. Founder ist nicht in CARDS und
   // wird daher nirgends als Kaufkarte gerendert.
-  const visibleCards = CARDS.filter(c => c.plan === 'newbie' ? !currentPlan : true);
+  const visibleCards = CARDS.filter(c => activeLifetime ? c.plan === 'trainer' : c.plan === 'newbie' ? !currentPlan : true);
+  const switchSourcePlan = activeLifetime && !(currentPlan === 'trainer' && (subStatus === 'active' || trialing)) ? 'active' : currentPlan;
   // Preis-Anker für die Founder-Ersparnis: echter Active-Preis aus dem Store
   // (gleiche Währung wie die angezeigten Preise), sonst Fallback auf die CHF-Angabe.
   const activePriceStr = packages.find(p => matchesStoreProduct(p.productId, PLAN_META.active.productId))?.priceString ?? PLAN_META.active.priceLabel.replace('/Mt.', '');
@@ -126,6 +128,8 @@ export default function PremiumScreen() {
   };
 
   const choose = async (plan: SubscriptionPlan) => {
+    // Permanent ACTIVE needs no second ACTIVE purchase; TRAINER remains optional.
+    if (activeLifetime && plan !== 'trainer') return;
     // Interner Tester: Premium ist bereits über die Berechtigungslogik
     // freigeschaltet — keine echte Kaufabwicklung, RevenueCat wird nicht berührt.
     if (isInternalTester) {
@@ -136,7 +140,7 @@ export default function PremiumScreen() {
     if (!user) { Alert.alert(t('trainer.connectHintTitle'), t('premium.loginRequired')); return; }
     // In-App nur erlaubte Upgrades. Downgrades/gesperrte Wechsel (inkl. Founder für
     // bestehende Zahler) laufen ausschliesslich über die Store-Abo-Verwaltung.
-    if (plan !== 'newbie' && currentPlan && !canSwitchPlanInApp(currentPlan, plan, { founderAvailable, platform: Platform.OS })) {
+    if (plan !== 'newbie' && switchSourcePlan && !canSwitchPlanInApp(switchSourcePlan, plan, { founderAvailable, platform: Platform.OS })) {
       Alert.alert(t('common.notice'), t('membership.switchViaStore'));
       return;
     }
@@ -293,12 +297,12 @@ export default function PremiumScreen() {
           </View>
         )}
 
-        {access.isLifetime ? (
+        {access.isLifetime && (
           <View style={[S.card, S.cardCurrent]}>
             <View style={S.cardHead}>
               <View style={{ flex: 1 }}>
                 <View style={S.nameRow}>
-                  <Text style={S.cardName}>{access.hasTrainerAccess ? t('premium.lifetimeTrainerActive') : t('premium.lifetimeActive')}</Text>
+                  <Text style={S.cardName}>{!activeLifetime && access.hasTrainerAccess ? t('premium.lifetimeTrainerActive') : t('premium.lifetimeActive')}</Text>
                   <View style={S.badge}><Text style={S.badgeTxt}>LIFETIME</Text></View>
                 </View>
               </View>
@@ -310,7 +314,8 @@ export default function PremiumScreen() {
               </View>
             </View>
           </View>
-        ) : (<>
+        )}
+        {(!access.isLifetime || activeLifetime) && (<>
         {/* Echter Lade-/Fehlerzustand, statt sofort „—"/„nicht geladen" zu zeigen. */}
         {iapLoading && (
           <View style={S.loadingRow}><ActivityIndicator color={C.accent} /><Text style={S.loadingTxt}>{t('auth.recoveryChecking')}</Text></View>
@@ -323,7 +328,7 @@ export default function PremiumScreen() {
         )}
         {visibleCards.map(card => {
           const meta = PLAN_META[card.plan];
-          const isCurrent = currentPlan === card.plan;
+          const isCurrent = currentPlan === card.plan && (!activeLifetime || subStatus === 'active' || trialing);
           const soldOut = card.founder && !founderAvailable;
           const busy = laden === card.plan;
           const pkg = packageForPlan(card.plan);
@@ -333,7 +338,7 @@ export default function PremiumScreen() {
           const missingStorePackage = card.plan !== 'newbie' && purchasesReady() && !pkg && !iapLoading;
           // Gesperrter Wechsel (Downgrade / nicht erlaubt) → nicht kaufbar, Hinweis auf Store.
           const blockedSwitch = card.plan !== 'newbie' && !isCurrent && !soldOut
-            && !canSwitchPlanInApp(currentPlan, card.plan, { founderAvailable, platform: Platform.OS });
+            && !canSwitchPlanInApp(switchSourcePlan, card.plan, { founderAvailable, platform: Platform.OS });
           return (
             <View key={card.plan} style={[S.card, card.founder && S.cardFounder, isRec && !card.founder && S.cardRec, isCurrent && S.cardCurrent]}>
               {isRec && (
@@ -394,8 +399,8 @@ export default function PremiumScreen() {
           <Text style={S.restoreTxt}>{t('premium.restore')}</Text>
         </TouchableOpacity>
         </>)}
-        {!access.isLifetime && <Text style={S.legal}>{t('premium.autoRenewNotice')}</Text>}
-        {!access.isLifetime && <Text style={S.legal}>{t('premium.legal')}</Text>}
+        {(!access.isLifetime || activeLifetime) && <Text style={S.legal}>{t('premium.autoRenewNotice')}</Text>}
+        {(!access.isLifetime || activeLifetime) && <Text style={S.legal}>{t('premium.legal')}</Text>}
         <View style={S.linksRow}>
           <Text style={S.link} accessibilityRole="link" onPress={() => openLegalLink(EULA_URL)}>{t('premium.terms')}</Text>
           <Text style={S.legal}>·</Text>
