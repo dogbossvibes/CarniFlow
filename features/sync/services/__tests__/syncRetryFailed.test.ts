@@ -30,8 +30,10 @@ jest.mock('@/features/sync/services/remoteTrainingSyncService', () => ({
   deleteRemoteTrackMarkers: async () => ({ data: null, error: null }),
   upsertRemoteTrackRun: async () => ({ data: null, error: null }),
 }));
-jest.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: 'u1' } } } }) }, from: () => ({}) } }));
-jest.mock('@/features/sync/services/netinfo', () => ({ fetchIsOnline: async () => true }));
+const mockGetSession = jest.fn();
+const mockIsOnline = jest.fn();
+jest.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: () => mockGetSession() }, from: () => ({}) } }));
+jest.mock('@/features/sync/services/netinfo', () => ({ fetchIsOnline: () => mockIsOnline() }));
 const mockStore = { isOnline: true, setOnlineStatus: jest.fn(), setSyncing: jest.fn(), setLastError: jest.fn(), setSyncProgress: jest.fn(), setLastSyncAt: jest.fn(), setCurrentSyncItem: jest.fn(), setPendingCount: jest.fn(), setFailedCount: jest.fn(), setConflictCount: jest.fn() };
 jest.mock('@/features/sync/store/syncStore', () => ({ useSyncStore: { getState: () => mockStore } }));
 
@@ -40,6 +42,7 @@ const mockMarkCompleted = jest.fn(async (..._a: any[]) => {});
 const mockMarkFailed = jest.fn(async (..._a: any[]) => {});
 const mockMarkConflict = jest.fn(async (..._a: any[]) => {});
 const mockRetryFailedOps = jest.fn(async () => {});
+const mockCounts = jest.fn();
 jest.mock('@/features/sync/repositories/syncQueueRepository', () => ({
   getPendingSyncOperations: () => mockGetPending(),
   markSyncProcessing: async () => {},
@@ -47,18 +50,26 @@ jest.mock('@/features/sync/repositories/syncQueueRepository', () => ({
   markSyncFailed: (...a: any[]) => mockMarkFailed(...a),
   markSyncConflict: (...a: any[]) => mockMarkConflict(...a),
   retryFailedOperations: () => mockRetryFailedOps(),
-  syncQueueCounts: async () => ({ pending: 0, failed: 0, conflict: 0 }), clearCompleted: async () => {},
+  syncQueueCounts: () => mockCounts(), clearCompleted: async () => {},
 }));
 jest.mock('@/features/media/repositories/localMediaRepository', () => ({
   getPendingMediaFiles: async () => [], markMediaUploaded: async () => {}, markMediaUploadFailed: async () => {},
 }));
 
 // eslint-disable-next-line import/first
-import { syncTrainingSession, syncNow, retryFailedSyncForSession, LOCAL_SESSION_MISSING } from '@/features/sync/services/syncEngine';
+import { syncTrainingSession, syncNow, retryFailedSync, retryFailedSyncForSession, LOCAL_SESSION_MISSING } from '@/features/sync/services/syncEngine';
 
 const item = (over: Record<string, unknown> = {}) => ({ id: 'sq-1', entity_type: 'training_session', entity_local_id: 'gone-1', operation: 'create', ...over });
 
-beforeEach(() => { jest.clearAllMocks(); mockGetLocal.mockReset(); mockGetPending.mockReset(); mockGetPending.mockResolvedValue([]); });
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockGetLocal.mockReset();
+  mockStore.setSyncing.mockReset();
+  mockCounts.mockReset().mockResolvedValue({ pending: 0, failed: 0, conflict: 0 });
+  mockGetPending.mockReset().mockResolvedValue([]);
+  mockIsOnline.mockReset().mockResolvedValue(true);
+  mockGetSession.mockReset().mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
+});
 
 describe('lokale Session fehlt → explizit nicht rekonstruierbar', () => {
   it('syncTrainingSession meldet ok:false mit reason local_missing (nicht mehr still ok:true)', async () => {
@@ -128,5 +139,130 @@ describe('retryFailedSyncForSession (Track-Open)', () => {
     mockGetLocal.mockResolvedValue(null);
     expect(await retryFailedSyncForSession('gone')).toBe(false);
     expect(mockRetryFailedOps).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('one sync worker across network and auth awaits', () => {
+  it('admits one worker when callers arrive before the network check completes', async () => {
+    let resolveOnline!: (online: boolean) => void;
+    mockIsOnline.mockImplementationOnce(() => new Promise<boolean>(resolve => { resolveOnline = resolve; }));
+    const first = syncNow();
+    const second = syncNow();
+    resolveOnline(true);
+    await Promise.all([first, second]);
+    expect(mockIsOnline).toHaveBeenCalledTimes(1);
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+  });
+
+  it('also excludes a second worker while authentication is pending', async () => {
+    let resolveSession!: (session: unknown) => void;
+    let authStarted!: () => void;
+    const enteredAuth = new Promise<void>(resolve => { authStarted = resolve; });
+    mockGetSession.mockImplementationOnce(() => new Promise(resolve => {
+      resolveSession = resolve;
+      authStarted();
+    }));
+    const first = syncNow();
+    await enteredAuth;
+    const second = syncNow();
+    resolveSession({ data: { session: { user: { id: 'u1' } } } });
+    await Promise.all([first, second]);
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['offline', 'logged-out', 'network-error', 'auth-error'])(
+    'releases the worker after %s so a later sync can run', async (failure) => {
+      if (failure === 'offline') mockIsOnline.mockResolvedValueOnce(false);
+      if (failure === 'logged-out') mockGetSession.mockResolvedValueOnce({ data: { session: null } });
+      if (failure === 'network-error') mockIsOnline.mockRejectedValueOnce(new Error('network unavailable'));
+      if (failure === 'auth-error') mockGetSession.mockRejectedValueOnce(new Error('auth unavailable'));
+      await syncNow();
+      expect(mockGetPending).not.toHaveBeenCalled();
+      expect(mockStore.setSyncing).not.toHaveBeenCalled();
+      await syncNow();
+      expect(mockGetPending).toHaveBeenCalledTimes(1);
+      expect(mockStore.setSyncing).toHaveBeenLastCalledWith(false);
+    },
+  );
+});
+
+
+describe('reservation lifetime and recovery', () => {
+  it('rejects an auth error even when the response still carries a session', async () => {
+    mockGetSession.mockResolvedValueOnce({ data: { session: { user: { id: 'u1' } } }, error: { message: 'revoked' } });
+    await syncNow();
+    expect(mockGetPending).not.toHaveBeenCalled();
+    expect(mockStore.setLastError).toHaveBeenCalledWith('revoked');
+    await syncNow();
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases after a queue read failure and preserves a later retry', async () => {
+    mockGetPending.mockRejectedValueOnce(new Error('queue read failed'));
+    await syncNow();
+    expect(mockStore.setLastError).toHaveBeenCalledWith('queue read failed');
+    expect(mockStore.setLastSyncAt).not.toHaveBeenCalled();
+    await retryFailedSync();
+    expect(mockRetryFailedOps).toHaveBeenCalledTimes(1);
+    expect(mockGetPending).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains the reservation through asynchronous cleanup and concurrent retry', async () => {
+    let finish!: () => void;
+    let entered!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    mockCounts.mockImplementationOnce(() => new Promise(resolve => {
+      finish = () => resolve({ pending: 0, failed: 0, conflict: 0 }); entered();
+    }));
+    const first = syncNow();
+    await started;
+    await Promise.all([syncNow(), retryFailedSync()]);
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+    finish(); await first;
+    await syncNow();
+    expect(mockGetPending).toHaveBeenCalledTimes(2);
+  });
+
+  it('releases even when cleanup counters or the store reset fail', async () => {
+    mockCounts.mockRejectedValueOnce(new Error('counts unavailable'));
+    mockStore.setSyncing.mockImplementation((value: boolean) => { if (!value) throw new Error('store observer failed'); });
+    await expect(syncNow()).rejects.toThrow('store observer failed');
+    mockStore.setSyncing.mockReset();
+    await syncNow();
+    expect(mockGetPending).toHaveBeenCalledTimes(2);
+    expect(mockStore.setSyncing).toHaveBeenLastCalledWith(false);
+  });
+
+  it.each(['logout', 'account-switch'])(
+    '%s cannot admit another worker while the current queue read is pending', async mode => {
+      let finish!: (items: any[]) => void;
+      let entered!: () => void;
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      mockGetPending.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; entered(); }));
+      const first = syncNow(); await started;
+      mockGetSession.mockResolvedValue({ data: { session: mode === 'logout' ? null : { user: { id: 'u2' } } } });
+      await syncNow();
+      expect(mockGetPending).toHaveBeenCalledTimes(1);
+      finish([]); await first;
+      await syncNow();
+      expect(mockGetPending).toHaveBeenCalledTimes(mode === 'logout' ? 1 : 2);
+      mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u2' } } } });
+      await syncNow();
+      expect(mockStore.setSyncing).toHaveBeenLastCalledWith(false);
+    },
+  );
+
+  it('server denial retains the failed item and leaves the reservation reusable', async () => {
+    mockGetLocal.mockResolvedValue({ local_id: 'denied', remote_id: null, payload_json: null, sync_status: 'pending' });
+    mockGetPending.mockResolvedValueOnce([item({ entity_local_id: 'denied' })]);
+    mockCreateRemote.mockResolvedValueOnce({ data: null, error: 'permission denied' });
+    await Promise.all([syncNow(), syncNow()]);
+    expect(mockGetPending).toHaveBeenCalledTimes(1);
+    expect(mockMarkFailed).toHaveBeenCalledWith('sq-1', 'permission denied');
+    expect(mockMarkCompleted).not.toHaveBeenCalled();
+    await syncNow();
+    expect(mockGetPending).toHaveBeenCalledTimes(2);
   });
 });

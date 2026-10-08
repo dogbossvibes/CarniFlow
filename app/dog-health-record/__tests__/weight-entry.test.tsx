@@ -34,6 +34,7 @@ import { readFileSync } from 'fs';
 import { Alert, InputAccessoryView, Keyboard, Platform, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
 import DogHealthRecordRoute from '@/app/dog-health-record/[id]';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
+import { DateField } from '@/components/ui/DateField';
 import { AnyvoChip } from '@/components/ui/AnyvoChip';
 import type { Dog } from '@/types';
 // Real implementations (not the CRUD-only-mocked parts) — used to compute
@@ -1974,5 +1975,44 @@ describe('Digital Health Record — Läufigkeit: Regression (bestehende Health-F
     const del = (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress?: () => void } }[] })
       .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'Tollwut löschen');
     expect(del).toBeTruthy();
+  });
+});
+
+function medicationDateFields(node: ReactTestRenderer) {
+  return (node.root as unknown as { findAllByType: (type: unknown) => { props: React.ComponentProps<typeof DateField> }[] }).findAllByType(DateField);
+}
+
+describe('Medication date picker regression', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+  });
+  it('saves selected start/end calendar dates and keeps the end constraint', async () => {
+    const node = render(); await flush(); openQuickAction(node, 'health.recordMedication');
+    act(() => allInputs(node)[0].props.onChangeText('Test medication'));
+    let fields = medicationDateFields(node);
+    expect(fields).toHaveLength(2);
+    expect(fields.every(field => field.props.stabilizeIOSBounds)).toBe(true);
+    const start = new Date(2026, 9, 8), end = new Date(2026, 10, 2);
+    act(() => fields[0].props.onChange(start));
+    fields = medicationDateFields(node);
+    expect(fields[1].props.minimumDate).toEqual(start);
+    act(() => fields[1].props.onChange(end));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateMedication).toHaveBeenCalledWith('dog-1', expect.objectContaining({ starts_on: '2026-10-08', ends_on: '2026-11-02' }));
+    act(() => node.unmount());
+  });
+  it('opens existing medication dates at local midnight and saves without shifting a day', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [{ ...MEDICATION_ROW, ends_on: '2026-10-30' }] });
+    const node = render(); await flush();
+    switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => findByText(node, 'Bearbeiten').props.onPress());
+    const fields = medicationDateFields(node);
+    expect(fields[0].props.value).toEqual(new Date(2026, 8, 20));
+    expect(fields[1].props.value).toEqual(new Date(2026, 9, 30));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockUpdateMedication).toHaveBeenCalledWith('med-1', expect.objectContaining({ starts_on: '2026-09-20', ends_on: '2026-10-30' }));
+    act(() => node.unmount());
   });
 });

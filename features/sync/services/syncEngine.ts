@@ -160,14 +160,19 @@ async function syncMediaItem(queueId: string, mediaLocalId: string) {
 export async function syncNow(): Promise<void> {
   if (running) return;
   const st = useSyncStore.getState();
-  if (!(await isOnline())) { st.setOnlineStatus(false); return; }
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return;   // ohne Login kein Sync
-
+  // Claim the worker before network/auth awaits, which can otherwise admit
+  // a second caller processing the same queue items concurrently.
   running = true;
-  st.setSyncing(true);
-  st.setLastError(null);
+  let syncStarted = false;
   try {
+    if (!(await isOnline())) { st.setOnlineStatus(false); return; }
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (!session) return;   // ohne Login kein Sync
+
+    syncStarted = true;
+    st.setSyncing(true);
+    st.setLastError(null);
     const ops = await getPendingSyncOperations(200);
     for (let i = 0; i < ops.length; i++) {
       await processQueueItem(ops[i]);
@@ -178,9 +183,15 @@ export async function syncNow(): Promise<void> {
   } catch (e: any) {
     st.setLastError(e?.message ?? 'Sync-Fehler');
   } finally {
-    await refreshCounts().catch(() => {});
-    st.setSyncing(false);
-    running = false;
+    try {
+      if (syncStarted) {
+        await refreshCounts().catch(() => {});
+        st.setSyncing(false);
+      }
+    } finally {
+      // Cleanup/store failures must never strand the admission reservation.
+      running = false;
+    }
   }
 }
 
