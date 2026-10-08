@@ -19,11 +19,11 @@ export interface PrecisionLocation {
   timestamp: number;          // ms seit Epoch
   provider:  string;          // 'gps' | 'ios_core_location' | 'expo-location' | …
   source:    'native' | 'expo-location';
-  // Phase 3 (additiv, optional — Android/Fallback setzen sie nicht):
+  // Additive uncertainty fields; older binaries and some providers omit them.
   altitudeAccuracy?: number | null;
   speedAccuracy?:    number | null;
   heading?:          number | null;   // Kurs (iOS course); = bearing
-  headingAccuracy?:  number | null;
+  headingAccuracy?:  number | null; // motion-course uncertainty (not CLHeading)
   quality?:          LocationQuality;
   rawGnssAvailable?: boolean;
   isMocked?:         boolean;
@@ -182,6 +182,7 @@ export interface ProviderStatus {
 export interface PrecisionTrackingOptions {
   intervalMs?:           number;        // gewünschtes Update-Intervall (Default 1000)
   minIntervalMs?:        number;        // schnellstes Intervall (Android, optional)
+  enableGnssStatusAndroid?: boolean;    // diagnostic status without raw measurements
   enableRawGnssAndroid?: boolean;       // Raw GNSS auf Android aktivieren (Phase 2)
   mode?:                 TrackingMode;  // iOS-Tuning (Phase 3)
   enableHeading?:        boolean;       // iOS Kompass/Heading (Phase 3)

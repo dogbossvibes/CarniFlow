@@ -2,6 +2,8 @@ import * as Location from 'expo-location';
 import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { precisionLocationClient as client } from '@/features/tracking/native/precisionLocationClient';
 import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
+import { normalizeFixQuality, type LocationFixQuality } from './locationFixQuality';
+import { beginPositionDiagnostics, recordPositionDiagnostics, recordGnssDiagnostics, endPositionDiagnostics } from './positionDiagnostics';
 
 // Zentrale Positionsquelle für die Fährtenaufnahme.
 //
@@ -22,6 +24,7 @@ import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceM
 export type LocationSourceKind = 'native' | 'expo' | 'external';
 
 export interface PositionSourceSample extends StreamSample {
+  t: number;
   source:   LocationSourceKind;
   provider: string | null;
 }
@@ -52,19 +55,23 @@ function baseInfo(): PositionSourceInfo {
 
 // Adapter: einheitliches Sample → expo-location LocationObject-Form, damit die
 // bestehende onFix-Logik der Recorder unverändert bleibt.
-export function sampleToLocationObject(s: PositionSourceSample): Location.LocationObject {
+export type TrackingLocationObject = Location.LocationObject & {
+  coords: Location.LocationObject['coords'] & Required<LocationFixQuality>;
+};
+
+export function sampleToLocationObject(s: PositionSourceSample): TrackingLocationObject {
   return {
     coords: {
       latitude:         s.lat,
       longitude:        s.lng,
       accuracy:         s.accuracy ?? null,
       altitude:         s.altitude ?? null,
-      altitudeAccuracy: null,
+      ...normalizeFixQuality(s),
       heading:          s.course ?? null,
       speed:            s.speed ?? null,
     },
     timestamp: s.t,
-  } as Location.LocationObject;
+  };
 }
 
 // Exakt der alte, auf Build 40 (Commit 82bd17c) nachweislich funktionierende
@@ -89,6 +96,7 @@ async function startLegacyExpoLocation(
       lng: loc.coords.longitude,
       accuracy: loc.coords.accuracy ?? null,
       altitude: loc.coords.altitude ?? null,
+      ...normalizeFixQuality({ altitudeAccuracy: loc.coords.altitudeAccuracy }),
       speed: loc.coords.speed ?? null,
       course: loc.coords.heading ?? null,
       t: loc.timestamp || Date.now(),
@@ -105,10 +113,29 @@ export async function startPositionSource(
   opts: Location.LocationOptions,
 ): Promise<PositionSourceHandle> {
   const info = baseInfo();
+  const diagnosticId = beginPositionDiagnostics();
+  let stopped = false;
+  let gnssSub: { remove: () => void } | null = null;
+  const removeGnss = () => {
+    try { gnssSub?.remove(); } catch { /* optional diagnostics cannot block source cleanup */ }
+    gnssSub = null;
+  };
+  const finishHandle = (stop: () => void, sourceInfo: PositionSourceInfo): PositionSourceHandle => ({
+    info: sourceInfo,
+    stop: () => {
+      if (stopped) return;
+      stopped = true;
+      removeGnss();
+      endPositionDiagnostics(diagnosticId);
+      stop();
+    },
+  });
 
   const emit = (s: StreamSample, fallbackSource: LocationSourceKind) => {
+    if (stopped) return;
     const src = s.source ?? fallbackSource;
-    const sample: PositionSourceSample = { ...s, source: src, provider: s.provider ?? null };
+    const sample: PositionSourceSample = { ...s, ...normalizeFixQuality(s), t: s.t ?? Date.now(), source: src, provider: s.provider ?? null };
+    recordPositionDiagnostics(diagnosticId, sample);
     info.source = src;
     if (sample.provider != null) info.provider = sample.provider;
     onSample(sample);
@@ -117,20 +144,37 @@ export async function startPositionSource(
   // 0) QA-A/B-Schalter: LEGACY erzwingt den alten expo-location-Pfad, ohne
   //    AnyvoPrecisionLocation überhaupt zu starten (siehe locationSourceMode.ts).
   if (getLocationSourceMode() === 'legacy') {
-    const stop = await startLegacyExpoLocation(emit, opts, 'expo-location-legacy');
-    return { stop, info: { ...info, isNativeAvailable: false, source: 'expo', provider: 'expo-location-legacy' } };
+    try {
+      const stop = await startLegacyExpoLocation(emit, opts, 'expo-location-legacy');
+      return finishHandle(stop, { ...info, isNativeAvailable: false, source: 'expo', provider: 'expo-location-legacy' });
+    } catch (error) {
+      stopped = true;
+      endPositionDiagnostics(diagnosticId);
+      throw error;
+    }
   }
 
   // 1) Bevorzugt: natives Modul / BLE über positionStream (fällt intern bereits
   //    auf expo-location zurück, wenn kein natives Modul im Build ist).
   try {
+    if (info.isNativeAvailable && typeof client.onGnssStatus === 'function') {
+      try { gnssSub = client.onGnssStatus(s => recordGnssDiagnostics(diagnosticId, s)); }
+      catch { /* older binaries may lack diagnostics; retain the native position path */ }
+    }
     const stop = await startPositionStream((s) => emit(s, info.source), opts);
-    return { stop, info };
+    return finishHandle(stop, info);
   } catch (e) {
     // 2) Harte Sicherung: schlägt der native Start fehl (z. B. Modul vorhanden,
     //    aber Fehler), auf reines expo-location zurückfallen. Kein Crash.
     console.warn('[positionSource] Native/positionStream fehlgeschlagen — Fallback auf expo-location.', e);
-    const stop = await startLegacyExpoLocation(emit, opts, 'expo-location');
-    return { stop, info: { ...info, source: 'expo', provider: 'expo-location' } };
+    removeGnss();
+    try {
+      const stop = await startLegacyExpoLocation(emit, opts, 'expo-location');
+      return finishHandle(stop, { ...info, source: 'expo', provider: 'expo-location' });
+    } catch (fallbackError) {
+      stopped = true;
+      endPositionDiagnostics(diagnosticId);
+      throw fallbackError;
+    }
   }
 }
