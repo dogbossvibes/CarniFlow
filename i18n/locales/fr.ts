@@ -2227,4 +2227,11 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "health.uxParasiteTreatment": "Traitement antiparasitaire",
   "health.uxActive": "actif",
   "health.uxInactive": "inactif",
+  "help.shellyTitle": "Accessoires de piste / bouton Shelly",
+  "help.shellyShort": "Shelly est un petit bouton Bluetooth. Il devrait faciliter la pose des pistes à l’avenir, sans devoir prendre le téléphone pour chaque action. La télécommande est encore en préparation.",
+  "help.shellyBody1": "Actuellement, seul un diagnostic interne de réception est disponible pour les testeurs lorsque ANYVO est ouvert au premier plan. Le bouton ne place aucun objet ni angle et ne termine ni ne sauvegarde de piste. La fiabilité avec l’écran éteint ou verrouillé n’est pas encore confirmée.",
+  "help.shellyBody2": "Candidat recommandé pour les essais : Shelly BLU Button Tough 1 ZB. Il propose Bluetooth et Zigbee et une protection IP54. La compatibilité avec ANYVO n’a pas encore été vérifiée sur du matériel réel et n’est pas garantie. Aucun bouton Shelly n’est nécessaire pour utiliser normalement ANYVO.",
+  "help.shellyBody3": "La réception directe sur le téléphone est prévue via Bluetooth avec BTHome. Zigbee ne remplace pas cette réception. Le téléphone fournit toujours la position GPS ; le bouton Shelly n’améliore pas la précision GPS.",
+  "help.shellyProductLink": "Voir le produit sur le site du fabricant",
+  "help.shellyLinkError": "Impossible d’ouvrir le site du fabricant. Réessayez plus tard.",
 };

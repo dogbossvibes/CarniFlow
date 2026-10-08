@@ -158,3 +158,91 @@ zu Lücken, Pause/Resume, Distanz/Score/End-Evidenz und Persistenz ausdrücklich
 entscheiden. Watch, konkrete GNSS-Geräte und Planer bleiben spätere Aufträge.
 OTA-fähige JS-Auslieferung ist autorisiert; eine GPS-/Shelly-Veröffentlichung ist
 zum Zeitpunkt dieses Berichts noch nicht ausgeführt. Kein neuer nativer Build autorisiert.
+
+## UI-Hilfe — Chat 07, 2026-10-08 (lokal, nicht integriert/veröffentlicht)
+
+Direkter Nutzerauftrag über MASTER `01a117fa-04b7-7992-a485-cfdeca7fcfa6`:
+Shelly in der App verständlich erklären und ein geeignetes Gerät nennen. Chat 07
+ist für diesen begrenzten Hilfe-Scope alleiniger Writer; Chat 02 prüft parallel nur
+read-only den Maßstab. Die obigen Feature-/OTA-Snapshots bleiben historische Belege;
+dieser Abschnitt erteilt keine zusätzliche Releasefreigabe.
+
+- Worktree: `/Users/moyo/canisflow-worktrees/anyvo-feature-tracking-gps-quality-shelly`
+- Branch: `feat/tracking-gps-quality-shelly-diagnostics`
+- Start-/Abschluss-HEAD: `7ed2962365aec68945a290945c0b6fdb92f6621d` (kein Commit)
+- Weg: **Profil → Hilfe & ANYVO kennenlernen → Fährte → Fährten-Zubehör / Shelly-Button**.
+  Bestehendes Hilfe-Center rendert das Thema automatisch aus der Help-Registry;
+  keine neue Route und kein Einstieg in die interne Diagnose.
+
+### Inhalt und Umsetzung
+
+Neues Help-Registry-Thema `track_shelly`, lokale Texte in DE/GSW/EN/FR/IT.
+Bestehendes HelpSheet zeigt im Detailmodus einen optionalen Herstellerlink mit
+Accessibility-Rolle `link`, mindestens 48 logischen Einheiten Höhe und behandeltem
+Öffnungsfehler. Bestehende Themen und kompakte Coachmarks bleiben ohne diesen Link.
+
+Deutscher Kurztext:
+> Shelly ist ein kleiner Bluetooth-Taster. Er soll künftig die Bedienung beim Fährtenlegen erleichtern, ohne dass du für jede Aktion zum Telefon greifen musst. Die Fernsteuerung ist noch in Vorbereitung.
+
+Detailinhalt: nur interne Vordergrund-Empfangsdiagnose im Testerkreis; kein Setzen
+von Gegenständen/Winkeln, kein Beenden/Speichern. Empfang bei ausgeschaltetem oder
+gesperrtem Bildschirm nicht bestätigt. **Shelly BLU Button Tough 1 ZB** als
+empfohlener Testkandidat (Bluetooth/Zigbee, IP54); echte Hardware-Kompatibilität
+ungeprüft und nicht garantiert, keine Kaufpflicht. Geplanter direkter Empfang via
+Bluetooth/BTHome; Zigbee kein Ersatz. GPS kommt vom Telefon und wird durch den
+Taster nicht genauer. Keine Verschlüsselungskompatibilität oder Klickbelegung
+behauptet. Keine Aktivieren-/Pairing-/Marker-Steuerung hinzugefügt.
+
+Quellen am 2026-10-08 frisch geöffnet:
+- https://www.shelly.com/de/products/shelly-blu-button-tough-1-zb-black
+- https://shelly-api-docs.shelly.cloud/docs-ble/Devices/BLU_ZB/button1_ZB/
+- https://docs.expo.dev/versions/v54.0.0/
+
+### Dateien dieses UI-Scope
+
+- `components/help/HelpSheet.tsx`
+- `features/help/helpRegistry.ts`
+- `features/help/__tests__/shelly-help.test.tsx`
+- `i18n/de-CH.ts`, `i18n/gsw-CH.ts`
+- `i18n/locales/en.ts`, `i18n/locales/fr.ts`, `i18n/locales/it.ts`
+- dieser bestehende Featurebericht (nur angehängter UI-Abschnitt)
+
+### Prüfungen und offene Phasen
+
+- Jest PASS: 4 Suites / 70 Tests (8 neue Hilfe-Tests; 62 bestehende Hilfe-/i18n-Tests).
+  Neue Tests: Auffindbarkeit per Kategorie, reale HelpSheet-Darstellung in fünf
+  Sprachen, Modell/Grenzen, offizieller Link und Öffnungsfehler, Link nur in Details.
+- ESLint für alle geänderten/neuen TS-/TSX-Dateien: PASS, keine Meldungen.
+- TypeScript `npx tsc --noEmit --incremental false`: PASS.
+- `git diff --check`: PASS.
+- Geschützte fremde Kotlin-Datei unverändert: SHA-1 vor/nach
+  `71e0e5065718e783f29a206a418fa0f9a703f297`.
+- UI/Geräte-QA OPEN: iOS/Android, große Schrift/kleine Displays, Scrollen des
+  längeren HelpSheets, VoiceOver/TalkBack-Fokus und tatsächlicher Browserwechsel.
+  Renderer-Tests ersetzen keine visuelle/native Abnahme; keine Screenshots behauptet.
+- Shelly-Hardware-QA, Firmware/BLE-Empfang und Locked-screen-Verhalten OPEN.
+- Review und Integration OPEN; Hilfe nicht veröffentlicht. Shared JS/TS/Dokumentation,
+  keine neue native-/Dependency-/Permission-/DB-Änderung durch diesen Hilfe-Scope.
+- Kein Stage, Commit, Push, Merge, OTA, Build, Release, Deploy oder DB-Write ausgeführt.
+
+## Übernahme und Abschlussprüfung der Hilfe — Chat 02, 2026-10-08
+
+Chat 07 hat die Schreibzuständigkeit für den obigen Hilfe-Scope über MASTER an
+Chat 02 übergeben; keine parallelen Hilfeänderungen. Die direkte Nutzerfreigabe
+im MASTER (Turn `01a11bfe-33dc-78b1-b572-4dade9512e46`) erlaubt saubere Commits
+der offenen OTA-Kandidaten. Veröffentlichung und abschließender Plattform-Preflight
+liegen bei Chat 01; dieser Commit veröffentlicht nichts.
+
+- Produktdiff vollständig geprüft. Hilfe bleibt Erklärung eines Testkandidaten,
+  ohne behauptete Steuerungs- oder Hintergrundzuverlässigkeit.
+- Frisch: Hilfe-Jest **1 Suite / 8 Tests PASS**, ESLint aller acht TS-/TSX-Dateien
+  **0 Fehler / 0 Warnungen**, TypeScript für diesen Scope einschließlich vorhandener
+  React-Test-Renderer-Deklaration **PASS**, `git diff --check` **PASS**.
+- Die vorstehenden 4 Suites / 70 Tests und vollständige TypeScript-Prüfung sind
+  die Prüfung von Chat 07; Zahlen überlappen und werden nicht addiert.
+- Ausschließlich die neun aufgeführten Hilfe-/Sprach-/Test-/Berichtsdateien werden
+  committet. Fremde Android-Kotlin-Änderung bleibt ungestaged und unverändert
+  (SHA-1 `71e0e5065718e783f29a206a418fa0f9a703f297`).
+- Endgültige Bundles/Runtime-Prüfung und OTA beim alleinigen Publisher Chat 01;
+  Geräte-QA und Shelly-Hardwaretest weiterhin OPEN. Kein neuer nativer Bedarf
+  durch die Hilfe. Keine Integration, kein Push, keine Veröffentlichung oder DB-Änderung hier.

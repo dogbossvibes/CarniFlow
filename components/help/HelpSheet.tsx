@@ -8,7 +8,7 @@ import {
 import { useT } from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  Modal, ScrollView, StyleSheet, Text,
+  Alert, Linking, Modal, ScrollView, StyleSheet, Text,
   TouchableOpacity, TouchableWithoutFeedback, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,6 +36,15 @@ export function HelpSheet({
   const title = t(HELP_TOPIC_TITLE_KEY[topic.id]);
   const bodyKeys = HELP_TOPIC_BODY_KEYS[topic.id] ?? [];
   const primaryText = primaryLabel ?? t('help.understood');
+  const externalLink = showDetails ? topic.externalLink : undefined;
+  const openExternalLink = async () => {
+    if (!externalLink) return;
+    try {
+      await Linking.openURL(externalLink.url);
+    } catch {
+      Alert.alert(t('common.error'), t(externalLink.errorKey));
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -58,6 +67,17 @@ export function HelpSheet({
               {showDetails && bodyKeys.map((key) => (
                 <Text key={key} style={s.detail}>{t(key)}</Text>
               ))}
+              {externalLink && (
+                <TouchableOpacity
+                  style={s.externalLink}
+                  onPress={openExternalLink}
+                  activeOpacity={0.8}
+                  accessibilityRole="link"
+                  accessibilityLabel={t(externalLink.labelKey)}
+                >
+                  <Text style={s.externalLinkText}>{t(externalLink.labelKey)}</Text>
+                </TouchableOpacity>
+              )}
             </ScrollView>
 
             <View style={s.actions}>
@@ -111,6 +131,8 @@ const s = StyleSheet.create({
   body: { marginBottom: 18 },
   text: { fontSize: 15, color: 'rgba(255,255,255,0.82)', lineHeight: 23 },
   detail: { fontSize: 14, color: C.muted, lineHeight: 22, marginTop: 12 },
+  externalLink: { minHeight: 48, justifyContent: 'center', paddingVertical: 12, marginTop: 12 },
+  externalLinkText: { fontSize: 14, color: C.accent, textDecorationLine: 'underline' },
   actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   secondaryBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 14,

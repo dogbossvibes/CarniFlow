@@ -2208,4 +2208,11 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "health.uxParasiteTreatment": "Parasitenbehandlung",
   "health.uxActive": "aktiv",
   "health.uxInactive": "inaktiv",
+  "help.shellyTitle": "Fährte-Zubehör / Shelly-Button",
+  "help.shellyShort": "Shelly isch en chline Bluetooth-Taster. Er söll künftig s Fährtelege erleichtere, ohni dass du für jedi Aktion s Telefon muesch hervorneh. D Fernstüürig isch no in Vorbereitig.",
+  "help.shellyBody1": "Aktuell git es nur e interni Empfangsdiagnose für de Testerkreis, während ANYVO im Vordergrund offe isch. De Button setzt kei Gegeständ oder Winkel und beendet oder speicheret kei Fährte. Zuverlässige Empfang bi usgschaltetem oder gsperrtem Bildschirm isch no nöd bestätigt.",
+  "help.shellyBody2": "Empfohlene Testkandidat: Shelly BLU Button Tough 1 ZB. S Gerät bietet Bluetooth und Zigbee sowie Schutz nach IP54. D Kompatibilität mit ANYVO isch no nöd mit echter Hardware prüeft und nöd garantiert. Für die normali Nutzig vo ANYVO bruchsch kein Shelly-Button.",
+  "help.shellyBody3": "Für de geplante direkte Empfang am Telefon isch Bluetooth mit BTHome vorgseh. Zigbee ersetzt dä Empfang nöd. D GPS-Position chunnt wiiterhin vom Telefon; de Shelly-Button verbessert d GPS-Genauigkeit nöd.",
+  "help.shellyProductLink": "Produkt bim Hersteller aaluege",
+  "help.shellyLinkError": "D Herstellerseite het nöd chönne geöffnet werde. Versuch es später nomal.",
 };

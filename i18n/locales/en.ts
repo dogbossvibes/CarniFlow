@@ -2208,4 +2208,11 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "health.uxParasiteTreatment": "Parasite treatment",
   "health.uxActive": "active",
   "health.uxInactive": "inactive",
+  "help.shellyTitle": "Tracking accessories / Shelly button",
+  "help.shellyShort": "Shelly is a small Bluetooth button. It is intended to make laying tracks easier in future, so you do not have to reach for your phone for every action. Remote control is still in preparation.",
+  "help.shellyBody1": "Currently, only an internal reception diagnostic for testers is available while ANYVO is open in the foreground. The button does not place articles or turns, and does not end or save a track. Reliable reception with the screen off or locked has not been confirmed.",
+  "help.shellyBody2": "Recommended test candidate: Shelly BLU Button Tough 1 ZB. It offers Bluetooth and Zigbee and an IP54 rating. Compatibility with ANYVO has not yet been tested with real hardware and is not guaranteed. You do not need a Shelly button for normal use of ANYVO.",
+  "help.shellyBody3": "Direct reception on the phone is planned to use Bluetooth with BTHome. Zigbee does not replace this reception. GPS positions still come from the phone; the Shelly button does not improve GPS accuracy.",
+  "help.shellyProductLink": "View product on manufacturer website",
+  "help.shellyLinkError": "The manufacturer website could not be opened. Please try again later.",
 };
