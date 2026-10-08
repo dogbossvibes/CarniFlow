@@ -31,7 +31,7 @@ import 'react-native-gesture-handler/jestSetup';
 // Done action only dismisses the keyboard — never state, never save.
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
-import { Alert, InputAccessoryView, Keyboard, Platform, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Alert, InputAccessoryView, Keyboard, Platform, RefreshControl, ScrollView, Switch, Text, TextInput, TouchableOpacity } from 'react-native';
 import DogHealthRecordRoute from '@/app/dog-health-record/[id]';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { AnyvoChip } from '@/components/ui/AnyvoChip';
@@ -44,6 +44,7 @@ import { durationDays as realDurationDays, fmtDate as realFmtDate, getHeatHistor
 import type { HealthOverviewData } from '@/services/healthService';
 
 const mockLoadHealthOverview = jest.fn();
+const mockRetryHealthReminder = jest.fn();
 // Läufigkeit-in-Gesundheitsakte-Integration (29.09.2026): captured so tests
 // can assert exact navigation targets (openHeatCycle/openHeatQuickAction).
 const mockPush = jest.fn();
@@ -119,11 +120,13 @@ jest.mock('@/lib/session-context', () => ({ useSession: () => ({ user: { id: 'ow
 // a test. Not what these tests are about; stub it out.
 jest.mock('@/components/ui/Toast', () => ({ useToast: () => ({ showToast: jest.fn(), toast: null }) }));
 jest.mock('@/hooks/useProfile', () => ({ useProfile: () => ({ profile: mockProfile }) }));
-jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
+jest.mock('@/i18n', () => ({ getLocale: () => 'de', useT: () => ({ t: (key: string, params?: Record<string, unknown>) => { if (!key.startsWith('health.ux')) return key; let value = jest.requireActual('@/i18n/de-CH').deCH[key] ?? key; for (const [name, replacement] of Object.entries(params ?? {})) value = value.replace(`{${name}}`, String(replacement)); return value; } }), translate: (key: string, params?: Record<string, unknown>) => { let value = jest.requireActual('@/i18n/de-CH').deCH[key] ?? key; for (const [name, replacement] of Object.entries(params ?? {})) value = value.replace(`{${name}}`, String(replacement)); return value; } }));
 jest.mock('@/services/dogs', () => ({ getDogById: (...a: unknown[]) => mockGetDogById(...a) }));
 jest.mock('@/services/dogHub', () => ({ deleteDogDocument: jest.fn(), getDogDocumentUrl: jest.fn() }));
 jest.mock('@/services/healthService', () => ({
+  HEALTH_SECTION_LIMIT: 120,
   loadHealthOverview: (...a: unknown[]) => mockLoadHealthOverview(...a),
+  retryHealthReminder: (...a: unknown[]) => mockRetryHealthReminder(...a),
   createWeightEntry: (...a: unknown[]) => mockCreateWeightEntry(...a),
   updateWeightEntry: (...a: unknown[]) => mockUpdateWeightEntry(...a),
   deleteWeightEntry: (...a: unknown[]) => mockDeleteWeightEntry(...a), createVaccination: (...a: unknown[]) => mockCreateVaccination(...a), updateVaccination: (...a: unknown[]) => mockUpdateVaccination(...a), deleteVaccination: (...a: unknown[]) => mockDeleteVaccination(...a),
@@ -178,6 +181,7 @@ function openWeightSheet(node: ReactTestRenderer) {
 }
 
 function openQuickAction(node: ReactTestRenderer, labelKey: string) {
+  if (!findByText(node, labelKey)) { act(() => { findByText(node, 'Weiteren Eintrag hinzufügen').props.onPress(); }); }
   act(() => { findByText(node, labelKey).props.onPress(); });
 }
 
@@ -196,7 +200,7 @@ function strings(node: ReactTestRenderer): string[] {
 
 function allInputs(node: ReactTestRenderer) {
   return (node.root as unknown as {
-    findAllByType: (t: unknown) => { props: { value?: string; placeholder?: string; onChangeText: (v: string) => void } }[];
+    findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; value?: string; placeholder?: string; onChangeText: (v: string) => void } }[];
   }).findAllByType(TextInput);
 }
 
@@ -1608,6 +1612,8 @@ describe('Digital Health Record — Läufigkeit: Gender-Gating', () => {
     mockGetHeatCycleDetails.mockResolvedValue({ cycles: [], phases: [], observations: [] });
     const node = render();
     await flush();
+    expect(findByText(node, 'health.recordHeat')).toBeFalsy(); // Less frequent actions are collapsed.
+    act(() => { findByText(node, 'Weiteren Eintrag hinzufügen').props.onPress(); });
     expect(findByText(node, 'health.recordHeat')).toBeTruthy(); // Quick Action
     expect(findByAccessibilityLabelPrefix(node, 'heat.addFirst') ?? findByAccessibilityLabelPrefix(node, 'heat.title')).toBeTruthy(); // Karte (leer oder befüllt)
   });
@@ -1861,7 +1867,7 @@ describe('Digital Health Record — Läufigkeit: Quick Action', () => {
     mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_OLD], phases: [], observations: [] });
     const node = render();
     await flush();
-    act(() => { findByText(node, 'health.recordHeat').props.onPress(); });
+    openQuickAction(node, 'health.recordHeat');
     expect(mockPush).toHaveBeenCalledWith({ pathname: '/dog-heat-new', params: { id: 'dog-1' } });
   });
 
@@ -1869,7 +1875,7 @@ describe('Digital Health Record — Läufigkeit: Quick Action', () => {
     mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_ACTIVE], phases: [], observations: [] });
     const node = render();
     await flush();
-    act(() => { findByText(node, 'health.recordHeat').props.onPress(); });
+    openQuickAction(node, 'health.recordHeat');
     expect(mockPush).toHaveBeenCalledWith('/dog-heat/cyc-active');
     expect(mockPush).not.toHaveBeenCalledWith(expect.objectContaining({ pathname: '/dog-heat-new' }));
   });
@@ -1974,5 +1980,94 @@ describe('Digital Health Record — Läufigkeit: Regression (bestehende Health-F
     const del = (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress?: () => void } }[] })
       .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'Tollwut löschen');
     expect(del).toBeTruthy();
+  });
+});
+
+
+describe('Health UX priorities: overview and reliable status', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    mockRetryHealthReminder.mockReset().mockResolvedValue('synced');
+  });
+  it('shows frequent actions first and exposes the remaining actions on demand', async () => {
+    const node = render(); await flush();
+    expect(findByText(node, 'health.recordWeight')).toBeTruthy();
+    expect(findByText(node, 'health.recordMedication')).toBeTruthy();
+    expect(findByText(node, 'health.recordVaccination')).toBeFalsy();
+    act(() => { findByText(node, 'Weiteren Eintrag hinzufügen').props.onPress(); });
+    expect(findByText(node, 'health.recordVaccination')).toBeTruthy();
+    node.unmount();
+  });
+  it('flags a failed section and retries without claiming complete health data', async () => {
+    mockLoadHealthOverview.mockResolvedValueOnce({ ...EMPTY_OVERVIEW, sectionErrors: { vaccinations: 'offline' } }).mockResolvedValue(EMPTY_OVERVIEW);
+    const node = render(); await flush();
+    expect(strings(node)).toContain('health.recordPartialLoad');
+    expect(strings(node)).toContain('Daten teilweise geladen');
+    await act(async () => { await findByText(node, 'Erneut laden').props.onPress(); });
+    expect(mockLoadHealthOverview).toHaveBeenCalledTimes(2);
+    expect(strings(node)).not.toContain('health.recordPartialLoad');
+    node.unmount();
+  });
+  it('opens the recent entry directly instead of requiring a timeline detour', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, vaccinations: [VACCINATION_ROW] });
+    const node = render(); await flush();
+    act(() => { findByText(node, 'Tollwut').props.onPress(); });
+    expect(strings(node)).toContain('Chargennummer');
+    expect(strings(node)).toContain('LOT-2026-A1');
+    node.unmount();
+  });
+  it('retries only the failed calendar side effect of an already saved medication', async () => {
+    mockCreateMedication.mockResolvedValue({ data: { id: 'saved-med' }, error: null, reminderSync: 'failed' });
+    const node = render(); await flush(); openQuickAction(node, 'health.recordMedication');
+    const input = allInputs(node)[0];
+    act(() => { input.props.onChangeText('Test medication'); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    const retryLabel = jest.requireActual('@/i18n/de-CH').deCH['health.uxReminderRetry'];
+    await act(async () => { await findByText(node, retryLabel).props.onPress(); });
+    expect(mockCreateMedication).toHaveBeenCalledTimes(1);
+    expect(mockRetryHealthReminder).toHaveBeenCalledWith({ kind: 'medication', dogId: 'dog-1', id: 'saved-med' });
+    node.unmount();
+  });
+});
+
+
+describe('T-66 review regressions', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+  });
+  it('preserves loaded heat cycles and shows partial status after a resolved service error rejects the aggregate read', async () => {
+    mockGetDogById.mockResolvedValue({ data: DOG_FEMALE, error: null });
+    mockGetHeatCycleDetails.mockResolvedValueOnce({ cycles: [CYCLE_ACTIVE], phases: [], observations: [] }).mockRejectedValueOnce({ message: 'offline' });
+    const node = render(); await flush();
+    expect(findByAccessibilityLabelPrefix(node, 'heat.title')).toBeTruthy();
+    await act(async () => { await node.root.findByType(RefreshControl).props.onRefresh(); });
+    expect(strings(node)).toContain('health.recordPartialLoad');
+    expect(findByAccessibilityLabelPrefix(node, 'heat.title')).toBeTruthy();
+    expect(findByAccessibilityLabelPrefix(node, 'heat.addFirst')).toBeFalsy();
+    node.unmount();
+  });
+  it('labels the medication active switch and the separate dose-unit input', async () => {
+    const node = render(); await flush(); openQuickAction(node, 'health.recordMedication');
+    expect(node.root.findByType(Switch).props.accessibilityLabel).toBe('Medikament aktiv');
+    node.unmount();
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [MEDICATION_ROW] });
+    const detail = render(); await flush();
+    act(() => { findByText(detail, 'Rimadyl').props.onPress(); }); await flush();
+    act(() => { findByText(detail, 'Gabe dokumentieren').props.onPress(); });
+    expect(allInputs(detail).some(input => input.props.accessibilityLabel === 'Einheit')).toBe(true);
+    detail.unmount();
+  });
+  it('warns about truncated data and preserves that warning if the same section fails on refresh', async () => {
+    mockLoadHealthOverview.mockResolvedValueOnce({ ...EMPTY_OVERVIEW, sectionLimits: { vaccinations: true } }).mockResolvedValueOnce({ ...EMPTY_OVERVIEW, sectionErrors: { vaccinations: 'offline' } });
+    const node = render(); await flush();
+    expect(strings(node)).toContain('Datenumfang begrenzt');
+    expect(strings(node).some(value => value.includes('bis zu 120 Einträge'))).toBe(true);
+    expect(strings(node)).toContain('Keine Fälligkeiten in den geladenen Daten');
+    await act(async () => { await node.root.findByType(RefreshControl).props.onRefresh(); });
+    expect(strings(node)).toContain('health.recordPartialLoad');
+    expect(strings(node).some(value => value.includes('bis zu 120 Einträge'))).toBe(true);
+    node.unmount();
   });
 });

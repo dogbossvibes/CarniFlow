@@ -5,7 +5,7 @@ import { C } from '@/constants/colors';
 // Auswahl-Chip (Mehrfachauswahl) im Fährten-Design.
 export function AnyvoChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity style={[s.chip, active && s.active]} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity style={[s.chip, active && s.active]} onPress={onPress} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: active }}>
       {active && <LinearGradient colors={[C.trackPrimary, C.trackPrimaryDk]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
       <Text style={[s.txt, active && s.txtActive]}>{label}</Text>
     </TouchableOpacity>

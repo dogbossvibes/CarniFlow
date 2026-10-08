@@ -173,9 +173,12 @@ const rowToObservation = (r: any): HeatObservation => ({
 
 // ── CRUD: Heat Cycles ───────────────────────────────────────────────────────
 
-export async function getHeatCycles(dogId: string): Promise<HeatCycle[]> {
-  const { data } = await supabase.from('dog_heat_cycles')
+export async function getHeatCycles(dogId: string, options: { throwOnError?: boolean } = {}): Promise<HeatCycle[]> {
+  const { data, error } = await supabase.from('dog_heat_cycles')
     .select('*').eq('dog_id', dogId).order('start_date', { ascending: false });
+  // Aggregate health reads must distinguish failure from a genuinely empty history.
+  // Keep legacy Home callers compatible; they do not all catch rejected reads.
+  if (error && options.throwOnError) throw error;
   return (data ?? []).map(rowToCycle);
 }
 
@@ -188,7 +191,7 @@ export async function getHeatCycleDetails(dogId: string): Promise<{
   phases: HeatPhase[];
   observations: HeatObservation[];
 }> {
-  const cycles = await getHeatCycles(dogId);
+  const cycles = await getHeatCycles(dogId, { throwOnError: true });
   if (cycles.length === 0) return { cycles, phases: [], observations: [] };
 
   const cycleIds = cycles.map(cycle => cycle.id);

@@ -1,3 +1,4 @@
+import type { TranslationKey } from '@/i18n';
 import type { DogDewormingEntryRow, DogHealthEntryRow, DogVetRow, DogDocumentRow } from '@/services/dogHub';
 import type { HealthCondition, HealthMedication, HealthVaccination } from '@/types/health';
 import type { HealthOverviewData } from '@/services/healthService';
@@ -64,15 +65,21 @@ function fmtDayMonthYear(value: string): string | null {
 // Läufigkeit-Bereich (components/dogs/HealthHeatSection.tsx); dies ist nur
 // eine zweite, kompakte Darstellung derselben Daten — kein zweites
 // Datenmodell.
-export function buildHealthTimeline(data: HealthOverviewData, heatCycles: HeatCycle[] = []): HealthTimelineItem[] {
-  const vaccinations = data.vaccinations.map((row: HealthVaccination) => ({ id: timelineId('vaccination', row.id), kind: 'vaccination' as const, title: row.vaccine_name || row.vaccine_type, date: safeDate(row.administered_on), detail: row.clinic_name, secondary: row.next_due_on ? `Nächste Fälligkeit: ${fmtDayMonthYear(row.next_due_on) ?? row.next_due_on}` : null }));
-  const parasites = data.parasites.map((row: DogDewormingEntryRow) => ({ id: timelineId('parasite', row.id), kind: 'parasite' as const, title: row.product || parasiteLabel(row.treatment_type), date: safeDate(row.treatment_date), detail: row.next_due_date ? `Fällig ${row.next_due_date}` : null }));
-  const medications = data.medications.map((row: HealthMedication) => ({ id: timelineId('medication', row.id), kind: 'medication' as const, title: row.name, date: safeDate(row.starts_on), detail: [row.dosage, row.frequency, row.is_active ? 'aktiv' : 'inaktiv'].filter(Boolean).join(' · ') || null }));
-  const vets = data.vetVisits.map((row: DogVetRow) => ({ id: timelineId('vet', row.id), kind: 'vet' as const, title: row.reason || 'Tierarztbesuch', date: safeDate(row.appointment_at), detail: row.clinic_name }));
-  const weights = data.entries.filter(e => e.weight_kg != null).map((row: DogHealthEntryRow) => ({ id: timelineId('weight', row.id), kind: 'weight' as const, title: 'Gewicht', date: safeDate(row.entry_date), detail: `${row.weight_kg} kg` }));
-  const conditions = data.conditions.map((row: HealthCondition) => ({ id: timelineId('condition', row.id), kind: 'condition' as const, title: row.name, date: safeDate(row.started_on || row.created_at), detail: conditionLabel(row.kind) }));
-  const documents = data.documents.map((row: DogDocumentRow) => ({ id: timelineId('document', row.id), kind: 'document' as const, title: row.title || 'Gesundheitsdokument', date: safeDate(row.issued_on || row.created_at), detail: row.subtype }));
-  const heat = heatCycles.map((cycle: HeatCycle) => { const duration = heatDurationDays(cycle.startDate, cycle.endDate); return { id: timelineId('heat', cycle.id), kind: 'heat' as const, title: 'Läufigkeit', date: safeDate(cycle.startDate), detail: cycle.endDate ? `${fmtDayMonthYear(cycle.startDate)} – ${fmtDayMonthYear(cycle.endDate)}` : `Seit ${fmtDayMonthYear(cycle.startDate)}`, secondary: duration ? `${duration} Tage` : null }; });
+export type TimelineDate = (value: string, fallback: string) => string;
+const fallbackDate: TimelineDate = (_value, fallback) => fallback;
+
+type TimelineText = (key: TranslationKey, fallback: string, params?: Record<string, string | number>) => string;
+const fallbackText: TimelineText = (_key, fallback) => fallback;
+
+export function buildHealthTimeline(data: HealthOverviewData, heatCycles: HeatCycle[] = [], text: TimelineText = fallbackText, dateText: TimelineDate = fallbackDate): HealthTimelineItem[] {
+  const vaccinations = data.vaccinations.map((row: HealthVaccination) => ({ id: timelineId('vaccination', row.id), kind: 'vaccination' as const, title: row.vaccine_name || row.vaccine_type, date: safeDate(row.administered_on), detail: row.clinic_name, secondary: row.next_due_on ? text('health.uxNextDueDate', `Nächste Fälligkeit: ${fmtDayMonthYear(row.next_due_on) ?? row.next_due_on}`, { date: dateText(row.next_due_on, fmtDayMonthYear(row.next_due_on) ?? row.next_due_on) }) : null }));
+  const parasites = data.parasites.map((row: DogDewormingEntryRow) => ({ id: timelineId('parasite', row.id), kind: 'parasite' as const, title: row.product || parasiteLabel(row.treatment_type, text), date: safeDate(row.treatment_date), detail: row.next_due_date ? text('health.uxDueDate', `Fällig ${row.next_due_date}`, { date: dateText(row.next_due_date, row.next_due_date) }) : null }));
+  const medications = data.medications.map((row: HealthMedication) => ({ id: timelineId('medication', row.id), kind: 'medication' as const, title: row.name, date: safeDate(row.starts_on), detail: [row.dosage, row.frequency, row.is_active ? text('health.uxActive', 'aktiv') : text('health.uxInactive', 'inaktiv')].filter(Boolean).join(' · ') || null }));
+  const vets = data.vetVisits.map((row: DogVetRow) => ({ id: timelineId('vet', row.id), kind: 'vet' as const, title: row.reason || text('health.recordVet', 'Tierarztbesuch'), date: safeDate(row.appointment_at), detail: row.clinic_name }));
+  const weights = data.entries.filter(e => e.weight_kg != null).map((row: DogHealthEntryRow) => ({ id: timelineId('weight', row.id), kind: 'weight' as const, title: text('health.recordWeight', 'Gewicht'), date: safeDate(row.entry_date), detail: `${row.weight_kg} kg` }));
+  const conditions = data.conditions.map((row: HealthCondition) => ({ id: timelineId('condition', row.id), kind: 'condition' as const, title: row.name, date: safeDate(row.started_on || row.created_at), detail: conditionLabel(row.kind, text) }));
+  const documents = data.documents.map((row: DogDocumentRow) => ({ id: timelineId('document', row.id), kind: 'document' as const, title: row.title || text('health.uxHealthDocument', 'Gesundheitsdokument'), date: safeDate(row.issued_on || row.created_at), detail: row.subtype }));
+  const heat = heatCycles.map((cycle: HeatCycle) => { const duration = heatDurationDays(cycle.startDate, cycle.endDate); return { id: timelineId('heat', cycle.id), kind: 'heat' as const, title: text('heat.title', 'Läufigkeit'), date: safeDate(cycle.startDate), detail: cycle.endDate ? `${dateText(cycle.startDate, fmtDayMonthYear(cycle.startDate) ?? cycle.startDate)} – ${dateText(cycle.endDate, fmtDayMonthYear(cycle.endDate) ?? cycle.endDate)}` : text('health.uxSince', `Seit ${fmtDayMonthYear(cycle.startDate)}`, { date: dateText(cycle.startDate, fmtDayMonthYear(cycle.startDate) ?? cycle.startDate) }), secondary: duration ? text('health.uxDays', `${duration} Tage`, { count: duration }) : null }; });
   return [...vaccinations, ...parasites, ...medications, ...vets, ...weights, ...conditions, ...documents, ...heat].sort((a, b) => {
     const aTime = a.date ? Date.parse(a.date) : null;
     const bTime = b.date ? Date.parse(b.date) : null;
@@ -89,10 +96,10 @@ export function filterHealthTimeline(items: HealthTimelineItem[], filter: Health
   return items.filter(item => item.kind === filter);
 }
 
-export function parasiteLabel(value: string | null | undefined): string {
-  return value === 'flea_tick' ? 'Parasitenprophylaxe' : value === 'heartworm' ? 'Herzwurmbehandlung' : value === 'other' ? 'Parasitenbehandlung' : 'Entwurmung';
+export function parasiteLabel(value: string | null | undefined, text: TimelineText = fallbackText): string {
+  return value === 'flea_tick' ? text('health.uxParasitePrevention', 'Parasitenprophylaxe') : value === 'heartworm' ? text('health.uxHeartwormTreatment', 'Herzwurmbehandlung') : value === 'other' ? text('health.uxParasiteTreatment', 'Parasitenbehandlung') : text('health.deworming', 'Entwurmung');
 }
 
-export function conditionLabel(value: HealthCondition['kind']): string {
-  return value === 'diagnosis' ? 'Diagnose' : value === 'allergy' ? 'Allergie' : 'Unverträglichkeit';
+export function conditionLabel(value: HealthCondition['kind'], text: TimelineText = fallbackText): string {
+  return value === 'diagnosis' ? text('health.recordDiagnosis', 'Diagnose') : value === 'allergy' ? text('health.recordAllergy', 'Allergie') : text('health.recordIntolerance', 'Unverträglichkeit');
 }
