@@ -1,6 +1,6 @@
 # Agent Session Handoff
 
-> Aktuellster Handoff: **Codex (2026-10-07), T-64 Android Native-Vorbereitung integriert**. Shared production state: `docs/agent/ANYVO_MASTER_STATUS.md`.
+> Aktuellster Handoff: **Codex (2026-10-08), T-65 Tracking Phase 1 separat veröffentlicht; GPS/Shelly lokal geprüft**. Shared production state: `docs/agent/ANYVO_MASTER_STATUS.md`.
 > Der Block zwischen den AUTO-GENERATED-Markern wird von `scripts/agent-handoff.mjs` erzeugt —
 > **nicht manuell** bearbeiten. Alles ausserhalb der Marker wird von den Agenten **manuell** gepflegt.
 >
@@ -8,7 +8,17 @@
 > **Repository state > Git state > Handoff documentation > Agent assumptions.**
 > Der tatsächliche Repository-Zustand hat immer Vorrang vor dieser Doku.
 
-## Current task — T-64 (2026-10-07)
+## Current task — T-65 (2026-10-08)
+
+- Phase 1 integriert: `d807964`, Feature `9a926a7`. Separate Production-OTAs iOS 1.0.4 `f8fb921` / Group `2063bba4…` und Android 1.0.3 `7e0f040` / Group `235b19b1…`, Update-IDs im Master/T-65. Guard, Bundles, Post-check und frische EAS-Abfrage PASS.
+- Geräte-QA und Build49-Background-Abnahme OPEN; kein Push, Build, Store- oder DB-Schritt.
+- GPS/Shelly-Code und eigener Bericht ausschließlich uncommitted im Feature-Worktree `anyvo-feature-tracking-gps-quality-shelly` auf `d807964`. Lokale Tests grün, keine neue Auslieferung. Android-native Änderungen brauchen passenden Build; Hardware-/Locked-screen-Nachweis OPEN.
+- Continuity-Tabelle ist unbeschlossen. Keine neuen Gaps, Segmentierungen, Distanz-/Score-/Recovery-Regeln ableiten.
+- Nächster Schritt: lokales Feature reviewen; Android-Kompilierung/kompatibles Binary und GPS-/Shelly-Hardwaretests separat beauftragen; Continuity-Semantik entscheiden. Watch/GNSS-Geräte/Planer später.
+- Release-Snapshots nicht zurück nach main mergen; bei neuer OTA frische EAS-Baseline/Ancestry prüfen. Keine laufenden Writer oder fremden Änderungen überschreiben.
+- Report: `docs/agent/tasks/T-65.md`; nächste allgemeine TASK-ID T-66.
+
+## Historical handoff — T-64 (2026-10-07)
 
 - **Completed:** Android-Native-Vorbereitung 1.0.4 (45), optionales BLE-Feature und TaskManager-Patch-Verifikation; Produktcommit `2316e7cfd06149f0b0a7a1b2baa04430b88b867f` in main per freigegebenem Fast-forward integriert.
 - **Tests:** 4 Suites / 32 Tests PASS, Typecheck und ESLint PASS, Config-Introspection PASS; vor/nach BLE-Fix nur BLE-required true → false, iOS-ModResults identisch.
@@ -30,7 +40,7 @@
 
 <!-- AUTO-GENERATED:START -->
 
-Generated: 2026-10-07T21:45:59.151Z
+Generated: 2026-10-08T08:03:05.867Z
 Agent: codex
 Branch: main
 
@@ -42,19 +52,20 @@ M docs/agent/ACTIVE_WORK.md
  M docs/agent/SESSION_HANDOFF.md
  M docs/agent/TASKS.md
  M docs/agent/WORK_LOG.md
- M docs/agent/tasks/T-64.md
+ M docs/agent/tasks/TRACKING-END-DETECTION-PHASE1.md
+?? docs/agent/tasks/T-65.md
 ```
 
 ### Diff stat
 ```
-docs/agent/ACTIVE_WORK.md         |  4 ++--
- docs/agent/ANYVO_MASTER_STATUS.md |  8 ++++++++
- docs/agent/PLATFORM_STATUS.md     | 16 ++++++++++++----
- docs/agent/SESSION_HANDOFF.md     | 14 ++++++++++++--
- docs/agent/TASKS.md               |  9 +++++++++
- docs/agent/WORK_LOG.md            |  8 ++++++++
- docs/agent/tasks/T-64.md          |  5 ++---
- 7 files changed, 53 insertions(+), 11 deletions(-)
+docs/agent/ACTIVE_WORK.md                         | 12 ++++-
+ docs/agent/ANYVO_MASTER_STATUS.md                 | 63 ++++++++++++++++++-----
+ docs/agent/PLATFORM_STATUS.md                     | 58 ++++++++++++++++-----
+ docs/agent/SESSION_HANDOFF.md                     | 14 ++++-
+ docs/agent/TASKS.md                               |  8 +++
+ docs/agent/WORK_LOG.md                            |  7 +++
+ docs/agent/tasks/TRACKING-END-DETECTION-PHASE1.md |  2 +
+ 7 files changed, 134 insertions(+), 30 deletions(-)
 ```
 
 ### Modified files
@@ -65,21 +76,21 @@ docs/agent/PLATFORM_STATUS.md
 docs/agent/SESSION_HANDOFF.md
 docs/agent/TASKS.md
 docs/agent/WORK_LOG.md
-docs/agent/tasks/T-64.md
+docs/agent/tasks/TRACKING-END-DETECTION-PHASE1.md
 ```
 
 ### Untracked files
 ```
-(leer)
+docs/agent/tasks/T-65.md
 ```
 
 ### Recent commits
 ```
+d807964 merge(tracking): integrate phase 1 end detection fixes
+9a926a7 fix(tracking): stabilize end detection and final object handling
+bd94ff2 docs(agent): record Android native preparation integration
 2316e7c fix(android): prepare native 1.0.4 build with optional BLE
 cd8cd82 docs(agent): add active work and platform parity overview
-41e5173 chore(repo): ignore local workspaces and QA artifacts
-9417ec0 fix(db): restore canonical heat schema migration
-f74ec87 fix(tracking): render adaptive distance scale reliably
 ```
 
 ### Runtime

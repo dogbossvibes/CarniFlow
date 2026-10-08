@@ -4,7 +4,7 @@
 Canonical source of truth for current ANYVO product, engineering, release and
 open-work status.
 
-**Last verified:** 2026-10-07 · fresh EAS query: iOS Runtime 1.0.3 → `968884f` (group `455dc249…`, unchanged), iOS Runtime 1.0.4 → `fd0c727` (group `79175057…`), Android Runtime 1.0.3 → `e88371d` (group `168ae23f…`, subscription hotfix; guarded post-check PASS).
+**Last verified:** 2026-10-08 · fresh EAS/post-check: iOS 1.0.4 → `f8fb921` / `2063bba4…`; Android 1.0.3 → `7e0f040` / `235b19b1…`; iOS 1.0.3 → `968884f` / `455dc249…` unchanged. Phase 1 published, device acceptance OPEN. GPS/Shelly local only.
 
 ## Rules
 
@@ -57,6 +57,40 @@ full GPS / motion / corner diagnostics behind it.
   worktrees are never automatically a release source of truth.
 - A future **1.0.3 hotfix branch must contain the runtime-aware guard** (`23e5df6` + `54a74c4`);
   branches of the old 1.0.3 line (e.g. `968884f`) still carry the old guard.
+
+## Tracking Phase 1 — integriert und separat veröffentlicht (2026-10-08)
+
+End-/Gegenstandsübergänge, Grace und Run-/Voice-Isolation sind in main integriert
+(`d807964e05ef26ddc807dc6664a06410d8c98778`, Feature `9a926a7`). Geräteabnahme bleibt **OPEN**.
+
+| Plattform / Runtime | Production-Commit | Update Group | Plattform-Update-ID |
+|---|---|---|---|
+| iOS / 1.0.4 | `f8fb921f99cc4aff9cc9a5a460a6015e63b1cd37` | `2063bba4-8e92-456a-b12e-f8dfaee2a270` | `01a11a6e-792b-726b-b066-ac95fc46587e` |
+| Android / 1.0.3 | `7e0f0406678bd2fbe8572ef4a23ff1af147d7343` | `235b19b1-f7a4-4bf9-9764-a25480abc338` | `01a11a75-5a2b-7abf-ba8e-fb923a8841f8` |
+
+Channel/Branch/Environment jeweils `production`. Separate kompatible Snapshots
+erhalten die jeweilige frisch geprüfte Plattform-Baseline und übernehmen nur die
+elf Phase-1-Dateien. Native Konfiguration, Dependencies und Module sind zur jeweiligen
+Baseline identisch. T-64-Native-Konfiguration und weitere main-Änderungen werden
+dadurch nicht zusätzlich ausgeliefert. Keine vollständige main-Parität behauptet.
+
+Frische EAS-Lesung, Environment-Guard, Ancestry, zweite Lesung, gemeinsamer Lock,
+plattformbezogener Export, tatsächliche Bundle-Prüfung und Publish/Post-check **PASS**.
+iOS 1.0.3 bleibt `968884f` / Group `455dc249-fb4f-4868-a646-67d88c1ae7cb`.
+Integration: 213 Suites / 2611 Tests PASS; je Release 8 Suites / 103 Tests PASS;
+TypeScript PASS, ESLint 0 Fehler / 3 bestehende Warnungen, diff-check PASS.
+Zahlen überlappen. Kein Push, neuer nativer Build, Store-Schritt oder DB-Eingriff.
+
+GPS-/GNSS-Qualität und Shelly-Diagnose sind separat **lokal implementiert und
+geprüft, uncommitted / nicht integriert / nicht veröffentlicht** in
+`anyvo-feature-tracking-gps-quality-shelly`, Branch
+`feat/tracking-gps-quality-shelly-diagnostics`, Basis `d807964`.
+Qualität wird additiv erhalten; Android-native Emission und Status-Trennung brauchen
+ein neues passendes Binary. Shelly ist ein Vordergrund-Diagnoseprototyp ohne
+Tracking-Aktionen. Continuity-Empfehlungen bleiben **unbeschlossen**.
+Native Kompilierung, Hardwareempfang, Locked-screen- und Build49-Geräteabnahme **OPEN**.
+Details: `tasks/T-65.md`; lokaler Featurebericht `tasks/TRACKING-GPS-QUALITY-SHELLY.md`.
+
 
 ## Android Native preparation integrated — T-64 (2026-10-07)
 
@@ -111,25 +145,25 @@ post-publish verification (see `docs/DEVELOPMENT_WORKFLOW.md` §8).
 
 ## Current Production Baseline
 
-Snapshot as of 2026-10-07 — verify against EAS before relying on it. Two iOS runtimes and
+Snapshot as of 2026-10-08 — verify against EAS before relying on it. Two iOS runtimes and
 Android runtime 1.0.3 are live in parallel on EAS branch `production`; each platform/runtime receives its own OTAs.
 
-### Android Runtime 1.0.3 — subscription hotfix (T-63)
+### Android Runtime 1.0.3 — Tracking Phase 1 on subscription hotfix (T-65 / T-63)
 
 | Item | Value |
 |---|---|
-| Production commit / branch | `e88371dc49233853162e87d8114c9f9d38a112d9` / `codex/android-subscription-release-1.0.3` |
+| Production commit / branch | `7e0f0406678bd2fbe8572ef4a23ff1af147d7343` / `release/tracking-end-android-103-2026-10-08` |
 | Channel / EAS branch / environment | `production` / `production` / `production` |
-| Update Group / Android Update ID | `168ae23f-676f-455c-8f15-bb475910d83e` / `01a117b7-e024-7a59-9d60-ade29e2b6b01` |
-| Previous Android OTA | `68b23f1`, group `917f8312-8085-4d9a-ba64-d3f8972a9d21` |
-| Product change | Recognize subscription:base-plan identifiers in paywall, membership, trial selection and restore; remove stale CHF9 paid-price fallback |
-| Scope | Existing Android production app/features/plugins/config snapshot preserved; six product/test paths differ from previous Android baseline |
+| Update Group / Android Update ID | `235b19b1-f7a4-4bf9-9764-a25480abc338` / `01a11a75-5a2b-7abf-ba8e-fb923a8841f8` |
+| Previous Android OTA | `e88371d`, group `168ae23f-676f-455c-8f15-bb475910d83e` (T-63 subscription hotfix, preserved) |
+| Product change | Phase-1 end/final-object/grace/lifecycle fixes; existing T-63 subscription fix preserved |
+| Scope | Eleven Phase-1 files versus the T-63 baseline; native/dependency/config and subscription paths unchanged |
 | Canonical main | Feature `3979246`, workflow-approval test repair `c302bce`; runtime compatibility snapshot is release-only and must never be merged into main |
-| Verification | Full run + repaired-suite rerun: all 326 suites / 3968 distinct tests verified; tsc PASS; ESLint 0 errors (one preexisting membership warning); Android export/actual-bundle checks and guarded publish/post-check PASS |
+| Verification | T-65: release 8/103 and integrated main 213/2611 PASS; tsc PASS; ESLint 0 errors / 3 existing warnings; export/actual-bundle and guarded publish/post-check PASS. Historical T-63 checks in its report |
 | Device acceptance | **OPEN** — verify displayed store prices, enabled purchase buttons, Google purchase sheet and subscription access |
 | Native / store release | No new build or submission. User reports the Google Play app is newly live; exact store versionCode/rollout was not independently checked (other chat login blocked) |
 
-Report: `docs/agent/tasks/T-63.md`. iOS runtime 1.0.4/latest group was unchanged in the guarded post-check.
+Reports: `docs/agent/tasks/T-65.md` (current), `docs/agent/tasks/T-63.md` (historical). iOS 1.0.4 remained on its new `2063bba4…` group during the guarded Android post-check.
 
 ### iOS Runtime 1.0.3 (Store build 1.0.3 (48)) — unchanged
 
@@ -139,7 +173,7 @@ Report: `docs/agent/tasks/T-63.md`. iOS runtime 1.0.4/latest group was unchanged
 | Production HEAD (iOS, runtime 1.0.3) | `968884f712544f45b35ebf8900ab64332b45ff7d` (`feat(tracking): add dog colors to track overlays`) |
 | Update Group / iOS update ID | `455dc249-fb4f-4868-a646-67d88c1ae7cb` / `01a10cd3-9696-7554-976d-442010037a09` |
 | Published | 2026-10-05 16:09:15 UTC |
-| EAS verification | **PASS** 2026-10-06 — newest runtime-1.0.3 group, iOS only, gitCommitHash `968884f` |
+| EAS verification | **PASS** fresh 2026-10-08 — newest runtime-1.0.3 group, iOS only, gitCommitHash `968884f`, unchanged |
 
 Contains, on top of `34e6185`: open-track continuation/recovery fixes, resting background
 UX, hold-to-abort, Live Activity V2 JS (V1 fallback on 1.0.3 binaries), Multi-Dog track
@@ -155,8 +189,8 @@ overlays (`c904955`) and per-dog overlay colors (`968884f`).
 | OTA (iOS only, runtime 1.0.4) | `04cad8da58c7b86ee0b808d0e01964e3341cca2a` — adaptive track distance scale, live distance, distance to next article |
 | Update Group / iOS update ID | `fcd879d9-b307-4cac-87e8-2a90f3d7f727` / `01a1114f-b484-724d-864f-87cebe27f239` (published 2026-10-06 13:03:18 UTC via guard) |
 | Device verification | **PASS** (owner, 1.0.4 (49) + OTA): quick-start widget, Live Activity V2, Dynamic Island, track distance scale |
-| OTA (iOS only, runtime 1.0.4) — **current since 2026-10-07** | `fd0c727a4d252e531dc95ad9592040265cf12418` — background lay hotfix: lay recording keeps processing/persisting with screen off (`b6bc114` diagnostics, `43ab3a9` session-scoped lay processor, `fd0c727` background lay fixes by session); supersedes `04cad8d` (contains it) |
-| Update Group / iOS update ID (current) | `79175057-4da7-4314-bf7f-ae7f0ccd738b` / `01a115cd-3e88-7611-b4bd-8321716cba59` (published 2026-10-07 via guard, baseline `fcd879d9…` ancestry PASS) |
+| OTA (iOS only, runtime 1.0.4) — **current since 2026-10-08** | `f8fb921f99cc4aff9cc9a5a460a6015e63b1cd37` — Tracking Phase 1; background-lay baseline `fd0c727` retained |
+| Update Group / iOS update ID (current) | `2063bba4-8e92-456a-b12e-f8dfaee2a270` / `01a11a6e-792b-726b-b066-ac95fc46587e` (2026-10-08; guarded publish/post-check PASS) |
 | Background screen-off device QA | **PASS** (owner-reported, pre-integration on hotfix build; screen off / pocket). Post-OTA smoke test on Build 49: pending |
 
 ### Production OTA guard (on `main`)
@@ -165,7 +199,7 @@ overlays (`c904955`) and per-dog overlay colors (`968884f`).
 - Initial runtime hardening **PASS** (`54a74c4`): `--initial-runtime-release` only with `--confirm`, only without an existing group for that runtime, same-platform fallback baseline, "FIRST OTA FOR RUNTIME" block, post-publish runtime mapping check.
 - **103/103** guard tests PASS; real dry-runs 1.0.3 (baseline `968884f`) and 1.0.4 (baseline `04cad8d`) PASS.
 
-Android is unchanged and **not** part of this baseline (parity analysis separate).
+The 2026-10-08 Phase-1 releases target iOS 1.0.4 and Android 1.0.3 separately. They preserve each platform baseline; full main/native parity remains a separate task.
 
 ### Historical snapshot 2026-10-04 (superseded by the tables above)
 
@@ -423,6 +457,7 @@ Keine Schwellenänderung ohne neue Feldbelege.
 
 | Date | Change | Evidence |
 |---|---|---|
+| 2026-10-08 | T-65: Tracking Phase 1 committed/integrated and published separately to iOS 1.0.4 and Android 1.0.3. GPS/Shelly locally implemented/tested only. Continuity and device QA OPEN. | Groups `2063bba4…` / `235b19b1…`; guarded post-check + fresh EAS PASS; report T-65 |
 | 2026-10-07 | T-63 Android-only subscription hotfix published for runtime 1.0.3; canonical main contains the feature fix and workflow-test repair. Device purchase QA open. | Group `168ae23f-676f-455c-8f15-bb475910d83e`, Android update `01a117b7-e024-7a59-9d60-ade29e2b6b01`, release `e88371dc49233853162e87d8114c9f9d38a112d9`; guarded publish/post-check PASS; report T-63 |
 | 2026-10-03 | Master status created. Production baseline set to `b780603`; iOS OTA `01a10074…` device-verified (PASS). | OTA group `ae879d82…`; commit chain above; owner device verification |
 | 2026-10-06 | `main` defined as canonical Production/Release line (fast-forward `e90df20` → `54a74c4`, no merge commit). iOS 1.0.4 (49) built + uploaded (not store-released); device PASS widget / Live Activity V2 / Dynamic Island / distance scale; OTA 1.0.4 `fcd879d9` (`04cad8d`). Runtime 1.0.3 unchanged on `968884f`. Guard runtime isolation + initial-runtime hardening (103/103). | Fresh EAS queries of groups `455dc249…` and `fcd879d9…`; EAS build `994f04ba…`; submission `02ea21d2…`; owner device test |

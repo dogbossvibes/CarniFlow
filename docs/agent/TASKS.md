@@ -11,6 +11,14 @@
 > Priorität bei Widerspruch: Repository state > Git state > Handoff-Doku.
 > Stand: 2026-08-05 · Branch `feat/track-module-rewrite`, HEAD `2d9e1cc` (0 Commits vor `origin`, gepusht).
 
+## Update 2026-10-08 (Codex) — T-65 Tracking Phase 1 separat veröffentlicht
+
+- **T-65:** DONE(code integrated + platform OTAs published); Geräte-QA/Build49-Abnahme OPEN. Report: `docs/agent/tasks/T-65.md`.
+- main `d807964` enthält Feature `9a926a7` und T-64. Production iOS 1.0.4 `f8fb921` / `2063bba4…`; Android 1.0.3 `7e0f040` / `235b19b1…`. Native Snapshots unverändert, andere Features nicht mit ausgeliefert.
+- 213/2611 auf main, je Release 8/103 PASS; TypeScript, lint ohne Fehler, Bundle-/Guard-/Post-check PASS. Zahlen überlappen.
+- GPS/Shelly ausschließlich lokal uncommitted im separaten Feature-Worktree; Continuity unbeschlossen; kein nativer Build/Store/Push/DB-Schritt.
+- **Next free general TASK-ID: T-66.**
+
 ## Update 2026-10-07 (Codex) — T-64 Android Native-Vorbereitung integriert
 
 - **T-64:** DONE(code integrated), nativer Build/Store-/Geräteabnahme OPEN. Report: `docs/agent/tasks/T-64.md`.

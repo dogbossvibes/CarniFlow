@@ -1,13 +1,47 @@
 # ANYVO – Platform Status
 
-Stand: **2026-10-07 (Europe/Zurich)**. Kanonische Übersicht für Code-, Native- und Release-Parität; Produkt-/Arbeitsgesamtstatus bleibt [ANYVO_MASTER_STATUS.md](ANYVO_MASTER_STATUS.md).
+Stand: **2026-10-08 (Europe/Zurich)**. Kanonische Übersicht für Code-, Native- und Release-Parität; Produkt-/Arbeitsgesamtstatus bleibt [ANYVO_MASTER_STATUS.md](ANYVO_MASTER_STATUS.md).
 
 - Git `main` ist die kanonische Code-Linie für die gesamte ANYVO-App (Hundeverwaltung und Alltag, Training/Tracking, Gesundheit, Dokumente, Termine, Medien und Trainer Connect).
 - Native Store-Builds und OTA-Bundles können zeitweise hinter `main` liegen.
 - EAS Branch/Channel `production` != Git `main`. EAS belegt veröffentlichte OTA-Bundles; Store-Konsolen belegen Store-Freigabe und Rollout; Device QA belegt tatsächliches Geräteverhalten.
 - Code-, Native- und Release-Parität werden getrennt dokumentiert. Plattformbezogene Funktionen müssen nicht identisch aussehen.
 
-**Verifikationsgrenze:** In dieser Prüfung wurden nur lokales Git, Config und Repo-Dokumentation gelesen. Kein frischer Remote-, EAS-, Store- oder Geräteabruf. `LOKAL VERIFIZIERT` = hier direkt geprüft; `DOKUMENTIERT` = lokaler Bericht mit Datum, hier nicht unabhängig erneut geprüft; `UNKNOWN` = kein ausreichender aktueller Beleg; `OPEN` = ausstehende Prüfung/Arbeit; `BLOCKED` = explizite Voraussetzung fehlt. Dokumentierte Releases sind immer **nicht frisch verifiziert**.
+**Verifikationsgrenze:** T-65 (2026-10-08) hat Git, Production-Environment, Plattform-Bundles und EAS frisch geprüft; siehe Update oben. Store-/Geräteabruf und native Kompilierung bleiben OPEN. Ältere Tabellenzeilen behalten ihren ausdrücklich historischen Belegstand. `LOKAL VERIFIZIERT` = hier direkt geprüft; `DOKUMENTIERT` = lokaler Bericht mit Datum, hier nicht unabhängig erneut geprüft; `UNKNOWN` = kein ausreichender aktueller Beleg; `OPEN` = ausstehende Prüfung/Arbeit; `BLOCKED` = explizite Voraussetzung fehlt. Dokumentierte Releases sind immer **nicht frisch verifiziert**.
+
+## Plattform-Update: Tracking Phase 1 — integriert und separat veröffentlicht (2026-10-08)
+
+End-/Gegenstandsübergänge, Grace und Run-/Voice-Isolation sind in main integriert
+(`d807964e05ef26ddc807dc6664a06410d8c98778`, Feature `9a926a7`). Geräteabnahme bleibt **OPEN**.
+
+| Plattform / Runtime | Production-Commit | Update Group | Plattform-Update-ID |
+|---|---|---|---|
+| iOS / 1.0.4 | `f8fb921f99cc4aff9cc9a5a460a6015e63b1cd37` | `2063bba4-8e92-456a-b12e-f8dfaee2a270` | `01a11a6e-792b-726b-b066-ac95fc46587e` |
+| Android / 1.0.3 | `7e0f0406678bd2fbe8572ef4a23ff1af147d7343` | `235b19b1-f7a4-4bf9-9764-a25480abc338` | `01a11a75-5a2b-7abf-ba8e-fb923a8841f8` |
+
+Channel/Branch/Environment jeweils `production`. Separate kompatible Snapshots
+erhalten die jeweilige frisch geprüfte Plattform-Baseline und übernehmen nur die
+elf Phase-1-Dateien. Native Konfiguration, Dependencies und Module sind zur jeweiligen
+Baseline identisch. T-64-Native-Konfiguration und weitere main-Änderungen werden
+dadurch nicht zusätzlich ausgeliefert. Keine vollständige main-Parität behauptet.
+
+Frische EAS-Lesung, Environment-Guard, Ancestry, zweite Lesung, gemeinsamer Lock,
+plattformbezogener Export, tatsächliche Bundle-Prüfung und Publish/Post-check **PASS**.
+iOS 1.0.3 bleibt `968884f` / Group `455dc249-fb4f-4868-a646-67d88c1ae7cb`.
+Integration: 213 Suites / 2611 Tests PASS; je Release 8 Suites / 103 Tests PASS;
+TypeScript PASS, ESLint 0 Fehler / 3 bestehende Warnungen, diff-check PASS.
+Zahlen überlappen. Kein Push, neuer nativer Build, Store-Schritt oder DB-Eingriff.
+
+GPS-/GNSS-Qualität und Shelly-Diagnose sind separat **lokal implementiert und
+geprüft, uncommitted / nicht integriert / nicht veröffentlicht** in
+`anyvo-feature-tracking-gps-quality-shelly`, Branch
+`feat/tracking-gps-quality-shelly-diagnostics`, Basis `d807964`.
+Qualität wird additiv erhalten; Android-native Emission und Status-Trennung brauchen
+ein neues passendes Binary. Shelly ist ein Vordergrund-Diagnoseprototyp ohne
+Tracking-Aktionen. Continuity-Empfehlungen bleiben **unbeschlossen**.
+Native Kompilierung, Hardwareempfang, Locked-screen- und Build49-Geräteabnahme **OPEN**.
+Details: `tasks/T-65.md`; lokaler Featurebericht `tasks/TRACKING-GPS-QUALITY-SHELLY.md`.
+
 
 ## Android Native-Vorbereitung — Update 2026-10-07
 
@@ -23,7 +57,7 @@ VersionCode 45 vor Build gegen dann aktuelle Play-/EAS-Werte prüfen. Details: [
 |---|---|
 | Branch | `main` — LOKAL VERIFIZIERT |
 | Worktree | `/Users/moyo/canisflow-worktrees/anyvo-main` — LOKAL VERIFIZIERT |
-| Code-Integration | `2316e7cfd06149f0b0a7a1b2baa04430b88b867f` — T-64, LOKAL VERIFIZIERT; nachfolgender Status-Doku-Commit separat, aktuelles HEAD per Git abfragen |
+| Code-Integration | `d807964e05ef26ddc807dc6664a06410d8c98778` — T-65, LOKAL VERIFIZIERT; T-64 erhalten, Status-Doku-Commit separat |
 | Working tree vor Erstellung | Nur `?? docs/agent/ACTIVE_WORK.md`; vorhandene fremde Doku, unverändert erhalten |
 | Lokaler Remote-Tracking-Ref | `origin/main` = `41e51734053fbc9c04c5de527edd6bf464cce66e` — lokal gelesen; main enthält weitere lokale Commits. Kein Fetch oder Push in T-64 |
 | Tatsächlicher Remote-Stand | **UNKNOWN / nicht frisch verifiziert**; kein Fetch oder Remote-Abruf. Der lokale Ref beweist keinen aktuellen Serverstand |
@@ -46,15 +80,15 @@ VersionCode 45 vor Build gegen dann aktuelle Play-/EAS-Werte prüfen. Details: [
 
 ### OTA
 
-Alle folgenden Stände: EAS Branch/Channel `production`; hier nicht frisch abgefragt.
+EAS Branch/Channel `production`; aktuelle Zielruntimes frisch geprüft 2026-10-08, historische Vorgänger entsprechend gekennzeichnet.
 
 | Runtime | Zuletzt dokumentierte Group / Commit | Beleg / Inhalt |
 |---|---|---|
-| `1.0.4` | `79175057-4da7-4314-bf7f-ae7f0ccd738b` / `fd0c727a4d252e531dc95ad9592040265cf12418` | Master-Status + TASKS, 2026-10-07: Guard/Post-check PASS dokumentiert; Background Lay bei ausgeschaltetem Bildschirm, sessiongebundene Verarbeitung/Persistenz |
+| `1.0.4` | `2063bba4-8e92-456a-b12e-f8dfaee2a270` / `f8fb921f99cc4aff9cc9a5a460a6015e63b1cd37` | T-65, 2026-10-08: frischer Guard/Publish/Post-check PASS; Phase 1 auf erhaltener Background-Lay-Baseline |
 | `1.0.4`, vorherige OTA | `fcd879d9-b307-4cac-87e8-2a90f3d7f727` / `04cad8da58c7b86ee0b808d0e01964e3341cca2a` | Master-Status, 2026-10-06: adaptiver Fährtenmaßstab, Live-Distanz, Distanz zum nächsten Gegenstand; in obiger OTA enthalten |
 | `1.0.3` | `455dc249-fb4f-4868-a646-67d88c1ae7cb` / `968884f712544f45b35ebf8900ab64332b45ff7d` | Veröffentlichung 2026-10-05, EAS-Prüfung 2026-10-06 / unverändert laut Snapshot 2026-10-07; Recovery, Ruhe-UX, Hold-to-abort, Multi-Dog-Overlays/Farben; Live Activity V2 JS mit V1-Fallback im älteren Binary |
 
-**OPEN:** Frischer EAS-Abgleich und Geräte-Update-ID. Die dokumentierte 1.0.4-OTA liegt vor den neuen `main`-Commits für Subscription-Matching (`3979246`), Accuracy-aware Search (`6b103c1`) und zuverlässige Maßstabdarstellung (`f74ec87`). Deren iOS-Auslieferung ist hier nicht belegt.
+**OPEN:** Geräte-Update-ID und Geräteabnahme; EAS-Abgleich 2026-10-08 bestanden. Die neue 1.0.4-OTA liefert ausschließlich Phase 1 auf bisheriger Baseline und enthält weiterhin nicht die zusätzlichen `main`-Commits für Subscription-Matching (`3979246`), Accuracy-aware Search (`6b103c1`) und zuverlässige Maßstabdarstellung (`f74ec87`). Deren iOS-Auslieferung ist hier nicht belegt.
 
 ### QA
 
@@ -85,12 +119,12 @@ EAS-Config: `appVersionSource = local`, Production `autoIncrement = false` — [
 |---|---|
 | Plattform / Runtime | Android / `1.0.3` |
 | Channel / EAS Branch / Environment | `production` / `production` / `production` |
-| Group | `168ae23f-676f-455c-8f15-bb475910d83e` |
-| Commit | `e88371dc49233853162e87d8114c9f9d38a112d9` |
-| Android Update ID | `01a117b7-e024-7a59-9d60-ade29e2b6b01` |
-| Inhalt | Subscription-/Base-Plan-ID-Matching in Paywall, Membership, Trial und Restore; veralteten CHF9-Preisfallback entfernt |
-| Verifikation | **DOKUMENTIERT, 2026-10-07**, [T-63](tasks/T-63.md): Guard-Publish/Post-check und Bundle-Prüfung PASS; hier nicht unabhängig erneut geprüft |
-| Vorherige OTA | Group `917f8312-8085-4d9a-ba64-d3f8972a9d21`, Commit `68b23f186ca0f527dc04cf7426d80736d74a7ff2` — T-63 |
+| Group | `235b19b1-f7a4-4bf9-9764-a25480abc338` |
+| Commit | `7e0f0406678bd2fbe8572ef4a23ff1af147d7343` |
+| Android Update ID | `01a11a75-5a2b-7abf-ba8e-fb923a8841f8` |
+| Inhalt | Phase-1-End-/Gegenstands-/Grace-/Lifecycle-Fixes; vorhandener T-63-Subscription-Fix erhalten |
+| Verifikation | **FRISCH VERIFIZIERT, 2026-10-08**, [T-65](tasks/T-65.md): Guard, Bundles, Publish/Post-check und anschließende EAS-Abfrage PASS |
+| Vorherige OTA | Group `168ae23f-676f-455c-8f15-bb475910d83e`, Commit `e88371dc49233853162e87d8114c9f9d38a112d9` — T-63, erhalten |
 
 T-63 bewahrt den bestehenden Android-1.0.3-Bundle-/Config-Stand und übernimmt gezielt den Subscription-Fix. Das ist **keine vollständige Auslieferung des aktuellen main**. Der releasebezogene Runtime-Snapshot darf laut T-63 nicht in main integriert werden. Historischer Parity-Commit `1d473a4fbea723dfc272cd1bd8de0e7267f071a1` ist lokal vorhanden; sein Name beweist keine heutige Parität.
 

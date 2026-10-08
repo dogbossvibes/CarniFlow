@@ -3,6 +3,13 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-10-08 — Codex (T-65 Tracking Phase 1, GPS-/Shelly-Fortsetzung)
+
+- Früheren Tool-Block über regulär genehmigte Eskalationen aufgehoben. Feature `9a926a7`, autorisierter main-Merge `d807964`; fremde Arbeit erhalten.
+- Zwei isolierte kompatible Phase-1-Snapshots veröffentlicht: iOS 1.0.4 `2063bba4…` / `f8fb921`, Android 1.0.3 `235b19b1…` / `7e0f040`. Frische EAS-/Guard-/Bundle-/Post-check-Prüfungen bestanden; ältere iOS 1.0.3 unverändert.
+- GPS-Qualitätserhaltung, Android-native Qualitäts-/Status-Ergänzung und Shelly-Foreground-Diagnose ausschließlich lokal im separaten Feature-Worktree umgesetzt/geprüft, uncommitted. Neue Regeln für Continuity nicht beschlossen.
+- Geräte-QA, Build49-Background-Abnahme, native Kompilierung und Shelly-Hardware/Locked-screen bleiben OPEN. Kein Push, nativer Build, Store- oder DB-Schritt. Eigene Berichte/Master/Handoff aktualisiert.
+
 ## 2026-10-07 — Codex (T-64 Android Native-Vorbereitung integriert)
 
 - Nutzer hat Commit und Integration ausdrücklich freigegeben. Produktcommit `2316e7cfd06149f0b0a7a1b2baa04430b88b867f`; main per Fast-forward von `cd8cd827` integriert.

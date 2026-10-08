@@ -3,7 +3,7 @@
 ## Canonical
 - Branch `main`
 - Worktree `/Users/moyo/canisflow-worktrees/anyvo-main`
-- Produktintegration `2316e7cfd06149f0b0a7a1b2baa04430b88b867f` (T-64, lokal geprüft am 2026-10-07); nachfolgende Doku-Commits separat, HEAD frisch per Git abfragen
+- Produktintegration `d807964e05ef26ddc807dc6664a06410d8c98778` (Tracking Phase 1, T-65, geprüft am 2026-10-08; T-64 enthalten); nachfolgende Doku-Commits separat, HEAD frisch per Git abfragen
 - `main` = kanonische Code-/Production-Linie.
 - EAS `production` != Git `main`; der tatsächlich live veröffentlichte Stand wird in EAS geprüft.
 - Produkt-/Release-Gesamtstatus: `docs/agent/ANYVO_MASTER_STATUS.md`.
@@ -26,9 +26,17 @@ Konservativ aktuell nur im täglichen Workspace:
 ### TRACKING – End Detection
 - Branch: `fix/tracking-end-detection`
 - Worktree: `/Users/moyo/canisflow-worktrees/anyvo-fix-tracking-end-detection`
-- Status: `Analysis / Implementation pending`
+- Status: `Phase 1 committed/integrated/published; device QA OPEN`
 - ChatGPT: `02 – TRACKING`
 - Codex terminal/session name: `TRACKING-END`
+
+### TRACKING — GPS quality / Shelly diagnostics (local only)
+- Branch: `feat/tracking-gps-quality-shelly-diagnostics`
+- Worktree: `/Users/moyo/canisflow-worktrees/anyvo-feature-tracking-gps-quality-shelly`
+- Basis: `d807964`; lokale Produkt-/Teständerungen und eigener Bericht uncommitted.
+- Status: `Locally implemented/tested; review/native compilation/hardware QA OPEN; no integration/release`
+- Continuity bleibt unbeschlossene Produktvorlage. Keine neuen Distanz-/Score-/End-/Gap-Regeln.
+- Separate Phase-1-Release-Snapshots sauber erhalten: `release/tracking-end-ios-104-2026-10-08@f8fb921` und `release/tracking-end-android-103-2026-10-08@7e0f040`. Nicht nach main mergen.
 
 ## Planned next work
 PLAN – keine angelegten oder freigegebenen Branches/Worktrees:

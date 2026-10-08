@@ -1,5 +1,7 @@
 # TRACKING-END — Phase 1: Enderkennung / finaler Gegenstand
 
+> **Fortsetzung 2026-10-08:** Phase 1 committed/in main integriert und separat als iOS-1.0.4-/Android-1.0.3-OTA veröffentlicht. Aktueller Beleg: [T-65](T-65.md). Geräte-/Build49-Abnahme weiterhin OPEN. Die folgenden ursprünglichen Angaben dokumentieren den Stand vom 2026-10-07.
+
 | Feld | Wert |
 |---|---|
 | Task-Zuordnung | `TRACKING-END`, Chat `02 – TRACKING – GPS / Fährten / Analyse`; keine neue T-ID reserviert |
