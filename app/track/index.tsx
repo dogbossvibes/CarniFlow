@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,11 +8,13 @@ import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
-import { getTrackSessionById, deleteTrackSession } from '@/features/tracking/services/trackService';
+import { deleteTrackSession } from '@/features/tracking/services/trackService';
 import { getTrackHistory } from '@/features/tracking/services/trackHistoryService';
 import { markTrainingAsDeleted } from '@/features/training/repositories/localTrainingRepository';
 import { retryFailedSync } from '@/features/sync/services/syncEngine';
-import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
+import { getTrackPreview } from '@/features/tracking/services/trackPreviewService';
+import { projectTrackSketch } from '@/features/tracking/utils/trackSketchGeometry';
+import { resolveTrackOverlayColorKey, trackOverlayColor } from '@/features/tracking/utils/trackOverlayColors';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import {
   FaehrtenHeader, SectionLabel, StatTriple, TrackRow, fmtAge, relDate, type TrackRowData,
@@ -22,7 +24,6 @@ import { GlobalActiveFaehrtenBar } from '@/features/tracking/components/GlobalAc
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { resolveAutoResume } from '@/features/tracking/store/activeFaehrtenModel';
 import { useToast } from '@/components/ui/Toast';
-import type { LatLng } from '@/features/tracking/utils/gpsFilter';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -33,8 +34,8 @@ function toRow(r: any, syncLabel: (state: 'pending' | 'failed') => string): Trac
     surface:   r.surface_types?.[0] ?? 'Fährte',
     date:      relDate(r.session_date ?? r.created_at),
     distanceM: r.distance_meters ?? null,
-    angles:    r.corners_total ?? 0,
-    objects:   r.articles_total ?? 0,
+    angles:    r.corners_total ?? null,
+    objects:   r.articles_total ?? null,
     age:       fmtAge(r.lying_time_minutes),
     score:     trackScore(r),
     syncState,
@@ -62,53 +63,64 @@ export default function TrackOverviewScreen() {
     const { target } = resolveAutoResume(useActiveFaehrten.getState().list());
     if (target) router.replace(target as never);
   }, [faehrtenHydrated, router]);
-  const { dogs } = useDogs();
+  const { dogs, refresh: refreshDogs } = useDogs();
+  useFocusEffect(useCallback(() => { void refreshDogs(); }, [refreshDogs]));
 
   const [dogId, setDogId]   = useState<string | null>(null);
-  const [rows, setRows]     = useState<any[]>([]);
-  const [hero, setHero]     = useState<any | null>(null);
+  const [storedRows, setRows]     = useState<any[]>([]);
+  const [hero, setHero]     = useState<Awaited<ReturnType<typeof getTrackPreview>>>(null);
+  const loadVersion = useRef(0);
   const [loading, setLoading] = useState(true);
   const { showToast, toast } = useToast();
 
+  const [loadedScope, setLoadedScope] = useState('');
   const activeDog = dogs.find(d => d.id === dogId) ?? dogs[0] ?? null;
   const effectiveDogId = activeDog?.id ?? null;
+  const scope = `${session?.user.id ?? ''}:${effectiveDogId ?? ''}`;
+  const rows = useMemo(() => loadedScope === scope ? storedRows : [], [loadedScope, scope, storedRows]);
+  const scopedHero = loadedScope === scope ? hero : null;
 
   const load = useCallback(async () => {
+    const generation = ++loadVersion.current;
     const uid = session?.user.id;
-    if (!uid) { setLoading(false); return; }
+    setRows([]); setHero(null);
+    if (!uid || !effectiveDogId) { setLoading(false); return; }
     setLoading(true);
-    // Remote + lokale (SQLite) Fährten zusammenführen → lokale pending/failed sind
-    // sofort sichtbar; ein Remote-Fehler verdeckt sie nicht (getTrackHistory-Fallback).
-    const merged = (await getTrackHistory(uid)).filter(r => r.status === 'completed');
-    const mine = effectiveDogId ? merged.filter(r => r.dog_id === effectiveDogId) : merged;
-    setRows(mine);
-    // Hero-Detail (echte GPS-Spur) nur für eine bereits synchronisierte Fährte laden
-    // (lokal-only hat noch keine Remote-Zeile → Skizzen-Fallback der Karte).
-    const last = mine[0];
-    if (last && !last.isLocalOnly) { const { data: detail } = await getTrackSessionById(last.id); setHero(detail); }
-    else setHero(null);
-    setLoading(false);
+    try {
+      const mine = (await getTrackHistory(uid)).filter(r => r.status === 'completed' && r.dog_id === effectiveDogId);
+      if (generation !== loadVersion.current) return;
+      setLoadedScope(`${uid}:${effectiveDogId}`);
+      setRows(mine);
+      const last = mine[0];
+      const detail = last ? await getTrackPreview(last.id, effectiveDogId, uid, last.isLocalOnly) : null;
+      if (generation === loadVersion.current) setHero(detail);
+    } finally { if (generation === loadVersion.current) setLoading(false); }
   }, [session?.user.id, effectiveDogId]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load().catch(() => {});
+    return () => { loadVersion.current++; };
+  }, [load]));
 
   // Fährte per Long-Press löschen: erst bestätigen, dann optimistisch entfernen.
   // Auch die LOKALE Kopie ausblenden (markTrainingAsDeleted), sonst würde die Fährte
   // beim nächsten Merge aus SQLite wieder auftauchen. Lokal-only → kein Remote-Delete
   // nötig (funktioniert offline).
   const confirmDelete = useCallback((id: string) => {
+    const version = loadVersion.current;
     const localOnly = !!rows.find(r => r.id === id)?.isLocalOnly;
     Alert.alert('Fährte löschen?', 'Möchtest du diese Fährte wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', [
       { text: 'Abbrechen', style: 'cancel' },
       {
         text: 'Löschen', style: 'destructive',
         onPress: async () => {
+          if (version !== loadVersion.current) return;
           const prev = rows;
-          const wasHero = hero?.id === id;
+          const wasHero = rows[0]?.id === id;
           setRows(rs => rs.filter(r => r.id !== id));
           if (!localOnly) {
             const { error } = await deleteTrackSession(id);
-            if (error) { setRows(prev); showToast('Fährte konnte nicht gelöscht werden.'); return; }
+            if (error) { if (version === loadVersion.current) setRows(prev); showToast('Fährte konnte nicht gelöscht werden.'); return; }
           }
           await markTrainingAsDeleted(id).catch(() => {});   // lokale Kopie ausblenden
           showToast('Fährte gelöscht');
@@ -116,7 +128,7 @@ export default function TrackOverviewScreen() {
         },
       },
     ]);
-  }, [rows, hero, showToast, load]);
+  }, [rows, showToast, load]);
 
   const syncLabel = useCallback(
     (state: 'pending' | 'failed') => t(state === 'failed' ? 'track.syncFailed' : 'track.syncPending'),
@@ -140,15 +152,10 @@ export default function TrackOverviewScreen() {
   const last = history[0];
   const lastScore = last?.score ?? null;
 
-  // Hero-Karte: echte Punkte aus der letzten Fährte.
-  const heroMap = useMemo(() => {
-    if (!hero) return null;
-    const lay: LatLng[]  = (hero.points ?? []).filter((p: any) => (p.point_type ?? 'lay') === 'lay').map((p: any) => ({ lat: p.latitude, lng: p.longitude }));
-    const run: LatLng[]  = ((hero.runs ?? [])[0]?.run_points ?? []).map((p: any) => ({ lat: p.lat, lng: p.lng }));
-    const markers: MapMarker[] = (hero.markers ?? []).map((m: any) => ({ id: m.id, type: m.marker_type, lat: m.latitude, lng: m.longitude, angleKind: m.angle_kind, material: m.material }));
-    const center = lay[Math.floor(lay.length / 2)] ?? null;
-    return { lay, run, markers, center, hasGps: lay.length > 1 };
-  }, [hero]);
+  const layColor = activeDog ? trackOverlayColor(resolveTrackOverlayColorKey(activeDog.id, activeDog.track_overlay_color_key)) : C.trackPrimary;
+  const geometry = useMemo(() => projectTrackSketch(scopedHero?.lay ?? [], 344, 200), [scopedHero]);
+  const sketchAngles = useMemo(() => (scopedHero?.markers ?? []).filter(m => m.type === 'winkel').map(m => ({ lat: m.lat!, lng: m.lng! })), [scopedHero]);
+  const sketchObjects = useMemo(() => (scopedHero?.markers ?? []).filter(m => m.type === 'gegenstand').map(m => ({ lat: m.lat!, lng: m.lng! })), [scopedHero]);
 
   const startHref = (effectiveDogId ? `/track/legen?dogId=${effectiveDogId}` : '/track/legen') as never;
   const actions: { icon: IconName; label: string; go: () => void; primary?: boolean }[] = [
@@ -183,32 +190,22 @@ export default function TrackOverviewScreen() {
             </View>
           ) : (
             <>
-              <View style={s.mapInner}>
-                {heroMap?.hasGps ? (
-                  <TrackingMap
-                    layPoints={heroMap.lay} runPoints={heroMap.run} markers={heroMap.markers}
-                    currentPosition={heroMap.center} follow={false} mapType="hybrid"
-                  />
-                ) : (
-                  // Kein GPS aufgezeichnet → abstrakte Skizze als Fallback.
-                  <TrackSketch legs={last.angles} objects={last.objects} w={344} h={248} progress={1} />
-                )}
-              </View>
-
-              {/* Overlays */}
-              <View style={[s.glass, s.ovTopLeft]}>
-                <Text style={s.ovCap}>LETZTE FÄHRTE</Text>
-                <Text style={s.ovTitle}>{last.surface}{last.distanceM != null ? ` · ${Math.round(last.distanceM)} m` : ''}</Text>
-              </View>
-              {lastScore != null && (
-                <View style={[s.glass, s.ovTopRight]}>
-                  <Text style={s.ovScore}>{lastScore}</Text>
-                  <Text style={s.ovCap}>PUNKTE</Text>
+              <TouchableOpacity onPress={() => openTrack(last)} accessibilityRole="button" accessibilityLabel={t('track.preview.open')} activeOpacity={0.85}>
+                <View style={s.previewHeader}>
+                  <View style={{ flex: 1, gap: 5 }}>
+                    <Text style={s.ovCap}>{t('track.preview.latest')}</Text>
+                    <Text style={s.ovTitle}>{last.surface}</Text>
+                    <Text style={s.mapEmptyTxt}>{last.date} · {last.distanceM != null && Number.isFinite(last.distanceM) ? `${Math.round(last.distanceM)} m` : '—'}</Text>
+                  </View>
+                  {lastScore != null && <View style={s.scoreBox}><Text style={s.ovScore}>{lastScore}</Text><Text style={s.ovCap}>{t('track.preview.points')}</Text></View>}
+                  <Ionicons name="chevron-forward" size={18} color={C.trackTextMut} />
                 </View>
-              )}
-              <View style={[s.glass, s.ovBottom]}>
-                <StatTriple total={stats.total} avg={stats.avg} streak={stats.streak} />
-              </View>
+                {geometry ? <View style={s.mapInner}>
+                  <TrackSketch points={scopedHero?.lay} angleMarkers={sketchAngles} objectMarkers={sketchObjects} accent={layColor} w={344} h={200} />
+                </View> : <View style={s.noGeometry}><Ionicons name="map-outline" size={28} color={C.trackTextMut} /><Text style={s.mapEmptyTxt}>{t('track.preview.noGps')}</Text></View>}
+                <Text style={s.previewCaption}>{t(geometry?.hasLine ? 'track.preview.recorded' : geometry ? 'track.preview.singlePoint' : 'track.preview.noGpsHint')}</Text>
+              </TouchableOpacity>
+              <View style={s.statsPanel}><StatTriple total={stats.total} avg={stats.avg} streak={stats.streak} /></View>
             </>
           )}
         </View>
@@ -241,7 +238,7 @@ export default function TrackOverviewScreen() {
         ) : (
           <View style={{ gap: 10 }}>
             {history.slice(0, 2).map(h => (
-              <TrackRow key={h.id} h={h} onPress={() => openTrack(h)} onLongPress={() => confirmDelete(h.id)} />
+              <TrackRow key={h.id} h={h} points={h.id === last?.id ? scopedHero?.lay : undefined} accent={layColor} onPress={() => openTrack(h)} onLongPress={() => confirmDelete(h.id)} />
             ))}
           </View>
         )}
@@ -258,17 +255,18 @@ const s = StyleSheet.create({
   content: { paddingHorizontal: 18, paddingBottom: 16 },
 
   globalBar:{ marginBottom: 14 },
-  mapCard: { height: 248, borderRadius: 26, overflow: 'hidden', marginBottom: 14, backgroundColor: C.trackSurface, borderWidth: 1, borderColor: C.trackPrimaryDk + '2A' },
-  mapInner:{ ...StyleSheet.absoluteFillObject },
-  mapEmpty:{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 30 },
+  mapCard: { minHeight: 200, borderRadius: 26, overflow: 'hidden', marginBottom: 14, backgroundColor: C.trackSurface, borderWidth: 1, borderColor: C.trackPrimaryDk + '2A' },
+  mapInner:{ height: 200, marginHorizontal: 12 },
+  previewHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18 },
+  scoreBox: { alignItems: 'center', gap: 3 },
+  noGeometry: { minHeight: 110, alignItems: 'center', justifyContent: 'center', padding: 18, gap: 12 },
+  previewCaption: { color: C.trackTextMut, fontSize: 11, textAlign: 'center', paddingHorizontal: 20, paddingBottom: 18, lineHeight: 16 },
+  statsPanel: { borderTopWidth: 1, borderTopColor: C.trackBorder, padding: 14, backgroundColor: C.trackCard },
+  mapEmpty:{ minHeight: 200, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 30 },
   mapEmptyTxt:{ fontSize: 13, color: C.trackTextMut, textAlign: 'center' },
 
-  glass:     { position: 'absolute', backgroundColor: 'rgba(20,22,25,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)' },
-  ovTopLeft: { top: 13, left: 13, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 7 },
-  ovTopRight:{ top: 13, right: 13, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center' },
-  ovBottom:  { left: 13, right: 13, bottom: 13, borderRadius: 14, paddingHorizontal: 6, paddingVertical: 10 },
-  ovCap:     { fontSize: 8, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1.4 },
-  ovTitle:   { fontSize: 13, color: C.trackText, fontWeight: '800', marginTop: 1 },
+  ovCap:     { fontSize: 10, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1.4 },
+  ovTitle:   { fontSize: 20, color: C.trackText, fontWeight: '800', marginTop: 1 },
   ovScore:   { fontSize: 24, color: C.trackPrimary, fontWeight: '900', letterSpacing: -0.5 },
 
   actionsGrid:{ flexDirection: 'row', flexWrap: 'wrap', gap: 11, marginBottom: 16 },

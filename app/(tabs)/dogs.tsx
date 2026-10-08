@@ -1,3 +1,4 @@
+import { resolveTrackOverlayColorKey, trackOverlayColor } from '@/features/tracking/utils/trackOverlayColors';
 import { DogCompactCard } from "@/components/dogs/DogCompactCard";
 import { dogToIdentity } from "@/components/dogs/types";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
@@ -101,6 +102,8 @@ export default function HundeScreen() {
                 <DogCompactCard
                   key={hund.id}
                   identity={dogToIdentity(hund)}
+                  trackColor={trackOverlayColor(resolveTrackOverlayColorKey(hund.id, hund.track_overlay_color_key))}
+                  trackColorLabel={`${t('dog.trackColor.title')}: ${t(`dog.trackColor.${resolveTrackOverlayColorKey(hund.id, hund.track_overlay_color_key)}`)}`}
                   lastTrainingLabel={null}
                   onOpen={() => router.push(`/dog/${hund.id}` as never)}
                   onTraining={() => router.push({ pathname: '/unit/timer', params: { dogId: hund.id, dogName: hund.name, source: 'dog_quickstart' } })}

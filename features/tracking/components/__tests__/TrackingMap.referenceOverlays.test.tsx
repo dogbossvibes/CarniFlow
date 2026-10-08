@@ -146,3 +146,13 @@ describe('TrackingMap — Referenz-Fährten', () => {
     expect(withRefs.calls[0][0]).toMatchObject({ latitude: LAY[4].lat, longitude: LAY[4].lng });
   });
 });
+
+
+it('verwendet die gewählte Hundefarbe nur für die aktive gelegte Spur, Referenzen und Absuche bleiben zugeordnet', () => {
+  const p = polys(renderMap({ referenceOverlays: REFS, layColor: '#AABBCC' }));
+  const own = p.filter(x => x.strokeColor === '#AABBCC');
+  expect(own.length).toBeGreaterThan(0);
+  expect(own[0].coordinates[0].latitude).toBe(LAY[0].lat);
+  expect(p.some(x => x.strokeColor === C.trackBlue)).toBe(true);
+  expect(p.filter(isRef).map(x => x.strokeColor)).toEqual(REFS.map(o => referenceTrackStroke(o.colorKey).strokeColor));
+});

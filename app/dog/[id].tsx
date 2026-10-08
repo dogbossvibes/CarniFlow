@@ -1,3 +1,4 @@
+import { DogTrackingPanel } from '@/features/tracking/components/DogTrackingPanel';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -281,6 +282,7 @@ export default function DogHubRoute() {
         items: appointments,
         onOpenCalendar: () => router.push('/plaene' as never),
       }}
+      trackingPanel={dog?.owner_id === userId ? <DogTrackingPanel key={`${userId}:${id}`} userId={userId} dogId={id} dogName={dog?.name ?? ''} lastTrackId={lastFaehrteId} /> : undefined}
       activeFaehrte={activeFaehrte}
       onOpenFaehrte={activeFaehrte ? () => router.push(reopenTarget(activeFaehrte) as never) : undefined}
       lastFaehrteId={lastFaehrteId}

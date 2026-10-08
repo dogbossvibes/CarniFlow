@@ -79,6 +79,7 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
 });
 
 interface Props {
+  layColor?: string;
   layPoints:        LatLng[];
   // Read-only Referenz-Fährten anderer eigener Hunde (nur Linie + Start-Label).
   // Reine Darstellung: fliessen in KEINE Kamera-/Fit-/Recenter-Logik ein.
@@ -127,7 +128,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, referenceOverlays, distanceScaleLine, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  layPoints, layColor = C.trackPrimary, referenceOverlays, distanceScaleLine, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -307,7 +308,7 @@ export function TrackingMap({
             Absuche. Kein Dash/Dimm (sonst mit der blauen Ist-Suchspur verwechselbar).
             Stil zentral über laidTrackStroke() (rein/testbar). */}
         {laySegmentParts.length > 0 ? laySegmentParts.map(part => {
-          const stroke = laidTrackStroke(part.kind, part.color);
+          const stroke = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
           return (
             <Polyline
               key={part.id}
@@ -321,7 +322,7 @@ export function TrackingMap({
             />
           );
         }) : layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={C.trackPrimary} strokeWidth={4} lineCap="round" lineJoin="round" />
+          <Polyline coordinates={layCoords} strokeColor={layColor} strokeWidth={4} lineCap="round" lineJoin="round" />
         )}
         {/* Fährten-Maßstab: dezente Querstriche über der gelegten Linie (zIndex 4),
             Zahlen nur alle 10 m (bzw. ausgedünnt). Standard-Delta wie initialRegion. */}
@@ -351,13 +352,13 @@ export function TrackingMap({
         {startAnchor ? (
           <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={onStartPress}>
             <View style={s.startFlagWrap}>
-              <View style={s.startFlag}><Ionicons name="flag" size={12} color="#04110F" /></View>
-              <Text style={s.startFlagLabel}>{t('track.startFlag')}</Text>
+              <View style={[s.startFlag, { backgroundColor: layColor }]}><Ionicons name="flag" size={12} color="#04110F" /></View>
+              <Text style={[s.startFlagLabel, { color: layColor }]}>{t('track.startFlag')}</Text>
             </View>
           </Marker>
         ) : start ? (
           <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} anchor={{ x: 0.5, y: 0.5 }} onPress={onStartPress}>
-            <View style={s.startDot} />
+            <View style={[s.startDot, { backgroundColor: layColor }]} />
           </Marker>
         ) : null}
 

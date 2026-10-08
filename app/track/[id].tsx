@@ -1,4 +1,5 @@
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
+import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
@@ -77,6 +78,7 @@ export default function TrackAuswertungScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useT();
   const [data, setData] = useState<any | null>(null);
+  const { color: layColor } = useDogTrackColor(data?.dog_id);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -697,6 +699,7 @@ export default function TrackAuswertungScreen() {
             <View style={StyleSheet.absoluteFill}>
               {map?.hasGps ? (
                 <TrackingMap
+                  layColor={layColor}
                   layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
                   startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
                   onStartPress={() => setDetailSel({ kind: 'start' })}
@@ -706,11 +709,11 @@ export default function TrackAuswertungScreen() {
                   currentPosition={null} follow={false} mapType="hybrid"
                 />
               ) : (
-                <TrackSketch legs={corners} objects={aTotal} w={320} h={190} progress={1} />
+                <TrackSketch accent={layColor} points={map?.lay} legs={corners} objects={aTotal} w={320} h={190} progress={1} />
               )}
             </View>
             <View style={s.legend}>
-              <Legend color={C.trackPrimary} label="Fährte" />
+              <Legend color={layColor} label="Fährte" />
               <Legend color="#fff" label="Gegenstand" square />
               <Legend color={C.trackWarning} label="Korrektur" />
             </View>
@@ -892,6 +895,7 @@ export default function TrackAuswertungScreen() {
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
               <TrackingMap
+                  layColor={layColor}
                 layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
                 startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
                 fitToTrackToken={fullscreenFitToken}

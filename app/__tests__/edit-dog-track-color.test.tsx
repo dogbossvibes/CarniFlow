@@ -63,10 +63,11 @@ const texts = () => r.root.findAllByType(Text).map((t: Node) => [].concat(t.prop
 beforeEach(() => { [mockBack, mockGetDog, mockUpdate].forEach(m => m.mockReset()); mockUpdate.mockResolvedValue({ data: {}, error: null }); });
 afterEach(() => { if (r) act(() => r.unmount()); r = null; });
 
-it('Spalte noch nicht migriert → kein Abschnitt, Feld wird nie gesendet, Save funktioniert', async () => {
+it('Spalte noch nicht migriert → deaktivierte Auswahl mit Hinweis, Feld wird nie gesendet', async () => {
   await mount(DOG);
-  expect(byId('track-color-auto')).toBeUndefined();
-  expect(texts()).not.toContain('dog.trackColor.section');
+  expect(byId('track-color-auto').props.disabled).toBe(true);
+  expect(texts()).toContain('dog.trackColor.unavailable');
+  expect(texts()).toContain('dog.trackColor.section');
   await save();
   expect(mockUpdate).toHaveBeenCalledTimes(1);
   expect(mockUpdate.mock.calls[0][1]).not.toHaveProperty('track_overlay_color_key');

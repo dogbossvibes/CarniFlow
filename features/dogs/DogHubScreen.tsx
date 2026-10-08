@@ -73,7 +73,7 @@ const TABS: { key: TabKey; labelKey: TranslationKey }[] = [
   { key: 'trainer',  labelKey: 'doghub.tab.trainer' },
 ];
 
-export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte }: { vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
+export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack, appointments, activeFaehrte, onOpenFaehrte, lastFaehrteId, onOpenLastFaehrte, trackingPanel }: { trackingPanel?: React.ReactNode; vm: DogHubVM; actions: DogHubActions; aiUnlocked: boolean; heat?: DogHeatProps; commands?: DogCommandsProps; backpack?: DogBackpackProps; appointments?: DogAppointmentsProps; activeFaehrte?: ActiveFaehrte | null; onOpenFaehrte?: () => void; lastFaehrteId?: string | null; onOpenLastFaehrte?: () => void }) {
   const { t, locale } = useT();
   const intlLocale = locale === 'fr' ? 'fr-CH' : locale === 'it' ? 'it-CH' : locale === 'en' ? 'en-GB' : 'de-CH';
   const [tab, setTab] = useState<TabKey>('overview');
@@ -135,6 +135,8 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                 {badges.map(b => <View key={b} style={s.badge}><Text style={s.badgeTxt}>{b}</Text></View>)}
               </View>
             ) : null}
+
+            {trackingPanel}
 
             {actions.onOpenHealthRecord ? (
               <View style={s.miniHub}>
@@ -299,7 +301,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
 
             {/* Oberste Karte: offene Fährte dieses Hundes (falls vorhanden). Bindet
                 die Fährte an den Hund — überlebt Navigation/Hundewechsel/Neustart. */}
-            {activeFaehrte && onOpenFaehrte ? (
+            {!trackingPanel && (activeFaehrte && onOpenFaehrte ? (
               <View style={{ marginBottom: 12 }}>
                 <ActiveFaehrteCard entry={activeFaehrte} dogName={id.name} onOpen={onOpenFaehrte} />
               </View>
@@ -313,7 +315,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
               </TouchableOpacity>
-            ) : null}
+            ) : null)}
 
             {/* Tab-Leiste */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabbar}>

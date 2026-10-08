@@ -122,3 +122,14 @@ describe('TrackReplayMap — Referenz vs. Absuche', () => {
     expect(reference(polys)).toHaveLength(1);
   });
 });
+
+
+it('Replay übernimmt die Hundefarbe ohne Suchspur und Heatmap umzudeuten', () => {
+  let node!: ReactTestRenderer;
+  act(() => { node = TestRenderer.create(<TrackReplayMap layPoints={LAY} layColor="#AABBCC" markers={[]} heatmapParts={HEAT} puckPosition={null} runPoints={RUN.points} />); });
+  const p = polylines(node);
+  expect(p.find(x => x.zIndex === 1)?.strokeColor).toBe('#AABBCC');
+  expect(byColor(p, SEARCH_ROUTE_FULL_STROKE)).toHaveLength(1);
+  expect(byColor(p, HEAT[0].color)).toHaveLength(1);
+  act(() => node.unmount());
+});

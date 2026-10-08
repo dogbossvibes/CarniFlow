@@ -1,3 +1,4 @@
+import type { SketchPoint } from '@/features/tracking/utils/trackSketchGeometry';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -135,8 +136,8 @@ export interface TrackRowData {
   surface:   string;
   date:      string;
   distanceM: number | null;
-  angles:    number;
-  objects:   number;
+  angles:    number | null;
+  objects:   number | null;
   age:       string;
   score:     number | null;
   syncState?: 'synced' | 'pending' | 'failed';   // lokal noch nicht/ nicht synchronisiert
@@ -164,11 +165,11 @@ export function StatTriple({ total, avg, streak }: { total: number; avg: number 
   );
 }
 
-export function TrackRow({ h, onPress, onLongPress }: { h: TrackRowData; onPress: () => void; onLongPress?: () => void }) {
+export function TrackRow({ h, onPress, onLongPress, points, accent }: { points?: readonly SketchPoint[]; accent?: string; h: TrackRowData; onPress: () => void; onLongPress?: () => void }) {
   return (
     <TouchableOpacity style={s.row} onPress={onPress} onLongPress={onLongPress} delayLongPress={350} activeOpacity={0.85}>
       <View style={s.rowSketch}>
-        <TrackSketch legs={h.angles} objects={h.objects} size={56} progress={1} />
+        <TrackSketch points={points} accent={accent} size={56} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={s.rowTitleLine}>
@@ -176,7 +177,7 @@ export function TrackRow({ h, onPress, onLongPress }: { h: TrackRowData; onPress
           <Text style={s.rowDate}> · {h.date}</Text>
         </View>
         <Text style={s.rowMeta} numberOfLines={1}>
-          {h.distanceM != null ? `${Math.round(h.distanceM)} m` : '—'} · {h.angles} Winkel · {h.age}
+          {h.distanceM != null ? `${Math.round(h.distanceM)} m` : '—'} · {h.angles ?? '—'} Winkel · {h.age}
         </Text>
         {/* Sync-Badge: lokal gespeicherte Fährte, die (noch) nicht synchronisiert ist.
             Kein Fehlerzustand der Fährte selbst — nur der Remote-Synchronisation. */}

@@ -202,3 +202,16 @@ describe('16: Multi-Dog Overlay', () => {
     expect(c.map(x => x.dogId)).toEqual(['dog-A']);
   });
 });
+
+
+describe('Hundeprofil-Recovery bleibt an den Account gebunden', () => {
+  it('fremder Account darf keinen Suchversuch verwerfen', async () => {
+    await writePendingNow('dog-A', pending());
+    expect(await discardSearchAttempt('sess-A', 'dog-A', { userId: 'other' })).toMatchObject({ ok: false, reason: 'wrong_user' });
+    expect(mockDeleteSearch).not.toHaveBeenCalled();
+  });
+  it('fremder Account darf keinen lokalen Abschluss schreiben', async () => {
+    expect(await completeTrackWithoutApp('sess-A', 'dog-A', 'other')).toMatchObject({ ok: false });
+    expect(mockSetLifecycle).not.toHaveBeenCalled();
+  });
+});

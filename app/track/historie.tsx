@@ -119,8 +119,8 @@ export default function TrackHistorieScreen() {
           <View style={{ gap: 11 }}>
             {visible.map(r => {
               const score = trackScore(r);
-              const angles = r.corners_total ?? 0;
-              const objects = r.articles_total ?? 0;
+              const angles = r.corners_total ?? null;
+              const objects = r.articles_total ?? null;
               const segmentCount = coerceTrackSegments(r.track_data?.segments).filter(s => s.status === 'completed').length;
               return (
                 <SwipeableTrainingItem key={r.id} trainingId={r.id} onDelete={handleDelete} bottomGap={0} confirmTitle={DEL_TITLE} confirmMessage={DEL_MSG}>
@@ -136,7 +136,7 @@ export default function TrackHistorieScreen() {
                       <Text style={s.date}> · {relDate(r.session_date ?? r.created_at)}</Text>
                     </View>
                     <Text style={s.meta} numberOfLines={1}>
-                      {r.distance_meters != null ? `${Math.round(r.distance_meters)} m` : '—'} · {angles} Winkel · {objects} Gegenst. · Teilstrecken: {segmentCount} · {fmtAge(r.lying_time_minutes)}
+                      {r.distance_meters != null ? `${Math.round(r.distance_meters)} m` : '—'} · {angles ?? '—'} Winkel · {objects} Gegenst. · Teilstrecken: {segmentCount} · {fmtAge(r.lying_time_minutes)}
                     </Text>
                     {(() => {
                       const w = [

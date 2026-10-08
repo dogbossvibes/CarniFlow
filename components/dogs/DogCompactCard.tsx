@@ -9,8 +9,10 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 // Kompakte Listenkarte: Avatar · Name · Rasse/Alter/Geschlecht · Sparten-Badge ·
 // letztes Training + Schnellaktionen (Training/Fährte/Statistik). Tap → Dog Hub.
 export function DogCompactCard({
-  identity, lastTrainingLabel, onOpen, onTraining, onFaehrte, onStats,
+  identity, lastTrainingLabel, onOpen, onTraining, onFaehrte, onStats, trackColor, trackColorLabel,
 }: {
+  trackColor?: string;
+  trackColorLabel?: string;
   identity: DogIdentity;
   lastTrainingLabel: string | null;
   onOpen: () => void;
@@ -34,6 +36,7 @@ export function DogCompactCard({
           {meta ? <Text style={s.meta} numberOfLines={1}>{meta}</Text> : null}
           {lastTrainingLabel ? <Text style={s.last} numberOfLines={1}>Zuletzt: {lastTrainingLabel}</Text> : null}
         </View>
+        {trackColor && <View testID="dog-track-color-stripe" accessible accessibilityLabel={trackColorLabel} style={{ width: 5, height: 38, borderRadius: 3, backgroundColor: trackColor }} />}
         <Ionicons name="chevron-forward" size={18} color={C.trackTextMut} />
       </View>
 
