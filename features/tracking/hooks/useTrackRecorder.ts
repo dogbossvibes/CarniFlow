@@ -1,3 +1,6 @@
+import { claimLayRecorderStore } from '@/features/tracking/utils/layRecorderOwnership';
+import { createBufferedPointWriter } from '@/features/tracking/utils/bufferedPointWriter';
+import { serializeBackgroundTransition } from '@/features/tracking/utils/backgroundTransitionQueue';
 import { pinQaTrackingModes } from '@/features/tracking/utils/qaPreferences';
 import { AppState } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -119,6 +122,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startMs  = useRef<number>(0);
   const recordingRef = useRef(false);   // true ⇒ Fixes fliessen in die Linie
+  const finalizationRef = useRef<Promise<void> | null>(null);
+  const isCurrentStoreOwnerRef = useRef<() => boolean>(() => false);
+  const recordingGenerationRef = useRef(0);
+  const warmupGenerationRef = useRef(0);
+  const backgroundScheduledRef = useRef(false);
   const warmupAccuracyRef = useRef<number | null>(null);
   const localSessionCreationRef = useRef<Promise<void> | null>(null);
   const bgActiveRef  = useRef(false);   // true ⇒ Hintergrund-Updates (Foreground-Service) laufen
@@ -273,26 +281,42 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaMarkerMetaRef.current.push({ markerId, source, scale, apexIndex });
   }, []);
 
-  const flushPoints = useCallback(async () => {
+  const pointWriterRef = useRef<ReturnType<typeof createBufferedPointWriter<(typeof ptBuffer.current)[number]>> | null>(null);
+  if (!pointWriterRef.current) pointWriterRef.current = createBufferedPointWriter(ptBuffer, async batch => {
     const sid = localSessionId.current;
-    if (!sid || ptBuffer.current.length === 0) return;
-    const batch = ptBuffer.current; ptBuffer.current = [];
+    if (!sid) throw new Error('Missing local tracking session');
+    await localSessionCreationRef.current;
     try { await createLocalTrackPointsBatch(sid, batch); }
-    catch (e) { console.warn('[trackRecorder] flush', e); ptBuffer.current.unshift(...batch); }
-  }, []);
+    catch (error) { console.warn('[trackRecorder] flush', error); throw error; }
+  });
+  const flushPoints = useCallback(() => pointWriterRef.current!.flush(), []);
 
-  const stopAll = useCallback(() => {
+  const stopAll = useCallback((persistInterrupted = true) => {
+    const wasRecording = recordingRef.current;
+    recordingGenerationRef.current++;
+    warmupGenerationRef.current++;
     recordingEvidenceRef.current?.close();
     recordingEvidenceRef.current = null;
     recordingRef.current = false;
+    if (wasRecording && persistInterrupted) {
+      const st = store.getState();
+      if (st.sessionStatus === 'laying' && st.dogId === localSessionInputRef.current?.dog_id) {
+        st.pauseRecording();
+        st.stopRecording();
+      }
+      void flushPoints();
+    }
     startLockRef.current = false;
     watchRef.current?.remove(); watchRef.current = null;
     headRef.current?.remove();  headRef.current = null;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-    if (bgActiveRef.current) {
+    if (backgroundScheduledRef.current) {
+      backgroundScheduledRef.current = false;
       bgActiveRef.current = false;
-      setTrackFixHandler(null);
-      void stopBackgroundUpdates();
+      void serializeBackgroundTransition(async () => {
+        setTrackFixHandler(null);
+        await stopBackgroundUpdates();
+      }).catch(() => {});
     }
     // QA-Motion-Mitschnitt beenden (falls er lief) und den sichtbaren
     // Aktiv-Zustand zurücksetzen.
@@ -306,7 +330,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     const st = store.getState();
     if (st.startLockActive) st.setStartLockActive(false);
     stopFaehrteActivity({ elapsedS: st.durationSeconds, distanceM: st.distanceMeters });
-  }, [store]);
+  }, [store, flushPoints]);
 
   useEffect(() => () => {
     recordingEvidenceRef.current?.close('recorderUnmounted');
@@ -866,6 +890,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
   const startWarmup = useCallback(async (): Promise<{ error: string | null }> => {
     if (watchRef.current) return { error: null };
+    const generation = ++warmupGenerationRef.current;
     warmupAccuracyRef.current = null;
     startupOriginRef.current ??= Date.now();
     startupRef.current!.warmupStartTSec ??= startupSec();
@@ -874,8 +899,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // nach dem App-Start auf dem Default statt auf der gewählten Quelle.
     // Idempotent; nach dem ersten Aufruf praktisch kostenlos.
     await hydrateQaModes();
+    if (generation !== warmupGenerationRef.current) return { error: 'cancelled' };
     startupRef.current!.permissionStartTSec ??= startupSec();
     const { status } = await Location.requestForegroundPermissionsAsync();
+    if (generation !== warmupGenerationRef.current) return { error: 'cancelled' };
     startupRef.current!.permissionEndTSec ??= startupSec();
     if (status !== 'granted') return { error: 'Standortberechtigung fehlt. Bitte in den Einstellungen erlauben.' };
     // iOS: falls „Genauer Standort" reduziert ist, einmalig präzise Ortung
@@ -895,12 +922,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     try {
       // Zentrale Positionsquelle: natives Precision-Modul bevorzugt, expo-Fallback.
       const handle = await startPositionSource((s) => {
+        if (generation !== warmupGenerationRef.current) return;
         recordingEvidenceRef.current?.source(s.source, s.provider);
         // Debug (source/provider) nur bei Änderung setzen — kein Re-Render-Sturm.
         setGpsDebug(d => (d.source === s.source && d.provider === s.provider) ? d : { ...d, source: s.source, provider: s.provider });
         markReportedSource(s.source ?? null);
         onFix(sampleToLocationObject(s));
       }, WATCH_OPTS);
+      if (generation !== warmupGenerationRef.current) { handle.stop(); return { error: 'cancelled' }; }
       watchRef.current = { remove: handle.stop };
       markWarmupStarted(activeEngine, activeSource);
       setGpsDebug(d => ({ ...d, isNativeAvailable: handle.info.isNativeAvailable, rawGnssSupported: handle.info.rawGnssSupported, source: d.source ?? handle.info.source }));
@@ -928,6 +957,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           .catch(() => { /* Motion ist optional; GPS-Aufnahme läuft weiter. */ });
       }
     } catch {
+      if (generation !== warmupGenerationRef.current) return { error: 'cancelled' };
       releaseQaModesRef.current?.(); releaseQaModesRef.current = null;
       return { error: 'GPS konnte nicht gestartet werden. Bitte kurz im Freien erneut versuchen.' };
     }
@@ -937,7 +967,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // laufenden Stream (→ onFix feuerte nie wieder, Spur blieb leer).
     // getLastKnownPositionAsync startet KEINE neue Anfrage und stört den Watch nicht.
     Location.getLastKnownPositionAsync()
-      .then(loc => { if (loc) onFix(loc); })
+      .then(loc => { if (loc && generation === warmupGenerationRef.current) onFix(loc); })
       .catch(() => { /* Stream liefert ohnehin laufend Fixes */ });
     return { error: null };
   }, [onFix]);
@@ -949,13 +979,21 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     localId: string; ownerId: string | null | undefined; dogId?: string | null; meta?: LocalTrackSessionMeta;
     onSessionStarted?: () => void;
   }): Promise<{ error: string | null }> => {
+    if (recordingRef.current) return { error: 'Eine Aufnahme läuft bereits.' };
+    const generation = ++recordingGenerationRef.current;
+    if (finalizationRef.current) await finalizationRef.current;
+    if (generation !== recordingGenerationRef.current) return { error: 'cancelled' };
+    if (localSessionId.current && !(await flushPoints())) return { error: 'Die vorige Aufnahme konnte noch nicht vollständig gespeichert werden.' };
+    if (generation !== recordingGenerationRef.current) return { error: 'cancelled' };
     if (!input.ownerId) return { error: 'Bitte zuerst anmelden.' };   // sauber abbrechen — keine halbe Session
     const dogId = input.dogId ?? null;
     if (!watchRef.current) {
       const w = await startWarmup();
       if (w.error) return w;
     }
+    if (generation !== recordingGenerationRef.current) return { error: 'cancelled' };
     if (!isLaySessionWarmupReady(warmupAccuracyRef.current)) return { error: 'gps_not_ready' };
+    const isCurrentRecording = () => recordingRef.current && recordingGenerationRef.current === generation && localSessionId.current === input.localId;
 
     // ── SOFORT scharf schalten (synchron, VOR jedem await/Netz-Call) ──
     // So hängt die Session nicht an Heading oder Hintergrundberechtigung. Der
@@ -996,6 +1034,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     ptBuffer.current = [];
     // Führende lokale Session-ID SOFORT deterministisch setzen (kein Warten auf Remote/Netz).
     localSessionId.current = input.localId;
+    isCurrentStoreOwnerRef.current = claimLayRecorderStore(store);
     recordingEvidenceRef.current?.close();
     recordingEvidenceRef.current = qaRef.current
       ? startQaRecordingEvidence(input.localId, 'lay', false, streamModesRef.current)
@@ -1063,14 +1102,19 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       // die OS-Berechtigung nur noch angefragt, wenn bereits erteilt oder erneut
       // fragbar. Ohne „Immer"-Berechtigung bleibt der Vordergrund-Watch als Fallback.
       const bgCurrent = await Location.getBackgroundPermissionsAsync();
-      if (!recordingRef.current) return;
+      if (!isCurrentRecording()) return;
       const mayRequest = bgCurrent.status === 'granted' || bgCurrent.canAskAgain;
       if (mayRequest) {
         const bg = await Location.requestBackgroundPermissionsAsync();
-        if (bg.status === 'granted' && recordingRef.current) {
-          setTrackFixHandler(loc => {
+        if (bg.status === 'granted' && isCurrentRecording()) {
+          backgroundScheduledRef.current = true;
+          await serializeBackgroundTransition(async () => {
+          if (!isCurrentRecording()) return;
+          setTrackFixHandler(async loc => {
+            if (!isCurrentRecording()) return;
             sessionEvidence?.source('expo', 'expo-location-task', 'background');
             onFixRef.current(loc);
+            if (!(await flushPoints())) throw new Error('Background GPS points could not be persisted');
           });
           sessionEvidence?.note('backgroundStartRequested');
           await startBackgroundUpdates({
@@ -1078,18 +1122,19 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
             notificationBody:  'Aufnahme aktiv – tippen, um ANYVO zu öffnen',
             notificationColor: '#15E6C3',
           });
-          if (!recordingRef.current) { setTrackFixHandler(null); await stopBackgroundUpdates(); return; }
+          if (!isCurrentRecording()) return; // stopAll has already queued cleanup before a newer start
           sessionEvidence?.note('backgroundStartSucceeded');
           watchRef.current?.remove(); watchRef.current = null;   // Warmup-Watch ablösen
           sessionEvidence?.note('foregroundStreamRemoved');
           bgActiveRef.current = true;
+          });
         }
       }
     } catch (e) { console.warn('[trackRecorder] background', e); /* Fallback: Vordergrund-Watch bleibt */ } })();
 
     // ── ab hier nur best-effort, blockiert die Aufnahme nicht ──
-    void Location.watchHeadingAsync(h => store.getState().setHeading(h.trueHeading ?? h.magHeading))
-      .then(handle => { if (recordingRef.current) headRef.current = handle; else handle.remove(); })
+    void Location.watchHeadingAsync(h => { if (isCurrentRecording()) store.getState().setHeading(h.trueHeading ?? h.magHeading); })
+      .then(handle => { if (isCurrentRecording()) headRef.current = handle; else handle.remove(); })
       .catch(() => { /* Heading optional */ });
 
     // Lokale SQLite-Session (Offline-First, KEIN Netz/getUser) — führende ID = input.localId.
@@ -1099,7 +1144,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     await localSessionCreationRef.current;
 
     return { error: null };
-  }, [startWarmup, store]);
+  }, [startWarmup, store, flushPoints]);
 
   const pause  = useCallback(() => {
     recordingEvidenceRef.current?.note('userPaused');
@@ -1150,6 +1195,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Transport läuft AUSSCHLIESSLICH über die persistente Sync-Queue (P-SAVE2) — kein
   // direkter finishTrackRecording-Pfad mehr (eine einzige Remote-Sync-Quelle).
   const finish = useCallback((): void => {
+    if (finalizationRef.current) return;
     // Letzten noch offenen (bestätigungswürdigen) Winkel best-effort retten, BEVOR
     // gestoppt wird — sonst ginge ein Winkel am Track-Ende ohne Auslauf verloren.
     for (const ev of confirmerRef.current.flush(Date.now())) {
@@ -1280,7 +1326,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       }
     }
 
-    stopAll();
+    stopAll(false);
     const s = store.getState();
     s.stopRecording();
     s.setLayFinishedAt(Date.now());   // ← Liegezeit-Start, sofort verfügbar
@@ -1301,15 +1347,18 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       ).markers,
     };
 
-    void (async () => {
+    const lid = localSessionId.current;
+    const sessionCreation = localSessionCreationRef.current;
+    const sessionInput = localSessionInputRef.current;
+    const isCurrentStoreOwner = isCurrentStoreOwnerRef.current;
+    finalizationRef.current = (async () => {
       // 1) LOKAL sichern = echter Erfolg. Punkte flushen, Session-Zeile sicherstellen
       //    (ensure-create, falls Start-Insert fehlschlug) und finalisieren.
-      const lid = localSessionId.current;
       try {
         if (!(await pendingLocalMarkers)) throw new Error('Lokale Marker konnten nicht vollständig gespeichert werden.');
-        await localSessionCreationRef.current;
-        await flushPoints();
-        if (localSessionInputRef.current) await createLocalTrainingSession(localSessionInputRef.current);   // idempotent
+        await sessionCreation;
+        if (!(await flushPoints())) throw new Error('Lokale GPS-Punkte konnten nicht vollständig gespeichert werden.');
+        if (sessionInput) await createLocalTrainingSession(sessionInput);   // idempotent
         if (lid) {
           await finalizeLocalTrainingSession(lid, {
             endedAt:           summary.endedAt,
@@ -1323,10 +1372,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
             status:            'completed',
           });
         }
-        store.getState().setSaveState('saved');   // lokal durabel → Erfolg (auch offline)
+        if (isCurrentStoreOwner()) store.getState().setSaveState('saved');   // lokal durabel → Erfolg (auch offline)
       } catch (e) {
         console.warn('[trackRecorder] local finalize', e);
-        store.getState().setSaveState('error');   // ehrlich: lokale Persistenz fehlgeschlagen
+        if (isCurrentStoreOwner()) store.getState().setSaveState('error');   // ehrlich: lokale Persistenz fehlgeschlagen
         return;
       }
 
@@ -1339,7 +1388,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: lid, operation: 'create', priority: 1 });
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
-    })();
+    })().finally(() => { finalizationRef.current = null; });
   }, [stopAll, store, flushPoints, persistConfirmedCorner, commitMarker, qaRel]);
 
   return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug };

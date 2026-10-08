@@ -23,7 +23,7 @@ import { Platform } from 'react-native';
 // Namen würden kollidieren.
 export const TRACK_LOCATION_TASK = 'anyvo-faehrte-bg';
 
-type FixHandler = (loc: Location.LocationObject) => void;
+type FixHandler = (loc: Location.LocationObject) => void | Promise<void>;
 let activeHandler: FixHandler | null = null;
 
 /** Recorder registriert hier seinen onFix; null = niemand hört zu (verwerfen). */
@@ -34,12 +34,15 @@ export function setTrackFixHandler(handler: FixHandler | null): void {
 // defineTask ist über die Plattformen hinweg lose typisiert → schmaler Cast
 // (gleiches Vorgehen wie im bestehenden lib/trackRecorder).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const define = TaskManager.defineTask as (task: string, executor: (body: any) => void) => void;
-define(TRACK_LOCATION_TASK, ({ data, error }: { data?: { locations?: Location.LocationObject[] }; error: { message: string } | null }) => {
+const define = TaskManager.defineTask as (task: string, executor: (body: any) => void | Promise<void>) => void;
+define(TRACK_LOCATION_TASK, async ({ data, error }: { data?: { locations?: Location.LocationObject[] }; error: { message: string } | null }) => {
   if (error) { console.warn('[bgLocation]', error.message); return; }
   const locations = data?.locations;
-  if (!locations?.length || !activeHandler) return;
-  for (const loc of locations) activeHandler(loc);
+  const handler = activeHandler;
+  if (!locations?.length || !handler) return;
+  // Keep this batch bound to its original recorder while persistence awaits.
+  // That recorder rejects callbacks after stop or a generation change.
+  for (const loc of locations) await handler(loc);
 });
 
 /** Hintergrund-Updates mit Foreground-Service (Android) + iOS-Indikator starten. */
