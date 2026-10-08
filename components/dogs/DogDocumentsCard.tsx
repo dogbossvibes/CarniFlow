@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { formatDate } from '@/i18n/format';
 import { categoryLabel, categoryIcon, FILE_TYPE_LABEL } from '@/features/dogs/documentCategories';
 import type { DogDocument } from './types';
 
@@ -10,7 +11,7 @@ function fmtDate(d: string | null): string | null {
   if (!d) return null;
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return null;
-  return dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDate(dt);
 }
 
 // Dokumentenordner: moderne Karten echter Uploads (Titel · Kategorie-Badge ·
@@ -19,7 +20,7 @@ export function DogDocumentsCard({
   documents, onAdd, onOpen, onDelete,
 }: {
   documents: DogDocument[];
-  onAdd: () => void;
+  onAdd?: () => void;
   onOpen?: (doc: DogDocument) => void;
   onDelete?: (doc: DogDocument) => void;
 }) {
@@ -30,9 +31,9 @@ export function DogDocumentsCard({
         <View style={s.emptyIcon}><Ionicons name="folder-open-outline" size={26} color={C.trackPrimary} /></View>
         <Text style={s.emptyTitle}>{t('docs.emptyTitle')}</Text>
         <Text style={s.emptyTxt}>
-          Lade wichtige Unterlagen deines Hundes hoch – zum Beispiel Impfpass, Stammbaum, Prüfungen oder Tierarztberichte.
+          {onAdd ? t('health.uxDocumentEmptyHelp') : t('docs.emptyTitle')}
         </Text>
-        <AnyvoButton label={t('docs.add')} icon="add" onPress={onAdd} />
+        {onAdd ? <AnyvoButton label={t('docs.add')} icon="add" onPress={onAdd} /> : null}
       </View>
     );
   }
@@ -42,7 +43,7 @@ export function DogDocumentsCard({
       {documents.map(d => {
         const date = fmtDate(d.issuedOn ?? d.createdAt);
         return (
-          <TouchableOpacity key={d.id} style={s.docCard} activeOpacity={onOpen ? 0.75 : 1} onPress={() => onOpen?.(d)}>
+          <TouchableOpacity key={d.id} style={s.docCard} activeOpacity={onOpen ? 0.75 : 1} onPress={() => onOpen?.(d)} accessibilityRole="button" accessibilityLabel={d.title}>
             <View style={s.docIcon}><Ionicons name={categoryIcon(d.category)} size={20} color={C.trackPrimary} /></View>
             <View style={{ flex: 1, gap: 5 }}>
               <Text style={s.docTitle} numberOfLines={1}>{d.title}</Text>
@@ -52,14 +53,14 @@ export function DogDocumentsCard({
               </View>
             </View>
             {onDelete ? (
-              <TouchableOpacity hitSlop={8} onPress={() => onDelete(d)} style={s.trash} activeOpacity={0.7}>
+              <TouchableOpacity hitSlop={8} onPress={() => onDelete(d)} style={s.trash} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('health.uxDeleteAction', { name: d.title })}>
                 <Ionicons name="trash-outline" size={17} color={C.trackTextMut} />
               </TouchableOpacity>
             ) : null}
           </TouchableOpacity>
         );
       })}
-      <AnyvoButton label={t('docs.add')} icon="add" variant="secondary" onPress={onAdd} />
+      {onAdd ? <AnyvoButton label={t('docs.add')} icon="add" variant="secondary" onPress={onAdd} /> : null}
     </View>
   );
 }

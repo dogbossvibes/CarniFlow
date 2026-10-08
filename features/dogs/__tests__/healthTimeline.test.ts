@@ -39,3 +39,18 @@ describe('health timeline aggregation', () => {
     expect(filterHealthTimeline(items, 'medication')).toEqual([]);
   });
 });
+
+
+describe('localized dynamic timeline dates', () => {
+  it('formats vaccination, parasite and heat dates through the supplied locale adapter', () => {
+    const data: HealthOverviewData = { ...empty, vaccinations: [{ id: 'v', owner_id: 'o', dog_id: 'd', vaccine_type: 'Rabies', administered_on: '2026-01-01', next_due_on: '2026-10-09', clinic_name: null, vaccine_name: null, note: null, document_id: null, batch_number: null, created_at: '2026-01-01', updated_at: '2026-01-01' }], parasites: [{ id: 'p', dog_id: 'd', treatment_date: '2026-01-01', next_due_date: '2026-10-10', treatment_type: 'deworming', product: 'Product', note: null, created_at: '2026-01-01' }] };
+    const text = (_key: unknown, fallback: string, params?: Record<string, string | number>) => params?.date ? `Due ${params.date}` : fallback;
+    const date = (value: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(`${value}T12:00:00`));
+    const heat = [{ id: 'h', dogId: 'd', startDate: '2026-10-01', endDate: '2026-10-08', status: 'completed' as const, notes: null, phase: null, createdAt: '2026-10-01' }];
+    const timeline = buildHealthTimeline(data, heat, text, date);
+    expect(timeline.find(item => item.kind === 'vaccination')?.secondary).toBe('Due 09/10/2026');
+    expect(timeline.find(item => item.kind === 'parasite')?.detail).toBe('Due 10/10/2026');
+    expect(timeline.find(item => item.kind === 'heat')?.detail).toBe('01/10/2026 – 08/10/2026');
+    expect(data.vaccinations[0].next_due_on).toBe('2026-10-09');
+  });
+});
