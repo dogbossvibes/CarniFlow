@@ -3,7 +3,7 @@ import { Text, StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import Overview from '../index';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
-import { FaehrtenHeader, StatTriple } from '@/features/tracking/components/FaehrtenChrome';
+import { FaehrtenHeader, StatTriple, TrackRow } from '@/features/tracking/components/FaehrtenChrome';
 import { trackOverlayColor } from '@/features/tracking/utils/trackOverlayColors';
 
 const mockHistory = jest.fn(), mockPreview = jest.fn(), mockRefresh = jest.fn();
@@ -17,7 +17,7 @@ jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k }) }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: mockDogs, refresh: mockRefresh }) }));
 jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: 'u' } } }) }));
 jest.mock('@/features/tracking/services/trackHistoryService', () => ({ getTrackHistory: (...a: unknown[]) => mockHistory(...a) }));
-jest.mock('@/features/tracking/services/trackPreviewService', () => ({ getTrackPreview: (...a: unknown[]) => mockPreview(...a) }));
+jest.mock('@/features/tracking/services/trackPreviewService', () => ({ getRecentTrackPreviews: (...a: unknown[]) => mockPreview(...a) }));
 jest.mock('@/features/tracking/services/trackService', () => ({ deleteTrackSession: jest.fn() }));
 jest.mock('@/features/training/repositories/localTrainingRepository', () => ({ markTrainingAsDeleted: jest.fn() }));
 jest.mock('@/features/sync/services/syncEngine', () => ({ retryFailedSync: jest.fn() }));
@@ -29,7 +29,7 @@ const row = (dog = 'd') => ({ id: `s-${dog}`, dog_id: dog, status: 'completed', 
 const gps = { lay: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8.001 }], markers: [] };
 const mount = async () => { await act(async () => { view = TestRenderer.create(<Overview />); }); };
 const texts = () => view.root.findAllByType(Text).flatMap((n: any) => n.props.children);
-beforeEach(() => { jest.clearAllMocks(); mockHistory.mockResolvedValue([row(), row('other')]); mockPreview.mockResolvedValue(null); });
+beforeEach(() => { jest.clearAllMocks(); mockHistory.mockResolvedValue([row(), row('other')]); mockPreview.mockResolvedValue({}); });
 afterEach(() => { if (view) act(() => view.unmount()); });
 it('shows an honest unavailable-GPS state and never substitutes a count-based line', async () => {
   await mount(); expect(texts()).toContain('track.preview.noGps');
@@ -37,8 +37,8 @@ it('shows an honest unavailable-GPS state and never substitutes a count-based li
   expect(view.root.findByType(StatTriple).props.total).toBe(1);
 });
 it('loads local-only geometry and displays actual positions in the dog color', async () => {
-  mockPreview.mockResolvedValue(gps); await mount();
-  expect(mockPreview).toHaveBeenCalledWith('s-d', 'd', 'u', true);
+  mockPreview.mockResolvedValue({ 's-d': gps }); await mount();
+  expect(mockPreview).toHaveBeenCalledWith([row()], 'd', 'u');
   const hero = view.root.findAllByType(TrackSketch).find((n: any) => n.props.w === 344)!;
   expect(hero.props.points).toEqual(gps.lay); expect(hero.props.accent).toBe(trackOverlayColor('violet'));
   expect(texts()).toContain('track.preview.recorded');
@@ -46,11 +46,23 @@ it('loads local-only geometry and displays actual positions in the dog color', a
   const statsContainer = view.root.findByType(StatTriple).parent!;
   expect(StyleSheet.flatten(statsContainer.props.style)?.position).not.toBe('absolute');
 });
+it('gives both visible history rows their own recorded path', async () => {
+  const older = { ...row(), id: 's-older' };
+  const olderGps = { ...gps, lay: [{ lat: 46, lng: 7 }, { lat: 46.001, lng: 7.001 }] };
+  mockHistory.mockResolvedValue([row(), older, row('other')]);
+  mockPreview.mockResolvedValue({ 's-d': gps, 's-older': olderGps });
+  await mount();
+  expect(mockPreview).toHaveBeenCalledWith([row(), older], 'd', 'u');
+  const histories = view.root.findAllByType(TrackRow);
+  expect(histories.map((n: any) => [n.props.h.id, n.props.points])).toEqual([
+    ['s-d', gps.lay], ['s-older', olderGps.lay],
+  ]);
+});
 it('ignores a delayed previous-dog preview after a dog switch', async () => {
   let finish!: (v: unknown) => void;
-  mockPreview.mockImplementation((id: string) => id === 's-d' ? new Promise(resolve => { finish = resolve; }) : Promise.resolve({ ...gps, lay: [{ lat: 48, lng: 9 }] }));
+  mockPreview.mockImplementation((_rows: unknown, dogId: string) => dogId === 'd' ? new Promise(resolve => { finish = resolve; }) : Promise.resolve({ 's-other': { ...gps, lay: [{ lat: 48, lng: 9 }] } }));
   await mount(); await act(async () => { view.root.findByType(FaehrtenHeader).props.onDog('other'); });
-  await act(async () => { finish(gps); });
+  await act(async () => { finish({ 's-d': gps }); });
   const hero = view.root.findAllByType(TrackSketch).find((n: any) => n.props.w === 344)!;
   expect(hero.props.points).toEqual([{ lat: 48, lng: 9 }]); expect(hero.props.accent).toBe(trackOverlayColor('orange'));
   expect(texts()).toContain('track.preview.singlePoint');

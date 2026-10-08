@@ -54,15 +54,15 @@ const OBJECTS: SearchObject[] = [
   { at: toLL(0, 70), index: 1, material: 'duebel', id: 'gegenstand-70' },
 ];
 
-function Harness({ onReady, objects }: { onReady: (s: SearchRecorder) => void; objects: SearchObject[] }) {
-  const s = useSearchRecorder({ laidPoints: LINE, laidObjects: objects, level: 'training', handlerDistanceM: 5 });
+function Harness({ onReady, objects, points = LINE }: { onReady: (s: SearchRecorder) => void; objects: SearchObject[]; points?: LatLng[] }) {
+  const s = useSearchRecorder({ laidPoints: points, laidObjects: objects, level: 'training', handlerDistanceM: 5 });
   onReady(s);
   return null;
 }
 let activeRenderer: ReactTestRenderer | null = null;
-function mount(objects: SearchObject[] = OBJECTS): { getRecorder: () => SearchRecorder } {
+function mount(objects: SearchObject[] = OBJECTS, points: LatLng[] = LINE): { getRecorder: () => SearchRecorder } {
   let latest!: SearchRecorder;
-  act(() => { activeRenderer = TestRenderer.create(<Harness objects={objects} onReady={(s) => { latest = s; }} />); });
+  act(() => { activeRenderer = TestRenderer.create(<Harness objects={objects} points={points} onReady={(s) => { latest = s; }} />); });
   return { getRecorder: () => latest };
 }
 let simClockMs = 0;
@@ -209,5 +209,29 @@ describe('useSearchRecorder — Search-Recovery-State', () => {
     expect(r.foundObjects).toBe(0);
     expect(r.breaks).toHaveLength(0);
     expect(r.offTrackState).toBe('on_track');
+  });
+});
+
+describe('known reference object count', () => {
+  it('keeps a recorded reference with zero objects at zero through finish', async () => {
+    const { getRecorder } = mount([]);
+    await flushMicrotasks();
+    expect(getRecorder().totalObjects).toBe(0);
+    act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+    walk(0, 20);
+    let result!: ReturnType<SearchRecorder['stop']>;
+    act(() => { result = getRecorder().stop(); });
+    expect(result.totalObjects).toBe(0);
+    expect(result.foundObjects).toBe(0);
+  });
+  it('preserves rulebook targets for a free search without a laid reference', async () => {
+    const { getRecorder } = mount([], []);
+    await flushMicrotasks();
+    expect(getRecorder().totalObjects).toBe(3);
+  });
+  it('preserves the actual nonzero count of the reference', async () => {
+    const { getRecorder } = mount(OBJECTS);
+    await flushMicrotasks();
+    expect(getRecorder().totalObjects).toBe(2);
   });
 });
