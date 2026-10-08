@@ -49,3 +49,10 @@ it('does not restart an expired grace or apply it to an earlier pending object',
     { nowMs: 12_000, eligible: true, pendingFinalObjectNearEnd: true, activeObjectWait: false })).toEqual(expired);
   expect(start(false).startedAtMs).toBeNull();
 });
+
+it('keeps the first grace-resolution timestamp stable after the final object is resolved', () => {
+  const resolved = advanceFinalObjectEndGrace(start(),
+    { nowMs: 10_500, eligible: true, pendingFinalObjectNearEnd: false, activeObjectWait: false });
+  expect(advanceFinalObjectEndGrace(resolved,
+    { nowMs: 15_000, eligible: true, pendingFinalObjectNearEnd: false, activeObjectWait: false })).toEqual(resolved);
+});
