@@ -1,3 +1,4 @@
+import { isContinuousPair, tagContinuitySections } from '../utils/trackContinuity';
 // ──────────────────────────────────────────────────────────────────────────
 // Track Analytics Engine (Punkt 10/11/13) — REIN deterministisch, KEINE KI,
 // keine erfundenen Punktemaxima. Nimmt ausschliesslich In-Session-Daten
@@ -38,6 +39,9 @@ const OBJECT_STATIONARY_MIN_S = 1.5;
 // ── Eingaben ──────────────────────────────────────────────────────────────
 
 export interface AnalyticsSample {
+  /** Explicit interruption before this observation; never assess the interval across it. */
+  breakBefore?: boolean;
+  continuitySection?: number;
   /** Handler-Fortschritt entlang der Soll-Fährte (Bogenlänge, m) zum Zeitpunkt dieses Fixes. */
   atM: number;
   /** Zurückgelegte, bereits akzeptierte Search-Linienlänge (m), optional bei historischen Samples. */
@@ -248,10 +252,11 @@ export function computeDeviationStats(samples: AnalyticsSample[]): DeviationStat
   const maxReliableM = reliable.length ? Math.max(...reliable.map(s => s.devM)) : Math.max(...devs);
   const maxRawM = Math.max(...devs);
 
-  let timeWithin15 = 0, timeWithin2 = 0, timeOutside3 = 0, timeOutside5 = 0, totalT = 0;
+  let timeWithin15 = 0, timeWithin2 = 0, timeOutside3 = 0, timeOutside5 = 0, totalT = 0, observedDurationS = 0;
   for (let i = 1; i < samples.length; i++) {
     const dt = Math.max(0, samples[i].tSec - samples[i - 1].tSec);
-    if (dt <= 0) continue;
+    if (dt <= 0 || !isContinuousPair(samples[i - 1], samples[i])) continue;
+    observedDurationS += dt;
     const w = Math.max(0.05, samples[i].confidence);
     const wt = dt * w;
     totalT += wt;
@@ -260,7 +265,7 @@ export function computeDeviationStats(samples: AnalyticsSample[]): DeviationStat
     if (samples[i].devM > 3.0) timeOutside3 += wt;
     if (samples[i].devM > 5.0) timeOutside5 += wt;
   }
-  const totalDurationS = samples.length > 1 ? samples[samples.length - 1].tSec - samples[0].tSec : 0;
+  const totalDurationS = observedDurationS;
   // Gewichtete Fraktion auf die tatsächliche Gesamtdauer zurückskaliert — bei
   // durchgängig confidence=1 (kein Fusion-Signal) identisch zur reinen, ungewichteten Zeit.
   const scale = totalT > 0 ? totalDurationS / totalT : 0;
@@ -342,7 +347,7 @@ function estimateAverageSpeed(samples: AnalyticsSample[]): number | null {
   let distSum = 0, timeSum = 0;
   for (let i = 1; i < samples.length; i++) {
     const dt = samples[i].tSec - samples[i - 1].tSec;
-    if (dt <= 0) continue;
+    if (dt <= 0 || !isContinuousPair(samples[i - 1], samples[i])) continue;
     distSum += Math.max(0, samples[i].atM - samples[i - 1].atM);
     timeSum += dt;
   }
@@ -368,7 +373,7 @@ export function analyzeObjects(samples: AnalyticsSample[], objects: AnalyticsObj
     let timeInAreaSec = 0;
     for (let i = 1; i < inArea.length; i++) {
       const dt = inArea[i].tSec - inArea[i - 1].tSec;
-      if (dt > 0 && dt < 5) timeInAreaSec += dt;   // >5s Lücke = separate Annäherung, nicht dieselbe Verweildauer
+      if (isContinuousPair(inArea[i - 1], inArea[i]) && dt > 0 && dt < 5) timeInAreaSec += dt;   // >5s Lücke = separate Annäherung, nicht dieselbe Verweildauer
     }
     const behavior: ObjectAnalysis['behavior'] = !inArea.length
       ? 'unbekannt'
@@ -413,6 +418,7 @@ export function computePace(samples: AnalyticsSample[]): PaceStats {
   let distAcc = 0, timeAcc = 0;
   for (let i = 1; i < samples.length; i++) {
     const dt = samples[i].tSec - samples[i - 1].tSec;
+    if (!isContinuousPair(samples[i - 1], samples[i])) { distAcc = 0; timeAcc = 0; continue; }
     if (dt <= 0) continue;
     const dAt = samples[i].atM - samples[i - 1].atM;
     // Rückwärts-Rauschen (Cursor-/GPS-Jitter) zählt weder als Distanz noch als Zeit.
@@ -513,6 +519,7 @@ function computeAnalysisConfidence(samples: AnalyticsSample[]): number {
   if (!samples.length) return 0;
   let sw = 0, swx = 0;
   for (let i = 1; i < samples.length; i++) {
+    if (!isContinuousPair(samples[i - 1], samples[i])) continue;
     const dt = Math.max(0.1, samples[i].tSec - samples[i - 1].tSec);
     sw += dt; swx += dt * samples[i].confidence;
   }
@@ -523,6 +530,7 @@ function computeAnalysisConfidence(samples: AnalyticsSample[]): number {
 // ── Öffentliche Hauptfunktion ─────────────────────────────────────────────
 
 export function computeTrackAnalytics(input: TrackAnalyticsInput): TrackAnalytics {
+  input = { ...input, samples: tagContinuitySections(input.samples) };
   const deviation = computeDeviationStats(input.samples);
   const corners = analyzeCorners(input.samples, input.corners);
   const objects = analyzeObjects(input.samples, input.objects);

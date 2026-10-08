@@ -81,7 +81,7 @@ function runScenario(sc: Scenario): Run {
     } else if (st.k === 'motion') {
       clock = st.t;
       motionBuf.push({ t: st.t, headingDelta: st.headingDelta, rotationMagnitude: Math.abs(st.headingDelta) / 10, accelerationMagnitude: 0.15, stepDelta: st.stepDelta, cadence: 100, movementState: 'walking' });
-    } else if (st.k === 'pause') state.isPaused = st.on;
+    } else if (st.k === 'pause') { processor.interruptContinuity(); state.isPaused = st.on; }
   }
   return run;
 }
@@ -94,7 +94,7 @@ afterEach(() => jest.restoreAllMocks());
 const processorScenarios = scenarios.filter(s => !s.steps.some(st => st.k === 'marker'));
 
 describe('Foreground-Parität mit dem Original (Golden b6bc114): Punktfolge, Distanz, Winkel', () => {
-  it.each(processorScenarios.map(s => [s.name, s] as const))('%s', (name, sc) => {
+  it.each(processorScenarios.filter(s => !['badAccuracyAtCorner', 'longGapAndDuplicateTime', 'pausedMidRoute'].includes(s.name)).map(s => [s.name, s] as const))('%s', (name, sc) => {
     const golden = LAY_GOLDEN_B6BC114[name];
     const run = runScenario(sc);
     expect(run.points).toHaveLength(golden.points);
@@ -182,5 +182,19 @@ describe('Architektur', () => {
     expect(b.pointsRef.current).toHaveLength(0);
     expect(a.canonDistRef.current).not.toBe(b.canonDistRef.current);
     expect(a.gpsQualityRef.current).not.toBe(b.gpsQualityRef.current);
+  });
+});
+
+
+describe('Lay continuity: explicitly changed pause/gap semantics', () => {
+  it.each(['badAccuracyAtCorner', 'longGapAndDuplicateTime', 'pausedMidRoute'])('%s stores a new section and no unknown distance', name => {
+    const run = runScenario(scenarios.find(s => s.name === name)!);
+    expect(run.points.filter(p => p.breakBefore)).toHaveLength(1);
+    const index = run.results.findIndex(r => r.acceptedPoint?.breakBefore);
+    expect(index).toBeGreaterThan(0);
+    expect(run.results[index].distanceM).toBe(run.results[index - 1].distanceM);
+    expect([...run.buffered].some(p => p.breakBefore) || run.points.some(p => p.breakBefore)).toBe(true);
+    // The boundary cannot produce a new corner; subsequent observed turns still work.
+    expect(run.results[index].corners).toEqual([]);
   });
 });

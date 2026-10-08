@@ -133,3 +133,18 @@ it('Replay übernimmt die Hundefarbe ohne Suchspur und Heatmap umzudeuten', () =
   expect(byColor(p, HEAT[0].color)).toHaveLength(1);
   act(() => node.unmount());
 });
+
+
+it('draws separated lay and search polylines and no puck during a recording gap', () => {
+  const points: ReplayGeometry["points"] = [ll(0, 0), ll(0, 10), { ...ll(0, 100), breakBefore: true }, ll(0, 110)];
+  const geometry = { points, pointsTimeSec: [0, 2, 20, 22] };
+  let node!: ReactTestRenderer;
+  act(() => { node = TestRenderer.create(<TrackReplayMap
+    layPoints={points.map(p => ({ lat: p.latitude, lng: p.longitude, breakBefore: p.breakBefore }))}
+    markers={[]} heatmapParts={[]} puckPosition={replayPositionAt(geometry, 10)} runPoints={points}
+    playedPoints={replayTraveledPoints(geometry, 10)} />); });
+  expect(reference(polylines(node)).map(p => p.coordinates.length)).toEqual([2, 2]);
+  expect(byColor(polylines(node), SEARCH_ROUTE_FULL_STROKE).map(p => p.coordinates.length)).toEqual([2, 2]);
+  expect(byColor(polylines(node), SEARCH_ROUTE_PLAYED_STROKE).map(p => p.coordinates.length)).toEqual([2]);
+  act(() => { node.unmount(); });
+});

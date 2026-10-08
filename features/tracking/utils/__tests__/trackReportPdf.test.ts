@@ -63,3 +63,17 @@ it('keeps long names and missing values readable, preserves gaps, and reports un
   expect(text.replaceAll(' ','')).toContain(labels.glyphNotice.replaceAll(' ',''));
   expect(paths.mock.calls.filter(([,options])=>options?.borderWidth===4)).toHaveLength(2);
 }, PDF_TEST_TIMEOUT_MS);
+
+it('shows the partial notice and refuses a stale numeric overall score', async () => {
+  const drawn = jest.spyOn(PDFPage.prototype, 'drawText');
+  const data = buildTrackUserExport({ points: [{ latitude: 47, longitude: 8 }, { latitude: 47.001, longitude: 8.001, breakBefore: true }], notes: 'CURRENT_DRAFT' }, '2026-10-08T12:00:00Z', true);
+  data.summary.analysisScore = 64;
+  const partialLabels = { ...labels, partialNotice: deCH['track.report.partialNotice'] };
+  const bytes = await buildTrackReportPdf(data, font, partialLabels, logo);
+  expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(0);
+  assertTextBounds(drawn.mock.calls);
+  const rendered = drawn.mock.calls.map(([text]) => text).join(' ');
+  expect(rendered).toContain('Teilaufzeichnung:');
+  expect(rendered).toContain('CURRENT_DRAFT');
+  expect(rendered).not.toContain('64');
+}, PDF_TEST_TIMEOUT_MS);

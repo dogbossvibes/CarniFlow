@@ -6,12 +6,14 @@ import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { loadPending, writePendingNow, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import {
-  applyTrackRecovery, completeTrackWithoutApp, discardSearchAttempt, evaluateTrackRecovery, healActiveFaehrtenFromPending, recordTrackCancelled,
+  loadLayRecovery, applyTrackRecovery, completeTrackWithoutApp, discardSearchAttempt, evaluateTrackRecovery, healActiveFaehrtenFromPending, recordTrackCancelled,
 } from '@/features/tracking/services/trackRecoveryService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
+const mockWriteLay = jest.fn();
+const mockWriteMarker = jest.fn();
 const mockSession = jest.fn();
 const mockLay = jest.fn();
 const mockMarkers = jest.fn();
@@ -34,6 +36,8 @@ jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
 }));
 jest.mock('@/features/tracking/native/liegezeitNotification', () => ({ endLiegezeitNotification: () => mockEndNotification() }));
 jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
+  createLocalTrackPointsBatch: (...a: unknown[]) => mockWriteLay(...a),
+  createLocalTrackMarker: (...a: unknown[]) => mockWriteMarker(...a),
   getLayTrackPointsBySession: (...a: unknown[]) => mockLay(...a),
   getTrackMarkersBySession: (...a: unknown[]) => mockMarkers(...a),
   getSearchPointsBySession: (...a: unknown[]) => mockSearch(...a),
@@ -64,6 +68,7 @@ beforeEach(async () => {
   useActiveFaehrten.setState({ byDog: {}, hydrated: true });
   useTrackingStore.setState({ dogId: null, currentSessionId: null, trackPoints: [], isRecording: false });
   [mockSession, mockLay, mockMarkers, mockSearch, mockCreateSession, mockClaimQuota, mockRemote, mockMarkCancelled, mockSetLifecycle, mockDeleteSession, mockEndNotification, mockDeleteSearch].forEach(m => m.mockReset());
+  mockWriteLay.mockReset().mockResolvedValue(undefined); mockWriteMarker.mockReset().mockResolvedValue(undefined);
   mockSession.mockResolvedValue(sessionRow);
   mockLay.mockResolvedValue([layRow(0), layRow(1), layRow(2)]);
   mockMarkers.mockResolvedValue([]);
@@ -372,5 +377,36 @@ describe('discardSearchAttempt („Absuche verwerfen")', () => {
     expect(await discardSearchAttempt('sess-A', 'dog-A')).toEqual({ ok: false, reason: 'failed' });
     warn.mockRestore();
     expect((await loadPending('dog-A'))?.status).toBe('searching');
+  });
+});
+
+
+describe('explicit lay resume I/O', () => {
+  const args = { sessionId: 'sess-A', dogId: 'dog-A', userId: 'user-1' };
+  beforeEach(async () => {
+    mockSession.mockResolvedValue({ ...sessionRow, status: 'active', ended_at: null, started_at: new Date(LAY_END - 300000).toISOString() });
+    await writePendingNow('dog-A', pending({ status: 'laying', layFinishedAt: null }));
+  });
+  it('keeps the owner/session and backfills only the missing point, without quota or remote writes', async () => {
+    mockLay.mockResolvedValue([layRow(0), layRow(1)]);
+    const result = await loadLayRecovery(args);
+    expect(result?.pending.trackPoints).toHaveLength(3);
+    expect(mockWriteLay).toHaveBeenCalledWith('sess-A', [expect.objectContaining({ timestamp: layRow(2).timestamp })]);
+    expect(mockCreateSession).not.toHaveBeenCalled();
+    expect(mockClaimQuota).not.toHaveBeenCalled();
+    expect(mockRemote).not.toHaveBeenCalled();
+    expect(useTrackingStore.getState().isRecording).toBe(false);
+  });
+  it('rejects an account mismatch before local recovery writes', async () => {
+    expect(await loadLayRecovery({ ...args, userId: 'other' })).toBeNull();
+    expect(mockWriteLay).not.toHaveBeenCalled();
+    expect(mockWriteMarker).not.toHaveBeenCalled();
+  });
+  it('does not arm recording or remove the recovery snapshot when local backfill fails', async () => {
+    mockLay.mockResolvedValue([layRow(0)]);
+    mockWriteLay.mockRejectedValueOnce(new Error('disk failure'));
+    await expect(loadLayRecovery(args)).rejects.toThrow('disk failure');
+    expect((await loadPending('dog-A'))?.status).toBe('laying');
+    expect(useTrackingStore.getState().isRecording).toBe(false);
   });
 });

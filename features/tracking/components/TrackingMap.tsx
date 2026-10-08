@@ -1,3 +1,4 @@
+import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -172,16 +173,16 @@ export function TrackingMap({
   // ein gleitendes Mittel würde Ecken abrunden, sodass die Linie neben den
   // Winkel-Markern verläuft. Nur grobe Ausreisser entfernen → Linie folgt dem
   // echten Weg und trifft die Winkel.
-  const layCoords = useMemo(
-    () => removeGpsJitter(layPoints).map(p => ({ latitude: p.lat, longitude: p.lng })),
+  const layParts = useMemo(
+    () => splitContinuousPoints(layPoints).map(part => removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng }))),
     [layPoints],
   );
   const laySegmentParts = useMemo(
     () => buildTrackSegmentPolylines(layPoints.map(p => ({ ...p, t: 0 })), segments),
     [layPoints, segments],
   );
-  const runCoords = useMemo(
-    () => removeGpsJitter(runPoints ?? []).map(p => ({ latitude: p.lat, longitude: p.lng })),
+  const runParts = useMemo(
+    () => splitContinuousPoints(runPoints ?? []).map(part => removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng }))),
     [runPoints],
   );
   // Rohspur bewusst UNGEGLÄTTET (zeigt das echte GPS-Rauschen für die Analyse).
@@ -321,9 +322,9 @@ export function TrackingMap({
               zIndex={part.kind === 'segment' ? 3 : 2}
             />
           );
-        }) : layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={layColor} strokeWidth={4} lineCap="round" lineJoin="round" />
-        )}
+        }) : layParts.filter(part => part.length > 1).map((part, index) => (
+          <Polyline key={`lay-${index}`} coordinates={part} strokeColor={layColor} strokeWidth={4} lineCap="round" lineJoin="round" />
+        ))}
         {/* Fährten-Maßstab: dezente Querstriche über der gelegten Linie (zIndex 4),
             Zahlen nur alle 10 m (bzw. ausgedünnt). Standard-Delta wie initialRegion. */}
         {scaleTicks && scaleTicks.ticks.length > 0 && (
@@ -337,9 +338,9 @@ export function TrackingMap({
           />
         )}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
-        {runCoords.length > 1 && (
-          <Polyline coordinates={runCoords} strokeColor={C.trackBlue} strokeWidth={4} />
-        )}
+        {runParts.filter(part => part.length > 1).map((part, index) => (
+          <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={4} />
+        ))}
 
         {/* Verworfene Punkte (Debug): kleine rote Marker */}
         {rejectedCoords.map((c, i) => (

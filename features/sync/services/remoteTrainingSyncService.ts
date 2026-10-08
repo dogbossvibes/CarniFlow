@@ -48,8 +48,9 @@ export async function createRemoteTrainingSession(local: LocalTrainingSession): 
         average_deviation_meters: summary.run.average_deviation_meters ?? null,
         articles_found:           summary.run.articles_found ?? null,
       } : {}),
-      ...((summary.segments || summary.run || summary.legs || summary.score != null || summary.evaluated_at) ? { track_data: {
+      ...((summary.layContinuity || summary.segments || summary.run || summary.legs || summary.score != null || summary.evaluated_at) ? { track_data: {
         ...(summary.segments ? { segments: summary.segments } : {}),
+        ...(summary.layContinuity ? { layContinuity: summary.layContinuity } : {}),
         ...(summary.run ? { run: runSummaryForTrackData(summary.run) } : {}),
         ...(summary.legs ? { legs: summary.legs } : {}),
         ...(summary.score != null ? { score: summary.score } : {}),

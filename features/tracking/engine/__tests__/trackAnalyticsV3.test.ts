@@ -189,3 +189,22 @@ describe('Automatische Gegenstandskontakte ohne Fundbehauptung', () => {
     expect(result.objectIndex).toBe(1);
   });
 });
+
+
+describe('Continuity assessment', () => {
+  it('excludes an explicit short interruption from assessable distance and elapsed deviation time', () => {
+    const points = [sample(0, 0), sample(2, 2), sample(80, 3, 0.5, 1, { breakBefore: true }), sample(82, 5), sample(84, 7)];
+    const result = computeTrackAnalyticsV3(input(points));
+    expect(result.assessableDistance.totalDistanceM).toBe(6);
+    expect(result.deviation.timeWithinM2S).toBe(6);
+    expect(result.pace.avgMps).toBeLessThan(2);
+  });
+  it('cannot join an excursion and its return across a recording gap', () => {
+    const points = [sample(0, 0), sample(2, 2), sample(4, 4, 6), sample(6, 6, 7), sample(8, 8, 8), sample(10, 10, 9),
+      sample(20, 11, 0.5, 1, { breakBefore: true }), sample(22, 13), sample(24, 15), sample(26, 17)];
+    const events = detectDeviationEvents(classifyAnalyticsSamples(points));
+    expect(events).toHaveLength(1);
+    expect(events[0].recovered).toBe(false);
+    expect(events[0].durationSec).toBe(6);
+  });
+});

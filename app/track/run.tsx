@@ -1,3 +1,4 @@
+import { readContinuityPoint } from '@/features/tracking/utils/trackContinuity';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Pressable, ScrollView, Text, View } from 'react-native';
@@ -48,6 +49,7 @@ import { getSearchPointsBySession } from '@/features/tracking/repositories/local
 import { discardSearchAttempt } from '@/features/tracking/services/trackRecoveryService';
 import { endLiegezeitNotification } from '@/features/tracking/native/liegezeitNotification';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { formatApproxDeviationM } from '@/features/tracking/utils/formatDeviation';
 import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import type { GpsStats } from '@/features/tracking/engine/types';
@@ -133,7 +135,7 @@ export default function TrackRunScreen() {
     // bei selbst-benachbarten Schenkeln den Durchgang über die gemeinsame
     // Zeitachse Marker ↔ Linie (P0 „Self-Crossing", qa-0ec8c4ca). Für den
     // Recorder (LL) ist das Feld unsichtbar.
-    const laidPoints = st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng, t: p.t }));
+    const laidPoints = st.trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng, t: p.t, ...(p.breakBefore ? { breakBefore: true } : {}) }));
     // Kanonische Eventposition (P0-Fix „Canonical Reference Progress"): JEDER
     // Marker bekommt seine Bogenlänge auf GENAU dieser laidPoints-Linie —
     // per Projektion seiner Koordinate (canonicalArc.ts). `distance_from_start`
@@ -153,7 +155,7 @@ export default function TrackRunScreen() {
       }
     }
     return {
-      laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng })),
+      laidLatLng: st.trackPoints.map(p => ({ lat: p.lat, lng: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
       laidPoints,
       laidAccuracies: st.trackPoints.map(p => p.accuracy ?? null),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number },
@@ -470,11 +472,13 @@ export default function TrackRunScreen() {
       const rows = await getSearchPointsBySession(sessId).catch(() => [] as any[]);
       saved = rows.map(r => ({
         lat: r.latitude, lng: r.longitude, accuracy: r.accuracy ?? null, altitude: r.altitude ?? null,
-        speed: r.speed ?? null, heading: null, t: Date.parse(r.timestamp) || Date.now(),
+        speed: r.speed ?? null, heading: null, t: Date.parse(r.timestamp), ...readContinuityPoint(r.payload_json),
       }));
     }
-    if (saved.length === 0) saved = pending.searchPoints ?? [];
-    return dedupeSearchPoints(saved);
+    // SQLite can contain the flushed prefix while the pending snapshot has the tail.
+    return dedupeSearchPoints([...saved, ...(pending.searchPoints ?? [])]
+      .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng) && Number.isFinite(p.t))
+      .sort((a, b) => a.t - b.t));
   };
 
   // 3) Recovery-Dialog: „Laufende Absuche fortsetzen?" (Fortsetzen/Beenden/Verwerfen).
@@ -510,45 +514,45 @@ export default function TrackRunScreen() {
     const runState = useTrackingStore.getState().searchRunState;
     prevOffTrackRef.current = runState.offTrackState;
     segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };
-    s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })), startedAtMs: pending.searchStartedAt ?? Date.now(), runState });
+    const startedAtMs = pending.searchStartedAt ?? Date.now();
+    s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
+      pointsTimeSec: saved.map(p => Math.max(0, (p.t - startedAtMs) / 1000)), startedAtMs, runState });
   };
 
   // Beenden: vorhandene Suchpunkte speichern + Session sauber abschliessen.
   const endSearch = async (pending: PendingTrack) => {
+    if (!(await flushSearchPoints(pending.sessionId ?? effectiveId ?? undefined).catch(() => false))) {
+      Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+      return;
+    }
     const saved = await loadSavedSearchPoints(pending);
-    await flushSearchPoints().catch(() => {});
     const sessId = pending.sessionId ?? effectiveId;
+    if (!sessId) { Alert.alert(t('common.error'), t('track.recoverySaveFailed')); return; }
     const runId = pending.runId ?? runIdRef.current ?? Crypto.randomUUID();
     const durationS = pending.searchStartedAt ? Math.max(0, Math.floor((Date.now() - pending.searchStartedAt) / 1000)) : 0;
-    // LOKAL zuerst (durabel): Run-Ergebnis der beendeten Absuche in payload_json.run.
-    //
-    // BEKANNTE EINSCHRÄNKUNG (Punkt 8 der Nachbesserung, geprüft, nicht
-    // improvisiert): dieser Recovery-Kurzpfad läuft NICHT über den laufenden
-    // useSearchRecorder — `saved` sind rohe, aus SQLite/dem Store
-    // wiederhergestellte Punkte (lat/lng/accuracy/…), OHNE die pro-Fix
-    // Cursor-Projektion/Abweichung/Fusion-Confidence, aus der
-    // AnalyticsSample[] besteht. Score/deviationAvgM/foundObjects/breaks sind
-    // in diesem Pfad bereits VOR dieser Nachbesserung hart auf 0/leer gesetzt
-    // (dieselbe Einschränkung, nicht neu) — `analytics` würde dieselbe Lücke
-    // erben und könnte nur durch ein vollständiges Offline-Replay der
-    // Fährtenprojektion (projectForward/EMA/Fusion ausserhalb des Hooks neu
-    // implementiert) korrekt gefüllt werden. Das wäre ein grosser, riskanter
-    // Eingriff ausserhalb des Scopes dieser Nachbesserung ("maximal
-    // konservativ") — daher bewusst NICHT improvisiert. `analytics` bleibt
-    // hier absichtlich weg (siehe buildRunResultPayload — additiv/optional,
-    // kein Dummy-Objekt). Test: run-recovery-analytics-gap.test.ts.
-    if (sessId) {
+    // Recovery has no complete per-fix analytics history. Preserve known facts;
+    // an unavailable score is null, never a fabricated zero-point performance.
+    const runState = useTrackingStore.getState().searchRunState;
+    try {
       await finalizeLocalTrackRun(sessId, buildRunResultPayload({
         runId, sessionId: sessId,
         startedAtMs: pending.searchStartedAt ?? Date.now(), endedAtMs: Date.now(),
         result: {
-          durationS, score: 0, deviationAvgM: 0, foundObjects: 0, totalObjects: 0,
-          distanceM: pathDistanceM(saved), breaks: [],
-          points: saved.map(p => ({ latitude: p.lat, longitude: p.lng })),
+          durationS, score: null,
+          deviationAvgM: runState.devCount > 0 ? runState.devSumM / runState.devCount : null,
+          foundObjects: snapData.laidObjects.filter(o => o.material !== 'duebel' && runState.foundObjectIds.includes(o.id ?? `idx:${o.index}`)).length,
+          totalObjects: snapData.laidObjects.filter(o => o.material !== 'duebel').length,
+          distanceM: pathDistanceM(saved), breaks: runState.breaks,
+          points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
         },
+        pointsTimeSec: pending.searchStartedAt != null ? saved.map(p => Math.max(0, (p.t - pending.searchStartedAt!) / 1000)) : undefined,
         searchHandlerDistanceM: pending.searchHandlerDistanceM,
+        referenceHasGaps: snapData.laidPoints.some(p => p.breakBefore),
         // analytics bewusst NICHT gesetzt — siehe Kommentar oben.
-      })).catch(() => {});
+      }));
+    } catch {
+      Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+      return; // keep the recoverable session until the local result is durable
     }
     // Remote-Transport über die Sync-Queue (RUN-SAVE2), nicht mehr direkt.
     if (sessId) {
@@ -576,7 +580,7 @@ export default function TrackRunScreen() {
         // bleiben. Kein 'cancelled', kein dauerhafter Abbruch-Marker — das ist allein
         // „Fährte abbrechen" vorbehalten. Danach zurück in die Liegezeit.
         const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null);
-        if (!released.ok) useTrackingStore.getState().clearSearchSession();   // lokal trotzdem nie 'cancelled'
+        if (!released.ok) { Alert.alert(t('common.error'), t('track.recoverySaveFailed')); return; }
         useTrackingStore.getState().resetSearchPoints();   // leert auch den Run-State
         startedRef.current = false;   // erlaubt einen frischen Start (neue Absuche, neue runId)
         // Kein State des verworfenen Runs darf in den neuen Search überlaufen.
@@ -590,7 +594,7 @@ export default function TrackRunScreen() {
   };
 
   // Hundespur / Abriss / Position → Karten-Koordinaten ({lat,lng}).
-  const runPoints = useMemo(() => s.points.map(p => ({ lat: p.latitude, lng: p.longitude })), [s.points]);
+  const runPoints = useMemo(() => s.points.map(p => ({ lat: p.latitude, lng: p.longitude, ...(p.breakBefore ? { breakBefore: true } : {}) })), [s.points]);
   const breakPts  = useMemo(() => s.breaks.map(b => ({ lat: b.at.latitude, lng: b.at.longitude })), [s.breaks]);
   const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
@@ -701,6 +705,7 @@ export default function TrackRunScreen() {
   const trackEndState = useTrackEndGuidance({
     recording: searchGuidanceActive,
     paused: s.paused,
+    continuityEpoch: s.continuityEpoch,
     sessionId: effectiveId,
     runId: runIdRef.current,
     dogProgressM: s.dogProgressM,
@@ -869,7 +874,7 @@ export default function TrackRunScreen() {
 
   const hasLaid = snapData.laidPoints.length > 1;
   const devShown = hasLaid && Number.isFinite(s.deviationM) ? s.deviationM : null;
-  const devOff = devShown != null && devShown > 8;
+  const devOff = s.offTrackState !== 'on_track';
 
   const handleCancel = () => {
     Alert.alert('Fährte läuft noch', 'Die Absuche bleibt aktiv. Zum Beenden bitte den Stop-Button antippen.', [{ text: 'Zur Aufnahme', style: 'cancel' }]);
@@ -892,6 +897,13 @@ export default function TrackRunScreen() {
     // defensiver Fallback, falls doch nicht gesetzt.
     const runId = runIdRef.current ?? Crypto.randomUUID();
     const sessId = effectiveId;
+    // Stop schedules the write; successful finalization must await its real result.
+    if (!(await flushSearchPoints(sessId ?? undefined).catch(() => false))) {
+      finishRequestedRef.current = false;
+      setFinishing(false);
+      Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+      return;
+    }
 
     // Punkt 10/13: Track Analytics Engine — REIN aus In-Session-Daten (keine
     // gespeicherten Rohpunkte, keine Migration). Ecken/Gegenstände kommen aus
@@ -972,7 +984,7 @@ export default function TrackRunScreen() {
       durationS: res.durationS,
       handlerDistanceHintM: searchHandlerDistanceM,
       // Referenz-Qualität der gelegten Fährte (Accuracy + scharfe Knicke ohne Winkel-Marker).
-      referenceLine: snapData.laidPoints.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, accuracy: snapData.laidAccuracies[i] ?? null })),
+      referenceLine: snapData.laidPoints.map((p, i) => ({ latitude: p.latitude, longitude: p.longitude, breakBefore: p.breakBefore, accuracy: snapData.laidAccuracies[i] ?? null })),
     }) : undefined;
 
     // 1) LOKAL zuerst = Erfolgsschwelle. Run-Ergebnis dauerhaft in payload_json.run.
@@ -988,6 +1000,7 @@ export default function TrackRunScreen() {
             breaks: res.breaks, points: res.points,
           },
           searchHandlerDistanceM,
+          referenceHasGaps: snapData.laidPoints.some(p => p.breakBefore),
           autoDwellObjectIds: res.autoDwellObjectIds,
           analytics,
           pointsTimeSec: res.pointsTimeSec,
@@ -1090,7 +1103,7 @@ export default function TrackRunScreen() {
   const metrics: { value: string; label: string; warn?: boolean }[] = [
     { value: `${Math.round(s.distanceM)} m`, label: `≈ ${metersToSteps(s.distanceM, stepLengthM)} Schr.` },
     { value: `${s.foundObjects}/${s.totalObjects}`, label: 'Gegenst.' },
-    { value: devShown != null ? `${devOff ? '+' : ''}${devShown.toFixed(1)} m` : '—', label: 'Abweich.', warn: devOff },
+    { value: devShown != null ? `${devOff ? '+' : ''}${formatApproxDeviationM(devShown)}` : '—', label: 'Abweich.', warn: devOff },
     { value: s.accuracy != null ? `±${Math.round(s.accuracy)} m` : '—', label: gpsLabel },
   ];
 
@@ -1156,6 +1169,11 @@ export default function TrackRunScreen() {
           </View>
         </View>
 
+        {(runPoints.some(p => p.breakBefore) || snapData.laidPoints.some(p => p.breakBefore)) && (
+          <View className="mx-[14px] mb-2 px-3 py-2 rounded-xl bg-white/5" accessibilityLiveRegion="polite">
+            <Text className="text-ft-muted text-[12px]">{t('track.continuityNotice')}</Text>
+          </View>
+        )}
         {/* Karte / Skizze */}
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
           {!arming && s.recording && (

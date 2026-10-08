@@ -10,7 +10,7 @@ import type { AngleKind, MarkerType, MarkerMaterial } from '@/features/tracking/
 //   • Start / Ende    = erster / letzter gelegter Punkt (gespeicherte Endpunkte)
 // So entspricht die historische Darstellung exakt dem, was beim Legen gespeichert wurde.
 
-export interface DetailLatLng { lat: number; lng: number }
+export interface DetailLatLng { lat: number; lng: number; breakBefore?: boolean }
 
 export interface DetailMarker {
   id: string;
@@ -38,7 +38,7 @@ export interface TrackDetailMap {
 
 export function buildTrackDetailMap(data: unknown): TrackDetailMap {
   const d = (data ?? {}) as {
-    points?: { latitude: number; longitude: number; point_type?: string | null }[];
+    points?: { latitude: number; longitude: number; point_type?: string | null; breakBefore?: boolean }[];
     runs?: { run_points?: { lat: number; lng: number }[] }[];
     markers?: {
       id: unknown; marker_type: MarkerType; latitude?: number | null; longitude?: number | null;
@@ -50,11 +50,11 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
 
   const lay: DetailLatLng[] = (d.points ?? [])
     .filter((p) => (p.point_type ?? 'lay') === 'lay')
-    .map((p) => ({ lat: p.latitude, lng: p.longitude }));
+    .map((p) => ({ lat: p.latitude, lng: p.longitude, ...(p.breakBefore ? { breakBefore: true } : {}) }));
 
   // Darstellung der Absuche: turn-aware `replay_points`, sonst `run_points` (Legacy).
   const run: DetailLatLng[] = selectDisplayRunPoints(data).points
-    .map((p) => ({ lat: p.lat, lng: p.lng }));
+    .map((p) => ({ lat: p.lat, lng: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) }));
 
   const sourceMarkers = d.markers ?? [];
   const cornerDistances = sourceMarkers

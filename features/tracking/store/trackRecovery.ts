@@ -1,3 +1,4 @@
+import { readContinuityPoint } from '../utils/trackContinuity';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
 import type { AngleKind, MarkerMaterial, MarkerSample, MarkerType, SessionStatus, TrackPointSample } from '@/features/tracking/store/trackingStore';
 import {
@@ -41,9 +42,8 @@ export type TrackCancelSource = 'resting_abort' | 'lay_conflict';
 //   resting/laid → Liegezeit (/track/liegen), aus Registry, Puffer oder SQLite.
 //   searching    → bestehende Search-Recovery in run.tsx (decideRecovery/resumeSearch),
 //                  NUR aus Registry/Puffer — eine Absuche wird nie aus SQLite rekonstruiert.
-//   laying       → NICHT freigegeben: der Recorder (useTrackRecorder) kann seinen
-//                  internen Zustand (Punkte/Distanz/Winkel-Confirmer) nicht aus dem Puffer
-//                  wiederaufnehmen; das ginge nur über Recorder-Änderungen.
+//   laying       → explicit resume of an authenticated local active session and matching
+//                  pending snapshot; fresh section/detectors, no automatic recording.
 //
 // Wichtig: `local_training_sessions.status = 'completed'` beweist NICHT, dass der
 // Fährtenprozess abgeschlossen ist — useTrackRecorder.finish() finalisiert die
@@ -72,11 +72,11 @@ export type RecoveryRejectReason =
   | 'search_completed'  // Suchlauf vorhanden → Fährte ist abgeschlossen
   | 'search_started'    // Suchpunkte ohne Lauf → Zustand nicht eindeutig
   | 'completed_without_app'   // dauerhaft „Ohne App abgeschlossen"
-  | 'laying_not_supported'    // unterbrochenes Legen: Recorder kann nicht wiederaufnehmen
+  | 'laying_not_supported'    // widersprüchlicher/finalisierter Lay-Zustand, nicht sicher wiederaufnehmbar
   | 'no_geometry';
 
 /** Lifecycle-Phase, in die fortgesetzt wird. */
-export type RecoveryMode = 'resting' | 'searching';
+export type RecoveryMode = 'resting' | 'searching' | 'laying';
 
 export type RecoverySource = 'registry' | 'pending' | 'session';
 
@@ -217,7 +217,7 @@ export function reconstructPendingFromSession(
 
   const trackPoints: TrackPointSample[] = layPoints.map(p => ({
     lat: p.latitude, lng: p.longitude, accuracy: p.accuracy, altitude: p.altitude,
-    speed: p.speed, heading: p.heading, t: Date.parse(p.timestamp),
+    speed: p.speed, heading: p.heading, t: Date.parse(p.timestamp), ...readContinuityPoint(p.payload_json),
   }));
   if (!hasValidLayGeometry(trackPoints) || !trackPoints.every(p => isNum(p.t))) return { ok: false, reason: 'no_geometry' };
 
@@ -309,7 +309,7 @@ export function decideTrackRecovery(input: {
 
   const reg = isValidEntry(registry[dogId]) ? registry[dogId] : null;
   if (reg && reg.sessionId !== sessionId) return { ok: false, reason: 'other_active' };
-  if (reg?.status === 'laying') return { ok: false, reason: 'laying_not_supported' };
+
 
   const finish = (source: RecoverySource, patch: Partial<ActiveFaehrte> | null, write: PendingTrack | null): RecoveryDecision => {
     const entry = patch ? upsertEntry(registry, dogId, patch)[dogId] : reg!;
@@ -320,7 +320,22 @@ export function decideTrackRecovery(input: {
   // Puffer frisch gelegter Fährten tragen sessionId=null (Recorder) → Zuordnung über den Registry-Beleg.
   const samePending = belongsToSession(pending, { dogId, sessionId }, reg?.sessionId ?? null);
   if (pending && !samePending && isOpenPending(pending)) return { ok: false, reason: 'other_pending' };
-  if (samePending && pendingStatus(pending!) === 'laying') return { ok: false, reason: 'laying_not_supported' };
+  if (reg?.status === 'laying' || (samePending && pendingStatus(pending!) === 'laying')) {
+    // Resume only the authenticated, still-open local recording and its own snapshot.
+    // An old registry entry can never reopen a finalized or foreign session.
+    if (!local || !input.userId) return { ok: false, reason: 'unknown_session' };
+    if (local.session.type !== 'track') return { ok: false, reason: 'not_track' };
+    if (local.session.status !== 'active' || local.session.ended_at || local.searchPointCount > 0)
+      return { ok: false, reason: 'laying_not_supported' };
+    if (!samePending || pending?.status !== 'laying' || pending.layFinishedAt
+      || !hasValidLayGeometry(pending.trackPoints) || !pending.trackPoints.every(p => isNum(p.t))
+      || !isNum(pending.distanceMeters) || !isNum(pending.durationSeconds)) return { ok: false, reason: 'no_geometry' };
+    const restored: PendingTrack = { ...pending, sessionId, dogId, paused: true };
+    const patch = registryPatchFromPending(restored, now);
+    const entry = upsertEntry(registry, dogId, patch)[dogId];
+    return { ok: true, source: 'pending', mode: 'laying', pendingToWrite: restored,
+      registryPatch: patch, target: reopenTarget(entry) };
+  }
   if (samePending && !RECOVERABLE_PENDING.includes(pendingStatus(pending!))) return { ok: false, reason: 'pending_closed' };
 
   // Recovery A: eigener, offener Puffer vorhanden (resting ODER laufende Absuche —
@@ -423,12 +438,12 @@ export function decideSearchDiscard(input: {
 
   const reg = isValidEntry(registry[dogId]) ? registry[dogId] : null;
   if (reg && reg.sessionId !== sessionId) return { ok: false, reason: 'other_active' };
-  if (reg?.status === 'laying') return { ok: false, reason: 'laying_not_supported' };
+
 
   // Puffer frisch gelegter Fährten tragen sessionId=null (Recorder) → Zuordnung über den Registry-Beleg.
   const samePending = belongsToSession(pending, { dogId, sessionId }, reg?.sessionId ?? null);
   if (pending && !samePending && isOpenPending(pending)) return { ok: false, reason: 'other_pending' };
-  if (samePending && pendingStatus(pending!) === 'laying') return { ok: false, reason: 'laying_not_supported' };
+  if (reg?.status === 'laying' || (samePending && pendingStatus(pending!) === 'laying')) return { ok: false, reason: 'laying_not_supported' };
   if (samePending && !RECOVERABLE_PENDING.includes(pendingStatus(pending!))) return { ok: false, reason: 'pending_closed' };
 
   let next: PendingTrack;

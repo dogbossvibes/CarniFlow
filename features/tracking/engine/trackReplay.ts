@@ -12,7 +12,7 @@ import type { AnalyticsSegment } from '@/features/tracking/engine/trackSegmentAn
 export type ReplaySpeed = 0.5 | 1 | 2 | 4;
 export const REPLAY_SPEEDS: ReplaySpeed[] = [0.5, 1, 2, 4];
 
-export interface ReplayGeometryPoint { latitude: number; longitude: number }
+export interface ReplayGeometryPoint { latitude: number; longitude: number; breakBefore?: boolean }
 
 export interface ReplayGeometry {
   points: ReplayGeometryPoint[];
@@ -105,6 +105,7 @@ export function replayPositionAt(geometry: ReplayGeometry, elapsedSec: number): 
       const span = t1 - t0;
       const t = span > 0 ? (elapsedSec - t0) / span : 0;
       const a = points[i - 1], b = points[i];
+      if (b.breakBefore) return elapsedSec === t1 ? b : null;
       return { latitude: a.latitude + (b.latitude - a.latitude) * t, longitude: a.longitude + (b.longitude - a.longitude) * t };
     }
   }
@@ -122,7 +123,7 @@ export function replayTraveledPoints(geometry: ReplayGeometry, elapsedSec: numbe
     out.push(points[i]);
   }
   const puck = replayPositionAt(geometry, elapsedSec);
-  if (puck && out.length < points.length) out.push(puck);
+  if (puck && out.length < points.length && pointsTimeSec[out.length - 1] !== elapsedSec) out.push(puck);
   return out;
 }
 

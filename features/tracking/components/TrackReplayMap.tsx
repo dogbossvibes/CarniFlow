@@ -1,3 +1,4 @@
+import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -61,25 +62,17 @@ export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, 
   const fitDoneRef = useRef(false);
   const { t } = useT();
 
-  const layCoords = useMemo(
-    () => removeGpsJitter(layPoints).map(p => ({ latitude: p.lat, longitude: p.lng })),
+  const layParts = useMemo(
+    () => splitContinuousPoints(layPoints).map(part => removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng }))),
     [layPoints],
   );
+  const layCoords = useMemo(() => layParts.flat(), [layParts]);
   const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers]);
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
 
-  const runCoords = useMemo(
-    () => runPoints.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
-    [runPoints],
-  );
-  const playedCoords = useMemo(
-    () => playedPoints.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
-    [playedPoints],
-  );
-  // Bei 0 s liefert replayTraveledPoints [Startpunkt, Puck=Startpunkt] — eine
-  // Linie ohne Ausdehnung wird nicht gezeichnet (abgespielt = nur Start).
-  const hasPlayedLine = playedCoords.length > 1
-    && playedCoords.some(c => c.latitude !== playedCoords[0].latitude || c.longitude !== playedCoords[0].longitude);
+  const runParts = useMemo(() => splitContinuousPoints(runPoints), [runPoints]);
+  const playedParts = useMemo(() => splitContinuousPoints(playedPoints), [playedPoints]);
+  const runCoords = runPoints;
 
   const fitCoords = useMemo(() => {
     const heatCoords = heatmapParts.flatMap(p => p.coordinates);
@@ -121,27 +114,27 @@ export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, 
         initialRegion={{ latitude: initial.lat, longitude: initial.lng, latitudeDelta: 0.0025, longitudeDelta: 0.0025 }}
       >
         {/* 1 Referenz — immer komplett, nie nach Replay-Zeit abgeschnitten. */}
-        {layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={laidTrackStroke('normal', layColor).strokeColor} strokeWidth={4} lineCap="round" lineJoin="round" zIndex={1} />
-        )}
+        {layParts.filter(part => part.length > 1).map((part, index) => (
+          <Polyline key={`lay-${index}`} coordinates={part} strokeColor={laidTrackStroke('normal', layColor).strokeColor} strokeWidth={4} lineCap="round" lineJoin="round" zIndex={1} />
+        ))}
 
         {/* 2 volle Absuche-Route — dezenter blauer Unterbau, immer komplett. */}
-        {runCoords.length > 1 && (
-          <Polyline coordinates={runCoords} strokeColor={SEARCH_ROUTE_FULL_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={2} />
-        )}
+        {runParts.filter(part => part.length > 1).map((part, index) => (
+          <Polyline key={`run-${index}`} coordinates={part} strokeColor={SEARCH_ROUTE_FULL_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={2} />
+        ))}
 
         {/* 3 bereits abgespielter Teil — kräftig blau, wächst mit der Zeit. */}
-        {hasPlayedLine && (
-          <Polyline coordinates={playedCoords} strokeColor={SEARCH_ROUTE_PLAYED_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={3} />
-        )}
+        {playedParts.filter(part => part.length > 1).map((part, index) => (
+          <Polyline key={`played-${index}`} coordinates={part} strokeColor={SEARCH_ROUTE_PLAYED_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={3} />
+        ))}
 
         {/* 4 Heatmap-eingefärbte Ist-Suchspur — vorab memoiziert übergeben,
             ändert sich NICHT während des Replays. Schmaler als die blaue
             Einfassung, damit die Analysefarbe sichtbar bleibt UND die Spur
             eindeutig als Absuche erkennbar ist. */}
-        {heatmapParts.map(part => (
+        {heatmapParts.map((part, index) => (
           <Polyline
-            key={part.segmentId}
+            key={`${part.segmentId}-${index}`}
             coordinates={part.coordinates.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
             strokeColor={part.color}
             strokeWidth={4}

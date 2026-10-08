@@ -22,7 +22,7 @@ export function TrackExportActions({ data }: { data: unknown }) {
     if(busyRef.current)return;busyRef.current=true;setActiveFormat(format);
     AccessibilityInfo.announceForAccessibility(t('track.export.preparing', { format: format.toUpperCase() }));
     try {
-      const keys=['title','reference','search','duration','objects','score','confidence','conditions','notes','map','source','unknown','date','glyphNotice'] as const;
+      const keys=['title','reference','search','duration','objects','score','confidence','conditions','notes','map','source','unknown','date','glyphNotice', 'partialNotice'] as const;
       const labels=Object.fromEntries(keys.map(key=>[key,t(`track.report.${key}` as TranslationKey)])) as unknown as ReportLabels;
       labels.noGeometry=t('track.export.unavailable');
       labels.confidenceLabels={ excellent:t('track.replay.legend.confidenceExcellent'), good:t('track.replay.legend.confidenceGood'), limited:t('track.replay.legend.confidenceLimited'), unreliable:t('track.replay.legend.confidenceUnreliable') };

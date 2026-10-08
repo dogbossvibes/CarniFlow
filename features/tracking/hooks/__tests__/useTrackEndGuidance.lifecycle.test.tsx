@@ -144,13 +144,16 @@ describe.each(['ios', 'android'] as const)('End hook lifecycle (%s platform mock
     expect(Speech.speak).toHaveBeenCalledTimes(1);
   });
 
-  it('pause blocks a grace timeout, then resume preserves once-only detection', () => {
+  it('pause expires unconfirmed evidence; new evidence confirms once only', () => {
     arrive(); update({ paused: true });
     act(() => { jest.advanceTimersByTime(FINAL_OBJECT_END_GRACE_MS); });
     expect(fired).not.toHaveBeenCalled();
     update({ paused: false }); fix(5000, 0.5);
+    expect(fired).not.toHaveBeenCalled();
+    fix(6000, 5); fix(7000, 0.5); fix(8000, 0.5);
+    act(() => { jest.advanceTimersByTime(FINAL_OBJECT_END_GRACE_MS); });
     expect(fired).toHaveBeenCalledTimes(1);
-    update({ paused: true }); update({ paused: false }); fix(6000, 0.5);
+    update({ paused: true }); update({ paused: false }); fix(10_000, 0.5);
     expect(fired).toHaveBeenCalledTimes(1);
   });
 

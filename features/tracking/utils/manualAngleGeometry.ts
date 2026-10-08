@@ -1,4 +1,4 @@
-import type { FusedTurn } from '@/features/tracking/utils/turnFusion';
+import { fuseTurns, type FusedTurn } from '@/features/tracking/utils/turnFusion';
 import type { ShortLegPoint } from '@/features/tracking/utils/shortLegCornerDetection';
 
 type ManualType = 'ow' | 'bw' | 'gw';
@@ -38,4 +38,18 @@ export function classifyManualAngleGeometry(
       motionDirection: turn.motion.direction, directionAgrees: turn.motion.directionAgrees,
       classificationSource: turn.source };
   }) };
+}
+
+/** Match across observed sections, without asking the turn detector to cross a gap. */
+export function classifyManualAngleGeometrySections(
+  markers: Parameters<typeof classifyManualAngleGeometry>[0], sections: readonly (readonly ShortLegPoint[])[],
+) {
+  const points: ShortLegPoint[] = [];
+  const turns: FusedTurn[] = [];
+  for (const section of sections) {
+    const offset = points.length;
+    turns.push(...fuseTurns(section).turns.map(turn => ({ ...turn, apexIndex: turn.apexIndex + offset })));
+    points.push(...section);
+  }
+  return classifyManualAngleGeometry(markers, points, turns);
 }

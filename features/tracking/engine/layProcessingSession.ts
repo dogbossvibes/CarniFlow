@@ -1,3 +1,4 @@
+import { isRecordingGap, splitContinuousPoints } from '../utils/trackContinuity';
 import type * as Location from 'expo-location';
 import type { AngleKind, MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
 import {
@@ -81,6 +82,9 @@ export interface AngleDebug {
 
 /** Fachlicher (und verarbeitungsnaher Diagnose-)Zustand EINER Lay-Session. */
 export interface LayProcessingState {
+  continuityPendingRef: Box<boolean>;
+  detectorOffsetRef: Box<number>;
+  completedDetectorSectionsRef: Box<ShortLegPoint[][]>;
   pointsRef: Box<AcceptedPoint[]>;
   emaRef: Box<LatLng | null>;
   lineEmaRef: Box<LatLng | null>;
@@ -117,6 +121,9 @@ export interface LayProcessingState {
 /** Anfangszustand — identisch zu den bisherigen useRef-Initialwerten. */
 export function createLayProcessingState(): LayProcessingState {
   return {
+    continuityPendingRef: box(false),
+    detectorOffsetRef: box(0),
+    completedDetectorSectionsRef: box<ShortLegPoint[][]>([]),
     pointsRef: box<AcceptedPoint[]>([]),
     emaRef: box<LatLng | null>(null),
     lineEmaRef: box<LatLng | null>(null),
@@ -164,7 +171,7 @@ export interface LayStoreFacade {
 
 export type LayPointRow = {
   latitude: number; longitude: number; accuracy: number | null; altitude: number | null;
-  speed: number | null; heading: number | null; timestamp: string;
+  speed: number | null; heading: number | null; timestamp: string; breakBefore?: boolean; measuredDistanceM?: number;
 };
 
 /** Vom Owner (heute: useTrackRecorder) bereitgestellte Ein-/Ausgänge. */
@@ -224,6 +231,18 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
 
   // Relativkoordinaten für den QA-Mitschnitt. Der Ursprung ist der erste
   // Rohfix; er selbst wird NICHT mitgeschrieben, nur die Differenzen.
+  const interruptContinuity = () => {
+    if (!recordingRef.current) return;
+    session.continuityPendingRef.current = pointsRef.current.length > 0;
+    emaRef.current = null; lineEmaRef.current = null; lastRawRef.current = null;
+    if (detectPointsRef.current.length) session.completedDetectorSectionsRef.current.push(detectPointsRef.current);
+    session.detectorOffsetRef.current = detectPointsRef.current.at(-1)?.cumDist ?? session.detectorOffsetRef.current;
+    detectPointsRef.current = []; detectEmaRef.current = null; rawTailRef.current = [];
+    liveTurnsRef.current.clear(); turnEvidenceRef.current.clear(); motionBufRef.current.clear();
+    lineTurnZoneRef.current = false; lastCornerAtRef.current = -Infinity;
+    canonDistRef.current.interrupt();
+  };
+
   const qaRel = (lat: number, lng: number, t: number, accuracy: number | null, cumDistM?: number): QaCapturePoint => {
     const o = qaOriginRef.current;
     const mPerLat = 111320;
@@ -439,7 +458,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
 
   const detectCorner = (): LayCornerEvent[] => {
     // BUILD40: unveränderte historische Einzelschuss-Erkennung.
-    if (getTrackingEngineMode() === 'build40') { return persistLegacyCorner(pointsRef.current); }
+    if (getTrackingEngineMode() === 'build40') { return persistLegacyCorner(splitContinuousPoints(pointsRef.current).at(-1) ?? []); }
     // CURRENT: adaptive Short-Leg-Erkennung auf dem dichteren Detektor-Puffer.
     // Die frühere, an LEG_MIN_M = 4 m gebundene Confirmation-Kaskade
     // (feedCornerBuffer/classifyCornerCandidate) konnte Schenkel unter 4 m
@@ -550,7 +569,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     s.addTrackPoint({ lat: p0.lat, lng: p0.lng, accuracy: p0.accuracy, altitude: null, speed: null, heading: null, t: now });
     ptBuffer.current.push({
       latitude: p0.lat, longitude: p0.lng, accuracy: p0.accuracy ?? null,
-      altitude: null, speed: null, heading: null, timestamp: new Date(now).toISOString(),
+      altitude: null, speed: null, heading: null, timestamp: new Date(now).toISOString(), measuredDistanceM: 0,
     });
     void recordBackgroundLayEvent(localSessionId.current, 'onFixAccepted').catch(() => {});
     return true;
@@ -567,6 +586,8 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       lat: c.latitude, lng: c.longitude, accuracy: c.accuracy ?? null,
       altitude: c.altitude ?? null, speed: c.speed ?? null, t: loc.timestamp || Date.now(),
     };
+    if (recordingRef.current && !startLockRef.current
+      && (s.isPaused || isRecordingGap(lastRawRef.current?.t ?? null, raw.t))) interruptContinuity();
     if (__DEV__) console.log('[trackRecorder] fix', { accuracy: raw.accuracy, recording: recordingRef.current });
 
     // ── QA-Mitschnitt: JEDER eingegangene Rohfix, vor allen Gates. Nur im
@@ -672,14 +693,14 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       const dLast = dPts[dPts.length - 1];
       const dStep = dLast ? calculateDistance(dLast, dEma) : 0;
       if (!dLast || dStep >= DETECTOR_INPUT.minStepM) {
-        dPts.push({ lat: dEma.lat, lng: dEma.lng, cumDist: (dLast?.cumDist ?? 0) + dStep, accuracy: raw.accuracy, t: raw.t });
+        dPts.push({ lat: dEma.lat, lng: dEma.lng, cumDist: (dLast?.cumDist ?? session.detectorOffsetRef.current) + dStep, accuracy: raw.accuracy, t: raw.t });
       }
       // Rohfix-Ring für den Stop-Flush (ungeglättet, kein Gate). Nur die
       // letzten Meter werden gebraucht — bewusst klein gehalten.
       const rt = rawTailRef.current;
       const rLast = rt[rt.length - 1];
       const rStep = rLast ? calculateDistance(rLast, { lat: raw.lat, lng: raw.lng }) : 0;
-      rt.push({ lat: raw.lat, lng: raw.lng, cumDist: (rLast?.cumDist ?? 0) + rStep, accuracy: raw.accuracy, t: raw.t });
+      rt.push({ lat: raw.lat, lng: raw.lng, cumDist: (rLast?.cumDist ?? session.detectorOffsetRef.current) + rStep, accuracy: raw.accuracy, t: raw.t });
       if (rt.length > 60) rt.splice(0, rt.length - 60);
       // Kurvenzone für Linien-Gate (dieser Fix) und Linien-Glättung (nächster Fix).
       lineTurnZoneRef.current = inTurnZone(dPts, lastCornerAtRef.current);
@@ -695,12 +716,13 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     }
     const pts = pointsRef.current;
     const last = pts[pts.length - 1];
-    const step = last ? calculateDistance(last, lineEma) : 0;
+    const beginsSection = session.continuityPendingRef.current && !!last;
+    const step = last && !beginsSection ? calculateDistance(last, lineEma) : 0;
     // Turn-aware Gate (CURRENT): 2,0 m auf gerader Strecke wie bisher, in der
     // Kurvenzone dichter (turnAwareLineGate.ts). BUILD40 bleibt beim festen Gate.
     const gateM = getTrackingEngineMode() === 'build40' ? MIN_STEP_M : lineGateStepM(detectPointsRef.current, lastCornerAtRef.current);
     out.rejectReason = 'distance_gate';
-    if (last && step < gateM) {
+    if (last && !beginsSection && step < gateM) {
       void recordBackgroundLayEvent(localSessionId.current, 'onFixRejected', 1, 'distance_gate').catch(() => {});
       return;
     }
@@ -708,7 +730,9 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     const accepted: AcceptedPoint = {
       lat: lineEma.lat, lng: lineEma.lng, t: raw.t, accuracy: raw.accuracy,
       cumDist: (last?.cumDist ?? 0) + step,
+      ...(beginsSection ? { breakBefore: true } : {}),
     };
+    session.continuityPendingRef.current = false;
     pts.push(accepted);
     out.outcome = 'accepted'; out.rejectReason = null; out.acceptedPoint = accepted;
     void recordBackgroundLayEvent(localSessionId.current, 'onFixAccepted').catch(() => {});
@@ -717,12 +741,15 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     const sample: TrackPointSample = {
       lat: accepted.lat, lng: accepted.lng, accuracy: accepted.accuracy,
       altitude: raw.altitude, speed: raw.speed, heading: null, t: accepted.t,
+      measuredDistanceM: canonDistRef.current.total,
+      ...(beginsSection ? { breakBefore: true } : {}),
     };
     s.addTrackPoint(sample, { skipDistance: true });   // Distanz kommt aus canonDistRef (Punktdichte-unabhängig); Store aktualisiert Qualität
     ptBuffer.current.push({
       latitude: sample.lat, longitude: sample.lng, accuracy: sample.accuracy ?? null,
       altitude: sample.altitude ?? null, speed: sample.speed ?? null, heading: null,
-      timestamp: new Date(sample.t).toISOString(),
+      timestamp: new Date(sample.t).toISOString(), measuredDistanceM: canonDistRef.current.total,
+      ...(beginsSection ? { breakBefore: true } : {}),
     });
     if (ptBuffer.current.length >= 25) void flushPoints();
 
@@ -746,5 +773,5 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     return out;
   };
 
-  return { processFix, qaRel };
+  return { processFix, qaRel, interruptContinuity };
 }

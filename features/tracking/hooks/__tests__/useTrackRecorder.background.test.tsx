@@ -5,12 +5,14 @@
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import * as TaskManager from 'expo-task-manager';
+import * as Location from 'expo-location';
+import { startPositionSource } from '../../utils/positionSource';
 import { useTrackRecorder } from '../useTrackRecorder';
 import { useTrackingStore } from '../../store/trackingStore';
 import { useActiveFaehrten } from '../../store/activeFaehrten';
 import { getLaySessionStatus, getBackgroundLayBinding, __resetLaySessionRuntimeForTests } from '../../engine/laySessionRuntime';
 import { createLocalTrackPointsBatch } from '@/features/tracking/repositories/localTrackRepository';
-import { finalizeLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
+import { createLocalTrainingSession, finalizeLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { loadQaRecordingEvidence } from '../../utils/qaRecordingEvidenceStore';
 jest.mock('@/lib/diagnosticsAccessState', () => ({
   diagnosticsAccessToken: () => 'authorized-fixture',
@@ -114,9 +116,14 @@ beforeEach(() => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   const s = state(); s.trackPoints.length = 0; s.markers.length = 0; s.distanceMeters = 0; s.startLockActive = false;
   (createLocalTrackPointsBatch as jest.Mock).mockReset().mockResolvedValue(undefined);
-  (finalizeLocalTrainingSession as jest.Mock).mockClear();
+  (finalizeLocalTrainingSession as jest.Mock).mockReset().mockResolvedValue(undefined);
+  (createLocalTrainingSession as jest.Mock).mockClear();
+  (Location.startLocationUpdatesAsync as jest.Mock).mockReset().mockResolvedValue(undefined);
+  (Location.stopLocationUpdatesAsync as jest.Mock).mockClear();
+  (Location.getBackgroundPermissionsAsync as jest.Mock).mockReset().mockResolvedValue({ status: 'granted', canAskAgain: true });
+  (Location.watchHeadingAsync as jest.Mock).mockReset().mockImplementation(() => new Promise(() => {}));
 });
-afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
+afterEach(async () => { await act(async () => { renderer?.unmount(); await settle(); }); renderer = null; jest.restoreAllMocks(); });
 
 it('QA an/aus erhält identische Vorder-/Hintergrund-Punkte, Distanz und Persistenz', async () => {
   const snapshots: unknown[] = [];
@@ -225,4 +232,112 @@ it('Unmount stoppt die Session (bestehendes Lifecycle-Verhalten): danach kein fa
   const points = state().trackPoints.length;
   await act(async () => { await task({ data: { locations: [bgLoc(3500, 15)] }, error: null }); });
   expect(state().trackPoints.length).toBe(points);
+});
+
+async function restartAsSecondSession() {
+  act(() => { current.stopAll(); });
+  await act(async () => { await current.startWarmup(); });
+  feed(100, 5, 0);
+  await act(async () => { await current.beginRecording({ localId: 'lay-2', ownerId: 'owner', dogId: 'dog-2' }); await settle(); });
+}
+it('ignores a permission response from the previous recording after a new session starts', async () => {
+  let releasePermission!: (permission: { status: string; canAskAgain: boolean }) => void;
+  (Location.getBackgroundPermissionsAsync as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { releasePermission = resolve; }));
+  await startWithBackground();
+  await restartAsSecondSession();
+  expect(getBackgroundLayBinding()?.sessionId).toBe('lay-2');
+  expect(Location.startLocationUpdatesAsync).toHaveBeenCalledTimes(1);
+  await act(async () => { releasePermission({ status: 'granted', canAskAgain: true }); await settle(); });
+  expect(getBackgroundLayBinding()?.sessionId).toBe('lay-2');
+  expect(Location.startLocationUpdatesAsync).toHaveBeenCalledTimes(1);
+});
+it('serializes a delayed native start, old stop and new start without stopping the new task', async () => {
+  const operations: string[] = [];
+  let releaseStart!: () => void;
+  (Location.startLocationUpdatesAsync as jest.Mock).mockImplementationOnce(() => {
+    operations.push('start-old'); return new Promise<void>(resolve => { releaseStart = resolve; });
+  }).mockImplementation(async () => { operations.push('start-new'); });
+  (Location.stopLocationUpdatesAsync as jest.Mock).mockImplementation(async () => { operations.push('stop-old'); });
+  await startWithBackground();
+  await restartAsSecondSession();
+  expect(operations).toEqual(['start-old']);
+  await act(async () => { releaseStart(); await settle(); await settle(); });
+  expect(operations).toEqual(['start-old', 'stop-old', 'start-new']);
+  expect(getBackgroundLayBinding()?.sessionId).toBe('lay-2');
+});
+it('removes a late heading handle from the old recording and retains the current handle', async () => {
+  let releaseHeading!: (handle: { remove: () => void }) => void;
+  const oldHandle = { remove: jest.fn() }, newHandle = { remove: jest.fn() };
+  (Location.watchHeadingAsync as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { releaseHeading = resolve; }))
+    .mockResolvedValueOnce(newHandle);
+  await startWithBackground(); await restartAsSecondSession();
+  await act(async () => { releaseHeading(oldHandle); await settle(); });
+  expect(oldHandle.remove).toHaveBeenCalledTimes(1);
+  expect(newHandle.remove).not.toHaveBeenCalled();
+});
+
+it('retains the new foreground fallback when an old native start resolves after BG was denied', async () => {
+  let releaseStart!: () => void;
+  (Location.startLocationUpdatesAsync as jest.Mock).mockImplementationOnce(() => new Promise<void>(resolve => { releaseStart = resolve; }));
+  (Location.getBackgroundPermissionsAsync as jest.Mock).mockResolvedValueOnce({ status: 'granted', canAskAgain: true })
+    .mockResolvedValueOnce({ status: 'denied', canAskAgain: false });
+  await startWithBackground(); await restartAsSecondSession();
+  const fallback = await (startPositionSource as jest.Mock).mock.results.at(-1)!.value;
+  expect(fallback.stop).not.toHaveBeenCalled();
+  await act(async () => { releaseStart(); await settle(); await settle(); });
+  expect(fallback.stop).not.toHaveBeenCalled();
+  expect(Location.startLocationUpdatesAsync).toHaveBeenCalledTimes(1);
+  expect(getBackgroundLayBinding()).toBeNull();
+});
+
+
+it('does not arm a new recording after stop while the previous tail is still flushing', async () => {
+  await startWithBackground();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  let releaseWrite!: () => void;
+  (createLocalTrackPointsBatch as jest.Mock).mockImplementationOnce(() => new Promise<void>(resolve => { releaseWrite = resolve; }));
+  act(() => { current.stopAll(); });
+  let pendingStart!: Promise<{ error: string | null }>;
+  act(() => { pendingStart = current.beginRecording({ localId: 'cancelled-lay', ownerId: 'owner', dogId: 'dog-2' }); });
+  act(() => { current.stopAll(); });
+  let result!: { error: string | null };
+  await act(async () => { releaseWrite(); result = await pendingStart; await settle(); });
+  expect(result.error).toBe('cancelled');
+  expect(getLaySessionStatus('cancelled-lay')).not.toBe('active');
+});
+
+
+it.each(['success', 'error'])('a late %s finalization cannot change a new hook recording for the same dog', async outcome => {
+  let complete!: () => void, fail!: (error: Error) => void;
+  (finalizeLocalTrainingSession as jest.Mock).mockImplementationOnce(() => new Promise<void>((resolve, reject) => { complete = resolve; fail = reject; }));
+  await startWithBackground();
+  await act(async () => { current.finish(); await settle(); });
+  expect(finalizeLocalTrainingSession).toHaveBeenCalledWith('lay-1', expect.anything());
+  await act(async () => { renderer?.unmount(); await settle(); renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  feed(100, 5, 0);
+  await act(async () => { await current.beginRecording({ localId: 'lay-2', ownerId: 'owner', dogId: 'dog-1' }); await settle(); });
+  (state().setSaveState as jest.Mock).mockClear();
+  await act(async () => { if (outcome === 'success') complete(); else fail(new Error('old write failed')); await settle(); await settle(); });
+  expect(state().setSaveState).not.toHaveBeenCalled();
+  expect(getLaySessionStatus('lay-2')).toBe('active');
+});
+
+it('waits for its own finalization before reusing the hook for a new session', async () => {
+  let complete!: () => void;
+  (finalizeLocalTrainingSession as jest.Mock).mockImplementationOnce(() => new Promise<void>(resolve => { complete = resolve; }));
+  await startWithBackground();
+  await act(async () => { current.finish(); await settle(); });
+  await act(async () => { await current.startWarmup(); });
+  feed(100, 5, 0);
+  let begin!: Promise<{ error: string | null }>;
+  let began = false;
+  act(() => { begin = current.beginRecording({ localId: 'lay-2', ownerId: 'owner', dogId: 'dog-1' }).then(value => { began = true; return value; }); });
+  await act(async () => { await settle(); });
+  expect(began).toBe(false);
+  expect((createLocalTrainingSession as jest.Mock).mock.calls.every(([row]) => row.local_id === 'lay-1')).toBe(true);
+  await act(async () => { complete(); expect((await begin).error).toBeNull(); await settle(); });
+  expect(createLocalTrainingSession).toHaveBeenLastCalledWith(expect.objectContaining({ local_id: 'lay-2' }));
+  expect(getLaySessionStatus('lay-2')).toBe('active');
 });

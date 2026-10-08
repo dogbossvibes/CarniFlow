@@ -299,9 +299,9 @@ describe('Allgemeine Lifecycle-Matrix', () => {
     expect(decide({ local: local({ searchPointCount: 5 }) })).toEqual({ ok: false, reason: 'search_started' });
   });
 
-  it('laying: unterbrochenes Legen ist NICHT freigegeben (Puffer oder Registry)', () => {
-    expect(decide({ pending: pending({ status: 'laying' }), local: local() })).toEqual({ ok: false, reason: 'laying_not_supported' });
-    expect(decide({ registry: regWith({ status: 'laying', sessionId: 'sess-A' }), local: local() })).toEqual({ ok: false, reason: 'laying_not_supported' });
+  it('laying: fehlender Owner oder bereits finalisierte Session wird nie wiederaufgenommen', () => {
+    expect(decide({ userId: 'user-1', pending: pending({ status: 'laying' }), local: local() })).toEqual({ ok: false, reason: 'laying_not_supported' });
+    expect(decide({ userId: 'user-1', registry: regWith({ status: 'laying', sessionId: 'sess-A' }), local: local() })).toEqual({ ok: false, reason: 'laying_not_supported' });
   });
 
   it('Zugehörigkeit gilt für jede Quelle: falscher Hund / Nutzer / gelöscht sperren auch Puffer-Recovery', () => {
@@ -441,4 +441,29 @@ describe('Analyse-Zustand und Recovery sind entkoppelt', () => {
       }
     }
   });
+});
+
+
+describe('explicit laying recovery', () => {
+  const live = () => local({ session: session({ status: 'active', ended_at: null }) });
+  const snapshot = () => pending({ status: 'laying', layFinishedAt: null, layStartedAt: null });
+  it('keeps the session, distance, objects and pause; no new quota/session', () => {
+    const p = snapshot();
+    const d = decide({ pending: p, local: live(), userId: 'user-1' });
+    expect(d).toMatchObject({ ok: true, mode: 'laying', target: '/track/legen?dogId=dog-A&id=sess-A',
+      pendingToWrite: { sessionId: 'sess-A', paused: true, distanceMeters: 123, trackPoints: p.trackPoints, markers: p.markers } });
+  });
+  it('rejects foreign, missing and corrupt recovery evidence', () => {
+    const base = { pending: snapshot(), local: live(), userId: 'user-1' };
+    expect(decide({ ...base, userId: 'other' })).toMatchObject({ ok: false, reason: 'wrong_user' });
+    expect(decide({ ...base, userId: undefined })).toMatchObject({ ok: false });
+    expect(decide({ ...base, pending: { ...snapshot(), trackPoints: [] } })).toMatchObject({ ok: false, reason: 'no_geometry' });
+    expect(decide({ ...base, local: local({ session: session({ status: 'active', ended_at: null }), searchPointCount: 1 }) })).toMatchObject({ ok: false });
+  });
+});
+
+it('never treats an active lay snapshot as a discardable search', () => {
+  expect(decideSearchDiscard({ registry: {}, dogId: 'dog-A', sessionId: 'sess-A', userId: 'user-1', now: NOW,
+    pending: pending({ status: 'laying', layFinishedAt: null }), local: local({ session: session({ status: 'active', ended_at: null }) })
+  })).toEqual({ ok: false, reason: 'laying_not_supported' });
 });

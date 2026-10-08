@@ -120,7 +120,9 @@ describe.each(['ios', 'android'] as const)('End/final object shared lifecycle (%
     await mount(); resume(); feed(60);
     expect(rec.activeObjectWait).toBe(true);
     act(() => { rec.markObject(); });
-    expect(rec.objectStatuses).toEqual(['pending', 'manual_found']);
+    // The new section now admits its first point immediately (no cross-gap EMA).
+    // The earlier object is already behind the persisted pre-pause cursor.
+    expect(rec.objectStatuses).toEqual(['missed', 'manual_found']);
     expect(mockNoteManualFound).toHaveBeenCalledWith('final');
     expect(rec.activeObjectWait).toBe(false);
   });

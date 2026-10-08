@@ -5,7 +5,7 @@ import { useTrackRecorder } from '../useTrackRecorder';
 import { useTrackingStore } from '../../store/trackingStore';
 import { requestVoice, resetVoiceEvents } from '../../utils/voiceEvents';
 import { saveQaSessionCapture } from '../../utils/qaSessionCapture';
-import { createLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
+import { createLocalTrainingSession, finalizeLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { createLocalTrackMarker, createLocalTrackPointsBatch } from '@/features/tracking/repositories/localTrackRepository';
 import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -47,6 +47,7 @@ jest.mock('../../store/trackingStore', () => {
   const state = {
     isPaused: false, distanceMeters: 0, durationSeconds: 0, trackPoints: [] as any[],
     markers: [] as any[], segments: [] as any[], startLockActive: false, gpsAccuracy: 5,
+    restoreLayRecording: jest.fn((p: any) => { state.trackPoints = [...p.trackPoints]; state.markers = [...p.markers]; state.distanceMeters = p.distanceMeters; state.startLockActive = false; }),
     startRecording: jest.fn(), setStartLockActive: jest.fn((active: boolean) => { state.startLockActive = active; }),
     setStartAnchor: jest.fn(), setStartDriftRejectedCount: jest.fn(),
     setCurrentPosition: jest.fn(), addTrackPoint: jest.fn((p: any) => { state.trackPoints.push(p); }),
@@ -350,4 +351,34 @@ it('does not start a session with poor warmup accuracy, then starts when it beco
       .toBeNull();
   });
   expect(visible).toHaveBeenCalledTimes(1);
+});
+
+it('resumes the same laid geometry and canonical distance with a fresh section after process restart', async () => {
+  await act(async () => { renderer = TestRenderer.create(<Harness />); await Promise.resolve(); });
+  await act(async () => { await current.startWarmup(); });
+  feed(0, 5, 100);
+  const points = [0, 10].map(n => ({ lat: metersToLatitude(n), lng: 0, t: 900000 + n * 1000, accuracy: 5 }));
+  const pending = { sessionId: 'local', dogId: 'dog', status: 'laying' as const, trackPoints: points, markers: [], runPoints: [],
+    distanceMeters: 9, durationSeconds: 12, layFinishedAt: null, startAnchor: points[0], savedAt: 920000 };
+  await act(async () => { expect((await current.beginRecording({ localId: 'local', ownerId: 'owner', dogId: 'dog',
+    resume: { pending, startedAt: new Date(900000).toISOString() } })).error).toBeNull(); });
+  expect(useTrackingStore.getState().trackPoints).toHaveLength(2);
+  feed(1000, 5, 100, 1);
+  expect(useTrackingStore.getState().trackPoints[2].breakBefore).toBe(true);
+  expect(useTrackingStore.getState().distanceMeters).toBe(9);
+  feed(2000, 5, 104, 1); feed(3000, 5, 108, 1);
+  expect(useTrackingStore.getState().distanceMeters).toBeGreaterThan(9);
+  expect(useTrackingStore.getState().distanceMeters).toBeLessThan(18);
+  expect(createLocalTrainingSession).toHaveBeenCalledWith(expect.objectContaining({ local_id: 'local', started_at: new Date(900000).toISOString() }));
+});
+
+it('never finalizes a laid track as saved when its point flush fails', async () => {
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  (finalizeLocalTrainingSession as jest.Mock).mockClear();
+  (createLocalTrackPointsBatch as jest.Mock).mockRejectedValueOnce(new Error('disk full'));
+  await act(async () => { current.finish(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
+  expect(finalizeLocalTrainingSession).not.toHaveBeenCalled();
+  expect(useTrackingStore.getState().setSaveState).toHaveBeenCalledWith('error');
 });

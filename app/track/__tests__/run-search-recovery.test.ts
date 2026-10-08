@@ -5,7 +5,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { DEFAULT_GUIDANCE_OPTIONS, DEFAULT_TRACK_END_OPTIONS } from '@/features/tracking/utils/guidanceEngine';
-import { OFF_TRACK } from '@/features/tracking/utils/offTrack';
+import { OFF_TRACK, getOffTrackThreshold } from '@/features/tracking/utils/offTrack';
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -32,7 +32,9 @@ describe('run.tsx — Search-Recovery-State', () => {
     expect(resume).toContain('const runState = useTrackingStore.getState().searchRunState;');
     expect(resume).toContain('prevOffTrackRef.current = runState.offTrackState;');
     expect(resume).toContain('segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };');
-    expect(resume).toMatch(/s\.start\(\{ points: saved\.map\([^)]*\)\), startedAtMs: [^,]+, runState \}\)/);
+    expect(resume).toContain('s.start({ points: saved.map');
+    expect(resume).toContain('pointsTimeSec: saved.map(p => Math.max(0, (p.t - startedAtMs) / 1000)), startedAtMs, runState');
+    expect(resume).toContain('p.breakBefore');
   });
 
   it('discard: Dedupe-Refs und Snapshot werden geleert (kein Überlauf in den nächsten Run)', () => {
@@ -94,17 +96,28 @@ describe('Schwellen unverändert', () => {
     expect(rec).toContain('stepObjectDwell(previous, {');
     expect(rec).toContain('const LOOKAHEAD_M = 20;');
     expect(rec).toContain('const BACK_M = 4;');
-    expect(rec).toContain('const BREAK_THRESHOLD_M = 6.0;');
+    expect(getOffTrackThreshold({ accuracyM: 10 })).toEqual({ warningM: 15, offTrackM: 17, recoveryM: 9, reliable: true });
+    expect(getOffTrackThreshold({ accuracyM: 35 }).reliable).toBe(false);
     expect(rec).not.toContain('distM(objectReference, o.at) <= OBJECT_HIT_M');
   });
-  it('Cursor-Seed läuft über den normalen Fenster-Projektionspfad (kein Voll-Linien-Workaround)', () => {
+  it('Cursor-Seed behält das lokale Fenster; Erweiterung nur bei einer Lücke ohne nahen Kandidaten)', () => {
     const rec = strip(read('features/tracking/hooks/useSearchRecorder.ts'));
     // Seit dem Live-Cursor-Fix (Self-Crossing): Kandidaten im UNVERÄNDERTEN Fenster
     // [cursor − BACK_M, cursor + LOOKAHEAD_M], Auswahl per Lotfuss-Kontinuität; ohne
     // Vorgänger weiterhin projectForward mit demselben Fenster.
-    expect(rec).toContain('const cands = projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);');
-    expect(rec).toContain(': projectForward(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);');
+    expect(rec).toContain('const localCandidates = projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, LOOKAHEAD_M, BACK_M);');
+    expect(rec).toContain(': projectForward(sm, laidPoints, arc.cum, cursorMRef.current, lookaheadM, BACK_M);');
     expect(rec).toContain('cursorMRef.current = seedCursorM; maxCursorMRef.current = seedCursorM;');
     expect(rec).toContain('lockedAtM: seedCursorM');
+    expect(rec).toContain('const widen = beginsSection && !localCandidates.some(candidate => candidate.offLineM <= ADVANCE_DEV_M);');
+  });
+});
+
+describe('Abweichungsanzeige respektiert GNSS-Messauflösung', () => {
+  it('zeigt eine ganze Näherung und färbt nach dem zentralen Off-Track-State', () => {
+    const screen = strip(read('app/track/run.tsx'));
+    expect(screen).toContain('formatApproxDeviationM(devShown)');
+    expect(screen).toContain('const devOff = s.offTrackState !== \'on_track\';');
+    expect(screen).not.toContain('devShown.toFixed(1)');
   });
 });

@@ -1,3 +1,4 @@
+import { readContinuityPoint } from './trackContinuity';
 import type { LocalTrainingSession, LocalTrackPoint, LocalTrackMarker } from '@/features/sync/types/sync';
 
 // Reine, testbare Zusammensetzung des Detail-/Auswertungs-Datensatzes aus lokalen
@@ -108,6 +109,7 @@ export function buildLocalTrackDetail(
     score:              payload.score ?? run?.score ?? local.score ?? null,
     track_data:         {
       ...(payload.segments ? { segments: payload.segments } : {}),
+      ...(payload.layContinuity ? { layContinuity: payload.layContinuity } : {}),
       ...(run ? { run } : {}),
       ...(payload.legs ? { legs: payload.legs } : {}),
       ...(payload.score != null ? { score: payload.score } : {}),
@@ -115,7 +117,7 @@ export function buildLocalTrackDetail(
     },
     points: points.map(p => ({
       latitude: p.latitude, longitude: p.longitude, point_type: p.point_type ?? 'lay',
-      accuracy: p.accuracy ?? null, timestamp: p.timestamp,
+      accuracy: p.accuracy ?? null, timestamp: p.timestamp, ...readContinuityPoint(p.payload_json),
     })),
     markers: markers.map(m => ({
       id: m.local_id, marker_type: m.marker_type, latitude: m.latitude, longitude: m.longitude,

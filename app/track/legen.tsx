@@ -1,3 +1,4 @@
+import { loadLayRecovery } from '@/features/tracking/services/trackRecoveryService';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
@@ -413,12 +414,20 @@ export default function LegenScreen() {
     if (beganRef.current) return;
     beganRef.current = true;
     resetVoiceEvents();
+    const requestedSessionId = typeof params.id === 'string' ? params.id : null;
+    const resumed = requestedSessionId ? await loadLayRecovery({ sessionId: requestedSessionId,
+      dogId: activeDog?.id, userId: session?.user?.id }).catch(() => null) : null;
+    if (requestedSessionId && !resumed) {
+      beganRef.current = false;
+      Alert.alert(t('common.error'), t('track.continuation.resumeFailed'));
+      return;
+    }
 
     // NEWBIE-Quota: max. 1 neue Fährte/Kalendermonat. Claim VOR dem Recorder-Start.
     // Idempotent auf trackClaimRef → ein Retry nach Fehler (beganRef zurückgesetzt)
     // verbraucht KEIN zweites Kontingent; der erlaubte Start darf die Fährte komplett
     // abschließen (kein zweiter Check im weiteren Verlauf). Premium überspringt.
-    if (!isPro) {
+    if (!resumed && !isPro) {
       if (!trackClaimRef.current) trackClaimRef.current = Crypto.randomUUID();
       const block = quotaBlock((await claimNewbieQuota('track', trackClaimRef.current)).status);
       if (block) {
@@ -432,10 +441,11 @@ export default function LegenScreen() {
     // Führende Session-ID SOFORT (kein Warten auf Supabase, kein getUser). Dieselbe UUID
     // wird später deterministisch als training_sessions.id verwendet (idempotenter Sync).
     const uid = session?.user?.id;
-    const clientUuid = Crypto.randomUUID();
+    const clientUuid = requestedSessionId ?? Crypto.randomUUID();
     sessionIdRef.current = null;   // Remote-ID erst nach erfolgreichem Insert (unten)
     const r = await rec.beginRecording({
       localId: clientUuid,
+      resume: resumed ?? undefined,
       ownerId: uid,
       dogId:   activeDog?.id ?? null,
       onSessionStarted: () => {
@@ -451,7 +461,7 @@ export default function LegenScreen() {
             ? { temperature: weather.temperature, windSpeed: weather.windSpeed, humidity: weather.humidity, condition: weather.weatherCondition }
             : null;
           useActiveFaehrten.getState().upsert(activeDog.id, {
-            status: 'laying', sessionId: clientUuid, startedAt: Date.now(),
+            status: 'laying', sessionId: clientUuid, startedAt: resumed ? Date.parse(resumed.startedAt) : Date.now(),
             gpsAccuracy: useTrackingStore.getState().gpsAccuracy, weather: snap,
           });
         }
@@ -468,7 +478,7 @@ export default function LegenScreen() {
       },
     });   // UI/Timer wurden per Callback gestartet; lokale Session ist jetzt angelegt
     if (r.error) { beganRef.current = false; showToast(r.error === 'gps_not_ready' ? t('track.gpsPreparing') : r.error); return; }
-  }, [session, activeDog, rec, showToast, t, surface, condition, weather, currentPosition, isPro, router]);
+  }, [session, activeDog, rec, showToast, t, surface, condition, weather, currentPosition, isPro, router, params.id]);
 
   // Aufnahme erst starten, NACHDEM der Disclosure-Dialog geschlossen ist:
   // „Weiter" setzt startAfterClose + schliesst den Dialog (showBgDisclosure=false).
@@ -1008,7 +1018,7 @@ export default function LegenScreen() {
                   >
                     <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
                     <Text className={`text-[14px] font-extrabold ${canStart ? 'text-ft-acc-text' : 'text-ft-muted'}`}>
-                      {canStart ? t('track.lay') : t('track.waitingGps')}
+                      {canStart ? t(params.id ? 'track.continuation.resume' : 'track.lay') : t('track.waitingGps')}
                     </Text>
                   </Pressable>
                 </View>

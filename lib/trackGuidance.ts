@@ -3,7 +3,7 @@
 // Projektion um einen Referenzpunkt — auf Fährten-Distanzen (wenige hundert
 // Meter) ausreichend genau und ohne externe Abhängigkeiten.
 
-export interface LatLng { lat: number; lng: number; }
+export interface LatLng { lat: number; lng: number; breakBefore?: boolean; }
 
 const M_PER_DEG_LAT = 111_320;
 

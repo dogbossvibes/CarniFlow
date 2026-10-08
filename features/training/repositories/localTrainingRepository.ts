@@ -107,6 +107,7 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
   gpsQualityAverage?: number | null;
   segments?: unknown;
   manualAngleGeometry?: unknown;
+  layContinuity?: unknown;
   status?: string;
 }): Promise<void> {
   const db = await getLocalDb();
@@ -116,6 +117,7 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
     cornersTotal:      input.cornersTotal ?? null,
     gpsQualityAverage: input.gpsQualityAverage ?? null,
     segments:          input.segments ?? null,
+    ...(input.layContinuity ? { layContinuity: input.layContinuity } : {}),
     ...(input.manualAngleGeometry ? { manualAngleGeometry: input.manualAngleGeometry } : {}),
   });
   // Ein inzwischen gesetzter lokaler Lifecycle-Marker (Abbruch / „Ohne App abgeschlossen")

@@ -14,6 +14,7 @@ import { relativePaceBand, type PaceReference } from '@/features/tracking/utils/
 // Modus) — nur beim Abweichungs-Modus geht es tatsächlich um Spurtreue.
 // ──────────────────────────────────────────────────────────────────────────
 
+import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { RELIABLE_CONFIDENCE_FLOOR, FULL_DEV_M, ON_TRACK_M, confidenceBand, type ConfidenceBand } from '@/features/tracking/engine/trackAnalytics';
 import type { AnalyticsSegment } from '@/features/tracking/engine/trackSegmentAnalysis';
 import type { ReplayGeometry, ReplayGeometryPoint } from '@/features/tracking/engine/trackReplay';
@@ -109,7 +110,9 @@ export function buildHeatmapParts(geometry: ReplayGeometry, segments: AnalyticsS
       if (t >= seg.startTimeSec && t <= seg.endTimeSec) coords.push(geometry.points[i]);
     }
     if (coords.length < 2) continue;   // zu kurz für eine sichtbare Teilstrecke
-    parts.push({ segmentId: seg.id, segmentIndex: seg.index, coordinates: coords, color: colorInfo.color, band: colorInfo.band });
+    for (const continuous of splitContinuousPoints(coords)) {
+      if (continuous.length > 1) parts.push({ segmentId: seg.id, segmentIndex: seg.index, coordinates: continuous, color: colorInfo.color, band: colorInfo.band });
+    }
   }
   return parts;
 }

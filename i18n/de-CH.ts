@@ -5,6 +5,7 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "track.report.partialNotice": "Teilaufzeichnung: Karte und gespeicherte Messwerte beziehen sich auf die beobachteten Abschnitte. Fehlende Wege und nicht beobachtete Gegenstände bleiben unbekannt. Es gibt keine Gesamtbewertung.",
   "track.export.preparing": "{format} wird vorbereitet …",
   "track.export.notesFormats": "Aktuelle Notiz für PDF, GPX und JSON",
   "track.export.jsonHint": "Für technische Auswertungen",
@@ -38,6 +39,9 @@ export const deCH = {
   "track.pace.meaning": "Tempo des Aufzeichnungsgeräts; daraus lässt sich nicht sicher ableiten, ob der Hund arbeitet oder rennt.",
   "track.pace.legend": "Langsamer · ähnlich · schneller als das Vergleichstempo",
 
+
+  "track.continuityNotice": "Aufzeichnung unterbrochen · Die Lücke zählt nicht zur gemessenen Strecke. Bewertet werden nur beobachtete Abschnitte.",
+  "track.recoverySaveFailed": "Die Absuche konnte nicht sicher gespeichert werden. Sie bleibt zum Fortsetzen erhalten. Bitte erneut versuchen.",
   // Allgemeine Aktionen / Buttons
   'common.save':      'Speichern',
   'common.cancel':    'Abbrechen',

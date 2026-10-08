@@ -2,6 +2,7 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "track.report.partialNotice": "Registrazione parziale: la mappa e le misure salvate riguardano i tratti osservati. I percorsi mancanti e gli oggetti non osservati restano sconosciuti. Nessuna valutazione complessiva.",
   "track.export.preparing": "Preparazione di {format} …",
   "track.export.notesFormats": "Nota attuale per PDF, GPX e JSON",
   "track.export.jsonHint": "Per analisi tecniche",
@@ -34,6 +35,9 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.pace.missing": "Dati affidabili insufficienti per confrontare il ritmo.",
   "track.pace.meaning": "Ritmo del dispositivo; non indica con certezza se il cane sta lavorando o correndo.",
   "track.pace.legend": "Più lento · simile · più veloce del ritmo di riferimento",
+
+  "track.continuityNotice": "Registrazione interrotta · Il tratto mancante è escluso dalla distanza misurata. Vengono valutati solo i tratti osservati.",
+  "track.recoverySaveFailed": "Non è stato possibile salvare la ricerca. Rimane disponibile per riprenderla. Riprova.",
 
   "common.save": "Salva",
   "common.cancel": "Annulla",

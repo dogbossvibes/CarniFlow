@@ -60,3 +60,43 @@ it('does not associate analytics or found totals from another run with the expor
   expect(snapshot.summary.analysisScore).toBeNull();
   expect(snapshot.summary.found).toBeNull();
 });
+
+it('exports stored reference and search boundaries without connecting gaps or reporting a stale score', () => {
+  const snapshot = buildTrackUserExport({ ...source,
+    points: [source.points[0], { ...source.points[1], timestamp: '2026-10-08T12:01:00Z' }],
+    runs: [{ ...source.runs[0], run_points: [source.runs[0].run_points[0], { ...source.runs[0].run_points[1], breakBefore: true }] }],
+    track_data: { ...source.track_data, layContinuity: { version: 1, breakBeforeTimestamps: ['2026-10-08T14:01:00+02:00'] } },
+  }, now, true);
+  expect(snapshot.reference.map(p => p.length)).toEqual([1, 1]);
+  expect(snapshot.search.map(p => p.length)).toEqual([1, 1]);
+  expect(snapshot.summary).toMatchObject({ analysisScore: null, referenceM: 120, searchM: 123, durationS: 65, total: 2 });
+  expect(snapshot.notes).toBe(source.notes);
+  expect(snapshot.continuity).toEqual({ version: 1, hasGaps: true, searchHasGaps: true, referenceHasGaps: true });
+  const gpx = trackExportGpx(snapshot);
+  expect(gpx.match(/<trkseg>/g)).toHaveLength(4);
+  expect(gpx).toContain('<anyvo:continuity version="1" hasGaps="true"');
+  expect(JSON.stringify(snapshot)).not.toContain('private-');
+});
+it('keeps sparse legacy tracks intact without inferring a gap from elapsed time', () => {
+  const snapshot = buildTrackUserExport({ ...source, runs: [{ ...source.runs[0], run_points: [{ lat: 47, lng: 8, t: 0 }, { lat: 48, lng: 9, t: 1000 }] }] }, now);
+  expect(snapshot.search.map(p => p.length)).toEqual([2]);
+  expect(snapshot).not.toHaveProperty('continuity');
+  expect(snapshot.summary.analysisScore).toBe(91);
+  expect(trackExportGpx(snapshot)).not.toContain('xmlns:anyvo');
+});
+it('preserves explicit unknown connectivity as separate positions when boundary locations are missing', () => {
+  const snapshot = buildTrackUserExport({ ...source, track_data: { run: { analytics: { trackScore: 64 }, continuity: { version: 1, hasGaps: true } } } }, now);
+  expect(snapshot.reference.map(p => p.length)).toEqual([1, 1]);
+  expect(snapshot.search.map(p => p.length)).toEqual([1, 1]);
+  expect(snapshot.summary.analysisScore).toBeNull();
+});
+it('tolerates malformed persisted timestamps and does not interpret string flags as boundaries', () => {
+  const snapshot = buildTrackUserExport({ points: [{ ...source.points[0], timestamp: {}, breakBefore: 'true' }, source.points[1]], track_data: { layContinuity: { version: 1, breakBeforeTimestamps: [] } } }, now);
+  expect(snapshot.reference.map(p => p.length)).toEqual([2]);
+  expect(snapshot).not.toHaveProperty('continuity');
+});
+it('ignores continuity metadata belonging to a different run', () => {
+  const snapshot = buildTrackUserExport({ ...source, runs: [{ ...source.runs[0], id: 'older' }], track_data: { run: { run_id: 'newer', continuity: { version: 1, hasGaps: true } } } }, now);
+  expect(snapshot.search.map(p => p.length)).toEqual([2]);
+  expect(snapshot).not.toHaveProperty('continuity');
+});

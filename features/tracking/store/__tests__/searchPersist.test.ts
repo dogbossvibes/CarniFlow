@@ -58,3 +58,62 @@ describe('searchPersist — inkrementelle Absuche-Persistenz (P1)', () => {
     expect(getSearchPersistError()).toBeNull();
   });
 });
+
+
+describe('searchPersist — continuity write barriers', () => {
+  let next = 0;
+  beforeEach(() => { mockBatch.mockReset(); mockBatch.mockResolvedValue(undefined); resetSearchBuffer(`barrier-${++next}`); });
+  it('waits for an in-flight batch and drains points added during it', async () => {
+    let release!: () => void;
+    mockBatch.mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
+    enqueueSearchPoint(pt(47, 8));
+    const first = flushSearchPoints();
+    await Promise.resolve();
+    enqueueSearchPoint(pt(47, 8.001));
+    let settled = false;
+    const finish = flushSearchPoints().then(ok => { settled = true; return ok; });
+    await Promise.resolve();
+    const settledBeforeRelease = settled;
+    release();
+    expect(await first).toBe(true);
+    expect(settledBeforeRelease).toBe(false);
+    expect(await finish).toBe(true);
+    expect(mockBatch.mock.calls.flatMap(call => call[1])).toHaveLength(2);
+    expect(_peekSearchBuffer().count).toBe(0);
+  });
+  it('reports an in-flight failure to every waiter', async () => {
+    let reject!: (error: Error) => void;
+    mockBatch.mockImplementationOnce(() => new Promise<void>((_, fail) => { reject = fail; }));
+    enqueueSearchPoint(pt(47, 8));
+    const first = flushSearchPoints();
+    await Promise.resolve();
+    const finish = flushSearchPoints();
+    reject(new Error('DISK_FULL'));
+    expect(await first).toBe(false);
+    expect(await finish).toBe(false);
+    expect(_peekSearchBuffer().count).toBe(1);
+    expect(await flushSearchPoints()).toBe(true);
+  });
+  it('never requeues a failed old-session batch into another dog/session', async () => {
+    let reject!: (error: Error) => void;
+    mockBatch.mockImplementationOnce(() => new Promise<void>((_, fail) => { reject = fail; }));
+    const oldSession = _peekSearchBuffer().sessionId!;
+    enqueueSearchPoint(pt(47, 8));
+    const old = flushSearchPoints();
+    await Promise.resolve();
+    resetSearchBuffer('next-dog-session');
+    enqueueSearchPoint(pt(48, 9));
+    reject(new Error('SQLITE_BUSY'));
+    expect(await old).toBe(false);
+    expect(_peekSearchBuffer()).toEqual({ sessionId: 'next-dog-session', count: 1 });
+    expect(getSearchPersistError()).toBeNull();
+    expect(await flushSearchPoints()).toBe(true);
+    expect(mockBatch.mock.calls[1][0]).toBe('next-dog-session');
+    expect(mockBatch.mock.calls[1][1][0].latitude).toBe(48);
+    // The old pending batch can still be retried under its original identity.
+    resetSearchBuffer(oldSession);
+    expect(await flushSearchPoints()).toBe(true);
+    expect(mockBatch.mock.calls[2][0]).toBe(oldSession);
+    expect(mockBatch.mock.calls[2][1][0].latitude).toBe(47);
+  });
+});

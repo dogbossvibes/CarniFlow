@@ -72,6 +72,7 @@ export type AnalysisQualityReason =
 
 export interface ClassifiedAnalyticsSample {
   sample: AnalyticsSample;
+  continuitySection?: number;
   state: AnalysisSampleState;
   reasons: AnalysisQualityReason[];
   dynamicCorridorM: number;
@@ -224,14 +225,16 @@ function recordedSearchDistance(start: AnalyticsSample, end: AnalyticsSample): n
 }
 
 export function classifyAnalyticsSamples(samples: AnalyticsSample[]): ClassifiedAnalyticsSample[] {
+  let continuitySection = 0;
   return samples.map((sample, index) => {
+    if (sample.breakBefore) continuitySection++;
     const reasons: AnalysisQualityReason[] = [];
     const accuracy = sample.accuracyM;
     const previous = samples[index - 1];
     const dt = previous ? sample.tSec - previous.tSec : 0;
-    const impliedSpeed = previous && dt > 0 ? recordedSearchDistance(previous, sample) / dt : null;
+    const impliedSpeed = previous && !sample.breakBefore && dt > 0 ? recordedSearchDistance(previous, sample) / dt : null;
     const reportedOrImpliedSpeed = Math.max(sample.speedMps ?? 0, impliedSpeed ?? 0);
-    const sparse = previous != null && (dt <= 0 || dt > TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec);
+    const sparse = sample.breakBefore === true || (previous != null && (dt <= 0 || dt > TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec));
 
     if (sample.geometryAccepted === false) reasons.push('geometry_rejected');
     if (sample.fusionClassification === 'gps_outlier') reasons.push('gps_outlier');
@@ -255,7 +258,7 @@ export function classifyAnalyticsSamples(samples: AnalyticsSample[]): Classified
       && reportedOrImpliedSpeed <= TRACK_ANALYSIS_THRESHOLDS.reliableSpeedMaxMps
       && (sample.motionConfidence == null || sample.motionConfidence >= TRACK_ANALYSIS_THRESHOLDS.reliableMotionConfidenceMin);
 
-    return { sample, state: excluded ? 'excluded' : reliable ? 'reliable' : 'uncertain', reasons, dynamicCorridorM: dynamicCorridor(sample) };
+    return { sample, continuitySection, state: excluded ? 'excluded' : reliable ? 'reliable' : 'uncertain', reasons, dynamicCorridorM: dynamicCorridor(sample) };
   });
 }
 
@@ -264,6 +267,7 @@ export function computeAssessableDistance(classified: ClassifiedAnalyticsSample[
   let uncertainDistanceM = 0;
   let excludedDistanceM = 0;
   for (let index = 1; index < classified.length; index++) {
+    if (classified[index].sample.breakBefore || classified[index].continuitySection !== classified[index - 1].continuitySection) continue;
     const distance = recordedSearchDistance(classified[index - 1].sample, classified[index].sample);
     const states = [classified[index - 1].state, classified[index].state];
     if (states.includes('excluded')) excludedDistanceM += distance;
@@ -319,7 +323,13 @@ export function detectDeviationEvents(classified: ClassifiedAnalyticsSample[]): 
     });
   };
 
+  let previousSection: number | undefined;
   for (const item of classified) {
+    if (item.sample.breakBefore || item.continuitySection !== previousSection) {
+      if (confirmed) pushEvent(confirmed, null);
+      candidate = []; confirmed = null; recovery = [];
+    }
+    previousSection = item.continuitySection;
     const outside = item.state === 'reliable' && item.sample.devM > item.dynamicCorridorM;
     const inside = item.state === 'reliable' && item.sample.devM <= item.dynamicCorridorM;
     if (!confirmed) {
@@ -359,7 +369,8 @@ function averageSpeed(items: ClassifiedAnalyticsSample[]): number | null {
   let duration = 0;
   for (let index = 1; index < items.length; index++) {
     const dt = items[index].sample.tSec - items[index - 1].sample.tSec;
-    if (dt <= 0) continue;
+    if (dt <= 0 || dt > TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec
+      || items[index].continuitySection !== items[index - 1].continuitySection) continue;
     distance += Math.max(0, items[index].sample.atM - items[index - 1].sample.atM);
     duration += dt;
   }
@@ -384,6 +395,7 @@ function contiguousReliableRuns(items: readonly ClassifiedAnalyticsSample[]): Cl
     const dt = previous ? item.sample.tSec - previous.sample.tSec : 0;
     const dm = previous ? item.sample.atM - previous.sample.atM : 0;
     const continuous = previous
+      && item.continuitySection === previous.continuitySection
       && Number.isFinite(dt)
       && dt > 0
       && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec
@@ -404,7 +416,7 @@ export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corner
     const shape = sideAndSharpness(corner.angleKind);
     const window = classified.filter(item => item.sample.atM >= corner.atM - TRACK_ANALYSIS_THRESHOLDS.cornerWindowBeforeM
       && item.sample.atM <= corner.atM + TRACK_ANALYSIS_THRESHOLDS.cornerWindowAfterM);
-    const reliable = window.filter(item => item.state === 'reliable').sort((a, b) => a.sample.tSec - b.sample.tSec);
+    let reliable = window.filter(item => item.state === 'reliable').sort((a, b) => a.sample.tSec - b.sample.tSec);
     const empty: CornerAnalysisV3 = {
       atM: corner.atM, ...shape, arrivalTSec: null, speedBeforeMps: null, speedAfterMps: null,
       speedChangePercent: null, minDistanceM: null, maxLateralDeviationM: null, overshootM: null,
@@ -417,6 +429,8 @@ export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corner
       const distance = Math.hypot(item.sample.atM - corner.atM, item.sample.devM);
       return distance < best.distance ? { item, distance } : best;
     }, { item: reliable[0], distance: Number.POSITIVE_INFINITY });
+    reliable = reliable.filter(item => item.continuitySection === nearest.item.continuitySection);
+    if (reliable.length < TRACK_ANALYSIS_THRESHOLDS.cornerStableConsecutiveSamples) return empty;
     const before = reliable.filter(item => item.sample.atM < corner.atM);
     const after = reliable.filter(item => item.sample.atM >= corner.atM);
     const afterRuns = contiguousReliableRuns(after);
@@ -435,7 +449,7 @@ export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corner
       if (previousAfter) {
         const dt = item.sample.tSec - previousAfter.sample.tSec;
         const dm = item.sample.atM - previousAfter.sample.atM;
-        if (!(dt > 0 && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec && Number.isFinite(dm) && dm >= 0)) {
+        if (!(item.continuitySection === previousAfter.continuitySection && dt > 0 && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec && Number.isFinite(dm) && dm >= 0)) {
           excursion = [];
           confirmedExcursion = null;
           insideCount = 0;
@@ -465,7 +479,7 @@ export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corner
       if (previousAfter) {
         const dt = item.sample.tSec - previousAfter.sample.tSec;
         const dm = item.sample.atM - previousAfter.sample.atM;
-        if (!(dt > 0 && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec && Number.isFinite(dm) && dm >= 0)) stableRun = [];
+        if (!(item.continuitySection === previousAfter.continuitySection && dt > 0 && dt <= TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec && Number.isFinite(dm) && dm >= 0)) stableRun = [];
       }
       previousAfter = item;
       if (item.sample.devM <= item.dynamicCorridorM) {
@@ -503,7 +517,7 @@ function speedSeries(items: ClassifiedAnalyticsSample[]): { item: ClassifiedAnal
   return items.map((item, index) => {
     if (item.sample.speedMps != null && Number.isFinite(item.sample.speedMps)) return { item, speed: Math.max(0, item.sample.speedMps) };
     const previous = items[index - 1];
-    if (!previous) return { item, speed: 0 };
+    if (!previous || item.continuitySection !== previous.continuitySection) return { item, speed: 0 };
     const dt = item.sample.tSec - previous.sample.tSec;
     return { item, speed: dt > 0 ? Math.max(0, item.sample.atM - previous.sample.atM) / dt : 0 };
   });
@@ -512,7 +526,11 @@ function speedSeries(items: ClassifiedAnalyticsSample[]): { item: ClassifiedAnal
 function longestDurationAtOrBelow(series: { item: ClassifiedAnalyticsSample; speed: number }[], maxSpeed: number): number {
   let start: number | null = null;
   let longest = 0;
+  let previous: ClassifiedAnalyticsSample | null = null;
   for (const entry of series) {
+    if (previous && (entry.item.continuitySection !== previous.continuitySection
+      || entry.item.sample.tSec - previous.sample.tSec > TRACK_ANALYSIS_THRESHOLDS.maxContinuousSampleGapSec)) start = null;
+    previous = entry.item;
     if (entry.speed <= maxSpeed) {
       if (start == null) start = entry.item.sample.tSec;
       longest = Math.max(longest, entry.item.sample.tSec - start);
@@ -543,7 +561,8 @@ export function analyzeObjectContacts(classified: ClassifiedAnalyticsSample[], o
       proximityWindowEndSec: usable[usable.length - 1]?.sample.tSec == null ? null : round1(usable[usable.length - 1].sample.tSec),
       minRecordedDistanceM: usable.length ? round1(Math.min(...usable.map(item => Math.hypot(item.sample.atM - object.atM, item.sample.devM)))) : null,
     };
-    if (usable.length < TRACK_ANALYSIS_THRESHOLDS.objectMinUsableSamples || reliable.length < TRACK_ANALYSIS_THRESHOLDS.objectMinReliableSamples) {
+    if (new Set(usable.map(item => item.continuitySection)).size > 1
+      || usable.length < TRACK_ANALYSIS_THRESHOLDS.objectMinUsableSamples || reliable.length < TRACK_ANALYSIS_THRESHOLDS.objectMinReliableSamples) {
       reasons.add('insufficient_samples');
       return {
         ...resultBase, speedBeforeMps: null, minimumSpeedMps: null, stopDurationSec: 0, speedAfterMps: null,
@@ -607,7 +626,10 @@ function computePaceV3(classified: ClassifiedAnalyticsSample[], base: TrackAnaly
   let stopGoPhases = 0;
   let movingSeen = false;
   let stopStart: number | null = null;
+  let previousSection: number | undefined;
   for (const entry of series) {
+    if (entry.item.continuitySection !== previousSection) { stopStart = null; movingSeen = false; }
+    previousSection = entry.item.continuitySection;
     if (entry.speed >= 0.5) {
       if (movingSeen && stopStart != null && entry.item.sample.tSec - stopStart >= TRACK_ANALYSIS_THRESHOLDS.stopGoStopMinSec) stopGoPhases++;
       movingSeen = true;

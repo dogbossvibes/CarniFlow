@@ -6,7 +6,7 @@
 // `runs[0].run_points`. Metriken und Analyse lesen weiterhin ausschliesslich
 // `run_points` — diese Funktion ist NUR für die Darstellung.
 
-export interface DisplayRunPoint { lat: number; lng: number; t?: number }
+export interface DisplayRunPoint { lat: number; lng: number; t?: number; breakBefore?: boolean }
 
 function validReplay(raw: unknown): DisplayRunPoint[] | null {
   if (!Array.isArray(raw) || raw.length < 2) return null;

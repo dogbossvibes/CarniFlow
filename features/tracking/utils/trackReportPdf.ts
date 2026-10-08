@@ -7,7 +7,7 @@ export interface ReportLabels {
   title: string; reference: string; search: string; duration: string; objects: string; score: string;
   confidence: string; conditions: string; notes: string; map: string; source: string; noGeometry: string;
   unknown: string; date: string; confidenceLabels?: Record<string, string>;
-  materialLabels?: Record<string, string>; glyphNotice: string;
+  materialLabels?: Record<string, string>; glyphNotice: string; partialNotice?: string;
 }
 const color = (hex: string): RGB => rgb(
   parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255,
@@ -106,7 +106,11 @@ export async function buildTrackReportPdf(
   line(`${labels.date}: ${data.date ?? labels.unknown}`, 8, muted);
   y -= 14;
   line(data.title, 32);
-  y -= 35;
+  y -= data.continuity?.hasGaps ? 11 : 35;
+  if (data.continuity?.hasGaps) {
+    line(labels.partialNotice ?? labels.unknown, 9, muted);
+    y -= 8;
+  }
 
   const mapW = 342, gap = 12, metricW = width - mapW - gap, metricInner = metricW - 38;
   const metrics = [
@@ -196,7 +200,8 @@ export async function buildTrackReportPdf(
 
   y = bottom - 18;
   card(margin, y, width, scoreH, scoreFill, 18);
-  const score = fmt(data.summary.analysisScore), hasScore = data.summary.analysisScore != null;
+  const displayedScore = data.continuity?.hasGaps ? null : data.summary.analysisScore;
+  const score = fmt(displayedScore), hasScore = displayedScore != null;
   const scoreSize = hasScore ? Math.min(40, 40 * 91 / Math.max(1, measure(score, 40, numericFont))) : 11;
   const scoreValueRows = hasScore ? [score] : wrap(score, scoreSize, 101);
   scoreValueRows.forEach((row, i) => text(row, margin + 20, y - 17 - scoreSize - i * 15, scoreSize, scoreMint, hasScore ? numericFont : font));

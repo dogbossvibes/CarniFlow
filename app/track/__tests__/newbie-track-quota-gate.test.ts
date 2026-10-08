@@ -35,7 +35,9 @@ describe('NEWBIE-Fährten-Zugang: kein Pro-only-Hardgate mehr', () => {
   it('legen.tsx: die serverautoritative Monats-Quota bleibt als einziges Gate erhalten', () => {
     const legen = readFileSync('app/track/legen.tsx', 'utf8');
     expect(legen).toContain("const { isPro } = useCapabilities();");
-    expect(legen).toContain("if (!isPro) {");
+    expect(legen).toContain("if (!resumed && !isPro) {");
+    expect(legen.indexOf("if (requestedSessionId && !resumed)")).toBeLessThan(legen.indexOf("claimNewbieQuota(\'track\'"));
+    expect(legen).toContain("const clientUuid = requestedSessionId ?? Crypto.randomUUID();");
     expect(legen).toContain("claimNewbieQuota('track', trackClaimRef.current)");
     expect(legen).toContain("handleQuotaBlock(block, 'track', t, () => router.push('/premium' as never));");
   });

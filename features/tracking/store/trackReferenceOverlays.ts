@@ -1,3 +1,4 @@
+import { readContinuityPoint } from '../utils/trackContinuity';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
 import type { SessionStatus } from '@/features/tracking/store/trackingStore';
 import { type ActiveFaehrtenMap, isValidEntry } from '@/features/tracking/store/activeFaehrtenModel';
@@ -122,7 +123,7 @@ export interface TrackReferenceSources {
   /** Lokale Session-Zeile (SQLite). */
   session:   Pick<LocalTrainingSession, 'local_id' | 'user_id' | 'dog_id' | 'type' | 'deleted_at' | 'status' | 'payload_json'> | null;
   /** Gelegte Punkte aus SQLite (nur geladen, wenn der Pending-Puffer nichts liefert). */
-  layPoints: readonly Pick<LocalTrackPoint, 'latitude' | 'longitude'>[] | null;
+  layPoints: readonly (Pick<LocalTrackPoint, 'latitude' | 'longitude'> & Partial<Pick<LocalTrackPoint, 'payload_json'>>)[] | null;
 }
 
 function hasFinalSearchRun(payloadJson: string | null | undefined): boolean {
@@ -184,10 +185,10 @@ export function resolveReferenceOverlay(
   if (isSessionBlocked(src.session, c.dogId, userId)) return null;
   let points: LatLng[] | null = null;
   if (pendingMatches(src.pending, c)) {
-    points = src.pending.trackPoints.map(p => ({ lat: p.lat, lng: p.lng }));
+    points = src.pending.trackPoints.map(p => ({ lat: p.lat, lng: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) }));
   } else if (src.session && src.layPoints) {
     // SQLite nur mit bekannter, zugehöriger Session-Zeile (Sperren oben geprüft).
-    points = src.layPoints.map(p => ({ lat: p.latitude, lng: p.longitude }));
+    points = src.layPoints.map(p => ({ lat: p.latitude, lng: p.longitude, ...readContinuityPoint(p.payload_json) }));
   }
   if (!points || !hasValidLayGeometry(points)) return null;
   return { dogId: c.dogId, sessionId: c.sessionId, dogName: c.dogName, colorKey: c.colorKey, status: c.status, points };

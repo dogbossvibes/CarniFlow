@@ -6,6 +6,7 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "track.report.partialNotice": "Enregistrement partiel : la carte et les mesures enregistrées concernent les sections observées. Les trajets manquants et les objets non observés restent inconnus. Aucune évaluation globale.",
   "track.export.preparing": "Préparation du fichier {format} …",
   "track.export.notesFormats": "Note actuelle pour PDF, GPX et JSON",
   "track.export.jsonHint": "Pour les analyses techniques",
@@ -38,6 +39,9 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.pace.missing": "Données fiables insuffisantes pour comparer le rythme.",
   "track.pace.meaning": "Rythme de l’appareil ; il ne permet pas de savoir avec certitude si le chien travaille ou court.",
   "track.pace.legend": "Plus lent · similaire · plus rapide que le rythme de référence",
+
+  "track.continuityNotice": "Enregistrement interrompu · La coupure est exclue de la distance mesurée. Seules les sections observées sont évaluées.",
+  "track.recoverySaveFailed": "La recherche n’a pas pu être enregistrée. Elle reste disponible pour être reprise. Veuillez réessayer.",
 
   // Allgemeine Aktionen / Buttons
   "common.save":      "Enregistrer",

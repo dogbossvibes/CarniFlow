@@ -5,7 +5,7 @@ import type { LocalTrackPoint, LocalTrackMarker, SyncStatus } from '@/features/s
 export interface NewTrackPoint {
   latitude: number; longitude: number;
   accuracy?: number | null; altitude?: number | null; speed?: number | null; heading?: number | null;
-  timestamp?: string; point_type?: string;
+  timestamp?: string; point_type?: string; breakBefore?: boolean; measuredDistanceM?: number;
 }
 
 // GPS-Punkte laufend als Batch persistieren (Crash-/Akku-sicher).
@@ -17,9 +17,9 @@ export async function createLocalTrackPointsBatch(sessionLocalId: string, points
     for (const p of points) {
       await db.runAsync(
         `insert into local_track_points (local_id, remote_id, session_local_id, session_remote_id, latitude, longitude, accuracy, altitude, speed, heading, timestamp, point_type, created_at, sync_status, payload_json)
-         values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', null)`,
+         values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
         newLocalId('pt'), sessionLocalId, p.latitude, p.longitude, p.accuracy ?? null, p.altitude ?? null,
-        p.speed ?? null, p.heading ?? null, p.timestamp ?? ts, p.point_type ?? 'lay', ts,
+        p.speed ?? null, p.heading ?? null, p.timestamp ?? ts, p.point_type ?? 'lay', ts, p.breakBefore || Number.isFinite(p.measuredDistanceM) ? JSON.stringify({ ...(p.breakBefore ? { breakBefore: true } : {}), ...(Number.isFinite(p.measuredDistanceM) ? { measuredDistanceM: p.measuredDistanceM } : {}) }) : null,
       );
     }
   });
@@ -37,9 +37,9 @@ export async function createLocalSearchPointsBatch(sessionId: string, points: Ne
     for (const p of points) {
       await db.runAsync(
         `insert into local_track_points (local_id, remote_id, session_local_id, session_remote_id, latitude, longitude, accuracy, altitude, speed, heading, timestamp, point_type, created_at, sync_status, payload_json)
-         values (?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'search', ?, 'pending', null)`,
+         values (?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'search', ?, 'pending', ?)`,
         newLocalId('pt'), sessionId, sessionId, p.latitude, p.longitude, p.accuracy ?? null, p.altitude ?? null,
-        p.speed ?? null, p.heading ?? null, p.timestamp ?? ts, ts,
+        p.speed ?? null, p.heading ?? null, p.timestamp ?? ts, ts, p.breakBefore ? JSON.stringify({ breakBefore: true }) : null,
       );
     }
   });
@@ -62,6 +62,7 @@ export async function deleteSearchPointsBySession(sessionId: string): Promise<vo
 }
 
 export interface NewTrackMarker {
+  sourceMarkerId?: string; recordedAtMs?: number;
   marker_type: string; material?: string | null; angle_kind?: string | null;
   latitude?: number | null; longitude?: number | null; accuracy?: number | null;
   distance_from_start?: number | null; note?: string | null; audio_local_uri?: string | null;
@@ -72,9 +73,10 @@ export async function createLocalTrackMarker(sessionLocalId: string, m: NewTrack
   const id = newLocalId('mk');
   await db.runAsync(
     `insert into local_track_markers (local_id, remote_id, session_local_id, session_remote_id, marker_type, material, angle_kind, latitude, longitude, accuracy, distance_from_start, note, audio_local_uri, audio_remote_url, created_at, sync_status, payload_json)
-     values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, 'pending', null)`,
+     values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, 'pending', ?)`,
     id, sessionLocalId, m.marker_type, m.material ?? null, m.angle_kind ?? null, m.latitude ?? null, m.longitude ?? null,
-    m.accuracy ?? null, m.distance_from_start ?? null, m.note ?? null, m.audio_local_uri ?? null, nowIso(),
+    m.accuracy ?? null, m.distance_from_start ?? null, m.note ?? null, m.audio_local_uri ?? null, typeof m.recordedAtMs === 'number' && Number.isFinite(m.recordedAtMs) ? new Date(m.recordedAtMs).toISOString() : nowIso(),
+    m.sourceMarkerId ? JSON.stringify({ sourceMarkerId: m.sourceMarkerId, recordedAtMs: m.recordedAtMs }) : null,
   );
   return id;
 }

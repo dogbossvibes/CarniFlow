@@ -5,6 +5,7 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "track.report.partialNotice": "Teilufzeichnig: D Charte und gspeicherete Messwert beziehnd sich uf die beobachtete Abschnitt. Fehlendi Wäg und nöd beobachteti Gägeständ bliibed unbekannt. Es git kei Gsamtbewertig.",
   "track.export.preparing": "{format} wird vorbereitet …",
   "track.export.notesFormats": "Aktuelli Notiz für PDF, GPX und JSON",
   "track.export.jsonHint": "Für technischi Uswertige",
@@ -14,6 +15,10 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "track.export.pdfHint": "Uswertig zum Läse und Wiitergäh",
   "track.export.pdf": "Bericht teile",
   "track.export.privacy": "Cha genaui Standört, Datum und Hundename enthalte.",
+
+  "track.continuityNotice": "Uufzeichnig unterbroche · D Lücke zählt nöd zur gmessene Strecki. Bewertet wärded nur beobachteti Abschnitt.",
+  "track.recoverySaveFailed": "D Suechi het nöd sicher chönne gspeicheret werde. Sie bliibt zum Wiitermache erhalte. Bitte nomal probiere.",
+
   // Allgemeine Aktionen / Buttons
   'common.save':     'Speichere',
   'common.cancel':   'Abbreche',

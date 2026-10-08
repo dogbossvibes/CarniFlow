@@ -2,6 +2,7 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "track.report.partialNotice": "Partial recording: the map and stored measurements cover observed sections. Missing paths and unobserved objects remain unknown. No overall score is available.",
   "track.export.preparing": "Preparing {format} …",
   "track.export.notesFormats": "Current note for PDF, GPX and JSON",
   "track.export.jsonHint": "For technical analysis",
@@ -34,6 +35,9 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.pace.missing": "Not enough reliable data for a pace comparison.",
   "track.pace.meaning": "Pace of the recording device; this cannot reliably show whether the dog is working or running.",
   "track.pace.legend": "Slower · similar · faster than the reference pace",
+
+  "track.continuityNotice": "Recording interrupted · The gap is excluded from the measured distance. Only observed sections are assessed.",
+  "track.recoverySaveFailed": "The search could not be saved safely. It remains available to resume. Please try again.",
 
   "common.save": "Save",
   "common.cancel": "Cancel",

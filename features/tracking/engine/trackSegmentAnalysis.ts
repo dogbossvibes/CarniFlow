@@ -1,3 +1,4 @@
+import { isContinuousPair, tagContinuitySections } from '../utils/trackContinuity';
 // ──────────────────────────────────────────────────────────────────────────
 // Track Segment Analysis — REIN deterministisch, KEINE KI. Zerlegt eine
 // Absuche nachträglich in logische Abschnitte (Start/Gerade/Winkel/
@@ -116,6 +117,7 @@ function atMAtTime(samples: AnalyticsSample[], tSec: number): number | null {
       const a = samples[i - 1], b = samples[i];
       const span = b.tSec - a.tSec;
       const t = span > 0 ? (tSec - a.tSec) / span : 0;
+      if (!isContinuousPair(a, b)) return tSec === b.tSec ? b.atM : null;
       return a.atM + (b.atM - a.atM) * t;
     }
   }
@@ -129,7 +131,10 @@ function samplesInRange(samples: AnalyticsSample[], startM: number, endM: number
 function timeRange(samples: AnalyticsSample[]): { startTimeSec: number | null; endTimeSec: number | null; durationSec: number | null } {
   if (!samples.length) return { startTimeSec: null, endTimeSec: null, durationSec: null };
   const startTimeSec = samples[0].tSec, endTimeSec = samples[samples.length - 1].tSec;
-  return { startTimeSec: round1(startTimeSec), endTimeSec: round1(endTimeSec), durationSec: round1(Math.max(0, endTimeSec - startTimeSec)) };
+  let observedSeconds = 0;
+  for (let i = 1; i < samples.length; i++) if (isContinuousPair(samples[i - 1], samples[i]))
+    observedSeconds += Math.max(0, samples[i].tSec - samples[i - 1].tSec);
+  return { startTimeSec: round1(startTimeSec), endTimeSec: round1(endTimeSec), durationSec: round1(observedSeconds) };
 }
 
 // Durchschnittstempo + Tempokonstanz für ein Segment — dieselbe Definition
@@ -140,7 +145,7 @@ function segmentPace(samples: AnalyticsSample[]): { averageSpeedMps: number | nu
   const speeds: number[] = [];
   for (let i = 1; i < samples.length; i++) {
     const dt = samples[i].tSec - samples[i - 1].tSec;
-    if (dt <= 0) continue;
+    if (dt <= 0 || !isContinuousPair(samples[i - 1], samples[i])) continue;
     const dAt = samples[i].atM - samples[i - 1].atM;
     if (dAt < 0) continue;
     speeds.push(dAt / dt);
@@ -157,6 +162,7 @@ function confidenceForSegment(samples: AnalyticsSample[]): number {
   if (!samples.length) return 1;   // "nichts gemessen" ≠ "schlecht" — dieselbe Konvention wie computeAnalysisConfidence([])
   let sw = 0, swx = 0;
   for (let i = 1; i < samples.length; i++) {
+    if (!isContinuousPair(samples[i - 1], samples[i])) continue;
     const dt = Math.max(0.1, samples[i].tSec - samples[i - 1].tSec);
     sw += dt; swx += dt * samples[i].confidence;
   }
@@ -349,6 +355,7 @@ function scoreForSegment(seg: Omit<AnalyticsSegment, 'score'>, input: TrackSegme
 // ── Öffentliche Hauptfunktion ─────────────────────────────────────────────
 
 export function computeTrackSegments(input: TrackSegmentationInput): AnalyticsSegment[] {
+  input = { ...input, samples: tagContinuitySections(input.samples) };
   if (input.trackLengthM <= 0) return [];
   const base = buildBaseSegments(input);
   const cornerZones = base.filter(s => s.type === 'corner').map(s => ({ start: s.startDistanceM, end: s.endDistanceM }));
@@ -366,7 +373,7 @@ export interface SegmentHighlight {
     | 'track.segments.highlights.mostUncertain';
   segmentId: string;
   segmentIndex: number;
-  valueText: string;  // bereits formatierter Wert (z. B. "1.3 m", "4.6 s") — reine Zahl, keine Bewertung
+  valueText: string;  // formatierter Messwert (Abweichung approximativ), keine Bewertung
 }
 
 export function computeSegmentHighlights(segments: AnalyticsSegment[]): SegmentHighlight[] {
@@ -375,13 +382,13 @@ export function computeSegmentHighlights(segments: AnalyticsSegment[]): SegmentH
   const straightLike = segments.filter(s => s.meanDeviationM != null && (s.type === 'straight' || s.type === 'start' || s.type === 'finish'));
   if (straightLike.length) {
     const best = straightLike.reduce((a, b) => (a.meanDeviationM! <= b.meanDeviationM! ? a : b));
-    highlights.push({ labelKey: 'track.segments.highlights.lowestDeviation', segmentId: best.id, segmentIndex: best.index, valueText: `${best.meanDeviationM!.toFixed(1)} m` });
+    highlights.push({ labelKey: 'track.segments.highlights.lowestDeviation', segmentId: best.id, segmentIndex: best.index, valueText: `≈${Math.round(best.meanDeviationM!)} m` });
   }
 
   const withMaxDev = segments.filter(s => s.maxDeviationM != null);
   if (withMaxDev.length) {
     const worst = withMaxDev.reduce((a, b) => (a.maxDeviationM! >= b.maxDeviationM! ? a : b));
-    highlights.push({ labelKey: 'track.segments.highlights.highestDeviation', segmentId: worst.id, segmentIndex: worst.index, valueText: `${worst.maxDeviationM!.toFixed(1)} m` });
+    highlights.push({ labelKey: 'track.segments.highlights.highestDeviation', segmentId: worst.id, segmentIndex: worst.index, valueText: `≈${Math.round(worst.maxDeviationM!)} m` });
   }
 
   const corners = segments.filter(s => s.type === 'corner' && s.durationSec != null);

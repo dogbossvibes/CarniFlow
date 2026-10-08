@@ -1,3 +1,4 @@
+import { restoreLayContinuity } from '../utils/trackContinuity';
 import { supabase } from '@/lib/supabase';
 import { validSessionRating } from '@/features/tracking/utils/sessionRating';
 import type { MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
@@ -384,6 +385,6 @@ export async function getTrackSessionById(id: string): Promise<Result<any>> {
     // Local-first: keine Remote-Zeile → still „not found" (KEIN console.error). Der
     // Caller (app/track/[id].tsx) lädt die Fährte dann vollständig aus SQLite.
     if (!session) return { data: null, error: null };
-    return { data: { ...session, points: points ?? [], markers: markers ?? [], runs: runs ?? [], engine: engineRes?.data ?? null }, error: null };
+    return { data: { ...session, points: restoreLayContinuity(points ?? [], session.track_data?.layContinuity), markers: markers ?? [], runs: runs ?? [], engine: engineRes?.data ?? null }, error: null };
   } catch (e) { return fail('getTrackSessionById', e); }
 }

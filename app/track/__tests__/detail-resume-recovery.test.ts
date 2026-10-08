@@ -102,9 +102,10 @@ describe('run.tsx „Absuche verwerfen": nur der Suchversuch, kein Abbruch der F
     expect(discard).not.toMatch(/recordTrackCancelled|setLocalTrackLifecycle/);
   });
 
-  it('zurück in die Liegezeit; Fallback ohne Freigabe bleibt lokal resting', () => {
+  it('zurück in die Liegezeit; bei fehlgeschlagenem Verwerfen bleibt der Versuch wiederherstellbar', () => {
     expect(discard).toContain('if (released.ok) setPendingExit(released.target);');
-    expect(discard).toContain('if (!released.ok) useTrackingStore.getState().clearSearchSession();');
+    expect(discard).toContain("if (!released.ok) { Alert.alert(t('common.error'), t('track.recoverySaveFailed')); return; }");
+    expect(discard.indexOf('if (!released.ok)')).toBeLessThan(discard.indexOf('resetSearchPoints()'));
   });
 
   it('echtes „Fährte abbrechen" (Liegezeit) bleibt cancelled + dauerhafter Marker', () => {

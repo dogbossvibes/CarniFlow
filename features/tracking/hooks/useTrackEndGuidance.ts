@@ -32,6 +32,7 @@ function distM(a: LL, b: LL): number {
 export function useTrackEndGuidance(input: {
   recording: boolean;
   paused?: boolean;
+  continuityEpoch?: number;
   sessionId?: string | null;
   runId?: string | null;
   dogProgressM: number | null;
@@ -62,6 +63,8 @@ export function useTrackEndGuidance(input: {
   const finalObjectGraceRef = useRef(INITIAL_FINAL_OBJECT_END_GRACE);
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
+  const lastObservedFixMsRef = useRef(-Infinity);
+  const continuityCutoffMsRef = useRef(-Infinity);
   const [graceClock, setGraceClock] = useState(0);
   latestInputRef.current = input;
   onFiredRef.current = input.onFired;
@@ -73,9 +76,10 @@ export function useTrackEndGuidance(input: {
   }, []);
 
   // Explicit run identity also handles a batched stop/start or a different dog
-  // at the same endpoint. Pause is not a new run and retains existing evidence.
+  // at the same endpoint. Pause retains the run identity, but expires unconfirmed GPS evidence.
   useEffect(() => {
     generationRef.current++;
+    lastObservedFixMsRef.current = -Infinity; continuityCutoffMsRef.current = -Infinity;
     stateRef.current = 'unseen'; endFixHistoryRef.current = INITIAL_END_FIX_HISTORY;
     finalObjectGraceRef.current = INITIAL_FINAL_OBJECT_END_GRACE; setEndState('unseen');
   }, [input.recording, input.sessionId, input.runId, input.endPoint?.latitude, input.endPoint?.longitude]);
@@ -85,11 +89,24 @@ export function useTrackEndGuidance(input: {
   }, [input.recording, input.sessionId, input.runId, input.endPoint?.latitude, input.endPoint?.longitude, input.initialFired]);
 
   useEffect(() => {
+    generationRef.current++;
+    continuityCutoffMsRef.current = lastObservedFixMsRef.current;
+    endFixHistoryRef.current = INITIAL_END_FIX_HISTORY;
+    finalObjectGraceRef.current = INITIAL_FINAL_OBJECT_END_GRACE;
+    onGraceChangeRef.current?.(INITIAL_FINAL_OBJECT_END_GRACE);
+    // Once confirmed, the end remains confirmed; only transient proof expires.
+  }, [input.paused, input.continuityEpoch]);
+
+  useEffect(() => {
+    if (input.paused && input.endHandlerFix)
+      lastObservedFixMsRef.current = Math.max(lastObservedFixMsRef.current, input.endHandlerFix.tMs);
     if (!input.recording || input.paused || input.dogProgressM == null) return;
     const geomDistanceM = input.estimatedDogPosition && input.endPoint
       ? distM(input.estimatedDogPosition, input.endPoint)
       : null;
-    const handlerFix = input.endHandlerFix;
+    const candidateFix = input.endHandlerFix;
+    const handlerFix = candidateFix && candidateFix.tMs > continuityCutoffMsRef.current ? candidateFix : null;
+    if (candidateFix) lastObservedFixMsRef.current = Math.max(lastObservedFixMsRef.current, candidateFix.tMs);
     const handlerDistanceToEndM = handlerFix && input.endPoint ? distM(handlerFix.position, input.endPoint) : null;
     if (handlerFix && handlerDistanceToEndM != null) {
       endFixHistoryRef.current = advanceEndFixHistory(endFixHistoryRef.current, {
@@ -175,7 +192,7 @@ export function useTrackEndGuidance(input: {
       return () => clearTimeout(timer);
     }
   }, [
-    input.recording, input.paused, input.sessionId, input.runId, input.dogProgressM, input.trackLengthM,
+    input.recording, input.paused, input.continuityEpoch, input.sessionId, input.runId, input.dogProgressM, input.trackLengthM,
     input.estimatedDogPosition, input.handlerProgressM, input.handlerPosition, input.endHandlerFix,
     input.lastSegmentReached,
     input.activeObjectWait, input.finalObjectPendingNearEnd, input.endPoint, input.openMandatoryObjects, input.voiceOn, graceClock,

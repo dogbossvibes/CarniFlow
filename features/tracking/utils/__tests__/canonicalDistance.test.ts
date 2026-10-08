@@ -66,7 +66,7 @@ describe('Kontrakt', () => {
   });
   it('Store: skipDistance addiert nichts, setDistanceMeters setzt absolut', () => {
     const st = fs.readFileSync('features/tracking/store/trackingStore.ts', 'utf8');
-    expect(st).toContain('last && !opts?.skipDistance ? calculateDistance(last, p) : 0');
+    expect(st).toContain('last && !p.breakBefore && !opts?.skipDistance ? calculateDistance(last, p) : 0');
     expect(st).toContain('setDistanceMeters: (m) =>');
   });
 });

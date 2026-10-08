@@ -16,7 +16,7 @@ export interface TrackReplayData {
   analytics: TrackAnalyticsV2 | TrackAnalyticsV3;
 }
 
-interface RawRunPoint { lat: number; lng: number; t?: number }
+interface RawRunPoint { lat: number; lng: number; t?: number; breakBefore?: boolean }
 
 export function extractTrackReplayData(data: unknown): TrackReplayData | null {
   const d = (data ?? {}) as {
@@ -30,7 +30,7 @@ export function extractTrackReplayData(data: unknown): TrackReplayData | null {
   const rawPoints: RawRunPoint[] = selectDisplayRunPoints(data).points;
   const hasAllTimestamps = rawPoints.length > 0 && rawPoints.every(p => typeof p.t === 'number');
   const geometry: ReplayGeometry = {
-    points: rawPoints.map(p => ({ latitude: p.lat, longitude: p.lng })),
+    points: rawPoints.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
     pointsTimeSec: hasAllTimestamps ? rawPoints.map(p => p.t as number) : [],
   };
   if (!isReplayAvailable(geometry)) return null;
