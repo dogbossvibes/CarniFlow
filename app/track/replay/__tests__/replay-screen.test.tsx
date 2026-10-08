@@ -11,6 +11,9 @@ import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import TrackReplayScreen from '@/app/track/replay/[id]';
 
 jest.mock('@/features/tracking/hooks/useDogTrackColor', () => ({ useDogTrackColor: () => ({ color: '#15E6C3' }) }));
+// Isolate the existing pace-history boundary from live backend configuration.
+jest.mock('@/features/tracking/services/dogPaceHistoryService', () => ({ getDogPaceHistory: jest.fn(async () => []) }));
+jest.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: jest.fn(async () => ({ data: { session: null } })) } } }));
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
