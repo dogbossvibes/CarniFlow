@@ -31,6 +31,10 @@ $$;
 \ir /tmp/active-lifetime-migrations/20260928090000_trainer_profiles_entitlement.sql
 \ir /tmp/active-lifetime-migrations/20261008170000_active_lifetime_access.sql
 
+-- Production has Supabase's existing DML table grants. RLS must still deny
+-- writes; testing only missing table privileges would miss this configuration.
+grant insert, update, delete on public.user_entitlements to authenticated;
+
 insert into auth.users values
  ('11111111-1111-4111-8111-111111111111','active@example.invalid'),
  ('22222222-2222-4222-8222-222222222222','other@example.invalid'),
@@ -72,19 +76,17 @@ end $$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
 select qa_assert((select count(*)=1 from user_entitlements),'only own active grant visible');
-do $$ begin
+do $$ declare affected integer; begin
   begin
     insert into user_entitlements(user_id,entitlement) values(auth.uid(),'active_lifetime');
     raise exception 'FAIL: client grant permitted';
   exception when insufficient_privilege then null; end;
-  begin
-    update user_entitlements set revoked_at=now() where user_id=auth.uid();
-    raise exception 'FAIL: client update permitted';
-  exception when insufficient_privilege then null; end;
-  begin
-    delete from user_entitlements where user_id=auth.uid();
-    raise exception 'FAIL: client delete permitted';
-  exception when insufficient_privilege then null; end;
+  update user_entitlements set revoked_at=now() where user_id=auth.uid();
+  get diagnostics affected = row_count;
+  perform qa_assert(affected=0,'RLS denies client update despite table grant');
+  delete from user_entitlements where user_id=auth.uid();
+  get diagnostics affected = row_count;
+  perform qa_assert(affected=0,'RLS denies client delete despite table grant');
   begin
     perform is_pro_member(auth.uid());
     raise exception 'FAIL: internal quota helper callable by client';
