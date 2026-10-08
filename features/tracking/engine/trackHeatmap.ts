@@ -1,3 +1,4 @@
+import { relativePaceBand, type PaceReference } from '@/features/tracking/utils/paceReference';
 // ──────────────────────────────────────────────────────────────────────────
 // Track Heatmap — zerlegt die abgesuchte Ist-Linie in kurze, eingefärbte
 // Polyline-Teile statt einer echten Flächen-Heatmap (Punkt 10/11). Die
@@ -13,7 +14,7 @@
 // Modus) — nur beim Abweichungs-Modus geht es tatsächlich um Spurtreue.
 // ──────────────────────────────────────────────────────────────────────────
 
-import { FULL_DEV_M, ON_TRACK_M, confidenceBand, type ConfidenceBand } from '@/features/tracking/engine/trackAnalytics';
+import { RELIABLE_CONFIDENCE_FLOOR, FULL_DEV_M, ON_TRACK_M, confidenceBand, type ConfidenceBand } from '@/features/tracking/engine/trackAnalytics';
 import type { AnalyticsSegment } from '@/features/tracking/engine/trackSegmentAnalysis';
 import type { ReplayGeometry, ReplayGeometryPoint } from '@/features/tracking/engine/trackReplay';
 
@@ -36,13 +37,14 @@ export function deviationBand(meanDeviationM: number): DeviationBand {
 // Perzentil-basiert relativ zur EIGENEN Session (Punkt 14) — kein globaler,
 // über alle Nutzer geltender Schwellenwert.
 export function pacePercentiles(segments: AnalyticsSegment[]): { p33: number; p66: number } {
-  const speeds = segments.map(s => s.averageSpeedMps).filter((v): v is number => v != null).sort((a, b) => a - b);
+  const speeds = segments.map(s => s.averageSpeedMps).filter((v): v is number => v != null && Number.isFinite(v) && v >= 0).sort((a, b) => a - b);
   if (!speeds.length) return { p33: 0, p66: 0 };
   const at = (p: number) => speeds[Math.min(speeds.length - 1, Math.floor(speeds.length * p))];
   return { p33: at(0.33), p66: at(0.66) };
 }
 
 export function paceBand(speedMps: number, percentiles: { p33: number; p66: number }): PaceBand {
+  if (percentiles.p33 === percentiles.p66) return speedMps < percentiles.p33 ? 'slow' : speedMps > percentiles.p66 ? 'fast' : 'normal';
   if (speedMps <= percentiles.p33) return 'slow';
   if (speedMps >= percentiles.p66) return 'fast';
   return 'normal';
@@ -88,14 +90,18 @@ export function heatmapColorForSegment(seg: AnalyticsSegment, metric: HeatmapMet
 // Schneidet die Replay-Geometrie (points/pointsTimeSec) anhand der
 // Segment-Zeitfenster in kurze, farbige Teile. Segmente ohne anwendbare
 // Metrik (z. B. 0 Samples) werden übersprungen (kein erfundener Wert).
-export function buildHeatmapParts(geometry: ReplayGeometry, segments: AnalyticsSegment[], metric: HeatmapMetric): HeatmapPart[] {
+export function buildHeatmapParts(geometry: ReplayGeometry, segments: AnalyticsSegment[], metric: HeatmapMetric, paceReference?: PaceReference | null): HeatmapPart[] {
+  if (metric === 'pace' && paceReference === null) return [];
   if (geometry.points.length !== geometry.pointsTimeSec.length || geometry.points.length < 2) return [];
   const percentiles = metric === 'pace' ? pacePercentiles(segments) : { p33: 0, p66: 0 };
   const parts: HeatmapPart[] = [];
 
   for (const seg of segments) {
     if (seg.startTimeSec == null || seg.endTimeSec == null) continue;
-    const colorInfo = heatmapColorForSegment(seg, metric, percentiles);
+    if (metric === 'pace' && (!Number.isFinite(seg.averageSpeedMps) || seg.averageSpeedMps == null || seg.averageSpeedMps < 0
+      || !Number.isFinite(seg.analysisConfidence) || seg.analysisConfidence < RELIABLE_CONFIDENCE_FLOOR)) continue;
+    const pace = metric === 'pace' && paceReference && seg.averageSpeedMps != null ? relativePaceBand(seg.averageSpeedMps, paceReference) : null;
+    const colorInfo = pace ? { color: PACE_BAND_COLORS[pace], band: pace } : heatmapColorForSegment(seg, metric, percentiles);
     if (!colorInfo) continue;
     const coords: ReplayGeometryPoint[] = [];
     for (let i = 0; i < geometry.points.length; i++) {
