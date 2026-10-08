@@ -2,13 +2,18 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "track.export.preparing": "Preparing {format} …",
+  "track.export.notesFormats": "Current note for PDF, GPX and JSON",
+  "track.export.jsonHint": "For technical analysis",
+  "track.export.gpxHint": "For use in compatible mapping apps",
+  "track.export.pdfHint": "Analysis to read and share",
   "track.report.glyphNotice": "Some characters are shown as ?. The JSON file contains the complete text.",
   "track.export.title": "Export analysis",
-  "track.export.privacy": "Export files contain exact locations, the date and the dog’s name. Share them only with people you want to receive these details.",
+  "track.export.privacy": "May contain exact locations, dates and the dog’s name.",
   "track.export.notes": "Include notes",
-  "track.export.pdf": "PDF report",
-  "track.export.gpx": "GPX tracks",
-  "track.export.json": "Track data file (JSON)",
+  "track.export.pdf": "Share report",
+  "track.export.gpx": "Export GPS tracks",
+  "track.export.json": "Export track data",
   "track.export.failed": "The export could not be created or shared. Your track is unchanged.",
   "track.export.unavailable": "No saved geometry available.",
   "track.report.title": "Tracking report",

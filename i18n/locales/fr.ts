@@ -6,13 +6,18 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "track.export.preparing": "Préparation du fichier {format} …",
+  "track.export.notesFormats": "Note actuelle pour PDF, GPX et JSON",
+  "track.export.jsonHint": "Pour les analyses techniques",
+  "track.export.gpxHint": "Pour les applications cartographiques compatibles",
+  "track.export.pdfHint": "Analyse à lire et à partager",
   "track.report.glyphNotice": "Certains caractères sont affichés sous forme de ?. Le fichier JSON contient le texte intégral.",
   "track.export.title": "Exporter l’analyse",
-  "track.export.privacy": "Les fichiers exportés contiennent les positions exactes, la date et le nom du chien. Partagez-les uniquement avec les personnes de votre choix.",
+  "track.export.privacy": "Peut contenir les positions exactes, la date et le nom du chien.",
   "track.export.notes": "Inclure les notes",
-  "track.export.pdf": "Rapport PDF",
-  "track.export.gpx": "Traces GPX",
-  "track.export.json": "Fichier de piste (JSON)",
+  "track.export.pdf": "Partager le rapport",
+  "track.export.gpx": "Exporter les traces GPS",
+  "track.export.json": "Exporter les données de piste",
   "track.export.failed": "Impossible de créer ou de partager le fichier. Votre piste reste inchangée.",
   "track.export.unavailable": "Aucun tracé enregistré disponible.",
   "track.report.title": "Rapport de pistage",

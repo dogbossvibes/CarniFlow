@@ -2,13 +2,18 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "track.export.preparing": "Preparazione di {format} …",
+  "track.export.notesFormats": "Nota attuale per PDF, GPX e JSON",
+  "track.export.jsonHint": "Per analisi tecniche",
+  "track.export.gpxHint": "Per applicazioni cartografiche compatibili",
+  "track.export.pdfHint": "Analisi da leggere e condividere",
   "track.report.glyphNotice": "Alcuni caratteri sono visualizzati come ?. Il file JSON contiene il testo completo.",
   "track.export.title": "Esporta analisi",
-  "track.export.privacy": "I file esportati contengono posizioni precise, data e nome del cane. Condividili solo con le persone a cui desideri fornire questi dati.",
+  "track.export.privacy": "Può contenere posizioni precise, data e nome del cane.",
   "track.export.notes": "Includi note",
-  "track.export.pdf": "Rapporto PDF",
-  "track.export.gpx": "Tracce GPX",
-  "track.export.json": "File della pista (JSON)",
+  "track.export.pdf": "Condividi rapporto",
+  "track.export.gpx": "Esporta tracce GPS",
+  "track.export.json": "Esporta dati della pista",
   "track.export.failed": "Impossibile creare o condividere il file. La pista rimane invariata.",
   "track.export.unavailable": "Nessun tracciato salvato disponibile.",
   "track.report.title": "Rapporto di pista",
