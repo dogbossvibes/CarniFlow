@@ -1,15 +1,18 @@
-/**
- * Android hotfix release contract: preserve the existing 1.0.3 binary runtime.
- * The canonical main retains its independent iOS 1.0.4 / Build 49 contract.
- */
+/** Android native release: preserve app identity and build the reviewed1.0.4 runtime. */
 import { readFileSync } from 'fs';
 
 const app = JSON.parse(readFileSync('app.json', 'utf8')).expo;
 const eas = JSON.parse(readFileSync('eas.json', 'utf8'));
 
 describe('Production-Native-Vertrag', () => {
-  it('Android hotfix uses Runtime 1.0.3 and the unchanged production app identity', () => {
-    expect(app.version).toBe('1.0.3');
+  it('Android native build uses1.0.4, versionCode45 and verified install hooks', () => {
+    expect(app.version).toBe('1.0.4');
+    expect(app.android.versionCode).toBe(45);
+    expect(eas.build.production.android.buildType).toBe('app-bundle');
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(pkg.scripts.postinstall).toBe('node scripts/patch-expo-task-manager.cjs');
+    expect(pkg.expo.autolinking.android.buildFromSource).toEqual(['expo-task-manager', 'unimodules-app-loader']);
+    expect(pkg.scripts['eas-build-post-install']).toBe('node scripts/patch-expo-task-manager.cjs --check');
     expect(app.runtimeVersion).toEqual({ policy: 'appVersion' });
     expect(app.ios.buildNumber).toBe('48');
     expect(app.android.package).toBe('com.anyvo.app');

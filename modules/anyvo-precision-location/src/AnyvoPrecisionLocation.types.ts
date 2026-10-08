@@ -19,7 +19,7 @@ export interface PrecisionLocation {
   timestamp: number;          // ms seit Epoch
   provider:  string;          // 'gps' | 'ios_core_location' | 'expo-location' | …
   source:    'native' | 'expo-location';
-  // Additive uncertainty fields; older binaries and some providers omit them.
+  // Additive uncertainty fields; older binaries and some providers omit them. Native Android requires API 26.
   altitudeAccuracy?: number | null;
   speedAccuracy?:    number | null;
   heading?:          number | null;   // Kurs (iOS course); = bearing
