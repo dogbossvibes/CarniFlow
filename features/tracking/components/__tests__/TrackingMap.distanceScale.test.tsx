@@ -141,6 +141,41 @@ describe('TrackingMap — Fährten-Maßstab', () => {
   });
 });
 
+describe('TrackingMap — Maßstab, wenn die Referenz erst nach dem Mount kommt (run.tsx)', () => {
+  const layout = (n: ReactTestRenderer) =>
+    act(() => { outer(n)?.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 500 } } }); });
+  const update = (n: ReactTestRenderer, line: { latitude: number; longitude: number }[]) =>
+    act(() => { (n as unknown as { update: (el: React.ReactElement) => void }).update(<TrackingMap layPoints={LAY} runPoints={RUN} currentPosition={LAY[11]} smartFollow follow distanceScaleLine={line} />); });
+
+  it('Regression: einziges Layout-Event bei leerer Linie → Höhe gemessen, Ticks erscheinen nach dem Laden', () => {
+    const n = renderMap({ distanceScaleLine: [] });          // Snapshot noch nicht geladen
+    expect(outer(n)).toBeDefined();                          // Höhe wird ab Mount gemessen
+    expect(mapView(n).props.onRegionChangeComplete).toEqual(expect.any(Function));
+    layout(n);                                               // RN feuert onLayout nur einmal
+    expect(ticks(n)).toHaveLength(0);                        // ohne Linie kein Layer
+    update(n, REF_LINE);                                     // Snapshot geladen, KEIN neues Layout-Event
+    expect(ticks(n).length).toBeGreaterThan(0);              // Standard-Delta → 5/10-m-Ticks
+    expect(new Set(ticks(n).map(p => p.strokeColor))).toEqual(new Set([DISTANCE_TICK_STROKE.five.strokeColor, DISTANCE_TICK_STROKE.ten.strokeColor]));
+  });
+  it('Region-Event vor dem Laden der Linie wird für den Zoom genutzt', () => {
+    const n = renderMap({ distanceScaleLine: [] });
+    layout(n);
+    const d = 40 / M_PER_DEG;
+    act(() => { mapView(n).props.onRegionChangeComplete({ latitude: LAY[20].lat, longitude: 8, latitudeDelta: d, longitudeDelta: d }); });
+    update(n, REF_LINE);
+    expect(ticks(n)).toHaveLength(40);                       // nah → 1-m-Ticks
+  });
+  it('typische Fährtenlängen 15/20/50/100 m beim Standard-Zoom: sichtbare Ticks', () => {
+    for (const len of [15, 20, 50, 100]) {
+      const line = Array.from({ length: len + 1 }, (_, i) => ({ latitude: 47 + i / M_PER_DEG, longitude: 8 }));
+      const n = renderMap({ distanceScaleLine: [] });
+      layout(n);
+      update(n, line);
+      expect(ticks(n)).toHaveLength(Math.floor(len / 5));
+    }
+  });
+});
+
 describe('run.tsx — Maßstab misst auf der Search-Referenz', () => {
   const src = readFileSync('app/track/run.tsx', 'utf8');
   it('Ticks entlang snapData.laidPoints (dieselbe Linie wie useSearchRecorder)', () => {
