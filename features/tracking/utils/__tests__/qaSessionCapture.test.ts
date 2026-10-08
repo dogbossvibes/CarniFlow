@@ -116,7 +116,7 @@ describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
     // dort steht eine eigene `mk_…`. Wird die falsche notiert, lässt sich der
     // Export nie wieder mit der Herkunft zusammenführen.
     expect(src).toContain('const dbId = await createLocalTrackMarker(');
-    expect(src).toContain('if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qa.apexIndex);');
+    expect(src).toContain('if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qaApexIndex, qaContext);');
     expect(src).not.toMatch(/qaNoteMarker\(`angle-/);
     expect(src).not.toMatch(/qaNoteMarker\(`\$\{type\}-/);
   });
@@ -137,7 +137,7 @@ describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
     expect(src).toContain('if (!qaRef.current) return;');
     // Und geschrieben, bevor die Puffer geleert werden.
     const write = src.indexOf('saveQaSessionCapture(');
-    const stop = src.indexOf('stopAll();', write);
+    const stop = src.indexOf('stopAll(false);', write);
     expect(write).toBeGreaterThan(-1);
     expect(stop).toBeGreaterThan(write);
   });
@@ -145,4 +145,11 @@ describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
   it('ein Fehler im Mitschnitt darf den Abschluss der Fährte nie blockieren', () => {
     expect(src).toContain('void saveQaSessionCapture(');
   });
+});
+
+
+it('refuses a capture whose supplied creation token is no longer current', async () => {
+  mockStore.clear();
+  await saveQaSessionCapture(capture('old-generation'), 'old-generation-token');
+  expect(mockStore.size).toBe(0);
 });

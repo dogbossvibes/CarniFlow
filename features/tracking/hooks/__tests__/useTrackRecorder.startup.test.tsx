@@ -11,7 +11,7 @@ import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 jest.mock('@/lib/diagnosticsAccessState', () => ({
-  diagnosticsAccessToken: () => 'authorized-fixture',
+  diagnosticsAccessToken: () => mockAccessToken,
   getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
   hasDiagnosticsAccess: () => true,
   subscribeDiagnosticsAccess: () => () => {},
@@ -33,6 +33,7 @@ jest.mock('expo-location', () => ({
 }));
 let feedFix: ((sample: any) => void) | null = null;
 let mockQaEnabled = false;
+let mockAccessToken: string | null = 'authorized-fixture';
 jest.mock('../../utils/positionSource', () => ({
   sampleToLocationObject: (s: any) => ({ coords: {
     latitude: s.lat, longitude: s.lng, accuracy: s.accuracy,
@@ -114,6 +115,7 @@ beforeEach(() => {
   clockMs = 1_000_000;
   feedFix = null;
   mockQaEnabled = false;
+  mockAccessToken = 'authorized-fixture';
   (saveQaSessionCapture as jest.Mock).mockClear();
   (createLocalTrainingSession as jest.Mock).mockReset().mockResolvedValue(undefined);
   (createLocalTrackMarker as jest.Mock).mockClear();
@@ -381,4 +383,44 @@ it('never finalizes a laid track as saved when its point flush fails', async () 
   await act(async () => { current.finish(); for (let i = 0; i < 12; i++) await Promise.resolve(); });
   expect(finalizeLocalTrainingSession).not.toHaveBeenCalled();
   expect(useTrackingStore.getState().setSaveState).toHaveBeenCalledWith('error');
+});
+
+
+it('keeps both private QA detector sections and marks the unobserved boundary after pause', async () => {
+  mockQaEnabled = true;
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  for (let i = 0; i < 8; i++) feed(3500 + i * 1000, 5, 14 + i * 2);
+  const state = useTrackingStore.getState();
+  Object.assign(state, { pauseRecording: () => { state.isPaused = true; }, resumeRecording: () => { state.isPaused = false; } });
+  act(() => { current.pause(); });
+  act(() => { current.resume(); });
+  for (let i = 0; i < 8; i++) feed(20_000 + i * 1000, 5, 60 + i * 2);
+  act(() => { current.pause(); });
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  const boundary = capture.detectorPoints.findIndex((point: { breakBefore?: boolean }) => point.breakBefore);
+  expect(boundary).toBeGreaterThan(0);
+  expect(capture.detectorPoints[boundary].cumDistM).toBe(capture.detectorPoints[boundary - 1].cumDistM);
+  expect(capture.linePoints.some((point: { breakBefore?: boolean }) => point.breakBefore)).toBe(true);
+  expect(capture.distances.detectorPathM).toBeGreaterThan(0);
+  expect(capture.distances.detectorPathM).toBeCloseTo(capture.detectorPoints[capture.detectorPoints.length - 1].cumDistM, 2);
+  expect(capture.reconstructionScope).toBe('current_detector_section');
+});
+
+
+it('drops a deferred capture and marker metadata after authority is revoked and regranted', async () => {
+  mockQaEnabled = true;
+  await start();
+  feed(1000, 5, 8, 1);
+  let releaseMarker!: (id: string) => void;
+  (createLocalTrackMarker as jest.Mock).mockImplementationOnce(() => new Promise<string>(resolve => { releaseMarker = resolve; }));
+  let pending!: Promise<void>;
+  await act(async () => { pending = current.addMarker('gegenstand'); });
+  act(() => current.finish());
+  mockAccessToken = null;
+  mockAccessToken = 'regranted-generation';
+  await act(async () => { releaseMarker('late-marker'); await pending; await Promise.resolve(); });
+  expect(saveQaSessionCapture).not.toHaveBeenCalled();
 });

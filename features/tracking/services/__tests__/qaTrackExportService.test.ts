@@ -97,10 +97,10 @@ describe('6./7./10. Export-Konsistenz', () => {
     expect(mockMarkers).toHaveBeenCalledWith(A);
     expect(mockCapture).toHaveBeenCalledWith(A);
     expect(mockPoints).toHaveBeenCalledWith(B);
-    expect(mockBackground).toHaveBeenCalledWith(A, { includeTimeline: true });
-    expect(mockBackground).toHaveBeenCalledWith(B, { includeTimeline: true });
+    expect(mockBackground).toHaveBeenCalledWith(A, { includeTimeline: true, includeRuntimeDropReasons: true });
+    expect(mockBackground).toHaveBeenCalledWith(B, { includeTimeline: true, includeRuntimeDropReasons: true });
     expect(mockEvidence).toHaveBeenCalledWith(A);
-    expect(ea.schemaMinor).toBe(10);
+    expect(ea.schemaMinor).toBe(11);
     expect(ea.backgroundLayDiagnosticsStatus).toBe('missing');
     expect(ea.recordingEvidence?.availability).toEqual({ lay: 'missing', search: 'missing' });
   });

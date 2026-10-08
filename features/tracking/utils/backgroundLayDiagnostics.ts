@@ -3,6 +3,7 @@
 // writers therefore cannot overwrite a shared counter with read/modify/write.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
+import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 
 const PREFIX = 'anyvo.bgLayDiag.v1::';
 const ACTIVE = `${PREFIX}active`;
@@ -80,6 +81,8 @@ export type BackgroundLayDiagnostics = {
   // onFixAccepted counts recorded line points, including the start anchor.
   counts: Record<(typeof COUNT_NAMES)[number], number>;
   rejectReasons: Record<string, number>;
+  /** Personal QA only: runtime drops, separate from GPS quality rejections. */
+  runtimeDropReasons?: Partial<Record<RuntimeDropReason, number>>;
   taskErrorReason: string | null;
   taskStartFailureReason: string | null;
   taskStopFailureReason: string | null;
@@ -96,9 +99,19 @@ const TIMELINE_NAMES = new Set<BackgroundLayEvent>([
   'taskStopFailure', 'taskRegistered', 'handlerRegistered', 'handlerCleared', 'taskError',
 ]);
 const TIMELINE_LIMIT = 128;
+const RUNTIME_DROP_REASONS = ['duplicate', 'no_bound_session', 'unknown_session', 'dog_mismatch',
+  'registry_mismatch', 'not_laying', 'session_not_active', 'session_finalized', 'fix_before_session_start', 'unknown'] as const;
+type RuntimeDropReason = (typeof RUNTIME_DROP_REASONS)[number];
+function runtimeDropReason(event: Event): RuntimeDropReason | null {
+  if (event.name === 'backgroundDuplicateDropped') return 'duplicate';
+  if (event.name === 'backgroundFinalizedSessionDropped') return 'session_finalized';
+  if (event.name !== 'backgroundSessionMismatch') return null;
+  return RUNTIME_DROP_REASONS.includes(event.reason as RuntimeDropReason) ? event.reason as RuntimeDropReason : 'unknown';
+}
 
 /** Read only this exact session. No latest-session or latest-dog fallback. */
-export async function loadBackgroundLayDiagnostics(sessionId: string, options?: { includeTimeline?: boolean }): Promise<BackgroundLayDiagnostics | null> {
+export async function loadBackgroundLayDiagnostics(sessionId: string, options?: { includeTimeline?: boolean; includeRuntimeDropReasons?: boolean }): Promise<BackgroundLayDiagnostics | null> {
+  const qaAccess = options?.includeRuntimeDropReasons ? diagnosticsAccessToken() : null;
   const meta = await AsyncStorage.getItem(metaKey(sessionId));
   if (!meta) return null;
   const startedAt = (JSON.parse(meta) as { startedAt: number }).startedAt;
@@ -134,6 +147,16 @@ export async function loadBackgroundLayDiagnostics(sessionId: string, options?: 
         name: e.name, tMs: Math.max(0, e.at - startedAt), ...(e.reason ? { reason: e.reason } : {}),
       })),
     };
+  }
+  // Re-check after asynchronous storage reads; a revoked/account-switched export
+  // must not acquire the additional personal QA fields.
+  if (qaAccess && qaAccess === diagnosticsAccessToken()) {
+    out.runtimeDropReasons = {};
+    for (const event of events) {
+      const reason = runtimeDropReason(event);
+      if (reason && Number.isFinite(event.count) && event.count > 0)
+        out.runtimeDropReasons[reason] = (out.runtimeDropReasons[reason] ?? 0) + event.count;
+    }
   }
   return out;
 }

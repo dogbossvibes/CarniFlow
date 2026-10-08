@@ -37,6 +37,8 @@ export interface QaCapturePoint {
   tMs: number;
   /** Nur für Detektor-/Linienpunkte: kumulierte Weglänge DIESER Pipeline. */
   cumDistM?: number;
+  /** Explicit unobserved boundary; no diagnostic line may bridge it. */
+  breakBefore?: boolean;
 }
 
 export type QaMarkerSource = 'auto' | 'auto_split_apex' | 'manual' | 'stop_flush' | 'build40' | 'unknown';
@@ -177,6 +179,14 @@ export interface QaMotionSample {
  *                       und ist als Rekonstruktion gekennzeichnet.
  */
 export interface QaCandidateMotion {
+  /** Latest geometry verdict, independent of the retained strongest Motion window. */
+  geometryAtLastEvaluation?: {
+    rejectReason: import('./shortLegCornerDetection').ShortLegRejectReason | null;
+    headingMeasured: boolean;
+    accepted: boolean;
+  };
+  /** True when this diagnostic sample context was thinned to its explicit limit. */
+  contextSamplesTruncated?: boolean;
   // ── Zuordnung ────────────────────────────────────────────────────────────
   apexIndex: number;
   /** ms relativ zum Aufnahmebeginn — der Zeitpunkt, für den ausgewertet wurde. */
@@ -224,6 +234,17 @@ export interface QaCandidateMotion {
  *  nachrechenbar sind. */
 export const QA_MOTION_CONTEXT_MS = 2000;
 
+export interface QaMotionCaptureDiagnostics {
+  candidateLimit: number;
+  samplesPerCandidateLimit: number;
+  contextHalfWindowMs: number;
+  candidateRetention: 'latest_apex_indices';
+  sampleRetention: 'bounded_observed_context';
+  evaluatedCandidateCount: number;
+  omittedCandidateCount: number;
+  truncated: boolean;
+}
+
 export interface QaSessionCapture {
   /** 1 = Schema v2.0 (ohne Motion), 2 = v2.1 (mit candidateMotionEvidence). */
   captureVersion: 1 | 2;
@@ -249,8 +270,11 @@ export interface QaSessionCapture {
   markers: QaMarkerMeta[];
   /** FINISH RECONSTRUCTED — Neuberechnung beim Stop, OHNE Motion. */
   autoDiagnostics: QaAutoDiagnostic[];
+  /** Finish reconstruction covers only this section, unlike retained live Motion rows. */
+  reconstructionScope?: 'current_detector_section';
   /** LIVE RECORDED + DERIVED — QA v2.1. Fehlt bei captureVersion 1. */
   candidateMotionEvidence?: QaCandidateMotion[];
+  motionCaptureDiagnostics?: QaMotionCaptureDiagnostics;
   /** QA v2.2 — Turn-Fusion je Ecke (FINISH RECONSTRUCTED, mit Motion, falls sie lief). */
   turnFusion?: QaTurnFusion[];
   /** QA v2.2 — IMU-only-Ereignisse (nie persistiert). */
@@ -298,9 +322,8 @@ export interface QaSessionCapture {
 const keyFor = (sessionLocalId: string) => `${KEY_PREFIX}${sessionLocalId}`;
 
 /** Mitschnitt ablegen und den Index auf die jüngsten Einträge begrenzen. */
-export async function saveQaSessionCapture(capture: QaSessionCapture): Promise<void> {
-  const accessToken = diagnosticsAccessToken();
-  if (!accessToken) return;
+export async function saveQaSessionCapture(capture: QaSessionCapture, accessToken = diagnosticsAccessToken()): Promise<void> {
+  if (!accessToken || accessToken !== diagnosticsAccessToken()) return;
   try {
     await AsyncStorage.setItem(keyFor(capture.sessionLocalId), JSON.stringify(capture));
     const raw = await AsyncStorage.getItem(INDEX_KEY);

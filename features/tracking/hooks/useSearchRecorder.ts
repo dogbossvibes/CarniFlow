@@ -231,7 +231,6 @@ export function useSearchRecorder(opts: {
   onFixDiagRef.current = opts.onFixDiag;
   const handlerDistanceM = opts.handlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M;
   const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
-  const totalObjects = laidObjects.length || model.objects;
 
   // Ziel-Session der lokalen Absuche-Persistenz (immer aktueller via Ref).
   const sessionIdRef = useRef<string | null>(opts.sessionId ?? null);
@@ -242,6 +241,9 @@ export function useSearchRecorder(opts: {
   // Bogenlängen der Soll-Fährte (stabil, da laidPoints aus dem Snapshot stammt).
   const arc = useMemo(() => buildArc(laidPoints), [laidPoints]);
   const hasTrack = arc.total > 1;
+  // A known reference may deliberately contain zero objects. Only free searches
+  // without a reference use the rulebook target; zero must not become three.
+  const totalObjects = hasTrack ? laidObjects.length : (laidObjects.length || model.objects);
 
   // ── State (UI) ──
   const [ready, setReady] = useState(false);

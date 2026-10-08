@@ -1,3 +1,4 @@
+import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 import { pinQaTrackingModes } from '@/features/tracking/utils/qaPreferences';
 import { claimLayRecorderStore } from '@/features/tracking/utils/layRecorderOwnership';
 import { serializeBackgroundTransition } from '@/features/tracking/utils/backgroundTransitionQueue';
@@ -129,8 +130,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, pointsRef, emaRef, lineEmaRef, canonDistRef, puckRef, lastRawRef, lastCornerAtRef, lineTurnZoneRef,
     lastCornerRescuedRef, detectPointsRef, detectEmaRef, rawTailRef, rejectedRef,
     startLockRef, startLockBeganRef, startFixesRef, startAnchorRef, startAnchorAccRef, startDriftRejRef,
-    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, turnEvidenceRef, qaMotionSeenRef,
-    qaCandidateMotionRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
+    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, turnEvidenceRef,
+    qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
   } = laySession;
   // ── Eigener, dichterer Punktstrom NUR für die Winkel-Erkennung ──
   // Die aufgezeichnete LINIE bleibt unverändert (EMA_ALPHA 0,4 / MIN_STEP_M 2 m).
@@ -220,9 +221,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
    * Herkunft zusammenführen. Die ID im Store (`angle-<ts>-<kind>`) ist eine
    * andere und taucht in der Datenbank nicht auf.
    */
-  const qaNoteMarker = useCallback((markerId: string, source: QaMarkerSource, scale: QaDistanceScale, apexIndex: number | null) => {
+  const qaNoteMarker = useCallback((markerId: string, source: QaMarkerSource, scale: QaDistanceScale, apexIndex: number | null, context: { token: string | null; sessionId: string | null; markers: QaMarkerMeta[] }) => {
     if (!qaRef.current) return;
-    qaMarkerMetaRef.current.push({ markerId, source, scale, apexIndex });
+    if (!context.token || context.token !== diagnosticsAccessToken() || context.sessionId !== localSessionId.current || context.markers !== qaMarkerMetaRef.current) return;
+    context.markers.push({ markerId, source, scale, apexIndex });
   }, []);
 
   // true = alles Gepufferte ist dauerhaft geschrieben (oder nichts offen); false = Write fehlgeschlagen
@@ -299,10 +301,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const enforceQaCaptureAccess = useCallback(() => {
     if (!isQaDiagnosticsEnabled()) {
       qaRef.current = false;
+      qaMotionCaptureRef.current.clear();
       recordingEvidenceRef.current?.close();
       recordingEvidenceRef.current = null;
     }
-  }, []);
+  }, [qaMotionCaptureRef]);
   useEffect(() => subscribeQaDiagnostics(enforceQaCaptureAccess), [enforceQaCaptureAccess]);
 
   // Observation only: AppState does not start, stop, or restore recording.
@@ -337,12 +340,15 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     const s = store.getState();
     s.addMarker(marker);
     const markerSessionId = localSessionId.current;
+    const qaContext = { token: diagnosticsAccessToken(), sessionId: markerSessionId, markers: qaMarkerMetaRef.current };
+    // Capture the QA index before async marker writes can cross a section boundary.
+    const qaApexIndex = qa?.apexIndex == null ? null : qa.apexIndex + completedDetectorSectionsRef.current.reduce((sum, section) => sum + section.length, 0);
     if (markerSessionId) {
       const localWrite = (async () => {
         try {
           await localSessionCreationRef.current;
           const dbId = await createLocalTrackMarker(markerSessionId, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null, sourceMarkerId: marker.id, recordedAtMs: marker.t });
-          if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qa.apexIndex);
+          if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qaApexIndex, qaContext);
           return true;
         } catch (e) { console.warn('[trackRecorder] marker', e); return false; }
       })();
@@ -350,7 +356,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       await localWrite;
     }
     if (s.currentSessionId && s.currentSessionId !== markerSessionId) await saveTrackMarker(s.currentSessionId, marker);
-  }, [store, qaNoteMarker]);
+  }, [store, qaNoteMarker, completedDetectorSectionsRef]);
 
   // Übergabe eines FINAL bestätigten Winkels an die bestehende Pipeline (Marker/
   // Voice/Logbuch/Persistenz) — genau EINMAL je Winkel. Geometrie/Confidence liegen
@@ -538,12 +544,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaAcceptedCountRef.current = 0;
     qaMarkerMetaRef.current = [];
     markerWritesRef.current = createMarkerWriteBarrier();
-    qaCandidateMotionRef.current = [];
+    qaMotionCaptureRef.current.clear();
     startupMovementRef.current = { samples: [], confirmationTSec: null, confirmationSource: null,
       confirmationConfidence: null, fallbackUsed: false, truncated: false };
     liveTurnsRef.current.clear();
     turnEvidenceRef.current.clear();
-    qaMotionSeenRef.current.clear();
     motionBufRef.current.clear();
     if (qaRef.current) clearQaCandidateLog();
     confirmerRef.current.reset();   // laufende Confirmation-State-Machine leeren
@@ -698,7 +703,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     await localSessionCreationRef.current;
 
     return { error: null };
-  }, [startWarmup, store, flushPoints, processFixWithQaAccess, processor, completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaCandidateMotionRef, qaLastRejectRef, qaMotionSeenRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
+  }, [startWarmup, store, flushPoints, processFixWithQaAccess, processor, completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
 
   const pause  = useCallback(() => { recordingEvidenceRef.current?.note('userPaused'); processor.interruptContinuity(); store.getState().pauseRecording(); }, [store, processor]);
   const resume = useCallback(() => { recordingEvidenceRef.current?.note('userResumed'); processor.interruptContinuity(); store.getState().resumeRecording(); }, [store, processor]);
@@ -796,7 +801,13 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // verworfen, es werden nur die Diagnosen übernommen.
     if (qaRef.current && localSessionId.current) {
       try {
+        const captureToken = diagnosticsAccessToken();
+        const captureMarkers = qaMarkerMetaRef.current;
+        const captureSessionId = localSessionId.current;
         const detectPts = detectPointsRef.current;
+        const detectorSections = [...completedDetectorSectionsRef.current, detectPts];
+        const detectorIndexOffset = completedDetectorSectionsRef.current.reduce((sum, section) => sum + section.length, 0);
+        const lastDetectorSection = [...detectorSections].reverse().find(section => section.length > 0);
         const linePts = pointsRef.current;
         const originMs = qaOriginRef.current?.t ?? detectPts[0]?.t ?? 0;
         // Hinweis: der Motion-Ringpuffer hält nur die letzten ~20 s — IMU-only-Ereignisse
@@ -823,7 +834,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         });
         const acceptedIdx = new Set(sweep.corners.map(c => c.apexIndex));
         const autoDiagnostics: QaAutoDiagnostic[] = sweep.diagnostics.map(d => ({
-          apexIndex: d.apexIndex,
+          apexIndex: detectorIndexOffset + d.apexIndex,
           tMs: d.t == null ? null : d.t - (qaOriginRef.current?.t ?? d.t),
           bearingBefore: d.bearingBefore,
           bearingAfter: d.bearingAfter,
@@ -836,8 +847,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           rejectReason: d.rejectReason,
           accepted: acceptedIdx.has(d.apexIndex),
         }));
-        const detectorPoints = detectPts.map(p => qaRel(p.lat, p.lng, p.t ?? 0, p.accuracy, p.cumDist));
-        const linePoints = linePts.map(p => qaRel(p.lat, p.lng, p.t, p.accuracy, p.cumDist));
+        const detectorPoints = detectorSections.flatMap((section, sectionIndex) => section.map((p, index) => ({
+          ...qaRel(p.lat, p.lng, p.t ?? 0, p.accuracy, p.cumDist),
+          ...(sectionIndex > 0 && index === 0 ? { breakBefore: true } : {}),
+        })));
+        const linePoints = linePts.map(p => ({ ...qaRel(p.lat, p.lng, p.t, p.accuracy, p.cumDist), ...(p.breakBefore ? { breakBefore: true } : {}) }));
         const rawFixes = qaRawFixesRef.current;
         const capture = {
           captureVersion: 2 as const,
@@ -852,7 +866,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           },
           distances: {
             rawPathM: pathLength(rawFixes),
-            detectorPathM: detectPts.length ? Math.round(detectPts[detectPts.length - 1].cumDist * 100) / 100 : 0,
+            detectorPathM: lastDetectorSection ? Math.round(lastDetectorSection[lastDetectorSection.length - 1].cumDist * 100) / 100 : 0,
             recordedLineM: linePts.length ? Math.round(linePts[linePts.length - 1].cumDist * 100) / 100 : 0,
             storeDistanceM: Math.round(store.getState().distanceMeters * 100) / 100,
           },
@@ -861,16 +875,19 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           linePoints,
           markers: qaMarkerMetaRef.current.slice(),
           autoDiagnostics,
-          candidateMotionEvidence: qaCandidateMotionRef.current.slice(),
-          turnFusion: associatedTurns.map(t => toQaTurnFusion(t, originMs)),
+          reconstructionScope: 'current_detector_section' as const,
+          ...qaMotionCaptureRef.current.snapshot(),
+          turnFusion: associatedTurns.map(t => ({ ...toQaTurnFusion(t, originMs), apexIndex: detectorIndexOffset + t.apexIndex })),
           imuOnlyEvents: sweep.imuOnly.map(e => toQaImuOnlyEvent(e, originMs)),
           startupDiagnostics: startupRef.current,
           startupMovementDiagnostics: startupMovementRef.current,
           voiceDiagnostics: voiceDiagnostics(),
-          manualAngleGeometryDiagnostics: classifyManualAngleGeometry(store.getState().markers, detectPts, associatedTurns),
+          manualAngleGeometryDiagnostics: classifyManualAngleGeometrySections(store.getState().markers, detectorSections),
         };
         void pendingLocalMarkers.then(markersSaved => {
-          if (markersSaved) void saveQaSessionCapture({ ...capture, markers: qaMarkerMetaRef.current.slice() });
+          if (markersSaved && captureToken && captureToken === diagnosticsAccessToken() && captureSessionId === localSessionId.current && captureMarkers === qaMarkerMetaRef.current) {
+            void saveQaSessionCapture({ ...capture, markers: captureMarkers.slice() }, captureToken);
+          }
         });
       } catch (e) {
         console.warn('[trackRecorder] QA-Mitschnitt', e);
@@ -942,7 +959,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })().finally(() => { finalizationRef.current = null; });
-  }, [stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaCandidateMotionRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
+  }, [stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaMotionCaptureRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
 
   return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug };
 }

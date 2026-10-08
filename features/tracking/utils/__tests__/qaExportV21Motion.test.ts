@@ -248,21 +248,12 @@ describe('6. Keine algorithmische Änderung', () => {
     expect(s).toContain('export const SPITZ_MIN = 15, SPITZ_MAX = 60;');
   });
 
-  it('der Mitschnitt ist rein beobachtend und nur im QA-Modus', () => {
-    const s = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(src).join('\n');
-    expect(s).toContain('if (qaRef.current && motionActiveRef.current) {');
-    // Die Aggregate stammen aus derselben Auswertung, die der Detektor nutzt.
-    expect(s).toContain('const ev = motionBufRef.current.evidenceForTrailing(tCand);');
-    // Die Fusion erhält zusätzlich den begrenzten Lookup für passende Motion-Episoden.
-    expect(s).toContain('fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection })');
-  });
+  // Behaviour (QA access, rejected candidates, bounded capture and processor
+  // parity) is exercised in qaMotionCapture and layProcessingSession tests.
+});
 
-  it('bei QA AUS entsteht kein einziger Motion-Eintrag', () => {
-    const s = ['features/tracking/hooks/useTrackRecorder.ts', 'features/tracking/engine/layProcessingSession.ts'].map(src).join('\n');
-    const block = s.slice(s.indexOf('if (qaRef.current && motionActiveRef.current) {'));
-    expect(block.slice(0, 200)).toContain('for (const d of diagnostics)');
-    // Kein Schreibpfad ausserhalb des Gates.
-    const alle = (s.match(/qaCandidateMotionRef\.current\.push/g) ?? []).length;
-    expect(alle).toBe(1);
-  });
+
+it('retains the explicit current-section reconstruction scope in the shared JSON', () => {
+  const exported = buildQaTrackExport('scope', points, markers, capture({ reconstructionScope: 'current_detector_section' }));
+  expect(JSON.parse(serializeQaTrackExport(exported)).reconstructionScope).toBe('current_detector_section');
 });

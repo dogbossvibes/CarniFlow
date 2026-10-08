@@ -1,3 +1,4 @@
+import { QaMotionCapture } from '@/features/tracking/utils/qaMotionCapture';
 import { isRecordingGap, splitContinuousPoints } from '../utils/trackContinuity';
 import type * as Location from 'expo-location';
 import type { AngleKind, MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
@@ -18,10 +19,9 @@ import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDist
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
 import { pushQaCandidateLine } from '@/features/tracking/utils/qaCandidateLog';
 import {
-  QA_MOTION_CONTEXT_MS,
-  type QaCapturePoint, type QaDistanceScale, type QaMarkerSource, type QaCandidateMotion, type QaSessionCapture,
+  type QaCapturePoint, type QaDistanceScale, type QaMarkerSource, type QaSessionCapture,
 } from '@/features/tracking/utils/qaSessionCapture';
-import { MotionEvidenceBuffer, TURN_EVIDENCE_DEFAULTS, motionTurnDirection, type TurnEvidence } from '@/features/tracking/utils/motionTurnEvidence';
+import { MotionEvidenceBuffer, TURN_EVIDENCE_DEFAULTS, type TurnEvidence } from '@/features/tracking/utils/motionTurnEvidence';
 import { recordBackgroundLayEvent } from '@/features/tracking/utils/backgroundLayDiagnostics';
 import { layStartBlockingReason } from '@/features/tracking/utils/layStartLock';
 import { confirmLayMovement } from '@/features/tracking/utils/layMovementConfirmation';
@@ -109,8 +109,7 @@ export interface LayProcessingState {
   angleDbgRef: Box<AngleDebug>;
   liveTurnsRef: Box<Map<number, FusedTurn>>;
   turnEvidenceRef: Box<Map<number, TurnEvidence>>;
-  qaMotionSeenRef: Box<Set<number>>;
-  qaCandidateMotionRef: Box<QaCandidateMotion[]>;
+  qaMotionCaptureRef: Box<QaMotionCapture>;
   qaLastRejectRef: Box<string | null>;
   qaOriginRef: Box<{ lat: number; lng: number; t: number } | null>;
   qaRawFixesRef: Box<QaCapturePoint[]>;
@@ -148,8 +147,7 @@ export function createLayProcessingState(): LayProcessingState {
     angleDbgRef: box<AngleDebug>({ count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null }),
     liveTurnsRef: box<Map<number, FusedTurn>>(new Map()),
     turnEvidenceRef: box<Map<number, TurnEvidence>>(new Map()),
-    qaMotionSeenRef: box<Set<number>>(new Set()),
-    qaCandidateMotionRef: box<QaCandidateMotion[]>([]),
+    qaMotionCaptureRef: box(new QaMotionCapture()),
     qaLastRejectRef: box<string | null>(null),
     qaOriginRef: box<{ lat: number; lng: number; t: number } | null>(null),
     qaRawFixesRef: box<QaCapturePoint[]>([]),
@@ -221,8 +219,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     pointsRef, emaRef, lineEmaRef, canonDistRef, puckRef, lastRawRef, lastCornerAtRef, lineTurnZoneRef,
     lastCornerRescuedRef, detectPointsRef, detectEmaRef, rawTailRef, rejectedRef,
     startLockRef, startLockBeganRef, startFixesRef, startAnchorRef, startAnchorAccRef, startDriftRejRef,
-    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, turnEvidenceRef, qaMotionSeenRef,
-    qaCandidateMotionRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
+    gpsQualityRef, gpsQualityStateRef, angleDbgRef, liveTurnsRef, turnEvidenceRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawFixesRef, qaRawCountRef, qaAcceptedCountRef,
   } = session;
   const {
     store, localSessionId, ptBuffer, flushPoints, commitMarker, onAngleRef, recordingRef, qaRef,
@@ -310,63 +307,11 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     }
     if (newlyAssociated) ({ corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection }));
 
-    // ── QA v2.1: Motion-Evidenz LIVE je Kandidat festhalten ────────────────
-    // Rein beobachtend. Greift nur im QA-Diagnosemodus und nur, solange Core
-    // Motion ohnehin läuft. Es wird NICHTS neu berechnet — die Aggregate
-    // stammen aus derselben Auswertung, die der Detektor gerade benutzt hat,
-    // und die Rohsamples kommen unverändert aus dem Ringpuffer.
+    // Observation only, including candidates rejected before a heading exists.
     if (qaRef.current && motionActiveRef.current) {
-      for (const d of diagnostics) {
-        const tCand = d.t;
-        if (tCand == null) continue;
-        // Nur Kandidaten, bei denen Motion überhaupt eine Rolle spielen kann:
-        // die Geometrie muss bis zur Richtungsmessung gekommen sein.
-        if (d.headingDeltaDeg == null) continue;
-        const ev = motionBufRef.current.evidenceForTrailing(tCand);
-        const previousIndex = qaCandidateMotionRef.current.findIndex(c => c.apexIndex === d.apexIndex);
-        if (previousIndex >= 0 && (qaCandidateMotionRef.current[previousIndex].turnEvidence ?? 0) >= (ev.evidence ?? 0)) continue;
-        qaMotionSeenRef.current.add(d.apexIndex);
-        const samples = motionBufRef.current.samplesIn(
-          tCand - (TURN_EVIDENCE_DEFAULTS.halfWindowSec * 1000 + QA_MOTION_CONTEXT_MS),
-          tCand + (TURN_EVIDENCE_DEFAULTS.halfWindowSec * 1000 + QA_MOTION_CONTEXT_MS),
-        );
-        const t0 = qaOriginRef.current?.t ?? tCand;
-        const candidate: QaCandidateMotion = {
-          apexIndex: d.apexIndex,
-          evaluatedAtMs: Math.round(tCand - t0),
-          windowStartMs: Math.round(ev.windowStartMs - tCand),
-          windowEndMs: Math.round(ev.windowEndMs - tCand),
-          sampleCount: ev.sampleCount,
-          firstSampleAgeMs: samples.length ? Math.round(samples[0].t - tCand) : null,
-          lastSampleAgeMs: samples.length ? Math.round(samples[samples.length - 1].t - tCand) : null,
-          motionAvailable: ev.available,
-          netYawDeg: Math.round(ev.netYawDeg * 100) / 100,
-          signedNetYawDeg: Math.round(ev.signedNetYawDeg * 100) / 100,
-          direction: motionTurnDirection(ev),
-          grossYawDeg: Math.round(ev.grossYawDeg * 100) / 100,
-          monotonicity: Math.round(ev.monotonicity * 1000) / 1000,
-          yawShare: Math.round(ev.yawShare * 1000) / 1000,
-          accelerationEvidence: Math.round(ev.gaitAccelFraction * 1000) / 1000,
-          stepDelta: ev.steps,
-          cadence: ev.cadence,
-          movementState: ev.movementState,
-          locomotionEvidence: ev.locomotionSource,
-          turnEvidence: ev.evidence,
-          adjustmentApplied: d.motionAdjustment ?? 0,
-          samples: samples.map(x => ({
-            dtMs: Math.round(x.t - tCand),
-            headingDelta: Math.round(x.headingDelta * 100) / 100,
-            rotationMagnitude: Math.round(x.rotationMagnitude * 1000) / 1000,
-            accelerationMagnitude: Math.round(x.accelerationMagnitude * 1000) / 1000,
-            stepDelta: x.stepDelta,
-            cadence: x.cadence,
-            movementState: x.movementState,
-          })),
-          source: 'live',
-        };
-        if (previousIndex >= 0) qaCandidateMotionRef.current[previousIndex] = candidate;
-        else qaCandidateMotionRef.current.push(candidate);
-      }
+      qaMotionCaptureRef.current.observe(diagnostics, motionBufRef.current,
+        qaOriginRef.current?.t ?? null, new Set(corners.map(c => c.apexIndex)),
+        session.completedDetectorSectionsRef.current.reduce((sum, section) => sum + section.length, 0));
     }
     if (__DEV__ && diagnostics.length) {
       const last = diagnostics[diagnostics.length - 1];

@@ -128,14 +128,14 @@ export async function buildExportForSession(localId: string): Promise<QaTrackExp
     getTrackMarkersBySession(localId).catch(() => []),
     loadQaSessionCapture(localId).catch(() => null),
     loadQaSearchCapture(localId).catch(() => null),
-    loadBackgroundLayDiagnostics(localId, { includeTimeline: true })
+    loadBackgroundLayDiagnostics(localId, { includeTimeline: true, includeRuntimeDropReasons: true })
       .then(diagnostics => ({ diagnostics, status: diagnostics ? 'available' as const : 'missing' as const }))
       .catch(() => ({ diagnostics: null, status: 'read_failed' as const })),
     loadQaRecordingEvidence(localId),
   ]);
   const exported: QaTrackExport = {
     ...buildQaTrackExport(localId, points, markers, capture, search),
-    schemaMinor: 10,
+    schemaMinor: 11,
     recordingEvidence,
     backgroundLayDiagnosticsStatus: background.status,
     ...(background.diagnostics ? { backgroundLayDiagnostics: background.diagnostics } : {}),

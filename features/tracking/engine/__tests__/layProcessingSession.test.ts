@@ -1,3 +1,4 @@
+import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, revokeDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
 // Sessiongebundener Lay-Processor: Foreground-Parität mit dem ORIGINALEN
 // useTrackRecorder (b6bc114) und explizite, testbare Ergebnisse — ohne React.
 import { createHash } from 'crypto';
@@ -74,6 +75,7 @@ function runScenario(sc: Scenario): Run {
   for (const st of sc.steps) {
     if (st.k === 'fix') {
       clock = st.t + (st.ageMs ?? 0);
+      if (sc.qa) resolveDiagnosticsAccess('qa', getDiagnosticsAccessSnapshot().generation, true);
       run.results.push(processor.processFix({
         coords: { latitude: LAT0 + st.y / M_LAT, longitude: LNG0 + st.x / M_LNG, accuracy: st.acc, altitude: null, speed: st.speed ?? 1, heading: null, altitudeAccuracy: null },
         timestamp: st.t,
@@ -87,8 +89,8 @@ function runScenario(sc: Scenario): Run {
 }
 const hash = (pts: TrackPointSample[]) => createHash('sha256').update(JSON.stringify(pts.map(p => [p.lat, p.lng, p.accuracy, p.t]))).digest('hex').slice(0, 16);
 
-beforeEach(() => { jest.spyOn(Date, 'now').mockImplementation(() => clock); jest.spyOn(console, 'log').mockImplementation(() => {}); });
-afterEach(() => jest.restoreAllMocks());
+beforeEach(() => { clock = T0; jest.useFakeTimers(); jest.setSystemTime(T0); setDiagnosticsSession('qa'); resolveDiagnosticsAccess('qa', getDiagnosticsAccessSnapshot().generation, true); jest.spyOn(Date, 'now').mockImplementation(() => clock); jest.spyOn(console, 'log').mockImplementation(() => {}); });
+afterEach(() => { revokeDiagnosticsAccess(); setDiagnosticsSession(null); jest.restoreAllMocks(); jest.useRealTimers(); });
 
 // Manuelle Marker sind Hook-Funktionalität (addMarker) — Processor-Parität ohne sie.
 const processorScenarios = scenarios.filter(s => !s.steps.some(st => st.k === 'marker'));
@@ -197,4 +199,43 @@ describe('Lay continuity: explicitly changed pause/gap semantics', () => {
     // The boundary cannot produce a new corner; subsequent observed turns still work.
     expect(run.results[index].corners).toEqual([]);
   });
+});
+
+
+
+describe('Personal QA observes without changing tracking outcomes', () => {
+  it.each(['motionEvidence current+qa', 'straight60 current', 'jitterBeforeCorner', 'badAccuracyAtCorner', 'pausedMidRoute'])(
+    '%s has identical product outputs with capture enabled or disabled', name => {
+      const sc = scenarios.find(s => s.name === name)!;
+      const off = runScenario({ ...sc, qa: false });
+      const on = runScenario({ ...sc, qa: true });
+      expect(on.results).toEqual(off.results);
+      expect(on.points).toEqual(off.points);
+      expect(on.angles).toEqual(off.angles);
+      expect(on.markers).toEqual(off.markers);
+      expect(on.distanceCalls).toEqual(off.distanceCalls);
+      expect(off.session.qaMotionCaptureRef.current.snapshot()).toEqual({});
+      const rows = on.session.qaMotionCaptureRef.current.snapshot().candidateMotionEvidence;
+      expect(rows?.length).toBeGreaterThan(0);
+      expect(rows?.some(r => r.geometryAtLastEvaluation?.rejectReason)).toBe(true);
+    });
+});
+
+
+it('joins private QA indices to their actual detector section without joining product geometry', () => {
+  const base = scenarios.find(s => s.name === 'motionEvidence current+qa')!;
+  const steps = [...base.steps];
+  steps.splice(Math.floor(steps.length * 0.4), 0, { k: 'pause', on: false });
+  steps.splice(Math.floor(base.steps.length / 3), 0, { k: 'pause', on: true });
+  const run = runScenario({ ...base, steps, qa: true });
+  const offset = run.session.completedDetectorSectionsRef.current.reduce((sum, section) => sum + section.length, 0);
+  expect(offset).toBeGreaterThan(0);
+  const detector = [...run.session.completedDetectorSectionsRef.current.flat(), ...run.session.detectPointsRef.current];
+  const rows = run.session.qaMotionCaptureRef.current.snapshot().candidateMotionEvidence!;
+  expect(rows.some(row => row.apexIndex < offset)).toBe(true);
+  expect(rows.some(row => row.apexIndex >= offset)).toBe(true);
+  expect(new Set(rows.map(row => row.apexIndex)).size).toBe(rows.length);
+  for (const row of rows) {
+    expect(detector[row.apexIndex].t! - run.session.qaOriginRef.current!.t).toBe(row.evaluatedAtMs);
+  }
 });

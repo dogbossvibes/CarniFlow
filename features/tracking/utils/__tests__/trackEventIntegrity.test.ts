@@ -82,7 +82,7 @@ describe('Fachliche Richtung ist kamera-unabhängig', () => {
           computeCameraTarget({ position: at(0, 0), headingDeg, mode, pitchDeg });
           // … das Label des Events bleibt unverändert.
           expect(ANGLE_LABEL.rechts).toBe('Rechtswinkel');
-          expect(ANGLE_SHORT.rechts).toBe('90 R');
+          expect(ANGLE_SHORT.rechts).toBe('R');
         }
       }
     }

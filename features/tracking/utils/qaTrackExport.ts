@@ -97,7 +97,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -146,6 +146,7 @@ export interface QaTrackExport {
    * der Live-Entscheidung verwechseln (siehe candidateMotionEvidence).
    */
   autoDiagnostics: QaAutoDiagnostic[];
+  reconstructionScope?: QaSessionCapture['reconstructionScope'];
 
   // ── QA v2.1 ─────────────────────────────────────────────────────────────
   /**
@@ -158,6 +159,7 @@ export interface QaTrackExport {
    * Beides ist NICHT dasselbe wie „Motion sah keine Drehung".
    */
   candidateMotionEvidence?: QaCandidateMotion[];
+  motionCaptureDiagnostics?: QaSessionCapture['motionCaptureDiagnostics'];
   /** true, wenn Core Motion während der Aufnahme überhaupt lief. */
   motionCaptureAvailable: boolean;
 
@@ -275,7 +277,7 @@ export function buildQaTrackExport(
   }
   const accs = anon.map(p => p.accuracy).filter((a): a is number => a != null);
   const motion = capture?.candidateMotionEvidence;
-  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 = capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
+  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 = capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
     || capture?.startupDiagnostics?.motionFirstCallbackTSec !== undefined ? 7
     : capture?.startupMovementDiagnostics
     || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
@@ -328,7 +330,9 @@ export function buildQaTrackExport(
     detectorPoints: capture?.detectorPoints ?? [],
     linePoints: capture?.linePoints ?? [],
     autoDiagnostics: capture?.autoDiagnostics ?? [],
+    reconstructionScope: capture?.reconstructionScope,
     candidateMotionEvidence: motion,
+    motionCaptureDiagnostics: capture?.motionCaptureDiagnostics,
     motionCaptureAvailable: !!motion && motion.length > 0,
     ...(capture?.turnFusion ? { turnFusion: capture.turnFusion } : {}),
     ...(capture?.imuOnlyEvents ? { imuOnlyEvents: capture.imuOnlyEvents } : {}),
@@ -403,10 +407,10 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
   // Sample-Zeit darf je absolut werden.
   for (const m of e.candidateMotionEvidence ?? []) {
     for (const v of [m.evaluatedAtMs, m.windowStartMs, m.windowEndMs, m.firstSampleAgeMs, m.lastSampleAgeMs]) {
-      if (v != null && Math.abs(v) >= 1e12) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
+      if (v != null && (!Number.isFinite(v) || Math.abs(v) >= 1e12)) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
     }
     for (const sm of m.samples) {
-      if (Math.abs(sm.dtMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
+      if (!Number.isFinite(sm.dtMs) || Math.abs(sm.dtMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
     }
   }
   for (const m of e.markers) {
