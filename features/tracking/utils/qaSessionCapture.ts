@@ -1,3 +1,4 @@
+import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 // QA-Mitschnitt einer gelegten Fährte — ausschliesslich für Feldtest-Analysen.
 //
 // ANLASS (Realdaten Teil A/B): der QA-Export konnte einen Feldlauf nicht
@@ -298,15 +299,21 @@ const keyFor = (sessionLocalId: string) => `${KEY_PREFIX}${sessionLocalId}`;
 
 /** Mitschnitt ablegen und den Index auf die jüngsten Einträge begrenzen. */
 export async function saveQaSessionCapture(capture: QaSessionCapture): Promise<void> {
+  const accessToken = diagnosticsAccessToken();
+  if (!accessToken) return;
   try {
     await AsyncStorage.setItem(keyFor(capture.sessionLocalId), JSON.stringify(capture));
     const raw = await AsyncStorage.getItem(INDEX_KEY);
+    if (accessToken !== diagnosticsAccessToken()) return;
     const ids: string[] = raw ? JSON.parse(raw) : [];
     const next = [capture.sessionLocalId, ...ids.filter(id => id !== capture.sessionLocalId)];
     const keep = next.slice(0, QA_CAPTURE_RETENTION);
     const drop = next.slice(QA_CAPTURE_RETENTION);
     await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(keep));
-    for (const id of drop) await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
+    for (const id of drop) {
+      if (accessToken !== diagnosticsAccessToken()) return;
+      await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
+    }
   } catch {
     // QA-Mitschnitt ist best-effort — ein Fehler darf den Abschluss der
     // Fährte niemals beeinträchtigen.
@@ -314,9 +321,11 @@ export async function saveQaSessionCapture(capture: QaSessionCapture): Promise<v
 }
 
 export async function loadQaSessionCapture(sessionLocalId: string): Promise<QaSessionCapture | null> {
+  const accessToken = diagnosticsAccessToken();
+  if (!accessToken) return null;
   try {
     const raw = await AsyncStorage.getItem(keyFor(sessionLocalId));
-    if (!raw) return null;
+    if (!raw || accessToken !== diagnosticsAccessToken()) return null;
     const parsed = JSON.parse(raw) as QaSessionCapture;
     // v2.0-Mitschnitte (captureVersion 1) bleiben lesbar.
     return parsed?.captureVersion === 1 || parsed?.captureVersion === 2 ? parsed : null;
@@ -326,19 +335,26 @@ export async function loadQaSessionCapture(sessionLocalId: string): Promise<QaSe
 }
 
 export async function listQaSessionCaptureIds(): Promise<string[]> {
+  const accessToken = diagnosticsAccessToken();
+  if (!accessToken) return [];
   try {
     const raw = await AsyncStorage.getItem(INDEX_KEY);
-    return raw ? (JSON.parse(raw) as string[]) : [];
+    return raw && accessToken === diagnosticsAccessToken() ? (JSON.parse(raw) as string[]) : [];
   } catch {
     return [];
   }
 }
 
 export async function clearQaSessionCaptures(): Promise<void> {
+  const accessToken = diagnosticsAccessToken();
+  if (!accessToken) return;
   try {
     const ids = await listQaSessionCaptureIds();
-    for (const id of ids) await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
-    await AsyncStorage.removeItem(INDEX_KEY);
+    for (const id of ids) {
+      if (accessToken !== diagnosticsAccessToken()) return;
+      await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
+    }
+    if (accessToken === diagnosticsAccessToken()) await AsyncStorage.removeItem(INDEX_KEY);
   } catch { /* best-effort */ }
 }
 

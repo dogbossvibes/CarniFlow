@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { type Session, type User } from '@supabase/supabase-js';
 import { router } from 'expo-router';
 import { supabase } from './supabase';
+import { setDiagnosticsSession } from '@/lib/diagnosticsAccessState';
 import { initLocaleSync, stopLocaleSync } from '@/services/localeSync';
 
 type SessionCtx = {
@@ -27,6 +28,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const finish = (s: Session | null) => {
       if (done) return;
       done = true;
+      setDiagnosticsSession(s?.user.id ?? null);
       setSession(s);
       setLoading(false);
       if (s?.user) initLocaleSync(s.user.id);   // Sprache aus Profil (falls Sync aktiv)
@@ -46,6 +48,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Keep in sync with Supabase auth events (login, logout, token refresh).
     // Das erste INITIAL_SESSION-Event schließt den Bootstrap ebenfalls ab.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // A delayed bootstrap response must not restore an earlier account after logout/switch.
+      done = true;
+      clearTimeout(safety);
+      setDiagnosticsSession(session?.user.id ?? null);
       setSession(session);
       setLoading(false);
       if (event === 'PASSWORD_RECOVERY') {
@@ -57,7 +63,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (session?.user) initLocaleSync(session.user.id); else stopLocaleSync();
     });
 
-    return () => { clearTimeout(safety); subscription.unsubscribe(); };
+    return () => { clearTimeout(safety); subscription.unsubscribe(); setDiagnosticsSession(null); };
   }, []);
 
   return (

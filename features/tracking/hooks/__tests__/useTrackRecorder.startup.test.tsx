@@ -1,3 +1,4 @@
+
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { useTrackRecorder } from '../useTrackRecorder';
@@ -7,6 +8,13 @@ import { saveQaSessionCapture } from '../../utils/qaSessionCapture';
 import { createLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
 import * as Speech from 'expo-speech';
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
 jest.mock('expo-speech', () => ({ speak: jest.fn(), stop: jest.fn() }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -46,7 +54,7 @@ jest.mock('../../store/trackingStore', () => {
   return { useTrackingStore: { getState: () => state } };
 });
 jest.mock('../../utils/qaModeBootstrap', () => ({ hydrateQaModes: jest.fn(async () => {}) }));
-jest.mock('../../utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQaEnabled }));
+jest.mock('../../utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQaEnabled, subscribeQaDiagnostics: () => () => {} }));
 jest.mock('../../utils/qaSessionCapture', () => ({
   ...jest.requireActual('../../utils/qaSessionCapture'),
   saveQaSessionCapture: jest.fn(async () => {}),
@@ -54,6 +62,7 @@ jest.mock('../../utils/qaSessionCapture', () => ({
 jest.mock('../../utils/trackingEngineMode', () => ({ getTrackingEngineMode: () => 'current' }));
 jest.mock('../../utils/locationSourceMode', () => ({ getLocationSourceMode: () => 'expo' }));
 jest.mock('../../utils/trackingWarmupState', () => ({
+  ...jest.requireActual('../../utils/trackingWarmupState'),
   markWarmupStarted: jest.fn(), markReportedSource: jest.fn(), markWarmupStopped: jest.fn(),
   markMotionStarted: jest.fn(), markMotionSample: jest.fn(),
 }));

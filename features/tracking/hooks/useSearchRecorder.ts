@@ -8,7 +8,10 @@
  * Portiert aus design_handoff_faehrten/useSearchRecorder.ts; der Helfer distM
  * (Haversine auf {latitude,longitude}) ist hier lokal definiert.
  */
-import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { isQaDiagnosticsEnabled, subscribeQaDiagnostics } from '@/features/tracking/utils/qaDiagnosticsMode';
+import { AppState } from 'react-native';
+import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
+import { startQaRecordingEvidence, type QaRecordingObserver } from '@/features/tracking/utils/qaRecordingEvidenceStore';
 import { isSupportCaptureEnabled } from '@/features/tracking/utils/supportDiagnostics';
 import { SEARCH_QA_LIMITS, type SearchQaTelemetry, type SearchQaRawFix } from '@/features/tracking/utils/qaSearchCapture';
 import { replayGeometryArrays, REPLAY_GEOMETRY, type ReplayGeoPoint } from '@/features/tracking/utils/searchReplayGeometry';
@@ -234,6 +237,8 @@ export function useSearchRecorder(opts: {
   // Ziel-Session der lokalen Absuche-Persistenz (immer aktueller via Ref).
   const sessionIdRef = useRef<string | null>(opts.sessionId ?? null);
   sessionIdRef.current = opts.sessionId ?? null;
+  const recordingEvidenceRef = useRef<QaRecordingObserver | null>(null);
+  const streamSourceModeRef = useRef<unknown>(null);
 
   // Bogenlängen der Soll-Fährte (stabil, da laidPoints aus dem Snapshot stammt).
   const arc = useMemo(() => buildArc(laidPoints), [laidPoints]);
@@ -281,6 +286,21 @@ export function useSearchRecorder(opts: {
   const replayEmaRef = useRef<LatLng | null>(null);
   // QA-Telemetrie (null = QA aus). Reiner Beobachter: wird nur geschrieben, nie von Cursor/Distanz/Score gelesen.
   const qaTelRef = useRef<SearchQaTelemetry | null>(null);
+  const enforceQaCaptureAccess = useCallback(() => {
+    const enabled = isQaDiagnosticsEnabled();
+    if (!enabled) {
+      recordingEvidenceRef.current?.close();
+      recordingEvidenceRef.current = null;
+    }
+    if (!enabled && qaTelRef.current?.captureLevel === 'qa') {
+      // Keep the existing customer support capture, discard internal-only fields.
+      if (isSupportCaptureEnabled()) {
+        qaTelRef.current.captureLevel = 'support';
+        delete qaTelRef.current.objectDwellCandidates;
+      } else qaTelRef.current = null;
+    }
+  }, []);
+  useEffect(() => subscribeQaDiagnostics(enforceQaCaptureAccess), [enforceQaCaptureAccess]);
   const qaLastCursorSampleSecRef = useRef(-Infinity);
   const replayDisabledRef = useRef(false);   // Resume: Vor-Resume-Punkte haben keine dichte Spur
   // Lotfusspunkt des zuletzt akzeptierten Punkts auf der Soll-Fährte — Kontinuität
@@ -370,6 +390,7 @@ export function useSearchRecorder(opts: {
 
   // ── Kernlogik ──
   const onFix = useCallback((loc: Location.LocationObject) => {
+    enforceQaCaptureAccess();
     setLiveFix({ lat: loc.coords.latitude, lng: loc.coords.longitude, accuracy: loc.coords.accuracy ?? null, t: loc.timestamp });
     const accRaw = loc.coords.accuracy ?? null;
     setAccuracy(accRaw != null ? Math.round(accRaw) : null);
@@ -892,7 +913,7 @@ export function useSearchRecorder(opts: {
   // onFix neu erzeugen und damit den Location-Watch-Effect (Deps: [onFix])
   // unnötig neu starten. Ein evtl. kurz veralteter Wert im Log ist unkritisch.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM, firstLegHeading]);
+  }, [enforceQaCaptureAccess, laidPoints, laidObjects, pushSnapshot, hasTrack, arc.cum, arc.total, handlerDistanceM, firstLegHeading]);
 
   // ── Watch ab Mount ──
   //
@@ -917,15 +938,26 @@ export function useSearchRecorder(opts: {
   // zusätzlich stabilisiert.
   const onFixRef = useRef(onFix);
   onFixRef.current = onFix;
+  // Observation only: no start/stop/restore or React updates on lifecycle events.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => recordingEvidenceRef.current?.appState(state));
+    return () => {
+      sub.remove();
+      recordingEvidenceRef.current?.close('recorderUnmounted');
+      recordingEvidenceRef.current = null;
+    };
+  }, []);
   useEffect(() => {
     let mounted = true;
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted' || !mounted) return;
       setReady(true);
+      streamSourceModeRef.current = getLocationSourceMode();
       // Zentrale Positionsquelle: natives Precision-Modul bevorzugt, expo-Fallback.
       const handle = await startPositionSource(
         (s) => {
+          recordingEvidenceRef.current?.source(s.source, s.provider);
           gpsSourceRef.current = s.source;
           setGpsDebug(d => (d.source === s.source && d.provider === s.provider) ? d : { ...d, source: s.source, provider: s.provider });
           onFixRef.current(sampleToLocationObject(s));
@@ -935,7 +967,7 @@ export function useSearchRecorder(opts: {
       if (!mounted) { handle.stop(); return; }   // Unmount während des Starts → kein Leak
       watchRef.current = { remove: handle.stop };
       setGpsDebug(d => ({ ...d, isNativeAvailable: handle.info.isNativeAvailable, rawGnssSupported: handle.info.rawGnssSupported, source: d.source ?? handle.info.source }));
-    })();
+    })().catch(() => { if (mounted) setReady(false); });
     return () => { mounted = false; watchRef.current?.remove(); };
   }, []);
 
@@ -1068,6 +1100,13 @@ export function useSearchRecorder(opts: {
     //     GPS-/Sensor-Zugriff, nur dieselben Fixes, die ohnehin verarbeitet werden),
     //   • beides aus → null → kein Overhead.
     const qaOn = isQaDiagnosticsEnabled();
+    recordingEvidenceRef.current?.close();
+    recordingEvidenceRef.current = qaOn && sessionIdRef.current
+      ? startQaRecordingEvidence(sessionIdRef.current, 'search', !!resume, {
+          engine: getTrackingEngineMode(), source: streamSourceModeRef.current ?? 'unknown',
+        })
+      : null;
+    recordingEvidenceRef.current?.appState(AppState.currentState);
     qaTelRef.current = (qaOn || isSupportCaptureEnabled())
       ? { captureLevel: qaOn ? 'qa' : 'support',
           startedAtMs: startMsRef.current, resumed: resumePts.length > 0, raw: [], filtered: [], display: [], cursorSamples: [], objectApproach: [],
@@ -1090,6 +1129,8 @@ export function useSearchRecorder(opts: {
   }, [pushSnapshot, hasTrack, arc.total, laidObjects]);
 
   const stop = useCallback((): SearchResult => {
+    recordingEvidenceRef.current?.close();
+    recordingEvidenceRef.current = null;
     recordingRef.current = false; setRecording(false);
     // Letzten lokalen Persistenz-Puffer schreiben (best-effort, blockiert nicht).
     void flushSearchPoints();
@@ -1122,7 +1163,10 @@ export function useSearchRecorder(opts: {
     };
   }, [computeScore, totalObjects]);
 
-  const setPaused = useCallback((p: boolean) => { pausedRef.current = p; setPausedState(p); }, []);
+  const setPaused = useCallback((p: boolean) => {
+    recordingEvidenceRef.current?.note(p ? 'userPaused' : 'userResumed');
+    pausedRef.current = p; setPausedState(p);
+  }, []);
 
   const markObject = useCallback(() => {
     const cur = smoothRef.current; if (!cur) return;

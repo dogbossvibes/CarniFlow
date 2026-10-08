@@ -1,3 +1,4 @@
+
 // QA-Modus: Rehydrierung beim App-Start, aktiver Zustand, Moduswechsel bei
 // laufendem Warmup.
 //
@@ -10,6 +11,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import { readFileSync } from 'fs';
 import { join } from 'path';
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
 // Eigener AsyncStorage-Mock mit einem Speicher, der IM TESTFILE lebt — er
 // überlebt damit `jest.resetModules()` und modelliert genau das, was ein
@@ -24,9 +32,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-const SOURCE_KEY = 'anyvo.qa.locationSourceMode';
-const ENGINE_KEY = 'anyvo.qa.trackingEngineMode';
-const DIAG_KEY = 'anyvo.qa.diagnosticsMode';
+const PREFS_KEY = 'anyvo.qa.preferences.v2.user-1';
 
 type SourceModule = typeof import('@/features/tracking/utils/locationSourceMode');
 type EngineModule = typeof import('@/features/tracking/utils/trackingEngineMode');
@@ -48,8 +54,7 @@ describe('QA-Modi werden beim App-Start rehydriert', () => {
   beforeEach(() => { jest.resetModules(); mockStore.clear(); });
 
   it('Storage = CURRENT + EXPO → nach Neustart liefern die Getter bereits CURRENT + EXPO', async () => {
-    mockStore.set(ENGINE_KEY, 'current');
-    mockStore.set(SOURCE_KEY, 'legacy');
+    mockStore.set(PREFS_KEY, JSON.stringify({ engine: 'current', source: 'legacy' }));
 
     restartApp();
     // Vor dem Bootstrapping stehen die Defaults …
@@ -61,8 +66,7 @@ describe('QA-Modi werden beim App-Start rehydriert', () => {
   });
 
   it('Storage = BUILD40 + EXPO → nach Neustart liefern die Getter bereits BUILD40 + EXPO', async () => {
-    mockStore.set(ENGINE_KEY, 'build40');
-    mockStore.set(SOURCE_KEY, 'legacy');
+    mockStore.set(PREFS_KEY, JSON.stringify({ engine: 'build40', source: 'legacy' }));
 
     restartApp();
     await loadBootstrap().hydrateQaModes();
@@ -77,7 +81,7 @@ describe('QA-Modi werden beim App-Start rehydriert', () => {
 
     loadDiag().setQaDiagnosticsEnabled(true);
     await new Promise<void>(r => setImmediate(r));
-    expect(mockStore.get(DIAG_KEY)).toBe('true');
+    expect(JSON.parse(mockStore.get(PREFS_KEY)!).diagnostics).toBe(true);
 
     restartApp();
     await loadBootstrap().hydrateQaModes();
@@ -94,7 +98,7 @@ describe('QA-Modi werden beim App-Start rehydriert', () => {
 
   it('das Bootstrapping hängt am Root-Layout, nicht mehr nur am Diagnose-Screen', () => {
     const layout = read('app/_layout.tsx');
-    expect(layout).toContain('hydrateQaModes');
+    expect(layout).toContain('<DiagnosticsAccessSync />');
     // Der Recorder wartet zusätzlich darauf, bevor er die Quelle liest — sonst
     // gäbe es ein Rennen zwischen App-Start und sofortigem Fährtenstart.
     const rec = read('features/tracking/hooks/useTrackRecorder.ts');
@@ -259,7 +263,7 @@ describe('Motion-Status ist im QA-Bereich sichtbar', () => {
 describe('Stop-Flush bleibt QA-only und unverändert kalibriert', () => {
   it('ist im Recorder an QA-Modus UND ENGINE=CURRENT gebunden', () => {
     const rec = read('features/tracking/hooks/useTrackRecorder.ts');
-    expect(rec).toContain("if (qaRef.current && getTrackingEngineMode() === 'current' && autoDetectRef.current)");
+    expect(rec).toContain("if (qaFinishModeRef.current && getTrackingEngineMode() === 'current' && autoDetectRef.current)");
   });
 
   it('die gemessenen Schwellen sind exakt die aus der Messrunde', () => {

@@ -14,6 +14,7 @@
 // Klassen, keine Fenster, keine Fusion. Sie liest nur.
 
 import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
+import { assertQaRecordingEvidence, type QaRecordingEvidence } from './qaRecordingEvidence';
 import type {
   QaSessionCapture, QaCapturePoint, QaMarkerSource, QaDistanceScale, QaAutoDiagnostic, QaTurnFusion, QaImuOnlyEvent,
   QaCandidateMotion,
@@ -95,7 +96,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -177,6 +178,9 @@ export interface QaTrackExport {
   startupMovementDiagnostics?: QaSessionCapture['startupMovementDiagnostics'];
   manualAngleGeometryDiagnostics?: QaSessionCapture['manualAngleGeometryDiagnostics'];
   voiceDiagnostics?: QaSessionCapture['voiceDiagnostics'];
+  /** v2.10: recording-time QA identity; background counters are unavailable on this callback runtime. */
+  backgroundLayDiagnosticsStatus?: 'unavailable';
+  recordingEvidence?: QaRecordingEvidence;
 }
 
 export function toMs(t: string | number | null | undefined): number {
@@ -367,6 +371,7 @@ export function serializeQaTrackExport(e: QaTrackExport): string {
  * aufgerufen — lieber gar kein Export als ein Standortleck.
  */
 export function assertNoAbsoluteData(e: QaTrackExport): void {
+  if (e.recordingEvidence) assertQaRecordingEvidence(e.recordingEvidence);
   const json = JSON.stringify(e);
   for (const forbidden of ['latitude', 'longitude', 'lat"', 'lng"']) {
     if (json.includes(forbidden)) throw new Error(`QA-Export enthält unerlaubtes Feld: ${forbidden}`);

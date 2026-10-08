@@ -1,3 +1,5 @@
+
+
 /**
  * QA-Export Session Freshness/Selection — Service: Liste (Reihenfolge, qaId,
  * Distanz aus payload_json, leer) und Export-Konsistenz Zeile → localId →
@@ -5,18 +7,28 @@
  */
 import { listRecentLaySessions, buildExportForSession, formatQaSessionRow } from '@/features/tracking/services/qaTrackExportService';
 import { hashSessionId } from '@/features/tracking/utils/qaTrackExport';
+jest.mock('@/services/diagnosticsAccessService', () => ({ refreshDiagnosticsAccess: async () => {} }));
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
 const mockSessions = jest.fn();
 const mockPoints = jest.fn();
 const mockMarkers = jest.fn();
 const mockCapture = jest.fn();
-jest.mock('@/features/training/repositories/localTrainingRepository', () => ({ getLocalTrainingSessions: (...a: unknown[]) => mockSessions(...a) }));
+const mockEvidence = jest.fn();
+jest.mock('@/features/training/repositories/localTrainingRepository', () => ({ getLocalTrainingSessions: (...a: unknown[]) => mockSessions(...a), getLocalTrainingSessionById: async () => ({ user_id: 'user-1' }) }));
 jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
   getLayTrackPointsBySession: (...a: unknown[]) => mockPoints(...a),
   getTrackMarkersBySession: (...a: unknown[]) => mockMarkers(...a),
 }));
 jest.mock('@/features/tracking/utils/qaSessionCapture', () => ({ loadQaSessionCapture: (...a: unknown[]) => mockCapture(...a) }));
 jest.mock('@/features/tracking/utils/qaSearchCapture', () => ({ loadQaSearchCapture: async () => null }));
+jest.mock('@/features/tracking/utils/qaRecordingEvidenceStore', () => ({ loadQaRecordingEvidence: (...a: unknown[]) => mockEvidence(...a) }));
 jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(async () => false), shareAsync: jest.fn() }));
 
 const A = 'aaaaaaaa-1111-4111-8111-111111111111';   // heute, neu
@@ -27,6 +39,7 @@ const sessionRow = (id: string, startedAt: string, payload: string | null) => ({
 beforeEach(() => {
   mockSessions.mockReset(); mockPoints.mockReset(); mockMarkers.mockReset(); mockCapture.mockReset();
   mockMarkers.mockResolvedValue([]); mockCapture.mockResolvedValue(null);
+  mockEvidence.mockReset().mockResolvedValue({ schemaVersion: 1, availability: { lay: 'missing', search: 'missing' }, lay: [], search: [] });
 });
 
 describe('listRecentLaySessions', () => {
@@ -81,7 +94,24 @@ describe('6./7./10. Export-Konsistenz', () => {
     expect(mockMarkers).toHaveBeenCalledWith(A);
     expect(mockCapture).toHaveBeenCalledWith(A);
     expect(mockPoints).toHaveBeenCalledWith(B);
+    expect(mockEvidence).toHaveBeenCalledWith(A);
+    expect(ea.schemaMinor).toBe(10);
+    expect(ea.backgroundLayDiagnosticsStatus).toBe('unavailable');
+    expect(ea.recordingEvidence?.availability).toEqual({ lay: 'missing', search: 'missing' });
   });
+
+  it('reports unavailable background counters and preserves the baseline tracking export', async () => {
+    const points = [pt(A, 0), pt(A, 1)];
+    mockPoints.mockResolvedValue(points);
+    const exported = await buildExportForSession(A);
+    expect(exported).not.toHaveProperty('backgroundLayDiagnostics');
+    expect(exported.backgroundLayDiagnosticsStatus).toBe('unavailable');
+    const { schemaMinor: _minor, recordingEvidence: _evidence, backgroundLayDiagnosticsStatus: _status, ...unchanged } = exported;
+    const { schemaMinor: _oldMinor, ...baseline } = jest.requireActual('@/features/tracking/utils/qaTrackExport')
+      .buildQaTrackExport(A, points, [], null, null);
+    expect(unchanged).toEqual(baseline);
+  });
+
 });
 
 describe('8./9. Auswahl nach Refresh (reconcileQaSelection)', () => {

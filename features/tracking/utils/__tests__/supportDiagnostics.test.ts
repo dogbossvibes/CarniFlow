@@ -1,3 +1,5 @@
+import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, revokeDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
+
 // Support-Diagnose für normale Kunden: Format, Privacy, Persistenz/Retention, Share.
 // Datenfluss nur Production → Diagnose; die Recorder-Identität (Capture an ≡ aus) prüft
 // hooks/__tests__/useSearchRecorder.qaTelemetry.test.tsx.
@@ -15,6 +17,7 @@ import { assertNoAbsoluteData, type RawLayPoint, type RawTrackMarker } from '@/f
 import { buildExportForSession } from '@/features/tracking/services/qaTrackExportService';
 import { shareSupportDiagnostics, hasSupportDiagnostics, buildSupportExportForSession } from '@/features/tracking/services/supportDiagnosticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+jest.mock('@/services/diagnosticsAccessService', () => ({ refreshDiagnosticsAccess: jest.fn(async () => {}) }));
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -32,7 +35,9 @@ jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
   getLayTrackPointsBySession: jest.fn(async () => mockLay),
   getTrackMarkersBySession: jest.fn(async () => mockMarkers),
 }));
-jest.mock('@/features/training/repositories/localTrainingRepository', () => ({ getLocalTrainingSessions: jest.fn(async () => []) }));
+jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
+  getLocalTrainingSessions: jest.fn(async () => []), getLocalTrainingSessionById: jest.fn(async (id: string) => id === 'qa-legacy' ? { user_id: 'owner' } : null),
+}));
 
 // Native Share-Sheet + Datei (Cache-Verzeichnis).
 const mockShareAsync = jest.fn(async () => undefined);
@@ -67,7 +72,10 @@ function diagFromField(name: 'F1' | 'F2', accuracy = 4.37): QaSearchDiagnostics 
   });
 }
 
+const grantQa = () => { setDiagnosticsSession('owner'); resolveDiagnosticsAccess('owner', getDiagnosticsAccessSnapshot().generation, true); };
+afterEach(() => revokeDiagnosticsAccess());
 beforeEach(async () => {
+  setDiagnosticsSession(null);
   await AsyncStorage.clear();
   for (const k of Object.keys(mockWritten)) delete mockWritten[k];
   mockShareAsync.mockClear(); mockIsAvailableAsync.mockClear(); mockIsAvailableAsync.mockImplementation(async () => true);
@@ -152,6 +160,7 @@ describe('Persistenz und Retention', () => {
   });
   it('Retention: letzte 5 bleiben (FIFO); QA-Namespace und fremde Daten werden nicht berührt', async () => {
     await AsyncStorage.setItem('anyvo.unrelated', 'keep-me');
+    grantQa();
     await saveQaSearchCapture('qa-a', diagFromField('F1'), 'qa');
     await saveQaSearchCapture('qa-b', diagFromField('F1'), 'qa');
     for (let i = 1; i <= 7; i++) await saveQaSearchCapture(`s${i}`, diagFromField('F1'), 'support');
@@ -166,6 +175,7 @@ describe('Persistenz und Retention', () => {
   it('Namespaces sind getrennt: Support-Eintrag erscheint nicht im QA-Speicher und umgekehrt', async () => {
     await saveQaSearchCapture('only-support', diagFromField('F1'), 'support');
     expect(await hasQaSearchCapture('only-support', 'qa')).toBe(false);
+    grantQa();
     await saveQaSearchCapture('only-qa', diagFromField('F1'));
     expect(await hasQaSearchCapture('only-qa', 'support')).toBe(false);
   });
@@ -178,6 +188,7 @@ describe('Persistenz und Retention', () => {
     expect(await hasQaSearchCapture('after', 'support')).toBe(true);
   });
   it('internes QA bleibt unverändert: ohne Namespace-Argument gelten die bisherigen QA-Schlüssel', async () => {
+    grantQa();
     await saveQaSearchCapture('qa-legacy', diagFromField('F1'));
     expect(await AsyncStorage.getItem('anyvo.qa.searchCapture.qa-legacy')).not.toBeNull();
     expect(await AsyncStorage.getItem('anyvo.qa.searchCapture.index')).toContain('qa-legacy');

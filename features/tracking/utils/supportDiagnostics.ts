@@ -22,13 +22,14 @@ import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapt
 export const SUPPORT_DIAGNOSTICS_CAPTURE = true;
 export const isSupportCaptureEnabled = (): boolean => SUPPORT_DIAGNOSTICS_CAPTURE;
 
-export type SupportExport = Omit<QaTrackExport, 'sessionId'> & { exportType: 'support' };
+export type SupportExport = Omit<QaTrackExport, 'sessionId' | 'recordingEvidence' | 'backgroundLayDiagnosticsStatus'> & { exportType: 'support' };
 
 /** Schlüsselnamen, die in einem Kunden-Export NIE vorkommen dürfen (Vergleich ohne Gross/Klein, ohne _ und -). */
 export const SUPPORT_FORBIDDEN_KEYS = [
   'latitude', 'longitude', 'lat', 'lon', 'lng',
   'email', 'userid', 'accountid', 'ownerid', 'sessionid', 'dogid', 'dogname', 'ownername',
   'accesstoken', 'refreshtoken', 'authtoken', 'token', 'deviceid', 'pushtoken', 'ip', 'ipaddress',
+  'recordingevidence',
 ] as const;
 
 const normalizeKey = (k: string) => k.toLowerCase().replace(/[_-]/g, '');

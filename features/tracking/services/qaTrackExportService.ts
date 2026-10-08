@@ -1,3 +1,5 @@
+import { assertDiagnosticsAccess, diagnosticsAccessToken, getDiagnosticsAccessSnapshot } from '@/lib/diagnosticsAccessState';
+import { refreshDiagnosticsAccess } from '@/services/diagnosticsAccessService';
 // QA-Export: Sessions auflisten, Export bauen, Datei teilen.
 //
 // Reines Lesen aus der lokalen Datenbank plus Datei-/Teilen-Handling. Kein
@@ -5,17 +7,21 @@
 // geschrieben und nichts gelöscht.
 
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import {
   getLayTrackPointsBySession, getTrackMarkersBySession,
 } from '@/features/tracking/repositories/localTrackRepository';
-import { getLocalTrainingSessions } from '@/features/training/repositories/localTrainingRepository';
+import { getLocalTrainingSessions, getLocalTrainingSessionById } from '@/features/training/repositories/localTrainingRepository';
 import { loadQaSessionCapture } from '@/features/tracking/utils/qaSessionCapture';
 import { loadQaSearchCapture } from '@/features/tracking/utils/qaSearchCapture';
+import { loadQaRecordingEvidence } from '@/features/tracking/utils/qaRecordingEvidenceStore';
 import {
   buildQaTrackExport, serializeQaTrackExport, qaExportFileName, assertNoAbsoluteData, hashSessionId,
   type QaTrackExport,
 } from '@/features/tracking/utils/qaTrackExport';
+
+const exportTokens = new WeakMap<QaTrackExport, string>();
 
 export interface QaSessionSummary {
   localId: string;
@@ -77,6 +83,9 @@ export function formatQaSessionRow(q: QaSessionSummary): string {
  * Lege-Punkte werden ausgelassen — die wären für eine Regression wertlos.
  */
 export async function listRecentLaySessions(ownerId: string, limit = 5): Promise<QaSessionSummary[]> {
+  const token = diagnosticsAccessToken();
+  assertDiagnosticsAccess(token);
+  if (ownerId !== getDiagnosticsAccessSnapshot().userId) throw new Error('Fremder Account.');
   const sessions = await getLocalTrainingSessions(ownerId, { type: 'track' }).catch(() => []);
   const out: QaSessionSummary[] = [];
   for (const s of sessions) {
@@ -92,6 +101,7 @@ export async function listRecentLaySessions(ownerId: string, limit = 5): Promise
       distanceM: distanceFromPayload(s.payload_json),
     });
   }
+  assertDiagnosticsAccess(token);
   return out;
 }
 
@@ -105,15 +115,31 @@ export async function listRecentLaySessions(ownerId: string, limit = 5): Promise
  * Werte zu erfinden.
  */
 export async function buildExportForSession(localId: string): Promise<QaTrackExport> {
-  const [points, markers, capture, search] = await Promise.all([
+  const token = diagnosticsAccessToken();
+  assertDiagnosticsAccess(token);
+  await refreshDiagnosticsAccess();
+  assertDiagnosticsAccess(token);
+  const session = await getLocalTrainingSessionById(localId);
+  assertDiagnosticsAccess(token);
+  if (!session || session.user_id !== getDiagnosticsAccessSnapshot().userId) throw new Error('Fährte gehört nicht zum angemeldeten Account.');
+  const [points, markers, capture, search, recordingEvidence] = await Promise.all([
     getLayTrackPointsBySession(localId),
     getTrackMarkersBySession(localId).catch(() => []),
     loadQaSessionCapture(localId).catch(() => null),
     loadQaSearchCapture(localId).catch(() => null),
+    loadQaRecordingEvidence(localId),
   ]);
-  const exported = buildQaTrackExport(localId, points, markers, capture, search);
+  const exported: QaTrackExport = {
+    ...buildQaTrackExport(localId, points, markers, capture, search),
+    schemaMinor: 10,
+    recordingEvidence,
+    // This runtime uses the original callback pipeline and records no background counters.
+    backgroundLayDiagnosticsStatus: 'unavailable',
+  };
   // Sicherheitsnetz vor jeder Weitergabe: lieber kein Export als ein Leck.
+  assertDiagnosticsAccess(token);
   assertNoAbsoluteData(exported);
+  exportTokens.set(exported, token);
   return exported;
 }
 
@@ -122,7 +148,7 @@ export async function buildExportForSession(localId: string): Promise<QaTrackExp
  * native Teilen-Menü. Gemeinsamer Helfer für QA-Export UND Support-Diagnose — kein zweiter Share-Pfad.
  * Funktioniert offline: es wird nur lokal geschrieben.
  */
-export async function shareJsonFile(json: string, name: string, dialogTitle: string): Promise<void> {
+export async function shareJsonFile(json: string, name: string, dialogTitle: string, validateAccess?: () => void): Promise<void> {
   // expo-sharing exportiert AUSSCHLIESSLICH benannte Funktionen
   // (`isAvailableAsync`, `shareAsync`) — es gibt keinen Default-Export.
   // Ein `const { default: Sharing } = await import('expo-sharing')` liefert
@@ -144,7 +170,9 @@ export async function shareJsonFile(json: string, name: string, dialogTitle: str
   const dir = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
   if (!dir) throw new Error('Kein beschreibbares Verzeichnis verfügbar.');
   const uri = `${dir}${name}`;
+  validateAccess?.();
   await FileSystem.writeAsStringAsync(uri, json);
+  validateAccess?.();
 
   await Sharing.shareAsync(uri, {
     dialogTitle,
@@ -158,20 +186,28 @@ export async function shareJsonFile(json: string, name: string, dialogTitle: str
  * Teilen-Menü. Gibt den Dateinamen zurück.
  */
 export async function shareQaExport(exported: QaTrackExport, opts?: { startedAt?: string | null }): Promise<string> {
+  const token = exportTokens.get(exported) ?? null;
+  assertDiagnosticsAccess(token);
+  await refreshDiagnosticsAccess();
+  assertDiagnosticsAccess(token);
   assertNoAbsoluteData(exported);
 
   // Dateiname mit Sessionstart (Datum/Uhrzeit) aus der Listenzeile — der JSON-Inhalt bleibt identisch.
   const name = qaExportFileName(exported, opts?.startedAt);
   const json = serializeQaTrackExport(exported);
-  await shareJsonFile(json, name, 'Fährten-QA-Export');
+  await shareJsonFile(json, name, 'Fährten-QA-Export', () => assertDiagnosticsAccess(token));
   return name;
 }
 
 /** Kleinere Exporte lassen sich auch direkt kopieren. */
 export async function copyQaExport(exported: QaTrackExport): Promise<number> {
+  const token = exportTokens.get(exported) ?? null;
+  assertDiagnosticsAccess(token);
+  await refreshDiagnosticsAccess();
+  assertDiagnosticsAccess(token);
   assertNoAbsoluteData(exported);
   const json = serializeQaTrackExport(exported);
-  const Clipboard = await import('expo-clipboard');
+  assertDiagnosticsAccess(token);
   await Clipboard.setStringAsync(json);
   return json.length;
 }

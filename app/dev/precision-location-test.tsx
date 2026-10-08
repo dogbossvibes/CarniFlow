@@ -49,19 +49,19 @@ import { ShellyDiagnosticsPanel } from '@/features/tracking/components/ShellyDia
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
 // QA-Golden-Reference-A/B-Schalter (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/
 // PRECISION).
-// Öffnen: Profil → „Entwickler & Diagnose" → „Fährten-Diagnose" (nur interne Tester), oder Deep-Link
+// Öffnen: Profil → „Entwickler & Diagnose" → „Fährten-Diagnose" (nur persönlich freigeschaltete Accounts), oder Deep-Link
 // anyvo://dev/precision-location-test
 //
 // Bewusst NICHT hinter `__DEV__` (Feldtests laufen auf echten Store-/TestFlight-
 // Builds, wo `__DEV__` false ist), sondern hinter dem Route-Gate unten: nur
-// interne Tester (profiles.is_internal_tester) sehen den Profil-Eintrag UND
+// persönlich freigeschaltete Accounts sehen den Profil-Eintrag UND
 // dürfen die Route öffnen. Der Screen ist rein lesend/umschaltend für QA und
 // verändert KEINE Trackinglogik.
 const IS_ANDROID = Platform.OS === 'android';
 const IS_IOS = Platform.OS === 'ios';
 
 // Route-Gate: dieselbe Authority wie der Profil-Eintrag (DiagnosticsRouteGate →
-// useDiagnosticsAccess → profiles.is_internal_tester, serverseitig geschützt).
+// useDiagnosticsAccess → can_use_internal_tracking_diagnostics, serverseitig geschützt).
 // Ein Deep-Link (anyvo://dev/precision-location-test) reicht damit nicht.
 export default function PrecisionLocationTestScreen() {
   return (
@@ -117,8 +117,8 @@ function PrecisionLocationTestContent() {
   const fieldTestProfile = getFieldTestProfile(fieldTestProfileId);
 
   useEffect(() => {
-    // Die persistierten Werte werden inzwischen bereits beim App-Start geladen
-    // (app/_layout.tsx → hydrateQaModes). Der Aufruf hier ist nur noch die
+    // Accountgebundene Werte werden nach der Serverfreigabe geladen
+    // (DiagnosticsAccessSync → hydrateQaModes). Der Aufruf hier ist die
     // Absicherung, dass der Screen nie einen veralteten Default anzeigt.
     void hydrateQaModes().then(() => {
       setSourceMode(getLocationSourceMode());
@@ -163,13 +163,13 @@ function PrecisionLocationTestContent() {
 
   const chooseSourceMode = (mode: LocationSourceMode) => {
     setLocationSourceMode(mode);
-    setSourceMode(mode);
+    setSourceMode(getLocationSourceMode());
   };
   const chooseEngineMode = (mode: TrackingEngineMode) => {
     setTrackingEngineMode(mode);
-    setEngineMode(mode);
+    setEngineMode(getTrackingEngineMode());
   };
-  const toggleQa = () => { const next = !qaOn; setQaDiagnosticsEnabled(next); setQaOn(next); };
+  const toggleQa = () => { const next = !qaOn; setQaDiagnosticsEnabled(next); setQaOn(isQaDiagnosticsEnabled()); };
 
   // Läuft gerade ein GPS-Warmup im Lege-Recorder? Dann ist die Quelle für
   // diesen Stream festgeschrieben — bewusst kein Hot-Swap einer laufenden

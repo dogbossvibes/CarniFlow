@@ -1,3 +1,4 @@
+
 // QA-Mitschnitt: Ablage, Aufbewahrung und die Verdrahtung im Recorder.
 //
 // Der Mitschnitt ist die Quelle für alles, was Schema v2 zusätzlich liefert.
@@ -11,6 +12,13 @@ import {
   clearQaSessionCaptures, pathLength, QA_CAPTURE_RETENTION,
   type QaSessionCapture,
 } from '@/features/tracking/utils/qaSessionCapture';
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
 // `jest.mock` wird über die Importe gehoben, greift also trotz dieser
 // Reihenfolge. Die Factory selbst fasst `mockStore` nicht an — das tun erst
