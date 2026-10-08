@@ -5,6 +5,15 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "track.export.preparing": "{format} wird vorbereitet …",
+  "track.export.notesFormats": "Aktuelli Notiz für PDF, GPX und JSON",
+  "track.export.jsonHint": "Für technischi Uswertige",
+  "track.export.json": "Fährtedate exportiere",
+  "track.export.gpxHint": "Für kompatibli Charteprogramm",
+  "track.export.gpx": "GPS-Spure exportiere",
+  "track.export.pdfHint": "Uswertig zum Läse und Wiitergäh",
+  "track.export.pdf": "Bericht teile",
+  "track.export.privacy": "Cha genaui Standört, Datum und Hundename enthalte.",
   // Allgemeine Aktionen / Buttons
   'common.save':     'Speichere',
   'common.cancel':   'Abbreche',
@@ -420,6 +429,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.autoDetected': 'Automatisch erkennt',
   'track.autoRemove': 'Erkennig entferne',
   'track.autoRemoveFailed': 'D automatischi Erkennig het nöd chönne entfernt werde.',
+  "track.recoverySaveFailed": "D Suechi het nöd sicher chönne gspeicheret werde. Sie bliibt zum Wiitermache erhalte. Bitte nomal probiere.",
   'track.gpsPreparing': 'GPS wird vorbereitet',
   'track.gpsWaitingAccuracy': 'GPS-Gnauigkeit {accuracy} m · bitte warte',
   'track.gpsReadyAccuracy': 'Bereit · GPS-Gnauigkeit {accuracy} m',

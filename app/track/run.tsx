@@ -515,9 +515,12 @@ export default function TrackRunScreen() {
 
   // Beenden: vorhandene Suchpunkte speichern + Session sauber abschliessen.
   const endSearch = async (pending: PendingTrack) => {
-    const saved = await loadSavedSearchPoints(pending);
-    await flushSearchPoints().catch(() => {});
     const sessId = pending.sessionId ?? effectiveId;
+    if (!sessId || !(await flushSearchPoints(sessId).catch(() => false))) {
+      Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+      return;
+    }
+    const saved = await loadSavedSearchPoints(pending);
     const runId = pending.runId ?? runIdRef.current ?? Crypto.randomUUID();
     const durationS = pending.searchStartedAt ? Math.max(0, Math.floor((Date.now() - pending.searchStartedAt) / 1000)) : 0;
     // LOKAL zuerst (durabel): Run-Ergebnis der beendeten Absuche in payload_json.run.
@@ -538,7 +541,7 @@ export default function TrackRunScreen() {
     // hier absichtlich weg (siehe buildRunResultPayload — additiv/optional,
     // kein Dummy-Objekt). Test: run-recovery-analytics-gap.test.ts.
     if (sessId) {
-      await finalizeLocalTrackRun(sessId, buildRunResultPayload({
+      const savedRun = await finalizeLocalTrackRun(sessId, buildRunResultPayload({
         runId, sessionId: sessId,
         startedAtMs: pending.searchStartedAt ?? Date.now(), endedAtMs: Date.now(),
         result: {
@@ -548,7 +551,11 @@ export default function TrackRunScreen() {
         },
         searchHandlerDistanceM: pending.searchHandlerDistanceM,
         // analytics bewusst NICHT gesetzt — siehe Kommentar oben.
-      })).catch(() => {});
+      })).then(() => true).catch(() => false);
+      if (!savedRun) {
+        Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+        return;
+      }
     }
     // Remote-Transport über die Sync-Queue (RUN-SAVE2), nicht mehr direkt.
     if (sessId) {
@@ -892,6 +899,12 @@ export default function TrackRunScreen() {
     // defensiver Fallback, falls doch nicht gesetzt.
     const runId = runIdRef.current ?? Crypto.randomUUID();
     const sessId = effectiveId;
+    if (!(await flushSearchPoints(sessId ?? undefined).catch(() => false))) {
+      finishRequestedRef.current = false;
+      setFinishing(false);
+      Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
+      return;
+    }
 
     // Punkt 10/13: Track Analytics Engine — REIN aus In-Session-Daten (keine
     // gespeicherten Rohpunkte, keine Migration). Ecken/Gegenstände kommen aus

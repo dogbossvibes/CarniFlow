@@ -775,8 +775,6 @@ export default function TrackAuswertungScreen() {
             </>
           )}
 
-          <TrackExportActions data={data} />
-
           {/* Notiz */}
           <SectionLabel>Notiz</SectionLabel>
           <View style={[s.card, { padding: 16 }]}>
@@ -794,6 +792,7 @@ export default function TrackAuswertungScreen() {
           </View>
 
           <View style={{ height: 18 }} />
+          <TrackExportActions data={{ ...data, notes }} />
           <SmartFeedbackSection dogId={data.dog_id} />
 
           {shares.some(share => !share.revoked_at) && (
