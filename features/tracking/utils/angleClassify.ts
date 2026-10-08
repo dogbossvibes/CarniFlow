@@ -40,10 +40,12 @@ export const ANGLE_LABEL: Record<AngleKind, string> = {
 };
 
 // Kompaktes Karten-Badge je Winkeltyp (geometrisch, klar unterscheidbar):
-// 90°-Winkel → „90 L/R", Spitzwinkel → „SL/SR". Abriss hat ein eigenes Icon.
+// `links/rechts` also persists direction-only detections with unresolved sharpness.
+// It cannot substantiate a numeric 90° badge. Preserve direction (L/R), and
+// retain SL/SR only for explicitly classified sharp corners. No geometry changes.
 export const ANGLE_SHORT: Record<AngleKind, string> = {
-  links:        '90 L',
-  rechts:       '90 R',
+  links:        'L',
+  rechts:       'R',
   spitz_links:  'SL',
   spitz_rechts: 'SR',
   spitz:        'S',

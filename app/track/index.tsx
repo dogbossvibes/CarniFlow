@@ -12,7 +12,7 @@ import { deleteTrackSession } from '@/features/tracking/services/trackService';
 import { getTrackHistory } from '@/features/tracking/services/trackHistoryService';
 import { markTrainingAsDeleted } from '@/features/training/repositories/localTrainingRepository';
 import { retryFailedSync } from '@/features/sync/services/syncEngine';
-import { getTrackPreview } from '@/features/tracking/services/trackPreviewService';
+import { getRecentTrackPreviews } from '@/features/tracking/services/trackPreviewService';
 import { projectTrackSketch } from '@/features/tracking/utils/trackSketchGeometry';
 import { resolveTrackOverlayColorKey, trackOverlayColor } from '@/features/tracking/utils/trackOverlayColors';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
@@ -68,7 +68,7 @@ export default function TrackOverviewScreen() {
 
   const [dogId, setDogId]   = useState<string | null>(null);
   const [storedRows, setRows]     = useState<any[]>([]);
-  const [hero, setHero]     = useState<Awaited<ReturnType<typeof getTrackPreview>>>(null);
+  const [previews, setPreviews] = useState<Awaited<ReturnType<typeof getRecentTrackPreviews>>>({});
   const loadVersion = useRef(0);
   const [loading, setLoading] = useState(true);
   const { showToast, toast } = useToast();
@@ -78,12 +78,13 @@ export default function TrackOverviewScreen() {
   const effectiveDogId = activeDog?.id ?? null;
   const scope = `${session?.user.id ?? ''}:${effectiveDogId ?? ''}`;
   const rows = useMemo(() => loadedScope === scope ? storedRows : [], [loadedScope, scope, storedRows]);
-  const scopedHero = loadedScope === scope ? hero : null;
+  const scopedPreviews = loadedScope === scope ? previews : {};
+  const scopedHero = rows[0] ? scopedPreviews[rows[0].id] ?? null : null;
 
   const load = useCallback(async () => {
     const generation = ++loadVersion.current;
     const uid = session?.user.id;
-    setRows([]); setHero(null);
+    setRows([]); setPreviews({});
     if (!uid || !effectiveDogId) { setLoading(false); return; }
     setLoading(true);
     try {
@@ -91,9 +92,8 @@ export default function TrackOverviewScreen() {
       if (generation !== loadVersion.current) return;
       setLoadedScope(`${uid}:${effectiveDogId}`);
       setRows(mine);
-      const last = mine[0];
-      const detail = last ? await getTrackPreview(last.id, effectiveDogId, uid, last.isLocalOnly) : null;
-      if (generation === loadVersion.current) setHero(detail);
+      const details = await getRecentTrackPreviews(mine, effectiveDogId, uid);
+      if (generation === loadVersion.current) setPreviews(details);
     } finally { if (generation === loadVersion.current) setLoading(false); }
   }, [session?.user.id, effectiveDogId]);
 
@@ -238,7 +238,7 @@ export default function TrackOverviewScreen() {
         ) : (
           <View style={{ gap: 10 }}>
             {history.slice(0, 2).map(h => (
-              <TrackRow key={h.id} h={h} points={h.id === last?.id ? scopedHero?.lay : undefined} accent={layColor} onPress={() => openTrack(h)} onLongPress={() => confirmDelete(h.id)} />
+              <TrackRow key={h.id} h={h} points={scopedPreviews[h.id]?.lay} accent={layColor} onPress={() => openTrack(h)} onLongPress={() => confirmDelete(h.id)} />
             ))}
           </View>
         )}

@@ -373,7 +373,7 @@ export function TrackingMap({
           </Marker>
         )}
 
-        {/* Marker: Winkel = mint Geometrie-Badge (90 L/R · SL/SR), Gegenstand =
+        {/* Marker: Winkel = mint Geometrie-Badge (L/R · SL/SR), Gegenstand =
             neutrales Quadrat-Badge (G1, G2 …), Abriss = Kästchen. Klar getrennt.
             Über PinMarker (memo + stabile ID) bleiben sie dauerhaft sichtbar. */}
         {markerList.map((m, i) => {
@@ -540,7 +540,7 @@ const s = StyleSheet.create({
   endFlag:        { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   endFlagLabel:   { marginTop: 2, fontSize: 9, fontWeight: '800', color: '#fff', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
   markerDot:   { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#04110F' },
-  // Winkel: kompaktes, geometrisches Mint-Badge mit Kurzlabel (90 L/R, SL/SR).
+  // Winkel: kompaktes, geometrisches Mint-Badge mit Kurzlabel (L/R, SL/SR).
   angleBadge:    { minWidth: 20, height: 17, paddingHorizontal: 4, borderRadius: 4, backgroundColor: C.trackPrimary, borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   angleBadgeTxt: { fontSize: 8.5, fontWeight: '900', color: '#04110F', letterSpacing: 0.2 },
   // Spitzwinkel: dünnere Umriss-Optik (dunkler Grund, Mint-Rand/-Text) → klar anders als 90°.
