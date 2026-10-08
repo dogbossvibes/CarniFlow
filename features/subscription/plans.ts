@@ -65,6 +65,7 @@ export const NEWBIE_BACKPACK_ITEM_LIMIT = 2;
 
 export type UserEntitlement =
   | 'lifetime'
+  | 'active_lifetime'
   | 'beta_tester'
   | 'ambassador'
   | 'staff';
@@ -87,6 +88,7 @@ export interface RuntimeCapabilities {
 export interface EffectiveCapabilities extends RuntimeCapabilities {
   capabilities: Capability[];
   hasLifetimeAccess: boolean;
+  hasActiveLifetimeAccess: boolean;
   activeEntitlements: UserEntitlement[];
 }
 
@@ -96,7 +98,7 @@ export interface EffectiveAccessInput {
   entitlements: UserEntitlementRecord[];
 }
 
-export const USER_ENTITLEMENTS: UserEntitlement[] = ['lifetime', 'beta_tester', 'ambassador', 'staff'];
+export const USER_ENTITLEMENTS: UserEntitlement[] = ['lifetime', 'active_lifetime', 'beta_tester', 'ambassador', 'staff'];
 export const REGULAR_PRODUCT_CAPABILITIES: Capability[] = [
   ...ACTIVE_CAPABILITIES,
   ...TRAINER_CAPABILITIES,
@@ -224,10 +226,12 @@ export function isKnownUserEntitlement(value: string | null | undefined): value 
 }
 
 export function isActiveUserEntitlement(
-  entitlement: Pick<UserEntitlementRecord, 'expiresAt' | 'revokedAt'> | null | undefined,
+  entitlement: Pick<UserEntitlementRecord, 'expiresAt' | 'revokedAt'> & Partial<Pick<UserEntitlementRecord, 'entitlement'>> | null | undefined,
   now: Date = new Date(),
 ): boolean {
   if (!entitlement || entitlement.revokedAt != null) return false;
+  // ACTIVE lifetime is permanent by contract; malformed finite grants fail closed.
+  if (entitlement.entitlement === 'active_lifetime' && entitlement.expiresAt !== null) return false;
   if (entitlement.expiresAt && new Date(entitlement.expiresAt).getTime() <= now.getTime()) return false;
   return true;
 }
@@ -286,6 +290,12 @@ export function resolveEffectiveCapabilities(
     .filter((item) => isActiveUserEntitlement(item, now))
     .map((item) => item.entitlement);
   const hasLifetimeAccess = activeEntitlements.includes('lifetime');
+  const hasActiveLifetimeAccess = activeEntitlements.includes('active_lifetime');
+
+  if (hasActiveLifetimeAccess) {
+    pro = true;
+    for (const capability of ACTIVE_CAPABILITIES) capabilities.add(capability);
+  }
 
   if (hasLifetimeAccess) {
     pro = true;
@@ -298,6 +308,7 @@ export function resolveEffectiveCapabilities(
     trainer_module: trainer,
     capabilities: REGULAR_PRODUCT_CAPABILITIES.filter((capability) => capabilities.has(capability)),
     hasLifetimeAccess,
+    hasActiveLifetimeAccess,
     activeEntitlements,
   };
 }

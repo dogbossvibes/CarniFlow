@@ -2,6 +2,7 @@ import { getPlanSubscription } from '@/services/subscriptionService';
 import { getActiveEntitlements } from '@/services/entitlementService';
 import {
   isTrainerPlan,
+  isPremiumPlan,
   isTrialLapsed,
   resolveEffectiveCapabilities,
 } from '@/features/subscription/plans';
@@ -27,14 +28,14 @@ export async function getUserAccess(userId: string): Promise<UserAccess> {
 
   // 1) Aktives Store-Abo (Apple/Google). Abgelaufener Trial zählt NICHT als aktiv.
   const subActive  = !!sub?.plan && !!sub.status && STATUS_ACTIVE.includes(sub.status) && !isTrialLapsed(sub);
-  const subPro     = subActive;                          // alle Pläne sind „pro"
+  const subPro     = subActive && isPremiumPlan(sub!.plan);
   const subTrainer = subActive && isTrainerPlan(sub!.plan);
 
   const effective = resolveEffectiveCapabilities({
     subscription: sub,
     entitlements: ent,
   });
-  const entPro     = effective.hasLifetimeAccess;
+  const entPro     = effective.hasLifetimeAccess || effective.hasActiveLifetimeAccess;
   const entTrainer = effective.hasLifetimeAccess;
 
   const hasActiveAccess  = subPro || entPro;
@@ -47,11 +48,15 @@ export async function getUserAccess(userId: string): Promise<UserAccess> {
   let isLifetime = false;
   let expiresAt: string | null = null;
 
-  if (entPro || entTrainer) {
+  if (effective.hasLifetimeAccess) {
     source = 'admin';
     planType = 'lifetime';
     isLifetime = true;
     expiresAt = ent.find((item) => item.entitlement === 'lifetime')?.expiresAt ?? null;
+  } else if (effective.hasActiveLifetimeAccess) {
+    source = 'admin';
+    planType = 'active_lifetime';
+    isLifetime = true;
   } else if (subActive) {
     source = 'apple';   // Store-Abo (RevenueCat/App Store); Google analog erweiterbar
     planType = sub!.plan;

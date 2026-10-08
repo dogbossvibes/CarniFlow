@@ -25,6 +25,32 @@ sind. Das umfasst Active-, Trainer- und Fährten-/IGP-Zugriff, soweit diese übe
 `lifetime` gewährt keinen Admin-, Debug-, Support- oder Mitarbeiterzugriff und
 hebt keine Mandanten- oder Datenschutzgrenzen auf.
 
+## Lebenslang ACTIVE
+
+`active_lifetime` gewährt ausschließlich die regulären ACTIVE-Capabilities.
+`expires_at` muss NULL sein (DB-Constraint); `revoked_at` bleibt der administrative
+Widerruf. Dieses Recht erzeugt weder TRAINER-, Tester- noch Diagnose-/Adminrechte.
+Vorhandene Store-, Lifetime- und Testerrechte werden additiv erhalten.
+
+Migration `20261008170000_active_lifetime_access.sql` ergänzt die bestehende
+Allowlist und `is_pro_member` für serverseitige Quotas. Keine Spiegelung nach
+`profiles`, `subscriptions` oder `user_capabilities`. Store-Webhooks ändern diese
+drei regulären Aboquellen weiterhin; das Sonderrecht bleibt separat erhalten.
+Die bestehende RLS lässt nur das Lesen eigener gültiger Grants zu; ausschließlich
+administrative Vergabe/Widerruf. Das interne Quota-Hilfs-RPC bleibt für normale
+Clients gesperrt.
+
+Die aktualisierte App zeigt ACTIVE mit „Dauerhaft freigeschaltet“. Ein optionaler
+TRAINER-Kauf bleibt möglich; ein zusätzlicher ACTIVE-Kauf wird nicht angeboten.
+Widerruf wird beim erneuten Mounten und bei App-Resume neu geprüft. Account-Keying
+verhindert das Übernehmen fremder Rechte beim Logout/Accountwechsel.
+
+Rollout: Client-Unterstützung auf kompatibler Runtime veröffentlichen und die
+kontrollierte Migration anwenden, dann den separat autorisierten Einzelaccount
+gezielt freischalten und unabhängig prüfen. Alte Clients ignorieren den neuen
+Entitlement-Wert; vor Client-Auslieferung keinen funktionierenden Gesamtzugriff
+behaupten. Private Accountdaten gehören nicht in die versionierte Dokumentation.
+
 ## Sicherheitsmodell und RLS
 `public.user_entitlements` hat RLS aktiviert. Authentifizierte Benutzer dürfen
 nur eigene aktive Entitlements lesen. Es gibt keine Insert-, Update- oder
