@@ -694,8 +694,8 @@ export default function ProfilScreen() {
           })}
         </View>
 
-        {/* Intern: Diagnose-Zugang NUR für interne Tester (profiles.is_internal_tester,
-            serverseitig per Trigger geschützt — siehe hooks/useDiagnosticsAccess.ts).
+        {/* Intern: Diagnose-Zugang NUR mit persönlicher Diagnoseberechtigung (
+            serverseitig geschützt — siehe hooks/useDiagnosticsAccess.ts).
             Für alle anderen wird der Bereich gar nicht gerendert (kein Platzhalter). */}
         {diagnosticsAccess.allowed && (
           <>

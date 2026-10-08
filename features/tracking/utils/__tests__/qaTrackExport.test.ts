@@ -248,10 +248,10 @@ describe('Datenquelle: ausschliesslich gelegte Punkte', () => {
     expect(Sharing.default?.isAvailableAsync).toBeUndefined();
   });
 
-  it('der Kopieren-Pfad bleibt unberührt — Namespace-Import ohne default', () => {
+  it('Kopieren nutzt einen Namespace-Import; Teilen prüft Verfügbarkeit und Zugriff', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const src = require('fs').readFileSync('features/tracking/services/qaTrackExportService.ts', 'utf8');
-    expect(src).toContain("const Clipboard = await import('expo-clipboard');");
+    expect(src).toContain("import * as Clipboard from 'expo-clipboard';");
     expect(src).not.toContain("{ default: Clipboard }");
     expect(src).toContain('Clipboard.setStringAsync(json)');
     // Die Datei wird erst NACH der Sharing-Prüfung geschrieben — kein
@@ -261,7 +261,7 @@ describe('Datenquelle: ausschliesslich gelegte Punkte', () => {
     const shareFn = src.slice(src.indexOf('export async function shareJsonFile'));
     expect(shareFn.indexOf('Sharing.isAvailableAsync')).toBeGreaterThan(-1);
     expect(shareFn.indexOf('Sharing.isAvailableAsync')).toBeLessThan(shareFn.indexOf('writeAsStringAsync'));
-    expect(src).toContain("await shareJsonFile(json, name, 'Fährten-QA-Export');");
+    expect(src).toContain("await shareJsonFile(json, name, 'Fährten-QA-Export', () => assertDiagnosticsAccess(token));");
   });
 
   it('der Export markiert seinen Inhalt explizit als lay', () => {

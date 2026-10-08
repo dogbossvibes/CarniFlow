@@ -1,3 +1,4 @@
+import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 // ──────────────────────────────────────────────────────────────────────────
 // QA-Mitschnitt der ABSUCHE (QA-Export schemaMinor 3, `searchDiagnostics`).
 //
@@ -488,21 +489,29 @@ export const QA_SEARCH_RETENTION = 5;
 const keyFor = (id: string, kind: SearchCaptureKind) => `${NAMESPACE[kind].prefix}${id}`;
 
 export async function saveQaSearchCapture(sessionLocalId: string, d: QaSearchDiagnostics, kind: SearchCaptureKind = 'qa'): Promise<void> {
+  const accessToken = diagnosticsAccessToken();
+  if (kind === 'qa' && !accessToken) return;
   try {
     const { index } = NAMESPACE[kind];
     await AsyncStorage.setItem(keyFor(sessionLocalId, kind), JSON.stringify(d));
     const raw = await AsyncStorage.getItem(index);
+    if (kind === 'qa' && accessToken !== diagnosticsAccessToken()) return;
     const ids: string[] = raw ? JSON.parse(raw) : [];
     const next = [sessionLocalId, ...ids.filter(id => id !== sessionLocalId)];
     await AsyncStorage.setItem(index, JSON.stringify(next.slice(0, QA_SEARCH_RETENTION)));
-    for (const id of next.slice(QA_SEARCH_RETENTION)) await AsyncStorage.removeItem(keyFor(id, kind)).catch(() => {});
+    for (const id of next.slice(QA_SEARCH_RETENTION)) {
+      if (kind === 'qa' && accessToken !== diagnosticsAccessToken()) return;
+      await AsyncStorage.removeItem(keyFor(id, kind)).catch(() => {});
+    }
   } catch { /* best-effort: Diagnose darf die Absuche nie beeinträchtigen */ }
 }
 
 export async function loadQaSearchCapture(sessionLocalId: string, kind: SearchCaptureKind = 'qa'): Promise<QaSearchDiagnostics | null> {
+  const accessToken = diagnosticsAccessToken();
+  if (kind === 'qa' && !accessToken) return null;
   try {
     const raw = await AsyncStorage.getItem(keyFor(sessionLocalId, kind));
-    if (!raw) return null;
+    if (!raw || kind === 'qa' && accessToken !== diagnosticsAccessToken()) return null;
     const p = JSON.parse(raw) as QaSearchDiagnostics;
     return p && typeof p.rawSearchPointCount === 'number' ? p : null;
   } catch { return null; }
@@ -510,9 +519,11 @@ export async function loadQaSearchCapture(sessionLocalId: string, kind: SearchCa
 
 /** Leichte Verfügbarkeitsprüfung über den Index (lädt NICHT das ganze Payload). */
 export async function hasQaSearchCapture(sessionLocalId: string, kind: SearchCaptureKind = 'qa'): Promise<boolean> {
+  const accessToken = diagnosticsAccessToken();
+  if (kind === 'qa' && !accessToken) return false;
   try {
     const raw = await AsyncStorage.getItem(NAMESPACE[kind].index);
     const ids: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(ids) && ids.includes(sessionLocalId);
+    return (kind !== 'qa' || accessToken === diagnosticsAccessToken()) && Array.isArray(ids) && ids.includes(sessionLocalId);
   } catch { return false; }
 }

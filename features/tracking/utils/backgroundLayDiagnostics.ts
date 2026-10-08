@@ -86,10 +86,19 @@ export type BackgroundLayDiagnostics = {
   foregroundPermissionState: string | null;
   backgroundPermissionState: string | null;
   taskRegistered: boolean | null;
+  /** Low-frequency transitions only; point/callback counters remain in counts. */
+  timeline?: { timeBasis: 'wall_relative'; events: { name: BackgroundLayEvent; tMs: number; reason?: string }[]; totalEvents: number; truncated: boolean };
 };
 
+const TIMELINE_NAMES = new Set<BackgroundLayEvent>([
+  'foreground', 'background', 'inactive', 'resume', 'foregroundPermission', 'backgroundPermission',
+  'taskStartAttempt', 'taskStartSuccess', 'taskStartFailure', 'taskStopAttempt', 'taskStopSuccess',
+  'taskStopFailure', 'taskRegistered', 'handlerRegistered', 'handlerCleared', 'taskError',
+]);
+const TIMELINE_LIMIT = 128;
+
 /** Read only this exact session. No latest-session or latest-dog fallback. */
-export async function loadBackgroundLayDiagnostics(sessionId: string): Promise<BackgroundLayDiagnostics | null> {
+export async function loadBackgroundLayDiagnostics(sessionId: string, options?: { includeTimeline?: boolean }): Promise<BackgroundLayDiagnostics | null> {
   const meta = await AsyncStorage.getItem(metaKey(sessionId));
   if (!meta) return null;
   const startedAt = (JSON.parse(meta) as { startedAt: number }).startedAt;
@@ -115,6 +124,16 @@ export async function loadBackgroundLayDiagnostics(sessionId: string): Promise<B
     if (e.name === 'foregroundPermission') out.foregroundPermissionState = e.reason ?? null;
     if (e.name === 'backgroundPermission') out.backgroundPermissionState = e.reason ?? null;
     if (e.name === 'taskRegistered') out.taskRegistered = e.reason === 'true';
+  }
+  if (options?.includeTimeline) {
+    const transitions = events.filter(e => TIMELINE_NAMES.has(e.name));
+    out.timeline = {
+      timeBasis: 'wall_relative',
+      totalEvents: transitions.length, truncated: transitions.length > TIMELINE_LIMIT,
+      events: transitions.slice(-TIMELINE_LIMIT).map(e => ({
+        name: e.name, tMs: Math.max(0, e.at - startedAt), ...(e.reason ? { reason: e.reason } : {}),
+      })),
+    };
   }
   return out;
 }

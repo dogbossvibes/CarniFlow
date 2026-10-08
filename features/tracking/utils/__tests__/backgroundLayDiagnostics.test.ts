@@ -52,3 +52,25 @@ it('exports relative times and reason codes without coordinates, IDs, or absolut
   expect(JSON.stringify(d)).not.toMatch(/latitude|longitude|session-a|dogId|2026-/);
   expect(() => assertSupportPrivacy({ backgroundLayDiagnostics: d })).not.toThrow();
 });
+
+it('preserves repeated lifecycle/permission transitions in order and marks a bounded timeline', async () => {
+  const now = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+  try {
+    await beginBackgroundLayDiagnostics('cycles');
+    const sequence = ['background', 'resume', 'background', 'resume'] as const;
+    for (const [i, event] of sequence.entries()) {
+      now.mockReturnValue(1_700_000_001_000 + i * 1000);
+      await recordBackgroundLayEvent('cycles', event);
+    }
+    expect((await loadBackgroundLayDiagnostics('cycles'))?.timeline).toBeUndefined();
+    let diag = await loadBackgroundLayDiagnostics('cycles', { includeTimeline: true });
+    expect(diag?.timeline?.events.map(e => e.name)).toEqual(sequence);
+    expect(diag?.timeline?.events.map(e => e.tMs)).toEqual([1000, 2000, 3000, 4000]);
+    expect(diag?.counts.resume).toBe(2);
+    for (let i = 0; i < 130; i++) await recordBackgroundLayEvent('cycles', 'inactive');
+    diag = await loadBackgroundLayDiagnostics('cycles', { includeTimeline: true });
+    expect(diag?.timeline).toMatchObject({ totalEvents: 134, truncated: true });
+    expect(diag?.timeline?.events).toHaveLength(128);
+    expect(() => assertSupportPrivacy(diag)).not.toThrow();
+  } finally { now.mockRestore(); }
+});

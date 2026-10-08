@@ -14,6 +14,8 @@
 // Klassen, keine Fenster, keine Fusion. Sie liest nur.
 
 import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
+import type { BackgroundLayDiagnostics } from './backgroundLayDiagnostics';
+import { assertQaRecordingEvidence, type QaRecordingEvidence } from './qaRecordingEvidence';
 import type {
   QaSessionCapture, QaCapturePoint, QaMarkerSource, QaDistanceScale, QaAutoDiagnostic, QaTurnFusion, QaImuOnlyEvent,
   QaCandidateMotion,
@@ -95,7 +97,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -177,6 +179,10 @@ export interface QaTrackExport {
   startupMovementDiagnostics?: QaSessionCapture['startupMovementDiagnostics'];
   manualAngleGeometryDiagnostics?: QaSessionCapture['manualAngleGeometryDiagnostics'];
   voiceDiagnostics?: QaSessionCapture['voiceDiagnostics'];
+  /** v2.10: exact-session background counters plus recording-time QA identity/observations. */
+  backgroundLayDiagnostics?: BackgroundLayDiagnostics;
+  backgroundLayDiagnosticsStatus?: 'available' | 'missing' | 'read_failed';
+  recordingEvidence?: QaRecordingEvidence;
 }
 
 export function toMs(t: string | number | null | undefined): number {
@@ -367,6 +373,18 @@ export function serializeQaTrackExport(e: QaTrackExport): string {
  * aufgerufen — lieber gar kein Export als ein Standortleck.
  */
 export function assertNoAbsoluteData(e: QaTrackExport): void {
+  if (e.recordingEvidence) assertQaRecordingEvidence(e.recordingEvidence);
+  if (e.backgroundLayDiagnostics) {
+    const visit = (value: unknown): void => {
+      if (typeof value === 'number' && (!Number.isFinite(value) || Math.abs(value) >= 1e8))
+        throw new Error('QA-Export enthält ungültige Hintergrund-Diagnosezeiten/Zähler.');
+      if (typeof value === 'string' && /\d{4}-\d{2}-\d{2}|@|[0-9a-f]{8}-[0-9a-f]{4}-/i.test(value))
+        throw new Error('QA-Export enthält unerlaubte Hintergrund-Diagnosedaten.');
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === 'object') Object.entries(value).forEach(([key, item]) => { visit(key); visit(item); });
+    };
+    visit(e.backgroundLayDiagnostics);
+  }
   const json = JSON.stringify(e);
   for (const forbidden of ['latitude', 'longitude', 'lat"', 'lng"']) {
     if (json.includes(forbidden)) throw new Error(`QA-Export enthält unerlaubtes Feld: ${forbidden}`);

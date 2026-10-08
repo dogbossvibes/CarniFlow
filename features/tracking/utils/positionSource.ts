@@ -1,3 +1,4 @@
+import { pinQaTrackingModes, loadQaPreferences } from './qaPreferences';
 import * as Location from 'expo-location';
 import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { precisionLocationClient as client } from '@/features/tracking/native/precisionLocationClient';
@@ -112,6 +113,15 @@ export async function startPositionSource(
   onSample: (s: PositionSourceSample) => void,
   opts: Location.LocationOptions,
 ): Promise<PositionSourceHandle> {
+  await loadQaPreferences();
+  const release = pinQaTrackingModes();
+  try {
+    const handle = await startPositionSourcePinned(onSample, opts);
+    return { ...handle, stop: () => { try { handle.stop(); } finally { release(); } } };
+  } catch (error) { release(); throw error; }
+}
+
+async function startPositionSourcePinned(onSample: (s: PositionSourceSample) => void, opts: Location.LocationOptions): Promise<PositionSourceHandle> {
   const info = baseInfo();
   const diagnosticId = beginPositionDiagnostics();
   let stopped = false;

@@ -23,7 +23,7 @@ import type { BackgroundLayDiagnostics } from '@/features/tracking/utils/backgro
 export const SUPPORT_DIAGNOSTICS_CAPTURE = true;
 export const isSupportCaptureEnabled = (): boolean => SUPPORT_DIAGNOSTICS_CAPTURE;
 
-export type SupportExport = Omit<QaTrackExport, 'sessionId'> & {
+export type SupportExport = Omit<QaTrackExport, 'sessionId' | 'recordingEvidence' | 'backgroundLayDiagnosticsStatus'> & {
   exportType: 'support';
   /** v2.9: optional session-scoped lifecycle counters; no coordinates or absolute times. */
   backgroundLayDiagnostics?: BackgroundLayDiagnostics;
@@ -42,6 +42,7 @@ export const SUPPORT_FORBIDDEN_KEYS = [
   'latitude', 'longitude', 'lat', 'lon', 'lng',
   'email', 'userid', 'accountid', 'ownerid', 'sessionid', 'dogid', 'dogname', 'ownername',
   'accesstoken', 'refreshtoken', 'authtoken', 'token', 'deviceid', 'pushtoken', 'ip', 'ipaddress',
+  'recordingevidence',
 ] as const;
 
 const normalizeKey = (k: string) => k.toLowerCase().replace(/[_-]/g, '');

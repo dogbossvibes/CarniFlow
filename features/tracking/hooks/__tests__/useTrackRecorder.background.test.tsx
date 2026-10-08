@@ -1,3 +1,4 @@
+
 // Phase 2 auf Hook-Ebene: useTrackRecorder registriert die Lay-Session in der
 // Runtime, bindet den Hintergrund-Task und hängt sich bei Resume an DENSELBEN
 // Session-State an. Echter Hook, echter Task-Executor, echte Runtime/Registry.
@@ -10,6 +11,14 @@ import { useActiveFaehrten } from '../../store/activeFaehrten';
 import { getLaySessionStatus, getBackgroundLayBinding, __resetLaySessionRuntimeForTests } from '../../engine/laySessionRuntime';
 import { createLocalTrackPointsBatch } from '@/features/tracking/repositories/localTrackRepository';
 import { finalizeLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
+import { loadQaRecordingEvidence } from '../../utils/qaRecordingEvidenceStore';
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
 jest.mock('expo-speech', () => ({ speak: jest.fn(), stop: jest.fn() }));
 jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -48,10 +57,12 @@ jest.mock('../../store/trackingStore', () => {
   return { useTrackingStore: { getState: () => state } };
 });
 jest.mock('../../utils/qaModeBootstrap', () => ({ hydrateQaModes: jest.fn(async () => {}) }));
-jest.mock('../../utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => false }));
+let mockQaOn = false;
+jest.mock('../../utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQaOn, subscribeQaDiagnostics: () => () => {} }));
 jest.mock('../../utils/trackingEngineMode', () => ({ getTrackingEngineMode: () => 'current' }));
 jest.mock('../../utils/locationSourceMode', () => ({ getLocationSourceMode: () => 'expo' }));
 jest.mock('../../utils/trackingWarmupState', () => ({
+  ...jest.requireActual('../../utils/trackingWarmupState'),
   markWarmupStarted: jest.fn(), markReportedSource: jest.fn(), markWarmupStopped: jest.fn(), markMotionStarted: jest.fn(), markMotionSample: jest.fn(),
 }));
 jest.mock('../../native/motionClient', () => ({ motionClient: { start: jest.fn(async () => {}), stop: jest.fn(), onSample: jest.fn(() => ({ remove: jest.fn() })) } }));
@@ -95,6 +106,7 @@ const state = () => useTrackingStore.getState() as any;
 
 beforeAll(() => { require('../../native/backgroundLocationTask'); });
 beforeEach(() => {
+  mockQaOn = false;
   clockMs = 1_000_000; feedFix = null;
   __resetLaySessionRuntimeForTests();
   useActiveFaehrten.setState({ byDog: {} });
@@ -105,6 +117,35 @@ beforeEach(() => {
   (finalizeLocalTrainingSession as jest.Mock).mockClear();
 });
 afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
+
+it('QA an/aus erhält identische Vorder-/Hintergrund-Punkte, Distanz und Persistenz', async () => {
+  const snapshots: unknown[] = [];
+  for (const qaOn of [false, true]) {
+    mockQaOn = qaOn;
+    __resetLaySessionRuntimeForTests();
+    useActiveFaehrten.setState({ byDog: {} });
+    const s = state(); s.trackPoints.length = 0; s.markers.length = 0; s.distanceMeters = 0; s.startLockActive = false;
+    (createLocalTrackPointsBatch as jest.Mock).mockClear();
+    await startWithBackground();
+    for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+    feed(1500, 5, 10); feed(2500, 5, 12);
+    await act(async () => { await task({ data: { locations: [bgLoc(3500, 15), bgLoc(4500, 18)] }, error: null }); });
+    feed(5500, 5, 21);
+    act(() => { renderer?.unmount(); }); renderer = null;
+    await settle();
+    const persisted = (createLocalTrackPointsBatch as jest.Mock).mock.calls.flatMap(c => c[1]);
+    snapshots.push(JSON.parse(JSON.stringify({ points: s.trackPoints, distanceM: s.distanceMeters,
+      persisted: persisted.map(({ local_id: _id, ...point }: any) => point) })));
+  }
+  expect(snapshots[1]).toEqual(snapshots[0]);
+  const evidence = await loadQaRecordingEvidence('lay-1');
+  expect(evidence.lay.at(-1)?.closed).toBe(true);
+  expect(evidence.lay.at(-1)?.events).toEqual(expect.arrayContaining([
+    expect.objectContaining({ name: 'sourceObserved', source: 'expo', deliveryChannel: 'background' }),
+    expect.objectContaining({ name: 'backgroundStartSucceeded' }),
+    expect.objectContaining({ name: 'recorderUnmounted' }),
+  ]));
+});
 
 it('bindet den Hintergrund-Task an genau diese Lay-Session und verarbeitet Task-Fixes im Hook-Processor', async () => {
   await startWithBackground();

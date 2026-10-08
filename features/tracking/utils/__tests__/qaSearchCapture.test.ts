@@ -1,3 +1,4 @@
+
 // QA-Search-Diagnose: Builder, Export-Schema (schemaMinor 3), Privacy, Legacy.
 import * as fs from 'fs';
 import {
@@ -7,6 +8,13 @@ import { findTurnVertices, buildReplayGeometry } from '@/features/tracking/utils
 import {
   buildQaTrackExport, assertNoAbsoluteData, serializeQaTrackExport, type RawLayPoint, type RawTrackMarker,
 } from '@/features/tracking/utils/qaTrackExport';
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: async () => null, setItem: async () => {}, removeItem: async () => {},
 }));

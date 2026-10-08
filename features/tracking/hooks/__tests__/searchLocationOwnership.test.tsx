@@ -1,3 +1,5 @@
+import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, revokeDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
+import { loadQaPreferences, setQaPreference } from '@/features/tracking/utils/qaPreferences';
 import React from 'react';
 import { AppState, DeviceEventEmitter } from 'react-native';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
@@ -129,10 +131,13 @@ function expectSourceAlive(mode: LocationSourceMode) {
   expect(mode === 'precision' ? mockNativeRunning : mockExpoListeners.size === 1).toBe(true);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.useFakeTimers();
   clockMs = 1700000000000;
   jest.setSystemTime(clockMs);
+  setDiagnosticsSession('owner');
+  resolveDiagnosticsAccess('owner', getDiagnosticsAccessSnapshot().generation, true);
+  await loadQaPreferences();
   jest.clearAllMocks();
   mockNativeListeners.clear(); mockExpoListeners.clear(); mockNativeRunning = false;
   renderer = null;
@@ -143,11 +148,30 @@ beforeEach(() => {
 afterEach(() => {
   act(() => { renderer?.unmount(); });
   useTrackingStore.getState().reset();
+  revokeDiagnosticsAccess();
   jest.useRealTimers();
 });
 
 describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search location owner — %s', mode => {
   beforeEach(() => { setLocationSourceMode(mode); });
+
+  it('revocation removes internal capture while the running GPS source keeps delivering', async () => {
+    setQaPreference('diagnostics', true);
+    await mount();
+    feed(0); feed(0); feed(0); startSearch();
+    for (let i = 0; i < 5; i++) feed(0);
+    for (let y = 2; y <= 10; y += 2) feed(y);
+    const before = recorder.points.length;
+    act(revokeDiagnosticsAccess);
+    expectSourceAlive(mode);
+    for (let y = 12; y <= 24; y += 2) feed(y);
+    expectSourceAlive(mode);
+    expect(recorder.points.length).toBeGreaterThan(before);
+    let result!: SearchResult;
+    act(() => { result = recorder.stop(); });
+    expect(result.qa?.captureLevel).toBe('support');
+    expect(result.qa?.objectDwellCandidates).toBeUndefined();
+  });
 
   it('reports near, stable reached, and departure transitions without absolute coordinates', async () => {
     await mount();

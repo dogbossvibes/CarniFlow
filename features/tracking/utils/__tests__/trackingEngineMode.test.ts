@@ -1,11 +1,21 @@
+
 import {
   getTrackingEngineMode, setTrackingEngineMode, loadPersistedTrackingEngineMode,
   subscribeTrackingEngineMode,
 } from '@/features/tracking/utils/trackingEngineMode';
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
+
+beforeEach(async () => { await loadPersistedTrackingEngineMode(); });
 
 describe('trackingEngineMode — QA-Golden-Reference-Schalter ENGINE=BUILD40/CURRENT', () => {
   it('Default ist "current"', () => {
