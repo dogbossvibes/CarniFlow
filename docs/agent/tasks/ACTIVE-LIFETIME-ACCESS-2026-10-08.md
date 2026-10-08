@@ -69,6 +69,32 @@ Zum Berichtzeitpunkt: keine Migration/Accountfreigabe live ausgeführt, keine Ge
 oder Kaufabnahme. Release-/DB-Abschlussbelege dürfen diesen Zustand erst nach tatsächlicher
 Durchführung ersetzen. Keine persönlichen Adressen/UUIDs in globaler Statusdoku.
 
+## Production-Schema-Nachtrag — 08.10.2026, 17:38 Europe/Zurich
+
+Der Nutzer verlangte nach der konkreten Bestätigungsfrage direkt den Abschluss
+(„kannst du es bitte abschliessen?“). Die automatische UI-Prüfung erlaubte daraufhin
+die vorbereitete Schemaaktion. Migration und Historyeintrag wurden in einer
+Transaktion ausgeführt; Safari zeigte nach COMMIT `ACTIVE_SCHEMA_INSTALLED`.
+Die Transaktion prüfte unveränderte RLS-Policies, TRAINER-/Quota-RPC-Definitionen
+und Entitlementanzahl. Kein Accountgrant in dieser Transaktion.
+
+Unabhängige Read-only-Nachprüfung am `2026-10-08 15:38:18.459839+00` bestätigt
+Historyversion/Name, validierten Permanent-Constraint, erweiterte Allowlist,
+ACTIVE-Pro-Helper, gesperrten Client-Execute-Zugriff und aktiviertes RLS.
+Production besitzt vorbestehende Supabase-DML-Tabellengrants; eine reine
+Tabellenprivilegprüfung ergab deshalb keine Sperre. Entscheidend sind die
+bestätigte ausschließlich eigene aktive SELECT-Policy, fehlende Schreibpolicies
+und kein `rolbypassrls`/`rolsuper` für anon/authenticated. Diese bestehenden
+Privilegien oder Policies wurden nicht verändert. Das lokale Harness wurde
+an diese Konfiguration angepasst: INSERT muss an RLS scheitern; UPDATE/DELETE
+dürfen trotz DML-Tabellenrechten null Zeilen ändern. Angepasstes Harness erneut
+ausgeführt: Exit0, `ACTIVE_LIFETIME_DB|PASS`, ROLLBACK. Keine Appcodeänderung.
+
+Clientrollout und exakter Accountgrant bleiben offen. Safari an MASTER für einen
+geordneten Single-Writer-Wechsel freigegeben; kein weiterer Live-Write aus Chat06
+ohne erneute abgestimmte Übernahme. Ursprünglicher Report beschreibt den Zustand
+vor der Migration und bleibt als Historie erhalten.
+
 ## Referenzen
 
 - Architektur: `docs/architecture/ENTITLEMENT_SYSTEM.md`.
