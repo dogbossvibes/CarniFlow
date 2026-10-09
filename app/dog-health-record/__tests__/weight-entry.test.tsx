@@ -2126,3 +2126,30 @@ describe('Medication date picker regression', () => {
     act(() => node.unmount());
   });
 });
+
+
+describe('Heat history sheet escape path with long content', () => {
+  it('uses the bounded safe-area sheet and repeatedly closes/reopens without mutating history', async () => {
+    const cycles = Array.from({ length: 20 }, (_, i) => ({ ...CYCLE_OLD, id: `history-${i}` }));
+    const original = JSON.stringify(cycles);
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    mockGetHeatCycleDetails.mockResolvedValue({ cycles, phases: [], observations: [] });
+    const node = render();
+    await flush();
+    const heatSheet = () => (node.root as unknown as { findAllByType: (type: unknown) => { props: { title?: string; visible: boolean; keyboardAware?: boolean; closeButton?: boolean; onClose: () => void } }[] })
+      .findAllByType(AnyvoBottomSheet).find(sheet => sheet.props.title === 'heat.title')!;
+    for (let i = 0; i < 3; i++) {
+      openHeatSheet(node);
+      await flush();
+      expect(heatSheet().props.visible).toBe(true);
+      expect(heatSheet().props.keyboardAware).toBe(true);
+      expect(heatSheet().props.closeButton).toBe(true);
+      act(() => { heatSheet().props.onClose(); });
+      expect(heatSheet().props.visible).toBe(false);
+    }
+    expect(JSON.stringify(cycles)).toBe(original);
+    expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+});
