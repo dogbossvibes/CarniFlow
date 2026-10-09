@@ -16,6 +16,8 @@ import { TrackReferenceOverlayLayer } from '@/features/tracking/components/Track
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
 import { DistanceScaleLayer, type ScaleRegion } from '@/features/tracking/components/DistanceScaleLayer';
 import { buildDistanceTicks, pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
+import { MapScaleBar } from './MapScaleBar';
+import { useMapScaleBar } from '../hooks/useMapScaleBar';
 import type { LL } from '@/features/tracking/utils/searchGeometry';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
@@ -89,6 +91,9 @@ interface Props {
   // Cursor/Progress und die kanonischen Ereignispositionen gemessen werden.
   // Fehlt die Prop, bleibt die Karte unverändert (kein Region-Tracking).
   distanceScaleLine?: readonly LL[];
+  showMapScale?: boolean;
+  mapScaleBottom?: number;
+  onMapScaleHeightChange?: (height: number) => void;
   runPoints?:       LatLng[];
   rawPoints?:       LatLng[];   // ungefilterte Rohspur (Debug) — grau, ungeglättet
   rejectedPoints?:  LatLng[];   // verworfene Punkte (Debug) — kleine rote Punkte
@@ -128,7 +133,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, layColor = C.trackPrimary, referenceOverlays, distanceScaleLine, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  layPoints, layColor = C.trackPrimary, referenceOverlays, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -208,12 +213,15 @@ export function TrackingMap({
   // Höhe/Region ab Mount messen, sobald der Maßstab angefordert ist — auch wenn die
   // Referenzlinie erst später kommt (run.tsx lädt den Snapshot nach dem Mount; ein
   // erst dann angehängtes onLayout feuert nie → Höhe 0 → Maßstab dauerhaft 'off').
-  const scaleRequested = distanceScaleLine !== undefined;
+  const scaleRequested = distanceScaleLine !== undefined || showMapScale;
   const [scaleRegion, setScaleRegion] = useState<ScaleRegion | null>(null);
   const [mapHeightPt, setMapHeightPt] = useState(0);
+  const [mapWidthPt, setMapWidthPt] = useState(0);
+  const { scale: barScale, refresh: refreshMapScale, invalidate: invalidateMapScale } = useMapScaleBar({ mapRef, enabled: showMapScale, ready: mapReady, width: mapWidthPt, height: mapHeightPt, bottom: mapScaleBottom });
   const onScaleRegion = useCallback((r: ScaleRegion) => {
     setScaleRegion(prev => (scaleRegionChanged(prev, r) ? r : prev));
-  }, []);
+    if (showMapScale) refreshMapScale();
+  }, [showMapScale, refreshMapScale]);
   // Zahlen weichen Winkeln/Gegenständen/Start/Ende aus (Marker bleiben lesbar).
   const scaleAvoid = useMemo<LL[]>(() => {
     if (!scaleTicks) return [];
@@ -267,7 +275,7 @@ export function TrackingMap({
   return (
     <View
       style={[StyleSheet.absoluteFill, style]}
-      onLayout={scaleRequested ? e => setMapHeightPt(e.nativeEvent.layout.height) : undefined}
+      onLayout={scaleRequested ? e => { setMapHeightPt(e.nativeEvent.layout.height); setMapWidthPt(e.nativeEvent.layout.width); } : undefined}
     >
       <MapView
         ref={mapRef}
@@ -282,6 +290,8 @@ export function TrackingMap({
         rotateEnabled
         pitchEnabled
         onMapReady={() => setMapReady(true)}
+        onRegionChange={showMapScale ? invalidateMapScale : undefined}
+        showsScale={showMapScale ? false : undefined}
         onRegionChangeComplete={scaleRequested ? onScaleRegion : undefined}
         onPanDrag={() => {
           // Eigene Kartengeste ⇒ Auto-Follow SOFORT pausieren (kein
@@ -423,6 +433,8 @@ export function TrackingMap({
           </Marker>
         )}
       </MapView>
+
+      {showMapScale && mapHeightPt - mapScaleBottom >= 100 && <MapScaleBar scale={barScale} bottom={mapScaleBottom} onHeightChange={onMapScaleHeightChange} />}
 
       {/* Floating Buttons rechts */}
       {!hideControls && (

@@ -106,14 +106,33 @@ export function offsetLL(p: LL, eastM: number, northM: number): LL {
  * memoisieren — unabhängig von Zoom und GPS-Fix). Ungültige Geometrie (leer,
  * < 2 Punkte, nicht-endliche Koordinaten, Länge < 1 m) → keine Ticks.
  */
-export function buildDistanceTicks(line: readonly LL[]): DistanceTickSet {
+export function buildDistanceTicks(line: readonly (LL & { breakBefore?: boolean })[]): DistanceTickSet {
   if (line.length < 2 || !line.every(finite)) return { totalM: 0, ticks: [] };
+  // Each section has its own tangent window. No interpolation or direction across a gap,
+  // including on older runtimes whose shared buildArc does not yet understand breaks.
+  const sections: LL[][] = [];
+  for (const p of line) {
+    if (sections.length === 0 || (p as LL & { breakBefore?: boolean }).breakBefore) sections.push([]);
+    sections[sections.length - 1].push(p);
+  }
+  const result: DistanceTickSet = { totalM: 0, ticks: [] };
+  for (const section of sections) {
+    const part = continuousDistanceTicks(section, result.totalM);
+    result.totalM += part.totalM;
+    result.ticks.push(...part.ticks);
+  }
+  return result;
+}
+
+function continuousDistanceTicks(line: readonly LL[], offset: number): DistanceTickSet {
+  if (line.length < 2) return { totalM: 0, ticks: [] };
   const { cum, total } = buildArc(line as LL[]);
-  if (!Number.isFinite(total) || total < 1) return { totalM: Number.isFinite(total) ? total : 0, ticks: [] };
-  const count = Math.floor(total + 1e-9);
+  if (!Number.isFinite(total) || total <= 0) return { totalM: Number.isFinite(total) ? total : 0, ticks: [] };
+  const first = Math.floor(offset + 1e-9) + 1;
+  const count = Math.max(0, Math.floor(offset + total + 1e-9) - first + 1);
   const w = DISTANCE_SCALE.tangentHalfWindowM;
   // Je Tick drei Abfragen (s − w, s, s + w); alle drei Folgen sind aufsteigend.
-  const ms = Array.from({ length: count }, (_, k) => k + 1);
+  const ms = Array.from({ length: count }, (_, k) => first + k - offset);
   const lo = ms.map(m => Math.max(0, m - w));
   const hi = ms.map(m => Math.min(total, m + w));
   const at = pointsAtSortedDistances(line, cum, ms);
@@ -129,7 +148,8 @@ export function buildDistanceTicks(line: readonly LL[]): DistanceTickSet {
         normal = { east: -b.y / chord, north: b.x / chord };   // Tangente um +90° gedreht
       }
     }
-    return { m, cls: tickClass(m), at: at[k], normal };
+    const absoluteM = first + k;
+    return { m: absoluteM, cls: tickClass(absoluteM), at: at[k], normal };
   });
   return { totalM: total, ticks };
 }
