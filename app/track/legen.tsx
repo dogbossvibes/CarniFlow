@@ -212,7 +212,7 @@ export default function LegenScreen() {
   }, [announceEvent]);
 
   const { autoDetect, setAutoDetect } = useAutoDetectSetting();
-  const { stepLengthM } = useStepLengthSetting();   // optionale persönliche Schrittlänge (Default 0,75 m)
+  const { stepLengthM } = useStepLengthSetting({ freezeWhileMounted: true });   // optionale persönliche Schrittlänge (Default 0,75 m)
   const { enabled: volumeKeyArticle } = useVolumeKeyArticleSetting();
   const rec = useTrackRecorder({ onAngle, autoDetect });
 
