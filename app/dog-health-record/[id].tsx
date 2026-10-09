@@ -563,7 +563,7 @@ export default function DogHealthRecordRoute() {
           app/dog-heat/[id].tsx — hier nur Status-Hero, rein rechnerische
           Verlaufsstatistik (getHeatHistoryStats) und die moderne
           Verlaufsliste, die zu app/dog-heat/[id].tsx verlinkt. */}
-      <AnyvoBottomSheet closeButton visible={heatOpen} onClose={() => setHeatOpen(false)} title={t('heat.title')}>
+      <AnyvoBottomSheet keyboardAware closeButton visible={heatOpen} onClose={() => setHeatOpen(false)} title={t('heat.title')}>
         <ScrollView style={s.sheetScroll} showsVerticalScrollIndicator={false}>
           <HealthHeatSheetContent
             cycles={heatCycles} phases={heatPhases} observations={heatObservations}
