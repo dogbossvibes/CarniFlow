@@ -221,6 +221,8 @@ describe('known reference object count', () => {
     walk(0, 20);
     let result!: ReturnType<SearchRecorder['stop']>;
     act(() => { result = getRecorder().stop(); });
+    expect(result.objectScoreBasis?.totalObjects).toBe(0);
+    expect(result.score).toBe(Math.round(result.objectScoreBasis!.trackPoints + 21));
     expect(result.totalObjects).toBe(0);
     expect(result.foundObjects).toBe(0);
   });
@@ -233,5 +235,73 @@ describe('known reference object count', () => {
     const { getRecorder } = mount(OBJECTS);
     await flushMicrotasks();
     expect(getRecorder().totalObjects).toBe(2);
+  });
+});
+
+
+describe('original Android scoring contract', () => {
+  it.each([
+    { cursor: 50, devSum: 20, devCount: 10, found: 1, breaks: 1, expectedTrack: 'partial' },
+    { cursor: 100, devSum: 10, devCount: 10, found: 2, breaks: 0, expectedTrack: 'full' },
+    { cursor: 75, devSum: 100, devCount: 10, found: 1, breaks: 0, expectedTrack: 'zero' },
+    { cursor: 20, devSum: 0, devCount: 0, found: 0, breaks: 0, expectedTrack: 'zero' },
+  ])('retains original score for $expectedTrack / $cursor m', async row => {
+    const { getRecorder } = mount();
+    await flushMicrotasks();
+    const runState: SearchRunState = { ...freshSearchRunState(), maxCursorM: row.cursor,
+      devSumM: row.devSum, devCount: row.devCount,
+      foundObjectIds: OBJECTS.slice(0, row.found).map(o => o.id!),
+      breaks: Array.from({ length: row.breaks }, () => ({ at: toLL(0, 20), t: 10, startedAtSec: 10 })),
+    };
+    act(() => { getRecorder().start({ points: [toLL(0, row.cursor)], startedAtMs: 1, runState }); });
+    const coverage = Math.min(1, row.cursor / getRecorder().trackLengthM);
+    const track = row.expectedTrack === 'partial' ? 79 * (8 / 8.5) * coverage - 4
+      : row.expectedTrack === 'full' ? 79 * coverage : 0;
+    const expectedScore = Math.round(track + row.found / 2 * 21);
+    expect(getRecorder().score).toBe(expectedScore);
+    let result!: ReturnType<SearchRecorder['stop']>;
+    act(() => { result = getRecorder().stop(); });
+    expect(result.score).toBe(expectedScore);
+    expect(result.foundObjects).toBe(row.found);
+    expect(result.deviationAvgM).toBe(row.devCount ? row.devSum / row.devCount : 0);
+    expect(result.breaks).toHaveLength(row.breaks);
+  });
+});
+
+
+describe('additive Android object snapshot at stop', () => {
+  it('retains manual/automatic finds and exact unrounded score basis from a recovered run', async () => {
+    const { getRecorder } = mount();
+    await flushMicrotasks();
+    const runState = { ...freshSearchRunState(), maxCursorM: 50, devSumM: 20, devCount: 10,
+      foundObjectIds: ['gegenstand-20', 'gegenstand-70'], autoDwellObjectIds: ['gegenstand-70'] };
+    act(() => { getRecorder().start({ points: [toLL(0, 50)], startedAtMs: 1, runState }); });
+    let result!: ReturnType<SearchRecorder['stop']>;
+    act(() => { result = getRecorder().stop(); });
+    expect(result.objectStatuses).toEqual(['manual_found', 'auto_dwell_found']);
+    expect(result.objectScoreBasis).toEqual({ version: 1, trackPoints: 79 * (8 / 8.5) * (50 / getRecorder().trackLengthM),
+      maxTrackPoints: 79, maxObjectPoints: 21, totalObjects: 2 });
+    expect(result.score).toBe(Math.round(result.objectScoreBasis!.trackPoints + 21));
+    act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+    expect(result.objectStatuses).toEqual(['manual_found', 'auto_dwell_found']);
+    let fresh!: ReturnType<SearchRecorder['stop']>;
+    act(() => { fresh = getRecorder().stop(); });
+    expect(fresh.objectStatuses).toEqual(['pending', 'pending']);
+    expect(fresh.objectScoreBasis!.trackPoints).toBe(0);
+  });
+  it('retains removed and confirmed-missed states without promoting pending objects to finds', async () => {
+    const { getRecorder } = mount();
+    await flushMicrotasks();
+    const runState = { ...freshSearchRunState(), dismissedAutoDwellIds: ['gegenstand-20'] };
+    act(() => { getRecorder().start({ points: [toLL(0, 0)], startedAtMs: 1, runState }); });
+    let pending!: ReturnType<SearchRecorder['stop']>;
+    act(() => { pending = getRecorder().stop(); });
+    expect(pending.objectStatuses).toEqual(['user_removed', 'pending']);
+    act(() => { getRecorder().confirmEnd(); });
+    let ended!: ReturnType<SearchRecorder['stop']>;
+    act(() => { ended = getRecorder().stop(); });
+    expect(ended.objectStatuses).toEqual(['user_removed', 'missed']);
+    expect(ended.foundObjects).toBe(0);
+    expect(ended.score).toBe(pending.score);
   });
 });

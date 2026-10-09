@@ -1,3 +1,4 @@
+import type { TrackObjectScoreBasis } from '../utils/trackObjectReview';
 /**
  * useSearchRecorder.ts — ANYVO Ausarbeiten / Suche (Expo / React Native)
  *
@@ -202,6 +203,7 @@ export type SearchResult = {
   foundObjectIndices: number[];
   autoDwellObjectIds: string[];
   objectStatuses: ReferenceObjectStatus[];
+  objectScoreBasis?: TrackObjectScoreBasis;
   // Punkt 17 (Track-Replay): Sekunden-seit-Start je Eintrag in `points`,
   // gleiche Länge/Reihenfolge wie `points` — additiv, KEINE zweite Geometrie.
   // Kürzer als `points` (Resume, ältere Sessions vor dieser Erweiterung) =
@@ -360,7 +362,7 @@ export function useSearchRecorder(opts: {
   // Kurs-Evidenz. Stabil pro laidPoints/arc, kein Recompute je Fix.
   const firstLegHeading = useMemo(() => computeFirstLegHeadingDeg(laidPoints, arc.cum), [laidPoints, arc.cum]);
 
-  const computeScore = useCallback(() => {
+  const computeScoreBreakdown = useCallback(() => {
     // Ohne Soll-Fährte (Freilauf-Training) gibt es nichts zu bewerten → neutral.
     const avgDev = devCountRef.current ? devSumRef.current / devCountRef.current : Infinity;
     // Strenge Abweichungs-Skala: volle Punkte bis FULL_DEV_M, linear auf 0 bis ZERO_DEV_M.
@@ -372,8 +374,14 @@ export function useSearchRecorder(opts: {
     const breakPenalty = breaksRef.current.length * 4;
     const trackScore = Math.max(0, model.trackPts * onTrackRatio * coverage - breakPenalty);
     const objScore = totalObjects ? (foundRef.current.size / totalObjects) * model.objectPts : model.objectPts;
-    return Math.round(Math.max(0, Math.min(100, trackScore + objScore)));
+    return {
+      score: Math.round(Math.max(0, Math.min(100, trackScore + objScore))),
+      objectScoreBasis: { version: 1, trackPoints: trackScore, maxTrackPoints: model.trackPts,
+        maxObjectPoints: model.objectPts, totalObjects } as TrackObjectScoreBasis,
+    };
   }, [model, totalObjects, hasTrack, arc.total]);
+
+  const computeScore = useCallback(() => computeScoreBreakdown().score, [computeScoreBreakdown]);
 
   const pushSnapshot = useCallback(() => {
     setSnap({
@@ -1161,9 +1169,9 @@ export function useSearchRecorder(opts: {
       deviationAvgM: devCountRef.current ? Math.round((devSumRef.current / devCountRef.current) * 10) / 10 : 0,
       distanceM: distRef.current,
       durationS,
-      score: computeScore(),
+      ...computeScoreBreakdown(),
     };
-  }, [computeScore, totalObjects]);
+  }, [computeScoreBreakdown, totalObjects]);
 
   const setPaused = useCallback((p: boolean) => {
     recordingEvidenceRef.current?.note(p ? 'userPaused' : 'userResumed');

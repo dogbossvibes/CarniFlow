@@ -1,3 +1,7 @@
+import { createRemoteTrainingSession } from '@/features/sync/services/remoteTrainingSyncService';
+import { buildRunResultPayload } from '@/features/tracking/utils/localTrackRun';
+import type { LocalTrainingSession } from '@/features/sync/types/sync';
+
 // Supabase-Upsert mocken (lazy, mock-präfixiert wg. jest-Hoisting).
 const mockUpsertResult = { data: { id: 'sess-1' }, error: null as unknown };
 const mockUpsert = jest.fn((_payload?: Record<string, any>, _opts?: Record<string, any>) => ({ select: () => ({ single: async () => mockUpsertResult }) }));
@@ -6,8 +10,6 @@ jest.mock('@/lib/supabase', () => ({ supabase: { from: (t?: string) => mockFrom(
 // mediaService zieht native Deps → für diesen Test neutralisieren.
 jest.mock('@/services/mediaService', () => ({ uploadImage: jest.fn(), uploadVideo: jest.fn(), uploadAudio: jest.fn() }));
 
-import { createRemoteTrainingSession } from '@/features/sync/services/remoteTrainingSyncService';
-import type { LocalTrainingSession } from '@/features/sync/types/sync';
 
 function localTrack(over: Partial<LocalTrainingSession> & { score?: number | null; payload?: Record<string, unknown> }): LocalTrainingSession {
   const { payload, ...rest } = over;
@@ -75,4 +77,31 @@ describe('createRemoteTrainingSession — rating_check (23514) behoben', () => {
     expect(errSpy).toHaveBeenCalled();   // echter Constraint-Fehler wird weiterhin geloggt
     errSpy.mockRestore();
   });
+});
+
+
+it('retains original object snapshot across offline JSON reload and failed/retried sync without modifying source data', async () => {
+  const run = buildRunResultPayload({ runId: 'run-stable', sessionId: 'sess-1', startedAtMs: 1, endedAtMs: 2000,
+    result: { durationS: 2, score: 88, deviationAvgM: 1, foundObjects: 1, totalObjects: 2,
+      distanceM: 10, breaks: [], points: [{ latitude: 47, longitude: 8 }] },
+    objectSnapshotInput: { objects: [{ id: 'source-a', index: 0, material: 'duebel' }, { id: 'source-b', index: 1 }],
+      statuses: ['manual_found', 'pending'],
+      scoreBasis: { version: 1, trackPoints: 77.5, maxTrackPoints: 79, maxObjectPoints: 21, totalObjects: 2 } },
+  });
+  const local = localTrack({ payload: { run } });
+  const originalJSON = local.payload_json;
+  const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    mockUpsertResult.error = { message: 'offline' };
+    expect((await createRemoteTrainingSession(local)).error).toContain('offline');
+    const first = JSON.parse(JSON.stringify(lastPayload()));
+    mockUpsertResult.error = null;
+    expect((await createRemoteTrainingSession(JSON.parse(JSON.stringify(local)))).error).toBeNull();
+    expect(lastPayload()).toEqual(first);
+    expect(lastPayload().track_data.run.object_snapshot).toEqual(run.object_snapshot);
+    expect(lastPayload().track_data.run.score).toBe(88);
+    expect(lastPayload().track_data.run).not.toHaveProperty('run_points');
+    expect(local.payload_json).toBe(originalJSON);
+    expect(lastOpts()).toEqual({ onConflict: 'id' });
+  } finally { spy.mockRestore(); }
 });

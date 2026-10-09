@@ -48,3 +48,42 @@ describe('buildRunResultPayload — analytics (Punkt 10/12/13, additiv)', () => 
     expect(p.analytics).toBe(analytics);
   });
 });
+
+
+describe('optional original object snapshot', () => {
+  const input = () => ({ objects: [
+    { id: 'marker-a', index: 0, material: 'stoff' },
+    { id: 'marker-b', index: 1, material: 'duebel' },
+    { id: 'marker-c', index: 2, material: 'holz' },
+  ], statuses: ['manual_found', 'auto_dwell_found', 'pending'] as import('../referenceObjectStatus').ReferenceObjectStatus[],
+  scoreBasis: { version: 1 as const, trackPoints: 74, maxTrackPoints: 79, maxObjectPoints: 21, totalObjects: 3 } });
+  it('adds snapshot while preserving every existing result field and durable JSON representation', () => {
+    const original = buildRunResultPayload(base);
+    const source = input();
+    const result = buildRunResultPayload({ ...base, objectSnapshotInput: source });
+    const { object_snapshot: snapshot, ...existing } = result;
+    expect(existing).toEqual(original);
+    expect(JSON.parse(JSON.stringify(result)).object_snapshot).toEqual({ version: 1,
+      objects: source.objects.map((o, i) => ({ ...o, recordedStatus: source.statuses[i] })), scoreBasis: source.scoreBasis });
+    source.objects[0].id = 'changed'; source.statuses[1] = 'user_removed'; source.scoreBasis.trackPoints = 0;
+    expect(snapshot).toMatchObject({ objects: [{ id: 'marker-a' }, { recordedStatus: 'auto_dwell_found' }, {}], scoreBasis: { trackPoints: 74 } });
+  });
+  it('does not backfill legacy/recovery runs or guess missing marker IDs', () => {
+    expect(buildRunResultPayload(base)).not.toHaveProperty('object_snapshot');
+    const source = input(); source.objects[1].id = '';
+    expect(buildRunResultPayload({ ...base, objectSnapshotInput: source })).toEqual(buildRunResultPayload(base));
+  });
+  it('uses result counts as authority and omits inconsistent new metadata without changing original save', () => {
+    const source = input(); source.statuses[1] = 'pending';
+    expect(buildRunResultPayload({ ...base, objectSnapshotInput: source })).toEqual(buildRunResultPayload(base));
+    expect(buildRunResultPayload({ ...base, objectSnapshotInput: { ...input(), statuses: [] } })).toEqual(buildRunResultPayload(base));
+  });
+  it('stores a real zero-object reference but never invents rulebook objects for free search', () => {
+    const noObjects = { ...base, result: { ...base.result, foundObjects: 0, totalObjects: 0 } };
+    const empty = { objects: [], statuses: [] };
+    expect(buildRunResultPayload({ ...noObjects, objectSnapshotInput: empty }).object_snapshot)
+      .toEqual({ version: 1, objects: [], scoreBasis: null });
+    const free = { ...noObjects, result: { ...noObjects.result, totalObjects: 3 } };
+    expect(buildRunResultPayload({ ...free, objectSnapshotInput: empty })).toEqual(buildRunResultPayload(free));
+  });
+});
