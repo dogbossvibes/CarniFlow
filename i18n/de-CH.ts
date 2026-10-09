@@ -384,6 +384,8 @@ export const deCH = {
   'track.searchApproachHint': 'Bitte zum Fährtenansatz gehen. Wähle den Abstand zum Hund und tippe auf Jetzt starten.',
   'track.searchApproachReached': 'Ansatz erreicht',
   'track.searchHandlerDistanceLabel': 'Abstand zum Hund',
+  "track.scale.mapLabel": "Kartenmassstab: {distance}",
+  "track.scale.mapPending": "Massstab …",
   'track.scale.progress': '{current} m / {total} m',
   'track.scale.nextObject': 'Nächster Gegenstand · {meters} m',
   'track.searchHandlerDistanceOption': 'Abstand {meters} Meter',

@@ -422,6 +422,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.searchApproachHint": "Please walk to the track start. Choose the distance to the dog and tap Start now.",
   "track.searchApproachReached": "Start reached",
   "track.searchHandlerDistanceLabel": "distance to dog",
+  "track.scale.mapLabel": "Map scale: {distance}",
+  "track.scale.mapPending": "Scale …",
   "track.scale.progress": "{current} m / {total} m",
   "track.scale.nextObject": "Next article · {meters} m",
   "track.searchHandlerDistanceOption": "distance {meters} Meter",

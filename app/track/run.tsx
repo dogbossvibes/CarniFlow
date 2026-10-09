@@ -1,3 +1,4 @@
+import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
 import { readContinuityPoint } from '@/features/tracking/utils/trackContinuity';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -210,6 +211,9 @@ export default function TrackRunScreen() {
   const [finishing, setFinishing] = useState(false);
   const [pendingExit, setPendingExit] = useState<string | null>(null);
   const [pocketLock, setPocketLock] = useState(false);
+  const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
+  const [mapScaleHeight, setMapScaleHeight] = useState(44);
+  const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, mapScaleHeight, view === 'map');
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
   const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
@@ -1192,6 +1196,9 @@ export default function TrackRunScreen() {
           {view === 'map' ? (
             <TrackingMap
                   layColor={layColor}
+              showMapScale
+              mapScaleBottom={mapOverlayLayout.scaleBottom}
+              onMapScaleHeightChange={setMapScaleHeight}
               layPoints={snapData.laidLatLng} dimLay
               distanceScaleLine={snapData.laidPoints}
               runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
@@ -1261,7 +1268,7 @@ export default function TrackRunScreen() {
           )}
 
           {/* Teilstrecke + Fährten-Maßstab gestapelt über der Metrik-Leiste. */}
-          <View className="absolute left-[14px] right-[14px] bottom-[88px] gap-2" pointerEvents="none">
+          <View style={{ bottom: mapOverlayLayout.contentBottom }} className="absolute left-[14px] right-[14px] gap-2" pointerEvents="none">
           {!arming && currentRunSegment && (
             <View className="rounded-[16px] px-4 py-3 bg-ft-glass border border-ft-glass-line">
               <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">Teilstrecke</Text>
@@ -1295,7 +1302,7 @@ export default function TrackRunScreen() {
           </View>
 
           {/* Metrik-Leiste (unten) */}
-          <View className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
+          <View onLayout={e => setMapMetricsHeight(e.nativeEvent.layout.height)} className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
             {metrics.map((mm, i) => {
               // Live-GPS-Qualität (Punkt 15/Abschnitt 7): nur an der GPS-Kachel,
               // jetzt als sichtbares Text-Label statt eines kaum erkennbaren

@@ -1002,6 +1002,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.searchApproachHint": "Va au départ de la piste. Choisis la distance au chien, puis touche Démarrer maintenant.",
   "track.searchApproachReached": "Départ atteint",
   "track.searchHandlerDistanceLabel": "Distance au chien",
+  "track.scale.mapLabel": "Échelle de la carte : {distance}",
+  "track.scale.mapPending": "Échelle …",
   "track.scale.progress": "{current} m / {total} m",
   "track.scale.nextObject": "Prochain objet · {meters} m",
   "track.searchHandlerDistanceOption": "Distance : {meters} mètres",
