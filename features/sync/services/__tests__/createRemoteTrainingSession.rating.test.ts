@@ -1,3 +1,7 @@
+import { runSupplementFromPayload } from '@/features/tracking/utils/localTrackDetail';
+import { createRemoteTrainingSession } from '@/features/sync/services/remoteTrainingSyncService';
+import type { LocalTrainingSession } from '@/features/sync/types/sync';
+
 // Supabase-Upsert mocken (lazy, mock-präfixiert wg. jest-Hoisting).
 const mockUpsertResult = { data: { id: 'sess-1' }, error: null as unknown };
 const mockUpsert = jest.fn((_payload?: Record<string, any>, _opts?: Record<string, any>) => ({ select: () => ({ single: async () => mockUpsertResult }) }));
@@ -6,8 +10,6 @@ jest.mock('@/lib/supabase', () => ({ supabase: { from: (t?: string) => mockFrom(
 // mediaService zieht native Deps → für diesen Test neutralisieren.
 jest.mock('@/services/mediaService', () => ({ uploadImage: jest.fn(), uploadVideo: jest.fn(), uploadAudio: jest.fn() }));
 
-import { createRemoteTrainingSession } from '@/features/sync/services/remoteTrainingSyncService';
-import type { LocalTrainingSession } from '@/features/sync/types/sync';
 
 function localTrack(over: Partial<LocalTrainingSession> & { score?: number | null; payload?: Record<string, unknown> }): LocalTrainingSession {
   const { payload, ...rest } = over;
@@ -75,4 +77,29 @@ describe('createRemoteTrainingSession — rating_check (23514) behoben', () => {
     expect(errSpy).toHaveBeenCalled();   // echter Constraint-Fehler wird weiterhin geloggt
     errSpy.mockRestore();
   });
+});
+
+
+it('preserves per-object recording evidence through local reload and cloud JSON transport', async () => {
+  const objectSnapshot = { version: 1, objects: [
+    { id: 'marker-a', index: 0, recordedStatus: 'manual_found' },
+    { id: 'marker-b', index: 1, recordedStatus: 'unobserved' },
+  ], scoreBasis: { version: 1, trackPoints: 62.375, maxTrackPoints: 79, maxObjectPoints: 21, totalObjects: 2 } };
+  const run = { run_id: 'run-1', session_id: 'sess-1', score: null, articles_found: 1, total_objects: 2,
+    continuity: { version: 1, hasGaps: true }, object_snapshot: objectSnapshot,
+    run_points: [{ lat: 47, lng: 8 }, { lat: 47.01, lng: 8, breakBefore: true }],
+    analytics: { analyticsVersion: 3, trackScore: null, sensorFact: 'unchanged' } };
+  const source = localTrack({ payload: { run, score: 73, legs: [{ name: 'Manual', score: 7.3, max: 10 }] } });
+  const before = source.payload_json;
+  const local = runSupplementFromPayload(before)!;
+  expect(local.track_data.run.object_snapshot).toEqual(objectSnapshot);
+  expect(local.runs[0].run_points).toEqual(run.run_points);
+  await createRemoteTrainingSession(source);
+  expect(lastPayload().track_data.run.object_snapshot).toEqual(objectSnapshot);
+  expect(lastPayload().track_data.run.analytics).toEqual(run.analytics);
+  expect(lastPayload().track_data.run.continuity).toEqual(run.continuity);
+  expect(lastPayload().track_data.run.score).toBeNull();
+  expect(lastPayload().track_data.score).toBe(73);
+  expect(lastPayload().track_data.run).not.toHaveProperty('run_points');
+  expect(source.payload_json).toBe(before);
 });

@@ -1002,6 +1002,8 @@ export default function TrackRunScreen() {
           searchHandlerDistanceM,
           referenceHasGaps: snapData.laidPoints.some(p => p.breakBefore),
           autoDwellObjectIds: res.autoDwellObjectIds,
+          objectSnapshotInput: { objects: snapData.laidObjects, statuses: res.objectStatuses,
+            scoreBasis: res.objectScoreBasis },
           analytics,
           pointsTimeSec: res.pointsTimeSec,
           replayPoints: res.replayPoints,

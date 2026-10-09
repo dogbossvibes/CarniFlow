@@ -84,6 +84,22 @@ afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = nu
 function walk(yFrom: number, yTo: number) { for (let y = yFrom; y <= yTo; y += 2) feed(y); }
 
 describe('useSearchRecorder — Search-Recovery-State', () => {
+  it('persists the exact existing score components without changing the final score', async () => {
+    const { getRecorder } = mount();
+    await flushMicrotasks();
+    act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+    walk(0, 40);
+    act(() => { getRecorder().markObject(); getRecorder().confirmEnd(); });
+    const beforeStop = getRecorder().score;
+    let result!: ReturnType<SearchRecorder['stop']>;
+    act(() => { result = getRecorder().stop(); });
+    expect(result.score).toBe(beforeStop);
+    const basis = result.objectScoreBasis!;
+    expect(basis).toMatchObject({ version: 1, maxTrackPoints: 79, maxObjectPoints: 21, totalObjects: 2 });
+    expect(result.score).toBe(Math.round(basis.trackPoints + result.foundObjects / result.totalObjects * basis.maxObjectPoints));
+    expect(result.objectStatuses).toEqual(['manual_found', 'missed']);
+  });
+
   it('1./2. frischer Start: Fortschritt 0; nach Lauf bis 40 m meldet der Recorder maxCursor ≈ 40 m (monoton) an den Store', async () => {
     const { getRecorder } = mount();
     await flushMicrotasks();

@@ -2,6 +2,7 @@
 // Run-Struktur für local_training_sessions.payload_json.run. Enthält alles, was heute
 // nur an finishTrackRun (remote) übergeben wird, plus die stabile client-Run-UUID.
 
+import { buildTrackObjectSnapshot } from './trackObjectReview';
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import type { TrackAnalyticsV2 } from '@/features/tracking/engine/trackSegmentAnalysis';
 import type { TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
@@ -26,6 +27,7 @@ export function buildRunResultPayload(args: {
   searchHandlerDistanceM?: number;
   referenceHasGaps?: boolean;
   autoDwellObjectIds?: string[];
+  objectSnapshotInput?: Omit<Parameters<typeof buildTrackObjectSnapshot>[0], 'foundObjects' | 'totalObjects'>;
   // Punkt 10/12/13: additiv, KEINE Migration nötig — payload_json ist schemalos
   // (JSONB). Fehlt sie (z. B. Freilauf ohne Soll-Fährte, Recovery-Kurzpfad ohne
   // laufenden Recorder), bleibt das Feld schlicht weg — bestehende Konsumenten
@@ -45,6 +47,7 @@ export function buildRunResultPayload(args: {
   replayPointsTimeSec?: number[];
 }): Record<string, unknown> {
   const r = args.result;
+  const objectSnapshot = args.objectSnapshotInput ? buildTrackObjectSnapshot({ ...args.objectSnapshotInput, foundObjects: r.foundObjects, totalObjects: r.totalObjects }) : undefined;
   const searchHasGaps = r.points.some(p => p.breakBefore === true);
   const referenceHasGaps = args.referenceHasGaps === true;
   const continuity = searchHasGaps || referenceHasGaps
@@ -68,6 +71,7 @@ export function buildRunResultPayload(args: {
     breaks:                    r.breaks.length,
     search_handler_distance_m: args.searchHandlerDistanceM ?? null,
     ...(args.autoDwellObjectIds?.length ? { object_detections: args.autoDwellObjectIds.map(id => ({ id, source: 'auto_dwell' })) } : {}),
+    ...(objectSnapshot ? { object_snapshot: objectSnapshot } : {}),
     run_points:                hasReplayTimestamps
       ? r.points.map((p, i) => ({ lat: p.latitude, lng: p.longitude, ...(p.breakBefore ? { breakBefore: true } : {}), t: args.pointsTimeSec![i] }))
       : r.points.map(p => ({ lat: p.latitude, lng: p.longitude, ...(p.breakBefore ? { breakBefore: true } : {}) })),
