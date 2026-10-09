@@ -33,7 +33,7 @@ jest.mock('@/components/ui/Toast', () => ({ useToast: () => ({ showToast: jest.f
 
 /* eslint-disable import/first -- Mocks müssen vor den Imports registriert sein */
 import { TrackingMap } from '@/features/tracking/components/TrackingMap';
-import { DISTANCE_TICK_STROKE, DISTANCE_TICK_Z } from '@/features/tracking/components/DistanceScaleLayer';
+import { DISTANCE_TICK_STROKE, DISTANCE_TICK_Z, DISTANCE_TICK_HALO } from '@/features/tracking/components/DistanceScaleLayer';
 import { referenceTrackStroke, REFERENCE_TRACK_HALO } from '@/features/tracking/components/TrackReferenceOverlayLayer';
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
 import { C } from '@/constants/colors';
@@ -53,7 +53,7 @@ const TICK_COLORS = new Set(Object.values(DISTANCE_TICK_STROKE).map(s => s.strok
 type PolyProps = { coordinates: { latitude: number; longitude: number }[]; strokeColor: string; strokeWidth: number; zIndex?: number };
 const polys = (n: ReactTestRenderer): PolyProps[] => (n.root as any).findAllByType(RNMaps!.Polyline).map((x: any) => x.props);
 const ticks = (n: ReactTestRenderer) => polys(n).filter(p => TICK_COLORS.has(p.strokeColor));
-const nonTicks = (n: ReactTestRenderer) => polys(n).filter(p => !TICK_COLORS.has(p.strokeColor));
+const nonTicks = (n: ReactTestRenderer) => polys(n).filter(p => !TICK_COLORS.has(p.strokeColor) && p.strokeColor !== DISTANCE_TICK_HALO);
 const labels = (n: ReactTestRenderer) => (n.root as any).findAll((x: any) => x.props?.testID === 'distance-scale-label' && typeof x.type === 'string');
 const mapView = (n: ReactTestRenderer) => (n.root as any).findByType(RNMaps!.default);
 const outer = (n: ReactTestRenderer) => (n.root as any).findAll((x: any) => typeof x.props?.onLayout === 'function')[0];
@@ -190,4 +190,26 @@ describe('run.tsx — Maßstab misst auf der Search-Referenz', () => {
   it('kein nächster Winkel im MVP', () => {
     expect(src).not.toMatch(/nextAngle|nextCorner|nächster Winkel/i);
   });
+});
+
+it('both active routes request a map-edge ruler above measured metrics and line ticks', () => {
+  for (const route of ['legen', 'run']) {
+    const source = readFileSync(`app/track/${route}.tsx`, 'utf8');
+    expect(source).toContain('showMapScale');
+    expect(source).toContain('mapScaleBottom={mapOverlayLayout.scaleBottom}');
+    expect(source).toContain('setMapMetricsHeight(e.nativeEvent.layout.height)');
+    expect(source).toContain('distanceScaleLine={');
+    expect(source).toContain('onMapScaleHeightChange={setMapScaleHeight}');
+    expect(source).toContain('bottom: mapOverlayLayout.contentBottom');
+    expect(source).not.toContain('bottom-[88px]');
+  }
+  const lay = readFileSync('app/track/legen.tsx', 'utf8');
+  expect(lay).toContain('p.breakBefore ? { breakBefore: true }');
+});
+it('map-edge ruler remains mounted in overview when line ticks are too dense', () => {
+  const n = renderMap({ showMapScale: true, mapScaleBottom: 86, distanceScaleLine: REF_LINE });
+  zoomTo(n, 1500);
+  expect(ticks(n)).toHaveLength(0);
+  expect((n.root as any).findAll((x: any) => x.props.testID === 'map-scale-bar').length).toBeGreaterThan(0);
+  expect(mapView(n).props.onRegionChange).toEqual(expect.any(Function));
 });

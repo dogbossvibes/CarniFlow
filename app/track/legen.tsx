@@ -1,5 +1,6 @@
+import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -190,6 +191,9 @@ export default function LegenScreen() {
   const sessionIdRef = useRef<string | null>(null);
   const stoppingRef = useRef(false);   // Doppelklick-Guard für „Stoppen"
   const [pocketLock, setPocketLock] = useState(false);
+  const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
+  const [mapScaleHeight, setMapScaleHeight] = useState(44);
+  const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, mapScaleHeight, view === 'map');
   const [pendingExit, setPendingExit] = useState<{ href: string } | { back: true } | null>(null);
 
   // Automatisch erkannter Winkel (rechts/links/spitz) → Haptik + Hinweis.
@@ -365,6 +369,7 @@ export default function LegenScreen() {
     startAnchor, startLockActive, startDriftRejectedCount, segments,
     dogId: storeDogId, currentSessionId: storeSessionId,
   } = useTrackingStore();
+  const distanceScaleLine = useMemo(() => trackPoints.map((p: (typeof trackPoints)[number] & { breakBefore?: boolean }) => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })), [trackPoints]);
   const activeSegment = activeOrPlannedSegment(segments);
   const currentStep = metersToSteps(distanceMeters, stepLengthM);
 
@@ -751,7 +756,11 @@ export default function LegenScreen() {
           {view === 'map' ? (
             <TrackingMap
                   layColor={layColor}
+              showMapScale
+              mapScaleBottom={mapOverlayLayout.scaleBottom}
+              onMapScaleHeightChange={setMapScaleHeight}
               layPoints={trackPoints}
+              distanceScaleLine={distanceScaleLine}
               referenceOverlays={showReferenceTracks ? referenceOverlays : NO_REFERENCE_OVERLAYS}
               markers={mapMarkers}
               segments={segments}
@@ -798,7 +807,7 @@ export default function LegenScreen() {
           )}
 
           {/* Metrik-Leiste (unten) */}
-          <View className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
+          <View onLayout={e => setMapMetricsHeight(e.nativeEvent.layout.height)} className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
             {metrics.map((mm, i) => (
               <View key={i} className={`flex-1 items-center ${i > 0 ? 'border-l border-ft-line' : ''}`}>
                 <Text className={`text-[15px] font-black ${mm.warn ? 'text-ft-warn' : 'text-ft-text'}`} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{mm.value}</Text>
@@ -822,7 +831,7 @@ export default function LegenScreen() {
           )}
 
           {phase === 'recording' && activeSegment && (
-            <View className="absolute left-[14px] right-[14px] bottom-[88px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
+            <View style={{ bottom: mapOverlayLayout.contentBottom }} className="absolute left-[14px] right-[14px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
               <View className="flex-row items-center justify-between gap-3">
                 <View className="flex-1">
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">{t('track.segmentActive')}</Text>
