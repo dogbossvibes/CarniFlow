@@ -1,3 +1,4 @@
+import { buildTrackObjectSnapshot } from './trackObjectReview';
 // Reine, testbare Abbildung: Absuche-Ergebnis (SearchResult + Kontext) → persistierte
 // Run-Struktur für local_training_sessions.payload_json.run. Enthält alles, was heute
 // nur an finishTrackRun (remote) übergeben wird, plus die stabile client-Run-UUID.
@@ -25,6 +26,8 @@ export function buildRunResultPayload(args: {
   result:                RunResultSource;
   searchHandlerDistanceM?: number;
   autoDwellObjectIds?: string[];
+  // Optional for newly completed recordings only; legacy/recovery payloads stay unchanged.
+  objectSnapshotInput?: Omit<Parameters<typeof buildTrackObjectSnapshot>[0], 'foundObjects' | 'totalObjects'>;
   // Punkt 10/12/13: additiv, KEINE Migration nötig — payload_json ist schemalos
   // (JSONB). Fehlt sie (z. B. Freilauf ohne Soll-Fährte, Recovery-Kurzpfad ohne
   // laufenden Recorder), bleibt das Feld schlicht weg — bestehende Konsumenten
@@ -44,6 +47,9 @@ export function buildRunResultPayload(args: {
   replayPointsTimeSec?: number[];
 }): Record<string, unknown> {
   const r = args.result;
+  const objectSnapshot = args.objectSnapshotInput ? buildTrackObjectSnapshot({
+    ...args.objectSnapshotInput, foundObjects: r.foundObjects, totalObjects: r.totalObjects,
+  }) : undefined;
   const hasReplayTimestamps = !!args.pointsTimeSec && args.pointsTimeSec.length === r.points.length && r.points.length > 0;
   const hasReplayGeometry = !!args.replayPoints && !!args.replayPointsTimeSec
     && args.replayPoints.length >= 2 && args.replayPoints.length === args.replayPointsTimeSec.length;
@@ -54,6 +60,7 @@ export function buildRunResultPayload(args: {
     ended_at:                  new Date(args.endedAtMs).toISOString(),
     duration_seconds:          r.durationS,
     score:                     r.score,
+    ...(objectSnapshot ? { object_snapshot: objectSnapshot } : {}),
     average_deviation_meters:  r.deviationAvgM,
     articles_found:            r.foundObjects,
     total_objects:             r.totalObjects,

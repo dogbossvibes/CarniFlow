@@ -1002,6 +1002,7 @@ export default function TrackRunScreen() {
           },
           searchHandlerDistanceM,
           autoDwellObjectIds: res.autoDwellObjectIds,
+          objectSnapshotInput: { objects: snapData.laidObjects, statuses: res.objectStatuses, scoreBasis: res.objectScoreBasis },
           analytics,
           pointsTimeSec: res.pointsTimeSec,
           replayPoints: res.replayPoints,
