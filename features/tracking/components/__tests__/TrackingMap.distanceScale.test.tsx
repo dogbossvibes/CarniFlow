@@ -9,7 +9,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
-const mockMapApi = { animateToRegion: jest.fn(), fitToCoordinates: jest.fn(), animateCamera: jest.fn(), setCamera: jest.fn(), getCamera: jest.fn(async () => ({})) };
+const mockMapApi = { coordinateForPoint: jest.fn(async ({ x }: { x: number; y: number }) => ({ latitude: 47 + x / (6371000 * Math.PI / 180), longitude: 8 })), animateToRegion: jest.fn(), fitToCoordinates: jest.fn(), animateCamera: jest.fn(), setCamera: jest.fn(), getCamera: jest.fn(async () => ({})) };
 jest.mock('@/components/tracking/TrackMap', () => {
   /* eslint-disable @typescript-eslint/no-require-imports */
   const R = require('react');
@@ -212,4 +212,23 @@ it('map-edge ruler remains mounted in overview when line ticks are too dense', (
   expect(ticks(n)).toHaveLength(0);
   expect((n.root as any).findAll((x: any) => x.props.testID === 'map-scale-bar').length).toBeGreaterThan(0);
   expect(mapView(n).props.onRegionChange).toEqual(expect.any(Function));
+});
+
+it('keeps sampling during continuous camera motion without waiting for region completion', async () => {
+  jest.useFakeTimers();
+  try {
+    mockMapApi.coordinateForPoint.mockClear();
+    const n = renderMap({ showMapScale: true, mapScaleBottom: 86 });
+    zoomTo(n, 1500);
+    await act(async () => { jest.advanceTimersByTime(100); });
+    const region = { latitude: 47, longitude: 8, latitudeDelta: 0.0016, longitudeDelta: 0.0016 };
+    // Overlapping follow animations can emit motion for seconds without a completion event.
+    for (let i = 0; i < 125; i++) {
+      act(() => mapView(n).props.onRegionChange(region));
+      await act(async () => { jest.advanceTimersByTime(16); });
+    }
+    const rulers = (n.root as any).findAll((x: any) => x.props.testID === 'map-scale-ruler');
+    expect(rulers.length).toBeGreaterThan(0);
+    expect(mockMapApi.coordinateForPoint.mock.calls.length).toBeLessThanOrEqual(60);
+  } finally { act(() => { mounted.splice(0).forEach(n => n.unmount()); }); jest.useRealTimers(); }
 });

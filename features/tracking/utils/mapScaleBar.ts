@@ -15,19 +15,64 @@ export function mapScaleForDistance(meters: number, width: number): MapScale | n
   return { meters: nice, width: width * nice / meters, label: nice >= 1000 ? `${nice / 1000} km` : `${nice} m` };
 }
 
+type Coordinate = { latitude: number; longitude: number };
+
+// Promise.all would release a batch on its first rejection although sibling native
+// calls can still be outstanding. The native maps API has no cancellation method.
+async function readProjectionBatch(map: MapScaleProjection, points: MapScalePoint[]): Promise<Coordinate[] | null> {
+  const settled = await Promise.allSettled(points.map(point => Promise.resolve().then(() => map.coordinateForPoint(point))));
+  if (settled.some(item => item.status === 'rejected')) return null;
+  return settled.map(item => (item as PromiseFulfilledResult<Coordinate>).value);
+}
+
+type NativeFlight = { listeners: Set<() => void> };
+const nativeFlights = new WeakMap<MapScaleProjection, NativeFlight>();
+
+/** One physically outstanding measurement per native MapView, across hook lifecycles. */
+export function requestMapScaleMeasurement(
+  map: MapScaleProjection, origin: MapScalePoint, width: number, isCurrent: () => boolean, onIdle: () => void,
+): { promise: Promise<MapScale | null> } | { unsubscribe: () => void } {
+  const existing = nativeFlights.get(map);
+  if (existing) {
+    existing.listeners.add(onIdle);
+    return { unsubscribe: () => { existing.listeners.delete(onIdle); } };
+  }
+  const flight: NativeFlight = { listeners: new Set() };
+  nativeFlights.set(map, flight);
+  const release = () => {
+    if (nativeFlights.get(map) === flight) nativeFlights.delete(map);
+    const listeners = [...flight.listeners];
+    flight.listeners.clear();
+    listeners.forEach(listener => listener());
+  };
+  const promise = measureMapScale(map, origin, width, isCurrent);
+  // Register release before returning the promise so a retry sees the freed map.
+  void promise.then(release, release);
+  return { promise };
+}
+
 /** Sample at the bar itself: rotation, latitude and perspective come from the native map. */
-export async function measureMapScale(map: MapScaleProjection, origin: MapScalePoint, width: number): Promise<MapScale | null> {
+export async function measureMapScale(map: MapScaleProjection, origin: MapScalePoint, width: number, isCurrent: () => boolean = () => true): Promise<MapScale | null> {
   const valid = (p: { latitude: number; longitude: number }) => p && Number.isFinite(p.latitude) &&
     Math.abs(p.latitude) <= 90 && Number.isFinite(p.longitude) && Math.abs(p.longitude) <= 180;
-  const [a, b] = await Promise.all([
-    map.coordinateForPoint(origin), map.coordinateForPoint({ x: origin.x + width, y: origin.y }),
-  ]);
+  if (!isCurrent()) return null;
+  const first = await readProjectionBatch(map, [origin, { x: origin.x + width, y: origin.y }]);
+  if (!isCurrent() || !first) return null;
+  const [a, b] = first;
   if (!valid(a) || !valid(b)) return null;
   const scale = mapScaleForDistance(haversineM(a, b), width);
   if (!scale) return null;
   // Verify the chosen width too; reject unstable/nonlinear projection instead of a false ruler.
-  const end = await map.coordinateForPoint({ x: origin.x + scale.width, y: origin.y });
-  if (!valid(end) || Math.abs(haversineM(a, end) / scale.meters - 1) > 0.03) return null;
+  // Read a fresh origin in the same batch: camera translation between batches must not
+  // be mistaken for zoom. Recheck the full probe as well to reject changing scale.
+  const second = await readProjectionBatch(map, [
+    origin, { x: origin.x + width, y: origin.y }, { x: origin.x + scale.width, y: origin.y },
+  ]);
+  if (!isCurrent() || !second) return null;
+  const [currentOrigin, currentFull, end] = second;
+  if (!valid(currentOrigin) || !valid(currentFull) || !valid(end) ||
+    Math.abs(haversineM(currentOrigin, currentFull) / haversineM(a, b) - 1) > 0.03 ||
+    Math.abs(haversineM(currentOrigin, end) / scale.meters - 1) > 0.03) return null;
   return scale;
 }
 
