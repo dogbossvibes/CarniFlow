@@ -187,7 +187,7 @@ export default function TrackRunScreen() {
   // Gewählter Abstand Hundeführer↔Hund (5/10 m) — vor Absuchestart gesetzt,
   // persistiert (Store/PendingTrack) und bei Recovery wiederhergestellt (Default 5).
   const [searchHandlerDistanceM, setSearchHandlerDistanceM] = useState<SearchHandlerDistanceM>(DEFAULT_HANDLER_DISTANCE_M);
-  const { stepLengthM } = useStepLengthSetting();   // optionale persönliche Schrittlänge (Default 0,75 m)
+  const { stepLengthM } = useStepLengthSetting({ freezeWhileMounted: true });   // optionale persönliche Schrittlänge (Default 0,75 m)
 
   const laidAngleArcM = useMemo(() => snapData.laidMarkers.filter(m => m.type === 'winkel')
     .flatMap(m => { const at = snapData.eventArcs[m.id]?.arcM; return at == null ? [] : [at]; }), [snapData]);
