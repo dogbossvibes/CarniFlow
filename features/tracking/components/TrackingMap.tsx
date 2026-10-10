@@ -217,7 +217,7 @@ export function TrackingMap({
   const [scaleRegion, setScaleRegion] = useState<ScaleRegion | null>(null);
   const [mapHeightPt, setMapHeightPt] = useState(0);
   const [mapWidthPt, setMapWidthPt] = useState(0);
-  const { scale: barScale, refresh: refreshMapScale, invalidate: invalidateMapScale } = useMapScaleBar({ mapRef, enabled: showMapScale, ready: mapReady, width: mapWidthPt, height: mapHeightPt, bottom: mapScaleBottom });
+  const { scale: barScale, refresh: refreshMapScale, onRegionChange: updateMovingMapScale } = useMapScaleBar({ mapRef, enabled: showMapScale, ready: mapReady, width: mapWidthPt, height: mapHeightPt, bottom: mapScaleBottom });
   const onScaleRegion = useCallback((r: ScaleRegion) => {
     setScaleRegion(prev => (scaleRegionChanged(prev, r) ? r : prev));
     if (showMapScale) refreshMapScale();
@@ -290,7 +290,7 @@ export function TrackingMap({
         rotateEnabled
         pitchEnabled
         onMapReady={() => setMapReady(true)}
-        onRegionChange={showMapScale ? invalidateMapScale : undefined}
+        onRegionChange={showMapScale ? updateMovingMapScale : undefined}
         showsScale={showMapScale ? false : undefined}
         onRegionChangeComplete={scaleRequested ? onScaleRegion : undefined}
         onPanDrag={() => {
