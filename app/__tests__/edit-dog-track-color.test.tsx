@@ -110,3 +110,13 @@ it('Save-Fehler → Fehlermeldung, kein Zurück (nicht als gespeichert behandelt
   expect(texts()).toContain('dog.saveErrorPlain');
   expect(mockBack).not.toHaveBeenCalled();
 });
+
+it('preserves custom RGB during an unrelated profile save; explicit palette change is saved', async () => {
+  await mount({ ...DOG, track_overlay_color_key: '#ABCDEF' });
+  expect(byId('track-color-custom').props.accessibilityState.selected).toBe(true);
+  await save();
+  expect(mockUpdate.mock.calls[0][1]).not.toHaveProperty('track_overlay_color_key');
+  act(() => byId('track-color-blue').props.onPress());
+  await save();
+  expect(mockUpdate.mock.calls[1][1].track_overlay_color_key).toBe('blue');
+});

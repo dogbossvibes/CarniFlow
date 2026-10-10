@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CustomTrackColorSheet } from './CustomTrackColorSheet';
 import { C } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
 import {
-  TRACK_OVERLAY_COLOR_KEYS, autoTrackOverlayColorKey, trackOverlayColor, type TrackOverlayColorKey,
+  TRACK_OVERLAY_COLOR_KEYS, autoTrackOverlayColorKey, trackOverlayColor, trackColorForeground, type TrackOverlayColorValue, type TrackOverlayColorKey,
 } from '@/features/tracking/utils/trackOverlayColors';
 
 const COLOR_NAME_KEY: Record<TrackOverlayColorKey, TranslationKey> = {
@@ -24,11 +26,12 @@ const COLOR_NAME_KEY: Record<TrackOverlayColorKey, TranslationKey> = {
  */
 export function TrackColorPicker({ dogId, value, onChange, disabled }: {
   dogId: string;
-  value: TrackOverlayColorKey | null;
-  onChange: (next: TrackOverlayColorKey | null) => void;
+  value: TrackOverlayColorValue | null;
+  onChange: (next: TrackOverlayColorValue | null) => void | boolean | Promise<void | boolean>;
   disabled?: boolean;
 }) {
   const { t } = useT();
+  const [customOpen, setCustomOpen] = useState(false);
   const suffix = t('dog.trackColor.a11ySuffix');
   const autoKey = autoTrackOverlayColorKey(dogId);
   const autoSelected = value == null;
@@ -70,12 +73,18 @@ export function TrackColorPicker({ dogId, value, onChange, disabled }: {
               style={[s.swatchHit, on && s.swatchHitOn]}
             >
               <View style={[s.swatch, { backgroundColor: trackOverlayColor(key) }]}>
-                {on && <Ionicons name="checkmark" size={20} color="#000000" />}
+                {on && <Ionicons name="checkmark" size={20} color={trackColorForeground(trackOverlayColor(key))} />}
               </View>
             </TouchableOpacity>
           );
         })}
       </View>
+      <TouchableOpacity testID="track-color-custom" accessibilityRole="button" accessibilityLabel={`${t('dog.trackColor.custom')}${value?.startsWith('#') ? `, ${value}` : ''}`} accessibilityState={{ selected: !!value?.startsWith('#'), disabled: !!disabled }} disabled={disabled} onPress={() => setCustomOpen(true)} style={[s.autoBtn, value?.startsWith('#') && s.autoBtnOn]}>
+        <View style={[s.autoDot, { borderWidth: 1, borderColor: '#888888', backgroundColor: trackOverlayColor(value ?? autoKey) }]} />
+        <Text style={s.autoTxtOn}>{t('dog.trackColor.custom')}</Text>
+        {value?.startsWith('#') && <Ionicons name="checkmark" size={16} color={C.accent} />}
+      </TouchableOpacity>
+      {customOpen && <CustomTrackColorSheet initialColor={trackOverlayColor(value ?? autoKey)} onClose={() => setCustomOpen(false)} onApply={onChange} disabled={disabled} />}
     </View>
   );
 }

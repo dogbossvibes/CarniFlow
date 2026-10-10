@@ -3,7 +3,7 @@ import { Fragment, memo, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { C, FT } from '@/constants/colors';
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
-import { trackOverlayColor, type TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
+import { trackOverlayColor, trackColorForeground, isTrackOverlayColorKey, type TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
 
 // Referenz-Fährten anderer eigener Hunde (read-only), jeweils in der Fährtenfarbe
 // DIESES Hundes (overlay.colorKey, aus seiner dogId aufgelöst). Auf Satellitenkarten
@@ -24,7 +24,7 @@ export const REFERENCE_TRACK_LINE = {
 } as const;
 
 /** Linienstil einer Referenz-Fährte in der Farbe ihres Hundes. */
-export function referenceTrackStroke(colorKey: TrackOverlayColorKey) {
+export function referenceTrackStroke(colorKey: TrackOverlayColorValue) {
   return {
     strokeColor: `${trackOverlayColor(colorKey)}${REFERENCE_TRACK_LINE.alphaHex}`,
     strokeWidth: REFERENCE_TRACK_LINE.strokeWidth,
@@ -63,7 +63,7 @@ const ReferencePolyline = memo(function ReferencePolyline({ Polyline, overlay }:
       {/* Halo zuerst (darunter), dann die Hundefarbe */}
       <Polyline
         coordinates={coords}
-        strokeColor={REFERENCE_TRACK_HALO.strokeColor}
+        strokeColor={!isTrackOverlayColorKey(overlay.colorKey) && trackColorForeground(trackOverlayColor(overlay.colorKey)) === '#FFFFFF' ? 'rgba(255,255,255,0.8)' : REFERENCE_TRACK_HALO.strokeColor}
         strokeWidth={REFERENCE_TRACK_HALO.strokeWidth}
         lineCap="round"
         lineJoin="round"

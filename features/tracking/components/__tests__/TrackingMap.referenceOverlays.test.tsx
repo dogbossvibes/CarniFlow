@@ -156,3 +156,12 @@ it('verwendet die gewählte Hundefarbe nur für die aktive gelegte Spur, Referen
   expect(p.some(x => x.strokeColor === C.trackBlue)).toBe(true);
   expect(p.filter(isRef).map(x => x.strokeColor)).toEqual(REFS.map(o => referenceTrackStroke(o.colorKey).strokeColor));
 });
+
+it('renders a dark custom RGB reference with a contrasting halo and unchanged path', () => {
+  const custom = { ...REFS[0], colorKey: '#000000' as const };
+  const node = renderMap({ referenceOverlays: [custom] });
+  const lines = polys(node);
+  expect(lines.some(p => p.strokeColor === 'rgba(255,255,255,0.8)')).toBe(true);
+  const foreground = lines.find(p => p.strokeColor === '#000000E0');
+  expect(foreground?.coordinates).toEqual(custom.points.map(p => ({ latitude: p.lat, longitude: p.lng })));
+});

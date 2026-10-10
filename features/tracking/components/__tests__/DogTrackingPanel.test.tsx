@@ -66,3 +66,16 @@ it('ignores a late remote result from a previously selected track', async () => 
   await act(async () => { finish({ data: { id: 's', dog_id: 'd', owner_id: 'u', runs: [{ ended_at: 'done' }] } }); });
   expect(view.root.findByType(TrackResumeCta).props.sessionId).toBe('older');
 });
+
+it('a late color save cannot refresh the previous account/dog context', async () => {
+  let finish!: (result: unknown) => void;
+  mockUpdate.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  await mount(); openColors();
+  let promise!: Promise<boolean>;
+  act(() => { promise = view.root.findByType(TrackColorPicker).props.onChange('#ABCDEF'); });
+  mockDog = { id: 'other', owner_id: 'other-user', track_overlay_color_key: 'orange' };
+  await act(async () => { view.update(<DogTrackingPanel userId="other-user" dogId="other" dogName="Other" />); });
+  await act(async () => { finish({ error: null }); await promise; });
+  expect(mockUpdate).toHaveBeenCalledWith('d', { track_overlay_color_key: '#ABCDEF' });
+  expect(mockRefresh).not.toHaveBeenCalled(); expect(Alert.alert).not.toHaveBeenCalled();
+});

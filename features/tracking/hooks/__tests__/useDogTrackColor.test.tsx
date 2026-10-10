@@ -38,3 +38,15 @@ it('a delayed previous-dog response cannot overwrite the newly selected dog or i
   expect(latest.dog?.id).toBe('new'); expect(latest.colorKey).toBe('orange');
   expect(await AsyncStorage.getItem('anyvo.dogTrackColor.v1::u::old')).toBeNull();
 });
+
+it('restores a normalized custom color offline without using another dog cache', async () => {
+  mockGetDog.mockResolvedValue({ data: { id: 'd', owner_id: 'u', track_overlay_color_key: '#a1b2c3' } });
+  await act(async () => { view = TestRenderer.create(<Probe dogId="d" />); });
+  expect(latest.color).toBe('#A1B2C3');
+  expect(await AsyncStorage.getItem('anyvo.dogTrackColor.v1::u::d')).toBe('"#A1B2C3"');
+  act(() => view.unmount()); mockGetDog.mockRejectedValue(new Error('offline'));
+  await act(async () => { view = TestRenderer.create(<Probe dogId="d" />); });
+  expect(latest.color).toBe('#A1B2C3');
+  await act(async () => { view.update(<Probe dogId="another" />); });
+  expect(latest.colorKey).toBe(autoTrackOverlayColorKey('another'));
+});

@@ -5,14 +5,14 @@ import { useSession } from '@/hooks/useSession';
 import { getDogById } from '@/services/dogs';
 import type { Dog } from '@/types';
 import { C } from '@/constants/colors';
-import { isTrackOverlayColorKey, resolveTrackOverlayColorKey, trackOverlayColor, type TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
+import { normalizeTrackOverlayColor, resolveTrackOverlayColorKey, trackOverlayColor, type TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
 
 /** Refresh on return from the profile editor; never retain another account/dog's color. */
 export function useDogTrackColor(dogId: string | null | undefined) {
   const { session } = useSession();
   const userId = session?.user.id;
   const [dog, setDog] = useState<Dog | null>(null);
-  const [cached, setCached] = useState<{ userId: string; dogId: string; key: TrackOverlayColorKey | null } | null>(null);
+  const [cached, setCached] = useState<{ userId: string; dogId: string; key: TrackOverlayColorValue | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const generation = useRef(0);
   const refresh = useCallback(async () => {
@@ -26,14 +26,14 @@ export function useDogTrackColor(dogId: string | null | undefined) {
       if (raw) {
         try {
           const value: unknown = JSON.parse(raw);
-          if (value === null || isTrackOverlayColorKey(value)) setCached({ userId, dogId, key: value });
+          if (value === null || normalizeTrackOverlayColor(value)) setCached({ userId, dogId, key: normalizeTrackOverlayColor(value) });
         } catch { /* Invalid cache is never treated as a colour. */ }
       }
       const { data } = await getDogById(dogId);
       if (token !== generation.current) return;
       if (data?.id === dogId && data.owner_id === userId) {
         setDog(data);
-        const key = isTrackOverlayColorKey(data.track_overlay_color_key) ? data.track_overlay_color_key : null;
+        const key = normalizeTrackOverlayColor(data.track_overlay_color_key);
         setCached({ userId, dogId, key });
         await AsyncStorage.setItem(cacheKey, JSON.stringify(key)).catch(() => {});
       }
@@ -43,7 +43,7 @@ export function useDogTrackColor(dogId: string | null | undefined) {
   useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current++; }; }, [refresh]));
   const own = dog && dog.id === dogId && dog.owner_id === userId ? dog : null;
   const cachedKey = cached && cached.userId === userId && cached.dogId === dogId ? cached.key : null;
-  const storedKey = own ? (isTrackOverlayColorKey(own.track_overlay_color_key) ? own.track_overlay_color_key : null) : cachedKey;
+  const storedKey = own ? (normalizeTrackOverlayColor(own.track_overlay_color_key)) : cachedKey;
   const colorKey = dogId ? resolveTrackOverlayColorKey(dogId, storedKey) : null;
   return { dog: own, storedKey, loading, refresh, colorKey, color: colorKey ? trackOverlayColor(colorKey) : C.trackPrimary };
 }
