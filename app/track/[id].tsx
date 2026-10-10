@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
+  ActivityIndicator, Modal, Pressable, StyleSheet,
   Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
-import { AnyvoButton } from '@/components/ui/AnyvoButton';
+import { TrackEvaluationLayout } from '@/features/tracking/components/TrackEvaluationLayout';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { MarkerDetailSheet, type TrackDetailSelection } from '@/features/tracking/components/MarkerDetailSheet';
 import { buildTrackDetailMap } from '@/features/tracking/utils/trackDetailMap';
@@ -191,8 +191,8 @@ export default function TrackAuswertungScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <FaehrtenHeader title="AUSWERTUNG" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <TrackEvaluationLayout contentContainerStyle={s.content} onSave={onSave} saving={saving}
+        onLogbook={() => router.push('/track/historie' as never)}>
           {/* Hero */}
           <View style={[s.card, s.cardGlow, s.hero]}>
             <TrackScoreRing value={score} size={118} label="Punkte" sub={verdict.sub} />
@@ -327,14 +327,7 @@ export default function TrackAuswertungScreen() {
           <SmartFeedbackSection dogId={data.dog_id} />
 
           <View style={{ height: 24 }} />
-        </ScrollView>
-
-        {/* Footer */}
-        <View style={s.footer}>
-          <AnyvoButton label="Logbuch" variant="secondary" icon="layers-outline" onPress={() => router.push('/track/historie' as never)} style={{ flex: 1 }} />
-          <AnyvoButton label="Speichern" icon="checkmark" onPress={onSave} loading={saving} style={{ flex: 1.4 }} />
-        </View>
-      </KeyboardAvoidingView>
+      </TrackEvaluationLayout>
 
       <MarkerDetailSheet selection={detailSel} onClose={() => setDetailSel(null)} />
 
@@ -459,5 +452,4 @@ const s = StyleSheet.create({
   segmentMeta:  { fontSize: 11.5, color: C.trackTextSec, fontWeight: '600', marginTop: 2 },
   smartHint:    { fontSize: 13, color: C.trackTextSec, lineHeight: 19, marginBottom: 8 },
 
-  footer:  { flexDirection: 'row', gap: 10, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 26, borderTopWidth: 1, borderTopColor: C.trackBorder, backgroundColor: C.trackBg },
 });
