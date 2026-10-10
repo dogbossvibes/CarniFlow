@@ -5,11 +5,13 @@ declare module 'react-test-renderer' {
 
   export interface ReactTestInstance {
     findByType(type: unknown): ReactTestInstance;
+    findAll(predicate: (node: ReactTestInstance) => boolean): ReactTestInstance[];
     props: Record<string, any>;
   }
   export interface ReactTestRenderer {
     root: ReactTestInstance;
     unmount(): void;
+    update(element: ReactElement): void;
   }
   export function create(element: ReactElement): ReactTestRenderer;
   export function act(callback: () => void | Promise<void>): void;

@@ -223,7 +223,7 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     title: 'Persönliche Schrittlänge',
     shortDescription:
       'Kalibriere deine normale Schrittlänge, damit Schrittangaben besser zu dir passen.',
-    body: ['Gehe eine bekannte Strecke und ANYVO berechnet deine Schrittlänge aus der GPS-Distanz.'],
+    body: ["Bleibe am Start stehen, bis GPS bereit ist. Starte dann und zähle 50 eigene normale Fährtenschritte auf gerader Strecke. Tippe am Ende auf Fertig und bleibe stehen, bis die Endposition geprüft ist. GPS liefert nur eine Schätzung. Erst «Schrittlänge übernehmen» speichert den Wert; Abbruch oder eine ungeeignete Messung ändern nichts."],
     category: 'tracking',
   },
   smart_analysis: {

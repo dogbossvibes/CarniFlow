@@ -1,217 +1,141 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import { useKeepAwake } from 'expo-keep-awake';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { FT } from '@/constants/colors';
-import { startPositionSource } from '@/features/tracking/utils/positionSource';
-import { calculateDistance, shouldAcceptTrackPoint, getGpsQuality } from '@/features/tracking/utils/gpsFilter';
-import {
-  CALIBRATION_STEPS, calibrateStepLength, isAcceptableCalibration,
-  MIN_CALIBRATED_STEP_LENGTH_M, MAX_CALIBRATED_STEP_LENGTH_M,
-} from '@/features/tracking/utils/stepCalibration';
+import { CALIBRATION_STEPS } from '@/features/tracking/utils/stepCalibration';
+import { useStepCalibration } from '@/features/tracking/hooks/useStepCalibration';
+import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { useStepLengthSetting } from '@/hooks/useStepLengthSetting';
 import { useToast } from '@/components/ui/Toast';
 import { HelpButton } from '@/components/help/HelpButton';
 import { useT } from '@/i18n';
 
 const cm = (m: number) => Math.round(m * 100);
+function Action({ label, onPress, disabled = false, primary = false, busy = false }: {
+  label: string; onPress: () => void; disabled?: boolean; primary?: boolean; busy?: boolean;
+}) {
+  return <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}
+    accessibilityState={{ disabled, busy }} style={{ minHeight: 48, opacity: disabled ? 0.5 : 1 }}
+    className={`items-center justify-center rounded-[16px] px-5 py-3.5 ${primary ? 'bg-ft-acc' : 'bg-white/5 border border-ft-line-strong'}`}>
+    <Text className={`text-[15px] text-center font-bold ${primary ? 'text-ft-acc-text' : 'text-ft-text'}`}>{label}</Text>
+  </Pressable>;
+}
 
-// SCHRITTLÄNGE KALIBRIEREN — der Nutzer geht CALIBRATION_STEPS echte Fährtenschritte
-// (zählt selbst) und tippt „Fertig". ANYVO misst die Gehstrecke über die bestehende
-// positionSource (kumulierte Haversine, Runtime-only — KEINE Fährte/Session/Persistenz)
-// und leitet die persönliche Schrittlänge ab.
 export default function StepCalibrationScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   useKeepAwake();
-  const { stepLengthM, setStepLengthM } = useStepLengthSetting();
+  const { stepLengthM, setStepLengthM, loaded, loadError, reload } = useStepLengthSetting();
+  const blocked = useTrackingStore(s => s.isRecording || s.sessionStatus === 'searching');
+  const measurement = useStepCalibration(blocked);
+  const { interrupt } = measurement;
   const { showToast, toast } = useToast();
   const { t } = useT();
-
-  const [phase, setPhase]   = useState<'intro' | 'measuring' | 'result'>('intro');
-  const [distanceM, setDistanceM] = useState(0);
-  const [accuracy, setAccuracy]   = useState<number | null>(null);
-  const [result, setResult]       = useState<number | null>(null);   // berechnete Schrittlänge (m), NICHT gerundet
-
-  const stopRef   = useRef<(() => void) | null>(null);
-  const lastPtRef = useRef<{ lat: number; lng: number; accuracy: number | null; t: number } | null>(null);
-  const accumRef  = useRef(0);
-
-  const stopSource = useCallback(() => { stopRef.current?.(); stopRef.current = null; }, []);
-  useEffect(() => () => stopSource(), [stopSource]);
-
-  const startMeasuring = useCallback(async () => {
-    // Berechtigung (nur Permission, keine parallele GPS-Abfrage — Position via positionSource).
-    let granted = (await Location.getForegroundPermissionsAsync()).status === 'granted';
-    if (!granted) granted = (await Location.requestForegroundPermissionsAsync()).status === 'granted';
-    if (!granted) { showToast(t('track.locationPermissionMissing')); return; }
-
-    accumRef.current = 0; lastPtRef.current = null;
-    setDistanceM(0); setAccuracy(null); setResult(null);
-    setPhase('measuring');
-
-    try {
-      const handle = await startPositionSource((s) => {
-        const next = { lat: s.lat, lng: s.lng, accuracy: s.accuracy ?? null, t: s.t ?? Date.now() };
-        setAccuracy(s.accuracy ?? null);
-        // Bestehende Filterprinzipien (Accuracy-/Speed-/Distanz-Gate) wiederverwenden.
-        if (shouldAcceptTrackPoint(lastPtRef.current, next)) {
-          if (lastPtRef.current) accumRef.current += calculateDistance(lastPtRef.current, next);
-          lastPtRef.current = next;
-          setDistanceM(accumRef.current);
-        }
-      }, { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 });
-      stopRef.current = handle.stop;
-    } catch {
-      showToast(t('track.gpsStartFailed'));
-      setPhase('intro');
-    }
-  }, [showToast]);
-
-  const finishMeasuring = useCallback(() => {
-    stopSource();
-    const dist = accumRef.current;
-    setDistanceM(dist);
-    setResult(calibrateStepLength(dist, CALIBRATION_STEPS));   // ungerundet
-    setPhase('result');
-  }, [stopSource]);
-
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const active = useRef(true);
+  useEffect(() => () => { active.current = false; }, []);
+  useFocusEffect(useCallback(() => {
+    active.current = true;
+    return () => { active.current = false; interrupt(); };
+  }, [interrupt]));
+  const back = useCallback(() => {
+    if (router.canGoBack()) router.back(); else router.replace('/(tabs)/profile' as never);
+  }, [router]);
   const cancel = useCallback(() => {
-    stopSource();
-    if (router.canGoBack()) router.back(); else router.replace('/(tabs)/profile' as never);
-  }, [router, stopSource]);
+    if (savingRef.current) return;
+    interrupt(); back();
+  }, [back, interrupt]);
+  const save = useCallback(async (value: number | null) => {
+    const current = useTrackingStore.getState();
+    if (!active.current || savingRef.current || !loaded || current.isRecording || current.sessionStatus === 'searching') return;
+    savingRef.current = true; setSaving(true);
+    try {
+      await setStepLengthM(value);
+      if (!active.current) return;
+      showToast(value === null ? t('track.resetStepLengthDone') : t('track.stepLengthSaved', { cm: cm(value) }));
+      if (value !== null) back();
+    } catch {
+      if (active.current) showToast(t('track.calibrationSaveFailed'));
+    } finally { savingRef.current = false; if (active.current) setSaving(false); }
+  }, [back, loaded, setStepLengthM, showToast, t]);
+  const issueKeys = {
+    signal: 'track.calibrationSignal', interrupted: 'track.calibrationInterrupted',
+    implausible: 'track.calibrationInvalid', uncertain: 'track.calibrationUncertain',
+    course: 'track.calibrationCourse', permission: 'track.locationPermissionMissing', busy: 'track.calibrationBusy',
+  } as const;
+  const phase = measurement.phase;
+  const idle = phase === 'idle';
+  const result = phase === 'result';
+  const failed = phase === 'error' || (result && measurement.issue != null);
+  const currentLabel = !loaded ? t('common.loading') : stepLengthM != null
+    ? t('profile.stepLengthPersonal', { cm: cm(stepLengthM) }) : t('profile.stepLengthDefault');
 
-  const acceptable = result != null && isAcceptableCalibration(distanceM, CALIBRATION_STEPS);
-
-  const applyResult = useCallback(async () => {
-    if (result == null || !acceptable) return;
-    await setStepLengthM(result);   // ungerundet persistiert (useStepLengthSetting)
-    showToast(t('track.stepLengthSaved', { cm: cm(result) }));
-    if (router.canGoBack()) router.back(); else router.replace('/(tabs)/profile' as never);
-  }, [result, acceptable, setStepLengthM, showToast, router]);
-
-  const remeasure = useCallback(() => { setPhase('intro'); setResult(null); setDistanceM(0); }, []);
-
-  const currentLabel = stepLengthM != null ? t('profile.stepLengthPersonal', { cm: cm(stepLengthM) }) : t('profile.stepLengthDefault');
-  const qual = getGpsQuality(accuracy);
-
-  return (
-    <View className="flex-1 bg-ft-bg">
-      <SafeAreaView edges={['top', 'bottom']} className="flex-1">
-        <View className="flex-row items-center gap-3 px-[18px] pb-3" style={{ paddingTop: insets.top + 4 }}>
-          <Pressable className="w-10 h-10 rounded-[12px] border border-ft-line-strong bg-white/10 items-center justify-center" onPress={cancel} hitSlop={10}>
-            <Ionicons name="chevron-back" size={20} color={FT.text} />
-          </Pressable>
-          <Text className="text-[18px] font-black text-ft-text">{t('track.stepCalibrationTitle')}</Text>
-          <View className="flex-1" />
-          <HelpButton topicId="track_step_calibration" autoShow tint={FT.text} />
+  return <View className="flex-1 bg-ft-bg">
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1">
+      <View className="flex-row items-center gap-3 px-[18px] pb-3" style={{ paddingTop: 4 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} accessibilityState={{ disabled: saving }}
+          disabled={saving} onPress={cancel} hitSlop={8} style={{ width: 48, height: 48, flexShrink: 0 }}
+          className="rounded-[12px] border border-ft-line-strong bg-white/10 items-center justify-center">
+          <Ionicons name="chevron-back" size={20} color={FT.text} />
+        </Pressable>
+        <Text className="flex-1 text-[18px] font-black text-ft-text" style={{ flexShrink: 1 }}>{t('track.stepCalibrationTitle')}</Text>
+        <HelpButton topicId="track_step_calibration" autoShow tint={FT.text} />
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 18, gap: 16 }} showsVerticalScrollIndicator={false}>
+        <View className="rounded-[20px] p-4 bg-white/5 border border-ft-line-strong gap-2">
+          <Text className="text-[13px] text-ft-muted">{t('track.current')}</Text>
+          <Text className="text-[22px] font-black text-ft-text">{currentLabel}</Text>
         </View>
-
-        <ScrollView contentContainerStyle={{ padding: 18, gap: 16 }} showsVerticalScrollIndicator={false}>
-          {phase === 'intro' && (
-            <>
-              <View className="rounded-[20px] p-4 bg-white/5 border border-ft-line-strong gap-2">
-                <Text className="text-[13px] text-ft-muted">{t('track.current')}</Text>
-                <Text className="text-[22px] font-black text-ft-text">{currentLabel}</Text>
-              </View>
-              <Text className="text-[14px] text-ft-text leading-[21px]">
-                {t('track.stepCalibrationIntroPrefix')} <Text className="font-black">{t('track.stepCalibrationSteps', { count: CALIBRATION_STEPS })}</Text>. {t('track.stepCalibrationIntroSuffix', { count: CALIBRATION_STEPS })}
-              </Text>
-              <Text className="text-[12.5px] text-ft-muted leading-[19px]">
-                {t('track.stepCalibrationHint')}
-              </Text>
-              <Pressable onPress={startMeasuring} className="flex-row items-center justify-center gap-2 mt-2 rounded-[16px] px-6 py-3.5 bg-ft-acc">
-                <Ionicons name="walk" size={18} color={FT.accText} />
-                <Text className="text-[15px] font-black text-ft-acc-text">{t('track.startCalibration')}</Text>
-              </Pressable>
-              {stepLengthM != null && (
-                <Pressable
-                  onPress={() => Alert.alert(t('track.resetStepLengthTitle'), t('track.resetStepLengthBody'), [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    { text: t('track.reset'), style: 'destructive', onPress: async () => { await setStepLengthM(null); showToast(t('track.resetStepLengthDone')); } },
-                  ])}
-                  className="flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-3 bg-white/5 border border-ft-line-strong"
-                >
-                  <Ionicons name="refresh" size={16} color={FT.muted} />
-                  <Text className="text-[14px] font-bold text-ft-muted">{t('track.resetToDefault')}</Text>
-                </Pressable>
-              )}
-            </>
-          )}
-
-          {phase === 'measuring' && (
-            <>
-              <Text className="text-[13px] text-ft-muted font-bold tracking-[1.4px] uppercase">{t('track.calibrationRunning')}</Text>
-              <Text className="text-[16px] font-black text-ft-text">{t('track.walkSteps', { count: CALIBRATION_STEPS })}</Text>
-              <View className="rounded-[20px] p-5 bg-white/5 border border-ft-line-strong items-center gap-1 mt-2">
-                <Text className="text-[48px] font-black text-ft-text" style={{ fontVariant: ['tabular-nums'] }}>{distanceM.toFixed(1)} m</Text>
-                <Text className="text-[10px] text-ft-muted font-bold tracking-[1.4px] uppercase">{t('track.measuredDistance')}</Text>
-              </View>
-              <View className="flex-row items-center justify-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-ft-line self-center">
-                <Ionicons name="navigate" size={13} color={accuracy != null && accuracy <= 15 ? FT.acc : FT.warn} />
-                <Text className="text-[12px] font-bold text-ft-text">
-                  {accuracy != null ? `GPS ±${Math.round(accuracy)} m` : t('track.gpsSearching')}
-                </Text>
-              </View>
-              {accuracy != null && accuracy > 20 && (
-                <Text className="text-[12px] text-ft-warn font-semibold text-center">{t('track.gpsTooInaccurate')}</Text>
-              )}
-              <Pressable onPress={finishMeasuring} className="flex-row items-center justify-center gap-2 mt-2 rounded-[16px] px-6 py-3.5 bg-ft-acc">
-                <Ionicons name="checkmark" size={18} color={FT.accText} />
-                <Text className="text-[15px] font-black text-ft-acc-text">{t('track.doneSteps', { count: CALIBRATION_STEPS })}</Text>
-              </Pressable>
-              <Pressable onPress={cancel} className="flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-3 bg-white/5 border border-ft-line-strong">
-                <Text className="text-[14px] font-bold text-ft-muted">{t('common.cancel')}</Text>
-              </Pressable>
-              <Text className="text-[11px] text-ft-faint text-center">{t('track.gpsQuality', { quality: qual })}</Text>
-            </>
-          )}
-
-          {phase === 'result' && result != null && (
-            <>
-              <View className="rounded-[20px] p-5 bg-white/5 border border-ft-line-strong gap-3">
-                <View>
-                  <Text className="text-[11px] text-ft-muted font-bold tracking-[1.2px] uppercase">{t('track.measuredDistance')}</Text>
-                  <Text className="text-[20px] font-black text-ft-text">{t('track.distanceSteps', { distance: distanceM.toFixed(1), count: CALIBRATION_STEPS })}</Text>
-                </View>
-                <View>
-                  <Text className="text-[11px] text-ft-muted font-bold tracking-[1.2px] uppercase">{t('track.yourStepLength')}</Text>
-                  <Text className="text-[34px] font-black text-ft-acc" style={{ fontVariant: ['tabular-nums'] }}>{result.toFixed(3)} m</Text>
-                  <Text className="text-[13px] text-ft-muted">{t('track.cmPerStep', { cm: cm(result) })}</Text>
-                </View>
-              </View>
-
-              {!acceptable && (
-                <View className="rounded-[16px] p-3 bg-white/5 border border-[rgba(255,181,71,0.5)] flex-row items-start gap-2">
-                  <Ionicons name="warning-outline" size={16} color={FT.warn} />
-                  <Text className="text-[12.5px] text-ft-warn font-semibold flex-1 leading-[19px]">
-                    {t('track.calibrationImplausible', { min: cm(MIN_CALIBRATED_STEP_LENGTH_M), max: cm(MAX_CALIBRATED_STEP_LENGTH_M) })}
-                  </Text>
-                </View>
-              )}
-
-              <Pressable
-                onPress={applyResult} disabled={!acceptable}
-                className={`flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-3.5 ${acceptable ? 'bg-ft-acc' : 'bg-white/10'}`}
-              >
-                <Ionicons name="checkmark-circle" size={18} color={acceptable ? FT.accText : FT.muted} />
-                <Text className={`text-[15px] font-black ${acceptable ? 'text-ft-acc-text' : 'text-ft-muted'}`}>{t('track.applyStepLength')}</Text>
-              </Pressable>
-              <Pressable onPress={remeasure} className="flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-3 bg-white/5 border border-ft-line-strong">
-                <Ionicons name="refresh" size={16} color={FT.text} />
-                <Text className="text-[14px] font-bold text-ft-text">{t('track.measureAgain')}</Text>
-              </Pressable>
-              <Pressable onPress={cancel} className="flex-row items-center justify-center gap-2 rounded-[16px] px-6 py-2.5">
-                <Text className="text-[13px] font-bold text-ft-muted">{t('common.cancel')}</Text>
-              </Pressable>
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-      {toast}
-    </View>
-  );
+        {loadError && <>
+          <Text accessibilityRole="alert" className="text-ft-warn">{t('track.calibrationLoadFailed')}</Text>
+          <Action label={t('common.retry')} onPress={() => { void reload().catch(() => {}); }} />
+        </>}
+        {blocked && <Text accessibilityRole="alert" className="text-ft-warn">{t('track.calibrationBusy')}</Text>}
+        {idle && <>
+          <Text className="text-[15px] text-ft-text leading-[23px]">{t('track.calibrationProtocol', { count: CALIBRATION_STEPS })}</Text>
+          <Text className="text-[13px] text-ft-muted leading-[20px]">{t('track.calibrationEstimate')}</Text>
+          <Action label={t('track.startCalibration')} onPress={() => { void measurement.start(); }} primary disabled={!loaded || blocked || saving} />
+          {stepLengthM != null && <Action label={t('track.resetToDefault')} disabled={!loaded || blocked || saving} busy={saving}
+            onPress={() => Alert.alert(t('track.resetStepLengthTitle'), t('track.resetStepLengthBody'), [
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('track.reset'), style: 'destructive', onPress: () => { void save(null); } },
+            ])} />}
+        </>}
+        {(phase === 'preparing' || phase === 'warming' || phase === 'finishing') && <Text accessibilityLiveRegion="polite" className="text-[16px] font-bold text-ft-text">
+          {t(phase === 'finishing' ? 'track.calibrationEndWait' : 'track.calibrationStartWait')}
+        </Text>}
+        {phase === 'ready' && <>
+          <Text accessibilityLiveRegion="polite" className="text-ft-text">{t('track.calibrationReady')}</Text>
+          <Action label={t('track.walkSteps', { count: CALIBRATION_STEPS })} onPress={measurement.begin} primary disabled={blocked} />
+        </>}
+        {phase === 'measuring' && <>
+          <Text className="text-[16px] font-bold text-ft-text">{t('track.calibrationWalking', { count: CALIBRATION_STEPS })}</Text>
+          <Action label={t('track.doneSteps', { count: CALIBRATION_STEPS })} onPress={measurement.finish} primary />
+        </>}
+        {(phase === 'measuring' || phase === 'finishing' || result) && <View className="rounded-[20px] p-5 bg-white/5 border border-ft-line-strong gap-2">
+          <Text className="text-[13px] text-ft-muted">{t('track.calibrationGpsDistance')}</Text>
+          <Text className="text-[34px] font-black text-ft-text" style={{ fontVariant: ['tabular-nums'] }}>≈ {measurement.distanceM.toFixed(1)} m</Text>
+          {result && measurement.stepLengthM != null && <>
+            <Text className="text-[13px] text-ft-muted">{t('track.yourStepLength')}</Text>
+            <Text className="text-[28px] font-black text-ft-acc">{t('track.cmPerStep', { cm: cm(measurement.stepLengthM) })}</Text>
+          </>}
+        </View>}
+        {measurement.accuracy != null && !idle && <Text className="text-[12px] text-ft-muted">
+          {t('track.calibrationRadius', { meters: Math.round(measurement.accuracy) })}
+        </Text>}
+        {failed && measurement.issue && <Text accessibilityRole="alert" className="text-[14px] text-ft-warn leading-[21px]">{t(issueKeys[measurement.issue])}</Text>}
+        {result && measurement.stepLengthM != null && <>
+          <Text className="text-[13px] text-ft-muted leading-[20px]">{t('track.calibrationEstimate')}</Text>
+          <Action label={saving ? t('common.saving') : t('track.applyStepLength')} primary disabled={saving || !loaded || blocked} busy={saving}
+            onPress={() => { if (measurement.stepLengthM != null && !measurement.issue) void save(measurement.stepLengthM); }} />
+        </>}
+        {(result || failed) && <Action label={t('track.measureAgain')} onPress={measurement.reset} disabled={saving || blocked} />}
+        {!idle && <Action label={t('common.cancel')} onPress={cancel} disabled={saving} />}
+      </ScrollView>
+    </SafeAreaView>
+    {toast}
+  </View>;
 }
