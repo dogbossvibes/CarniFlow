@@ -36,7 +36,7 @@ export function DogCompactCard({
           {meta ? <Text style={s.meta} numberOfLines={1}>{meta}</Text> : null}
           {lastTrainingLabel ? <Text style={s.last} numberOfLines={1}>Zuletzt: {lastTrainingLabel}</Text> : null}
         </View>
-        {trackColor && <View testID="dog-track-color-stripe" accessible accessibilityLabel={trackColorLabel} style={{ width: 5, height: 38, borderRadius: 3, backgroundColor: trackColor }} />}
+        {trackColor && <View testID="dog-track-color-stripe" accessible accessibilityLabel={trackColorLabel} style={{ width: 5, height: 38, borderRadius: 3, borderWidth: 0.5, borderColor: '#888888', backgroundColor: trackColor }} />}
         <Ionicons name="chevron-forward" size={18} color={C.trackTextMut} />
       </View>
 

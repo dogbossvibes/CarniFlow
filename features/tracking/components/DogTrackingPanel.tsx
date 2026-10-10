@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -7,7 +7,7 @@ import { useT } from '@/i18n';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useDogActiveFaehrte } from '@/features/tracking/hooks/useActiveFaehrte';
 import { TrackColorPicker } from '@/components/dogs/TrackColorPicker';
-import { type TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
+import { trackOverlayColorNameKey, type TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
 import { updateDog } from '@/services/dogs';
 import { getDogRecoveryTracks, type DogRecoveryTrack } from '@/features/tracking/services/dogTrackRecoveryService';
 import { getTrackSessionById } from '@/features/tracking/services/trackService';
@@ -26,6 +26,10 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
   const [showTracks, setShowTracks] = useState(false);
   const [savingColor, setSavingColor] = useState(false);
   const savingRef = useRef(false);
+  const colorScope = useRef(`${userId}:${dogId}`);
+  colorScope.current = `${userId}:${dogId}`;
+  const colorAlive = useRef(true);
+  useEffect(() => { colorAlive.current = true; return () => { colorAlive.current = false; }; }, []);
   const [tracks, setTracks] = useState<DogRecoveryTrack[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,15 +62,18 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
     }).catch(() => { if (token === generation.current) setRemoteResult({ id: selected, scope, final: false }); });
     return () => { generation.current++; };
   }, [selected, loadedScope, scope, dogId, userId]));
-  const saveColor = async (next: TrackOverlayColorKey | null) => {
-    if (!supported || savingRef.current) return;
+  const saveColor = async (next: TrackOverlayColorValue | null) => {
+    if (!supported || dog?.id !== dogId || dog.owner_id !== userId || savingRef.current) return false;
+    const startedScope = colorScope.current;
     savingRef.current = true; setSavingColor(true);
     try {
       const result = await updateDog(dogId, { track_overlay_color_key: next });
+      if (!colorAlive.current || startedScope !== colorScope.current) return false;
       if (result.error) throw result.error;
       await refresh();
-    } catch { Alert.alert(t('dog.trackColor.title'), t('dog.saveErrorPlain')); }
-    finally { savingRef.current = false; setSavingColor(false); }
+      return true;
+    } catch { if (colorAlive.current && startedScope === colorScope.current) Alert.alert(t('dog.trackColor.title'), t('dog.saveErrorPlain')); return false; }
+    finally { savingRef.current = false; if (colorAlive.current) setSavingColor(false); }
   };
   const dateLabel = (date: string | null) => {
     const stamp = Date.parse(date ?? '');
@@ -76,13 +83,13 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
     <View style={s.header}><Ionicons name="footsteps-outline" size={21} color={color} /><Text style={s.title}>{t('track.profile.title')}</Text></View>
     <TouchableOpacity testID="dog-track-color-toggle" style={s.colorRow} onPress={() => setColorOpen(v => !v)} accessibilityRole="button" accessibilityState={{ expanded: colorOpen }}>
       <View style={[s.stripe, { backgroundColor: color }]} />
-      <Text style={s.text}>{t('dog.trackColor.title')}{colorKey ? ` · ${t(`dog.trackColor.${colorKey}`)}` : ''}</Text>
+      <Text style={s.text}>{t('dog.trackColor.title')}{colorKey ? ` · ${t(trackOverlayColorNameKey(colorKey))}` : ''}</Text>
       <Ionicons name={colorOpen ? 'chevron-up' : 'chevron-down'} size={18} color={C.trackTextMut} />
     </TouchableOpacity>
     {colorOpen && <View style={{ gap: 10, paddingBottom: 12 }}>
       {colorLoading ? <ActivityIndicator color={color} /> : <>
         {!supported && <Text style={s.hint}>{t('dog.trackColor.unavailable')}</Text>}
-        <TrackColorPicker dogId={dogId} value={storedKey} onChange={saveColor} disabled={!supported || savingColor} />
+        <TrackColorPicker key={`${userId}:${dogId}`} dogId={dogId} value={storedKey} onChange={saveColor} disabled={!supported || savingColor} />
         {savingColor && <ActivityIndicator color={color} />}
       </>}
     </View>}
@@ -106,7 +113,7 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
 const s = StyleSheet.create({
   panel: { borderWidth: 1, borderColor: C.trackBorder, borderRadius: 20, backgroundColor: C.trackCard, padding: 16, marginBottom: 14, gap: 10 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10 }, title: { color: C.trackText, fontSize: 17, fontWeight: '800' },
-  colorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 }, stripe: { width: 5, height: 28, borderRadius: 3 },
+  colorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 }, stripe: { width: 5, height: 28, borderRadius: 3, borderWidth: 0.5, borderColor: '#888888' },
   text: { flex: 1, color: C.trackText, fontSize: 13 }, hint: { color: C.trackTextSec, fontSize: 12, lineHeight: 18 },
   savedRow: { flexDirection: 'row', alignItems: 'center', padding: 12, minHeight: 48, gap: 8, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder },
   selected: { borderColor: C.trackPrimary }, link: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, linkText: { color: C.trackPrimary, fontSize: 13, fontWeight: '700', flexShrink: 1 },

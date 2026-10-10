@@ -4,7 +4,7 @@ import { type ActiveFaehrtenMap, isValidEntry } from '@/features/tracking/store/
 import { durableLifecycle, hasValidLayGeometry, isOpenPending } from '@/features/tracking/store/trackRecovery';
 import type { LocalTrackPoint, LocalTrainingSession } from '@/features/sync/types/sync';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
-import { resolveTrackOverlayColorKey, type TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
+import { resolveTrackOverlayColorKey, type TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Referenz-Fährten beim Legen — REINE, testbare Logik (kein React/Expo/Native).
@@ -30,7 +30,7 @@ export interface TrackReferenceOverlay {
   sessionId: string;
   dogName:   string;
   /** Fährtenfarbe DIESES Hundes (aus seiner dogId aufgelöst, nie vom aktuellen Hund). */
-  colorKey:  TrackOverlayColorKey;
+  colorKey:  TrackOverlayColorValue;
   status:    TrackReferenceStatus;
   points:    LatLng[];
 }
@@ -40,7 +40,7 @@ export interface TrackReferenceCandidate {
   dogId:     string;
   sessionId: string;
   dogName:   string;
-  colorKey:  TrackOverlayColorKey;
+  colorKey:  TrackOverlayColorValue;
   status:    TrackReferenceStatus;
   /** Sortierbasis (Beginn des Legens) — stabile Reihenfolge, unabhängig von updatedAt. */
   order:     number;
