@@ -56,8 +56,9 @@ export async function getSearchPointsBySession(sessionId: string): Promise<Local
 
 // Nur die Absuche-Punkte einer Session löschen (P2 „Verwerfen"). Die gelegten
 // Punkte (point_type='lay') bleiben unberührt.
-export async function deleteSearchPointsBySession(sessionId: string): Promise<void> {
+export async function deleteSearchPointsBySession(sessionId: string, assertScope?: () => void): Promise<void> {
   const db = await getLocalDb();
+  assertScope?.();
   await db.runAsync(`delete from local_track_points where session_local_id=? and point_type='search'`, sessionId);
 }
 

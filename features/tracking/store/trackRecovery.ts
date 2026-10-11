@@ -1,3 +1,4 @@
+import { transferredPending } from '@/features/tracking-transfer/recovery';
 import { readContinuityPoint } from '../utils/trackContinuity';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
 import type { AngleKind, MarkerMaterial, MarkerSample, MarkerType, SessionStatus, TrackPointSample } from '@/features/tracking/store/trackingStore';
@@ -214,6 +215,11 @@ export function reconstructPendingFromSession(
   // Lege-Ende: ended_at entsteht in finish() im selben Übergang wie setLayFinishedAt().
   const layFinishedAt = session.ended_at ? Date.parse(session.ended_at) : NaN;
   if (!isNum(layFinishedAt)) return { ok: false, reason: 'lay_not_finished' };
+
+  if (payload?.trackTransferReceipt != null) {
+    try { return { ok: true, pending: transferredPending(snap, opts.userId, dogId, opts.now) }; }
+    catch { return { ok: false, reason: 'no_geometry' }; }
+  }
 
   const trackPoints: TrackPointSample[] = layPoints.map(p => ({
     lat: p.latitude, lng: p.longitude, accuracy: p.accuracy, altitude: p.altitude,

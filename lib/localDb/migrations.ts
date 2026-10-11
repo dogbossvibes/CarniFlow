@@ -132,4 +132,18 @@ export const MIGRATIONS: LocalMigration[] = [
     name: 'add_angle_kind_to_local_track_markers',
     sql: `alter table local_track_markers add column angle_kind text;`,
   },
+  {
+    version: 7,
+    name: 'create_local_track_transfer_sync',
+    sql: `create table if not exists local_track_transfer_sync (
+      session_id text primary key references local_training_sessions(local_id) on delete cascade,
+      receipt_id text not null unique,
+      user_id text not null,
+      receipt_json text not null,
+      revision integer not null,
+      base_patch_json text not null,
+      pending_json text,
+      deleted integer not null default 0
+    );`,
+  },
 ];

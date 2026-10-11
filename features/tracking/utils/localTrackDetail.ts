@@ -89,6 +89,8 @@ export function buildLocalTrackDetail(
   return {
     id:                 local.local_id,
     dog_id:             local.dog_id,
+    owner_id:           local.user_id,
+    ...(payload.trackTransferReceipt ? { lying_time_minutes: payload.trackTransferLyingTimeMinutes ?? null } : {}),
     dog:                null,   // Hundename lokal nicht vorhanden → Screen fällt auf 'Fährte' zurück
     session_date:       time ? time.slice(0, 10) : null,
     created_at:         local.created_at ?? null,
@@ -108,6 +110,8 @@ export function buildLocalTrackDetail(
     rating:             payload.score ?? local.score ?? null,
     score:              payload.score ?? run?.score ?? local.score ?? null,
     track_data:         {
+      ...(Object.hasOwn(payload, 'trackTransferReceipt') ? { trackTransferReceipt: payload.trackTransferReceipt } : {}),
+      ...(payload.manualAngleGeometry ? { manualAngleGeometry: payload.manualAngleGeometry } : {}),
       ...(payload.segments ? { segments: payload.segments } : {}),
       ...(payload.layContinuity ? { layContinuity: payload.layContinuity } : {}),
       ...(run ? { run } : {}),
@@ -120,7 +124,7 @@ export function buildLocalTrackDetail(
       accuracy: p.accuracy ?? null, timestamp: p.timestamp, ...readContinuityPoint(p.payload_json),
     })),
     markers: markers.map(m => ({
-      id: m.local_id, marker_type: m.marker_type, latitude: m.latitude, longitude: m.longitude,
+      id: payload.trackTransferReceipt ? (parseObj(m.payload_json)?.sourceMarkerId ?? m.local_id) : m.local_id, marker_type: m.marker_type, latitude: m.latitude, longitude: m.longitude,
       angle_kind: m.angle_kind, material: m.material, distance_from_start: m.distance_from_start,
       note: m.note, audio_url: m.audio_remote_url, created_at: m.created_at, found: false,
     })),

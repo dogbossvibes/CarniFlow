@@ -1,3 +1,6 @@
+import { useSession } from '@/hooks/useSession';
+import { useTransferRunScope } from '@/features/tracking-transfer/useRunScope';
+import type { TransferRunIdentity } from '@/features/tracking-transfer/runScope';
 import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
 import { readContinuityPoint } from '@/features/tracking/utils/trackContinuity';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
@@ -115,6 +118,9 @@ const EMPTY_SNAP_CONST = {
 export default function TrackRunScreen() {
   const { id, dogId } = useLocalSearchParams<{ id: string; dogId?: string }>();
   const router = useRouter();
+  const { session: transferAuth } = useSession();
+  const transferScope = useTransferRunScope(transferAuth?.user.id ?? null);
+  const transferToken = transferScope.token();
   const { t } = useT();
   useKeepAwake();   // Display während der Absuche anlassen (Bildschirm nicht sperren)
   // Registry aufräumen: eine abgeschlossene/abgebrochene Fährte gehört dem Hund
@@ -176,6 +182,16 @@ export default function TrackRunScreen() {
 
   const [phase, setPhase] = useState<'checking' | 'ready'>('checking');
   const [effectiveId, setEffectiveId] = useState<string | null>(id ?? null);
+  const assertTransfer = useCallback((value: TransferRunIdentity | null | undefined) =>
+    transferScope.assert(transferToken, value, id ?? effectiveId, dogId), [transferScope, transferToken, id, effectiveId, dogId]);
+  const allowedTransfer = useCallback((value: TransferRunIdentity | null | undefined) => {
+    try { assertTransfer(value); return true; } catch { return false; }
+  }, [assertTransfer]);
+  const currentTransfer = useCallback(() => {
+    const st = useTrackingStore.getState();
+    return { transferReceipt: st.transferReceipt, sessionId: st.currentSessionId, dogId: st.dogId, runId: st.searchRunId };
+  }, []);
+  const renderTransferIdentity = useMemo(currentTransfer, [currentTransfer, transferToken, effectiveId, dogId, phase]);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
   const finishRequestedRef = useRef(false);   // synchroner Once-only-Guard für Confirm-Callbacks
@@ -305,7 +321,7 @@ export default function TrackRunScreen() {
     let alive = true;
     (async () => {
       const pending = await loadPending(dogId);
-      if (!alive) return;
+      if (!alive || !allowedTransfer(pending) || !allowedTransfer(currentTransfer())) return;
       // Persistierten Startanker als Fallback merken (RC-4): überlebt App-Neustart.
       if (pending?.startAnchor) setAnchorFallback({ lat: pending.startAnchor.lat, lng: pending.startAnchor.lng });
       // Recovery: gewählten 1/5/10-m-Abstand wiederherstellen (nicht erneut fragen).
@@ -341,12 +357,15 @@ export default function TrackRunScreen() {
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, transferToken, transferAuth?.user.id]);
 
   // Absuche WIRKLICH starten: Recorder + Timer + Status 'searching'. Wird erst am
   // Fährtenansatz (Arming) bzw. beim Fortsetzen aufgerufen — NICHT beim Betreten.
   const beginSearchNow = useCallback((mode: StartMode = 'manual-at-start') => {
     if (startedRef.current) return;
+    let boundRunId: string | null;
+    try { assertTransfer(renderTransferIdentity); boundRunId = assertTransfer(currentTransfer()); }
+    catch { Alert.alert('Fährte nicht verfügbar', 'Bitte öffne die übergebene Fährte erneut in deinem Konto.'); return; }
     startedRef.current = true;
     approachPhaseRef.current = nextStartZonePhase(approachPhaseRef.current, false, false, true);
     if (approachQaRef.current && approachOriginRef.current != null)
@@ -373,7 +392,7 @@ export default function TrackRunScreen() {
     searchStartMsRef.current = startMs;
     // Stabile client-Run-UUID SOFORT (führende Run-ID, kein Warten auf Supabase).
     // Wird via setSearchRunId in den PendingTrack persistiert → überlebt App-Kill/Recovery.
-    const runUuid = Crypto.randomUUID();
+    const runUuid = boundRunId ?? Crypto.randomUUID();
     runIdRef.current = runUuid;
     useTrackingStore.getState().setSearchRunId(runUuid);
     // Gewählten Abstand in den Store spiegeln → landet im PendingTrack-Snapshot (Recovery).
@@ -393,7 +412,7 @@ export default function TrackRunScreen() {
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
     // Kein direkter Remote-Start mehr (RUN-SAVE2): track_runs wird beim Stop über die
     // Sync-Queue idempotent per runUuid upserted. runUuid ist bereits lokal geführt.
-  }, [s, voiceOn, dogId, effectiveId, searchHandlerDistanceM, t]);
+  }, [s, voiceOn, dogId, searchHandlerDistanceM, t, assertTransfer, currentTransfer, renderTransferIdentity]);
 
   // Nach bestätigtem Ansatz und echter Abbewegung beginnt die Absuche ohne
   // weitere Zeit-Sperre. Der manuelle Override bleibt für GPS-Probleme erhalten.
@@ -487,6 +506,7 @@ export default function TrackRunScreen() {
 
   // 3) Recovery-Dialog: „Laufende Absuche fortsetzen?" (Fortsetzen/Beenden/Verwerfen).
   const showRecoveryDialog = (pending: PendingTrack) => {
+    if (!allowedTransfer(pending)) return;
     Alert.alert('Laufende Absuche fortsetzen?', 'Es wurde eine unterbrochene Absuche gefunden.', [
       { text: 'Fortsetzen', onPress: () => void resumeSearch(pending) },
       { text: 'Beenden',    onPress: () => confirmRecoveryEnd(pending) },
@@ -498,12 +518,18 @@ export default function TrackRunScreen() {
   // Fortsetzen: bestehenden Datensatz weiterverwenden (KEINE neue runId, keine Duplikate,
   // Recorder genau einmal — resume seedet Punkte/Distanz/Timer).
   const resumeSearch = async (pending: PendingTrack) => {
+    let transferredRun: string | null;
+    try {
+      transferredRun = assertTransfer(pending);
+      if (transferredRun && pending.runId && transferredRun !== pending.runId) throw new Error('TRANSFER_RUN_MISMATCH');
+    } catch { Alert.alert('Fährte nicht verfügbar', 'Bitte öffne die übergebene Fährte erneut in deinem Konto.'); return; }
     const saved = await loadSavedSearchPoints(pending);
+    if (!allowedTransfer(pending)) return;
     useTrackingStore.getState().setSearchPoints(saved);
     useTrackingStore.getState().setSessionStatus('searching');
     // DIESELBE runUuid weiterverwenden (keine neue Run-ID, keine Duplikate). Fehlt sie
     // in einem Legacy-Puffer, deterministisch einmal erzeugen + persistieren.
-    const rid = pending.runId ?? Crypto.randomUUID();
+    const rid = transferredRun ?? pending.runId ?? Crypto.randomUUID();
     runIdRef.current = rid;
     useTrackingStore.getState().setSearchRunId(rid);
     searchStartMsRef.current = pending.searchStartedAt ?? Date.now();
@@ -525,14 +551,17 @@ export default function TrackRunScreen() {
 
   // Beenden: vorhandene Suchpunkte speichern + Session sauber abschliessen.
   const endSearch = async (pending: PendingTrack) => {
+    if (!allowedTransfer(pending)) return;
     if (!(await flushSearchPoints(pending.sessionId ?? effectiveId ?? undefined).catch(() => false))) {
       Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
       return;
     }
+    if (!allowedTransfer(pending)) return;
     const saved = await loadSavedSearchPoints(pending);
+    if (!allowedTransfer(pending)) return;
     const sessId = pending.sessionId ?? effectiveId;
     if (!sessId) { Alert.alert(t('common.error'), t('track.recoverySaveFailed')); return; }
-    const runId = pending.runId ?? runIdRef.current ?? Crypto.randomUUID();
+    const runId = assertTransfer(pending) ?? pending.runId ?? runIdRef.current ?? Crypto.randomUUID();
     const durationS = pending.searchStartedAt ? Math.max(0, Math.floor((Date.now() - pending.searchStartedAt) / 1000)) : 0;
     // Recovery has no complete per-fix analytics history. Preserve known facts;
     // an unavailable score is null, never a fabricated zero-point performance.
@@ -553,17 +582,19 @@ export default function TrackRunScreen() {
         searchHandlerDistanceM: pending.searchHandlerDistanceM,
         referenceHasGaps: snapData.laidPoints.some(p => p.breakBefore),
         // analytics bewusst NICHT gesetzt — siehe Kommentar oben.
-      }));
+      }), pending.transferReceipt ? () => assertTransfer(pending) : undefined);
     } catch {
       Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
       return; // keep the recoverable session until the local result is durable
     }
+    if (!allowedTransfer(pending)) return;
     // Remote-Transport über die Sync-Queue (RUN-SAVE2), nicht mehr direkt.
     if (sessId) {
       try { await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: sessId, operation: 'create', priority: 1 }); }
       catch (e) { console.warn('[trackRun] enqueue', e); }
       void syncNow().catch(() => {});
     }
+    if (!allowedTransfer(pending)) return;
     startedRef.current = true;
     setRecovery(null);
     s.stop();
@@ -575,15 +606,19 @@ export default function TrackRunScreen() {
 
   // Verwerfen: NUR den Suchlauf löschen (gelegte Fährte bleibt), mit Bestätigung.
   const discardSearch = (pending: PendingTrack) => {
+    if (!allowedTransfer(pending)) return;
     Alert.alert('Absuche verwerfen?', 'Nur der Suchlauf wird gelöscht — die gelegte Fährte bleibt erhalten.', [
       { text: 'Abbrechen', style: 'cancel', onPress: () => showRecoveryDialog(pending) },
       { text: 'Verwerfen', style: 'destructive', onPress: async () => {
+        if (!allowedTransfer(pending)) return;
         const sessId = pending.sessionId ?? effectiveId;
         // NUR den Suchversuch verwerfen (wie der Dialog sagt): Suchpunkte dieser Session
         // löschen, Fährte wieder 'resting' (Puffer + Registry), Lay-Daten/Session/Hund
         // bleiben. Kein 'cancelled', kein dauerhafter Abbruch-Marker — das ist allein
         // „Fährte abbrechen" vorbehalten. Danach zurück in die Liegezeit.
-        const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null);
+        const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null, pending.transferReceipt
+          ? { userId: pending.transferReceipt.recipientUserId, assertScope: () => assertTransfer(pending) } : undefined);
+        if (!allowedTransfer(pending)) return;
         if (!released.ok) { Alert.alert(t('common.error'), t('track.recoverySaveFailed')); return; }
         useTrackingStore.getState().resetSearchPoints();   // leert auch den Run-State
         startedRef.current = false;   // erlaubt einen frischen Start (neue Absuche, neue runId)
@@ -885,6 +920,7 @@ export default function TrackRunScreen() {
   };
 
   const confirmRecoveryEnd = (pending: PendingTrack) => {
+    if (!allowedTransfer(pending)) return;
     Alert.alert('Absuche wirklich beenden?', 'Die gespeicherten Suchpunkte bleiben erhalten.', [
       { text: 'Weiter', style: 'cancel' },
       { text: 'Absuche beenden', style: 'destructive', onPress: () => void endSearch(pending) },
@@ -892,6 +928,8 @@ export default function TrackRunScreen() {
   };
 
   const handleFinish = async () => {
+    const transferIdentity = renderTransferIdentity.transferReceipt ? renderTransferIdentity : currentTransfer();
+    if (!allowedTransfer(transferIdentity)) return;
     if (finishing || finishRequestedRef.current) return;   // Doppelt-Tippen → keine doppelte Finalisierung
     finishRequestedRef.current = true;
     hapticSuccess();
@@ -909,6 +947,7 @@ export default function TrackRunScreen() {
       return;
     }
 
+    if (!allowedTransfer(transferIdentity)) return;
     // Punkt 10/13: Track Analytics Engine — REIN aus In-Session-Daten (keine
     // gespeicherten Rohpunkte, keine Migration). Ecken/Gegenstände kommen aus
     // denselben gefilterten Markern, aus denen auch snapData.laidObjects
@@ -1012,7 +1051,7 @@ export default function TrackRunScreen() {
           pointsTimeSec: res.pointsTimeSec,
           replayPoints: res.replayPoints,
           replayPointsTimeSec: res.replayPointsTimeSec,
-        }));
+        }), transferIdentity.transferReceipt ? () => assertTransfer(transferIdentity) : undefined);
       } catch (e) {
         console.warn('[trackRun] local finalize', e);
         finishRequestedRef.current = false;
@@ -1022,6 +1061,7 @@ export default function TrackRunScreen() {
       }
     }
 
+    if (!allowedTransfer(transferIdentity)) return;
     // Lokal sicher → Session abschliessen (Recovery bietet sie nicht mehr als laufend an).
     useTrackingStore.getState().setSessionStatus('completed');
     useTrackingStore.getState().reset();

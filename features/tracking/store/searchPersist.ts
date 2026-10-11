@@ -64,10 +64,11 @@ export function flushSearchPoints(sessionId?: string): Promise<boolean> {
   return state ? flushBuffer(state) : Promise.resolve(true);
 }
 /** Called only after an explicit discard, with the recorder stopped. */
-export async function discardSearchBuffer(sessionId: string): Promise<void> {
+export async function discardSearchBuffer(sessionId: string, assertScope?: () => void): Promise<void> {
   const state = buffers.get(sessionId);
   if (!state) return;
   if (state.inFlight) await state.inFlight;
+  assertScope?.();
   state.points = [];
   buffers.delete(sessionId);
   if (active === state) active = null;

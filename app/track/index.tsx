@@ -1,3 +1,4 @@
+import { TransferEntry } from '@/features/tracking-transfer/TransferEntry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -228,6 +229,8 @@ export default function TrackOverviewScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        <TransferEntry />
 
         {/* ── Verlauf ── */}
         <SectionLabel action="Logbuch" onAction={() => router.push('/track/historie' as never)}>Verlauf</SectionLabel>

@@ -159,20 +159,28 @@ export type DiscardSearchResult = { ok: true; target: string } | { ok: false; re
  * 'cancelled', kein dauerhafter Marker, keine neue Session, kein Quota-Claim. Eine fremde
  * offene Fährte desselben Hundes wird nie berührt. Offline-fähig.
  */
-export async function discardSearchAttempt(sessionId: string | null | undefined, dogId: string | null | undefined, opts: { hasRemoteSearchRun?: boolean; userId?: string | null } = {}): Promise<DiscardSearchResult> {
+export async function discardSearchAttempt(sessionId: string | null | undefined, dogId: string | null | undefined, opts: { hasRemoteSearchRun?: boolean; userId?: string | null; assertScope?: () => void } = {}): Promise<DiscardSearchResult> {
   try {
     if (!sessionId) return { ok: false, reason: 'no_session' };
     if (!dogId) return { ok: false, reason: 'no_dog' };
+    opts.assertScope?.();
     await ensureHydrated();
+    opts.assertScope?.();
     const [pending, local] = await Promise.all([loadPending(dogId).catch(() => null), loadLocalSnapshot(sessionId)]);
+    opts.assertScope?.();
     const d = decideSearchDiscard({
       registry: useActiveFaehrten.getState().byDog, dogId, sessionId, pending, local,
       hasRemoteSearchRun: opts.hasRemoteSearchRun, userId: opts.userId, now: Date.now(),
     });
     if (!d.ok) return d;
-    await discardSearchBuffer(sessionId);
-    await deleteSearchPointsBySession(sessionId);   // nur point_type='search'
+    if (opts.assertScope) await discardSearchBuffer(sessionId, opts.assertScope);
+    else await discardSearchBuffer(sessionId);
+    opts.assertScope?.();
+    if (opts.assertScope) await deleteSearchPointsBySession(sessionId, opts.assertScope);
+    else await deleteSearchPointsBySession(sessionId);   // nur point_type='search'
+    opts.assertScope?.();
     await writePendingNow(dogId, d.pending);
+    opts.assertScope?.();
     const reg = useActiveFaehrten.getState().get(dogId);
     if (reg?.sessionId === sessionId) useActiveFaehrten.getState().remove(dogId);   // alten Such-Eintrag ersetzen
     useActiveFaehrten.getState().upsert(dogId, d.registryPatch);
