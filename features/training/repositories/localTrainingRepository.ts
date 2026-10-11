@@ -132,13 +132,21 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
 // Absuche-/Run-Ergebnis lokal dauerhaft in payload_json.run ablegen (durabler Erfolg,
 // unabhängig vom Remote-Save). Read-merge-write: die bestehende Lay-Summary
 // (payload_json vom Legen-Finalize) bleibt erhalten. Kein Schema-Change.
-export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<string, unknown>): Promise<void> {
+export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<string, unknown>, assertScope?: () => void): Promise<void> {
   const db = await getLocalDb();
   const row = await db.getFirstAsync<{ payload_json: string | null }>(
     `select payload_json from local_training_sessions where local_id=?`, sessionLocalId,
   );
+  assertScope?.();
   let payload: Record<string, unknown> = {};
   if (row?.payload_json) { try { payload = JSON.parse(row.payload_json) ?? {}; } catch { payload = {}; } }
+  if (payload.trackTransferReceipt != null) {
+    await db.runAsync(
+      `update local_training_sessions set payload_json=json_set(payload_json, '$.run', json(?)), updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
+      JSON.stringify(run), nowIso(), sessionLocalId,
+    );
+    return;
+  }
   payload.run = run;
   // Eine bereits synchronisierte Session hat mit dem neuen Run frische lokale Daten →
   // zurück auf 'pending', damit RUN-SAVE2 sie erneut hochlädt (erst nach Run + Punkten
@@ -206,6 +214,14 @@ export async function dismissLocalAutoDwellDetection(sessionLocalId: string, obj
   const detection = run.object_detections.find((d: any) => d?.id === objectId && d?.source === 'auto_dwell');
   if (!detection) return false;
   detection.user_override = true;
+  if (payload.trackTransferReceipt) {
+    const index = run.object_detections.indexOf(detection);
+    const result = await db.runAsync(
+      `update local_training_sessions set payload_json=json_set(payload_json, ?, json('true')), updated_at=?, sync_status='pending' where local_id=? and json_extract(payload_json, ?) = ?`,
+      `$.run.object_detections[${index}].user_override`, nowIso(), sessionLocalId, `$.run.object_detections[${index}].id`, objectId,
+    );
+    return (result?.changes ?? 0) > 0;
+  }
   await db.runAsync(
     `update local_training_sessions set payload_json=?, updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
     JSON.stringify(payload), nowIso(), sessionLocalId,

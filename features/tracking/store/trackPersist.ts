@@ -1,3 +1,4 @@
+import type { TrackTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MarkerSample, TrackPointSample, StartAnchor, SessionStatus } from '@/features/tracking/store/trackingStore';
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
@@ -23,6 +24,7 @@ function isDogKey(k: string): boolean {
 }
 
 export interface PendingTrack {
+  transferReceipt?: TrackTransferReceipt | null;
   sessionId:       string | null;
   dogId?:          string | null;   // Besitzer der Fährte (bestehende dogs.id) — Schlüssel des Slots
   trackPoints:     TrackPointSample[];

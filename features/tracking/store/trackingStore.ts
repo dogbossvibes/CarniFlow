@@ -1,3 +1,4 @@
+import type { TrackTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import { create } from 'zustand';
 import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { schedulePersist, writePendingNow, clearPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
@@ -89,6 +90,7 @@ interface TrackingState {
   segments:            TrackSegment[];
   runPoints:           TrackPointSample[];         // Legacy (useTrackRun) — NICHT vom aktiven Absuche-Pfad genutzt
   searchTrackPoints:   TrackPointSample[];         // aktive Absuche-Spur (P1) — getrennt von der gelegten `trackPoints`
+  transferReceipt: TrackTransferReceipt | null;
   searchRunId:         string | null;              // track_runs.id der aktiven Absuche (P2 Recovery/Finalisierung)
   sessionStatus:       SessionStatus;              // Session-Lebenszyklus (P2)
   searchHandlerDistanceM: SearchHandlerDistanceM;  // Absuche: gewählter Abstand Hundeführer↔Hund (5/10 m)
@@ -183,6 +185,7 @@ const INITIAL = {
   segments:              [] as TrackSegment[],
   runPoints:             [] as TrackPointSample[],
   searchTrackPoints:     [] as TrackPointSample[],
+  transferReceipt:       null as TrackTransferReceipt | null,
   searchRunId:           null as string | null,
   sessionStatus:         'laid' as SessionStatus,   // neutraler Default (nicht 'searching' → keine Recovery)
   searchHandlerDistanceM: DEFAULT_HANDLER_DISTANCE_M as SearchHandlerDistanceM,   // Fallback 5 m
@@ -209,6 +212,7 @@ const INITIAL = {
 // autoritativ, `searchPoints` hier ist ein Fallback für die Wiederherstellung.
 function snapshot(s: TrackingState): PendingTrack {
   return {
+    transferReceipt: s.transferReceipt,
     sessionId: s.currentSessionId, dogId: s.dogId, trackPoints: s.trackPoints, markers: s.markers,
     segments: s.segments, runPoints: s.runPoints, distanceMeters: s.distanceMeters, durationSeconds: s.durationSeconds,
     layFinishedAt: s.layFinishedAt, startAnchor: s.startAnchor, savedAt: Date.now(),
@@ -312,6 +316,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // Recovery (P2): Absuche-Metadaten + Punkte aus dem Puffer in den Store spielen
   // (nach App-Kill). Legacy-sicher (Felder optional). Setzt NICHT auf Aufnahme.
   restoreSearchSession: (p) => set({
+    transferReceipt: p.transferReceipt ?? null,
     currentSessionId: p.sessionId,
     isPaused:         p.paused ?? false,   // Recovery: Pausezustand wiederherstellen (kein Auto-Recording)
     dogId:            p.dogId ?? null,
@@ -407,6 +412,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // den Store spielen, damit die Absuche sie snapshotten kann. Setzt NICHT auf
   // Aufnahme — nur die gelegten Daten + Liegezeit-Start.
   restorePending: (p) => set({
+    transferReceipt: p.transferReceipt ?? null,
     currentSessionId: p.sessionId,
     isPaused:         p.paused ?? false,   // Recovery: Pausezustand wiederherstellen (kein Auto-Recording)
     dogId:            p.dogId ?? null,

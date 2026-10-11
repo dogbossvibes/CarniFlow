@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import '@/features/tracking-transfer/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,6 +71,7 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, userId, s
 }) {
   const router = useRouter();
   const { t } = useT();
+  const { t: transferT } = useTranslation('trackTransfer');
   const tx = (k: string) => t(`${K}${k}` as never);
   const TITLE = tx('resume');
   const SUBTITLE = tx('resumeHint');
@@ -107,6 +110,9 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, userId, s
   const visible = canResume || canClose || cancelled;
   useEffect(() => { onVisibleChange?.(visible); }, [visible, onVisibleChange]);
 
+  if (decision && !decision.ok && decision.reason === 'transfer_gaps_unsupported') {
+    return <View style={s.card}><Text accessibilityRole="alert" style={s.cardText}>{transferT('gapUnsupported')}</Text></View>;
+  }
   if (!visible) {
     if (showUnavailable && !done && decision && !decision.ok) {
       return <View style={s.card} testID="track-recovery-unavailable"><Text style={s.cardText}>{t('track.profile.unavailable')}</Text></View>;

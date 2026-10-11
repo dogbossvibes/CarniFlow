@@ -1,3 +1,5 @@
+import { hasTransferredGaps } from '@/features/tracking-transfer/androidGapSafety';
+import { UnsupportedTransferView } from '@/features/tracking-transfer/UnsupportedTransferView';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -135,6 +137,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   const st0 = useTrackingStore.getState();
   const hasStore = matchesRestingIdentity(identity, { dogId: st0.dogId, sessionId: st0.currentSessionId }, regSessionId)
     && (st0.trackPoints.length > 0 || st0.layStartedAt != null);
+  const [unsupportedTransfer, setUnsupportedTransfer] = useState<unknown>(() => hasStore && hasTransferredGaps(st0) ? st0 : null);
   const [unresolved, setUnresolved] = useState(false);   // vorgegebene Session lokal nicht ladbar → keine Ersatzanzeige
   const [startMs, setStartMs] = useState<number | null>(() =>
     regEntry?.layStartedAt != null ? regEntry.layStartedAt
@@ -172,6 +175,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
     loadPending(dogId).then(p => {
       if (!alive) return;
       if (id && !matchesRestingIdentity(identity, p, regSessionId)) { setUnresolved(true); return; }
+      if (hasTransferredGaps(p)) { setUnsupportedTransfer(p); return; }
       if (p && (isRestingRecovery(p) || p.trackPoints.length > 0)) {
         useTrackingStore.getState().restorePending(p);   // KEINE neue sessionId, Status bleibt; setzt dogId
         setStartMs(p.layStartedAt ?? p.layFinishedAt ?? Date.now());
@@ -227,6 +231,11 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   const elapsedS = restingElapsedSeconds(startMs, now);
 
   const startSearch = async () => {
+    const current = useTrackingStore.getState();
+    const registry = useActiveFaehrten.getState().get(dogId);
+    const registrySession = matchesRestingIdentity(identity, registry) ? registry?.sessionId ?? null : null;
+    const isThisTrack = matchesRestingIdentity(identity, { dogId: current.dogId, sessionId: current.currentSessionId }, registrySession);
+    if (isThisTrack && hasTransferredGaps(current)) { setUnsupportedTransfer(current); return; }
     if (starting || startMs == null) return;   // erst starten, wenn Liegezeit-Start feststeht
     setStarting(true);
     allowLeaveRef.current = true;   // beabsichtigte Navigation → kein Abbruch-Dialog
@@ -291,6 +300,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
 
   // Vorgegebene Session nicht (mehr) lokal ladbar: keine Ersatzanzeige, Verlassen ohne Abbruch-Dialog.
   useEffect(() => { if (unresolved) allowLeaveRef.current = true; }, [unresolved]);
+  if (unsupportedTransfer) return <UnsupportedTransferView data={unsupportedTransfer} onBack={() => { allowLeaveRef.current = true; router.replace('/track' as never); }} />;
   if (unresolved) return <RestingIdentityMissing />;
 
   return (

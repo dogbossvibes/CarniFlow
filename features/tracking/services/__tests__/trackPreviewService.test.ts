@@ -7,7 +7,7 @@ jest.mock('@/features/training/repositories/localTrainingRepository', () => ({ g
 const local = { id: 's', dog_id: 'd', points: [{ latitude: 47, longitude: 8 }, { latitude: 47.001, longitude: 8.001 }] };
 beforeEach(() => { jest.clearAllMocks(); mockRow.mockResolvedValue({ local_id: 's', user_id: 'u', dog_id: 'd', type: 'track' }); mockLocal.mockResolvedValue(local); mockRemote.mockResolvedValue({ data: null }); });
 it('draws local pending GPS without requiring a network request', async () => {
-  expect((await getTrackPreview('s', 'd', 'u', true))?.lay).toHaveLength(2); expect(mockRemote).not.toHaveBeenCalled();
+  expect((await getTrackPreview('s', 'd', 'u', true))?.lay).toHaveLength(2); expect(mockRemote).not.toHaveBeenCalled(); expect(mockLocal).toHaveBeenCalledWith('s', 'u');
 });
 it('fills a missing remote GPS path from the same owned local session', async () => {
   mockRemote.mockResolvedValue({ data: { id: 's', dog_id: 'd', owner_id: 'u', points: [] } });

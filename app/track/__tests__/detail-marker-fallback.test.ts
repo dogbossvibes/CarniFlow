@@ -4,7 +4,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
+import { buildLocalTrackDetail, pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
 
 const R1 = { id: 'r1', marker_type: 'winkel', angle_kind: 'rechts' };
 const R2 = { id: 'r2', marker_type: 'winkel', angle_kind: 'spitz_rechts' };
@@ -38,8 +38,11 @@ describe('app/track/[id].tsx Verdrahtung', () => {
     expect(src).toContain('if (picked.length > 0) d = { ...d, markers: picked };');
   });
   it('lokale Marker haben denselben Row-Shape wie track_markers (angle_kind/material/marker_type)', () => {
-    const local = fs.readFileSync(path.resolve(__dirname, '..', '..', '..', 'features/tracking/utils/localTrackDetail.ts'), 'utf8');
-    expect(local).toContain('id: m.local_id, marker_type: m.marker_type, latitude: m.latitude, longitude: m.longitude,');
-    expect(local).toContain('angle_kind: m.angle_kind, material: m.material, distance_from_start: m.distance_from_start,');
+    const local = buildLocalTrackDetail({ local_id: 'session', payload_json: '{}' } as never, [], [{
+      local_id: 'marker', marker_type: 'winkel', latitude: 47, longitude: 8, angle_kind: 'rechts',
+      material: null, distance_from_start: 20, created_at: '2026-10-11T00:00:00.000Z',
+    }] as never);
+    expect(local.markers[0]).toMatchObject({ id: 'marker', marker_type: 'winkel', latitude: 47, longitude: 8,
+      angle_kind: 'rechts', material: null, distance_from_start: 20 });
   });
 });

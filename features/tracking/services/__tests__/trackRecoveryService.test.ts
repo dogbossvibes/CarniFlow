@@ -374,3 +374,18 @@ describe('discardSearchAttempt („Absuche verwerfen")', () => {
     expect((await loadPending('dog-A'))?.status).toBe('searching');
   });
 });
+
+describe('transfer callback scope during asynchronous discard', () => {
+  it('retains SQLite points, pending and registry if identity changes while the snapshot is loading', async () => {
+    await writePendingNow('dog-A', pending({ status: 'searching', runId: 'run-A', searchStartedAt: LAY_END }));
+    const before = await AsyncStorage.getItem('anyvo_track_pending_v1::dog-A');
+    useActiveFaehrten.getState().upsert('dog-A', { sessionId: 'sess-A', status: 'searching' });
+    const registry = JSON.stringify(useActiveFaehrten.getState().byDog);
+    let current = true;
+    mockSearch.mockImplementation(async () => { current = false; return []; });
+    const result = await discardSearchAttempt('sess-A', 'dog-A', { assertScope: () => { if (!current) throw new Error('ACCOUNT_CHANGED'); } });
+    expect(result.ok).toBe(false); expect(mockDeleteSearch).not.toHaveBeenCalled();
+    expect(await AsyncStorage.getItem('anyvo_track_pending_v1::dog-A')).toBe(before);
+    expect(JSON.stringify(useActiveFaehrten.getState().byDog)).toBe(registry);
+  });
+});

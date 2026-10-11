@@ -1,6 +1,14 @@
+import { hasTransferredGaps } from '@/features/tracking-transfer/androidGapSafety';
+import { UnsupportedTransferView } from '@/features/tracking-transfer/UnsupportedTransferView';
+import { useTranslation } from 'react-i18next';
+import { transferErrorKey } from '@/features/tracking-transfer/i18n';
+import { ensureOwnTransferLocal } from '@/features/tracking-transfer/runtime';
+import { parseTransferReceipt } from '@/features/tracking-transfer/importPlan';
+import { useSession } from '@/hooks/useSession';
+import { TransferEntry } from '@/features/tracking-transfer/TransferEntry';
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet,
   Text, TextInput, View,
@@ -75,8 +83,15 @@ const CORNER_INTERPRETATION_KEYS: Record<TrackAnalyticsV3['corners'][number]['in
 export default function TrackAuswertungScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { session: authenticatedSession } = useSession();
   const insets = useSafeAreaInsets();
   const { t } = useT();
+  const { t: transferT } = useTranslation('trackTransfer');
+  const authGeneration = useRef(0);
+  const [authEpoch, setAuthEpoch] = useState(0);
+  useEffect(() => { const { data: auth } = supabase.auth.onAuthStateChange(event => {
+    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { authGeneration.current++; setData(null); setNotes(''); setLegs([]); setAuthEpoch(n => n + 1); }
+  }); return () => auth.subscription.unsubscribe(); }, []);
   const [data, setData] = useState<any | null>(null);
   const { color: layColor } = useDogTrackColor(data?.dog_id);
   const [loading, setLoading] = useState(true);
@@ -109,18 +124,33 @@ export default function TrackAuswertungScreen() {
     const holdsOpenTrack = isOpenStatus(st.sessionStatus) && (st.trackPoints.length > 0 || st.isRecording);
     if (!holdsOpenTrack) st.reset();
     if (!id) return;
+    let alive = true;
+    const loadEpoch = authGeneration.current;
+    const userId = authenticatedSession?.user.id;
+    setData(null); setNotes(''); setLegs([]); setLoading(true);
     (async () => {
       const r = await getTrackSessionById(id);
       // Fällt remote nichts zurück (noch nicht synchronisiert / offline) → lokal (SQLite)
       // zusammenbauen, damit die Auswertung nie mit „nicht gefunden" abbricht.
       let d = r.data;
       let localOnly = false;
+      // Own offline edits remain authoritative on this device until their revisioned save succeeds.
+      if (d?.track_data?.trackTransferReceipt) {
+        let ownLocal = await getLocalTrackDetail(id, userId).catch(() => null);
+        if (!ownLocal && alive && loadEpoch === authGeneration.current) {
+          const restored = await ensureOwnTransferLocal(id);
+          if (restored.error) throw new Error(restored.error);
+          ownLocal = await getLocalTrackDetail(id, userId).catch(() => null);
+        }
+        if (!ownLocal) throw new Error('TRANSFER_UNAVAILABLE');
+        d = ownLocal; localOnly = true;
+      }
       if (!d) {
-        d = await getLocalTrackDetail(id).catch(() => null); localOnly = !!d;
+        d = await getLocalTrackDetail(id, userId).catch(() => null); localOnly = !!d;
       } else if (!(d.runs?.length)) {
         // Remote-Session vorhanden, aber der Absuche-Run (track_runs) ist noch nicht
         // synchronisiert → lokale Run-Daten ergänzen, damit Score/Spur nicht fehlen.
-        const sup = await getLocalRunSupplement(id).catch(() => null);
+        const sup = await getLocalRunSupplement(id, userId).catch(() => null);
         if (sup?.runs?.length) {
           d = {
             ...d, runs: sup.runs,
@@ -135,9 +165,16 @@ export default function TrackAuswertungScreen() {
       // (Production-Befund: Marker-Sync scheiterte am DB-Contract → remote 0 Marker,
       // obwohl die Winkel lokal vorliegen). Keine Duplikate (pickDetailMarkers).
       if (d && !localOnly && !(d.markers?.length)) {
-        const local = await getLocalTrackDetail(id).catch(() => null);
+        const local = await getLocalTrackDetail(id, userId).catch(() => null);
         const picked = pickDetailMarkers(d.markers ?? [], local?.markers ?? []);
         if (picked.length > 0) d = { ...d, markers: picked };
+      }
+      if (!alive || loadEpoch !== authGeneration.current) return;
+      if (d?.track_data && Object.hasOwn(d.track_data, 'trackTransferReceipt')) {
+        try {
+          const receipt = parseTransferReceipt(d.track_data.trackTransferReceipt);
+          if (!userId || receipt.recipientUserId !== userId || receipt.ownSessionId !== id || receipt.recipientDogId !== d.dog_id) d = null;
+        } catch { d = null; }
       }
       setData(d);
       setIsLocalOnly(localOnly);
@@ -162,8 +199,9 @@ export default function TrackAuswertungScreen() {
         if (d.dog_id && reg?.sessionId === String(id) && searched) useActiveFaehrten.getState().remove(d.dog_id);
       }
       setLoading(false);
-    })();
-  }, [id]);
+    })().catch(() => { if (alive && loadEpoch === authGeneration.current) { setData(null); setLoading(false); } });
+    return () => { alive = false; };
+  }, [id, authenticatedSession?.user.id, authEpoch]);
 
   const score = useMemo(() => overallScore(legs), [legs]);
   const verdict = scoreVerdict(score);
@@ -302,7 +340,7 @@ export default function TrackAuswertungScreen() {
     setSaving(true);
     // Lokal-only Fährte: Auswertung lokal speichern + zur Re-Sync einreihen (kein
     // Remote-Direktschreiben ohne Remote-Zeile, kein AI-Embedding ohne Remote-Session).
-    if (isLocalOnly) {
+    if (isLocalOnly && !data?.track_data?.trackTransferReceipt) {
       await saveLocalTrackEvaluation(id, { score, notes: notes.trim() || null, legs }).catch(() => {});
       setSaving(false);
       router.replace('/track' as never);
@@ -310,6 +348,7 @@ export default function TrackAuswertungScreen() {
     }
     const { error } = await saveTrackEvaluation(id, { legs, rating: score, notes: notes.trim() || null });
     setSaving(false);
+    if (error) Alert.alert(transferT('title'), transferT(transferErrorKey(new Error(error))));
     if (!error) {
       // Semantik-Embedding (non-blocking) — darf das Speichern nicht aufhalten.
       const surf = data.surface_types?.[0] ?? 'Fährte';
@@ -326,6 +365,7 @@ export default function TrackAuswertungScreen() {
     }
   };
 
+  if (hasTransferredGaps(data)) return <UnsupportedTransferView data={data} onBack={() => router.replace('/track' as never)} />;
   if (loading) return <View style={s.center}><ActivityIndicator color={C.trackPrimary} size="large" /></View>;
   if (!data)   return <View style={s.center}><Text style={s.muted}>Fährte nicht gefunden.</Text></View>;
 
@@ -368,7 +408,7 @@ export default function TrackAuswertungScreen() {
         onLogbook={() => router.push('/track/historie' as never)}>
           {/* Recovery-Karte direkt unter dem Header: offene Fährte fortsetzen oder „Ohne App
               abgeschlossen". Ohne Karte zeigt der QA-Diagnosemodus den konkreten Grund. */}
-          <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />
+          <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />
 
           {/* Hero — links Ring (nur Zahl + /100), Beschriftung „Manuelle
               Bewertung" UNTER dem Ring (ausserhalb der Kreisgrafik), rechts die
@@ -389,6 +429,8 @@ export default function TrackAuswertungScreen() {
               </View>
             </View>
           </View>
+
+          {data.status === 'completed' && <TransferEntry sourceId={String(id)} />}
 
           {data.status === 'completed' && (
             <View style={[s.card, s.shareCard]}>

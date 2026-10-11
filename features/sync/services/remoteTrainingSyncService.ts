@@ -1,3 +1,4 @@
+import { assertOrdinaryTrainingSyncAllowed } from '@/features/tracking-transfer/syncGuard';
 import { supabase } from '@/lib/supabase';
 import { uploadImage, uploadVideo, uploadAudio } from '@/services/mediaService';
 import { validSessionRating } from '@/features/tracking/utils/sessionRating';
@@ -22,6 +23,7 @@ export async function createRemoteTrainingSession(local: LocalTrainingSession): 
     const summary = ((): Record<string, any> => {
       try { return local.payload_json ? JSON.parse(local.payload_json) : {}; } catch { return {}; }
     })();
+    assertOrdinaryTrainingSyncAllowed(local);
     const { data, error } = await supabase.from('training_sessions').upsert({
       id: local.local_id,   // clientseitige UUID = training_sessions.id
       owner_id: local.user_id, dog_id: local.dog_id, type: local.type ?? 'track',

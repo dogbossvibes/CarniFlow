@@ -1,3 +1,5 @@
+import { hasTransferredGaps } from '@/features/tracking-transfer/androidGapSafety';
+import { transferredPending } from '@/features/tracking-transfer/recovery';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
 import type { AngleKind, MarkerMaterial, MarkerSample, MarkerType, SessionStatus, TrackPointSample } from '@/features/tracking/store/trackingStore';
 import {
@@ -73,6 +75,7 @@ export type RecoveryRejectReason =
   | 'search_started'    // Suchpunkte ohne Lauf → Zustand nicht eindeutig
   | 'completed_without_app'   // dauerhaft „Ohne App abgeschlossen"
   | 'laying_not_supported'    // unterbrochenes Legen: Recorder kann nicht wiederaufnehmen
+  | 'transfer_gaps_unsupported'
   | 'no_geometry';
 
 /** Lifecycle-Phase, in die fortgesetzt wird. */
@@ -215,6 +218,11 @@ export function reconstructPendingFromSession(
   const layFinishedAt = session.ended_at ? Date.parse(session.ended_at) : NaN;
   if (!isNum(layFinishedAt)) return { ok: false, reason: 'lay_not_finished' };
 
+  if (payload?.trackTransferReceipt != null) {
+    try { return { ok: true, pending: transferredPending(snap, opts.userId, dogId, opts.now) }; }
+    catch { return { ok: false, reason: 'no_geometry' }; }
+  }
+
   const trackPoints: TrackPointSample[] = layPoints.map(p => ({
     lat: p.latitude, lng: p.longitude, accuracy: p.accuracy, altitude: p.altitude,
     speed: p.speed, heading: p.heading, t: Date.parse(p.timestamp),
@@ -306,6 +314,10 @@ export function decideTrackRecovery(input: {
     const detail = blocked === 'cancelled' || blocked === 'completed_without_app' ? lifecycleDetail(local?.session) : null;
     return detail && (detail.lifecycleSource || detail.lifecycleAt) ? { ok: false, reason: blocked, detail } : { ok: false, reason: blocked };
   }
+
+  if (hasTransferredGaps(local) && !input.userId) return { ok: false, reason: 'no_geometry' };
+  if (hasTransferredGaps(local) || (pending?.sessionId === sessionId && pending?.dogId === dogId && hasTransferredGaps(pending)))
+    return { ok: false, reason: 'transfer_gaps_unsupported' };
 
   const reg = isValidEntry(registry[dogId]) ? registry[dogId] : null;
   if (reg && reg.sessionId !== sessionId) return { ok: false, reason: 'other_active' };

@@ -1,3 +1,6 @@
+import { parseTransferReceipt } from '@/features/tracking-transfer/importPlan';
+import { isTransferTrainingSession } from '@/features/tracking-transfer/syncGuard';
+import type { LocalTrainingSession } from '@/features/sync/types/sync';
 import { getUserTrackSessions } from '@/features/tracking/services/trackService';
 import {
   getLocalTrainingSessions, getLocalTrainingSessionById, updateLocalTrackEvaluation,
@@ -18,11 +21,20 @@ export async function getTrackHistory(ownerId: string): Promise<TrackHistoryRow[
   return mergeTrackHistory(remoteRes.data ?? [], local ?? []);
 }
 
+function canReadLocal(local: LocalTrainingSession, userId?: string | null) {
+  if (!isTransferTrainingSession(local)) return true;
+  try {
+    const receipt = parseTransferReceipt(JSON.parse(local.payload_json ?? '{}').trackTransferReceipt);
+    return !!userId && !local.deleted_at && local.user_id === userId && receipt.recipientUserId === userId
+      && receipt.ownSessionId === local.local_id && receipt.recipientDogId === local.dog_id;
+  } catch { return false; }
+}
+
 // Detail einer noch nicht synchronisierten Fährte lokal (SQLite) zusammenbauen —
 // Fallback, wenn getTrackSessionById (remote) nichts liefert. null, wenn lokal unbekannt.
-export async function getLocalTrackDetail(localId: string): Promise<Record<string, any> | null> {
+export async function getLocalTrackDetail(localId: string, userId?: string | null): Promise<Record<string, any> | null> {
   const local = await getLocalTrainingSessionById(localId).catch(() => null);
-  if (!local) return null;
+  if (!local || !canReadLocal(local, userId)) return null;
   const [points, markers] = await Promise.all([
     getTrackPointsBySession(localId).catch(() => []),
     getTrackMarkersBySession(localId).catch(() => []),
@@ -32,9 +44,9 @@ export async function getLocalTrackDetail(localId: string): Promise<Record<strin
 
 // Run-Ergänzung aus der lokalen Session — für eine remote-Session, deren Absuche-Run
 // (track_runs) noch nicht synchronisiert ist. null, wenn lokal kein Run vorliegt.
-export async function getLocalRunSupplement(localId: string): Promise<ReturnType<typeof runSupplementFromPayload>> {
+export async function getLocalRunSupplement(localId: string, userId?: string | null): Promise<ReturnType<typeof runSupplementFromPayload>> {
   const local = await getLocalTrainingSessionById(localId).catch(() => null);
-  return local ? runSupplementFromPayload(local.payload_json) : null;
+  return local && canReadLocal(local, userId) ? runSupplementFromPayload(local.payload_json) : null;
 }
 
 // Auswertung (Score/Notiz) einer lokal-only Fährte lokal speichern + zur Re-Sync

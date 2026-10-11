@@ -82,11 +82,12 @@ export interface AnyvoPersonResult { id: string; fullName: string | null; userna
 // Suchbegriff, keine private Spalte (nie phone_number/plan/email), nie anonym
 // ausführbar. NICHT dieselbe RPC wie get_profile_display_names (die löst nur
 // bereits bekannte ids auf, hier wird gesucht).
-export async function searchAnyvoPeople(query: string): Promise<AnyvoPersonResult[]> {
+export async function searchAnyvoPeople(query: string, strict = false): Promise<AnyvoPersonResult[]> {
   const q = query.trim();
   if (q.length < 2) return [];
   const { data, error } = await supabase.rpc('search_anyvo_people', { p_query: q }) as
     { data: { id: string; full_name: string | null; username: string | null }[] | null; error: unknown };
+  if (error && strict) throw new Error('PERSON_LOOKUP_FAILED');
   if (error || !data) return [];
   return data.map(p => ({ id: p.id, fullName: p.full_name, username: p.username }));
 }
@@ -97,17 +98,21 @@ export async function searchAnyvoPeople(query: string): Promise<AnyvoPersonResul
 // Server. Kein „Trainer werden", keine Trainer-Capability, keine automatische
 // Track-Sharing-Berechtigung (can_view_shared_track prüft weiterhin exakt
 // connection_type = 'trainer_client').
-export async function connectAnyvoPerson(ownerUserId: string, personId: string): Promise<{ data: Connection | null; error: string | null }> {
+export async function connectAnyvoPerson(ownerUserId: string, personId: string, assertCurrent: () => void = () => {}): Promise<{ data: Connection | null; error: string | null }> {
+  assertCurrent();
   if (ownerUserId === personId) return { data: null, error: 'Du kannst dich nicht mit dir selbst verbinden.' };
   const existing = await supabase
     .from('connections').select('*')
     .eq('owner_user_id', ownerUserId).eq('connected_user_id', personId).eq('connection_type', PERSON_CONNECTION_TYPE)
     .maybeSingle();
+  assertCurrent();
+  if (existing.error) return { data: null, error: existing.error.message };
   if (existing.data) return { data: existing.data as Connection, error: null };
   const { data, error } = await supabase
     .from('connections')
     .insert({ owner_user_id: ownerUserId, connected_user_id: personId, status: 'accepted', created_by: 'owner', connection_type: PERSON_CONNECTION_TYPE })
     .select('*').single();
+  assertCurrent();
   if (error) return { data: null, error: error.message };
   return { data: data as Connection, error: null };
 }

@@ -23,8 +23,9 @@ describe('Track-Detail: Lifecycle schützt liegende Fährten', () => {
 
   it('Recovery-Karte direkt unter dem Header; gesperrt nur durch einen FINALEN Suchlauf', () => {
     expect(detail).toContain('const canOfferResume = !hasFinalSearchRun(data);');
-    expect(detail).toContain('<TrackResumeCta sessionId={String(id)} dogId={data.dog_id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />');
-    const scroll = detail.indexOf('<ScrollView contentContainerStyle={s.content}');
+    expect(detail).toContain('<TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />');
+    const scroll = detail.search(/<(?:ScrollView|TrackEvaluationLayout)\s+contentContainerStyle=\{s\.content\}/);
+    expect(detail.indexOf('<FaehrtenHeader ')).toBeLessThan(scroll);
     const card = detail.indexOf('<TrackResumeCta ');
     const hero = detail.indexOf('<View style={[s.card, s.cardGlow, s.hero]}>');
     expect(scroll).toBeGreaterThan(-1);
@@ -96,7 +97,7 @@ describe('run.tsx „Absuche verwerfen": nur der Suchversuch, kein Abbruch der F
   const discard = run.slice(run.indexOf('const discardSearch'), run.indexOf('const runPoints'));
 
   it('ruft discardSearchAttempt, setzt NICHT cancelled und entfernt die Fährte nicht aus der Registry', () => {
-    expect(discard).toContain('const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null);');
+    expect(discard).toContain('const released = await discardSearchAttempt(sessId, dogId ?? pending.dogId ?? null, pending.transferReceipt');
     expect(discard).not.toContain("setSessionStatus('cancelled')");
     expect(discard).not.toContain('clearRegistry()');
     expect(discard).not.toMatch(/recordTrackCancelled|setLocalTrackLifecycle/);

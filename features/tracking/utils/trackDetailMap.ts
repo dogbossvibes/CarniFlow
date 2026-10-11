@@ -1,3 +1,4 @@
+import { hasTransferredGaps, transferGapPoints } from '@/features/tracking-transfer/androidGapSafety';
 import { selectDisplayRunPoints } from '@/features/tracking/utils/searchDisplayGeometry';
 import type { AngleKind, MarkerType, MarkerMaterial } from '@/features/tracking/store/trackingStore';
 
@@ -10,7 +11,7 @@ import type { AngleKind, MarkerType, MarkerMaterial } from '@/features/tracking/
 //   • Start / Ende    = erster / letzter gelegter Punkt (gespeicherte Endpunkte)
 // So entspricht die historische Darstellung exakt dem, was beim Legen gespeichert wurde.
 
-export interface DetailLatLng { lat: number; lng: number }
+export interface DetailLatLng { lat: number; lng: number; breakBefore?: boolean }
 
 export interface DetailMarker {
   id: string;
@@ -48,7 +49,7 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
     distance_meters?: number | null;
   };
 
-  const lay: DetailLatLng[] = (d.points ?? [])
+  const lay: DetailLatLng[] = hasTransferredGaps(data) ? transferGapPoints(data) : (d.points ?? [])
     .filter((p) => (p.point_type ?? 'lay') === 'lay')
     .map((p) => ({ lat: p.latitude, lng: p.longitude }));
 

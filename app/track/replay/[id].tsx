@@ -1,3 +1,7 @@
+import { hasTransferredGaps } from '@/features/tracking-transfer/androidGapSafety';
+import { UnsupportedTransferView } from '@/features/tracking-transfer/UnsupportedTransferView';
+import { useSession } from '@/hooks/useSession';
+import { ensureOwnTransferLocal } from '@/features/tracking-transfer/runtime';
 import { dogPaceReference, currentPaceReference } from '@/features/tracking/utils/paceReference';
 import { getDogPaceHistory } from '@/features/tracking/services/dogPaceHistoryService';
 import { supabase } from '@/lib/supabase';
@@ -42,24 +46,41 @@ export default function TrackReplayScreen() {
   const [data, setData] = useState<any | null>(null);
   const { color: layColor } = useDogTrackColor(data?.dog_id);
   const [loading, setLoading] = useState(true);
+  const { session } = useSession();
+  const generation = useRef(0);
+  const [epoch, setEpoch] = useState(0);
+  useEffect(() => { const { data: auth } = supabase.auth.onAuthStateChange(event => {
+    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { generation.current++; setData(null); setEpoch(n => n + 1); }
+  }); return () => auth.subscription.unsubscribe(); }, []);
 
   useEffect(() => {
     if (!id) return;
+    let alive = true; const token = generation.current, userId = session?.user.id;
+    setData(null); setLoading(true);
     (async () => {
       const r = await getTrackSessionById(id);
       let d = r.data;
+      if (d?.track_data?.trackTransferReceipt) {
+        if (!alive || token !== generation.current) return;
+        if (!userId || d.owner_id !== userId) throw new Error('ACCOUNT_CHANGED');
+        const restored = await ensureOwnTransferLocal(id);
+        if (restored.error) throw new Error(restored.error);
+        d = await getLocalTrackDetail(id, userId);
+      }
       if (!d) {
-        d = await getLocalTrackDetail(id).catch(() => null);
+        d = await getLocalTrackDetail(id, userId).catch(() => null);
       } else if (!(d.runs?.length)) {
-        const sup = await getLocalRunSupplement(id).catch(() => null);
+        const sup = await getLocalRunSupplement(id, userId).catch(() => null);
         if (sup?.runs?.length) d = { ...d, runs: sup.runs, track_data: { ...(d.track_data ?? {}), ...sup.track_data } };
       }
+      if (!alive || token !== generation.current) return;
       setData(d);
       setLoading(false);
-    })();
-  }, [id]);
+    })().catch(() => { if (alive && token === generation.current) { setData(null); setLoading(false); } });
+    return () => { alive = false; };
+  }, [id, session?.user.id, epoch]);
 
-  const replayData = useMemo(() => extractTrackReplayData(data), [data]);
+  const replayData = useMemo(() => hasTransferredGaps(data) ? null : extractTrackReplayData(data), [data]);
   const [paceHistory,setPaceHistory]=useState<unknown[]>([]);
   useEffect(()=>{let active=true;setPaceHistory([]);
     if(data?.dog_id)void (async()=>{
@@ -165,6 +186,7 @@ export default function TrackReplayScreen() {
     if (segment.startTimeSec != null) setState(previous => pauseReplay(seekReplay(previous, segment.startTimeSec!, replayData.geometry)));
   }
 
+  if (hasTransferredGaps(data)) return <UnsupportedTransferView data={data} onBack={() => router.replace('/track' as never)} />;
   if (loading) {
     return <View style={s.center}><ActivityIndicator color={C.trackPrimary} size="large" /></View>;
   }

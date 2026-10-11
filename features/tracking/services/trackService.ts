@@ -1,3 +1,4 @@
+import { mutateOwnTransfer } from '@/features/tracking-transfer/runtime';
 import { supabase } from '@/lib/supabase';
 import { validSessionRating } from '@/features/tracking/utils/sessionRating';
 import type { MarkerSample, TrackPointSample } from '@/features/tracking/store/trackingStore';
@@ -288,6 +289,8 @@ export async function finishTrackRun(runId: string, sessionId: string, summary: 
 // Fährte verwerfen (Abbrechen): Session + Punkte/Marker/Runs (FK-Cascade) löschen.
 export async function deleteTrackSession(id: string): Promise<Result<null>> {
   try {
+    const transfer = await mutateOwnTransfer(id, 'delete');
+    if (transfer.handled) return { data: null, error: transfer.error };
     const { error } = await supabase.from('training_sessions').delete().eq('id', id);
     if (error) return fail('deleteTrackSession', error);
     return { data: null, error: null };
@@ -303,6 +306,9 @@ export interface EvaluationInput {
 
 export async function saveTrackEvaluation(sessionId: string, input: EvaluationInput): Promise<Result<null>> {
   try {
+    const transfer = await mutateOwnTransfer(sessionId, { notes: input.notes, rating: validSessionRating(input.rating),
+      evaluation: { legs: input.legs, score: input.rating, evaluatedAt: new Date().toISOString() } });
+    if (transfer.handled) return { data: null, error: transfer.error };
     const { data: existing } = await supabase.from('training_sessions').select('track_data').eq('id', sessionId).maybeSingle();
     const currentTrackData = ((existing as any)?.track_data && typeof (existing as any).track_data === 'object') ? (existing as any).track_data : {};
     const { error } = await supabase.from('training_sessions').update({
@@ -320,6 +326,8 @@ export async function saveTrackEvaluation(sessionId: string, input: EvaluationIn
 // Gemessene Liegezeit (Minuten) auf der Session speichern — beim Start der Ausarbeitung.
 export async function setTrackLyingTime(sessionId: string, minutes: number): Promise<Result<null>> {
   try {
+    const transfer = await mutateOwnTransfer(sessionId, { lyingTimeMinutes: minutes });
+    if (transfer.handled) return { data: null, error: transfer.error };
     const { error } = await supabase.from('training_sessions')
       .update({ lying_time_minutes: minutes }).eq('id', sessionId);
     if (error) return fail('setTrackLyingTime', error);

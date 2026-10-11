@@ -8,6 +8,8 @@ import React from 'react';
 import { Alert } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
+// The transfer-only read-only view now reads account context; ordinary resting fixtures remain signed out.
+jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: null }) }));
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));

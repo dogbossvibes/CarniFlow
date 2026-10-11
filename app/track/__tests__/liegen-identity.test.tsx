@@ -5,6 +5,8 @@ import React from 'react';
 import { Alert } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
+// The transfer-only read-only view now reads account context; ordinary resting fixtures remain signed out.
+jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: null }) }));
 jest.mock('@react-native-async-storage/async-storage', () =>
   jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
@@ -179,5 +181,31 @@ describe('Liegezeit-Identität (Benachrichtigung / Live Activity)', () => {
     expect(useActiveFaehrten.getState().get('dog-A')).toBeNull();
     expect(useActiveFaehrten.getState().get('dog-B')).toMatchObject({ status: 'resting', sessionId: 'sess-B' });
     expect((await loadPending('dog-B'))?.status).toBe('resting');
+  });
+});
+
+
+describe('transfer gap gate is scoped to the opened resting route', () => {
+  const startButton = () => renderer.root.findAll((n: Rendered) => typeof n.props.onPress === 'function'
+    && n.findAll((child: Rendered) => child.props.children === i18n.t('track.search')).length > 0)[0];
+  const gapStore = (dogId: string, sessionId: string | null) => ({
+    dogId, currentSessionId: sessionId, transferReceipt: { recipientUserId: 'qa', recipientDogId: dogId, ownSessionId: sessionId },
+    trackPoints: [{ lat: 47, lng: 8, t: T0, breakBefore: true }],
+  });
+  it.each([['dog-B', 'sess-B'], ['dog-A', 'sess-A-other']])('ordinary A starts when the store holds gap transfer %s/%s', async (dogId, sessionId) => {
+    await mount({ id: 'sess-A', dogId: 'dog-A' });
+    act(() => useTrackingStore.setState(gapStore(dogId, sessionId) as never));
+    const before = JSON.stringify(useTrackingStore.getState().trackPoints);
+    await act(async () => { await startButton().props.onPress(); });
+    expect(mockReplace).toHaveBeenCalledWith('/track/run?id=sess-A&dogId=dog-A');
+    expect(useTrackingStore.getState().currentSessionId).toBe(sessionId);
+    expect(JSON.stringify(useTrackingStore.getState().trackPoints)).toBe(before);
+  });
+  it.each(['sess-A', null])('matching gap A stays blocked, including a registry-bound legacy slot (%s)', async sessionId => {
+    await mount({ id: 'sess-A', dogId: 'dog-A' });
+    act(() => useTrackingStore.setState(gapStore('dog-A', sessionId) as never));
+    await act(async () => { await startButton().props.onPress(); });
+    expect(mockReplace).not.toHaveBeenCalled(); expect(mockEndNotification).not.toHaveBeenCalled();
+    expect(useTrackingStore.getState().trackPoints[0]).toMatchObject({ breakBefore: true });
   });
 });
