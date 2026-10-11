@@ -140,8 +140,8 @@ function AccountTransferScreen({ userId }: { userId: string | null }) {
         if (alive.current) { setOwned(current => [...current, ...result.owned.filter(row => !current.some(old => old.receipt.receiptId === row.receipt.receiptId))]); setNextOwned(result.next); }
       }); }} />}
       {preview && preview.transfer.recipientUserId === userId && <View style={styles.card}>
-        <Text style={styles.heading}>{t('track')} · {preview.reference.distanceM?.toLocaleString()} m</Text>
-        <View style={styles.sketch} onLayout={event => setSketchWidth(Math.max(1, event.nativeEvent.layout.width))}>
+        <Text style={styles.heading}>{t('track')} · {preview.reference.distanceM?.toLocaleString(undefined, { maximumFractionDigits: 0 })} m</Text>
+        <View testID="transfer-preview-viewport" style={styles.sketch} onLayout={event => setSketchWidth(Math.max(1, event.nativeEvent.layout.width))}>
           <TrackSketch points={preview.reference.points} w={sketchWidth} h={160}
             angleMarkers={preview.reference.markers.flatMap(m => m.type === 'winkel' && m.lat !== null && m.lng !== null ? [{ lat: m.lat, lng: m.lng }] : [])}
             objectMarkers={preview.reference.markers.flatMap(m => m.type === 'gegenstand' && m.lat !== null && m.lng !== null ? [{ lat: m.lat, lng: m.lng }] : [])} />
@@ -172,5 +172,5 @@ const styles = StyleSheet.create({
   card: { borderRadius: 22, padding: 18, gap: 12, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   button: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: C.border },
   selected: { borderColor: C.accent, backgroundColor: 'rgba(0,224,190,0.08)' }, disabled: { opacity: 0.45 },
-  action: { color: C.accent, fontSize: 15, fontWeight: '700' }, sketch: { alignItems: 'center' },
+  action: { color: C.accent, fontSize: 15, fontWeight: '700' }, sketch: { width: '100%', height: 160, flexShrink: 0, overflow: 'hidden' },
 });

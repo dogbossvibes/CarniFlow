@@ -1,6 +1,7 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
+import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import TransferScreen from '../TransferScreen';
 const mockPush = jest.fn(), mockOffer = jest.fn(), mockAccept = jest.fn(), mockRead = jest.fn();
 const mockList = jest.fn();
@@ -16,7 +17,6 @@ jest.mock('@/lib/supabase', () => ({ supabase: { auth: { onAuthStateChange: () =
 jest.mock('@/lib/localDb/client', () => ({ getLocalDb: async () => ({ getAllAsync: async () => [mockSource] }) }));
 jest.mock('@/features/training-groups/useConnectedInviteTargets', () => ({ useConnectedInviteTargets: () => [{ userId: 'contact', displayName: 'Alex' }] }));
 jest.mock('@/features/tracking/store/trackingStore', () => ({ useTrackingStore: { getState: () => ({}) } }));
-jest.mock('@/features/tracking/components/TrackSketch', () => ({ TrackSketch: () => null }));
 jest.mock('@/features/sync/services/syncEngine', () => ({ syncPendingOperations: async () => {} }));
 jest.mock('../rpc', () => ({ createSupabaseTransferClient: () => ({ epoch: () => 0, dispose: jest.fn() }) }));
 jest.mock('../localStore', () => ({ createTransferLocalStore: () => ({}) }));
@@ -51,6 +51,13 @@ it('requires a chosen own dog before acceptance and opens the new own record aft
   mockList.mockResolvedValue({ incoming: [transfer], outgoing: [], serverNowMs: 1791720000000 });
   mockRead.mockResolvedValue({ transfer, reference: { distanceM: 42, points: [], markers: [] }, serverNowMs: 1791720000000 });
   await render(); await press('details'); expect(mockAccept).not.toHaveBeenCalled();
+  // The real SVG uses percentage height. Its scroll-content parent MUST supply a
+  // bounded height or iOS expands the preview and pushes dog/accept controls away.
+  const viewport = renderer.root.findAll(n => n.props.testID === 'transfer-preview-viewport')[0];
+  expect(StyleSheet.flatten(viewport.props.style)).toMatchObject({ height: 160, width: '100%', flexShrink: 0 });
+  expect(renderer.root.findByType(TrackSketch).props.h).toBe(160);
+  await act(async () => viewport.props.onLayout({ nativeEvent: { layout: { width: 320, height: 160 } } }));
+  expect(renderer.root.findByType(TrackSketch).props.w).toBe(320);
   expect(button('accept').props.accessibilityState.disabled).toBe(true); await press('Quiron');
   expect(button('accept').props.accessibilityState.disabled).toBe(false); await press('accept');
   expect(mockAccept).toHaveBeenCalledWith(transfer, expect.objectContaining({ distanceM: 42 }), 'dog');
@@ -75,4 +82,28 @@ it('opens a current own copy when the original sender and offer are gone', async
   mockListOwned.mockResolvedValue({ owned: [{ receipt: { receiptId: 'receipt', recipientDogId: 'dog', acceptedAtMs: 1791720000000 }, revision: 3, deleted: false }], next: null });
   await render(); await press('recover'); expect(mockRestoreOwned).toHaveBeenCalledWith('receipt');
   await press('open'); expect(mockPush).toHaveBeenCalledWith('/track/restored'); expect(mockRead).not.toHaveBeenCalled(); expect(mockAccept).not.toHaveBeenCalled();
+});
+
+it('keeps dog selection and acceptance after a narrow preview relayout without importing on view', async () => {
+  const transfer = { transferId: 'transfer', senderUserId: 'contact', recipientUserId: 'owner', status: 'pending', createdAtMs: 1791720000000, expiresAtMs: 1791806400000 };
+  mockList.mockResolvedValue({ incoming: [transfer], outgoing: [], serverNowMs: 1791720000000 });
+  mockRead.mockResolvedValue({ transfer, reference: { distanceM: 287.275, points: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8.001 }], markers: [] }, serverNowMs: 1791720000000 });
+  await render(); await press('details');
+  const viewport = renderer.root.findAll(n => n.props.testID === 'transfer-preview-viewport')[0];
+  await act(async () => viewport.props.onLayout({ nativeEvent: { layout: { width: 220, height: 160 } } }));
+  expect(renderer.root.findByType(TrackSketch).props.w).toBe(220);
+  expect(StyleSheet.flatten(viewport.props.style).height).toBe(160);
+  expect(button('Quiron')).toBeDefined(); expect(button('accept')).toBeDefined();
+  expect(mockAccept).not.toHaveBeenCalled(); expect(mockPush).not.toHaveBeenCalled();
+  await press('cancel'); expect(renderer.root.findAll(n => n.props.testID === 'track-sketch')).toHaveLength(0);
+});
+it('retains the preview and selected dog after an ambiguous accept failure, allowing an explicit retry', async () => {
+  const transfer = { transferId: 'transfer', senderUserId: 'contact', recipientUserId: 'owner', status: 'pending', createdAtMs: 1791720000000, expiresAtMs: 1791806400000 };
+  mockList.mockResolvedValue({ incoming: [transfer], outgoing: [], serverNowMs: 1791720000000 });
+  mockRead.mockResolvedValue({ transfer, reference: { distanceM: 42, points: [], markers: [] }, serverNowMs: 1791720000000 });
+  mockAccept.mockRejectedValueOnce(new Error('timeout'));
+  await render(); await press('details'); await press('Quiron'); await press('accept');
+  expect(mockPush).not.toHaveBeenCalled(); expect(button('accept').props.accessibilityState.disabled).toBe(false);
+  await press('accept'); expect(mockAccept.mock.calls).toEqual([[transfer, expect.anything(), 'dog'], [transfer, expect.anything(), 'dog']]);
+  await press('open'); expect(mockPush).toHaveBeenCalledWith('/track/own-session');
 });
