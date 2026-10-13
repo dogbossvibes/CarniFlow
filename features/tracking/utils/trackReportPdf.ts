@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
+import { recordedObjectOutcome } from './trackObjectReview';
+import type { ReferenceObjectStatus } from './referenceObjectStatus';
 import { C } from '../../../constants/colors';
 import type { ExportPoint, TrackUserExport } from './trackUserExport';
 
@@ -7,7 +9,9 @@ export interface ReportLabels {
   title: string; reference: string; search: string; duration: string; objects: string; score: string;
   confidence: string; conditions: string; notes: string; map: string; source: string; noGeometry: string;
   unknown: string; date: string; confidenceLabels?: Record<string, string>;
-  materialLabels?: Record<string, string>; glyphNotice: string; partialNotice?: string;
+  materialLabels?: Record<string, string>;
+  reviewLabels?: { title: string; history: string; truncated: string; score: string; noScore: string; status: Record<string, string>; original: string };
+  glyphNotice: string; partialNotice?: string;
 }
 const color = (hex: string): RGB => rgb(
   parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255,
@@ -117,7 +121,7 @@ export async function buildTrackReportPdf(
     [labels.reference, fmt(data.summary.referenceM, ' m')],
     [labels.search, fmt(data.summary.searchM, ' m')],
     [labels.duration, duration],
-    [labels.objects, `${fmt(data.summary.found)} / ${fmt(data.summary.total)}`],
+    [data.objectReview && labels.reviewLabels ? labels.reviewLabels.title : labels.objects, `${fmt(data.summary.found)} / ${fmt(data.summary.total)}`],
   ].map(([label, value]) => {
     const numeric = /^[\d .:/min]+$/.test(value);
     const suffix = numeric ? value.match(/ (m|min)$/)?.[1] ?? '' : '';
@@ -231,6 +235,26 @@ export async function buildTrackReportPdf(
   } else {
     // Long weather descriptions or marker lists use the paginating text flow.
     for (const section of sections) { heading(section.title); line(section.body); y -= 14; }
+  }
+  if (data.objectReview && labels.reviewLabels) {
+    const review = data.objectReview, rl = labels.reviewLabels;
+    const status = (value: string) => rl.status[value] ?? rl.status[recordedObjectOutcome(value as ReferenceObjectStatus) ?? 'unknown'];
+    heading(rl.title);
+    for (const object of review.objects) {
+      line(`${object.label}: ${status(object.effectiveStatus)} (${rl.original}: ${status(object.recordedStatus)})`, 9);
+    }
+    line(review.totalScore == null ? rl.noScore : rl.score.replace('{score}', String(review.totalScore)), 9, muted);
+    if (review.audit.length) {
+      heading(rl.history);
+      if (review.auditTruncated) line(rl.truncated, 9, muted);
+      for (const event of review.audit) {
+        ensure(40);
+        line(`${event.createdAt} · #${event.revision}`, 8, muted);
+        for (const change of event.changes) line(`${change.label}: ${status(change.before)} -> ${status(change.after)}`, 9);
+        y -= 6;
+      }
+    }
+    y -= 12;
   }
   if (data.notes) { heading(labels.notes); line(data.notes); y -= 12; }
   // Keep the measurement explanation together when possible, without a fixed-height box.

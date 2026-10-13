@@ -1,3 +1,4 @@
+import { parseObjectReview, reviewCounts, reviewObjectLabel, type ObjectReview } from '../services/objectReview/model';
 import { restoreLayContinuity } from './trackContinuity';
 
 /** User export contract. Deliberately separate from anonymised QA exports. */
@@ -13,6 +14,10 @@ export interface TrackUserExport {
   conditions: { temperatureC: number | null; humidityPercent: number | null; windSpeed: number | null; weather: string | null };
   /** Present only for explicit gap evidence; absent does not prove full observation. */
   continuity?: ExportContinuity;
+  /** Confirmed review projection; original measurements and analysis are unchanged. */
+  objectReview?: { version: 1; revision: number; totalScore: number | null; auditTruncated: boolean;
+    objects: { label: string; recordedStatus: string; effectiveStatus: string }[];
+    audit: { revision: number; createdAt: string; changes: { label: string; before: string; after: string }[] }[] };
   /** These are recorded receiver positions, not a separately measured dog track. */
   positionMeaning: 'recorded-receiver-position';
 }
@@ -53,6 +58,14 @@ export function buildTrackUserExport(value: unknown, exportedAt: string, include
   const d = record(value), td = record(d.track_data), run = record(td.run), row = record(array(d.runs)[0]);
   const runMatches = !(typeof row.id === 'string' && typeof run.run_id === 'string' && row.id !== run.run_id);
   const analytics = runMatches ? record(run.analytics) : {};
+  let objectReview: ObjectReview | undefined;
+  if (d.objectReview) {
+    try {
+      const parsed = parseObjectReview(d.objectReview, { ownerId: '', sessionId: String(d.id), dogId: String(d.dog_id), runId: String(row.id ?? run.run_id) });
+      if (parsed.revision > 0) objectReview = parsed;
+    } catch { /* An unrelated/invalid review never changes this export. */ }
+  }
+  const corrected = objectReview ? reviewCounts(objectReview) : null;
   if (includeNotes && typeof d.notes === 'string' && d.notes.length > 20_000) throw new Error('export-too-large');
   const rawLay = array(d.points);
   if (rawLay.length > MAX_POINTS) throw new Error('export-too-large');
@@ -92,10 +105,17 @@ export function buildTrackUserExport(value: unknown, exportedAt: string, include
     date: text(d.session_date), notes: includeNotes ? text(d.notes) : null,
     reference, search, markers,
     summary: { referenceM: nonnegative(d.distance_meters), searchM: nonnegative(row.distance_meters ?? (runMatches ? run.distance_meters : undefined)),
-      durationS: nonnegative(row.duration_seconds ?? (runMatches ? run.duration_seconds : undefined)), found: nonnegative(row.articles_found ?? (runMatches ? d.articles_found ?? run.articles_found : null)),
-      total: nonnegative(d.articles_total ?? run.total_objects), analysisScore: !continuity && typeof analytics.trackScore === 'number' && analytics.trackScore <= 100 ? nonnegative(analytics.trackScore) : null, confidence: text(analytics.analysisConfidenceBand) },
+      durationS: nonnegative(row.duration_seconds ?? (runMatches ? run.duration_seconds : undefined)), found: corrected ? corrected.completeFound : nonnegative(row.articles_found ?? (runMatches ? d.articles_found ?? run.articles_found : null)),
+      total: corrected ? corrected.total : nonnegative(d.articles_total ?? run.total_objects), analysisScore: !continuity && typeof analytics.trackScore === 'number' && analytics.trackScore <= 100 ? nonnegative(analytics.trackScore) : null, confidence: text(analytics.analysisConfidenceBand) },
     conditions: { temperatureC: number(d.temperature), humidityPercent: number(d.humidity), windSpeed: nonnegative(d.wind_speed), weather: text(d.weather_condition ?? d.wetter) },
     ...(continuity ? { continuity } : {}),
+    ...(objectReview ? { objectReview: { version: 1 as const, revision: objectReview.revision,
+      totalScore: objectReview.totalScore, auditTruncated: objectReview.auditTruncated,
+      objects: objectReview.objects.map(o => ({ label: reviewObjectLabel(objectReview!, o.objectId), recordedStatus: o.recordedStatus, effectiveStatus: o.effectiveStatus })),
+      audit: objectReview.audit.map(e => ({ revision: e.revision, createdAt: e.createdAt, changes: e.changes.map(c => ({
+        label: reviewObjectLabel(objectReview!, c.objectId), before: e.beforeOutcomes[c.objectId], after: c.status,
+      })) })),
+    } } : {}),
     positionMeaning: 'recorded-receiver-position',
   };
 }

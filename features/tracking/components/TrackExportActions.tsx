@@ -25,6 +25,10 @@ export function TrackExportActions({ data }: { data: unknown }) {
       const keys=['title','reference','search','duration','objects','score','confidence','conditions','notes','map','source','unknown','date','glyphNotice', 'partialNotice'] as const;
       const labels=Object.fromEntries(keys.map(key=>[key,t(`track.report.${key}` as TranslationKey)])) as unknown as ReportLabels;
       labels.noGeometry=t('track.export.unavailable');
+      labels.reviewLabels = { title: t('track.review.exportLabel'), history: t('track.review.history'),
+        truncated: t('track.review.truncated'), score: t('track.review.score', { score: '{score}' }), noScore: t('track.review.noScore'),
+        original: t('track.review.original', { status: '' }).replace(/[:：]\s*$/, ''),
+        status: Object.fromEntries((['found','not_found','unobserved','unknown'] as const).map(status => [status, t(`track.review.${status}`)])) };
       labels.confidenceLabels={ excellent:t('track.replay.legend.confidenceExcellent'), good:t('track.replay.legend.confidenceGood'), limited:t('track.replay.legend.confidenceLimited'), unreliable:t('track.replay.legend.confidenceUnreliable') };
       labels.materialLabels={ holz:t('track.materialWood'), duebel:t('track.materialDowel'), stoff:t('track.materialFabric'), filz:t('track.materialFelt'), leder:t('track.materialLeather'), plastik:t('track.materialPlastic'), metall:t('track.materialMetal'), teppich:t('track.materialCarpet'), diverses:t('track.materialOther'), gegenstand:t('track.object'), winkel:t('track.angle') };
       await shareTrackUserExport(data,format,labels,includeNotes);

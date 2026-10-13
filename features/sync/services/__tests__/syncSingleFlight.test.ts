@@ -44,6 +44,12 @@ jest.mock('@/features/media/repositories/localMediaRepository', () => ({
   getPendingMediaFiles: async () => [], markMediaUploaded: async () => {}, markMediaUploadFailed: async () => {},
 }));
 
+const mockReviewSync = jest.fn(async () => {});
+const mockReviewCounts = jest.fn(async () => ({ pending: 0, failed: 0, conflict: 0 }));
+jest.mock('@/features/tracking/services/objectReview/service', () => ({
+  syncObjectReviews: () => mockReviewSync(), objectReviewQueueCounts: () => mockReviewCounts(),
+}));
+
 // eslint-disable-next-line import/first
 import { syncNow } from '@/features/sync/services/syncEngine';
 
@@ -53,4 +59,13 @@ beforeEach(() => { jest.clearAllMocks(); mockGetLocal.mockReset(); mockGetPendin
 it('admits only one sync worker when two callers arrive before network/auth awaits settle', async () => {
   await Promise.all([syncNow(), syncNow()]);
   expect(mockGetPending).toHaveBeenCalledTimes(1);
+});
+
+it('synchronizes the separate review outbox and includes its pending, failed and conflict totals', async () => {
+  mockReviewCounts.mockResolvedValueOnce({ pending: 1, failed: 2, conflict: 3 });
+  await syncNow();
+  expect(mockReviewSync).toHaveBeenCalledTimes(1);
+  expect(mockStore.setPendingCount).toHaveBeenCalledWith(1);
+  expect(mockStore.setFailedCount).toHaveBeenCalledWith(2);
+  expect(mockStore.setConflictCount).toHaveBeenCalledWith(3);
 });
