@@ -1,5 +1,6 @@
 import { syncOwnTransfer } from '@/features/tracking-transfer/runtime';
 import { assertOrdinaryTrainingSyncAllowed } from '@/features/tracking-transfer/syncGuard';
+import { syncObjectReviews, objectReviewQueueCounts } from '@/features/tracking/services/objectReview/service';
 import { fetchIsOnline } from '@/features/sync/services/netinfo';
 import { supabase } from '@/lib/supabase';
 import { useSyncStore } from '@/features/sync/store/syncStore';
@@ -29,8 +30,9 @@ async function isOnline(): Promise<boolean> {
 
 async function refreshCounts() {
   const c = await syncQueueCounts();
+  const reviews = await objectReviewQueueCounts();
   const st = useSyncStore.getState();
-  st.setPendingCount(c.pending); st.setFailedCount(c.failed); st.setConflictCount(c.conflict);
+  st.setPendingCount(c.pending + reviews.pending); st.setFailedCount(c.failed + reviews.failed); st.setConflictCount(c.conflict + reviews.conflict);
 }
 
 // Grund, warum ein Queue-Item NICHT rekonstruierbar ist: die lokale Session
@@ -199,6 +201,8 @@ export async function syncNow(): Promise<void> {
       st.setSyncProgress((i + 1) / ops.length);
     }
     await clearCompleted();
+    // Separate append-only review outbox; never rewrite parent sessions/markers.
+    await syncObjectReviews();
     st.setLastSyncAt(Date.now());
   } catch (e: any) {
     st.setLastError(e?.message ?? 'Sync-Fehler');

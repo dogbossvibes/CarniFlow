@@ -62,6 +62,6 @@ export async function localCounts(): Promise<Record<string, number>> {
 // Beim Logout optional alle lokalen Daten löschen.
 export async function wipeLocalData(): Promise<void> {
   const db = await getLocalDb();
-  await db.execAsync(`delete from local_track_distractions; delete from local_track_transfer_sync; delete from local_track_points; delete from local_track_markers;
+  await db.execAsync(`delete from track_object_review_outbox; delete from track_object_review_cache; delete from local_track_distractions; delete from local_track_transfer_sync; delete from local_track_points; delete from local_track_markers;
     delete from local_media_files; delete from local_training_sessions; delete from sync_queue;`);
 }

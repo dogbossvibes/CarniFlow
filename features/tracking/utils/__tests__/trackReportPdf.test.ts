@@ -63,3 +63,27 @@ it('keeps long names and missing values readable, preserves gaps, and reports un
   expect(text.replaceAll(' ','')).toContain(labels.glyphNotice.replaceAll(' ',''));
   expect(paths.mock.calls.filter(([,options])=>options?.borderWidth===4)).toHaveLength(2);
 }, PDF_TEST_TIMEOUT_MS);
+
+it('renders confirmed corrections and paginated audit without replacing the sensor score', async () => {
+  const drawn = jest.spyOn(PDFPage.prototype, 'drawText');
+  const data = buildTrackUserExport({ dog: { name: 'Quiron' }, points: [{ latitude: 47, longitude: 8 }, { latitude: 47.0006, longitude: 8 }, { latitude: 47.0006, longitude: 8.0005 }],
+    track_data: { run: { analytics: { trackScore: 78, analysisConfidenceBand: 'good' } } } }, '2026-10-09T12:00:00Z');
+  data.summary.found = 1; data.summary.total = 2;
+  data.objectReview = { version: 1, revision: 51, totalScore: 84, auditTruncated: true,
+    objects: [{ label: 'G1', recordedStatus: 'auto_dwell_found', effectiveStatus: 'not_found' }, { label: 'G2', recordedStatus: 'missed', effectiveStatus: 'found' }],
+    audit: Array.from({ length: 50 }, (_, i) => ({ revision: i + 2, createdAt: '2026-10-09T12:00:00Z',
+      changes: [{ label: 'G1', before: i % 2 ? 'found' : 'not_found', after: i % 2 ? 'not_found' : 'found' }] })),
+  };
+  const reviewedLabels = { ...labels, reviewLabels: { title: deCH['track.review.exportLabel'], history: deCH['track.review.history'],
+    truncated: deCH['track.review.truncated'], score: deCH['track.review.score'], noScore: deCH['track.review.noScore'], original: 'Aufnahme',
+    status: { found: deCH['track.review.found'], not_found: deCH['track.review.not_found'], unobserved: deCH['track.review.unobserved'], unknown: deCH['track.review.unknown'] } } };
+  const result = await buildTrackReportPdf(data, font, reviewedLabels, logo);
+  const document = await PDFDocument.load(result);
+  expect(document.getPageCount()).toBeGreaterThan(1);
+  assertTextBounds(drawn.mock.calls);
+  const allText = drawn.mock.calls.map(([value]) => value).join(' ');
+  expect(allText).toContain('Korrigierter Aufnahmescore: 84/100');
+  expect(allText).toContain('Nicht gefunden'); expect(allText).toContain('#51'); expect(allText).toContain('50 Änderungen');
+  expect(data.summary.analysisScore).toBe(78);
+  if (process.env.ANYVO_REVIEW_PDF_OUT) fs.writeFileSync(process.env.ANYVO_REVIEW_PDF_OUT, Buffer.from(result, 'base64'));
+}, PDF_TEST_TIMEOUT_MS);

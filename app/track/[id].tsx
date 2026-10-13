@@ -8,6 +8,9 @@ import { ensureOwnTransferLocal } from '@/features/tracking-transfer/runtime';
 import { parseTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import { useSession } from '@/hooks/useSession';
 import { TransferEntry } from '@/features/tracking-transfer/TransferEntry';
+import { TrackObjectCorrections } from '@/features/tracking/components/TrackObjectCorrections';
+import { useTrackObjectReview } from '@/features/tracking/hooks/useTrackObjectReview';
+import { reviewCounts } from '@/features/tracking/services/objectReview/model';
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -34,9 +37,7 @@ import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingE
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { CustomerTrackDiagnosisCard } from '@/features/tracking/components/CustomerTrackDiagnosisCard';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
-import { retryFailedSyncForSession, syncNow } from '@/features/sync/services/syncEngine';
-import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
-import { dismissLocalAutoDwellDetection } from '@/features/training/repositories/localTrainingRepository';
+import { retryFailedSyncForSession } from '@/features/sync/services/syncEngine';
 import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
 import { isOpenStatus } from '@/features/tracking/store/activeFaehrtenModel';
 import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
@@ -103,21 +104,9 @@ export default function TrackAuswertungScreen() {
   const [legs, setLegs]   = useState<LegRow[]>([]);
   const [notes, setNotes] = useState('');
   const [isLocalOnly, setIsLocalOnly] = useState(false);
-  const [removingAutoId, setRemovingAutoId] = useState<string | null>(null);
-  const removeAutoDetection = useCallback(async (objectId: string) => {
-    if (!id || removingAutoId) return;
-    setRemovingAutoId(objectId);
-    try {
-      const saved = await dismissLocalAutoDwellDetection(String(id), objectId);
-      if (!saved) throw new Error('local run unavailable');
-      setData((previous: any) => ({ ...previous, track_data: { ...previous.track_data,
-        run: { ...previous.track_data?.run, object_detections: (previous.track_data?.run?.object_detections ?? [])
-          .map((d: any) => d.id === objectId && d.source === 'auto_dwell' ? { ...d, user_override: true } : d) } } }));
-      await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: String(id), operation: 'create', priority: 1 });
-      void syncNow().catch(() => {});
-    } catch { Alert.alert(t('track.autoDetected'), t('track.autoRemoveFailed')); }
-    finally { setRemovingAutoId(null); }
-  }, [id, removingAutoId, t]);
+  const detailRunId = data?.runs?.[0]?.id ?? data?.track_data?.run?.run_id;
+  const objectReview = useTrackObjectReview({ sessionId: data?.id === id ? id : undefined,
+    ownerId: data?.owner_id, dogId: data?.dog_id, runId: detailRunId, localRun: data?.track_data?.run });
 
   useEffect(() => {
     // Flow abgeschlossen → Store leeren. NICHT, wenn der Store noch eine offene
@@ -375,8 +364,10 @@ export default function TrackAuswertungScreen() {
   const dogName = data.dog?.name ?? 'Fährte';
   const surface = data.surface_types?.[0] ?? 'Fährte';
   const corners = data.corners_total ?? 0;
-  const aFound = data.articles_found ?? 0;
-  const aTotal = data.articles_total ?? 0;
+  const reviewed = objectReview.review && objectReview.review.revision > 0 ? objectReview.review : null;
+  const correctedCounts = reviewed ? reviewCounts(reviewed) : null;
+  const aFound = correctedCounts ? (correctedCounts.completeFound ?? '—') : data.articles_found ?? 0;
+  const aTotal = correctedCounts ? correctedCounts.total : data.articles_total ?? 0;
 
   // Bedingungen (echtes Wetter zur Startposition + Untergrund/Beschaffenheit).
   const weatherCond: string | null = data.weather_condition ?? data.wetter ?? null;
@@ -394,7 +385,7 @@ export default function TrackAuswertungScreen() {
   const hasConditions = condStats.length > 0 || condTags.length > 0;
 
   const highlights: { icon: IconName; value: string; label: string }[] = [
-    { icon: 'flag',          value: `${aFound}/${aTotal}`, label: 'Gegenstände' },
+    { icon: 'flag',          value: `${aFound}/${aTotal}`, label: reviewed ? t('track.review.exportLabel') : 'Gegenstände' },
     // corners_total = Anzahl der beim LEGEN gespeicherten Winkel-Marker (alle
     // angle_kinds inkl. Absatz/Abriss; useTrackRecorder Summary). NICHT die
     // automatisch analysierten Ecken (analytics.corners, ohne Absatz/Abriss)
@@ -773,7 +764,6 @@ export default function TrackAuswertungScreen() {
                 {map.markers.filter(marker => marker.type === 'gegenstand').map((marker, index) => {
                   const material = marker.material && MATERIAL_LABEL_KEYS[marker.material] ? t(MATERIAL_LABEL_KEYS[marker.material]) : t('track.analysisMaterialUnknown');
                   const label = marker.material === 'duebel' ? material : `G${marker.objectIndex ?? index + 1}`;
-                  const autoDetection = (data?.track_data?.run?.object_detections ?? []).find((d: any) => d.id === marker.id && d.source === 'auto_dwell' && !d.user_override);
                   return (
                     <View key={marker.id ?? index}><Pressable style={s.objectLogRow} onPress={() => setDetailSel({ kind: 'marker', marker })}>
                       <Text style={s.objectLogTitle}>{label} · {material}</Text>
@@ -783,17 +773,14 @@ export default function TrackAuswertungScreen() {
                       </Text>
                       <Ionicons name="chevron-forward" size={15} color={C.trackTextMut} />
                     </Pressable>
-                    {!!autoDetection && <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 }}>
-                      <Text style={s.objectLogMeta}>{t('track.autoDetected')}</Text>
-                      <Pressable disabled={removingAutoId === marker.id} onPress={() => void removeAutoDetection(marker.id!)}>
-                        <Text style={s.objectLogMeta}>{t('track.autoRemove')}</Text>
-                      </Pressable>
-                    </View>}</View>
+                    </View>
                   );
                 })}
               </View>
             </>
           )}
+
+          <TrackObjectCorrections controller={objectReview} />
 
           {segmentAnalysis.count > 0 && (
             <>
@@ -839,7 +826,7 @@ export default function TrackAuswertungScreen() {
           </View>
 
           <View style={{ height: 18 }} />
-          <TrackExportActions data={{ ...data, notes }} />
+          <TrackExportActions data={{ ...data, notes, objectReview: reviewed }} />
           <SmartFeedbackSection dogId={data.dog_id} />
 
           {shares.some(share => !share.revoked_at) && (

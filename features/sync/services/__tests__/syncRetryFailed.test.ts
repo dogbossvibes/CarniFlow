@@ -9,6 +9,8 @@
  */
 import { readFileSync } from 'fs';
 
+jest.mock('@/features/tracking/services/objectReview/service', () => ({ syncObjectReviews: async () => {}, objectReviewQueueCounts: async () => ({ pending: 0, failed: 0, conflict: 0 }) }));
+
 const mockGetLocal = jest.fn();
 jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
   getLocalTrainingSessionById: (id: string) => mockGetLocal(id),

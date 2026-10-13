@@ -148,4 +148,26 @@ export const MIGRATIONS: LocalMigration[] = [
     );`,
   },
   { version: 8, name: 'independent_distraction_tracks', sql: DISTRACTION_SCHEMA },
+  {
+    version: 9,
+    name: 'create_track_object_review_store',
+    // Separate from sync_queue: older clients discard unknown queue entity types.
+    // No foreign-key cascade: pending human observations survive parent resync.
+    sql: `create table if not exists track_object_review_cache (
+      owner_id text not null, run_id text not null, session_id text not null,
+      dog_id text not null, revision integer not null, response_json text not null,
+      updated_at text not null, primary key (owner_id, run_id)
+    );
+    create table if not exists track_object_review_outbox (
+      operation_id text primary key, owner_id text not null, run_id text not null,
+      session_id text not null, dog_id text not null, request_json text not null,
+      state text not null check (state in ('pending','failed','conflict','sent','cancelled')),
+      created_at text not null, last_error text
+    );
+    create unique index if not exists idx_review_one_open
+      on track_object_review_outbox (owner_id, run_id)
+      where state in ('pending','failed','conflict');
+    create index if not exists idx_review_owner_state
+      on track_object_review_outbox (owner_id, state);`,
+  },
 ];
