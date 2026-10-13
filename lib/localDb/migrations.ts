@@ -1,3 +1,4 @@
+import { PLANNER_SCHEMA } from '@/features/tracking-planner/schema';
 import { DISTRACTION_SCHEMA } from '@/features/tracking-distractions/schema';
 // Lokale SQLite-Migrationen (idempotent). Jede Migration hat eine Version;
 // angewandte Versionen stehen in local_schema_migrations.
@@ -170,4 +171,5 @@ export const MIGRATIONS: LocalMigration[] = [
     create index if not exists idx_review_owner_state
       on track_object_review_outbox (owner_id, state);`,
   },
+  { version: 10, name: 'local_track_planner', sql: PLANNER_SCHEMA },
 ];
