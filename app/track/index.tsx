@@ -1,3 +1,4 @@
+import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
 import { TransferEntry } from '@/features/tracking-transfer/TransferEntry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -230,6 +231,7 @@ export default function TrackOverviewScreen() {
           ))}
         </View>
 
+        <PlannerEntry />
         <TransferEntry />
 
         {/* ── Verlauf ── */}
