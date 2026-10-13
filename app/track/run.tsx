@@ -1,3 +1,4 @@
+import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { useSession } from '@/hooks/useSession';
 import { useTransferRunScope } from '@/features/tracking-transfer/useRunScope';
 import type { TransferRunIdentity } from '@/features/tracking-transfer/runScope';
@@ -118,6 +119,7 @@ const EMPTY_SNAP_CONST = {
 export default function TrackRunScreen() {
   const { id, dogId } = useLocalSearchParams<{ id: string; dogId?: string }>();
   const router = useRouter();
+  const distractionTracks = useDistractionOverlays(typeof id === 'string' ? id : undefined);
   const { session: transferAuth } = useSession();
   const transferScope = useTransferRunScope(transferAuth?.user.id ?? null);
   const transferToken = transferScope.token();
@@ -1235,6 +1237,7 @@ export default function TrackRunScreen() {
           )}
           {view === 'map' ? (
             <TrackingMap
+              distractionTracks={distractionTracks}
                   layColor={layColor}
               showMapScale
               mapScaleBottom={mapOverlayLayout.scaleBottom}

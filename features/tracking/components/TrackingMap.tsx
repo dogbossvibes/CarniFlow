@@ -1,3 +1,5 @@
+import type { DistractionTrack } from '@/features/tracking-distractions/model';
+import { DistractionLines } from '@/features/tracking-distractions/DistractionLayer';
 import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -86,6 +88,8 @@ interface Props {
   layPoints:        LatLng[];
   // Read-only Referenz-Fährten anderer eigener Hunde (nur Linie + Start-Label).
   // Reine Darstellung: fliessen in KEINE Kamera-/Fit-/Recenter-Logik ein.
+  distractionTracks?: readonly DistractionTrack[];
+  distractionDraft?: DistractionTrack;
   referenceOverlays?: readonly TrackReferenceOverlay[];
   // Fährten-Maßstab (1/5/10-m-Distanzmarkierungen, adaptiv nach Zoom) entlang
   // GENAU dieser Referenzlinie — die Search-Referenz (laidPoints), auf der auch
@@ -134,7 +138,7 @@ interface Props {
 }
 
 export function TrackingMap({
-  layPoints, layColor = C.trackPrimary, referenceOverlays, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -308,6 +312,8 @@ export function TrackingMap({
       >
         {/* Referenz-Fährten anderer eigener Hunde: zuerst + zIndex 1 → immer unter
             der aktuellen Lay-Linie (zIndex 2/3). */}
+        {distractionDraft && <DistractionLines tracks={[distractionDraft]} Polyline={Polyline} Marker={Marker} />}
+        {distractionTracks && <DistractionLines tracks={distractionTracks} Polyline={Polyline} Marker={Marker} />}
         {referenceOverlays && referenceOverlays.length > 0 && (
           <TrackReferenceOverlayLayer overlays={referenceOverlays} Polyline={Polyline} Marker={Marker} />
         )}
