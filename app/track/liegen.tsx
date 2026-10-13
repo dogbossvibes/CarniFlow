@@ -1,3 +1,4 @@
+import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { hasTransferredGaps } from '@/features/tracking-transfer/androidGapSafety';
 import { UnsupportedTransferView } from '@/features/tracking-transfer/UnsupportedTransferView';
 import { useEffect, useRef, useState } from 'react';
@@ -326,6 +327,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
           )}
         </View>
 
+        {id && <DistractionEntry parentId={id} />}
         {/* Timer in der Mitte */}
         <View className="flex-1 items-center justify-center px-6">
           <View className="w-[150px] h-[150px] rounded-full items-center justify-center mb-7 border-2 border-[rgba(21,230,195,0.35)] bg-ft-acc-dim">

@@ -1,0 +1,9 @@
+import { Pressable, Text } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { C } from '@/constants/colors';
+import './i18n';
+export function DistractionEntry({ parentId, beforeOpen }: { parentId: string; beforeOpen?(): void }) {
+ const router = useRouter(), { t } = useTranslation('distractions');
+ return <Pressable accessibilityRole="button" style={{ minHeight: 48, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: C.border }} onPress={() => { beforeOpen?.(); router.push({ pathname: '/track/verleitungen', params: { id: parentId } } as never); }}><Text style={{ color: C.accent, fontSize: 16, fontWeight: '700' }}>{t('title')}</Text></Pressable>;
+}

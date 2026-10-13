@@ -1,3 +1,4 @@
+import { DISTRACTION_SCHEMA } from '@/features/tracking-distractions/schema';
 // Lokale SQLite-Migrationen (idempotent). Jede Migration hat eine Version;
 // angewandte Versionen stehen in local_schema_migrations.
 export interface LocalMigration { version: number; name: string; sql: string }
@@ -146,4 +147,5 @@ export const MIGRATIONS: LocalMigration[] = [
       deleted integer not null default 0
     );`,
   },
+  { version: 8, name: 'independent_distraction_tracks', sql: DISTRACTION_SCHEMA },
 ];

@@ -1,3 +1,5 @@
+import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
+import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { hasTransferredGaps } from '@/features/tracking-transfer/androidGapSafety';
 import { UnsupportedTransferView } from '@/features/tracking-transfer/UnsupportedTransferView';
 import { useTranslation } from 'react-i18next';
@@ -83,6 +85,7 @@ const CORNER_INTERPRETATION_KEYS: Record<TrackAnalyticsV3['corners'][number]['in
 export default function TrackAuswertungScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const distractionTracks = useDistractionOverlays(typeof id === 'string' ? id : undefined);
   const { session: authenticatedSession } = useSession();
   const insets = useSafeAreaInsets();
   const { t } = useT();
@@ -430,6 +433,7 @@ export default function TrackAuswertungScreen() {
             </View>
           </View>
 
+          {data.owner_id === authenticatedSession?.user.id && <DistractionEntry parentId={String(id)} />}
           {data.status === 'completed' && <TransferEntry sourceId={String(id)} />}
 
           {data.status === 'completed' && (
@@ -741,6 +745,7 @@ export default function TrackAuswertungScreen() {
             <View style={StyleSheet.absoluteFill}>
               {map?.hasGps ? (
                 <TrackingMap
+                  distractionTracks={distractionTracks}
                   layColor={layColor}
                   layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
                   startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
@@ -929,6 +934,7 @@ export default function TrackAuswertungScreen() {
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
               <TrackingMap
+                  distractionTracks={distractionTracks}
                   layColor={layColor}
                 layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
                 startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
