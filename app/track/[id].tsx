@@ -5,7 +5,7 @@ import { transferErrorKey } from '@/features/tracking-transfer/i18n';
 import { ensureOwnTransferLocal } from '@/features/tracking-transfer/runtime';
 import { parseTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import { useSession } from '@/hooks/useSession';
-import { TransferEntry } from '@/features/tracking-transfer/TransferEntry';
+import { ExchangeEntry } from '@/features/tracking-exchange/ExchangeEntry';
 import { TrackObjectCorrections } from '@/features/tracking/components/TrackObjectCorrections';
 import { useTrackObjectReview } from '@/features/tracking/hooks/useTrackObjectReview';
 import { reviewCounts } from '@/features/tracking/services/objectReview/model';
@@ -417,7 +417,7 @@ export default function TrackAuswertungScreen() {
           )}
 
           {data.owner_id === authenticatedSession?.user.id && <DistractionEntry parentId={String(id)} />}
-          {data.status === 'completed' && <TransferEntry sourceId={String(id)} />}
+          {data.status === 'completed' && <ExchangeEntry sourceId={String(id)} />}
 
           {data.status === 'completed' && (
             <View style={[s.card, s.shareCard]}>

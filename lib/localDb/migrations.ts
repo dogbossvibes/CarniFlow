@@ -1,3 +1,4 @@
+import { EXCHANGE_SCHEMA } from '@/features/tracking-exchange/schema';
 import { PLANNER_SCHEMA } from '@/features/tracking-planner/schema';
 import { DISTRACTION_SCHEMA } from '@/features/tracking-distractions/schema';
 // Lokale SQLite-Migrationen (idempotent). Jede Migration hat eine Version;
@@ -175,4 +176,5 @@ export const MIGRATIONS: LocalMigration[] = [
   { version: 11, name: 'distraction_parent_reference', sql: `create table if not exists local_distraction_parents (
     owner_id text not null, session_id text not null, payload_json text not null, primary key(owner_id,session_id)
   );` },
+  { version: 12, name: 'track_file_exchange', sql: EXCHANGE_SCHEMA },
 ];

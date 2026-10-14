@@ -1,0 +1,3 @@
+import { putPendingTrackFile,takePendingTrackFile } from '../pending';
+import { offer,ids } from './fixture';
+it('requires matching account, one-time token and expiry',()=>{putPendingTrackFile(ids.task,'A',offer(),1000);expect(()=>takePendingTrackFile(ids.task,'B',1001)).toThrow();expect(()=>takePendingTrackFile(ids.task,'A',1001)).toThrow();putPendingTrackFile(ids.task,'A',offer(),1000);expect(takePendingTrackFile(ids.task,'A',1001)).toEqual(offer());expect(()=>takePendingTrackFile(ids.task,'A',1001)).toThrow();putPendingTrackFile(ids.task,'A',offer(),1000);expect(()=>takePendingTrackFile(ids.task,'A',601000)).toThrow();});

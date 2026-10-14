@@ -1,6 +1,6 @@
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
-import { TransferEntry } from '@/features/tracking-transfer/TransferEntry';
+import { ExchangeEntry } from '@/features/tracking-exchange/ExchangeEntry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -234,7 +234,7 @@ export default function TrackOverviewScreen() {
 
         <DistractionEntry dogId={effectiveDogId} />
         <PlannerEntry />
-        <TransferEntry />
+        <ExchangeEntry />
 
         {/* ── Verlauf ── */}
         <SectionLabel action="Logbuch" onAction={() => router.push('/track/historie' as never)}>Verlauf</SectionLabel>
