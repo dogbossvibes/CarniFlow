@@ -1,3 +1,4 @@
+import { attachSpecialGeometry } from '../utils/specialAngleGeometry';
 import type { TrackTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import { create } from 'zustand';
 import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '@/features/tracking/utils/gpsFilter';
@@ -63,6 +64,9 @@ export interface MarkerSample {
   audio_url:         string | null;
   found:             boolean;
   t:                 number;
+  geometryDirection?: 'links' | 'rechts' | 'unresolved';
+  geometrySharpness?: 'normal' | 'sharp' | 'unresolved';
+  geometrySource?: 'manual' | 'gps';
   // Auto-Winkel-Confidence (nur zur Laufzeit; NICHT in der DB — Persistenz s. u.):
   // die track_markers-Tabelle hat keine Spalte dafür; DB-Persistenz wäre eine
   // Migration und ist bewusst als Folgepunkt offen. Historische Marker ohne diese
@@ -72,6 +76,7 @@ export interface MarkerSample {
 }
 
 interface TrackingState {
+  annotateAngleGeometry: (entries: unknown) => void;
   currentSessionId:    string | null;
   dogId:               string | null;   // Besitzer der aktiven Fährte (bestehende dogs.id) — Schlüssel des Puffers
   isRecording:         boolean;
@@ -267,6 +272,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setGpsStats: (stats) => set({ gpsStats: stats }),
   setMotionStatus: (st) => set({ motionStatus: st }),
 
+  annotateAngleGeometry: (entries) => { set(s => ({ markers: attachSpecialGeometry(s.markers, entries) })); persist(get); },
   addMarker: (m) => { set(s => ({ markers: [...s.markers, m] })); persist(get); },
   addSegment: (segment) => { set(s => ({ segments: [...s.segments, segment] })); persistNow(get); },
   updateSegment: (id, patch) => {

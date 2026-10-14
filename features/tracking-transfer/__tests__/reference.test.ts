@@ -147,3 +147,24 @@ it('projects the actual recorder manualAngleGeometry array into the bounded wire
   f.session.payload_json = JSON.stringify({ ...JSON.parse(f.session.payload_json!), manualAngleGeometry: [geometry] });
   expect(projectTrackTransferSource(f.session, f.points, f.markers).manualAngleGeometry?.markers).toEqual([geometry]);
 });
+it('projects keyed geometry into V1 without leaking internal keys or dropping confidence',()=>{
+ const f=fixture(),m=f.markers[0];m.marker_type='winkel';m.angle_kind='bw';m.material=null;
+ const geometry={markerKey:`bw:${m.latitude!.toFixed(7)}:${m.longitude!.toFixed(7)}:${m.distance_from_start!.toFixed(1)}`,manualMarkerType:'bw',geometryDirection:'rechts',geometrySharpness:'sharp',geometrySource:'gps',geometryQuality:0.9,confidence:0.8,motionDirection:null,directionAgrees:null,classificationSource:'gps'};
+ f.session.payload_json=JSON.stringify({...JSON.parse(f.session.payload_json!),manualAngleGeometry:[geometry]});
+ const result=projectTrackTransferSource(f.session,f.points,f.markers);
+ expect(result.version).toBe(1);expect(result.manualAngleGeometry!.markers[0]).toMatchObject({geometryDirection:'rechts',geometrySharpness:'sharp',confidence:0.8});
+ expect(JSON.stringify(result)).not.toContain('markerKey');expect(JSON.stringify(result)).not.toContain('geometrySource');
+});
+it('does not send an Abriss direction through a V1 server that would lose it',()=>{
+ const f=fixture(),m=f.markers[0];m.marker_type='winkel';m.angle_kind='abriss';m.material=null;
+ m.payload_json=JSON.stringify({...JSON.parse(m.payload_json!),geometryDirection:'links',geometrySharpness:'unresolved',geometrySource:'manual'});
+ expect(()=>projectTrackTransferSource(f.session,f.points,f.markers)).toThrow('DIRECTION_TRANSFER_UNAVAILABLE');
+});
+
+it.each(['coordinates','distance'] as const)('preserves legacy direction in V1 when %s are nullable', missing=>{
+ const f=fixture(),m=f.markers[0];m.marker_type='winkel';m.angle_kind='bw';m.material=null;
+ if(missing==='coordinates'){m.latitude=null;m.longitude=null;}else m.distance_from_start=null;
+ const geometry={manualMarkerType:'bw',geometryDirection:'rechts',geometrySharpness:'sharp',geometryQuality:null,confidence:null,motionDirection:null,directionAgrees:null,classificationSource:'manual'};
+ f.session.payload_json=JSON.stringify({...JSON.parse(f.session.payload_json!),manualAngleGeometry:[geometry]});
+ expect(projectTrackTransferSource(f.session,f.points,f.markers).manualAngleGeometry?.markers[0]).toEqual(geometry);
+});

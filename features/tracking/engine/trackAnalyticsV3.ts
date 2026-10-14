@@ -8,6 +8,7 @@
  */
 import {
   confidenceBand,
+  cornerSideSharpness,
   type AnalyticsCornerInput,
   type AnalyticsObjectInput,
   type AnalyticsSample,
@@ -366,15 +367,6 @@ function averageSpeed(items: ClassifiedAnalyticsSample[]): number | null {
   return duration > 0 ? round2(distance / duration) : reported[0] ?? null;
 }
 
-function sideAndSharpness(kind: AnalyticsCornerInput['angleKind']): Pick<CornerAnalysisV3, 'side' | 'sharpness'> {
-  if (kind === 'links') return { side: 'links', sharpness: 'rechtwinklig' };
-  if (kind === 'rechts') return { side: 'rechts', sharpness: 'rechtwinklig' };
-  if (kind === 'spitz_links') return { side: 'links', sharpness: 'spitz' };
-  if (kind === 'spitz_rechts') return { side: 'rechts', sharpness: 'spitz' };
-  if (kind === 'spitz') return { side: 'unbekannt', sharpness: 'spitz' };
-  return { side: 'unbekannt', sharpness: 'unbekannt' };
-}
-
 function contiguousReliableRuns(items: readonly ClassifiedAnalyticsSample[]): ClassifiedAnalyticsSample[][] {
   const sorted = [...items].sort((a, b) => a.sample.tSec - b.sample.tSec);
   const runs: ClassifiedAnalyticsSample[][] = [];
@@ -401,7 +393,7 @@ function contiguousReliableRuns(items: readonly ClassifiedAnalyticsSample[]): Cl
 
 export function analyzeCornersV3(classified: ClassifiedAnalyticsSample[], corners: AnalyticsCornerInput[]): CornerAnalysisV3[] {
   return corners.map(corner => {
-    const shape = sideAndSharpness(corner.angleKind);
+    const shape = cornerSideSharpness(corner);
     const window = classified.filter(item => item.sample.atM >= corner.atM - TRACK_ANALYSIS_THRESHOLDS.cornerWindowBeforeM
       && item.sample.atM <= corner.atM + TRACK_ANALYSIS_THRESHOLDS.cornerWindowAfterM);
     const reliable = window.filter(item => item.state === 'reliable').sort((a, b) => a.sample.tSec - b.sample.tSec);

@@ -1,3 +1,5 @@
+import { ParentReferenceLines } from '@/features/tracking-distractions/ParentReferenceLines';
+import { specialAngleBadge } from '../utils/specialAngleGeometry';
 import type { DistractionTrack } from '@/features/tracking-distractions/model';
 import { DistractionLines } from '@/features/tracking-distractions/DistractionLayer';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -53,23 +55,23 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
   label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void;
 }) {
   const [track, setTrack] = useState(true);
-  useEffect(() => { const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, []);
+  useEffect(() => { setTrack(true); const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, [kind, label, acute, duebel, color]);
   let child;
   // Abriss: bordertes Kästchen MIT Symbol — eine inhaltsleere Custom-Marker-View
   // wird von react-native-maps (v. a. Android, nach tracksViewChanges=false) nicht
   // zuverlässig gezeichnet. Das Kreuz-Symbol gibt messbaren Inhalt (wie der
   // Ausarbeiten-Abriss) und hält die bestehende Abriss-Optik.
-  if (kind === 'abriss') child = <View style={s.abrissBox}><Ionicons name="close" size={11} color={C.trackWarning} /></View>;
+  if (kind === 'abriss') child = <View style={[s.angleBadge, { borderColor: C.trackWarning }]}><Text style={s.angleBadgeTxt}>{label || '×'}</Text></View>;
   // GW = Rechteck mit „GW", BW = Kreis mit „BW", OW = eigenes Badge mit „OW".
   // Alle mit messbarem TEXT-Inhalt (Android-tauglich, kein leerer Marker).
-  else if (kind === 'gw') child = <View style={s.gwBox}><Text style={s.figTxt}>GW</Text></View>;
-  else if (kind === 'bw') child = <View style={s.bwCircle}><Text style={s.figTxt}>BW</Text></View>;
+  else if (kind === 'gw') child = <View style={[s.gwBox, label && label.length > 2 ? { minWidth: 48, width: 'auto' } : null]}><Text style={s.figTxt}>{label || 'GW'}</Text></View>;
+  else if (kind === 'bw') child = <View style={[s.bwCircle, label && label.length > 2 ? { minWidth: 48, width: 'auto' } : null]}><Text style={s.figTxt}>{label || 'BW'}</Text></View>;
   // OW = Dreieck mit „OW": gefüllter Ionicons-Triangle-Glyph (messbarer Inhalt,
   // Android-tauglich — kein leeres CSS-Border-Dreieck) + Text darüber.
   else if (kind === 'ow') child = (
-    <View style={s.owTri}>
+    <View style={[s.owTri, label && label.length > 2 ? { minWidth: 48, width: 'auto' } : null]}>
       <Ionicons name="triangle" size={26} color={C.trackWarning} />
-      <Text style={s.owTriTxt}>OW</Text>
+      <Text style={s.owTriTxt}>{label || 'OW'}</Text>
     </View>
   );
   else if (kind === 'angle') child = <View style={[s.angleBadge, acute && s.angleBadgeAcute]}><Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text></View>;
@@ -85,6 +87,8 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
 interface Props {
   layColor?: string;
   layPoints:        LatLng[];
+  /** Read-only main reference for the distraction flow; never a recorded lay line. */
+  mainReferencePoints?: readonly (LatLng & { breakBefore?: boolean })[];
   // Read-only Referenz-Fährten anderer eigener Hunde (nur Linie + Start-Label).
   // Reine Darstellung: fliessen in KEINE Kamera-/Fit-/Recenter-Logik ein.
   distractionTracks?: readonly DistractionTrack[];
@@ -136,8 +140,10 @@ interface Props {
   style?:           StyleProp<ViewStyle>;
 }
 
+const EMPTY_MARKERS: MapMarker[] = [];
+
 export function TrackingMap({
-  layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = [], segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  layPoints, mainReferencePoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -156,9 +162,19 @@ export function TrackingMap({
     deviceHeadingDeg: heading ?? null,
     courseDeg: courseDeg ?? null,
     speedMps: speedMps ?? null,
-    enabled: smartFollow && mapReady,
+    enabled: smartFollow && mapReady && follow,
   });
-  useEffect(() => { camera.attachMap(mapRef.current); }, [camera, mapReady]);
+  const attachCameraMap = camera.attachMap;
+  useEffect(() => { attachCameraMap(mapRef.current); }, [attachCameraMap, mapReady]);
+
+  const resumeCamera = () => {
+    if (!follow) onToggleFollow?.();
+    camera.recenter();
+  };
+  const selectCameraMode = (mode: 'heading' | 'north' | 'free') => {
+    camera.setMode(mode);
+    if ((mode !== 'free') !== follow) onToggleFollow?.();
+  };
 
   // Klassische Live-Zentrierung (historische/nicht-aktive Karten). Bei
   // aktivem Smart Follow übernimmt ausschliesslich der Kamera-Controller —
@@ -203,8 +219,8 @@ export function TrackingMap({
     () => (rejectedPoints ?? []).slice(-60).map(p => ({ latitude: p.lat, longitude: p.lng })),
     [rejectedPoints],
   );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers.length]);
+  // Geometry labels can change without changing the marker count (finish/recovery).
+  const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers]);
   // Fortlaufende Nummer je Gegenstand (G1, G2, …) — nach Index in markerList.
   // Dübel bekommt KEINE G-Nummer (roter Zylinder) → zählt nicht mit (objectNumbers).
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
@@ -311,6 +327,7 @@ export function TrackingMap({
       >
         {/* Referenz-Fährten anderer eigener Hunde: zuerst + zIndex 1 → immer unter
             der aktuellen Lay-Linie (zIndex 2/3). */}
+        {mainReferencePoints && <ParentReferenceLines points={mainReferencePoints} color={layColor} Polyline={Polyline} />}
         {distractionDraft && <DistractionLines tracks={[distractionDraft]} Polyline={Polyline} Marker={Marker} />}
         {distractionTracks && <DistractionLines tracks={distractionTracks} Polyline={Polyline} Marker={Marker} />}
         {referenceOverlays && referenceOverlays.length > 0 && (
@@ -400,7 +417,9 @@ export function TrackingMap({
           if (m.type === 'winkel') {
             // Abriss / GW / OW / BW haben eigene Darstellungen; sonst normaler Winkel.
             const ak = angleMarkerKind(m.angleKind);
-            if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak} onPress={onPress} />;
+            if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak}
+              label={ak === 'abriss' && m.geometryDirection !== 'links' && m.geometryDirection !== 'rechts' ? undefined : specialAngleBadge(m) ?? undefined}
+              onPress={onPress} />;
             const label = (m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠';
             const acute = m.angleKind === 'spitz_links' || m.angleKind === 'spitz_rechts' || m.angleKind === 'spitz';
             return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} onPress={onPress} />;
@@ -452,33 +471,36 @@ export function TrackingMap({
               Norden / Frei — kompakt gestapelt im bestehenden FAB-Stil. */}
           {smartFollow && (
             <>
+              <Text style={s.modeLabel} accessibilityLiveRegion="polite" testID="track-camera-mode">
+                {t(`track.mapMode.${camera.mode}`)}{camera.mode !== 'free' && (camera.paused || !follow) ? ` · ${t('track.pause')}` : ''}
+              </Text>
               <Fab
                 icon="navigate"
-                active={camera.mode === 'heading'}
+                active={camera.mode === 'heading' && follow && !camera.paused}
                 accessibilityLabel={t('track.mapMode.heading')}
-                onPress={() => { camera.setMode('heading'); showToast(t('track.mapMode.heading')); }}
+                onPress={() => { selectCameraMode('heading'); showToast(t('track.mapMode.heading')); }}
               />
               <Fab
                 icon="compass"
-                active={camera.mode === 'north'}
+                active={camera.mode === 'north' && follow && !camera.paused}
                 accessibilityLabel={t('track.mapMode.north')}
-                onPress={() => { camera.setMode('north'); showToast(t('track.mapMode.north')); }}
+                onPress={() => { selectCameraMode('north'); showToast(t('track.mapMode.north')); }}
               />
               <Fab
                 icon="hand-left-outline"
                 active={camera.mode === 'free'}
                 accessibilityLabel={t('track.mapMode.free')}
-                onPress={() => { camera.setMode('free'); showToast(t('track.mapMode.free')); }}
+                onPress={() => { selectCameraMode('free'); showToast(t('track.mapMode.free')); }}
               />
               <PitchFab pitched={camera.pitched} onPress={camera.togglePitch} label={camera.pitched ? '3D' : '2D'} />
               {/* Recenter: erscheint, sobald eine eigene Geste Smart Follow
                   pausiert hat — kein stilles Zurückspringen. */}
-              {camera.paused && (
+              {camera.mode !== 'free' && (camera.paused || !follow) && (
                 <Fab
                   icon="locate"
                   active
                   accessibilityLabel={t('track.mapMode.resumeFollow')}
-                  onPress={() => { camera.recenter(); showToast(t('track.mapMode.resumeFollow')); }}
+                  onPress={() => { resumeCamera(); showToast(t('track.mapMode.resumeFollow')); }}
                 />
               )}
             </>
@@ -492,6 +514,9 @@ export function TrackingMap({
               accessibilityLabel={follow ? t('track.mapFollow.disableLabel') : t('track.mapFollow.enableLabel')}
               accessibilityHint={follow ? t('track.mapFollow.disableHint') : t('track.mapFollow.enableHint')}
               onPress={() => {
+                if (smartFollow) {
+                  if (follow) camera.onUserGesture(); else camera.recenter();
+                }
                 onToggleFollow();
                 showToast(follow ? t('track.mapFollow.off') : t('track.mapFollow.on'));
               }}
@@ -536,6 +561,7 @@ function Fab({ icon, onPress, active, accessibilityLabel, accessibilityHint }: {
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
+      accessibilityState={{ selected: !!active }}
     >
       <Ionicons name={icon} size={20} color={active ? '#04110F' : C.trackText} />
     </TouchableOpacity>
@@ -545,7 +571,8 @@ function Fab({ icon, onPress, active, accessibilityLabel, accessibilityHint }: {
 const s = StyleSheet.create({
   fallback:    { ...StyleSheet.absoluteFillObject, backgroundColor: C.trackSurface, alignItems: 'center', justifyContent: 'center', gap: 10 },
   fallbackTxt: { fontSize: 13, color: C.trackTextMut },
-  fabCol:      { position: 'absolute', right: 14, top: 14, gap: 10 },
+  fabCol:      { position: 'absolute', right: 14, top: 14, gap: 10, alignItems: 'flex-end' },
+  modeLabel: { maxWidth: 150, color: C.trackText, backgroundColor: 'rgba(13,13,13,0.9)', borderRadius: 10, padding: 7, fontSize: 12, fontWeight: '700', textAlign: 'right' },
   fab:         { width: 46, height: 46, borderRadius: 14, backgroundColor: 'rgba(13,13,13,0.9)', borderWidth: 1, borderColor: C.trackBorder, alignItems: 'center', justifyContent: 'center' },
   fabActive:   { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary },
   pitchTxt:       { fontSize: 13, fontWeight: '900', color: C.white, letterSpacing: 0.5 },

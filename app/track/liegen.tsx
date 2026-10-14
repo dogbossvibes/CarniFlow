@@ -1,3 +1,4 @@
+import { countLaidCorners } from '@/features/tracking/utils/specialAngleGeometry';
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { hasTransferredGaps } from '@/features/tracking-transfer/androidGapSafety';
 import { UnsupportedTransferView } from '@/features/tracking-transfer/UnsupportedTransferView';
@@ -60,7 +61,7 @@ function summarize(st: { distanceMeters: number; markers: { type: string; materi
   const completedSegments = (st.segments ?? []).filter(s => s.status === 'completed').sort((a, b) => a.startStep - b.startStep);
   return {
     distanceM: Math.round(st.distanceMeters),
-    winkel:    st.markers.filter(m => m.type === 'winkel').length,
+    winkel:    countLaidCorners(st.markers),
     objekte:   objects.length,
     materials: objects.map((m, i) => ({ index: i + 1, label: materialLabel(m.material) })),
     segments:  completedSegments,

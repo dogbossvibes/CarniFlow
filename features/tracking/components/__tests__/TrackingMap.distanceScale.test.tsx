@@ -32,7 +32,7 @@ jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k }) }));
 jest.mock('@/components/ui/Toast', () => ({ useToast: () => ({ showToast: jest.fn(), toast: null }) }));
 
 /* eslint-disable import/first -- Mocks müssen vor den Imports registriert sein */
-import { TrackingMap } from '@/features/tracking/components/TrackingMap';
+import { TrackingMap, PinMarker } from '@/features/tracking/components/TrackingMap';
 import { DISTANCE_TICK_STROKE, DISTANCE_TICK_Z, DISTANCE_TICK_HALO } from '@/features/tracking/components/DistanceScaleLayer';
 import { referenceTrackStroke, REFERENCE_TRACK_HALO } from '@/features/tracking/components/TrackReferenceOverlayLayer';
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
@@ -231,4 +231,43 @@ it('keeps sampling during continuous camera motion without waiting for region co
     expect(rulers.length).toBeGreaterThan(0);
     expect(mockMapApi.coordinateForPoint.mock.calls.length).toBeLessThanOrEqual(60);
   } finally { act(() => { mounted.splice(0).forEach(n => n.unmount()); }); jest.useRealTimers(); }
+});
+
+it('refreshes the native marker snapshot after direction changes, then freezes it again', () => {
+  jest.useFakeTimers();
+  const Marker = RNMaps!.Marker;
+  let node!: ReactTestRenderer;
+  try {
+    act(() => { node = TestRenderer.create(<PinMarker Marker={Marker} lat={47} lng={8} kind="bw" label="BW" />); });
+    act(() => { jest.advanceTimersByTime(1200); });
+    expect(node.root.findByType(Marker).props.tracksViewChanges).toBe(false);
+    act(() => { node.update(<PinMarker Marker={Marker} lat={47} lng={8} kind="bw" label="BW SL" />); });
+    expect(node.root.findByType(Marker).props.tracksViewChanges).toBe(true);
+    act(() => { jest.advanceTimersByTime(1200); });
+    expect(node.root.findByType(Marker).props.tracksViewChanges).toBe(false);
+  } finally { act(() => node?.unmount()); jest.useRealTimers(); }
+});
+
+it.each(['bw', 'ow', 'gw', 'abriss'] as const)('actual parent map shows saved direction and preserves unresolved %s labels', angleKind => {
+  const node = renderMap({markers:[{id:'special',type:'winkel',angleKind,lat:47,lng:8,geometryDirection:'links',geometrySharpness:'sharp'}]});
+  const texts = () => node.root.findAll(n => (n as unknown as { type: unknown }).type === 'Text').map(n => n.props.children);
+  expect(texts()).toContain(angleKind === 'abriss' ? 'A L' : `${angleKind.toUpperCase()} SL`);
+  act(() => { node.update(<TrackingMap currentPosition={null} follow={false} layPoints={LAY} markers={[{id:'special',type:'winkel',angleKind,lat:47,lng:8,geometryDirection:'unresolved'}]}/>); });
+  expect(texts()).toContain(angleKind === 'abriss' ? '×' : angleKind.toUpperCase());
+});
+
+
+it('renders the distraction main reference as independent sections without a legacy lay bridge', () => {
+ const points = [{lat:47,lng:8}, {lat:47.001,lng:8}, {lat:48,lng:9,breakBefore:true}, {lat:48.001,lng:9}, {lat:49,lng:10,breakBefore:true}];
+ const before = JSON.stringify(points);
+ const node = renderMap({layPoints:[], runPoints:[], mainReferencePoints:points, layColor:'#abcdef', follow:false,
+  startAnchor:points[0], endPoint:points.at(-1), fitToPoints:points});
+ const lines = polys(node);
+ expect(lines).toHaveLength(2);
+ expect(lines.map(p => p.coordinates)).toEqual([
+  [{latitude:47,longitude:8},{latitude:47.001,longitude:8}],
+  [{latitude:48,longitude:9},{latitude:48.001,longitude:9}],
+ ]);
+ expect(lines.every(p => p.strokeColor === '#abcdef')).toBe(true);
+ expect(JSON.stringify(points)).toBe(before);
 });

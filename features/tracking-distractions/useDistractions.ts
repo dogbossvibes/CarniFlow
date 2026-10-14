@@ -3,19 +3,31 @@ import { useFocusEffect } from 'expo-router';
 import { create } from 'zustand';
 import { useSession } from '@/hooks/useSession';
 import { supabase } from '@/lib/supabase';
+import { parentRepository } from './parentRepository';
 import { distractionRepository, type StoredDistraction } from './repository';
 export const useDistractionVisibility = create<{ hidden: Record<string, boolean>; toggle(id: string): void }>(set => ({ hidden: {}, toggle: id => set(s => ({ hidden: { ...s.hidden, [id]: !s.hidden[id] } })) }));
 export function useDistractions(parentId: string | undefined) {
  const { session } = useSession(); const userId = session?.user.id ?? null;
- const [epoch, setEpoch] = useState(0), scope = useRef({ userId, epoch }); scope.current = { userId, epoch };
+ const [, renderEpoch] = useState(0), scope = useRef({ userId, epoch: 0 });
+ const renderedUser = useRef(userId);
+ if (renderedUser.current !== userId) {
+  renderedUser.current = userId;
+  if (scope.current.userId !== userId) scope.current = { userId, epoch: scope.current.epoch + 1 };
+ }
+ const epoch = scope.current.epoch;
  const [result, setResult] = useState<{ key: string; rows: StoredDistraction[] } | null>(null), [error, setError] = useState<unknown>(null);
  const generation = useRef(0), alive = useRef(true);
- useEffect(() => { const generationBox = generation; alive.current = true; const { data } = supabase.auth.onAuthStateChange(event => {
-  if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { scope.current = { ...scope.current, epoch: scope.current.epoch + 1 }; generation.current++; setEpoch(scope.current.epoch); setResult(null); }
+ useEffect(() => { const generationBox = generation; alive.current = true; const { data } = supabase.auth.onAuthStateChange((event, next) => {
+  const nextId = event === 'SIGNED_OUT' ? null : next?.user.id ?? null;
+  if (event === 'SIGNED_OUT' || event === 'SIGNED_IN' && nextId !== scope.current.userId) {
+   scope.current = { userId: nextId, epoch: scope.current.epoch + 1 }; generation.current++; renderEpoch(scope.current.epoch); setResult(null);
+  }
  }); return () => { alive.current = false; generationBox.current++; data.subscription.unsubscribe(); }; }, []);
- // A fresh repository captures the new auth epoch, including A → B → A.
+ // Both auth callbacks and context-first identity changes invalidate old repositories.
  // eslint-disable-next-line react-hooks/exhaustive-deps
  const repository = useMemo(() => userId ? distractionRepository(userId, () => scope.current) : null, [userId, epoch]);
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ const parents = useMemo(() => userId ? parentRepository(userId, () => scope.current) : null, [userId, epoch]);
  const refresh = useCallback(async () => {
   const token = ++generation.current; setResult(null); setError(null);
   if (!repository || !parentId) return;
@@ -24,7 +36,7 @@ export function useDistractions(parentId: string | undefined) {
  }, [repository, parentId, userId, epoch]);
  useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current++; }; }, [refresh]));
  const rows = result?.key === `${userId}:${epoch}:${parentId}` ? result.rows : [];
- return { userId, epoch, repository, rows, error, refresh, scope };
+ return { userId, epoch, repository, parents, rows, error, refresh, scope };
 }
 
 export function useDistractionOverlays(parentId: string | undefined) {

@@ -1,3 +1,4 @@
+import { attachSpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import type { LocalSessionSnapshot } from '@/features/tracking/store/trackRecovery';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
 import { parseTransferReceipt, TransferImportError, type TrackTransferReceipt } from './importPlan';
@@ -21,9 +22,9 @@ export function transferredPending(snap: LocalSessionSnapshot, userId: string | 
   return {
     sessionId: receipt.ownSessionId, dogId, transferReceipt: receipt,
     trackPoints: reference.points.map(p => ({ ...p, measuredDistanceM: p.measuredDistanceM ?? undefined })),
-    markers: reference.markers.map(m => ({ id: m.id, type: m.type, material: m.material, angleKind: m.angleKind,
+    markers: attachSpecialGeometry(reference.markers.map(m => ({ id: m.id, type: m.type, material: m.material, angleKind: m.angleKind,
       lat: m.lat, lng: m.lng, accuracy: m.accuracy, distance_from_start: m.distanceFromStartM!, t: m.t,
-      note: null, audio_url: null, found: false })),
+      note: null, audio_url: null, found: false })), reference.manualAngleGeometry?.markers),
     segments: reference.segments.map(s => ({ ...s, dogId, trackSessionId: receipt.ownSessionId })),
     runPoints: [], searchPoints: [], distanceMeters: reference.distanceM, durationSeconds: reference.durationSeconds,
     layFinishedAt: reference.finishedAtMs, startAnchor: null, savedAt: now, runId: receipt.ownRunId,

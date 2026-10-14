@@ -56,6 +56,7 @@ jest.mock('../../store/trackingStore', () => {
     setDuration: jest.fn(), setHeading: jest.fn(),
     stopRecording: jest.fn(), setLayFinishedAt: jest.fn(), setSaveState: jest.fn(),
     addMarker: jest.fn((m: any) => { state.markers.push(m); }),
+    annotateAngleGeometry: jest.fn((entries: unknown) => { state.markers = jest.requireActual('../../utils/specialAngleGeometry').attachSpecialGeometry(state.markers, entries); }),
   };
   return { useTrackingStore: { getState: () => state } };
 });
@@ -256,4 +257,16 @@ it('waits for its own finalization before reusing the hook and its session refs'
   expect((createLocalTrainingSession as jest.Mock).mock.calls.every(([row]) => row.local_id === 'local')).toBe(true);
   await act(async () => { complete(); expect((await begin).error).toBeNull(); await settle(); });
   expect(createLocalTrainingSession).toHaveBeenLastCalledWith(expect.objectContaining({ local_id: 'new' }));
+});
+
+it.each(['bw','ow','gw','abriss'] as const)('finish preserves %s direction and existing objects through the real recorder', async angleKind => {
+ await start();
+ const state=useTrackingStore.getState();state.currentPosition={lat:47,lng:8};
+ await act(async()=>{await current.addMarker('gegenstand',{material:'holz'});clockMs++;await current.addMarker('winkel',{angleKind,geometryDirection:'links',geometrySharpness:angleKind==='abriss'?'unresolved':'sharp',geometrySource:'manual'});});
+ const markerIds=state.markers.map(m=>m.id);
+ await act(async()=>{current.finish();for(let i=0;i<30;i++)await Promise.resolve();});
+ expect(useTrackingStore.getState().markers.map(m=>m.id)).toEqual(markerIds);
+ expect(useTrackingStore.getState().markers[1]).toMatchObject({angleKind,geometryDirection:'links',geometrySource:'manual'});
+ expect(finalizeLocalTrainingSession).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({articlesTotal:1,cornersTotal:angleKind==='abriss'?0:1,manualAngleGeometry:[expect.objectContaining({manualMarkerType:angleKind,geometryDirection:'links'})]}));
+ expect(createLocalTrackMarker).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({sourceMarkerId:markerIds[1],geometryDirection:'links',geometrySource:'manual'}));
 });

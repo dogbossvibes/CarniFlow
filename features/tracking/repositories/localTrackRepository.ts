@@ -1,3 +1,4 @@
+import { readSpecialGeometry, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { getLocalDb } from '@/lib/localDb/client';
 import { newLocalId, nowIso } from '@/lib/localDb/ids';
 import type { LocalTrackPoint, LocalTrackMarker, SyncStatus } from '@/features/sync/types/sync';
@@ -62,7 +63,8 @@ export async function deleteSearchPointsBySession(sessionId: string, assertScope
   await db.runAsync(`delete from local_track_points where session_local_id=? and point_type='search'`, sessionId);
 }
 
-export interface NewTrackMarker {
+export interface NewTrackMarker extends SpecialGeometry {
+  sourceMarkerId?: string; recordedAtMs?: number;
   marker_type: string; material?: string | null; angle_kind?: string | null;
   latitude?: number | null; longitude?: number | null; accuracy?: number | null;
   distance_from_start?: number | null; note?: string | null; audio_local_uri?: string | null;
@@ -73,9 +75,10 @@ export async function createLocalTrackMarker(sessionLocalId: string, m: NewTrack
   const id = newLocalId('mk');
   await db.runAsync(
     `insert into local_track_markers (local_id, remote_id, session_local_id, session_remote_id, marker_type, material, angle_kind, latitude, longitude, accuracy, distance_from_start, note, audio_local_uri, audio_remote_url, created_at, sync_status, payload_json)
-     values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, 'pending', null)`,
+     values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, 'pending', ?)`,
     id, sessionLocalId, m.marker_type, m.material ?? null, m.angle_kind ?? null, m.latitude ?? null, m.longitude ?? null,
-    m.accuracy ?? null, m.distance_from_start ?? null, m.note ?? null, m.audio_local_uri ?? null, nowIso(),
+    m.accuracy ?? null, m.distance_from_start ?? null, m.note ?? null, m.audio_local_uri ?? null, typeof m.recordedAtMs === 'number' && Number.isFinite(m.recordedAtMs) ? new Date(m.recordedAtMs).toISOString() : nowIso(),
+    m.sourceMarkerId ? JSON.stringify({ sourceMarkerId: m.sourceMarkerId, recordedAtMs: m.recordedAtMs, ...readSpecialGeometry(m) }) : null,
   );
   return id;
 }

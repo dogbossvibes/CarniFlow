@@ -1,3 +1,4 @@
+import { attachSpecialGeometry, projectAngleMarkers, type SpecialGeometry } from './specialAngleGeometry';
 import { hasTransferredGaps, transferGapPoints } from '@/features/tracking-transfer/androidGapSafety';
 import { selectDisplayRunPoints } from '@/features/tracking/utils/searchDisplayGeometry';
 import type { AngleKind, MarkerType, MarkerMaterial } from '@/features/tracking/store/trackingStore';
@@ -13,7 +14,7 @@ import type { AngleKind, MarkerType, MarkerMaterial } from '@/features/tracking/
 
 export interface DetailLatLng { lat: number; lng: number; breakBefore?: boolean }
 
-export interface DetailMarker {
+export interface DetailMarker extends SpecialGeometry {
   id: string;
   type: MarkerType;
   lat: number | null;
@@ -46,6 +47,7 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
       angle_kind?: AngleKind | null; material?: MarkerMaterial | null;
       distance_from_start?: number | null; note?: string | null;
     }[];
+    track_data?: { manualAngleGeometry?: unknown };
     distance_meters?: number | null;
   };
 
@@ -57,7 +59,8 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
   const run: DetailLatLng[] = selectDisplayRunPoints(data).points
     .map((p) => ({ lat: p.lat, lng: p.lng }));
 
-  const sourceMarkers = d.markers ?? [];
+  const rawMarkers = d.markers ?? [];
+  const sourceMarkers = projectAngleMarkers(attachSpecialGeometry(rawMarkers.map(m => ({ ...m, id: String(m.id), type: m.marker_type, angleKind: m.angle_kind, lat: m.latitude ?? null, lng: m.longitude ?? null })), d.track_data?.manualAngleGeometry));
   const cornerDistances = sourceMarkers
     .filter(marker => marker.marker_type === 'winkel' && marker.angle_kind !== 'absatz' && marker.angle_kind !== 'abriss')
     .map(marker => marker.distance_from_start ?? 0);
@@ -68,6 +71,7 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
     const distance = m.distance_from_start ?? null;
     return {
       id: String(m.id),
+      geometryDirection: m.geometryDirection, geometrySharpness: m.geometrySharpness, geometrySource: m.geometrySource,
       type: m.marker_type,
       lat: m.latitude ?? null,
       lng: m.longitude ?? null,
