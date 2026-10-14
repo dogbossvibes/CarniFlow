@@ -278,7 +278,7 @@ export async function loadLayRecovery(args: TrackRecoveryArgs): Promise<{ pendin
   for (const m of merged.markersToPersist) await createLocalTrackMarker(args.sessionId, {
     marker_type: m.type, material: m.material, angle_kind: m.angleKind, latitude: m.lat, longitude: m.lng,
     accuracy: m.accuracy, distance_from_start: m.distance_from_start, note: m.note,
-    sourceMarkerId: m.id, recordedAtMs: m.t,
+    sourceMarkerId: m.id, recordedAtMs: m.t, geometryDirection: m.geometryDirection, geometrySharpness: m.geometrySharpness, geometrySource: m.geometrySource,
   });
   return { pending: merged.pending, startedAt: local.started_at };
 }

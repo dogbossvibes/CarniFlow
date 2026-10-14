@@ -170,3 +170,35 @@ describe('useSmartTrackCamera', () => {
     }
   });
 });
+
+describe('camera controls without waiting for another GPS fix', () => {
+ afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; });
+ it('map attachment immediately applies the current direction', () => {
+  const h=mount({position:at(0,0),courseDeg:90,speedMps:1});const map=makeFakeMap();
+  act(()=>h.api.attachMap(map));expect(map.calls.at(-1)?.heading).toBe(90);
+ });
+ it('north, heading and pitch changes apply to the existing fix immediately', () => {
+  const h=mount({position:at(0,0),courseDeg:90,speedMps:1});const map=makeFakeMap();act(()=>h.api.attachMap(map));
+  act(()=>h.api.setMode('north'));expect(map.calls.at(-1)?.heading).toBe(0);
+  act(()=>h.api.setMode('heading'));expect(map.calls.at(-1)!.heading).toBe(90);
+  act(()=>h.api.togglePitch());expect(map.calls.at(-1)!.pitch).toBeGreaterThan(0);
+ });
+ it('resuming from free mode actually restores a following mode', () => {
+  const h=mount({position:at(0,0)});const map=makeFakeMap();act(()=>h.api.attachMap(map));
+  act(()=>h.api.setMode('free'));const count=map.calls.length;
+  h.update({position:at(10,0)});expect(map.calls).toHaveLength(count);
+  act(()=>h.api.recenter());expect(h.api.mode).toBe('heading');expect(h.api.following).toBe(true);expect(map.calls.length).toBeGreaterThan(count);
+ });
+});
+
+describe('control changes versus ordinary heading updates', () => {
+ afterEach(() => { act(() => renderer?.unmount()); renderer=null; jest.restoreAllMocks(); });
+ it('keeps ordinary fix smoothing/throttling and recenters fully to the known course', () => {
+  let now=1000;jest.spyOn(Date,'now').mockImplementation(()=>now);
+  const h=mount({position:at(0,0),courseDeg:0,speedMps:1}),map=makeFakeMap();act(()=>h.api.attachMap(map));
+  now+=1000;h.update({position:at(1,0),courseDeg:90,speedMps:1});
+  expect(map.calls.at(-1)?.heading).toBe(31.5);
+  const count=map.calls.length;h.update({position:at(1.1,0),courseDeg:90,speedMps:1});expect(map.calls).toHaveLength(count);
+  act(()=>h.api.onUserGesture());act(()=>h.api.recenter());expect(map.calls.at(-1)?.heading).toBe(90);
+ });
+});

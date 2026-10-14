@@ -1,3 +1,4 @@
+import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
 import { TransferEntry } from '@/features/tracking-transfer/TransferEntry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -231,6 +232,7 @@ export default function TrackOverviewScreen() {
           ))}
         </View>
 
+        <DistractionEntry dogId={effectiveDogId} />
         <PlannerEntry />
         <TransferEntry />
 

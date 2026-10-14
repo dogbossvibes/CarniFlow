@@ -1,3 +1,4 @@
+import { countLaidCorners, projectAngleMarkers } from '@/features/tracking/utils/specialAngleGeometry';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { useSession } from '@/hooks/useSession';
 import { useTransferRunScope } from '@/features/tracking-transfer/useRunScope';
@@ -169,7 +170,7 @@ export default function TrackRunScreen() {
       laidAccuracies: st.trackPoints.map(p => p.accuracy ?? null),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number },
         index: i, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null })),
-      laidMarkers: st.markers,
+      laidMarkers: projectAngleMarkers(st.markers),
       eventArcs,
       segments: st.segments,
       referenceCanonicalLengthM: st.distanceMeters,
@@ -640,9 +641,9 @@ export default function TrackRunScreen() {
   const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
   const mapMarkers: MapMarker[] = snapData.laidMarkers.map(m => ({
-    id: m.id, type: m.type, lat: m.lat, lng: m.lng, angleKind: m.angleKind, material: m.material,
+    ...m,
   }));
-  const winkel = snapData.laidMarkers.filter(m => m.type === 'winkel').length;
+  const winkel = countLaidCorners(snapData.laidMarkers);
 
   // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
   // Bogenlänge). Ereignis-Bogenlänge = KANONISCHE arcM aus dem Snapshot
@@ -958,7 +959,7 @@ export default function TrackRunScreen() {
     const cornerInputs: AnalyticsCornerInput[] = snapData.laidMarkers
       .filter((m): m is typeof m & { angleKind: AnalyticsAngleKind } =>
         m.type === 'winkel' && m.angleKind != null && m.angleKind !== 'absatz' && m.angleKind !== 'abriss')
-      .flatMap(m => { const atM = snapData.eventArcs[m.id]?.arcM; return atM == null ? [] : [{ atM, angleKind: m.angleKind }]; });
+      .flatMap(m => { const atM = snapData.eventArcs[m.id]?.arcM; return atM == null ? [] : [{ atM, angleKind: m.angleKind, geometryDirection: m.geometryDirection, geometrySharpness: m.geometrySharpness }]; });
     const objectMarkers = snapData.laidMarkers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
     const objectInputs: AnalyticsObjectInput[] = objectMarkers.map((m, i) => ({
       objectId: m.id,

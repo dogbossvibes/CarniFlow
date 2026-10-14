@@ -1,3 +1,4 @@
+import { attachSpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { MIGRATIONS } from '@/lib/localDb/migrations';
 import { importTrackTransfer, parseTransferReceipt, type ImportDependencies, type ImportTransaction } from '../importPlan';
 import { parseTrackTransferReference } from '../reference';
@@ -97,4 +98,42 @@ it('never imports into a different account', async () => {
 });
 it.each([{ ...receipt(), version: 2 }, { ...receipt(), extra: true }, { ...receipt(), ownRunId: id(5) }, { ...receipt(), acceptedAtMs: NaN }])('rejects malformed receipt', value => {
   expect(() => parseTransferReceipt(value)).toThrow('RECEIPT_INVALID');
+});
+
+it('persists transferred Fachwinkel geometry and survives changed marker IDs and ordering', async () => {
+  const h = harness();
+  try {
+    const ref = reference();
+    const marker = { ...ref.markers[0], id: 'manual', type: 'winkel' as const, material: null, angleKind: 'bw' as const };
+    ref.markers = [marker, {...marker,id:'auto',angleKind:'spitz_links'}];
+    ref.manualAngleGeometry = { truncated: false, markers: [{ manualMarkerType:'bw',geometryDirection:'links',geometrySharpness:'sharp',geometryQuality:null,confidence:null,motionDirection:null,directionAgrees:null,classificationSource:'manual' }] };
+    await importTrackTransfer(h.deps, receipt().recipientUserId, receipt(), ref);
+    const row = h.db.prepare('select payload_json from local_training_sessions').get();
+    const payload = JSON.parse(row.payload_json);
+    expect(payload.cornersTotal).toBe(1);
+    const rows = h.db.prepare('select * from local_track_markers order by local_id desc').all();
+    expect(rows).toHaveLength(2);
+    const projected = attachSpecialGeometry(rows.map((m: Record<string,unknown>) => ({ id:'changed-'+m.local_id, type:String(m.marker_type), angleKind:String(m.angle_kind),lat:Number(m.latitude),lng:Number(m.longitude),distance_from_start:Number(m.distance_from_start) })),payload.manualAngleGeometry);
+    expect(projected.find(m=>m.angleKind==='bw')).toMatchObject({geometryDirection:'links',geometrySharpness:'sharp'});
+  } finally { h.db.close(); }
+});
+
+it.each(['coordinates', 'distance', 'duplicate'] as const)('keeps validated legacy geometry across %s import and reload', async missing => {
+ const h=harness();
+ try {
+  const ref=reference();
+  const marker={...ref.markers[0],id:'manual',type:'winkel' as const,material:null,angleKind:'bw' as const};
+  if(missing==='coordinates'){marker.lat=null;marker.lng=null;}
+  if(missing==='distance')marker.distanceFromStartM=null;
+  ref.markers=[marker];
+  const entry={manualMarkerType:'bw' as const,geometryDirection:'rechts' as const,geometrySharpness:'sharp' as const,geometryQuality:null,confidence:null,motionDirection:null,directionAgrees:null,classificationSource:'manual'};
+  ref.manualAngleGeometry={truncated:false,markers:[entry]};
+  if(missing==='duplicate'){ref.markers.push({...marker,id:'duplicate'});ref.manualAngleGeometry.markers.push({...entry});}
+  await importTrackTransfer(h.deps,receipt().recipientUserId,receipt(),ref);
+  const payload=JSON.parse(h.db.prepare('select payload_json from local_training_sessions').get().payload_json);
+  expect(payload.manualAngleGeometry[0]).not.toHaveProperty('markerKey');
+  const reload=attachSpecialGeometry(ref.markers.map(m=>({...m,distance_from_start:m.distanceFromStartM})),payload.manualAngleGeometry);
+  expect(reload[0]).toMatchObject({geometryDirection:'rechts',geometrySharpness:'sharp'});
+  expect(JSON.parse(h.db.prepare('select payload_json from local_track_markers order by local_id').get().payload_json).geometryDirection).toBe('rechts');
+ }finally{h.db.close();}
 });

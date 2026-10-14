@@ -78,6 +78,8 @@ export type AnalyticsAngleKind = 'links' | 'rechts' | 'spitz_links' | 'spitz_rec
 export interface AnalyticsCornerInput {
   atM: number;
   angleKind: AnalyticsAngleKind;
+  geometryDirection?: 'links' | 'rechts' | 'unresolved';
+  geometrySharpness?: 'normal' | 'sharp' | 'unresolved';
 }
 
 export interface AnalyticsObjectInput {
@@ -281,7 +283,7 @@ function round1(x: number): number { return Math.round(x * 10) / 10; }
 
 // ── Eckenanalyse ──────────────────────────────────────────────────────────
 
-function cornerSideSharpness(kind: AnalyticsAngleKind): { side: CornerSide; sharpness: CornerSharpness } {
+function kindSideSharpness(kind: AnalyticsAngleKind): { side: CornerSide; sharpness: CornerSharpness } {
   switch (kind) {
     case 'links': return { side: 'links', sharpness: 'rechtwinklig' };
     case 'rechts': return { side: 'rechts', sharpness: 'rechtwinklig' };
@@ -292,9 +294,19 @@ function cornerSideSharpness(kind: AnalyticsAngleKind): { side: CornerSide; shar
   }
 }
 
+/** Fachtyp remains intact; independently known geometry enriches its classification. */
+export function cornerSideSharpness(corner: AnalyticsCornerInput): { side: CornerSide; sharpness: CornerSharpness } {
+  const fallback = kindSideSharpness(corner.angleKind);
+  if (!['bw', 'ow', 'gw'].includes(corner.angleKind)) return fallback;
+  return {
+    side: corner.geometryDirection === 'links' || corner.geometryDirection === 'rechts' ? corner.geometryDirection : fallback.side,
+    sharpness: corner.geometrySharpness === 'sharp' ? 'spitz' : corner.geometrySharpness === 'normal' ? 'rechtwinklig' : fallback.sharpness,
+  };
+}
+
 export function analyzeCorners(samples: AnalyticsSample[], corners: AnalyticsCornerInput[]): CornerAnalysis[] {
   return corners.map(corner => {
-    const { side, sharpness } = cornerSideSharpness(corner.angleKind);
+    const { side, sharpness } = cornerSideSharpness(corner);
     const window = samples.filter(s => s.atM >= corner.atM - CORNER_WINDOW_BEFORE_M && s.atM <= corner.atM + CORNER_WINDOW_AFTER_M);
     if (!window.length) {
       return { atM: corner.atM, side, sharpness, arrivalTSec: null, speedBeforeMps: null, minDistanceM: null, maxLateralDeviationM: null, overshootM: null, reacquisitionSec: null };

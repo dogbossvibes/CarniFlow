@@ -1,5 +1,6 @@
 import { registerGroupResources } from '@/features/training-groups/registerResources';
 export const de = {
+  directionTransfer: 'Fährten mit Abrissrichtung können noch nicht übergeben werden. Deine Fährte und die Richtungsangaben bleiben gespeichert.',
   ownCopies: 'Meine übernommenen Fährten', moreCopies: 'Weitere Fährten laden',
   revisionConflict: 'Diese Fährte wurde auf einem anderen Gerät geändert. Deine lokalen Änderungen bleiben erhalten. Die Synchronisation wurde angehalten.',
   copyGone: 'Diese eigene Fährte wurde gelöscht und wird nicht wiederhergestellt.',
@@ -30,6 +31,7 @@ export const de = {
   busyDog: 'Für diesen Hund ist bereits eine andere Fährte offen. Die übernommene Fährte bleibt im Logbuch.',
 };
 const en: typeof de = {
+  directionTransfer: 'Tracks with an offset direction cannot be transferred yet. Your track and direction information remain saved.',
   ownCopies: 'My accepted tracks', moreCopies: 'Load more tracks',
   revisionConflict: 'This track changed on another device. Your local changes are retained. Synchronisation has stopped.',
   copyGone: 'This own track was deleted and will not be recreated.',
@@ -57,6 +59,7 @@ export function transferErrorKey(error: unknown): keyof typeof de {
   if (['SOURCE_INCOMPLETE', 'REFERENCE_INVALID', 'SOURCE_UNAVAILABLE'].includes(code)) return 'incomplete';
   if (code === 'TRANSFER_REVISION_CONFLICT') return 'revisionConflict';
   if (code === 'TRANSFER_COPY_GONE') return 'copyGone';
+  if (code === 'DIRECTION_TRANSFER_UNAVAILABLE') return 'directionTransfer';
   if (code === 'SOURCE_NOT_SYNCED') return 'sourceSync';
   if (code === 'TRANSFER_QUOTA_EXCEEDED') return 'quota';
   if (code === 'STORAGE') return 'storage';

@@ -1,3 +1,4 @@
+import { attachSpecialGeometry, countLaidCorners, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 import { pinQaTrackingModes } from '@/features/tracking/utils/qaPreferences';
 import { claimLayRecorderStore } from '@/features/tracking/utils/layRecorderOwnership';
@@ -49,7 +50,7 @@ import { TRACK_LOCATION_TASK, setTrackFixHandler, startBackgroundUpdates, stopBa
 import { beginBackgroundLayDiagnostics, endBackgroundLayDiagnostics, recordBackgroundLayEvent } from '@/features/tracking/utils/backgroundLayDiagnostics';
 import { startQaRecordingEvidence, type QaRecordingObserver } from '@/features/tracking/utils/qaRecordingEvidenceStore';
 import { startFaehrteActivity, updateFaehrteActivity, stopFaehrteActivity } from '@/features/tracking/native/faehrteLiveActivity';
-import { classifyManualAngleGeometry, classifyManualAngleGeometrySections } from '@/features/tracking/utils/manualAngleGeometry';
+import { classifyManualAngleGeometrySections } from '@/features/tracking/utils/manualAngleGeometry';
 import { voiceDiagnostics } from '@/features/tracking/utils/voiceEvents';
 import { isLaySessionWarmupReady } from '@/features/tracking/utils/layStartLock';
 import {
@@ -347,7 +348,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       const localWrite = (async () => {
         try {
           await localSessionCreationRef.current;
-          const dbId = await createLocalTrackMarker(markerSessionId, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null, sourceMarkerId: marker.id, recordedAtMs: marker.t });
+          const dbId = await createLocalTrackMarker(markerSessionId, { marker_type: marker.type, material: marker.material, angle_kind: marker.angleKind, latitude: marker.lat, longitude: marker.lng, accuracy: marker.accuracy, distance_from_start: marker.distance_from_start, note: marker.note, audio_local_uri: null, sourceMarkerId: marker.id, recordedAtMs: marker.t, geometryDirection: marker.geometryDirection, geometrySharpness: marker.geometrySharpness, geometrySource: marker.geometrySource });
           if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qaApexIndex, qaContext);
           return true;
         } catch (e) { console.warn('[trackRecorder] marker', e); return false; }
@@ -710,7 +711,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   const addMarker = useCallback(async (
     type: MarkerType,
-    markerOpts?: { note?: string; audioUrl?: string; material?: MarkerMaterial; angleKind?: AngleKind },
+    markerOpts?: SpecialGeometry & { note?: string; audioUrl?: string; material?: MarkerMaterial; angleKind?: AngleKind },
   ) => {
     const s = store.getState();
     const now = Date.now();
@@ -729,6 +730,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       type,
       material: markerOpts?.material ?? null,
       angleKind: markerOpts?.angleKind ?? null,
+      geometryDirection: markerOpts?.geometryDirection, geometrySharpness: markerOpts?.geometrySharpness, geometrySource: markerOpts?.geometrySource,
       lat: pos?.lat ?? null,
       lng: pos?.lng ?? null,
       accuracy: s.gpsAccuracy,
@@ -900,6 +902,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     s.setLayFinishedAt(Date.now());   // ← Liegezeit-Start, sofort verfügbar
     s.setSaveState('saving');
 
+    const manualAngleGeometry = classifyManualAngleGeometrySections(s.markers, [...completedDetectorSectionsRef.current, detectPointsRef.current], s.markers.length).markers;
+    s.annotateAngleGeometry(manualAngleGeometry);
     // Summary synchron aus dem Vor-Stop-Snapshot festhalten.
     const summary = {
       endedAt:           new Date().toISOString(),
@@ -907,12 +911,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       distanceMeters:    s.distanceMeters,
       gpsQualityAverage: calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy)),
       articlesTotal:     s.markers.filter(m => m.type === 'gegenstand').length,
-      cornersTotal:      s.markers.filter(m => m.type === 'winkel').length,
+      cornersTotal:      countLaidCorners(attachSpecialGeometry(s.markers, manualAngleGeometry)),
       segments:          s.segments,
       layContinuity: { version: 1, breakBeforeTimestamps: s.trackPoints.filter(p => p.breakBefore).map(p => new Date(p.t).toISOString()) },
-      manualAngleGeometry: classifyManualAngleGeometrySections(
-        s.markers, [...completedDetectorSectionsRef.current, detectPointsRef.current],
-      ).markers,
+      manualAngleGeometry,
     };
 
     const lid = localSessionId.current;

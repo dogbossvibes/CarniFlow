@@ -55,6 +55,7 @@ jest.mock('../../store/trackingStore', () => {
     addTrackPoint: jest.fn((p: any) => { state.trackPoints.push(p); }), setDistanceMeters: jest.fn((m: number) => { state.distanceMeters = m; }),
     setDuration: jest.fn(), setHeading: jest.fn(), stopRecording: jest.fn(), setLayFinishedAt: jest.fn(), setSaveState: jest.fn(),
     addMarker: jest.fn((m: any) => { state.markers.push(m); }),
+    annotateAngleGeometry: jest.fn((entries: unknown) => { state.markers = jest.requireActual('../../utils/specialAngleGeometry').attachSpecialGeometry(state.markers, entries); }),
   };
   return { useTrackingStore: { getState: () => state } };
 });

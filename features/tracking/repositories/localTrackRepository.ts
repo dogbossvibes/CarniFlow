@@ -1,3 +1,4 @@
+import { readSpecialGeometry, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { getLocalDb } from '@/lib/localDb/client';
 import { newLocalId, nowIso } from '@/lib/localDb/ids';
 import type { LocalTrackPoint, LocalTrackMarker, SyncStatus } from '@/features/sync/types/sync';
@@ -62,7 +63,7 @@ export async function deleteSearchPointsBySession(sessionId: string, assertScope
   await db.runAsync(`delete from local_track_points where session_local_id=? and point_type='search'`, sessionId);
 }
 
-export interface NewTrackMarker {
+export interface NewTrackMarker extends SpecialGeometry {
   sourceMarkerId?: string; recordedAtMs?: number;
   marker_type: string; material?: string | null; angle_kind?: string | null;
   latitude?: number | null; longitude?: number | null; accuracy?: number | null;
@@ -77,7 +78,7 @@ export async function createLocalTrackMarker(sessionLocalId: string, m: NewTrack
      values (?, null, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, 'pending', ?)`,
     id, sessionLocalId, m.marker_type, m.material ?? null, m.angle_kind ?? null, m.latitude ?? null, m.longitude ?? null,
     m.accuracy ?? null, m.distance_from_start ?? null, m.note ?? null, m.audio_local_uri ?? null, typeof m.recordedAtMs === 'number' && Number.isFinite(m.recordedAtMs) ? new Date(m.recordedAtMs).toISOString() : nowIso(),
-    m.sourceMarkerId ? JSON.stringify({ sourceMarkerId: m.sourceMarkerId, recordedAtMs: m.recordedAtMs }) : null,
+    m.sourceMarkerId ? JSON.stringify({ sourceMarkerId: m.sourceMarkerId, recordedAtMs: m.recordedAtMs, ...readSpecialGeometry(m) }) : null,
   );
   return id;
 }

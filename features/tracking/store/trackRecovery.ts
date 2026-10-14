@@ -1,3 +1,4 @@
+import { attachSpecialGeometry, readSpecialGeometry } from '../utils/specialAngleGeometry';
 import { transferredPending } from '@/features/tracking-transfer/recovery';
 import { readContinuityPoint } from '../utils/trackContinuity';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
@@ -230,6 +231,7 @@ export function reconstructPendingFromSession(
   const markerSamples: MarkerSample[] = markers.map(m => {
     const t = Date.parse(m.created_at);
     return {
+      ...readSpecialGeometry((() => { try { return JSON.parse(m.payload_json ?? '{}'); } catch { return {}; } })()),
       id: m.local_id,
       type: m.marker_type as MarkerType,
       material: (m.material ?? null) as MarkerMaterial | null,
@@ -247,7 +249,7 @@ export function reconstructPendingFromSession(
       sessionId: session.local_id,
       dogId,
       trackPoints,
-      markers: markerSamples,
+      markers: attachSpecialGeometry(markerSamples, payload?.manualAngleGeometry),
       segments: coerceTrackSegments(payload?.segments),
       runPoints: [],
       distanceMeters: isNum(payload?.distanceMeters) ? payload!.distanceMeters : 0,

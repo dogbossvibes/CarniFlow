@@ -14,8 +14,15 @@ export function createDistractionRepository(ownerId: string, deps: Deps) {
  const check = () => { const current = deps.scope(); if (!ownerId || scope.userId !== ownerId || current.userId !== ownerId || scope.epoch !== current.epoch) throw new DistractionError('ACCOUNT_CHANGED'); };
  const parent = async (tx: Tx, id: string) => {
   check(); const row = await tx.getFirstAsync<{ local_id: string; user_id: string; type: string; deleted_at: string | null }>(
-   'select local_id,user_id,type,deleted_at from local_training_sessions where local_id=? and user_id=? and deleted_at is null', id, ownerId);
-  check(); if (!row || row.local_id !== id || row.user_id !== ownerId || row.type !== 'track' || row.deleted_at) throw new DistractionError('PARENT_UNAVAILABLE');
+   'select local_id,user_id,type,deleted_at from local_training_sessions where local_id=?', id);
+  check();
+  if (row) {
+   if (row.local_id !== id || row.user_id !== ownerId || row.type !== 'track' || row.deleted_at) throw new DistractionError('PARENT_UNAVAILABLE');
+   return;
+  }
+  // The reference writer validates geometry once. Per-fix writes only check its scoped identity.
+  const reference = await tx.getFirstAsync<{ owner_id: string; session_id: string }>('select owner_id,session_id from local_distraction_parents where owner_id=? and session_id=?', ownerId, id); check();
+  if (!reference || reference.owner_id !== ownerId || reference.session_id !== id) throw new DistractionError('PARENT_UNAVAILABLE');
  };
  return {
   async list(parentId: string): Promise<StoredDistraction[]> {

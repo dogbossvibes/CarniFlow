@@ -132,3 +132,8 @@ describe('createRemoteTrainingSession — Run-Metadaten aus payload_json.run', (
     expect(row.track_data.run.run_points).toBeUndefined();   // run_points liegen in track_runs
   });
 });
+it('preserves manual angle geometry in an otherwise empty track summary on upload',async()=>{
+ const geometry=[{markerKey:'bw:47:8:10',manualMarkerType:'bw',geometryDirection:'rechts',geometrySharpness:'sharp',geometrySource:'manual'}];
+ await createRemoteTrainingSession({...localBase,payload_json:JSON.stringify({manualAngleGeometry:geometry})});
+ expect(mockUpsert.mock.calls[0][0].track_data.manualAngleGeometry).toEqual(geometry);
+});

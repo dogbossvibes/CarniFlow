@@ -310,7 +310,7 @@ export interface QaSessionCapture {
     truncated: boolean;
   };
   manualAngleGeometryDiagnostics?: {
-    markers: { manualMarkerType: 'ow' | 'bw' | 'gw'; geometryDirection: 'links' | 'rechts' | 'unresolved';
+    markers: { manualMarkerType: 'ow' | 'bw' | 'gw' | 'abriss'; geometryDirection: 'links' | 'rechts' | 'unresolved';
       geometrySharpness: 'normal' | 'sharp' | 'unresolved'; geometryQuality: number | null;
       confidence: number | null; motionDirection: 'links' | 'rechts' | null;
       directionAgrees: boolean | null; classificationSource: string | null }[];

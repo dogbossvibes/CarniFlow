@@ -1,3 +1,4 @@
+import { attachSpecialGeometry, isSpecialAngle, readSpecialGeometry, specialAngleKey } from '@/features/tracking/utils/specialAngleGeometry';
 import type { LocalTrainingSession, LocalTrackPoint, LocalTrackMarker } from '@/features/sync/types/sync';
 import { parseTrackTransferReference, TransferReferenceError, TRANSFER_LIMITS } from './reference';
 
@@ -13,7 +14,7 @@ export interface SourceDependencies {
   snapshot<T>(read: (db: SourceReader) => Promise<T>): Promise<T>;
 }
 export class TransferSourceError extends Error {
-  constructor(readonly code: 'ACCOUNT_CHANGED' | 'SOURCE_UNAVAILABLE' | 'SOURCE_ACTIVE' | 'SOURCE_NOT_SYNCED') {
+  constructor(readonly code: 'ACCOUNT_CHANGED' | 'SOURCE_UNAVAILABLE' | 'SOURCE_ACTIVE' | 'SOURCE_NOT_SYNCED' | 'DIRECTION_TRANSFER_UNAVAILABLE') {
     super(code); this.name = 'TransferSourceError';
   }
 }
@@ -78,15 +79,26 @@ export function projectTrackTransferSource(session: LocalTrainingSession, points
     return { id: original.sourceMarkerId, type: m.marker_type, material: m.material, angleKind: m.angle_kind,
       lat: m.latitude, lng: m.longitude, accuracy: m.accuracy, distanceFromStartM: m.distance_from_start, t: original.recordedAtMs };
   });
+  const sourceGeometry = Array.isArray(payload.manualAngleGeometry) ? payload.manualAngleGeometry : null;
+  const annotated = attachSpecialGeometry(projectedMarkers.map((m, i) => ({ ...m, ...readSpecialGeometry(json(markers[i].payload_json)), distance_from_start: m.distanceFromStartM })), sourceGeometry);
+  // V1 cannot express an Abriss direction. Never silently discard that information.
+  if (annotated.some(m => m.angleKind === 'abriss' && (m.geometryDirection === 'links' || m.geometryDirection === 'rechts'))) throw new TransferSourceError('DIRECTION_TRANSFER_UNAVAILABLE');
+  const manual = annotated.filter(m => isSpecialAngle(m.angleKind) && m.angleKind !== 'abriss');
+  const transferGeometry = sourceGeometry ? { truncated: manual.length > 100, markers: manual.slice(0, 100).map((m, i) => {
+    const keyed = sourceGeometry.filter(e => e && typeof e === 'object' && e.markerKey === specialAngleKey(m));
+    const legacy = sourceGeometry[i];
+    const entry = keyed.length === 1 ? keyed[0] : sourceGeometry.every(e => e && typeof e === 'object' && !('markerKey' in e)) && legacy?.manualMarkerType === m.angleKind ? legacy : null;
+    return { manualMarkerType: m.angleKind, geometryDirection: m.geometryDirection ?? 'unresolved', geometrySharpness: m.geometrySharpness ?? 'unresolved',
+      geometryQuality: entry?.geometryQuality ?? null, confidence: entry?.confidence ?? null, motionDirection: entry?.motionDirection ?? null,
+      directionAgrees: entry?.directionAgrees ?? null, classificationSource: entry?.classificationSource ?? null };
+  }) } : payload.manualAngleGeometry ?? null;
   const segments = payload.segments ?? [];
   if (!Array.isArray(segments)) throw new TransferReferenceError('SOURCE_INCOMPLETE');
   return parseTrackTransferReference({ version: 1, startedAtMs: start, finishedAtMs: end,
     distanceM: payload.distanceMeters ?? null, durationSeconds: session.duration_seconds,
     points: projectedPoints, markers: projectedMarkers,
     segments: segments.map(s => projectSegment(s, session.dog_id!, session.local_id)),
-    manualAngleGeometry: Array.isArray(payload.manualAngleGeometry)
-      ? { markers: payload.manualAngleGeometry, truncated: projectedMarkers.filter(m => ['ow', 'bw', 'gw'].includes(String(m.angleKind))).length > 100 }
-      : payload.manualAngleGeometry ?? null });
+    manualAngleGeometry: transferGeometry });
 }
 
 /** No network, mutations, legacy repair or inferred marker timestamps. Caller revalidates server ownership. */

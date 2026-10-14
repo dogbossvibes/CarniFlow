@@ -205,17 +205,7 @@ export default function TrackAuswertungScreen() {
     // Logbuch-Kartenmodell ausschließlich aus gespeicherten Daten (keine Winkel-/
     // Marker-Neuberechnung); reine Funktion buildTrackDetailMap.
     const detail = buildTrackDetailMap(data);
-    let manualAngleOrdinal = 0;
-    const manualGeometry = (data.track_data?.manualAngleGeometry ?? []) as { geometryDirection: MapMarker['geometryDirection']; geometrySharpness: MapMarker['geometrySharpness'] }[];
-    const markers: MapMarker[] = detail.markers.map(m => ({
-      id: m.id, type: m.type, lat: m.lat, lng: m.lng,
-      angleKind: m.angleKind, material: m.material,
-      distanceFromStart: m.distanceFromStart, note: m.note,
-      objectIndex: m.objectIndex, legIndex: m.legIndex,
-      ...(['ow', 'bw', 'gw'].includes(m.angleKind ?? '')
-        ? { geometryDirection: manualGeometry[manualAngleOrdinal]?.geometryDirection,
-            geometrySharpness: manualGeometry[manualAngleOrdinal++]?.geometrySharpness } : {}),
-    }));
+    const markers: MapMarker[] = detail.markers.map(m => ({ ...m }));
     const segments = coerceTrackSegments(data.track_data?.segments);
     const fitPoints = [
       ...detail.lay,

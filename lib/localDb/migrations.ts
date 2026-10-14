@@ -172,4 +172,7 @@ export const MIGRATIONS: LocalMigration[] = [
       on track_object_review_outbox (owner_id, state);`,
   },
   { version: 10, name: 'local_track_planner', sql: PLANNER_SCHEMA },
+  { version: 11, name: 'distraction_parent_reference', sql: `create table if not exists local_distraction_parents (
+    owner_id text not null, session_id text not null, payload_json text not null, primary key(owner_id,session_id)
+  );` },
 ];

@@ -1,3 +1,5 @@
+import { SpecialAnglePicker } from '@/features/tracking/components/SpecialAnglePicker';
+import { countLaidCorners, projectAngleMarkers, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
 import { loadLayRecovery } from '@/features/tracking/services/trackRecoveryService';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
@@ -173,7 +175,6 @@ export default function LegenScreen() {
   const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (Open-Meteo)
   const [weatherState, setWeatherState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const weatherFetchedRef = useRef(false);
-  const [lastAngle, setLastAngle] = useState<AngleKind | null>(null);
   const [gsPicker, setGsPicker] = useState(false);   // Gegenstand-Schnellauswahl (Inline, kein Sheet)
   const [winkelSheet, setWinkelSheet] = useState(false);       // Winkeltyp wählen (GW/OW/BW/Abriss)
   const [segmentSheet, setSegmentSheet] = useState(false);
@@ -214,7 +215,6 @@ export default function LegenScreen() {
   }, [showToast, t]);
 
   const onAngle = useCallback((kind: AngleKind) => {
-    setLastAngle(kind);
     // Automatisch erkannt → gedrosselt: Abriss als Warnung, sonst Winkel-Impuls.
     if (kind === 'abriss') hapticWarning(); else hapticAngle();
     announceEvent(angleEvent(kind), 'detected');
@@ -253,7 +253,7 @@ export default function LegenScreen() {
 
   // Manuell einen Fachwinkel (GW/OW/BW) ODER Abriss an der aktuellen Position setzen.
   // Nutzt dieselbe currentPosition/positionSource wie die Aufnahme (keine extra GPS-Abfrage).
-  const placeWinkel = useCallback((angleKind: AngleKind) => {
+  const placeWinkel = useCallback((angleKind: AngleKind, geometry?: SpecialGeometry) => {
     if (phaseRef.current !== 'recording') return;
     const st = useTrackingStore.getState();
     // Fachliche Annahme ZUERST: ohne Startanker UND ohne valide aktuelle Position
@@ -261,7 +261,7 @@ export default function LegenScreen() {
     if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
     // addMarker fügt den Marker (mit currentPosition) SYNCHRON in den Store ein
     // (commitMarker → s.addMarker vor dem ersten await) → Karte reagiert sofort.
-    void rec.addMarker('winkel', { angleKind });
+    void rec.addMarker('winkel', { angleKind, ...geometry });
     if (angleKind === 'abriss') hapticWarning(); else hapticAngle();   // Feedback nach der Annahme
     announceEvent(angleEvent(angleKind), 'set');
     setWinkelSheet(false);
@@ -522,9 +522,9 @@ export default function LegenScreen() {
     return () => clearInterval(iv);
   }, [phase, activeDog]);
 
-  const mapMarkers: MapMarker[] = markers.map(mk => ({ id: mk.id, type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind, material: mk.material }));
+  const mapMarkers: MapMarker[] = projectAngleMarkers(markers).map(mk => ({ ...mk }));
   const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
-  const winkel = markers.filter(mk => mk.type === 'winkel').length;
+  const winkel = countLaidCorners(markers);
   // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
   const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
@@ -617,7 +617,7 @@ export default function LegenScreen() {
       useActiveFaehrten.getState().upsert(activeDog.id, {
         status: 'resting', sessionId: id, layStartedAt: Date.now(),
         distanceMeters: Math.round(distanceMeters),
-        winkelCount: finalMarkers.filter(m => m.type === 'winkel').length,
+        winkelCount: countLaidCorners(finalMarkers),
         objektCount: finalMarkers.filter(m => m.type === 'gegenstand').length,
       });
     }
@@ -1080,7 +1080,7 @@ export default function LegenScreen() {
         )}
 
         {/* Winkel-Schnellwahl: Inline-Popover direkt über dem Winkel-Button — KEIN
-            BottomSheet. Tap auf GW/OW/BW/Abriss setzt sofort + schliesst; Tap
+            BottomSheet. Fachtyp und Richtung wählen; erst die Bestätigung setzt den Marker. Tap
             außerhalb (Backdrop) schliesst ohne Marker. */}
         {winkelSheet && phase === 'recording' && (
           <>
@@ -1099,24 +1099,7 @@ export default function LegenScreen() {
                 maxHeight: quickPickerLayout.maxHeight,
               }}
             >
-              <View className="flex-row gap-2">
-                {([
-                  { kind: 'gw',     short: 'GW',     icon: 'square-outline'   },
-                  { kind: 'ow',     short: 'OW',     icon: 'triangle-outline' },
-                  { kind: 'bw',     short: 'BW',     icon: 'ellipse-outline'  },
-                  { kind: 'abriss', short: 'Abriss', icon: 'close'            },
-                ] as const).map(o => (
-                  <Pressable
-                    key={o.kind}
-                    accessibilityLabel={t('track.setAngle', { label: t(trackEventLabelKey(angleEvent(o.kind))) })}
-                    onPress={() => placeWinkel(o.kind)}
-                    className="flex-1 h-[64px] rounded-[16px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
-                  >
-                    <Ionicons name={o.icon} size={22} color={o.kind === 'abriss' ? FT.warn : FT.acc} />
-                    <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{o.short}</Text>
-                  </Pressable>
-                ))}
-              </View>
+              <SpecialAnglePicker onSelect={placeWinkel} />
             </View>
           </>
         )}

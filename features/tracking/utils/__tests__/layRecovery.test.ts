@@ -37,3 +37,7 @@ it('retains repeated colocated markers and is idempotent after missing marker ba
   expect(second.markersToPersist).toEqual([]);
   expect(second.pending.markers).toHaveLength(2);
 });
+it('restores explicit Abriss direction from durable marker metadata after process loss',()=>{
+ const marker={local_id:'db',marker_type:'winkel',angle_kind:'abriss',latitude:47,longitude:8,accuracy:4,distance_from_start:8,material:null,note:null,audio_remote_url:null,created_at:new Date(1000).toISOString(),payload_json:JSON.stringify({sourceMarkerId:'source',recordedAtMs:1000,geometryDirection:'rechts',geometrySharpness:'unresolved',geometrySource:'manual'})} as LocalTrackMarker;
+ expect(mergeLayRecovery(pending(),[row(0),row(1)],[marker])?.pending.markers[0]).toMatchObject({angleKind:'abriss',geometryDirection:'rechts',geometrySource:'manual'});
+});

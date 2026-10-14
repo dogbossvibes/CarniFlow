@@ -1,3 +1,4 @@
+import { attachSpecialGeometry, countLaidCorners, readSpecialGeometry, specialAngleKey } from '@/features/tracking/utils/specialAngleGeometry';
 import { parseTrackTransferReference, type TrackTransferReference } from './reference';
 
 export interface TrackTransferReceipt {
@@ -44,13 +45,21 @@ export function createTrackTransferImportPlan(receiptValue: unknown, referenceVa
   const receipt = parseTransferReceipt(receiptValue), reference = parseTrackTransferReference(referenceValue);
   const createdAt = new Date(receipt.acceptedAtMs).toISOString();
   const segments = reference.segments.map(s => ({ ...s, dogId: receipt.recipientDogId, trackSessionId: receipt.ownSessionId }));
+  const annotated = attachSpecialGeometry(reference.markers.map(marker => ({ ...marker, distance_from_start: marker.distanceFromStartM })), reference.manualAngleGeometry?.markers);
+  const manualMarkers = annotated.filter(marker => ['bw', 'ow', 'gw'].includes(marker.angleKind ?? ''));
+  // Legacy nullable coordinates cannot form stable keys. Keep their validated ordinal contract intact.
+  const geometryKeys = manualMarkers.map(specialAngleKey);
+  const canKeyGeometry = geometryKeys.every(key => key !== null) && new Set(geometryKeys).size === geometryKeys.length;
+  const geometry = reference.manualAngleGeometry?.markers.map((entry, index) => ({
+    ...entry, ...(canKeyGeometry ? { markerKey: specialAngleKey(manualMarkers[index]) } : {}),
+  }));
   const payload = {
     distanceMeters: reference.distanceM,
     articlesTotal: reference.markers.filter(m => m.type === 'gegenstand').length,
-    cornersTotal: reference.markers.filter(m => m.type === 'winkel').length,
+    cornersTotal: countLaidCorners(annotated),
     segments,
     layContinuity: { version: 1, breakBeforeTimestamps: reference.points.filter(p => p.breakBefore).map(p => new Date(p.t).toISOString()) },
-    ...(reference.manualAngleGeometry ? { manualAngleGeometry: reference.manualAngleGeometry.markers } : {}),
+    ...(geometry ? { manualAngleGeometry: geometry } : {}),
     trackTransferReceipt: receipt,
   };
   const parent = insert('local_training_sessions', {
@@ -73,7 +82,7 @@ export function createTrackTransferImportPlan(receiptValue: unknown, referenceVa
     local_id: `transfer:${receipt.receiptId}:marker:${i}`, remote_id: null, session_local_id: receipt.ownSessionId, session_remote_id: null,
     marker_type: m.type, material: m.material, angle_kind: m.angleKind, latitude: m.lat, longitude: m.lng,
     accuracy: m.accuracy, distance_from_start: m.distanceFromStartM, note: null, audio_local_uri: null, audio_remote_url: null,
-    created_at: new Date(m.t).toISOString(), sync_status: 'pending', payload_json: JSON.stringify({ sourceMarkerId: m.id, recordedAtMs: m.t }),
+    created_at: new Date(m.t).toISOString(), sync_status: 'pending', payload_json: JSON.stringify({ sourceMarkerId: m.id, recordedAtMs: m.t, ...readSpecialGeometry(annotated[i]) }),
   }));
   const queue = insert('sync_queue', { id: `transfer:${receipt.receiptId}:sync`, entity_type: 'training_session',
     entity_local_id: receipt.ownSessionId, operation: 'create', priority: 5, payload_json: null,
