@@ -59,6 +59,43 @@
       "env": {
         "EXPO_PUBLIC_BACKEND_ENV": "staging"
       }
+    },
+    "native-widgets-ios-simulator": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "native-widgets-qa",
+      "environment": "production",
+      "ios": {
+        "simulator": true,
+        "image": "macos-sequoia-15.6-xcode-26.2"
+      }
+    },
+    "native-widgets-ios": {
+      "extends": "production",
+      "distribution": "store",
+      "environment": "production",
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.2"
+      }
+    },
+    "native-widgets-android-qa": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "native-widgets-qa",
+      "environment": "production",
+      "android": {
+        "buildType": "apk",
+        "image": "ubuntu-24.04-jdk-17-ndk-r27b"
+      }
+    },
+    "native-widgets-android": {
+      "extends": "production",
+      "distribution": "store",
+      "environment": "production",
+      "android": {
+        "buildType": "app-bundle",
+        "image": "ubuntu-24.04-jdk-17-ndk-r27b"
+      }
     }
   },
   "submit": {

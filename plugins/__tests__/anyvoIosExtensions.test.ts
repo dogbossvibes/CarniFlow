@@ -23,6 +23,7 @@ describe('Target-Zuordnung (Source of Truth im Repo)', () => {
   it('Widget-Target: Liegezeit V2 + Schnellstart + Widget-Katalog; App-Target: Intents + Kataloge', () => {
     expect(plugin.WIDGET_SOURCES.map((p: string) => p.split('/').pop())).toEqual([
       'AnyvoRestingActivityAttributes.swift', 'AnyvoRestingActivityWidget.swift', 'AnyvoQuickStartWidget.swift',
+      'AnyvoDailyWidgetCore.swift', 'AnyvoDailyWidgets.swift', 'AnyvoWidgetLocations.swift',
     ]);
     expect(plugin.WIDGET_RESOURCES.map((p: string) => p.split('/').pop())).toEqual(['Localizable.xcstrings']);
     expect(plugin.APP_SOURCES.map((p: string) => p.split('/').pop())).toEqual(['AnyvoAppIntents.swift']);

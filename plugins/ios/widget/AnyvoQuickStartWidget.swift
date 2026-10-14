@@ -144,5 +144,6 @@ struct AnyvoQuickStartWidget: Widget {
     .configurationDisplayName("qs.displayName")
     .description("qs.description")
     .supportedFamilies([.systemSmall, .systemMedium])
+    .anyvoPhoneOnly()
   }
 }

@@ -1,0 +1,14 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'expo.modules.anyvodailywidget'
+version = '1.0.0'
+android {
+  namespace 'expo.modules.anyvodailywidget'
+  defaultConfig { minSdkVersion 24 }
+}
+dependencies {
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.json:json:20180813'
+}

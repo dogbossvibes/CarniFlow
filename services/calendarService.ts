@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { CalendarEvent, NewCalendarEvent, EventStatus } from '@/types/calendar';
+import { notifyDailyWidgetDataChanged } from '@/features/widgets/dailyWidgetRefresh';
 
 const SELECT = '*, dog:dogs(name, photo_url)';
 
@@ -23,6 +24,7 @@ export async function createOwnEvent(userId: string, ev: NewCalendarEvent) {
     .single();
   // Bucht die Kund:in einen Termin mit Trainer:in → diese benachrichtigen.
   if (!res.error && ev.trainer_id) notifyAppointment(userId, ev.trainer_id, ev.title, '📅 Neue Terminanfrage').catch(() => {});
+  if (!res.error) notifyDailyWidgetDataChanged();
   return res;
 }
 
@@ -34,6 +36,7 @@ export async function createTrainerEvent(trainerId: string, clientOwnerId: strin
     .select(SELECT)
     .single();
   if (!res.error) notifyAppointment(trainerId, clientOwnerId, ev.title, '📅 Neuer Termin').catch(() => {});
+  if (!res.error) notifyDailyWidgetDataChanged();
   return res;
 }
 
@@ -49,13 +52,16 @@ async function notifyAppointment(senderId: string, recipientId: string, title: s
 }
 
 export function updateCalendarEvent(id: string, updates: Partial<CalendarEvent>) {
-  return supabase.from('calendar_events').update(updates).eq('id', id).select(SELECT).single();
+  return supabase.from('calendar_events').update(updates).eq('id', id).select(SELECT).single()
+    .then(result => { if (!result.error) notifyDailyWidgetDataChanged(); return result; });
 }
 
 export function setEventStatus(id: string, status: EventStatus) {
-  return supabase.from('calendar_events').update({ status }).eq('id', id).select(SELECT).single();
+  return supabase.from('calendar_events').update({ status }).eq('id', id).select(SELECT).single()
+    .then(result => { if (!result.error) notifyDailyWidgetDataChanged(); return result; });
 }
 
 export function deleteCalendarEvent(id: string) {
-  return supabase.from('calendar_events').delete().eq('id', id);
+  return supabase.from('calendar_events').delete().eq('id', id)
+    .then(result => { if (!result.error) notifyDailyWidgetDataChanged(); return result; });
 }

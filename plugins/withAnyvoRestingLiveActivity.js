@@ -24,7 +24,8 @@
 // ─────────────────────────────────────────────────────────────────────────
 const fs = require('fs');
 const path = require('path');
-const { withXcodeProject } = require('expo/config-plugins');
+const { withXcodeProject, withInfoPlist, withEntitlementsPlist } = require('expo/config-plugins');
+const plist = require('@expo/plist').default;
 
 const WIDGET_TARGET = 'LiveActivity';
 const APP_PRODUCT_TYPE = '"com.apple.product-type.application"';
@@ -36,6 +37,9 @@ const WIDGET_SOURCES = [
   path.join(MODULE_DIR, 'ios', 'AnyvoRestingActivityAttributes.swift'),
   path.join(MODULE_DIR, 'widget', 'AnyvoRestingActivityWidget.swift'),
   path.join(IOS_SRC, 'widget', 'AnyvoQuickStartWidget.swift'),
+  path.join('modules', 'anyvo-daily-widget', 'ios', 'AnyvoDailyWidgetCore.swift'),
+  path.join(IOS_SRC, 'widget', 'AnyvoDailyWidgets.swift'),
+  path.join(IOS_SRC, 'widget', 'AnyvoWidgetLocations.swift'),
 ];
 const WIDGET_RESOURCES = [path.join(IOS_SRC, 'widget', 'Localizable.xcstrings')];
 const APP_SOURCES = [path.join(IOS_SRC, 'app', 'AnyvoAppIntents.swift')];
@@ -51,8 +55,44 @@ const APP_LOCALIZED_STRINGS = [{ name: 'AppShortcuts.strings', srcDir: path.join
 
 const BUNDLE_FILE = 'LiveActivityWidgetBundle.swift';
 const V1_WIDGET = 'LiveActivityWidget()';
-const BUNDLE_WIDGETS = ['AnyvoRestingActivityWidget()', 'AnyvoQuickStartWidget()'];
+const BUNDLE_WIDGETS = ['AnyvoRestingActivityWidget()', 'AnyvoQuickStartWidget()',
+  'if #available(iOS 17.0, *) {\n      AnyvoDailyWidget()\n      AnyvoAppointmentsWidget()\n    }'];
 const SNAPSHOT = Symbol.for('anyvo.liveActivityPrebuildSnapshot');
+const ENTITLEMENTS_SNAPSHOT = Symbol.for('anyvo.widgetEntitlementsPrebuildSnapshot');
+
+function patchWidgetEntitlements(cfg, group) {
+  if (cfg.modRequest.introspect) return;
+  const directory = path.join(cfg.modRequest.platformProjectRoot, WIDGET_TARGET);
+  const file = path.join(directory, `${WIDGET_TARGET}.entitlements`);
+  const current = fs.existsSync(file) ? plist.parse(fs.readFileSync(file, 'utf8')) : {};
+  const previous = cfg[ENTITLEMENTS_SNAPSHOT] ?? {};
+  const value = { ...previous, ...current };
+  const key = 'com.apple.security.application-groups';
+  value[key] = [...new Set([...(previous[key] ?? []), ...(current[key] ?? []), group])];
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(file, plist.build(value));
+}
+
+function configureWidgetMetadata(config) {
+  const identifier = config.ios?.bundleIdentifier;
+  if (!identifier || !/^[A-Za-z0-9.-]+$/.test(identifier)) throw new Error('Valid iOS bundle identifier required.');
+  const group = `group.${identifier}.widgets`;
+  config.extra ??= {}; config.extra.eas ??= {}; config.extra.eas.build ??= {};
+  config.extra.eas.build.experimental ??= {}; config.extra.eas.build.experimental.ios ??= {};
+  const ios = config.extra.eas.build.experimental.ios;
+  const entries = ios.appExtensions ?? [];
+  const own = entries.filter(item => item.targetName === WIDGET_TARGET);
+  if (own.some(item => item.bundleIdentifier !== `${identifier}.${WIDGET_TARGET}`)) throw new Error('Widget extension bundle identity mismatch.');
+  const extension = Object.assign({ targetName: WIDGET_TARGET, bundleIdentifier: `${identifier}.${WIDGET_TARGET}` }, ...own);
+  const entitlements = Object.assign({}, ...own.map(item => item.entitlements ?? {}));
+  const key = 'com.apple.security.application-groups';
+  entitlements[key] = [...new Set([...own.flatMap(item => item.entitlements?.[key] ?? []), group])];
+  extension.entitlements = entitlements;
+  // expo-live-activity@0.4.2 treats index 0 as absent. Normalize only our exact
+  // extension AFTER its config function; preserve all unrelated extension records.
+  ios.appExtensions = [...entries.filter(item => item.targetName !== WIDGET_TARGET), extension];
+  return config;
+}
 
 /** WidgetBundle um V2- und Schnellstart-Widget ergänzen (idempotent). Exportiert für Tests. */
 function patchWidgetBundle(source) {
@@ -201,8 +241,27 @@ function copyInto(projectRoot, rels, dir) {
   for (const rel of rels) fs.copyFileSync(path.join(projectRoot, rel), path.join(dir, path.basename(rel)));
 }
 
-const withAnyvoRestingLiveActivity = config =>
-  withXcodeProject(config, cfg => {
+const withAnyvoRestingLiveActivity = config => {
+  const identifier = config.ios?.bundleIdentifier;
+  if (!identifier || !/^[A-Za-z0-9.-]+$/.test(identifier)) throw new Error('[withAnyvoRestingLiveActivity] Valid iOS bundle identifier required.');
+  const group = `group.${identifier}.widgets`;
+  config.ios.entitlements ??= {};
+  config.ios.entitlements['com.apple.security.application-groups'] = [...new Set([
+    ...(config.ios.entitlements['com.apple.security.application-groups'] ?? []), group,
+  ])];
+  config = withInfoPlist(config, cfg => {
+    cfg.modResults.AnyvoWidgetAppGroup = group;
+    // expo-live-activity@0.4.2 writes {} in its InfoPlist mod. This registered
+    // BEFORE the package executes AFTER that write, restoring all prior keys.
+    patchWidgetEntitlements(cfg, group);
+    return cfg;
+  });
+  config = withEntitlementsPlist(config, cfg => {
+    const key = 'com.apple.security.application-groups';
+    cfg.modResults[key] = [...new Set([...(cfg.modResults[key] ?? []), group])];
+    return cfg;
+  });
+  return withXcodeProject(config, cfg => {
     const project = cfg.modResults;
     const { projectRoot, platformProjectRoot } = cfg.modRequest;
     restoreSnapshotIfAny(project);
@@ -221,6 +280,18 @@ const withAnyvoRestingLiveActivity = config =>
     const appName = appKey ? project.hash.project.objects.PBXNativeTarget[appKey].name.replace(/"/g, '') : null;
     const appGroup = appName ? findGroupKey(project, appName) : null;
     if (!appKey || !appGroup) throw new Error('[withAnyvoRestingLiveActivity] App-Target/-Gruppe nicht gefunden.');
+
+    // Preserve existing extension plist/entitlements, including foreign keys.
+    for (const [name, patch] of [
+      ['Info.plist', value => ({ ...value, AnyvoWidgetAppGroup: group })],
+      [`${WIDGET_TARGET}.entitlements`, value => ({ ...value,
+        'com.apple.security.application-groups': [...new Set([...(value['com.apple.security.application-groups'] ?? []), group])],
+      })],
+    ]) {
+      const file = path.join(widgetDir, name);
+      const value = fs.existsSync(file) ? plist.parse(fs.readFileSync(file, 'utf8')) : {};
+      fs.writeFileSync(file, plist.build(patch(value)));
+    }
 
     copyInto(projectRoot, [...WIDGET_SOURCES, ...WIDGET_RESOURCES], widgetDir);
     for (const rel of WIDGET_SOURCES) addFileToTarget(project, { name: path.basename(rel), dirName: WIDGET_TARGET, groupKey: widgetGroup, targetKey: widgetKeys[0], isa: 'PBXSourcesBuildPhase' });
@@ -244,13 +315,21 @@ const withAnyvoRestingLiveActivity = config =>
     fs.writeFileSync(bundlePath, patchWidgetBundle(fs.readFileSync(bundlePath, 'utf8')));
     return cfg;
   });
+};
 
 /** Läuft VOR dem expo-live-activity-Mod (in app.json NACH dem Paket eintragen). */
-const withAnyvoLiveActivityPrebuildGuard = config =>
-  withXcodeProject(config, cfg => {
+const withAnyvoLiveActivityPrebuildGuard = config => {
+  config = configureWidgetMetadata(config);
+  return withInfoPlist(withXcodeProject(config, cfg => {
     snapshotIfTargetExists(cfg.modResults);
     return cfg;
+  }), cfg => {
+    // Registered AFTER the package: save before its unconditional {} overwrite.
+    const file = path.join(cfg.modRequest.platformProjectRoot, WIDGET_TARGET, `${WIDGET_TARGET}.entitlements`);
+    cfg[ENTITLEMENTS_SNAPSHOT] = fs.existsSync(file) ? plist.parse(fs.readFileSync(file, 'utf8')) : {};
+    return cfg;
   });
+};
 
 module.exports = withAnyvoRestingLiveActivity;
 module.exports.withAnyvoLiveActivityPrebuildGuard = withAnyvoLiveActivityPrebuildGuard;
@@ -266,3 +345,6 @@ module.exports.WIDGET_RESOURCES = WIDGET_RESOURCES;
 module.exports.APP_SOURCES = APP_SOURCES;
 module.exports.APP_RESOURCES = APP_RESOURCES;
 module.exports.APP_LOCALIZED_STRINGS = APP_LOCALIZED_STRINGS;
+module.exports.patchWidgetEntitlements = patchWidgetEntitlements;
+module.exports.ENTITLEMENTS_SNAPSHOT = ENTITLEMENTS_SNAPSHOT;
+module.exports.configureWidgetMetadata = configureWidgetMetadata;

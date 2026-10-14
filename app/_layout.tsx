@@ -25,6 +25,7 @@ import { AppIntentRouteHandler } from '@/features/appIntents/AppIntentRouteHandl
 import { RestingLiveActivitySync } from '@/features/tracking/components/RestingLiveActivitySync';
 import { DiagnosticsAccessSync } from '@/components/DiagnosticsAccessSync';
 import { useT } from '@/i18n';
+import { DailyWidgetSync } from '@/features/widgets/DailyWidgetSync';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
 void initMonitoring();
@@ -67,6 +68,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
     <SessionProvider>
       <DiagnosticsAccessSync />
+      <DailyWidgetSync />
       <StatusBar style="light" />
       <SyncProvider />
       <ActiveFaehrtenSelfHeal />
