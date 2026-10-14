@@ -3,6 +3,7 @@ import { restoreLayContinuity, splitContinuousPoints } from '@/features/tracking
 import { DistractionError } from './model';
 
 export interface ParentReference {
+ exchangeTaskId?: string; groupTaskId?: string;
  version: 1; id: string; ownerId: string; dogId: string; date: string | null;
  distanceM: number | null; map: TrackDetailMap;
 }
