@@ -12,7 +12,7 @@ import { canCompleteWithoutApp, type RecoveryDecision } from '@/features/trackin
 import { isQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import { useT } from '@/i18n';
 
-// Alle Kundentexte aus i18n (track.continuation.*); nur die QA-Zeile bleibt technisch.
+// Kundentexte aus i18n (track.continuation.*); interne Recovery-Codes sind keine Statushinweise.
 const K = 'track.continuation.' as const;
 
 // Buttons bewusst mit STATISCHEN Styles (TouchableOpacity statt Style-Funktion): unter der
@@ -49,7 +49,7 @@ export function cancelledDiagnosticsLines(d: RecoveryDecision): string[] {
  *  • searching → primär „Absuche fortsetzen" (bestehende Search-Recovery), sekundär „Ohne App abgeschlossen",
  *  • begonnene, nicht fortsetzbare Absuche (search_started) → „Unvollständige Absuche erkannt" mit
  *    „Absuche verwerfen und Fährte wieder freigeben" oder „Ohne App abgeschlossen" (keine Auto-Entscheidung),
- *  • sonst keine Karte. Im QA-Diagnosemodus steht dann der konkrete Recovery-Reason da.
+ *  • sonst keine Karte, auch bei aktiviertem QA-Diagnosemodus.
  * Keine neue Session, kein Quota-Claim, kein erfundener Suchlauf.
  */
 /** QA-Zeile: Grund + (bei dauerhaftem Abschluss) wodurch/wann — z. B. „Recovery: cancelled · resting_abort · 2026-…". */
@@ -117,14 +117,8 @@ export function TrackResumeCta({ sessionId, dogId, hasRemoteSearchRun, userId, s
     if (showUnavailable && !done && decision && !decision.ok) {
       return <View style={s.card} testID="track-recovery-unavailable"><Text style={s.cardText}>{t('track.profile.unavailable')}</Text></View>;
     }
-    // Entwicklungs-/Testpfad: konkreter Grund statt stillem Verstecken (nur QA-Diagnosemodus).
-    if (decision && !decision.ok && isQaDiagnosticsEnabled()) {
-      return (
-        <View style={s.qa} testID="track-recovery-reason">
-          <Text style={s.qaText}>{recoveryReasonLine(decision)}</Text>
-        </View>
-      );
-    }
+    // Eine abgelehnte Wiederaufnahme ist kein Fehler der Auswertung.
+    // Auch Tester sehen hier nur handlungsrelevante, verständliche Hinweise.
     return null;
   }
 
@@ -340,6 +334,4 @@ const s = StyleSheet.create({
   diagToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', minHeight: 32, paddingVertical: 4 },
   diagToggleText: { color: C.trackTextMut, fontSize: 12, fontWeight: '700' },
   diagLine: { color: C.trackTextSec, fontSize: 12, lineHeight: 17 },
-  qa: { marginBottom: 12, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.05)' },
-  qaText: { color: C.trackTextSec, fontSize: 11, fontFamily: 'Courier' },
 });
