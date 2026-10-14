@@ -116,17 +116,20 @@ describe('TrackResumeCta', () => {
     expect(texts(r)).toContain('nicht in ANYVO beendet');
   });
 
-  it('nicht fortsetzbar: normal nichts sichtbar; im QA-Diagnosemodus der konkrete Reason', async () => {
-    mockEvaluate.mockResolvedValue({ ok: false, reason: 'search_completed' });
-    let r = await mount();
-    expect(r.toJSON()).toBeNull();
-    expect(mockVisible).toHaveBeenLastCalledWith(false);
-    act(() => { r.unmount(); }); renderer = null;
-    mockQa = true;
-    r = await mount();
-    expect(byId(r, 'track-recovery-reason')).toBeDefined();
-    expect(texts(r)).toContain('Recovery: search_completed');
-    expect(byId(r, 'track-resume-cta')).toBeUndefined();
+  describe.each([false, true])('Diagnosemodus %s', qa => {
+    it.each(['search_completed', 'unknown_session', 'completed_without_app', 'no_geometry', 'other_active', 'wrong_user'])(
+      '%s: keine technische Statuszeile und keine vorgetäuschte Wiederaufnahme', async reason => {
+        mockQa = qa;
+        mockEvaluate.mockResolvedValue({ ok: false, reason });
+        const r = await mount();
+        expect(r.toJSON()).toBeNull();
+        expect(mockVisible).toHaveBeenLastCalledWith(false);
+        expect(mockApply).not.toHaveBeenCalled();
+        expect(mockComplete).not.toHaveBeenCalled();
+        expect(mockDiscard).not.toHaveBeenCalled();
+        expect(mockReopen).not.toHaveBeenCalled();
+      },
+    );
   });
 
   it('recovery searching → „Absuche fortsetzen" + „Ohne App abgeschlossen"', async () => {
