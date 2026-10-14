@@ -39,3 +39,29 @@ it('accepts the existing prefixed local session identity without changing it', (
  expect(parseDistractionTrack(track).parentSessionId).toBe(track.parentSessionId);
  expect(() => parseDistractionTrack({ ...track, parentSessionId: 'local_untrusted' })).toThrow('INVALID');
 });
+
+// CLLocation timestamps are Double milliseconds, not necessarily integers.
+it('accepts fractional native fixes and stores canonical milliseconds without mutating the source', () => {
+ const s = createDistractionSampler(), base = 1791980000000;
+ const sample = { lat: 47, lng: 8, accuracy: 3, t: base + 0.375 };
+ const first = s.accept(sample, base + 1)!;
+ expect(first).not.toBeNull(); expect(first.t).toBe(base); expect(sample.t).toBe(base + 0.375);
+ const second = s.accept({ ...sample, lat: 47.00002, t: base + 1000.625 }, base + 1001)!;
+ expect(second).toMatchObject({ t: base + 1000, breakBefore: false });
+ expect(distractionDistance([first, second])).toBeGreaterThan(2);
+ expect(parseDistractionTrack({ ...fixture(), startedAtMs: base, finishedAtMs: base + 1001, points: [first, second] }).points).toHaveLength(2);
+});
+it('keeps fractional fixes subject to freshness, ordering, quality and gap checks', () => {
+ const s = createDistractionSampler(), sample = { lat: 47, lng: 8, accuracy: 3, t: 1000.25 };
+ expect(s.accept(sample, 1000)).toBeNull(); // raw future time must not be hidden by truncation
+ expect(s.accept(sample, 6001)).toBeNull();
+ expect(s.accept({ ...sample, accuracy: 41 }, 1001)).toBeNull();
+ expect(s.accept(sample, 1001)).not.toBeNull();
+ expect(s.accept({ ...sample, lat: 47.00002, t: 1000.75 }, 1001)).toBeNull(); // same stored millisecond
+ expect(s.accept({ ...sample, t: 999.75 }, 1001)).toBeNull();
+ expect(s.accept({ ...sample, lat: 48, t: 2000.25 }, 2001)).toBeNull();
+ expect(s.accept({ ...sample, lat: 47.00002, t: 7000.5 }, 7001)?.breakBefore).toBe(true);
+});
+it.each([NaN, Infinity, -1, 0.5, 8640000000000001])('rejects invalid native time %s', t => {
+ expect(createDistractionSampler().accept({ lat: 47, lng: 8, accuracy: 3, t }, 8640000000000001)).toBeNull();
+});

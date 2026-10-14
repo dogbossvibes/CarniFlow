@@ -14,6 +14,7 @@ const mockStop = jest.fn(), mockRefresh = jest.fn(), mockSave = jest.fn(async (t
 const mockScope = { current: { userId: 'owner', epoch: 0 } };
 const mockRepository = { save: mockSave, list: async () => mockRows };
 let mockMainRecording = false;
+const mockHidden: Record<string, boolean> = {};
 const mockParent = { id: mockTrack.parentSessionId, ownerId: 'owner', dogId: 'dog', date: '2026-10-14', distanceM: 223, map: { lay: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8 }], markers: [{ id: 'g1', type: 'gegenstand', lat: 47, lng: 8 }], start: { lat: 47, lng: 8 }, end: { lat: 47.001, lng: 8 } } };
 const mockLoad = jest.fn(async () => mockParent);
 const mockParents = { load: mockLoad };
@@ -24,7 +25,7 @@ jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({ id: '22222222-2
 jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 jest.mock('@/features/training-groups/registerResources', () => ({ registerGroupResources: jest.fn() }));
 jest.mock('../useDistractions', () => ({ useDistractions: () => ({ userId: 'owner', epoch: 0, repository: mockRepository, parents: mockParents, rows: mockRows, error: null, refresh: mockRefresh, scope: mockScope }),
- useDistractionVisibility: Object.assign((selector: (s: unknown) => unknown) => selector({ hidden: {}, toggle: jest.fn() }), { getState: () => ({ changed: jest.fn() }) }) }));
+ useDistractionVisibility: Object.assign((selector: (s: unknown) => unknown) => selector({ hidden: mockHidden, toggle: jest.fn() }), { getState: () => ({ changed: jest.fn() }) }) }));
 jest.mock('@/features/tracking/components/TrackingMap', () => ({ TrackingMap: (props: unknown) => jest.requireActual('react').createElement('Map', props) }));
 jest.mock('@/features/tracking/hooks/useDogTrackColor', () => ({ useDogTrackColor: () => ({ color: '#aabbcc' }) }));
 jest.mock('@/features/tracking/store/trackingStore', () => ({ useTrackingStore: { getState: () => ({ isRecording: mockMainRecording, isRunningTrack: false }) } }));
@@ -37,7 +38,7 @@ jest.mock('@/features/tracking/utils/positionSource', () => ({ startPositionSour
 let r: ReturnType<typeof TestRenderer.create>;
 function button(label: string) { return r.root.findAll(n => n.props.accessibilityRole === 'button' && n.findAll(x => x.props.children === label).length > 0)[0]; }
 async function press(label: string) { await act(async () => { button(label).props.onPress(); }); }
-beforeEach(() => { mockRows = []; mockMainRecording = false; mockScope.current = { userId: 'owner', epoch: 0 }; jest.clearAllMocks(); mockLoad.mockResolvedValue(mockParent); Object.defineProperty(AppState, 'currentState', { configurable: true, value: 'active' }); });
+beforeEach(() => { mockRows = []; for (const key of Object.keys(mockHidden)) delete mockHidden[key]; mockMainRecording = false; mockScope.current = { userId: 'owner', epoch: 0 }; jest.clearAllMocks(); mockLoad.mockResolvedValue(mockParent); Object.defineProperty(AppState, 'currentState', { configurable: true, value: 'active' }); });
 afterEach(() => { if (r) act(() => r.unmount()); jest.restoreAllMocks(); });
 it('records a separately named draft, pauses, saves and leaves main-track geometry out of writes', async () => {
  const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
@@ -46,9 +47,11 @@ it('records a separately named draft, pauses, saves and leaves main-track geomet
  act(() => r.root.findByType(TextInput).props.onChangeText('Querlinie'));
  await press('startNew');
  const now = 2000; clock.mockReturnValue(now);
- await act(async () => { mockEmit({ lat: 47, lng: 8, accuracy: 3, t: now }); });
+ await act(async () => { mockEmit({ lat: 47, lng: 8, accuracy: 3, t: now - 0.625 }); });
  clock.mockReturnValue(now + 2000);
- try { await act(async () => { mockEmit({ lat: 47.00004, lng: 8, accuracy: 3, t: now + 2000 }); });
+ try { await act(async () => { mockEmit({ lat: 47.00004, lng: 8, accuracy: 3, t: now + 1999.625 }); });
+  const draft = r.root.findAll(n => n.props.layColor === '#aabbcc')[0].props.distractionDraft;
+  expect(draft.points).toHaveLength(2); expect(draft.points.every((p: { t: number }) => Number.isSafeInteger(p.t))).toBe(true);
   await press('pause'); await press('finish');
  } finally { clock.mockReturnValue(now + 2000); }
  expect(mockRows[0].track.name).toBe('Querlinie'); expect(mockRows[0].track.parentSessionId).toBe(mockTrack.parentSessionId);
@@ -74,4 +77,15 @@ it('failed parent load disables starting and offers retry without creating a pha
  await act(async () => { r = TestRenderer.create(<DistractionScreen />); });
  expect(button('startNew').props.disabled).toBe(true); expect(mockSave).not.toHaveBeenCalled();
  await press('refresh'); expect(button('startNew').props.disabled).toBe(false);
+});
+
+it('explains waiting for GPS and explicitly hidden geometry without implying recorded distance', async () => {
+ jest.spyOn(Date, 'now').mockReturnValue(1000);
+ await act(async () => { r = TestRenderer.create(<DistractionScreen />); });
+ mockHidden[mockTrack.id] = true;
+ await press('startNew');
+ expect(r.root.findAll(n => n.props.children === 'waitingGps').length).toBeGreaterThan(0);
+ expect(r.root.findAll(n => n.props.children === 'hiddenHint').length).toBeGreaterThan(0);
+ expect(r.root.findAll(n => n.props.layColor === '#aabbcc')[0].props.distractionDraft).toBeUndefined();
+ expect(mockRows[0].track.points).toHaveLength(0);
 });

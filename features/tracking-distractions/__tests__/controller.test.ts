@@ -1,5 +1,5 @@
 import { createDistractionRecorder, type DistractionRecorderDeps } from '../controller';
-import { DISTRACTION_LIMITS } from '../model';
+import { DISTRACTION_LIMITS, parseDistractionTrack } from '../model';
 import { fixture } from './fixture';
 function setup() {
  let emit!: Parameters<DistractionRecorderDeps['start']>[0], now = 1000, valid = true;
@@ -64,4 +64,19 @@ it('finishes the durable line at capacity and refuses another recording start', 
  await expect(c.start()).rejects.toThrow('LIMIT');
  const result = await c.finish(); expect(result.track.points).toHaveLength(DISTRACTION_LIMITS.points);
  expect(result.track.finishedAtMs).toBe(now); expect(c.snapshot.error).toBeNull(); await c.dispose();
+});
+
+it('persists native fractional fixes through finish and reload as a drawable continuous line', async () => {
+ const h = setup(); let emit!: Parameters<DistractionRecorderDeps['start']>[0]; let now = 1791980000000;
+ h.deps.now = () => now; h.deps.start = async cb => { emit = cb; return { stop: h.stop }; };
+ h.deps.save = async (track, revision) => ({ track: parseDistractionTrack(JSON.parse(JSON.stringify(track))), revision: revision + 1 });
+ await h.controller.start();
+ now += 1001; emit({ lat: 47, lng: 8, accuracy: 3, t: now - 0.625 });
+ now += 1000; emit({ lat: 47.00002, lng: 8, accuracy: 3, t: now - 0.375 });
+ const stored = await h.controller.finish();
+ const reloaded = parseDistractionTrack(JSON.parse(JSON.stringify(stored.track)));
+ expect(reloaded.points).toHaveLength(2);
+ expect(reloaded.points.every(p => Number.isSafeInteger(p.t) && !p.breakBefore)).toBe(true);
+ expect(reloaded.finishedAtMs).toBe(now); expect(reloaded.parentSessionId).toBe(fixture().parentSessionId);
+ await h.controller.dispose();
 });

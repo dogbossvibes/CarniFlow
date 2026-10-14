@@ -18,7 +18,7 @@ import { distractionDistance, DistractionError, type DistractionTrack } from './
 import { createDistractionRecorder } from './controller';
 import { useDistractions, useDistractionVisibility } from './useDistractions';
 import type { StoredDistraction } from './repository';
-import { distractionErrorKey } from './i18n';
+import { distractionErrorKey, distractionDisplayName } from './i18n';
 import { fetchDistractionWeather } from './weather';
 
 function Button({ label, onPress, disabled = false }: { label: string; onPress(): void; disabled?: boolean }) {
@@ -120,13 +120,14 @@ function DistractionContent({ parentId, data }: { parentId: string; data: Return
    <View style={styles.row}><Text style={[styles.body, { color: layColor }]}>━ {t('mainTrack')}</Text><Text style={[styles.body, { color: C.trackPurple }]}>┄ {t('distractionLine')}</Text></View>
    <Button label={t('showAll')} onPress={() => setFitToken(n => n + 1)} /></>}
    {current && <View style={styles.card}>
-    <Text style={styles.heading}>{current.track.name}</Text><Text style={styles.body}>{t(recording ? 'recording' : current.track.finishedAtMs ? 'saved' : 'paused')}</Text>
+    <Text style={styles.heading}>{distractionDisplayName(current.track.name)}</Text><Text style={styles.body}>{t(recording ? current.track.points.length ? 'recording' : 'waitingGps' : current.track.finishedAtMs ? 'saved' : 'paused')}</Text>
     <Text style={styles.body}>{t('distractionDistance')}: {Math.round(distractionDistance(current.track.points))} m · {current.track.points.filter(p => p.breakBefore).length} {t('gaps')}</Text>
     <Text style={styles.body}>{t('laidAt')}: {new Date(current.track.startedAtMs).toLocaleString()}</Text>
     {current.track.finishedAtMs !== null && <Text style={styles.body}>{t('age')}: {Math.max(0, Math.floor((Date.now() - current.track.finishedAtMs) / 60000))} {t('minutes')}</Text>}
     <Text style={styles.body}>{current.track.weather ? `${t('weather')}: ${current.track.weather.temperature ?? '—'} °C · ${current.track.weather.windSpeed ?? '—'} km/h · ${current.track.weather.humidity ?? '—'} %` : t('weatherMissing')}</Text>
-    <View style={styles.row}><Text style={styles.body}>{t('visible')}</Text><Switch accessibilityLabel={`${current.track.name}: ${t('visible')}`} value={!hidden[current.track.id]} onValueChange={() => toggle(current.track.id)} /></View>
-    {recording && current.track.points.length < 2 && <Text accessibilityLiveRegion="polite" style={styles.body}>{t('waitingPoints')}</Text>}
+    <View style={styles.row}><Text style={styles.body}>{t('visible')}</Text><Switch accessibilityLabel={`${distractionDisplayName(current.track.name)}: ${t('visible')}`} value={!hidden[current.track.id]} onValueChange={() => toggle(current.track.id)} /></View>
+    {hidden[current.track.id] && <Text accessibilityLiveRegion="polite" style={styles.body}>{t('hiddenHint')}</Text>}
+    {recording && current.track.points.length === 1 && <Text accessibilityLiveRegion="polite" style={styles.body}>{t('waitingPoints')}</Text>}
     {!current.track.finishedAtMs && <>
      <Button label={t(recording ? 'pause' : current.track.points.length ? 'resume' : 'start')} disabled={busy || !parent || parentLoading} onPress={() => { void act(async () => { if (recording) recorder.current?.pause(); else await recorder.current?.start(); }); }} />
      <Button label={t('finish')} disabled={busy || current.track.points.length < 2} onPress={() => { void act(async () => { await recorder.current?.finish(); await data.refresh(); }); }} />
@@ -138,12 +139,12 @@ function DistractionContent({ parentId, data }: { parentId: string; data: Return
    <Text style={styles.body}>{t('foreground')}</Text>
    {!data.rows.length && <Text style={styles.body}>{t('empty')}</Text>}
    {data.rows.filter(row => row.track.id !== current?.track.id).map(row => <View key={row.track.id} style={styles.card}>
-    <Text style={styles.heading}>{row.track.name}</Text>
+    <Text style={styles.heading}>{distractionDisplayName(row.track.name)}</Text>
     <Text style={styles.body}>{t('laidAt')}: {new Date(row.track.startedAtMs).toLocaleString()}</Text>
     <Text style={styles.body}>{Math.round(distractionDistance(row.track.points))} m · {t(row.track.finishedAtMs ? 'saved' : 'paused')}</Text>
     {row.track.finishedAtMs !== null && <Text style={styles.body}>{t('age')}: {Math.max(0, Math.floor((Date.now() - row.track.finishedAtMs) / 60000))} {t('minutes')}</Text>}
     <Text style={styles.body}>{row.track.weather ? `${t('weather')}: ${row.track.weather.temperature ?? '—'} °C · ${row.track.weather.windSpeed ?? '—'} km/h · ${row.track.weather.humidity ?? '—'} %` : t('weatherMissing')}</Text>
-    <View style={styles.row}><Text style={styles.body}>{t('visible')}</Text><Switch accessibilityLabel={`${row.track.name}: ${t('visible')}`} value={!hidden[row.track.id]} onValueChange={() => toggle(row.track.id)} /></View>
+    <View style={styles.row}><Text style={styles.body}>{t('visible')}</Text><Switch accessibilityLabel={`${distractionDisplayName(row.track.name)}: ${t('visible')}`} value={!hidden[row.track.id]} onValueChange={() => toggle(row.track.id)} /></View>
     {row.track.finishedAtMs === null && <Button label={t('resume')} disabled={busy || recording || !parent || parentLoading} onPress={() => { void act(async () => { await select(row); await recorder.current?.start(); }); }} />}
    </View>)}
   </ScrollView>

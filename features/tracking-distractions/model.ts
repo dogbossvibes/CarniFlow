@@ -61,15 +61,18 @@ export function createDistractionSampler(existing: readonly DistractionPoint[] =
   return {
     interrupt() { pendingBreak = true; goodAt = null; },
     accept(sample: { lat: number; lng: number; t: number; accuracy?: number | null }, now: number): DistractionPoint | null {
-      if (!finite(sample.lat, -90, 90) || !finite(sample.lng, -180, 180) || !time(sample.t)
+      // CLLocation supplies fractional milliseconds. Canonicalize only the stored
+      // timestamp; freshness and future checks still use the original fix time.
+      const storedTime = Math.floor(sample.t);
+      if (!finite(sample.lat, -90, 90) || !finite(sample.lng, -180, 180) || !finite(sample.t, 1, 8_640_000_000_000_000) || !time(storedTime)
         || sample.t > now || now - sample.t > 5000 || sample.accuracy == null || !finite(sample.accuracy, 0, MAX_ACCURACY_M)
-        || last && sample.t <= last.t || goodAt !== null && sample.t <= goodAt) return null;
+        || last && storedTime <= last.t || goodAt !== null && sample.t <= goodAt) return null;
       const gap = pendingBreak || isRecordingGap(goodAt, sample.t);
       const distance = last ? calculateDistance(last, sample) : 0;
       if (last && !gap && distance / ((sample.t - last.t) / 1000) > MAX_SPEED_MPS) return null;
       goodAt = sample.t;
       if (last && !gap && distance < MIN_STEP_M) return null;
-      const point = { lat: sample.lat, lng: sample.lng, t: sample.t, accuracy: sample.accuracy, breakBefore: !!last && gap };
+      const point = { lat: sample.lat, lng: sample.lng, t: storedTime, accuracy: sample.accuracy, breakBefore: !!last && gap };
       last = point; pendingBreak = false; return point;
     },
   };

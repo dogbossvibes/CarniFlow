@@ -1,6 +1,7 @@
 import { Fragment, useMemo } from 'react';
 import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { C } from '@/constants/colors';
+import { distractionDisplayName } from './i18n';
 import type { DistractionTrack } from './model';
 
 export function distractionParts(track: DistractionTrack) {
@@ -14,6 +15,6 @@ export function DistractionLines({ tracks, Polyline, Marker }: { tracks: readonl
    <Polyline coordinates={coordinates} strokeColor="rgba(0,0,0,0.65)" strokeWidth={6} zIndex={0} tappable={false} />
    <Polyline coordinates={coordinates} strokeColor={C.trackPurple} strokeWidth={3} lineDashPattern={[8, 6]} zIndex={1} tappable={false} />
   </Fragment>)}
-  {track.points[0] && <Marker coordinate={{ latitude: track.points[0].lat, longitude: track.points[0].lng }} title={track.name} pinColor={C.trackPurple} />}
+  {track.points[0] && <Marker coordinate={{ latitude: track.points[0].lat, longitude: track.points[0].lng }} title={distractionDisplayName(track.name)} pinColor={C.trackPurple} />}
  </Fragment>)}</>;
 }
