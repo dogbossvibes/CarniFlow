@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,8 +8,9 @@ import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { disciplineColor } from '@/constants/disciplines';
-import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs, setGoalMinutes, resetUnit } from '@/stores/activeTraining';
+import { useActiveTraining, updateExercise, removeExercise, pauseUnit, resumeUnit, elapsedMs, setGoalMinutes, resetUnit, retryActiveTrainingLoad } from '@/stores/activeTraining';
 import { tapHaptic } from '@/lib/haptics';
+import { useSession } from '@/hooks/useSession';
 import { useT } from '@/i18n';
 
 function formatTime(sec: number): string {
@@ -40,6 +41,8 @@ export default function LiveScreen() {
   const router = useRouter();
   const { t } = useT();
   const active = useActiveTraining();
+  const { session } = useSession();
+  const owner = session?.user.id;
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -50,6 +53,9 @@ export default function LiveScreen() {
   const running = !active.paused;
 
   // Kein aktives Training → zurück zum Start.
+  if (active.hydrating) return <ActivityIndicator />;
+  if (active.hydrationError) return <TouchableOpacity accessibilityRole="button" onPress={() => { if (owner) retryActiveTrainingLoad(owner); }}><Text>{t('trainingDoc.draftError')}</Text></TouchableOpacity>;
+  if (active.summaryDraft?.pending) return <Redirect href="/unit/summary" />;
   if (!active.unitId) return <Redirect href="/unit/start" />;
 
   const beenden = () => {
@@ -61,7 +67,7 @@ export default function LiveScreen() {
     tapHaptic();
     Alert.alert(t('training.cancelRunningTitle'), t('training.cancelRunningBody'), [
       { text: t('training.keepTraining'), style: 'cancel' },
-      { text: t('training.discard'), style: 'destructive', onPress: () => { resetUnit(); router.replace('/(tabs)/training' as never); } },
+      { text: t('training.discard'), style: 'destructive', onPress: () => { if (resetUnit(owner) === false) return; router.replace('/(tabs)/training' as never); } },
     ]);
   };
 
@@ -90,7 +96,7 @@ export default function LiveScreen() {
                 <TouchableOpacity
                   key={min}
                   style={[s.zielChip, aktiv && s.zielChipOn]}
-                  onPress={() => { tapHaptic(); setGoalMinutes(min); }}
+                  onPress={() => { tapHaptic(); setGoalMinutes(min, owner); }}
                   activeOpacity={0.8}
                 >
                   <Text style={[s.zielChipTxt, aktiv && s.zielChipTxtOn]}>{min}</Text>
@@ -114,11 +120,11 @@ export default function LiveScreen() {
                     <Text style={s.exName}>{ex.exercise_name}</Text>
                     <Text style={s.exDisc}>{ex.discipline}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => { tapHaptic(); removeExercise(i); }} hitSlop={8}>
+                  <TouchableOpacity onPress={() => { tapHaptic(); removeExercise(i, owner); }} hitSlop={8}>
                     <Ionicons name="close-circle" size={22} color={C.subtle} />
                   </TouchableOpacity>
                 </View>
-                <Stars value={ex.rating} onChange={n => updateExercise(i, { rating: n })} />
+                <Stars value={ex.rating} onChange={n => updateExercise(i, { rating: n }, owner)} />
               </View>
             );
           })}
@@ -137,7 +143,7 @@ export default function LiveScreen() {
           <AnimatedPressable
             style={s.pauseBtn}
             scale={0.95}
-            onPress={() => { tapHaptic(); active.paused ? resumeUnit() : pauseUnit(); }}
+            onPress={() => { tapHaptic(); if (active.paused) resumeUnit(owner); else pauseUnit(owner); }}
           >
             <Ionicons name={running ? 'pause' : 'play'} size={22} color={C.white} />
             <Text style={s.pauseTxt}>{running ? t('timer.pause') : t('timer.resume')}</Text>

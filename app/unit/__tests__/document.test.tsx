@@ -1,11 +1,16 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { Text, TextInput, TouchableOpacity } from 'react-native';
 import DocumentScreen from '@/app/unit/document';
 
 const mockCreateDocumentedUnit = jest.fn();
+const mockAtomicSave = jest.fn();
+const mockReplaySave = jest.fn();
+let mockUuidCounter = 0;
 const mockUpdateDocumentedUnit = jest.fn();
 const mockGetTrainingUnitById = jest.fn();
 const mockGetRecentExerciseNames = jest.fn();
+const mockGetTrainingUnits = jest.fn();
 const mockUpdateCustomCategory = jest.fn();
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -13,8 +18,10 @@ let mockDogs: { id: string; name: string }[] = [];
 let mockDogsLoading = false;
 let mockCategories: { id: string; name: string; icon: string; color: string; exercises: string[]; key: string; label: string; accent: string; custom: boolean }[] = [];
 let mockParams: Record<string, string> = {};
+let mockOwner = 'owner-1';
 
-jest.mock('expo-crypto', () => ({ randomUUID: () => 'unit-id' }));
+jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
+jest.mock('expo-crypto', () => ({ randomUUID: () => mockUuidCounter++ === 0 ? 'unit-id' : `uuid-${mockUuidCounter}` }));
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: jest.fn(), push: (...args: unknown[]) => mockPush(...args), replace: (...args: unknown[]) => mockReplace(...args) }),
@@ -26,7 +33,7 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: ({ children }: { children?: React.ReactNode }) => <View>{children}</View> };
 });
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: mockDogs, loading: mockDogsLoading }) }));
-jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: 'owner-1' } } }) }));
+jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: mockOwner } } }) }));
 jest.mock('@/hooks/useProfile', () => ({ useProfile: () => ({ profile: null }) }));
 jest.mock('@/hooks/useCustomCategories', () => ({ useCustomCategories: () => ({ categories: mockCategories }) }));
 jest.mock('@/constants/disciplines', () => ({
@@ -35,11 +42,22 @@ jest.mock('@/constants/disciplines', () => ({
   disciplineColor: () => '#00FFCC',
 }));
 jest.mock('@/constants/sparten', () => ({ DEFAULT_SPARTEN: ['Fährte'] }));
+jest.mock('@/services/trainingDocumentService', () => ({
+  saveAtomicTrainingDocument: (...args: unknown[]) => mockReplaySave(...args),
+  listExerciseIdentities: async () => ({ data: [], error: null }),
+  listServerTrainingFocuses: async () => ({ data: [], error: null }),
+}));
 jest.mock('@/services/trainingUnitService', () => ({
+  saveDocumentedUnitAtomic: (owner: string, id: string, unit: unknown, exercises: unknown, mode: string, options: { current: () => boolean }) => {
+    const override = mockAtomicSave(owner, id, unit, exercises, mode, options);
+    if (override !== undefined) return override;
+    return mode === 'edit' ? mockUpdateDocumentedUnit(id, unit, exercises, options.current) : mockCreateDocumentedUnit(owner, unit, exercises, id, options.current);
+  },
   createDocumentedUnit: (...args: unknown[]) => mockCreateDocumentedUnit(...args),
   updateDocumentedUnit: (...args: unknown[]) => mockUpdateDocumentedUnit(...args),
   getTrainingUnitById: (...args: unknown[]) => mockGetTrainingUnitById(...args),
   getRecentExerciseNames: (...args: unknown[]) => mockGetRecentExerciseNames(...args),
+  getTrainingPreparationUnits: (...args: unknown[]) => mockGetTrainingUnits(...args),
 }));
 jest.mock('@/services/customCategoryService', () => ({
   updateCustomCategory: (...args: unknown[]) => mockUpdateCustomCategory(...args),
@@ -66,9 +84,12 @@ jest.mock('@/components/ui/DogIcon', () => ({ DogIcon: () => null }));
 // ihr Interaktionsverhalten (Bewertung/Notiz, Sheet-Validierung, Speichern-für-
 // Zukunft) ist Teil dessen, was diese Tests abdecken sollen.
 
+const mounted: ReactTestRenderer[] = [];
+afterEach(async () => { await act(async () => { for (const node of mounted.splice(0)) node.unmount(); await Promise.resolve(); }); });
 function render(): ReactTestRenderer {
   let node!: ReactTestRenderer;
   act(() => { node = TestRenderer.create(<DocumentScreen />); });
+  mounted.push(node);
   return node;
 }
 
@@ -76,7 +97,7 @@ function render(): ReactTestRenderer {
 // vor dem Testende abschliessen — sonst landet das setState nach der
 // act()-Grenze (React-Warnung / potenzieller Zugriff nach Teardown).
 async function flush() {
-  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
 }
 
 function update(node: ReactTestRenderer) {
@@ -129,7 +150,10 @@ function inputByPlaceholder(node: ReactTestRenderer, placeholder: string) {
 }
 
 // Default: keine Vorschläge, ausser ein Test setzt bewusst etwas anderes.
-beforeEach(() => {
+beforeEach(async () => {
+  mockOwner = 'owner-1'; mockUuidCounter = 0; mockAtomicSave.mockReset(); mockReplaySave.mockReset();
+  await AsyncStorage.clear();
+  mockGetTrainingUnits.mockReset().mockReturnValue({ limit: () => Promise.resolve({ data: [], error: null }) });
   mockGetRecentExerciseNames.mockReset().mockResolvedValue({ data: [], error: null });
 });
 
@@ -168,7 +192,7 @@ describe('DocumentScreen dog selection', () => {
       'owner-1',
       expect.objectContaining({ dog_id: 'dog-1' }),
       expect.any(Array),
-      'unit-id',
+      'unit-id', expect.any(Function),
     );
   });
 
@@ -222,6 +246,7 @@ describe('DocumentScreen — Übungsbewertung & Notiz', () => {
 
   it('speichert Bewertung und Notiz pro Übung statt hartem null', async () => {
     const node = render();
+    await flush();
     selectExercise(node);
     await flush();
 
@@ -238,6 +263,7 @@ describe('DocumentScreen — Übungsbewertung & Notiz', () => {
     }).findAllByType(TouchableOpacity).filter((btn) => btn.findAllByProps({ name: 'star-outline' }).length > 0);
     act(() => { stars[2].props.onPress(); });
 
+    tap(node, 'trainingDoc.exerciseDetails');
     const note = inputByPlaceholder(node, 'training.exerciseNotePlaceholder');
     act(() => { note.props.onChangeText('War heute unruhig'); });
 
@@ -248,7 +274,7 @@ describe('DocumentScreen — Übungsbewertung & Notiz', () => {
       'owner-1',
       expect.anything(),
       [expect.objectContaining({ exercise_name: 'Übung', rating: 3, notes: 'War heute unruhig', seq_index: 0 })],
-      'unit-id',
+      'unit-id', expect.any(Function),
     );
   });
 });
@@ -418,7 +444,7 @@ describe('DocumentScreen — Vorschläge aus Historie', () => {
     await flush();
     update(node);
 
-    expect(mockGetRecentExerciseNames).toHaveBeenCalledWith('owner-1', 'Fährte');
+    expect(mockGetRecentExerciseNames).toHaveBeenCalledWith('owner-1', 'Fährte', 20, 'dog-1');
     expect(strings(node)).toContain('Distanzkontrolle');
   });
 
@@ -453,7 +479,7 @@ describe('DocumentScreen — bestehende Einheit bearbeiten', () => {
     mockUpdateDocumentedUnit.mockReset();
     mockGetTrainingUnitById.mockReset().mockResolvedValue({
       data: {
-        dog_id: 'dog-1', notes: 'Altes Training', score: 7, session_date: '2026-05-01',
+        owner_id: 'owner-1', dog_id: 'dog-1', notes: 'Altes Training', score: 7, session_date: '2026-05-01',
         duration_sec: 1200, photos: [], videos: [], audio_files: [],
         motivation: null, konzentration: null, praezision: null, ausdauer: null, trieblage: null, impulskontrolle: null,
         exercises: [{ discipline: 'Fährte', exercise_name: 'Übung', rating: 4, notes: 'Gut gelaufen' }],
@@ -471,6 +497,7 @@ describe('DocumentScreen — bestehende Einheit bearbeiten', () => {
 
     // TextInput-Inhalte sind kein <Text>-Kind (strings() greift hier nicht) —
     // direkt am kontrollierten value der jeweiligen Felder prüfen.
+    tap(node, 'trainingDoc.exerciseDetails');
     expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Gut gelaufen');
     expect(inputByPlaceholder(node, 'training.descriptionPlaceholder').props.value).toBe('Altes Training');
 
@@ -480,14 +507,14 @@ describe('DocumentScreen — bestehende Einheit bearbeiten', () => {
     expect(mockUpdateDocumentedUnit).toHaveBeenCalledWith(
       'unit-1',
       expect.anything(),
-      [expect.objectContaining({ exercise_name: 'Übung', rating: 4, notes: 'Gut gelaufen' })],
+      [expect.objectContaining({ exercise_name: 'Übung', rating: 4, notes: 'Gut gelaufen' })], expect.any(Function),
     );
   });
 
   it('8. eine zuvor gespeicherte eigene Übung erscheint beim erneuten Öffnen weiterhin korrekt (inkl. Kennzeichnung) und bleibt beim Speichern erhalten', async () => {
     mockGetTrainingUnitById.mockReset().mockResolvedValue({
       data: {
-        dog_id: 'dog-1', notes: null, score: null, session_date: '2026-05-01',
+        owner_id: 'owner-1', dog_id: 'dog-1', notes: null, score: null, session_date: '2026-05-01',
         duration_sec: 1200, photos: [], videos: [], audio_files: [],
         motivation: null, konzentration: null, praezision: null, ausdauer: null, trieblage: null, impulskontrolle: null,
         // „Cavaletti / Balance" steht NICHT in der festen Übungsliste des Mocks
@@ -510,7 +537,7 @@ describe('DocumentScreen — bestehende Einheit bearbeiten', () => {
     expect(mockUpdateDocumentedUnit).toHaveBeenCalledWith(
       'unit-1',
       expect.anything(),
-      [expect.objectContaining({ exercise_name: 'Cavaletti / Balance' })],
+      [expect.objectContaining({ exercise_name: 'Cavaletti / Balance' })], expect.any(Function),
     );
   });
 });
@@ -528,17 +555,233 @@ describe('DocumentScreen — Dauer-Stepper', () => {
   it('erhöht und verringert die Dauer in 5-Minuten-Schritten', async () => {
     const node = render();
     await flush();
-    expect(strings(node)).toContain('45');
+    expect(strings(node)).toContain('trainingDoc.optionalDuration');
+    const durationAction = (node.root as unknown as { findByProps: (props: { accessibilityLabel: string }) => { props: { onPress: () => void } } }).findByProps({ accessibilityLabel: 'trainingDoc.enterDuration' });
+    act(() => durationAction.props.onPress());
+    expect(strings(node)).toContain('5');
 
     const findBtn = (label: string) => (node.root as unknown as {
       findByProps: (p: { accessibilityLabel: string }) => { props: { onPress: () => void } };
     }).findByProps({ accessibilityLabel: label });
 
     act(() => { findBtn('training.durationDecrease').props.onPress(); });
-    expect(strings(node)).toContain('40');
+    expect(strings(node)).toContain('5');
 
     act(() => { findBtn('training.durationIncrease').props.onPress(); });
-    act(() => { findBtn('training.durationIncrease').props.onPress(); });
-    expect(strings(node)).toContain('50');
+    expect(strings(node)).toContain('10');
   });
+});
+
+describe('DocumentScreen — safe preparation and draft flow', () => {
+  beforeEach(() => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Malu' }];
+    mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
+    mockCreateDocumentedUnit.mockReset();
+    mockGetTrainingUnitById.mockReset();
+  });
+  const past = () => ({ id: 'past-unit', owner_id: 'owner-1', dog_id: 'dog-1', status: 'completed',
+    session_date: '2026-10-14', created_at: '2026-10-14T12:00:00Z', notes: 'Past observation',
+    shared_with_trainer: true, photos: ['private-past-photo'], videos: ['private-video'],
+    exercises: [{ id: 'past-ex', discipline: 'Fährte', exercise_name: 'Übung', rating: 5, notes: 'Past result', seq_index: 0, duration_sec: 123 }],
+  });
+  it('reuses exercises as a plan with no old performance, media or invented duration', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush();
+    tap(node, 'trainingDoc.buildOn'); await flush();
+    expect(saveButton(node).props.disabled).toBe(true);
+    expect(strings(node)).toContain('trainingDoc.planned');
+    tap(node, 'trainingDoc.planned'); await flush();
+    mockCreateDocumentedUnit.mockResolvedValue({ error: null, data: { id: 'new' } });
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockCreateDocumentedUnit).toHaveBeenCalledWith('owner-1', expect.objectContaining({ duration_sec: null, photos: [], videos: [], shared_with_trainer: false }),
+      [expect.objectContaining({ rating: null, notes: null, duration_sec: null })], 'unit-id', expect.any(Function));
+  });
+  it('does not display another dog history even when a stale response contains it', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush();
+    expect(strings(node)).toContain('Past observation');
+    tap(node, 'Malu'); await flush();
+    expect(strings(node)).not.toContain('Past observation');
+    expect(strings(node)).toContain('trainingDoc.noHistory');
+  });
+  it('guards two presses in the same render and preserves draft after a thrown save', async () => {
+    const node = render(); await flush(); selectExercise(node); await flush();
+    let rejectSave!: (reason: Error) => void;
+    mockCreateDocumentedUnit.mockReturnValue(new Promise((_resolve, reject) => { rejectSave = reject; }));
+    const press = saveButton(node).props.onPress;
+    await act(async () => {
+      const first = press(); const second = press();
+      rejectSave(new Error('offline')); await Promise.all([first, second]);
+    });
+    expect(mockCreateDocumentedUnit).toHaveBeenCalledTimes(1);
+    expect(saveButton(node).props.disabled).toBe(false);
+    act(() => node.unmount()); await flush();
+    const reopened = render(); await flush();
+    expect(strings(reopened)).toContain('training.selectedCount');
+    expect(saveButton(reopened).props.disabled).toBe(false);
+  });
+  it('keeps existing media/transcript, measured times and trainer permission when editing', async () => {
+    mockParams = { id: 'edit-unit' };
+    mockGetTrainingUnitById.mockResolvedValue({ data: { ...past(), started_at: '2026-10-14T10:00:00Z', ended_at: '2026-10-14T10:02:00Z', duration_sec: 120,
+      audio_files: [{ url: 'audio-a', duration: '0:10', transcript: 'Existing transcript' }] }, error: null });
+    mockUpdateDocumentedUnit.mockResolvedValue({ error: null });
+    const node = render(); await flush();
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockUpdateDocumentedUnit).toHaveBeenCalledWith('edit-unit', expect.objectContaining({ shared_with_trainer: true,
+      started_at: '2026-10-14T10:00:00Z', ended_at: '2026-10-14T10:02:00Z',
+      audio_files: [{ url: 'audio-a', duration: '0:10', transcript: 'Existing transcript' }],
+    }), [expect.objectContaining({ duration_sec: 123, rating: 5, notes: 'Past result' })], expect.any(Function));
+  });
+});
+
+
+describe('DocumentScreen — asynchronous identity and edit reconciliation', () => {
+  beforeEach(() => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false;
+    mockCategories = []; mockParams = { dogId: 'dog-1' };
+    mockCreateDocumentedUnit.mockReset(); mockUpdateDocumentedUnit.mockReset(); mockGetTrainingUnitById.mockReset();
+  });
+  it('rejects a late history response after switching accounts', async () => {
+    let resolveOld!: (value: unknown) => void;
+    mockGetTrainingUnits.mockReturnValueOnce({ limit: () => new Promise(resolve => { resolveOld = resolve; }) });
+    const node = render(); await flush();
+    mockOwner = 'owner-2';
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [], error: null }) });
+    update(node); await flush();
+    await act(async () => { resolveOld({ data: [{ id: 'old', owner_id: 'owner-1', dog_id: 'dog-1', status: 'completed',
+      session_date: '2026-10-14', created_at: '2026-10-14', notes: 'PRIVATE OLD OWNER',
+      exercises: [{ id: 'row', discipline: 'Fährte', exercise_name: 'Übung' }] }], error: null }); });
+    expect(strings(node)).not.toContain('PRIVATE OLD OWNER');
+  });
+  it('does not overwrite an edit whose server aggregate changed during entry', async () => {
+    mockParams = { id: 'existing' };
+    const source = { id: 'existing', owner_id: 'owner-1', dog_id: 'dog-1', status: 'completed', session_date: '2026-10-14',
+      notes: 'original', photos: [], videos: [], audio_files: [], exercises: [{ id: 'row', discipline: 'Fährte', exercise_name: 'Übung', rating: 3, notes: null }] };
+    mockGetTrainingUnitById.mockResolvedValue({ data: source, error: null });
+    const node = render(); await flush();
+    mockGetTrainingUnitById.mockResolvedValue({ data: { ...source, notes: 'changed on another device' }, error: null });
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockUpdateDocumentedUnit).not.toHaveBeenCalled();
+    expect(strings(node)).toContain('trainingDoc.reviewSave');
+  });
+  it('includes new focus and identity in one atomic request, keeps inputs on failure, and never uploads device-only focus data', async () => {
+    mockReplace.mockClear();
+    const node = render(); await flush(); selectExercise(node); await flush();
+    const focusInput = inputByPlaceholder(node, 'trainingDoc.nextFocus');
+    act(() => { focusInput.props.onChangeText('Keep some distance'); }); await flush();
+    mockCreateDocumentedUnit.mockResolvedValueOnce({ data: null, error: { message: 'offline' } });
+    await act(async () => { await saveButton(node).props.onPress(); }); await flush();
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(inputByPlaceholder(node, 'trainingDoc.nextFocus').props.value).toBe('Keep some distance');
+    const options = mockAtomicSave.mock.calls[0][5];
+    expect(options.focusChanges).toEqual([expect.objectContaining({ action: 'create', request: expect.objectContaining({ text: 'Keep some distance', disciplineKey: 'system:faehrte' }) })]);
+    expect(options.identityChanges).toHaveLength(1);
+    mockCreateDocumentedUnit.mockResolvedValueOnce({ data: { id: 'unit-id' }, error: null });
+    await act(async () => { await saveButton(node).props.onPress(); }); await flush();
+    expect(mockAtomicSave.mock.calls[1][5].focusChanges).toEqual(options.focusChanges);
+    expect(await AsyncStorage.getItem('training_focus_device_v1:owner-1')).toBeNull();
+  });});
+
+describe('DocumentScreen — final storage guards', () => {
+  beforeEach(() => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = [];
+    mockParams = { dogId: 'dog-1' }; mockReplace.mockReset(); mockCreateDocumentedUnit.mockReset();
+  });
+  it('does not navigate after an account switch during draft removal', async () => {
+    const node = render(); await flush(); selectExercise(node); await flush();
+    const remove = AsyncStorage.removeItem as jest.Mock;
+    const original = remove.getMockImplementation()!;
+    let resolveRemove!: () => void;
+    remove.mockImplementationOnce((key: string) => new Promise<void>(resolve => { resolveRemove = () => { void original(key).then(resolve); }; }));
+    mockCreateDocumentedUnit.mockResolvedValue({ data: { id: 'unit-id' }, error: null });
+    let pending!: Promise<void>;
+    await act(async () => { pending = saveButton(node).props.onPress(); for (let i = 0; i < 20; i++) await Promise.resolve(); });
+    expect(resolveRemove).toBeDefined();
+    mockOwner = 'owner-2'; update(node); await flush();
+    await act(async () => { resolveRemove(); await pending; });
+    expect(mockReplace).not.toHaveBeenCalled();
+    remove.mockImplementation(original);
+  });
+  it('preserves an unreadable draft instead of overwriting it with an empty form', async () => {
+    const key = `training_document_v1:owner-1:new:${encodeURIComponent(JSON.stringify(['dog-1', null]))}`;
+    await AsyncStorage.setItem(key, '{broken draft');
+    const node = render(); await flush();
+    expect(strings(node)).toContain('trainingDoc.draftError');
+    expect(await AsyncStorage.getItem(key)).toBe('{broken draft');
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('DocumentScreen — atomic restore and exact duration', () => {
+  const source = { id: 'existing', owner_id: 'owner-1', dog_id: 'dog-1', status: 'completed', session_date: '2026-10-14',
+    notes: 'original', duration_sec: 125, photos: ['old-photo'], videos: [], audio_files: [], score: 4,
+    exercises: [{ id: 'row', discipline: 'Fährte', exercise_name: 'Übung', rating: 3, notes: 'old exercise', duration_sec: 37, seq_index: 0 }] };
+  beforeEach(() => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = []; mockParams = { id: 'existing' };
+    mockGetTrainingUnitById.mockReset().mockResolvedValue({ data: source, error: null });
+    mockReplace.mockReset(); mockUpdateDocumentedUnit.mockReset().mockResolvedValue({ data: { id: 'existing' }, error: null });
+  });
+  it('preserves125seconds on a note-only edit and uses manual minutes only after explicit change', async () => {
+    const node = render(); await flush();
+    act(() => { inputByPlaceholder(node, 'training.descriptionPlaceholder').props.onChangeText('new observation'); });
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockAtomicSave.mock.calls[0][2].duration_sec).toBe(125);
+    expect(mockAtomicSave.mock.calls[0][3][0].duration_sec).toBe(37);
+  });
+  it('captures an explicit duration change instead of retaining the old seconds', async () => {
+    const node = render(); await flush();
+    const button = (node.root as unknown as { findByProps: (p: object) => { props: { onPress: () => void } } }).findByProps({ accessibilityLabel: 'training.durationIncrease' });
+    act(() => button.props.onPress());
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockAtomicSave.mock.calls[0][2].duration_sec).toBe(420);
+  });
+  it('restores a lost-ack edit from its exact durable intent even if the form snapshot is older', async () => {
+    let originalRequest: any;
+    mockAtomicSave.mockImplementation(async (_owner, id, unit, exercises, _mode, options) => {
+      originalRequest = { requestId: options.operationId, unitId: id, expectedToken: 'original-token', unit,
+        exercises, focusChanges: options.focusChanges, identityChanges: options.identityChanges };
+      await AsyncStorage.setItem('training_atomic_save_v1:owner-1:existing', JSON.stringify({ version: 1, value: { fingerprint: 'original-input', request: originalRequest, completed: false } }));
+      return { data: null, error: { message: 'reply lost' } };
+    });
+    const first = render(); await flush();
+    act(() => { inputByPlaceholder(first, 'training.descriptionPlaceholder').props.onChangeText('COMMITTED NEW NOTE'); });
+    await act(async () => { await saveButton(first).props.onPress(); }); await flush();
+    await act(async () => { first.unmount(); }); mounted.splice(mounted.indexOf(first), 1);
+    const key = 'training_document_v1:owner-1:edit:existing';
+    const oldDraft = JSON.parse((await AsyncStorage.getItem(key))!);
+    expect(oldDraft.value.unitId).toBe('existing');
+    oldDraft.value.description = 'OLDER LOCAL SNAPSHOT';
+    await AsyncStorage.setItem(key, JSON.stringify(oldDraft));
+    mockGetTrainingUnitById.mockResolvedValue({ data: { ...source, notes: 'COMMITTED NEW NOTE' }, error: null });
+    const second = render(); await flush();
+    expect(inputByPlaceholder(second, 'training.descriptionPlaceholder').props.value).toBe('COMMITTED NEW NOTE');
+    expect(saveButton(second).props.disabled).toBe(false);
+    mockReplaySave.mockResolvedValue({ data: { version: 1, unitId: 'existing', token: 'saved-token', currentToken: 'saved-token', duplicate: true, exerciseIds: ['row'] }, error: null });
+    await act(async () => { await saveButton(second).props.onPress(); });
+    expect(mockReplaySave).toHaveBeenCalledWith('owner-1', originalRequest, expect.any(Function));
+    expect(mockAtomicSave).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith({ pathname: '/unit/detail', params: { id: 'existing' } });
+  });
+  it('preserves exact remote seconds when restoring an older draft without the seconds field', async () => {
+    const first = render(); await flush(); await act(async () => first.unmount()); mounted.splice(mounted.indexOf(first), 1);
+    const key = 'training_document_v1:owner-1:edit:existing'; const saved = JSON.parse((await AsyncStorage.getItem(key))!);
+    delete saved.value.recordedDurationSec; saved.value.durationMin = 2; saved.value.description = 'legacy draft note';
+    await AsyncStorage.setItem(key, JSON.stringify(saved));
+    const second = render(); await flush(); await act(async () => { await saveButton(second).props.onPress(); });
+    expect(mockAtomicSave.mock.calls[0][2].duration_sec).toBe(125);
+  });
+  it('tapping the already selected dog leaves results and exercise duration intact', async () => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Other' }];
+    const node = render(); await flush(); tap(node, 'Yam');
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockAtomicSave.mock.calls[0][3][0]).toMatchObject({ notes: 'old exercise', duration_sec: 37, rating: 3 });
+  });
+  it('keeps the real timer seconds instead of replacing97seconds with rounded minutes', async () => {
+    mockParams = { dogId: 'dog-1', duration: '97' }; mockCreateDocumentedUnit.mockResolvedValue({ data: {}, error: null });
+    const node = render(); await flush(); selectExercise(node); await flush();
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockAtomicSave.mock.calls[0][2].duration_sec).toBe(97);
+  });
+
 });

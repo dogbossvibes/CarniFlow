@@ -11,8 +11,10 @@ import { useSession } from '@/hooks/useSession';
 import { getDiscipline, type Discipline } from '@/constants/disciplines';
 import { HeroImage } from '@/components/training/HeroImage';
 import { ExerciseCard } from '@/components/training/ExerciseCard';
+import { trainingUnitFingerprint } from '@/features/training/documentation/retry';
+import type { TrainingUnit } from '@/types/trainingUnit';
 import { createTrainingUnit } from '@/services/trainingUnitService';
-import { useActiveTraining, startUnit, addExercise } from '@/stores/activeTraining';
+import { useActiveTraining, startUnit, addExercise, retryActiveTrainingLoad } from '@/stores/activeTraining';
 import { useT } from '@/i18n';
 
 const HERO_H = 260;
@@ -63,6 +65,8 @@ export default function DisciplineScreen() {
 
   const handleChoose = async (name: string) => {
     const ownerId = session?.user.id;
+    if (active.hydrating) return;
+    if (active.hydrationError && ownerId) { Alert.alert(t('common.error'), t('trainingDoc.draftError'), [{ text: t('common.retry'), onPress: () => retryActiveTrainingLoad(ownerId) }]); return; }
     if (!ownerId || !dogId) {
       Alert.alert(t('common.error'), t('training.sessionOrDogMissing'));
       return;
@@ -78,10 +82,10 @@ export default function DisciplineScreen() {
         Alert.alert(t('common.error'), error?.message ?? t('training.startError'));
         return;
       }
-      startUnit({ unitId: data.id, dogId, dogName: dogName || null });
+      if (startUnit({ unitId: data.id, dogId, dogName: dogName || null, ownerId, sourceFingerprint: trainingUnitFingerprint(data as TrainingUnit) }) === false) return;
     }
 
-    addExercise({ discipline: disc.label, exercise_name: name, rating: null, notes: null, duration_sec: null });
+    addExercise({ discipline: disc.label, exercise_name: name, rating: null, notes: null, duration_sec: null }, ownerId);
     router.replace('/unit/live');
   };
 

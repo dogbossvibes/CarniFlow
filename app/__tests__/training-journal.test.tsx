@@ -1,7 +1,19 @@
+// ANYVO Gesture UX v1 — Training rollout (30.09.2026): app/training-journal
+// .tsx now renders non-track rows via AnyvoSwipeRow (components/ui/
+// AnyvoSwipeRow.tsx), which needs react-native-gesture-handler's own Jest
+// environment setup, and transitively imports lib/monitoring (for
+// captureError), which touches @react-native-async-storage/async-storage at
+// module scope — same mocks already established elsewhere in this codebase
+// wherever a module transitively touches either.
+import 'react-native-gesture-handler/jestSetup';
+
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { Alert, Text, TouchableOpacity } from 'react-native';
 import TrainingJournalScreen from '@/app/training-journal';
 import type { FeedItem } from '@/services/trainingFeed';
+jest.mock('@/services/trainingDocumentService', () => ({ listServerTrainingFocuses: async () => ({ data: [], error: null }) }));
+jest.mock('@react-native-async-storage/async-storage', () =>
+  jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -104,9 +116,13 @@ function mk(over: Partial<FeedItem> = {}): FeedItem {
   };
 }
 
+const mounted: ReactTestRenderer[] = [];
+afterEach(() => { act(() => { for (const node of mounted.splice(0)) node.unmount(); }); });
+jest.mock('@/lib/monitoring', () => ({ captureError: jest.fn() }));
 function render(): ReactTestRenderer {
   let node!: ReactTestRenderer;
   act(() => { node = TestRenderer.create(<TrainingJournalScreen />); });
+  mounted.push(node);
   return node;
 }
 

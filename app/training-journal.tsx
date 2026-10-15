@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -6,10 +6,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
+import { ServerTrainingFocusList, useServerTrainingFocuses } from '@/components/training/ServerTrainingFocusList';
+import { TrainingFocusList } from '@/components/training/TrainingFocusList';
+import { readTrainingFocuses, type TrainingFocus } from '@/features/training/documentation/focus';
 import { useTrainingFeed } from '@/hooks/useTrainingFeed';
 import { DISCIPLINES, disciplineColor } from '@/constants/disciplines';
 import type { FeedItem } from '@/services/trainingFeed';
 import { deleteFeedItem } from '@/services/deleteTraining';
+import { AnyvoSwipeRow, type AnyvoSwipeAction } from '@/components/ui/AnyvoSwipeRow';
+import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import {
   filterFeed, groupFeed, summarize, paginate, hasMore, disciplinesOf,
   itemDiscipline, itemDogName, itemHasMedia, itemNotePreview,
@@ -34,7 +39,7 @@ export default function TrainingJournalScreen() {
   const { t, locale } = useT();
   const { dogId: paramDogId } = useLocalSearchParams<{ dogId?: string }>();
   const { dogs } = useDogs();
-  const { feed, loading, refresh } = useTrainingFeed();   // voller Feed, Filter clientseitig
+  const { feed, loading, refresh, ownerId, error: feedError } = useTrainingFeed();   // voller Feed, Filter clientseitig
 
   const [dogFilter, setDogFilter] = useState<string | null>(paramDogId ?? null);
   const [discFilter, setDiscFilter] = useState<string | null>(null);
@@ -42,6 +47,18 @@ export default function TrainingJournalScreen() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
+  const [focusData, setFocusData] = useState<{ owner: string; items: TrainingFocus[] }>({ owner: '', items: [] });
+  const [focusRevision, setFocusRevision] = useState(0);
+  const serverFocuses = useServerTrainingFocuses(ownerId, undefined, undefined, focusRevision);
+  const focusLabels = new Map(DISCIPLINES.map(d => [`system:${d.key}`, d.label]));
+  for (const item of feed) for (const exercise of item.exercises ?? []) if (exercise.discipline_key) focusLabels.set(exercise.discipline_key, exercise.discipline);
+  useEffect(() => {
+    if (!ownerId) return;
+    let cancelled = false;
+    readTrainingFocuses(ownerId).then(items => { if (!cancelled) setFocusData({ owner: ownerId, items }); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [ownerId, focusRevision, feed]);
+  const currentFocuses = focusData.owner === ownerId ? focusData.items : [];
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const year = new Date().getFullYear();
@@ -65,6 +82,51 @@ export default function TrainingJournalScreen() {
     else if (it.source === 'track') router.push(`/track/${it.id}` as never);
     else                            router.push(`/training/${it.id}` as never);
   };
+
+  // ANYVO Gesture UX v1 — Training rollout (30.09.2026). Same routes the
+  // detail screens' own existing edit affordances already use — no new
+  // edit flow: app/unit/detail.tsx's own "Bearbeiten" button navigates to
+  // /unit/document for a 'unit' entry; app/training/[id].tsx (the legacy
+  // 'session' detail screen) already reads an `edit` search param
+  // (useLocalSearchParams<{ id: string; edit?: string }>()) to open
+  // directly in its existing inline edit mode. Never called for 'track'
+  // entries (Tracking domain, out of scope for this patch).
+  const openEdit = (it: FeedItem) => {
+    if (it.source === 'unit') router.push({ pathname: '/unit/document', params: { id: it.id } } as never);
+    else router.push({ pathname: '/training/[id]', params: { id: it.id, edit: 'true' } } as never);
+  };
+
+  // ANYVO Gesture UX v1 — Training rollout (30.09.2026). Wraps the exact
+  // same confirm-then-delete mechanics already used by confirmDeleteTrack
+  // just below (same Alert.alert pattern, same deleteFeedItem service, same
+  // refresh()) — only for non-track (unit/session) entries. Returns a real
+  // Promise<void> (resolving only once the user has actually decided, and
+  // rejecting only on a genuine delete failure) so AnyvoSwipeRow's own
+  // already-hardened async handling (components/ui/AnyvoSwipeRow.tsx,
+  // 30.09.2026) can meaningfully govern this action's pending/retry/
+  // no-unhandled-rejection behavior end-to-end — not just the network call
+  // in isolation. User-facing error feedback stays this handler's own
+  // responsibility (Alert.alert), exactly as AnyvoSwipeRow's contract
+  // requires; AnyvoSwipeRow only additionally reports the same failure via
+  // captureError for telemetry.
+  const confirmDeleteTraining = useCallback((it: FeedItem): Promise<void> => new Promise<void>((resolve, reject) => {
+    Alert.alert(t('training.deleteTitle'), t('training.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel', onPress: () => resolve() },
+      {
+        text: t('common.delete'), style: 'destructive',
+        onPress: async () => {
+          const { error } = await deleteFeedItem(it);   // RLS: nur eigene Einträge
+          if (error) {
+            Alert.alert(t('journal.deleteTrainingError'));
+            reject(new Error(error));
+            return;
+          }
+          await refresh();                              // Feed aktualisieren (kein App-Reload)
+          resolve();
+        },
+      },
+    ], { cancelable: true, onDismiss: () => resolve() });
+  }), [t, refresh]);
 
   // Fährteneintrag löschen: bestätigen → über die bestehende vereinheitlichte
   // Delete-Fassade (deleteFeedItem; löscht die Fährten-Session inkl. FK-Cascade auf
@@ -127,6 +189,16 @@ export default function TrainingJournalScreen() {
         >
           <Text style={s.subtitle}>{t('journal.subtitle')}</Text>
 
+          {ownerId && <ServerTrainingFocusList key={`${ownerId}:${dogFilter}:${discFilter}`} ownerId={ownerId} {...serverFocuses}
+            rows={serverFocuses.rows.filter(f => (!dogFilter || f.dog_id === dogFilter) && (!discFilter || focusLabels.get(f.discipline_key) === discFilter))}
+            dogNames={Object.fromEntries(dogs.map(d => [d.id, d.name]))}
+            onRetry={() => setFocusRevision(v => v + 1)} onOpenSource={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} />}
+          {ownerId && <TrainingFocusList collapsedByDefault key={`${ownerId}:${dogFilter}:${discFilter}`} ownerId={ownerId}
+            dogId={dogFilter} discipline={discFilter}
+            dogNames={Object.fromEntries(dogs.map(d => [d.id, d.name]))}
+            availableUnitIds={feedError ? undefined : new Set(feed.filter(it => it.source === 'unit').map(it => it.id))}
+            onOpenSource={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })}
+            onChange={() => setFocusRevision(v => v + 1)} />}
           {/* Zusammenfassung „Dieses Jahr" */}
           <View style={s.summaryCard}>
             <Text style={s.summaryEyebrow}>{t('journal.thisYear')}</Text>
@@ -202,10 +274,11 @@ export default function TrainingJournalScreen() {
             </TouchableOpacity>
           ) : null}
 
+          {feedError && <TouchableOpacity onPress={onRefresh} style={s.loadMore} accessibilityRole="button"><Text style={s.cardNote}>{t('trainingDoc.historyError')}</Text></TouchableOpacity>}
           {/* Inhalt */}
           {loading && feed.length === 0 ? (
             <ActivityIndicator color={C.trackPrimary} style={{ marginTop: 40 }} />
-          ) : feed.length === 0 ? (
+          ) : feed.length === 0 && feedError ? null : feed.length === 0 ? (
             <EmptyState
               icon="book-outline"
               title={t('journal.emptyTitle')}
@@ -230,15 +303,17 @@ export default function TrainingJournalScreen() {
                       <JournalCard
                         key={`${it.source}-${it.id}`}
                         item={it}
+                        focus={it.source === 'unit' ? (serverFocuses.rows.find(f => f.source_unit_id === it.id && f.status !== 'done')?.text ?? currentFocuses.find(f => f.originUnitId === it.id && f.status !== 'done')?.text) : undefined}
                         dogName={itemDogName(it) ?? dogName(it.dog_id)}
                         localeTag={intlLocale(locale)}
                         minutesLabel={(min) => t('journal.minutesShort', { count: min })}
                         pointsLabel={(pts) => t('dog.pointsShort', { points: pts })}
                         mediaLabel={t('journal.media')}
                         onPress={() => openDetail(it)}
-                        onDelete={it.source === 'track' ? () => confirmDeleteTrack(it) : undefined}
+                        onDelete={it.source === 'track' ? () => confirmDeleteTrack(it) : () => confirmDeleteTraining(it)}
                         deleting={deletingId === it.id}
-                        deleteLabel={t('journal.deleteTrackA11y')}
+                        deleteLabel={it.source === 'track' ? t('journal.deleteTrackA11y') : t('training.deleteA11y')}
+                        onEdit={it.source === 'track' ? undefined : () => openEdit(it)}
                       />
                     ))}
                   </View>
@@ -295,21 +370,50 @@ function EmptyState({ icon, title, text, ctaLabel, onCta }: { icon: IconName; ti
   );
 }
 
+// ANYVO Gesture UX v1 — Training rollout (30.09.2026). Row-type is decided
+// exclusively by item.source, never by which props happen to be passed:
+// - 'track' (GPS-Fährten) → the exact, byte-identical legacy row this
+//   component had before this patch (plain TouchableOpacity + the existing
+//   inline trash-icon button). Tracking domain, explicitly out of scope —
+//   nothing about it changes.
+// - 'unit'/'session' (real training entries) → migrated to the shared
+//   AnyvoSwipeRow (components/ui/AnyvoSwipeRow.tsx), the exact same
+//   already-hardened primitive the dog-command pilot (062347b/ffb332b)
+//   uses. TAP still opens the exact same existing detail flow (onPress,
+//   unchanged). SWIPE left reveals Bearbeiten/Löschen, calling the exact
+//   same pre-existing onEdit/onDelete handlers the screen provides above —
+//   no second edit/delete implementation. LONG PRESS opens the same
+//   Öffnen/Bearbeiten/Löschen action-sheet pattern as
+//   app/dog-command/[id].tsx's pilot. "Wiederholen"/"Teilen" are
+//   deliberately NOT offered — audited and confirmed to have no existing,
+//   tested handler reachable from a FeedItem at this level (see the
+//   accompanying rollout report).
 function JournalCard({
   item, dogName, localeTag, minutesLabel, pointsLabel, mediaLabel, onPress,
-  onDelete, deleting, deleteLabel,
+  onDelete, deleting, deleteLabel, onEdit, editLabel, focus,
 }: {
   item: FeedItem;
+  focus?: string;
   dogName: string;
   localeTag: string;
   minutesLabel: (min: number) => string;
   pointsLabel: (pts: number) => string;
   mediaLabel: string;
   onPress: () => void;
+  // Legacy (track) inline delete button only. Ignored for training entries
+  // — see onDelete's second role below.
   onDelete?: () => void;
   deleting?: boolean;
   deleteLabel?: string;
+  // Only ever provided for non-track entries (see the call site above).
+  onEdit?: () => void;
+  editLabel?: string;
 }) {
+  const { t } = useT();
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const isTrack = item.source === 'track';
+
   const discipline = itemDiscipline(item);
   const accent = disciplineColor(discipline);
   const note = itemNotePreview(item);
@@ -321,22 +425,30 @@ function JournalCard({
   const meta = [dogName || null, durationMin != null ? minutesLabel(durationMin) : null, distance, time].filter(Boolean).join(' · ');
   const a11y = `${discipline}. ${meta}${item.rating != null ? `. ${pointsLabel(item.rating)}` : ''}${media ? `. ${mediaLabel}` : ''}`;
 
-  return (
-    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={a11y}>
+  const cardInner = (
+    <>
       <View style={[s.cardIcon, { backgroundColor: `${accent}22`, borderColor: `${accent}55` }]}>
         <Ionicons name={discIcon(discipline)} size={17} color={accent} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={s.cardTitle} numberOfLines={1}>{discipline}</Text>
+        <Text style={s.cardTitle} numberOfLines={1}>{isTrack ? discipline : disciplinesOf([item]).join(' · ')}</Text>
         <Text style={s.cardMeta} numberOfLines={1}>{meta}</Text>
-        {note ? <Text style={s.cardNote} numberOfLines={1}>{note}</Text> : null}
+        {item.source !== 'track' && item.exercises?.length ? <Text style={s.cardNote} numberOfLines={expanded ? undefined : 1}>
+          {item.exercises.map(e => e.exercise_name).join(' · ')}
+        </Text> : null}
+        {note ? <Text style={s.cardNote} numberOfLines={expanded ? undefined : 1}>{note}</Text> : null}
+        {focus ? <Text style={s.cardNote} numberOfLines={expanded ? undefined : 1}>{t('trainingDoc.nextFocus')}: {focus}</Text> : null}
+        {!isTrack && <TouchableOpacity onPress={() => setExpanded(v => !v)} style={{ minHeight: 44, justifyContent: 'center' }}
+          accessibilityRole="button" accessibilityState={{ expanded }}>
+          <Text style={s.cardNote}>{t(expanded ? 'trainingDoc.less' : 'trainingDoc.more')}</Text>
+        </TouchableOpacity>}
       </View>
       <View style={s.cardRight}>
         {item.rating != null ? (
           <View style={s.pill}><Text style={s.pillTxt}>{pointsLabel(item.rating)}</Text></View>
         ) : null}
         {media ? <Ionicons name="images-outline" size={15} color={C.trackTextMut} accessibilityLabel={mediaLabel} /> : null}
-        {onDelete ? (
+        {isTrack && onDelete ? (
           deleting ? (
             <ActivityIndicator size="small" color={C.trackTextMut} style={s.cardDelete} />
           ) : (
@@ -353,7 +465,57 @@ function JournalCard({
         ) : null}
         <Ionicons name="chevron-forward" size={16} color={C.trackTextMut} />
       </View>
-    </TouchableOpacity>
+    </>
+  );
+
+  if (isTrack) {
+    // Legacy path — byte-identical to pre-Gesture-UX-v1 behavior.
+    return (
+      <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={a11y}>
+        {cardInner}
+      </TouchableOpacity>
+    );
+  }
+
+  const actions: AnyvoSwipeAction[] = [
+    ...(onEdit ? [{ key: 'edit', label: editLabel ?? t('common.edit'), icon: 'create-outline' as const, onPress: onEdit }] : []),
+    ...(onDelete ? [{ key: 'delete', label: deleteLabel ?? t('common.delete'), icon: 'trash-outline' as const, destructive: true, onPress: onDelete }] : []),
+  ];
+
+  return (
+    <>
+      <AnyvoSwipeRow
+        onPress={onPress}
+        onLongPress={actions.length ? () => setActionsOpen(true) : undefined}
+        rightActions={actions}
+        accessibilityLabel={actions.length ? `${a11y}, lange drücken für Aktionen` : a11y}
+      >
+        <View style={s.card}>{cardInner}</View>
+      </AnyvoSwipeRow>
+
+      {/* Long-Press-Aktionsmenü — dasselbe Muster wie
+          app/dog-command/[id].tsx's Pilot (ein Sheet pro Row). */}
+      <AnyvoBottomSheet visible={actionsOpen} onClose={() => setActionsOpen(false)} title={discipline}>
+        <View style={{ gap: 8, paddingBottom: 6 }}>
+          <TouchableOpacity testID="journal-action-menu-open" style={s.menuAction} onPress={() => { setActionsOpen(false); onPress(); }} activeOpacity={0.85} accessibilityRole="button">
+            <Ionicons name="open-outline" size={19} color={C.trackText} />
+            <Text style={s.menuActionTxt}>{t('common.open')}</Text>
+          </TouchableOpacity>
+          {onEdit ? (
+            <TouchableOpacity testID="journal-action-menu-edit" style={s.menuAction} onPress={() => { setActionsOpen(false); onEdit(); }} activeOpacity={0.85} accessibilityRole="button">
+              <Ionicons name="create-outline" size={19} color={C.trackText} />
+              <Text style={s.menuActionTxt}>{t('common.edit')}</Text>
+            </TouchableOpacity>
+          ) : null}
+          {onDelete ? (
+            <TouchableOpacity testID="journal-action-menu-delete" style={s.menuAction} onPress={() => { setActionsOpen(false); onDelete(); }} activeOpacity={0.85} accessibilityRole="button">
+              <Ionicons name="trash-outline" size={19} color={C.trackDanger} />
+              <Text style={[s.menuActionTxt, { color: C.trackDanger }]}>{t('common.delete')}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </AnyvoBottomSheet>
+    </>
   );
 }
 
@@ -398,6 +560,8 @@ const s = StyleSheet.create({
   cardNote:  { fontSize: 12, color: C.trackTextMut, fontWeight: '500', marginTop: 2 },
   cardRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardDelete:{ width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  menuAction:   { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, paddingHorizontal: 14, paddingVertical: 13 },
+  menuActionTxt:{ fontSize: 14.5, color: C.trackText, fontWeight: '700' },
   pill:      { borderRadius: 9, borderWidth: 1, borderColor: C.accentMid, backgroundColor: C.accentDim, paddingHorizontal: 9, paddingVertical: 4 },
   pillTxt:   { fontSize: 12, color: C.trackPrimary, fontWeight: '800' },
 
