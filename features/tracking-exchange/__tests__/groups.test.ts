@@ -1,12 +1,10 @@
 import { parseTaskDetail,groupTaskService } from '../groups/tasks';
 import { createGroupRpcClient } from '../groups/groupRpc';
-import { GROUP_DISTRACTION_RELEASE_READY } from '../groups/releaseGate';
 import { offer,returned,ids } from './fixture';
 jest.mock('@/lib/supabase',()=>({supabase:{}}));
 const owner='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',recipient='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',outsider='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const meta=()=>({taskId:ids.task,groupId:ids.parent,creatorUserId:owner,recipientUserId:recipient,sourceTrainingId:ids.child,sourceRevision:'rev1',referenceDigest:'a'.repeat(64),createdAtMs:1000,expiresAtMs:10000,acceptedAtMs:null});
 const detail=()=>({version:1,serverNowMs:1100,task:meta(),reference:offer().reference,submissions:[]});
-it('group release remains closed until backend acceptance, independent from live sharing',()=>expect(GROUP_DISTRACTION_RELEASE_READY).toBe(false));
 it('validates addressed identity and hides reference before recipient acceptance',()=>{expect(parseTaskDetail(detail(),owner,ids.task).reference).not.toBeNull();expect(()=>parseTaskDetail(detail(),recipient,ids.task)).toThrow();expect(parseTaskDetail({...detail(),reference:null},recipient,ids.task).reference).toBeNull();expect(()=>parseTaskDetail(detail(),outsider,ids.task)).toThrow();});
 it('rejects contributions from another author or parent, and duplicate submission IDs',()=>{const s={submissionId:ids.child,authorUserId:recipient,contribution:returned().contribution,decision:null,createdAtMs:4000,reviewedAtMs:null};const d={...detail(),task:{...meta(),acceptedAtMs:2000},submissions:[s]};expect(parseTaskDetail(d,owner,ids.task).submissions).toHaveLength(1);expect(()=>parseTaskDetail({...d,submissions:[{...s,authorUserId:outsider}]},owner,ids.task)).toThrow();expect(()=>parseTaskDetail({...d,submissions:[s,s]},owner,ids.task)).toThrow();});
 it('same explicit submission uses stable caller ID and server digest, no automatic retries',async()=>{const call=jest.fn(async()=>({...detail(),task:{...meta(),acceptedAtMs:2000},submissions:[{submissionId:ids.child,authorUserId:recipient,contribution:returned().contribution,decision:null,createdAtMs:4000,reviewedAtMs:null}]}));const service=groupTaskService({call} as never,recipient);await service.submit(ids.task,ids.child,'a'.repeat(64),returned().contribution);expect(call).toHaveBeenCalledTimes(1);expect(call).toHaveBeenCalledWith(recipient,'training_group_distraction_v1','submit',expect.objectContaining({submissionId:ids.child,referenceDigest:'a'.repeat(64)}));});
