@@ -1815,6 +1815,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'premium.trainerPackageUnavailable': 'S Trainer-Abo het im Moment nöd chönne glade werde. Bitte prüef dini Internetverbindig und versuech es nomal.',
   'premium.notAvailable': 'Nöd verfügbar.',
   'premium.purchaseIncomplete': 'Kauf isch nöd abgschlosse worde.',
+  'premium.syncPending': 'D Bestätigung vo dim Abo isch no offe. Bitte nöd nomal chaufe. Prüef dini Mitgliedschaft spöter nomal.',
+  'premium.accountChanged': 'Dis Konto het sich gänderet. Prüef dini Mitgliedschaft im passende Konto.',
   'premium.activationFailed': 'Aktivierige fehlgschlage.',
   'premium.comingSoon': 'Bald verfügbar',
   'premium.purchaseUnavailable': 'Chäuf sind grad nöd verfügbar. Bitte spöter nomal versueche.',
