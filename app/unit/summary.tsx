@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import * as Crypto from 'expo-crypto';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,7 +14,10 @@ import { finishTrainingUnit } from '@/services/trainingUnitService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import type { TrainingMetrics } from '@/types/analytics';
 import { queryClient } from '@/lib/queryClient';
-import { useActiveTraining, resetUnit } from '@/stores/activeTraining';
+import { useActiveTraining, resetUnit, updateSummaryDraft, saveActiveTrainingDraft, retryActiveTrainingLoad } from '@/stores/activeTraining';
+import { readTrainingSaveIntent, retryTrainingSave } from '@/features/training/documentation/saveIntent';
+import type { DocumentSave } from '@/services/trainingDocumentService';
+import { useSession } from '@/hooks/useSession';
 import { useProfile } from '@/hooks/useProfile';
 import { successHaptic, tapHaptic } from '@/lib/haptics';
 import { useT } from '@/i18n';
@@ -26,29 +30,78 @@ function formatDur(sec: number): string {
 }
 
 export default function SummaryScreen() {
+  const { session } = useSession();
+  const active = useActiveTraining();
+  const { t } = useT();
+  if (active.hydrating) return <ActivityIndicator />;
+  if (active.hydrationError && session) return <TouchableOpacity accessibilityRole="button" onPress={() => retryActiveTrainingLoad(session.user.id)}><Text>{t('trainingDoc.draftError')}</Text></TouchableOpacity>;
+  if (!session) return <Redirect href="/(auth)/login" />;
+  return <SummaryForm key={`${session.user.id}:${active.unitId ?? ''}`} />;
+}
+
+function SummaryForm() {
   const router = useRouter();
   const { t } = useT();
   const active = useActiveTraining();
   const { profile } = useProfile();
+  const { session } = useSession();
+  const alive = useRef(true);
+  const saveLock = useRef(false);
+  useEffect(() => () => { alive.current = false; }, []);
   const { duration } = useLocalSearchParams<{ duration: string }>();
-  const durationSec = Number(duration ?? 0) || 0;
+  const [durationSec, setDurationSec] = useState(!active.summaryDraft?.pending && Number(duration) > 0 ? Number(duration) : active.summaryDraft?.durationSec ?? (Number(duration ?? 0) || 0));
+  const operationId = useRef(active.summaryDraft?.operationId ?? Crypto.randomUUID());
+  const [pendingRequest, setPendingRequest] = useState<DocumentSave | null>(null);
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
-  const [rating, setRating] = useState<number | null>(null);
-  const [notes, setNotes]   = useState('');
-  const [metrics, setMetrics] = useState<TrainingMetrics>({
+  const [rating, setRating] = useState<number | null>(active.summaryDraft?.rating ?? null);
+  const [notes, setNotes]   = useState(active.summaryDraft?.notes ?? '');
+  const [metrics, setMetrics] = useState<TrainingMetrics>(active.summaryDraft?.metrics ?? {
     motivation: null, konzentration: null, praezision: null,
     ausdauer: null, trieblage: null, impulskontrolle: null,
   });
   const [saving, setSaving] = useState(false);
 
-  if (!active.unitId) return <Redirect href="/(tabs)/home" />;
+  useEffect(() => {
+    let cancelled = false;
+    if (!session?.user.id || !active.unitId || active.ownerId && active.ownerId !== session.user.id) return;
+    void readTrainingSaveIntent(session.user.id, active.unitId).then(saved => {
+      if (cancelled) return;
+      const request = saved?.request.requestId === operationId.current ? saved.request : null;
+      setPendingRequest(request);
+      if (request) {
+        setNotes(request.unit.notes ?? ''); setRating(request.unit.rating ?? null); setDurationSec(request.unit.duration_sec ?? durationSec);
+        setMetrics(old => ({ ...old, ...Object.fromEntries(Object.keys(old).filter(k => k in request.unit).map(k => [k, request.unit[k as keyof typeof request.unit]])) }));
+      }
+      setLoadError(false); setReady(true);
+    }).catch(() => { if (!cancelled) { setLoadError(true); setReady(true); } });
+    return () => { cancelled = true; };
+    // Duration is captured once for this active-unit form, not changed by a retry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id, active.unitId, retry]);
+  useEffect(() => {
+    if (ready && !loadError && session?.user.id && (!active.ownerId || active.ownerId === session.user.id)) updateSummaryDraft({ operationId: operationId.current, rating, notes, metrics, durationSec, pending: !!pendingRequest }, session.user.id);
+  }, [ready, loadError, session?.user.id, active.ownerId, rating, notes, metrics, durationSec, pendingRequest]);
 
-  const rated = active.exercises.filter(e => e.rating != null);
+  if (!active.unitId || (active.ownerId && active.ownerId !== session?.user.id)) return <Redirect href="/(tabs)/home" />;
+
+  const displayedExercises = pendingRequest?.exercises ?? active.exercises;
+  const rated = displayedExercises.filter(e => e.rating != null);
   const avg = rated.length ? rated.reduce((sum, e) => sum + (e.rating ?? 0), 0) / rated.length : null;
 
   const speichern = async () => {
+    if (!session || !ready || loadError || saveLock.current) return;
+    saveLock.current = true;
     setSaving(true);
-    const { error } = await finishTrainingUnit(
+    try {
+    updateSummaryDraft({ operationId: operationId.current, rating, notes, metrics, durationSec, pending: true }, session.user.id);
+    await saveActiveTrainingDraft(session.user.id);
+    if (!alive.current) return;
+    const { error } = pendingRequest
+      ? await retryTrainingSave(session.user.id, active.unitId!, operationId.current, () => alive.current)
+      : await finishTrainingUnit(
       active.unitId!,
       { duration_sec: durationSec, rating, notes: notes.trim() || null, shared_with_trainer: profile?.share_trainings_default ?? false, ...metrics },
       active.exercises.map((e, i) => ({
@@ -58,19 +111,32 @@ export default function SummaryScreen() {
         notes:         e.notes,
         duration_sec:  e.duration_sec,
         seq_index:     i,
-      })),
+      })), session.user.id, () => alive.current, active.sourceFingerprint ?? undefined, operationId.current,
     );
-    setSaving(false);
+    if (!alive.current) return;
 
     if (error) {
       if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
-      Alert.alert(t('common.error'), error.message ?? t('training.saveError'));
+      Alert.alert(t('common.error'), t(['CONFLICT', 'UNRESOLVED_SAVE'].includes(error.code ?? '') ? 'trainingDoc.reviewSave' : 'training.saveError'));
       return;
     }
     successHaptic();
-    resetUnit();
+    if (resetUnit(session.user.id) === false) return;
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     router.replace('/(tabs)/home');
+    } catch {
+      if (alive.current) Alert.alert(t('common.error'), t('training.saveError'));
+    } finally {
+      if (alive.current && session?.user.id && active.unitId) {
+        const saved = await readTrainingSaveIntent(session.user.id, active.unitId).catch(() => null);
+        if (alive.current) {
+          const request = saved?.request.requestId === operationId.current ? saved.request : null;
+          setPendingRequest(request); setSaving(false);
+          updateSummaryDraft({ operationId: operationId.current, rating, notes, metrics, durationSec, pending: !!request }, session.user.id);
+        }
+      }
+      saveLock.current = false;
+    }
   };
 
   const dirty = rating != null || notes.trim() !== '' || Object.values(metrics).some(v => v != null);
@@ -100,6 +166,8 @@ export default function SummaryScreen() {
         </HeroImage>
 
         <View style={s.body}>
+          {pendingRequest && <Text style={s.label}>{t('trainingDoc.pendingSave')}</Text>}
+          {loadError && <TouchableOpacity accessibilityRole="button" onPress={() => setRetry(value => value + 1)}><Text style={s.label}>{t('trainingDoc.draftError')}</Text></TouchableOpacity>}
           {/* Stats */}
           <View style={s.statsRow}>
             <View style={s.statCard}>
@@ -107,7 +175,7 @@ export default function SummaryScreen() {
               <Text style={s.statLabel}>{t('training.durationLabel')}</Text>
             </View>
             <View style={s.statCard}>
-              <Text style={s.statVal}>{active.exercises.length}</Text>
+              <Text style={s.statVal}>{displayedExercises.length}</Text>
               <Text style={s.statLabel}>{t('training.exercisesLabel')}</Text>
             </View>
             <View style={s.statCard}>
@@ -118,7 +186,7 @@ export default function SummaryScreen() {
 
           {/* Übungsliste */}
           <Text style={s.label}>{t('training.exercisesLabel')}</Text>
-          {active.exercises.map((ex, i) => (
+          {displayedExercises.map((ex, i) => (
             <View key={`${ex.exercise_name}-${i}`} style={s.exRow}>
               <View style={[s.exDot, { backgroundColor: disciplineColor(ex.discipline) }]} />
               <Text style={s.exName}>{ex.exercise_name}</Text>
@@ -136,7 +204,7 @@ export default function SummaryScreen() {
           <Text style={s.label}>{t('training.ratingLabel')}</Text>
           <View style={s.bigStars}>
             {[1, 2, 3, 4, 5].map(n => (
-              <TouchableOpacity key={n} onPress={() => { tapHaptic(); setRating(n); }} hitSlop={6}>
+              <TouchableOpacity key={n} onPress={() => { if (!pendingRequest && !saving) { tapHaptic(); setRating(n); } }} hitSlop={6}>
                 <Ionicons
                   name={rating != null && n <= rating ? 'star' : 'star-outline'}
                   size={32}
@@ -154,13 +222,14 @@ export default function SummaryScreen() {
             placeholderTextColor={C.placeholder}
             value={notes}
             onChangeText={setNotes}
+            editable={!pendingRequest && !saving}
             multiline
           />
 
           <Text style={s.label}>{t('training.metricsLabel')}</Text>
-          <MetricsInput value={metrics} onChange={setMetrics} />
+          <MetricsInput value={metrics} onChange={value => { if (!pendingRequest && !saving) setMetrics(value); }} />
 
-          <AnimatedPressable style={[s.saveBtn, saving && { opacity: 0.5 }]} scale={0.97} disabled={saving} onPress={speichern}>
+          <AnimatedPressable style={[s.saveBtn, saving && { opacity: 0.5 }]} scale={0.97} disabled={saving || !ready || loadError} onPress={speichern}>
             <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
             <Text style={s.saveTxt}>{saving ? t('common.saving') : t('training.saveUnit')}</Text>

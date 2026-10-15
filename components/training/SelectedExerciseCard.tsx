@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -22,12 +23,19 @@ interface Props {
   onRatingChange: (rating: number | null) => void;
   onNotesChange:  (notes: string) => void;
   onRemove:       () => void;
+  nextFocus?: string;
+  onNextFocusChange?: (text: string) => void;
+  performed?: boolean;
+  onPerformedChange?: () => void;
+  historical?: { date: string; rating: number | null; notes: string | null; onOpen: () => void };
 }
 
 export function SelectedExerciseCard({
   name, accentColor, isCustom, rating, notes, onRatingChange, onNotesChange, onRemove,
+  performed = true, onPerformedChange, historical, nextFocus, onNextFocusChange,
 }: Props) {
   const { t } = useT();
+  const [details, setDetails] = useState(false);
 
   const setStar = (n: number) => {
     tapHaptic();
@@ -44,26 +52,48 @@ export function SelectedExerciseCard({
       )}
       <View style={s.head}>
         <View style={[s.dot, { backgroundColor: accentColor }]} />
-        <Text style={s.name} numberOfLines={1}>{name}</Text>
+        <Text style={s.name}>{name}</Text>
         <TouchableOpacity
           onPress={() => { tapHaptic(); onRemove(); }}
           activeOpacity={0.7}
-          hitSlop={8}
+          style={s.removeButton}
           accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
+          accessibilityLabel={`${t('common.delete')}: ${name}`}
         >
           <Ionicons name="close" size={16} color={C.muted} />
         </TouchableOpacity>
       </View>
 
-      <View style={s.stars} accessibilityLabel={t('training.exerciseRatingA11y')}>
+      {onPerformedChange && <TouchableOpacity onPress={onPerformedChange} style={s.toggle}
+        accessibilityRole="checkbox" accessibilityLabel={`${name}: ${t(performed ? 'trainingDoc.performed' : 'trainingDoc.planned')}`} accessibilityState={{ checked: performed }}>
+        <Ionicons name={performed ? 'checkbox' : 'square-outline'} size={22} color={accentColor} />
+        <Text style={s.history}>{t(performed ? 'trainingDoc.performed' : 'trainingDoc.planned')}</Text>
+      </TouchableOpacity>}
+
+      {historical && <View style={s.past}>
+        <Text style={s.history}>{t('trainingDoc.past', { date: historical.date })}</Text>
+        <Text style={s.history}>{historical.rating != null ? `${historical.rating}/5` : '—'}{historical.notes ? ` · ${historical.notes}` : ''}</Text>
+        <TouchableOpacity onPress={historical.onOpen} accessibilityRole="button" accessibilityLabel={`${t('trainingDoc.openHistory')}: ${name}`} style={s.toggle}>
+          <Text style={s.history}>{t('trainingDoc.openHistory')}</Text>
+        </TouchableOpacity>
+      </View>}
+
+      {performed && <View style={s.stars} accessibilityLabel={t('training.exerciseRatingA11y')}>
         {[1, 2, 3, 4, 5].map(n => (
-          <TouchableOpacity key={n} onPress={() => setStar(n)} activeOpacity={0.7} hitSlop={6}>
+          <TouchableOpacity key={n} onPress={() => setStar(n)} activeOpacity={0.7} style={s.starButton}
+            accessibilityRole="button" accessibilityLabel={`${name}: ${t('training.exerciseRatingA11y')} ${n}/5`}
+            accessibilityState={{ selected: rating === n }}>
             <Ionicons name={(rating ?? 0) >= n ? 'star' : 'star-outline'} size={19} color={C.star} />
           </TouchableOpacity>
         ))}
-      </View>
+      </View>}
 
+      <TouchableOpacity onPress={() => setDetails(v => !v)} style={s.toggle} accessibilityRole="button" accessibilityState={{ expanded: details }}>
+        <Text style={s.history}>{t('trainingDoc.exerciseDetails')}</Text>
+        <Ionicons name={details ? 'chevron-up' : 'chevron-down'} size={18} color={C.muted} />
+      </TouchableOpacity>
+      {details && <>
+      {!historical && <Text style={s.history}>{t('trainingDoc.noIdentity')}</Text>}
       <TextInput
         style={s.note}
         placeholder={t('training.exerciseNotePlaceholder')}
@@ -71,12 +101,24 @@ export function SelectedExerciseCard({
         value={notes ?? ''}
         onChangeText={onNotesChange}
         multiline
+        accessibilityLabel={`${name}: ${t('training.exerciseNotePlaceholder')}`}
       />
+      {onNextFocusChange && <>
+        <Text style={s.history}>{t('trainingDoc.nextFocus')}</Text>
+        <TextInput style={s.note} value={nextFocus ?? ''} onChangeText={onNextFocusChange} multiline maxLength={500}
+          placeholder={t('trainingDoc.nextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={`${name}: ${t('trainingDoc.nextFocus')}`} />
+      </>}
+      </>}
     </View>
   );
 }
 
 const s = StyleSheet.create({
+  toggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  history: { color: C.muted, fontSize: 12, flexShrink: 1 },
+  past: { padding: 10, backgroundColor: C.card, borderRadius: 10, gap: 5 },
+  starButton: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' },
+  removeButton: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' },
   card: { backgroundColor: C.cardAlt, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 12, gap: 8 },
   customBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
   customBadgeTxt: { fontSize: 10, color: C.accent, fontWeight: '800', letterSpacing: 0.3 },
@@ -86,6 +128,6 @@ const s = StyleSheet.create({
   stars:{ flexDirection: 'row', gap: 5 },
   note: {
     fontSize: 12.5, color: C.white, backgroundColor: C.input, borderRadius: 10,
-    borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 7, minHeight: 34,
+    borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 7, minHeight: 44,
   },
 });
