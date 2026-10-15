@@ -3,7 +3,7 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
@@ -14,6 +14,7 @@ import * as Crypto from 'expo-crypto';
 import { createDocumentedUnit } from '@/services/trainingUnitService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
 import { queryClient } from '@/lib/queryClient';
+import { localDay } from '@/features/training/documentation/model';
 import type { TrainingMetrics } from '@/types/analytics';
 
 const EMPTY_METRICS: TrainingMetrics = {
@@ -33,15 +34,25 @@ function formatTime(sec: number): string {
 // vorab). Am Ende führt „Fertig" direkt in die Dokumentation, wo Dauer schon
 // vorbefüllt ist und Sparte/Übungen/Bewertung erfasst werden.
 export default function TimerScreen() {
+  const { session } = useSession();
+  if (!session) return <Redirect href="/(auth)/login" />;
+  return <TimerForm key={session.user.id} />;
+}
+
+function TimerForm() {
   const router = useRouter();
   const { t } = useT();
   const { dogs } = useDogs();
   const { session } = useSession();
   // Optionaler Kontext (z. B. aus dem KI-Hinweis / Schnellstart): Hund + Sparte
   // sind dann schon bekannt und werden an die Dokumentation durchgereicht.
-  const { dogId, dogName, discipline, source, note } =
+  const { dogId, dogName, discipline, note } =
     useLocalSearchParams<{ dogId?: string; dogName?: string; discipline?: string; source?: string; note?: string }>();
 
+  const alive = useRef(true);
+  const saveLock = useRef(false);
+  const savePayload = useRef<Parameters<typeof createDocumentedUnit>[1] | null>(null);
+  useEffect(() => () => { alive.current = false; }, []);
   const unitIdRef = useRef(Crypto.randomUUID());   // stabile ID → idempotenter Quota-Claim
   const baseRef = useRef(0);              // Sekunden aus abgeschlossenen Lauf-Segmenten
   const segStartRef = useRef(Date.now()); // Start des aktuellen laufenden Segments
@@ -73,25 +84,33 @@ export default function TimerScreen() {
   const doSave = async (dogId: string) => {
     const ownerId = session?.user.id;
     if (!ownerId) { Alert.alert(t('common.error'), t('training.sessionMissing')); return; }
+    if (saveLock.current) return;
+    saveLock.current = true;
+    try {
     const ended = new Date();
-    const { error } = await createDocumentedUnit(ownerId, {
+    savePayload.current ??= {
       dog_id:       dogId,
-      session_date: ended.toISOString().split('T')[0],
+      session_date: localDay(ended),
       started_at:   new Date(ended.getTime() - elapsed * 1000).toISOString(),
       ended_at:     ended.toISOString(),
       duration_sec: elapsed,
       score: null, notes: null, photos: [], videos: [], audio_files: [],
       shared_with_trainer: false,
       ...EMPTY_METRICS,
-    }, [], unitIdRef.current);
+    };
+    const { error } = await createDocumentedUnit(ownerId, savePayload.current, [], unitIdRef.current, () => alive.current);
+    if (!alive.current) return;
     if (error) {
       if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
-      haptic.error(); Alert.alert(t('common.error'), error.message ?? t('training.saveError')); return;
+      haptic.error(); Alert.alert(t('common.error'), t(['CONFLICT', 'UNRESOLVED_SAVE'].includes(error.code ?? '') ? 'trainingDoc.reviewSave' : 'training.saveError')); return;
     }
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     router.replace('/(tabs)/home');
+    } catch {
+      if (alive.current) Alert.alert(t('common.error'), t('training.saveError'));
+    } finally { saveLock.current = false; }
   };
 
   const saveWithoutDoc = () => {

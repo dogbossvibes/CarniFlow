@@ -38,6 +38,10 @@ export interface TrainingUnit {
 }
 
 export interface TrainingExercise {
+  // Optional additive backend identity; absent legacy rows are never matched
+  // solely by their potentially ambiguous display name.
+  exercise_identity_id?: string | null;
+  discipline_key?: string | null;
   id?:           string;
   unit_id?:      string;
   discipline:    string;        // Fährte | Unterordnung | Schutzdienst | <eigene>

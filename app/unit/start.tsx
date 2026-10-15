@@ -13,7 +13,9 @@ import { DEFAULT_SPARTEN } from '@/constants/sparten';
 import { HelpButton } from '@/components/help/HelpButton';
 import { HeroImage } from '@/components/training/HeroImage';
 import { DisciplineGridCard } from '@/components/training/DisciplineGridCard';
-import { useActiveTraining, startUnit, addExercise } from '@/stores/activeTraining';
+import { useActiveTraining, startUnit, addExercise, retryActiveTrainingLoad } from '@/stores/activeTraining';
+import { trainingUnitFingerprint } from '@/features/training/documentation/retry';
+import type { TrainingUnit } from '@/types/trainingUnit';
 import { createTrainingUnit } from '@/services/trainingUnitService';
 import { DogIcon } from '@/components/ui/DogIcon';
 import { useCustomCategories } from '@/hooks/useCustomCategories';
@@ -58,6 +60,8 @@ export default function UnitStartScreen() {
   // Übungs-/Unterkategorie-Auswahl ins Live-Tracking starten.
   const startDirect = async (disc: Discipline, dogId: string, dogName: string | null) => {
     const ownerId = session?.user.id;
+    if (active.hydrating) return;
+    if (active.hydrationError && ownerId) { Alert.alert(t('common.error'), t('trainingDoc.draftError'), [{ text: t('common.retry'), onPress: () => retryActiveTrainingLoad(ownerId) }]); return; }
     if (!ownerId) { Alert.alert(t('common.error'), t('training.sessionMissing')); return; }
 
     if (!active.unitId) {
@@ -69,10 +73,10 @@ export default function UnitStartScreen() {
         Alert.alert(t('common.error'), error?.message ?? t('training.startError'));
         return;
       }
-      startUnit({ unitId: data.id, dogId, dogName: dogName || null });
+      if (startUnit({ unitId: data.id, dogId, dogName: dogName || null, ownerId, sourceFingerprint: trainingUnitFingerprint(data as TrainingUnit) }) === false) return;
     }
     // Eintrag auf Sparten-Ebene (kein Unterkategorie-Name).
-    addExercise({ discipline: disc.label, exercise_name: disc.label, rating: null, notes: null, duration_sec: null });
+    addExercise({ discipline: disc.label, exercise_name: disc.label, rating: null, notes: null, duration_sec: null }, ownerId);
     router.replace('/unit/live');
   };
 

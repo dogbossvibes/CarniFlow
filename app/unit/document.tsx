@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import {
-  Alert, KeyboardAvoidingView, Platform, ScrollView,
+  ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { HelpButton } from '@/components/help/HelpButton';
@@ -17,6 +17,15 @@ import { CompactDurationStepper } from '@/components/ui/CompactDurationStepper';
 import { MultiVideoUpload } from '@/components/training/MultiVideoUpload';
 import { MetricsInput } from '@/components/training/MetricsInput';
 import { CustomExerciseSheet } from '@/components/training/CustomExerciseSheet';
+import { readPendingTrainingSave, readTrainingSaveIntent, retryTrainingSave } from '@/features/training/documentation/saveIntent';
+import { addTrainingFocuses } from '@/features/training/documentation/focus';
+import { ServerTrainingFocusList, useServerTrainingFocuses } from '@/components/training/ServerTrainingFocusList';
+import { TrainingFocusList } from '@/components/training/TrainingFocusList';
+import { ExerciseIdentityList } from '@/components/training/ExerciseIdentityList';
+import { TrainingPreparation } from '@/components/training/TrainingPreparation';
+import { relevantUnits, planFromHistory, lastExerciseHistory, performedExercises, localDay, measuredMinutes, type PlannedExercise } from '@/features/training/documentation/model';
+import { isConfirmedDocumentedRetry, trainingUnitFingerprint } from '@/features/training/documentation/retry';
+import { documentDraftKey, loadDocumentDraft, saveDocumentDraft, clearDocumentDraft } from '@/features/training/documentation/draft';
 import { SelectedExerciseCard } from '@/components/training/SelectedExerciseCard';
 import { useDogs } from '@/hooks/useDogs';
 import { useSession } from '@/hooks/useSession';
@@ -25,7 +34,7 @@ import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { DISCIPLINES, customToDiscipline, disciplineColor, type Discipline } from '@/constants/disciplines';
 import { DEFAULT_SPARTEN } from '@/constants/sparten';
 import {
-  createDocumentedUnit, updateDocumentedUnit, getTrainingUnitById, getRecentExerciseNames,
+  saveDocumentedUnitAtomic, getTrainingUnitById, getRecentExerciseNames, getTrainingPreparationUnits,
 } from '@/services/trainingUnitService';
 import { updateCustomCategory } from '@/services/customCategoryService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
@@ -35,6 +44,7 @@ import { queryClient } from '@/lib/queryClient';
 import { tapHaptic, successHaptic } from '@/lib/haptics';
 import type { AudioNote } from '@/types';
 import type { TrainingMetrics } from '@/types/analytics';
+import type { DocumentSave } from '@/services/trainingDocumentService';
 import type { TrainingUnit } from '@/types/trainingUnit';
 import { useT } from '@/i18n';
 
@@ -43,25 +53,79 @@ const EMPTY_METRICS: TrainingMetrics = {
   ausdauer: null, trieblage: null, impulskontrolle: null,
 };
 
+const scopeKey = (d: Discipline) => d.key.startsWith('custom:') ? d.key : `system:${d.key}`;
+
 const SCORE_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-function ymd(d: Date) { return d.toISOString().split('T')[0]; }
+interface DocumentDraft {
+  unitId: string; dogId: string | null; activeDisc: string; selected: PlannedExercise[];
+  description: string; score: number; date: string; durationMin: number | null;
+  photos: string[]; videos: string[]; audio: (AudioNote & { transcript?: string | null })[]; metrics: TrainingMetrics;
+  shared: boolean; operationId?: string; recordedDurationSec?: number | null; atomic?: boolean; nextFocusDisciplineKey?: string; nextFocus?: string; nextFocusDiscipline?: string; focusId?: string; sourceFingerprint?: string; remoteCompleted?: boolean;
+}
 
-interface SelExercise {
-  discipline: string;
-  name:       string;
-  rating:     number | null;
-  notes:      string | null;
+function draftFromIntent(draft: DocumentDraft, request: DocumentSave): DocumentDraft {
+  const unit = request.unit;
+  const focus = request.focusChanges?.filter(change => change.action === 'create').map(change => change.request) ?? [];
+  const general = focus.find(item => !item.sourceExerciseId);
+  const ids = new Set(request.exercises.map(e => e.id));
+  return { ...draft, unitId: request.unitId, operationId: request.requestId, atomic: true, remoteCompleted: false,
+    dogId: unit.dog_id ?? draft.dogId, description: unit.notes ?? '', score: unit.score ?? 0,
+    date: unit.session_date ? `${unit.session_date}T12:00:00` : draft.date,
+    durationMin: unit.duration_sec != null ? Math.round(unit.duration_sec / 60) : null, recordedDurationSec: unit.duration_sec ?? null,
+    photos: unit.photos ?? draft.photos, videos: unit.videos ?? draft.videos,
+    audio: unit.audio_files?.map(a => ({ ...a, createdAt: '' })) ?? draft.audio,
+    shared: unit.shared_with_trainer ?? draft.shared,
+    metrics: { ...draft.metrics, ...Object.fromEntries(Object.keys(EMPTY_METRICS).filter(k => k in unit).map(k => [k, unit[k as keyof typeof unit]])) },
+    nextFocus: general?.text ?? '', nextFocusDisciplineKey: general?.disciplineKey ?? '', focusId: general?.id ?? draft.focusId,
+    selected: [...request.exercises.map(e => {
+      const previous = draft.selected.find(old => old.key === e.id);
+      const next = focus.find(item => item.sourceExerciseId === e.id);
+      return { ...previous, key: e.id, name: e.exercise_name, discipline: e.discipline, disciplineKey: e.discipline_key,
+        exerciseKey: e.exercise_identity_id ?? undefined, performed: true, rating: e.rating, notes: e.notes,
+        durationSec: e.duration_sec, nextFocus: next?.text, nextFocusId: next?.id,
+        identityNew: request.identityChanges?.some(change => change.request.id === e.exercise_identity_id) ?? false };
+    }), ...draft.selected.filter(e => !e.performed && !ids.has(e.key))],
+  };
+}
+
+function validDocumentDraft(value: unknown): value is DocumentDraft {
+  if (!value || typeof value !== 'object') return false;
+  const d = value as DocumentDraft;
+  return typeof d.unitId === 'string' && !!d.unitId && typeof d.activeDisc === 'string'
+    && (d.dogId == null || typeof d.dogId === 'string') && typeof d.description === 'string'
+    && typeof d.shared === 'boolean' && Number.isFinite(d.score)
+    && typeof d.date === 'string' && Number.isFinite(new Date(d.date).getTime())
+    && (d.durationMin === null || (Number.isFinite(d.durationMin) && d.durationMin >= 0))
+    && Array.isArray(d.selected) && d.selected.every(e => e && typeof e.key === 'string' && typeof e.name === 'string'
+      && typeof e.discipline === 'string' && typeof e.performed === 'boolean'
+      && (e.rating === null || (Number.isFinite(e.rating) && e.rating >= 1 && e.rating <= 5))
+      && (e.notes === null || typeof e.notes === 'string'))
+    && Array.isArray(d.photos) && d.photos.every(url => typeof url === 'string')
+    && Array.isArray(d.videos) && d.videos.every(url => typeof url === 'string')
+    && Array.isArray(d.audio) && d.audio.every(a => a && typeof a.url === 'string' && typeof a.duration === 'string')
+    && !!d.metrics && ['motivation', 'konzentration', 'praezision', 'ausdauer', 'trieblage', 'impulskontrolle']
+      .every(key => { const v = d.metrics[key as keyof TrainingMetrics]; return v === null || Number.isFinite(v); });
 }
 
 export default function DocumentScreen() {
+  const { session, loading } = useSession();
+  const { id, dogId: entryDog, discipline: entryDiscipline } = useLocalSearchParams<{ id?: string; dogId?: string; discipline?: string }>();
+  if (loading) return <ActivityIndicator />;
+  if (!session) return <Redirect href="/(auth)/login" />;
+  // A new account or edit target gets a fresh component; late reads cannot
+  // repopulate another account's form.
+  return <DocumentForm key={`${session?.user.id ?? 'signed-out'}:${id ?? `new:${entryDog ?? ''}:${entryDiscipline ?? ''}`}`} />;
+}
+
+function DocumentForm() {
   const router = useRouter();
   const { t } = useT();
   const { id, duration, dogId: dogIdParam, discipline: discParam, note: noteParam } =
     useLocalSearchParams<{ id?: string; duration?: string; dogId?: string; discipline?: string; note?: string }>();
   const editing = !!id;
   // Vom Timer mitgegebene Dauer (Sekunden) → Minuten vorbefüllen.
-  const initialMin = duration ? Math.max(1, Math.round(Number(duration) / 60)) : 45;
+  const initialMin = measuredMinutes(duration);
   const { dogs, loading: dogsLoading } = useDogs();
   const { session } = useSession();
   const { profile } = useProfile();
@@ -77,49 +141,151 @@ export default function DocumentScreen() {
   ];
 
   // Vom KI-Hinweis/Timer vorgeschlagene Sparte (Label → Key), sofern aktiv.
-  const paramDiscKey = discParam ? DISCIPLINES.find(d => d.label === discParam)?.key : undefined;
+  const paramDiscKey = discParam ? disciplines.find(d => d.label === discParam || d.key === discParam)?.key : undefined;
   const initialDisc = paramDiscKey && disciplines.some(d => d.key === paramDiscKey)
     ? paramDiscKey : (disciplines[0]?.key ?? 'faehrte');
 
   const [dogId, setDogId] = useState<string | null>(dogIdParam ?? (dogs.length === 1 ? dogs[0].id : null));
   const [activeDisc, setActiveDisc] = useState<string>(initialDisc);
-  const [selected, setSelected] = useState<SelExercise[]>([]);
+  const [selected, setSelected] = useState<PlannedExercise[]>([]);
   const [customSheetOpen, setCustomSheetOpen] = useState(false);
   const [recentNames, setRecentNames] = useState<string[]>([]);
   const [description, setDescription] = useState(noteParam ?? '');
   const [score, setScore] = useState(0);
   const [date, setDate] = useState(new Date());
   const [durationMin, setDurationMin] = useState(initialMin);
+  const recordedDurationSec = useRef(duration && Number.isFinite(Number(duration)) && Number(duration) > 0 ? Number(duration) : null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
-  const [audio, setAudio] = useState<AudioNote[]>([]);
+  const [audio, setAudio] = useState<(AudioNote & { transcript?: string | null })[]>([]);
   const [metrics, setMetrics] = useState<TrainingMetrics>(EMPTY_METRICS);
+  const [nextFocus, setNextFocus] = useState('');
+  const [nextFocusDiscipline, setNextFocusDiscipline] = useState('');
+  const [nextFocusDisciplineKey, setNextFocusDisciplineKey] = useState('');
+  const [pendingSave, setPendingSave] = useState(false);
+  const legacyCompletion = useRef(false);
   const [saving, setSaving] = useState(false);
-
-  // Edit-Modus: bestehende Einheit laden und Felder vorbelegen.
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  const [recordedTimes, setRecordedTimes] = useState<{ started_at: string | null; ended_at: string | null }>({ started_at: null, ended_at: null });
+  const sourceFingerprint = useRef<string | undefined>(undefined);
+  const [editConflict, setEditConflict] = useState(false);
+  const [remoteCompleted, setRemoteCompleted] = useState(false);
+  const saveLock = useRef(false);
+  const stopDraft = useRef(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftBlocked, setDraftBlocked] = useState(false);
+  const [draftError, setDraftError] = useState(false);
+  const [loadRetry, setLoadRetry] = useState(0);
+  const [editLoaded, setEditLoaded] = useState(!editing);
+  const [details, setDetails] = useState(editing);
+  const [shared, setShared] = useState<boolean | null>(null);
+  const [historyRetry, setHistoryRetry] = useState(0);
+  const [history, setHistory] = useState<{ scope: string; units: TrainingUnit[]; error: boolean; loading: boolean; limited: boolean }>({ scope: '', units: [], error: false, loading: false, limited: false });
+  const entryContext = dogIdParam || discParam ? JSON.stringify([dogIdParam ?? null, discParam ?? null]) : undefined;
+  const draftKey = session?.user.id ? documentDraftKey(session.user.id, id, entryContext) : null;
+  const disciplineTouched = useRef(false);
+  const resolvedInitialDisc = paramDiscKey ?? disciplines[0]?.key;
   useEffect(() => {
-    if (!id) return;
+    if (!editing && !disciplineTouched.current && resolvedInitialDisc) setActiveDisc(resolvedInitialDisc);
+  }, [editing, resolvedInitialDisc]);
+  const unitIdRef = useRef(id ?? Crypto.randomUUID());
+  const focusIdRef = useRef(Crypto.randomUUID());
+  const operationIdRef = useRef(Crypto.randomUUID());
+
+  useEffect(() => {
+    if (!draftKey || !session?.user.id) return;
+    let cancelled = false;
+    const owner = session.user.id;
     (async () => {
-      const { data } = await getTrainingUnitById(id);
-      const u = data as TrainingUnit | null;
-      if (!u) return;
-      setDogId(u.dog_id);
-      setSelected((u.exercises ?? []).map(e => ({
-        discipline: e.discipline, name: e.exercise_name, rating: e.rating, notes: e.notes,
-      })));
-      setDescription(u.notes ?? '');
-      setScore(u.score ?? 0);
-      setDate(u.session_date ? new Date(u.session_date) : new Date());
-      setDurationMin(u.duration_sec ? Math.round(u.duration_sec / 60) : 45);
-      setPhotos(u.photos ?? []);
-      setVideos(u.videos ?? []);
-      setAudio((u.audio_files ?? []).map(a => ({ url: a.url, duration: a.duration, createdAt: '' })));
-      setMetrics({
-        motivation: u.motivation, konzentration: u.konzentration, praezision: u.praezision,
-        ausdauer: u.ausdauer, trieblage: u.trieblage, impulskontrolle: u.impulskontrolle,
-      });
+      let draft: DocumentDraft | null = null;
+      try {
+        const saved = await loadDocumentDraft<unknown>(draftKey);
+        if (saved != null && !validDocumentDraft(saved)) throw new Error('Invalid training draft');
+        draft = saved ?? null;
+      } catch {
+        if (!cancelled) { setDraftError(true); setDraftBlocked(true); setDraftReady(true); }
+        return;
+      }
+      if (cancelled) return;
+      let restoringIntent = false;
+      if (draft && typeof draft.unitId === 'string' && Array.isArray(draft.selected)
+          && typeof draft.date === 'string' && Number.isFinite(new Date(draft.date).getTime())
+          && Array.isArray(draft.photos) && Array.isArray(draft.videos) && Array.isArray(draft.audio)) {
+        unitIdRef.current = id ?? draft.unitId;
+        operationIdRef.current = draft.operationId ?? operationIdRef.current;
+        focusIdRef.current = draft.focusId ?? focusIdRef.current;
+        sourceFingerprint.current = draft.sourceFingerprint;
+        setRemoteCompleted(draft.remoteCompleted ?? false);
+        legacyCompletion.current = !!draft.remoteCompleted && !draft.atomic;
+        setNextFocusDisciplineKey(draft.nextFocusDisciplineKey ?? '');
+        let pending;
+        try { pending = await readTrainingSaveIntent(owner, id ?? draft.unitId); }
+        catch { if (!cancelled) { setDraftError(true); setDraftBlocked(true); setDraftReady(true); } return; }
+        if (cancelled) return;
+        restoringIntent = !!pending && pending.request.requestId === operationIdRef.current;
+        if (restoringIntent && pending) draft = draftFromIntent(draft, pending.request);
+        setPendingSave(restoringIntent);
+        recordedDurationSec.current = draft.recordedDurationSec ?? null;
+        setRemoteCompleted(draft.remoteCompleted ?? false);
+        setNextFocusDisciplineKey(draft.nextFocusDisciplineKey ?? '');
+        focusIdRef.current = draft.focusId ?? focusIdRef.current;
+        disciplineTouched.current = true;
+        setDogId(draft.dogId); setActiveDisc(draft.activeDisc); setSelected(draft.selected);
+        setDescription(draft.description); setScore(draft.score); setDate(new Date(draft.date));
+        setDurationMin(draft.durationMin); setPhotos(draft.photos); setVideos(draft.videos);
+        setAudio(draft.audio); setMetrics(draft.metrics); setShared(draft.shared); setNextFocus(draft.nextFocus ?? ''); setNextFocusDiscipline(draft.nextFocusDiscipline ?? '');
+      }
+      if (id) {
+        try {
+          const { data, error } = await getTrainingUnitById(id);
+          if (cancelled) return;
+          const u = data as TrainingUnit | null;
+          if (error || !u || u.owner_id !== owner) throw new Error('Training unavailable');
+          const fingerprint = trainingUnitFingerprint(u);
+          if (draft && !restoringIntent && !draft.remoteCompleted && draft.sourceFingerprint !== fingerprint) {
+            setEditConflict(true); setEditLoaded(false); setDraftReady(true); return;
+          }
+          if (draft && !restoringIntent && !Object.prototype.hasOwnProperty.call(draft, 'recordedDurationSec')
+              && u.duration_sec != null && draft.durationMin === Math.round(u.duration_sec / 60)) {
+            recordedDurationSec.current = u.duration_sec;
+          }
+          if (!restoringIntent) sourceFingerprint.current = fingerprint;
+          setEditConflict(false);
+          setEditLoaded(true);
+          setRecordedTimes({ started_at: u.started_at ?? null, ended_at: u.ended_at ?? null });
+          if (!draft) {
+            setDogId(u.dog_id);
+            setSelected((u.exercises ?? []).map((e, i) => ({
+              key: e.id ?? `edit-${i}`, discipline: e.discipline, name: e.exercise_name,
+              rating: e.rating ?? null, notes: e.notes ?? null, performed: true, durationSec: e.duration_sec, exerciseKey: e.exercise_identity_id ?? undefined, disciplineKey: e.discipline_key,
+            })));
+            setDescription(u.notes ?? ''); setScore(u.score ?? 0);
+            setDate(u.session_date ? new Date(`${u.session_date}T12:00:00`) : new Date());
+            recordedDurationSec.current = u.duration_sec;
+            setDurationMin(u.duration_sec != null ? Math.round(u.duration_sec / 60) : null);
+            setPhotos(u.photos ?? []); setVideos(u.videos ?? []);
+            setAudio((u.audio_files ?? []).map(a => ({ url: a.url, duration: a.duration, createdAt: '', transcript: a.transcript })));
+            setShared(!!u.shared_with_trainer);
+            setMetrics({ motivation: u.motivation ?? null, konzentration: u.konzentration ?? null, praezision: u.praezision ?? null,
+              ausdauer: u.ausdauer ?? null, trieblage: u.trieblage ?? null, impulskontrolle: u.impulskontrolle ?? null });
+          }
+        } catch { if (!cancelled) setDraftError(true); }
+      }
+      if (!cancelled) setDraftReady(true);
     })();
-  }, [id]);
+    return () => { cancelled = true; };
+  }, [draftKey, id, session?.user.id, loadRetry]);
+
+  const draftSnapshot = useCallback((): DocumentDraft => ({ unitId: unitIdRef.current, dogId, activeDisc, selected, description, score,
+    date: date.toISOString(), durationMin, recordedDurationSec: recordedDurationSec.current, photos, videos, audio, metrics,
+    shared: shared ?? profile?.share_trainings_default ?? false, operationId: operationIdRef.current, atomic: !legacyCompletion.current,
+    nextFocusDisciplineKey, nextFocus, nextFocusDiscipline, focusId: focusIdRef.current, sourceFingerprint: sourceFingerprint.current, remoteCompleted,
+  }), [dogId, activeDisc, selected, description, score, date, durationMin, photos, videos, audio, metrics, shared, profile?.share_trainings_default, nextFocusDisciplineKey, nextFocus, nextFocusDiscipline, remoteCompleted]);
+  useEffect(() => {
+    if (!draftReady || !draftKey || draftBlocked || stopDraft.current || (editing && !editLoaded)) return;
+    void saveDocumentDraft(draftKey, draftSnapshot()).catch(() => { if (alive.current) setDraftError(true); });
+  }, [draftReady, draftKey, draftBlocked, editing, editLoaded, draftSnapshot]);
 
   // Genau einen Hund erst nach abgeschlossenem Load automatisch wählen. Die
   // Auswahl aus Navigation oder Edit-Modus bleibt dabei unverändert.
@@ -128,21 +294,48 @@ export default function DocumentScreen() {
   }, [dogsLoading, dogs, editing, dogId]);
 
   const disc = disciplines.find(d => d.key === activeDisc) ?? disciplines[0];
+  const [focusRevision, setFocusRevision] = useState(0);
+  const serverFocuses = useServerTrainingFocuses(dogId ? session?.user.id : undefined, dogId ?? undefined, disc ? scopeKey(disc) : undefined, focusRevision);
   const isCustomDiscipline = !!disc?.key.startsWith('custom:');
   const activeCategory = isCustomDiscipline
     ? categories.find(c => `custom:${c.id}` === disc?.key)
     : undefined;
 
+  const discLabel = disc?.label;
+  const discExercises = JSON.stringify(disc?.exercises ?? []);
   // Vorschläge aus der eigenen Trainingshistorie für FESTE Sparten (siehe
   // CustomExerciseSheet-Kommentar): kein neues Schema, rein lesende Query.
   useEffect(() => {
-    if (!disc || isCustomDiscipline || !session?.user.id) { setRecentNames([]); return; }
+    setRecentNames([]);
+    if (!discLabel || !dogId || isCustomDiscipline || !session?.user.id) { setRecentNames([]); return; }
     let cancelled = false;
-    getRecentExerciseNames(session.user.id, disc.label).then(({ data }) => {
-      if (!cancelled) setRecentNames(data.filter(n => !disc.exercises.includes(n)));
-    });
+    const currentExercises = JSON.parse(discExercises) as string[];
+    getRecentExerciseNames(session.user.id, discLabel, 20, dogId ?? undefined).then(({ data }) => {
+      if (!cancelled) setRecentNames(data.filter(n => !currentExercises.includes(n)));
+    }).catch(() => { if (!cancelled) setRecentNames([]); });
     return () => { cancelled = true; };
-  }, [disc?.key, isCustomDiscipline, session?.user.id]);
+  }, [discLabel, discExercises, dogId, isCustomDiscipline, session?.user.id]);
+
+  const historyScope = `${session?.user.id}:${dogId}:${disc?.label}`;
+  const visibleHistory = history.scope === historyScope ? history : { units: [], error: false, loading: !!dogId, limited: false };
+  useEffect(() => {
+    if (!session?.user.id || !dogId || !discLabel) return;
+    let cancelled = false;
+    const owner = session.user.id; const dog = dogId; const label = discLabel;
+    setHistory(prev => prev.scope === historyScope ? { ...prev, loading: true, error: false } : { scope: historyScope, units: [], loading: true, error: false, limited: false });
+    Promise.resolve(getTrainingPreparationUnits(owner, dog, label).limit(101)).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) throw error;
+      setHistory({ scope: historyScope, units: relevantUnits((data ?? []).slice(0, 100) as TrainingUnit[], owner, dog, label),
+        loading: false, error: false, limited: (data?.length ?? 0) > 100 });
+    }).catch(() => { if (!cancelled) setHistory(prev => prev.scope === historyScope ? { ...prev, loading: false, error: true } : { scope: historyScope, units: [], loading: false, error: true, limited: false }); });
+    return () => { cancelled = true; };
+  }, [historyScope, historyRetry, session?.user.id, dogId, discLabel]);
+
+  const reuseExercises = (unit: TrainingUnit, exercises: NonNullable<TrainingUnit['exercises']>) => {
+    setSelected(prev => [...prev, ...exercises.filter(e => !prev.some(p => p.sourceUnitId === unit.id && !!e.id && p.sourceExerciseId === e.id))
+      .map(e => ({ ...planFromHistory(unit, e, Crypto.randomUUID()), exerciseKey: e.exercise_identity_id ?? Crypto.randomUUID(), identityNew: !e.exercise_identity_id, disciplineKey: e.discipline_key ?? (disc && e.discipline === disc.label ? scopeKey(disc) : null) }))]);
+  };
 
   const isSelected = (label: string, name: string) =>
     selected.some(e => e.discipline === label && e.name === name);
@@ -162,7 +355,7 @@ export default function DocumentScreen() {
     setSelected(prev =>
       prev.some(e => e.discipline === label && e.name === name)
         ? prev.filter(e => !(e.discipline === label && e.name === name))
-        : [...prev, { discipline: label, name, rating: null, notes: null }],
+        : [...prev, { key: Crypto.randomUUID(), discipline: label, name, rating: null, notes: null, performed: true, exerciseKey: Crypto.randomUUID(), identityNew: true, disciplineKey: disc ? scopeKey(disc) : null }],
     );
   };
 
@@ -176,7 +369,7 @@ export default function DocumentScreen() {
     setSelected(prev =>
       prev.some(e => e.discipline === disc.label && e.name === name)
         ? prev
-        : [...prev, { discipline: disc.label, name, rating: null, notes: null }],
+        : [...prev, { key: Crypto.randomUUID(), discipline: disc.label, name, rating: null, notes: null, performed: true, exerciseKey: Crypto.randomUUID(), identityNew: true, disciplineKey: disc ? scopeKey(disc) : null }],
     );
     setCustomSheetOpen(false);
     // Eigene Sparte + „für zukünftige Trainings speichern": dieselbe Persistenz
@@ -187,6 +380,7 @@ export default function DocumentScreen() {
         exercises: [...activeCategory.exercises, name],
       });
       if (!error) queryClient.invalidateQueries({ queryKey: ['customCategories'] });
+      else if (alive.current) Alert.alert(t('common.error'), t('training.saveError'));
     }
   };
 
@@ -201,55 +395,125 @@ export default function DocumentScreen() {
     setSelected(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const canSave = !!dogId && selected.length > 0;
-
-  // Stabile ID pro Doku-Versuch → idempotenter Quota-Claim über Retries hinweg.
-  const unitIdRef = useRef(Crypto.randomUUID());
+  const canSave = draftReady && editLoaded && !editConflict && !!dogId && dogs.some(d => d.id === dogId) && selected.some(e => e.performed);
 
   const speichern = async () => {
-    if (!canSave || !session?.user.id) return;
+    if (!canSave || !session?.user.id || saveLock.current) return;
+    saveLock.current = true;
+    Keyboard.dismiss();
     setSaving(true);
-    const started = new Date(date); started.setHours(12, 0, 0, 0);
-    const ended = new Date(started.getTime() + durationMin * 60000);
+    try {
     const payload = {
       dog_id:       dogId!,
-      session_date: ymd(date),
-      started_at:   started.toISOString(),
-      ended_at:     ended.toISOString(),
-      duration_sec: durationMin * 60,
+      session_date: localDay(date),
+      started_at:   recordedTimes.started_at,
+      ended_at:     recordedTimes.ended_at,
+      duration_sec: recordedDurationSec.current ?? (durationMin != null ? durationMin * 60 : null),
       score:        score || null,
       notes:        description.trim() || null,
       photos,
       videos,
-      audio_files:  audio.map(a => ({ url: a.url, duration: a.duration, transcript: null })),
-      shared_with_trainer: profile?.share_trainings_default ?? false,
+      audio_files:  audio.map(a => ({ url: a.url, duration: a.duration, transcript: a.transcript ?? null })),
+      shared_with_trainer: shared ?? profile?.share_trainings_default ?? false,
       ...metrics,
     };
-    const exercises = selected.map((e, i) => ({
-      discipline: e.discipline, exercise_name: e.name,
-      rating: e.rating, notes: e.notes?.trim() || null, duration_sec: null, seq_index: i,
-    }));
+    const exercises = selected.filter(e => e.performed).map((e, i) => ({ ...performedExercises([e])[0], id: e.key, seq_index: i, exercise_identity_id: e.exerciseKey ?? null, discipline_key: e.disciplineKey ?? null }));
 
-    const { error } = editing
-      ? await updateDocumentedUnit(id!, payload, exercises)
-      : (await createDocumentedUnit(session.user.id, payload, exercises, unitIdRef.current));
-    setSaving(false);
-    if (error) {
-      // NEWBIE-Quota (nur bei NEUER Doku): Upgrade- bzw. Retry-UX, sonst generisch.
-      if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
-      Alert.alert(t('common.error'), error.message ?? t('training.saveError')); return;
+    if (editing && !remoteCompleted && !pendingSave) {
+      const latest = await getTrainingUnitById(id!);
+      if (!alive.current) return;
+      if (latest.error || !latest.data || latest.data.owner_id !== session.user.id
+          || trainingUnitFingerprint(latest.data as TrainingUnit) !== sourceFingerprint.current) {
+        setEditConflict(true);
+        Alert.alert(t('common.error'), t('trainingDoc.reviewSave'));
+        return;
+      }
     }
+    let error: { code?: string; message?: string } | null = null;
+    if (pendingSave) {
+      const result = await retryTrainingSave(session.user.id, id ?? unitIdRef.current, operationIdRef.current, () => alive.current);
+      error = result.error;
+    } else if (remoteCompleted) {
+      const latest = await getTrainingUnitById(id ?? unitIdRef.current);
+      if (!alive.current) return;
+      if (latest.error || !latest.data || !isConfirmedDocumentedRetry(latest.data as TrainingUnit, session.user.id, payload, exercises)) {
+        Alert.alert(t('common.error'), t('trainingDoc.reviewSave')); return;
+      }
+    } else {
+      const focusChanges = [
+        ...(nextFocus.trim() ? [{ action: 'create' as const, request: { id: focusIdRef.current, requestId: focusIdRef.current,
+          sourceUnitId: id ?? unitIdRef.current, disciplineKey: nextFocusDisciplineKey, text: nextFocus.trim() } }] : []),
+        ...selected.filter(e => e.performed && e.nextFocus?.trim()).map(e => ({ action: 'create' as const, request: {
+          id: e.nextFocusId!, requestId: e.nextFocusId!, sourceUnitId: id ?? unitIdRef.current,
+          sourceExerciseId: e.key, disciplineKey: e.disciplineKey ?? '', text: e.nextFocus!.trim(),
+        } })),
+      ];
+      if (focusChanges.some(change => !change.request.id || !change.request.disciplineKey
+          || !exercises.some(e => e.discipline_key === change.request.disciplineKey))) {
+        Alert.alert(t('common.error'), t('trainingDoc.reviewSave')); return;
+      }
+      if (draftKey) await saveDocumentDraft(draftKey, draftSnapshot());
+      if (!alive.current) return;
+      const result = await saveDocumentedUnitAtomic(session.user.id, id ?? unitIdRef.current, payload, exercises,
+        editing ? 'edit' : 'create', { operationId: operationIdRef.current, current: () => alive.current,
+          expectedFingerprint: editing ? sourceFingerprint.current : undefined, focusChanges,
+          identityChanges: selected.filter(e => e.performed && e.identityNew && e.exerciseKey && e.disciplineKey).map(e => ({ request: {
+            id: e.exerciseKey!, requestId: e.exerciseKey!, expectedRevision: null, disciplineKey: e.disciplineKey!, displayName: e.name,
+          } })),
+        });
+      error = result.error;
+    }
+    if (!alive.current) return;
+    if (error) {
+      if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;
+      Alert.alert(t('common.error'), ['TRAINING_DOCUMENT_REVIEW_REQUIRED', 'CONFLICT', 'UNRESOLVED_SAVE'].includes(error.code ?? '') ? t('trainingDoc.reviewSave') : t(error.code === 'LOCAL_SAVE_ERROR' ? 'trainingDoc.draftError' : 'training.saveError')); return;
+    }
+    setRemoteCompleted(true);
+    const focusInputs = [
+      ...(nextFocus.trim() ? [{ key: 'unit', text: nextFocus.trim(), discipline: nextFocusDiscipline || disc?.label || activeDisc, exerciseName: undefined as string | undefined, exerciseKey: undefined as string | undefined }] : []),
+      ...selected.filter(e => e.nextFocus?.trim()).map(e => ({ key: e.key, text: e.nextFocus!.trim(), discipline: e.discipline, exerciseName: e.name, exerciseKey: e.exerciseKey ?? e.key })),
+    ];
+    if (legacyCompletion.current && focusInputs.length) {
+      try {
+        await addTrainingFocuses(session.user.id, focusInputs.map(f => ({
+          id: `${id ?? unitIdRef.current}:${focusIdRef.current}:${f.key}`, dogId: dogId!, discipline: f.discipline,
+          originUnitId: id ?? unitIdRef.current, originDate: localDay(date), exerciseName: f.exerciseName, exerciseKey: f.exerciseKey,
+          originText: f.text, text: f.text, status: 'open',
+        })), () => alive.current);
+      } catch {
+        if (!alive.current) return;
+        Alert.alert(t('trainingDoc.focusError'), t('trainingDoc.focusLocal'));
+        return; // Preserve the complete draft; the next save reconciles the persisted unit before writing.
+      }
+    }
+    if (!alive.current) return;
+    stopDraft.current = true;
+    if (draftKey) await clearDocumentDraft(draftKey).catch(() => {});
+    if (!alive.current) return;
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     if (editing) router.replace({ pathname: '/unit/detail', params: { id: id! } });
     else         router.replace('/(tabs)/home');
+    } catch {
+      if (!alive.current) return;
+      Alert.alert(t('common.error'), t('training.saveError'));
+    } finally {
+      if (alive.current && session?.user.id) {
+        const pending = await readPendingTrainingSave(session.user.id, id ?? unitIdRef.current).catch(() => null);
+        if (alive.current) { setPendingSave(!!pending); setSaving(false); }
+      }
+      saveLock.current = false;
+    }
   };
+
+  if (draftBlocked) return <SafeAreaView style={s.safe}><Text style={s.saveHint}>{t('trainingDoc.draftError')}</Text><TouchableOpacity style={s.chip} accessibilityRole="button" onPress={() => { setDraftBlocked(false); setDraftReady(false); setLoadRetry(v => v + 1); }}><Text style={s.chipTxt}>{t('common.retry')}</Text></TouchableOpacity></SafeAreaView>;
+  if (!draftReady) return <SafeAreaView style={s.safe}><ActivityIndicator accessibilityLabel={t('common.loading')} /></SafeAreaView>;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={s.backBtn} accessibilityRole="button" accessibilityLabel={t('common.back')} onPress={() => router.back()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View>
@@ -261,7 +525,13 @@ export default function DocumentScreen() {
       </View>
 
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" pointerEvents={saving || remoteCompleted || pendingSave ? 'none' : 'auto'}>
+          <Text style={s.label}>{t('trainingDoc.localDraft')}</Text>
+          {draftError && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.draftError')}</Text>}
+          {editing && !editLoaded && <TouchableOpacity accessibilityRole="button" style={s.chip} onPress={() => setLoadRetry(v => v + 1)}><Text style={s.chipTxt}>{t('common.retry')}</Text></TouchableOpacity>}
+          {editConflict && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.reviewSave')}</Text>}
+          {pendingSave && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.pendingSave')}</Text>}
+          {remoteCompleted && legacyCompletion.current && <Text style={s.saveHint}>{t('trainingDoc.remoteCompleted')}</Text>}
           {/* Trainingskontext: Hund + Sparte kompakt in einer Card */}
           <View style={s.contextCard}>
             {!dogsLoading && dogs.length === 0 ? (
@@ -289,7 +559,7 @@ export default function DocumentScreen() {
                   {dogs.map(d => {
                     const aktiv = dogId === d.id;
                     return (
-                      <TouchableOpacity key={d.id} style={[s.chip, aktiv && s.chipActive]} onPress={() => { tapHaptic(); setDogId(d.id); }} activeOpacity={0.8}>
+                      <TouchableOpacity key={d.id} style={[s.chip, aktiv && s.chipActive]} accessibilityRole="button" accessibilityState={{ selected: aktiv }} accessibilityLabel={d.name} onPress={() => { if (dogId === d.id) return; tapHaptic(); setDogId(d.id); setNextFocus(''); setNextFocusDiscipline(''); setNextFocusDisciplineKey(''); setRecentNames([]); setCustomSheetOpen(false); setSelected(prev => prev.map(e => ({ ...e, rating: null, notes: null, performed: false, durationSec: null, nextFocus: undefined, nextFocusId: undefined, sourceUnitId: undefined, sourceExerciseId: undefined })));  }} activeOpacity={0.8}>
                         {aktiv && <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />}
                         <Text style={[s.chipTxt, aktiv && s.chipTxtActive]}>{d.name}</Text>
                       </TouchableOpacity>
@@ -304,7 +574,7 @@ export default function DocumentScreen() {
               {disciplines.map(d => {
                 const aktiv = activeDisc === d.key;
                 return (
-                  <TouchableOpacity key={d.key} style={[s.chip, aktiv && { borderColor: d.accent, backgroundColor: `${d.accent}1A` }]} onPress={() => { tapHaptic(); setActiveDisc(d.key); }} activeOpacity={0.8}>
+                  <TouchableOpacity key={d.key} style={[s.chip, aktiv && { borderColor: d.accent, backgroundColor: `${d.accent}1A` }]} accessibilityRole="button" accessibilityState={{ selected: aktiv }} accessibilityLabel={d.label} onPress={() => { tapHaptic(); disciplineTouched.current = true; setActiveDisc(d.key); setRecentNames([]); setCustomSheetOpen(false); }} activeOpacity={0.8}>
                     <Ionicons name={d.icon} size={13} color={aktiv ? d.accent : C.muted} />
                     <Text style={[s.chipTxt, aktiv && { color: d.accent, fontWeight: '700' }]}>{d.label}</Text>
                   </TouchableOpacity>
@@ -324,6 +594,16 @@ export default function DocumentScreen() {
             </View>
           </View>
 
+          {!editing && dogId && disc && <TrainingPreparation units={visibleHistory.units} discipline={disc.label}
+            loading={visibleHistory.loading} error={visibleHistory.error} limited={visibleHistory.limited}
+            onRetry={() => setHistoryRetry(v => v + 1)} onReuse={reuseExercises}
+            onOpen={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} />}
+
+          {disc && session?.user.id && <ExerciseIdentityList key={`${session.user.id}:${disc.key}`} ownerId={session.user.id} disciplineKey={scopeKey(disc)}
+            onSelect={identity => setSelected(prev => prev.some(e => e.exerciseKey === identity.id) ? prev.filter(e => e.exerciseKey !== identity.id)
+              : [...prev, { key: Crypto.randomUUID(), discipline: disc.label, disciplineKey: identity.discipline_key,
+                name: identity.display_name, exerciseKey: identity.id, rating: null, notes: null, performed: false }])} />}
+
           {/* Übungen (Mehrfachauswahl) — Chips, unverändert in der Logik */}
           {disc && (
             <>
@@ -332,7 +612,7 @@ export default function DocumentScreen() {
                 {disc.exercises.filter(e => e !== 'Eigene Übung').map(ex => {
                   const aktiv = isSelected(disc.label, ex);
                   return (
-                    <TouchableOpacity key={ex} style={[s.chip, aktiv && { borderColor: disc.accent, backgroundColor: `${disc.accent}1A` }]} onPress={() => toggleExercise(disc.label, ex)} activeOpacity={0.8}>
+                    <TouchableOpacity key={ex} style={[s.chip, aktiv && { borderColor: disc.accent, backgroundColor: `${disc.accent}1A` }]} accessibilityRole="button" accessibilityState={{ selected: aktiv }} accessibilityLabel={ex} onPress={() => toggleExercise(disc.label, ex)} activeOpacity={0.8}>
                       <Text style={[s.chipTxt, aktiv && { color: disc.accent, fontWeight: '700' }]}>{ex}</Text>
                     </TouchableOpacity>
                   );
@@ -340,7 +620,7 @@ export default function DocumentScreen() {
                 {recentNames.map(ex => {
                   const aktiv = isSelected(disc.label, ex);
                   return (
-                    <TouchableOpacity key={`recent-${ex}`} style={[s.chip, aktiv && { borderColor: disc.accent, backgroundColor: `${disc.accent}1A` }]} onPress={() => toggleExercise(disc.label, ex)} activeOpacity={0.8}>
+                    <TouchableOpacity key={`recent-${ex}`} style={[s.chip, aktiv && { borderColor: disc.accent, backgroundColor: `${disc.accent}1A` }]} accessibilityRole="button" accessibilityState={{ selected: aktiv }} accessibilityLabel={ex} onPress={() => toggleExercise(disc.label, ex)} activeOpacity={0.8}>
                       <Text style={[s.chipTxt, aktiv && { color: disc.accent, fontWeight: '700' }]}>{ex}</Text>
                     </TouchableOpacity>
                   );
@@ -359,14 +639,18 @@ export default function DocumentScreen() {
             </>
           )}
 
+
+
           {/* Ausgewählte Übungen → Karten mit Bewertung + Notiz */}
           {selected.length > 0 && (
             <>
               <Text style={s.label}>{t('training.selectedCount', { count: selected.length })}</Text>
               <View style={s.selectedList}>
-                {selected.map((e, i) => (
+                {selected.map((e, i) => {
+                  const previous = lastExerciseHistory(visibleHistory.units.filter(unit => unit.id !== id), e)[0];
+                  return (
                   <SelectedExerciseCard
-                    key={`${e.discipline}-${e.name}`}
+                    key={e.key}
                     name={e.name}
                     accentColor={disciplineColor(e.discipline)}
                     isCustom={isCustomExercise(e.discipline, e.name)}
@@ -375,22 +659,46 @@ export default function DocumentScreen() {
                     onRatingChange={r => setExerciseRating(i, r)}
                     onNotesChange={n => setExerciseNotes(i, n)}
                     onRemove={() => removeExercise(i)}
+                    nextFocus={e.nextFocus}
+                    onNextFocusChange={text => setSelected(prev => prev.map((x, j) => j === i ? { ...x, nextFocus: text, nextFocusId: x.nextFocusId ?? Crypto.randomUUID() } : x))}
+                    performed={e.performed}
+                    onPerformedChange={() => setSelected(prev => prev.map((x, j) => j === i ? { ...x, performed: !x.performed } : x))}
+                    historical={previous ? { date: previous.unit.session_date, rating: previous.exercise.rating,
+                      notes: previous.exercise.notes, onOpen: () => router.push({ pathname: '/unit/detail', params: { id: previous.unit.id } }) } : undefined}
                   />
-                ))}
+                ); })}
               </View>
             </>
           )}
 
+          {session?.user.id && dogId && disc && <ServerTrainingFocusList key={historyScope} ownerId={session.user.id} {...serverFocuses}
+            onRetry={() => setFocusRevision(v => v + 1)} onOpenSource={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} />}
+          {session?.user.id && dogId && disc && <TrainingFocusList collapsedByDefault key={historyScope} ownerId={session.user.id} dogId={dogId} discipline={disc.label} />}
+          <Text style={s.label}>{t('trainingDoc.nextFocus')}{nextFocus && nextFocusDiscipline ? ` · ${nextFocusDiscipline}` : ''}</Text>
+          <TextInput style={s.textarea} value={nextFocus} onChangeText={text => { setNextFocus(text); setNextFocusDiscipline(disc?.label ?? activeDisc); setNextFocusDisciplineKey(disc ? scopeKey(disc) : ''); }} editable={!saving && !remoteCompleted} multiline maxLength={500}
+            placeholder={t('trainingDoc.nextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={t('trainingDoc.nextFocus')} />
+          <Text style={s.saveHint}>{t('trainingDoc.focusAccount')}</Text>
           {/* Trainingsnotiz */}
           <Text style={s.label}>{t('training.descriptionLabel')}</Text>
-          <TextInput style={s.textarea} placeholder={t('training.descriptionPlaceholder')} placeholderTextColor={C.placeholder} value={description} onChangeText={setDescription} multiline />
+          <TextInput style={s.textarea} placeholder={t('training.descriptionPlaceholder')} placeholderTextColor={C.placeholder} value={description} onChangeText={setDescription} editable={!saving && !remoteCompleted} multiline />
 
           {/* Datum + Dauer */}
           <Text style={s.label}>{t('training.dateLabel')}</Text>
           <DateField value={date} onChange={setDate} maximumDate={new Date()} />
 
           <Text style={s.label}>{t('training.durationLabel')}</Text>
-          <CompactDurationStepper value={durationMin} onChange={setDurationMin} />
+          {durationMin == null ? <TouchableOpacity onPress={() => { recordedDurationSec.current = null; setDurationMin(5); }} accessibilityRole="button" accessibilityLabel={t('trainingDoc.enterDuration')} style={s.chip}>
+            <Text style={s.chipTxt}>{t('trainingDoc.optionalDuration')} · {t('trainingDoc.enterDuration')}</Text>
+          </TouchableOpacity> : <>
+            <CompactDurationStepper value={durationMin} onChange={value => { recordedDurationSec.current = null; setDurationMin(value); }} />
+            <TouchableOpacity onPress={() => { recordedDurationSec.current = null; setDurationMin(null); }} accessibilityRole="button" style={s.chip}>
+              <Text style={s.chipTxt}>{t('trainingDoc.unknownDuration')}</Text>
+            </TouchableOpacity>
+          </>}
+          <TouchableOpacity onPress={() => setDetails(v => !v)} accessibilityRole="button" accessibilityState={{ expanded: details }} style={s.chip}>
+            <Text style={s.chipTxt}>{t('trainingDoc.details')}</Text>
+          </TouchableOpacity>
+          {details && <>
 
           {/* Gesamteindruck 1–10 — kompakte Segment-Leiste, Datenformat unverändert */}
           <Text style={[s.label, { marginTop: 22 }]}>{t('training.ratingLabel')}</Text>
@@ -429,6 +737,7 @@ export default function DocumentScreen() {
             <AudioRecorder value={audio} onChange={setAudio} />
           </View>
 
+          </>}
           <View style={{ height: 24 }} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -437,13 +746,13 @@ export default function DocumentScreen() {
       <SafeAreaView edges={['bottom']} style={s.footer}>
         {!canSave && (
           <Text style={s.saveHint}>
-            {!dogId ? t('training.chooseDogSaveHint') : t('training.chooseExerciseSaveHint')}
+            {!dogId ? t('training.chooseDogSaveHint') : t('trainingDoc.performedHint')}
           </Text>
         )}
         <AnimatedPressable style={[s.saveBtn, !canSave && { opacity: 0.4 }]} scale={0.97} disabled={!canSave || saving} onPress={speichern}>
           <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
           <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
-          <Text style={s.saveTxt}>{saving ? t('common.saving') : editing ? t('training.saveChanges') : t('training.saveUnit')}</Text>
+          <Text style={s.saveTxt}>{saving ? t('common.saving') : remoteCompleted ? t('common.retry') : editing ? t('training.saveChanges') : t('training.saveUnit')}</Text>
         </AnimatedPressable>
       </SafeAreaView>
 
@@ -461,7 +770,7 @@ const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   flex:   { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  backBtn:{ width: 38, height: 38, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  backBtn:{ width: 44, height: 44, borderRadius: 12, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   eyebrow:{ fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 2, marginBottom: 2 },
   title:  { fontSize: 22, color: C.white, fontWeight: '900', letterSpacing: -0.4 },
 
@@ -473,7 +782,7 @@ const s = StyleSheet.create({
   contextCard: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14 },
 
   chipRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:         { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 9, overflow: 'hidden' },
+  chip:         { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 9, overflow: 'hidden' },
   chipActive:   { borderColor: C.accent },
   chipTxt:      { fontSize: 13, color: C.muted, fontWeight: '600' },
   chipTxtActive:{ color: C.accentText, fontWeight: '700' },
