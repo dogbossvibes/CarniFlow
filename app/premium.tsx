@@ -11,7 +11,7 @@ import { haptic } from '@/lib/haptics';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, ensurePurchasesConfigured, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, ensurePurchasesConfigured, isPurchaseAccountCurrent, type PurchasePackage } from '@/lib/purchases';
 import {
   activatePlan, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
 } from '@/services/subscriptionService';
@@ -182,18 +182,19 @@ export default function PremiumScreen() {
         // auf die Store-Abo-Verwaltung verweisen. iOS bleibt unverändert (Group).
         let oldProductIdentifier: string | null = null;
         if (Platform.OS === 'android' && currentPlan && currentPlan !== 'newbie' && plan !== currentPlan) {
-          oldProductIdentifier = await getActiveStoreProductId();
+          oldProductIdentifier = await getActiveStoreProductId(user.id);
           if (!oldProductIdentifier) {
             haptic.warning();
             Alert.alert(t('common.notice'), t('membership.switchViaStore'));
             return;
           }
         }
-        const res = await buyPackage(pkg, { oldProductIdentifier });
+        const res = await buyPackage(pkg, { oldProductIdentifier, userId: user.id });
         if (res.cancelled) return;
-        if (!res.ok) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), res.error ?? t('premium.purchaseIncomplete')); return; }
+        if (!res.ok) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), res.error?.startsWith('IAP_ACCOUNT_') ? t('premium.accountChanged') : (res.error ?? t('premium.purchaseIncomplete'))); return; }
         const { error } = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration, providerProductId: meta.productId });
-        if (error) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), t('premium.activationFailed')); return; }
+        if (error) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), t(error === 'SUBSCRIPTION_SYNC_PENDING' ? 'premium.syncPending' : 'premium.activationFailed')); return; }
+        if (!isPurchaseAccountCurrent(user.id)) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
         finish(plan);
       } else if (purchasesReady()) {
         Alert.alert(t('trainer.connectHintTitle'), plan === 'trainer' ? t('premium.trainerPackageUnavailable') : t('premium.packageUnavailable'));
@@ -233,19 +234,20 @@ export default function PremiumScreen() {
 
   const handleRestore = async () => {
     setLaden('active');
-    const res = await restorePurchases();
-    setLaden(null);
-    const { data: { user } } = await supabase.auth.getUser();
-    const restoredPlan = restorePlanFromResult(res, currentPlan);
-    if (restoredPlan && user) {
-      const plan: SubscriptionPlan = restoredPlan;
-      await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration });
-      haptic.success();   // Restore erfolgreich
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { Alert.alert(t('common.notice'), t('premium.loginRequired')); return; }
+      const res = await restorePurchases(user.id);
+      if (!res.ok) { Alert.alert(t('common.notice'), t(res.error?.startsWith('IAP_ACCOUNT_') ? 'premium.accountChanged' : 'premium.activationFailed')); return; }
+      const plan = restorePlanFromResult(res, currentPlan);
+      if (!plan) { haptic.warning(); Alert.alert(t('premium.noneFound'), t('premium.noneFoundBody')); return; }
+      const activation = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration });
+      if (activation.error) { Alert.alert(t('common.notice'), t(activation.pending ? 'premium.syncPending' : 'premium.activationFailed')); return; }
+      if (!isPurchaseAccountCurrent(user.id)) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
+      haptic.success();
       Alert.alert(t('premium.restored'), t('premium.restoredBody'), [{ text: 'OK', onPress: () => router.back() }]);
-    } else {
-      haptic.warning();   // nichts wiederherzustellen
-      Alert.alert(t('premium.noneFound'), res.error ?? t('premium.noneFoundBody'));
-    }
+    } catch { Alert.alert(t('common.notice'), t('premium.activationFailed')); }
+    finally { setLaden(null); }
   };
 
   return (
@@ -395,7 +397,7 @@ export default function PremiumScreen() {
           );
         })}
 
-        <TouchableOpacity onPress={handleRestore} style={S.restoreBtn} activeOpacity={0.7}>
+        <TouchableOpacity onPress={handleRestore} disabled={laden !== null} style={S.restoreBtn} activeOpacity={0.7}>
           <Text style={S.restoreTxt}>{t('premium.restore')}</Text>
         </TouchableOpacity>
         </>)}

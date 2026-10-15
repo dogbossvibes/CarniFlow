@@ -2031,6 +2031,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "premium.trainerPackageUnavailable": "Impossible de charger l’abonnement entraîneur pour le moment. Vérifie ta connexion Internet et réessaie.",
   "premium.notAvailable": "Indisponible.",
   "premium.purchaseIncomplete": "L’achat n’a pas été finalisé.",
+  "premium.syncPending": "La confirmation de votre abonnement est en attente. Ne faites pas un nouvel achat. Vérifiez votre adhésion plus tard.",
+  "premium.accountChanged": "Votre compte a changé. Vérifiez votre adhésion avec le bon compte.",
   "premium.activationFailed": "Échec de l’activation.",
   "premium.comingSoon": "Bientôt disponible",
   "premium.purchaseUnavailable": "Les achats sont momentanément indisponibles. Réessaie plus tard.",

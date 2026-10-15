@@ -115,6 +115,6 @@ describe('buildAndroidChangeInfo — Android Product-Change', () => {
 
 describe('getActiveStoreProductId', () => {
   it('liefert null, wenn IAP nicht bereit ist (kein Crash)', async () => {
-    await expect(getActiveStoreProductId()).resolves.toBeNull();
+    await expect(getActiveStoreProductId('A')).resolves.toBeNull();
   });
 });

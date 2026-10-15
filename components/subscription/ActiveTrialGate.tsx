@@ -32,7 +32,7 @@ export function ActiveTrialGate() {
       const res = await trial.startTrial();
       if (res.ok) { setVisible(false); return; }
       if (res.cancelled) return;     // Nutzer hat im Store abgebrochen → Sheet offen lassen
-      Alert.alert(t('activeTrial.title'), t('activeTrial.error'));
+      Alert.alert(t('activeTrial.title'), t(res.pending ? 'premium.syncPending' : 'activeTrial.error'));
     } finally {
       setStarting(false);
     }

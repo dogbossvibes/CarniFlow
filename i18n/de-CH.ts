@@ -1850,6 +1850,8 @@ export const deCH = {
   'premium.trainerPackageUnavailable': 'Das Trainer-Abo konnte momentan nicht geladen werden. Bitte prüfe deine Internetverbindung und versuche es erneut.',
   'premium.notAvailable': 'Nicht verfügbar.',
   'premium.purchaseIncomplete': 'Kauf wurde nicht abgeschlossen.',
+  'premium.syncPending': 'Die Bestätigung deines Abos ist noch offen. Bitte nicht erneut kaufen. Prüfe deine Mitgliedschaft später erneut.',
+  'premium.accountChanged': 'Dein Konto hat sich geändert. Prüfe deine Mitgliedschaft im passenden Konto.',
   'premium.activationFailed': 'Aktivierung fehlgeschlagen.',
   'premium.comingSoon': 'Bald verfügbar',
   'premium.purchaseUnavailable': 'Käufe sind gerade nicht verfügbar. Bitte später erneut versuchen.',
