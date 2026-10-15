@@ -1744,6 +1744,8 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "premium.trainerPackageUnavailable": "Impossibile caricare l’abbonamento Allenatore. Controlla la connessione e riprova.",
   "premium.notAvailable": "Non disponibile.",
   "premium.purchaseIncomplete": "Acquisto non completato.",
+  "premium.syncPending": "La conferma del tuo abbonamento è ancora in attesa. Non effettuare un altro acquisto. Controlla la tua iscrizione più tardi.",
+  "premium.accountChanged": "Il tuo account è cambiato. Controlla la tua iscrizione con l’account corretto.",
   "premium.activationFailed": "Attivazione non riuscita.",
   "premium.comingSoon": "Disponibile a breve",
   "premium.purchaseUnavailable": "Gli acquisti non sono disponibili al momento. Riprova più tardi.",

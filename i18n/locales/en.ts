@@ -1714,6 +1714,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "premium.trainerPackageUnavailable": "Trainer package unavailable",
   "premium.notAvailable": "Not available.",
   "premium.purchaseIncomplete": "The purchase couldn't be completed.",
+  "premium.syncPending": "Your subscription confirmation is still pending. Please do not purchase again. Check your membership again later.",
+  "premium.accountChanged": "Your account has changed. Check your membership in the correct account.",
   "premium.activationFailed": "Activation failed.",
   "premium.comingSoon": "Bald available",
   "premium.purchaseUnavailable": "Purchase unavailable",

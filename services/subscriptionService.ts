@@ -5,6 +5,7 @@ import {
   type SubscriptionPlan, type SubscriptionStatus,
 } from '@/features/subscription/plans';
 import { setCapabilities } from '@/services/capabilityService';
+import { syncSubscriptionAuthority, type SubscriptionSyncResult } from '@/services/subscriptionAuthorityService';
 
 export interface Subscription {
   id:         string;
@@ -94,7 +95,8 @@ export async function activatePlan(args: {
   trialEndsAt?: string | null;
   providerProductId?: string | null;
   providerSubscriptionId?: string | null;
-}): Promise<{ error: string | null }> {
+}): Promise<SubscriptionSyncResult> {
+  if (args.plan !== 'newbie') return syncSubscriptionAuthority(args.userId, args.plan);
   const meta = PLAN_META[args.plan];
   // NEWBIE ist KEIN Trial (dauerhaft kostenlos, kein Ablaufdatum) — kein
   // impliziter 'trialing'-Default mehr. Nur ein expliziter args.status
@@ -112,7 +114,7 @@ export async function activatePlan(args: {
       user_id: args.userId,
       plan: args.plan,
       status,
-      tier: args.plan === 'trainer' ? 'trainer' : 'pro',   // Altbestand-Spalte mitführen
+      tier: 'pro',   // Dieser Legacy-Pfad bleibt ausschließlich NEWBIE.
       product_id: meta.productId,
       provider: 'app_store',
       store: 'app_store',
