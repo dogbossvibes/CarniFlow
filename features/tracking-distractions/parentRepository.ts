@@ -1,3 +1,4 @@
+import { readImportedParent } from '@/features/tracking-exchange/importedParent';
 import { getLocalDb } from '@/lib/localDb/client';
 import { getLocalTrainingSessionById } from '@/features/training/repositories/localTrainingRepository';
 import { getTrackPointsBySession, getTrackMarkersBySession } from '@/features/tracking/repositories/localTrackRepository';
@@ -12,6 +13,7 @@ export interface ParentTx {
  runAsync(sql: string, ...args: (string | number)[]): Promise<unknown>;
 }
 interface Deps {
+ importedParent?(id: string): Promise<ParentReference | null>;
  scope(): { userId: string | null; epoch: number };
  localRow(id: string): Promise<{ user_id: string; type: string; deleted_at: string | null } | null>;
  localDetail(id: string): Promise<unknown>;
@@ -61,6 +63,8 @@ export function createParentRepository(ownerId: string, deps: Deps) {
     const detail = await deps.localDetail(id); checkRead();
     return save(buildParentReference(detail, ownerId, id), checkRead);
    }
+   const imported = await deps.importedParent?.(id); checkRead();
+   if (imported) return imported;
    // Only read the server. Never manufacture a training session or a sync operation.
    const remote = await deps.remoteDetail(id); checkRead();
    if (!remote.error) {
@@ -78,7 +82,7 @@ export function createParentRepository(ownerId: string, deps: Deps) {
  };
 }
 export function parentRepository(ownerId: string, scope: Deps['scope']) {
- return createParentRepository(ownerId, { scope, localRow: getLocalTrainingSessionById,
+ return createParentRepository(ownerId, { scope, importedParent: id => readImportedParent(ownerId, id), localRow: getLocalTrainingSessionById,
   localDetail: async id => {
    const row = await getLocalTrainingSessionById(id);
    if (!row || row.user_id !== ownerId || row.type !== 'track' || row.status !== 'completed' || row.deleted_at) throw new DistractionError('PARENT_UNAVAILABLE');

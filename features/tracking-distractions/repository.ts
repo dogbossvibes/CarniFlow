@@ -22,7 +22,9 @@ export function createDistractionRepository(ownerId: string, deps: Deps) {
   }
   // The reference writer validates geometry once. Per-fix writes only check its scoped identity.
   const reference = await tx.getFirstAsync<{ owner_id: string; session_id: string }>('select owner_id,session_id from local_distraction_parents where owner_id=? and session_id=?', ownerId, id); check();
-  if (!reference || reference.owner_id !== ownerId || reference.session_id !== id) throw new DistractionError('PARENT_UNAVAILABLE');
+  if (reference && reference.owner_id === ownerId && reference.session_id === id) return;
+  const imported = await tx.getFirstAsync<{ owner_id: string; parent_id: string }>('select owner_id,parent_id from local_track_exchange where owner_id=? and parent_id=? and role=?', ownerId, id, 'incoming'); check();
+  if (!imported || imported.owner_id !== ownerId || imported.parent_id !== id) throw new DistractionError('PARENT_UNAVAILABLE');
  };
  return {
   async list(parentId: string): Promise<StoredDistraction[]> {

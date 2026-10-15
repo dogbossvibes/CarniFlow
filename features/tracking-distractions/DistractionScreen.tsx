@@ -1,3 +1,4 @@
+import '@/features/tracking-exchange/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +31,7 @@ export default function DistractionScreen() {
  return <DistractionContent key={`${data.userId}:${data.epoch}:${id}`} parentId={id} data={data} />;
 }
 function DistractionContent({ parentId, data }: { parentId: string; data: ReturnType<typeof useDistractions> }) {
+ const { t: exchangeT } = useTranslation('trackExchange');
  const { t } = useTranslation('distractions'); const router = useRouter();
  const { parents, refresh, scope } = data;
  const [name, setName] = useState(''), [error, setError] = useState<unknown>(null), [busy, setBusy] = useState(false);
@@ -109,8 +111,9 @@ function DistractionContent({ parentId, data }: { parentId: string; data: Return
    {parentLoading && <ActivityIndicator color={C.trackPrimary} accessibilityLabel={t('loadingMain')} />}
    {parentError && <View style={styles.card}><Text accessibilityRole="alert" style={styles.body}>{t('mainUnavailable')}</Text><Button label={t('refresh')} onPress={() => { void loadParent(); }} /></View>}
    {parent && <View style={styles.card}>
-    <Text style={styles.heading}>{t('mainTrack')}</Text>
-    <Text style={styles.body}>{dogs.find(dog => dog.id === parent.dogId)?.name ?? t('dogFallback')} · {parent.date ? new Date(parent.date).toLocaleDateString() : t('unknownDate')} · {parent.distanceM === null ? t('unknownDistance') : `${Math.round(parent.distanceM)} m`}</Text>
+    <Text style={styles.heading}>{t('mainTrack')}</Text>{parent.exchangeTaskId && <Text style={styles.body}>{exchangeT('received')}</Text>}
+    <Text style={styles.body}>{parent.exchangeTaskId ? t('mainTrack') : dogs.find(dog => dog.id === parent.dogId)?.name ?? t('dogFallback')} · {parent.date ? new Date(parent.date).toLocaleDateString() : t('unknownDate')} · {parent.distanceM === null ? t('unknownDistance') : `${Math.round(parent.distanceM)} m`}</Text>
+    {parent.exchangeTaskId && <Button label={exchangeT('return')} disabled={busy || recording} onPress={() => router.push({ pathname: parent.groupTaskId ? '/track/group-tasks' : '/track/share', params: { taskId: parent.groupTaskId ?? parent.exchangeTaskId } } as never)} />}
     <Button label={t('changeMain')} disabled={busy || recording} onPress={() => { recorder.current?.pause(); router.push('/track/verleitungen' as never); }} />
    </View>}
    {!!(error || data.error) && <Text accessibilityRole="alert" style={styles.error}>{t(distractionErrorKey(error || data.error))}</Text>}
