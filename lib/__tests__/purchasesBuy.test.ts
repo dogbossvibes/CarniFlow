@@ -74,7 +74,7 @@ describe('buyPackage — Android Product-Change Wiring', () => {
     const raw = { product: { identifier: id } };
     const androidPkg = { ...pkg, productId: id, raw };
     const old = 'anyvo_active_monthly_10:anyvo-active-monthly-400';
-    await buyPackage(androidPkg, { oldProductIdentifier: old });
+    await buyPackage(androidPkg, { userId: 'A', oldProductIdentifier: old });
     expect(mockPP).toHaveBeenCalledWith(raw, null, {
       oldProductIdentifier: old,
       replacementMode: 'WITH_TIME_PRORATION',
