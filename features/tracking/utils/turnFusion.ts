@@ -15,8 +15,9 @@
 //
 // Was diese Stufe tut:
 //   1. DIREKTION und SCHÄRFE sind getrennte Grössen. Die Richtung kommt aus dem
-//      GPS-Vorzeichen; Motion (vorzeichenbehaftetes Yaw) bestätigt oder
-//      widerspricht — sie erzeugt keine Richtung gegen die GPS-Geometrie.
+//      GPS-Vorzeichen. Nur bei schwacher, bereits vorhandener GPS-Ecke kann
+//      starke gerichtete Motion die Richtung übersteuern (Telemetrie:
+//      motion_override_low_geometry). Das ist kein Beweis gegen Handyrotation.
 //      „spitz" ist eine Behauptung über den Winkel und braucht belegbare
 //      GPS-Geometrie (turnGeometryQuality). Motion trägt zu Existenz,
 //      Richtungsbestätigung/-widerspruch und Motion-Qualität bei — NIE zur

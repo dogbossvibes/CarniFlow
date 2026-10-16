@@ -10,6 +10,9 @@ import { createLocalTrackMarker, createLocalTrackPointsBatch } from '@/features/
 import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
+import { motionClient } from '../../native/motionClient';
+import { markMotionSample } from '../../utils/trackingWarmupState';
+import type { MotionSample } from '@/modules/anyvo-motion';
 jest.mock('@/lib/diagnosticsAccessState', () => ({
   diagnosticsAccessToken: () => mockAccessToken,
   getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
@@ -74,7 +77,7 @@ jest.mock('../../utils/trackingWarmupState', () => ({
   markMotionStarted: jest.fn(), markMotionSample: jest.fn(),
 }));
 jest.mock('../../native/motionClient', () => ({ motionClient: {
-  start: jest.fn(async () => {}), stop: jest.fn(), onSample: jest.fn(() => ({ remove: jest.fn() })),
+  start: jest.fn(async () => true), stop: jest.fn(), onSample: jest.fn(() => ({ remove: jest.fn() })),
 } }));
 jest.mock('../../native/precisionLocationClient', () => ({ precisionLocationClient: { requestTemporaryFullAccuracy: jest.fn(async () => {}) } }));
 jest.mock('../../native/backgroundLocationTask', () => ({
@@ -114,6 +117,9 @@ function feed(afterTapMs: number, accuracy: number, northM: number, speed = 0, a
 }
 beforeEach(() => {
   clockMs = 1_000_000;
+  (motionClient.start as jest.Mock).mockReset().mockResolvedValue(true);
+  (motionClient.onSample as jest.Mock).mockClear();
+  (markMotionSample as jest.Mock).mockClear();
   feedFix = null;
   mockQaEnabled = false;
   mockAccessToken = 'authorized-fixture';
@@ -436,4 +442,47 @@ it.each(['bw','ow','gw','abriss'] as const)('finish preserves %s direction and e
  expect(useTrackingStore.getState().markers[1]).toMatchObject({angleKind,geometryDirection:'links',geometrySource:'manual'});
  expect(finalizeLocalTrainingSession).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({articlesTotal:1,cornersTotal:angleKind==='abriss'?0:1,manualAngleGeometry:[expect.objectContaining({manualMarkerType:angleKind,geometryDirection:'links'})]}));
  expect(createLocalTrackMarker).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({sourceMarkerId:markerIds[1],geometryDirection:'links',geometrySource:'manual'}));
+});
+
+
+it('ignores a queued native callback after stop, including after a new warm-up', async () => {
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  const oldCallback = (motionClient.onSample as jest.Mock).mock.calls[0][0];
+  const sample: MotionSample = { timestamp: clockMs, headingDelta: 90, stepDelta: 3,
+    accelerationMagnitude: 0.2, rotationMagnitude: 1, cadence: 2,
+    movementState: 'walking', motionConfidence: 1, activityConfidence: 'high' };
+  act(() => { current.stopAll(); oldCallback(sample); });
+  expect(markMotionSample).not.toHaveBeenCalled();
+  await act(async () => { await current.startWarmup(); });
+  act(() => { oldCallback(sample); });
+  expect(markMotionSample).not.toHaveBeenCalled();
+  const currentCallback = (motionClient.onSample as jest.Mock).mock.calls.at(-1)[0];
+  act(() => { currentCallback(sample); });
+  expect(markMotionSample).toHaveBeenCalledTimes(1);
+});
+
+it('does not advertise motion readiness when the native start fails', async () => {
+  mockQaEnabled = true;
+  (motionClient.start as jest.Mock).mockResolvedValue(false);
+  await start();
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.startupDiagnostics.motionReadyTSec).toBeNull();
+});
+
+it('does not let a previous warm-up start completion mark a new warm-up ready', async () => {
+  mockQaEnabled = true;
+  let resolveOld!: (started: boolean) => void;
+  (motionClient.start as jest.Mock).mockImplementationOnce(() => new Promise<boolean>(resolve => { resolveOld = resolve; }));
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  act(() => { current.stopAll(); });
+  (motionClient.start as jest.Mock).mockResolvedValue(false);
+  await act(async () => { await current.startWarmup(); resolveOld(true); await Promise.resolve(); });
+  feed(0, 5, 0);
+  await act(async () => { await current.beginRecording({ localId: 'new', ownerId: 'owner' }); });
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.startupDiagnostics.motionReadyTSec).toBeNull();
 });
