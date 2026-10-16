@@ -1,23 +1,9 @@
-// Motion-Turn-Evidenz — ISOLIERTER PROTOTYP.
-//
-// Beantwortet AUSSCHLIESSLICH eine Frage:
-//   "Hat in diesem Zeitfenster eine reale, gerichtete Drehbewegung des
-//    Handlers stattgefunden?"  →  turnEvidence 0..1
-//
-// `evidence` beantwortet bewusst NICHT: links/rechts, Winkelgrösse, Spitzwinkel,
-// absolute/geografische Richtung, Position. Das bleibt Aufgabe der GPS-Geometrie.
-// Das vorzeichenbehaftete Netto-Yaw (`signedNetYawDeg`) wird seit der
-// Turn-Fusion exportiert, damit die Fusionsstufe (turnFusion.ts) eine GPS-
-// Richtung bestätigen oder ihr widersprechen kann — der Detektor liest es nicht.
-//
-// Hintergrund: langsam korrelierter GNSS-Bias ist aus Positionsdaten allein
-// nicht von echter langsamer Bewegung unterscheidbar (gemessen — Alpha-Beta,
-// CV-Kalman und Sliding-Fit haben alle keinen relevanten Driftnutzen gebracht).
-// Core Motion ist die einzige davon UNABHÄNGIGE Informationsquelle, die im
-// Build bereits vorhanden ist.
-//
-// Dieses Modul ist NICHT verdrahtet: weder der CURRENT-Corner-Detector noch
-// Recorder/Search/Fusion rufen es auf. Es dient der Messung.
+// Motion-Turn-Evidenz für den produktiven Lay-Recorder und Offline-Replays.
+// Bewertet gerichtete GERÄTErotation und Bewegungsindizien, nicht unmittelbar
+// eine Drehung des Handlers. Handyrotation beim Gehen kann dieselbe Evidenz
+// liefern. Deshalb darf erst turnFusion.ts mit GPS-Geometrie eine Ecke ableiten.
+// Die Evidenz und signedNetYawDeg stützen Richtung/Confidence; die geometrische
+// Schärfe (normal/spitz) bleibt Aufgabe der GPS-Geometrie.
 
 import type { MovementState } from '@/modules/anyvo-motion';
 
@@ -427,7 +413,11 @@ export class MotionEvidenceBuffer {
   constructor(private readonly retentionSec = 20) {}
 
   push(s: MotionWindowSample): void {
-    this.samples.push(s);
+    // Aggregated deltas are not cumulative: replaying a sample would count
+    // its yaw and steps twice. Late samples also break rate/retention order.
+    const last = this.samples[this.samples.length - 1];
+    if (!Number.isFinite(s.t) || (last != null && s.t <= last.t)) return;
+    this.samples.push({ ...s });
     const cutoff = s.t - this.retentionSec * 1000;
     while (this.samples.length && this.samples[0].t < cutoff) this.samples.shift();
   }
