@@ -942,6 +942,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         markMotionStarted();
         startupRef.current!.motionSubscriptionStartedTSec ??= startupSec();
         motionSubRef.current = motionClient.onSample((m) => {
+          if (generation !== warmupGenerationRef.current || !motionActiveRef.current) return;
           markMotionSample();
           const callbackTime = startupSec();
           startupRef.current!.motionFirstCallbackTSec ??= callbackTime;
@@ -954,7 +955,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           });
         });
         startupRef.current!.pedometerSubscriptionStartedTSec ??= startupSec();
-        void motionClient.start().then(() => { startupRef.current!.motionReadyTSec ??= startupSec(); })
+        void motionClient.start().then((started) => {
+          if (started && generation === warmupGenerationRef.current && motionActiveRef.current) {
+            startupRef.current!.motionReadyTSec ??= startupSec();
+          }
+        })
           .catch(() => { /* Motion ist optional; GPS-Aufnahme läuft weiter. */ });
       }
     } catch {

@@ -125,8 +125,8 @@ function lockAndWalk(getRecorder: () => SearchRecorder, steps: number): number {
 }
 
 describe('useSearchRecorder — Sensor-Fusion-Schutzschicht (Punkt 2 der Nachbesserung)', () => {
-  beforeEach(() => { feedSample = null; motionSampleCb = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null; });
-  afterEach(() => { act(() => { activeRenderer?.unmount(); }); });
+  beforeEach(() => { feedSample = null; motionSampleCb = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null; jest.spyOn(Date, 'now').mockImplementation(() => simClockMs); });
+  afterEach(() => { act(() => { activeRenderer?.unmount(); }); jest.restoreAllMocks(); });
 
   it('normaler GPS-Fix (kein Motion-Widerspruch) → Linie bewegt sich normal weiter', async () => {
     const laidPoints = denseLeg(0, 60, 0);
@@ -250,14 +250,12 @@ describe('useSearchRecorder — Sensor-Fusion-Schutzschicht (Punkt 2 der Nachbes
 
     // movementState bewusst weiterhin 'stationary' (veraltete Apple-Klassifikation),
     // aber accel/rotation/stepDelta zeigen unzweideutig echtes Gehen.
-    feedMotion({
-      movementState: 'stationary', motionConfidence: 0.9,
-      accelerationMagnitude: 0.3, rotationMagnitude: 0.4, stepDelta: 1,
-    });
-
     let walked = y;
     const distances: number[] = [distAfterLock];
     for (let i = 0; i < 6; i++) {
+      // Continuous walking supplies fresh measurements, despite stale activity classification.
+      feedMotion({ movementState: 'stationary', motionConfidence: 0.9,
+        accelerationMagnitude: 0.3, rotationMagnitude: 0.4, stepDelta: 1 });
       walked += 2;
       feed(6, 0, walked);
       distances.push(getRecorder().distanceM);
@@ -319,4 +317,96 @@ describe('useSearchRecorder — Sensor-Fusion-Schutzschicht (Punkt 2 der Nachbes
     expect(getRecorder().distanceM).toBeGreaterThan(distBefore);
     expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_only');
   });
+});
+
+
+describe('Motion freshness and run boundaries', () => {
+  beforeEach(() => { feedSample = null; motionSampleCb = null; simClockMs = 100000; activeRenderer = null;
+    jest.spyOn(Date, 'now').mockImplementation(() => simClockMs); });
+  afterEach(() => { act(() => { activeRenderer?.unmount(); }); jest.restoreAllMocks(); });
+
+  it('does not freeze a continuing search using a stationary sample from ten seconds ago', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    const y = lockAndWalk(getRecorder, 9);
+    const before = getRecorder().distanceM;
+    feedMotion({ timestamp: simClockMs - 10000 });
+    feed(5, 0, y + 2);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_only');
+    expect(getRecorder().distanceM).toBeGreaterThan(before);
+  });
+
+  it('ignores idle motion received before a new search starts', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    feedMotion({});
+    act(() => { getRecorder().start(); });
+    feed(5, 0, 0);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_only');
+  });
+
+  it('does not reuse motion from before or during a pause', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    const y = lockAndWalk(getRecorder, 9);
+    feedMotion({});
+    act(() => { getRecorder().setPaused(true); });
+    feedMotion({});
+    act(() => { getRecorder().setPaused(false); });
+    feed(5, 0, y + 2);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_only');
+  });
+  it('rejects a future timestamp without blocking subsequent valid samples', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    feedMotion({ timestamp: simClockMs + 60000 });
+    feed(5, 0, 0);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_only');
+    feedMotion({});
+    feed(5, 0, 0);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_motion');
+  });
+
+  it('does not carry stationary evidence across stop and restart', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    feedMotion({});
+    act(() => { getRecorder().stop(); });
+    act(() => { getRecorder().start(); });
+    feed(5, 0, 0);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_only');
+  });
+
+  it('expires a sample that was fresh at receipt when the sensor stops sending', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    const y = lockAndWalk(getRecorder, 9);
+    feedMotion({});
+    feed(5, 0, y);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_motion');
+    const before = getRecorder().distanceM;
+    simClockMs += 2000;
+    feed(5, 0, y + 2);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_only');
+    expect(getRecorder().distanceM).toBeGreaterThan(before);
+  });
+
+  it.each([0, -1])('does not replace newer walking evidence with duplicate/late stationary evidence (%s ms)', async offset => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    const y = lockAndWalk(getRecorder, 9);
+    const before = getRecorder().distanceM;
+    feedMotion({ movementState: 'walking', accelerationMagnitude: 0.3, stepDelta: 1 });
+    feedMotion({ timestamp: simClockMs + offset });
+    feed(5, 0, y + 2);
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_motion');
+    expect(getRecorder().distanceM).toBeGreaterThan(before);
+  });
+
 });

@@ -39,8 +39,8 @@ import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/feat
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
 import { motionClient } from '@/features/tracking/native/motionClient';
 import {
-  evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand,
-  type MotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
+  evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand, motionForFix,
+  type TimedMotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
 } from '@/features/tracking/engine/trackFusionEngine';
 import type { AnalyticsSample } from '@/features/tracking/engine/trackAnalytics';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
@@ -343,11 +343,12 @@ export function useSearchRecorder(opts: {
   const maxCursorMRef = useRef(0);   // weitester erreichter Fortschritt (für Coverage)
 
   // ── Core-Motion-Sensor-Fusion (rein additiv, siehe GpsQuality-Kommentar oben) ──
-  const motionLatestRef = useRef<MotionInput | null>(null);
+  const motionLatestRef = useRef<TimedMotionInput | null>(null);
   // Rein diagnostisch (Punkt 9 des Audits) — bewusst NICHT Teil von MotionInput/
   // evaluateFusion (keine Funktions-/Signaturänderung an der reinen Fusion-
   // Engine), nur für das sparsame [fusion]-DEV-Log unten.
   const motionActivityAgeMsRef = useRef<number | null>(null);
+  const motionNotBeforeRef = useRef(0);
   const motionUnsubRef = useRef<{ remove: () => void } | null>(null);
   const fusionHistoryRef = useRef<FusionHistory>({ prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null });
   const analyticsSamplesRef = useRef<AnalyticsSample[]>([]);
@@ -408,6 +409,7 @@ export function useSearchRecorder(opts: {
     const raw: LatLng = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
     const tNow = loc.timestamp || Date.now();
     const speed = loc.coords.speed ?? null;
+    const motion = motionForFix(motionLatestRef.current, tNow, Date.now());
     const prev = smoothRef.current;
 
     // Fix-Annahme wie beim Legen (Genauigkeit ≤ 45 m, Speed ≤ 12 m/s), gegen den
@@ -457,7 +459,7 @@ export function useSearchRecorder(opts: {
         dtMs,
         jumpM: decision.jumpM,
         speedMps: decision.jumpM != null && dtMs != null && dtMs > 0 ? decision.jumpM / (dtMs / 1000) : null,
-        movementState: motionLatestRef.current?.movementState ?? null,
+        movementState: motion?.movementState ?? null,
         fusion: fusionClass,
         pointsBefore,
         pointsAfter: pointsRef.current.length,
@@ -511,7 +513,7 @@ export function useSearchRecorder(opts: {
     const gpsHeading = loc.coords.heading ?? null;
     const fusion = evaluateFusion(
       { latitude: raw.latitude, longitude: raw.longitude, timestamp: tNow, horizontalAccuracy: accRaw, speed, course: gpsHeading },
-      motionLatestRef.current,
+      motion,
       fusionHistoryRef.current,
       DEFAULT_FUSION_CONFIG,
     );
@@ -589,8 +591,8 @@ export function useSearchRecorder(opts: {
       // Core-Motion (Punkt 7): rein optionale Zusatzevidenz, siehe
       // searchStartAcquisition.ts — niemals ein Gate, nur eine leichte
       // Aufweitung der erlaubten Abweichung bei erkannter Fussbewegung.
-      const startMotion = motionLatestRef.current
-        ? { movementState: motionLatestRef.current.movementState ?? 'unknown', motionConfidence: motionLatestRef.current.motionConfidence ?? 0 }
+      const startMotion = motion
+        ? { movementState: motion.movementState ?? 'unknown', motionConfidence: motion.motionConfidence ?? 0 }
         : null;
       searchStartRef.current = stepSearchStart(
         searchStartRef.current, startEvalu, { position: sm, accuracy: accRaw, headingDeg: heading, motion: startMotion },
@@ -688,13 +690,13 @@ export function useSearchRecorder(opts: {
           accuracyM: accRaw,
           geometryAccepted: false,
           fusionClassification: fusion.classification,
-          motionConfidence: motionLatestRef.current?.motionConfidence ?? null,
+          motionConfidence: motion?.motionConfidence ?? null,
         });
       }
       if (__DEV__) console.log('[fusion]', fusion.classification, {
         confidence: Math.round(fusion.confidence * 100) / 100, reasonFlags: fusion.reasonFlags,
-        source: gpsDebug.source, movementState: motionLatestRef.current?.movementState ?? null,
-        activityAgeMs: motionActivityAgeMsRef.current, geometryBlocked: true,
+        source: gpsDebug.source, movementState: motion?.movementState ?? null,
+        activityAgeMs: motion ? motionActivityAgeMsRef.current : null, geometryBlocked: true,
       });
       emitDiag(fusion.classification === 'stationary' ? 'BLOCK_FUSION_STATIONARY' : 'BLOCK_FUSION_OUTLIER', fusion.classification);
       return;
@@ -831,7 +833,7 @@ export function useSearchRecorder(opts: {
         accuracyM: accRaw,
         geometryAccepted: true,
         fusionClassification: fusion.classification,
-        motionConfidence: motionLatestRef.current?.motionConfidence ?? null,
+        motionConfidence: motion?.motionConfidence ?? null,
       });
     }
 
@@ -988,8 +990,13 @@ export function useSearchRecorder(opts: {
   // aktuellsten Wert. Wird recordingRef nicht gesetzt (nicht aufgenommen),
   // ist motionClient ohnehin gestoppt → keine Samples zu erwarten. ──
   useEffect(() => {
+    let listening = true;
     const sub = motionClient.onSample((sMotion) => {
+      if (!listening || !recordingRef.current || pausedRef.current
+        || !motionForFix(sMotion, sMotion.timestamp, Date.now()) || sMotion.timestamp < motionNotBeforeRef.current
+        || (motionLatestRef.current != null && sMotion.timestamp <= motionLatestRef.current.timestamp)) return;
       motionLatestRef.current = {
+        timestamp: sMotion.timestamp,
         movementState: sMotion.movementState,
         stepDelta: sMotion.stepDelta,
         accelerationMagnitude: sMotion.accelerationMagnitude,
@@ -1001,6 +1008,9 @@ export function useSearchRecorder(opts: {
     });
     motionUnsubRef.current = sub;
     return () => {
+      listening = false;
+      motionLatestRef.current = null;
+      motionActivityAgeMsRef.current = null;
       sub.remove();
       // Defensiv: falls die Absuche noch lief, sauber stoppen (kein Leak über
       // den Unmount hinaus, Punkt 16).
@@ -1020,6 +1030,9 @@ export function useSearchRecorder(opts: {
 
   // ── Steuerung ──
   const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState }, opts?: { forceLocked?: boolean }) => {
+    motionLatestRef.current = null;
+    motionActivityAgeMsRef.current = null;
+    motionNotBeforeRef.current = Date.now();
     const resumePts = resume?.points ?? [];
     // Fortsetzen: mit den wiederhergestellten Punkten seeden (Linie/Distanz laufen
     // weiter); frisch: leer.
@@ -1139,6 +1152,8 @@ export function useSearchRecorder(opts: {
   }, [pushSnapshot, hasTrack, arc.total, laidObjects]);
 
   const stop = useCallback((): SearchResult => {
+    motionLatestRef.current = null;
+    motionActivityAgeMsRef.current = null;
     recordingEvidenceRef.current?.close();
     recordingEvidenceRef.current = null;
     recordingRef.current = false; setRecording(false);
@@ -1174,6 +1189,10 @@ export function useSearchRecorder(opts: {
   }, [computeScoreBreakdown, totalObjects]);
 
   const setPaused = useCallback((p: boolean) => {
+    if (p === pausedRef.current) return;
+    motionLatestRef.current = null;
+    motionActivityAgeMsRef.current = null;
+    motionNotBeforeRef.current = Date.now();
     recordingEvidenceRef.current?.note(p ? 'userPaused' : 'userResumed');
     pausedRef.current = p; setPausedState(p);
   }, []);
