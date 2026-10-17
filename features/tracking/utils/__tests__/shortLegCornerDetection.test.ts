@@ -364,3 +364,15 @@ describe('QA-Diagnose je Kandidat', () => {
     expect(yesMotion.diagnostics.confidence - noMotion.diagnostics.confidence).toBeLessThanOrEqual(0.07);
   });
 });
+
+
+describe('Gemeldete GPS-Unsicherheit bei klarer Referenzgeometrie', () => {
+  it.each([5, 15, 30])('erkennt vier Rechts-/Linkswinkel bei %s m Accuracy (10 m Schenkel, ohne Drift)', accuracy => {
+    const coords: [number, number][] = [[0, 0]];
+    for (const heading of [0, 270, 0, 90, 0]) {
+      coords.push(...walk(coords[coords.length - 1], heading, 10, 1));
+    }
+    const { corners } = detectShortLegCorners(detectorPoints(coords, accuracy));
+    expect(corners.map(c => c.kind)).toEqual(['links', 'rechts', 'rechts', 'links']);
+  });
+});

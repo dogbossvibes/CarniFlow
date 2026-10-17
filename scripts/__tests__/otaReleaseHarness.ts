@@ -89,6 +89,14 @@ else if (a[0] === 'channel:view') {
   out((g ? g.entries : []).map(e => Object.assign({}, e, { group: g.group, branch: 'production', createdAt: g.createdAt || '2026-10-04T00:00:00.000Z' })));
 } else if (a[0] === 'update') {
   let s = load();
+  // Test-owned barrier: keep the first publisher inside update until the
+  // parallel-start assertion has finished, independent of machine speed.
+  const barrier = process.env.FAKE_UPDATE_RELEASE_FILE;
+  const barrierStart = Date.now();
+  while (barrier && !fs.existsSync(barrier)) {
+    if (Date.now() - barrierStart > 120000) process.exit(2);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+  }
   if (s.sleepMs) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, s.sleepMs);
   if (s.failUpdate) process.exit(1);
   s = load();
@@ -130,11 +138,12 @@ export interface Harness {
  * z. B. um einen Hotfix für eine ältere, parallel aktive Runtime zu modellieren.
  * `appJson`: komplett eigene app.json (z. B. nicht bestimmbare Runtime).
  */
-export function createHarness(opts: { appVersion?: string; appJson?: unknown } = {}): Harness {
+export function createHarness(opts: { appVersion?: string; appJson?: unknown; easJson?: unknown } = {}): Harness {
   const dir = mkdtempSync(join(tmpdir(), 'anyvo-ota-test-'));
   const repo = join(dir, 'repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
   for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
+  if (opts.easJson !== undefined) writeFileSync(join(repo, 'eas.json'), JSON.stringify(opts.easJson, null, 2));
   if (opts.appJson !== undefined) writeFileSync(join(repo, 'app.json'), JSON.stringify(opts.appJson, null, 2));
   else {
     const app = JSON.parse(readFileSync('app.json', 'utf8'));

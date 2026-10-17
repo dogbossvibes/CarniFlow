@@ -247,17 +247,59 @@ export function parseNativeBuild(buildJson) {
   };
 }
 
-/** Validierung des nativen Basis-Builds (Initial-Modus). Leere Liste = gültige Basis. */
-export function evaluateNativeBaseBuild({ build, buildId, platform, runtime }) {
+/** Nur nachweisbare Production-Vererbung; Plattform-Overrides bleiben wirksam. */
+export function resolveProductionBuildProfile(easJson, name, platform) {
+  const profiles = easJson?.build;
+  if (!profiles || !ALLOWED_PLATFORMS.includes(platform)) return null;
+  const chain = [], seen = new Set();
+  while (name != null) {
+    if (typeof name !== 'string' || seen.has(name) || chain.length >= 5 || !Object.hasOwn(profiles, name)) return null;
+    const profile = profiles[name];
+    if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return null;
+    seen.add(name);
+    chain.unshift(profile);
+    name = profile.extends;
+  }
+  if (!seen.has('production')) return null;
+  let merged = {}, platformConfig = {};
+  for (const profile of chain) {
+    const override = profile[platform];
+    if (override != null && (typeof override !== 'object' || Array.isArray(override))) return null;
+    merged = { ...merged, ...profile };
+    platformConfig = { ...platformConfig, ...override };
+  }
+  const effective = { ...merged, ...platformConfig };
+  if (effective.channel !== PRODUCTION_CHANNEL || effective.environment !== 'production'
+    || effective.distribution !== 'store'
+    || (effective.developmentClient !== undefined && effective.developmentClient !== false)
+    || (effective.simulator !== undefined && effective.simulator !== false)
+    || (effective.buildConfiguration && effective.buildConfiguration !== 'Release')
+    || effective.config || effective.gradleCommand) return null;
+  return effective;
+}
+
+const appVersionFrom = (config, platform) => config?.expo?.[platform]?.version ?? config?.expo?.version ?? null;
+
+/** Validierung des nativen Basis-Builds (Initial-Modus). Leere Liste = gültige Basis.
+ * Abweichende Runtime/Profil nur mit Konfiguration vom unveränderlichen EAS-Build-Commit.
+ */
+export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeConfig, releaseAppVersion }) {
   if (!build) return [`EAS-Build ${buildId ?? '—'} nicht gefunden/lesbar`];
   const problems = [];
   if (build.id !== buildId) problems.push(`EAS-Build-ID ${build.id} ≠ angefragt ${buildId}`);
   if (build.status !== 'FINISHED') problems.push(`Basis-Build ${build.id}: Status ${build.status ?? '—'} ≠ FINISHED`);
   if (build.platform !== platform) problems.push(`Basis-Build ${build.id}: Plattform ${build.platform ?? '—'} ≠ Ziel ${platform}`);
   if (build.runtimeVersion !== runtime) problems.push(`Basis-Build ${build.id}: Runtime ${build.runtimeVersion ?? '—'} ≠ Ziel-Runtime ${runtime}`);
-  if (build.appVersion !== runtime) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion)`);
+  const needsConfig = build.appVersion !== runtime || build.buildProfile !== 'production';
+  const configMatches = !!nativeConfig && typeof build.appVersion === 'string' && !!build.appVersion.trim()
+    && resolveReleaseRuntime(nativeConfig.appJson, platform) === runtime
+    && appVersionFrom(nativeConfig.appJson, platform) === build.appVersion
+    && releaseAppVersion === build.appVersion;
+  if (build.appVersion !== runtime && !configMatches) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion oder belegter Override)`);
   if (build.channel !== PRODUCTION_CHANNEL) problems.push(`Basis-Build ${build.id}: Channel ${build.channel ?? '—'} ≠ ${PRODUCTION_CHANNEL}`);
-  if (build.buildProfile !== 'production') problems.push(`Basis-Build ${build.id}: Profil ${build.buildProfile ?? '—'} ≠ production`);
+  if (needsConfig && !configMatches) problems.push(`Basis-Build ${build.id}: App-Version/Runtime nicht durch Build-Commit-Konfiguration und Release-App-Version belegt`);
+  if (needsConfig && !resolveProductionBuildProfile(nativeConfig?.easJson, build.buildProfile, platform))
+    problems.push(`Basis-Build ${build.id}: Profil ${build.buildProfile ?? '—'} ist kein belegtes Production-Store-Profil`);
   if (!/^[0-9a-f]{40}$/.test(build.gitCommitHash ?? '')) problems.push(`Basis-Build ${build.id}: kein gültiger gitCommitHash`);
   return problems;
 }
@@ -465,6 +507,19 @@ function readNativeBuild(buildId) {
   catch { return null; }
 }
 
+function readNativeBuildConfig(commit) {
+  if (!/^[0-9a-f]{40}$/.test(commit ?? '')) return null;
+  try {
+    // Dynamische Konfiguration kann app.json verändern; ohne Auswertung kein Beleg.
+    const files = sh('git', ['ls-tree', '--name-only', commit]).split('\n');
+    if (files.some(f => /^app\.config\.(js|ts|mjs|cjs)$/.test(f))) return null;
+    return {
+      appJson: JSON.parse(sh('git', ['show', `${commit}:app.json`])),
+      easJson: JSON.parse(sh('git', ['show', `${commit}:eas.json`])),
+    };
+  } catch { return null; }
+}
+
 /**
  * Baseline für den Release. Normal: OTA-Group genau (Plattform, Runtime).
  * Initial: nur zulässig, solange für (Plattform, Runtime) KEINE Group existiert — dann der
@@ -477,7 +532,11 @@ function readBaseline(platform, runtime, initial, buildId) {
     return { active: null, ownOta: own, problems: [`--initial-runtime-release unzulässig: für ${platform} / Runtime ${runtime} existiert bereits Production-Group ${own.group} — normalen Release ohne Initial-Flags verwenden`] };
   }
   const build = readNativeBuild(buildId);
-  const problems = evaluateNativeBaseBuild({ build, buildId, platform, runtime });
+  const needsConfig = build && (build.appVersion !== runtime || build.buildProfile !== 'production');
+  const nativeConfig = needsConfig ? readNativeBuildConfig(build.gitCommitHash) : undefined;
+  const releaseAppVersion = needsConfig && existsSync('app.json')
+    ? appVersionFrom(JSON.parse(readFileSync('app.json', 'utf8')), platform) : undefined;
+  const problems = evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeConfig, releaseAppVersion });
   return { active: build?.gitCommitHash ? nativeBaseline(build) : null, ownOta: null, problems };
 }
 

@@ -133,9 +133,10 @@ export async function buildExportForSession(localId: string): Promise<QaTrackExp
       .catch(() => ({ diagnostics: null, status: 'read_failed' as const })),
     loadQaRecordingEvidence(localId),
   ]);
+  const base = buildQaTrackExport(localId, points, markers, capture, search);
   const exported: QaTrackExport = {
-    ...buildQaTrackExport(localId, points, markers, capture, search),
-    schemaMinor: 11,
+    ...base,
+    schemaMinor: Math.max(base.schemaMinor ?? 0, 11) as QaTrackExport['schemaMinor'],
     recordingEvidence,
     backgroundLayDiagnosticsStatus: background.status,
     ...(background.diagnostics ? { backgroundLayDiagnostics: background.diagnostics } : {}),
