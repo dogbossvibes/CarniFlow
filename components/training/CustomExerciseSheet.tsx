@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { C } from '@/constants/colors';
@@ -33,7 +33,7 @@ export function CustomExerciseSheet({ visible, onClose, isCustomDiscipline, onSa
   const [saveForFuture, setSaveForFuture] = useState(true);
 
   const reset = () => { setName(''); setSaveForFuture(true); };
-  const handleClose = () => { reset(); onClose(); };
+  const handleClose = () => { Keyboard.dismiss(); reset(); onClose(); };
 
   const handleSave = () => {
     const trimmed = name.trim();
@@ -45,19 +45,8 @@ export function CustomExerciseSheet({ visible, onClose, isCustomDiscipline, onSa
   };
 
   return (
-    <AnyvoBottomSheet visible={visible} onClose={handleClose} title={t('training.customExerciseSheetTitle')}>
-      {/* ROOT CAUSE (T-eigene-Übung): AnyvoBottomSheet selbst hat kein Keyboard-
-          Handling — der Sheet-Inhalt hängt an position:absolute/bottom:0 fest am
-          unteren Bildschirmrand. Das Namensfeld hat autoFocus, öffnet die Tastatur
-          also sofort beim Öffnen des Sheets; ohne Ausgleich schiebt sich „Speichern"
-          (unten in den actions) auf kleinen iPhones hinter die Tastatur und ist
-          nicht mehr erreichbar — die Übung liess sich dadurch nicht zuverlässig
-          hinzufügen. Fix lokal hier (nicht in AnyvoBottomSheet selbst, das von
-          sieben weiteren, unabhängigen Screens genutzt wird): KeyboardAvoidingView
-          um genau diesen Sheet-Inhalt, dasselbe Verhalten wie bereits in
-          app/unit/document.tsx selbst verwendet (padding auf iOS, Android regelt
-          das bereits selbst — kein zweiter, konkurrierender Mechanismus). */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <AnyvoBottomSheet visible={visible} onClose={handleClose} title={t('training.customExerciseSheetTitle')} keyboardAware closeButton>
+      <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <Text style={s.label}>{t('training.customExerciseNameLabel')}</Text>
         <TextInput
           style={s.input}
@@ -88,6 +77,7 @@ export function CustomExerciseSheet({ visible, onClose, isCustomDiscipline, onSa
           <Text style={s.hint}>{t('training.saveForFutureAutoHint')}</Text>
         )}
 
+      </ScrollView>
         <View style={s.actions}>
           <TouchableOpacity style={s.cancelBtn} onPress={handleClose} activeOpacity={0.8}>
             <Text style={s.cancelTxt}>{t('common.cancel')}</Text>
@@ -101,7 +91,7 @@ export function CustomExerciseSheet({ visible, onClose, isCustomDiscipline, onSa
             <Text style={s.saveTxt}>{t('common.save')}</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+
     </AnyvoBottomSheet>
   );
 }
@@ -118,9 +108,9 @@ const s = StyleSheet.create({
   hint: { fontSize: 12.5, color: C.muted, marginTop: 14, lineHeight: 17 },
 
   actions:  { flexDirection: 'row', gap: 10, marginTop: 22, marginBottom: 6 },
-  cancelBtn:{ flex: 1, height: 50, borderRadius: 16, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  cancelBtn:{ flex: 1, minHeight: 50, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   cancelTxt:{ fontSize: 14, color: C.muted, fontWeight: '700' },
-  saveBtn:  { flex: 1, height: 50, borderRadius: 16, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  saveBtn:  { flex: 1, minHeight: 50, padding: 12, borderRadius: 16, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   saveBtnDisabled: { opacity: 0.4 },
   saveTxt:  { fontSize: 14, color: C.accentText, fontWeight: '800' },
 });

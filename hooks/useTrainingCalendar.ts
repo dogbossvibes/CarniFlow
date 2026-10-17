@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCalendarEvents } from '@/services/calendarService';
 import { useSession } from '@/hooks/useSession';
 import type { CalendarEvent } from '@/types/calendar';
@@ -8,11 +8,13 @@ export function useTrainingCalendar() {
   const { session } = useSession();
   const uid = session?.user.id;
 
+  const client = useQueryClient();
   const query = useQuery({
     queryKey: ['calendar', uid],
     enabled:  !!uid,
     queryFn:  async (): Promise<CalendarEvent[]> => {
-      const { data } = await getCalendarEvents(uid!);
+      const { data, error } = await getCalendarEvents(uid!);
+      if (error) throw error;
       return (data as CalendarEvent[]) ?? [];
     },
   });
@@ -21,6 +23,9 @@ export function useTrainingCalendar() {
     events:  query.data ?? [],
     loading: uid ? query.isPending : false,
     refresh: query.refetch,
+    upsert: (event: CalendarEvent) => client.setQueryData<CalendarEvent[]>(['calendar', uid], old =>
+      [...(old ?? []).filter(item => item.id !== event.id), event].sort((a, b) => a.start_at.localeCompare(b.start_at))),
+    remove: (id: string) => client.setQueryData<CalendarEvent[]>(['calendar', uid], old => (old ?? []).filter(item => item.id !== id)),
   };
 }
 

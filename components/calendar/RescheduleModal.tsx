@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { fmtTime } from '@/lib/eventFormat';
@@ -59,36 +59,32 @@ export function RescheduleModal({
     const startISO = toISO(date, start);
     if (!startISO) { Alert.alert(t('calendar.dateTimeTitle'), t('calendar.dateStartFormatBody')); return; }
     const endISO = end ? toISO(date, end) : null;
+    Keyboard.dismiss();
     onSubmit(startISO, endISO);
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={onClose} />
-      <View style={s.sheet}>
-        <SafeAreaView edges={['bottom']}>
-          <View style={s.handle} />
-          <Text style={s.title}>{t('calendar.suggestNewTime')}</Text>
+    <AnyvoBottomSheet visible={visible} onClose={() => { Keyboard.dismiss(); onClose(); }} title={t('calendar.suggestNewTime')} keyboardAware closeButton>
+          <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <Text style={s.sub}>{t('calendar.customerMustConfirm')}</Text>
 
           <View style={s.row}>
-            <Field label={t('calendar.dateUpper')} flex={1.3}><TextInput style={s.input} value={date} onChangeText={value => setDate(fmtDateInput(value))} placeholder={t('calendar.datePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={10} /></Field>
-            <Field label={t('calendar.startUpper')} flex={1}><TextInput style={s.input} value={start} onChangeText={value => setStart(fmtTimeInput(value))} placeholder={t('calendar.timePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
-            <Field label={t('calendar.endUpper')} flex={1}><TextInput style={s.input} value={end} onChangeText={value => setEnd(fmtTimeInput(value))} placeholder={t('calendar.timePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
+            <Field label={t('calendar.dateUpper')}><TextInput style={s.input} value={date} onChangeText={value => setDate(fmtDateInput(value))} placeholder={t('calendar.datePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" accessibilityLabel={t('calendar.dateUpper')} maxLength={10} /></Field>
+            <Field label={t('calendar.startUpper')}><TextInput style={s.input} value={start} onChangeText={value => setStart(fmtTimeInput(value))} placeholder={t('calendar.timePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
+            <Field label={t('calendar.endUpper')}><TextInput style={s.input} value={end} onChangeText={value => setEnd(fmtTimeInput(value))} placeholder={t('calendar.timePlaceholder')} placeholderTextColor={C.subtle} keyboardType="numeric" maxLength={5} /></Field>
           </View>
 
-          <TouchableOpacity style={s.btn} onPress={submit} activeOpacity={0.9}>
+          </ScrollView>
+          <TouchableOpacity style={s.btn} accessibilityRole="button" onPress={submit} activeOpacity={0.9}>
             <Ionicons name="paper-plane" size={18} color="#001210" />
             <Text style={s.btnTxt}>{t('calendar.sendSuggestion')}</Text>
           </TouchableOpacity>
-        </SafeAreaView>
-      </View>
-    </Modal>
+    </AnyvoBottomSheet>
   );
 }
 
-function Field({ label, children, flex }: { label: string; children: React.ReactNode; flex: number }) {
-  return <View style={[s.field, { flex }]}><Text style={s.label}>{label}</Text>{children}</View>;
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <View style={s.field}><Text style={s.label}>{label}</Text>{children}</View>;
 }
 
 const s = StyleSheet.create({
@@ -97,10 +93,10 @@ const s = StyleSheet.create({
   handle:  { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 16 },
   title:   { fontSize: 18, color: C.white, fontWeight: '800', textAlign: 'center' },
   sub:     { fontSize: 13, color: C.muted, textAlign: 'center', marginTop: 4, marginBottom: 18 },
-  row:     { flexDirection: 'row', gap: 10, marginBottom: 18 },
+  row:     { flexDirection: 'column', gap: 10, marginBottom: 18 },
   field:   {},
   label:   { fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 1, marginBottom: 6 },
   input:   { backgroundColor: C.input, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 12, color: C.white, fontSize: 15, fontWeight: '700' },
-  btn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 54, borderRadius: 16, backgroundColor: ACCENT },
-  btnTxt:  { fontSize: 16, color: '#001210', fontWeight: '900' },
+  btn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 54, padding: 12, borderRadius: 16, backgroundColor: ACCENT },
+  btnTxt:  { fontSize: 16, color: '#001210', fontWeight: '900', flexShrink: 1, textAlign: 'center' },
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -92,7 +92,7 @@ export default function PasswordRecoveryScreen() {
         </View>
       </View>
 
-      <View style={s.content}>
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
         {!ready && !linkError ? (
           <View style={s.center}>
             <ActivityIndicator size="large" color={C.accent} />
@@ -125,7 +125,7 @@ export default function PasswordRecoveryScreen() {
             <Button label={t('auth.savePassword')} onPress={savePassword} loading={saving} />
           </>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

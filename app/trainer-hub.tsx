@@ -264,7 +264,7 @@ const s = StyleSheet.create({
   eyebrow: { fontSize: 9, color: C.accent, fontWeight: '800', letterSpacing: 2, marginBottom: 2 },
   title:   { fontSize: 24, color: C.white, fontWeight: '900', letterSpacing: -0.5 },
   subtitle: { fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 16 },
-  logo:    { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: C.border },
+  logo:    { width: 40, height: 40 },
   content: { paddingHorizontal: 20, paddingTop: 8 },
 
   cards:   { gap: 14 },

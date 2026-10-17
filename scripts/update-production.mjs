@@ -244,20 +244,43 @@ export function parseNativeBuild(buildJson) {
     channel: buildJson.updateChannel?.name ?? buildJson.channel ?? null,
     buildProfile: buildJson.buildProfile ?? null,
     gitCommitHash: buildJson.gitCommitHash ?? null,
+    ...(typeof buildJson.distribution === 'string' ? { distribution: buildJson.distribution.toLowerCase() } : {}),
+    ...(typeof buildJson.isForIosSimulator === 'boolean' ? { isForIosSimulator: buildJson.isForIosSimulator } : {}),
   };
 }
 
+/** A custom profile is accepted only with its committed native-build source proof. */
+export function evaluateNativeSensorProductionProfile({ build, nativeSourceEas }) {
+  const prefix = `Basis-Build ${build?.id ?? '—'}`;
+  if (build?.platform !== 'ios' || build?.buildProfile !== 'native-sensor-ios') {
+    return [`${prefix}: Profil ${build?.buildProfile ?? '—'} ≠ production`];
+  }
+  const production = nativeSourceEas?.build?.production;
+  const sensor = nativeSourceEas?.build?.['native-sensor-ios'];
+  if (!production || !sensor || sensor.extends !== 'production' || production.extends != null) {
+    return [`${prefix}: native-sensor-ios ohne belegte direkte production-Vererbung im nativen Source-Commit`];
+  }
+  const problems = [];
+  if ((sensor.environment ?? production.environment) !== 'production') problems.push(`${prefix}: Profil-Environment ≠ production`);
+  if ((sensor.channel ?? production.channel) !== PRODUCTION_CHANNEL) problems.push(`${prefix}: Profil-Channel ≠ production`);
+  if ((sensor.distribution ?? production.distribution) !== 'store' || build.distribution !== 'store') problems.push(`${prefix}: Profil/Build-Distribution ≠ store`);
+  if ((sensor.ios?.simulator ?? production.ios?.simulator ?? false) !== false || build.isForIosSimulator !== false) problems.push(`${prefix}: kein belegter iOS-Geräte-Build`);
+  if ((sensor.env?.EXPO_PUBLIC_BACKEND_ENV ?? production.env?.EXPO_PUBLIC_BACKEND_ENV) !== 'production') problems.push(`${prefix}: Profil-Backend ≠ production`);
+  return problems;
+}
+
 /** Validierung des nativen Basis-Builds (Initial-Modus). Leere Liste = gültige Basis. */
-export function evaluateNativeBaseBuild({ build, buildId, platform, runtime }) {
+export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, expectedAppVersion = runtime, nativeSourceEas = null }) {
   if (!build) return [`EAS-Build ${buildId ?? '—'} nicht gefunden/lesbar`];
   const problems = [];
   if (build.id !== buildId) problems.push(`EAS-Build-ID ${build.id} ≠ angefragt ${buildId}`);
   if (build.status !== 'FINISHED') problems.push(`Basis-Build ${build.id}: Status ${build.status ?? '—'} ≠ FINISHED`);
   if (build.platform !== platform) problems.push(`Basis-Build ${build.id}: Plattform ${build.platform ?? '—'} ≠ Ziel ${platform}`);
   if (build.runtimeVersion !== runtime) problems.push(`Basis-Build ${build.id}: Runtime ${build.runtimeVersion ?? '—'} ≠ Ziel-Runtime ${runtime}`);
-  if (build.appVersion !== runtime) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion)`);
+  if (typeof expectedAppVersion !== 'string' || !expectedAppVersion.trim()) problems.push('Marketingversion der Release-Konfiguration nicht bestimmbar');
+  if (build.appVersion !== expectedAppVersion) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur ${expectedAppVersion === runtime ? `Ziel-Runtime ${runtime} (policy appVersion)` : `Marketingversion ${expectedAppVersion ?? '—'}`}`);
   if (build.channel !== PRODUCTION_CHANNEL) problems.push(`Basis-Build ${build.id}: Channel ${build.channel ?? '—'} ≠ ${PRODUCTION_CHANNEL}`);
-  if (build.buildProfile !== 'production') problems.push(`Basis-Build ${build.id}: Profil ${build.buildProfile ?? '—'} ≠ production`);
+  if (build.buildProfile !== 'production') problems.push(...evaluateNativeSensorProductionProfile({ build, nativeSourceEas }));
   if (!/^[0-9a-f]{40}$/.test(build.gitCommitHash ?? '')) problems.push(`Basis-Build ${build.id}: kein gültiger gitCommitHash`);
   return problems;
 }
@@ -470,14 +493,19 @@ function readNativeBuild(buildId) {
  * Initial: nur zulässig, solange für (Plattform, Runtime) KEINE Group existiert — dann der
  * validierte native Basis-Build dieser Runtime. Nie die OTA einer fremden Runtime/Plattform.
  */
-function readBaseline(platform, runtime, initial, buildId) {
+function readBaseline(platform, runtime, initial, buildId, expectedAppVersion) {
   const own = readActiveProduction(platform, runtime);
   if (!initial) return { active: own, ownOta: own, problems: [] };
   if (own) {
     return { active: null, ownOta: own, problems: [`--initial-runtime-release unzulässig: für ${platform} / Runtime ${runtime} existiert bereits Production-Group ${own.group} — normalen Release ohne Initial-Flags verwenden`] };
   }
   const build = readNativeBuild(buildId);
-  const problems = evaluateNativeBaseBuild({ build, buildId, platform, runtime });
+  let nativeSourceEas = null;
+  if (build?.buildProfile === 'native-sensor-ios' && /^[0-9a-f]{40}$/.test(build.gitCommitHash ?? '')) {
+    try { nativeSourceEas = JSON.parse(sh('git', ['show', `${build.gitCommitHash}:eas.json`])); }
+    catch { /* Missing/unreadable committed profile proof fails closed below. */ }
+  }
+  const problems = evaluateNativeBaseBuild({ build, buildId, platform, runtime, expectedAppVersion, nativeSourceEas });
   return { active: build?.gitCommitHash ? nativeBaseline(build) : null, ownOta: null, problems };
 }
 
@@ -620,7 +648,9 @@ function main() {
 
   // 5. Ziel-Runtime (fail closed) + EAS = Source of Truth: frischer Live-Stand nach Lock-Erwerb,
   //    runtime-genau für (Plattform, Ziel-Runtime).
-  const releaseRuntime = resolveReleaseRuntime(existsSync('app.json') ? JSON.parse(readFileSync('app.json', 'utf8')) : null, platform);
+  const releaseConfig = existsSync('app.json') ? JSON.parse(readFileSync('app.json', 'utf8')) : null;
+  const releaseRuntime = resolveReleaseRuntime(releaseConfig, platform);
+  const releaseAppVersion = releaseConfig?.expo?.[platform]?.version ?? releaseConfig?.expo?.version ?? null;
   const target = resolveTargetRuntime({ runtimeFlag, releaseRuntime });
   if (!target.runtime) {
     for (const p of target.problems) console.log(`❌ ${p}`);
@@ -631,7 +661,7 @@ function main() {
   let channel, baseline, otherBefore;
   try {
     channel = readChannel();
-    baseline = readBaseline(platform, target.runtime, initialRuntimeRelease, initialBuildId);
+    baseline = readBaseline(platform, target.runtime, initialRuntimeRelease, initialBuildId, releaseAppVersion);
     otherBefore = readNewestPlatformProduction(otherPlatform);
   } catch (e) {
     console.log(`❌ Aktiver Production-Stand konnte nicht aus EAS gelesen werden (eas login / Netz? ${e?.message ?? ''}). Kein Update veröffentlicht.`);
@@ -677,7 +707,7 @@ function main() {
   //    umschalten); sonst denselben nativen Basis-Build und die Ancestry erneut validieren.
   let recheck;
   try {
-    const rb = readBaseline(platform, target.runtime, initialRuntimeRelease, initialBuildId);
+    const rb = readBaseline(platform, target.runtime, initialRuntimeRelease, initialBuildId, releaseAppVersion);
     const ok = rb.problems.length === 0 && !!rb.active?.gitCommitHash && gitIsAncestor(rb.active.gitCommitHash, head) === true;
     recheck = ok ? rb.active : (rb.ownOta ?? null);
   } catch { recheck = null; }

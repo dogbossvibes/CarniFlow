@@ -125,3 +125,21 @@ describe('DateField — medication iOS recycling regression', () => {
     act(() => android.unmount());
   });
 });
+
+
+describe('DateField — text to picker handoff', () => {
+  const realOS = Platform.OS;
+  afterEach(() => { Platform.OS = realOS; jest.restoreAllMocks(); });
+  it.each(['ios', 'android'] as const)('dismisses keyboard before opening date/time on %s, without changing input', os => {
+    Platform.OS = os;
+    const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+    for (const mode of ['date', 'time'] as const) {
+      const changed = jest.fn();
+      const node = openField({ mode, onChange: changed });
+      expect(dismiss).toHaveBeenCalled();
+      expect(changed).not.toHaveBeenCalled();
+      if (os === 'android') expect(dismiss.mock.invocationCallOrder.at(-1)).toBeLessThan(mockOpen.mock.invocationCallOrder.at(-1)!);
+      act(() => node.unmount());
+    }
+  });
+});

@@ -103,8 +103,8 @@ function KeyboardAwareSheet({ backdrop, sheet }: { backdrop: React.ReactNode; sh
 // or mutate data. Backdrop-tap dismissal is left completely unchanged and
 // still works everywhere it already did, as a secondary method.
 export function AnyvoBottomSheet({
-  visible, onClose, title, children, keyboardAware = false, closeButton = false,
-}: { visible: boolean; onClose: () => void; title?: string; children: React.ReactNode; keyboardAware?: boolean; closeButton?: boolean }) {
+  visible, onClose, title, children, keyboardAware = false, closeButton = false, onDismiss,
+}: { visible: boolean; onClose: () => void; title?: string; children: React.ReactNode; keyboardAware?: boolean; closeButton?: boolean; onDismiss?: () => void }) {
   const backdrop = (
     <TouchableWithoutFeedback onPress={onClose}>
       <View style={s.backdrop} />
@@ -136,7 +136,7 @@ export function AnyvoBottomSheet({
     </View>
   );
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={onDismiss}>
       {keyboardAware ? <KeyboardAwareSheet backdrop={backdrop} sheet={sheet} /> : <>{backdrop}{sheet}</>}
     </Modal>
   );

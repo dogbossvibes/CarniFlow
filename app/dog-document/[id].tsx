@@ -71,7 +71,7 @@ export default function DogDocumentEditor() {
           <View style={{ width: 38 }} />
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
           <Text style={s.label}>{healthMode ? 'Gesundheitskategorie' : t('dog.category')}</Text>
           <View style={s.kinds}>
             {DOC_CATEGORIES.map(k => {

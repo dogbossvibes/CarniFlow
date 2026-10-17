@@ -149,7 +149,7 @@ export default function UnitDetailScreen() {
 
   return (
     <View style={s.root}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <HeroImage height={260} overlay={0.96} contentPosition="top">
           <SafeAreaView edges={['top']} style={s.heroSafe}>
             <View style={s.heroText}>
