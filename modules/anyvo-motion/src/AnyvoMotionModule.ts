@@ -4,7 +4,7 @@ import type { AnyvoMotionModuleEvents, MotionStatus, MotionUpdateOptions } from 
 declare class AnyvoMotionModule extends NativeModule<AnyvoMotionModuleEvents> {
   isAvailable(): boolean;
   getStatus(): Promise<MotionStatus>;
-  startMotionUpdates(options: MotionUpdateOptions): Promise<void>;
+  startMotionUpdates(options: MotionUpdateOptions): Promise<boolean | void>;
   stopMotionUpdates(): Promise<void>;
 }
 

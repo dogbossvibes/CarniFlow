@@ -121,12 +121,16 @@ export function buildPublishEnv(baseEnv, head) {
 
 // ── Reine Guard-Logik (testbar, ohne I/O) ─────────────────────────────────────
 
-/** Runtime, auf die dieser Release zielt — nur aus der App-Konfiguration (app.json). */
-export function resolveReleaseRuntime(appJson) {
+/** Plattformgenaue Bundle-Runtime; mehrdeutige oder ungültige Overrides → STOP. */
+export function resolveReleaseRuntime(appJson, platform) {
   const expo = appJson?.expo ?? appJson ?? {};
-  const rv = expo.runtimeVersion;
+  if (platform !== undefined && !ALLOWED_PLATFORMS.includes(platform)) return null;
+  const hasOverride = p => Object.hasOwn(expo[p] ?? {}, 'runtimeVersion');
+  if (platform === undefined && ALLOWED_PLATFORMS.some(hasOverride)) return null;
+  const rv = platform && hasOverride(platform) ? expo[platform].runtimeVersion : expo.runtimeVersion;
   if (typeof rv === 'string' && rv.trim()) return rv.trim();
-  if (rv && typeof rv === 'object' && rv.policy === 'appVersion' && typeof expo.version === 'string' && expo.version.trim()) return expo.version.trim();
+  const version = (platform && expo[platform]?.version) ?? expo.version;
+  if (rv && typeof rv === 'object' && rv.policy === 'appVersion' && typeof version === 'string' && version.trim()) return version.trim();
   return null;   // andere Policies (fingerprint/nativeVersion) → nicht sicher vorab bestimmbar → STOP
 }
 
@@ -616,7 +620,7 @@ function main() {
 
   // 5. Ziel-Runtime (fail closed) + EAS = Source of Truth: frischer Live-Stand nach Lock-Erwerb,
   //    runtime-genau für (Plattform, Ziel-Runtime).
-  const releaseRuntime = resolveReleaseRuntime(existsSync('app.json') ? JSON.parse(readFileSync('app.json', 'utf8')) : null);
+  const releaseRuntime = resolveReleaseRuntime(existsSync('app.json') ? JSON.parse(readFileSync('app.json', 'utf8')) : null, platform);
   const target = resolveTargetRuntime({ runtimeFlag, releaseRuntime });
   if (!target.runtime) {
     for (const p of target.problems) console.log(`❌ ${p}`);

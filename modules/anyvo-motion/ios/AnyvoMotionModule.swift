@@ -7,8 +7,8 @@ import CoreMotion
 // (Plausibilisierung/Outlier-Erkennung/Stillstand/Start-Acquisition) — niemals
 // Ersatz für Core Location. Motion Permission (NSMotionUsageDescription) gilt
 // nur für Pedometer/Activity; bei denied/restricted/unavailable degradiert die
-// Manager-Klasse graziös (keine Exceptions), die JS-Seite fällt dann auf
-// fusionMode = 'gps_only' zurück (kein Blocker für die Fährte).
+// Manager-Klasse ohne Schritt-/Aktivitätsevidenz. Device Motion bleibt optional;
+// bei ausbleibenden Motion-Samples nutzt der JS-Frischeguard nur GPS.
 public class AnyvoMotionModule: Module {
   private lazy var motionManagerImpl = AnyvoMotionManager()
 
@@ -36,7 +36,7 @@ public class AnyvoMotionModule: Module {
 
     AsyncFunction("startMotionUpdates") { (options: [String: Any]) in
       let emitIntervalMs = options["emitIntervalMs"] as? Int ?? 250
-      self.motionManagerImpl.start(emitIntervalMs: emitIntervalMs)
+      return self.motionManagerImpl.start(emitIntervalMs: emitIntervalMs)
     }
 
     AsyncFunction("stopMotionUpdates") {

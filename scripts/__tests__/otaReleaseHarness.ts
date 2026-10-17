@@ -136,9 +136,13 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown } =
   mkdirSync(join(repo, 'scripts'), { recursive: true });
   for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
   if (opts.appJson !== undefined) writeFileSync(join(repo, 'app.json'), JSON.stringify(opts.appJson, null, 2));
-  else if (opts.appVersion) {
+  else {
     const app = JSON.parse(readFileSync('app.json', 'utf8'));
-    app.expo.version = opts.appVersion;
+    // Standard-Fixtures modellieren eine gemeinsame appVersion-Runtime.
+    // Plattform-Overrides nur über explizites appJson in den Test aufnehmen.
+    if (opts.appVersion) app.expo.version = opts.appVersion;
+    delete app.expo.ios?.runtimeVersion;
+    delete app.expo.android?.runtimeVersion;
     writeFileSync(join(repo, 'app.json'), JSON.stringify(app, null, 2));
   }
   const releaseRuntime = opts.appVersion ?? RELEASE_RUNTIME;

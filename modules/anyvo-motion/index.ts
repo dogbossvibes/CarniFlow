@@ -44,8 +44,9 @@ export async function getMotionStatus(): Promise<MotionStatus> {
 export async function startMotionUpdates(options: MotionUpdateOptions = {}): Promise<boolean> {
   if (!Native) return false;
   try {
-    await Native.startMotionUpdates(options);
-    return true;
+    const started = await Native.startMotionUpdates(options);
+    // Older binaries return void; v2 explicitly reports unavailable sensors.
+    return started !== false;
   } catch {
     // Native Start-Fehler (z. B. Permission-Dialog abgelehnt) → gps_only,
     // niemals eine blockierende Fehlermeldung für die Fährte selbst.

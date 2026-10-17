@@ -12,7 +12,7 @@ Fährtenaufzeichnung. Wird per Expo-Autolinking automatisch verlinkt (liegt in
 > unbrauchbar.
 
 Nur **iOS** (`expo-module.config.json`: `"platforms": ["apple"]`). Android hat
-keine native Entsprechung in diesem Modul — `services/trackFusionEngine.ts`
+keine native Entsprechung in diesem Modul — `features/tracking/engine/trackFusionEngine.ts`
 degradiert dort automatisch auf `fusionMode = 'gps_only'`.
 
 ## Öffentliche API
@@ -73,3 +73,68 @@ CMMotionActivityManager benötigen keine iOS-Version über 15.1, daher hier
 bewusst NICHT das 16.4-Präzedens kopiert. Siehe Abschlussbericht der Core-
 Motion-Aufgabe für Details — die beiden anderen Module wurden NICHT
 angefasst (ausserhalb des Auftragsumfangs).
+
+
+## Sensorqualität v2 – Vorbereitung für das nächste iOS-Binary
+
+Diese Änderung benötigt einen neuen nativen Build. Die separate JS-OTA mit
+Frische-/Laufisolationsschutz muss auch in dessen Quellstand enthalten sein.
+Android erhält durch dieses Modul keine neue native Sensorquelle.
+
+- Device-Motion-Callbacks, Pedometer, Activity, Timer und Start/Stop werden auf
+  einer seriellen Hintergrundqueue verarbeitet. Jede native Rückmeldung und
+  jeder Timer ist an die Generation seiner Aufnahme gebunden.
+- Leere oder über 2 s alte Device-Motion-Fenster werden nicht gesendet. Es gibt
+  keinen künstlichen Nullwert als Ersatz für ausgefallene Messungen. Der
+  JS-Frischeguard fällt bei fehlenden Ereignissen auf GPS-only zurück.
+- `timestamp` bezeichnet den letzten tatsächlichen Messzeitpunkt des Fensters
+  in Unix-ms. Die Umrechnung verwendet die monotone Messzeit und deren Alter
+  beim Senden. Sendezeit und Fensteranfang/-ende sind getrennt verfügbar.
+- Ungültige/duplizierte/rückwärts laufende Device-Motion-Werte sowie alte
+  Laufgenerationen werden verworfen. Ein Messfenster bleibt auf höchstens
+  2 s begrenzt, auch wenn die Queue oder der Timer aussetzt.
+- Pedometerdaten bleiben kumulative Updates. `pedometerIntervalMs` beschreibt
+  das letzte Updateintervall, **nicht** eine zeitgenaue Aufteilung einzelner
+  Schritte auf Device-Motion-Fenster. Alte Updates erhöhen nur den internen
+  Zählerstand; sie liefern keine frischen Schritte/Kadenz. Fehlende Kadenz
+  löscht den vorherigen Wert. Schritt- und Activity-Confidence setzen
+  tatsächlich frische Daten voraus, nicht nur vorhandene Hardware.
+- Die vorhandene Activity-Empfangsaltersgrenze von 6 s sowie die Fallback-
+  Beschleunigungsschwellen bleiben erhalten. `activityAgeMs` ist Empfangsalter,
+  `deviceMotionAgeMs` und `pedometerAgeMs` beziehen sich auf Messzeitpunkte.
+
+Additive optionale Felder auf `MotionSample`: `qualityVersion: 2`, `runId`,
+`windowStartTimestamp`, `windowEndTimestamp`, `emittedAtTimestamp`,
+`deviceMotionSampleCount`, `deviceMotionAgeMs`, `pedometerAgeMs`,
+`pedometerIntervalMs`, `discardedWindowCount`. Bestehende Binaries ohne diese
+Felder bleiben kompatibel. `getStatus()` ergänzt Version/Laufkennung und
+verworfene Fenster; `pedometerAuthorized` liest den tatsächlichen Systemstatus.
+Ein neues natives `startMotionUpdates()` meldet `false`, wenn Device Motion
+nicht verfügbar ist; der JS-Wrapper akzeptiert weiterhin das `void` alter Binaries.
+
+### Lokale Tests
+
+`Package.swift` ist ausschließlich ein Test-Harness für die im Produkt verwendete
+`ios/MotionSensorState.swift`. Die App verwendet unverändert Expo/CocoaPods;
+Testquellen liegen außerhalb des Pod-Quellverzeichnisses.
+
+```sh
+swift test --package-path modules/anyvo-motion
+node node_modules/jest/bin/jest.js --runInBand --runTestsByPath modules/anyvo-motion/__tests__/compatibility.test.ts
+```
+
+Vor dem Binary: vollständiger iOS-SDK-/Expo-Linktest und anschließend tatsächliche
+Sensor-/Berechtigungs-/Background-/Resume-Prüfung. Tests mit simulierten
+Messwerten belegen weder native Sensorverfügbarkeit noch Winkelgenauigkeit im Feld.
+FGO, GPS-Zulassung, Winkel-/Score-/Endlogik sind nicht Teil dieses Moduls.
+
+
+### Geprüfte API-Quellen
+
+- [Apple: CMLogItem.timestamp – Messzeit seit Geräteboot](https://developer.apple.com/documentation/coremotion/cmlogitem/timestamp?language=objc)
+- [Apple: Device-Motion-Updates auf eigener OperationQueue](https://developer.apple.com/documentation/coremotion/cmmotionmanager/startdevicemotionupdates%28using%3Ato%3Awithhandler%3A%29)
+- [Apple: CMPedometerData – Endzeit, kumulative Schritte und Kadenz](https://developer.apple.com/documentation/CoreMotion/CMPedometerData?changes=l_11&language=objc)
+
+Der angefragte Expo-v54-Dokumentationsindex leitet derzeit auf die aktuelle
+Version weiter. Für die Expo-Bridge wurden deshalb die installierten
+Expo-54-Modulquellen herangezogen; kein SDK-Upgrade durchgeführt.

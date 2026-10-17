@@ -21,6 +21,18 @@ export interface MotionSample {
   // die nutzt intern bereits ihre eigene Staleness-Prüfung). `null` = noch nie
   // eine Activity empfangen (kein CMMotionActivityManager verfügbar/erlaubt).
   activityAgeMs?:         number | null;
+  /** Additive v2 contract; absent on existing binaries. No empty motion windows are emitted. */
+  qualityVersion?: 2;
+  runId?: string;
+  windowStartTimestamp?: number;
+  windowEndTimestamp?: number;
+  emittedAtTimestamp?: number;
+  deviceMotionSampleCount?: number;
+  deviceMotionAgeMs?: number;
+  pedometerAgeMs?: number | null;
+  /** Interval covered by the latest cumulative pedometer update, not the motion window. */
+  pedometerIntervalMs?: number | null;
+  discardedWindowCount?: number;
 }
 
 export interface MotionStatus {
@@ -29,6 +41,9 @@ export interface MotionStatus {
   activityAvailable:     boolean;
   pedometerAuthorized:   boolean;
   running:               boolean;
+  qualityVersion?: 2;
+  runId?: string | null;
+  discardedWindowCount?: number;
 }
 
 export interface MotionError {

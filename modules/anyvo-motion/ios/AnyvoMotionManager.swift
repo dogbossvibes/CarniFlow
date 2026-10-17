@@ -1,268 +1,145 @@
 import Foundation
 import CoreMotion
 
-// ANYVO Motion — iOS Core-Motion-Manager.
-//
-// Aggregiert CMDeviceMotion (userAcceleration/rotationRate/attitude),
-// CMPedometer (Schritte/Kadenz) und optional CMMotionActivityManager
-// (Bewegungszustand: stationary/walking/running/automotive/unknown + Confidence)
-// zu einem gedrosselten, aggregierten Sample für die Fusion-Engine auf der
-// JS-Seite. KEIN Ersatz für GPS, KEIN Dead-Reckoning per doppelter
-// Beschleunigungsintegration (IMU-Drift wäre nach Sekunden bereits unbrauchbar).
-// Läuft ausschliesslich während einer aktiven Fährte — start()/stop() werden
-// explizit vom Expo-Modul gesteuert, kein Hintergrundbetrieb sonst.
-//
-// Interne Sample-Rate ~20 Hz (deviceMotionUpdateInterval) — an JS gehen nur
-// aggregierte Werte je Emit-Fenster (Default 250 ms = 4 Hz), keine 100-Hz-
-// Rohdatenflut über die Bridge (Akku/CPU, Punkt 3 des Auftrags).
+// All sensor, timer and lifecycle state belongs to one serial queue. Native
+// callbacks carry their start generation; stop/start cannot revive an old run.
 final class AnyvoMotionManager {
   private let motionManager = CMMotionManager()
   private let pedometer = CMPedometer()
   private var activityManager: CMMotionActivityManager?
-
-  // Emit-Closures (vom Module gesetzt) — dasselbe Muster wie
-  // AnyvoPrecisionLocationManager.
+  private let queue = DispatchQueue(label: "app.anyvo.motion", qos: .utility)
+  private let queueKey = DispatchSpecificKey<UInt8>()
+  private lazy var sensorQueue: OperationQueue = {
+    let operations = OperationQueue()
+    operations.name = "app.anyvo.motion.callbacks"
+    operations.maxConcurrentOperationCount = 1
+    operations.underlyingQueue = queue
+    return operations
+  }()
+  private var state = MotionSensorState()
+  private var timer: DispatchSourceTimer?
   var onSample: (([String: Any]) -> Void)?
   var onError: ((String, String) -> Void)?
 
-  private var running = false
-  private var emitIntervalS: Double = 0.25
+  init() { queue.setSpecific(key: queueKey, value: 1) }
 
-  // Aggregations-Fenster seit dem letzten Emit.
-  private var windowAccelSamples: [Double] = []
-  private var windowRotationSamples: [Double] = []
-  private var firstYawInWindow: Double?
-  private var lastYaw: Double?
+  private func serialized<T>(_ body: () -> T) -> T {
+    if DispatchQueue.getSpecific(key: queueKey) != nil { return body() }
+    return queue.sync(execute: body)
+  }
 
-  private var lastEmittedStepTotal = 0
-  private var currentStepTotal = 0
-  private var currentCadence: Double?
-  private var lastActivity: CMMotionActivity?
-  private var pedometerAuthDenied = false
-
-  private var emitTimer: Timer?
-
-  // MARK: - Start / Stop
-
-  func start(emitIntervalMs: Int) {
-    guard !running else { return }
-    running = true
-    emitIntervalS = max(0.1, Double(emitIntervalMs) / 1000.0)
-    resetWindow()
-
-    startDeviceMotion()
-    startPedometer()
-    startActivity()
-
-    DispatchQueue.main.async { [weak self] in
-      guard let self = self, self.running else { return }
-      let timer = Timer(timeInterval: self.emitIntervalS, repeats: true) { [weak self] _ in
-        self?.emitAggregatedSample()
+  @discardableResult
+  func start(emitIntervalMs: Int) -> Bool {
+    serialized {
+      if state.running { return true }
+      guard motionManager.isDeviceMotionAvailable else {
+        onError?("MOTION_DEVICE_MOTION_UNAVAILABLE", "Bewegungssensoren auf diesem Gerät nicht verfügbar.")
+        return false
       }
-      RunLoop.main.add(timer, forMode: .common)
-      self.emitTimer = timer
+      let token = state.start(at: ProcessInfo.processInfo.systemUptime)
+      startDeviceMotion(token: token)
+      startPedometer(token: token)
+      startActivity(token: token)
+      // Match the existing 100 ms minimum; cap malformed/custom intervals to
+      // the evidence freshness horizon. Default remains 250 ms.
+      let interval = min(2.0, max(0.1, Double(emitIntervalMs) / 1000))
+      let newTimer = DispatchSource.makeTimerSource(queue: queue)
+      newTimer.schedule(deadline: .now() + interval, repeating: interval)
+      newTimer.setEventHandler { [weak self] in
+        guard let self = self else { return }
+        if let payload = self.state.emit(token: token,
+          now: ProcessInfo.processInfo.systemUptime,
+          unixMs: Date().timeIntervalSince1970 * 1000) {
+          self.onSample?(payload)
+        }
+      }
+      timer = newTimer
+      newTimer.resume()
+      return true
     }
   }
 
   func stop() {
-    guard running else { return }
-    running = false
-    motionManager.stopDeviceMotionUpdates()
-    pedometer.stopUpdates()
-    activityManager?.stopActivityUpdates()
-    activityManager = nil
-    DispatchQueue.main.async { [weak self] in
-      self?.emitTimer?.invalidate()
-      self?.emitTimer = nil
+    serialized {
+      state.stop()
+      timer?.cancel(); timer = nil
+      motionManager.stopDeviceMotionUpdates()
+      pedometer.stopUpdates()
+      activityManager?.stopActivityUpdates(); activityManager = nil
     }
-    resetWindow()
-    lastEmittedStepTotal = 0
-    currentStepTotal = 0
-    currentCadence = nil
-    lastActivity = nil
-    lastActivityAt = nil
-    pedometerAuthDenied = false
   }
 
-  // MARK: - Device Motion (Beschleunigung/Rotation/Attitude)
-
-  private func startDeviceMotion() {
-    guard motionManager.isDeviceMotionAvailable else {
-      onError?("MOTION_DEVICE_MOTION_UNAVAILABLE", "Bewegungssensoren auf diesem Gerät nicht verfügbar.")
-      return
-    }
+  private func startDeviceMotion(token: UInt64) {
     motionManager.deviceMotionUpdateInterval = 1.0 / 20.0
-    motionManager.startDeviceMotionUpdates(to: OperationQueue.current ?? OperationQueue.main) { [weak self] motion, _ in
-      guard let self = self, let motion = motion else { return }
-      let a = motion.userAcceleration
-      let r = motion.rotationRate
-      let accelMag = (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot()
-      let rotMag = (r.x * r.x + r.y * r.y + r.z * r.z).squareRoot()
-      self.windowAccelSamples.append(accelMag)
-      self.windowRotationSamples.append(rotMag)
-      let yawDeg = motion.attitude.yaw * 180.0 / Double.pi
-      if self.firstYawInWindow == nil { self.firstYawInWindow = yawDeg }
-      self.lastYaw = yawDeg
+    motionManager.startDeviceMotionUpdates(to: sensorQueue) { [weak self] motion, error in
+      guard let self = self else { return }
+      self.queue.async { [weak self] in
+        guard let self = self, self.state.accepts(token) else { return }
+        guard let motion = motion, error == nil else { return }
+        let a = motion.userAcceleration, r = motion.rotationRate
+        self.state.recordMotion(token: token, at: motion.timestamp,
+          receivedAt: ProcessInfo.processInfo.systemUptime,
+          acceleration: (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot(),
+          rotation: (r.x * r.x + r.y * r.y + r.z * r.z).squareRoot(),
+          yawDegrees: motion.attitude.yaw * 180 / Double.pi)
+      }
     }
   }
 
-  // MARK: - Pedometer (Schritte/Kadenz)
-
-  private func startPedometer() {
+  private func startPedometer(token: UInt64) {
     guard CMPedometer.isStepCountingAvailable() else { return }
     pedometer.startUpdates(from: Date()) { [weak self] data, error in
       guard let self = self else { return }
-      if error != nil {
-        // Berechtigung verweigert/eingeschränkt oder anderer Pedometer-Fehler —
-        // Schrittdaten bleiben dann einfach leer. Kein Crash, GPS läuft unberührt weiter.
-        self.pedometerAuthDenied = true
-        return
-      }
-      guard let data = data else { return }
-      self.currentStepTotal = data.numberOfSteps.intValue
-      if let cadence = data.currentCadence {
-        self.currentCadence = cadence.doubleValue * 60.0   // Schritte/s → Schritte/min
+      self.queue.async { [weak self] in
+        guard let self = self, self.state.accepts(token) else { return }
+        guard error == nil else { self.state.invalidatePedometer(token: token); return }
+        guard let data = data else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        let age = Date().timeIntervalSince(data.endDate)
+        guard age >= 0 else { return }
+        self.state.recordPedometer(token: token, total: data.numberOfSteps.intValue,
+          endAt: now - age, receivedAt: now,
+          cadencePerMinute: data.currentCadence.map { $0.doubleValue * 60 })
       }
     }
   }
 
-  // MARK: - Motion Activity (Bewegungszustand)
-
-  private func startActivity() {
+  private func startActivity(token: UInt64) {
     guard CMMotionActivityManager.isActivityAvailable() else { return }
     let manager = CMMotionActivityManager()
     activityManager = manager
-    manager.startActivityUpdates(to: OperationQueue.main) { [weak self] activity in
-      guard let self = self, let activity = activity else { return }
-      self.lastActivity = activity
-      // Root-Cause-Fix (Build 42 — "Ist-Suchspur fehlt komplett"): bisher wurde
-      // `lastActivity` unbegrenzt weitergegeben, auch wenn Apples Klassifikator
-      // seit dem Beginn echter Bewegung keine neue Meldung mehr geschickt hat.
-      // Monotoner Empfangszeitstempel (systemUptime) → Staleness unten in
-      // movementState()/emitAggregatedSample() prüfbar, unbeeinflusst von
-      // Systemzeitänderungen.
-      self.lastActivityAt = ProcessInfo.processInfo.systemUptime
-    }
-  }
-
-  // Wie lange gilt eine CMMotionActivity-Klassifikation noch als aktuell?
-  // CMMotionActivityManager garantiert KEIN periodisches "Heartbeat"-Update,
-  // solange sich der Zustand nicht ändert — ein zu kurzer Wert würde also auch
-  // eine noch korrekte, bloss lange unveränderte Klassifikation ständig als
-  // "stale" verwerfen. Der Wert ist deshalb NICHT willkürlich 5 s, sondern an
-  // der einzigen bereits im Projekt etablierten Grösse für "wie lange darf ein
-  // Handler plausibel noch am Fährtenansatz stehen, bevor echte Bewegung zu
-  // erwarten ist" ausgerichtet (START_LOCK_MIN_MS = 5000 ms in
-  // useTrackRecorder.ts) — plus einem kleinen Puffer für die eigene, alle
-  // 250 ms laufende Aggregation (emitAggregatedSample), damit nicht jeder
-  // einzelne Emit-Tick knapp an der Grenze kippt.
-  private static let activityStalenessMaxS: TimeInterval = 6.0
-  private var lastActivityAt: TimeInterval?
-
-  private func hasFreshActivity() -> Bool {
-    guard lastActivity != nil, let at = lastActivityAt else { return false }
-    return ProcessInfo.processInfo.systemUptime - at <= Self.activityStalenessMaxS
-  }
-
-  // MARK: - Aggregation / Emit
-
-  private func resetWindow() {
-    windowAccelSamples = []
-    windowRotationSamples = []
-    firstYawInWindow = nil
-    lastYaw = nil
-  }
-
-  private func emitAggregatedSample() {
-    guard running else { return }
-    let now = Date().timeIntervalSince1970 * 1000
-
-    let accelMag = windowAccelSamples.isEmpty ? 0 : windowAccelSamples.reduce(0, +) / Double(windowAccelSamples.count)
-    let rotMag = windowRotationSamples.isEmpty ? 0 : windowRotationSamples.reduce(0, +) / Double(windowRotationSamples.count)
-    var headingDelta = 0.0
-    if let first = firstYawInWindow, let last = lastYaw {
-      var d = last - first
-      // Kürzeste Winkeldifferenz (Wrap um ±180°) — kein Sprung bei -179°→+179°.
-      while d > 180 { d -= 360 }
-      while d < -180 { d += 360 }
-      headingDelta = d
-    }
-
-    let stepDelta = max(0, currentStepTotal - lastEmittedStepTotal)
-    lastEmittedStepTotal = currentStepTotal
-
-    let (state, activityConfidence) = movementState(accelMag: accelMag)
-
-    // Grober, konservativer Confidence-Grundwert je nach verfügbaren Signalen —
-    // die eigentliche, gewichtete Fusion-Bewertung passiert auf JS-Seite
-    // (trackFusionEngine.ts). Hier nur: "wie viele Sensor-Quellen liefern gerade
-    // überhaupt Daten".
-    var confidence = 0.6
-    if !pedometerAuthDenied && CMPedometer.isStepCountingAvailable() { confidence += 0.2 }
-    if hasFreshActivity() { confidence += 0.2 }   // eine veraltete Klassifikation darf die Confidence nicht mehr anheben
-    confidence = min(1.0, confidence)
-
-    // Instrumentation (Punkt 9 des Audits): rein informativ, additiv, fliesst
-    // NICHT in movementState/confidence-Berechnung ein (die nutzt intern
-    // bereits hasFreshActivity()) — erlaubt der JS-Seite aber, das reale
-    // Staleness-Verhalten auf einem echten Gerät sichtbar zu machen
-    // (`[fusion]`-DEV-Log in useSearchRecorder.ts).
-    let activityAgeMs: Any = lastActivityAt != nil
-      ? (ProcessInfo.processInfo.systemUptime - lastActivityAt!) * 1000
-      : NSNull()
-
-    onSample?([
-      "timestamp": now,
-      "accelerationMagnitude": accelMag,
-      "rotationMagnitude": rotMag,
-      "headingDelta": headingDelta,
-      "stepDelta": stepDelta,
-      "cadence": currentCadence ?? NSNull(),
-      "movementState": state,
-      "motionConfidence": confidence,
-      "activityConfidence": activityConfidence,
-      "activityAgeMs": activityAgeMs,
-    ])
-
-    resetWindow()
-  }
-
-  // Fallback-Heuristik, falls CMMotionActivityManager nicht verfügbar/verweigert
-  // ODER die letzte Klassifikation zu alt ist (siehe activityStalenessMaxS):
-  // grobe Klassifikation allein aus der gemittelten Beschleunigungsmagnitude.
-  // Nur ein Zusatzsignal — niemals harte Wahrheit (siehe Fusion-Engine JS-seitig).
-  private func movementState(accelMag: Double) -> (String, String) {
-    if hasFreshActivity(), let activity = lastActivity {
-      let conf: String
-      switch activity.confidence {
-      case .low: conf = "low"
-      case .medium: conf = "medium"
-      case .high: conf = "high"
-      @unknown default: conf = "low"
+    manager.startActivityUpdates(to: sensorQueue) { [weak self] activity in
+      guard let self = self else { return }
+      self.queue.async { [weak self] in
+        guard let self = self, self.state.accepts(token), let activity = activity else { return }
+        let confidence: String
+        switch activity.confidence {
+        case .low: confidence = "low"
+        case .medium: confidence = "medium"
+        case .high: confidence = "high"
+        @unknown default: confidence = "low"
+        }
+        let movement = activity.stationary ? "stationary" : activity.running ? "running"
+          : activity.walking ? "walking" : activity.automotive ? "automotive" : "unknown"
+        // Classification callbacks are event-driven. Keep the established 6 s
+        // receipt-age policy; it is distinct from the device-motion sample age.
+        self.state.recordActivity(token: token, receivedAt: ProcessInfo.processInfo.systemUptime,
+          state: movement, confidence: confidence)
       }
-      if activity.stationary { return ("stationary", conf) }
-      if activity.running { return ("running", conf) }
-      if activity.walking { return ("walking", conf) }
-      if activity.automotive { return ("automotive", conf) }
-      return ("unknown", conf)
     }
-    // Ohne (frischen) Activity-Manager: grobe Schwellen aus der eigenen,
-    // garantiert aktuellen (250-ms-Fenster) Beschleunigungsmagnitude — anders
-    // als eine veraltete Apple-Klassifikation ist das echte, taufrische
-    // Evidenz, deshalb hier weiterhin zulässig (empirisch konservativ, kein
-    // Ersatz für echte Klassifikation — deshalb activityConfidence "low").
-    if accelMag < 0.03 { return ("stationary", "low") }
-    if accelMag < 0.25 { return ("walking", "low") }
-    return ("running", "low")
   }
 
   func buildStatus() -> [String: Any] {
-    return [
-      "deviceMotionAvailable": motionManager.isDeviceMotionAvailable,
-      "stepCountingAvailable": CMPedometer.isStepCountingAvailable(),
-      "activityAvailable": CMMotionActivityManager.isActivityAvailable(),
-      "pedometerAuthorized": !pedometerAuthDenied,
-      "running": running,
-    ]
+    serialized {
+      [
+        "deviceMotionAvailable": motionManager.isDeviceMotionAvailable,
+        "stepCountingAvailable": CMPedometer.isStepCountingAvailable(),
+        "activityAvailable": CMMotionActivityManager.isActivityAvailable(),
+        "pedometerAuthorized": CMPedometer.authorizationStatus() == .authorized,
+        "running": state.running, "qualityVersion": 2,
+        "runId": state.running ? state.runID as Any : NSNull(),
+        "discardedWindowCount": state.discardedWindowCount,
+      ]
+    }
   }
 }

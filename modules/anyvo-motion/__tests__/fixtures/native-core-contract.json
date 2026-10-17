@@ -1,0 +1,27 @@
+{
+  "empty" : null,
+  "fresh" : {
+    "accelerationMagnitude" : 0.10000000000000001,
+    "activityAgeMs" : null,
+    "activityConfidence" : "low",
+    "cadence" : null,
+    "deviceMotionAgeMs" : 50.000000000000711,
+    "deviceMotionSampleCount" : 2,
+    "discardedWindowCount" : 0,
+    "emittedAtTimestamp" : 100000,
+    "headingDelta" : 20,
+    "motionConfidence" : 0.59999999999999998,
+    "movementState" : "walking",
+    "pedometerAgeMs" : null,
+    "pedometerIntervalMs" : null,
+    "qualityVersion" : 2,
+    "rotationMagnitude" : 0.20000000000000001,
+    "runId" : "D013509E-60B7-4AA8-BB59-281B167FBCAB",
+    "stepDelta" : 0,
+    "timestamp" : 99950,
+    "windowEndTimestamp" : 99950,
+    "windowStartTimestamp" : 99800
+  },
+  "newRunIsDifferent" : true,
+  "previousRunRejected" : true
+}
