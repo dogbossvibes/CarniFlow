@@ -5,15 +5,23 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "track.angleList.title": "Winkel und Richtige",
+  "track.angleList.hint": "Gspeichereti Markierige vo de gleite Fährte. Tippe öffnet d Details.",
+  "track.angleList.empty": "Kei Winkelmarkierige gspeicheret.",
+  "track.angleList.directionUnknown": "Richtig unbekannt",
+  "track.angleList.typeDirectionUnknown": "Art und Richtig unbekannt",
+  "track.angleList.distanceUnknown": "Entfernig nöd gspeicheret",
+  "track.angleList.openDetails": "Details zur Markierig öffne",
+  "track.review.dismissShort": "Verwerfe",
   // Gegenstandskorrekturen – ergänzte Schlüssel aus dem C1-Release-Preflight.
-  "track.review.coldHint": "Automatischi Erkennige chönd au ohni Verbindig verworfe werde. D Vormerkig bliibt uf däm Grät gspeicheret; d Originalufnahm bliibt erhalte.",
-  "track.review.autoNumber": "Automatischi Erkennig {number}",
-  "track.review.dismissAuto": "Automatischi Erkennig {number} verwerfe",
+  "track.review.coldHint": "Automatischi Gegestandsfund chönd au ohni Verbindig verworfe werde. D Vormerkig bliibt uf däm Grät gspeicheret; d Originalufnahm bliibt erhalte.",
+  "track.review.autoNumber": "Automatische Gegestandsfund {number}",
+  "track.review.dismissAuto": "Automatische Gegestandsfund {number} verwerfe",
   "track.review.dismissQueued": "Verwerfe vorgmerkt",
   "track.review.intentPending": "Uf däm Grät gspeicheret. No kei bestätigti Korrektur. Sobald d Gägestandsliste verfüegbar isch, d Vormerkig zueordne und bestätige.",
   "track.review.mapHint": "Lokali Erkennige und synchronisierti Gägeständ chönd verschiedeni Kennige ha. Wähl für jedi Vormerkig de gmeinti Gägestand. Es wird nüt automatisch zuegordnet.",
   "track.review.confirmIntent": "Zueordnig bestätige und speichere",
-  "track.review.initHint": "Für de bestätigti Änderigsverlauf wird d Gägestandsliste online gsicheret. Automatischi Erkennige chönd scho vorher offline zum Verwerfe vorgmerkt werde.",
+  "track.review.initHint": "Für de bestätigti Änderigsverlauf wird d Gägestandsliste online gsicheret. Automatischi Gegestandsfund chönd scho vorher offline zum Verwerfe vorgmerkt werde.",
   "track.review.incomplete": "D Gägestandsliste isch no nöd vollständig synchronisiert. Bitte synchronisiere und nomal probiere. Es isch kei Änderigsverlauf aagleit worde.",
   "track.review.title": "Gägeständ naaprüefe",
   "track.review.hint": "Versehentlichi Iigabe korrigiere. D ursprüngliche Ufnahm bliibt erhalte.",
