@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -49,7 +49,7 @@ export default function ForgotPasswordScreen() {
         </View>
       </View>
 
-      <View style={s.content}>
+      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
         <Text style={s.text}>
           {t('auth.forgotIntro')}
         </Text>
@@ -70,7 +70,7 @@ export default function ForgotPasswordScreen() {
         ) : null}
         <Button label={t('auth.sendResetMail')} onPress={sendReset} loading={loading} />
         {loading ? <ActivityIndicator color={C.accent} style={{ marginTop: 12 }} /> : null}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

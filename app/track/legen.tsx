@@ -1160,7 +1160,8 @@ export default function LegenScreen() {
         label={t('track.stopLaying')}
       />
 
-      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')}>
+      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')} keyboardAware closeButton>
+        <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View className="gap-4 pb-2">
           <View className="flex-row flex-wrap gap-[10px]">
             {TRACK_SEGMENT_TYPES.map(type => {
@@ -1214,6 +1215,7 @@ export default function LegenScreen() {
             <Text className="text-[14px] font-black text-ft-acc-text">{t('track.segmentStartNow')}</Text>
           </Pressable>
         </View>
+        </ScrollView>
       </AnyvoBottomSheet>
 
       {/* Play-Pflicht: Hintergrundstandort-Disclosure VOR der ersten Location-

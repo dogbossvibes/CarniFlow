@@ -103,7 +103,7 @@ function AccountTransferScreen({ userId }: { userId: string | null }) {
   const status = (offer: TransferOffer) => offer.status === 'pending' && offer.expiresAtMs <= serverNow ? 'expired' : offer.status;
   return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
     <View style={styles.header}><Button label={t('back')} onPress={() => router.back()} /><Button label={t('refresh')} disabled={busy} onPress={() => { void refreshDogs(); void act(refresh); }} /></View>
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>{t('title')}</Text><Text style={styles.muted}>{t('subtitle')}</Text>
       {!userId && <Text style={styles.error}>{t('account')}</Text>}
       {busy && <ActivityIndicator color={C.accent} />}

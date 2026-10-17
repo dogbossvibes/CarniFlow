@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -8,7 +8,7 @@ import { eventMeta, STATUS_LABEL, type CalendarEvent } from '@/types/calendar';
 
 const ACCENT = '#00F5D4';
 
-export function NextAppointmentCard({ event }: { event: CalendarEvent | null }) {
+export function NextAppointmentCard({ event, onPress }: { event: CalendarEvent | null; onPress?: (event: CalendarEvent) => void }) {
   const { t } = useT();
   if (!event) {
     return (
@@ -22,7 +22,7 @@ export function NextAppointmentCard({ event }: { event: CalendarEvent | null }) 
   }
   const m = eventMeta(event.type);
   return (
-    <View style={s.card}>
+    <TouchableOpacity style={s.card} onPress={() => onPress?.(event)} disabled={!onPress} activeOpacity={0.85} accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={`${event.title}, ${relativeDayLabel(event.start_at)}, ${fmtTime(event.start_at)}`}>
       <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,245,212,0.06)' }]} />
 
@@ -46,7 +46,7 @@ export function NextAppointmentCard({ event }: { event: CalendarEvent | null }) 
           <Text style={[s.statusTxt, { color: m.color }]}>{STATUS_LABEL[event.status]}</Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
