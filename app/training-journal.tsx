@@ -181,7 +181,7 @@ export default function TrainingJournalScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
+        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag"
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

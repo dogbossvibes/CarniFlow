@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFabBottom } from '@/hooks/useFabBottom';
 import { haptic } from '@/lib/haptics';
@@ -16,6 +16,8 @@ import { RescheduleModal } from '@/components/calendar/RescheduleModal';
 import { TimelineView } from '@/components/calendar/TimelineView';
 import { WeekView } from '@/components/calendar/WeekView';
 import { MonthView } from '@/components/calendar/MonthView';
+import { EventActionsSheet } from '@/components/calendar/EventActionsSheet';
+import { useT } from '@/i18n';
 import { CreateEventModal } from '@/components/calendar/CreateEventModal';
 import { deleteCalendarEvent, updateCalendarEvent } from '@/services/calendarService';
 import { useSession } from '@/hooks/useSession';
@@ -30,14 +32,26 @@ type Tab = 'timeline' | 'week' | 'month';
 const ACCENT = '#00F5D4';
 
 export default function TrainingHubScreen() {
+  const { session } = useSession();
+  return <TrainingHubContent key={session?.user.id ?? 'signed-out'} />;
+}
+
+function TrainingHubContent() {
+  const { t } = useT();
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const router = useRouter();
   const fabBottom = useFabBottom();
   const { session } = useSession();
   const uid = session?.user.id;
-  const { events, loading, refresh } = useTrainingCalendar();
+  const { events, loading, refresh, upsert, remove } = useTrainingCalendar();
   const { pending, incoming, accept, decline } = useTrainerAppointments();
   const [tab, setTab] = useState<Tab>('timeline');
   const [createOpen, setCreateOpen] = useState(false);
+  const pendingEdit = useRef<CalendarEvent | null>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
+  const [selected, setSelected] = useState<CalendarEvent | null>(null);
+  const [editing, setEditing] = useState<CalendarEvent | null>(null);
   const [reschedule, setReschedule] = useState<CalendarEvent | null>(null);
   const { isTrainerModule } = useCapabilities();
   const [umfragen, setUmfragen] = useState<TrainerUmfrage[]>([]);
@@ -52,21 +66,34 @@ export default function TrainingHubScreen() {
     refresh();
   };
 
-  const onEventPress = (e: CalendarEvent) => {
-    const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [];
-    options.push({
-      text: 'In Apple/Google Kalender',
-      onPress: async () => {
-        const res = await addEventToDeviceCalendar(e);
-        Alert.alert(res.ok ? 'Hinzugefügt' : 'Hinweis', res.ok ? 'Termin wurde in deinen Kalender übernommen.' : (res.error ?? 'Fehler'));
-      },
-    });
-    options.push({
-      text: 'Löschen', style: 'destructive',
-      onPress: async () => { await deleteCalendarEvent(e.id); await cancelEventReminders(e.id); refresh(); },
-    });
-    options.push({ text: 'Abbrechen', style: 'cancel' });
-    Alert.alert(e.title, undefined, options);
+  const onEventPress = (event: CalendarEvent) => { setSelected(event); setActionsVisible(true); };
+  const finishActions = () => {
+    setSelected(null);
+    if (pendingEdit.current) { setEditing(pendingEdit.current); pendingEdit.current = null; setCreateOpen(true); }
+  };
+  const closeActions = () => { setActionsVisible(false); if (Platform.OS !== 'ios') finishActions(); };
+  const exportSelected = async () => {
+    if (!selected || !DEVICE_CALENDAR_AVAILABLE) return;
+    const result = await addEventToDeviceCalendar(selected);
+    if (alive.current && !result.ok) Alert.alert(t('common.error'), result.error ?? t('calendar.deviceCalendarFailed'));
+  };
+  const deleteSelected = () => {
+    const event = selected;
+    if (!event || event.owner_id !== uid || event.source_type || event.source_id) return;
+    Alert.alert(t('calendar.deleteEvent'), t('calendar.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => {
+        if (!alive.current) return;
+        try {
+          const result = await deleteCalendarEvent(event.id);
+          if (!alive.current) return;
+          if (result.error) throw result.error;
+          await cancelEventReminders(event.id);
+          if (!alive.current) return;
+          remove(event.id); closeActions(); refresh();
+        } catch { if (alive.current) Alert.alert(t('common.error'), t('calendar.saveFailed')); }
+      } },
+    ]);
   };
 
   return (
@@ -88,7 +115,7 @@ export default function TrainingHubScreen() {
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={{ paddingHorizontal: 20 }}>
-          <NextAppointmentCard event={nextEvent(events)} />
+          <NextAppointmentCard event={nextEvent(events)} onPress={onEventPress} />
         </View>
 
         <View style={{ marginTop: 20 }}>
@@ -153,11 +180,14 @@ export default function TrainingHubScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <TouchableOpacity style={[s.fab, { bottom: fabBottom }]} onPress={() => { haptic.light(); setCreateOpen(true); }} activeOpacity={0.9}>
+      <TouchableOpacity style={[s.fab, { bottom: fabBottom }]} onPress={() => { haptic.light(); setEditing(null); setCreateOpen(true); }} activeOpacity={0.9}>
         <Ionicons name="add" size={30} color="#001210" />
       </TouchableOpacity>
 
-      <CreateEventModal visible={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => refresh()} />
+      {selected && uid ? <EventActionsSheet visible={actionsVisible} event={selected} userId={uid} onClose={closeActions} onDismiss={finishActions}
+        onEdit={() => { pendingEdit.current = selected; closeActions(); }}
+        onDelete={deleteSelected} onExport={exportSelected} /> : null}
+      <CreateEventModal visible={createOpen} event={editing} onClose={() => { setCreateOpen(false); setEditing(null); }} onCreated={event => { upsert(event); refresh(); }} />
       <RescheduleModal visible={!!reschedule} event={reschedule} onClose={() => setReschedule(null)} onSubmit={submitReschedule} />
     </SafeAreaView>
   );

@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import type { CalendarEvent, NewCalendarEvent, EventStatus } from '@/types/calendar';
 
+import { canEditOwnEvent, EDITABLE_EVENT_FIELDS, type EventEditPatch } from '@/features/calendar/eventEditing';
+
 const SELECT = '*, dog:dogs(name, photo_url)';
 
 // Alle für den Nutzer relevanten Termine (eigene + als Trainer angelegte).
@@ -50,6 +52,28 @@ async function notifyAppointment(senderId: string, recipientId: string, title: s
 
 export function updateCalendarEvent(id: string, updates: Partial<CalendarEvent>) {
   return supabase.from('calendar_events').update(updates).eq('id', id).select(SELECT).single();
+}
+
+// Owner editor: update the same record, preserving identity, trainer negotiation,
+// source metadata and every field the form does not expose. RLS remains decisive.
+export async function updateOwnCalendarEvent(userId: string, original: CalendarEvent, changes: EventEditPatch) {
+  const { data: auth, error: authError } = await supabase.auth.getSession();
+  if (authError || auth.session?.user.id !== userId || !canEditOwnEvent(original, userId)) {
+    return { data: null, error: { message: 'CALENDAR_ACCESS_CHANGED' } };
+  }
+  const patch = Object.fromEntries(EDITABLE_EVENT_FIELDS.filter(key => key in changes).map(key => [key, changes[key]]));
+  if (!Object.keys(patch).length) return { data: original, error: null };
+  let query = supabase.from('calendar_events').update(patch).eq('id', original.id).eq('owner_id', userId);
+  // Fail closed when this snapshot was changed/deleted in another client.
+  for (const key of [...EDITABLE_EVENT_FIELDS, 'status', 'trainer_id', 'created_by', 'source_type', 'source_id'] as const) {
+    const value = original[key];
+    if (value == null) query = query.is(key, null);
+    else if (Array.isArray(value)) query = query.filter(key, 'eq', `{${value.map(item => JSON.stringify(item)).join(',')}}`);
+    else query = query.eq(key, value);
+  }
+  const result = await query.select(SELECT).maybeSingle();
+  if (result.error || !result.data) return { data: null, error: result.error ?? { message: 'CALENDAR_CONFLICT' } };
+  return { data: result.data as unknown as CalendarEvent, error: null };
 }
 
 export function setEventStatus(id: string, status: EventStatus) {

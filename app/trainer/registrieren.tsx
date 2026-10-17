@@ -59,7 +59,7 @@ export default function TrainerRegistrierenScreen() {
       <View style={S.topBar}>
         <TouchableOpacity onPress={() => router.back()} style={S.back} hitSlop={8}><Ionicons name="chevron-back" size={22} color="#E8E8F2" /></TouchableOpacity>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={S.header}>
           <Text style={S.title}>{t('trainer.registerTitle')}</Text>
           <Text style={S.sub}>{t('trainer.registerSub')}</Text>

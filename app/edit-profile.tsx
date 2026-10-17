@@ -141,7 +141,7 @@ export default function EditProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={s.avatarKreis}>
           <Text style={s.avatarText}>{initialen || '?'}</Text>
         </View>
