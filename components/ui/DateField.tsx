@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,6 +36,10 @@ export function DateField({
 }) {
   const { t } = useT();
   const [showIOS, setShowIOS] = useState(false);
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => setShowIOS(false));
+    return () => sub.remove();
+  }, []);
   const isTime = mode === 'time';
   const format = isTime ? fmtTime : fmtDate;
   const ph = placeholder ?? (isTime ? t('date.chooseTime') : t('date.chooseDate'));
@@ -43,7 +47,7 @@ export function DateField({
 
   const open = () => {
     const base = value ?? new Date();
-    if (stabilizeIOSBounds) Keyboard.dismiss();
+    Keyboard.dismiss();
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
         value: base, mode, is24Hour: true, maximumDate, minimumDate,
@@ -63,11 +67,11 @@ export function DateField({
   return (
     <View style={style}>
       {label ? <Text style={s.label}>{label}</Text> : null}
-      <Pressable style={s.field} onPress={open} testID="date-field">
+      <Pressable style={s.field} onPress={open} testID="date-field" accessibilityRole="button" accessibilityLabel={[label, value ? format(value) : ph].filter(Boolean).join(': ')} accessibilityState={{ expanded: showIOS }}>
         <Ionicons name={icon} size={18} color={C.accent} />
         <Text style={[s.value, !value && s.placeholder]} numberOfLines={1}>{value ? format(value) : ph}</Text>
         {value && onClear ? (
-          <Pressable onPress={onClear} hitSlop={8}><Ionicons name="close-circle" size={18} color={C.muted} /></Pressable>
+          <Pressable onPress={e => { e.stopPropagation(); onClear(); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.delete')}><Ionicons name="close-circle" size={18} color={C.muted} /></Pressable>
         ) : (
           <Ionicons name={showIOS ? 'chevron-up' : 'chevron-down'} size={16} color={C.muted} />
         )}
@@ -84,7 +88,7 @@ export function DateField({
             onChange={(e, d) => { if (e.type === 'set' && d) onChange(d); }}
             style={{ alignSelf: 'stretch' }}
           />
-          <Pressable style={s.done} onPress={() => setShowIOS(false)}>
+          <Pressable style={s.done} onPress={() => setShowIOS(false)} accessibilityRole="button">
             <Text style={s.doneTxt}>{t('common.done')}</Text>
           </Pressable>
         </View>
@@ -95,10 +99,10 @@ export function DateField({
 
 const s = StyleSheet.create({
   label:      { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
-  field:      { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 14 },
+  field:      { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 14 },
   value:      { flex: 1, fontSize: 15, color: C.white, fontWeight: '600' },
   placeholder:{ color: C.muted, fontWeight: '500' },
   iosWrap:    { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginTop: 8, padding: 6 },
-  done:       { alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8 },
+  done:       { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8 },
   doneTxt:    { fontSize: 15, color: C.accent, fontWeight: '800' },
 });

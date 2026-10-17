@@ -104,7 +104,7 @@ function DistractionContent({ parentId, data }: { parentId: string; data: Return
   const stored = await data.repository.save(track, 0); check(); await select(stored); await data.refresh(); setName(''); await recorder.current?.start();
  }
  return <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-  <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+  <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
    <Button label={t('back')} onPress={() => { recorder.current?.pause(); router.back(); }} />
    <Text style={styles.title} accessibilityRole="header">{t('entry')}</Text>
    <Text style={styles.body}>{t('flowHint')}</Text>

@@ -75,7 +75,7 @@ export default function DogGoalEditor() {
           <View style={{ width: 38 }} />
         </View>
 
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
           <Text style={s.label}>{t('dog.goalFallback')}</Text>
           <TextInput value={title} onChangeText={setTitle} placeholder={t('dog.goalPlaceholder')} placeholderTextColor={C.trackTextMut} style={s.input} />
 

@@ -45,7 +45,7 @@ function Content({data}:{data:ReturnType<typeof useDistractions>}){
  const map=reference?displayReference(reference,'preview','preview').map:null;
  const returning=preview?.kind==='distraction-return'?preview.contribution:undefined;
  const button=(label:string,fn:()=>Promise<void>)=><ExchangeButton label={label} disabled={busy} onPress={()=>void act(fn)}/>;
- return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+ return <SafeAreaView style={styles.safe}><ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
   <ExchangeButton label={t('back')} disabled={busy} onPress={()=>{if(preview||selected){setPreview(null);setSelected(null);setMessage('');}else if(router.canGoBack())router.back();else router.replace('/track' as never);}}/>
   {params.importNotice&&<Text style={styles.body}>{t('importHint')}</Text>}<Text accessibilityRole="header" style={styles.title}>{t('title')}</Text><Text style={styles.body}>{t('hint')}</Text>
   {busy&&<ActivityIndicator accessibilityLabel={t('loading')} color={C.accent}/>}{!!error&&<Text accessibilityRole="alert" style={styles.error}>{t(exchangeErrorKey(error))}</Text>}{!!message&&<Text accessibilityRole="alert" style={styles.body}>{message}</Text>}
