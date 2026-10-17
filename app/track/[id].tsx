@@ -1,3 +1,4 @@
+import { TrackAngleList } from '@/features/tracking/components/TrackAngleList';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { useTranslation } from 'react-i18next';
@@ -748,6 +749,8 @@ export default function TrackAuswertungScreen() {
               <Legend color={C.trackWarning} label="Korrektur" />
             </View>
           </View>
+
+          <TrackAngleList markers={map?.markers ?? []} onSelect={marker => setDetailSel({ kind: 'marker', marker })} />
 
           {!!map?.markers.some(marker => marker.type === 'gegenstand') && (
             <>
