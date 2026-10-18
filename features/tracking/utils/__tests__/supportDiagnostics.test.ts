@@ -69,7 +69,7 @@ function diagFromField(name: 'F1' | 'F2', accuracy = 4.37): QaSearchDiagnostics 
   };
   return buildSearchDiagnostics({
     origin: ll(0, 0), telemetry: tel, resumed: false, analyticsSampleCount: 0, laid: { total: 27, end: null }, objects: [], cornerAtM: [],
-    end: { fired: null, hapticFired: null, voiceFired: null }, manualStopTSec: 50,
+    end: { eventObservation: 'complete', fired: null, hapticFired: null, voiceFired: null }, manualStopTSec: 50,
     run: { points: g.run.map(toLL), pointsTimeSec: g.run.map((p: any) => p.tSec) },
     replay: { points: g.replay.map(toLL), timeSec: g.replay.map((p: any) => p.tSec) },
   });
@@ -121,7 +121,7 @@ describe('Format', () => {
     const exp = buildSupportExport(mockLay, mockMarkers, diagFromField('F2'));
     expect(exp.exportType).toBe('support');
     expect(exp.schemaVersion).toBe(2);
-    expect(exp.schemaMinor).toBe(8);
+    expect(exp.schemaMinor).toBe(12);
     expect(exp.points[0]).toMatchObject({ x: 0, y: 0, tMs: 0 });
     expect(Math.max(...exp.points.map(p => Math.abs(p.x) + Math.abs(p.y)))).toBeLessThan(100);
   });
@@ -195,7 +195,9 @@ describe('Persistenz und Retention', () => {
     await saveQaSearchCapture('qa-legacy', diagFromField('F1'));
     expect(await AsyncStorage.getItem('anyvo.qa.searchCapture.qa-legacy')).not.toBeNull();
     expect(await AsyncStorage.getItem('anyvo.qa.searchCapture.index')).toContain('qa-legacy');
-    expect((await buildExportForSession('qa-legacy')).sessionId).toBeTruthy();   // bestehender interner Export weiter möglich
+    const exported = await buildExportForSession('qa-legacy');
+    expect(exported.sessionId).toBeTruthy();   // bestehender interner Export weiter möglich
+    expect(exported.schemaMinor).toBe(12);     // Recording-Evidence darf die neue Version nicht absenken
   });
 });
 
@@ -209,7 +211,7 @@ describe('Teilen', () => {
     await recordBackgroundLayEvent('sess-diag', 'handlerMissing');
     await saveQaSearchCapture('sess-diag', toSupportCapture(diagFromField('F1')), 'support');
     const exported = await buildSupportExportForSession('sess-diag');
-    expect(exported?.schemaMinor).toBe(9);
+    expect(exported?.schemaMinor).toBe(12);
     expect(exported?.backgroundLayDiagnostics?.counts.taskCallback).toBe(1);
     expect(exported?.backgroundLayDiagnostics?.counts.handlerMissing).toBe(1);
     expect(exported?.backgroundLayDiagnostics?.timeline).toBeUndefined();
@@ -301,5 +303,45 @@ describe('Verdrahtung (Source)', () => {
     expect(de).toContain("'track.customerDiagnosis.shareTitle': 'Diagnosedaten teilen'");
     expect(de).toContain("'track.customerDiagnosis.shareSubtitle': 'Technische Fährtendaten für Support und Fehleranalyse teilen.'");
     expect(de).toContain("'track.customerDiagnosis.unavailable': 'Für diese ältere Fährte liegen keine vollständigen Diagnosedaten vor.'");
+  });
+});
+
+
+describe('Ende-Ereignis im Kundenexport', () => {
+  it('erhält ein tatsächlich beobachtetes Ende ohne internen QA-Mitschnitt bis nach Persistenz/Export', async () => {
+    // beforeEach entzieht den QA-Zugriff; nur der normale Support-Namespace ist erlaubt.
+    const d = diagFromField('F1');
+    d.end = { ...d.end, eventObservation: 'complete',
+      eventFired: { tSec: 487.4, progressM: 48.94, searchDistanceM: 50 },
+      eventCount: 1, hapticFired: true, voiceFired: false };
+    await saveQaSearchCapture('support-end', toSupportCapture(d), 'support');
+    const exported = await buildSupportExportForSession('support-end');
+    expect(exported?.qaCaptureAvailable).toBe(false);
+    expect(exported?.searchDiagnostics?.end).toEqual(d.end);
+    expect(exported?.schemaMinor).toBe(12);
+    expect(() => assertSupportPrivacy(exported)).not.toThrow();
+  });
+
+  it('normalisiert alte fehlende QA-Ereignisse beim erneuten Export zu unbekannt, ohne gespeicherte Daten umzuschreiben', async () => {
+    const legacy = diagFromField('F1');
+    delete legacy.end.eventObservation;
+    legacy.end.eventCount = 0;
+    const serialized = JSON.stringify(legacy);
+    await AsyncStorage.setItem('anyvo.support.searchCapture.legacy-end', serialized);
+    const exported = await buildSupportExportForSession('legacy-end');
+    expect(exported?.searchDiagnostics?.end).toMatchObject({
+      eventObservation: 'unknown', eventFired: null, eventCount: null,
+    });
+    expect(await AsyncStorage.getItem('anyvo.support.searchCapture.legacy-end')).toBe(serialized);
+    expect(buildSupportExport(mockLay, mockMarkers, legacy).searchDiagnostics?.end.eventCount).toBeNull();
+    expect(JSON.stringify(legacy)).toBe(serialized);
+  });
+
+  it('erfindet bei unvollständiger Resume-Beobachtung kein ausgebliebenes Ereignis', () => {
+    const d = diagFromField('F2');
+    d.end.eventObservation = 'partial';
+    const exported = buildSupportExport(mockLay, mockMarkers, d);
+    expect(exported.searchDiagnostics?.end).toMatchObject({ eventObservation: 'partial', eventCount: null });
+    expect(d.end.eventCount).toBe(0);
   });
 });

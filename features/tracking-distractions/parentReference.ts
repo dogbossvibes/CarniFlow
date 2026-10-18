@@ -29,8 +29,8 @@ export function parseParentReference(value: unknown, ownerId: string, id: string
  const v = object(value), map = object(v.map);
  if (v.version !== 1 || v.id !== id || v.ownerId !== ownerId || !Array.isArray(map.lay) || !Array.isArray(map.markers)) throw new DistractionError('PARENT_UNAVAILABLE');
  return buildParentReference({ id, type: 'track', owner_id: ownerId, dog_id: v.dogId, status: 'completed', started_at: v.date, distance_meters: v.distanceM,
-  points: map.lay.map(p => { const point = object(p); return { latitude: point.lat, longitude: point.lng, point_type: 'lay', breakBefore: point.breakBefore === true }; }),
+  points: map.lay.map(p => { const point = object(p); return { latitude: point.lat, longitude: point.lng, point_type: 'lay', breakBefore: point.breakBefore === true, timestamp: typeof point.timestamp === 'string' ? point.timestamp : undefined }; }),
   markers: map.markers.map(m => { const marker = object(m); return { id: marker.id, marker_type: marker.type, latitude: marker.lat, longitude: marker.lng,
-   angle_kind: marker.angleKind, material: marker.material, distance_from_start: marker.distanceFromStart, note: marker.note }; }),
+   angle_kind: marker.angleKind, material: marker.material, distance_from_start: marker.distanceFromStart, note: marker.note, created_at: typeof marker.createdAt === 'string' ? marker.createdAt : undefined }; }),
  }, ownerId, id);
 }

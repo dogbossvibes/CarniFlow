@@ -350,10 +350,10 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     for (const c of corners) {
       if (c.atM <= lastCornerAtRef.current) continue;   // schon gemeldet
       const fused = turns.find(t => t.apexIndex === c.apexIndex) ?? null;
-      // Eine gepaarte (Split-Apex-)Ecke wird früh gemeldet; entdeckt der Regelpfad
-      // mit mehr Punkten einen Nachbarscheitel in derselben Ecke, darf daraus keine
-      // zweite Markierung werden.
-      if (lastCornerRescuedRef.current && c.atM - lastCornerAtRef.current < CORNER_GAP_M) continue;
+      // Apply the detector's existing exclusion across evaluations as well as
+      // within a sweep. Ordinary GPS apexes can shift with new evidence too.
+      // Keep detector metres here; display/reference metres are a different scale.
+      if (c.atM - lastCornerAtRef.current < CORNER_GAP_M) continue;
       if (fused) liveTurnsRef.current.set(c.apexIndex, fused);
       lastCornerRescuedRef.current = fused?.source === 'gps_split_apex';
       lastCornerAtRef.current = c.atM;

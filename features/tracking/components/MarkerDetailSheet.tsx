@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { C } from '@/constants/colors';
@@ -10,10 +10,12 @@ import type { MapMarker } from '@/features/tracking/components/TrackingMap';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 // Auswahl im Logbuch: ein gespeicherter Feature-Marker ODER das Fährtenende.
-export type TrackDetailSelection =
+export type TrackDetailItem =
   | { kind: 'start' }
   | { kind: 'marker'; marker: MapMarker }
   | { kind: 'end'; totalDistanceM: number | null };
+
+export type TrackDetailSelection = TrackDetailItem | { kind: 'group'; items: TrackDetailItem[] };
 
 const MATERIAL_KEY: Partial<Record<MarkerMaterial, TranslationKey>> = {
   holz: 'track.materialWood', duebel: 'track.materialDowel', stoff: 'track.materialFabric', filz: 'track.materialFelt',
@@ -28,7 +30,7 @@ const MATERIAL_KEY: Partial<Record<MarkerMaterial, TranslationKey>> = {
 
 // Reine Detail-Ableitung aus einer Auswahl — nur GESPEICHERTE Werte, keine Berechnung.
 export function describeSelection(
-  sel: TrackDetailSelection,
+  sel: TrackDetailItem,
   t: (k: TranslationKey) => string,
 ): { icon: IconName; title: string; rows: { label: string; value: string }[] } {
   const distRow = (d: number | null | undefined) =>
@@ -94,6 +96,21 @@ export function MarkerDetailSheet({
 }) {
   const { t } = useT();
   if (!selection) return null;
+  if (selection.kind === 'group') return (
+    <AnyvoBottomSheet visible onClose={onClose} title={t('track.markerGroup.title')} closeButton>
+      <ScrollView style={{ maxHeight: 400 }} contentContainerStyle={s.body}>
+        {selection.items.map((item, index) => {
+          const info = describeSelection(item, t);
+          return <View key={`${item.kind}:${index}`} style={s.groupItem}>
+            <Text accessibilityRole="header" style={s.groupTitle}>{info.title}</Text>
+            {info.rows.map((row, rowIndex) => <View key={rowIndex} style={s.row}>
+              <Text style={s.rowLabel}>{row.label}</Text><Text style={s.rowValue}>{row.value}</Text>
+            </View>)}
+          </View>;
+        })}
+      </ScrollView>
+    </AnyvoBottomSheet>
+  );
   const info = describeSelection(selection, t);
   return (
     <AnyvoBottomSheet visible onClose={onClose} title={info.title}>
@@ -113,6 +130,8 @@ export function MarkerDetailSheet({
 }
 
 const s = StyleSheet.create({
+  groupItem: { gap: 4, paddingVertical: 10 },
+  groupTitle: { color: C.trackPrimary, fontSize: 17, fontWeight: '700' },
   body:     { paddingBottom: 12, gap: 10 },
   iconWrap: { width: 44, height: 44, borderRadius: 14, backgroundColor: C.trackPrimaryDk + '24', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   row:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.trackBorder },
