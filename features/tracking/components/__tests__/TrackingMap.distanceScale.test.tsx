@@ -9,6 +9,11 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
+jest.mock('@/components/ui/AnyvoBottomSheet', () => {
+  const { View, Text } = jest.requireActual('react-native');
+  return { AnyvoBottomSheet: ({ title, children, onClose }: any) => <View testID="group-sheet" onTouchEnd={onClose}><Text>{title}</Text>{children}</View> };
+});
+
 const mockMapApi = { coordinateForPoint: jest.fn(async ({ x }: { x: number; y: number }) => ({ latitude: 47 + x / (6371000 * Math.PI / 180), longitude: 8 })), animateToRegion: jest.fn(), fitToCoordinates: jest.fn(), animateCamera: jest.fn(), setCamera: jest.fn(), getCamera: jest.fn(async () => ({})) };
 jest.mock('@/components/tracking/TrackMap', () => {
   /* eslint-disable @typescript-eslint/no-require-imports */
@@ -79,12 +84,12 @@ function zoomTo(node: ReactTestRenderer, visibleM: number) {
 afterEach(() => { act(() => { mounted.splice(0).forEach(n => n.unmount()); }); });
 
 describe('TrackingMap — Fährten-Maßstab', () => {
-  it('ohne distanceScaleLine: keine Ticks, kein Region-Tracking, kein onLayout (unverändert)', () => {
+  it('without scale or markers: no ticks or region tracking, but layout is measured for later data', () => {
     const n = renderMap();
     expect(ticks(n)).toHaveLength(0);
     expect(labels(n)).toHaveLength(0);
     expect(mapView(n).props.onRegionChangeComplete).toBeUndefined();
-    expect(outer(n)).toBeUndefined();
+    expect(outer(n)).toBeDefined();
   });
   it('nah (≈ 40 m sichtbar, 12.5 pt/m) → 1-m-Ticks inkl. 5/10 m, Zahlen 10/20/30/40', () => {
     const n = renderMap({ distanceScaleLine: REF_LINE });
@@ -251,7 +256,65 @@ it('refreshes the native marker snapshot after direction changes, then freezes i
 it.each(['bw', 'ow', 'gw', 'abriss'] as const)('actual parent map shows saved direction and preserves unresolved %s labels', angleKind => {
   const node = renderMap({markers:[{id:'special',type:'winkel',angleKind,lat:47,lng:8,geometryDirection:'links',geometrySharpness:'sharp'}]});
   const texts = () => node.root.findAll(n => (n as unknown as { type: unknown }).type === 'Text').map(n => n.props.children);
-  expect(texts()).toContain(angleKind === 'abriss' ? 'A L' : `${angleKind.toUpperCase()} SL`);
+  expect(texts().some(text => typeof text === 'string' && text.split(' · ')[0] === (angleKind === 'abriss' ? 'A L' : `${angleKind.toUpperCase()} SL`))).toBe(true);
   act(() => { node.update(<TrackingMap currentPosition={null} follow={false} layPoints={LAY} markers={[{id:'special',type:'winkel',angleKind,lat:47,lng:8,geometryDirection:'unresolved'}]}/>); });
-  expect(texts()).toContain(angleKind === 'abriss' ? '×' : angleKind.toUpperCase());
+  expect(texts().some(text => typeof text === 'string' && text.split(' · ')[0] === (angleKind === 'abriss' ? '×' : angleKind.toUpperCase()))).toBe(true);
+});
+
+// User-visible overlap regression: field G5 + angle, and final object + end.
+describe('TrackingMap overlapping feature access', () => {
+  it('shows both identities in a combined badge and opens all details without moving coordinates', () => {
+    const markers = [
+      { id: 'g5', type: 'gegenstand', lat: LAY[20].lat, lng: 8, objectIndex: 5, material: 'stoff', distanceFromStart: 20 },
+      { id: 'left', type: 'winkel', lat: LAY[20].lat + 0.08 / M_PER_DEG, lng: 8, angleKind: 'links', distanceFromStart: 20.08 },
+    ];
+    const n = renderMap({ markers });
+    zoomTo(n, 100);
+    const badge = (n.root as any).findAllByType(RNMaps!.Marker).find((node: any) => node.props.accessibilityLabel?.includes('G5'));
+    expect(badge.props.coordinate).toEqual({ latitude: markers[0].lat, longitude: 8 });
+    act(() => { badge.props.onPress(); });
+    const text = JSON.stringify(n.root.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children));
+    expect(text).toContain('track.markerGroup.title');
+    expect(text).toContain('G5');
+    expect(text).toContain('track.detailDistanceFromStart');
+    // Every feature becomes separately available again when sufficiently zoomed in.
+    zoomTo(n, 0.2);
+    expect((n.root as any).findAllByType(RNMaps!.Marker).some((node: any) => node.props.accessibilityLabel?.includes('G5,'))).toBe(false);
+  });
+  it('includes the end and last object together with the authoritative saved total', () => {
+    const n = renderMap({ endPoint: LAY[40], endTotalDistanceM: 39,
+      markers: [{ id: 'g7', type: 'gegenstand', lat: LAY[40].lat, lng: 8, objectIndex: 7, material: 'holz' }] });
+    const badge = (n.root as any).findAllByType(RNMaps!.Marker).find((node: any) => node.props.accessibilityLabel?.includes('G7'));
+    act(() => { badge.props.onPress(); });
+    expect(JSON.stringify(n.root.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children))).toContain('39 m');
+    expect(JSON.stringify(n.root.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children))).toContain('track.detailTrackEnd');
+  });
+});
+
+
+it('keeps the displayed object number in live grouped details before persistence', () => {
+  const n = renderMap({ markers: [
+    { id: 'live-object', type: 'gegenstand', lat: LAY[20].lat, lng: 8, material: 'stoff' },
+    { id: 'live-angle', type: 'winkel', lat: LAY[20].lat, lng: 8, angleKind: 'links' },
+  ] });
+  const badge = (n.root as any).findAllByType(RNMaps!.Marker).find((node: any) => node.props.accessibilityLabel?.includes('G1'));
+  act(() => { badge.props.onPress(); });
+  const sheet = n.root.findAll(node => node.props.testID === 'group-sheet')[0];
+  expect(sheet.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children)).toContain('G1');
+});
+
+
+it('uses the initial layout when markers arrive after mount and zooms them apart', () => {
+ const n = renderMap();
+ act(() => { outer(n).props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 360, height: 500 } } }); });
+ const markers = [
+  { id: 'late-object', type: 'gegenstand' as const, lat: LAY[20].lat, lng: 8, objectIndex: 5 },
+  { id: 'late-angle', type: 'winkel' as const, lat: LAY[20].lat + 0.08 / M_PER_DEG, lng: 8, angleKind: 'links' as const },
+ ];
+ act(() => { n.update(<TrackingMap layPoints={LAY} currentPosition={null} follow={false} markers={markers} />); });
+ const grouped = () => (n.root as any).findAllByType(RNMaps!.Marker).some((node: any) => node.props.accessibilityLabel?.includes('G5,'));
+ expect(grouped()).toBe(true);
+ // No second layout event: native layout already happened before data arrived.
+ act(() => { mapView(n).props.onRegionChangeComplete({ latitude: LAY[20].lat, longitude: 8, latitudeDelta: 0.2 / M_PER_DEG, longitudeDelta: 0.2 / M_PER_DEG }); });
+ expect(grouped()).toBe(false);
 });

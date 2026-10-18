@@ -1,3 +1,4 @@
+import * as turnFusion from '../../utils/turnFusion';
 import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, revokeDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
 // Sessiongebundener Lay-Processor: Foreground-Parität mit dem ORIGINALEN
 // useTrackRecorder (b6bc114) und explizite, testbare Ergebnisse — ohne React.
@@ -238,4 +239,20 @@ it('joins private QA indices to their actual detector section without joining pr
   for (const row of rows) {
     expect(detector[row.apexIndex].t! - run.session.qaOriginRef.current!.t).toBe(row.evaluatedAtMs);
   }
+});
+
+// Candidate selection may move to a neighbouring apex as more evidence arrives.
+// Reproduce across separate processor evaluations, not just one offline sweep.
+it('commits a normal corner only once when a later evaluation moves its apex within the existing 2 m exclusion', () => {
+  let calls = 0;
+  const spy = jest.spyOn(turnFusion, 'fuseTurns').mockImplementation(() => {
+    const atM = [10, 11.3, 14][Math.min(calls++, 2)];
+    return { corners: [{ kind: 'rechts', atM, apexIndex: 0 }], diagnostics: [], turns: [] } as unknown as ReturnType<typeof turnFusion.fuseTurns>;
+  });
+  try {
+    const run = runScenario(scenarios.find(s => s.name === 'right90 current')!);
+    expect(calls).toBeGreaterThan(2);
+    expect(run.markers.map(m => m.distance_from_start)).toEqual([10, 14]);
+    expect(run.angles).toEqual(['rechts', 'rechts']);
+  } finally { spy.mockRestore(); }
 });
