@@ -212,9 +212,12 @@ export interface QaSearchDiagnostics {
     referencePosition: { x: number; y: number } | null;
     minSearchDistToEndM: number | null;
     progressAtMinEndDistM: number | null;
-    /** Zeitpunkt (s seit Suchstart), Fortschritt und Search-Distanz beim Ende-Ereignis; null = nicht ausgelöst. */
+    /** Beobachtungsumfang; fehlend bei Altbestand. Resume deckt nur den aktuellen Abschnitt ab. */
+    eventObservation?: 'complete' | 'partial' | 'unknown';
+    /** Zeitpunkt (s seit Suchstart), Fortschritt und Search-Distanz; null = kein Ereignis beobachtet. */
     eventFired: { tSec: number; progressM: number; searchDistanceM: number } | null;
-    eventCount: number;
+    /** null = nicht bestimmbar; 0 nur bei vollständiger Beobachtung ohne Ereignis. */
+    eventCount: number | null;
     hapticFired: boolean | null;
     voiceFired: boolean | null;
     manualStopTSec: number;
@@ -229,6 +232,16 @@ export interface QaSearchDiagnostics {
   /** Immer 'display_only': replay_points ändert keine Metrik. */
   replayRole: 'display_only';
   truncated: { raw: boolean; cursor: boolean };
+}
+
+/** Altbestand darf ein fehlendes QA-Ereignis nicht als bewiesenes Ausbleiben ausweisen. */
+export function normalizeSearchEndDiagnostics(end: QaSearchDiagnostics['end']): QaSearchDiagnostics['end'] {
+  const eventObservation = end.eventObservation ?? 'unknown';
+  return {
+    ...end,
+    eventObservation,
+    eventCount: end.eventFired ? 1 : eventObservation === 'complete' ? 0 : null,
+  };
 }
 
 // ── Geometrie-Hilfen ─────────────────────────────────────────────────────
@@ -301,7 +314,8 @@ export interface BuildSearchDiagnosticsInput {
   objects: { index: number; at: { latitude: number; longitude: number }; atM: number | null; found: boolean | null;
     status?: ReferenceObjectStatus; legIndex: number | null }[];
   cornerAtM: readonly number[];
-  end: { fired: { tSec: number; progressM: number; searchDistanceM: number } | null; hapticFired: boolean | null; voiceFired: boolean | null };
+  end: { fired: { tSec: number; progressM: number; searchDistanceM: number } | null; hapticFired: boolean | null; voiceFired: boolean | null;
+    eventObservation?: QaSearchDiagnostics['end']['eventObservation'] };
   manualStopTSec: number;
 }
 
@@ -429,15 +443,16 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
       truncated: tel.truncated.cursor,
     },
     objects,
-    end: {
+    end: normalizeSearchEndDiagnostics({
       referencePosition: endRel ? { x: round(endRel.x, 3), y: round(endRel.y, 3) } : null,
       minSearchDistToEndM: tel.minDistToEndM == null ? null : round(tel.minDistToEndM),
       progressAtMinEndDistM: tel.progressAtMinEndM == null ? null : round(tel.progressAtMinEndM),
       eventFired: input.end.fired ? { tSec: round(input.end.fired.tSec, 1), progressM: round(input.end.fired.progressM), searchDistanceM: round(input.end.fired.searchDistanceM) } : null,
-      eventCount: input.end.fired ? 1 : 0,
+      eventObservation: input.end.eventObservation === 'complete' && input.resumed ? 'partial' : input.end.eventObservation,
+      eventCount: null,
       hapticFired: input.end.hapticFired, voiceFired: input.end.voiceFired,
       manualStopTSec: round(input.manualStopTSec, 1),
-    },
+    }),
     parity: {
       toleranceM: tol, turnCount: turns.length,
       turnPreservedCountRun: preservedRun, turnPreservedCountReplay: preservedReplay, turns,
@@ -471,7 +486,7 @@ export function summarizeSearchDiagnostics(d: QaSearchDiagnostics) {
       finalNormalizedProgress: d.cursor.samples.at(-1)?.normalizedProgress ?? null,
     },
     objects: { referenceCount: d.objects.length, items: d.objects },
-    end: d.end,
+    end: normalizeSearchEndDiagnostics(d.end),
   };
 }
 

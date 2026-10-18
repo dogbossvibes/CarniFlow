@@ -116,6 +116,17 @@ describe.each(['ios', 'android'] as const)('End/final object shared lifecycle (%
     expect(endFired).toHaveBeenCalledTimes(1);
   });
 
+  it('G7-like proximity of 0.88 m while moving is not a confirmed object indication', async () => {
+    await mount({ guidance: true }); resume(55);
+    feed(55, 1); feed(57, 1);
+    for (let i = 0; i < 8; i++) feed(59.12, 1);
+    expect(rec.foundObjects).toBe(0);
+    expect(mockNoteAutoDwell).not.toHaveBeenCalled();
+    let statuses: string[] = [];
+    act(() => { statuses = rec.stop().objectStatuses; });
+    expect(statuses).toEqual(['missed', 'missed']);
+  });
+
   it('manual confirmation releases the final-object wait without needing another fix', async () => {
     await mount(); resume(); feed(60);
     expect(rec.activeObjectWait).toBe(true);

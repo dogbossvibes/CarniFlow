@@ -2,6 +2,7 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "track.markerGroup.title": "Markers in this area",
   "track.angleList.title": "Turns and directions",
   "track.angleList.hint": "Saved markers on the laid track. Tap to view details.",
   "track.angleList.empty": "No turn markers saved.",

@@ -1,3 +1,4 @@
+import { buildSearchEventArcs } from './canonicalArc';
 import { attachSpecialGeometry, projectAngleMarkers, type SpecialGeometry } from './specialAngleGeometry';
 import { hasTransferredGaps, transferGapPoints } from '@/features/tracking-transfer/androidGapSafety';
 import { selectDisplayRunPoints } from '@/features/tracking/utils/searchDisplayGeometry';
@@ -8,13 +9,14 @@ import type { AngleKind, MarkerType, MarkerMaterial } from '@/features/tracking/
 //   • gelegte Linie   = points(point_type='lay')
 //   • abgesuchte Linie = runs[0].run_points
 //   • Marker          = markers[] mit gespeichertem angle_kind / material /
-//                       distance_from_start / note (KEINE Neuberechnung aus der Polyline)
+//                       note; Meterzuordnung auf derselben Referenzlinie wie die Absuche
 //   • Start / Ende    = erster / letzter gelegter Punkt (gespeicherte Endpunkte)
-// So entspricht die historische Darstellung exakt dem, was beim Legen gespeichert wurde.
+// Geometrie und Markertyp bleiben erhalten; gespeicherte Datensätze werden nicht verändert.
 
-export interface DetailLatLng { lat: number; lng: number; breakBefore?: boolean }
+export interface DetailLatLng { lat: number; lng: number; breakBefore?: boolean; timestamp?: string }
 
 export interface DetailMarker extends SpecialGeometry {
+  createdAt?: string;
   id: string;
   type: MarkerType;
   lat: number | null;
@@ -40,12 +42,12 @@ export interface TrackDetailMap {
 
 export function buildTrackDetailMap(data: unknown): TrackDetailMap {
   const d = (data ?? {}) as {
-    points?: { latitude: number; longitude: number; point_type?: string | null }[];
+    points?: { latitude: number; longitude: number; point_type?: string | null; breakBefore?: boolean; timestamp?: string }[];
     runs?: { run_points?: { lat: number; lng: number }[] }[];
     markers?: {
       id: unknown; marker_type: MarkerType; latitude?: number | null; longitude?: number | null;
       angle_kind?: AngleKind | null; material?: MarkerMaterial | null;
-      distance_from_start?: number | null; note?: string | null;
+      distance_from_start?: number | null; note?: string | null; created_at?: string;
     }[];
     track_data?: { manualAngleGeometry?: unknown };
     distance_meters?: number | null;
@@ -53,7 +55,7 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
 
   const lay: DetailLatLng[] = hasTransferredGaps(data) ? transferGapPoints(data) : (d.points ?? [])
     .filter((p) => (p.point_type ?? 'lay') === 'lay')
-    .map((p) => ({ lat: p.latitude, lng: p.longitude }));
+    .map((p) => ({ lat: p.latitude, lng: p.longitude, ...(p.timestamp ? { timestamp: p.timestamp } : {}) }));
 
   // Darstellung der Absuche: turn-aware `replay_points`, sonst `run_points` (Legacy).
   const run: DetailLatLng[] = selectDisplayRunPoints(data).points
@@ -61,16 +63,29 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
 
   const rawMarkers = d.markers ?? [];
   const sourceMarkers = projectAngleMarkers(attachSpecialGeometry(rawMarkers.map(m => ({ ...m, id: String(m.id), type: m.marker_type, angleKind: m.angle_kind, lat: m.latitude ?? null, lng: m.longitude ?? null })), d.track_data?.manualAngleGeometry));
+  // One existing, time-aware reference for detail/list/leg placement and Search.
+  // Keep historical stored values untouched; missing geometry retains its explicit fallback.
+  // The legacy Android Search engine cannot project across gaps. Keep its transfer
+  // gate and display missing event metres rather than invent a connecting path.
+  const unsupportedGaps = hasTransferredGaps(data) || (d.points ?? []).some(p => p.breakBefore);
+  const arcs = unsupportedGaps ? Object.fromEntries(sourceMarkers.map(m => [m.id, { arcM: null }])) : buildSearchEventArcs(sourceMarkers.map(m => ({
+    id: m.id, lat: m.lat, lng: m.lng, distance_from_start: m.distance_from_start,
+    t: m.created_at ? Date.parse(m.created_at) : null,
+  })), (d.points ?? []).filter(p => (p.point_type ?? 'lay') === 'lay')
+    .map(p => ({ latitude: p.latitude, longitude: p.longitude, breakBefore: p.breakBefore,
+      t: p.timestamp ? Date.parse(p.timestamp) : null })));
   const cornerDistances = sourceMarkers
     .filter(marker => marker.marker_type === 'winkel' && marker.angle_kind !== 'absatz' && marker.angle_kind !== 'abriss')
-    .map(marker => marker.distance_from_start ?? 0);
+    .map(marker => arcs[marker.id].arcM)
+    .filter((distance): distance is number => distance != null && Number.isFinite(distance));
   let nextObjectIndex = 0;
   const markers: DetailMarker[] = sourceMarkers.map((m) => {
     const isNumberedObject = m.marker_type === 'gegenstand' && m.material !== 'duebel';
     const objectIndex = isNumberedObject ? ++nextObjectIndex : null;
-    const distance = m.distance_from_start ?? null;
+    const distance = arcs[m.id].arcM;
     return {
       id: String(m.id),
+      ...(m.created_at ? { createdAt: m.created_at } : {}),
       geometryDirection: m.geometryDirection, geometrySharpness: m.geometrySharpness, geometrySource: m.geometrySource,
       type: m.marker_type,
       lat: m.latitude ?? null,

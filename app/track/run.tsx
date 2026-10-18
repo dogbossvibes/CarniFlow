@@ -241,6 +241,8 @@ export default function TrackRunScreen() {
   const startedRef = useRef(false);
   const runIdRef = useRef<string | null>(null);
   const searchStartMsRef = useRef<number | null>(null);   // Suchzeit-Start (für lokale Run-Finalisierung)
+  const endEventRef = useRef<{ tSec: number; progressM: number; searchDistanceM: number; voice: boolean } | null>(null);
+  const endEventObservationRef = useRef<'complete' | 'partial' | 'unknown'>('unknown');
   const segmentAnnouncementRef = useRef<Record<string, SearchSegmentAnnouncementState>>({});
   // Off-Track-Übergänge (Feedback nur auf echten State-Wechseln); wird bei Resume aus
   // dem Search-Recovery-State geseedet (siehe resumeSearch), bei Discard zurückgesetzt.
@@ -400,6 +402,8 @@ export default function TrackRunScreen() {
       language: speechLanguage(i18n.language as never), priority: 2,
       onceKey: 'search-started', phase: 'search' });
     const startMs = Date.now();
+    endEventRef.current = null;
+    endEventObservationRef.current = 'complete';
     searchStartMsRef.current = startMs;
     // Stabile client-Run-UUID SOFORT (führende Run-ID, kein Warten auf Supabase).
     // Wird via setSearchRunId in den PendingTrack persistiert → überlebt App-Kill/Recovery.
@@ -541,6 +545,9 @@ export default function TrackRunScreen() {
     const rid = transferredRun ?? pending.runId ?? Crypto.randomUUID();
     runIdRef.current = rid;
     useTrackingStore.getState().setSearchRunId(rid);
+    endEventRef.current = null;
+    // Auch eine Recovery ohne gespeicherte Punkte ist nur teilweise beobachtet.
+    endEventObservationRef.current = 'partial';
     searchStartMsRef.current = pending.searchStartedAt ?? Date.now();
     startedRef.current = true;   // verhindert den frischen Start-Effect
     setRecovery(null);
@@ -728,24 +735,23 @@ export default function TrackRunScreen() {
   const acceptedHandlerDistanceToEndM = s.endHandlerFix && endPoint ? haversineM(s.endHandlerFix.position, endPoint) : null;
   const lastSegmentReached = s.trackLengthM > 0 && s.progressM / s.trackLengthM >= 0.75
     && acceptedHandlerDistanceToEndM != null && acceptedHandlerDistanceToEndM <= 5;
-  // QA (rein beobachtend): Zustand beim einmaligen Ende-Ereignis festhalten. Die
+  // Support und QA (rein beobachtend): das tatsächliche Ende-Ereignis festhalten. Die
   // Ende-Logik selbst (useTrackEndGuidance/stepTrackEnd) bleibt unverändert; Haptik
   // und Voice feuern im selben Tick wie `onFired` (siehe useTrackEndGuidance).
   const sLatestRef = useRef(s);
   sLatestRef.current = s;
   const voiceOnRef = useRef(voiceOn);
   voiceOnRef.current = voiceOn;
-  const qaEndRef = useRef<{ tSec: number; progressM: number; searchDistanceM: number; voice: boolean } | null>(null);
   const noteEndFired = useCallback(() => {
     useTrackingStore.getState().noteSearchEndFired();
     sLatestRef.current.confirmEnd();
-    if (isQaDiagnosticsEnabled() && !qaEndRef.current) {
+    if (!endEventRef.current) {
       const st = sLatestRef.current;
-      qaEndRef.current = {
+      endEventRef.current = {
         tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
         progressM: st.dogProgressM, searchDistanceM: st.distanceM, voice: voiceOnRef.current,
       };
-      if (endConfirmationRef.current) endConfirmationRef.current.confirmationTSec = qaEndRef.current.tSec;
+      if (endConfirmationRef.current) endConfirmationRef.current.confirmationTSec = endEventRef.current.tSec;
     }
   }, []);
   const openMandatoryObjects = Math.max(0, s.totalObjects - s.foundObjects);
@@ -819,14 +825,14 @@ export default function TrackRunScreen() {
       finalObjectGraceEndedTSec: finalObjectGraceQaRef.current.endedAtMs == null || searchStartMsRef.current == null ? null
         : Math.max(0, (finalObjectGraceQaRef.current.endedAtMs - searchStartMsRef.current) / 1000),
       finalObjectGraceReason: finalObjectGraceQaRef.current.reason,
-      confirmationTSec: endConfirmationRef.current?.confirmationTSec ?? qaEndRef.current?.tSec ?? null,
+      confirmationTSec: endConfirmationRef.current?.confirmationTSec ?? endEventRef.current?.tSec ?? null,
       rejectionReason: blockerReason,
     };
     const recorded = boundedPush(endQaRef.current, { tSec: (Date.now() - (searchStartMsRef.current ?? Date.now())) / 1000,
       handlerProgressM: s.progressM, dogProjectedProgressM: s.dogProgressM,
       configuredDogLeadM: searchHandlerDistanceM, handlerDistanceToEndM, dogDistanceToEndM,
       activeObjectWait: s.activeObjectWait, endEligible: blockerReason == null, blockerReason,
-      eventFiredTSec: qaEndRef.current?.tSec ?? null }, TRACKING_UX_QA_LIMITS.end);
+      eventFiredTSec: endEventRef.current?.tSec ?? null }, TRACKING_UX_QA_LIMITS.end);
     if (!recorded) endQaTruncatedRef.current = true;
   }, [searchGuidanceActive, s.progressM, s.dogProgressM, s.endHandlerFix, s.estimatedDogPosition,
     s.trackLengthM, endPoint, openMandatoryObjects, s.activeObjectWait, searchHandlerDistanceM,
@@ -982,7 +988,7 @@ export default function TrackRunScreen() {
       positionAccuracyM: m.accuracy,
       legIndex: 1 + cornerInputs.filter(corner => corner.atM <= (snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start)).length,
     }));
-    // QA-Search-Diagnose (nur QA-Modus, rein beobachtend, best-effort): Ströme,
+    // Support-/QA-Search-Diagnose (rein beobachtend, best-effort): Ströme,
     // Cursor-Samples, Gegenstände, Ende, Replay-Parität → eigener QA-Speicher.
     // Verändert weder `res` noch Analytics/Score/Distanz.
     if (res.qa && sessId && snapData.laidPoints.length) {
@@ -1019,7 +1025,7 @@ export default function TrackRunScreen() {
             atM: o.atM ?? null, found: o.found ?? null, status: res.objectStatuses[i], legIndex: o.legIndex ?? null,
           })),
           cornerAtM: cornerInputs.map(c => c.atM),
-          end: { fired: qaEndRef.current, hapticFired: qaEndRef.current ? true : null, voiceFired: qaEndRef.current ? qaEndRef.current.voice : null },
+          end: { eventObservation: endEventObservationRef.current, fired: endEventRef.current, hapticFired: endEventRef.current ? true : null, voiceFired: endEventRef.current ? endEventRef.current.voice : null },
           manualStopTSec: stopSec,
         });
         // Interner QA-Speicher nur im QA-Modus (unverändert); die privacy-reduced Support-Diagnose

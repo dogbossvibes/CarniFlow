@@ -204,8 +204,8 @@ export default function TrackAuswertungScreen() {
 
   const map = useMemo(() => {
     if (!data) return null;
-    // Logbuch-Kartenmodell ausschließlich aus gespeicherten Daten (keine Winkel-/
-    // Marker-Neuberechnung); reine Funktion buildTrackDetailMap.
+    // Gespeicherte Geometrie und Markertypen bleiben erhalten; die angezeigten
+    // Meter liegen auf derselben Referenzlinie wie bei der Absuche.
     const detail = buildTrackDetailMap(data);
     const markers: MapMarker[] = detail.markers.map(m => ({ ...m }));
     const segments = coerceTrackSegments(data.track_data?.segments);
@@ -730,7 +730,7 @@ export default function TrackAuswertungScreen() {
                   distractionTracks={distractionTracks}
                   layColor={layColor}
                   layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
-                  startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
+                  startAnchor={map.start} endPoint={map.end} endTotalDistanceM={map.totalDistanceM} fitToPoints={map.fitPoints}
                   onStartPress={() => setDetailSel({ kind: 'start' })}
                   onMarkerPress={(m) => setDetailSel({ kind: 'marker', marker: m })}
                   onEndPress={() => setDetailSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
@@ -917,7 +917,7 @@ export default function TrackAuswertungScreen() {
                   distractionTracks={distractionTracks}
                   layColor={layColor}
                 layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
-                startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
+                startAnchor={map.start} endPoint={map.end} endTotalDistanceM={map.totalDistanceM} fitToPoints={map.fitPoints}
                 fitToTrackToken={fullscreenFitToken}
                 onStartPress={() => setFullscreenSel({ kind: 'start' })}
                 onMarkerPress={(m) => setFullscreenSel({ kind: 'marker', marker: m })}

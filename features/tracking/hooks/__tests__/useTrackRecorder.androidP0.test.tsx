@@ -1,3 +1,4 @@
+import * as turnFusion from '../../utils/turnFusion';
 
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
@@ -269,4 +270,21 @@ it.each(['bw','ow','gw','abriss'] as const)('finish preserves %s direction and e
  expect(useTrackingStore.getState().markers[1]).toMatchObject({angleKind,geometryDirection:'links',geometrySource:'manual'});
  expect(finalizeLocalTrainingSession).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({articlesTotal:1,cornersTotal:angleKind==='abriss'?0:1,manualAngleGeometry:[expect.objectContaining({manualMarkerType:angleKind,geometryDirection:'links'})]}));
  expect(createLocalTrackMarker).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({sourceMarkerId:markerIds[1],geometryDirection:'links',geometrySource:'manual'}));
+});
+
+
+it('does not announce a shifted ordinary GPS apex twice across live callbacks', async () => {
+  let calls = 0;
+  const spy = jest.spyOn(turnFusion, 'fuseTurns').mockImplementation(() => ({
+    corners: [{ kind: 'rechts', atM: [10, 11.3, 14][Math.min(calls++, 2)], apexIndex: 0 }],
+    diagnostics: [], turns: [], imuOnly: [],
+  }) as unknown as ReturnType<typeof turnFusion.fuseTurns>);
+  try {
+    await start();
+    for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+    for (let i = 0; i < 40; i++) feed(1500 + i * 1000, 5, 10 + i * 2, 1);
+    await act(settle);
+    expect(calls).toBeGreaterThan(2);
+    expect(useTrackingStore.getState().markers.filter(m => m.type === 'winkel').map(m => m.distance_from_start)).toEqual([10, 14]);
+  } finally { spy.mockRestore(); }
 });

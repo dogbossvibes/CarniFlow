@@ -45,7 +45,10 @@ it('handles remote timestamp gap metadata, search gaps and original ordinary row
   expect(hasTransferredGaps(detail)).toBe(true); expect(JSON.stringify(detail)).toBe(before);
   expect(hasTransferredGaps({ ...detail, track_data: {} })).toBe(false);
   expect(hasTransferredGaps({ transferReceipt: fixture.accept.receipt, searchPoints: [{ breakBefore: true }] })).toBe(true);
-  expect(buildTrackDetailMap({ points: detail.points }).lay).toEqual([{ lat: 1, lng: 2 }, { lat: 2, lng: 3 }]);
+  expect(buildTrackDetailMap({ points: detail.points }).lay).toEqual([
+    { lat: 1, lng: 2, timestamp: new Date(1000).toISOString() },
+    { lat: 2, lng: 3, timestamp: new Date(2000).toISOString() },
+  ]);
 });
 
 it('never renders a previous account reference in the read-only fallback', () => {

@@ -1,3 +1,5 @@
+import { groupMapFeatures } from '../utils/mapMarkerGroups';
+import { MarkerDetailSheet, describeSelection, type TrackDetailItem, type TrackDetailSelection } from './MarkerDetailSheet';
 import { ParentReferenceLines } from '@/features/tracking-distractions/ParentReferenceLines';
 import { specialAngleBadge } from '../utils/specialAngleGeometry';
 import type { DistractionTrack } from '@/features/tracking-distractions/model';
@@ -50,9 +52,9 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // stabile ID sorgen dafür, dass der Marker NICHT bei jedem GPS-Fix neu erzeugt wird
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress }: {
+export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress, accessibilityLabel }: {
   Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder';
-  label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void;
+  label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void; accessibilityLabel?: string;
 }) {
   const [track, setTrack] = useState(true);
   useEffect(() => { setTrack(true); const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, [kind, label, acute, duebel, color]);
@@ -75,13 +77,13 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
     </View>
   );
   else if (kind === 'angle') child = <View style={[s.angleBadge, acute && s.angleBadgeAcute]}><Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text></View>;
-  else if (kind === 'object') child = <View style={[s.objectBadge, duebel && s.objectBadgeDuebel]}><Text style={[s.objectBadgeTxt, duebel && s.objectBadgeTxtDuebel]}>{label}</Text></View>;
+  else if (kind === 'object') child = <View style={[s.objectBadge, duebel && s.objectBadgeDuebel, label && label.length > 3 ? { width: 'auto', minWidth: 44, minHeight: 44, paddingHorizontal: 8 } : null]}><Text style={[s.objectBadgeTxt, duebel && s.objectBadgeTxtDuebel]}>{label}</Text></View>;
   // Dübel = ROTER ZYLINDER (keine G-Nummer): solid gefüllter Körper + Deckel-Ellipse.
   // Solide Füllflächen werden von react-native-maps zuverlässig gezeichnet (kein
   // leeres Border-View wie beim Abriss-Bug).
   else if (kind === 'cylinder') child = <View style={s.cylBody}><View style={s.cylTop} /></View>;
   else child = <View style={[s.markerDot, { backgroundColor: color }]} />;
-  return <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track} onPress={onPress}>{child}</Marker>;
+  return <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track} onPress={onPress} accessibilityLabel={accessibilityLabel ?? label} accessibilityRole={onPress ? "button" : undefined}>{child}</Marker>;
 });
 
 interface Props {
@@ -111,6 +113,7 @@ interface Props {
   dimLay?:          boolean;    // DEPRECATED/ignoriert: gelegte Fährte ist während der Absuche jetzt immer solide Mint (Prod-Bugfix). Prop bleibt für Aufrufer-Kompatibilität.
   startAnchor?:     LatLng | null;   // stabilisierter Startpunkt → Fähnchen (statt erstem Rohpunkt)
   endPoint?:        LatLng | null;   // gespeichertes Fährtenende (letzter gelegter Punkt) → Ziel-Fähnchen
+  endTotalDistanceM?: number | null;
   fitToPoints?:     LatLng[];        // Logbuch/Detail: initialer Ausschnitt über alle gespeicherten Punkte, genau einmal
   fitToTrackToken?: number;          // expliziter Refit aus der historischen Vollbildkarte
   onStartPress?:    () => void;      // Tap auf Start-Fähnchen (Logbuch-Detail „Start")
@@ -143,7 +146,7 @@ interface Props {
 const EMPTY_MARKERS: MapMarker[] = [];
 
 export function TrackingMap({
-  layPoints, mainReferencePoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  layPoints, mainReferencePoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -233,10 +236,28 @@ export function TrackingMap({
   // Höhe/Region ab Mount messen, sobald der Maßstab angefordert ist — auch wenn die
   // Referenzlinie erst später kommt (run.tsx lädt den Snapshot nach dem Mount; ein
   // erst dann angehängtes onLayout feuert nie → Höhe 0 → Maßstab dauerhaft 'off').
-  const scaleRequested = distanceScaleLine !== undefined || showMapScale;
+  const scaleRequested = distanceScaleLine !== undefined || showMapScale || markerList.length > 0;
   const [scaleRegion, setScaleRegion] = useState<ScaleRegion | null>(null);
   const [mapHeightPt, setMapHeightPt] = useState(0);
   const [mapWidthPt, setMapWidthPt] = useState(0);
+  const [groupSelection, setGroupSelection] = useState<TrackDetailSelection | null>(null);
+  const markerGroups = useMemo(() => {
+    const features: { key: string; lat: number; lng: number; label: string; selection: TrackDetailItem }[] = markerList.map((marker, index) => ({
+      key: `marker:${index}`, lat: marker.lat!, lng: marker.lng!,
+      label: marker.type === 'winkel' ? marker.angleKind === 'abriss' && marker.geometryDirection !== 'links' && marker.geometryDirection !== 'rechts' ? '×' : specialAngleBadge(marker) ?? ANGLE_SHORT[marker.angleKind!] ?? '∠'
+        : marker.type === 'gegenstand' ? marker.material === 'duebel' ? t('track.materialDowel') : `G${marker.objectIndex ?? objectNo.get(index) ?? ''}`
+        : describeSelection({ kind: 'marker', marker }, t).title,
+      selection: { kind: 'marker', marker: marker.type === 'gegenstand' && marker.material !== 'duebel'
+        ? { ...marker, objectIndex: marker.objectIndex ?? objectNo.get(index) } : marker },
+    }));
+    const startPosition = startAnchor ?? layPoints[0];
+    if (startPosition) features.push({ key: 'start', ...startPosition, label: t('track.startFlag'), selection: { kind: 'start' } });
+    if (endPoint) features.push({ key: 'end', ...endPoint, label: t('track.endFlag'), selection: { kind: 'end',
+      totalDistanceM: endTotalDistanceM ?? null } });
+    const ptPerM = pointsPerMeter(scaleRegion?.latitudeDelta ?? 0.0016, mapHeightPt);
+    return groupMapFeatures(features, ptPerM > 0 ? 34 / ptPerM : 1.5).filter(group => group.length > 1);
+  }, [markerList, objectNo, startAnchor, endPoint, endTotalDistanceM, layPoints, scaleRegion?.latitudeDelta, mapHeightPt, t]);
+  const groupedKeys = useMemo(() => new Set(markerGroups.flatMap(group => group.map(feature => feature.key))), [markerGroups]);
   const { scale: barScale, refresh: refreshMapScale, onRegionChange: updateMovingMapScale } = useMapScaleBar({ mapRef, enabled: showMapScale, ready: mapReady, width: mapWidthPt, height: mapHeightPt, bottom: mapScaleBottom });
   const onScaleRegion = useCallback((r: ScaleRegion) => {
     setScaleRegion(prev => (scaleRegionChanged(prev, r) ? r : prev));
@@ -295,7 +316,7 @@ export function TrackingMap({
   return (
     <View
       style={[StyleSheet.absoluteFill, style]}
-      onLayout={scaleRequested ? e => { setMapHeightPt(e.nativeEvent.layout.height); setMapWidthPt(e.nativeEvent.layout.width); } : undefined}
+      onLayout={e => { setMapHeightPt(e.nativeEvent.layout.height); setMapWidthPt(e.nativeEvent.layout.width); }}
     >
       <MapView
         ref={mapRef}
@@ -382,7 +403,7 @@ export function TrackingMap({
         ))}
 
         {/* Startpunkt: stabilisierter Anker → Fähnchen; sonst (Auswertung/Legacy) der schlichte Punkt. */}
-        {startAnchor ? (
+        {!groupedKeys.has('start') && (startAnchor ? (
           <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={onStartPress}>
             <View style={s.startFlagWrap}>
               <View style={[s.startFlag, { backgroundColor: layColor }]}><Ionicons name="flag" size={12} color="#04110F" /></View>
@@ -393,11 +414,11 @@ export function TrackingMap({
           <Marker coordinate={{ latitude: start.lat, longitude: start.lng }} anchor={{ x: 0.5, y: 0.5 }} onPress={onStartPress}>
             <View style={[s.startDot, { backgroundColor: layColor }]} />
           </Marker>
-        ) : null}
+        ) : null)}
 
         {/* Fährtenende: gespeicherter Endpunkt (letzter gelegter Punkt) → Ziel-Fähnchen,
             optisch klar vom (grünen) Startpunkt unterscheidbar. */}
-        {endPoint && (
+        {endPoint && !groupedKeys.has('end') && (
           <Marker coordinate={{ latitude: endPoint.lat, longitude: endPoint.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} onPress={onEndPress}>
             <View style={s.endFlagWrap}>
               <View style={s.endFlag}><Ionicons name="flag" size={12} color="#fff" /></View>
@@ -410,6 +431,7 @@ export function TrackingMap({
             neutrales Quadrat-Badge (G1, G2 …), Abriss = Kästchen. Klar getrennt.
             Über PinMarker (memo + stabile ID) bleiben sie dauerhaft sichtbar. */}
         {markerList.map((m, i) => {
+          if (groupedKeys.has(`marker:${i}`)) return null;
           const lat = m.lat as number, lng = m.lng as number;
           const key = m.id ?? `mk-${i}`;
           // Logbuch: Tap auf einen gespeicherten Marker öffnet die Detailanzeige.
@@ -430,6 +452,12 @@ export function TrackingMap({
           }
           return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} onPress={onPress} />;
         })}
+
+        {markerGroups.map(group => <PinMarker key={group.map(feature => feature.key).join('|')}
+          Marker={Marker} lat={group[0].lat} lng={group[0].lng} kind="object"
+          label={`${group.slice(0, 3).map(feature => feature.label).join(' · ')}${group.length > 3 ? ` +${group.length - 3}` : ''}`}
+          accessibilityLabel={group.map(feature => describeSelection(feature.selection, t).title).join(', ')}
+          onPress={() => setGroupSelection({ kind: 'group', items: group.map(feature => feature.selection) })} />)}
 
         {/* Abriss-Marker (Ausarbeiten): rotes Kreuz-Symbol */}
         {(breaks ?? []).map((b, i) => (
@@ -458,6 +486,7 @@ export function TrackingMap({
           </Marker>
         )}
       </MapView>
+      <MarkerDetailSheet selection={groupSelection} onClose={() => setGroupSelection(null)} />
 
       {showMapScale && mapHeightPt - mapScaleBottom >= 100 && <MapScaleBar scale={barScale} bottom={mapScaleBottom} onHeightChange={onMapScaleHeightChange} />}
 

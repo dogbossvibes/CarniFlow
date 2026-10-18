@@ -14,17 +14,22 @@ export function buildParentReference(detail: unknown, ownerId: string, id: strin
  if (!ownerId || d.type !== 'track' || d.owner_id !== ownerId || d.id !== id || typeof d.dog_id !== 'string' || !d.dog_id
    || d.deleted_at || d.status !== 'completed' || !Array.isArray(d.points) || d.points.length > 100000)
   throw new DistractionError('PARENT_UNAVAILABLE');
- const map = buildTrackDetailMap({ ...d, runs: [], track_data: null });
  // Independent read-only reference: Android's legacy detail map drops lay gaps.
  // Restore only recorded boundaries, never infer a connection or mutate the source.
  const sourcePoints = d.points.map(object).filter(p => (p.point_type ?? 'lay') === 'lay');
  if (sourcePoints.some(p => !coordinate(p.latitude, 90) || !coordinate(p.longitude, 180)))
   throw new DistractionError('PARENT_UNAVAILABLE');
- map.lay = restoreLayContinuity(sourcePoints.map(p => ({
+ const restored = restoreLayContinuity(sourcePoints.map(p => ({
   lat: p.latitude as number, lng: p.longitude as number, breakBefore: p.breakBefore === true,
   timestamp: typeof p.timestamp === 'string' ? p.timestamp : undefined,
   payload_json: typeof p.payload_json === 'string' ? p.payload_json : undefined,
- })), object(d.track_data).layContinuity).map(p => ({ lat: p.lat, lng: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) }));
+ })), object(d.track_data).layContinuity);
+ // Resolve persisted boundaries before assigning event metres; the cache must
+ // use the same geometry as the first load.
+ const map = buildTrackDetailMap({ ...d, runs: [], track_data: null,
+  points: sourcePoints.map((p, i) => ({ ...p, breakBefore: restored[i].breakBefore === true })),
+ });
+ map.lay = restored.map(p => ({ lat: p.lat, lng: p.lng, ...(p.timestamp ? { timestamp: p.timestamp } : {}), ...(p.breakBefore ? { breakBefore: true } : {}) }));
  map.start = map.lay[0] ?? null;
  map.end = map.lay.at(-1) ?? null;
  map.hasLay = map.lay.length > 1;
@@ -42,8 +47,8 @@ export function parseParentReference(value: unknown, ownerId: string, id: string
  const v = object(value), map = object(v.map);
  if (v.version !== 1 || v.id !== id || v.ownerId !== ownerId || !Array.isArray(map.lay) || !Array.isArray(map.markers)) throw new DistractionError('PARENT_UNAVAILABLE');
  return buildParentReference({ id, type: 'track', owner_id: ownerId, dog_id: v.dogId, status: 'completed', started_at: v.date, distance_meters: v.distanceM,
-  points: map.lay.map(p => { const point = object(p); return { latitude: point.lat, longitude: point.lng, point_type: 'lay', breakBefore: point.breakBefore === true }; }),
+  points: map.lay.map(p => { const point = object(p); return { latitude: point.lat, longitude: point.lng, point_type: 'lay', breakBefore: point.breakBefore === true, timestamp: typeof point.timestamp === 'string' ? point.timestamp : undefined }; }),
   markers: map.markers.map(m => { const marker = object(m); return { id: marker.id, marker_type: marker.type, latitude: marker.lat, longitude: marker.lng,
-   angle_kind: marker.angleKind, material: marker.material, distance_from_start: marker.distanceFromStart, note: marker.note }; }),
+   angle_kind: marker.angleKind, material: marker.material, distance_from_start: marker.distanceFromStart, note: marker.note, created_at: typeof marker.createdAt === 'string' ? marker.createdAt : undefined }; }),
  }, ownerId, id);
 }

@@ -1,3 +1,4 @@
+import { buildArc, projectForward } from '../searchGeometry';
 import { readFileSync } from 'fs';
 import { buildTrackDetailMap } from '@/features/tracking/utils/trackDetailMap';
 
@@ -47,8 +48,16 @@ describe('buildTrackDetailMap — Logbuch aus gespeicherten Daten', () => {
   });
 
   it('normaler Winkel links/rechts wird 1:1 aus angle_kind gemappt', () => {
-    expect(m.markers[0]).toMatchObject({ type: 'winkel', angleKind: 'links', distanceFromStart: 40 });
-    expect(m.markers[1]).toMatchObject({ type: 'winkel', angleKind: 'rechts', distanceFromStart: 80 });
+    expect(m.markers[0]).toMatchObject({ type: 'winkel', angleKind: 'links', distanceFromStart: expect.any(Number) });
+    expect(m.markers[1]).toMatchObject({ type: 'winkel', angleKind: 'rechts', distanceFromStart: expect.any(Number) });
+  });
+
+  it('marker metres follow the actual saved line rather than the old detector scale', () => {
+    const line = savedTrack.points.filter(p => p.point_type === 'lay');
+    const arc = buildArc(line);
+    savedTrack.markers.forEach((marker, i) => {
+      expect(m.markers[i].distanceFromStart).toBeCloseTo(projectForward(marker, line, arc.cum, 0, arc.total, 0).atM, 6);
+    });
   });
 
   it('Spitzwinkel links/rechts werden 1:1 aus angle_kind gemappt', () => {
@@ -57,7 +66,7 @@ describe('buildTrackDetailMap — Logbuch aus gespeicherten Daten', () => {
   });
 
   it('Gegenstand mit Material + Note wird gemappt', () => {
-    expect(m.markers[4]).toMatchObject({ type: 'gegenstand', material: 'leder', distanceFromStart: 210, note: 'Handschuh', objectIndex: 1, legIndex: 5 });
+    expect(m.markers[4]).toMatchObject({ type: 'gegenstand', material: 'leder', distanceFromStart: expect.any(Number), note: 'Handschuh', objectIndex: 1, legIndex: 5 });
   });
 
   it('13+14) historische Materialien fehlen optional, drei Objekte bleiben G1/G2/G3', () => {

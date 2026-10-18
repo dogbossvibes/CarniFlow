@@ -38,3 +38,20 @@ it.each(['direct', 'payload', 'timestamp'] as const)('preserves %s boundaries th
 it('rejects an invalid coordinate rather than deleting it and connecting its neighbours', () => {
  expect(() => buildParentReference({...detail(),points:[detail().points[0],{latitude:NaN,longitude:8,breakBefore:true},detail().points[1]]},'owner','main')).toThrow('PARENT_UNAVAILABLE');
 });
+
+
+it('retains the recorded time axis when a returning-leg reference is loaded from cache', () => {
+ const t0 = Date.UTC(2020, 0, 1);
+ const xy = (y: number, ms: number) => ({ latitude: y / 111320, longitude: 0, point_type: 'lay', timestamp: new Date(t0 + ms).toISOString() });
+ const d = { ...detail(), points: [xy(0, 0), xy(10, 10000), xy(0, 20000)], markers: [
+  { id: 'late-angle', marker_type: 'winkel', angle_kind: 'rechts', latitude: 1 / 111320, longitude: 0,
+   distance_from_start: 400, created_at: new Date(t0 + 19000).toISOString() },
+ ] };
+ const original = JSON.stringify(d);
+ const ref = buildParentReference(d, 'owner', 'main');
+ expect(ref.map.markers[0].distanceFromStart).toBeCloseTo(19, 0);
+ const cached = parseParentReference(JSON.parse(JSON.stringify(ref)), 'owner', 'main');
+ expect(cached.map.markers[0].distanceFromStart).toBeCloseTo(19, 0);
+ expect(cached).toEqual(ref);
+ expect(JSON.stringify(d)).toBe(original);
+});

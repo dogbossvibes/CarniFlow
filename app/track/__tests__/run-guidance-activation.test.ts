@@ -101,3 +101,22 @@ describe('Pins: Canonical Reference + Search Recovery State unverändert', () =>
     expect(rec).toContain('const LOOKAHEAD_M = 20;');
   });
 });
+
+
+describe('Support-Ende-Ereignis unabhängig vom QA-Modus', () => {
+  it('beobachtet den echten onFired-Callback einmal und verwendet denselben Wert im Export', () => {
+    const callback = block('const noteEndFired =', 'const openMandatoryObjects');
+    expect(callback).toContain('noteSearchEndFired()');
+    expect(callback).toContain('sLatestRef.current.confirmEnd()');
+    expect(callback).toContain('if (!endEventRef.current)');
+    expect(callback).not.toContain('isQaDiagnosticsEnabled');
+    expect(callback).not.toContain('captureLevel');
+    expect(block('const beginSearchNow', 'const handleManualStart')).toContain("endEventObservationRef.current = 'complete'");
+    expect(block('const beginSearchNow', 'const handleManualStart')).toContain('endEventRef.current = null');
+    expect(block('const resumeSearch', 'const endSearch')).toContain("endEventObservationRef.current = 'partial'");
+    expect(block('const resumeSearch', 'const endSearch')).toContain('endEventRef.current = null');
+    expect(block('const trackEndState =', 'const trackEndReached')).toContain('onFired: noteEndFired');
+    expect(run).toContain("eventObservation: endEventObservationRef.current, fired: endEventRef.current");
+    expect(run).toContain("saveQaSearchCapture(sessId, toSupportCapture(diag), 'support')");
+  });
+});

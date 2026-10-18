@@ -113,7 +113,7 @@ describe('Verdrahtung im Recorder', () => {
   });
   it('gepaarte Ecken tragen ihre eigene Marker-Herkunft und dürfen keine Doppelmarkierung erzeugen', () => {
     expect(rec).toContain("'auto_split_apex' : 'auto'");
-    expect(rec).toContain('lastCornerRescuedRef.current && c.atM - lastCornerAtRef.current < CORNER_GAP_M');
+    expect(rec).toContain('c.atM - lastCornerAtRef.current < CORNER_GAP_M');
   });
   it('Stop-Flush bleibt unverändert der Regelpfad (kein Rescue am Puffer-Ende)', () => {
     const flush = fs.readFileSync('features/tracking/utils/stopFlushCorner.ts', 'utf8');

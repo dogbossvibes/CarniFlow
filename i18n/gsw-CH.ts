@@ -5,6 +5,7 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "track.markerGroup.title": "Markierige i däm Bereich",
   "track.angleList.title": "Winkel und Richtige",
   "track.angleList.hint": "Gspeichereti Markierige vo de gleite Fährte. Tippe öffnet d Details.",
   "track.angleList.empty": "Kei Winkelmarkierige gspeicheret.",

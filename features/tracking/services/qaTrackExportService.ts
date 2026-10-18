@@ -129,9 +129,10 @@ export async function buildExportForSession(localId: string): Promise<QaTrackExp
     loadQaSearchCapture(localId).catch(() => null),
     loadQaRecordingEvidence(localId),
   ]);
+  const base = buildQaTrackExport(localId, points, markers, capture, search);
   const exported: QaTrackExport = {
-    ...buildQaTrackExport(localId, points, markers, capture, search),
-    schemaMinor: 10,
+    ...base,
+    schemaMinor: Math.max(base.schemaMinor ?? 0, 10) as QaTrackExport['schemaMinor'],
     recordingEvidence,
     // This runtime uses the original callback pipeline and records no background counters.
     backgroundLayDiagnosticsStatus: 'unavailable',
