@@ -24,6 +24,7 @@ import {
   getTrackingEngineMode, setTrackingEngineMode,
   type TrackingEngineMode,
 } from '@/features/tracking/utils/trackingEngineMode';
+import { subscribeQaPreferences } from '@/features/tracking/utils/qaPreferences';
 import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
 import { isQaDiagnosticsEnabled, setQaDiagnosticsEnabled } from '@/features/tracking/utils/qaDiagnosticsMode';
 import {
@@ -47,8 +48,7 @@ import { PositionQualityDiagnostics } from '@/features/tracking/components/Posit
 import { ShellyDiagnosticsPanel } from '@/features/tracking/components/ShellyDiagnosticsPanel';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
-// QA-Golden-Reference-A/B-Schalter (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/
-// PRECISION).
+// erweiterten Vergleichstests (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/PRECISION).
 // Öffnen: Profil → „Entwickler & Diagnose" → „Fährten-Diagnose" (nur persönlich freigeschaltete Accounts), oder Deep-Link
 // anyvo://dev/precision-location-test
 //
@@ -93,6 +93,8 @@ function PrecisionLocationTestContent() {
   const subs = useRef<{ remove: () => void }[]>([]);
   const [sourceMode, setSourceMode] = useState<LocationSourceMode>(getLocationSourceMode());
   const [engineMode, setEngineMode] = useState<TrackingEngineMode>(getTrackingEngineMode());
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [modeNotice, setModeNotice] = useState<string | null>(null);
   const [qaOn, setQaOn] = useState<boolean>(isQaDiagnosticsEnabled());
   const [activeModes, setActiveModes] = useState<ActiveTrackingModes>(getActiveTrackingModes());
   const [qaLines, setQaLines] = useState<readonly string[]>(getQaCandidateLines());
@@ -120,11 +122,16 @@ function PrecisionLocationTestContent() {
     // Accountgebundene Werte werden nach der Serverfreigabe geladen
     // (DiagnosticsAccessSync → hydrateQaModes). Der Aufruf hier ist die
     // Absicherung, dass der Screen nie einen veralteten Default anzeigt.
-    void hydrateQaModes().then(() => {
+    let mounted = true;
+    const refresh = () => {
+      if (!mounted) return;
       setSourceMode(getLocationSourceMode());
       setEngineMode(getTrackingEngineMode());
       setQaOn(isQaDiagnosticsEnabled());
-    });
+    };
+    const unsubscribe = subscribeQaPreferences(refresh);
+    void hydrateQaModes().then(refresh);
+    return () => { mounted = false; unsubscribe(); };
   }, []);
   useEffect(() => subscribeActiveTrackingModes(setActiveModes), []);
   // Verfügbarkeit des nativen Motion-Moduls — genau die vorhandene Prüfung,
@@ -164,30 +171,29 @@ function PrecisionLocationTestContent() {
   const chooseSourceMode = (mode: LocationSourceMode) => {
     setLocationSourceMode(mode);
     setSourceMode(getLocationSourceMode());
+    setModeNotice(getLocationSourceMode() === mode ? null : 'Bitte zuerst die laufende Fährte oder GPS-Vorbereitung beenden.');
   };
   const chooseEngineMode = (mode: TrackingEngineMode) => {
     setTrackingEngineMode(mode);
     setEngineMode(getTrackingEngineMode());
+    setModeNotice(getTrackingEngineMode() === mode ? null : 'Bitte zuerst die laufende Fährte oder GPS-Vorbereitung beenden.');
+  };
+  const restoreStandard = () => {
+    setTrackingEngineMode('current');
+    setLocationSourceMode('precision');
+    setEngineMode(getTrackingEngineMode());
+    setSourceMode(getLocationSourceMode());
+    setModeNotice(getTrackingEngineMode() === 'current' && getLocationSourceMode() === 'precision'
+      ? null : 'Bitte zuerst die laufende Fährte oder GPS-Vorbereitung beenden.');
   };
   const toggleQa = () => { const next = !qaOn; setQaDiagnosticsEnabled(next); setQaOn(isQaDiagnosticsEnabled()); };
 
-  // Läuft gerade ein GPS-Warmup im Lege-Recorder? Dann ist die Quelle für
-  // diesen Stream festgeschrieben — bewusst kein Hot-Swap einer laufenden
-  // Location-Subscription nur für QA.
   const warmupRunning = activeModes.warmupActive;
-  const pendingChange = warmupRunning &&
-    (activeModes.engine !== engineMode || activeModes.source !== sourceMode);
+  const standardMode = engineMode === 'current' && sourceMode === 'precision';
   const activeCombi = warmupRunning
     ? `${trackingEngineDisplayLabel(activeModes.engine)} · ${activeModes.source === 'legacy' ? 'EXPO' : 'PRECISION'}`
     : null;
-  // Klartext des aktuell aktiven Zustands — der Feldtest vergleicht
-  // A = BUILD40 + EXPO gegen B = CURRENT + EXPO.
-  const engineLabel = trackingEngineDisplayLabel(engineMode);
-  const sourceLabel = sourceMode === 'legacy' ? 'EXPO' : 'PRECISION';
-  const combiLabel = `${engineLabel} + ${sourceLabel}`;
-  const combiHint = engineMode === 'build40' && sourceMode === 'legacy' ? 'Test A (Golden Reference)'
-    : engineMode === 'current' && sourceMode === 'legacy' ? 'Test B (neue Engine, ohne Precision)'
-    : sourceMode === 'precision' ? 'Nativer Pfad mit Expo-Fallback, falls nötig' : '';
+  const combiLabel = `${trackingEngineDisplayLabel(engineMode)} + ${sourceMode === 'legacy' ? 'EXPO' : 'PRECISION'}`;
 
   const native = isNativeModuleAvailable();
   const locationDisplay = trackingLocationDiagnosticDisplay({ selected: sourceMode, active: activeModes,
@@ -249,46 +255,51 @@ function PrecisionLocationTestContent() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={8} style={s.back}>
           <Ionicons name="chevron-back" size={20} color={C.white} />
         </TouchableOpacity>
-        <Text style={s.title}>Fährten-Diagnose · Testmodus</Text>
+        <Text style={s.title}>Fährten-Diagnose</Text>
       </View>
 
       <ScrollView contentContainerStyle={s.body}>
         <BuildOtaSection />
 
-        <Section title="Auswahl für den nächsten Fährtenstart">
+        <Section title="Fährtenaufnahme">
           <View style={s.activeBox}>
-            <Text style={s.activeVal}>{combiLabel}</Text>
-            {combiHint ? <Text style={s.activeHint}>{combiHint}</Text> : null}
+            <Text style={s.activeVal}>{standardMode ? 'Standardeinstellung aktiv' : 'Vergleichstest eingestellt'}</Text>
+            <Text style={s.activeHint}>{combiLabel}</Text>
           </View>
           <Text style={s.note}>
-            Legen, Ansatz und Absuche lesen diese Einstellungen beim Start
-            ihres GPS-Streams. Ein laufender Stream behält seine bereits
-            gestartete Quelle. Beide Einstellungen werden beim App-Start
-            rehydriert.
+            Für normale Fährten ist keine Auswahl nötig. Die aktuelle Engine nutzt
+            Precision und wechselt bei fehlendem Modul oder Startfehler automatisch
+            auf Expo. Precision ist keine Zusage einer bestimmten GPS-Genauigkeit.
           </Text>
+          {!standardMode && (
+            <>
+              <Text style={s.warn}>Eine frühere Testauswahl ist noch eingestellt. Für normale Fährten kannst du zur Standardeinstellung zurückkehren.</Text>
+              <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={restoreStandard}
+                accessibilityRole="button" accessibilityLabel="Standardeinstellung verwenden" activeOpacity={0.85}>
+                <Text style={s.btnTxt}>Standardeinstellung verwenden</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {modeNotice && <Text style={s.warn} accessibilityLiveRegion="polite">{modeNotice}</Text>}
           {warmupRunning && (
             <>
               <Row label="Gerade aktiv im Lege-Screen" value={activeCombi ?? '—'} good />
               <Row label="Quelle meldet" value={activeModes.reportedSource ?? 'wartet auf ersten Fix'} />
             </>
           )}
-          {pendingChange && (
-            <Text style={s.warn}>
-              Ein GPS-Stream läuft bereits ({activeCombi}). Die Änderung wird
-              beim nächsten Fährtenstart aktiv — dafür den Lege-Screen
-              verlassen und neu öffnen. Ein laufender Stream wird bewusst nicht
-              umgehängt.
-            </Text>
-          )}
+          <Text style={s.note}>
+            Während einer laufenden Fährte oder GPS-Vorbereitung ist die Auswahl
+            gesperrt. Nach deren Ende wird eine neue Auswahl beim nächsten Fährtenstart aktiv.
+          </Text>
         </Section>
 
         <Section title="QA-Diagnose beim Legen">
           <Text style={s.note}>
-            Schaltet ausschliesslich BEOBACHTENDE Zusatzfunktionen frei: die
-            Anzeige der tatsächlich aktiven Engine/Source im Lege-Screen, die
-            Kandidaten-Mitschrift unten und — nur mit ENGINE=CURRENT — den
-            Core-Motion-Mitschnitt. Verändert weder Erkennung noch Confidence,
-            GPS oder Distanz. Nichts davon wird gespeichert.
+            Für eine gezielte Fehleranalyse vor dem Fährtenstart einschalten.
+            Erfasst zusätzliche GPS-, Winkel- und Bewegungsdiagnosen für den
+            QA-Export. Verfügbare Diagnosedaten werden lokal zur Fährte gespeichert.
+            Die normale Bewegungsunterstützung der aktuellen Engine ist auch ohne
+            QA-Diagnose aktiv, sofern das Gerät sie bereitstellt.
           </Text>
           <View style={s.abRow}>
             <TouchableOpacity style={[s.abBtn, !qaOn && s.abBtnActive]} onPress={() => { if (qaOn) toggleQa(); }} activeOpacity={0.85}>
@@ -298,7 +309,7 @@ function PrecisionLocationTestContent() {
               <Text style={[s.abBtnTxt, qaOn && s.abBtnTxtActive]}>EIN</Text>
             </TouchableOpacity>
           </View>
-          <Row label="Motion beim Legen" value={qaOn && engineMode === 'current' ? 'wird mitgeschnitten' : 'aus'} good={qaOn && engineMode === 'current'} />
+          <Row label="Zusätzliche Motion-Diagnose" value={qaOn && engineMode === 'current' ? 'für nächsten Start eingeschaltet' : 'aus'} good={qaOn && engineMode === 'current'} lines={2} />
         </Section>
 
         <Section title="Motion">
@@ -310,7 +321,7 @@ function PrecisionLocationTestContent() {
               <Text style={s.activeHint}>
                 {activeModes.motion === 'live' ? `Motion · aktiv (${activeModes.motionSamples} Samples)`
                   : activeModes.motion === 'waiting' ? 'Motion · keine Samples'
-                    : 'Motion · nicht mitgeschnitten (QA aus oder Legacy · Build 40)'}
+                    : 'Motion · nicht aktiv'}
               </Text>
             )}
           </View>
@@ -322,66 +333,78 @@ function PrecisionLocationTestContent() {
           {!motionModule && (
             <Text style={s.warn}>
               Das native Motion-Modul steckt nicht in diesem Build. Der Feldtest
-              läuft dann ohne Motion-Daten — GPS, Erkennung und Aufzeichnung sind
-              davon unberührt.
+              läuft dann ohne Bewegungsunterstützung. Die GPS-Aufnahme bleibt
+              verfügbar; Bewegungsdiagnosen sind eingeschränkt.
             </Text>
           )}
         </Section>
 
-        <Section title="Tracking Engine">
-          <Text style={s.note}>
-            Legacy · Build 40 = historischer Vergleichspfad der auf Build 40
-            verwendeten Tracking-Logik. CURRENT = aktuelle Tracking-Engine.
-          </Text>
-          <View style={s.abRow}>
-            <TouchableOpacity
-              style={[s.abBtn, engineMode === 'build40' && s.abBtnActive]}
-              onPress={() => chooseEngineMode('build40')}
-              activeOpacity={0.85}
-            >
-              <Text style={[s.abBtnTxt, engineMode === 'build40' && s.abBtnTxtActive]}>Legacy · Build 40</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.abBtn, engineMode === 'current' && s.abBtnActive]}
-              onPress={() => chooseEngineMode('current')}
-              activeOpacity={0.85}
-            >
-              <Text style={[s.abBtnTxt, engineMode === 'current' && s.abBtnTxtActive]}>CURRENT</Text>
-            </TouchableOpacity>
-          </View>
-        </Section>
+        <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => setAdvancedOpen(open => !open)}
+          accessibilityRole="button" accessibilityLabel="Erweiterte Vergleichstests"
+          accessibilityState={{ expanded: advancedOpen }} activeOpacity={0.85}>
+          <Text style={s.btnTxt}>Erweiterte Vergleichstests</Text>
+          <Ionicons name={advancedOpen ? 'chevron-up' : 'chevron-down'} size={18} color={C.white} />
+        </TouchableOpacity>
+        {advancedOpen && (
+          <>
+            <Text style={s.note}>Nur für gezielte Vergleiche bei der Fehleranalyse. Die Auswahl wird gespeichert. Das Öffnen dieses Bereichs ändert keine Einstellung.</Text>
+            <Section title="Tracking Engine">
+              <Text style={s.note}>
+                Legacy · Build 40 = historischer Vergleichspfad der auf Build 40
+                verwendeten Tracking-Logik. CURRENT = aktuelle Tracking-Engine und Standard.
+              </Text>
+              <View style={s.abRow}>
+                <TouchableOpacity
+                  style={[s.abBtn, engineMode === 'build40' && s.abBtnActive]}
+                  onPress={() => chooseEngineMode('build40')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[s.abBtnTxt, engineMode === 'build40' && s.abBtnTxtActive]}>Legacy · Build 40</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.abBtn, engineMode === 'current' && s.abBtnActive]}
+                  onPress={() => chooseEngineMode('current')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[s.abBtnTxt, engineMode === 'current' && s.abBtnTxtActive]}>CURRENT</Text>
+                </TouchableOpacity>
+              </View>
+            </Section>
 
-        <Section title="Location Source">
-          <Text style={s.note}>
-            EXPO = direkter expo-location-Pfad; AnyvoPrecisionLocation wird
-            für die Fährte nicht gestartet. PRECISION = nativer
-            AnyvoPrecisionLocation-Pfad mit Expo-Fallback bei fehlendem Modul
-            oder Startfehler.
-          </Text>
-          <View style={s.abRow}>
-            <TouchableOpacity
-              style={[s.abBtn, sourceMode === 'legacy' && s.abBtnActive]}
-              onPress={() => chooseSourceMode('legacy')}
-              activeOpacity={0.85}
-            >
-              <Text style={[s.abBtnTxt, sourceMode === 'legacy' && s.abBtnTxtActive]}>EXPO</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.abBtn, sourceMode === 'precision' && s.abBtnActive]}
-              onPress={() => chooseSourceMode('precision')}
-              activeOpacity={0.85}
-            >
-              <Text style={[s.abBtnTxt, sourceMode === 'precision' && s.abBtnTxtActive]}>PRECISION</Text>
-            </TouchableOpacity>
-          </View>
-        </Section>
+            <Section title="Location Source">
+              <Text style={s.note}>
+                EXPO = direkter expo-location-Pfad; AnyvoPrecisionLocation wird
+                für die Fährte nicht gestartet. PRECISION (Standard) = nativer
+                AnyvoPrecisionLocation-Pfad mit Expo-Fallback bei fehlendem Modul
+                oder Startfehler.
+              </Text>
+              <View style={s.abRow}>
+                <TouchableOpacity
+                  style={[s.abBtn, sourceMode === 'legacy' && s.abBtnActive]}
+                  onPress={() => chooseSourceMode('legacy')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[s.abBtnTxt, sourceMode === 'legacy' && s.abBtnTxtActive]}>EXPO</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.abBtn, sourceMode === 'precision' && s.abBtnActive]}
+                  onPress={() => chooseSourceMode('precision')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[s.abBtnTxt, sourceMode === 'precision' && s.abBtnTxtActive]}>PRECISION · Standard</Text>
+                </TouchableOpacity>
+              </View>
+            </Section>
+
+          </>
+        )}
 
         <Section title="Aktive Location Source">
           <Row label="Ausgewählt" value={locationDisplay.selected} />
           <Row label="Lege-Stream gestartet mit" value={locationDisplay.streamSelection} />
           <Row label="Tatsächlich gemeldete Quelle" value={locationDisplay.active} />
           <Row label="Runtime-Provider" value={locationDisplay.runtimeProvider} lines={2} />
-          <Text style={s.note}>Die Laufzeitquelle erscheint erst nach einem echten GPS-Fix. Änderungen an der Auswahl gelten ab dem nächsten Stream.</Text>
+          <Text style={s.note}>Die Laufzeitquelle erscheint erst nach einem echten GPS-Fix. Die Standardauswahl bleibt auch bei automatischem Expo-Ersatzweg auf Precision.</Text>
         </Section>
 
         <Section title="Native Precision Modul">

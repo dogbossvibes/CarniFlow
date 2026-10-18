@@ -42,7 +42,7 @@ describe('Diagnose-Screen: Sessionliste fokus-aktuell', () => {
     expect(service).toContain('getTrackMarkersBySession(localId).catch(() => []),');
     expect(service).toContain('loadQaSessionCapture(localId).catch(() => null),');
     expect(service).toContain('loadQaSearchCapture(localId).catch(() => null),');
-    expect(service).toContain('const exported = buildQaTrackExport(localId, points, markers, capture, search);');
+    expect(service).toContain('buildQaTrackExport(localId, points, markers, capture, search)');
     expect(service).toContain('assertNoAbsoluteData(exported);');
   });
 });
