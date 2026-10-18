@@ -41,7 +41,7 @@
     "build:prod:ios": "eas build --profile production --platform ios",
     "build:prod:android": "eas build --profile production --platform android",
     "postinstall": "node scripts/patch-expo-task-manager.cjs",
-    "eas-build-post-install": "node scripts/patch-expo-task-manager.cjs --check"
+    "eas-build-post-install": "node scripts/eas-build-post-install.cjs"
   },
   "jest": {
     "preset": "jest-expo",

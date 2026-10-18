@@ -2,7 +2,7 @@
   "expo": {
     "name": "ANYVO",
     "slug": "anyvo",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "anyvo",
@@ -51,12 +51,13 @@
         "android.permission.READ_MEDIA_VIDEO"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 45,
+      "versionCode": 47,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCriuMb0ZKmtn52yNH7AjmfGWsaUEuNDdg"
         }
-      }
+      },
+      "runtimeVersion": "1.0.5"
     },
     "web": {
       "output": "static",
