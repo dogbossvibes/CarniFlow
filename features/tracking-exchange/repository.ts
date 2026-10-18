@@ -1,8 +1,9 @@
 import * as Crypto from 'expo-crypto';
 import { getLocalDb } from '@/lib/localDb/client';
 import { parseDistractionTrack, DISTRACTION_LIMITS } from '@/features/tracking-distractions/model';
-import { parseFile, canonicalReference, ExchangeError, uuid, type TrackOffer, type TrackReturn, type ExchangeReference } from './contract';
+import { parseFile, canonicalReference, ExchangeError, uuid, label, type TrackOffer, type TrackReturn, type ExchangeReference } from './contract';
 export interface ExchangeRow { taskId:string; parentId:string; role:'outgoing'|'incoming'; offer:TrackOffer }
+export interface ExchangeSummary { taskId:string;parentId:string;role:'outgoing'|'incoming';title:string;referenceDigest:string;createdAtMs:number;finishedContributions:number;returns:{id:string;name:string;createdAtMs:number}[] }
 interface RawRow { task_id:string; parent_id:string; role:'outgoing'|'incoming'; offer_json:string }
 export interface ExchangeTx {
  getFirstAsync<T>(sql:string,...args:(string|number)[]):Promise<T|null>;
@@ -24,6 +25,45 @@ export function createExchangeRepository(ownerId:string,deps:ExchangeDeps) {
  const find=async(tx:ExchangeTx,taskId:string)=>{check();const r=await tx.getFirstAsync<RawRow>('select task_id,parent_id,role,offer_json from local_track_exchange where owner_id=? and task_id=?',ownerId,taskId);check();return r?row(r):null;};
  const verify=async(offer:TrackOffer)=>{check();const digest=await deps.digest(canonicalReference(offer.reference));check();if(digest!==offer.referenceDigest)throw new ExchangeError('INVALID');};
  return {
+  /** Read-only projection of existing records. A file export is never a delivery receipt. */
+  async summaries():Promise<{rows:ExchangeSummary[];limited:boolean}>{check();return deps.transaction(async tx=>{
+   // Fetch metadata only: the hub must not materialise hundreds of GPS payloads.
+   type Meta={task_id:string;parent_id:string;role:'outgoing'|'incoming';created_at:number;format:string;version:number;kind:string;payload_task:string;title:string;digest:string};
+   const offerJson="case when json_valid(offer_json) then offer_json else '{}' end";
+   const raw=await tx.getAllAsync<Meta>(`select task_id,parent_id,role,created_at,
+    json_extract(${offerJson},'$.format') as format,json_extract(${offerJson},'$.version') as version,
+    json_extract(${offerJson},'$.kind') as kind,json_extract(${offerJson},'$.taskId') as payload_task,
+    json_extract(${offerJson},'$.title') as title,json_extract(${offerJson},'$.referenceDigest') as digest
+    from local_track_exchange where owner_id=? and task_id not in (select local_task_id from local_track_group_tasks where owner_id=local_track_exchange.owner_id)
+    order by created_at desc,task_id limit 201`,ownerId);check();
+   const tasks=raw.slice(0,200).map(value=>{
+    uuid(value.task_id);uuid(value.parent_id.startsWith('local_')?value.parent_id.slice(6):value.parent_id);
+    if(value.format!=='anyvo-track'||value.version!==1||value.kind!=='distraction-request'||value.payload_task!==value.task_id||!['incoming','outgoing'].includes(value.role)||typeof value.digest!=='string'||!/^[a-f0-9]{64}$/.test(value.digest)||!Number.isSafeInteger(value.created_at)||value.created_at<0)throw new ExchangeError('INVALID');
+    return {taskId:value.task_id,parentId:value.parent_id,role:value.role,title:label(value.title,80),referenceDigest:value.digest,createdAtMs:value.created_at};
+   });
+   const rows:ExchangeSummary[]=[];
+   if(tasks.length){
+    const parents=[...new Set(tasks.map(task=>task.parentId))], ids=tasks.map(task=>task.taskId);
+    const placeholders=(values:string[])=>values.map(()=>'?').join(',');
+    const payload="case when json_valid(payload_json) then payload_json else '{}' end";
+    const children=await tx.getAllAsync<{parent_session_id:string;payload_parent:string;finished_type:string;finished_at:number|null}>(`select parent_session_id,json_extract(${payload},'$.parentSessionId') as payload_parent,json_type(${payload},'$.finishedAtMs') as finished_type,json_extract(${payload},'$.finishedAtMs') as finished_at from local_track_distractions where owner_id=? and parent_session_id in (${placeholders(parents)})`,ownerId,...parents);check();
+    const finished=new Map<string,number>();
+    for(const child of children){
+     if(child.payload_parent!==child.parent_session_id||!['null','integer'].includes(child.finished_type)||child.finished_at!==null&&(!Number.isSafeInteger(child.finished_at)||child.finished_at<0))throw new ExchangeError('INVALID');
+     if(child.finished_at!==null)finished.set(child.parent_session_id,(finished.get(child.parent_session_id)??0)+1);
+    }
+    type ReceiptMeta={task_id:string;contribution_id:string;created_at:number;format:string;version:number;kind:string;payload_task:string;digest:string;child_id:string;parent_id:string;name:string};
+    const receipts=await tx.getAllAsync<ReceiptMeta>(`select task_id,contribution_id,created_at,json_extract(${payload},'$.format') as format,json_extract(${payload},'$.version') as version,json_extract(${payload},'$.kind') as kind,json_extract(${payload},'$.taskId') as payload_task,json_extract(${payload},'$.referenceDigest') as digest,json_extract(${payload},'$.contribution.id') as child_id,json_extract(${payload},'$.contribution.parentSessionId') as parent_id,json_extract(${payload},'$.contribution.name') as name from local_track_exchange_receipts where owner_id=? and task_id in (${placeholders(ids)}) order by created_at desc,contribution_id`,ownerId,...ids);check();
+    for(const task of tasks){
+     const returns=receipts.filter(receipt=>receipt.task_id===task.taskId).map(receipt=>{
+      uuid(receipt.contribution_id);
+      if(task.role!=='outgoing'||receipt.format!=='anyvo-track'||receipt.version!==1||receipt.kind!=='distraction-return'||receipt.payload_task!==task.taskId||receipt.child_id!==receipt.contribution_id||receipt.parent_id!==task.taskId||receipt.digest!==task.referenceDigest||!Number.isSafeInteger(receipt.created_at)||receipt.created_at<0)throw new ExchangeError('INVALID');
+      return {id:receipt.contribution_id,name:label(receipt.name,DISTRACTION_LIMITS.name),createdAtMs:receipt.created_at};});
+     rows.push({...task,finishedContributions:finished.get(task.parentId)??0,returns});
+    }
+   }
+   check();return {rows,limited:raw.length>200};
+  });},
   async list():Promise<ExchangeRow[]>{check();return deps.transaction(async tx=>{const rows=await tx.getAllAsync<RawRow>('select task_id,parent_id,role,offer_json from local_track_exchange where owner_id=? and task_id not in (select local_task_id from local_track_group_tasks where owner_id=local_track_exchange.owner_id) order by created_at desc limit 200',ownerId);check();return rows.map(row);});},
   async get(taskId:string){uuid(taskId);return deps.transaction(tx=>find(tx,taskId));},
   async create(parentId:string,title:string,reference:ExchangeReference):Promise<ExchangeRow>{

@@ -6,8 +6,9 @@ import TransferScreen from '../TransferScreen';
 const mockPush = jest.fn(), mockOffer = jest.fn(), mockAccept = jest.fn(), mockRead = jest.fn();
 const mockList = jest.fn();
 let mockUser = 'owner';
+let mockParams: Record<string, string> = {};
 const mockSource = { local_id: 'source', dog_id: 'dog', title: 'Wiesenfährte', ended_at: '2026-10-11T12:00:00.000Z' };
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, back: jest.fn() }), useLocalSearchParams: () => ({}),
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush, back: jest.fn() }), useLocalSearchParams: () => mockParams,
   useFocusEffect: (fn: () => void) => { const React = jest.requireActual('react'); React.useEffect(fn, [fn]); } }));
 jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: mockTranslate }) }));
 function mockTranslate(key: string) { return key; }
@@ -31,7 +32,7 @@ function button(label: string) { return renderer.root.findAll(n => typeof n.prop
   && n.findAll(x => x.props.children === label).length > 0)[0]; }
 async function press(label: string) { await act(async () => { button(label).props.onPress(); }); }
 beforeEach(() => {
-  mockUser = 'owner'; jest.clearAllMocks(); mockListOwned.mockResolvedValue({ owned: [], next: null }); mockRestoreOwned.mockResolvedValue({ sessionId: 'restored', dogId: 'dog' }); mockList.mockResolvedValue({ incoming: [], outgoing: [], serverNowMs: 1791720000000 });
+  mockUser = 'owner'; mockParams = {}; jest.clearAllMocks(); mockListOwned.mockResolvedValue({ owned: [], next: null }); mockRestoreOwned.mockResolvedValue({ sessionId: 'restored', dogId: 'dog' }); mockList.mockResolvedValue({ incoming: [], outgoing: [], serverNowMs: 1791720000000 });
   mockOffer.mockResolvedValue({}); mockAccept.mockResolvedValue({ sessionId: 'own-session', dogId: 'dog' });
 });
 afterEach(() => { if (renderer) act(() => renderer.unmount()); jest.restoreAllMocks(); });
@@ -106,4 +107,25 @@ it('retains the preview and selected dog after an ambiguous accept failure, allo
   expect(mockPush).not.toHaveBeenCalled(); expect(button('accept').props.accessibilityState.disabled).toBe(false);
   await press('accept'); expect(mockAccept.mock.calls).toEqual([[transfer, expect.anything(), 'dog'], [transfer, expect.anything(), 'dog']]);
   await press('open'); expect(mockPush).toHaveBeenCalledWith('/track/own-session');
+});
+
+it('hub compose route opens only the existing explicit composer without offering or accepting', async () => {
+  mockParams = { compose: '1', sourceId: 'source' }; await render();
+  expect(button('send')).toBeDefined(); expect(renderer.root.findAll(n => n.props.children === 'incoming')).toHaveLength(0);
+  expect(renderer.root.findAll(n => n.props.children === 'outgoing')).toHaveLength(0);
+  expect(mockOffer).not.toHaveBeenCalled(); expect(mockAccept).not.toHaveBeenCalled();
+});
+it('hub incoming route reads exactly the listed transfer and still requires dog and acceptance', async () => {
+  const transfer = { transferId: 'actual-transfer', senderUserId: 'contact', recipientUserId: 'owner', status: 'pending', createdAtMs: 1791720000000, expiresAtMs: 1791806400000 };
+  mockParams = { view: 'incoming', transferId: transfer.transferId };
+  mockList.mockResolvedValue({ incoming: [transfer], outgoing: [], serverNowMs: 1791720000000 });
+  mockRead.mockResolvedValue({ transfer, reference: { distanceM: 42, points: [], markers: [] }, serverNowMs: 1791720000000 });
+  await render(); expect(mockRead).toHaveBeenCalledWith('actual-transfer');
+  expect(button('accept').props.accessibilityState.disabled).toBe(true); expect(mockAccept).not.toHaveBeenCalled();
+  expect(renderer.root.findAll(n => n.props.children === 'chooseTrack')).toHaveLength(0);
+});
+it('does not read a deep-link transfer that is missing from this account’s current list', async () => {
+  mockParams = { view: 'incoming', transferId: 'not-owned' }; await render();
+  expect(mockRead).not.toHaveBeenCalled(); expect(mockAccept).not.toHaveBeenCalled();
+  expect(renderer.root.findAll(n => n.props.children === 'unavailable')).not.toHaveLength(0);
 });

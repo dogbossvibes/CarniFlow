@@ -41,11 +41,22 @@ export function isTrainerConnectionForClient(c: ConnectionView): boolean {
 // Connect, Track Sharing, Trainer-Hub) sind unverändert. Health Sharing ruft mit
 // PERSON_CONNECTION_TYPE auf.
 export async function listConnections(userId: string, connectionType: string = 'trainer_client'): Promise<ConnectionView[]> {
-  const { data } = await supabase
+  return readConnections(userId, connectionType, false);
+}
+
+/** Opt-in error/cancellation reporting for screens that distinguish offline from empty. */
+export async function listConnectionsStrict(userId: string, connectionType: string = 'trainer_client', signal?: AbortSignal): Promise<ConnectionView[]> {
+  return readConnections(userId, connectionType, true, signal);
+}
+
+async function readConnections(userId: string, connectionType: string, strict: boolean, signal?: AbortSignal): Promise<ConnectionView[]> {
+  const query = supabase
     .from('connections').select('*')
     .or(`owner_user_id.eq.${userId},connected_user_id.eq.${userId}`)
     .eq('connection_type', connectionType)
     .order('created_at', { ascending: false });
+  const { data, error } = await (signal ? query.abortSignal(signal) : query);
+  if (error && strict) throw new Error('CONNECTION_LOOKUP_FAILED');
   const rows = (data as Connection[]) ?? [];
   if (!rows.length) return [];
 
@@ -56,8 +67,10 @@ export async function listConnections(userId: string, connectionType: string = '
   // und nur für Trainer-Profile oder eine bestehende Verbindung (beliebigen
   // Typs) des aufrufenden Nutzers — genau der hier benötigte Fall.
   const counterpartIds = rows.map(r => r.owner_user_id === userId ? r.connected_user_id : r.owner_user_id);
-  const { data: profs } = await supabase.rpc('get_profile_display_names', { p_ids: counterpartIds }) as
-    { data: { id: string; full_name: string | null; username: string | null }[] | null };
+  const namesQuery = supabase.rpc('get_profile_display_names', { p_ids: counterpartIds });
+  const { data: profs, error: profileError } = await (signal ? namesQuery.abortSignal(signal) : namesQuery) as
+    { data: { id: string; full_name: string | null; username: string | null }[] | null; error?: unknown };
+  if (profileError && strict) throw new Error('CONNECTION_LOOKUP_FAILED');
   const nameById = new Map((profs ?? []).map(p => [p.id, p.full_name]));
   const usernameById = new Map((profs ?? []).map(p => [p.id, p.username]));
 

@@ -25,33 +25,50 @@ export function sanitizeSeen(raw: unknown): HelpTopicId[] {
 let currentUserId: string | null = null;
 let hydratedFor: string | null | undefined = undefined;
 let state: HelpTopicId[] = [];
+let hydrationGeneration = 0;
+const emptySeen: HelpTopicId[] = [];
+const writes = new Map<string, Promise<void>>();
 const listeners = new Set<() => void>();
 const emit = () => { for (const l of listeners) l(); };
 
 async function hydrate(userId: string | null) {
+  const generation = ++hydrationGeneration;
   currentUserId = userId;
+  hydratedFor = undefined;
+  state = [];
+  emit();
+  let next: HelpTopicId[] = [];
   try {
-    const raw = await AsyncStorage.getItem(keyForUser(userId));
-    state = sanitizeSeen(raw ? JSON.parse(raw) : null);
-  } catch { state = []; }
+    const key = keyForUser(userId);
+    await writes.get(key)?.catch(() => {});
+    if (generation !== hydrationGeneration || currentUserId !== userId) return;
+    const raw = await AsyncStorage.getItem(key);
+    next = sanitizeSeen(raw ? JSON.parse(raw) : null);
+  } catch { /* Keep the empty fallback without overwriting storage. */ }
+  if (generation !== hydrationGeneration || currentUserId !== userId) return;
+  state = next;
   hydratedFor = userId;
   emit();
 }
 
 function persist() {
-  AsyncStorage.setItem(keyForUser(currentUserId), JSON.stringify(state)).catch(() => { /* best-effort */ });
+  const key = keyForUser(currentUserId), snapshot = JSON.stringify(state);
+  const task = (writes.get(key) ?? Promise.resolve()).catch(() => {}).then(() => AsyncStorage.setItem(key, snapshot));
+  writes.set(key, task);
+  void task.finally(() => { if (writes.get(key) === task) writes.delete(key); }).catch(() => {});
 }
 
 // Topic als gesehen markieren (idempotent).
-export function markHelpSeen(id: HelpTopicId) {
-  if (!VALID.has(id) || state.includes(id)) return;
+export function markHelpSeen(id: HelpTopicId, userId: string | null = currentUserId) {
+  if (userId !== currentUserId || hydratedFor !== userId || !VALID.has(id) || state.includes(id)) return;
   state = [...state, id];
   emit();
   persist();
 }
 
 // Alle Hinweise zurücksetzen (nur Help-State, keine anderen Einstellungen).
-export function resetHelpSeen() {
+export function resetHelpSeen(userId: string | null = currentUserId) {
+  if (userId !== currentUserId || hydratedFor !== userId) return;
   state = [];
   emit();
   persist();
@@ -67,7 +84,7 @@ export function useHelpSeen(userId: string | null | undefined): HelpTopicId[] {
     const uid = userId ?? null;
     if (hydratedFor !== uid) void hydrate(uid);
   }, [userId]);
-  return seen;
+  return hydratedFor === (userId ?? null) ? seen : emptySeen;
 }
 
 // Wie useHelpSeen, liefert zusätzlich `hydrated`: erst true, wenn der Storage

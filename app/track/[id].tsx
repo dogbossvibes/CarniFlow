@@ -1,4 +1,5 @@
 import { TrackAngleList } from '@/features/tracking/components/TrackAngleList';
+import { HelpButton } from '@/components/help/HelpButton';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { useTranslation } from 'react-i18next';
@@ -385,7 +386,7 @@ export default function TrackAuswertungScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <FaehrtenHeader title="AUSWERTUNG" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} />
+      <FaehrtenHeader title="AUSWERTUNG" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} trailing={<HelpButton topicId="track_review" tint={C.trackTextSec} />} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

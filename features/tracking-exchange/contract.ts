@@ -14,7 +14,7 @@ export function record(value: unknown, keys: readonly string[]): Record<string, 
 }
 export function uuid(value: unknown): string { assert(typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)); return value; }
 export function finite(value: unknown, min: number, max: number): number { assert(typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max); return value; }
-function label(value: unknown, max: number): string { assert(typeof value === 'string' && value.trim().length && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value)); return value; }
+export function label(value: unknown, max: number): string { assert(typeof value === 'string' && value.trim().length && value.length <= max && !/[\u0000-\u001f\u007f]/.test(value)); return value; }
 function nullableNumber(value: unknown, max: number) { return value === null ? null : finite(value, 0, max); }
 function choice<T extends string>(value: unknown, values: readonly T[]): T | null { assert(value === null || values.includes(value as T)); return value as T | null; }
 export interface ExchangeReference {

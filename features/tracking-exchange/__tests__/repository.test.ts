@@ -20,3 +20,28 @@ it('imports are idempotent, rekeyed locally and do not become outgoing source ow
 it('return export reads only the account-scoped saved finished child and uses wire task id',async()=>{const h=setup();const file=offer();file.referenceDigest=await h.digest(canonicalReference(file.reference));const task=await h.repo.accept(file);const child={...returned().contribution,parentSessionId:task.parentId};h.db.prepare('insert into local_track_distractions values(?,?,?,?,?,?)').run(child.id,'owner',task.parentId,1,1,JSON.stringify(child));expect((await h.repo.makeReturn(file.taskId,child.id)).contribution.parentSessionId).toBe(file.taskId);await expect(h.repo.makeReturn(file.taskId,ids.parent)).rejects.toThrow('NOT_FOUND');h.db.close();});
 it('rolls back writes when identity changes inside a transaction and rejects ABA',async()=>{const h=setup();h.interrupt();await expect(h.repo.create(ids.parent,'Wiese',reference())).rejects.toThrow('ACCOUNT_CHANGED');expect(h.db.prepare('select count(*) as n from local_track_exchange').get()).toEqual({n:0});h.db.close();const b=setup();b.aba();await expect(b.repo.list()).rejects.toThrow('ACCOUNT_CHANGED');b.db.close();});
 it('rejects corrupted reference hash before persisting incoming locations',async()=>{const h=setup();await expect(h.repo.accept(offer())).rejects.toThrow('INVALID');expect(h.db.prepare('select count(*) as n from local_track_exchange').get()).toEqual({n:0});h.db.close();});
+it('read-only summaries use actual timestamps, applied receipts and owner scope',async()=>{
+ const h=setup(),task=await h.repo.create(ids.parent,'Saved main',reference());
+ const ret={...returned(),taskId:task.taskId,referenceDigest:task.offer.referenceDigest,contribution:{...returned().contribution,parentSessionId:task.taskId}};
+ await h.repo.applyReturn(ret,reference());
+ const before=h.db.prepare('select total_changes() as n').get();const summaries=await h.repo.summaries();
+ expect(summaries.limited).toBe(false);expect(JSON.stringify(summaries)).not.toMatch(/"points"|"lat"|"reference":/);expect(summaries.rows[0]).toMatchObject({taskId:task.taskId,parentId:ids.parent,createdAtMs:123456,finishedContributions:1,returns:[{id:ret.contribution.id,name:ret.contribution.name,createdAtMs:123456}]});
+ expect(h.db.prepare('select total_changes() as n').get()).toEqual(before);
+ h.change();await expect(h.repo.summaries()).rejects.toThrow('ACCOUNT_CHANGED');h.db.close();
+});
+it('summary excludes group-local tasks and never reads another owner’s receipts',async()=>{
+ const h=setup(),task=await h.repo.create(ids.parent,'Saved',reference());
+ h.db.prepare('insert into local_track_exchange_receipts values(?,?,?,?,?,?)').run('other',task.taskId,'bad','invalid','bad',12);
+ expect((await h.repo.summaries()).rows[0].returns).toEqual([]);
+ h.db.prepare('insert into local_track_group_tasks values(?,?,?,?)').run('owner','server',task.taskId,task.offer.referenceDigest);
+ expect(await h.repo.summaries()).toEqual({rows:[],limited:false});h.db.close();
+});
+it('summary distinguishes 200 entries from a truncated 201-entry selection',async()=>{
+ const h=setup();
+ for(let n=0;n<201;n++){
+  const id=`${String(n).padStart(8,'0')}-0000-4000-8000-000000000000`,file={...offer(),taskId:id};
+  h.db.prepare('insert into local_track_exchange values(?,?,?,?,?,?)').run('owner',id,'incoming',ids.parent,JSON.stringify(file),n);
+  if(n===199)expect((await h.repo.summaries()).limited).toBe(false);
+ }
+ const result=await h.repo.summaries();expect(result.limited).toBe(true);expect(result.rows).toHaveLength(200);expect(result.rows[0].createdAtMs).toBe(200);h.db.close();
+});

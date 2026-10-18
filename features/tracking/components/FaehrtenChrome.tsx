@@ -1,5 +1,5 @@
 import type { SketchPoint } from '@/features/tracking/utils/trackSketchGeometry';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -91,13 +91,14 @@ export function DogSwitch({ dog, dogs, onDog }: { dog: Dog | null; dogs: Dog[]; 
 }
 
 export function FaehrtenHeader({
-  title, onBack, dog, dogs, onDog,
+  title, onBack, dog, dogs, onDog, trailing,
 }: {
   title: string;
   onBack?: () => void;
   dog?: Dog | null;
   dogs?: Dog[];
   onDog?: (id: string) => void;
+  trailing?: ReactNode;
 }) {
   return (
     <View style={s.header}>
@@ -110,9 +111,10 @@ export function FaehrtenHeader({
           <Ionicons name="git-branch" size={18} color={C.trackPrimary} />
         </View>
       )}
-      <Text style={s.headerTitle}>{title}</Text>
+      <Text style={[s.headerTitle, trailing ? { flexShrink: 1 } : undefined]}>{title}</Text>
       <View style={{ flex: 1 }} />
       {dog && dogs && onDog ? <DogSwitch dog={dog} dogs={dogs} onDog={onDog} /> : null}
+      {trailing}
     </View>
   );
 }
