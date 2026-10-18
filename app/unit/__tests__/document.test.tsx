@@ -30,7 +30,10 @@ jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');
-  return { SafeAreaView: ({ children }: { children?: React.ReactNode }) => <View>{children}</View> };
+  return {
+    SafeAreaView: ({ children }: { children?: React.ReactNode }) => <View>{children}</View>,
+    useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  };
 });
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: mockDogs, loading: mockDogsLoading }) }));
 jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: mockOwner } } }) }));

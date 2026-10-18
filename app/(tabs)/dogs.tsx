@@ -106,7 +106,7 @@ export default function HundeScreen() {
                   trackColorLabel={`${t('dog.trackColor.title')}: ${t(trackOverlayColorNameKey(resolveTrackOverlayColorKey(hund.id, hund.track_overlay_color_key)))}`}
                   lastTrainingLabel={null}
                   onOpen={() => router.push(`/dog/${hund.id}` as never)}
-                  onTraining={() => router.push({ pathname: '/unit/timer', params: { dogId: hund.id, dogName: hund.name, source: 'dog_quickstart' } })}
+                  onTraining={() => router.push({ pathname: '/unit/document', params: { dogId: hund.id } })}
                   onFaehrte={() => router.push(`/track/legen?dogId=${hund.id}` as never)}
                   onStats={() => router.push(`/dog/${hund.id}` as never)}
                 />
