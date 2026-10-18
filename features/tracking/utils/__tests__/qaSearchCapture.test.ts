@@ -52,7 +52,7 @@ function fixture(withReplay = true) {
     laid: { total: 24, end: ll(12, 12) }, referenceCanonicalLengthM: 20,
     objects: [{ index: 0, at: ll(12.4, 6), atM: 18, found: true, legIndex: 2 }],
     cornerAtM: [12],
-    end: { fired: { tSec: 19, progressM: 23.5, searchDistanceM: 22.9 }, hapticFired: true, voiceFired: true },
+    end: { eventObservation: 'complete', fired: { tSec: 19, progressM: 23.5, searchDistanceM: 22.9 }, hapticFired: true, voiceFired: true },
     manualStopTSec: 21.4,
   };
   return { input, path };
@@ -60,7 +60,7 @@ function fixture(withReplay = true) {
 
 /** Altformat vor schemaMinor 8: geometry.raw ohne accuracyM/accepted/rejectReason. */
 const legacyShape = (d: QaSearchDiagnostics): QaSearchDiagnostics => ({
-  ...d, geometry: { ...d.geometry, raw: d.geometry.raw.map(({ x, y, tSec }) => ({ x, y, tSec })) as QaSearchDiagnostics['geometry']['raw'] },
+  ...d, end: { ...d.end, eventObservation: undefined }, geometry: { ...d.geometry, raw: d.geometry.raw.map(({ x, y, tSec }) => ({ x, y, tSec })) as QaSearchDiagnostics['geometry']['raw'] },
 });
 
 const REQUIRED_KEYS = [
@@ -168,7 +168,7 @@ describe('buildSearchDiagnostics', () => {
     expect(e.hapticFired).toBe(true);
     expect(e.voiceFired).toBe(true);
     expect(e.manualStopTSec).toBe(21.4);
-    const none = buildSearchDiagnostics({ ...fixture().input, end: { fired: null, hapticFired: null, voiceFired: null } }).end;
+    const none = buildSearchDiagnostics({ ...fixture().input, end: { eventObservation: 'complete', fired: null, hapticFired: null, voiceFired: null } }).end;
     expect(none).toMatchObject({ eventFired: null, eventCount: 0, hapticFired: null, voiceFired: null });
   });
 
@@ -280,7 +280,7 @@ describe('QA-Export schemaMinor 8 — Accuracy pro Search-Fix', () => {
     f.input.telemetry.raw = f.input.telemetry.raw.map((r, i) => ({ ...r, accuracy: acc[i % acc.length] }));
     return f;
   };
-  const stripRaw = (d: QaSearchDiagnostics) => ({ ...d, geometry: { ...d.geometry, raw: d.geometry.raw.map(({ x, y, tSec }) => ({ x, y, tSec })) } });
+  const stripRaw = (d: QaSearchDiagnostics) => ({ ...d, end: { ...d.end, eventObservation: undefined }, geometry: { ...d.geometry, raw: d.geometry.raw.map(({ x, y, tSec }) => ({ x, y, tSec })) } });
   const strip = (g: QaSearchDiagnostics['geometry']) => ({ ...g, raw: g.raw.map(({ x, y, tSec }) => ({ x, y, tSec })) });
 
   it('A: der Roh-Fix exportiert seine horizontale Accuracy in Metern (accuracyM)', () => {
@@ -328,9 +328,9 @@ describe('QA-Export schemaMinor 8 — Accuracy pro Search-Fix', () => {
     for (const p of d.geometry.raw) expect(p.accuracyM).toBe(Math.round(p.x / 0.1) + 1);   // x = i·0,1 ⇒ Accuracy = 1 + i
   });
 
-  it('Schema: der aktuelle Builder-Export ist schemaMinor 8, Altformate bleiben 4 und 3 (rückwärtskompatibel)', () => {
+  it('Schema: der aktuelle Builder-Export ist schemaMinor 12, Altformate bleiben 4 und 3 (rückwärtskompatibel)', () => {
     const d = buildSearchDiagnostics(fixture().input);
-    expect(buildQaTrackExport('ts_1', [] as RawLayPoint[], [] as RawTrackMarker[], null, d).schemaMinor).toBe(8);
+    expect(buildQaTrackExport('ts_1', [] as RawLayPoint[], [] as RawTrackMarker[], null, d).schemaMinor).toBe(12);
     expect(buildQaTrackExport('ts_1', [] as RawLayPoint[], [] as RawTrackMarker[], null, legacyShape(d)).schemaMinor).toBe(4);
     // Ein gespeicherter Altbestand ohne Accuracy-Felder bleibt les- und zusammenfassbar.
     expect(() => summarizeSearchDiagnostics(legacyShape(d))).not.toThrow();
@@ -374,5 +374,36 @@ describe('QA-Export schemaMinor 8 — Accuracy pro Search-Fix', () => {
     });
     // die Roh-Geometrie bleibt identisch, nur additive Felder kommen dazu
     g.raw.forEach((p: any, i: number) => { expect(d.geometry.raw[i].x).toBeCloseTo(p.x, 2); expect(d.geometry.raw[i].accuracyM).toBe(3.2); });
+  });
+});
+
+
+describe('Ende-Beobachtungsumfang', () => {
+  it.each([
+    ['complete', false, 0], ['complete', true, null], ['partial', false, null],
+    ['unknown', false, null], [undefined, false, null],
+  ] as const)('fehlendes Ereignis bei Umfang %s / resumed=%s ergibt %s', (eventObservation, resumed, eventCount) => {
+    const input = fixture().input;
+    const end = buildSearchDiagnostics({ ...input, resumed,
+      end: { fired: null, hapticFired: null, voiceFired: null, eventObservation },
+    }).end;
+    expect(end.eventCount).toBe(eventCount);
+    expect(end.eventObservation).toBe(resumed && eventObservation === 'complete' ? 'partial' : eventObservation ?? 'unknown');
+  });
+
+  it('bewahrt ein beobachtetes Ereignis bei Resume, ohne vollständige Beobachtung zu behaupten', () => {
+    const end = buildSearchDiagnostics({ ...fixture().input, resumed: true }).end;
+    expect(end).toMatchObject({ eventCount: 1, eventObservation: 'partial', eventFired: { tSec: 19 } });
+  });
+
+  it('liest alte Null-Ereignisse als unbekannt und erhält alte positive Ereignisse', () => {
+    const d = buildSearchDiagnostics(fixture().input);
+    delete d.end.eventObservation;
+    expect(summarizeSearchDiagnostics(d).end).toMatchObject({ eventObservation: 'unknown', eventCount: 1 });
+    d.end.eventFired = null;
+    d.end.eventCount = 0;
+    const before = JSON.stringify(d);
+    expect(summarizeSearchDiagnostics(d).end).toMatchObject({ eventObservation: 'unknown', eventCount: null });
+    expect(JSON.stringify(d)).toBe(before);
   });
 });

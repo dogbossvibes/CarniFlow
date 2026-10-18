@@ -2,6 +2,7 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "track.markerGroup.title": "Marcatori in questa zona",
   "track.angleList.title": "Angoli e direzioni",
   "track.angleList.hint": "Marcatori salvati sulla pista tracciata. Tocca per visualizzare i dettagli.",
   "track.angleList.empty": "Nessun marcatore di angolo salvato.",

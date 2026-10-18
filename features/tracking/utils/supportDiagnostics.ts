@@ -13,7 +13,7 @@
 import {
   buildQaTrackExport, assertNoAbsoluteData, type QaTrackExport, type RawLayPoint, type RawTrackMarker,
 } from '@/features/tracking/utils/qaTrackExport';
-import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
+import { normalizeSearchEndDiagnostics, type QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
 import type { BackgroundLayDiagnostics } from '@/features/tracking/utils/backgroundLayDiagnostics';
 
 /**
@@ -32,7 +32,7 @@ export type SupportExport = Omit<QaTrackExport, 'sessionId' | 'recordingEvidence
 /** Additive v2.9 support field. The privacy gate also checks every diagnostic value. */
 export function attachBackgroundLayDiagnostics<T extends SupportExport>(exported: T, diagnostics: BackgroundLayDiagnostics | null): T {
   if (!diagnostics) return exported;
-  const enriched = { ...exported, schemaMinor: 9 as const, backgroundLayDiagnostics: diagnostics };
+  const enriched = { ...exported, schemaMinor: Math.max(exported.schemaMinor ?? 0, 9) as QaTrackExport['schemaMinor'], backgroundLayDiagnostics: diagnostics };
   assertSupportPrivacy(enriched);
   return enriched as T;
 }
@@ -91,6 +91,7 @@ const QA_ONLY_KEYS = [
  */
 export function toSupportCapture(d: QaSearchDiagnostics): QaSearchDiagnostics {
   const copy: Record<string, unknown> = { ...d };
+  if (d.end) copy.end = normalizeSearchEndDiagnostics(d.end);
   for (const k of QA_ONLY_KEYS) delete copy[k];
   return copy as unknown as QaSearchDiagnostics;
 }
@@ -113,7 +114,7 @@ export function buildSupportExport(
   points: readonly RawLayPoint[], markers: readonly RawTrackMarker[], search: QaSearchDiagnostics,
 ): SupportExport {
   // Der Hash dient nur als Platzhalter für den bestehenden Builder und wird sofort wieder entfernt.
-  const full = buildQaTrackExport('support', points as RawLayPoint[], markers as RawTrackMarker[], null, search);
+  const full = buildQaTrackExport('support', points as RawLayPoint[], markers as RawTrackMarker[], null, toSupportCapture(search));
   assertNoAbsoluteData(full);
   const { sessionId: _dropped, ...rest } = full;
   void _dropped;
