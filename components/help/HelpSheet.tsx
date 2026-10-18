@@ -3,8 +3,12 @@ import {
   HELP_TOPIC_BODY_KEYS,
   HELP_TOPIC_SHORT_KEY,
   HELP_TOPIC_TITLE_KEY,
+  HELP_TOPIC_RELATED,
   type HelpTopic,
+  type HelpTopicId,
 } from '@/features/help/helpRegistry';
+import { helpLayout } from '@/features/help/helpLayout';
+import { useEffect, useState } from 'react';
 import { useT } from '@/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -23,6 +27,8 @@ export function HelpSheet({
   onMore,
   primaryLabel,
   showDetails = false,
+  collapsibleDetails = false,
+  onTopic,
 }: {
   visible: boolean;
   topic: HelpTopic | null;
@@ -30,21 +36,22 @@ export function HelpSheet({
   onMore?: () => void;
   primaryLabel?: string;
   showDetails?: boolean;
+  collapsibleDetails?: boolean;
+  onTopic?: (id: HelpTopicId) => void;
 }) {
   const { t } = useT();
   const { height, width, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // Percentage maxHeight inside the content-sized safe area cannot bound the body.
-  const availableHeight = Math.max(0, height - insets.top - insets.bottom - 24);
-  const cardMaxHeight = Math.min(height * 0.8, availableHeight);
-  const stackedActions = width < 360 || fontScale > 1.3;
-  // If scaled header/actions would crowd out the body, scroll the whole card.
-  const scrollWholeCard = availableHeight < 240 * fontScale;
+  const { cardMaxHeight, stackedActions, scrollWholeCard } = helpLayout(height, width, fontScale, insets.top, insets.bottom);
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { setExpanded(false); }, [topic?.id, visible]);
   if (!topic) return null;
   const title = t(HELP_TOPIC_TITLE_KEY[topic.id]);
   const bodyKeys = HELP_TOPIC_BODY_KEYS[topic.id] ?? [];
   const primaryText = primaryLabel ?? t('help.understood');
-  const externalLink = showDetails ? topic.externalLink : undefined;
+  const detailsVisible = showDetails && (!collapsibleDetails || expanded);
+  const externalLink = detailsVisible ? topic.externalLink : undefined;
+  const related = HELP_TOPIC_RELATED[topic.id] ?? [];
   const openExternalLink = async () => {
     if (!externalLink) return;
     try {
@@ -57,7 +64,13 @@ export function HelpSheet({
   const bodyContent = (<>
 
               <Text style={s.text}>{t(HELP_TOPIC_SHORT_KEY[topic.id])}</Text>
-              {showDetails && bodyKeys.map((key) => (
+              {showDetails && collapsibleDetails && (bodyKeys.length > 0 || topic.externalLink) ? <TouchableOpacity
+                accessibilityRole="button" accessibilityState={{ expanded }}
+                accessibilityLabel={t(expanded ? 'help.detailsHide' : 'help.detailsShow')}
+                onPress={() => setExpanded(value => !value)} style={s.externalLink}>
+                <Text style={s.externalLinkText}>{t(expanded ? 'help.detailsHide' : 'help.detailsShow')}</Text>
+              </TouchableOpacity> : null}
+              {detailsVisible && bodyKeys.map((key) => (
                 <Text key={key} style={s.detail}>{t(key)}</Text>
               ))}
               {externalLink && (
@@ -71,6 +84,13 @@ export function HelpSheet({
                   <Text style={s.externalLinkText}>{t(externalLink.labelKey)}</Text>
                 </TouchableOpacity>
               )}
+              {showDetails && onTopic && related.length > 0 ? <View style={s.related}>
+                <Text accessibilityRole="header" style={s.detail}>{t('help.relatedTopics')}</Text>
+                {related.map(id => <TouchableOpacity key={id} accessibilityRole="button"
+                  accessibilityLabel={t(HELP_TOPIC_TITLE_KEY[id])} onPress={() => onTopic(id)} style={s.relatedLink}>
+                  <Text style={s.externalLinkText}>{t(HELP_TOPIC_TITLE_KEY[id])}</Text>
+                </TouchableOpacity>)}
+              </View> : null}
 
   </>);
   const cardContent = (<>
@@ -148,6 +168,8 @@ const s = StyleSheet.create({
   body: { flexShrink: 1, minHeight: 0, marginBottom: 18 },
   text: { fontSize: 15, color: C.white, lineHeight: 23 },
   detail: { fontSize: 14, color: C.muted, lineHeight: 22, marginTop: 12 },
+  related: { marginTop: 12 },
+  relatedLink: { minHeight: 48, justifyContent: 'center', paddingVertical: 10 },
   externalLink: { minHeight: 48, justifyContent: 'center', paddingVertical: 12, marginTop: 12 },
   externalLinkText: { fontSize: 14, color: C.accent, textDecorationLine: 'underline' },
   actions: { flexShrink: 0, flexDirection: 'row', gap: 10, alignItems: 'stretch' },

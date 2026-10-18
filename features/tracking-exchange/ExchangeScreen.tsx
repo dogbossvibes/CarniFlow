@@ -1,5 +1,4 @@
 import { takePendingTrackFile } from './pending';
-import { GROUP_DISTRACTION_RELEASE_READY } from './groups/releaseGate';
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
 import { ActivityIndicator,Pressable,ScrollView,StyleSheet,Text,TextInput,View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,7 +20,7 @@ import { exchangeErrorKey } from './i18n';
 export function ExchangeButton({label,onPress,disabled=false}:{label:string;onPress():void;disabled?:boolean}){return <Pressable accessibilityRole="button" accessibilityState={{disabled}} disabled={disabled} style={[styles.button,disabled&&{opacity:0.45}]} onPress={onPress}><Text style={styles.action}>{label}</Text></Pressable>;}
 export default function ExchangeScreen(){const data=useDistractions(undefined);return <Content key={`${data.userId}:${data.epoch}`} data={data}/>;}
 function Content({data}:{data:ReturnType<typeof useDistractions>}){
- const {t}=useTranslation('trackExchange'),router=useRouter(),params=useLocalSearchParams<{sourceId?:string;taskId?:string;incoming?:string;importNotice?:string}>();
+ const {t}=useTranslation('trackExchange'),router=useRouter(),params=useLocalSearchParams<{sourceId?:string;taskId?:string;incoming?:string;importNotice?:string;mode?:string}>();
  const [sourceId,setSourceId]=useState(typeof params.sourceId==='string'?params.sourceId:''),[title,setTitle]=useState('');
  const [rows,setRows]=useState<ExchangeRow[]>([]),[history,setHistory]=useState<TrackHistoryRow[]>([]),[preview,setPreview]=useState<TrackFile|null>(null);
  const [selected,setSelected]=useState<string|null>(typeof params.taskId==='string'?params.taskId:null),[error,setError]=useState<unknown>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
@@ -29,7 +28,7 @@ function Content({data}:{data:ReturnType<typeof useDistractions>}){
  const alive=useRef(true),lock=useRef(false),generation=useRef(0),captured=useRef({...data.scope.current});
  const check=useCallback(()=>{const s=data.scope.current;if(!alive.current||s.userId!==captured.current.userId||s.epoch!==captured.current.epoch)throw new ExchangeError('ACCOUNT_CHANGED');},[data.scope]);
  const repo=useMemo(()=>data.userId?exchangeRepository(data.userId,()=>data.scope.current):null,[data.userId,data.scope]);
- const load=useCallback(async()=>{const token=++generation.current;if(!repo||!data.userId)return;try{const list=await repo.list();check();if(token!==generation.current)return;setRows(list);}catch(e){if(alive.current&&token===generation.current)setError(e);}},[repo,data.userId,check]);
+ const load=useCallback(async()=>{const token=++generation.current;if(!repo||!data.userId)return;try{const list=await repo.list();check();if(token!==generation.current)return;if(typeof params.taskId==='string'&&!list.some(row=>row.taskId===params.taskId)){const requested=await repo.get(params.taskId);check();if(token!==generation.current)return;if(!requested)throw new ExchangeError('NOT_FOUND');list.unshift(requested);}setRows(list);}catch(e){if(alive.current&&token===generation.current)setError(e);}},[repo,data.userId,check,params.taskId]);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
  useEffect(()=>{if(typeof params.incoming==='string'&&data.userId){try{check();setPreview(takePendingTrackFile(params.incoming,data.userId));}catch(e){setError(e);}}},[params.incoming,data.userId,check]);
  useFocusEffect(useCallback(()=>{void load();return()=>{generation.current++;};},[load]));
@@ -46,8 +45,8 @@ function Content({data}:{data:ReturnType<typeof useDistractions>}){
  const returning=preview?.kind==='distraction-return'?preview.contribution:undefined;
  const button=(label:string,fn:()=>Promise<void>)=><ExchangeButton label={label} disabled={busy} onPress={()=>void act(fn)}/>;
  return <SafeAreaView style={styles.safe}><ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-  <ExchangeButton label={t('back')} disabled={busy} onPress={()=>{if(preview||selected){setPreview(null);setSelected(null);setMessage('');}else if(router.canGoBack())router.back();else router.replace('/track' as never);}}/>
-  {params.importNotice&&<Text style={styles.body}>{t('importHint')}</Text>}<Text accessibilityRole="header" style={styles.title}>{t('title')}</Text><Text style={styles.body}>{t('hint')}</Text>
+  <ExchangeButton label={t('back')} disabled={busy} onPress={()=>{if(preview){setPreview(null);setMessage('');}else if(selected&&params.mode){setSelected(null);setMessage('');}else if(router.canGoBack())router.back();else router.replace('/track/sharing' as never);}}/>
+  {params.importNotice&&<Text style={styles.body}>{t('importHint')}</Text>}<Text accessibilityRole="header" style={styles.title}>{t(task?task.role==='incoming'?'received':'outgoing':params.mode==='compose'?'file':'import')}</Text>
   {busy&&<ActivityIndicator accessibilityLabel={t('loading')} color={C.accent}/>}{!!error&&<Text accessibilityRole="alert" style={styles.error}>{t(exchangeErrorKey(error))}</Text>}{!!message&&<Text accessibilityRole="alert" style={styles.body}>{message}</Text>}
   {preview||task?<>
    <Text style={styles.heading}>{preview?.kind==='distraction-return'?t('review'):task?.offer.title??(preview as TrackOffer)?.title}</Text>
@@ -56,13 +55,11 @@ function Content({data}:{data:ReturnType<typeof useDistractions>}){
    {preview?<><Text style={styles.body}>{t('unverified')}</Text>{preview.kind==='distraction-request'&&rows.some(r=>r.taskId===preview.taskId&&r.role==='outgoing')?<><Text style={styles.body}>{t('privacy')}</Text>{button(t('send'),async()=>{await shareTrackFile(preview,check);setMessage(t('prepared'));})}</>:button(t(preview.kind==='distraction-request'?'accept':'add'),importConfirm)}<ExchangeButton label={t('cancel')} disabled={busy} onPress={()=>setPreview(null)}/></>:
     task?.role==='incoming'?<><Text style={styles.body}>{t('incoming')}</Text><ExchangeButton label={t('record')} disabled={busy} onPress={()=>router.push({pathname:'/track/verleitungen',params:{id:task.parentId}} as never)}/><Text style={styles.heading}>{t('finished')}</Text>{!children.length&&<Text style={styles.body}>{t('noneFinished')}</Text>}{children.map(child=><View key={child.id} style={styles.card}><Text style={styles.heading}>{child.name} · {Math.round(child.distance)} m</Text>{button(t('return'),async()=>{if(!repo)return;const file=await repo.makeReturn(task.taskId,child.id);check();await shareTrackFile(file,check);setMessage(t('prepared'));})}</View>)}</>:
     task&&<><Text style={styles.body}>{t('outgoing')}</Text><Text style={styles.body}>{t('privacy')}</Text>{button(t('send'),async()=>{await shareTrackFile(task.offer,check);setMessage(t('prepared'));})}<ExchangeButton label={t('open')} disabled={busy} onPress={()=>router.push({pathname:'/track/verleitungen',params:{id:task.parentId}} as never)}/></>}
-  </>:<>
-   <View style={styles.card}><Text style={styles.heading}>{t('import')}</Text><Text style={styles.body}>{t('importHint')}</Text>{button(t('import'),async()=>{const file=await importTrackFile(check);check();if(file?.kind==='distraction-return'){const original=await repo?.get(file.taskId);check();if(!original||original.role!=='outgoing')throw new ExchangeError('NOT_FOUND');if(original.offer.referenceDigest!==file.referenceDigest)throw new ExchangeError('CONFLICT');setRows(previous=>[original,...previous.filter(r=>r.taskId!==original.taskId)]);}if(file)setPreview(file);})}</View>
-   <View style={styles.card}><Text style={styles.heading}>{t('file')}</Text><Text style={styles.body}>{t('fileHint')}</Text><TextInput accessibilityLabel={t('name')} placeholder={t('name')} placeholderTextColor={C.trackTextMut} value={title} onChangeText={setTitle} maxLength={80} style={styles.input}/>{sourceId&&<Text style={styles.body}>{t('source')} ✓</Text>}{button(t(sourceId?'preview':'source'),prepare)}
-    {history.map(row=><ExchangeButton key={row.id} label={`${row.session_date??'—'} · ${row.distance_meters==null?'—':Math.round(row.distance_meters)} m`} disabled={busy} onPress={()=>{setSourceId(row.id);setHistory([]);}}/>)}</View>
-   <View style={styles.card}><Text style={styles.heading}>{t('search')}</Text><Text style={styles.body}>{t('searchHint')}</Text><ExchangeButton label={t('search')} onPress={()=>router.push({pathname:'/track/transfer',params:sourceId?{sourceId}:{}} as never)}/></View>
-   <View style={styles.card}><Text style={styles.heading}>{t('groups')}</Text><Text style={styles.body}>{t(GROUP_DISTRACTION_RELEASE_READY?'groupHint':'groupPending')}</Text>{GROUP_DISTRACTION_RELEASE_READY&&<ExchangeButton label={t('groups')} disabled={busy} onPress={()=>router.push({pathname:'/track/group-tasks',params:sourceId?{sourceId}:{}} as never)}/>}</View>
-   <Text style={styles.heading}>{t('pending')}</Text>{!rows.length&&<Text style={styles.body}>{t('empty')}</Text>}{rows.map(row=><View key={row.taskId} style={styles.card}><Text style={styles.body}>{t(row.role)}</Text><ExchangeButton label={row.offer.title} disabled={busy} onPress={()=>setSelected(row.taskId)}/></View>)}{button(t('refresh'),load)}
+  </>:selected?<View style={styles.card}><Text style={styles.body}>{t('notFound')}</Text>{button(t('refresh'),load)}</View>:<>
+   {params.mode!=='compose'&&<View style={styles.card}><Text style={styles.heading}>{t('import')}</Text><Text style={styles.body}>{t('importHint')}</Text>{button(t('import'),async()=>{const file=await importTrackFile(check);check();if(file?.kind==='distraction-return'){const original=await repo?.get(file.taskId);check();if(!original||original.role!=='outgoing')throw new ExchangeError('NOT_FOUND');if(original.offer.referenceDigest!==file.referenceDigest)throw new ExchangeError('CONFLICT');setRows(previous=>[original,...previous.filter(r=>r.taskId!==original.taskId)]);}if(file)setPreview(file);})}</View>}
+   {params.mode==='compose'&&<View style={styles.card}><Text style={styles.heading}>{t('file')}</Text><Text style={styles.body}>{t('fileHint')}</Text><TextInput accessibilityLabel={t('name')} placeholder={t('name')} placeholderTextColor={C.trackTextMut} value={title} onChangeText={setTitle} maxLength={80} style={styles.input}/>{sourceId&&<Text style={styles.body}>{t('source')} ✓</Text>}{button(t(sourceId?'preview':'source'),prepare)}
+    {history.map(row=><ExchangeButton key={row.id} label={`${row.session_date??'—'} · ${row.distance_meters==null?'—':Math.round(row.distance_meters)} m`} disabled={busy} onPress={()=>{setSourceId(row.id);setHistory([]);}}/>)}</View>}
+
   </>}
  </ScrollView></SafeAreaView>;
 }

@@ -1,6 +1,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 import type { TranslationKey } from '@/i18n';
+import { GROUP_DISTRACTION_RELEASE_READY } from '@/features/tracking-exchange/groups/releaseGate';
 // Zentrale, datengetriebene Help-Registry — Single Source of Truth für
 // Coachmarks, „?"-Hilfe im Screen, Help-Center und „ANYVO kennenlernen".
 // Keine Hilfetexte über die Screens verteilt. KEINE KI (Smart Analyse =
@@ -10,6 +11,7 @@ import type { TranslationKey } from '@/i18n';
 export type HelpCategory = 'start' | 'training' | 'tracking' | 'analysis';
 
 export type HelpTopicId =
+  | 'first_steps'
   | 'home'
   | 'account_security'
   | 'add_dog'
@@ -23,6 +25,8 @@ export type HelpTopicId =
   | 'track_gps'
   | 'track_shelly'
   | 'track_search'
+  | 'track_review'
+  | 'track_together'
   | 'track_handler_distance'
   | 'track_step_calibration'
   | 'smart_analysis'
@@ -54,6 +58,9 @@ export const HELP_CATEGORY_LABEL_KEY: Record<HelpCategory, TranslationKey> = {
 };
 
 export const HELP_TOPIC_TITLE_KEY: Record<HelpTopicId, TranslationKey> = {
+  first_steps: 'help.firstStepsTitle',
+  track_review: 'help.trackReviewTitle',
+  track_together: 'help.trackTogetherTitle',
   home: 'help.homeTitle',
   account_security: 'profile.accountSecurity',
   add_dog: 'dog.add',
@@ -74,6 +81,9 @@ export const HELP_TOPIC_TITLE_KEY: Record<HelpTopicId, TranslationKey> = {
 };
 
 export const HELP_TOPIC_SHORT_KEY: Record<HelpTopicId, TranslationKey> = {
+  first_steps: 'help.firstStepsShort',
+  track_review: 'help.trackReviewShort',
+  track_together: 'help.trackTogetherShort',
   home: 'help.homeShort',
   account_security: 'help.accountSecurityShort',
   add_dog: 'help.addDogShort',
@@ -94,15 +104,41 @@ export const HELP_TOPIC_SHORT_KEY: Record<HelpTopicId, TranslationKey> = {
 };
 
 export const HELP_TOPIC_BODY_KEYS: Partial<Record<HelpTopicId, TranslationKey[]>> = {
+  first_steps: ['help.firstStepsBody1', 'help.firstStepsBody2', 'help.firstStepsBody3'],
+  track_gps: ['help.trackGpsBody1', 'help.trackGpsBody2', 'help.trackGpsBody3'],
+  track_segments: ['help.trackSegmentsBody1'],
+  track_objects: ['help.trackObjectsBody1'],
+  track_search: ['help.trackSearchBody1', 'help.trackSearchBody2'],
+  track_review: ['help.trackReviewBody1', 'help.trackReviewBody2'],
+  track_together: ['help.trackTogetherBody1', 'help.trackTogetherBody2', 'help.trackTogetherVersions', GROUP_DISTRACTION_RELEASE_READY ? 'help.trackGroupsReady' : 'help.trackGroupsUnavailable'],
   track_shelly: ['help.shellyBody1', 'help.shellyBody2', 'help.shellyBody3'],
   home: ['help.homeBody1', 'help.homeBody2'],
   account_security: ['help.accountSecurityBody1', 'help.accountSecurityBody2'],
-  track_laying: ['help.trackLayingBody1', 'help.trackLayingBody2'],
+  track_laying: ['help.trackLayingBody1', 'help.trackLayingBody2', 'help.trackLayingBody3'],
   track_angles: ['help.trackAnglesBody1'],
   track_step_calibration: ['help.trackStepCalibrationBody1'],
 };
 
+export const FIRST_STEP_TOPICS: HelpTopicId[] = ['add_dog', 'document_training', 'track_laying'];
+export const HELP_TOPIC_RELATED: Partial<Record<HelpTopicId, HelpTopicId[]>> = {
+  first_steps: ['account_security', 'add_dog', 'document_training', 'track_laying'],
+  add_dog: ['account_security', 'document_training'],
+  document_training: ['start_timer', 'recent_sessions'],
+  start_timer: ['document_training'],
+  start_training: ['document_training', 'start_timer'],
+  track_laying: ['track_gps', 'track_segments', 'track_objects', 'track_angles', 'track_search', 'track_together'],
+  track_gps: ['track_laying', 'track_step_calibration'],
+  track_search: ['track_handler_distance', 'track_gps', 'track_review'],
+  track_review: ['track_angles', 'recent_sessions'],
+  track_together: ['track_review'],
+};
+
 export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
+  first_steps: {
+    id: 'first_steps', title: 'Erste Schritte',
+    shortDescription: 'Lerne ANYVO ohne Probedaten kennen: Hund anlegen, Training dokumentieren und die erste Fährte vorbereiten.',
+    category: 'start',
+  },
   home: {
     id: 'home',
     title: 'Startbildschirm anpassen',
@@ -150,18 +186,23 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     id: 'start_training',
     title: 'Training starten',
     shortDescription:
-      'Wähle Hund und Disziplin und leg los. ANYVO führt dich durch die Einheit und speichert deine Dokumentation.',
+      "Wähle Hund und Disziplin für eine Live-Einheit. Training dokumentieren bleibt ein eigener Einstieg ohne Timerstart.",
     category: 'training',
   },
+  track_gps: {
+    id: 'track_gps',
+    title: 'GPS & Startpunkt',
+    shortDescription:
+      "Umgebung, Gerät und Trageposition können den Empfang beeinflussen. Die GPS-Anzeige ist eine Schätzung, keine Garantie für den tatsächlichen Positionsfehler.",
+    category: 'tracking',
+  },
+
   track_laying: {
     id: 'track_laying',
     title: 'Fährte legen',
     shortDescription:
       'ANYVO zeichnet deine Strecke per GPS auf. Während des Legens kannst du Teilstrecken, Gegenstände, Winkel und Abrisse markieren.',
-    body: [
-      'Tippe „Jetzt starten", sobald dein Startpunkt sitzt.',
-      'Die Aufzeichnung läuft auch im Hintergrund weiter.',
-    ],
+    body: ["Wähle den Hund und prüfe Standortfreigaben und GPS-Anzeige. Starte erst, wenn die App den Start anbietet. Der gespeicherte Startpunkt beruht auf einer geschätzten Position.", "Mit den nötigen Freigaben kann die Aufnahme im Hintergrund weiterlaufen. Betriebssystem und Energiespareinstellungen können sie einschränken. Beachte die Erklärung zur Hintergrundortung auf Android.", "Beim Legen hältst du Pause bzw. Fortsetzen gedrückt. Halte Stoppen gedrückt, um das Legen bewusst zu beenden und zur Liegezeit zu wechseln. Prüfe Hinweise auf noch ausstehende Speicherung."],
     category: 'tracking',
   },
   track_segments: {
@@ -182,8 +223,8 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     id: 'track_angles',
     title: 'Winkel markieren',
     shortDescription:
-      'GW = Geschlossener Winkel\nOW = Offener Winkel\nBW = Bodenwinkel\n✕ = Abriss',
-    body: ['Tippe während des Legens auf den Winkel-Button und wähle die passende Art.'],
+      "Winkel können automatisch erkannt oder manuell markiert werden. Beides braucht eine spätere Kontrolle; eine Markierung ist keine garantierte Messung der tatsächlichen Geometrie.",
+    body: ["Über Winkel wählst du GW (geschlossener Winkel), OW (offener Winkel), BW (Bodenwinkel) oder Abriss. Wähle die angebotene Richtung und Form; die automatische Richtungsbestimmung ist eine eigene Option."],
     category: 'tracking',
   },
   track_shelly: {
@@ -197,18 +238,11 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
       errorKey: 'help.shellyLinkError',
     },
   },
-  track_gps: {
-    id: 'track_gps',
-    title: 'GPS & Startpunkt',
-    shortDescription:
-      'Warte auf ein stabiles GPS-Signal und setze den Startpunkt mit „Jetzt starten". So beginnt die Fährte genau dort, wo du stehst.',
-    category: 'tracking',
-  },
   track_search: {
     id: 'track_search',
     title: 'Fährte absuchen',
     shortDescription:
-      'Beim Absuchen führt dich ANYVO entlang der gelegten Fährte und kündigt Winkel, Gegenstände und Abrisse voraus an.',
+      "Bei der Absuche zeigt ANYVO die aufgezeichnete Fährte und bietet Hinweise zu Winkeln und Gegenständen. Prüfe sie zusammen mit deiner eigenen Beobachtung.",
     category: 'tracking',
   },
   track_handler_distance: {
@@ -226,6 +260,18 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     body: ["Bleibe am Start stehen, bis GPS bereit ist. Starte dann und zähle 50 eigene normale Fährtenschritte auf gerader Strecke. Tippe am Ende auf Fertig und bleibe stehen, bis die Endposition geprüft ist. GPS liefert nur eine Schätzung. Erst «Schrittlänge übernehmen» speichert den Wert; Abbruch oder eine ungeeignete Messung ändern nichts."],
     category: 'tracking',
   },
+  track_review: {
+    id: 'track_review', title: 'Auswertung & Datenerhalt',
+    shortDescription: 'Im Logbuch öffnest du gespeicherte Fährten und Auswertungen. Vergleiche gelegte Spur und Absuche und ergänze deine Beobachtungen.',
+    category: 'tracking',
+  },
+
+  track_together: {
+    id: 'track_together', title: 'Übergabe & Austausch',
+    shortDescription: 'Nutze nur die Funktionen, die deine Version und dein Konto anbieten. Eine Übergabe zur eigenen Absuche ist etwas anderes als eine Verleitungsaufgabe per Datei.',
+    category: 'tracking',
+  },
+
   smart_analysis: {
     id: 'smart_analysis',
     title: 'Smart Analyse',
@@ -258,10 +304,10 @@ export const GUIDED_TOUR_KEY: { titleKey: TranslationKey; textKey: TranslationKe
   { titleKey: 'help.tourAnalysisTitle', textKey: 'help.tourAnalysisText' },
 ];
 export const GUIDED_TOUR: TourStep[] = [
-  { title: 'Startbildschirm', text: 'Passe deinen Start so an, wie du ANYVO nutzt.' },
-  { title: 'Hund',            text: 'Lege zuerst deinen Hund an.' },
-  { title: 'Training',        text: 'Starte einen Timer oder dokumentiere eine Einheit.' },
-  { title: 'Fährte',          text: 'Lege Fährten mit GPS und markiere Teilstrecken, Gegenstände und Winkel.' },
-  { title: 'Absuche',         text: 'Wähle 5 m oder 10 m Abstand zum Hund. ANYVO passt die Hinweise entsprechend an.' },
-  { title: 'Smart Analyse',   text: 'ANYVO wertet deine dokumentierten Trainingsdaten deterministisch aus.' },
+  {"title": "ANYVO im Alltag", "text": "Hunde, Gesundheit, Dokumente, Termine, Training und Fährten gehören zusammen. Passe die Schnellzugriffe auf deinem Startbildschirm an deinen Alltag an."},
+  {"title": "Hund", "text": "Melde dich mit deinem Konto an und lege deinen Hund unter Hunde an. Wähle bei Dokumentationen und Fährten immer den passenden Hund."},
+  {"title": "Training", "text": "Training dokumentieren erfasst Übungen, Beobachtungen und Medien ohne Timerstart. Nutze den Live-Timer nur, wenn du eine Einheit messen möchtest."},
+  {"title": "Fährte", "text": "Wähle den Hund, lies die Standortfreigaben und prüfe die GPS-Anzeige. Beim Legen setzt du Gegenstände und Teilstrecken; Winkel können automatisch erkannt oder manuell markiert werden."},
+  {"title": "Absuche", "text": "Nach dem Legen folgt die Liegezeit. Öffne die Absuche, prüfe Hund und Abstand und bestätige den Start. Zum bewussten Beenden hältst du den Auswerten-Knopf gedrückt."},
+  {"title": "Nachschauen & weiterlernen", "text": "Sieh dir Aufnahmen und Auswertungen im Logbuch an und ergänze Notizen. Prüfe angebotene Korrekturen und Freigaben bewusst. Dieser Rundgang legt keine Trainingsdaten an."},
 ];

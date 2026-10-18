@@ -45,3 +45,24 @@ it('keeps both footer actions and Android/backdrop close callbacks, repeatedly r
   }
   expect(close).toHaveBeenCalledTimes(4);
 });
+
+it('starts with a summary, expands details and resets expansion when the topic changes', () => {
+  render({ topic: HELP_TOPICS.track_gps, collapsibleDetails: true });
+  const text = () => node.root.findAllByType(Text).map((n: { props: { children: unknown } }) => n.props.children);
+  expect(text()).toContain('help.trackGpsShort');
+  expect(text()).not.toContain('help.trackGpsBody1');
+  const expand = node.root.findAllByType(TouchableOpacity).find((n: { props: { accessibilityLabel: string } }) => n.props.accessibilityLabel === 'help.detailsShow');
+  act(() => expand.props.onPress());
+  expect(text()).toContain('help.trackGpsBody1');
+  act(() => node.update(<HelpSheet visible topic={HELP_TOPICS.track_laying} onClose={close} showDetails collapsibleDetails />));
+  expect(text()).not.toContain('help.trackLayingBody1');
+});
+
+it('links to the same registry topics without starting another feature', () => {
+  const choose = jest.fn();
+  render({ topic: HELP_TOPICS.track_laying, collapsibleDetails: true, onTopic: choose });
+  const gps = node.root.findAllByType(TouchableOpacity).find((n: { props: { accessibilityLabel: string } }) => n.props.accessibilityLabel === 'help.trackGpsTitle');
+  act(() => gps.props.onPress());
+  expect(choose).toHaveBeenCalledWith('track_gps');
+  expect(close).not.toHaveBeenCalled();
+});

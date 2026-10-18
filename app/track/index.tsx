@@ -1,6 +1,7 @@
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
 import { ExchangeEntry } from '@/features/tracking-exchange/ExchangeEntry';
+import { HelpButton } from '@/components/help/HelpButton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -176,6 +177,7 @@ export default function TrackOverviewScreen() {
         title="FÄHRTEN"
         onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/training' as never))}
         dog={activeDog} dogs={dogs} onDog={setDogId}
+        trailing={<HelpButton topicId="track_laying" tint={C.trackTextSec} />}
       />
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>

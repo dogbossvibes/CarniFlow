@@ -31,6 +31,7 @@ export default function HelpScreen() {
   const faqs = [
     { frage: t('help.faqDogQuestion'), antwort: t('help.faqDogAnswer') },
     { frage: t('help.faqTrainingQuestion'), antwort: t('help.faqTrainingAnswer') },
+    { frage: t('help.faqGpsQuestion'), antwort: t('help.trackGpsShort') },
     { frage: t('help.faqRatingQuestion'), antwort: t('help.faqRatingAnswer') },
     { frage: t('help.faqTrainerQuestion'), antwort: t('help.faqTrainerAnswer') },
     { frage: t('help.faqNotificationsQuestion'), antwort: t('help.faqNotificationsAnswer') },
@@ -57,7 +58,7 @@ export default function HelpScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -71,6 +72,13 @@ export default function HelpScreen() {
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
       >
+        <TouchableOpacity style={s.kontaktKarte} onPress={() => router.push('/help-center')} accessibilityRole="button" accessibilityLabel={t('help.firstStepsTitle')}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.kontaktTitel}>{t('help.firstStepsTitle')}</Text>
+            <Text style={s.kontaktSub}>{t('help.firstStepsShort')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={C.subtle} />
+        </TouchableOpacity>
         <Text style={s.intro}>
           {t('help.intro')}
         </Text>
@@ -85,6 +93,9 @@ export default function HelpScreen() {
                   style={s.faqKopf}
                   onPress={() => toggle(i)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: aktiv }}
+                  accessibilityLabel={f.frage}
                 >
                   <Text style={s.faqFrage}>{f.frage}</Text>
                   <Ionicons

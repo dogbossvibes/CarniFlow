@@ -25,3 +25,12 @@ afterEach(()=>{if(screen)act(()=>screen.unmount());});
 it('picking an offer shows preview and requires a separate acceptance',async()=>{mockImport.mockResolvedValue(offer());await act(async()=>{screen=TestRenderer.create(<ExchangeScreen/>);});await press('import');expect(mockAccept).not.toHaveBeenCalled();expect(button('accept')).toBeTruthy();expect(screen.root.findAll(n=>n.props.children==='unverified').length).toBeGreaterThan(0);await press('accept');expect(mockAccept).toHaveBeenCalledTimes(1);});
 it('return preview includes both lines and does not apply before confirmation',async()=>{mockRows=[{taskId:ids.task,parentId:ids.parent,role:'outgoing',offer:offer()}];mockImport.mockResolvedValue(returned());await act(async()=>{screen=TestRenderer.create(<ExchangeScreen/>);});await press('import');expect(mockApply).not.toHaveBeenCalled();expect(screen.root.findAll(n=>n.props.distractionTracks?.length===1).length).toBeGreaterThan(0);await press('add');expect(mockApply).toHaveBeenCalledTimes(1);});
 it('account epoch change during picker completion does not display stale coordinates',async()=>{mockImport.mockImplementation(async()=>{mockScope.current={userId:'other',epoch:1};return offer();});await act(async()=>{screen=TestRenderer.create(<ExchangeScreen/>);});await press('import');expect(mockAccept).not.toHaveBeenCalled();expect(screen.root.findAll(n=>n.props.layPoints).length).toBe(0);});
+
+it('file-only mode uses the existing picker and does not show compose or unrelated forms',async()=>{
+ mockParams={mode:'file'};mockImport.mockResolvedValue(null);await act(async()=>{screen=TestRenderer.create(<ExchangeScreen/>);});
+ expect(button('import')).toBeTruthy();expect(button('source')).toBeUndefined();expect(button('search')).toBeUndefined();await press('import');expect(mockImport).toHaveBeenCalledTimes(1);expect(mockAccept).not.toHaveBeenCalled();
+});
+it('compose-only mode defers creation and does not show unrelated import, transfer or group cards',async()=>{
+ mockParams={mode:'compose'};await act(async()=>{screen=TestRenderer.create(<ExchangeScreen/>);});
+ expect(button('source')).toBeTruthy();expect(button('import')).toBeUndefined();expect(button('search')).toBeUndefined();expect(button('groups')).toBeUndefined();expect(mockShare).not.toHaveBeenCalled();
+});

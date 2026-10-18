@@ -5,11 +5,14 @@ import {
   HELP_CATEGORY_LABEL_KEY,
   HELP_CATEGORY_ORDER,
   HELP_TOPIC_TITLE_KEY,
+  HELP_TOPICS,
+  FIRST_STEP_TOPICS,
   topicsByCategory,
   type HelpTopic,
 } from '@/features/help/helpRegistry';
 import { useT } from '@/i18n';
-import { resetHelpSeen } from '@/stores/helpSeen';
+import { markHelpSeen, resetHelpSeen, useHelpSeenState } from '@/stores/helpSeen';
+import { useSession } from '@/hooks/useSession';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -23,10 +26,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // Kategorie (datengetrieben aus der Registry) + Reset. Kein Handbuch —
 // jeder Eintrag öffnet eine kompakte Anleitung.
 export default function HelpCenterScreen() {
+  const { user } = useSession();
+  const userId = user?.id ?? null;
+  return <HelpCenterContent key={userId ?? 'anonymous'} userId={userId} />;
+}
+
+function HelpCenterContent({ userId }: { userId: string | null }) {
   const router = useRouter();
   const { t } = useT();
   const [topic, setTopic] = useState<HelpTopic | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
+  const { hydrated } = useHelpSeenState(userId);
+  const closeTopic = () => {
+    if (topic) markHelpSeen(topic.id, userId);
+    setTopic(null);
+  };
 
   const onReset = () => {
     Alert.alert(
@@ -34,7 +48,7 @@ export default function HelpCenterScreen() {
       t('help.resetAllBody'),
       [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('home.resetConfirm'), style: 'destructive', onPress: () => resetHelpSeen() },
+        { text: t('home.resetConfirm'), style: 'destructive', onPress: () => resetHelpSeen(userId) },
       ],
     );
   };
@@ -58,6 +72,18 @@ export default function HelpCenterScreen() {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        <View style={s.firstSteps}>
+          <TouchableOpacity onPress={() => setTopic(HELP_TOPICS.first_steps)} accessibilityRole="button" accessibilityLabel={t('help.firstStepsTitle')} style={s.firstIntro}>
+            <Text accessibilityRole="header" style={s.firstTitle}>{t('help.firstStepsTitle')}</Text>
+            <Text style={s.firstText}>{t('help.firstStepsShort')}</Text>
+          </TouchableOpacity>
+          {FIRST_STEP_TOPICS.map((id, index) => <TouchableOpacity key={id} style={s.zeile}
+            onPress={() => setTopic(HELP_TOPICS[id])} accessibilityRole="button" accessibilityLabel={t(HELP_TOPIC_TITLE_KEY[id])}>
+            <Text style={s.stepNumber}>{index + 1}.</Text>
+            <Text style={s.zeileLabel}>{t(HELP_TOPIC_TITLE_KEY[id])}</Text>
+            <Ionicons name="chevron-forward" size={16} color={C.subtle} />
+          </TouchableOpacity>)}
+        </View>
         {/* ── ANYVO KENNENLERNEN ── */}
         <TouchableOpacity
           style={s.tourCard}
@@ -78,7 +104,7 @@ export default function HelpCenterScreen() {
 
         {/* ── KATEGORIEN ── */}
         {HELP_CATEGORY_ORDER.map((cat) => {
-          const topics = topicsByCategory(cat);
+          const topics = topicsByCategory(cat).filter(tp => tp.id !== 'first_steps');
           if (topics.length === 0) return null;
           return (
             <View key={cat}>
@@ -124,6 +150,8 @@ export default function HelpCenterScreen() {
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel={t('help.resetAll')}
+          disabled={!hydrated}
+          accessibilityState={{ disabled: !hydrated }}
         >
           <Ionicons name="refresh-outline" size={18} color={C.accent} />
           <Text style={s.resetText}>{t('help.resetAll')}</Text>
@@ -132,7 +160,7 @@ export default function HelpCenterScreen() {
         <View style={{ height: 60 }} />
       </ScrollView>
 
-      <HelpSheet visible={topic != null} topic={topic} onClose={() => setTopic(null)} showDetails />
+      <HelpSheet visible={topic != null} topic={topic} onClose={closeTopic} showDetails collapsibleDetails onTopic={id => { if (topic) markHelpSeen(topic.id, userId); setTopic(HELP_TOPICS[id]); }} />
       <GuidedTour visible={tourOpen} onClose={() => setTourOpen(false)} />
     </SafeAreaView>
   );
@@ -154,6 +182,11 @@ const s = StyleSheet.create({
 
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 4 },
+  firstSteps: { backgroundColor: C.card, borderColor: C.border, borderWidth: 1, borderRadius: 18, marginBottom: 16 },
+  firstIntro: { padding: 18, minHeight: 56 },
+  firstTitle: { fontSize: 18, color: C.white, fontWeight: '800', marginBottom: 8 },
+  firstText: { fontSize: 14, color: C.muted, lineHeight: 22 },
+  stepNumber: { fontSize: 16, color: C.accent, fontWeight: '800', marginRight: 12 },
 
   tourCard: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
