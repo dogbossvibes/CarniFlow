@@ -28,7 +28,7 @@ export function TrackObjectCorrections({ controller: c }: { controller: TrackObj
   useEffect(() => { setTargets({}); setTargetRevision(null); }, [currentContext, intent?.operationId]);
   if (!c.available) return null;
   const statusText = (status: ReviewedObjectStatus) => t(`track.review.${status}`);
-  const button = (label: string, onPress: () => void, disabled = c.busy) => <Pressable accessibilityRole="button" accessibilityLabel={label}
+  const button = (label: string, onPress: () => void, disabled = c.busy, accessibilityLabel = label) => <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel}
     accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[s.button, disabled && s.disabled]}><Text style={s.action}>{label}</Text></Pressable>;
   const counts = review ? reviewCounts(review) : null;
   const error = c.error instanceof Error ? c.error.message : String(c.error ?? '');
@@ -47,7 +47,7 @@ export function TrackObjectCorrections({ controller: c }: { controller: TrackObj
         const pending = !!intent?.changes.some(change => change.objectId === object.objectId);
         return <View key={object.objectId} style={s.object}>
           <Text style={s.text}>{label}{pending ? ` · ${t('track.review.dismissQueued')}` : ''}</Text>
-          {!pending && button(t('track.review.dismissAuto', { number: object.index + 1 }), () => void c.queueAutoIntent(object.objectId))}
+          {!pending && button(t('track.review.dismissShort'), () => void c.queueAutoIntent(object.objectId), c.busy, t('track.review.dismissAuto', { number: object.index + 1 }))}
         </View>;
       })}
     </View>}

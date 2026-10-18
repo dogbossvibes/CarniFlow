@@ -71,7 +71,7 @@ it('C1: offers durable dismissal of a recorded auto detection offline before any
   const c = control({ review: null, error: new Error('REVIEW_OFFLINE') });
   Object.assign(c, { localAutoObjects: [{ objectId: 'local-auto-id', index: 0, material: null }], queueAutoIntent: jest.fn(async () => true) });
   mount(c);
-  expect(button('Automatische Erkennung 1 verwerfen')).toBeTruthy();
+  expect(button('Automatischen Gegenstandsfund 1 verwerfen')).toBeTruthy();
 });
 
 
@@ -79,8 +79,8 @@ it('keeps cold intent visible without server data and allows another offline dis
   const c = control({ review: null, localAutoObjects: coldIntent().localAutoObjects,
     pending: { request: coldIntent(), state: 'failed', lastError: 'offline' } });
   mount(c); expect(text()).toContain('Verwerfen vorgemerkt');
-  expect(button('Automatische Erkennung 1 verwerfen')).toBeUndefined();
-  await act(async () => button('Automatische Erkennung 2 verwerfen').props.onPress());
+  expect(button('Automatischen Gegenstandsfund 1 verwerfen')).toBeUndefined();
+  await act(async () => button('Automatischen Gegenstandsfund 2 verwerfen').props.onPress());
   expect(c.queueAutoIntent).toHaveBeenCalledWith('local-auto-b');
   expect(c.initialize).not.toHaveBeenCalled(); expect(c.save).not.toHaveBeenCalled();
 });
@@ -89,11 +89,23 @@ it('never preselects a server identity and submits only the explicit mapping wit
     pending: { request: coldIntent(), state: 'conflict', lastError: 'REVIEW_INTENT_CONFIRMATION_REQUIRED' } });
   mount(c);
   expect(button('Zuordnung bestätigen und speichern').props.disabled).toBe(true);
-  act(() => renderer.root.findAll((n: any) => n.props.accessibilityRole === 'radio' && n.props.accessibilityLabel === 'Automatische Erkennung 1 → G1' && typeof n.props.onPress === 'function')[0].props.onPress());
+  act(() => renderer.root.findAll((n: any) => n.props.accessibilityRole === 'radio' && n.props.accessibilityLabel === 'Automatischer Gegenstandsfund 1 → G1' && typeof n.props.onPress === 'function')[0].props.onPress());
   act(() => renderer.update(<TrackObjectCorrections controller={{ ...c, review: baseline({ revision: 3 }) }} />));
   act(() => button('Zuordnung bestätigen und speichern').props.onPress());
   expect(c.resolveIntent).toHaveBeenCalledWith({ 'local-auto-a': 'object-a' }, 0);
   act(() => button('Abbrechen').props.onPress());
   expect(button('Zuordnung bestätigen und speichern').props.disabled).toBe(true);
   expect(c.acceptCurrent).not.toHaveBeenCalled();
+});
+
+it('labels object finds explicitly, keeps the visible action short and dismisses by ID after reordering', async () => {
+  const objects = coldIntent().localAutoObjects;
+  const c = control({ review: null, localAutoObjects: [objects[1], objects[0]] });
+  mount(c);
+  expect(text()).toContain('Automatischer Gegenstandsfund 2');
+  expect(text()).not.toContain('Winkel');
+  const action = button('Automatischen Gegenstandsfund 2 verwerfen');
+  expect(action.findAll((n: any) => n.type === 'Text').some((n: any) => n.props.children === 'Verwerfen')).toBe(true);
+  await act(async () => action.props.onPress());
+  expect(c.queueAutoIntent).toHaveBeenCalledWith(objects[1].objectId);
 });
