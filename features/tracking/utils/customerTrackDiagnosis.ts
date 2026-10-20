@@ -1,3 +1,4 @@
+import { scoredObjectSummary } from './scoredObjectProjection';
 // Kundenfähige Fährtendiagnose — REINE, testbare Logik (kein React/Expo/Native).
 //
 // Zwei Aufgaben, beide rein lesend auf bereits GESPEICHERTEN Daten einer Fährte:
@@ -126,9 +127,10 @@ export function buildCustomerDiagnosisSummary(data: Record<string, any> | null |
 
   const corners = isNum(data?.corners_total) ? data!.corners_total : markers.length ? markers.filter(m => m.marker_type === 'winkel').length : null;
   if (corners != null) rows.push({ key: 'corners', labelKey: `${P}corners` as TranslationKey, value: { text: String(corners) } });
-  const objects = isNum(data?.articles_total) ? data!.articles_total : markers.length ? markers.filter(m => m.marker_type === 'gegenstand').length : null;
+  const objectSummary = scoredObjectSummary(data);
+  const objects = objectSummary.total;
   if (objects != null) {
-    const found = run?.articlesFound;
+    const found = objectSummary.hasJokers ? objectSummary.found : run?.articlesFound;
     rows.push({ key: 'objects', labelKey: `${P}objects` as TranslationKey, value: kind === 'searched' && isNum(found)
       ? { textKey: `${P}objectsFound` as TranslationKey, params: { found, total: objects } }
       : { text: String(objects) } });

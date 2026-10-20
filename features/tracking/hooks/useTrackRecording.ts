@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { useCallback, useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
@@ -219,7 +220,7 @@ export function useTrackRecording() {
       layingDurationSeconds: s.durationSeconds,
       distanceMeters:        s.distanceMeters,
       gpsQualityAverage:     accAvg,
-      articlesTotal:         s.markers.filter(m => m.type === 'gegenstand').length,
+      articlesTotal:         s.markers.filter(isScoredObject).length,
       cornersTotal:          s.markers.filter(m => m.type === 'winkel').length,
       distractionsTotal:     s.markers.filter(m => m.type === 'verleitung').length,
     });

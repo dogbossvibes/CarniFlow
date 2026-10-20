@@ -1,3 +1,4 @@
+import { isScoredObject } from './objectMarkers';
 import { C } from '@/constants/colors';
 import { calculateDistance, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { DEFAULT_STEP_LENGTH_M } from '@/features/tracking/utils/steps';
@@ -422,7 +423,7 @@ export function analyzeTrackSegments(input: {
     // Start/Stop-Modell: keine Vorabplanung mehr → tatsächlich dokumentierte
     // Länge ausweisen (keine „geplant X Schritte"-Formulierung).
     hints.push(`Teilstrecke ${label}: ${actual} Schritte dokumentiert.`);
-    const markersInside = (input.markers ?? []).filter(m => m.type === 'gegenstand' && m.distance_from_start >= segment.startStep * DEFAULT_STEP_LENGTH_M && m.distance_from_start <= segment.endStep * DEFAULT_STEP_LENGTH_M);
+    const markersInside = (input.markers ?? []).filter(m => isScoredObject(m) && m.distance_from_start >= segment.startStep * DEFAULT_STEP_LENGTH_M && m.distance_from_start <= segment.endStep * DEFAULT_STEP_LENGTH_M);
     if (markersInside.length > 0) {
       hints.push(`${markersInside.length} Gegenstand${markersInside.length === 1 ? '' : 'e'} lagen innerhalb der Teilstrecke ${label}.`);
     }

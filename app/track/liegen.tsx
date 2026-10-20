@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { countLaidCorners } from '@/features/tracking/utils/specialAngleGeometry';
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
 import { hasTransferredGaps } from '@/features/tracking-transfer/androidGapSafety';
@@ -43,7 +44,9 @@ function fmtAge(sec: number) {
 function materialLabel(material: MarkerMaterial | null | undefined): string {
   switch (material) {
     case 'holz':     return 'Holz';
-    case 'duebel':   return 'Dübel';
+    case 'duebel':   return 'Dübel · Joker';
+    case 'ball':     return 'Ball · Joker';
+    case 'gummi':    return 'Gummi';
     case 'stoff':    return 'Stoff';
     case 'filz':     return 'Filz';
     case 'leder':    return 'Leder';
@@ -57,7 +60,7 @@ function materialLabel(material: MarkerMaterial | null | undefined): string {
 
 // Kennzahlen der gelegten Fährte für die Zusammenfassung.
 function summarize(st: { distanceMeters: number; markers: { type: string; material?: MarkerMaterial | null }[]; segments?: TrackSegment[] }) {
-  const objects = st.markers.filter(m => m.type === 'gegenstand');
+  const objects = st.markers.filter(isScoredObject);
   const completedSegments = (st.segments ?? []).filter(s => s.status === 'completed').sort((a, b) => a.startStep - b.startStep);
   return {
     distanceM: Math.round(st.distanceMeters),

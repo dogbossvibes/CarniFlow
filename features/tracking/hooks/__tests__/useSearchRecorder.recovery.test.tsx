@@ -48,10 +48,10 @@ const toLL = (xE: number, yN: number): LatLng => ({ latitude: yN / M_PER_DEG, lo
 // Gerade Fährte nach Norden, 100 m, 2-m-Raster (wie die gelegte Linie).
 const LINE: LatLng[] = [];
 for (let y = 0; y <= 100; y += 2) LINE.push(toLL(0, y));
-// Gegenstand bei 20 m (Stoff) und Dübel bei 70 m — mit stabilen Marker-IDs.
+// Gegenstand bei 20 m (Stoff) und Gummi bei 70 m — mit stabilen Marker-IDs.
 const OBJECTS: SearchObject[] = [
   { at: toLL(0, 20), index: 0, material: 'stoff', id: 'gegenstand-20' },
-  { at: toLL(0, 70), index: 1, material: 'duebel', id: 'gegenstand-70' },
+  { at: toLL(0, 70), index: 1, material: 'gummi', id: 'gegenstand-70' },
 ];
 
 function Harness({ onReady, objects, points = LINE }: { onReady: (s: SearchRecorder) => void; objects: SearchObject[]; points?: LatLng[] }) {
@@ -135,7 +135,7 @@ describe('useSearchRecorder — Search-Recovery-State', () => {
     expect(getRecorder().progressM).toBe(0);   // dokumentierte Legacy-Degradation (Fenster [−4, +20] um 0)
   });
 
-  it('8./9. gefundener Gegenstand UND Dübel überleben Resume (stabile Marker-IDs); Fund-Distanz unverändert', async () => {
+  it('8./9. gefundener Gegenstand UND Gummi überleben Resume (stabile Marker-IDs); Fund-Distanz unverändert', async () => {
     const runState: SearchRunState = { ...freshSearchRunState(), maxCursorM: 75, foundObjectIds: ['gegenstand-20', 'gegenstand-70'] };
     const { getRecorder } = mount();
     await flushMicrotasks();
@@ -304,4 +304,42 @@ describe('additive Android object snapshot at stop', () => {
     expect(ended.foundObjects).toBe(0);
     expect(ended.score).toBe(pending.score);
   });
+});
+
+it('excludes both jokers from resumed finds, penalties and object snapshots without shifting legacy keys', async () => {
+  const objects: SearchObject[] = [
+    { at: toLL(0, 10), index: 0, material: 'duebel' },
+    { at: toLL(0, 20), index: 1, material: 'gummi' },
+    { at: toLL(0, 70), index: 2, material: 'ball' },
+  ];
+  const { getRecorder } = mount(objects);
+  await flushMicrotasks();
+  const runState = { ...freshSearchRunState(), maxCursorM: 75, foundObjectIds: ['idx:0', 'idx:1', 'idx:2'] };
+  act(() => { getRecorder().start({ points: [toLL(0, 75)], startedAtMs: 1, runState }); });
+  expect(getRecorder().totalObjects).toBe(1);
+  expect(getRecorder().foundObjects).toBe(1);
+  walk(76, 100);
+  act(() => getRecorder().confirmEnd());
+  let result!: ReturnType<SearchRecorder['stop']>;
+  act(() => { result = getRecorder().stop(); });
+  expect(result.foundObjectIndices).toEqual([0]);
+  expect(result.objectStatuses).toHaveLength(1);
+  expect(result.objectScoreBasis?.totalObjects).toBe(1);
+  expect(storeCalls.found).toEqual([]);
+  expect(objects.map(o => o.material)).toEqual(['duebel', 'gummi', 'ball']);
+});
+
+it('a joker-only track has no object waiting phase or missed-object penalty', async () => {
+  const { getRecorder } = mount([{ at: toLL(0, 100), index: 0, material: 'ball' }, { at: toLL(0, 20), index: 1, material: 'duebel' }]);
+  await flushMicrotasks();
+  act(() => getRecorder().start(undefined, { forceLocked: true }));
+  walk(0, 100);
+  expect(getRecorder().totalObjects).toBe(0);
+  expect(getRecorder().foundObjects).toBe(0);
+  act(() => getRecorder().confirmEnd());
+  let result!: ReturnType<SearchRecorder['stop']>;
+  act(() => { result = getRecorder().stop(); });
+  expect(result.objectStatuses).toEqual([]);
+  expect(result.foundObjectIndices).toEqual([]);
+  expect(storeCalls.found).toEqual([]);
 });

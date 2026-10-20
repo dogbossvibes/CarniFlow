@@ -137,7 +137,7 @@ describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
     expect(src).toContain('if (!qaRef.current) return;');
     // Und geschrieben, bevor die Puffer geleert werden.
     const write = src.indexOf('saveQaSessionCapture(');
-    const stop = src.indexOf('stopAll();', write);
+    const stop = src.indexOf('stopAll(false);', write);
     expect(write).toBeGreaterThan(-1);
     expect(stop).toBeGreaterThan(write);
   });

@@ -53,7 +53,7 @@ describe('buildRunResultPayload — analytics (Punkt 10/12/13, additiv)', () => 
 describe('optional original object snapshot', () => {
   const input = () => ({ objects: [
     { id: 'marker-a', index: 0, material: 'stoff' },
-    { id: 'marker-b', index: 1, material: 'duebel' },
+    { id: 'marker-b', index: 1, material: 'gummi' },
     { id: 'marker-c', index: 2, material: 'holz' },
   ], statuses: ['manual_found', 'auto_dwell_found', 'pending'] as import('../referenceObjectStatus').ReferenceObjectStatus[],
   scoreBasis: { version: 1 as const, trackPoints: 74, maxTrackPoints: 79, maxObjectPoints: 21, totalObjects: 3 } });
@@ -67,6 +67,12 @@ describe('optional original object snapshot', () => {
       objects: source.objects.map((o, i) => ({ ...o, recordedStatus: source.statuses[i] })), scoreBasis: source.scoreBasis });
     source.objects[0].id = 'changed'; source.statuses[1] = 'user_removed'; source.scoreBasis.trackPoints = 0;
     expect(snapshot).toMatchObject({ objects: [{ id: 'marker-a' }, { recordedStatus: 'auto_dwell_found' }, {}], scoreBasis: { trackPoints: 74 } });
+  });
+  it.each(['duebel', 'ball'])('omits a contaminated scoring snapshot containing joker %s without rewriting original results', material => {
+    const source = input(); source.objects[1].material = material;
+    const before = JSON.stringify(source);
+    expect(buildRunResultPayload({ ...base, objectSnapshotInput: source })).toEqual(buildRunResultPayload(base));
+    expect(JSON.stringify(source)).toBe(before);
   });
   it('does not backfill legacy/recovery runs or guess missing marker IDs', () => {
     expect(buildRunResultPayload(base)).not.toHaveProperty('object_snapshot');

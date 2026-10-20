@@ -6,6 +6,11 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "track.materialBall": "Balle",
+  "track.materialRubber": "Caoutchouc",
+  "track.jokers": "Jokers",
+  "track.jokerHint": "Les chevilles et les balles sont des jokers facultatifs, exclus de l’analyse des objets.",
+  "track.voiceBall": "Balle joker",
   "track.markerGroup.title": "Repères dans cette zone",
   "track.angleList.title": "Angles et directions",
   "track.angleList.hint": "Repères enregistrés sur la piste tracée. Touchez pour afficher les détails.",

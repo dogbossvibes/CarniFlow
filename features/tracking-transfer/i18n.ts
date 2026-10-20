@@ -1,5 +1,6 @@
 import { registerGroupResources } from '@/features/training-groups/registerResources';
 export const de = {
+  updateRequired: 'Für diese Fährte wird die aktuelle ANYVO-Version benötigt. Bitte aktualisiere die App.',
   directionTransfer: 'Fährten mit Abrissrichtung können noch nicht übergeben werden. Deine Fährte und die Richtungsangaben bleiben gespeichert.',
   gapTitle: 'Fährte mit Aufzeichnungslücken',
   gapUnsupported: 'Diese übergebene Fährte enthält Aufzeichnungslücken. Diese Android-Version unterstützt dafür noch keine sichere Absuche, Auswertung oder Wiedergabe. Bereits übernommene Daten bleiben vollständig erhalten. Eine neue Übernahme ist hier noch nicht möglich und verbraucht keine Fährtenquote.',
@@ -33,6 +34,7 @@ export const de = {
   busyDog: 'Für diesen Hund ist bereits eine andere Fährte offen. Die übernommene Fährte bleibt im Logbuch.',
 };
 const en: typeof de = {
+  updateRequired: 'This track requires the current ANYVO version. Please update the app.',
   directionTransfer: 'Tracks with an offset direction cannot be transferred yet. Your track and direction information remain saved.',
   gapTitle: 'Track with recording gaps',
   gapUnsupported: 'This transferred track contains recording gaps. This Android version cannot yet safely search, evaluate or replay it. Previously accepted data is fully retained. New acceptance is unavailable here and does not consume your track quota.',
@@ -65,6 +67,7 @@ export function transferErrorKey(error: unknown): keyof typeof de {
   if (code === 'TRANSFER_REVISION_CONFLICT') return 'revisionConflict';
   if (code === 'TRANSFER_COPY_GONE') return 'copyGone';
   if (code === 'DIRECTION_TRANSFER_UNAVAILABLE') return 'directionTransfer';
+  if (code === 'TRANSFER_UPDATE_REQUIRED') return 'updateRequired';
   if (code === 'SOURCE_NOT_SYNCED') return 'sourceSync';
   if (code === 'TRANSFER_QUOTA_EXCEEDED') return 'quota';
   if (code === 'STORAGE') return 'storage';

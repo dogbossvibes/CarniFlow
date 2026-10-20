@@ -1,4 +1,5 @@
 import { hasTransferredGaps } from './androidGapSafety';
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { TransferContactSearch } from './TransferContactSearch';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -147,7 +148,7 @@ function AccountTransferScreen({ userId }: { userId: string | null }) {
             angleMarkers={preview.reference.markers.flatMap(m => m.type === 'winkel' && m.lat !== null && m.lng !== null ? [{ lat: m.lat, lng: m.lng }] : [])}
             objectMarkers={preview.reference.markers.flatMap(m => m.type === 'gegenstand' && m.lat !== null && m.lng !== null ? [{ lat: m.lat, lng: m.lng }] : [])} />
         </View>
-        <Text style={styles.muted}>{preview.reference.markers.filter(m => m.type === 'gegenstand').length} {t('objects')} · {preview.reference.points.filter(p => p.breakBefore).length} {t('gaps')}</Text>
+        <Text style={styles.muted}>{preview.reference.markers.filter(isScoredObject).length} {t('objects')} · {preview.reference.points.filter(p => p.breakBefore).length} {t('gaps')}</Text>
         {hasTransferredGaps({ transferReceipt: true, points: preview.reference.points }) && <Text accessibilityRole="alert" style={styles.body}>{t('gapUnsupported')}</Text>}
         <Text style={styles.body}>{t('acceptInfo')}</Text><Text style={styles.heading}>{t('chooseDog')}</Text>
         {dogs.map(d => <Button key={d.id} label={d.name} selected={dogId === d.id} disabled={busy} onPress={() => setDogId(d.id)} />)}

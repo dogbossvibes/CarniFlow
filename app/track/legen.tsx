@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { SpecialAnglePicker } from '@/features/tracking/components/SpecialAnglePicker';
 import { countLaidCorners, projectAngleMarkers, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
@@ -11,7 +12,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { requestVoice, resetVoiceEvents } from '@/features/tracking/utils/voiceEvents';
-import { FT } from '@/constants/colors';
+import { C, FT } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
 import { useSession } from '@/hooks/useSession';
@@ -67,8 +68,10 @@ const NO_REFERENCE_OVERLAYS: TrackReferenceOverlay[] = [];
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
 const GEGENSTAND_MATERIALS: { material: MarkerMaterial; icon: MatIcon; label: string }[] = [
+  { material: 'ball', icon: 'tennisball-outline', label: 'Ball · Joker' },
+  { material: 'gummi', icon: 'ellipse-outline', label: 'Gummi' },
   { material: 'holz',     icon: 'leaf-outline',        label: 'Holz' },
-  { material: 'duebel',   icon: 'git-commit-outline',  label: 'Dübel' },
+  { material: 'duebel',   icon: 'git-commit-outline',  label: 'Dübel · Joker' },
   { material: 'stoff',    icon: 'shirt-outline',       label: 'Stoff' },
   { material: 'filz',     icon: 'layers-outline',      label: 'Filz' },
   { material: 'leder',    icon: 'bag-outline',         label: 'Leder' },
@@ -513,7 +516,7 @@ export default function LegenScreen() {
   }, [phase, activeDog]);
 
   const mapMarkers: MapMarker[] = projectAngleMarkers(markers).map(mk => ({ ...mk }));
-  const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
+  const gegenstaende = markers.filter(isScoredObject).length;
   const winkel = countLaidCorners(markers);
   // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
   const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
@@ -608,7 +611,7 @@ export default function LegenScreen() {
         status: 'resting', sessionId: id, layStartedAt: Date.now(),
         distanceMeters: Math.round(distanceMeters),
         winkelCount: countLaidCorners(finalMarkers),
-        objektCount: finalMarkers.filter(m => m.type === 'gegenstand').length,
+        objektCount: finalMarkers.filter(isScoredObject).length,
       });
     }
     const dq = activeDog ? `&dogId=${activeDog.id}` : '';
@@ -1046,6 +1049,7 @@ export default function LegenScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}
               >
+                <Text style={{ width: '100%', color: C.trackTextSec, padding: 6 }}>{t('track.jokerHint')}</Text>
                 {GEGENSTAND_MATERIALS.map(m => (
                   <Pressable
                     key={m.material}
@@ -1061,7 +1065,7 @@ export default function LegenScreen() {
                     ) : (
                       <Ionicons name={m.icon} size={20} color={FT.acc} />
                     )}
-                    <Text numberOfLines={1} className="text-[10px] font-extrabold text-ft-text">{m.label}</Text>
+                    <Text numberOfLines={1} className="text-[10px] font-extrabold text-ft-text">{m.material === 'ball' ? `${t('track.materialBall')} · ${t('track.jokers')}` : m.material === 'gummi' ? t('track.materialRubber') : m.label}</Text>
                   </Pressable>
                 ))}
               </ScrollView>

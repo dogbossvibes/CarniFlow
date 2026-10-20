@@ -1,4 +1,5 @@
 import type { TrackObjectScoreBasis } from '../utils/trackObjectReview';
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 /**
  * useSearchRecorder.ts — ANYVO Ausarbeiten / Suche (Expo / React Native)
  *
@@ -67,7 +68,7 @@ export interface GpsDebug {
 
 export type LatLng = { latitude: number; longitude: number };
 // `id` = stabile Marker-ID (Recovery-Identität der Funde); fehlt sie, gilt der Index.
-export type SearchObject = { at: LatLng; index: number; material: string; id?: string; atM?: number | null };
+export type SearchObject = { at: LatLng; index: number; material: string; id?: string; recoveryIndex?: number; atM?: number | null };
 export type Break = {
   at: LatLng;
   t: number;               // Sekunden seit Start, wann der Abriss BESTÄTIGT wurde (Konvention unverändert, z. B. Map-Marker-Zeitpunkt)
@@ -229,7 +230,9 @@ export function useSearchRecorder(opts: {
   /** QA-Diagnose: pro eingehendem Fix genau ein Endstatus (siehe searchFixDiag.ts). Rein beobachtend. */
   onFixDiag?: (d: SearchFixDiag) => void;
 }): SearchRecorder {
-  const { laidPoints, laidObjects, level } = opts;
+  const { laidPoints, level } = opts;
+  const laidObjects = useMemo(() => opts.laidObjects.map((o, i) => ({ ...o, recoveryIndex: o.recoveryIndex ?? i }))
+    .filter(o => !isTrainingJoker(o.material)), [opts.laidObjects]);
   const onFixDiagRef = useRef(opts.onFixDiag);
   onFixDiagRef.current = opts.onFixDiag;
   const handlerDistanceM = opts.handlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M;

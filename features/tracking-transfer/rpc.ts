@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-const serverCodes = new Set(['TRANSFER_UNAVAILABLE', 'TRANSFER_AUTH_REQUIRED', 'TRANSFER_INVALID_REQUEST', 'REFERENCE_INVALID',
+const serverCodes = new Set(['TRANSFER_UPDATE_REQUIRED', 'TRANSFER_UNAVAILABLE', 'TRANSFER_AUTH_REQUIRED', 'TRANSFER_INVALID_REQUEST', 'REFERENCE_INVALID',
   'REFERENCE_TOO_LARGE', 'TRANSFER_CONFLICT', 'SOURCE_INCOMPLETE', 'TRANSFER_REFERENCE_EXPIRED', 'TRANSFER_QUOTA_EXCEEDED',
   'TRANSFER_MAINTENANCE_UNAVAILABLE', 'TRANSFER_LIMIT_REACHED', 'TRANSFER_REVISION_CONFLICT', 'TRANSFER_COPY_GONE', 'TRANSFER_COPY_INCONSISTENT']);
 export class TransferApiError extends Error {
@@ -27,7 +27,7 @@ export function createTransferRpcClient(deps: TransferRpcDependencies, timeoutMs
       try {
         // A strict wire limit includes RPC argument overhead. No silent point thinning.
         let bytes = 0;
-        for (const c of JSON.stringify({ p_action: action, p_request: request })) {
+        for (const c of JSON.stringify({ p_action: action, p_request: { ...request, markerContractVersion: 2 } })) {
           const cp = c.codePointAt(0)!; bytes += cp < 128 ? 1 : cp < 2048 ? 2 : cp < 65536 ? 3 : 4;
         }
         if (bytes > 4_000_000) throw new TransferApiError('REFERENCE_TOO_LARGE');
@@ -61,6 +61,11 @@ export function createSupabaseTransferClient() {
       const { data } = supabase.auth.onAuthStateChange(event => { if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') listener(); });
       return () => data.subscription.unsubscribe();
     },
-    request(action, request, signal) { return supabase.rpc('track_transfer_v1', { p_action: action, p_request: request }).abortSignal(signal); },
+    async request(action, request, signal) {
+      const result = await supabase.rpc('track_transfer_v2', { p_action: action,
+        p_request: { ...request, markerContractVersion: 2 } }).abortSignal(signal);
+      if (!result.error && result.data?.markerContractVersion !== 2) throw new TransferApiError('INVALID_RESPONSE');
+      return result;
+    },
   });
 }

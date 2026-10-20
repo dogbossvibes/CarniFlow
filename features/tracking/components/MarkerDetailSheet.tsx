@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
@@ -18,7 +19,7 @@ export type TrackDetailItem =
 export type TrackDetailSelection = TrackDetailItem | { kind: 'group'; items: TrackDetailItem[] };
 
 const MATERIAL_KEY: Partial<Record<MarkerMaterial, TranslationKey>> = {
-  holz: 'track.materialWood', duebel: 'track.materialDowel', stoff: 'track.materialFabric', filz: 'track.materialFelt',
+  holz: 'track.materialWood', duebel: 'track.materialDowel', ball: 'track.materialBall', gummi: 'track.materialRubber', stoff: 'track.materialFabric', filz: 'track.materialFelt',
   leder: 'track.materialLeather', plastik: 'track.materialPlastic', metall: 'track.materialMetal',
   teppich: 'track.materialCarpet', diverses: 'track.materialOther',
 };
@@ -67,12 +68,13 @@ export function describeSelection(
     };
   }
   if (m.type === 'gegenstand') {
-    const isDowel = m.material === 'duebel';
+    const isDowel = isTrainingJoker(m.material);
     const materialLabel = m.material && MATERIAL_KEY[m.material] ? t(MATERIAL_KEY[m.material]!) : null;
     return {
       icon: isDowel ? 'ellipse' : 'flag',
-      title: isDowel ? t('track.materialDowel') : m.objectIndex ? `G${m.objectIndex}` : t('track.object'),
+      title: isDowel ? `${materialLabel} · ${t('track.jokers')}` : m.objectIndex ? `G${m.objectIndex}` : t('track.object'),
       rows: [
+        ...(isDowel ? [{ label: t('track.jokers'), value: t('track.jokerHint') }] : []),
         ...(materialLabel && !isDowel ? [{ label: t('track.detailMaterial'), value: materialLabel }] : []),
         ...distRow(m.distanceFromStart),
         ...(m.legIndex != null ? [{ label: t('track.analysisLeg'), value: String(m.legIndex) }] : []),
