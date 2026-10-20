@@ -249,3 +249,10 @@ describe('trackAnalytics — Root-Cause-Fix Build 43: leere Samples (keine verwe
     expect(res.trackScore).toBe(0);
   });
 });
+
+it('overrunning optional jokers never changes object metrics or the score',()=>{
+ const regular={atM:20,material:'gummi',found:true};
+ const reference=computeTrackAnalytics(baseInput({objects:[regular]}));
+ const withJokers=computeTrackAnalytics(baseInput({objects:[{atM:10,material:'duebel',found:false},regular,{atM:35,material:'ball',found:false}]}));
+ expect(withJokers.objects).toEqual(reference.objects);expect(withJokers.trackScore).toBe(reference.trackScore);
+});

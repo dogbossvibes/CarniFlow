@@ -34,7 +34,7 @@ export function isDowel(material: MarkerMaterial | string | null | undefined): b
  */
 export function trackEventLabelKey(event: TrackEvent): TranslationKey {
   if (event.kind === 'object') {
-    return isDowel(event.material) ? 'track.materialDowel' : 'track.object';
+    return event.material === 'ball' ? 'track.materialBall' : isDowel(event.material) ? 'track.materialDowel' : 'track.object';
   }
   switch (event.angleKind) {
     case 'links':        return 'track.angleLeftFull';
@@ -57,7 +57,7 @@ export function trackEventLabelKey(event: TrackEvent): TranslationKey {
  */
 export function trackEventGuidanceKey(event: TrackEvent): TranslationKey {
   if (event.kind === 'object') {
-    return isDowel(event.material) ? 'track.voiceDowel' : 'track.voiceObject';
+    return event.material === 'ball' ? 'track.voiceBall' : isDowel(event.material) ? 'track.voiceDowel' : 'track.voiceObject';
   }
   switch (event.angleKind) {
     case 'links':        return 'track.voiceLeft';

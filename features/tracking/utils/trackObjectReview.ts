@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import type { ReferenceObjectStatus } from './referenceObjectStatus';
 
 /** An immutable recording snapshot. Human corrections are stored separately. */
@@ -47,6 +48,7 @@ export function buildTrackObjectSnapshot(input: {
   totalObjects: number;
   scoreBasis?: TrackObjectScoreBasis;
 }): TrackObjectSnapshot | undefined {
+  if (input.objects.some(o => isTrainingJoker(o.material))) return undefined;
   if (input.objects.length !== input.statuses.length || input.objects.length !== input.totalObjects) return undefined;
   const ids = new Set<string>();
   const objects: TrackObjectSnapshot['objects'] = [];

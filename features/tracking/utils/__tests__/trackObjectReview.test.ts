@@ -63,8 +63,13 @@ describe('reviewed score uses the existing object component', () => {
 
 it('preserves optional material without changing recorded identities, counts, states or score', () => {
   const original = snapshotInput();
-  const result = buildTrackObjectSnapshot({ ...original, objects: original.objects.map((o, i) => ({ ...o, material: i === 0 ? 'duebel' : 'holz' })) })!;
-  expect(result.objects.map(o => o.material)).toEqual(['duebel', 'holz', 'holz']);
+  const result = buildTrackObjectSnapshot({ ...original, objects: original.objects.map((o, i) => ({ ...o, material: i === 0 ? 'gummi' : 'holz' })) })!;
+  expect(result.objects.map(o => o.material)).toEqual(['gummi', 'holz', 'holz']);
   expect(result.objects.map(({ material: _material, ...rest }) => rest)).toEqual(buildTrackObjectSnapshot(original)!.objects);
   expect(result.scoreBasis).toEqual(basis);
+});
+
+it.each(['duebel','ball'])('refuses a new snapshot that accidentally includes Joker %s', material => {
+ const original=snapshotInput();
+ expect(buildTrackObjectSnapshot({...original,objects:original.objects.map((o,i)=>({...o,material:i===0?material:'holz'}))})).toBeUndefined();
 });

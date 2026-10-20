@@ -3,7 +3,7 @@ import { key } from './fixtures';
 import { localRun, coldIntent } from './intentFixtures';
 it('retains exact local detection IDs, including legacy runs without a snapshot; does not infer remote markers', () => {
   expect(localAutoObjectsFromRun(localRun(), key)).toEqual([
-    { objectId: 'local-auto-a', index: 0, material: 'duebel' }, { objectId: 'local-auto-b', index: 1, material: null }]);
+    { objectId: 'local-auto-a', index: 0, material: 'gummi' }, { objectId: 'local-auto-b', index: 1, material: null }]);
   expect(localAutoObjectsFromRun({ ...localRun(), object_snapshot: undefined }, key)[0].material).toBeNull();
 });
 it.each(['run_id', 'session_id', 'ended_at'])('rejects wrong or incomplete run binding %s', field => {
@@ -18,4 +18,11 @@ it('allows only an explicit dismissal of an existing local automatic detection',
   expect(() => validateIntent(coldIntent())).not.toThrow();
   expect(() => validateIntent({ ...coldIntent(), changes: [{ objectId: 'remote-guess', status: 'not_found' }] })).toThrow('REVIEW_INVALID_INTENT');
   expect(() => validateIntent({ ...coldIntent(), changes: [{ objectId: 'local-auto-a', status: 'found' }] })).toThrow('REVIEW_INVALID_INTENT');
+});
+
+it.each(['duebel','ball'])('excludes a known %s Joker while keeping original detection IDs',material=>{
+ const run=localRun();run.object_snapshot.objects[0].material=material;
+ expect(localAutoObjectsFromRun(run,key)).toEqual([{objectId:'local-auto-b',index:0,material:null}]);
+ const intent=coldIntent();intent.localAutoObjects[0].material=material;
+ expect(()=>validateIntent(intent)).toThrow('REVIEW_INVALID_INTENT');
 });

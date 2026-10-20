@@ -1,3 +1,5 @@
+import { scoredObjectSummary } from '@/features/tracking/utils/scoredObjectProjection';
+import { isScoredObject, isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { TrackAngleList } from '@/features/tracking/components/TrackAngleList';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
@@ -74,7 +76,7 @@ const CONFIDENCE_BAND_LABEL: Record<TrackAnalytics['analysisConfidenceBand'], Tr
 
 const MATERIAL_LABEL_KEYS: Record<string, TranslationKey> = {
   leder: 'track.materialLeather', holz: 'track.materialWood', filz: 'track.materialFelt',
-  stoff: 'track.materialFabric', plastik: 'track.materialPlastic', duebel: 'track.materialDowel',
+  stoff: 'track.materialFabric', plastik: 'track.materialPlastic', duebel: 'track.materialDowel', ball: 'track.materialBall', gummi: 'track.materialRubber',
   metall: 'track.materialMetal', teppich: 'track.materialCarpet', diverses: 'track.materialOther',
 };
 const CORNER_INTERPRETATION_KEYS: Record<TrackAnalyticsV3['corners'][number]['interpretation'], TranslationKey> = {
@@ -355,8 +357,9 @@ export default function TrackAuswertungScreen() {
   const corners = data.corners_total ?? 0;
   const reviewed = objectReview.review && objectReview.review.revision > 0 ? objectReview.review : null;
   const correctedCounts = reviewed ? reviewCounts(reviewed) : null;
-  const aFound = correctedCounts ? (correctedCounts.completeFound ?? '—') : data.articles_found ?? 0;
-  const aTotal = correctedCounts ? correctedCounts.total : data.articles_total ?? 0;
+  const recordedCounts = scoredObjectSummary(data);
+  const aFound = correctedCounts ? (correctedCounts.completeFound ?? '—') : recordedCounts.found ?? '—';
+  const aTotal = correctedCounts ? correctedCounts.total : recordedCounts.total ?? 0;
 
   // Bedingungen (echtes Wetter zur Startposition + Untergrund/Beschaffenheit).
   const weatherCond: string | null = data.weather_condition ?? data.wetter ?? null;
@@ -752,13 +755,13 @@ export default function TrackAuswertungScreen() {
 
           <TrackAngleList markers={map?.markers ?? []} onSelect={marker => setDetailSel({ kind: 'marker', marker })} />
 
-          {!!map?.markers.some(marker => marker.type === 'gegenstand') && (
+          {!!map?.markers.some(isScoredObject) && (
             <>
               <SectionLabel>{t('track.analysisObjects')}</SectionLabel>
               <View style={[s.card, { padding: 16, marginBottom: 16, gap: 10 }]}>
-                {map.markers.filter(marker => marker.type === 'gegenstand').map((marker, index) => {
+                {map.markers.filter(isScoredObject).map((marker, index) => {
                   const material = marker.material && MATERIAL_LABEL_KEYS[marker.material] ? t(MATERIAL_LABEL_KEYS[marker.material]) : t('track.analysisMaterialUnknown');
-                  const label = marker.material === 'duebel' ? material : `G${marker.objectIndex ?? index + 1}`;
+                  const label = isTrainingJoker(marker.material) ? `${material} · ${t('track.jokers')}` : `G${marker.objectIndex ?? index + 1}`;
                   return (
                     <View key={marker.id ?? index}><Pressable style={s.objectLogRow} onPress={() => setDetailSel({ kind: 'marker', marker })}>
                       <Text style={s.objectLogTitle}>{label} · {material}</Text>

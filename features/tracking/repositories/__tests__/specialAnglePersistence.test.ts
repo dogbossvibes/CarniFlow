@@ -28,3 +28,12 @@ it.each(['bw', 'ow', 'gw', 'abriss'])('persists %s direction through real SQLite
   expect(merged.pending.markers).toHaveLength(1);
   expect(merged.pending.markers[0].geometryDirection).toBe('rechts');
 });
+it.each(['duebel','ball','gummi'])('keeps %s losslessly through the unchanged SQLite material column and recovery', async material => {
+ mockDb.exec("insert into local_training_sessions(local_id) values ('session')");
+ await createLocalTrackMarker('session',{sourceMarkerId:'object-source',recordedAtMs:1000,marker_type:'gegenstand',material,latitude:47,longitude:8,distance_from_start:5});
+ const rows=await getTrackMarkersBySession('session');
+ expect(rows).toHaveLength(1);expect(rows[0].material).toBe(material);
+ expect(JSON.parse(rows[0].payload_json!)).toMatchObject({sourceMarkerId:'object-source'});
+ const pending:PendingTrack={sessionId:'session',dogId:'dog',status:'laying',trackPoints:[],markers:[],runPoints:[],distanceMeters:5,durationSeconds:1,layFinishedAt:null,startAnchor:null,savedAt:1000};
+ expect(mergeLayRecovery(pending,[],rows)!.pending.markers[0]).toMatchObject({id:rows[0].local_id,material});
+});

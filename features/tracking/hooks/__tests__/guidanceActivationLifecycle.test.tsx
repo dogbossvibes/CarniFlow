@@ -49,13 +49,13 @@ jest.mock('@/features/tracking/store/searchPersist', () => ({
 
 const M_PER_DEG = 111320;
 const toLL = (xE: number, yN: number): LatLng => ({ latitude: yN / M_PER_DEG, longitude: xE / M_PER_DEG });
-// Gerade 30-m-Fährte nach Norden (2-m-Raster). Winkel bei 5 m, Dübel bei 4 m — beide in
+// Gerade 30-m-Fährte nach Norden (2-m-Raster). Winkel bei 5 m, Gummi bei 4 m — beide in
 // der Voice-(10 m)/Haptik-(6/4 m)-Zone, sobald der Hund (Handler + 5 m) bei ≥ 0 m steht.
 const LINE: LatLng[] = [];
 for (let y = 0; y <= 30; y += 2) LINE.push(toLL(0, y));
 const NO_OBJECTS: SearchObject[] = [];
 const ANGLES: GuidanceAngle[] = [{ id: 'angle-5-rechts', arcM: 5, angleKind: 'rechts' }];
-const OBJECTS: GuidanceObject[] = [{ id: 'gegenstand-4', arcM: 4, material: 'duebel' }];
+const OBJECTS: GuidanceObject[] = [{ id: 'gegenstand-4', arcM: 4, material: 'gummi' }];
 
 const voiceFired: string[] = [];
 const hapticFired: string[] = [];
@@ -129,7 +129,7 @@ describe('Lifecycle: Arming/SEEKING/CANDIDATE → AUS, START_LOCKED → AN', () 
     expect(get().searchStartState).toBe('START_LOCKED');
     expect(seen[seen.length - 1]).toBe('true|START_LOCKED|true');
     // Jetzt darf derselbe Winkel nach bestehender Guidance-Logik angesagt/vibriert werden:
-    // dogProgressM = 0 + 5 m → Winkel 5 m: Voice-Distanz 0 ≤ 10 ✓, Haptik 0 ≤ 6 ✓; Dübel 4 m liegt hinter dem Hund.
+    // dogProgressM = 0 + 5 m → Winkel 5 m: Voice-Distanz 0 ≤ 10 ✓, Haptik 0 ≤ 6 ✓; Gummi 4 m liegt hinter dem Hund.
     expect(voiceFired).toEqual(['angle-5-rechts']);
     expect(speak).toHaveBeenCalledTimes(1);
     expect(hapticFired).toEqual(['angle-5-rechts']);

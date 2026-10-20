@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
@@ -11,7 +12,8 @@ export interface MarkerChoice { type: MarkerType; material?: MarkerMaterial; ang
 
 const MATERIALS: { material: MarkerMaterial; icon: IconName; labelKey: TranslationKey }[] = [
   { material: 'holz',     icon: 'leaf-outline',        labelKey: 'track.materialWood' },
-  { material: 'duebel',   icon: 'git-commit-outline',  labelKey: 'track.materialDowel' },
+  { material: 'gummi', icon: 'ellipse-outline', labelKey: 'track.materialRubber' },
+  { material: 'filz', icon: 'layers-outline', labelKey: 'track.materialFelt' },
   { material: 'stoff',    icon: 'shirt-outline',       labelKey: 'track.materialFabric' },
   { material: 'leder',    icon: 'bag-outline',         labelKey: 'track.materialLeather' },
   { material: 'plastik',  icon: 'cube-outline',        labelKey: 'track.materialPlastic' },
@@ -61,6 +63,15 @@ export function MarkerBottomSheet({
           ))}
         </View>
 
+        <Text style={[s.label, { marginTop: 16 }]}>{t('track.jokers')}</Text>
+        <Text style={s.sub}>{t('track.jokerHint')}</Text>
+        <View style={s.grid}>{(['duebel', 'ball'] as const).filter(isTrainingJoker).map(material => (
+          <TouchableOpacity key={material} accessibilityRole="button" style={s.cell}
+            onPress={() => pick({ type: 'gegenstand', material })}>
+            <Ionicons name={material === 'ball' ? 'tennisball-outline' : 'git-commit-outline'} size={20} color={C.trackPrimary} />
+            <Text style={s.cellLabel}>{t(material === 'ball' ? 'track.materialBall' : 'track.materialDowel')}</Text>
+          </TouchableOpacity>
+        ))}</View>
         <Text style={[s.label, { marginTop: 16 }]}>
           {t('track.angle')}{suggestedAngleLabel ? <Text style={s.hint}>  · {t('track.suggestion', { label: suggestedAngleLabel })}</Text> : null}
         </Text>
