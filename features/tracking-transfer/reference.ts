@@ -1,3 +1,4 @@
+import { MARKER_MATERIALS } from '@/features/tracking/utils/objectMarkers';
 /** Bounded wire contract. No owner/dog rights, search results, notes, audio or device IDs. */
 export const TRANSFER_LIMITS = { points: 20_000, markers: 256, segments: 128, bytes: 4_000_000 } as const;
 export class TransferReferenceError extends Error {
@@ -43,7 +44,7 @@ const positive = (v: unknown) => num(v, 0);
 const time = (v: unknown) => integer(v, 1, 8_640_000_000_000_000);
 const quality = (v: unknown) => num(v, 0, 1);
 const markerTypes = ['gegenstand', 'winkel', 'verleitung', 'sprachmarker'] as const;
-const materials = ['stoff', 'filz', 'holz', 'duebel', 'leder', 'plastik', 'metall', 'teppich', 'diverses'] as const;
+const materials = MARKER_MATERIALS;
 const angles = ['links', 'rechts', 'spitz_links', 'spitz_rechts', 'spitz', 'absatz', 'abriss', 'gw', 'ow', 'bw'] as const;
 const segmentTypes = ['no_food', 'low_food', 'intensive_food', 'distraction', 'surface_change', 'custom'] as const;
 function point(v: unknown) {

@@ -133,6 +133,6 @@ export function sanitizeSearchRunState(raw: unknown): SearchRunState {
 }
 
 /** Stabile Identität eines Suchobjekts: Marker-ID, sonst (nur ohne ID) der Index. */
-export function searchObjectKey(obj: { id?: string | null }, index: number): string {
-  return obj.id ?? `idx:${index}`;
+export function searchObjectKey(obj: { id?: string | null; recoveryIndex?: number }, index: number): string {
+  return obj.id ?? `idx:${obj.recoveryIndex ?? index}`;
 }

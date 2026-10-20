@@ -5,6 +5,11 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "track.materialBall": "Ball",
+  "track.materialRubber": "Gummi",
+  "track.jokers": "Joker",
+  "track.jokerHint": "Dübel und Ball sind freiwillige Joker. Sie zählen nicht zur Gegenstandsauswertung.",
+  "track.voiceBall": "Ball als Joker",
   "track.markerGroup.title": "Markierungen in diesem Bereich",
   "track.angleList.title": "Winkel und Richtungen",
   "track.angleList.hint": "Gespeicherte Markierungen der gelegten Fährte. Antippen öffnet die Details.",

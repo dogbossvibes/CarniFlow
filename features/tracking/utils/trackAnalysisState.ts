@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 // Welchen Zustand hat die automatische Analyse (Track Score 2.0) einer Fährte?
 //
 // REIN LESEND: diese Datei berechnet nichts, speichert nichts und verändert
@@ -124,7 +125,9 @@ export interface TrackAnalysisAvailability {
 export function trackAnalysisAvailability(data: TrackAnalysisSource | null | undefined): TrackAnalysisAvailability {
   const raw = data?.track_data?.run?.analytics;
   const state = trackAnalysisState(data, raw);
-  const analytics = state === 'available' ? (raw as AvailableTrackAnalytics) : null;
+  const original = state === 'available' ? (raw as AvailableTrackAnalytics) : null;
+  const analytics = original?.objects.some(o => isTrainingJoker(o.material))
+    ? { ...original, objects: original.objects.filter(o => !isTrainingJoker(o.material)), trackScore: null } : original;
   const geometry = hasSearchGeometry(data);
   return {
     state, analytics, hasSearchGeometry: geometry,

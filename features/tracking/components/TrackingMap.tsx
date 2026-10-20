@@ -1,3 +1,4 @@
+import { isTrainingJoker, objectNumbers } from '@/features/tracking/utils/objectMarkers';
 import { groupMapFeatures } from '../utils/mapMarkerGroups';
 import { MarkerDetailSheet, describeSelection, type TrackDetailItem, type TrackDetailSelection } from './MarkerDetailSheet';
 import { specialAngleBadge } from '../utils/specialAngleGeometry';
@@ -13,7 +14,6 @@ import { useT } from '@/i18n';
 import { MAPS_AVAILABLE, RNMaps, type MapType } from '@/components/tracking/TrackMap';
 import { removeGpsJitter, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { ANGLE_SHORT, angleMarkerKind } from '@/features/tracking/utils/angleClassify';
-import { objectNumbers } from '@/features/tracking/utils/objectMarkers';
 import type { MarkerType, MarkerMaterial, AngleKind } from '@/features/tracking/store/trackingStore';
 import type { TrackSegment } from '@/features/tracking/utils/trackSegments';
 import { buildTrackSegmentPolylines, laidTrackStroke } from '@/features/tracking/utils/trackSegments';
@@ -53,7 +53,7 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress, accessibilityLabel }: {
-  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder';
+  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder' | 'ball';
   label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void; accessibilityLabel?: string;
 }) {
   const [track, setTrack] = useState(true);
@@ -81,6 +81,7 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
   // Dübel = ROTER ZYLINDER (keine G-Nummer): solid gefüllter Körper + Deckel-Ellipse.
   // Solide Füllflächen werden von react-native-maps zuverlässig gezeichnet (kein
   // leeres Border-View wie beim Abriss-Bug).
+  else if (kind === 'ball') child = <View style={[s.objectBadge, { borderRadius: 20 }]}><Ionicons name="tennisball" size={24} color={C.trackWarning} /></View>;
   else if (kind === 'cylinder') child = <View style={s.cylBody}><View style={s.cylTop} /></View>;
   else child = <View style={[s.markerDot, { backgroundColor: color }]} />;
   return <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track} onPress={onPress} accessibilityLabel={accessibilityLabel ?? label} accessibilityRole={onPress ? "button" : undefined}>{child}</Marker>;
@@ -243,9 +244,9 @@ export function TrackingMap({
     const features: { key: string; lat: number; lng: number; label: string; selection: TrackDetailItem }[] = markerList.map((marker, index) => ({
       key: `marker:${index}`, lat: marker.lat!, lng: marker.lng!,
       label: marker.type === 'winkel' ? marker.angleKind === 'abriss' && marker.geometryDirection !== 'links' && marker.geometryDirection !== 'rechts' ? '×' : specialAngleBadge(marker) ?? ANGLE_SHORT[marker.angleKind!] ?? '∠'
-        : marker.type === 'gegenstand' ? marker.material === 'duebel' ? t('track.materialDowel') : `G${marker.objectIndex ?? objectNo.get(index) ?? ''}`
+        : marker.type === 'gegenstand' ? isTrainingJoker(marker.material) ? t(marker.material === 'ball' ? 'track.materialBall' : 'track.materialDowel') : `G${marker.objectIndex ?? objectNo.get(index) ?? ''}`
         : describeSelection({ kind: 'marker', marker }, t).title,
-      selection: { kind: 'marker', marker: marker.type === 'gegenstand' && marker.material !== 'duebel'
+      selection: { kind: 'marker', marker: marker.type === 'gegenstand' && !isTrainingJoker(marker.material)
         ? { ...marker, objectIndex: marker.objectIndex ?? objectNo.get(index) } : marker },
     }));
     const startPosition = startAnchor ?? layPoints[0];
@@ -444,6 +445,7 @@ export function TrackingMap({
             return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} onPress={onPress} />;
           }
           if (m.type === 'gegenstand') {
+            if (m.material === 'ball') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="ball" onPress={onPress} />;
             if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" onPress={onPress} />;
             return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${m.objectIndex ?? objectNo.get(i) ?? ''}`} onPress={onPress} />;
           }

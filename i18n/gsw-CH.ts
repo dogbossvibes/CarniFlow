@@ -5,6 +5,11 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "track.materialBall": "Ball",
+  "track.materialRubber": "Gummi",
+  "track.jokers": "Joker",
+  "track.jokerHint": "Dübel und Ball sind freiwilligi Joker. Si zähled nöd zur Gägestandsuswertig.",
+  "track.voiceBall": "Ball als Joker",
   "track.markerGroup.title": "Markierige i däm Bereich",
   "track.angleList.title": "Winkel und Richtige",
   "track.angleList.hint": "Gspeichereti Markierige vo de gleite Fährte. Tippe öffnet d Details.",

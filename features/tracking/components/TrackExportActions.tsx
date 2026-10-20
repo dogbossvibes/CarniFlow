@@ -30,7 +30,7 @@ export function TrackExportActions({ data }: { data: unknown }) {
         original: t('track.review.original', { status: '' }).replace(/[:：]\s*$/, ''),
         status: Object.fromEntries((['found','not_found','unobserved','unknown'] as const).map(status => [status, t(`track.review.${status}`)])) };
       labels.confidenceLabels={ excellent:t('track.replay.legend.confidenceExcellent'), good:t('track.replay.legend.confidenceGood'), limited:t('track.replay.legend.confidenceLimited'), unreliable:t('track.replay.legend.confidenceUnreliable') };
-      labels.materialLabels={ holz:t('track.materialWood'), duebel:t('track.materialDowel'), stoff:t('track.materialFabric'), filz:t('track.materialFelt'), leder:t('track.materialLeather'), plastik:t('track.materialPlastic'), metall:t('track.materialMetal'), teppich:t('track.materialCarpet'), diverses:t('track.materialOther'), gegenstand:t('track.object'), winkel:t('track.angle') };
+      labels.materialLabels={ holz:t('track.materialWood'), duebel:t('track.materialDowel'), ball:t('track.materialBall'), gummi:t('track.materialRubber'), stoff:t('track.materialFabric'), filz:t('track.materialFelt'), leder:t('track.materialLeather'), plastik:t('track.materialPlastic'), metall:t('track.materialMetal'), teppich:t('track.materialCarpet'), diverses:t('track.materialOther'), gegenstand:t('track.object'), winkel:t('track.angle') };
       await shareTrackUserExport(data,format,labels,includeNotes);
     } catch {if(mounted.current)Alert.alert(t('track.export.title'),t('track.export.failed'));}
     finally {busyRef.current=false;if(mounted.current)setActiveFormat(null);}

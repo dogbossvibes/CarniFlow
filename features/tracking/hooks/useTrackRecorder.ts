@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { attachSpecialGeometry, countLaidCorners, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 import { pinQaTrackingModes } from '@/features/tracking/utils/qaPreferences';
@@ -333,6 +334,20 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     return () => sub.remove();
   }, []);
 
+  // Refresh displayed BW/OW/GW geometry from the same confirmed detector sections.
+  // Ordinary objects do not change detector state or suppress corner recognition.
+  const refreshManualGeometry = useCallback(() => {
+    const state = store.getState();
+    if (!state.markers.some(m => ['bw', 'ow', 'gw'].includes(m.angleKind ?? ''))) return;
+    const entries = classifyManualAngleGeometrySections(state.markers,
+      [...completedDetectorSectionsRef.current, detectPointsRef.current], state.markers.length).markers;
+    const next = attachSpecialGeometry(state.markers, entries);
+    if (next.some((m, i) => m.geometryDirection !== state.markers[i].geometryDirection
+      || m.geometrySharpness !== state.markers[i].geometrySharpness || m.geometrySource !== state.markers[i].geometrySource)) {
+      state.annotateAngleGeometry(entries);
+    }
+  }, [store, completedDetectorSectionsRef, detectPointsRef]);
+
   // Marker im Store + lokal (SQLite) + Supabase ablegen (best-effort).
   const commitMarker = useCallback(async (
     marker: MarkerSample,
@@ -340,6 +355,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   ) => {
     const s = store.getState();
     s.addMarker(marker);
+    if (marker.type === 'winkel') refreshManualGeometry();
     const markerSessionId = localSessionId.current;
     const qaContext = { token: diagnosticsAccessToken(), sessionId: markerSessionId, markers: qaMarkerMetaRef.current };
     // Capture the QA index before async marker writes can cross a section boundary.
@@ -357,7 +373,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       await localWrite;
     }
     if (s.currentSessionId && s.currentSessionId !== markerSessionId) await saveTrackMarker(s.currentSessionId, marker);
-  }, [store, qaNoteMarker, completedDetectorSectionsRef]);
+  }, [store, qaNoteMarker, completedDetectorSectionsRef, refreshManualGeometry]);
 
   // Übergabe eines FINAL bestätigten Winkels an die bestehende Pipeline (Marker/
   // Voice/Logbuch/Persistenz) — genau EINMAL je Winkel. Geometrie/Confidence liegen
@@ -395,8 +411,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const processFixWithQaAccess = useCallback((loc: Location.LocationObject) => {
     // Local check also covers suspended JS timers after a background lease expiry.
     enforceQaCaptureAccess();
-    return processor.processFix(loc);
-  }, [processor, enforceQaCaptureAccess]);
+    const result = processor.processFix(loc);
+    if (result.corners.length) refreshManualGeometry();
+    return result;
+  }, [processor, enforceQaCaptureAccess, refreshManualGeometry]);
 
   // EIN Fix-Handler für Warmup UND Aufnahme.
   const onFix = useCallback((loc: Location.LocationObject) => {
@@ -915,7 +933,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       durationSeconds:   s.durationSeconds,
       distanceMeters:    s.distanceMeters,
       gpsQualityAverage: calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy)),
-      articlesTotal:     s.markers.filter(m => m.type === 'gegenstand').length,
+      articlesTotal:     s.markers.filter(isScoredObject).length,
       cornersTotal:      countLaidCorners(attachSpecialGeometry(s.markers, manualAngleGeometry)),
       segments:          s.segments,
       layContinuity: { version: 1, breakBeforeTimestamps: s.trackPoints.filter(p => p.breakBefore).map(p => new Date(p.t).toISOString()) },

@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { useCallback, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
@@ -72,7 +73,7 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
     const since = Date.now() - lastSpeak.current;
 
     const open = s.markers
-      .filter(m => m.type === 'gegenstand' && !m.found && m.lat != null && m.lng != null)
+      .filter(m => isScoredObject(m) && !m.found && m.lat != null && m.lng != null)
       .map(m => ({ lat: m.lat as number, lng: m.lng as number }));
     const artDist = nearestArticleDist(cur, open);
 
@@ -111,7 +112,7 @@ export function useTrackRun(voiceOnRef: { current: boolean }) {
 
   const foundArticle = useCallback(async () => {
     const s = store.getState();
-    const next = s.markers.find(m => m.type === 'gegenstand' && !m.found);
+    const next = s.markers.find(m => isScoredObject(m) && !m.found);
     if (!next) return;
     s.markArticleFound(next.id);
     speak('Gegenstand gefunden.');

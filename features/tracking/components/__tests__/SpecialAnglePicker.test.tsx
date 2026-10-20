@@ -26,3 +26,16 @@ it('accepts a direction once even when a queued second tap arrives',()=>{
  const onSelect=jest.fn();act(()=>{tree=Renderer.create(<SpecialAnglePicker onSelect={onSelect}/>);});press('BW');
  press('track.detailRight');press('track.detailRight');expect(onSelect).toHaveBeenCalledTimes(1);
 });
+
+it.each(['BW','OW','GW'].flatMap(kind => [
+ ['track.detailLeft','links','normal'], ['track.detailRight','rechts','normal'],
+ ['track.detailSharpLeft','links','sharp'], ['track.detailSharpRight','rechts','sharp'],
+].map(([label,direction,sharpness]) => [kind,label,direction,sharpness])))('%s retains %s with its independent geometry', (kind,label,direction,sharpness) => {
+ const onSelect=jest.fn();act(()=>{tree=Renderer.create(<SpecialAnglePicker onSelect={onSelect}/>);});
+ press(kind);press(label);expect(onSelect).toHaveBeenCalledWith(kind.toLowerCase(),{geometryDirection:direction,geometrySharpness:sharpness,geometrySource:'manual'});
+});
+
+it('offers Absatz explicitly without inventing GPS direction or treating it as Abriss',()=>{
+ const onSelect=jest.fn();act(()=>{tree=Renderer.create(<SpecialAnglePicker onSelect={onSelect}/>);});
+ press('track.angleStep');expect(onSelect).toHaveBeenCalledWith('absatz');expect(onSelect).toHaveBeenCalledTimes(1);
+});
