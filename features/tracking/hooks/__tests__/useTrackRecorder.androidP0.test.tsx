@@ -1,4 +1,6 @@
 import * as turnFusion from '../../utils/turnFusion';
+import * as turnZone from '../../utils/turnAwareLineGate';
+import * as engineMode from '../../utils/trackingEngineMode';
 
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
@@ -287,4 +289,70 @@ it('does not announce a shifted ordinary GPS apex twice across live callbacks', 
     expect(calls).toBeGreaterThan(2);
     expect(useTrackingStore.getState().markers.filter(m => m.type === 'winkel').map(m => m.distance_from_start)).toEqual([10, 14]);
   } finally { spy.mockRestore(); }
+});
+
+
+describe('P1 Android hook: current-fix line smoothing', () => {
+  async function walkTurn(direction: -1 | 1, engine: 'current' | 'build40', interruptions = false) {
+    jest.spyOn(engineMode, 'getTrackingEngineMode').mockReturnValue(engine);
+    const zoneSpy = jest.spyOn(turnZone, 'inTurnZone'); // Real detector, observation only.
+    (Location.getBackgroundPermissionsAsync as jest.Mock).mockResolvedValue({ status: 'denied', canAskAgain: false });
+    await start();
+    let line: { lat: number; lng: number } | null = null;
+    let zone = false, entries = 0, exits = 0, acceptedInTurn = 0;
+    const push = (ms: number, north: number, east: number, accuracy = 5) => {
+      const raw = { lat: metersToLatitude(north), lng: metersToLatitude(east) };
+      const previousZone = zone;
+      const points = useTrackingStore.getState().trackPoints;
+      const beforeCount = points.length;
+      zoneSpy.mockClear();
+      clockMs = 1_000_000 + ms;
+      act(() => { feedFix?.({ ...raw, accuracy, speed: 1, t: clockMs }); });
+      // Rejected/start-locked fixes do not refresh detector evidence. On admitted
+      // fixes the real detector's current zone must govern this same line point.
+      zone = zoneSpy.mock.results.at(-1)?.value ?? zone;
+      if (!previousZone && zone) entries++;
+      if (previousZone && !zone) exits++;
+      const alpha = engine === 'build40' ? 0.4 : zone ? 0.7 : 0.4;
+      line = line ? { lat: line.lat + (raw.lat - line.lat) * alpha, lng: line.lng + (raw.lng - line.lng) * alpha } : raw;
+      if (points.length > beforeCount) {
+        const last = points.at(-1)!; // Start anchor may precede the current point.
+        // The anchor itself is not a line-EMA sample.
+        if (points.length > 1) {
+          expect(last.lat).toBeCloseTo(line.lat, 12);
+          expect(last.lng).toBeCloseTo(line.lng, 12);
+          if (zone) acceptedInTurn++;
+        }
+      }
+    };
+    for (let i = 1; i <= 5; i++) push(i * 1000, 0, 0);
+    for (let i = 1; i <= 20; i++) push(5000 + i * 1000, i, 0);
+    for (let i = 1; i <= 24; i++) {
+      const ms = 25000 + i * 1000;
+      push(ms, 20, direction * i);
+      if (interruptions && i === 3) {
+        expect(zone).toBe(true);
+        const state = useTrackingStore.getState(), beforeCount = state.trackPoints.length;
+        push(ms + 100, 20, direction * i - 20, 80); // Accuracy rejection.
+        push(ms + 200, 20, direction * i - 20, 5); // Implausible jump.
+        state.isPaused = true;
+        push(ms + 300, 20, direction * i);
+        state.isPaused = false;
+        expect(state.trackPoints).toHaveLength(beforeCount);
+      }
+    }
+    expect(entries).toBeGreaterThan(0);
+    expect(exits).toBeGreaterThan(0);
+    expect(acceptedInTurn).toBeGreaterThan(0);
+    return useTrackingStore.getState().distanceMeters;
+  }
+  it.each([-1, 1] as const)('uses fresh turn evidence on left/right path %s', async direction => {
+    await walkTurn(direction, 'current');
+  });
+  it('retains paused and rejected EMA history without refreshing turn evidence', async () => {
+    await walkTurn(1, 'current', true);
+  });
+  it('BUILD40 retains fixed 0.4 smoothing across the same real detector transitions', async () => {
+    await walkTurn(1, 'build40');
+  });
 });
