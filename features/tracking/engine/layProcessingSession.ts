@@ -555,11 +555,15 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
       : { lat: raw.lat, lng: raw.lng };
     emaRef.current = ema;
-    // Geometrie-Kette der LINIE (turn-aware, s. o.).
+    // Warmup, Pause und abgelehnte Fixes behalten ihren bisherigen EMA-Verlauf.
+    // Nach einem zugelassenen Detektor-Fix wird unten dessen aktuelle Zone genutzt.
+    // Bei einem Zonenwechsel immer vom Zustand VOR diesem Fix neu berechnen,
+    // damit derselbe Rohfix nicht zweimal in die Glättung eingeht.
     const prevLine = lineEmaRef.current;
-    const lineEma: LatLng = prevLine
-      ? { lat: prevLine.lat + (raw.lat - prevLine.lat) * lineAlpha, lng: prevLine.lng + (raw.lng - prevLine.lng) * lineAlpha }
+    const smoothLine = (alpha: number): LatLng => prevLine
+      ? { lat: prevLine.lat + (raw.lat - prevLine.lat) * alpha, lng: prevLine.lng + (raw.lng - prevLine.lng) * alpha }
       : { lat: raw.lat, lng: raw.lng };
+    let lineEma = smoothLine(lineAlpha);
     lineEmaRef.current = lineEma;
 
     // Live-Puck getrennt und LEICHTER glätten (PUCK_ALPHA > EMA_ALPHA): er folgt
@@ -647,8 +651,13 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       const rStep = rLast ? calculateDistance(rLast, { lat: raw.lat, lng: raw.lng }) : 0;
       rt.push({ lat: raw.lat, lng: raw.lng, cumDist: (rLast?.cumDist ?? session.detectorOffsetRef.current) + rStep, accuracy: raw.accuracy, t: raw.t });
       if (rt.length > 60) rt.splice(0, rt.length - 60);
-      // Kurvenzone für Linien-Gate (dieser Fix) und Linien-Glättung (nächster Fix).
+      // Linien-Gate und Linien-Glättung nutzen beide den aktuellen Detektor-Fix.
       lineTurnZoneRef.current = inTurnZone(dPts, lastCornerAtRef.current);
+    }
+    const currentLineAlpha = getTrackingEngineMode() === 'build40' ? EMA_ALPHA : lineEmaAlpha(lineTurnZoneRef.current);
+    if (currentLineAlpha !== lineAlpha) {
+      lineEma = smoothLine(currentLineAlpha);
+      lineEmaRef.current = lineEma;
     }
 
     // 3) Distanz-Gate: erst ab MIN_STEP_M einen neuen Linienpunkt setzen.
