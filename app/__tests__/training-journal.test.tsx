@@ -8,7 +8,7 @@
 import 'react-native-gesture-handler/jestSetup';
 
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Alert, Text, TouchableOpacity } from 'react-native';
+import { Alert, AppState, Text, TouchableOpacity, type AppStateStatus } from 'react-native';
 import TrainingJournalScreen from '@/app/training-journal';
 import type { FeedItem } from '@/services/trainingFeed';
 jest.mock('@/services/trainingDocumentService', () => ({ listServerTrainingFocuses: async () => ({ data: [], error: null }) }));
@@ -17,6 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+let mockFocusEffect: (() => void | (() => void)) | undefined;
 const mockRefresh = jest.fn(() => Promise.resolve());
 const mockDeleteFeedItem = jest.fn((_item?: FeedItem) => Promise.resolve({ error: null as string | null }));
 let mockFeed: FeedItem[] = [];
@@ -56,6 +57,7 @@ const mockLabels: Record<string, string> = {
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack }),
+  useFocusEffect: (effect: () => void | (() => void)) => { mockFocusEffect = effect; },
   useLocalSearchParams: () => ({}),
 }));
 
@@ -80,7 +82,7 @@ jest.mock('@/hooks/useDogs', () => ({
 }));
 
 jest.mock('@/hooks/useTrainingFeed', () => ({
-  useTrainingFeed: () => ({ feed: mockFeed, loading: false, refresh: mockRefresh }),
+  useTrainingFeed: () => ({ feed: mockFeed, loading: false, refresh: mockRefresh, ownerId: 'u1' }),
 }));
 
 // Bestehende vereinheitlichte Delete-Fassade mocken (kein Supabase im UI-Test).
@@ -137,7 +139,7 @@ function allStrings(node: ReactTestRenderer): string {
 function trackCards(node: ReactTestRenderer): { props: { onPress?: () => void; accessibilityLabel?: string } }[] {
   return (node.root as unknown as { findAllByType: (t: unknown) => { props: { onPress?: () => void; accessibilityLabel?: string } }[] })
     .findAllByType(TouchableOpacity)
-    .filter((b) => b.props.accessibilityLabel?.startsWith('Fährte'));
+    .filter((b) => b.props.accessibilityLabel?.startsWith('Fährte.'));
 }
 
 // Lösch-Buttons tragen das (im Test unmockte) Key-Label 'journal.deleteTrackA11y'
@@ -271,4 +273,77 @@ describe('Trainingsjournal — Fährte löschen', () => {
     expect(trackCards(node)).toHaveLength(1);                   // Eintrag bleibt sichtbar
     spy.mockRestore();
   });
+});
+
+
+describe('Journal — alle Sparten und erneutes Öffnen', () => {
+  const protection = (source: 'unit' | 'session', id: string) => mk({ id, source,
+    exercises: [{ discipline: 'Schutzdienst', exercise_name: 'Bewachen', rating: null, notes: null, duration_sec: null, seq_index: 0 }],
+  });
+  const press = (node: ReactTestRenderer, label: string) => {
+    const button = node.root.findAll(n => n.props.accessibilityLabel === label && typeof n.props.onPress === 'function')[0];
+    act(() => button.props.onPress());
+  };
+
+  it('zeigt Schutzdienst aus Einheiten und Alteinträgen zusammen mit GPS-Fährten; Filter zurück auf Alle verliert nichts', () => {
+    mockFeed = [mk({ id: 'gps' }), protection('unit', 'documented'), protection('session', 'legacy')];
+    const node = render();
+    expect(trackCards(node)).toHaveLength(1);
+    expect(allStrings(node)).toContain('Bewachen');
+    press(node, 'Schutzdienst');
+    expect(trackCards(node)).toHaveLength(0);
+    expect(allStrings(node)).toContain('Bewachen');
+    press(node, 'Alle Sparten');
+    expect(trackCards(node)).toHaveLength(1);
+    expect(allStrings(node)).toContain('Bewachen');
+  });
+
+  it('filtert vor dem 25er-Fenster und lässt ältere Schutzdienst-Einträge über Mehr laden erreichen', () => {
+    mockFeed = [...Array.from({ length: 25 }, (_, i) => mk({ id: `gps-${i}` })), protection('unit', 'older')];
+    const node = render();
+    expect(allStrings(node)).not.toContain('Bewachen');
+    press(node, 'Schutzdienst');
+    expect(allStrings(node)).toContain('Bewachen');
+    press(node, 'Alle Sparten');
+    expect(allStrings(node)).not.toContain('Bewachen');
+    press(node, 'Mehr laden');
+    expect(allStrings(node)).toContain('Bewachen');
+  });
+
+  it('lädt den gecachten Feed bei jedem Navigationsfokus neu, ohne die Sparten-Auswahl zu löschen', async () => {
+    mockRefresh.mockClear(); mockFocusEffect = undefined;
+    mockFeed = [mk(), protection('unit', 'documented')];
+    const node = render();
+    press(node, 'Schutzdienst');
+    expect(mockFocusEffect).toEqual(expect.any(Function));
+    let cleanup: void | (() => void);
+    await act(async () => { cleanup = mockFocusEffect?.(); });
+    act(() => { cleanup?.(); });
+    await act(async () => { cleanup = mockFocusEffect?.(); });
+    act(() => { cleanup?.(); });
+    expect(mockRefresh).toHaveBeenCalledTimes(2);
+    expect(mockRefresh).toHaveBeenLastCalledWith({ cancelRefetch: false });
+    expect(trackCards(node)).toHaveLength(0);
+    expect(allStrings(node)).toContain('Bewachen');
+  });
+
+  it('lädt beim Resume nach und entfernt den Listener beim Verlassen', async () => {
+    const remove = jest.fn();
+    let handler!: (state: AppStateStatus) => void;
+    const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      handler = callback; return { remove };
+    });
+    mockRefresh.mockClear(); mockFeed = [mk()]; render();
+    let cleanup: void | (() => void);
+    await act(async () => { cleanup = mockFocusEffect?.(); });
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    await act(async () => { handler('background'); });
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    await act(async () => { handler('active'); });
+    expect(mockRefresh).toHaveBeenCalledTimes(2);
+    act(() => { cleanup?.(); });
+    expect(remove).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
 });

@@ -199,6 +199,7 @@ export default function UnitDetailScreen() {
               <View style={s.flex}>
                 <Text style={s.exName}>{ex.exercise_name}</Text>
                 <Text style={s.exDisc}>{ex.discipline}</Text>
+                {ex.notes?.trim() ? <Text style={s.notesTxt}>{ex.notes}</Text> : null}
               </View>
               {ex.rating != null && (
                 <View style={s.exStars}>
