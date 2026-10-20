@@ -599,6 +599,26 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     expect(mockCreateDocumentedUnit).toHaveBeenCalledWith('owner-1', expect.objectContaining({ duration_sec: null, photos: [], videos: [], shared_with_trainer: false }),
       [expect.objectContaining({ rating: null, notes: null, duration_sec: null })], 'unit-id', expect.any(Function));
   });
+  it('zeigt gespeicherte Übungsnotizen schon in der Vorbereitung', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush();
+    expect(strings(node)).toContain('Past result');
+  });
+  it('verknüpft Vorhistorie nur nach Auswahl und behält die neue Beobachtung', async () => {
+    const old = past();
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [old], error: null }) });
+    const node = render(); await flush(); selectExercise(node); await flush();
+    tap(node, 'trainingDoc.exerciseDetails');
+    act(() => { inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Today only'); });
+    const choose = node.root.findAll(n => n.props.testID === 'exercise-history-past-unit-past-ex' && typeof n.props.onPress === 'function')[0];
+    expect(choose).toBeDefined();
+    act(() => { choose.props.onPress(); }); await flush();
+    expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Today only');
+    expect(strings(node)).toContain('Past result');
+    mockCreateDocumentedUnit.mockResolvedValue({ error: null, data: { id: 'new' } });
+    await act(async () => { await saveButton(node).props.onPress(); });
+    expect(mockAtomicSave.mock.calls[0][3][0]).toEqual(expect.objectContaining({ notes: 'Today only' }));
+  });
   it('does not display another dog history even when a stale response contains it', async () => {
     mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
     const node = render(); await flush();

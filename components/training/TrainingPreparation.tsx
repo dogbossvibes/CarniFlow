@@ -21,7 +21,10 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
           <Text style={s.text}>{last.session_date} · {discipline}</Text>
         </TouchableOpacity>
         <Text style={s.text} numberOfLines={expanded ? undefined : 3}>{last.notes}</Text>
-        <Text style={s.text}>{last.exercises?.filter(e => e.discipline === discipline).map(e => e.exercise_name).join(' · ')}</Text>
+        {last.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <View key={exercise.id ?? i}>
+          <Text style={s.text}>{exercise.exercise_name}</Text>
+          {exercise.notes?.trim() ? <Text style={s.text}>{exercise.notes}</Text> : null}
+        </View>)}
         <TouchableOpacity style={s.button} onPress={() => onReuse(last, last.exercises?.filter(e => e.discipline === discipline) ?? [])} accessibilityRole="button">
           <Text style={s.action}>{t('trainingDoc.buildOn')}</Text>
         </TouchableOpacity>
@@ -33,6 +36,7 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
           {unit.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <TouchableOpacity key={exercise.id ?? i} style={s.button}
             accessibilityRole="button" onPress={() => onReuse(unit, [exercise])}>
             <Text style={s.text}>＋ {exercise.exercise_name}{exercise.rating != null ? ` · ${exercise.rating}/5` : ''}</Text>
+            {exercise.notes?.trim() ? <Text style={s.text}>{exercise.notes}</Text> : null}
           </TouchableOpacity>)}
         </View>)}
         {expanded && count < units.length && <TouchableOpacity style={s.button} onPress={() => setCount(v => v + 5)} accessibilityRole="button">
