@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 /**
  * Confidence-basierte Fährtenanalyse (Schema v3).
  *
@@ -514,7 +515,7 @@ function longestDurationAtOrBelow(series: { item: ClassifiedAnalyticsSample; spe
 }
 
 export function analyzeObjectContacts(classified: ClassifiedAnalyticsSample[], objects: AnalyticsObjectInput[], handlerDistanceHintM = 0): ObjectContactAnalysis[] {
-  return objects.map((object, index) => {
+  return objects.filter(o => !isTrainingJoker(o.material)).map((object, index) => {
     // Eine konfigurierte Führer-Hund-Distanz erweitert bloss das unsichere
     // Vorfeld. Sie wird nie als exakte Hundeposition oder Fundbeleg benutzt.
     const beforeRadius = TRACK_ANALYSIS_THRESHOLDS.objectWindowBeforeM + Math.min(12, Math.max(0, handlerDistanceHintM));

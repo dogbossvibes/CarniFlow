@@ -16,9 +16,9 @@ const speak = jest.requireMock('expo-speech').speak as jest.Mock;
 const impact = jest.requireMock('expo-haptics').impactAsync as jest.Mock;
 const hapticSuccess = jest.requireMock('@/features/tracking/utils/haptics').hapticSuccess as jest.Mock;
 
-// Winkel 5 m nach dem Start (in der 10-m-Voice-/6-m-Haptik-Zone bei Hund 0 m), Dübel bei 4 m.
+// Winkel 5 m nach dem Start (in der 10-m-Voice-/6-m-Haptik-Zone bei Hund 0 m), Gummi bei 4 m.
 const ANGLES: GuidanceAngle[] = [{ id: 'angle-5-rechts', arcM: 5, angleKind: 'rechts' }];
-const OBJECTS: GuidanceObject[] = [{ id: 'gegenstand-4', arcM: 4, material: 'duebel' }];
+const OBJECTS: GuidanceObject[] = [{ id: 'gegenstand-4', arcM: 4, material: 'gummi' }];
 const NONE: GuidanceObject[] = [];
 
 let renderer: ReactTestRenderer | null = null;
@@ -89,7 +89,7 @@ describe('Voice — Activation Guard', () => {
     expect(fired).toEqual([]);
   });
 
-  it('11./12. Recovery: geseedeter Winkel bleibt über die enabled-Transition stumm; ungeseedeter Dübel wird nach enable normal angesagt', () => {
+  it('11./12. Recovery: geseedeter Winkel bleibt über die enabled-Transition stumm; ungeseedeter Gummi-Gegenstand wird nach enable normal angesagt', () => {
     jest.useFakeTimers({ now: 2_000_000 });
     const fired: string[] = [];
     const cb = (id: string) => fired.push(id);
@@ -98,12 +98,12 @@ describe('Voice — Activation Guard', () => {
     expect(speak).not.toHaveBeenCalled();
     act(() => { rerender(<Voice dog={0} enabled seed={seed} onAnnounced={cb} objects={OBJECTS} />); });
     expect(speak).toHaveBeenCalledTimes(1);
-    expect(fired).toEqual(['gegenstand-4']);      // Winkel (Seed) nicht erneut, Dübel (nie fired) normal
+    expect(fired).toEqual(['gegenstand-4']);      // Winkel (Seed) nicht erneut, Gummi (nie fired) normal
   });
 });
 
 describe('Haptik — Activation Guard (eigene Menge)', () => {
-  it('4./5. Dübel 4 m vor dem Hund: disabled → keine Haptik, nicht verbraucht; enabled → 1 Impuls', () => {
+  it('4./5. Gummi 4 m vor dem Hund: disabled → keine Haptik, nicht verbraucht; enabled → 1 Impuls', () => {
     jest.useFakeTimers({ now: 3_000_000 });
     const fired: string[] = [];
     const cb = (id: string) => fired.push(id);

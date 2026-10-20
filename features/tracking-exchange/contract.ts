@@ -1,3 +1,4 @@
+import { MARKER_MATERIALS, isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import type { TrackDetailMap, DetailMarker } from '@/features/tracking/utils/trackDetailMap';
 import type { ParentReference } from '@/features/tracking-distractions/parentReference';
 import { parseDistractionTrack, distractionDistance, type DistractionTrack } from '@/features/tracking-distractions/model';
@@ -37,7 +38,7 @@ export function parseReference(value: unknown): ExchangeReference {
   const type = choice(m.type, ['gegenstand','winkel','verleitung'] as const); assert(type);
   return { id: label(m.id, 100), type, lat: finite(m.lat,-90,90), lng: finite(m.lng,-180,180),
    angleKind: choice(m.angleKind, ['links','rechts','spitz_links','spitz_rechts','spitz','absatz','abriss','gw','ow','bw'] as const),
-   material: choice(m.material, ['stoff','filz','holz','duebel','leder','plastik','metall','teppich','diverses'] as const),
+   material: choice(m.material, MARKER_MATERIALS),
    distanceFromStart: nullableNumber(m.distanceFromStart, 1000000),
    geometryDirection: choice(m.geometryDirection, ['links','rechts','unresolved'] as const), geometrySharpness: choice(m.geometrySharpness, ['normal','sharp','unresolved'] as const) };
  });
@@ -55,7 +56,7 @@ export function displayReference(reference: ExchangeReference, localParentId: st
  const r = parseReference(reference);let objectIndex=0;
  const corners=r.markers.filter(m=>m.type==='winkel'&&m.angleKind!=='abriss'&&m.angleKind!=='absatz').map(m=>m.distanceFromStart??0);
  return {version:1,id:localParentId,ownerId,dogId:'',date:r.date,distanceM:r.distanceM,map:{lay:r.points,run:[],start:r.points[0],end:r.points.at(-1)!,hasLay:true,hasRun:false,totalDistanceM:r.distanceM,
-  markers:r.markers.map(m=>{const numbered=m.type==='gegenstand'&&m.material!=='duebel';return {...m,geometryDirection:m.geometryDirection??undefined,geometrySharpness:m.geometrySharpness??undefined,note:null,objectIndex:numbered?++objectIndex:null,legIndex:numbered&&m.distanceFromStart!==null?1+corners.filter(d=>d<=m.distanceFromStart!).length:null};})}};
+  markers:r.markers.map(m=>{const numbered=isScoredObject(m);return {...m,geometryDirection:m.geometryDirection??undefined,geometrySharpness:m.geometrySharpness??undefined,note:null,objectIndex:numbered?++objectIndex:null,legIndex:numbered&&m.distanceFromStart!==null?1+corners.filter(d=>d<=m.distanceFromStart!).length:null};})}};
 }
 export interface TrackOffer { format:'anyvo-track'; version:1; kind:'distraction-request'; taskId:string; title:string; referenceDigest:string; reference:ExchangeReference }
 export interface TrackReturn { format:'anyvo-track'; version:1; kind:'distraction-return'; taskId:string; referenceDigest:string; contribution:DistractionTrack }

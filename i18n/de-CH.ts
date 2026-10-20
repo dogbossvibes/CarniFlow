@@ -35,6 +35,11 @@ export const deCH = {
   "help.trackGroupsUnavailable": "Gruppenaufgaben sind in dieser Version nicht freigegeben. Die anderen angebotenen Austauschfunktionen bleiben davon getrennt.",
   "help.trackTogetherVersions": "In manchen Android-Versionen ist die Absuche übernommener Fährten mit Aufzeichnungslücken gesperrt. Eine angezeigte Vorschau bedeutet dann keine verfügbare Absuche. Beachte den Hinweis der App.",
 
+  "track.materialBall": "Ball",
+  "track.materialRubber": "Gummi",
+  "track.jokers": "Joker",
+  "track.jokerHint": "Dübel und Ball sind freiwillige Joker. Sie zählen nicht zur Gegenstandsauswertung.",
+  "track.voiceBall": "Ball als Joker",
   "track.markerGroup.title": "Markierungen in diesem Bereich",
   "track.angleList.title": "Winkel und Richtungen",
   "track.angleList.hint": "Gespeicherte Markierungen der gelegten Fährte. Antippen öffnet die Details.",

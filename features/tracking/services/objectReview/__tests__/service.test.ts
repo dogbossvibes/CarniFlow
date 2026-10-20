@@ -22,15 +22,15 @@ jest.mock('../repository', () => ({
 beforeEach(() => {
   jest.resetAllMocks(); mockListeners = new Set(); mockSession = { user: { id: key.ownerId } };
   mockOnline.mockResolvedValue(true); mockCached.mockResolvedValue(null); mockOperations.mockResolvedValue([]);
-  mockRpc.mockResolvedValue({ data: baseline(), error: null });
+  mockRpc.mockResolvedValue({ data: { ...baseline(), version: 2 }, error: null });
 });
 it('reading does not initialize or mutate original training data', async () => {
   await readObjectReview(key);
-  expect(mockRpc).toHaveBeenCalledWith('get_track_object_review_v1', { p_session_id: key.sessionId, p_run_id: key.runId, p_dog_id: key.dogId });
+  expect(mockRpc).toHaveBeenCalledWith('get_track_object_review_v2', { p_session_id: key.sessionId, p_run_id: key.runId, p_dog_id: key.dogId });
   expect(mockListeners.size).toBe(0);
 });
 it('initializes only via explicit action and reports an unavailable backend', async () => {
-  await initializeObjectReview(key); expect(mockRpc.mock.calls[0][0]).toBe('initialize_track_object_review_v1');
+  await initializeObjectReview(key); expect(mockRpc.mock.calls[0][0]).toBe('initialize_track_object_review_v2');
   mockRpc.mockResolvedValue({ error: { code: 'PGRST202', message: 'not installed' }, data: null });
   await expect(readObjectReview(key)).rejects.toThrow('PGRST202'); expect(mockEnqueue).not.toHaveBeenCalled();
 });
@@ -38,7 +38,7 @@ it('rejects another account before sending and ignores a response after logout',
   mockSession = { user: { id: 'other' } }; await expect(readObjectReview(key)).rejects.toThrow('REVIEW_ACCOUNT_CHANGED');
   expect(mockRpc).not.toHaveBeenCalled();
   mockSession = { user: { id: key.ownerId } };
-  mockRpc.mockImplementation(async () => { mockListeners.forEach(cb => cb('SIGNED_OUT', null)); return { data: baseline() }; });
+  mockRpc.mockImplementation(async () => { mockListeners.forEach(cb => cb('SIGNED_OUT', null)); return { data: { ...baseline(), version: 2 } }; });
   await expect(readObjectReview(key)).rejects.toThrow('REVIEW_ACCOUNT_CHANGED'); expect(mockCache).not.toHaveBeenCalled();
 });
 it('queues offline changes locally without network mutation or optimistic confirmed results', async () => {
@@ -49,10 +49,10 @@ it('queues offline changes locally without network mutation or optimistic confir
 });
 it('retries the same operation after a lost ACK and never retries conflicts automatically', async () => {
   mockOperations.mockResolvedValue([{ request: request(), state: 'failed' }, { request: request({ operationId: 'conflict' }), state: 'conflict' }]);
-  mockRpc.mockResolvedValue({ data: { ...corrected(), operationId: 'op-a', appliedRevision: 1, replayed: true } });
+  mockRpc.mockResolvedValue({ data: { ...corrected(), version: 2, operationId: 'op-a', appliedRevision: 1, replayed: true } });
   await syncObjectReviews();
   expect(mockRpc).toHaveBeenCalledTimes(1);
-  expect(mockRpc).toHaveBeenCalledWith('apply_track_object_review_v1', expect.objectContaining({ p_operation_id: 'op-a', p_expected_revision: 0 }));
+  expect(mockRpc).toHaveBeenCalledWith('apply_track_object_review_v2', expect.objectContaining({ p_operation_id: 'op-a', p_expected_revision: 0 }));
   expect(mockSetState).toHaveBeenCalledWith(request(), 'sent');
   expect(mockCache.mock.invocationCallOrder[0]).toBeLessThan(mockSetState.mock.invocationCallOrder[0]);
 });
@@ -62,7 +62,7 @@ it.each(['REVIEW_REVISION_CONFLICT', 'REVIEW_OPERATION_CONFLICT', '23505'])('ret
 });
 it('never acknowledges a wrong operation or malformed response', async () => {
   mockOperations.mockResolvedValue([{ request: request(), state: 'pending' }]);
-  mockRpc.mockResolvedValue({ data: { ...corrected(), operationId: 'another-op', appliedRevision: 1, replayed: false } });
+  mockRpc.mockResolvedValue({ data: { ...corrected(), version: 2, operationId: 'another-op', appliedRevision: 1, replayed: false } });
   await syncObjectReviews(); expect(mockSetState).toHaveBeenCalledWith(request(), 'failed', 'REVIEW_INVALID_ACK'); expect(mockCache).not.toHaveBeenCalled();
 });
 it('has a single sync worker even before connectivity and auth await', async () => {
@@ -78,7 +78,7 @@ it('times out stalled requests, retains the same operation and releases the work
     await jest.advanceTimersByTimeAsync(REVIEW_REQUEST_TIMEOUT_MS + 1);
     await sync;
     expect(mockSetState).toHaveBeenCalledWith(request(), 'failed', 'REVIEW_TIMEOUT');
-    mockRpc.mockResolvedValue({ data: { ...corrected(), operationId: 'op-a', appliedRevision: 1, replayed: true } });
+    mockRpc.mockResolvedValue({ data: { ...corrected(), version: 2, operationId: 'op-a', appliedRevision: 1, replayed: true } });
     await syncObjectReviews(); expect(mockSetState).toHaveBeenLastCalledWith(request(), 'sent');
   } finally { jest.useRealTimers(); }
 });
@@ -108,7 +108,7 @@ it('extends an existing offline intent immutably and never duplicates a double t
 it('reconnect prepares a baseline but NEVER maps local IDs or sends a cold intent to apply RPC', async () => {
   mockOperations.mockResolvedValue([{ request: coldIntent(), state: 'pending' }]);
   await syncObjectReviews();
-  expect(mockRpc.mock.calls.map(call => call[0])).toEqual(['initialize_track_object_review_v1']);
+  expect(mockRpc.mock.calls.map(call => call[0])).toEqual(['initialize_track_object_review_v2']);
   expect(mockSetState).toHaveBeenCalledWith(coldIntent(), 'conflict', 'REVIEW_INTENT_CONFIRMATION_REQUIRED');
   expect(mockEnqueue).not.toHaveBeenCalled(); expect(mockReplace).not.toHaveBeenCalled();
 });
@@ -134,7 +134,12 @@ it('never queues or resolves cold intents for a different account', async () => 
 
 it('keeps the cold intent unacknowledged when the account changes during baseline preparation', async () => {
   mockOperations.mockResolvedValue([{ request: coldIntent(), state: 'pending' }]);
-  mockRpc.mockImplementation(async () => { mockListeners.forEach(cb => cb('SIGNED_OUT', null)); return { data: baseline(), error: null }; });
+  mockRpc.mockImplementation(async () => { mockListeners.forEach(cb => cb('SIGNED_OUT', null)); return { data: { ...baseline(), version: 2 }, error: null }; });
   await syncObjectReviews();
   expect(mockCache).not.toHaveBeenCalled(); expect(mockSetState).not.toHaveBeenCalled(); expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it('rejects a v1 wire response on the new endpoint instead of acknowledging an incompatible contract',async()=>{
+ mockRpc.mockResolvedValue({data:baseline(),error:null});
+ await expect(readObjectReview(key)).rejects.toThrow('REVIEW_INVALID_RESPONSE');expect(mockCache).not.toHaveBeenCalled();
 });

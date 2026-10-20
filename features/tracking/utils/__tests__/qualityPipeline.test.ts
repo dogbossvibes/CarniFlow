@@ -2,6 +2,12 @@ import { setLocationSourceMode } from '@/features/tracking/utils/locationSourceM
 import { startPositionSource, sampleToLocationObject } from '@/features/tracking/utils/positionSource';
 import { getPositionDiagnostics } from '@/features/tracking/utils/positionDiagnostics';
 
+// Isolate source selection from account-capability state; that has its own tests.
+let mockSourceMode = 'precision';
+jest.mock('@/features/tracking/utils/locationSourceMode',()=>({
+ getLocationSourceMode:()=>mockSourceMode,setLocationSourceMode:(value:string)=>{mockSourceMode=value;},
+}));
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));

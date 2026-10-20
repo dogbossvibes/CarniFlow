@@ -22,8 +22,8 @@ afterEach(() => jest.restoreAllMocks());
 it.each(responses)('parses and exports actual $response.source HTTP results without changing originals or exposing IDs', async ({ key, response }) => {
   const review = parseObjectReview(response, key);
   expect(parseObjectReview(JSON.parse(JSON.stringify(review)), key)).toEqual(review);
-  expect(reviewCounts(review).completeFound).toBe(2);
-  expect(review.totalScore).toBe(response.source === 'recording_snapshot' ? 84 : null);
+  expect(reviewCounts(review).completeFound).toBe(1);
+  expect(review.totalScore).toBeNull();
   expect(review.audit).toHaveLength(response.source === 'recording_snapshot' ? 2 : 1);
   for (const field of ['sessionId', 'runId', 'dogId'] as const) {
     expect(() => parseObjectReview(response, { ...key, [field]: 'unrelated' })).toThrow();
@@ -33,10 +33,10 @@ it.each(responses)('parses and exports actual $response.source HTTP results with
     track_data: { run: { run_id: key.runId, analytics: { trackScore: 42 } } }, objectReview: review };
   const before = JSON.stringify(data);
   const exported = buildTrackUserExport(data, '2026-10-13T19:12:00Z');
-  expect(exported.summary).toMatchObject({ found: 2, total: 2, analysisScore: 42 });
+  expect(exported.summary).toMatchObject({ found: 1, total: 1, analysisScore: 42 });
   expect(exported.objectReview?.totalScore).toBe(review.totalScore);
   expect(exported.objectReview?.audit).toHaveLength(review.audit.length);
-  expect(exported.objectReview?.objects.map(o => o.recordedStatus)).toEqual(response.objects.map(o => o.recordedStatus));
+  expect(exported.objectReview?.objects.map(o => o.recordedStatus)).toEqual(response.objects.filter(o=>o.material!=='duebel'&&o.material!=='ball').map(o => o.recordedStatus));
   expect(JSON.stringify(exported)).not.toMatch(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
   expect(JSON.stringify(data)).toBe(before);
   const drawn = jest.spyOn(PDFPage.prototype, 'drawText');

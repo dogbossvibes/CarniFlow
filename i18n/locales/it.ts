@@ -32,6 +32,11 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "help.trackGroupsUnavailable": "I compiti di gruppo non sono attivi in questa versione. Le altre funzioni di scambio proposte restano separate.",
   "help.trackTogetherVersions": "Alcune versioni Android non permettono la ricerca su piste ricevute con lacune di registrazione. Un’anteprima visibile non significa che la ricerca sia disponibile. Segui l’avviso dell’app.",
 
+  "track.materialBall": "Palla",
+  "track.materialRubber": "Gomma",
+  "track.jokers": "Jolly",
+  "track.jokerHint": "Tasselli e palle sono jolly facoltativi, esclusi dall’analisi degli oggetti.",
+  "track.voiceBall": "Palla jolly",
   "track.markerGroup.title": "Marcatori in questa zona",
   "track.angleList.title": "Angoli e direzioni",
   "track.angleList.hint": "Marcatori salvati sulla pista tracciata. Tocca per visualizzare i dettagli.",

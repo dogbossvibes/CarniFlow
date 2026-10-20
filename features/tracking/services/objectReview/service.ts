@@ -40,7 +40,8 @@ async function rpcReview(key: ReviewKey, name: string, extra: Record<string, unk
     const { data, error } = await bounded(supabase.rpc(name, { ...argsFor(key), ...extra }).abortSignal(controller.signal), () => controller.abort());
     assertCurrent();
     if (error) throw new Error(`${error.code ?? ''} ${error.message}`);
-    if (name === 'apply_track_object_review_v1' && (!data || data.operationId !== extra.p_operation_id
+    if (data?.version !== 2) throw new Error('REVIEW_INVALID_RESPONSE');
+    if (name === 'apply_track_object_review_v2' && (!data || data.operationId !== extra.p_operation_id
       || data.appliedRevision !== Number(extra.p_expected_revision) + 1 || typeof data.replayed !== 'boolean'
       || data.revision < data.appliedRevision)) throw new Error('REVIEW_INVALID_ACK');
     const response = parseObjectReview(data, key);
@@ -50,9 +51,9 @@ async function rpcReview(key: ReviewKey, name: string, extra: Record<string, unk
     return (await cachedReview(key)) ?? response;
   });
 }
-export const readObjectReview = (key: ReviewKey) => rpcReview(key, 'get_track_object_review_v1');
+export const readObjectReview = (key: ReviewKey) => rpcReview(key, 'get_track_object_review_v2');
 /** Explicit user action only; freezes a baseline on the server, does not edit original data. */
-export const initializeObjectReview = (key: ReviewKey) => rpcReview(key, 'initialize_track_object_review_v1');
+export const initializeObjectReview = (key: ReviewKey) => rpcReview(key, 'initialize_track_object_review_v2');
 export async function queueObjectChanges(key: ReviewKey, revision: number, changes: ObjectChange[]): Promise<void> {
   await guarded(key.ownerId, async assertCurrent => {
     const request: ReviewRequest = { ...key, operationId: Crypto.randomUUID(), expectedRevision: revision, changes };
@@ -82,7 +83,7 @@ async function sync(): Promise<void> {
         await setReviewOperationState(request, 'conflict', 'REVIEW_INTENT_CONFIRMATION_REQUIRED');
         continue;
       }
-      await rpcReview(request, 'apply_track_object_review_v1', {
+      await rpcReview(request, 'apply_track_object_review_v2', {
         p_operation_id: request.operationId, p_expected_revision: request.expectedRevision, p_changes: request.changes,
       });
       // Cache first, ACK second. An interrupted ACK safely retries the SAME operation UUID.

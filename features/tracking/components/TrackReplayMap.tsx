@@ -174,6 +174,7 @@ export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, 
             return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} onPress={onPress} />;
           }
           if (m.type === 'gegenstand') {
+            if (m.material === 'ball') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="ball" onPress={onPress} />;
             if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" onPress={onPress} />;
             return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${m.objectIndex ?? objectNo.get(i) ?? ''}`} onPress={onPress} />;
           }

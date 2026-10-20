@@ -1,3 +1,5 @@
+import { scoredObjectSummary } from './scoredObjectProjection';
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { parseObjectReview, reviewCounts, reviewObjectLabel, type ObjectReview } from '../services/objectReview/model';
 /** User export contract. Deliberately separate from anonymised QA exports. */
 export interface ExportPoint { lat: number; lng: number; time?: string }
@@ -68,17 +70,19 @@ export function buildTrackUserExport(value: unknown, exportedAt: string, include
   for (const value of array(d.markers)) {
     const m = record(value), point = coordinate(m.latitude, m.longitude);
     const kind = text(m.marker_type) ?? 'marker';
-    const label = kind === 'gegenstand' && m.material !== 'duebel' ? `G${++objectNo}` : kind;
+    const label = kind === 'gegenstand' ? isTrainingJoker(text(m.material)) ? `Joker: ${m.material}` : `G${++objectNo}` : kind;
     if (!point) continue;
     markers.push({ ...point, label, kind, material: text(m.material) });
   }
+  const articleSummary = scoredObjectSummary(d);
+  const legacyJokerAnalysis = array(analytics.objects).some(o => isTrainingJoker(text(record(o).material)));
   return {
     format: 'anyvo-track', version: 1, exportedAt, title: text(record(d.dog).name) ?? 'ANYVO',
     date: text(d.session_date), notes: includeNotes ? text(d.notes) : null,
     reference, search, markers,
     summary: { referenceM: nonnegative(d.distance_meters), searchM: nonnegative(row.distance_meters ?? (runMatches ? run.distance_meters : undefined)),
-      durationS: nonnegative(row.duration_seconds ?? (runMatches ? run.duration_seconds : undefined)), found: corrected ? corrected.completeFound : nonnegative(row.articles_found ?? (runMatches ? d.articles_found ?? run.articles_found : null)),
-      total: corrected ? corrected.total : nonnegative(d.articles_total ?? run.total_objects), analysisScore: typeof analytics.trackScore === 'number' && analytics.trackScore <= 100 ? nonnegative(analytics.trackScore) : null, confidence: text(analytics.analysisConfidenceBand) },
+      durationS: nonnegative(row.duration_seconds ?? (runMatches ? run.duration_seconds : undefined)), found: corrected ? corrected.completeFound : articleSummary.hasJokers ? articleSummary.found : nonnegative(row.articles_found ?? (runMatches ? d.articles_found ?? run.articles_found : null)),
+      total: corrected ? corrected.total : articleSummary.total, analysisScore: !legacyJokerAnalysis && typeof analytics.trackScore === 'number' && analytics.trackScore <= 100 ? nonnegative(analytics.trackScore) : null, confidence: text(analytics.analysisConfidenceBand) },
     conditions: { temperatureC: number(d.temperature), humidityPercent: number(d.humidity), windSpeed: nonnegative(d.wind_speed), weather: text(d.weather_condition ?? d.wetter) },
     ...(objectReview ? { objectReview: { version: 1 as const, revision: objectReview.revision,
       totalScore: objectReview.totalScore, auditTruncated: objectReview.auditTruncated,

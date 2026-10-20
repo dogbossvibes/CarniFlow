@@ -6,3 +6,11 @@ it('rejects malformed, too large, discontinuous-only and unsupported versions',(
 it('rejects invalid coordinates, unknown marker types and duplicate IDs',()=>{const o=offer();o.reference.points[0].lat=91;expect(()=>parseFile(o)).toThrow();const m=offer();m.reference.markers.push(m.reference.markers[0]);expect(()=>parseFile(m)).toThrow();});
 it('normalizes input key order into a stable reference digest input',()=>{const r=reference();expect(canonicalReference({...r,date:r.date,points:r.points.map(p=>({breakBefore:p.breakBefore,lng:p.lng,lat:p.lat}))})).toBe(canonicalReference(r));});
 it('accepts finished return only for its task and rejects gap-only/duplicate time/unbounded accuracy',()=>{expect(parseFile(returned())).toEqual(returned());for(const edit of [(r:ReturnType<typeof returned>)=>{r.contribution.parentSessionId='00000000-0000-4000-8000-000000000000';},(r:ReturnType<typeof returned>)=>{r.contribution.finishedAtMs=null;},(r:ReturnType<typeof returned>)=>{r.contribution.points[1].breakBefore=true;},(r:ReturnType<typeof returned>)=>{r.contribution.points[1].t=1000;}]){const r=returned();edit(r);expect(()=>parseFile(r)).toThrow();}});
+
+it('round-trips ball and rubber without losing any marker and numbers only scored objects', () => {
+ const o=offer();o.reference.markers=(['duebel','ball','gummi'] as const).map((material,i)=>({id:`m${i}`,type:'gegenstand' as const,lat:47,lng:8,angleKind:null,material,distanceFromStart:i,geometryDirection:null,geometrySharpness:null}));
+ const result=parseFileText(JSON.stringify(o));expect(result).toEqual(o);
+ const map=displayReference(o.reference,'local','owner').map;
+ expect(referenceFromMap(map,o.reference.date)).toEqual(o.reference);
+ expect(map.markers.map(m=>m.objectIndex)).toEqual([null,null,1]);
+});

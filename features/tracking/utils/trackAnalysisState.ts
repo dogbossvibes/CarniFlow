@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 // Welchen Zustand hat die automatische Analyse (Track Score 2.0) einer Fährte?
 //
 // REIN LESEND: diese Datei berechnet nichts, speichert nichts und verändert
@@ -15,6 +16,9 @@
 // Bisher sahen beide identisch aus, nämlich gar nicht.
 
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
+
+/** An old score that included Jokers cannot be safely recomputed from totals. */
+export type AvailableTrackAnalytics = Omit<TrackAnalytics, 'trackScore'> & { trackScore: number | null };
 
 /** Nur die Felder, die für die Entscheidung gebraucht werden. */
 export interface TrackAnalysisSource {
@@ -97,8 +101,8 @@ export function hasSearchGeometry(data: TrackAnalysisSource | null | undefined):
 
 export interface TrackAnalysisAvailability {
   state: TrackAnalysisState;
-  /** Nur bei state === 'available' gesetzt — dieselbe Referenz wie track_data.run.analytics. */
-  analytics: TrackAnalytics | null;
+  /** Read-only projection; recorded metrics remain unchanged. */
+  analytics: AvailableTrackAnalytics | null;
   hasSearchGeometry: boolean;
   /**
    * Gelber Hinweis „Automatische Auswertung nicht verfügbar — keine verwertbare
@@ -117,7 +121,9 @@ export interface TrackAnalysisAvailability {
 export function trackAnalysisAvailability(data: TrackAnalysisSource | null | undefined): TrackAnalysisAvailability {
   const raw = data?.track_data?.run?.analytics;
   const state = trackAnalysisState(data, raw);
-  const analytics = state === 'available' ? (raw as TrackAnalytics) : null;
+  const original = state === 'available' ? (raw as TrackAnalytics) : null;
+  const analytics = original?.objects.some(o => isTrainingJoker(o.material))
+    ? { ...original, objects: original.objects.filter(o => !isTrainingJoker(o.material)), trackScore: null } : original;
   const geometry = hasSearchGeometry(data);
   return {
     state, analytics, hasSearchGeometry: geometry,

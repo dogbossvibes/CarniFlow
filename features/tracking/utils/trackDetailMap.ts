@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { buildSearchEventArcs } from './canonicalArc';
 import { attachSpecialGeometry, projectAngleMarkers, type SpecialGeometry } from './specialAngleGeometry';
 import { hasTransferredGaps, transferGapPoints } from '@/features/tracking-transfer/androidGapSafety';
@@ -80,7 +81,7 @@ export function buildTrackDetailMap(data: unknown): TrackDetailMap {
     .filter((distance): distance is number => distance != null && Number.isFinite(distance));
   let nextObjectIndex = 0;
   const markers: DetailMarker[] = sourceMarkers.map((m) => {
-    const isNumberedObject = m.marker_type === 'gegenstand' && m.material !== 'duebel';
+    const isNumberedObject = isScoredObject(m);
     const objectIndex = isNumberedObject ? ++nextObjectIndex : null;
     const distance = arcs[m.id].arcM;
     return {

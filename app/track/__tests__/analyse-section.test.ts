@@ -95,7 +95,8 @@ describe('Track-Detail — Analyse-Sektion (Punkt 9/14, additiv)', () => {
   it('die automatische Score-Karte bleibt separat vom manuellen Score gerendert', () => {
     const src = source();
     expect(src).toContain('{analytics && (');
-    expect(src).toContain('<Text style={s.analyseScoreVal}>{analytics.trackScore}<Text style={s.analyseScoreMax}>/100</Text></Text>');
+    expect(src).toContain("{analytics.trackScore ?? '—'}");
+    expect(src).toContain('{analytics.trackScore != null && <Text style={s.analyseScoreMax}>/100</Text>}');
     expect(src).toContain('<SectionLabel>Analyse</SectionLabel>');
   });
 

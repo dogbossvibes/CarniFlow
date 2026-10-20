@@ -5,7 +5,7 @@ import { useTrackRecorder } from '../useTrackRecorder';
 import { useTrackingStore } from '../../store/trackingStore';
 import { requestVoice, resetVoiceEvents } from '../../utils/voiceEvents';
 import { saveQaSessionCapture } from '../../utils/qaSessionCapture';
-import { createLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
+import { createLocalTrainingSession, finalizeLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { createLocalTrackMarker } from '@/features/tracking/repositories/localTrackRepository';
 import * as Speech from 'expo-speech';
 import { motionClient } from '../../native/motionClient';
@@ -32,6 +32,7 @@ jest.mock('expo-location', () => ({
 }));
 let feedFix: ((sample: any) => void) | null = null;
 let mockQaEnabled = false;
+let mockAutoDetect = false;
 jest.mock('../../utils/positionSource', () => ({
   sampleToLocationObject: (s: any) => ({ coords: {
     latitude: s.lat, longitude: s.lng, accuracy: s.accuracy,
@@ -95,7 +96,7 @@ let renderer: ReactTestRenderer | null = null;
 let current: Recorder;
 let clockMs = 1_000_000;
 const metersToLatitude = (m: number) => m / 111_320;
-function Harness() { current = useTrackRecorder({ autoDetect: false }); return null; }
+function Harness() { current = useTrackRecorder({ autoDetect: mockAutoDetect }); return null; }
 async function start(onSessionStarted?: () => void) {
   await act(async () => { renderer = TestRenderer.create(<Harness />); });
   await act(async () => { expect((await current.startWarmup()).error).toBeNull(); });
@@ -116,12 +117,14 @@ beforeEach(() => {
   (markMotionSample as jest.Mock).mockClear();
   feedFix = null;
   mockQaEnabled = false;
+  mockAutoDetect = false;
   (saveQaSessionCapture as jest.Mock).mockClear();
   (createLocalTrainingSession as jest.Mock).mockReset().mockResolvedValue(undefined);
   (createLocalTrackMarker as jest.Mock).mockClear();
   (Speech.speak as jest.Mock).mockClear();
   jest.spyOn(Date, 'now').mockImplementation(() => clockMs);
   const state = useTrackingStore.getState();
+  state.isPaused = false;
   state.trackPoints.length = 0;
   state.markers.length = 0;
   state.distanceMeters = 0;
@@ -355,4 +358,46 @@ it('does not let a previous warm-up start completion mark a new warm-up ready', 
   await act(async () => { current.finish(); await Promise.resolve(); });
   const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
   expect(capture.startupDiagnostics.motionReadyTSec).toBeNull();
+});
+
+// A real hook/processor route: the same GPS evidence must survive a marker at its apex.
+async function walkMarkedCorner(kind: 'links' | 'rechts' | 'spitz_links' | 'spitz_rechts', special?: 'bw' | 'ow' | 'gw') {
+  mockAutoDetect = true;
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 2, 0);
+  let elapsed = 1000;
+  const fix = (east: number, north: number) => {
+    clockMs = 1_000_000 + elapsed; elapsed += 1000;
+    act(() => { feedFix?.({ lat: metersToLatitude(north), lng: metersToLatitude(east), accuracy: 2, speed: 1, t: clockMs }); });
+  };
+  for (let n = 0; n <= 40; n++) fix(0, n);
+  const state = useTrackingStore.getState();
+  state.currentPosition = { lat: metersToLatitude(40), lng: 0 };
+  await act(async () => { await current.addMarker('gegenstand', { material: 'gummi' }); });
+  if (special) await act(async () => { await current.addMarker('winkel', { angleKind: special }); });
+  const sign = kind.endsWith('rechts') ? 1 : -1;
+  const sharp = kind.startsWith('spitz');
+  for (let i = 1; i <= 40; i++) fix(sign * i * (sharp ? Math.SQRT1_2 : 1), 40 - (sharp ? i * Math.SQRT1_2 : 0));
+  return useTrackingStore.getState();
+}
+it.each(['links', 'rechts', 'spitz_links', 'spitz_rechts'] as const)('retains an object on the %s apex AND independently recognizes its angle', async kind => {
+  const state = await walkMarkedCorner(kind);
+  const corners = state.markers.filter(m => m.type === 'winkel');
+  expect(corners.map(m => m.angleKind)).toEqual([kind]);
+  expect(state.markers.filter(m => m.type === 'gegenstand').map(m => m.material)).toEqual(['gummi']);
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  expect(useTrackingStore.getState().markers.filter(m => m.type === 'winkel').map(m => m.angleKind)).toEqual([kind]);
+}, 15000);
+it.each(['bw','ow','gw'] as const)('updates %s geometry while laying even with an object at the same apex', async special => {
+  const state = await walkMarkedCorner('spitz_rechts', special);
+  expect(state.markers.find(m => m.angleKind === special)).toMatchObject({ geometryDirection: 'rechts', geometrySharpness: 'sharp', geometrySource: 'gps' });
+  expect(state.markers.filter(m => m.type === 'gegenstand')).toHaveLength(1);
+}, 15000);
+
+it('persists all Joker markers while finalizing only rubber as a scored article',async()=>{
+ await start();
+ for(const material of ['duebel','ball','gummi'] as const){clockMs+=1;await act(async()=>{await current.addMarker('gegenstand',{material});});}
+ await act(async()=>{current.finish();for(let i=0;i<10;i++)await Promise.resolve();});
+ expect(useTrackingStore.getState().markers.map(m=>m.material)).toEqual(['duebel','ball','gummi']);
+ expect(finalizeLocalTrainingSession).toHaveBeenLastCalledWith('local',expect.objectContaining({articlesTotal:1}));
 });

@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { attachSpecialGeometry, countLaidCorners, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { claimLayRecorderStore } from '@/features/tracking/utils/layRecorderOwnership';
 import { createBufferedPointWriter } from '@/features/tracking/utils/bufferedPointWriter';
@@ -354,6 +355,20 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     return () => sub.remove();
   }, []);
 
+  // Refresh displayed BW/OW/GW geometry from the existing Android detector buffer.
+  // Ordinary objects do not change detector state or suppress corner recognition.
+  const refreshManualGeometry = useCallback(() => {
+    const state = store.getState();
+    if (!state.markers.some(m => ['bw', 'ow', 'gw'].includes(m.angleKind ?? ''))) return;
+    const entries = classifyManualAngleGeometry(state.markers, detectPointsRef.current,
+      fuseTurns(detectPointsRef.current).turns, state.markers.length).markers;
+    const next = attachSpecialGeometry(state.markers, entries);
+    if (next.some((m, i) => m.geometryDirection !== state.markers[i].geometryDirection
+      || m.geometrySharpness !== state.markers[i].geometrySharpness || m.geometrySource !== state.markers[i].geometrySource)) {
+      state.annotateAngleGeometry(entries);
+    }
+  }, [store]);
+
   // Marker im Store + lokal (SQLite) + Supabase ablegen (best-effort).
   const commitMarker = useCallback(async (
     marker: MarkerSample,
@@ -361,6 +376,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   ) => {
     const s = store.getState();
     s.addMarker(marker);
+    if (marker.type === 'winkel') refreshManualGeometry();
     const markerSessionId = localSessionId.current;
     if (markerSessionId) {
       const localWrite = (async () => {
@@ -375,7 +391,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       await localWrite;
     }
     if (s.currentSessionId) await saveTrackMarker(s.currentSessionId, marker);
-  }, [store, qaNoteMarker]);
+  }, [store, qaNoteMarker, refreshManualGeometry]);
 
   // Übergabe eines FINAL bestätigten Winkels an die bestehende Pipeline (Marker/
   // Voice/Logbuch/Persistenz) — genau EINMAL je Winkel. Geometrie/Confidence liegen
@@ -1346,7 +1362,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       durationSeconds:   s.durationSeconds,
       distanceMeters:    s.distanceMeters,
       gpsQualityAverage: calculateAverageAccuracy(s.trackPoints.map(p => p.accuracy)),
-      articlesTotal:     s.markers.filter(m => m.type === 'gegenstand').length,
+      articlesTotal:     s.markers.filter(isScoredObject).length,
       cornersTotal:      countLaidCorners(attachSpecialGeometry(s.markers, manualAngleGeometry)),
       segments:          s.segments,
       manualAngleGeometry,

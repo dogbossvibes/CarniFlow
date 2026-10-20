@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { attachSpecialGeometry, countLaidCorners, readSpecialGeometry, specialAngleKey } from '@/features/tracking/utils/specialAngleGeometry';
 import { parseTrackTransferReference, type TrackTransferReference } from './reference';
 
@@ -55,7 +56,7 @@ export function createTrackTransferImportPlan(receiptValue: unknown, referenceVa
   }));
   const payload = {
     distanceMeters: reference.distanceM,
-    articlesTotal: reference.markers.filter(m => m.type === 'gegenstand').length,
+    articlesTotal: reference.markers.filter(isScoredObject).length,
     cornersTotal: countLaidCorners(annotated),
     segments,
     layContinuity: { version: 1, breakBeforeTimestamps: reference.points.filter(p => p.breakBefore).map(p => new Date(p.t).toISOString()) },

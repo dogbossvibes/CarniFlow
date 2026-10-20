@@ -40,9 +40,9 @@ it('C1: cold offline intent -> explicit server mapping -> lost ACK retry preserv
   expect(before.expectedRevision).toBeNull(); expect(before.changes).toHaveLength(2);
   const server = baseline({ source: 'legacy_markers', totalScore: null, hasGaps: null,
     objects: baseline().objects.map(o => ({ ...o, recordedStatus: 'unknown', effectiveStatus: 'unknown' })) });
-  mockOnline = true; mockRpc.mockResolvedValue({ data: server, error: null });
+  mockOnline = true; mockRpc.mockResolvedValue({ data: { ...server, version: 2 }, error: null });
   await syncObjectReviews();
-  expect(mockRpc.mock.calls.map(call => call[0])).toEqual(['initialize_track_object_review_v1']);
+  expect(mockRpc.mock.calls.map(call => call[0])).toEqual(['initialize_track_object_review_v2']);
   expect((await pendingReview(key))?.state).toBe('conflict');
   expect((await cachedReview(key))?.revision).toBe(0);
   await syncObjectReviews(); expect(mockRpc).toHaveBeenCalledTimes(1); // no automatic resolution
@@ -53,11 +53,11 @@ it('C1: cold offline intent -> explicit server mapping -> lost ACK retry preserv
   mockRpc.mockRejectedValueOnce(new Error('lost ACK'));
   await syncObjectReviews(); expect((await pendingReview(key))?.state).toBe('failed');
   expect((await pendingReview(key))?.request).toEqual(queued);
-  mockRpc.mockResolvedValue({ data: { ...server, revision: 1, objects: server.objects.map(o => ({ ...o, effectiveStatus: 'not_found' })),
+  mockRpc.mockResolvedValue({ data: { ...server, version: 2, revision: 1, objects: server.objects.map(o => ({ ...o, effectiveStatus: 'not_found' })),
     operationId: queued.operationId, appliedRevision: 1, replayed: true }, error: null });
   await syncObjectReviews();
   expect(await reviewOperations(key.ownerId)).toEqual([]);
-  const calls = mockRpc.mock.calls.filter(call => call[0] === 'apply_track_object_review_v1');
+  const calls = mockRpc.mock.calls.filter(call => call[0] === 'apply_track_object_review_v2');
   expect(calls).toHaveLength(2); expect(calls[0]).toEqual(calls[1]);
   expect(calls[0][1].p_changes).toEqual([{ objectId: 'object-a', status: 'not_found' }, { objectId: 'object-b', status: 'not_found' }]);
   expect(originals()).toBe(original);
