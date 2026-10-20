@@ -1,5 +1,6 @@
 import { registerGroupResources } from '@/features/training-groups/registerResources';
 export const de = {
+  updateRequired: 'Für diese Fährte wird die aktuelle ANYVO-Version benötigt. Bitte aktualisiere die App.',
   directionTransfer: 'Fährten mit Abrissrichtung können noch nicht übergeben werden. Deine Fährte und die Richtungsangaben bleiben gespeichert.',
   ownCopies: 'Meine übernommenen Fährten', moreCopies: 'Weitere Fährten laden',
   revisionConflict: 'Diese Fährte wurde auf einem anderen Gerät geändert. Deine lokalen Änderungen bleiben erhalten. Die Synchronisation wurde angehalten.',
@@ -31,6 +32,7 @@ export const de = {
   busyDog: 'Für diesen Hund ist bereits eine andere Fährte offen. Die übernommene Fährte bleibt im Logbuch.',
 };
 const en: typeof de = {
+  updateRequired: 'This track requires the current ANYVO version. Please update the app.',
   directionTransfer: 'Tracks with an offset direction cannot be transferred yet. Your track and direction information remain saved.',
   ownCopies: 'My accepted tracks', moreCopies: 'Load more tracks',
   revisionConflict: 'This track changed on another device. Your local changes are retained. Synchronisation has stopped.',
@@ -60,6 +62,7 @@ export function transferErrorKey(error: unknown): keyof typeof de {
   if (code === 'TRANSFER_REVISION_CONFLICT') return 'revisionConflict';
   if (code === 'TRANSFER_COPY_GONE') return 'copyGone';
   if (code === 'DIRECTION_TRANSFER_UNAVAILABLE') return 'directionTransfer';
+  if (code === 'TRANSFER_UPDATE_REQUIRED') return 'updateRequired';
   if (code === 'SOURCE_NOT_SYNCED') return 'sourceSync';
   if (code === 'TRANSFER_QUOTA_EXCEEDED') return 'quota';
   if (code === 'STORAGE') return 'storage';

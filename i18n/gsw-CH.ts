@@ -35,6 +35,11 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "help.trackGroupsUnavailable": "Gruppeufgabe sind i dere Version nöd freigegeh. Anderi aabotni Uustuschfunktione bliibed devo trennt.",
   "help.trackTogetherVersions": "I manche Android-Versione isch d Absuche vo übernommene Fährte mit Ufnahmelücke gsperrt. E aazeigti Vorschau bedüütet denn kei verfüegbari Absuche. Beachte de Hiwiis vo de App.",
 
+  "track.materialBall": "Ball",
+  "track.materialRubber": "Gummi",
+  "track.jokers": "Joker",
+  "track.jokerHint": "Dübel und Ball sind freiwilligi Joker. Si zähled nöd zur Gägestandsuswertig.",
+  "track.voiceBall": "Ball als Joker",
   "track.markerGroup.title": "Markierige i däm Bereich",
   "track.angleList.title": "Winkel und Richtige",
   "track.angleList.hint": "Gspeichereti Markierige vo de gleite Fährte. Tippe öffnet d Details.",

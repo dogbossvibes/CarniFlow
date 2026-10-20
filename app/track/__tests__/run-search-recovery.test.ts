@@ -57,7 +57,7 @@ describe('run.tsx — Search-Recovery-State', () => {
   });
 
   it('laidObjects tragen die Marker-ID (stabile Fund-Identität)', () => {
-    expect(run).toContain("index: i, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null }))");
+    expect(run).toContain("index: i, recoveryIndex: m.recoveryIndex, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null }))");
   });
 
   it('Completed/„Beenden": Store-Reset (clearPending) bleibt der Cleanup-Pfad', () => {

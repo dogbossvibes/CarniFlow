@@ -1,3 +1,4 @@
+import { isScoredObject, isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { countLaidCorners, projectAngleMarkers } from '@/features/tracking/utils/specialAngleGeometry';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { useSession } from '@/hooks/useSession';
@@ -47,7 +48,7 @@ import {
 import { loadPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
 import { buildSearchEventArcs, type CanonicalArc } from '@/features/tracking/utils/canonicalArc';
 import { nextObjectDistance, searchDistanceReadout } from '@/features/tracking/utils/distanceScale';
-import type { SearchRunState } from '@/features/tracking/store/searchRunState';
+import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
 
 import { decideRecovery, dedupeSearchPoints, pathDistanceM } from '@/features/tracking/store/searchRecovery';
 import { flushSearchPoints } from '@/features/tracking/store/searchPersist';
@@ -140,7 +141,8 @@ export default function TrackRunScreen() {
   // Frischer Start und Discard bauen den Snapshot OHNE Recovery (recovery: null).
   const buildSnap = (withRecovery = false) => {
     const st = useTrackingStore.getState();
-    const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
+    const objs = st.markers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null)
+      .map((m, recoveryIndex) => ({ ...m, recoveryIndex })).filter(isScoredObject);
     // `t` (Fix-Zeitstempel je Linienpunkt) bleibt erhalten: canonicalArc wählt
     // bei selbst-benachbarten Schenkeln den Durchgang über die gemeinsame
     // Zeitachse Marker ↔ Linie (P0 „Self-Crossing", qa-0ec8c4ca). Für den
@@ -169,7 +171,7 @@ export default function TrackRunScreen() {
       laidPoints,
       laidAccuracies: st.trackPoints.map(p => p.accuracy ?? null),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number },
-        index: i, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null })),
+        index: i, recoveryIndex: m.recoveryIndex, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null })),
       laidMarkers: projectAngleMarkers(st.markers),
       eventArcs,
       segments: st.segments,
@@ -583,8 +585,8 @@ export default function TrackRunScreen() {
         result: {
           durationS, score: null,
           deviationAvgM: runState.devCount > 0 ? runState.devSumM / runState.devCount : null,
-          foundObjects: snapData.laidObjects.filter(o => o.material !== 'duebel' && runState.foundObjectIds.includes(o.id ?? `idx:${o.index}`)).length,
-          totalObjects: snapData.laidObjects.filter(o => o.material !== 'duebel').length,
+          foundObjects: snapData.laidObjects.filter(o => !isTrainingJoker(o.material) && runState.foundObjectIds.includes(searchObjectKey(o, o.index))).length,
+          totalObjects: snapData.laidObjects.filter(o => !isTrainingJoker(o.material)).length,
           distanceM: pathDistanceM(saved), breaks: runState.breaks,
           points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
         },
@@ -664,15 +666,15 @@ export default function TrackRunScreen() {
       .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, angleKind: m.angleKind, lat: m.lat, lng: m.lng }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
-  // Gegenstände (inkl. material für die Voice-Ansage „Dübel"/„Gegenstand").
+  // Nur reguläre Gegenstände führen die Absuche; optionale Joker bleiben Kartenmarker.
   const guidanceObjects = useMemo<GuidanceObject[]>(
     () => snapData.laidMarkers
-      .filter(m => m.type === 'gegenstand')
+      .filter(isScoredObject)
       .flatMap(m => { const arcM = snapData.eventArcs[m.id]?.arcM; return arcM == null ? [] : [{ id: m.id, arcM, material: m.material, lat: m.lat, lng: m.lng }]; }),
     [snapData.laidMarkers, snapData.eventArcs],
   );
   // ── Search-Guidance Activation Guard ─────────────────────────────────────
-  // EIN zentraler Zustand für ACTIVE SEARCH GUIDANCE (Winkel/Gegenstand/Dübel/
+  // EIN zentraler Zustand für ACTIVE SEARCH GUIDANCE (Winkel/Gegenstand/
   // GW-OW-BW-Abriss-Voice, deren Haptik, Segment-Ansagen, Off-Track-Feedback,
   // Ende). Zwei bestehende Recorder-Authorities, beide nötig:
   //   • `s.recording` — true erst ab s.start() (beginSearchNow/resumeSearch),
@@ -966,10 +968,10 @@ export default function TrackRunScreen() {
       .filter((m): m is typeof m & { angleKind: AnalyticsAngleKind } =>
         m.type === 'winkel' && m.angleKind != null && m.angleKind !== 'absatz' && m.angleKind !== 'abriss')
       .flatMap(m => { const atM = snapData.eventArcs[m.id]?.arcM; return atM == null ? [] : [{ atM, angleKind: m.angleKind, geometryDirection: m.geometryDirection, geometrySharpness: m.geometrySharpness }]; });
-    const objectMarkers = snapData.laidMarkers.filter(m => m.type === 'gegenstand' && m.lat != null && m.lng != null);
+    const objectMarkers = snapData.laidMarkers.filter(m => isScoredObject(m) && m.lat != null && m.lng != null);
     const objectInputs: AnalyticsObjectInput[] = objectMarkers.map((m, i) => ({
       objectId: m.id,
-      objectIndex: objectMarkers.slice(0, i + 1).filter(marker => marker.material !== 'duebel').length,
+      objectIndex: i + 1,
       atM: snapData.eventArcs[m.id]?.arcM ?? m.distance_from_start,
       material: m.material,
       found: res.foundObjectIndices.includes(i),

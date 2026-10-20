@@ -36,6 +36,11 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "help.trackGroupsUnavailable": "Les tâches de groupe ne sont pas activées dans cette version. Les autres échanges proposés restent distincts.",
   "help.trackTogetherVersions": "Certaines versions Android ne permettent pas de rechercher une piste reçue avec des lacunes d’enregistrement. Un aperçu affiché ne signifie pas que la recherche est disponible. Respecte l’avis de l’application.",
 
+  "track.materialBall": "Balle",
+  "track.materialRubber": "Caoutchouc",
+  "track.jokers": "Jokers",
+  "track.jokerHint": "Les chevilles et les balles sont des jokers facultatifs, exclus de l’analyse des objets.",
+  "track.voiceBall": "Balle joker",
   "track.markerGroup.title": "Repères dans cette zone",
   "track.angleList.title": "Angles et directions",
   "track.angleList.hint": "Repères enregistrés sur la piste tracée. Touchez pour afficher les détails.",

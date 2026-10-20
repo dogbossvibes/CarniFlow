@@ -1,6 +1,8 @@
 import { parseObjectReview, reviewCounts, reviewObjectLabel, validateChanges } from '../model';
 import { baseline, corrected, key, request } from './fixtures';
 import backendResponses from './backendResponses.json';
+import newFiltered from './response-new-filtered.json';
+import sealedJokers from './response-sealed-jokers.json';
 import { buildTrackUserExport } from '../../../utils/trackUserExport';
 it('preserves original and effective outcomes across JSON roundtrip', () => {
   const original = corrected();
@@ -32,7 +34,7 @@ it('rejects duplicate identities and invalid transitions', () => {
 });
 it('does not number dowels or pretend to know legacy G ordinals', () => {
   const review = baseline({ objects: [{ ...baseline().objects[0], material: 'duebel' }, baseline().objects[1]] });
-  expect(reviewObjectLabel(review, 'object-a')).toBe('D1');
+  expect(reviewObjectLabel(review, 'object-a')).toBe('Dübel · Joker');
   expect(reviewObjectLabel(review, 'object-b')).toBe('G1');
   expect(reviewObjectLabel({ ...review, source: 'legacy_markers' }, 'object-b')).toBe('#2');
 });
@@ -55,7 +57,7 @@ it('accepts actual synthetic PostgreSQL RPC responses and survives local JSON re
     const parsed = parseObjectReview(response, binding);
     expect(parseObjectReview(JSON.parse(JSON.stringify(parsed)), binding)).toEqual(parsed);
   }
-  expect(parseObjectReview(cases[0].response, cases[0].key).totalScore).toBe(74);
+  expect(parseObjectReview(cases[0].response, cases[0].key).totalScore).toBeNull();
   expect(parseObjectReview(cases[1].response, cases[1].key).totalScore).toBeNull();
   expect(parseObjectReview(cases[2].response, cases[2].key).source).toBe('legacy_markers');
 });
@@ -63,4 +65,22 @@ it('binds review to the displayed older run, independently of newer payload anal
   const result = buildTrackUserExport({ id: key.sessionId, dog_id: key.dogId,
     runs: [{ id: key.runId, articles_found: 0 }], track_data: { run: { run_id: 'newer', analytics: { trackScore: 99 } } }, objectReview: corrected() }, '2026-10-09T12:00:00Z');
   expect(result.summary.found).toBe(2); expect(result.summary.analysisScore).toBeNull();
+});
+
+it.each(['response-new-filtered.json', 'response-sealed-jokers.json'])('accepts the coordinated R3 backend contract and immutable joker audit: %s', name => {
+  const response = name.includes('sealed') ? sealedJokers : newFiltered;
+  const binding = { ownerId: 'owner', sessionId: response.sessionId, runId: response.runId, dogId: response.dogId };
+  const before = JSON.stringify(response);
+  const review = parseObjectReview(response, binding);
+  expect(review.objects.map(o => o.material)).toEqual(['holz', 'gummi']);
+  expect(review.objects.map(o => o.index)).toEqual([0, 1]);
+  expect(parseObjectReview(JSON.parse(JSON.stringify(review)), binding)).toEqual(review);
+  expect(JSON.stringify(response)).toBe(before);
+  if (name.includes('sealed')) {
+    expect(review.totalScore).toBeNull();
+    expect(reviewObjectLabel(review, 'obj-0')).toBe('Joker');
+    expect(() => validateChanges(review, [{ objectId: 'obj-0', status: 'not_found' }])).toThrow();
+    expect(() => parseObjectReview({ ...response, excludedJokerObjectIds: [] }, binding)).toThrow();
+    expect(parseObjectReview({ ...response, totalScore: 100 }, binding).totalScore).toBeNull();
+  }
 });

@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { attachSpecialGeometry } from '../utils/specialAngleGeometry';
 import type { TrackTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import { create } from 'zustand';
@@ -13,7 +14,7 @@ import {
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
-export type MarkerMaterial = 'stoff' | 'filz' | 'holz' | 'duebel' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
+export type MarkerMaterial = 'stoff' | 'filz' | 'holz' | 'duebel' | 'ball' | 'gummi' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
 // Winkel-/Figur-Typen einer Fährte. Schärfe (rechtwinklig/spitz) und Richtung
 // (links/rechts) sind getrennt: ein Spitzwinkel ist immer AUCH nach links oder
 // rechts. 'spitz' (ohne Richtung) bleibt nur für Altdaten erhalten.
@@ -408,7 +409,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
 
   markArticleFound: (markerId) => set(s => ({
     markers: s.markers.map(m => m.id === markerId ? { ...m, found: true } : m),
-    articlesFound: s.markers.filter(m => m.found || m.id === markerId).filter(m => m.type === 'gegenstand').length,
+    articlesFound: s.markers.filter(m => m.found || m.id === markerId).filter(isScoredObject).length,
   })),
 
   setCurrentPosition: (pos, accuracy) => set({ currentPosition: pos, gpsAccuracy: accuracy ?? null, gpsQuality: accuracy != null ? getGpsQuality(accuracy) : get().gpsQuality }),

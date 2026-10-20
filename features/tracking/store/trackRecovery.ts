@@ -1,3 +1,4 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { attachSpecialGeometry, readSpecialGeometry } from '../utils/specialAngleGeometry';
 import { transferredPending } from '@/features/tracking-transfer/recovery';
 import { readContinuityPoint } from '../utils/trackContinuity';
@@ -139,7 +140,7 @@ export function registryPatchFromPending(p: PendingTrack, now: number): Partial<
     searchStartedAt: p.searchStartedAt ?? null,
     distanceMeters:  p.distanceMeters ?? 0,
     winkelCount:     p.markers.filter(m => m.type === 'winkel').length,
-    objektCount:     p.markers.filter(m => m.type === 'gegenstand').length,
+    objektCount:     p.markers.filter(isScoredObject).length,
     updatedAt:       now,
   };
 }

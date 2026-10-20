@@ -50,6 +50,8 @@ describe('sanitizeSearchRunState — legacy-sicher (17.)', () => {
   it('searchObjectKey: Marker-ID vor Index', () => {
     expect(searchObjectKey({ id: 'gegenstand-77' }, 3)).toBe('gegenstand-77');
     expect(searchObjectKey({}, 3)).toBe('idx:3');
+    expect(searchObjectKey({ recoveryIndex: 7 }, 1)).toBe('idx:7');
+    expect(searchObjectKey({ id:'stable', recoveryIndex:7 },1)).toBe('stable');
   });
 });
 

@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import type { ObjectChange, ReviewKey, ReviewRequest } from './model';
 
 /** Local recording identity only. Never assumed to be a server marker UUID. */
@@ -27,6 +28,7 @@ export function localAutoObjectsFromRun(value: unknown, key: ReviewKey): LocalAu
     ids.add(detection.id);
     const reference = snapshot.version === 1 && Array.isArray(snapshot.objects)
       ? snapshot.objects.map(object).find(o => o.id === detection.id) : undefined;
+    if (typeof reference?.material === 'string' && isTrainingJoker(reference.material)) continue;
     result.push({ objectId: detection.id, index: result.length, material: typeof reference?.material === 'string' ? reference.material : null });
   }
   return result;
@@ -36,7 +38,7 @@ export function validateIntent(request: ReviewIntent): void {
     || !request.changes.length || request.changes.length > request.localAutoObjects.length) throw new Error('REVIEW_INVALID_INTENT');
   const ids = new Set<string>();
   for (const [i, item] of request.localAutoObjects.entries()) {
-    if (typeof item.objectId !== 'string' || !item.objectId.trim() || item.index !== i || ids.has(item.objectId)
+    if (isTrainingJoker(item.material) || typeof item.objectId !== 'string' || !item.objectId.trim() || item.index !== i || ids.has(item.objectId)
       || (item.material !== null && typeof item.material !== 'string')) throw new Error('REVIEW_INVALID_INTENT');
     ids.add(item.objectId);
   }

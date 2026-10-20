@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { isContinuousPair, tagContinuitySections } from '../utils/trackContinuity';
 // ──────────────────────────────────────────────────────────────────────────
 // Track Analytics Engine (Punkt 10/11/13) — REIN deterministisch, KEINE KI,
@@ -371,7 +372,7 @@ function round2(x: number): number { return Math.round(x * 100) / 100; }
 // ── Gegenstandsanalyse ────────────────────────────────────────────────────
 
 export function analyzeObjects(samples: AnalyticsSample[], objects: AnalyticsObjectInput[]): ObjectAnalysis[] {
-  return objects.map(obj => {
+  return objects.filter(o => !isTrainingJoker(o.material)).map(obj => {
     const window = samples.filter(s => Math.abs(s.atM - obj.atM) <= CORNER_WINDOW_BEFORE_M);
     if (!window.length) {
       return { atM: obj.atM, material: obj.material, found: obj.found, minDistanceM: null, approachSpeedMps: null, timeInAreaSec: 0, behavior: 'unbekannt' };

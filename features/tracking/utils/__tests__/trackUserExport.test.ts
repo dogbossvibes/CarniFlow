@@ -43,7 +43,7 @@ it('does not invent timestamps, distances or found states for old/incomplete tra
 });
 it('keeps object numbering when a marker has no valid position; dowels do not consume an object number', () => {
   const snapshot = buildTrackUserExport({ markers: [{ marker_type: 'gegenstand' }, { ...source.markers[0], material: 'duebel' }, source.markers[0]] }, now);
-  expect(snapshot.markers.map(m => m.label)).toEqual(['gegenstand', 'G2']);
+  expect(snapshot.markers.map(m => m.label)).toEqual(['Joker: duebel', 'G2']);
 });
 it('handles missing data and rejects oversized geometry without silently truncating', () => {
   expect(buildTrackUserExport(null, now).reference).toEqual([]);

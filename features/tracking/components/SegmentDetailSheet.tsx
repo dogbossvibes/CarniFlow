@@ -27,7 +27,7 @@ type TFunc = (k: any, p?: any) => string;
 const MATERIAL_KEY: Record<string, TranslationKey> = {
   holz: 'track.materialWood', filz: 'track.materialFelt', stoff: 'track.materialFabric',
   leder: 'track.materialLeather', plastik: 'track.materialPlastic', diverses: 'track.materialOther',
-  metall: 'track.materialMetal', teppich: 'track.materialCarpet', duebel: 'track.materialDowel',
+  metall: 'track.materialMetal', teppich: 'track.materialCarpet', duebel: 'track.materialDowel', ball: 'track.materialBall', gummi: 'track.materialRubber',
 };
 
 function segmentTitle(seg: AnalyticsSegment, analytics: TrackAnalyticsV2 | TrackAnalyticsV3 | null, t: TFunc): string {

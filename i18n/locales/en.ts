@@ -32,6 +32,11 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "help.trackGroupsUnavailable": "Group tasks are not enabled in this version. Other exchange features offered by the app are separate.",
   "help.trackTogetherVersions": "Some Android versions cannot search accepted tracks that contain recording gaps. A displayed preview does not mean search is available. Follow the app’s notice.",
 
+  "track.materialBall": "Ball",
+  "track.materialRubber": "Rubber",
+  "track.jokers": "Jokers",
+  "track.jokerHint": "Dowels and balls are optional rewards. They do not count towards article analysis.",
+  "track.voiceBall": "Ball reward",
   "track.markerGroup.title": "Markers in this area",
   "track.angleList.title": "Turns and directions",
   "track.angleList.hint": "Saved markers on the laid track. Tap to view details.",
