@@ -149,7 +149,7 @@ describe('Screen nicht gemountet / kein activeHandler', () => {
   });
 });
 
-describe('Hintergrund vs. Vordergrund: fachliche Parität (Golden aus b6bc114)', () => {
+describe('Hintergrund vs. Vordergrund: fachliche Parität und erhaltene Legacy-Goldens', () => {
   // Szenarien mit zwei VERSCHIEDENEN Fixes desselben Zeitstempels: im Hintergrund ist das per
   // Definition eine Doppelzustellung (sessionId + Zeitstempel) → separat geprüft (s. u.).
   const hasDistinctSameTime = (sc: Scenario) => {
@@ -190,22 +190,38 @@ describe('Hintergrund vs. Vordergrund: fachliche Parität (Golden aus b6bc114)',
     expect(bg.distanceCalls.at(-1)).toBe(fg.distanceCalls.at(-1));
     expect(bg.angles).toEqual(fg.angles);
   });
-  it.each(bgScenarios.map(s => [s.name, s] as const))('%s — Hintergrundpfad = Vordergrund-Golden', async (name, sc: Scenario) => {
+  it.each(bgScenarios.map(s => [s.name, s] as const))('%s — Hintergrundpfad = aktueller Vordergrund', async (name, sc: Scenario) => {
     const h = await runBackground(sc);
+    // P1 intentionally changes CURRENT turn vertices. Compare the actual two
+    // delivery paths instead of pinning the background to pre-fix geometry.
+    __resetLaySessionRuntimeForTests();
+    const fg = startSession('fg', null, { engine: sc.engine, qa: sc.qa, autoDetect: sc.autoDetect, startedAtMs: T0 });
+    for (const st of sc.steps) {
+      if (st.k !== 'fix') continue;
+      clock = st.t + (st.ageMs ?? 0);
+      const fix = loc(st.t, st.x, st.y, st.acc as number);
+      if (st.acc === null) (fix.coords as { accuracy: number | null }).accuracy = null;
+      await deliverLayFix('fg', fix, 'foreground');
+    }
+    expect(h.points).toEqual(fg.points);
+    expect(h.distanceCalls).toEqual(fg.distanceCalls);
+    expect(h.angles).toEqual(fg.angles);
     const golden = LAY_GOLDEN_B6BC114[name];
-    expect(h.points).toHaveLength(golden.points);
+    if (sc.engine === 'build40' || name.startsWith('straight60')) {
+      expect(h.points).toHaveLength(golden.points);
+      expect(hash(h.points)).toBe(golden.pointsHash);
+    }
     if (name === 'badAccuracyAtCorner') {
       // The explicitly chosen continuity policy treats the unusable interval as a gap.
       expect(h.points.filter(point => point.breakBefore)).toHaveLength(1);
       expect(h.persisted.filter(point => point.breakBefore)).toHaveLength(1);
       expect(h.distanceCalls.at(-1) ?? 0).toBeLessThan(golden.distance);
     } else {
-      expect(hash(h.points)).toBe(golden.pointsHash);
       expect(h.distanceCalls.at(-1) ?? 0).toBe(golden.distance);
     }
-    expect(h.angles).toEqual(golden.corners);
+    expect(h.angles).toEqual(name.startsWith('acuteRight current') ? ['spitz_rechts'] : golden.corners);
     // Alles Akzeptierte ist nach dem letzten Task-Callback dauerhaft geschrieben.
-    expect(h.persisted).toHaveLength(golden.points);
+    expect(h.persisted).toHaveLength(h.points.length);
   });
 });
 
