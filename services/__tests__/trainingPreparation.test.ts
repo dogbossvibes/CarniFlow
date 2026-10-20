@@ -21,7 +21,7 @@ it('reads both models by owner/dog/discipline, preserves old notes and unique so
   expect(sq.or).toHaveBeenCalledWith('type.is.null,type.neq.track');
   expect(sq.limit).toHaveBeenCalledWith(101);
   expect(result.units.map(u => u.id)).toEqual(['same-id', 'legacy-session:same-id']);
-  expect(result.units[1]).toMatchObject({ historySource: 'session', originalId: 'same-id', notes: 'Old observation', exercises: [{ notes: 'Old observation' }] });
+  expect(result.units[1]).toMatchObject({ historySource: 'session', originalId: 'same-id', notes: 'Old observation', exercises: [{ notes: null }] });
   expect(old.id).toBe('same-id');
   expect(result.limited).toBe(false);
 });

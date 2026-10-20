@@ -2387,6 +2387,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "trainingDoc.performed": "Pratiqué aujourd’hui",
   "trainingDoc.details": "Détails et médias",
   "trainingDoc.exerciseDetails": "Observation et historique",
+  "trainingDoc.historyExerciseNote": "Observation sur l’exercice",
+  "trainingDoc.historySessionNote": "Note de séance",
   "trainingDoc.exerciseObservation": "Observation sur cet exercice (facultatif)",
   "trainingDoc.exerciseNextFocus": "La prochaine fois pour cet exercice (facultatif)",
   "trainingDoc.sessionNextFocus": "Objectif de la discipline (facultatif)",

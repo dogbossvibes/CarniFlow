@@ -2412,6 +2412,8 @@ export const deCH = {
   "trainingDoc.performed": "Heute trainiert",
   "trainingDoc.details": "Details und Medien",
   "trainingDoc.exerciseDetails": "Beobachtung und Verlauf",
+  "trainingDoc.historyExerciseNote": "Übungsbeobachtung",
+  "trainingDoc.historySessionNote": "Trainingsnotiz",
   "trainingDoc.exerciseObservation": "Beobachtung zu dieser Übung (optional)",
   "trainingDoc.exerciseNextFocus": "Nächstes Mal bei dieser Übung (optional)",
   "trainingDoc.sessionNextFocus": "Schwerpunkt für die Sparte (optional)",

@@ -26,7 +26,8 @@ export async function loadTrainingPreparation(owner: string, dog: string, discip
       .map(session => {
         const item = sessionToFeedItem(session);
         return { ...item, id: `legacy-session:${session.id}`, historySource: 'session' as const, originalId: session.id,
-          exercises: item.exercises?.map(exercise => ({ ...exercise, id: `legacy-exercise:${session.id}` })),
+          // Legacy has one session note, not a separate exercise observation.
+          exercises: item.exercises?.map(exercise => ({ ...exercise, notes: null, id: `legacy-exercise:${session.id}` })),
         };
       }),
   ];

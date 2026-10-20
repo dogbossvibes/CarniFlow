@@ -2368,6 +2368,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "trainingDoc.performed": "Performed today",
   "trainingDoc.details": "Details and media",
   "trainingDoc.exerciseDetails": "Observation and history",
+  "trainingDoc.historyExerciseNote": "Exercise observation",
+  "trainingDoc.historySessionNote": "Training note",
   "trainingDoc.exerciseObservation": "Observation for this exercise (optional)",
   "trainingDoc.exerciseNextFocus": "Next time for this exercise (optional)",
   "trainingDoc.sessionNextFocus": "Discipline focus (optional)",

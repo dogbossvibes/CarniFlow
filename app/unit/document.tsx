@@ -681,7 +681,7 @@ function DocumentForm() {
                     historyChoices={!editing && !previous && !saving && !remoteCompleted ? visibleHistory.units.filter(unit => unit.id !== id).flatMap(unit =>
                       (unit.exercises ?? []).filter(past => past.discipline === e.discipline && past.exercise_name === e.name
                         && !!past.id).map(past => ({
-                        id: `${unit.id}-${past.id}`, date: unit.session_date, notes: past.notes,
+                        id: `${unit.id}-${past.id}`, date: unit.session_date, notes: past.notes, trainingNotes: unit.notes,
                         // A name only offers candidates. The user explicitly picks
                         // the original row; today's result is never copied/reset.
                         onSelect: () => setSelected(prev => prev.map(current => current.key !== e.key ? current : {
@@ -692,7 +692,7 @@ function DocumentForm() {
                         })),
                       }))) : []}
                     historical={previous ? { date: previous.unit.session_date, rating: previous.exercise.rating,
-                      notes: previous.exercise.notes, onOpen: () => openHistory(previous.unit) } : undefined}
+                      notes: previous.exercise.notes, trainingNotes: previous.unit.notes, onOpen: () => openHistory(previous.unit) } : undefined}
                   />
                 ); })}
               </View>

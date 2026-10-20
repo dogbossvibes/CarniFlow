@@ -624,7 +624,8 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     expect(choose).toBeDefined();
     act(() => { choose.props.onPress(); }); await flush();
     expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Today only');
-    expect(strings(node)).toContain('Past result');
+    const card = node.root.findAll(n => n.props.name === 'Übung' && n.props.historical)[0];
+    expect(card.props.historical).toMatchObject({ notes: 'Past result', trainingNotes: 'Past observation' });
     mockCreateDocumentedUnit.mockResolvedValue({ error: null, data: { id: 'new' } });
     await act(async () => { await saveButton(node).props.onPress(); });
     expect(mockAtomicSave.mock.calls[0][3][0]).toEqual(expect.objectContaining({ notes: 'Today only' }));
@@ -636,6 +637,15 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     tap(node, 'Malu'); await flush();
     expect(strings(node)).not.toContain('Past observation');
     expect(strings(node)).toContain('trainingDoc.noHistory');
+  });
+  it('zeigt allgemeine Notizen älterer Trainings getrennt von Übungsbeobachtungen im ausgeklappten Verlauf', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past(), { ...past(), id: 'older-unit', session_date: '2026-10-13', notes: 'Older general note' }], error: null }) });
+    const node = render(); await flush();
+    expect(strings(node)).not.toContain('Older general note');
+    tap(node, 'trainingDoc.selectPast'); await flush();
+    expect(strings(node)).toContain('Older general note');
+    expect(strings(node)).toContain('trainingDoc.historySessionNote');
+    expect(strings(node)).toContain('trainingDoc.historyExerciseNote');
   });
   it('lädt nach Rückkehr und Resume neu, erhält heutige Eingaben und entfernt den Listener beim Verlassen', async () => {
     const remove = jest.fn();

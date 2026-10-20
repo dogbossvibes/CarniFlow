@@ -2374,6 +2374,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "trainingDoc.performed": "Hüt trainiert",
   "trainingDoc.details": "Details und Medie",
   "trainingDoc.exerciseDetails": "Beobachtig und Verlauf",
+  "trainingDoc.historyExerciseNote": "Üebigsbeobachtig",
+  "trainingDoc.historySessionNote": "Trainingsnotiz",
   "trainingDoc.exerciseObservation": "Beobachtig zu dere Üebig (optional)",
   "trainingDoc.exerciseNextFocus": "Nächscht Mal bi dere Üebig (optional)",
   "trainingDoc.sessionNextFocus": "Schwerpunkt für d Sparte (optional)",

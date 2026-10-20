@@ -20,10 +20,10 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
         <TouchableOpacity onPress={() => onOpen(last)} style={s.button} accessibilityRole="button">
           <Text style={s.text}>{last.session_date} · {discipline}</Text>
         </TouchableOpacity>
-        <Text style={s.text} numberOfLines={expanded ? undefined : 3}>{last.notes}</Text>
+        {last.notes?.trim() ? <Text style={s.text} numberOfLines={expanded ? undefined : 3}>{t('trainingDoc.historySessionNote')}: {last.notes}</Text> : null}
         {last.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <View key={exercise.id ?? i}>
           <Text style={s.text}>{exercise.exercise_name}</Text>
-          {exercise.notes?.trim() ? <Text style={s.text}>{exercise.notes}</Text> : null}
+          {exercise.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historyExerciseNote')}: {exercise.notes}</Text> : null}
         </View>)}
         <TouchableOpacity style={s.button} onPress={() => onReuse(last, last.exercises?.filter(e => e.discipline === discipline) ?? [])} accessibilityRole="button">
           <Text style={s.action}>{t('trainingDoc.buildOn')}</Text>
@@ -33,10 +33,11 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
         </TouchableOpacity>
         {expanded && units.slice(0, count).map(unit => <View key={unit.id}>
           <TouchableOpacity onPress={() => onOpen(unit)} style={s.button} accessibilityRole="button"><Text style={s.text}>{unit.session_date}</Text></TouchableOpacity>
+          {unit.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historySessionNote')}: {unit.notes}</Text> : null}
           {unit.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <TouchableOpacity key={exercise.id ?? i} style={s.button}
             accessibilityRole="button" onPress={() => onReuse(unit, [exercise])}>
             <Text style={s.text}>＋ {exercise.exercise_name}{exercise.rating != null ? ` · ${exercise.rating}/5` : ''}</Text>
-            {exercise.notes?.trim() ? <Text style={s.text}>{exercise.notes}</Text> : null}
+            {exercise.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historyExerciseNote')}: {exercise.notes}</Text> : null}
           </TouchableOpacity>)}
         </View>)}
         {expanded && count < units.length && <TouchableOpacity style={s.button} onPress={() => setCount(v => v + 5)} accessibilityRole="button">

@@ -27,8 +27,8 @@ interface Props {
   onNextFocusChange?: (text: string) => void;
   performed?: boolean;
   onPerformedChange?: () => void;
-  historyChoices?: { id: string; date: string; notes: string | null; onSelect: () => void }[];
-  historical?: { date: string; rating: number | null; notes: string | null; onOpen: () => void };
+  historyChoices?: { id: string; date: string; notes: string | null; trainingNotes?: string | null; onSelect: () => void }[];
+  historical?: { date: string; rating: number | null; notes: string | null; trainingNotes?: string | null; onOpen: () => void };
 }
 
 export function SelectedExerciseCard({
@@ -74,7 +74,9 @@ export function SelectedExerciseCard({
 
       {historical && <View style={s.past}>
         <Text style={s.history}>{t('trainingDoc.past', { date: historical.date })}</Text>
-        <Text style={s.history}>{historical.rating != null ? `${historical.rating}/5` : '—'}{historical.notes ? ` · ${historical.notes}` : ''}</Text>
+        <Text style={s.history}>{historical.rating != null ? `${historical.rating}/5` : '—'}</Text>
+        {historical.notes?.trim() ? <Text style={s.history}>{t('trainingDoc.historyExerciseNote')}: {historical.notes}</Text> : null}
+        {historical.trainingNotes?.trim() ? <Text style={s.history}>{t('trainingDoc.historySessionNote')}: {historical.trainingNotes}</Text> : null}
         <TouchableOpacity onPress={historical.onOpen} accessibilityRole="button" accessibilityLabel={`${t('trainingDoc.openHistory')}: ${name}`} style={s.toggle}>
           <Text style={s.history}>{t('trainingDoc.openHistory')}</Text>
         </TouchableOpacity>
@@ -101,7 +103,8 @@ export function SelectedExerciseCard({
           testID={`exercise-history-${choice.id}`} style={s.past} accessibilityRole="button"
           accessibilityLabel={`${t('trainingDoc.selectPast')}: ${name}, ${choice.date}`} onPress={choice.onSelect}>
           <Text style={s.history}>{choice.date} · {name}</Text>
-          {choice.notes?.trim() ? <Text style={s.history}>{choice.notes}</Text> : null}
+          {choice.notes?.trim() ? <Text style={s.history}>{t('trainingDoc.historyExerciseNote')}: {choice.notes}</Text> : null}
+          {choice.trainingNotes?.trim() ? <Text style={s.history}>{t('trainingDoc.historySessionNote')}: {choice.trainingNotes}</Text> : null}
           <Text style={s.history}>{t('trainingDoc.buildOn')}</Text>
         </TouchableOpacity>)}
         {historyChoices.length > historyCount && <TouchableOpacity style={s.toggle} accessibilityRole="button" onPress={() => setHistoryCount(v => v + 5)}>
