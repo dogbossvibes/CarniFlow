@@ -3,7 +3,8 @@ import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSn
 // Sessiongebundener Lay-Processor: Foreground-Parität mit dem ORIGINALEN
 // useTrackRecorder (b6bc114) und explizite, testbare Ergebnisse — ohne React.
 import { createHash } from 'crypto';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
+import { join } from 'path';
 import {
   createLayProcessingState, createLayProcessor,
   type LayFixResult, type LayPointRow, type LayStoreFacade, type LayProcessingState,
@@ -20,6 +21,14 @@ jest.mock('../../utils/backgroundLayDiagnostics', () => ({ recordBackgroundLayEv
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(async () => null), setItem: jest.fn(async () => {}), removeItem: jest.fn(async () => {}) }));
 
 interface Run {
+  lineFixes: {
+    raw: { lat: number; lng: number };
+    before: { lat: number; lng: number } | null;
+    after: { lat: number; lng: number } | null;
+    wasTurn: boolean;
+    isTurn: boolean;
+    result: LayFixResult;
+  }[];
   session: LayProcessingState;
   results: LayFixResult[];
   points: TrackPointSample[];
@@ -35,7 +44,7 @@ interface Run {
 function runScenario(sc: Scenario): Run {
   mockEngine = sc.engine ?? 'current';
   clock = T0;
-  const run: Run = { session: createLayProcessingState(), results: [], points: [], distanceCalls: [], angles: [], markers: [], buffered: [], flushes: 0, storeLog: [] };
+  const run: Run = { lineFixes: [], session: createLayProcessingState(), results: [], points: [], distanceCalls: [], angles: [], markers: [], buffered: [], flushes: 0, storeLog: [] };
   const state: LayStoreFacade = {
     isPaused: false,
     setCurrentPosition: () => { run.storeLog.push('position'); },
@@ -77,10 +86,17 @@ function runScenario(sc: Scenario): Run {
     if (st.k === 'fix') {
       clock = st.t + (st.ageMs ?? 0);
       if (sc.qa) resolveDiagnosticsAccess('qa', getDiagnosticsAccessSnapshot().generation, true);
+      const before = run.session.lineEmaRef.current;
+      const wasTurn = run.session.lineTurnZoneRef.current;
       run.results.push(processor.processFix({
         coords: { latitude: LAT0 + st.y / M_LAT, longitude: LNG0 + st.x / M_LNG, accuracy: st.acc, altitude: null, speed: st.speed ?? 1, heading: null, altitudeAccuracy: null },
         timestamp: st.t,
       } as never));
+      run.lineFixes.push({
+        raw: { lat: LAT0 + st.y / M_LAT, lng: LNG0 + st.x / M_LNG },
+        before, after: run.session.lineEmaRef.current,
+        wasTurn, isTurn: run.session.lineTurnZoneRef.current, result: run.results.at(-1)!,
+      });
     } else if (st.k === 'motion') {
       clock = st.t;
       motionBuf.push({ t: st.t, headingDelta: st.headingDelta, rotationMagnitude: Math.abs(st.headingDelta) / 10, accelerationMagnitude: 0.15, stepDelta: st.stepDelta, cadence: 100, movementState: 'walking' });
@@ -96,14 +112,104 @@ afterEach(() => { revokeDiagnosticsAccess(); setDiagnosticsSession(null); jest.r
 // Manuelle Marker sind Hook-Funktionalität (addMarker) — Processor-Parität ohne sie.
 const processorScenarios = scenarios.filter(s => !s.steps.some(st => st.k === 'marker'));
 
-describe('Foreground-Parität mit dem Original (Golden b6bc114): Punktfolge, Distanz, Winkel', () => {
+describe('P1: line smoothing uses the current accepted detector fix', () => {
+  it.each(['right90 current', 'left90 current'])('%s changes smoothing on entry and exit without a one-fix delay', name => {
+    const run = runScenario(scenarios.find(s => s.name === name)!);
+    const transitions = run.lineFixes.filter(f => f.wasTurn !== f.isTurn);
+    expect(transitions.some(f => f.isTurn)).toBe(true);
+    expect(transitions.some(f => !f.isTurn)).toBe(true);
+    for (const f of transitions) {
+      expect(f.before).not.toBeNull();
+      const alpha = f.isTurn ? 0.7 : 0.4;
+      expect(f.after?.lat).toBeCloseTo(f.before!.lat + (f.raw.lat - f.before!.lat) * alpha, 12);
+      expect(f.after?.lng).toBeCloseTo(f.before!.lng + (f.raw.lng - f.before!.lng) * alpha, 12);
+      if (f.result.acceptedPoint) {
+        expect(f.result.acceptedPoint).toMatchObject(f.after!);
+      }
+    }
+  });
+  it('BUILD40 keeps fixed smoothing even when the current detector enters a turn', () => {
+    const run = runScenario(scenarios.find(s => s.name === 'right90 build40')!);
+    expect(run.lineFixes.some(f => !f.wasTurn && f.isTurn)).toBe(true);
+    for (const f of run.lineFixes.filter(f => f.before)) {
+      expect(f.after?.lat).toBeCloseTo(f.before!.lat + (f.raw.lat - f.before!.lat) * 0.4, 12);
+      expect(f.after?.lng).toBeCloseTo(f.before!.lng + (f.raw.lng - f.before!.lng) * 0.4, 12);
+    }
+  });
+  it('accuracy and jump rejections do not update the detector turn zone', () => {
+    const sc = scenarios.find(s => s.name === 'right90 current')!;
+    const turn = runScenario(sc).lineFixes.find(f => !f.wasTurn && f.isTurn)!;
+    const steps = sc.steps.flatMap(st => st.k === 'fix' && st.t === turn.result.acceptedPoint?.t
+      ? [st, { ...st, t: st.t + 100, x: st.x - 20, acc: 80 },
+        { ...st, t: st.t + 200, x: st.x - 20, acc: 5 }]
+      : [st]);
+    const rejected = runScenario({ ...sc, steps }).lineFixes.filter(f =>
+      f.result.rejectReason === 'accuracy' || f.result.rejectReason === 'gps_outlier');
+    expect(rejected.map(f => f.result.rejectReason)).toEqual(['accuracy', 'gps_outlier']);
+    for (const f of rejected) {
+      expect(f.wasTurn).toBe(true);
+      expect(f.isTurn).toBe(true);
+      expect(f.result.acceptedPoint).toBeNull();
+      expect(f.after?.lat).toBeCloseTo(f.before!.lat + (f.raw.lat - f.before!.lat) * 0.7, 12);
+      expect(f.after?.lng).toBeCloseTo(f.before!.lng + (f.raw.lng - f.before!.lng) * 0.7, 12);
+    }
+  });
+});
+
+describe('P1: existing real raw fixes through the production processor', () => {
+  const dir = join(__dirname, '../../utils/__tests__/fixtures/realFieldV21');
+  // Observed by replaying the published 49a5784 processor in this same harness.
+  // These are baseline classifications, not claims about physical ground truth.
+  const baselineAngles: Record<string, AngleKind[]> = {
+    'f1t-qa-1616e65f.json': ['rechts', 'links'],
+    'ft2-qa-c2a47f13.json': ['rechts', 'links'],
+    'lauf1-qa-a3055da3.json': ['rechts'],
+    'lauf10-qa-5637ad58.json': [],
+    'lauf2-qa-848ea966.json': ['links'],
+    'lauf3-qa-1c341a07.json': [],
+    'lauf7-qa-3e78df58.json': [],
+    'lauf8-qa-ef808e24.json': [],
+    'lauf9-qa-01e12e75.json': ['rechts'],
+    'r1-qa-03d970ff.json': ['links'],
+    'spitz-qa-0ec8c4ca.json': ['rechts', 'links', 'spitz_links', 'spitz_rechts'],
+  };
+  const fixtures = readdirSync(dir).filter(f => f.endsWith('.json') && !f.includes('search'))
+    .map(f => ({ name: f, data: JSON.parse(readFileSync(join(dir, f), 'utf8')) }))
+    .filter(f => f.data.rawFixes?.length);
+  it('covers the eleven recorded lay streams', () => { expect(fixtures).toHaveLength(11); });
+  it.each(fixtures)('$name preserves canonical distance and detector samples across line modes', ({ name, data }) => {
+    // These stored coordinates are relative metres, not new field observations.
+    const steps: Scenario['steps'] = data.rawFixes.map((f: { x: number; y: number; tMs: number; accuracy: number }) =>
+      ({ k: 'fix', x: f.x, y: f.y, t: T0 + f.tMs, acc: f.accuracy }));
+    const current = runScenario({ name, steps, engine: 'current' });
+    const legacy = runScenario({ name, steps, engine: 'build40' });
+    expect(current.points.length).toBeGreaterThan(0);
+    expect(current.angles).toEqual(baselineAngles[name]);
+    expect(current.results.map(r => r.distanceM)).toEqual(legacy.results.map(r => r.distanceM));
+    expect(current.session.detectPointsRef.current).toEqual(legacy.session.detectPointsRef.current);
+    expect(current.session.completedDetectorSectionsRef.current).toEqual(legacy.session.completedDetectorSectionsRef.current);
+    expect(current.results.map(r => r.anchorReleased)).toEqual(legacy.results.map(r => r.anchorReleased));
+    expect(current.results.map(r => r.rejectedCount)).toEqual(legacy.results.map(r => r.rejectedCount));
+    const firstTurn = current.lineFixes.findIndex(f => f.isTurn);
+    if (firstTurn >= 0) {
+      expect(current.lineFixes.slice(0, firstTurn).map(f => f.after))
+        .toEqual(legacy.lineFixes.slice(0, firstTurn).map(f => f.after));
+    }
+  });
+});
+
+describe('Original golden: unchanged distance, BUILD40 and straight geometry; CURRENT turn timing', () => {
   it.each(processorScenarios.filter(s => !['badAccuracyAtCorner', 'longGapAndDuplicateTime', 'pausedMidRoute'].includes(s.name)).map(s => [s.name, s] as const))('%s', (name, sc) => {
     const golden = LAY_GOLDEN_B6BC114[name];
     const run = runScenario(sc);
-    expect(run.points).toHaveLength(golden.points);
-    expect(hash(run.points)).toBe(golden.pointsHash);
+    // CURRENT turn geometry intentionally changes with P1. Keep the historical
+    // goldens intact for BUILD40 and routes that never enter a turn zone.
+    if (sc.engine === 'build40' || !run.lineFixes.some(f => f.isTurn)) {
+      expect(run.points).toHaveLength(golden.points);
+      expect(hash(run.points)).toBe(golden.pointsHash);
+    }
     expect(run.distanceCalls.at(-1) ?? 0).toBe(golden.distance);
-    expect(run.angles).toEqual(golden.corners);
+    expect(run.angles).toEqual(name.startsWith('acuteRight current') ? ['spitz_rechts'] : golden.corners);
   });
 });
 
@@ -114,10 +220,10 @@ describe('Corner-Parität (Schwerpunkt-Szenarien)', () => {
     expect(kinds('left90 current')).toEqual(['links']);
     expect(kinds('right90 build40')).toEqual(['rechts']);
   });
-  it('Spitzwinkel: Verhalten unverändert (inkl. bisheriger Klassifikation je Engine)', () => {
+  it('Spitzwinkel: CURRENT erkennt rechts nun spitz, BUILD40 bleibt unverändert', () => {
     expect(kinds('acuteLeft current')).toEqual(['spitz_links']);
     expect(kinds('acuteRight build40')).toEqual(['spitz_rechts']);
-    expect(kinds('acuteRight current')).toEqual(LAY_GOLDEN_B6BC114['acuteRight current'].corners);
+    expect(kinds('acuteRight current')).toEqual(['spitz_rechts']);
   });
   it('gerade Strecke: kein Winkel; Jitter vor der Ecke: genau einer; schlechte Accuracy an der Ecke: wie bisher', () => {
     expect(kinds('straight60 current')).toEqual([]);
