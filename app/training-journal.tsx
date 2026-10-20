@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
@@ -76,6 +76,19 @@ export default function TrainingJournalScreen() {
   const resetFilters = () => { setDogFilter(null); setDiscFilter(null); setPeriod('all'); setQuery(''); setPage(1); };
 
   const onRefresh = async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } };
+
+  // The stack keeps this screen mounted. Query window-focus refresh is disabled
+  // in React Native, so navigation back and resume must re-read the shared feed.
+  // Keep cached rows and filters visible while fetching; use the query's error UI
+  // on failure and do not cancel a request shared with another feed consumer.
+  useFocusEffect(useCallback(() => {
+    if (!ownerId) return;
+    void refresh({ cancelRefetch: false });
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void refresh({ cancelRefetch: false });
+    });
+    return () => subscription.remove();
+  }, [ownerId, refresh]));
 
   const openDetail = (it: FeedItem) => {
     if      (it.source === 'unit')  router.push({ pathname: '/unit/detail', params: { id: it.id } });
