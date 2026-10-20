@@ -27,15 +27,17 @@ interface Props {
   onNextFocusChange?: (text: string) => void;
   performed?: boolean;
   onPerformedChange?: () => void;
-  historical?: { date: string; rating: number | null; notes: string | null; onOpen: () => void };
+  historyChoices?: { id: string; date: string; notes: string | null; trainingNotes?: string | null; onSelect: () => void }[];
+  historical?: { date: string; rating: number | null; notes: string | null; trainingNotes?: string | null; onOpen: () => void };
 }
 
 export function SelectedExerciseCard({
   name, accentColor, isCustom, rating, notes, onRatingChange, onNotesChange, onRemove,
-  performed = true, onPerformedChange, historical, nextFocus, onNextFocusChange,
+  performed = true, onPerformedChange, historical, historyChoices = [], nextFocus, onNextFocusChange,
 }: Props) {
   const { t } = useT();
   const [details, setDetails] = useState(false);
+  const [historyCount, setHistoryCount] = useState(5);
 
   const setStar = (n: number) => {
     tapHaptic();
@@ -72,7 +74,9 @@ export function SelectedExerciseCard({
 
       {historical && <View style={s.past}>
         <Text style={s.history}>{t('trainingDoc.past', { date: historical.date })}</Text>
-        <Text style={s.history}>{historical.rating != null ? `${historical.rating}/5` : '—'}{historical.notes ? ` · ${historical.notes}` : ''}</Text>
+        <Text style={s.history}>{historical.rating != null ? `${historical.rating}/5` : '—'}</Text>
+        {historical.notes?.trim() ? <Text style={s.history}>{t('trainingDoc.historyExerciseNote')}: {historical.notes}</Text> : null}
+        {historical.trainingNotes?.trim() ? <Text style={s.history}>{t('trainingDoc.historySessionNote')}: {historical.trainingNotes}</Text> : null}
         <TouchableOpacity onPress={historical.onOpen} accessibilityRole="button" accessibilityLabel={`${t('trainingDoc.openHistory')}: ${name}`} style={s.toggle}>
           <Text style={s.history}>{t('trainingDoc.openHistory')}</Text>
         </TouchableOpacity>
@@ -93,7 +97,21 @@ export function SelectedExerciseCard({
         <Ionicons name={details ? 'chevron-up' : 'chevron-down'} size={18} color={C.muted} />
       </TouchableOpacity>
       {details && <>
-      {!historical && <Text style={s.history}>{t('trainingDoc.noIdentity')}</Text>}
+      {!historical && <>
+        <Text style={s.history}>{t(historyChoices.length ? 'trainingDoc.selectPast' : 'trainingDoc.noIdentity')}</Text>
+        {historyChoices.slice(0, historyCount).map(choice => <TouchableOpacity key={choice.id}
+          testID={`exercise-history-${choice.id}`} style={s.past} accessibilityRole="button"
+          accessibilityLabel={`${t('trainingDoc.selectPast')}: ${name}, ${choice.date}`} onPress={choice.onSelect}>
+          <Text style={s.history}>{choice.date} · {name}</Text>
+          {choice.notes?.trim() ? <Text style={s.history}>{t('trainingDoc.historyExerciseNote')}: {choice.notes}</Text> : null}
+          {choice.trainingNotes?.trim() ? <Text style={s.history}>{t('trainingDoc.historySessionNote')}: {choice.trainingNotes}</Text> : null}
+          <Text style={s.history}>{t('trainingDoc.buildOn')}</Text>
+        </TouchableOpacity>)}
+        {historyChoices.length > historyCount && <TouchableOpacity style={s.toggle} accessibilityRole="button" onPress={() => setHistoryCount(v => v + 5)}>
+          <Text style={s.history}>{t('trainingDoc.more')}</Text>
+        </TouchableOpacity>}
+      </>}
+      <Text style={s.history}>{t('trainingDoc.exerciseObservation')}</Text>
       <TextInput
         style={s.note}
         placeholder={t('training.exerciseNotePlaceholder')}
@@ -104,9 +122,9 @@ export function SelectedExerciseCard({
         accessibilityLabel={`${name}: ${t('training.exerciseNotePlaceholder')}`}
       />
       {onNextFocusChange && <>
-        <Text style={s.history}>{t('trainingDoc.nextFocus')}</Text>
+        <Text style={s.history}>{t('trainingDoc.exerciseNextFocus')}</Text>
         <TextInput style={s.note} value={nextFocus ?? ''} onChangeText={onNextFocusChange} multiline maxLength={500}
-          placeholder={t('trainingDoc.nextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={`${name}: ${t('trainingDoc.nextFocus')}`} />
+          placeholder={t('trainingDoc.exerciseNextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={`${name}: ${t('trainingDoc.exerciseNextFocus')}`} />
       </>}
       </>}
     </View>
@@ -116,7 +134,7 @@ export function SelectedExerciseCard({
 const s = StyleSheet.create({
   toggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
   history: { color: C.muted, fontSize: 12, flexShrink: 1 },
-  past: { padding: 10, backgroundColor: C.card, borderRadius: 10, gap: 5 },
+  past: { minHeight: 44, padding: 10, backgroundColor: C.card, borderRadius: 10, gap: 5 },
   starButton: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' },
   removeButton: { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' },
   card: { backgroundColor: C.cardAlt, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 12, gap: 8 },

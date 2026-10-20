@@ -23,6 +23,7 @@ let mockFeed: FeedItem[] = [];
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: mockBack }),
+  useFocusEffect: jest.fn(),
   useLocalSearchParams: () => ({}),
 }));
 // Raw-key passthrough (established convention for gesture-wiring suites,
