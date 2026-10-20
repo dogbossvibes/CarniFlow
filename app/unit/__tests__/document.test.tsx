@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { AppState, Text, TextInput, TouchableOpacity, type AppStateStatus } from 'react-native';
 import DocumentScreen from '@/app/unit/document';
+import { TrainingPreparation } from '@/components/training/TrainingPreparation';
 
 const mockCreateDocumentedUnit = jest.fn();
 const mockAtomicSave = jest.fn();
@@ -19,10 +20,12 @@ let mockDogsLoading = false;
 let mockCategories: { id: string; name: string; icon: string; color: string; exercises: string[]; key: string; label: string; accent: string; custom: boolean }[] = [];
 let mockParams: Record<string, string> = {};
 let mockOwner = 'owner-1';
+let mockDocumentFocused = true;
 
 jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('expo-crypto', () => ({ randomUUID: () => mockUuidCounter++ === 0 ? 'unit-id' : `uuid-${mockUuidCounter}` }));
 jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void | (() => void)) => { const React = jest.requireActual('react'); const focused = mockDocumentFocused; React.useEffect(() => focused ? effect() : undefined, [effect, focused]); },
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ back: jest.fn(), push: (...args: unknown[]) => mockPush(...args), replace: (...args: unknown[]) => mockReplace(...args) }),
 }));
@@ -50,6 +53,8 @@ jest.mock('@/services/trainingDocumentService', () => ({
   listExerciseIdentities: async () => ({ data: [], error: null }),
   listServerTrainingFocuses: async () => ({ data: [], error: null }),
 }));
+const mockLegacySessions = jest.fn();
+jest.mock('@/services/training', () => ({ getTrainingSessions: (...args: unknown[]) => mockLegacySessions(...args) }));
 jest.mock('@/services/trainingUnitService', () => ({
   saveDocumentedUnitAtomic: (owner: string, id: string, unit: unknown, exercises: unknown, mode: string, options: { current: () => boolean }) => {
     const override = mockAtomicSave(owner, id, unit, exercises, mode, options);
@@ -154,8 +159,13 @@ function inputByPlaceholder(node: ReactTestRenderer, placeholder: string) {
 
 // Default: keine Vorschläge, ausser ein Test setzt bewusst etwas anderes.
 beforeEach(async () => {
+  jest.spyOn(AppState, 'addEventListener').mockImplementation(() => ({ remove: jest.fn() }));
+  mockDocumentFocused = true;
   mockOwner = 'owner-1'; mockUuidCounter = 0; mockAtomicSave.mockReset(); mockReplaySave.mockReset();
   await AsyncStorage.clear();
+  const legacyQuery = { eq: jest.fn(), or: jest.fn(), limit: jest.fn().mockResolvedValue({ data: [], error: null }) };
+  legacyQuery.eq.mockReturnValue(legacyQuery); legacyQuery.or.mockReturnValue(legacyQuery);
+  mockLegacySessions.mockReset().mockReturnValue(legacyQuery);
   mockGetTrainingUnits.mockReset().mockReturnValue({ limit: () => Promise.resolve({ data: [], error: null }) });
   mockGetRecentExerciseNames.mockReset().mockResolvedValue({ data: [], error: null });
 });
@@ -627,6 +637,52 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     expect(strings(node)).not.toContain('Past observation');
     expect(strings(node)).toContain('trainingDoc.noHistory');
   });
+  it('lädt nach Rückkehr und Resume neu, erhält heutige Eingaben und entfernt den Listener beim Verlassen', async () => {
+    const remove = jest.fn();
+    let handler!: (state: AppStateStatus) => void;
+    const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, callback) => { handler = callback; return { remove }; });
+    const node = render(); await flush(); selectExercise(node); tap(node, 'trainingDoc.exerciseDetails');
+    act(() => { inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Unsaved today'); });
+    const update = () => (node as unknown as { update(element: React.ReactElement): void }).update(<DocumentScreen />);
+    const oldCalls = mockGetTrainingUnits.mock.calls.length;
+    mockDocumentFocused = false; act(update); await flush();
+    expect(remove).toHaveBeenCalled();
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    expect(mockGetTrainingUnits).toHaveBeenCalledTimes(oldCalls);
+    mockDocumentFocused = true; act(update); await flush();
+    expect(strings(node)).toContain('Past result');
+    const focusedCalls = mockGetTrainingUnits.mock.calls.length;
+    act(() => handler('background')); await flush(); expect(mockGetTrainingUnits).toHaveBeenCalledTimes(focusedCalls);
+    act(() => handler('active')); await flush(); expect(mockGetTrainingUnits).toHaveBeenCalledTimes(focusedCalls + 1);
+    expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Unsaved today');
+    spy.mockRestore();
+  });
+  it('verwirft eine überholte Resume-Antwort und behält Historie bei einem späteren Ladefehler', async () => {
+    let handler!: (state: AppStateStatus) => void;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, callback) => { handler = callback; return { remove: jest.fn() }; });
+    const node = render(); await flush();
+    let oldResolve!: (value: unknown) => void; let newResolve!: (value: unknown) => void;
+    mockGetTrainingUnits.mockReturnValueOnce({ limit: () => new Promise(resolve => { oldResolve = resolve; }) })
+      .mockReturnValueOnce({ limit: () => new Promise(resolve => { newResolve = resolve; }) });
+    act(() => handler('active')); await flush();
+    act(() => handler('active')); await flush();
+    await act(async () => { newResolve({ data: [{ ...past(), notes: 'Latest history' }], error: null }); }); await flush();
+    await act(async () => { oldResolve({ data: [{ ...past(), notes: 'Stale history' }], error: null }); }); await flush();
+    expect(strings(node)).toContain('Latest history'); expect(strings(node)).not.toContain('Stale history');
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: null, error: new Error('offline') }) });
+    act(() => handler('active')); await flush();
+    expect(strings(node)).toContain('Latest history'); expect(strings(node)).toContain('trainingDoc.historyError');
+  });
+  it('zeigt ältere Sessions und öffnet ihre bestehende Detailroute', async () => {
+    const q = mockLegacySessions();
+    q.limit.mockResolvedValue({ data: [{ id: 'legacy-id', owner_id: 'owner-1', dog_id: 'dog-1', category: 'Fährte', title: 'Übung',
+      session_date: '2026-10-13', created_at: '2026-10-13T08:00:00Z', notes: 'Legacy observation' }], error: null });
+    const node = render(); await flush();
+    expect(strings(node)).toContain('Legacy observation');
+    const preparation = node.root.findByType(TrainingPreparation);
+    act(() => preparation.props.onOpen(preparation.props.units[0]));
+    expect(mockPush).toHaveBeenCalledWith('/training/legacy-id');
+  });
   it('guards two presses in the same render and preserves draft after a thrown save', async () => {
     const node = render(); await flush(); selectExercise(node); await flush();
     let rejectSave!: (reason: Error) => void;
@@ -690,12 +746,13 @@ describe('DocumentScreen — asynchronous identity and edit reconciliation', () 
   it('includes new focus and identity in one atomic request, keeps inputs on failure, and never uploads device-only focus data', async () => {
     mockReplace.mockClear();
     const node = render(); await flush(); selectExercise(node); await flush();
-    const focusInput = inputByPlaceholder(node, 'trainingDoc.nextFocus');
+    tap(node, 'trainingDoc.details');
+    const focusInput = inputByPlaceholder(node, 'trainingDoc.sessionNextFocus');
     act(() => { focusInput.props.onChangeText('Keep some distance'); }); await flush();
     mockCreateDocumentedUnit.mockResolvedValueOnce({ data: null, error: { message: 'offline' } });
     await act(async () => { await saveButton(node).props.onPress(); }); await flush();
     expect(mockReplace).not.toHaveBeenCalled();
-    expect(inputByPlaceholder(node, 'trainingDoc.nextFocus').props.value).toBe('Keep some distance');
+    expect(inputByPlaceholder(node, 'trainingDoc.sessionNextFocus').props.value).toBe('Keep some distance');
     const options = mockAtomicSave.mock.calls[0][5];
     expect(options.focusChanges).toEqual([expect.objectContaining({ action: 'create', request: expect.objectContaining({ text: 'Keep some distance', disciplineKey: 'system:faehrte' }) })]);
     expect(options.identityChanges).toHaveLength(1);

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import {
-  ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView,
+  ActivityIndicator, Alert, AppState, Keyboard, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { HelpButton } from '@/components/help/HelpButton';
@@ -22,8 +22,9 @@ import { addTrainingFocuses } from '@/features/training/documentation/focus';
 import { ServerTrainingFocusList, useServerTrainingFocuses } from '@/components/training/ServerTrainingFocusList';
 import { TrainingFocusList } from '@/components/training/TrainingFocusList';
 import { ExerciseIdentityList } from '@/components/training/ExerciseIdentityList';
+import { loadTrainingPreparation, type PreparationUnit } from '@/services/trainingPreparation';
 import { TrainingPreparation } from '@/components/training/TrainingPreparation';
-import { relevantUnits, planFromHistory, lastExerciseHistory, performedExercises, localDay, measuredMinutes, type PlannedExercise } from '@/features/training/documentation/model';
+import { planFromHistory, lastExerciseHistory, performedExercises, localDay, measuredMinutes, type PlannedExercise } from '@/features/training/documentation/model';
 import { isConfirmedDocumentedRetry, trainingUnitFingerprint } from '@/features/training/documentation/retry';
 import { documentDraftKey, loadDocumentDraft, saveDocumentDraft, clearDocumentDraft } from '@/features/training/documentation/draft';
 import { SelectedExerciseCard } from '@/components/training/SelectedExerciseCard';
@@ -34,7 +35,7 @@ import { useCustomCategories } from '@/hooks/useCustomCategories';
 import { DISCIPLINES, customToDiscipline, disciplineColor, type Discipline } from '@/constants/disciplines';
 import { DEFAULT_SPARTEN } from '@/constants/sparten';
 import {
-  saveDocumentedUnitAtomic, getTrainingUnitById, getRecentExerciseNames, getTrainingPreparationUnits,
+  saveDocumentedUnitAtomic, getTrainingUnitById, getRecentExerciseNames,
 } from '@/services/trainingUnitService';
 import { updateCustomCategory } from '@/services/customCategoryService';
 import { handleQuotaBlock } from '@/features/subscription/quotaUx';
@@ -181,7 +182,7 @@ function DocumentForm() {
   const [details, setDetails] = useState(editing);
   const [shared, setShared] = useState<boolean | null>(null);
   const [historyRetry, setHistoryRetry] = useState(0);
-  const [history, setHistory] = useState<{ scope: string; units: TrainingUnit[]; error: boolean; loading: boolean; limited: boolean }>({ scope: '', units: [], error: false, loading: false, limited: false });
+  const [history, setHistory] = useState<{ scope: string; units: PreparationUnit[]; error: boolean; loading: boolean; limited: boolean }>({ scope: '', units: [], error: false, loading: false, limited: false });
   const entryContext = dogIdParam || discParam ? JSON.stringify([dogIdParam ?? null, discParam ?? null]) : undefined;
   const draftKey = session?.user.id ? documentDraftKey(session.user.id, id, entryContext) : null;
   const disciplineTouched = useRef(false);
@@ -318,19 +319,33 @@ function DocumentForm() {
 
   const historyScope = `${session?.user.id}:${dogId}:${disc?.label}`;
   const visibleHistory = history.scope === historyScope ? history : { units: [], error: false, loading: !!dogId, limited: false };
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!session?.user.id || !dogId || !discLabel) return;
     let cancelled = false;
+    let requestVersion = historyRetry;
     const owner = session.user.id; const dog = dogId; const label = discLabel;
-    setHistory(prev => prev.scope === historyScope ? { ...prev, loading: true, error: false } : { scope: historyScope, units: [], loading: true, error: false, limited: false });
-    Promise.resolve(getTrainingPreparationUnits(owner, dog, label).limit(101)).then(({ data, error }) => {
-      if (cancelled) return;
-      if (error) throw error;
-      setHistory({ scope: historyScope, units: relevantUnits((data ?? []).slice(0, 100) as TrainingUnit[], owner, dog, label),
-        loading: false, error: false, limited: (data?.length ?? 0) > 100 });
-    }).catch(() => { if (!cancelled) setHistory(prev => prev.scope === historyScope ? { ...prev, loading: false, error: true } : { scope: historyScope, units: [], loading: false, error: true, limited: false }); });
-    return () => { cancelled = true; };
-  }, [historyScope, historyRetry, session?.user.id, dogId, discLabel]);
+    const load = async () => {
+      const version = ++requestVersion;
+      setHistory(prev => prev.scope === historyScope ? { ...prev, loading: true, error: false } : { scope: historyScope, units: [], loading: true, error: false, limited: false });
+      try {
+        const result = await loadTrainingPreparation(owner, dog, label);
+        if (!cancelled && version === requestVersion) setHistory({ scope: historyScope, ...result, loading: false, error: false });
+      } catch {
+        if (!cancelled && version === requestVersion) setHistory(prev => prev.scope === historyScope ? { ...prev, loading: false, error: true } : { scope: historyScope, units: [], loading: false, error: true, limited: false });
+      }
+    };
+    void load();
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void load();
+    });
+    return () => { cancelled = true; subscription.remove(); };
+  }, [historyScope, historyRetry, session?.user.id, dogId, discLabel]));
+
+  const openHistory = (unit: TrainingUnit) => {
+    const source = unit as PreparationUnit;
+    if (source.historySource === 'session') router.push(`/training/${source.originalId}` as never);
+    else router.push({ pathname: '/unit/detail', params: { id: unit.id } });
+  };
 
   const reuseExercises = (unit: TrainingUnit, exercises: NonNullable<TrainingUnit['exercises']>) => {
     setSelected(prev => [...prev, ...exercises.filter(e => !prev.some(p => p.sourceUnitId === unit.id && !!e.id && p.sourceExerciseId === e.id))
@@ -597,7 +612,7 @@ function DocumentForm() {
           {!editing && dogId && disc && <TrainingPreparation units={visibleHistory.units} discipline={disc.label}
             loading={visibleHistory.loading} error={visibleHistory.error} limited={visibleHistory.limited}
             onRetry={() => setHistoryRetry(v => v + 1)} onReuse={reuseExercises}
-            onOpen={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} />}
+            onOpen={openHistory} />}
 
           {disc && session?.user.id && <ExerciseIdentityList key={`${session.user.id}:${disc.key}`} ownerId={session.user.id} disciplineKey={scopeKey(disc)}
             onSelect={identity => setSelected(prev => prev.some(e => e.exerciseKey === identity.id) ? prev.filter(e => e.exerciseKey !== identity.id)
@@ -677,7 +692,7 @@ function DocumentForm() {
                         })),
                       }))) : []}
                     historical={previous ? { date: previous.unit.session_date, rating: previous.exercise.rating,
-                      notes: previous.exercise.notes, onOpen: () => router.push({ pathname: '/unit/detail', params: { id: previous.unit.id } }) } : undefined}
+                      notes: previous.exercise.notes, onOpen: () => openHistory(previous.unit) } : undefined}
                   />
                 ); })}
               </View>
@@ -687,12 +702,14 @@ function DocumentForm() {
           {session?.user.id && dogId && disc && <ServerTrainingFocusList key={historyScope} ownerId={session.user.id} {...serverFocuses}
             onRetry={() => setFocusRevision(v => v + 1)} onOpenSource={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} />}
           {session?.user.id && dogId && disc && <TrainingFocusList collapsedByDefault key={historyScope} ownerId={session.user.id} dogId={dogId} discipline={disc.label} />}
-          <Text style={s.label}>{t('trainingDoc.nextFocus')}{nextFocus && nextFocusDiscipline ? ` · ${nextFocusDiscipline}` : ''}</Text>
+          {(details || !!nextFocus.trim()) && <>
+          <Text style={s.label}>{t('trainingDoc.sessionNextFocus')}{nextFocus && nextFocusDiscipline ? ` · ${nextFocusDiscipline}` : ''}</Text>
           <TextInput style={s.textarea} value={nextFocus} onChangeText={text => { setNextFocus(text); setNextFocusDiscipline(disc?.label ?? activeDisc); setNextFocusDisciplineKey(disc ? scopeKey(disc) : ''); }} editable={!saving && !remoteCompleted} multiline maxLength={500}
-            placeholder={t('trainingDoc.nextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={t('trainingDoc.nextFocus')} />
+            placeholder={t('trainingDoc.sessionNextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={t('trainingDoc.sessionNextFocus')} />
           <Text style={s.saveHint}>{t('trainingDoc.focusAccount')}</Text>
+          </>}
           {/* Trainingsnotiz */}
-          <Text style={s.label}>{t('training.descriptionLabel')}</Text>
+          <Text style={s.label}>{t('trainingDoc.sessionNotes')}</Text>
           <TextInput style={s.textarea} placeholder={t('training.descriptionPlaceholder')} placeholderTextColor={C.placeholder} value={description} onChangeText={setDescription} editable={!saving && !remoteCompleted} multiline />
 
           {/* Datum + Dauer */}

@@ -108,6 +108,7 @@ export function SelectedExerciseCard({
           <Text style={s.history}>{t('trainingDoc.more')}</Text>
         </TouchableOpacity>}
       </>}
+      <Text style={s.history}>{t('trainingDoc.exerciseObservation')}</Text>
       <TextInput
         style={s.note}
         placeholder={t('training.exerciseNotePlaceholder')}
@@ -118,9 +119,9 @@ export function SelectedExerciseCard({
         accessibilityLabel={`${name}: ${t('training.exerciseNotePlaceholder')}`}
       />
       {onNextFocusChange && <>
-        <Text style={s.history}>{t('trainingDoc.nextFocus')}</Text>
+        <Text style={s.history}>{t('trainingDoc.exerciseNextFocus')}</Text>
         <TextInput style={s.note} value={nextFocus ?? ''} onChangeText={onNextFocusChange} multiline maxLength={500}
-          placeholder={t('trainingDoc.nextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={`${name}: ${t('trainingDoc.nextFocus')}`} />
+          placeholder={t('trainingDoc.exerciseNextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={`${name}: ${t('trainingDoc.exerciseNextFocus')}`} />
       </>}
       </>}
     </View>

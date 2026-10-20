@@ -308,6 +308,7 @@ export default function TrainingJournalScreen() {
             />
           ) : (
             <>
+              <Text style={s.cardNote} accessibilityLiveRegion="polite">{t('journal.entryCount', { shown: windowed.length, total: filtered.length })}</Text>
               {groups.map(g => (
                 <View key={g.key} style={{ marginTop: 8 }}>
                   <Text style={s.groupLabel}>{groupLabel(g)}</Text>

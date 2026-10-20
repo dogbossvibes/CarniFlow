@@ -6,7 +6,7 @@ import type { TrainingUnit, TrainingExercise } from '@/types/trainingUnit';
 
 export function TrainingPreparation({ units, discipline, loading, error, limited, onRetry, onReuse, onOpen }: {
   units: TrainingUnit[]; discipline: string; loading: boolean; error: boolean; limited: boolean;
-  onRetry: () => void; onReuse: (unit: TrainingUnit, exercises: TrainingExercise[]) => void; onOpen: (id: string) => void;
+  onRetry: () => void; onReuse: (unit: TrainingUnit, exercises: TrainingExercise[]) => void; onOpen: (unit: TrainingUnit) => void;
 }) {
   const { t } = useT();
   const [expanded, setExpanded] = useState(false);
@@ -17,7 +17,7 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
     {loading && <Text style={s.text}>{t('common.loading')}</Text>}
     {error && <TouchableOpacity onPress={onRetry} style={s.button} accessibilityRole="button"><Text style={s.text}>{t('trainingDoc.historyError')}</Text></TouchableOpacity>}
     {!last ? (!loading && !error ? <Text style={s.text}>{t(limited ? 'trainingDoc.limited' : 'trainingDoc.noHistory')}</Text> : null) : <>
-        <TouchableOpacity onPress={() => onOpen(last.id)} style={s.button} accessibilityRole="button">
+        <TouchableOpacity onPress={() => onOpen(last)} style={s.button} accessibilityRole="button">
           <Text style={s.text}>{last.session_date} · {discipline}</Text>
         </TouchableOpacity>
         <Text style={s.text} numberOfLines={expanded ? undefined : 3}>{last.notes}</Text>
@@ -32,7 +32,7 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
           <Text style={s.action}>{t('trainingDoc.selectPast')}</Text>
         </TouchableOpacity>
         {expanded && units.slice(0, count).map(unit => <View key={unit.id}>
-          <TouchableOpacity onPress={() => onOpen(unit.id)} style={s.button} accessibilityRole="button"><Text style={s.text}>{unit.session_date}</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => onOpen(unit)} style={s.button} accessibilityRole="button"><Text style={s.text}>{unit.session_date}</Text></TouchableOpacity>
           {unit.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <TouchableOpacity key={exercise.id ?? i} style={s.button}
             accessibilityRole="button" onPress={() => onReuse(unit, [exercise])}>
             <Text style={s.text}>＋ {exercise.exercise_name}{exercise.rating != null ? ` · ${exercise.rating}/5` : ''}</Text>
