@@ -13,6 +13,7 @@ import { AppState } from 'react-native';
 import { motionClient } from '../../native/motionClient';
 import { markMotionSample } from '../../utils/trackingWarmupState';
 import type { MotionSample } from '@/modules/anyvo-motion';
+import { MotionEvidenceBuffer } from '../../utils/motionTurnEvidence';
 jest.mock('@/lib/diagnosticsAccessState', () => ({
   diagnosticsAccessToken: () => mockAccessToken,
   getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
@@ -474,6 +475,30 @@ it('does not advertise motion readiness when the native start fails', async () =
   expect(capture.startupDiagnostics.motionReadyTSec).toBeNull();
 });
 
+it.each([false, true])('forwards the original sensor tuple and retains relative provenance only in QA (%s)', async qa => {
+  mockQaEnabled = qa;
+  const push = jest.spyOn(MotionEvidenceBuffer.prototype, 'push');
+  try {
+    await start();
+    const callback = (motionClient.onSample as jest.Mock).mock.calls.at(-1)[0];
+    const sample: MotionSample = { timestamp: clockMs, headingDelta: 20, stepDelta: 2,
+      accelerationMagnitude: 0.15, rotationMagnitude: 0.4, cadence: 90,
+      movementState: 'walking', motionConfidence: 0.8, activityConfidence: 'low',
+      qualityVersion: 3, runId: 'private-native-run', windowStartTimestamp: clockMs - 200,
+      windowEndTimestamp: clockMs, emittedAtTimestamp: clockMs + 50,
+      deviceMotionSampleCount: 5, deviceMotionAgeMs: 50, discardedWindowCount: 2 };
+    act(() => callback(sample));
+    const forwarded = push.mock.calls.at(-1)![0];
+    expect(forwarded).toMatchObject({ t: clockMs, headingDelta: 20, stepDelta: 2,
+      accelerationMagnitude: 0.15, rotationMagnitude: 0.4, cadence: 90, movementState: 'walking' });
+    if (qa) {
+      expect(forwarded.diagnostics).toMatchObject({ qualityVersion: 3, windowStartOffsetMs: -200,
+        windowEndOffsetMs: 0, emittedAtOffsetMs: 50, discardedWindowCount: 2 });
+      expect(JSON.stringify(forwarded.diagnostics)).not.toMatch(/private-native-run|Timestamp|runId/);
+    } else expect(forwarded.diagnostics).toBeUndefined();
+  } finally { push.mockRestore(); }
+});
+
 it('does not let a previous warm-up start completion mark a new warm-up ready', async () => {
   mockQaEnabled = true;
   let resolveOld!: (started: boolean) => void;
@@ -530,4 +555,75 @@ it('persists all Joker markers while finalizing only rubber as a scored article'
  await act(async()=>{current.finish();for(let i=0;i<10;i++)await Promise.resolve();});
  expect(useTrackingStore.getState().markers.map(m=>m.material)).toEqual(['duebel','ball','gummi']);
  expect(finalizeLocalTrainingSession).toHaveBeenLastCalledWith('local',expect.objectContaining({articlesTotal:1}));
+});
+
+it.each([10_000, -10_000])('incident source-age audit: does not form an anchor from stale/future fixes (%s)', async age => {
+ await start();
+ const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;
+ anchor.mockClear();
+ for (const ms of [100,200,300,400]) feed(ms,5,100,0,age);
+ expect(anchor).not.toHaveBeenCalled();
+});
+
+it('incident source-age audit: accepts the exact five-second boundary for this session only',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [6000,7000,8000,9000]) feed(ms,5,0,0,5000);
+ expect(anchor).toHaveBeenCalledTimes(1);
+});
+it('incident source-age audit: rejects pre-session data even inside the age limit',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [100,200,300,400]) feed(ms,5,100,0,1000);
+ expect(anchor).not.toHaveBeenCalled();
+});
+it('incident source-age audit: rejects source ages just above the existing boundary',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [6000,7000,8000,9000]) feed(ms,5,100,0,5001);
+ expect(anchor).not.toHaveBeenCalled();
+});
+it('incident source-age audit: delayed historical fixes do not create a fallback anchor',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [20000,21000,22000,23000]) feed(ms,5,100,0,19000);
+ expect(anchor).not.toHaveBeenCalled();expect(useTrackingStore.getState().trackPoints).toHaveLength(0);
+});
+it('incident source-age audit: fresh anchor after stale inputs uses the real current position',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [100,200,300,400]) feed(ms,5,100,0,10000);
+ for(const ms of [1000,2000,3000,4000]) feed(ms,5,25);
+ expect(anchor).toHaveBeenCalledTimes(1);
+ expect(anchor).toHaveBeenCalledWith(expect.objectContaining({lat:metersToLatitude(25)}));
+});
+
+// Independent review regressions: source age and receipt-time timeout are separate.
+it('does not release an existing anchor early through a future fix timestamp', async () => {
+  await start(); for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  expect(useTrackingStore.getState().startLockActive).toBe(true);
+  feed(500, 5, 0, 0, -20_000);
+  expect(useTrackingStore.getState().startLockActive).toBe(true);
+  expect(useTrackingStore.getState().trackPoints).toHaveLength(0);
+});
+
+it('uses twelve seconds of receipt time for fallback with an eligible two-second-old fix', async () => {
+  mockQaEnabled = true;
+  await start(); for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(12_000, 5, 0, 0, 2000);
+  expect(useTrackingStore.getState().startLockActive).toBe(false);
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.startupMovementDiagnostics).toMatchObject({ confirmationTSec: 12, confirmationSource: 'fallback' });
+});
+
+it('accepts native fractional milliseconds within the current truncated JS clock bucket', async () => {
+  const anchor = useTrackingStore.getState().setStartAnchor as jest.Mock; anchor.mockClear();
+  await start(); for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0, 0, -0.5);
+  expect(anchor).toHaveBeenCalledTimes(1);
+});
+
+it('preserves measurement time for the first line point and subsequent eligible queued fixes', async () => {
+  await start(); for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(12_000, 5, 0, 0, 2000);
+  feed(12_100, 5, 10, 0, 1100);
+  const times = useTrackingStore.getState().trackPoints.map(p => p.t);
+  expect(times[0]).toBe(1_010_000);
+  expect(times.at(-1)).toBe(1_011_000);
+  expect(times.every((t, i) => i === 0 || t >= times[i - 1])).toBe(true);
 });

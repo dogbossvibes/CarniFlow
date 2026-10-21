@@ -22,6 +22,7 @@ import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MovementState } from '@/modules/anyvo-motion';
+import type { MotionWindowDiagnostics } from './motionSampleDiagnostics';
 import type { FusedTurn, ImuOnlyEvent } from '@/features/tracking/utils/turnFusion';
 
 const KEY_PREFIX = 'anyvo.qa.trackCapture.';
@@ -161,6 +162,8 @@ export interface QaMotionSample {
   stepDelta: number;
   cadence: number | null;
   movementState: MovementState;
+  /** Additive relative native provenance; unavailable in historical captures. */
+  diagnostics?: MotionWindowDiagnostics;
 }
 
 /**

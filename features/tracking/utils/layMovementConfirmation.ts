@@ -1,4 +1,5 @@
 import { calculateDistance, type LatLng } from './gpsFilter';
+import { stepsForWindow, type MotionStepInterval } from './motionStepEvidence';
 
 export interface LayMovementFix extends LatLng { accuracy: number; t: number }
 export interface LayGaitSample {
@@ -6,6 +7,7 @@ export interface LayGaitSample {
   stepDelta: number;
   movementState: string | null;
   accelerationMagnitude: number;
+  stepInterval?: MotionStepInterval | null;
 }
 export type LayMovementSource = 'pedometer' | 'gps_displacement' | 'motion_gps' | 'fallback' | null;
 export interface LayMovementResult {
@@ -31,7 +33,7 @@ export function confirmLayMovement(input: {
 }): LayMovementResult {
   const fixes = input.acceptedFixes.filter(f => f.t >= input.sessionStartedMs && f.t <= input.nowMs);
   const gait = input.gaitSamples.filter(s => s.t >= input.sessionStartedMs && s.t <= input.nowMs);
-  const stepDelta = gait.reduce((n, s) => n + Math.max(0, s.stepDelta), 0);
+  const stepDelta = gait.reduce((n, s) => n + Math.max(0, stepsForWindow(s, input.sessionStartedMs, input.nowMs)), 0);
   const last = fixes[fixes.length - 1];
   const displacementM = input.anchor && last ? calculateDistance(input.anchor, last) : null;
   const motionState = gait[gait.length - 1]?.movementState ?? null;

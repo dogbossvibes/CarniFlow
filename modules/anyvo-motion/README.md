@@ -138,3 +138,69 @@ FGO, GPS-Zulassung, Winkel-/Score-/Endlogik sind nicht Teil dieses Moduls.
 Der angefragte Expo-v54-Dokumentationsindex leitet derzeit auf die aktuelle
 Version weiter. Für die Expo-Bridge wurden deshalb die installierten
 Expo-54-Modulquellen herangezogen; kein SDK-Upgrade durchgeführt.
+
+## Sensorqualität v3 – frische Schritte bei leeren Motion-Fenstern erhalten
+
+Vorbereiteter nativer Kandidat, **neuer iOS-Build erforderlich**. Die v2-
+Implementierung verbrauchte `pendingSteps` auch dann, wenn `emit()` wegen eines
+leeren oder veralteten Device-Motion-Fensters überhaupt kein Ereignis lieferte.
+
+- Positive kumulative Schritt-Deltas bleiben als getrennte Quellintervalle
+  bis zu einem gültigen Motion-Ereignis erhalten. Jede Charge verfällt weiterhin
+  nach der vorhandenen 2-s-Grenze ihres eigenen Quell-Endzeitpunkts. Spätere
+  Null-Deltas oder andere Updates verlängern diese Grenze nicht.
+- Schritte werden genau einmal übergeben und nicht einem Motion-Messzeitpunkt
+  zugeordnet, der vor ihrem Quell-Endzeitpunkt liegt. Fehlende Motion bleibt
+  unbekannt: kein leeres Motion-Ereignis, keine erfundene Nullrotation.
+- Fehler verwerfen ausstehende Schritte, behalten jedoch den kumulativen
+  Zeit-/Zählerstand zur Duplikat- und Reihenfolgeprüfung. Stop/Start trennt alle
+  Zähler und Messdaten. Veraltete Daten werden niemals nachgeholt.
+- `pedometerCumulativeSteps`, `pedometerPublishedStepCount`,
+  `pedometerPendingStepCount`, `pedometerDiscardedStepCount` machen die Bilanz
+  sichtbar: Quelle = übergeben + ausstehend + verworfen. Die beiden
+  `pedometerStepWindow…Timestamp`-Felder beschreiben nur die Abdeckung der gerade
+  übergebenen kumulativen Deltas, **keine Zeitstempel einzelner Schritte**.
+  Ohne übergebene Schritte sind beide `null`.
+- Der persönlich freigeschaltete Diagnosebereich zeigt eine manuell
+  aktualisierbare Momentaufnahme. Der QA-Mitschnitt bewahrt verfügbare native
+  Alters-, Intervall-, Fenster- und Bilanzfelder bei den vorhandenen begrenzten
+  Kandidatenkontexten. Zeiten werden relativ zum Motion-Messzeitpunkt gespeichert;
+  die native Laufkennung wird nicht exportiert. Neue Exporte mit diesen Daten
+  melden Schema 2.13. Historische Daten werden nicht ergänzt.
+
+Bestehende Binaries ohne Qualitätsfelder bzw. mit `qualityVersion: 2` bleiben
+kompatibel. GPS-Zulassung, Start-/Winkel-/Endschwellen, Motion-Gewichte und
+Bewertung werden durch die Diagnosefelder nicht verändert. Eine vollständig
+ausgefallene Motion-Quelle liefert weiterhin keine Schritt-Ersatzereignisse.
+
+Apple beschreibt Pedometer-Updates als kumulativ ab dem Startdatum:
+[startUpdates(from:withHandler:)](https://developer.apple.com/documentation/coremotion/cmpedometer/startupdates(from:withhandler:)).
+Aus diesen Intervallen lassen sich einzelne Schritte nicht zeitgenau auf eine
+Winkelspitze verteilen. Die vorliegenden Yam-Aufnahmen belegen nicht, wie oft
+der korrigierte Verlustpfad tatsächlich auftrat oder ob er fehlende Winkel
+verursachte. Dafür bleiben ein passender nativer Prüfbuild und Feldbelege nötig.
+
+### v3-Verbraucher: Quellintervalle statt Übergabezeit
+
+Die native Lieferkorrektur allein ist kein auslieferbarer Gesamtvertrag.
+Der unabhängige Review von `422f321` hat nachgewiesen, dass früher gegangene
+Schritte sonst bei einer späteren Standdrehung als neue Bewegung zählen können.
+Die Clientkorrektur bewahrt deshalb das v3-Schrittintervall unabhängig von QA
+im flüchtigen RAM bis zum fachlichen Verbraucher:
+
+- Turn-Evidenz zählt eine Charge nur, wenn ihr vollständiges bekanntes Intervall
+  im jeweiligen Kandidatenfenster liegt. Teilüberschneidung wird nicht geschätzt.
+- Startbestätigung zählt nur vollständig nach dem Aufnahmestart liegende Schritte.
+- Die Absuche trennt Start/Resume und bewertet das Intervall bei jedem GPS-Fix
+  erneut gegen den bestehenden 2-s-Frischehorizont von Messung und Empfang.
+  Unbekannte Schritte sind dort `null`, nicht ein künstlich gemessener Nullwert.
+- Fehlende oder ungültige v3-Provenienz liefert keine Schrittunterstützung.
+  Legacy/v2 bleibt beim bisherigen Verhalten. Beschleunigungssignatur,
+  GPS-/Fusion-Schwellen und Gewichte bleiben erhalten.
+
+`motionStepEvidence.ts` enthält die gemeinsame Intervallprüfung; die beiden
+nativen Adapter erhalten die Quelle für Lay und Search. Absolute RAM-Intervalle
+werden weder in QA noch in Fährten-/Suchdaten gespeichert. QA bewahrt nur die
+gesonderte relative Allowlist; der Exportguard weist absolute Schrittintervalle
+zusätzlich ausdrücklich zurück. Build-Kandidat und JS-Verbraucher müssen
+zusammen geprüft werden. `422f321` allein bleibt die belegte RED-Basis.

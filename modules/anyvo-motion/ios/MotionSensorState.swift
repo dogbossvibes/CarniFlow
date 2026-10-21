@@ -3,6 +3,7 @@ import Foundation
 /// Queue-confined sensor state. No CoreMotion/Expo dependency: the exact code
 /// used by the bridge can be exercised with deterministic clocks and callbacks.
 struct MotionSensorState {
+  static let qualityVersion = 3
   static let maxMotionAgeS = 2.0
   static let maxPedometerAgeS = 2.0
   static let maxActivityAgeS = 6.0
@@ -20,11 +21,16 @@ struct MotionSensorState {
   private var rotationSum = 0.0
   private var firstYaw: Double?
   private var lastYaw: Double?
-  private var totalSteps = 0
-  private var pendingSteps = 0
+  private struct StepBatch { let count: Int; let startAt: Double; let endAt: Double }
+  private(set) var totalSteps = 0
+  private(set) var publishedStepCount = 0
+  private(set) var discardedStepCount = 0
+  private var pendingSteps: [StepBatch] = []
+  var pendingStepCount: Int { pendingSteps.reduce(0) { $0 + $1.count } }
   private var pedometerAt: Double?
   private var pedometerIntervalS: Double?
   private var cadence: Double?
+  private var pedometerInvalidated = false
   private var activityAt: Double?
   private var activityState = "unknown"
   private var activityConfidence = "low"
@@ -55,8 +61,10 @@ struct MotionSensorState {
 
   private mutating func resetSensors() {
     resetWindow()
-    lastMotionAt = nil; totalSteps = 0; pendingSteps = 0
+    lastMotionAt = nil; totalSteps = 0; pendingSteps = []
+    publishedStepCount = 0; discardedStepCount = 0
     pedometerAt = nil; pedometerIntervalS = nil; cadence = nil
+    pedometerInvalidated = false
     activityAt = nil; activityState = "unknown"; activityConfidence = "low"
   }
 
@@ -87,23 +95,37 @@ struct MotionSensorState {
                                 receivedAt: Double, cadencePerMinute: Double?) {
     guard accepts(token), validTime(endAt, receivedAt: receivedAt), total >= totalSteps,
       pedometerAt.map({ endAt > $0 }) ?? true else { return }
-    pedometerIntervalS = endAt - (pedometerAt ?? startedAt)
+    expirePendingSteps(at: receivedAt)
+    let startAt = pedometerAt ?? startedAt
+    pedometerIntervalS = endAt - startAt
     let delta = total - totalSteps
     totalSteps = total
     pedometerAt = endAt
+    pedometerInvalidated = false
     // Delayed cumulative data advances the baseline, but cannot be promoted
     // into fresh steps by the next timer tick or a later callback.
     if receivedAt - endAt <= Self.maxPedometerAgeS {
-      pendingSteps += delta
+      if delta > 0 { pendingSteps.append(StepBatch(count: delta, startAt: startAt, endAt: endAt)) }
       cadence = cadencePerMinute.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
     } else {
-      pendingSteps = 0; cadence = nil
+      discardedStepCount += delta; cadence = nil
     }
   }
 
   mutating func invalidatePedometer(token: UInt64) {
     guard accepts(token) else { return }
-    pendingSteps = 0; pedometerAt = nil; cadence = nil; pedometerIntervalS = nil
+    discardedStepCount += pendingStepCount; pendingSteps = []
+    // Keep the last accepted cumulative end time as the source baseline.
+    // Clearing it could accept an older callback or invent post-error coverage.
+    cadence = nil; pedometerIntervalS = nil
+    pedometerInvalidated = true
+  }
+
+  private mutating func expirePendingSteps(at now: Double) {
+    for batch in pendingSteps where now - batch.endAt > Self.maxPedometerAgeS {
+      discardedStepCount += batch.count
+    }
+    pendingSteps.removeAll { now - $0.endAt > Self.maxPedometerAgeS }
   }
 
   mutating func recordActivity(token: UInt64, receivedAt: Double, state: String, confidence: String) {
@@ -118,7 +140,8 @@ struct MotionSensorState {
   /// stale windows, even when a timer/activity/pedometer remains active.
   mutating func emit(token: UInt64, now: Double, unixMs: Double) -> [String: Any]? {
     guard accepts(token), now.isFinite, unixMs.isFinite else { return nil }
-    defer { resetWindow(); pendingSteps = 0 }
+    expirePendingSteps(at: now)
+    defer { resetWindow() }
     guard let first = firstWindowAt, let last = lastWindowAt, count > 0,
       now >= last, now - last <= Self.maxMotionAgeS,
       now - first <= Self.maxMotionAgeS else {
@@ -131,9 +154,16 @@ struct MotionSensorState {
     yaw = yaw.truncatingRemainder(dividingBy: 360)
     if yaw > 180 { yaw -= 360 }
     if yaw < -180 { yaw += 360 }
-    let stepAge = pedometerAt.map { max(0, now - $0) }
+    let stepAge = pedometerInvalidated ? nil : pedometerAt.map { max(0, now - $0) }
     let activityAge = activityAt.map { max(0, now - $0) }
-    let freshSteps = stepAge.map { $0 <= Self.maxPedometerAgeS } ?? false
+    let freshSteps = !pedometerInvalidated && (stepAge.map { $0 <= Self.maxPedometerAgeS } ?? false)
+    // A cumulative delta covers its source interval, not this motion window.
+    // Keep it across empty ticks, but never attach it to older motion or let a
+    // newer zero-step callback refresh an expired batch. Each batch emits once.
+    let delivered = pendingSteps.filter { $0.endAt <= last }
+    let stepDelta = delivered.reduce(0) { $0 + $1.count }
+    pendingSteps.removeAll { $0.endAt <= last }
+    publishedStepCount += stepDelta
     let freshActivity = activityAge.map { $0 <= Self.maxActivityAgeS } ?? false
     let fallbackState = accel < 0.03 ? "stationary" : (accel < 0.25 ? "walking" : "running")
     let confidence = min(1.0, 0.6 + (freshSteps ? 0.2 : 0) + (freshActivity ? 0.2 : 0))
@@ -142,7 +172,7 @@ struct MotionSensorState {
     payload["accelerationMagnitude"] = accel
     payload["rotationMagnitude"] = rotation
     payload["headingDelta"] = yaw
-    payload["stepDelta"] = freshSteps ? pendingSteps : 0
+    payload["stepDelta"] = stepDelta
     payload["cadence"] = NSNull()
     if freshSteps, let cadence { payload["cadence"] = cadence }
     payload["movementState"] = freshActivity ? activityState : fallbackState
@@ -150,7 +180,7 @@ struct MotionSensorState {
     payload["activityConfidence"] = freshActivity ? activityConfidence : "low"
     payload["activityAgeMs"] = NSNull()
     if let activityAge { payload["activityAgeMs"] = activityAge * 1000 }
-    payload["qualityVersion"] = 2
+    payload["qualityVersion"] = Self.qualityVersion
     payload["runId"] = runID
     payload["windowStartTimestamp"] = unixMs - (now - first) * 1000
     payload["windowEndTimestamp"] = unixMs - (now - last) * 1000
@@ -162,6 +192,16 @@ struct MotionSensorState {
     payload["pedometerIntervalMs"] = NSNull()
     if let pedometerIntervalS { payload["pedometerIntervalMs"] = pedometerIntervalS * 1000 }
     payload["discardedWindowCount"] = discardedWindowCount
+    payload["pedometerCumulativeSteps"] = totalSteps
+    payload["pedometerPublishedStepCount"] = publishedStepCount
+    payload["pedometerPendingStepCount"] = pendingStepCount
+    payload["pedometerDiscardedStepCount"] = discardedStepCount
+    payload["pedometerStepWindowStartTimestamp"] = NSNull()
+    payload["pedometerStepWindowEndTimestamp"] = NSNull()
+    if let firstStep = delivered.first, let lastStep = delivered.last {
+      payload["pedometerStepWindowStartTimestamp"] = unixMs - (now - firstStep.startAt) * 1000
+      payload["pedometerStepWindowEndTimestamp"] = unixMs - (now - lastStep.endAt) * 1000
+    }
     return payload
   }
 }

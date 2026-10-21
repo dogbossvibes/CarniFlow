@@ -374,7 +374,7 @@ export async function getUserTrackSessions(ownerId: string): Promise<Result<any[
 
 export async function getTrackSessionById(id: string): Promise<Result<any>> {
   try {
-    const [{ data: session, error: sErr }, { data: points }, { data: markers }, { data: runs }, engineRes] = await Promise.all([
+    const [{ data: session, error: sErr }, { data: points, error: pErr }, { data: markers, error: mErr }, { data: runs, error: rErr }, engineRes] = await Promise.all([
       // maybeSingle() statt single(): eine local-first Fährte OHNE Remote-Zeile liefert
       // 0 Zeilen → das ist ein ERWARTBARER Zustand, KEIN Fehler (früher PGRST116 → LogBox).
       supabase.from('training_sessions').select('*, dog:dogs(name)').eq('id', id).maybeSingle(),
@@ -393,6 +393,36 @@ export async function getTrackSessionById(id: string): Promise<Result<any>> {
     // Local-first: keine Remote-Zeile → still „not found" (KEIN console.error). Der
     // Caller (app/track/[id].tsx) lädt die Fährte dann vollständig aus SQLite.
     if (!session) return { data: null, error: null };
+    // A failed child query is unknown data, not an empty recorded track. Let
+    // callers use their existing local fallback/retry instead of hiding saved
+    // GPS, corners or the search behind a successful partial remote result.
+    if (pErr) return fail('getTrackSessionPoints', pErr);
+    if (mErr) return fail('getTrackSessionMarkers', mErr);
+    if (rErr) return fail('getTrackSessionRuns', rErr);
     return { data: { ...session, points: restoreLayContinuity(points ?? [], session.track_data?.layContinuity), markers: markers ?? [], runs: runs ?? [], engine: engineRes?.data ?? null }, error: null };
   } catch (e) { return fail('getTrackSessionById', e); }
+}
+
+
+export interface TrackCompletionSummary {
+  id: string;
+  owner_id: string;
+  dog_id: string | null;
+  track_data?: { run?: unknown } | null;
+  runs: { ended_at?: string | null }[];
+}
+
+/** Completion evidence must not depend on successful GPS/marker reads. */
+export async function getTrackCompletionById(id: string): Promise<Result<TrackCompletionSummary>> {
+  try {
+    const [{ data: session, error: sessionError }, { data: runs, error: runError }] = await Promise.all([
+      supabase.from('training_sessions').select('id,owner_id,dog_id,track_data').eq('id', id).maybeSingle(),
+      supabase.from('track_runs').select('ended_at').eq('session_id', id),
+    ]);
+    if (sessionError && (sessionError as { code?: string }).code !== 'PGRST116')
+      return fail('getTrackCompletion', sessionError);
+    if (!session) return { data: null, error: null };
+    if (runError) return fail('getTrackCompletionRuns', runError);
+    return { data: { ...session, runs: runs ?? [] } as TrackCompletionSummary, error: null };
+  } catch (error) { return fail('getTrackCompletion', error); }
 }

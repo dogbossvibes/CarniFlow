@@ -9,6 +9,7 @@ import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { useSearchRecorder, type SearchRecorder, type LatLng } from '@/features/tracking/hooks/useSearchRecorder';
 import type { MotionSample } from '@/modules/anyvo-motion';
+import * as fusion from '@/features/tracking/engine/trackFusionEngine';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -407,6 +408,41 @@ describe('Motion freshness and run boundaries', () => {
     feed(5, 0, y + 2);
     expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_motion');
     expect(getRecorder().distanceM).toBeGreaterThan(before);
+  });
+
+  it.each([false, true])('does not attribute pre-boundary v3 source steps to a new/resumed search (%s)', async resume => {
+    const evaluate = jest.spyOn(fusion, 'evaluateFusion');
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    let y = 0;
+    if (resume) {
+      y = lockAndWalk(getRecorder, 9);
+      act(() => { getRecorder().setPaused(true); });
+      simClockMs += 200;
+      act(() => { getRecorder().setPaused(false); });
+    }
+    const boundary = simClockMs; simClockMs += 200;
+    feedMotion({ qualityVersion: 3, stepDelta: 2,
+      pedometerStepWindowStartTimestamp: boundary - 500, pedometerStepWindowEndTimestamp: boundary - 100 });
+    feed(5, 0, y);
+    expect(evaluate.mock.calls.at(-1)![1]?.stepDelta).toBeNull();
+    expect(evaluate.mock.calls.at(-1)![1]?.accelerationMagnitude).toBe(0.01);
+  });
+
+  it('expires a v3 cumulative step interval at the next GPS fix while retaining fresh motion', async () => {
+    const evaluate = jest.spyOn(fusion, 'evaluateFusion');
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    const y = lockAndWalk(getRecorder, 9), measurement = simClockMs;
+    feedMotion({ qualityVersion: 3, stepDelta: 2,
+      pedometerStepWindowStartTimestamp: measurement - 1000, pedometerStepWindowEndTimestamp: measurement - 100 });
+    feed(5, 0, y);
+    expect(evaluate.mock.calls.at(-1)![1]?.stepDelta).toBe(2);
+    feed(5, 0, y);
+    expect(evaluate.mock.calls.at(-1)![1]?.stepDelta).toBeNull();
+    expect(getRecorder().gpsQuality?.fusionMode).toBe('gps_motion');
   });
 
 });

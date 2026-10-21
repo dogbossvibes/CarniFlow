@@ -101,6 +101,7 @@ function PrecisionLocationTestContent() {
   const [motionModule, setMotionModule] = useState<boolean>(false);
   const [motionAvailable, setMotionAvailable] = useState<boolean>(false);
   const [motionStatus, setMotionStatus] = useState<MotionStatus | null>(null);
+  const [motionStatusRefresh, setMotionStatusRefresh] = useState(0);
   // ── Fährten-QA-Export ──
   const { session } = useSession();
   // Sessionliste fokus-aktuell (useQaLaySessions): bei jeder Rückkehr auf diesen
@@ -137,10 +138,13 @@ function PrecisionLocationTestContent() {
   // Verfügbarkeit des nativen Motion-Moduls — genau die vorhandene Prüfung,
   // keine neue API. Ein Feldtest darf nicht still ohne Motion-Daten laufen.
   useEffect(() => {
+    let current = true;
     setMotionModule(motionClient.isModuleAvailable());
     setMotionAvailable(motionClient.isAvailable());
-    motionClient.getStatus().then(setMotionStatus).catch(() => setMotionStatus(null));
-  }, []);
+    motionClient.getStatus().then(status => { if (current) setMotionStatus(status); })
+      .catch(() => { if (current) setMotionStatus(null); });
+    return () => { current = false; };
+  }, [motionStatusRefresh]);
   useEffect(() => subscribeQaCandidateLog(setQaLines), []);
   const runExport = async (localId: string, mode: 'share' | 'copy') => {
     // Export läuft AUSSCHLIESSLICH über die localId der sichtbar gewählten Zeile.
@@ -330,6 +334,17 @@ function PrecisionLocationTestContent() {
           <Row label="Schrittzähler" value={motionStatus?.stepCountingAvailable ? 'Ja' : 'Nein'} good={motionStatus?.stepCountingAvailable} />
           <Row label="Bewegungsklassifikation" value={motionStatus?.activityAvailable ? 'Ja' : 'Nein'} good={motionStatus?.activityAvailable} />
           <Row label="Bewegungsberechtigung" value={motionStatus?.pedometerAuthorized ? 'erteilt' : 'fehlt/verweigert'} good={motionStatus?.pedometerAuthorized} />
+          <Row label="Sensorvertrag" value={motionStatus?.qualityVersion == null ? 'älterer Build / nicht verfügbar' : `v${motionStatus.qualityVersion}`} />
+          <Row label="Verworfene Sensorfenster" value={motionStatus?.discardedWindowCount?.toString() ?? 'nicht verfügbar'} />
+          <Row label="Schritte · Quelle" value={motionStatus?.pedometerCumulativeSteps?.toString() ?? 'nicht verfügbar'} />
+          <Row label="Schritte · übergeben" value={motionStatus?.pedometerPublishedStepCount?.toString() ?? 'nicht verfügbar'} />
+          <Row label="Schritte · ausstehend" value={motionStatus?.pedometerPendingStepCount?.toString() ?? 'nicht verfügbar'} />
+          <Row label="Schritte · veraltet / verworfen" value={motionStatus?.pedometerDiscardedStepCount?.toString() ?? 'nicht verfügbar'} />
+          <Text style={s.activeHint}>Momentaufnahme des nativen Laufs, kein Zähler der gesamten Fährte. Im QA-Export stehen zusätzlich verfügbare Sensorzeiten und Intervalle am jeweiligen Kandidaten. Ältere Aufnahmen erhalten diese Daten nicht nachträglich.</Text>
+          <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => setMotionStatusRefresh(value => value + 1)}
+            accessibilityRole="button" accessibilityLabel="Sensorstatus aktualisieren" activeOpacity={0.85}>
+            <Text style={s.btnTxt}>Sensorstatus aktualisieren</Text>
+          </TouchableOpacity>
           {!motionModule && (
             <Text style={s.warn}>
               Das native Motion-Modul steckt nicht in diesem Build. Der Feldtest

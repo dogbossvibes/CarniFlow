@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Screen from '../precision-location-test';
 import { loadQaPreferences, getQaPreferences, setQaPreference, pinQaTrackingModes } from '@/features/tracking/utils/qaPreferences';
 import { markWarmupStarted, markWarmupStopped } from '@/features/tracking/utils/trackingWarmupState';
+import { motionClient } from '@/features/tracking/native/motionClient';
 
 // Native-screen transforms can be slow on the shared development machine.
 jest.setTimeout(20000);
@@ -29,7 +30,7 @@ jest.mock('@/modules/anyvo-precision-location', () => ({
   stopPrecisionTracking: async () => {},
 }));
 jest.mock('@/features/tracking/native/motionClient', () => ({ motionClient: {
-  isModuleAvailable: () => true, isAvailable: () => true, getStatus: async () => null,
+  isModuleAvailable: () => true, isAvailable: () => true, getStatus: jest.fn(async () => null),
 } }));
 jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: 'user-1' } } }) }));
 jest.mock('@/features/tracking/hooks/useQaLaySessions', () => ({ useQaLaySessions: () => ({ sessions: mockSessions }) }));
@@ -55,6 +56,7 @@ beforeEach(async () => {
   // Drain the serialized writes from fixture setup before checking mount side effects.
   await new Promise<void>(resolve => setImmediate(resolve));
   jest.clearAllMocks();
+  (motionClient.getStatus as jest.Mock).mockReset().mockResolvedValue(null);
 });
 afterEach(async () => { await act(async () => { renderer?.unmount(); }); renderer = null; markWarmupStopped(); });
 
@@ -109,4 +111,27 @@ it('reflects preference updates while open and explains Motion independently of 
   expect(text()).toContain('Vergleichstest eingestellt');
   expect(text()).toContain('auch ohne QA-Diagnose aktiv');
   expect(text()).not.toContain('Nichts davon wird gespeichert');
+});
+
+it('shows native delivery accounting and refreshes without changing recording settings', async () => {
+  (motionClient.getStatus as jest.Mock).mockResolvedValue({ qualityVersion: 3,
+    pedometerCumulativeSteps: 12, pedometerPublishedStepCount: 8,
+    pedometerPendingStepCount: 1, pedometerDiscardedStepCount: 3, discardedWindowCount: 4 });
+  await mount();
+  expect(text()).toContain('v3'); expect(text()).toContain('Schritte · übergeben');
+  expect(text()).toContain('Momentaufnahme des nativen Laufs');
+  expect(text()).toContain('12');
+  (motionClient.getStatus as jest.Mock).mockResolvedValue({ qualityVersion: 3, pedometerCumulativeSteps: 17 });
+  await press('Sensorstatus aktualisieren');
+  expect(text()).toContain('17'); expect(motionClient.getStatus).toHaveBeenCalledTimes(2);
+  expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+});
+
+it('ignores the older status response after a second refresh', async () => {
+  let old!: (status: unknown) => void;
+  (motionClient.getStatus as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { old = resolve; }))
+    .mockResolvedValue({ qualityVersion: 3, pedometerCumulativeSteps: 17 });
+  await mount(); await press('Sensorstatus aktualisieren');
+  await act(async () => { old({ qualityVersion: 2, pedometerCumulativeSteps: 12 }); });
+  expect(text()).toContain('v3'); expect(text()).toContain('17'); expect(text()).not.toContain('v2');
 });

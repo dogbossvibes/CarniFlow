@@ -1,5 +1,6 @@
 import { QaMotionCapture, QA_MOTION_CANDIDATE_LIMIT, QA_MOTION_SAMPLE_LIMIT } from '../qaMotionCapture';
 import { MotionEvidenceBuffer } from '../motionTurnEvidence';
+import { motionSampleDiagnostics } from '../motionSampleDiagnostics';
 import { buildQaTrackExport, assertNoAbsoluteData } from '../qaTrackExport';
 import type { QaSessionCapture } from '../qaSessionCapture';
 import type { ShortLegRejectReason } from '../shortLegCornerDetection';
@@ -140,4 +141,36 @@ it('enforces the session-wide candidate limit across multiple sections', () => {
   expect(snapshot.candidateMotionEvidence![0].apexIndex).toBe(42);
   expect(snapshot.candidateMotionEvidence!.at(-1)!.apexIndex).toBe(269);
   expect(snapshot.motionCaptureDiagnostics).toMatchObject({ evaluatedCandidateCount: 170, omittedCandidateCount: 42, truncated: true });
+});
+
+it('retains relative native quality through capture and export without changing derived evidence', () => {
+  const capture = new QaMotionCapture(); const buffer = new MotionEvidenceBuffer();
+  const diagnostics = motionSampleDiagnostics({ timestamp: T + 3000, qualityVersion: 3,
+    headingDelta: 3, accelerationMagnitude: 0.1, rotationMagnitude: 0.2, stepDelta: 2,
+    cadence: 90, movementState: 'walking', motionConfidence: 1, activityConfidence: 'high',
+    runId: 'private-native-run', windowStartTimestamp: T + 2800, windowEndTimestamp: T + 3000,
+    emittedAtTimestamp: T + 3050, deviceMotionSampleCount: 5, deviceMotionAgeMs: 50,
+    pedometerAgeMs: 100, pedometerIntervalMs: 1000, discardedWindowCount: 2,
+    pedometerCumulativeSteps: 4, pedometerPublishedStepCount: 2, pedometerPendingStepCount: 0,
+    pedometerDiscardedStepCount: 2, pedometerStepWindowStartTimestamp: T + 1900,
+    pedometerStepWindowEndTimestamp: T + 2900 });
+  buffer.push({ t: T + 3000, headingDelta: 3, rotationMagnitude: 0.2, accelerationMagnitude: 0.1,
+    stepDelta: 2, cadence: 90, movementState: 'walking', diagnostics });
+  const before = buffer.evidenceForTrailing(T + 3000);
+  capture.observe([candidate()], buffer, T, new Set());
+  const snapshot = capture.snapshot();
+  expect(snapshot.candidateMotionEvidence![0].samples[0].diagnostics).toEqual(diagnostics);
+  snapshot.candidateMotionEvidence![0].samples[0].diagnostics!.discardedWindowCount = 99;
+  expect(capture.snapshot().candidateMotionEvidence![0].samples[0].diagnostics!.discardedWindowCount).toBe(2);
+  expect(buffer.evidenceForTrailing(T + 3000)).toEqual(before);
+  const stored: QaSessionCapture = { captureVersion: 2, sessionLocalId: 'local', durationMs: 6000,
+    counts: { rawFixes: 0, acceptedFixes: 0, rejectedFixes: 0, detectorPoints: 0, linePoints: 0 },
+    distances: { rawPathM: 0, detectorPathM: 0, recordedLineM: 0, storeDistanceM: 0 },
+    rawFixes: [], detectorPoints: [], linePoints: [], markers: [], autoDiagnostics: [], ...capture.snapshot() };
+  const exported = buildQaTrackExport('local', [], [], stored);
+  expect(exported.schemaMinor).toBe(13);
+  expect(() => assertNoAbsoluteData(exported)).not.toThrow();
+  expect(JSON.stringify(exported)).not.toMatch(/private-native-run|1800000000000|runId|Timestamp/);
+  exported.candidateMotionEvidence![0].samples[0].diagnostics!.emittedAtOffsetMs = T;
+  expect(() => assertNoAbsoluteData(exported)).toThrow('native Motion-Diagnosedaten');
 });

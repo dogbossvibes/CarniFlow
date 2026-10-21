@@ -64,6 +64,7 @@ export class QaMotionCapture {
         rotationMagnitude: round(s.rotationMagnitude, 1000),
         accelerationMagnitude: round(s.accelerationMagnitude, 1000),
         stepDelta: s.stepDelta, cadence: s.cadence, movementState: s.movementState,
+        ...(s.diagnostics ? { diagnostics: { ...s.diagnostics } } : {}),
       }));
       const union = new Map((previous?.samples ?? []).map(s => [s.dtMs, s]));
       for (const sample of current) union.set(sample.dtMs, sample);
@@ -108,7 +109,9 @@ export class QaMotionCapture {
     if (!this.access || this.access !== diagnosticsAccessToken()) { this.clear(); return {}; }
     const rows = [...this.rows.values()].map(row => ({ ...row,
       geometryAtLastEvaluation: row.geometryAtLastEvaluation && { ...row.geometryAtLastEvaluation },
-      samples: row.samples.map(sample => ({ ...sample })),
+      samples: row.samples.map(sample => ({ ...sample,
+        ...(sample.diagnostics ? { diagnostics: { ...sample.diagnostics } } : {}),
+      })),
     }));
     return {
       candidateMotionEvidence: rows,
