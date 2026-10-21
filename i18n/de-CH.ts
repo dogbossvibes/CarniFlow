@@ -830,6 +830,10 @@ export const deCH = {
   'greeting.morning': 'Guten Morgen',
   'greeting.day':     'Guten Tag',
   'greeting.evening': 'Guten Abend',
+  "greeting.settingsTitle": "Tagesgruss",
+  "greeting.soundLabel": "Begrüssungston",
+  "greeting.soundHint": "Optional beim ersten Öffnen nach einem App-Neustart. Aufnahmen und Ansagen haben Vorrang.",
+  "greeting.soundSaveError": "Die Toneinstellung konnte nicht gespeichert werden.",
 
   // Terminkalender (Startseite)
   'calendar.viewAll':         'Alle ansehen',

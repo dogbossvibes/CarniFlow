@@ -1,4 +1,5 @@
-import { AudioModule, setAudioModeAsync } from 'expo-audio';
+import { setAppAudioModeAsync } from '@/lib/greetingAudioSafety';
+import { AudioModule } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 
 // expo-audio ist hook-basiert → die eigentliche Aufnahme-Steuerung (start/pause/
@@ -15,11 +16,11 @@ export async function requestMicrophonePermission(): Promise<boolean> {
 }
 
 export async function enableRecordingMode() {
-  await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+  await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
 }
 
 export async function disableRecordingMode() {
-  await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+  await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
 }
 
 export async function deleteLocalRecording(uri: string | null) {
