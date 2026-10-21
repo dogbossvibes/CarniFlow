@@ -2,6 +2,9 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "trainingDoc.savedVariants": "{count} varianti salvate",
+  "trainingDoc.variant": "Variante {number}",
+  "trainingDoc.renameError": "Impossibile rinominare. Riprova.",
   "track.materialBall": "Palla",
   "track.materialRubber": "Gomma",
   "track.jokers": "Jolly",

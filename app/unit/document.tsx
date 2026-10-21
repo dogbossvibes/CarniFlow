@@ -352,9 +352,6 @@ function DocumentForm() {
       .map(e => ({ ...planFromHistory(unit, e, Crypto.randomUUID()), exerciseKey: e.exercise_identity_id ?? Crypto.randomUUID(), identityNew: !e.exercise_identity_id, disciplineKey: e.discipline_key ?? (disc && e.discipline === disc.label ? scopeKey(disc) : null) }))]);
   };
 
-  const isSelected = (label: string, name: string) =>
-    selected.some(e => e.discipline === label && e.name === name);
-
   // „Eigene Übung"-Kennzeichnung ohne neue Spalte: eine Übung gilt als eigen,
   // wenn sie NICHT in der (festen oder eigenen) Übungsliste der Sparte steht.
   // Funktioniert dadurch automatisch auch nach dem erneuten Laden eines
@@ -615,46 +612,18 @@ function DocumentForm() {
             onOpen={openHistory} />}
 
           {disc && session?.user.id && <ExerciseIdentityList key={`${session.user.id}:${disc.key}`} ownerId={session.user.id} disciplineKey={scopeKey(disc)}
+            disciplineLabel={disc.label} suggestions={[...disc.exercises.filter(e => e !== 'Eigene Übung'), ...recentNames]}
+            historyByIdentity={Object.fromEntries(visibleHistory.units.filter(unit => unit.id !== id).reverse().flatMap(unit => (unit.exercises ?? [])
+              .filter(exercise => !!exercise.exercise_identity_id)
+              .map(exercise => [exercise.exercise_identity_id!, { date: unit.session_date, notes: exercise.notes }])))}
+            selectedIds={selected.filter(e => e.discipline === disc.label).map(e => e.exerciseKey ?? '')}
+            selectedNames={selected.filter(e => e.discipline === disc.label).map(e => e.name)}
+            disabled={saving || remoteCompleted}
+            onCreate={name => toggleExercise(disc.label, name)}
+            onAddCustom={() => { tapHaptic(); setCustomSheetOpen(true); }}
             onSelect={identity => setSelected(prev => prev.some(e => e.exerciseKey === identity.id) ? prev.filter(e => e.exerciseKey !== identity.id)
               : [...prev, { key: Crypto.randomUUID(), discipline: disc.label, disciplineKey: identity.discipline_key,
                 name: identity.display_name, exerciseKey: identity.id, rating: null, notes: null, performed: false }])} />}
-
-          {/* Übungen (Mehrfachauswahl) — Chips, unverändert in der Logik */}
-          {disc && (
-            <>
-              <Text style={s.label}>{t('training.exercisesFor', { discipline: disc.label.toUpperCase() })}</Text>
-              <View style={s.chipRow}>
-                {disc.exercises.filter(e => e !== 'Eigene Übung').map(ex => {
-                  const aktiv = isSelected(disc.label, ex);
-                  return (
-                    <TouchableOpacity key={ex} style={[s.chip, aktiv && { borderColor: disc.accent, backgroundColor: `${disc.accent}1A` }]} accessibilityRole="button" accessibilityState={{ selected: aktiv }} accessibilityLabel={ex} onPress={() => toggleExercise(disc.label, ex)} activeOpacity={0.8}>
-                      <Text style={[s.chipTxt, aktiv && { color: disc.accent, fontWeight: '700' }]}>{ex}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {recentNames.map(ex => {
-                  const aktiv = isSelected(disc.label, ex);
-                  return (
-                    <TouchableOpacity key={`recent-${ex}`} style={[s.chip, aktiv && { borderColor: disc.accent, backgroundColor: `${disc.accent}1A` }]} accessibilityRole="button" accessibilityState={{ selected: aktiv }} accessibilityLabel={ex} onPress={() => toggleExercise(disc.label, ex)} activeOpacity={0.8}>
-                      <Text style={[s.chipTxt, aktiv && { color: disc.accent, fontWeight: '700' }]}>{ex}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() => { tapHaptic(); setCustomSheetOpen(true); }}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('training.addCustomExercise')}
-                >
-                  <Ionicons name="add" size={13} color={disc.accent} />
-                  <Text style={[s.chipTxt, { color: disc.accent, fontWeight: '700' }]}>{t('training.addCustomExercise')}</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-
 
           {/* Ausgewählte Übungen → Karten mit Bewertung + Notiz */}
           {selected.length > 0 && (

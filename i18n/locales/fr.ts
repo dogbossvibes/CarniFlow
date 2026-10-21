@@ -6,6 +6,9 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "trainingDoc.savedVariants": "{count} variantes enregistrées",
+  "trainingDoc.variant": "Variante {number}",
+  "trainingDoc.renameError": "Le changement de nom a échoué. Réessaie.",
   "track.materialBall": "Balle",
   "track.materialRubber": "Caoutchouc",
   "track.jokers": "Jokers",

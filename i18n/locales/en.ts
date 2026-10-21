@@ -2,6 +2,9 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "trainingDoc.savedVariants": "{count} saved variants",
+  "trainingDoc.variant": "Variant {number}",
+  "trainingDoc.renameError": "Could not rename. Please try again.",
   "track.materialBall": "Ball",
   "track.materialRubber": "Rubber",
   "track.jokers": "Jokers",

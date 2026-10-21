@@ -5,6 +5,9 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "trainingDoc.savedVariants": "{count} gespeicherte Varianten",
+  "trainingDoc.variant": "Variante {number}",
+  "trainingDoc.renameError": "Umbenennen fehlgeschlagen. Bitte erneut versuchen.",
   "track.materialBall": "Ball",
   "track.materialRubber": "Gummi",
   "track.jokers": "Joker",
