@@ -44,7 +44,7 @@ German, English, French and Italian text; system fonts, scrollable controls,
 
 Checks:
 
-- `node scripts/check-watch-contract.mjs`: real host Foundation,12 shared parser,
+- `node scripts/check-watch-contract.mjs`: real host Foundation,13 shared parser,
   lifecycle, freshness, request-correlation scenarios; no Watch SDK required.
 - `swift test --package-path modules/anyvo-wearable-control` on a fullXcode host:
   same shared scenarios through XCTest. CommandLineTools alone may lack XCTest.

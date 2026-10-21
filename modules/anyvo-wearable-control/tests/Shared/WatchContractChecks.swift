@@ -134,6 +134,20 @@ final class WatchContractChecks {
     try expectNil(state.snapshot)
     try expectFalse(state.receiveSnapshot(old, wallTimeMs: 1_800_000_000_005, uptimeMs: 5))
   }
+  func testExpiredIdleSnapshotImmediatelyClearsPreviousActiveCapabilities() throws {
+    var state = WatchCommandState()
+    let active = try snapshot()
+    _ = state.receiveSnapshot(active, wallTimeMs: 1_800_000_000_000, uptimeMs: 0)
+    let idle = try snapshot(["contextId": NSNull(), "leaseId": NSNull(), "sessionId": NSNull(),
+      "dogId": NSNull(), "dogName": NSNull(), "phase": "idle", "capabilities": [],
+      "expiresAtMs": 1_800_000_000_001, "sequence": 13])
+    try expectTrue(state.receiveSnapshot(idle, wallTimeMs: 1_800_000_000_001, uptimeMs: 1))
+    try expectNil(state.snapshot?.contextId)
+    try expectEqual(state.snapshot?.phase, .idle)
+    for action in WatchAction.allCases { try expectFalse(state.canSend(action, connected: true, uptimeMs: 2)) }
+    try expectFalse(state.receiveSnapshot(active, wallTimeMs: 1_800_000_000_002, uptimeMs: 2))
+    try expectEqual(state.snapshot?.phase, .idle)
+  }
   func testWatchFreshnessUsesMonotonicBoundNotWallClockExtension() throws {
     var state = WatchCommandState()
     _ = state.receiveSnapshot(try snapshot(["expiresAtMs": 1_900_000_000_000]), wallTimeMs: 1_800_000_000_000, uptimeMs: 0)
@@ -192,6 +206,8 @@ final class WatchContractChecks {
     print("PASS testTimeoutAndTransportFailureNeverConfirmSuccess")
     try testContextRotationAndOutOfOrderStateDoNotAuthorizeOldTarget()
     print("PASS testContextRotationAndOutOfOrderStateDoNotAuthorizeOldTarget")
+    try testExpiredIdleSnapshotImmediatelyClearsPreviousActiveCapabilities()
+    print("PASS testExpiredIdleSnapshotImmediatelyClearsPreviousActiveCapabilities")
     try testWatchFreshnessUsesMonotonicBoundNotWallClockExtension()
     print("PASS testWatchFreshnessUsesMonotonicBoundNotWallClockExtension")
     try testPreparedCommandEncodesExplicitNullAndBoundSnapshotFields()

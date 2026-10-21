@@ -56,7 +56,7 @@ The existing map-guard hook test is updated to the new preserved-plus-appended h
 
 ## Executed checks
 
--12 native Swift/Foundation scenarios PASS using the exact shared02 synthetic
+-13 native Swift/Foundation scenarios PASS using the exact shared02 synthetic
 fixtures: valid/invalid/unknown/missing/oversize wire data, prepared/null session,
 capability/connection/expiry guards, matching ACK only, timeout/reconnection state,
 context rotation/out-of-order messages, bounded monotonic freshness, confirmation
@@ -80,7 +80,7 @@ XCTest. A real Foundation host executable runs the same shared scenario source;
 fullXcode keeps an XCTest wrapper in Package.swift. Initial host attempts were
 invalidated by editing an input during a cold SDK compilation and by attempting to
 relocate path-bound compiler caches. Both failures are retained; the stable-source
-12-scenario run passed. No fake XCTest/SDK stubs were used or reported as a compile.
+13-scenario run passed. No fake XCTest/SDK stubs were used or reported as a compile.
 
 ## Required next steps / remaining evidence
 
