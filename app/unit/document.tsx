@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import {
-  ActivityIndicator, Alert, AppState, Keyboard, KeyboardAvoidingView, Platform, ScrollView,
+  ActivityIndicator, Alert, AppState, BackHandler, Keyboard, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -48,6 +48,7 @@ import type { TrainingMetrics } from '@/types/analytics';
 import type { DocumentSave } from '@/services/trainingDocumentService';
 import type { TrainingUnit } from '@/types/trainingUnit';
 import { useT } from '@/i18n';
+import { formatDate } from '@/i18n/format';
 
 const EMPTY_METRICS: TrainingMetrics = {
   motivation: null, konzentration: null, praezision: null,
@@ -62,7 +63,8 @@ interface DocumentDraft {
   unitId: string; dogId: string | null; activeDisc: string; selected: PlannedExercise[];
   description: string; score: number; date: string; durationMin: number | null;
   photos: string[]; videos: string[]; audio: (AudioNote & { transcript?: string | null })[]; metrics: TrainingMetrics;
-  shared: boolean; operationId?: string; recordedDurationSec?: number | null; atomic?: boolean; nextFocusDisciplineKey?: string; nextFocus?: string; nextFocusDiscipline?: string; focusId?: string; sourceFingerprint?: string; remoteCompleted?: boolean;
+  otherDogs?: Record<string, Omit<DocumentDraft, 'otherDogs'>>;
+  workflowStep?: number; shared: boolean; operationId?: string; recordedDurationSec?: number | null; atomic?: boolean; nextFocusDisciplineKey?: string; nextFocus?: string; nextFocusDiscipline?: string; focusId?: string; sourceFingerprint?: string; remoteCompleted?: boolean;
 }
 
 function draftFromIntent(draft: DocumentDraft, request: DocumentSave): DocumentDraft {
@@ -93,6 +95,7 @@ function draftFromIntent(draft: DocumentDraft, request: DocumentSave): DocumentD
 function validDocumentDraft(value: unknown): value is DocumentDraft {
   if (!value || typeof value !== 'object') return false;
   const d = value as DocumentDraft;
+  if (d.otherDogs && (typeof d.otherDogs !== 'object' || Array.isArray(d.otherDogs) || !Object.entries(d.otherDogs).every(([dog, value]) => value && value.dogId === dog && !('otherDogs' in value) && validDocumentDraft(value)))) return false;
   return typeof d.unitId === 'string' && !!d.unitId && typeof d.activeDisc === 'string'
     && (d.dogId == null || typeof d.dogId === 'string') && typeof d.description === 'string'
     && typeof d.shared === 'boolean' && Number.isFinite(d.score)
@@ -121,7 +124,7 @@ export default function DocumentScreen() {
 
 function DocumentForm() {
   const router = useRouter();
-  const { t } = useT();
+  const { t, locale } = useT();
   const { id, duration, dogId: dogIdParam, discipline: discParam, note: noteParam } =
     useLocalSearchParams<{ id?: string; duration?: string; dogId?: string; discipline?: string; note?: string }>();
   const editing = !!id;
@@ -180,9 +183,29 @@ function DocumentForm() {
   const [loadRetry, setLoadRetry] = useState(0);
   const [editLoaded, setEditLoaded] = useState(!editing);
   const [details, setDetails] = useState(editing);
+  const [workflowStep, setWorkflowStep] = useState(0);
+  const [contextOpen, setContextOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [preparationOpen, setPreparationOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [otherDogDrafts, setOtherDogDrafts] = useState<NonNullable<DocumentDraft['otherDogs']>>({});
+  const scrollRef = useRef<ScrollView>(null);
+  const dogSwitchLock = useRef(false);
+  useEffect(() => { dogSwitchLock.current = false; }, [dogId]);
+  const moveToStep = useCallback((step: number) => { Keyboard.dismiss(); setWorkflowStep(step); setPickerOpen(step === 1 && !selected.length); scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [selected.length]);
+
   const [shared, setShared] = useState<boolean | null>(null);
   const [historyRetry, setHistoryRetry] = useState(0);
   const [history, setHistory] = useState<{ scope: string; units: PreparationUnit[]; error: boolean; loading: boolean; limited: boolean }>({ scope: '', units: [], error: false, loading: false, limited: false });
+  useFocusEffect(useCallback(() => {
+    if (editing || saved || workflowStep === 0) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (saving || pendingSave || remoteCompleted) return false;
+      moveToStep(workflowStep - 1);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [editing, saved, workflowStep, saving, pendingSave, remoteCompleted, moveToStep]));
   const entryContext = dogIdParam || discParam ? JSON.stringify([dogIdParam ?? null, discParam ?? null]) : undefined;
   const draftKey = session?.user.id ? documentDraftKey(session.user.id, id, entryContext) : null;
   const disciplineTouched = useRef(false);
@@ -227,6 +250,8 @@ function DocumentForm() {
         restoringIntent = !!pending && pending.request.requestId === operationIdRef.current;
         if (restoringIntent && pending) draft = draftFromIntent(draft, pending.request);
         setPendingSave(restoringIntent);
+        setOtherDogDrafts(draft.otherDogs ?? {});
+        setWorkflowStep(restoringIntent || draft.remoteCompleted ? 2 : [0, 1, 2].includes(draft.workflowStep ?? -1) ? draft.workflowStep! : draft.selected.length ? 1 : 0);
         recordedDurationSec.current = draft.recordedDurationSec ?? null;
         setRemoteCompleted(draft.remoteCompleted ?? false);
         setNextFocusDisciplineKey(draft.nextFocusDisciplineKey ?? '');
@@ -278,11 +303,11 @@ function DocumentForm() {
     return () => { cancelled = true; };
   }, [draftKey, id, session?.user.id, loadRetry]);
 
-  const draftSnapshot = useCallback((): DocumentDraft => ({ unitId: unitIdRef.current, dogId, activeDisc, selected, description, score,
+  const draftSnapshot = useCallback((): DocumentDraft => ({ otherDogs: otherDogDrafts, workflowStep, unitId: unitIdRef.current, dogId, activeDisc, selected, description, score,
     date: date.toISOString(), durationMin, recordedDurationSec: recordedDurationSec.current, photos, videos, audio, metrics,
     shared: shared ?? profile?.share_trainings_default ?? false, operationId: operationIdRef.current, atomic: !legacyCompletion.current,
     nextFocusDisciplineKey, nextFocus, nextFocusDiscipline, focusId: focusIdRef.current, sourceFingerprint: sourceFingerprint.current, remoteCompleted,
-  }), [dogId, activeDisc, selected, description, score, date, durationMin, photos, videos, audio, metrics, shared, profile?.share_trainings_default, nextFocusDisciplineKey, nextFocus, nextFocusDiscipline, remoteCompleted]);
+  }), [otherDogDrafts, workflowStep, dogId, activeDisc, selected, description, score, date, durationMin, photos, videos, audio, metrics, shared, profile?.share_trainings_default, nextFocusDisciplineKey, nextFocus, nextFocusDiscipline, remoteCompleted]);
   useEffect(() => {
     if (!draftReady || !draftKey || draftBlocked || stopDraft.current || (editing && !editLoaded)) return;
     void saveDocumentDraft(draftKey, draftSnapshot()).catch(() => { if (alive.current) setDraftError(true); });
@@ -348,6 +373,7 @@ function DocumentForm() {
   };
 
   const reuseExercises = (unit: TrainingUnit, exercises: NonNullable<TrainingUnit['exercises']>) => {
+    moveToStep(1);
     setSelected(prev => [...prev, ...exercises.filter(e => !prev.some(p => p.sourceUnitId === unit.id && !!e.id && p.sourceExerciseId === e.id))
       .map(e => ({ ...planFromHistory(unit, e, Crypto.randomUUID()), exerciseKey: e.exercise_identity_id ?? Crypto.randomUUID(), identityNew: !e.exercise_identity_id, disciplineKey: e.discipline_key ?? (disc && e.discipline === disc.label ? scopeKey(disc) : null) }))]);
   };
@@ -384,6 +410,7 @@ function DocumentForm() {
         : [...prev, { key: Crypto.randomUUID(), discipline: disc.label, name, rating: null, notes: null, performed: true, exerciseKey: Crypto.randomUUID(), identityNew: true, disciplineKey: disc ? scopeKey(disc) : null }],
     );
     setCustomSheetOpen(false);
+    setPickerOpen(false);
     // Eigene Sparte + „für zukünftige Trainings speichern": dieselbe Persistenz
     // wie im Kategorie-Editor (app/unit/new-category.tsx) — keine zweite Logik.
     if (activeCategory && saveForFuture && !activeCategory.exercises.includes(name)) {
@@ -407,6 +434,39 @@ function DocumentForm() {
     setSelected(prev => prev.filter((_, i) => i !== idx));
   };
 
+  // Each dog keeps its own unit/request identities and complete local form.
+  // Inactive drafts stay inside the existing account-scoped durable draft.
+  const emptyDogDraft = (targetDog: string): Omit<DocumentDraft, 'otherDogs'> => ({
+    unitId: Crypto.randomUUID(), operationId: Crypto.randomUUID(), focusId: Crypto.randomUUID(),
+    dogId: targetDog, activeDisc, selected: [], description: '', score: 0, date: new Date().toISOString(),
+    durationMin: null, recordedDurationSec: null, photos: [], videos: [], audio: [], metrics: { ...EMPTY_METRICS },
+    shared: profile?.share_trainings_default ?? false, atomic: true, workflowStep: 0,
+  });
+  const changeDog = (targetDog: string) => {
+    if (dogSwitchLock.current || dogId === targetDog || editing || saving || pendingSave || remoteCompleted) return;
+    dogSwitchLock.current = true;
+    const snapshot = draftSnapshot();
+    const { otherDogs: _otherDogs, ...currentDraft } = snapshot;
+    const next = otherDogDrafts[targetDog] ?? (dogId ? emptyDogDraft(targetDog) : { ...currentDraft, dogId: targetDog });
+    setOtherDogDrafts(previous => {
+      const result = { ...previous };
+      delete result[targetDog];
+      if (dogId) result[dogId] = currentDraft;
+      return result;
+    });
+    unitIdRef.current = next.unitId; operationIdRef.current = next.operationId ?? Crypto.randomUUID(); focusIdRef.current = next.focusId ?? Crypto.randomUUID();
+    recordedDurationSec.current = next.recordedDurationSec ?? null;
+    disciplineTouched.current = true;
+    setDogId(targetDog); setActiveDisc(next.activeDisc); setSelected(next.selected);
+    setDescription(next.description); setScore(next.score); setDate(new Date(next.date)); setDurationMin(next.durationMin);
+    setPhotos(next.photos); setVideos(next.videos); setAudio(next.audio); setMetrics(next.metrics); setShared(next.shared);
+    setNextFocus(next.nextFocus ?? ''); setNextFocusDiscipline(next.nextFocusDiscipline ?? ''); setNextFocusDisciplineKey(next.nextFocusDisciplineKey ?? '');
+    setWorkflowStep(next.workflowStep ?? 0); setPickerOpen(false); setPreparationOpen(false); setContextOpen(false); setCustomSheetOpen(false); setRecentNames([]);
+    sourceFingerprint.current = undefined; legacyCompletion.current = false;
+  };
+
+  const hintDiscipline = disciplines.find(d => d.key === activeDisc && selected.some(e => e.performed && e.discipline === d.label))
+    ?? disciplines.find(d => selected.some(e => e.performed && e.discipline === d.label)) ?? disc;
   const canSave = draftReady && editLoaded && !editConflict && !!dogId && dogs.some(d => d.id === dogId) && selected.some(e => e.performed);
 
   const speichern = async () => {
@@ -500,13 +560,16 @@ function DocumentForm() {
     }
     if (!alive.current) return;
     stopDraft.current = true;
-    if (draftKey) await clearDocumentDraft(draftKey).catch(() => {});
+    if (draftKey) {
+      if (Object.keys(otherDogDrafts).length) await saveDocumentDraft(draftKey, { ...emptyDogDraft(dogId!), otherDogs: otherDogDrafts });
+      else await clearDocumentDraft(draftKey).catch(() => {});
+    }
     if (!alive.current) return;
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     if (editing) router.replace({ pathname: '/unit/detail', params: { id: id! } });
-    else         router.replace('/(tabs)/home');
+    else setSaved(true);
     } catch {
       if (!alive.current) return;
       Alert.alert(t('common.error'), t('training.saveError'));
@@ -519,26 +582,41 @@ function DocumentForm() {
     }
   };
 
+  if (saved) return <SafeAreaView style={s.safe}>
+    <ScrollView contentContainerStyle={[s.content, { paddingTop: 32, gap: 18 }]}>
+      <Ionicons name="checkmark-circle" size={48} color={C.accent} />
+      <Text style={s.title} accessibilityRole="header" accessibilityLiveRegion="polite">{t('trainingFlow.saved')}</Text>
+      <Text style={s.contextTitle}>{dogs.find(d => d.id === dogId)?.name} · {formatDate(date, undefined, locale ?? 'de')}</Text>
+      {selected.filter(e => e.performed).map(e => <View key={e.key} style={s.focusEntry}><Text style={s.contextTitle}>{e.name} · {e.discipline}</Text>
+        <Text style={s.fieldLabel}>{t('trainingFlow.observed')}</Text><Text style={s.flowHelp}>{e.notes?.trim() || t('trainingFlow.noObservation')}</Text>
+        {!!e.nextFocus?.trim() && <><Text style={s.fieldLabel}>{t('trainingDoc.exerciseNextFocus')}</Text><Text style={s.flowHelp}>{e.nextFocus}</Text></>}
+      </View>)}
+      {!!nextFocus.trim() && <Text style={s.flowHelp}>{t('trainingDoc.sessionNextFocus')}: {nextFocus}</Text>}
+      <TouchableOpacity accessibilityRole="button" style={s.contextToggle} onPress={() => router.replace({ pathname: '/unit/detail', params: { id: unitIdRef.current } })}><Text style={s.actionText}>{t('trainingFlow.viewSaved')}</Text></TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" style={s.contextToggle} onPress={() => router.replace('/(tabs)/home')}><Text style={s.actionText}>{t('common.close')}</Text></TouchableOpacity>
+    </ScrollView>
+  </SafeAreaView>;
+
   if (draftBlocked) return <SafeAreaView style={s.safe}><Text style={s.saveHint}>{t('trainingDoc.draftError')}</Text><TouchableOpacity style={s.chip} accessibilityRole="button" onPress={() => { setDraftBlocked(false); setDraftReady(false); setLoadRetry(v => v + 1); }}><Text style={s.chipTxt}>{t('common.retry')}</Text></TouchableOpacity></SafeAreaView>;
   if (!draftReady) return <SafeAreaView style={s.safe}><ActivityIndicator accessibilityLabel={t('common.loading')} /></SafeAreaView>;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} accessibilityRole="button" accessibilityLabel={t('common.back')} onPress={() => router.back()} activeOpacity={0.7}>
+        <TouchableOpacity style={s.backBtn} accessibilityRole="button" accessibilityLabel={t('common.back')} onPress={() => { if (!editing && workflowStep > 0 && !pendingSave && !remoteCompleted) moveToStep(workflowStep - 1); else router.back(); }} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={s.eyebrow}>{t('training.diary')}</Text>
-          <Text style={s.title}>{editing ? t('training.editTraining') : t('training.documentTraining')}</Text>
+          <Text style={s.title} accessibilityRole="header" accessibilityLiveRegion="polite">{editing ? t('training.editTraining') : t((['trainingFlow.prepareTitle', 'trainingFlow.observeTitle', 'trainingFlow.nextTitle'] as const)[workflowStep])}</Text>
         </View>
-        <View style={{ flex: 1 }} />
         <HelpButton topicId="document_training" autoShow tint={C.white} />
       </View>
 
+      {!editing && <View style={s.steps} accessibilityLabel={t('trainingFlow.step', { step: workflowStep + 1 })}>{(['prepare', 'observe', 'next'] as const).map((key, index) => <View key={key} style={[s.step, workflowStep === index && s.activeStep]}><Text style={[s.stepText, workflowStep === index && { color: C.white }]}>{index + 1} · {t(`trainingFlow.${key}`)}</Text></View>)}</View>}
       <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" pointerEvents={saving || remoteCompleted || pendingSave ? 'none' : 'auto'}>
-          <Text style={s.label}>{t('trainingDoc.localDraft')}</Text>
+        <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" pointerEvents={saving || remoteCompleted || pendingSave ? 'none' : 'auto'}>
+
           {draftError && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.draftError')}</Text>}
           {editing && !editLoaded && <TouchableOpacity accessibilityRole="button" style={s.chip} onPress={() => setLoadRetry(v => v + 1)}><Text style={s.chipTxt}>{t('common.retry')}</Text></TouchableOpacity>}
           {editConflict && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.reviewSave')}</Text>}
@@ -546,6 +624,8 @@ function DocumentForm() {
           {remoteCompleted && legacyCompletion.current && <Text style={s.saveHint}>{t('trainingDoc.remoteCompleted')}</Text>}
           {/* Trainingskontext: Hund + Sparte kompakt in einer Card */}
           <View style={s.contextCard}>
+            {!editing && dogId && dogs.some(d => d.id === dogId) && <><Text style={s.contextTitle}>{dogs.find(d => d.id === dogId)?.name} · {disc?.label}</Text><Text style={s.flowHelp}>{formatDate(date, undefined, locale ?? 'de')}</Text><TouchableOpacity style={s.contextToggle} accessibilityRole="button" accessibilityState={{ expanded: contextOpen }} onPress={() => setContextOpen(v => !v)}><Text style={s.actionText}>{t('trainingFlow.changeContext')}</Text></TouchableOpacity></>}
+            {(editing || contextOpen || !dogId || !dogs.length) && <>
             {!dogsLoading && dogs.length === 0 ? (
               <>
                 <Text style={s.label}>{t('training.dogLabel')}</Text>
@@ -571,7 +651,7 @@ function DocumentForm() {
                   {dogs.map(d => {
                     const aktiv = dogId === d.id;
                     return (
-                      <TouchableOpacity key={d.id} style={[s.chip, aktiv && s.chipActive]} accessibilityRole="button" accessibilityState={{ selected: aktiv }} accessibilityLabel={d.name} onPress={() => { if (dogId === d.id) return; tapHaptic(); setDogId(d.id); setNextFocus(''); setNextFocusDiscipline(''); setNextFocusDisciplineKey(''); setRecentNames([]); setCustomSheetOpen(false); setSelected(prev => prev.map(e => ({ ...e, rating: null, notes: null, performed: false, durationSec: null, nextFocus: undefined, nextFocusId: undefined, sourceUnitId: undefined, sourceExerciseId: undefined })));  }} activeOpacity={0.8}>
+                      <TouchableOpacity key={d.id} style={[s.chip, aktiv && s.chipActive]} accessibilityRole="button" accessibilityState={{ selected: aktiv }} accessibilityLabel={d.name} onPress={() => { if (dogId === d.id) return; if (!editing) { tapHaptic(); changeDog(d.id); return; } tapHaptic(); setDogId(d.id); setNextFocus(''); setNextFocusDiscipline(''); setNextFocusDisciplineKey(''); setRecentNames([]); setCustomSheetOpen(false); setSelected(prev => prev.map(e => ({ ...e, rating: null, notes: null, performed: false, durationSec: null, nextFocus: undefined, nextFocusId: undefined, sourceUnitId: undefined, sourceExerciseId: undefined })));  }} activeOpacity={0.8}>
                         {aktiv && <LinearGradient colors={['#00FFCC', '#00FFCC']} style={StyleSheet.absoluteFill} />}
                         <Text style={[s.chipTxt, aktiv && s.chipTxtActive]}>{d.name}</Text>
                       </TouchableOpacity>
@@ -604,26 +684,38 @@ function DocumentForm() {
                 <Text style={[s.chipTxt, { color: C.accent, fontWeight: '700' }]}>{t('training.createCategory')}</Text>
               </TouchableOpacity>
             </View>
+            </>}
           </View>
 
-          {!editing && dogId && disc && <TrainingPreparation units={visibleHistory.units} discipline={disc.label}
+          {(editing || workflowStep === 0) && <>
+          {session?.user.id && dogId && disc && <ServerTrainingFocusList preparation={!editing} key={`server:${historyScope}`} ownerId={session.user.id} {...serverFocuses}
+            onRetry={() => setFocusRevision(v => v + 1)} onOpenSource={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} />}
+          {session?.user.id && dogId && disc && <TrainingFocusList preparation={!editing} key={`local:${historyScope}`} ownerId={session.user.id} dogId={dogId} discipline={disc.label}
+            onOpenSource={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} availableUnitIds={new Set(visibleHistory.units.map(unit => unit.id))} />}
+          {!editing && <Text style={s.flowHelp}>{t('trainingFlow.prepareHelp')}</Text>}
+          {!editing && dogId && disc && <TouchableOpacity style={s.contextToggle} accessibilityRole="button" accessibilityState={{ expanded: preparationOpen }} onPress={() => setPreparationOpen(v => !v)}><Text style={s.actionText}>{t('trainingFlow.previousTraining')}</Text></TouchableOpacity>}
+          {!editing && preparationOpen && dogId && disc && <TrainingPreparation units={visibleHistory.units} discipline={disc.label}
             loading={visibleHistory.loading} error={visibleHistory.error} limited={visibleHistory.limited}
             onRetry={() => setHistoryRetry(v => v + 1)} onReuse={reuseExercises}
             onOpen={openHistory} />}
+          </>}
 
-          {disc && session?.user.id && <ExerciseIdentityList key={`${session.user.id}:${disc.key}`} ownerId={session.user.id} disciplineKey={scopeKey(disc)}
+          {(editing || workflowStep === 1) && <>
+          {!editing && <><Text style={s.sectionTitle}>{t('trainingFlow.trainedToday')}</Text><TouchableOpacity style={s.contextToggle} accessibilityRole="button" accessibilityState={{ expanded: pickerOpen }} onPress={() => setPickerOpen(v => !v)}><Text style={s.actionText}>{t(selected.length ? 'trainingFlow.addExercise' : 'trainingFlow.chooseExercise')}</Text></TouchableOpacity></>}
+          {(editing || pickerOpen) && disc && session?.user.id && <ExerciseIdentityList key={`${session.user.id}:${disc.key}`} ownerId={session.user.id} disciplineKey={scopeKey(disc)}
             disciplineLabel={disc.label} suggestions={[...disc.exercises.filter(e => e !== 'Eigene Übung'), ...recentNames]}
             historyByIdentity={Object.fromEntries(visibleHistory.units.filter(unit => unit.id !== id).reverse().flatMap(unit => (unit.exercises ?? [])
               .filter(exercise => !!exercise.exercise_identity_id)
               .map(exercise => [exercise.exercise_identity_id!, { date: unit.session_date, notes: exercise.notes }])))}
             selectedIds={selected.filter(e => e.discipline === disc.label).map(e => e.exerciseKey ?? '')}
             selectedNames={selected.filter(e => e.discipline === disc.label).map(e => e.name)}
+            allowRename={editing}
             disabled={saving || remoteCompleted}
-            onCreate={name => toggleExercise(disc.label, name)}
+            onCreate={name => { toggleExercise(disc.label, name); setPickerOpen(false); }}
             onAddCustom={() => { tapHaptic(); setCustomSheetOpen(true); }}
-            onSelect={identity => setSelected(prev => prev.some(e => e.exerciseKey === identity.id) ? prev.filter(e => e.exerciseKey !== identity.id)
+            onSelect={identity => { setSelected(prev => prev.some(e => e.exerciseKey === identity.id) ? prev.filter(e => e.exerciseKey !== identity.id)
               : [...prev, { key: Crypto.randomUUID(), discipline: disc.label, disciplineKey: identity.discipline_key,
-                name: identity.display_name, exerciseKey: identity.id, rating: null, notes: null, performed: false }])} />}
+                name: identity.display_name, exerciseKey: identity.id, rating: null, notes: null, performed: !editing }]); setPickerOpen(false); }} />}
 
           {/* Ausgewählte Übungen → Karten mit Bewertung + Notiz */}
           {selected.length > 0 && (
@@ -635,6 +727,7 @@ function DocumentForm() {
                   return (
                   <SelectedExerciseCard
                     key={e.key}
+                    observationMode={!editing}
                     name={e.name}
                     accentColor={disciplineColor(e.discipline)}
                     isCustom={isCustomExercise(e.discipline, e.name)}
@@ -644,7 +737,7 @@ function DocumentForm() {
                     onNotesChange={n => setExerciseNotes(i, n)}
                     onRemove={() => removeExercise(i)}
                     nextFocus={e.nextFocus}
-                    onNextFocusChange={text => setSelected(prev => prev.map((x, j) => j === i ? { ...x, nextFocus: text, nextFocusId: x.nextFocusId ?? Crypto.randomUUID() } : x))}
+                    onNextFocusChange={editing ? text => setSelected(prev => prev.map((x, j) => j === i ? { ...x, nextFocus: text, nextFocusId: x.nextFocusId ?? Crypto.randomUUID() } : x)) : undefined}
                     performed={e.performed}
                     onPerformedChange={() => setSelected(prev => prev.map((x, j) => j === i ? { ...x, performed: !x.performed } : x))}
                     historyChoices={!editing && !previous && !saving && !remoteCompleted ? visibleHistory.units.filter(unit => unit.id !== id).flatMap(unit =>
@@ -668,15 +761,28 @@ function DocumentForm() {
             </>
           )}
 
-          {session?.user.id && dogId && disc && <ServerTrainingFocusList key={historyScope} ownerId={session.user.id} {...serverFocuses}
-            onRetry={() => setFocusRevision(v => v + 1)} onOpenSource={unitId => router.push({ pathname: '/unit/detail', params: { id: unitId } })} />}
-          {session?.user.id && dogId && disc && <TrainingFocusList collapsedByDefault key={historyScope} ownerId={session.user.id} dogId={dogId} discipline={disc.label} />}
-          {(details || !!nextFocus.trim()) && <>
-          <Text style={s.label}>{t('trainingDoc.sessionNextFocus')}{nextFocus && nextFocusDiscipline ? ` · ${nextFocusDiscipline}` : ''}</Text>
-          <TextInput style={s.textarea} value={nextFocus} onChangeText={text => { setNextFocus(text); setNextFocusDiscipline(disc?.label ?? activeDisc); setNextFocusDisciplineKey(disc ? scopeKey(disc) : ''); }} editable={!saving && !remoteCompleted} multiline maxLength={500}
-            placeholder={t('trainingDoc.sessionNextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={t('trainingDoc.sessionNextFocus')} />
-          <Text style={s.saveHint}>{t('trainingDoc.focusAccount')}</Text>
           </>}
+          {(editing || workflowStep === 2) && <>
+          {!editing && <>
+            <Text style={s.flowHelp}>{t('trainingFlow.nextHelp')}</Text>
+            {selected.filter(e => e.performed).map(e => <View key={e.key} style={s.focusEntry}>
+              <Text style={s.contextTitle}>{e.name} · {e.discipline}</Text>
+              <Text style={s.flowHelp}>{t('trainingFlow.observed')}: {e.notes?.trim() || t('trainingFlow.noObservation')}</Text>
+              <Text style={s.fieldLabel}>{t('trainingDoc.exerciseNextFocus')}</Text>
+              <TextInput style={s.textarea} value={e.nextFocus ?? ''} multiline maxLength={500} editable={!saving && !remoteCompleted}
+                accessibilityLabel={`${e.name}: ${t('trainingDoc.exerciseNextFocus')}`} placeholder={t('trainingFlow.hintPlaceholder')} placeholderTextColor={C.placeholder}
+                onChangeText={text => setSelected(prev => prev.map(x => x.key === e.key ? { ...x, nextFocus: text, nextFocusId: x.nextFocusId ?? Crypto.randomUUID() } : x))} />
+            </View>)}
+          </>}
+          <Text style={s.label}>{t('trainingDoc.sessionNextFocus')}{nextFocus && nextFocusDiscipline ? ` · ${nextFocusDiscipline}` : ''}</Text>
+          <TextInput style={s.textarea} value={nextFocus} onChangeText={text => { setNextFocus(text); setNextFocusDiscipline(hintDiscipline?.label ?? activeDisc); setNextFocusDisciplineKey(hintDiscipline ? scopeKey(hintDiscipline) : ''); }} editable={!saving && !remoteCompleted} multiline maxLength={500}
+            placeholder={t('trainingDoc.sessionNextFocus')} placeholderTextColor={C.placeholder} accessibilityLabel={t('trainingDoc.sessionNextFocus')} />
+          </>}
+          {(editing || workflowStep === 1) && <>
+          <TouchableOpacity onPress={() => setDetails(v => !v)} accessibilityRole="button" accessibilityState={{ expanded: details }} style={s.contextToggle}>
+            <Text style={s.actionText}>{t('trainingFlow.optionalDetails')}</Text>
+          </TouchableOpacity>
+          {details && <>
           {/* Trainingsnotiz */}
           <Text style={s.label}>{t('trainingDoc.sessionNotes')}</Text>
           <TextInput style={s.textarea} placeholder={t('training.descriptionPlaceholder')} placeholderTextColor={C.placeholder} value={description} onChangeText={setDescription} editable={!saving && !remoteCompleted} multiline />
@@ -694,10 +800,6 @@ function DocumentForm() {
               <Text style={s.chipTxt}>{t('trainingDoc.unknownDuration')}</Text>
             </TouchableOpacity>
           </>}
-          <TouchableOpacity onPress={() => setDetails(v => !v)} accessibilityRole="button" accessibilityState={{ expanded: details }} style={s.chip}>
-            <Text style={s.chipTxt}>{t('trainingDoc.details')}</Text>
-          </TouchableOpacity>
-          {details && <>
 
           {/* Gesamteindruck 1–10 — kompakte Segment-Leiste, Datenformat unverändert */}
           <Text style={[s.label, { marginTop: 22 }]}>{t('training.ratingLabel')}</Text>
@@ -737,21 +839,24 @@ function DocumentForm() {
           </View>
 
           </>}
+          </>}
           <View style={{ height: 24 }} />
         </ScrollView>
       </KeyboardAvoidingView>
 
       {/* Speichern — sticky/fixed CTA über dem Home Indicator */}
       <SafeAreaView edges={['bottom']} style={s.footer}>
-        {!canSave && (
+        {!canSave && (editing || workflowStep > 0) && (
           <Text style={s.saveHint}>
-            {!dogId ? t('training.chooseDogSaveHint') : t('trainingDoc.performedHint')}
+            {!dogId ? t('training.chooseDogSaveHint') : !editing && !selected.length ? t('trainingFlow.chooseExercise') : t('trainingDoc.performedHint')}
           </Text>
         )}
-        <AnimatedPressable style={[s.saveBtn, !canSave && { opacity: 0.4 }]} scale={0.97} disabled={!canSave || saving} onPress={speichern}>
+        <AnimatedPressable style={[s.saveBtn, (workflowStep === 0 && !editing ? !dogId : !canSave) && { opacity: 0.4 }]} scale={0.97}
+          disabled={saving || (workflowStep === 0 && !editing && !pendingSave && !remoteCompleted ? !dogId || !dogs.some(d => d.id === dogId) : !canSave)}
+          onPress={editing || workflowStep === 2 || pendingSave || remoteCompleted ? speichern : () => moveToStep(workflowStep + 1)}>
           <LinearGradient colors={['#00FFCC', '#00FFCC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
           <Ionicons name="checkmark-circle" size={22} color={C.accentText} />
-          <Text style={s.saveTxt}>{saving ? t('common.saving') : remoteCompleted ? t('common.retry') : editing ? t('training.saveChanges') : t('training.saveUnit')}</Text>
+          <Text style={s.saveTxt}>{saving ? t('common.saving') : remoteCompleted || pendingSave ? t('common.retry') : editing ? t('training.saveChanges') : t((['trainingFlow.start', 'trainingFlow.continue', 'training.saveUnit'] as const)[workflowStep])}</Text>
         </AnimatedPressable>
       </SafeAreaView>
 
@@ -773,6 +878,17 @@ const s = StyleSheet.create({
   eyebrow:{ fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 2, marginBottom: 2 },
   title:  { fontSize: 22, color: C.white, fontWeight: '900', letterSpacing: -0.4 },
 
+  steps: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 16 },
+  step: { flex: 1, borderTopWidth: 3, borderColor: C.border, paddingTop: 8 },
+  activeStep: { borderColor: C.accent },
+  stepText: { color: C.muted, fontSize: 12, flexShrink: 1 },
+  contextTitle: { color: C.white, fontSize: 16, fontWeight: '700' },
+  contextToggle: { minHeight: 44, paddingVertical: 12, justifyContent: 'center' },
+  actionText: { color: C.accent, fontSize: 15, fontWeight: '600' },
+  sectionTitle: { color: C.white, fontSize: 19, fontWeight: '700', marginTop: 22 },
+  fieldLabel: { color: C.white, fontSize: 15, marginBottom: 8 },
+  flowHelp: { color: C.subtle, fontSize: 15, lineHeight: 23, marginVertical: 12 },
+  focusEntry: { padding: 16, gap: 8, marginVertical: 10, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   scroll:  { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 4 },
 
@@ -794,7 +910,7 @@ const s = StyleSheet.create({
 
   selectedList: { gap: 10 },
 
-  textarea: { backgroundColor: C.input, borderRadius: 16, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 14, padding: 14, minHeight: 90, textAlignVertical: 'top' },
+  textarea: { backgroundColor: C.input, borderRadius: 16, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 16, padding: 14, minHeight: 100, textAlignVertical: 'top' },
 
   scoreCompact: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   scoreValue:   { fontSize: 15, color: C.white, fontWeight: '900', minWidth: 46 },
@@ -807,6 +923,6 @@ const s = StyleSheet.create({
 
   footer:  { paddingHorizontal: 20, paddingTop: 10, backgroundColor: C.bg, borderTopWidth: 1, borderTopColor: C.border },
   saveHint:{ fontSize: 12.5, color: C.muted, textAlign: 'center', marginBottom: 10, fontWeight: '600' },
-  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 56, borderRadius: 18, overflow: 'hidden', marginBottom: 10 },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 56, paddingVertical: 14, paddingHorizontal: 12, borderRadius: 18, overflow: 'hidden', marginBottom: 10 },
   saveTxt: { fontSize: 16, color: C.accentText, fontWeight: '900', letterSpacing: 0.3 },
 });

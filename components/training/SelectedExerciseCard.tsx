@@ -18,6 +18,7 @@ interface Props {
   // document.tsx: isCustomExercise) — keine eigene Spalte/Migration nötig,
   // gilt auch nach dem erneuten Laden eines gespeicherten Trainings.
   isCustom?:   boolean;
+  observationMode?: boolean;
   rating:      number | null;
   notes:       string | null;
   onRatingChange: (rating: number | null) => void;
@@ -33,7 +34,7 @@ interface Props {
 
 export function SelectedExerciseCard({
   name, accentColor, isCustom, rating, notes, onRatingChange, onNotesChange, onRemove,
-  performed = true, onPerformedChange, historical, historyChoices = [], nextFocus, onNextFocusChange,
+  performed = true, onPerformedChange, historical, historyChoices = [], nextFocus, onNextFocusChange, observationMode = false,
 }: Props) {
   const { t } = useT();
   const [details, setDetails] = useState(false);
@@ -66,13 +67,16 @@ export function SelectedExerciseCard({
         </TouchableOpacity>
       </View>
 
-      {onPerformedChange && <TouchableOpacity onPress={onPerformedChange} style={s.toggle}
+      {onPerformedChange && (!observationMode || !performed) && <TouchableOpacity onPress={onPerformedChange} style={s.toggle}
         accessibilityRole="checkbox" accessibilityLabel={`${name}: ${t(performed ? 'trainingDoc.performed' : 'trainingDoc.planned')}`} accessibilityState={{ checked: performed }}>
         <Ionicons name={performed ? 'checkbox' : 'square-outline'} size={22} color={accentColor} />
         <Text style={s.history}>{t(performed ? 'trainingDoc.performed' : 'trainingDoc.planned')}</Text>
       </TouchableOpacity>}
 
-      {historical && <View style={s.past}>
+      {observationMode && performed && <Text style={s.history}>{t('trainingFlow.trainedToday')}</Text>}
+      {observationMode && <><Text style={s.history}>{t('trainingDoc.exerciseObservation')}</Text><TextInput style={[s.note, s.observation]} value={notes ?? ''} onChangeText={onNotesChange} multiline maxLength={500}
+        placeholder={t('training.exerciseNotePlaceholder')} placeholderTextColor={C.placeholder} accessibilityLabel={`${name}: ${t('training.exerciseNotePlaceholder')}`} /></>}
+      {historical && (!observationMode || details) && <View style={s.past}>
         <Text style={s.history}>{t('trainingDoc.past', { date: historical.date })}</Text>
         <Text style={s.history}>{historical.rating != null ? `${historical.rating}/5` : '—'}</Text>
         {historical.notes?.trim() ? <Text style={s.history}>{t('trainingDoc.historyExerciseNote')}: {historical.notes}</Text> : null}
@@ -82,7 +86,7 @@ export function SelectedExerciseCard({
         </TouchableOpacity>
       </View>}
 
-      {performed && <View style={s.stars} accessibilityLabel={t('training.exerciseRatingA11y')}>
+      {performed && (!observationMode || details) && <View style={s.stars} accessibilityLabel={t('training.exerciseRatingA11y')}>
         {[1, 2, 3, 4, 5].map(n => (
           <TouchableOpacity key={n} onPress={() => setStar(n)} activeOpacity={0.7} style={s.starButton}
             accessibilityRole="button" accessibilityLabel={`${name}: ${t('training.exerciseRatingA11y')} ${n}/5`}
@@ -111,6 +115,7 @@ export function SelectedExerciseCard({
           <Text style={s.history}>{t('trainingDoc.more')}</Text>
         </TouchableOpacity>}
       </>}
+      {!observationMode && <>
       <Text style={s.history}>{t('trainingDoc.exerciseObservation')}</Text>
       <TextInput
         style={s.note}
@@ -121,6 +126,7 @@ export function SelectedExerciseCard({
         multiline
         accessibilityLabel={`${name}: ${t('training.exerciseNotePlaceholder')}`}
       />
+      </>}
       {onNextFocusChange && <>
         <Text style={s.history}>{t('trainingDoc.exerciseNextFocus')}</Text>
         <TextInput style={s.note} value={nextFocus ?? ''} onChangeText={onNextFocusChange} multiline maxLength={500}
@@ -132,6 +138,7 @@ export function SelectedExerciseCard({
 }
 
 const s = StyleSheet.create({
+  observation: { minHeight: 110, textAlignVertical: 'top' },
   toggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
   history: { color: C.muted, fontSize: 12, flexShrink: 1 },
   past: { minHeight: 44, padding: 10, backgroundColor: C.card, borderRadius: 10, gap: 5 },
@@ -142,10 +149,10 @@ const s = StyleSheet.create({
   customBadgeTxt: { fontSize: 10, color: C.accent, fontWeight: '800', letterSpacing: 0.3 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot:  { width: 7, height: 7, borderRadius: 3.5 },
-  name: { flex: 1, fontSize: 13.5, color: C.white, fontWeight: '700' },
-  stars:{ flexDirection: 'row', gap: 5 },
+  name: { flex: 1, fontSize: 16, color: C.white, fontWeight: '700' },
+  stars:{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   note: {
-    fontSize: 12.5, color: C.white, backgroundColor: C.input, borderRadius: 10,
+    fontSize: 16, color: C.white, backgroundColor: C.input, borderRadius: 10,
     borderWidth: 1, borderColor: C.border, paddingHorizontal: 10, paddingVertical: 7, minHeight: 44,
   },
 });

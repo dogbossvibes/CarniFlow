@@ -8,14 +8,14 @@ import { listExerciseIdentities, saveExerciseIdentity, type ExerciseIdentity } f
 const nameKey = (name: string) => name.trim().toLowerCase();
 type Props = {
   ownerId: string; disciplineKey: string; disciplineLabel: string; suggestions: string[];
-  selectedIds: string[]; selectedNames: string[]; disabled?: boolean;
+  selectedIds: string[]; selectedNames: string[]; disabled?: boolean; allowRename?: boolean;
   historyByIdentity?: Record<string, { date: string; notes: string | null }>;
   onSelect: (identity: ExerciseIdentity) => void; onCreate: (name: string) => void; onAddCustom: () => void;
 };
 
 // Names group presentation only. Choosing a stored variant always preserves its ID.
 export function ExerciseIdentityList({ ownerId, disciplineKey, disciplineLabel, suggestions, selectedIds, selectedNames,
-  disabled = false, historyByIdentity = {}, onSelect, onCreate, onAddCustom }: Props) {
+  disabled = false, allowRename = true, historyByIdentity = {}, onSelect, onCreate, onAddCustom }: Props) {
   const { t } = useT();
   const scope = `${ownerId}:${disciplineKey}`;
   const identity = useRef({ scope, generation: 0 });
@@ -99,7 +99,7 @@ export function ExerciseIdentityList({ ownerId, disciplineKey, disciplineLabel, 
             <Text style={s.text}>{group.name}</Text>
             {multiple && <Text style={s.text}>{t('trainingDoc.savedVariants', { count: group.rows.length })}</Text>}
           </TouchableOpacity>
-          {group.rows.length === 1 && <TouchableOpacity testID={`exercise-rename-${group.rows[0].id}`} style={s.button} disabled={blocked} accessibilityRole="button"
+          {allowRename && group.rows.length === 1 && <TouchableOpacity testID={`exercise-rename-${group.rows[0].id}`} style={s.button} disabled={blocked} accessibilityRole="button"
             accessibilityLabel={`${t('common.edit')}: ${group.name}`} onPress={() => rename(group.rows[0])}><Text style={s.text}>{t('common.edit')}</Text></TouchableOpacity>}
         </View>
         {multiple && openGroup === key && group.rows.map((row, index) => <View key={row.id} style={s.row}>
@@ -108,8 +108,8 @@ export function ExerciseIdentityList({ ownerId, disciplineKey, disciplineLabel, 
             accessibilityLabel={`${group.name}, ${t('trainingDoc.variant', { number: index + 1 })}${historyByIdentity[row.id] ? `, ${historyByIdentity[row.id].date}, ${historyByIdentity[row.id].notes ?? ''}` : ''}`}
             onPress={() => { if (!blocked) onSelect(row); }}><Text style={s.text}>{t('trainingDoc.variant', { number: index + 1 })}</Text>
             {historyByIdentity[row.id] && <Text style={s.text}>{historyByIdentity[row.id].date}{historyByIdentity[row.id].notes ? ` · ${historyByIdentity[row.id].notes}` : ''}</Text>}</TouchableOpacity>
-          <TouchableOpacity testID={`exercise-rename-${row.id}`} style={s.button} disabled={blocked} accessibilityRole="button"
-            accessibilityLabel={`${t('common.edit')}: ${group.name}, ${t('trainingDoc.variant', { number: index + 1 })}`} onPress={() => rename(row)}><Text style={s.text}>{t('common.edit')}</Text></TouchableOpacity>
+          {allowRename && <TouchableOpacity testID={`exercise-rename-${row.id}`} style={s.button} disabled={blocked} accessibilityRole="button"
+            accessibilityLabel={`${t('common.edit')}: ${group.name}, ${t('trainingDoc.variant', { number: index + 1 })}`} onPress={() => rename(row)}><Text style={s.text}>{t('common.edit')}</Text></TouchableOpacity>}
         </View>)}
       </View>;
     })}
