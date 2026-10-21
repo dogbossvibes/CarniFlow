@@ -710,10 +710,13 @@ function DocumentForm() {
             selectedIds={selected.filter(e => e.discipline === disc.label).map(e => e.exerciseKey ?? '')}
             selectedNames={selected.filter(e => e.discipline === disc.label).map(e => e.name)}
             allowRename={editing}
+            singleChoicePerName={!editing}
             disabled={saving || remoteCompleted}
             onCreate={name => { toggleExercise(disc.label, name); setPickerOpen(false); }}
             onAddCustom={() => { tapHaptic(); setCustomSheetOpen(true); }}
-            onSelect={identity => { setSelected(prev => prev.some(e => e.exerciseKey === identity.id) ? prev.filter(e => e.exerciseKey !== identity.id)
+            onSelect={identity => { setSelected(prev => !editing && prev.some(e => e.discipline === disc.label
+              && e.name.trim().toLowerCase() === identity.display_name.trim().toLowerCase()) ? prev
+              : prev.some(e => e.exerciseKey === identity.id) ? prev.filter(e => e.exerciseKey !== identity.id)
               : [...prev, { key: Crypto.randomUUID(), discipline: disc.label, disciplineKey: identity.discipline_key,
                 name: identity.display_name, exerciseKey: identity.id, rating: null, notes: null, performed: !editing }]); setPickerOpen(false); }} />}
 
