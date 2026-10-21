@@ -190,6 +190,8 @@ function DocumentForm() {
   const [saved, setSaved] = useState(false);
   const [otherDogDrafts, setOtherDogDrafts] = useState<NonNullable<DocumentDraft['otherDogs']>>({});
   const scrollRef = useRef<ScrollView>(null);
+  const dogSwitchLock = useRef(false);
+  useEffect(() => { dogSwitchLock.current = false; }, [dogId]);
   const moveToStep = useCallback((step: number) => { Keyboard.dismiss(); setWorkflowStep(step); setPickerOpen(step === 1 && !selected.length); scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [selected.length]);
 
   const [shared, setShared] = useState<boolean | null>(null);
@@ -441,10 +443,11 @@ function DocumentForm() {
     shared: profile?.share_trainings_default ?? false, atomic: true, workflowStep: 0,
   });
   const changeDog = (targetDog: string) => {
-    if (dogId === targetDog || editing || saving || pendingSave || remoteCompleted) return;
+    if (dogSwitchLock.current || dogId === targetDog || editing || saving || pendingSave || remoteCompleted) return;
+    dogSwitchLock.current = true;
     const snapshot = draftSnapshot();
     const { otherDogs: _otherDogs, ...currentDraft } = snapshot;
-    const next = otherDogDrafts[targetDog] ?? emptyDogDraft(targetDog);
+    const next = otherDogDrafts[targetDog] ?? (dogId ? emptyDogDraft(targetDog) : { ...currentDraft, dogId: targetDog });
     setOtherDogDrafts(previous => {
       const result = { ...previous };
       delete result[targetDog];

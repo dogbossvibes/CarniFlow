@@ -1057,3 +1057,30 @@ describe('DocumentScreen — approved three-step training flow', () => {
   });
 
 });
+
+
+it('preserves entry duration and note when choosing the first dog from an unassigned form', async () => {
+  mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Malu' }]; mockDogsLoading = false; mockCategories = [];
+  mockParams = { duration: '97', note: 'Timer entry note' };
+  mockCreateDocumentedUnit.mockReset().mockResolvedValue({ data: { id: 'unit-id' }, error: null });
+  const node = render(); await flush(); tap(node, 'Malu'); await flush(); await selectExercise(node);
+  await submitTraining(node);
+  expect(mockAtomicSave.mock.calls[0][2]).toEqual(expect.objectContaining({ dog_id: 'dog-2', duration_sec: 97, notes: 'Timer entry note' }));
+});
+
+it('guards consecutive context presses from one render without dropping another dog draft', async () => {
+  mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Malu' }, { id: 'dog-3', name: 'Quiron' }];
+  mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
+  const node = render(); await flush(); await selectExercise(node);
+  act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Yam draft'));
+  showContext(node); tap(node, 'Malu'); await flush(); await selectExercise(node);
+  act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Malu draft'));
+  showContext(node); tap(node, 'Yam'); await flush(); showContext(node);
+  const malu = pressableWithText(node, 'Malu'); const quiron = pressableWithText(node, 'Quiron');
+  act(() => { malu.props.onPress(); quiron.props.onPress(); }); await flush();
+  expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Malu draft');
+  showContext(node); tap(node, 'Yam'); await flush();
+  expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Yam draft');
+  showContext(node); tap(node, 'Malu'); await flush();
+  expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Malu draft');
+});
