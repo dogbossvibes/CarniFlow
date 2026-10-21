@@ -19,16 +19,19 @@ const focus = { id: 'focus-a', owner_id: 'owner-a', dog_id: 'dog-a', discipline_
   source_unit_snapshot_id: 'old-unit', source_date_snapshot: '2026-10-14', source_text_snapshot: 'original', text: 'Current target', status: 'open', revision: 1 } as ServerFocus;
 beforeEach(() => { jest.clearAllMocks(); mockList.mockResolvedValue({ data: identities, error: null }); });
 afterEach(() => { act(() => { node?.unmount(); }); node = undefined as unknown as ReactTestRenderer; });
-const registry = (owner = 'owner-a') => <ExerciseIdentityList ownerId={owner} disciplineKey="system:obedience" onSelect={mockSelect} />;
+const registry = (owner = 'owner-a') => <ExerciseIdentityList ownerId={owner} disciplineKey="system:obedience" disciplineLabel="Obedience" suggestions={[]} selectedIds={[]} selectedNames={[]} onCreate={jest.fn()} onAddCustom={jest.fn()} onSelect={mockSelect} />;
 const focusList = (owner = 'owner-a') => <ServerTrainingFocusList ownerId={owner} rows={owner === 'owner-a' ? [focus] : []} loading={false} error={false} limited={false} onRetry={mockRetry} onOpenSource={jest.fn()} />;
 
 test('identical labels select distinct stable identities, never a name join', async () => {
   await show(registry());
-  act(() => { buttons('Sit')[0].props.onPress(); buttons('Sit')[1].props.onPress(); });
+  act(() => buttons('Sit')[0].props.onPress());
+  const variants = root().findAllByType(TouchableOpacity).filter(b => String(b.props.testID).startsWith('exercise-variant-'));
+  act(() => { variants[0].props.onPress(); variants[1].props.onPress(); });
   expect(mockSelect.mock.calls.map(call => call[0].id)).toEqual(['one', 'two']);
 });
 test('rename targets one stable identity and retains unsaved input after network failure', async () => {
-  await show(registry()); act(() => buttons('trainingDoc.more')[0].props.onPress());
+  await show(registry()); act(() => buttons('Sit')[0].props.onPress());
+  act(() => buttons('common.edit')[0].props.onPress());
   const input = root().findAllByType(TextInput)[0]; act(() => input.props.onChangeText('Stay'));
   mockRename.mockResolvedValue({ data: null, error: { message: 'offline' } });
   await act(async () => { await buttons('common.save')[0].props.onPress(); });

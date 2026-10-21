@@ -5,6 +5,9 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "trainingDoc.savedVariants": "{count} gspeichereti Variante",
+  "trainingDoc.variant": "Variante {number}",
+  "trainingDoc.renameError": "Umbenenne fehlgschlage. Bitte nomal versueche.",
   "help.firstStepsTitle": "Ersti Schritt",
   "help.firstStepsShort": "ANYVO ohni Probedate kenne lerne: Hund aalege, Training dokumentiere und die erscht Fährte vorbereite.",
   "help.firstStepsBody1": "Meld di mit dim Konto aa und leg under Hunde din Hund aa. Prüef im Profil d Aameldig und d Kontoiistellige.",
