@@ -2,6 +2,9 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "trainingDoc.savedVariants": "{count} varianti salvate",
+  "trainingDoc.variant": "Variante {number}",
+  "trainingDoc.renameError": "Impossibile rinominare. Riprova.",
   "help.firstStepsTitle": "Primi passi",
   "help.firstStepsShort": "Scopri ANYVO senza dati di prova: aggiungi un cane, documenta un allenamento e prepara la prima pista.",
   "help.firstStepsBody1": "Accedi al tuo account e aggiungi il cane in Cani. Controlla metodo di accesso e impostazioni del conto nel profilo.",

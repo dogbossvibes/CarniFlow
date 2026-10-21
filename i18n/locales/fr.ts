@@ -6,6 +6,9 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "trainingDoc.savedVariants": "{count} variantes enregistrées",
+  "trainingDoc.variant": "Variante {number}",
+  "trainingDoc.renameError": "Le changement de nom a échoué. Réessaie.",
   "help.firstStepsTitle": "Premiers pas",
   "help.firstStepsShort": "Découvre ANYVO sans données d’essai : ajoute un chien, documente un entraînement et prépare ta première piste.",
   "help.firstStepsBody1": "Connecte-toi à ton compte et ajoute ton chien dans Chiens. Vérifie le mode de connexion et les réglages du compte dans ton profil.",
