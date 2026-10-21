@@ -1,0 +1,6 @@
+<resources>
+  <!-- Matches the current tracking design tokens C.trackPrimary and C.accentText. -->
+  <color name="anyvo_control_primary">#15E6C3</color>
+  <color name="anyvo_on_primary">#060606</color>
+  <color name="anyvo_background">#09090F</color>
+</resources>

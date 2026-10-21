@@ -1,0 +1,29 @@
+<resources>
+  <string name="app_name">ANYVO</string>
+  <string name="connect_phone">Handy verbinden</string>
+  <string name="prepare_phone">Am Handy vorbereiten</string>
+  <string name="open_phone">ANYVO am Handy öffnen.</string>
+  <string name="expired">Status abgelaufen. Bitte aktualisieren.</string>
+  <string name="confirm_end">Phase am Handy beenden?</string>
+  <string name="end_yes">Ja, beenden</string>
+  <string name="cancel">Abbrechen</string>
+  <string name="wait_phone">Warte auf Handy …</string>
+  <string name="refresh">Aktualisieren</string>
+  <string name="start_lay">Legen starten</string>
+  <string name="start_search">Suche starten</string>
+  <string name="mark_object">Gegenstand markieren</string>
+  <string name="pause">Pause</string>
+  <string name="resume">Fortsetzen</string>
+  <string name="end_phase">Phase beenden</string>
+  <string name="lay_prepared">Legen vorbereitet</string>
+  <string name="search_prepared">Suche vorbereitet</string>
+  <string name="lay_recording">Legen läuft</string>
+  <string name="search_recording">Suche läuft</string>
+  <string name="paused">Pausiert</string>
+  <string name="finishing">Wird beendet …</string>
+  <string name="finished">Phase beendet</string>
+  <string name="accepted">Am Handy ausgeführt</string>
+  <string name="unconfirmed">Nicht bestätigt. Status am Handy prüfen.</string>
+  <string name="busy">Handy beschäftigt. Status aktualisieren.</string>
+  <string name="rejected">Nicht ausgeführt. Status aktualisieren.</string>
+</resources>

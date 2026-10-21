@@ -1,0 +1,29 @@
+<resources>
+  <string name="app_name">ANYVO</string>
+  <string name="connect_phone">Connecter le téléphone</string>
+  <string name="prepare_phone">Préparer sur le téléphone</string>
+  <string name="open_phone">Ouvrez ANYVO sur le téléphone.</string>
+  <string name="expired">État expiré. Actualisez.</string>
+  <string name="confirm_end">Terminer cette phase sur le téléphone ?</string>
+  <string name="end_yes">Oui, terminer</string>
+  <string name="cancel">Annuler</string>
+  <string name="wait_phone">En attente du téléphone …</string>
+  <string name="refresh">Actualiser</string>
+  <string name="start_lay">Commencer la pose</string>
+  <string name="start_search">Commencer la recherche</string>
+  <string name="mark_object">Marquer un objet</string>
+  <string name="pause">Pause</string>
+  <string name="resume">Reprendre</string>
+  <string name="end_phase">Terminer la phase</string>
+  <string name="lay_prepared">Pose préparée</string>
+  <string name="search_prepared">Recherche préparée</string>
+  <string name="lay_recording">Pose en cours</string>
+  <string name="search_recording">Recherche en cours</string>
+  <string name="paused">En pause</string>
+  <string name="finishing">Fin en cours …</string>
+  <string name="finished">Phase terminée</string>
+  <string name="accepted">Exécuté sur le téléphone</string>
+  <string name="unconfirmed">Non confirmé. Vérifiez le téléphone.</string>
+  <string name="busy">Téléphone occupé. Actualisez.</string>
+  <string name="rejected">Non exécuté. Actualisez.</string>
+</resources>

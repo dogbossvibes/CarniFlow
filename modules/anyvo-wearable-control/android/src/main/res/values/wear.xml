@@ -1,0 +1,5 @@
+<resources>
+  <string-array name="android_wear_capabilities">
+    <item>anyvo_phone_control_v1</item>
+  </string-array>
+</resources>

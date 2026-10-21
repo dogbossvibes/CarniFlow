@@ -1,0 +1,30 @@
+<resources>
+  <string name="app_name">ANYVO</string>
+  <string name="connect_phone">Connect phone</string>
+  <string name="prepare_phone">Prepare on phone</string>
+  <string name="open_phone">Open ANYVO on your phone.</string>
+  <string name="expired">Status expired. Please refresh.</string>
+  <string name="confirm_end">End this phase on your phone?</string>
+  <string name="end_yes">Yes, end phase</string>
+  <string name="cancel">Cancel</string>
+  <string name="wait_phone">Waiting for phone …</string>
+  <string name="refresh">Refresh</string>
+  <string name="start_lay">Start laying</string>
+  <string name="start_search">Start search</string>
+  <string name="mark_object">Mark object</string>
+  <string name="pause">Pause</string>
+  <string name="resume">Resume</string>
+  <string name="end_phase">End phase</string>
+  <string name="lay_prepared">Laying prepared</string>
+  <string name="search_prepared">Search prepared</string>
+  <string name="lay_recording">Laying in progress</string>
+  <string name="search_recording">Search in progress</string>
+  <string name="paused">Paused</string>
+  <string name="finishing">Finishing …</string>
+  <string name="finished">Phase ended</string>
+  <string name="accepted">Performed on phone</string>
+  <string name="unconfirmed">Unconfirmed. Check your phone.</string>
+  <string name="busy">Phone busy. Refresh status.</string>
+  <string name="rejected">Not performed. Refresh status.</string>
+  <string-array name="android_wear_capabilities"><item>anyvo_watch_control_v1</item></string-array>
+</resources>

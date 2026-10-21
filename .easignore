@@ -64,6 +64,12 @@ fahertescreen.PNG
 # Lokale Native-Modul-Build-Artefakte (Gradle)
 modules/*/android/build/
 
+# Independent Wear target: sources belong in the archive, local Gradle outputs do not.
+/wear/android/.gradle/
+/wear/android/.kotlin/
+/wear/android/**/build/
+/wear/android/local.properties
+
 # Local release/build artifacts
 /ANYVO-current-repository.zip
 *.zip
