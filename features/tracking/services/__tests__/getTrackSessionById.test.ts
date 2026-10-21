@@ -3,8 +3,10 @@
 // direkt nach .eq() awaited werden) und bietet order()/maybeSingle()/single().
 type Resp = { data: unknown; error: unknown };
 const mockResp: Record<string, Resp> = {};
+const mockTables: string[] = [];
 const mockOrders: { table: string; column: string }[] = [];
 function mockBuilder(table: string) {
+  mockTables.push(table);
   const r = (): Resp => mockResp[table] ?? { data: null, error: null };
   const b: Record<string, unknown> = {};
   b.select = () => b;
@@ -18,11 +20,11 @@ function mockBuilder(table: string) {
 }
 jest.mock('@/lib/supabase', () => ({ supabase: { from: (t: string) => mockBuilder(t) } }));
 
-import { getTrackSessionById } from '@/features/tracking/services/trackService';
+import { getTrackSessionById, getTrackCompletionById } from '@/features/tracking/services/trackService';
 
 function setResponses(map: Record<string, Resp>) {
   for (const k of Object.keys(mockResp)) delete mockResp[k];
-  mockOrders.length = 0;
+  mockOrders.length = 0; mockTables.length = 0;
   Object.assign(mockResp, map);
 }
 
@@ -90,5 +92,59 @@ describe('getTrackSessionById — local-first tolerant (T-59)', () => {
     expect(res.data).toBeNull();
     expect(res.error).toBeNull();
     expect(errSpy).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('critical detail children cannot silently become empty recordings', () => {
+  it.each(['track_points', 'track_markers', 'track_runs'])('%s failure returns an error for the local detail fallback', async table => {
+    setResponses({
+      training_sessions: { data: { id: 'own-track', owner_id: 'owner' }, error: null },
+      track_points: { data: [{ id: 'p' }], error: null },
+      track_markers: { data: [{ id: 'm' }], error: null },
+      track_runs: { data: [{ id: 'r' }], error: null },
+      [table]: { data: null, error: { code: '57014', message: 'statement timeout' } },
+    });
+    const result = await getTrackSessionById('own-track');
+    expect(result).toEqual({ data: null, error: 'statement timeout' });
+    expect(errSpy).toHaveBeenCalledTimes(1);
+  });
+  it('optional legacy engine data can still be unavailable without hiding a complete track', async () => {
+    setResponses({
+      training_sessions: { data: { id: 'own-track' }, error: null },
+      track_points: { data: [{ id: 'p' }], error: null },
+      track_markers: { data: [], error: null }, track_runs: { data: [], error: null },
+      track_engine_sessions: { data: null, error: { message: 'legacy table unavailable' } },
+    });
+    const result = await getTrackSessionById('own-track');
+    expect(result.error).toBeNull(); expect(result.data.points).toHaveLength(1);
+    expect(result.data.engine).toBeNull(); expect(errSpy).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('completion reads remain independent from GPS and markers', () => {
+  it.each(['track_points', 'track_markers'])('a completed run remains visible despite %s being unavailable', async table => {
+    setResponses({ training_sessions: { data: { id: 's', owner_id: 'u', dog_id: 'd' }, error: null },
+      track_runs: { data: [{ ended_at: '2026-10-21' }], error: null },
+      [table]: { data: null, error: { message: 'statement timeout' } },
+    });
+    const result = await getTrackCompletionById('s');
+    expect(result.error).toBeNull(); expect(result.data?.runs[0].ended_at).toBe('2026-10-21');
+    expect(mockTables).toEqual(['training_sessions', 'track_runs']);
+  });
+  it('run read failure remains unknown rather than verified no final run', async () => {
+    setResponses({ training_sessions: { data: { id: 's' }, error: null },
+      track_runs: { data: null, error: { message: 'offline' } } });
+    expect(await getTrackCompletionById('s')).toEqual({ data: null, error: 'offline' });
+  });
+  it('verified missing remote session remains distinct from a query error', async () => {
+    setResponses({ training_sessions: { data: null, error: null } });
+    expect(await getTrackCompletionById('s')).toEqual({ data: null, error: null });
+  });
+  it('a known open run remains available for local recovery', async () => {
+    setResponses({ training_sessions: { data: { id: 's', owner_id: 'u', dog_id: 'd' }, error: null },
+      track_runs: { data: [{ ended_at: null }], error: null } });
+    expect((await getTrackCompletionById('s')).data?.runs).toEqual([{ ended_at: null }]);
   });
 });

@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { DogTrackingPanel } from '../DogTrackingPanel';
 import { TrackResumeCta } from '../TrackResumeCta';
+import { ActiveFaehrteCard } from '../ActiveFaehrteCard';
 import { TrackColorPicker } from '@/components/dogs/TrackColorPicker';
 
 const mockGetTracks = jest.fn(), mockRemote = jest.fn(), mockUpdate = jest.fn(), mockRefresh = jest.fn(), mockPush = jest.fn();
@@ -14,7 +15,7 @@ jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k, locale: 'de-CH'
 jest.mock('@/features/tracking/hooks/useDogTrackColor', () => ({ useDogTrackColor: () => ({ dog: mockDog, color: '#A78BFA', colorKey: 'violet', storedKey: 'violet', loading: false, refresh: mockRefresh }) }));
 jest.mock('@/features/tracking/hooks/useActiveFaehrte', () => ({ useDogActiveFaehrte: () => mockActive }));
 jest.mock('@/features/tracking/services/dogTrackRecoveryService', () => ({ getDogRecoveryTracks: (...a: unknown[]) => mockGetTracks(...a) }));
-jest.mock('@/features/tracking/services/trackService', () => ({ getTrackSessionById: (...a: unknown[]) => mockRemote(...a) }));
+jest.mock('@/features/tracking/services/trackService', () => ({ getTrackCompletionById: (...a: unknown[]) => mockRemote(...a) }));
 jest.mock('@/services/dogs', () => ({ updateDog: (...a: unknown[]) => mockUpdate(...a) }));
 jest.mock('../TrackResumeCta', () => ({ TrackResumeCta: () => null }));
 jest.mock('../ActiveFaehrteCard', () => ({ ActiveFaehrteCard: () => null }));
@@ -35,9 +36,10 @@ it('blocks recovery for a remotely completed search', async () => {
   mockRemote.mockResolvedValue({ data: { id: 's', dog_id: 'd', owner_id: 'u', runs: [{ ended_at: '2026-10-08' }] } });
   await mount(); expect(view.root.findAllByType(TrackResumeCta)).toHaveLength(0);
 });
-it('retains offline recovery when the server is unavailable', async () => {
+it('keeps an unknown historical completion offline as retry, never as a verified open track', async () => {
   mockRemote.mockRejectedValue(new Error('offline')); await mount();
-  expect(view.root.findByType(TrackResumeCta).props.sessionId).toBe('s');
+  expect(view.root.findAllByType(TrackResumeCta)).toHaveLength(0);
+  expect(view.root.findAll((n: any) => n.props.testID === 'dog-recovery-retry-completion').length).toBeGreaterThan(0);
 });
 const openColors = () => { const btn = view.root.findAll((n: any) => n.props.testID === 'dog-track-color-toggle')[0]; act(() => btn.props.onPress()); };
 it('saves only the color field and refreshes the confirmed server value', async () => {
@@ -78,4 +80,36 @@ it('a late color save cannot refresh the previous account/dog context', async ()
   await act(async () => { finish({ error: null }); await promise; });
   expect(mockUpdate).toHaveBeenCalledWith('d', { track_overlay_color_key: '#ABCDEF' });
   expect(mockRefresh).not.toHaveBeenCalled(); expect(Alert.alert).not.toHaveBeenCalled();
+});
+
+it('does not expose recovery after a failed run read and retries the same scoped track', async () => {
+  mockRemote.mockResolvedValueOnce({ data: null, error: 'run timeout' })
+    .mockResolvedValueOnce({ data: { id: 's', dog_id: 'd', owner_id: 'u', runs: [] }, error: null });
+  await mount(); expect(view.root.findAllByType(TrackResumeCta)).toHaveLength(0);
+  await act(async () => { view.root.findAll((n: any) => n.props.testID === 'dog-recovery-retry-completion')[0].props.onPress(); });
+  expect(view.root.findByType(TrackResumeCta).props.sessionId).toBe('s');
+  expect(mockRemote.mock.calls).toEqual([['s'], ['s']]);
+});
+it('does not trust another account or dog completion result', async () => {
+  mockRemote.mockResolvedValue({ data: { id: 's', dog_id: 'd', owner_id: 'other', runs: [] } });
+  await mount(); expect(view.root.findAllByType(TrackResumeCta)).toHaveLength(0);
+});
+
+it('retains the active local track card offline while historical completion needs retry', async () => {
+  mockActive = { sessionId: 'active-local', status: 'resting' };
+  mockRemote.mockRejectedValue(new Error('offline')); await mount();
+  expect(view.root.findAllByType(ActiveFaehrteCard)).toHaveLength(1);
+  expect(view.root.findAllByType(TrackResumeCta)).toHaveLength(0);
+});
+
+it('ignores late completion from the previous account and dog', async () => {
+ let finish!: (value: unknown) => void;
+ mockGetTracks.mockImplementation(async (user: string) => [{ id: user === 'u' ? 's' : 'new', date: 'today' }]);
+ mockRemote.mockImplementation((id: string) => id === 's' ? new Promise(resolve => { finish = resolve; })
+   : Promise.resolve({ data: { id:'new', owner_id:'other', dog_id:'other-dog', runs:[{ended_at:'done'}] }, error:null }));
+ await mount();mockDog={id:'other-dog',owner_id:'other',track_overlay_color_key:'violet'};
+ await act(async () => { view.update(<DogTrackingPanel userId="other" dogId="other-dog" dogName="Other" />); });
+ await act(async () => { finish({data:{id:'s',owner_id:'u',dog_id:'d',runs:[]},error:null}); });
+ expect(view.root.findAllByType(TrackResumeCta)).toHaveLength(0);
+ expect(mockRemote.mock.calls.map(([id])=>id)).toContain('new');
 });

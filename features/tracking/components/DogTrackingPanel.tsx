@@ -10,8 +10,7 @@ import { TrackColorPicker } from '@/components/dogs/TrackColorPicker';
 import { trackOverlayColorNameKey, type TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
 import { updateDog } from '@/services/dogs';
 import { getDogRecoveryTracks, type DogRecoveryTrack } from '@/features/tracking/services/dogTrackRecoveryService';
-import { getTrackSessionById } from '@/features/tracking/services/trackService';
-import { hasFinalSearchRun } from '@/features/tracking/store/trackRecovery';
+import { useTrackCompletion } from '@/features/tracking/hooks/useTrackCompletion';
 import { TrackResumeCta } from './TrackResumeCta';
 import { ActiveFaehrteCard } from './ActiveFaehrteCard';
 import { reopenTarget } from '@/features/tracking/store/activeFaehrtenModel';
@@ -33,17 +32,15 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
   const [tracks, setTracks] = useState<DogRecoveryTrack[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [remoteResult, setRemoteResult] = useState<{ id: string; scope: string; final: boolean } | null>(null);
   const [failed, setFailed] = useState(false);
   const [revision, setRevision] = useState(0);
-  const generation = useRef(0);
   const scope = `${userId}:${dogId}:${revision}`;
   const [loadedScope, setLoadedScope] = useState('');
-  const remoteFinal = remoteResult?.id === selected && remoteResult?.scope === scope ? remoteResult.final : null;
+  const completion = useTrackCompletion({ sessionId: loadedScope === scope ? selected : null, dogId, userId, revision });
   const supported = !!dog && Object.prototype.hasOwnProperty.call(dog, 'track_overlay_color_key');
   useFocusEffect(useCallback(() => {
     let alive = true;
-    setLoading(true); setFailed(false); setTracks([]); setSelected(null); setRemoteResult(null);
+    setLoading(true); setFailed(false); setTracks([]); setSelected(null);
     if (!userId) { setLoading(false); return; }
     getDogRecoveryTracks(userId, dogId).then(rows => {
       if (!alive) return;
@@ -51,17 +48,6 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
     }).catch(() => { if (alive) setFailed(true); }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [userId, dogId, scope]));
-  useFocusEffect(useCallback(() => {
-    const token = ++generation.current;
-    setRemoteResult(null);
-    if (!selected || loadedScope !== scope) return;
-    getTrackSessionById(selected).then(({ data }) => {
-      if (token !== generation.current) return;
-      const own = data?.id === selected && data?.dog_id === dogId && data?.owner_id === userId;
-      setRemoteResult({ id: selected, scope, final: own ? hasFinalSearchRun(data) : false });
-    }).catch(() => { if (token === generation.current) setRemoteResult({ id: selected, scope, final: false }); });
-    return () => { generation.current++; };
-  }, [selected, loadedScope, scope, dogId, userId]));
   const saveColor = async (next: TrackOverlayColorValue | null) => {
     if (!supported || dog?.id !== dogId || dog.owner_id !== userId || savingRef.current) return false;
     const startedScope = colorScope.current;
@@ -102,7 +88,10 @@ export function DogTrackingPanel({ userId, dogId, dogName, lastTrackId }: { user
           <Text style={s.text}>{dateLabel(track.date)} · {t(track.cancelled ? 'track.profile.cancelled' : 'track.profile.open')}</Text>
           {selected === track.id && <Ionicons name="checkmark" size={18} color={color} />}
         </TouchableOpacity>)}
-        {selected && (remoteFinal == null ? <ActivityIndicator color={color} /> : remoteFinal ? <Text style={s.hint}>{t('track.profile.finished')}</Text> : <TrackResumeCta key={`${scope}:${selected}:${revision}`} sessionId={selected} dogId={dogId} userId={userId} hasRemoteSearchRun={remoteFinal} showUnavailable />)}
+        {selected && (completion.status === 'loading' ? <ActivityIndicator color={color} />
+          : completion.status === 'unknown' ? <TouchableOpacity testID="dog-recovery-retry-completion" onPress={completion.retry} accessibilityRole="button" style={s.link}><Text style={s.hint}>{t('track.profile.retry')}</Text></TouchableOpacity>
+          : completion.status === 'final' ? <Text style={s.hint}>{t('track.profile.finished')}</Text>
+          : <TrackResumeCta key={`${scope}:${selected}:${revision}`} sessionId={selected} dogId={dogId} userId={userId} hasRemoteSearchRun={false} showUnavailable />)}
         {selected && <TouchableOpacity style={s.link} onPress={() => router.push(`/track/${selected}` as never)} accessibilityRole="button"><Text style={s.linkText}>{t('track.profile.details')}</Text><Ionicons name="chevron-forward" size={16} color={C.trackPrimary} /></TouchableOpacity>}
       </>}
       {!loading && loadedScope === scope && tracks.length === 0 && <Text style={s.hint}>{t('track.profile.noOpen')}</Text>}

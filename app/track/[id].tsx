@@ -15,6 +15,7 @@ import { useTrackObjectReview } from '@/features/tracking/hooks/useTrackObjectRe
 import { reviewCounts } from '@/features/tracking/services/objectReview/model';
 import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
+import { useTrackCompletion } from '@/features/tracking/hooks/useTrackCompletion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
@@ -101,6 +102,8 @@ export default function TrackAuswertungScreen() {
   }); return () => auth.subscription.unsubscribe(); }, []);
   const [data, setData] = useState<any | null>(null);
   const { color: layColor } = useDogTrackColor(data?.dog_id);
+  const completion = useTrackCompletion({ sessionId: data?.id === id ? String(id) : null,
+    dogId: data?.dog_id, userId: authenticatedSession?.user.id, revision: authEpoch });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -165,6 +168,7 @@ export default function TrackAuswertungScreen() {
         if (picked.length > 0) d = { ...d, markers: picked };
       }
       if (!alive || loadEpoch !== authGeneration.current) return;
+      if (localOnly && d && (!userId || d.owner_id !== userId || d.id !== id)) d = null;
       if (d?.track_data && Object.hasOwn(d.track_data, 'trackTransferReceipt')) {
         try {
           const receipt = parseTransferReceipt(d.track_data.trackTransferReceipt);
@@ -244,8 +248,12 @@ export default function TrackAuswertungScreen() {
   const analysisState = availability.state;
   // Recovery nur ohne TATSÄCHLICH finalen Suchlauf (hasFinalSearchRun) — ein unvollständiger
   // Run (remote track_runs ohne ended_at) blockiert nicht. Die Eindeutigkeit prüft TrackResumeCta.
-  const canOfferResume = !hasFinalSearchRun(data);
+  const ownRecoveryScope = !!authenticatedSession?.user.id && data?.id === id
+    && data?.owner_id === authenticatedSession.user.id;
+  const canOfferResume = ownRecoveryScope && !hasFinalSearchRun(data)
+    && (completion.status === 'open' || completion.status === 'absent');
   const [recoveryCardVisible, setRecoveryCardVisible] = useState(false);
+  useEffect(() => { if (!canOfferResume) setRecoveryCardVisible(false); }, [canOfferResume]);
   const qaDiagnostics = isQaDiagnosticsEnabled();
   const isReplayEligible = useMemo(() => isTrackReplayEligible(data), [data]);
   const [analyseExpanded, setAnalyseExpanded] = useState(false);
@@ -351,7 +359,7 @@ export default function TrackAuswertungScreen() {
   };
 
   if (loading) return <View style={s.center}><ActivityIndicator color={C.trackPrimary} size="large" /></View>;
-  if (!data)   return <View style={s.center}><Text style={s.muted}>Fährte nicht gefunden.</Text></View>;
+  if (!data || (isLocalOnly && (data.id !== id || data.owner_id !== authenticatedSession?.user.id))) return <View style={s.center}><Text style={s.muted}>Fährte nicht gefunden.</Text></View>;
 
   const dogName = data.dog?.name ?? 'Fährte';
   const surface = data.surface_types?.[0] ?? 'Fährte';
@@ -395,7 +403,12 @@ export default function TrackAuswertungScreen() {
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Recovery-Karte direkt unter dem Header: offene Fährte fortsetzen oder „Ohne App
               abgeschlossen". Ohne Karte zeigt der QA-Diagnosemodus den konkreten Grund. */}
-          <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />
+          {canOfferResume && <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={false} onVisibleChange={setRecoveryCardVisible} />}
+          {ownRecoveryScope && !hasFinalSearchRun(data) && completion.status === 'unknown' && (
+            <Pressable testID="track-detail-retry-completion" accessibilityRole="button" onPress={completion.retry} style={s.card}>
+              <Text style={s.muted}>{t('track.profile.retry')}</Text>
+            </Pressable>
+          )}
 
           {/* Hero — links Ring (nur Zahl + /100), Beschriftung „Manuelle
               Bewertung" UNTER dem Ring (ausserhalb der Kreisgrafik), rechts die
