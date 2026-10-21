@@ -414,6 +414,7 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
     }
     for (const sm of m.samples) {
       if (!Number.isFinite(sm.dtMs) || Math.abs(sm.dtMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
+      if ('stepInterval' in sm) throw new Error('QA-Export enthält unerlaubte absolute Schritt-Quellintervalle.');
       for (const value of Object.values(sm.diagnostics ?? {})) {
         if (value != null && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) >= 1e8))
           throw new Error('QA-Export enthält ungültige native Motion-Diagnosedaten.');

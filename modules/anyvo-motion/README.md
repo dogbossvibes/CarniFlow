@@ -179,3 +179,28 @@ Aus diesen Intervallen lassen sich einzelne Schritte nicht zeitgenau auf eine
 Winkelspitze verteilen. Die vorliegenden Yam-Aufnahmen belegen nicht, wie oft
 der korrigierte Verlustpfad tatsächlich auftrat oder ob er fehlende Winkel
 verursachte. Dafür bleiben ein passender nativer Prüfbuild und Feldbelege nötig.
+
+### v3-Verbraucher: Quellintervalle statt Übergabezeit
+
+Die native Lieferkorrektur allein ist kein auslieferbarer Gesamtvertrag.
+Der unabhängige Review von `422f321` hat nachgewiesen, dass früher gegangene
+Schritte sonst bei einer späteren Standdrehung als neue Bewegung zählen können.
+Die Clientkorrektur bewahrt deshalb das v3-Schrittintervall unabhängig von QA
+im flüchtigen RAM bis zum fachlichen Verbraucher:
+
+- Turn-Evidenz zählt eine Charge nur, wenn ihr vollständiges bekanntes Intervall
+  im jeweiligen Kandidatenfenster liegt. Teilüberschneidung wird nicht geschätzt.
+- Startbestätigung zählt nur vollständig nach dem Aufnahmestart liegende Schritte.
+- Die Absuche trennt Start/Resume und bewertet das Intervall bei jedem GPS-Fix
+  erneut gegen den bestehenden 2-s-Frischehorizont von Messung und Empfang.
+  Unbekannte Schritte sind dort `null`, nicht ein künstlich gemessener Nullwert.
+- Fehlende oder ungültige v3-Provenienz liefert keine Schrittunterstützung.
+  Legacy/v2 bleibt beim bisherigen Verhalten. Beschleunigungssignatur,
+  GPS-/Fusion-Schwellen und Gewichte bleiben erhalten.
+
+`motionStepEvidence.ts` enthält die gemeinsame Intervallprüfung; die beiden
+nativen Adapter erhalten die Quelle für Lay und Search. Absolute RAM-Intervalle
+werden weder in QA noch in Fährten-/Suchdaten gespeichert. QA bewahrt nur die
+gesonderte relative Allowlist; der Exportguard weist absolute Schrittintervalle
+zusätzlich ausdrücklich zurück. Build-Kandidat und JS-Verbraucher müssen
+zusammen geprüft werden. `422f321` allein bleibt die belegte RED-Basis.

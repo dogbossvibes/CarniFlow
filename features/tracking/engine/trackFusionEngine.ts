@@ -18,6 +18,8 @@
 // Core Location gelieferten Fixes.
 // ──────────────────────────────────────────────────────────────────────────
 
+import { stepIntervalWithin, type MotionStepInterval } from '../utils/motionStepEvidence';
+
 export type TrackPointClassification =
   | 'accepted'
   | 'smoothed'
@@ -53,7 +55,7 @@ export interface MotionInput {
  * Eight default 250 ms aggregates tolerate delivery jitter without retaining
  * stationary evidence across a sensor outage. This is not a GPS admission gate. */
 export const MOTION_FIX_MAX_AGE_MS = 2000;
-export type TimedMotionInput = MotionInput & { timestamp: number };
+export type TimedMotionInput = MotionInput & { timestamp: number; stepInterval?: MotionStepInterval | null };
 
 export function motionForFix(
   sample: TimedMotionInput | null, fixTimeMs: number, nowMs: number,
@@ -63,6 +65,9 @@ export function motionForFix(
     || !Number.isFinite(nowMs) || Math.floor(sample.timestamp) > nowMs
     || nowMs - sample.timestamp > MOTION_FIX_MAX_AGE_MS
     || Math.abs(fixTimeMs - sample.timestamp) > MOTION_FIX_MAX_AGE_MS) return null;
+  if (sample.stepInterval !== undefined && !stepIntervalWithin(sample.stepInterval,
+    Math.max(fixTimeMs - MOTION_FIX_MAX_AGE_MS, nowMs - MOTION_FIX_MAX_AGE_MS),
+    Math.min(fixTimeMs, nowMs), sample.timestamp)) return { ...sample, stepDelta: null };
   return sample;
 }
 

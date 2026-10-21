@@ -7,6 +7,7 @@
 
 import type { MovementState } from '@/modules/anyvo-motion';
 import type { MotionWindowDiagnostics } from './motionSampleDiagnostics';
+import { stepsForWindow, type MotionStepInterval } from './motionStepEvidence';
 
 const DEG = 180 / Math.PI;
 
@@ -34,6 +35,8 @@ export interface MotionWindowSample {
   movementState: MovementState;
   /** Read-only sensor provenance. Never used to change turn evidence or gates. */
   diagnostics?: MotionWindowDiagnostics;
+  /** Native v3 coverage in RAM; absent for legacy, null when unknown. */
+  stepInterval?: MotionStepInterval | null;
 }
 
 export interface TurnEvidenceParams {
@@ -252,7 +255,7 @@ export function computeTurnEvidence(
     totalRotDeg += s.rotationMagnitude * DEG * d;
     peakYawRate = Math.max(peakYawRate, Math.abs(s.headingDelta) / d);
     peakRotRate = Math.max(peakRotRate, s.rotationMagnitude);
-    steps += s.stepDelta;
+    steps += stepsForWindow(s, candidateTimeMs - params.halfWindowSec * 1000, candidateTimeMs + params.halfWindowSec * 1000);
     if (s.accelerationMagnitude >= params.gaitAccelThresholdG) gaitAccelSamples++;
     stateCount.set(s.movementState, (stateCount.get(s.movementState) ?? 0) + 1);
   }
@@ -420,7 +423,9 @@ export class MotionEvidenceBuffer {
     // its yaw and steps twice. Late samples also break rate/retention order.
     const last = this.samples[this.samples.length - 1];
     if (!Number.isFinite(s.t) || (last != null && s.t <= last.t)) return;
-    this.samples.push({ ...s, ...(s.diagnostics ? { diagnostics: { ...s.diagnostics } } : {}) });
+    this.samples.push({ ...s, ...(s.diagnostics ? { diagnostics: { ...s.diagnostics } } : {}),
+      ...(s.stepInterval ? { stepInterval: { ...s.stepInterval } } : {}),
+    });
     const cutoff = s.t - this.retentionSec * 1000;
     while (this.samples.length && this.samples[0].t < cutoff) this.samples.shift();
   }
@@ -436,7 +441,9 @@ export class MotionEvidenceBuffer {
    */
   samplesIn(fromMs: number, toMs: number): MotionWindowSample[] {
     return this.samples.filter(s => s.t >= fromMs && s.t <= toMs)
-      .map(s => ({ ...s, ...(s.diagnostics ? { diagnostics: { ...s.diagnostics } } : {}) }));
+      .map(s => ({ ...s, ...(s.diagnostics ? { diagnostics: { ...s.diagnostics } } : {}),
+        ...(s.stepInterval ? { stepInterval: { ...s.stepInterval } } : {}),
+      }));
   }
 
   /** QA v2.1 — Zeitstempel des ältesten/jüngsten Samples, oder null. */

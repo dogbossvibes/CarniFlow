@@ -40,6 +40,7 @@ import { statusAcrossGap, statusAfterProgress, statusAtConfirmedEnd, type Refere
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
 import { motionClient } from '@/features/tracking/native/motionClient';
+import { nativeMotionFusionSample } from '@/features/tracking/utils/nativeMotionSampleAdapters';
 import {
   evaluateFusion, DEFAULT_FUSION_CONFIG, confidenceBand, motionForFix,
   type TimedMotionInput, type FusionHistory, type ConfidenceBand, type FusionMode,
@@ -1077,15 +1078,7 @@ export function useSearchRecorder(opts: {
       if (!listening || !recordingRef.current || pausedRef.current
         || !motionForFix(sMotion, sMotion.timestamp, Date.now()) || sMotion.timestamp < motionNotBeforeRef.current
         || (motionLatestRef.current != null && sMotion.timestamp <= motionLatestRef.current.timestamp)) return;
-      motionLatestRef.current = {
-        timestamp: sMotion.timestamp,
-        movementState: sMotion.movementState,
-        stepDelta: sMotion.stepDelta,
-        accelerationMagnitude: sMotion.accelerationMagnitude,
-        rotationMagnitude: sMotion.rotationMagnitude,
-        headingDelta: sMotion.headingDelta,
-        motionConfidence: sMotion.motionConfidence,
-      };
+      motionLatestRef.current = nativeMotionFusionSample(sMotion, motionNotBeforeRef.current);
       motionActivityAgeMsRef.current = sMotion.activityAgeMs ?? null;
     });
     motionUnsubRef.current = sub;
