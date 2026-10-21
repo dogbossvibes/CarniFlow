@@ -41,7 +41,7 @@
     "build:prod:ios": "eas build --profile production --platform ios",
     "build:prod:android": "eas build --profile production --platform android",
     "postinstall": "node scripts/patch-expo-task-manager.cjs && node scripts/patch-react-native-maps.cjs",
-    "eas-build-post-install": "node scripts/native-sensor-xctest.mjs && node scripts/native-map-crash-check.mjs"
+    "eas-build-post-install": "node scripts/native-sensor-xctest.mjs && node scripts/native-map-crash-check.mjs && node scripts/native-watch-check.mjs"
   },
   "jest": {
     "preset": "jest-expo",

@@ -134,6 +134,7 @@
         }
       ],
       "expo-sqlite",
+      "./plugins/withAnyvoWatchApp",
       "./plugins/withAnyvoRestingLiveActivity",
       "expo-live-activity",
       "./plugins/withAnyvoLiveActivityPrebuildGuard",

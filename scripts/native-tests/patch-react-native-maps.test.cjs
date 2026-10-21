@@ -59,5 +59,5 @@ test('installation changes only the expected file and preserves it on repeat or 
 test('release hooks preserve sensor and TaskManager checks and add the map checks', () => {
   const { scripts } = require('../../package.json');
   assert.equal(scripts.postinstall, 'node scripts/patch-expo-task-manager.cjs && node scripts/patch-react-native-maps.cjs');
-  assert.equal(scripts['eas-build-post-install'], 'node scripts/native-sensor-xctest.mjs && node scripts/native-map-crash-check.mjs');
+  assert.equal(scripts['eas-build-post-install'], 'node scripts/native-sensor-xctest.mjs && node scripts/native-map-crash-check.mjs && node scripts/native-watch-check.mjs');
 });
