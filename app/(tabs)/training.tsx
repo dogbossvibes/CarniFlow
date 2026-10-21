@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import '@/features/training-groups/integrationI18n';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +15,7 @@ import { HeroImage } from '@/components/training/HeroImage';
 export default function TrainingScreen() {
   const router = useRouter();
   const { t } = useT();
+  const { t: groupText } = useTranslation('groupIntegration');
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -75,6 +78,16 @@ export default function TrainingScreen() {
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </AnimatedPressable>
 
+        <AnimatedPressable accessibilityRole="button" accessibilityLabel={groupText('openGroups')} style={[s.faehrteCard, { marginTop: 12 }]} scale={0.98} onPress={() => router.push('/training-groups' as never)}>
+          <View style={[s.actionIcon, { backgroundColor: C.accentDim }]}>
+            <Ionicons name="people-outline" size={20} color={C.accent} />
+          </View>
+          <View style={s.flex}>
+            <Text style={s.docTitel}>{groupText('openGroups')}</Text>
+            <Text style={s.docSub}>{groupText('subtitle')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={C.muted} />
+        </AnimatedPressable>
         <View style={{ height: 120 }} />
       </ScrollView>
     </SafeAreaView>

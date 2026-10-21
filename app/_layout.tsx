@@ -26,6 +26,7 @@ import { RestingLiveActivitySync } from '@/features/tracking/components/RestingL
 import { DiagnosticsAccessSync } from '@/components/DiagnosticsAccessSync';
 import { useT } from '@/i18n';
 import { DailyWidgetSync } from '@/features/widgets/DailyWidgetSync';
+import { LiveShareProvider } from '@/features/training-groups/LiveShareProvider';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
 void initMonitoring();
@@ -74,6 +75,7 @@ export default function RootLayout() {
       <ActiveFaehrtenSelfHeal />
       <AppIntentRouteHandler />
       <RestingLiveActivitySync />
+      <LiveShareProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
@@ -108,6 +110,7 @@ export default function RootLayout() {
         <Stack.Screen name="connect/vorschau" />
         <Stack.Screen name="dev/offline-debug" />
       </Stack>
+      </LiveShareProvider>
       <AppLockGate />
     </SessionProvider>
     </QueryClientProvider>

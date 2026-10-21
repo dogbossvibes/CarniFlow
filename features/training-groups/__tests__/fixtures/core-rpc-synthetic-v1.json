@@ -1,0 +1,151 @@
+{
+  "training_group_v1:create": {
+    "group": {
+      "title": "Private training",
+      "status": "active",
+      "groupId": "11111111-1111-4000-8000-000000000103",
+      "members": [
+        {
+          "role": "owner",
+          "userId": "11111111-1111-4000-8000-000000000001",
+          "joinedAtMs": 1791611248022,
+          "displayName": "Owner A",
+          "membershipId": "11111111-1111-4000-8000-000000000103"
+        }
+      ],
+      "createdAtMs": 1791611248022,
+      "ownerUserId": "11111111-1111-4000-8000-000000000001"
+    },
+    "version": 1,
+    "serverNowMs": 1791611248023
+  },
+  "training_group_v1:accept": {
+    "group": {
+      "title": "Private training",
+      "status": "active",
+      "groupId": "11111111-1111-4000-8000-000000000103",
+      "members": [
+        {
+          "role": "owner",
+          "userId": "11111111-1111-4000-8000-000000000001",
+          "joinedAtMs": 1791611248022,
+          "displayName": "Owner A",
+          "membershipId": "11111111-1111-4000-8000-000000000103"
+        },
+        {
+          "role": "member",
+          "userId": "11111111-1111-4000-8000-000000000002",
+          "joinedAtMs": 1791611248044,
+          "displayName": "B",
+          "membershipId": "11111111-1111-4000-8000-000000000105"
+        }
+      ],
+      "createdAtMs": 1791611248022,
+      "ownerUserId": "11111111-1111-4000-8000-000000000001"
+    },
+    "version": 1,
+    "serverNowMs": 1791611248045
+  },
+  "training_group_session_v1:open": {
+    "session": {
+      "title": "Session",
+      "status": "active",
+      "groupId": "11111111-1111-4000-8000-000000000103",
+      "sessionId": "11111111-1111-4000-8000-000000000104",
+      "expiresAtMs": 1791618448058,
+      "ownerUserId": "11111111-1111-4000-8000-000000000001",
+      "participants": [
+        {
+          "dogId": "11111111-1111-4000-8000-000000000011",
+          "userId": "11111111-1111-4000-8000-000000000001",
+          "dogName": "Synthetic 1",
+          "colorKey": "orange",
+          "displayName": "Owner A",
+          "participationId": "11111111-1111-4000-8000-000000000104"
+        }
+      ]
+    },
+    "version": 1,
+    "serverNowMs": 1791611248060
+  },
+  "training_group_session_v1:join": {
+    "session": {
+      "title": "Session",
+      "status": "active",
+      "groupId": "11111111-1111-4000-8000-000000000103",
+      "sessionId": "11111111-1111-4000-8000-000000000104",
+      "expiresAtMs": 1791618448058,
+      "ownerUserId": "11111111-1111-4000-8000-000000000001",
+      "participants": [
+        {
+          "dogId": "11111111-1111-4000-8000-000000000011",
+          "userId": "11111111-1111-4000-8000-000000000001",
+          "dogName": "Synthetic 1",
+          "colorKey": "orange",
+          "displayName": "Owner A",
+          "participationId": "11111111-1111-4000-8000-000000000104"
+        },
+        {
+          "dogId": "11111111-1111-4000-8000-000000000012",
+          "userId": "11111111-1111-4000-8000-000000000002",
+          "dogName": "Synthetic 2",
+          "colorKey": "orange",
+          "displayName": "B",
+          "participationId": "11111111-1111-4000-8000-000000000107"
+        }
+      ]
+    },
+    "version": 1,
+    "serverNowMs": 1791611248082
+  },
+  "training_group_session_v1:get": {
+    "session": {
+      "title": "Session",
+      "status": "active",
+      "groupId": "11111111-1111-4000-8000-000000000103",
+      "sessionId": "11111111-1111-4000-8000-000000000104",
+      "expiresAtMs": 1791618448058,
+      "ownerUserId": "11111111-1111-4000-8000-000000000001",
+      "participants": [
+        {
+          "dogId": "11111111-1111-4000-8000-000000000011",
+          "userId": "11111111-1111-4000-8000-000000000001",
+          "dogName": "Synthetic 1",
+          "colorKey": "orange",
+          "displayName": "Owner A",
+          "participationId": "11111111-1111-4000-8000-000000000104"
+        },
+        {
+          "dogId": "11111111-1111-4000-8000-000000000012",
+          "userId": "11111111-1111-4000-8000-000000000002",
+          "dogName": "Synthetic 2",
+          "colorKey": "orange",
+          "displayName": "B",
+          "participationId": "11111111-1111-4000-8000-000000000107"
+        }
+      ]
+    },
+    "version": 1,
+    "serverNowMs": 1791611248087
+  },
+  "training_group_live_v1:snapshot": {
+    "leaseMs": 5000,
+    "version": 1,
+    "positions": [
+      {
+        "dogId": "11111111-1111-4000-8000-000000000011",
+        "userId": "11111111-1111-4000-8000-000000000001",
+        "shareId": "11111111-1111-4000-8000-000000000114",
+        "latitude": 0,
+        "sequence": 1,
+        "accuracyM": 5,
+        "longitude": 0,
+        "sessionId": "11111111-1111-4000-8000-000000000104",
+        "expiresAtMs": 1791611368133,
+        "observedAtMs": 1791611248177,
+        "receivedAtMs": 1791611248187
+      }
+    ],
+    "serverNowMs": 1791611248214
+  }
+}
