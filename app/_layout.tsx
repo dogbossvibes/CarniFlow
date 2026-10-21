@@ -26,6 +26,7 @@ import { RestingLiveActivitySync } from '@/features/tracking/components/RestingL
 import { DiagnosticsAccessSync } from '@/components/DiagnosticsAccessSync';
 import { useT } from '@/i18n';
 import { DailyWidgetSync } from '@/features/widgets/DailyWidgetSync';
+import { WearableProvider } from '@/features/tracking/wearable/WearableProvider';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
 void initMonitoring();
@@ -67,6 +68,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
     <QueryClientProvider client={queryClient}>
     <SessionProvider>
+    <WearableProvider>
       <DiagnosticsAccessSync />
       <DailyWidgetSync />
       <StatusBar style="light" />
@@ -109,6 +111,7 @@ export default function RootLayout() {
         <Stack.Screen name="dev/offline-debug" />
       </Stack>
       <AppLockGate />
+    </WearableProvider>
     </SessionProvider>
     </QueryClientProvider>
     </GestureHandlerRootView>

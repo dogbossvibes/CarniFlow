@@ -17,6 +17,9 @@ export function createTransferRunScope(initialUserId: string | null) {
     mount() { mounted = true; },
     dispose() { mounted = false; epoch++; },
     setUser(next: string | null, identityEvent = false) { if (identityEvent || next !== userId) epoch++; userId = next; },
+    assertOwner(token: number) {
+      if (!mounted || token !== epoch || !userId) throw new TransferImportError('ACCOUNT_CHANGED');
+    },
     assert(token: number, value: TransferRunIdentity | null | undefined, expectedSessionId?: string | null, expectedDogId?: string | null) {
       if (value?.transferReceipt == null) return null;
       if (!mounted || token !== epoch || !userId) throw new TransferImportError('ACCOUNT_CHANGED');

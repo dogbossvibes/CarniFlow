@@ -1,3 +1,4 @@
+import { useWearableBinding } from '@/features/tracking/wearable/WearableProvider';
 import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { SpecialAnglePicker } from '@/features/tracking/components/SpecialAnglePicker';
 import { countLaidCorners, projectAngleMarkers, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
@@ -10,7 +11,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
+import { useIsFocused, usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { requestVoice, resetVoiceEvents } from '@/features/tracking/utils/voiceEvents';
 import { C, FT } from '@/constants/colors';
@@ -158,6 +159,7 @@ function RecDot() {
 // nach GPS-Warmup wird direkt eine Session angelegt und aufgezeichnet. Winkel
 // (rechts/links/spitz) werden automatisch erkannt, Haptik bei jeder Erkennung.
 export default function LegenScreen() {
+  const wearableFocused = useIsFocused();
   const router = useRouter();
   const { t } = useT();
   const insets = useSafeAreaInsets();   // sichere Abstände (Dynamic Island / Statusbar)
@@ -648,6 +650,38 @@ export default function LegenScreen() {
     const dId = activeDog?.id ?? null;
     if (dId && useActiveFaehrten.getState().get(dId)) useActiveFaehrten.getState().upsert(dId, { paused: nextPaused });
   }, [activeDog, isPaused, rec]);
+
+  // Connected watch control shares the existing recorder and never creates GPS ownership.
+  // Starting stays on the phone: background disclosure and recovery/quota dialogs must be completed there.
+  useWearableBinding(session?.user.id ?? null, `lay:${activeDog?.id ?? ''}:${params.id ?? ''}`, wearableFocused && !!activeDog, {
+    getState: () => {
+      const st = useTrackingStore.getState();
+      const active = phaseRef.current === 'recording' && st.isRecording && st.dogId === activeDog?.id && !stoppingRef.current;
+      return { sessionId: active ? sessionIdRef.current : null, dogId: activeDog?.id ?? null, dogName: activeDog?.name ?? null,
+        phase: active ? (st.isPaused ? 'lay_paused' : 'lay_recording') : 'lay_prepared',
+        distanceM: active ? st.distanceMeters : null, elapsedSeconds: active ? st.durationSeconds : null,
+        capabilities: active ? [...(!st.isPaused && st.startAnchor && st.currentPosition ? ['mark_object' as const] : []),
+          st.isPaused ? 'resume' as const : 'pause' as const, 'end_phase' as const] : [] };
+    },
+    execute: async (action, stillCurrent) => {
+      if (!stillCurrent()) return false;
+      const st = useTrackingStore.getState();
+      if (!st.isRecording || st.dogId !== activeDog?.id || phaseRef.current !== 'recording' || stoppingRef.current) return false;
+      if (action === 'mark_object') {
+        if (st.isPaused || !st.startAnchor || !st.currentPosition) return false;
+        const before = new Set(st.markers.map(marker => marker.id));
+        await rec.addMarker('gegenstand', { material: lastMaterialRef.current });
+        const added = useTrackingStore.getState().markers.some(marker => !before.has(marker.id) && marker.type === 'gegenstand');
+        if (added) { hapticMarker(); announceEvent(objectEvent(lastMaterialRef.current), 'set'); }
+        return added;
+      }
+      if ((action === 'pause' && !st.isPaused) || (action === 'resume' && st.isPaused)) {
+        togglePause(); return useTrackingStore.getState().isPaused === (action === 'pause');
+      }
+      if (action === 'end_phase') { finishTrack(); return !useTrackingStore.getState().isRecording; }
+      return false;
+    },
+  });
 
   const guardedBack = useCallback(() => {
     if (phaseRef.current !== 'recording') {

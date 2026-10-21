@@ -1,3 +1,5 @@
+import { captureSearchFinalization } from '@/features/tracking/utils/searchFinalizationGate';
+import { useWearableBinding } from '@/features/tracking/wearable/WearableProvider';
 import { isScoredObject, isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { countLaidCorners, projectAngleMarkers } from '@/features/tracking/utils/specialAngleGeometry';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
@@ -12,7 +14,7 @@ import { Alert, Animated, Pressable, ScrollView, Text, View } from 'react-native
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
+import { useIsFocused, usePreventRemove } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
@@ -119,7 +121,10 @@ const EMPTY_SNAP_CONST = {
 // useSearchRecorder startet genau einmal und liefert Spur, Abrisse, Abweichung,
 // Metriken und Live-Score. Stop → Auswertung via s.stop().
 export default function TrackRunScreen() {
+  const wearableFocused = useIsFocused();
   const { id, dogId } = useLocalSearchParams<{ id: string; dogId?: string }>();
+  const finishRouteRef = useRef({ id, dogId });
+  finishRouteRef.current = { id, dogId };
   const router = useRouter();
   const distractionTracks = useDistractionOverlays(typeof id === 'string' ? id : undefined);
   const { session: transferAuth } = useSession();
@@ -230,6 +235,8 @@ export default function TrackRunScreen() {
   }, [voiceOn, s.recording, autoDwellVoiceKey, t]);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
+  // A new account/route owns its own UI flags; old async saves cannot release them.
+  useEffect(() => { finishRequestedRef.current = false; setFinishing(false); }, [transferToken, id, dogId]);
   const [pendingExit, setPendingExit] = useState<string | null>(null);
   const [pocketLock, setPocketLock] = useState(false);
   const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
@@ -938,10 +945,18 @@ export default function TrackRunScreen() {
     ]);
   };
 
-  const handleFinish = async () => {
+  const handleFinish = async (): Promise<boolean> => {
     const transferIdentity = renderTransferIdentity.transferReceipt ? renderTransferIdentity : currentTransfer();
-    if (!allowedTransfer(transferIdentity)) return;
-    if (finishing || finishRequestedRef.current) return;   // Doppelt-Tippen → keine doppelte Finalisierung
+    if (!allowedTransfer(transferIdentity)) return false;
+    let operation: ReturnType<typeof captureSearchFinalization>;
+    try {
+      operation = captureSearchFinalization({
+        assertOwner: () => transferScope.assertOwner(transferToken), read: currentTransfer,
+        routeIsCurrent: () => finishRouteRef.current.id === id && finishRouteRef.current.dogId === dogId,
+        expected: { sessionId: effectiveId, dogId: dogId ?? storedColorDogId, runId: runIdRef.current },
+      });
+    } catch { return false; }
+    if (finishing || finishRequestedRef.current) return false;   // Doppelt-Tippen → keine doppelte Finalisierung
     finishRequestedRef.current = true;
     hapticSuccess();
     setFinishing(true);
@@ -951,14 +966,16 @@ export default function TrackRunScreen() {
     const runId = runIdRef.current ?? Crypto.randomUUID();
     const sessId = effectiveId;
     // Stop schedules the write; successful finalization must await its real result.
-    if (!(await flushSearchPoints(sessId ?? undefined).catch(() => false))) {
+    const flushed = await flushSearchPoints(sessId ?? undefined).catch(() => false);
+    if (!operation.isCurrent()) return false;
+    if (!flushed) {
       finishRequestedRef.current = false;
       setFinishing(false);
       Alert.alert(t('common.error'), t('track.recoverySaveFailed'));
-      return;
+      return false;
     }
 
-    if (!allowedTransfer(transferIdentity)) return;
+    if (!operation.isCurrent() || !allowedTransfer(transferIdentity)) return false;
     // Punkt 10/13: Track Analytics Engine — REIN aus In-Session-Daten (keine
     // gespeicherten Rohpunkte, keine Migration). Ecken/Gegenstände kommen aus
     // denselben gefilterten Markern, aus denen auch snapData.laidObjects
@@ -1062,34 +1079,64 @@ export default function TrackRunScreen() {
           pointsTimeSec: res.pointsTimeSec,
           replayPoints: res.replayPoints,
           replayPointsTimeSec: res.replayPointsTimeSec,
-        }), transferIdentity.transferReceipt ? () => assertTransfer(transferIdentity) : undefined);
+        }), () => { operation.assert(); assertTransfer(transferIdentity); });
       } catch (e) {
+        if (!operation.isCurrent()) return false;
         console.warn('[trackRun] local finalize', e);
         finishRequestedRef.current = false;
         setFinishing(false);
         Alert.alert('Speichern fehlgeschlagen', 'Die Absuche konnte nicht lokal gespeichert werden. Bitte erneut versuchen.');
-        return;   // kein Reset, keine Navigation → Ergebnis bleibt erhalten
+        return false;   // kein Reset, keine Navigation → Ergebnis bleibt erhalten
       }
     }
 
-    if (!allowedTransfer(transferIdentity)) return;
-    // Lokal sicher → Session abschliessen (Recovery bietet sie nicht mehr als laufend an).
-    useTrackingStore.getState().setSessionStatus('completed');
-    useTrackingStore.getState().reset();
-    clearRegistry();
-
+    if (!operation.isCurrent() || !allowedTransfer(transferIdentity)) return false;
     // 2) Remote-Transport ausschliesslich über die persistente Sync-Queue (RUN-SAVE2):
     //    dieselbe training_session erneut enqueuen → syncNow lädt Lay + Run (track_runs
     //    per runUuid) idempotent hoch. Navigation wartet NICHT (lokal bereits durabel).
     if (sessId) {
       try {
         await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: sessId, operation: 'create', priority: 1 });
-      } catch (e) { console.warn('[trackRun] enqueue', e); }
-      void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
+      } catch (e) { if (!operation.isCurrent()) return false; console.warn('[trackRun] enqueue', e); }
     }
+    if (!operation.isCurrent() || !allowedTransfer(transferIdentity)) return false;
+    // The final store/registry/navigation transition is synchronous, after every awaited write.
+    useTrackingStore.getState().setSessionStatus('completed');
+    useTrackingStore.getState().reset();
+    clearRegistry();
+    if (sessId) void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     setFinishing(false);
     router.replace((sessId ? `/track/${sessId}` : '/track') as never);
+    return true;
   };
+
+  useWearableBinding(transferAuth?.user.id ?? null, `search:${id ?? ''}:${dogId ?? storedColorDogId ?? ''}`, wearableFocused && phase === 'ready' && !recovery, {
+    getState: () => {
+      const control = s.getControlState();
+      return { sessionId: runIdRef.current, dogId: dogId ?? storedColorDogId, dogName,
+      phase: finishing || finishRequestedRef.current ? 'finishing' : control.recording ? (control.paused ? 'search_paused' : 'search_recording') : 'search_prepared',
+      distanceM: control.recording ? s.distanceM : null, elapsedSeconds: control.recording ? s.elapsedS : null,
+      capabilities: finishing || finishRequestedRef.current ? [] : control.recording
+        ? [...(!control.paused && s.position && s.foundObjects < s.totalObjects ? ['mark_object' as const] : []),
+          control.paused ? 'resume' as const : 'pause' as const, 'end_phase' as const]
+        : arming && approach.armed && !startedRef.current ? ['start_search'] : [] };
+    },
+    execute: async (action, stillCurrent) => {
+      if (!stillCurrent()) return false;
+      const control = s.getControlState();
+      try { assertTransfer(renderTransferIdentity); assertTransfer(currentTransfer()); } catch { return false; }
+      if (action === 'start_search') {
+        if (!arming || !approach.armed || startedRef.current) return false;
+        beginSearchNow('manual-at-start'); return startedRef.current;
+      }
+      if (!control.recording || finishing || finishRequestedRef.current) return false;
+      if (action === 'mark_object') return !control.paused && s.markObject();
+      if (action === 'pause') return !control.paused && s.setPaused(true);
+      if (action === 'resume') return control.paused && s.setPaused(false);
+      if (action === 'end_phase') return handleFinish();
+      return false;
+    },
+  });
 
   const guardedBack = useCallback(() => {
     if (pocketLock) return;

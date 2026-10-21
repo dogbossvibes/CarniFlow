@@ -184,8 +184,9 @@ export interface SearchRecorder {
   // Off-Track desselben Runs; fehlt er (Legacy-Puffer) → wie bisher ab 0.
   start: (resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState; pointsTimeSec?: number[] }, opts?: { forceLocked?: boolean }) => void;
   stop: () => SearchResult;
-  setPaused: (p: boolean) => void;
-  markObject: () => void;
+  getControlState: () => { recording: boolean; paused: boolean };
+  setPaused: (p: boolean) => boolean;
+  markObject: () => boolean;
   dismissAutoObject: (id: string) => void;
   confirmEnd: () => void;
 }
@@ -1283,15 +1284,16 @@ export function useSearchRecorder(opts: {
   }, [computeScoreBreakdown, totalObjects]);
 
   const setPaused = useCallback((p: boolean) => {
-    if (p === pausedRef.current) return;
+    if (!recordingRef.current || p === pausedRef.current) return false;
     recordingEvidenceRef.current?.note(p ? 'userPaused' : 'userResumed');
     interruptContinuity();
     pausedRef.current = p; setPausedState(p);
     if (!p) { smoothRef.current = null; endSmoothRef.current = null; setEndHandlerFix(null); }
+    return true;
   }, [interruptContinuity]);
 
   const markObject = useCallback(() => {
-    const cur = smoothRef.current; if (!cur) return;
+    const cur = smoothRef.current; if (!cur) return false;
     let bestI = -1, bestD = Infinity;
     laidObjects.forEach((o, i) => {
       if (foundRef.current.has(i)) return;
@@ -1309,7 +1311,9 @@ export function useSearchRecorder(opts: {
         dwell.startedMs != null && !dwell.accepted && !foundRef.current.has(i)));
       useTrackingStore.getState().noteSearchObjectFound(searchObjectKey(laidObjects[bestI], bestI));
       pushSnapshot();
+      return true;
     }
+    return false;
   }, [laidObjects, pushSnapshot]);
 
   const dismissAutoObject = useCallback((id: string) => {
@@ -1349,6 +1353,6 @@ export function useSearchRecorder(opts: {
     elapsedS, score: snap.score, accuracy,
     gpsDebug, gpsQuality,
     searchStartState,
-    start, stop, setPaused, markObject, dismissAutoObject, confirmEnd,
+    start, stop, getControlState: () => ({ recording: recordingRef.current, paused: pausedRef.current }), setPaused, markObject, dismissAutoObject, confirmEnd,
   };
 }
