@@ -21,8 +21,8 @@ export interface MotionSample {
   // die nutzt intern bereits ihre eigene Staleness-Prüfung). `null` = noch nie
   // eine Activity empfangen (kein CMMotionActivityManager verfügbar/erlaubt).
   activityAgeMs?:         number | null;
-  /** Additive v2 contract; absent on existing binaries. No empty motion windows are emitted. */
-  qualityVersion?: 2;
+  /** Additive quality contract; absent on legacy binaries. No empty motion windows are emitted. */
+  qualityVersion?: 2 | 3;
   runId?: string;
   windowStartTimestamp?: number;
   windowEndTimestamp?: number;
@@ -33,6 +33,15 @@ export interface MotionSample {
   /** Interval covered by the latest cumulative pedometer update, not the motion window. */
   pedometerIntervalMs?: number | null;
   discardedWindowCount?: number;
+  /** v3: cumulative source count = published + pending + discarded steps. */
+  pedometerCumulativeSteps?: number;
+  pedometerPublishedStepCount?: number;
+  pedometerPendingStepCount?: number;
+  /** Expired or invalidated steps; never promoted to current movement evidence. */
+  pedometerDiscardedStepCount?: number;
+  /** Coverage of the cumulative deltas included in stepDelta, not per-step times. */
+  pedometerStepWindowStartTimestamp?: number | null;
+  pedometerStepWindowEndTimestamp?: number | null;
 }
 
 export interface MotionStatus {
@@ -41,9 +50,13 @@ export interface MotionStatus {
   activityAvailable:     boolean;
   pedometerAuthorized:   boolean;
   running:               boolean;
-  qualityVersion?: 2;
+  qualityVersion?: 2 | 3;
   runId?: string | null;
   discardedWindowCount?: number;
+  pedometerCumulativeSteps?: number;
+  pedometerPublishedStepCount?: number;
+  pedometerPendingStepCount?: number;
+  pedometerDiscardedStepCount?: number;
 }
 
 export interface MotionError {

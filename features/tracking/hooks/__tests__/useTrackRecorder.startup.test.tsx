@@ -13,6 +13,7 @@ import { AppState } from 'react-native';
 import { motionClient } from '../../native/motionClient';
 import { markMotionSample } from '../../utils/trackingWarmupState';
 import type { MotionSample } from '@/modules/anyvo-motion';
+import { MotionEvidenceBuffer } from '../../utils/motionTurnEvidence';
 jest.mock('@/lib/diagnosticsAccessState', () => ({
   diagnosticsAccessToken: () => mockAccessToken,
   getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
@@ -472,6 +473,30 @@ it('does not advertise motion readiness when the native start fails', async () =
   await act(async () => { current.finish(); await Promise.resolve(); });
   const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
   expect(capture.startupDiagnostics.motionReadyTSec).toBeNull();
+});
+
+it.each([false, true])('forwards the original sensor tuple and retains relative provenance only in QA (%s)', async qa => {
+  mockQaEnabled = qa;
+  const push = jest.spyOn(MotionEvidenceBuffer.prototype, 'push');
+  try {
+    await start();
+    const callback = (motionClient.onSample as jest.Mock).mock.calls.at(-1)[0];
+    const sample: MotionSample = { timestamp: clockMs, headingDelta: 20, stepDelta: 2,
+      accelerationMagnitude: 0.15, rotationMagnitude: 0.4, cadence: 90,
+      movementState: 'walking', motionConfidence: 0.8, activityConfidence: 'low',
+      qualityVersion: 3, runId: 'private-native-run', windowStartTimestamp: clockMs - 200,
+      windowEndTimestamp: clockMs, emittedAtTimestamp: clockMs + 50,
+      deviceMotionSampleCount: 5, deviceMotionAgeMs: 50, discardedWindowCount: 2 };
+    act(() => callback(sample));
+    const forwarded = push.mock.calls.at(-1)![0];
+    expect(forwarded).toMatchObject({ t: clockMs, headingDelta: 20, stepDelta: 2,
+      accelerationMagnitude: 0.15, rotationMagnitude: 0.4, cadence: 90, movementState: 'walking' });
+    if (qa) {
+      expect(forwarded.diagnostics).toMatchObject({ qualityVersion: 3, windowStartOffsetMs: -200,
+        windowEndOffsetMs: 0, emittedAtOffsetMs: 50, discardedWindowCount: 2 });
+      expect(JSON.stringify(forwarded.diagnostics)).not.toMatch(/private-native-run|Timestamp|runId/);
+    } else expect(forwarded.diagnostics).toBeUndefined();
+  } finally { push.mockRestore(); }
 });
 
 it('does not let a previous warm-up start completion mark a new warm-up ready', async () => {

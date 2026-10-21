@@ -97,7 +97,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -277,7 +277,8 @@ export function buildQaTrackExport(
   }
   const accs = anon.map(p => p.accuracy).filter((a): a is number => a != null);
   const motion = capture?.candidateMotionEvidence;
-  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 = capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
+  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 13 = motion?.some(row => row.samples.some(sample => sample.diagnostics)) ? 13
+    : capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
     || capture?.startupDiagnostics?.motionFirstCallbackTSec !== undefined ? 7
     : capture?.startupMovementDiagnostics
     || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
@@ -413,6 +414,10 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
     }
     for (const sm of m.samples) {
       if (!Number.isFinite(sm.dtMs) || Math.abs(sm.dtMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
+      for (const value of Object.values(sm.diagnostics ?? {})) {
+        if (value != null && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) >= 1e8))
+          throw new Error('QA-Export enthält ungültige native Motion-Diagnosedaten.');
+      }
     }
   }
   for (const m of e.markers) {

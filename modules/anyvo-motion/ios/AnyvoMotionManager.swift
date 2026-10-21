@@ -136,9 +136,13 @@ final class AnyvoMotionManager {
         "stepCountingAvailable": CMPedometer.isStepCountingAvailable(),
         "activityAvailable": CMMotionActivityManager.isActivityAvailable(),
         "pedometerAuthorized": CMPedometer.authorizationStatus() == .authorized,
-        "running": state.running, "qualityVersion": 2,
+        "running": state.running, "qualityVersion": MotionSensorState.qualityVersion,
         "runId": state.running ? state.runID as Any : NSNull(),
         "discardedWindowCount": state.discardedWindowCount,
+        "pedometerCumulativeSteps": state.totalSteps,
+        "pedometerPublishedStepCount": state.publishedStepCount,
+        "pedometerPendingStepCount": state.pendingStepCount,
+        "pedometerDiscardedStepCount": state.discardedStepCount,
       ]
     }
   }

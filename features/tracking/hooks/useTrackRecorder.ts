@@ -39,6 +39,7 @@ import { createBufferedPointWriter } from '@/features/tracking/utils/bufferedPoi
 import { createMarkerWriteBarrier } from '@/features/tracking/utils/markerWriteBarrier';
 import { motionClient } from '@/features/tracking/native/motionClient';
 import { MotionEvidenceBuffer } from '@/features/tracking/utils/motionTurnEvidence';
+import { motionSampleDiagnostics } from '@/features/tracking/utils/motionSampleDiagnostics';
 import { saveTrackMarker } from '@/features/tracking/services/trackService';
 import { createLocalTrainingSession, finalizeLocalTrainingSession, type NewLocalTrainingSession } from '@/features/training/repositories/localTrainingRepository';
 import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
@@ -492,6 +493,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
             t: m.timestamp, headingDelta: m.headingDelta,
             rotationMagnitude: m.rotationMagnitude, accelerationMagnitude: m.accelerationMagnitude,
             stepDelta: m.stepDelta, cadence: m.cadence, movementState: m.movementState,
+            ...(qaRef.current ? { diagnostics: motionSampleDiagnostics(m) } : {}),
           });
         });
         startupRef.current!.pedometerSubscriptionStartedTSec ??= startupSec();

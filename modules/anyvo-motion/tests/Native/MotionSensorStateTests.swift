@@ -18,7 +18,8 @@ final class MotionSensorStateTests: XCTestCase {
     s.recordActivity(token: t, receivedAt: 10.1, state: "stationary", confidence: "high")
     XCTAssertNil(emit(&s, t)); XCTAssertEqual(s.discardedWindowCount, 1)
     add(&s, t, at: 10.3)
-    XCTAssertEqual(emit(&s, t, at: 10.5)?["stepDelta"] as? Int, 0)
+    // Empty device-motion ticks must not consume independent fresh steps.
+    XCTAssertEqual(emit(&s, t, at: 10.5)?["stepDelta"] as? Int, 2)
   }
 
   func testMeasurementTimeAndWindowCoverageInsteadOfTimerTime() throws {

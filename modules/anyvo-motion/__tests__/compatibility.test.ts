@@ -1,6 +1,6 @@
 import type { MotionSample } from '../src/AnyvoMotion.types';
 
-describe('native motion v2 compatibility', () => {
+describe('native motion quality compatibility', () => {
   afterEach(() => { jest.resetModules(); jest.dontMock('../src/AnyvoMotionModule'); });
 
   function load(native: unknown) {
@@ -33,7 +33,7 @@ describe('native motion v2 compatibility', () => {
     expect(await denied.startMotionUpdates()).toBe(false);
   });
 
-  it('preserves measurement-time quality fields through the public subscription', () => {
+  it.each([2, 3] as const)('preserves v%s measurement-time quality fields through the public subscription', qualityVersion => {
     let receiver: ((s: MotionSample) => void) | undefined;
     const remove = jest.fn();
     const client = load({ addListener: (_: string, cb: typeof receiver) => { receiver = cb; return { remove }; } });
@@ -43,9 +43,12 @@ describe('native motion v2 compatibility', () => {
       timestamp: 1000, accelerationMagnitude: 0.2, rotationMagnitude: 0.1,
       headingDelta: 20, stepDelta: 1, cadence: 100, movementState: 'walking',
       motionConfidence: 0.8, activityConfidence: 'low', activityAgeMs: null,
-      qualityVersion: 2, runId: 'test-run', windowStartTimestamp: 800, windowEndTimestamp: 1000,
+      qualityVersion, runId: 'test-run', windowStartTimestamp: 800, windowEndTimestamp: 1000,
       emittedAtTimestamp: 1050, deviceMotionSampleCount: 5, deviceMotionAgeMs: 50,
       pedometerAgeMs: 100, pedometerIntervalMs: 1000, discardedWindowCount: 1,
+      ...(qualityVersion === 3 ? { pedometerCumulativeSteps: 3, pedometerPublishedStepCount: 1,
+        pedometerPendingStepCount: 0, pedometerDiscardedStepCount: 2,
+        pedometerStepWindowStartTimestamp: 100, pedometerStepWindowEndTimestamp: 900 } : {}),
     };
     receiver?.(payload);
     expect(callback).toHaveBeenCalledWith(payload);

@@ -6,6 +6,7 @@
 // Schärfe (normal/spitz) bleibt Aufgabe der GPS-Geometrie.
 
 import type { MovementState } from '@/modules/anyvo-motion';
+import type { MotionWindowDiagnostics } from './motionSampleDiagnostics';
 
 const DEG = 180 / Math.PI;
 
@@ -31,6 +32,8 @@ export interface MotionWindowSample {
   /** Schritte/Minute, falls verfügbar. Rein diagnostisch (kann veraltet sein). */
   cadence: number | null;
   movementState: MovementState;
+  /** Read-only sensor provenance. Never used to change turn evidence or gates. */
+  diagnostics?: MotionWindowDiagnostics;
 }
 
 export interface TurnEvidenceParams {
@@ -417,7 +420,7 @@ export class MotionEvidenceBuffer {
     // its yaw and steps twice. Late samples also break rate/retention order.
     const last = this.samples[this.samples.length - 1];
     if (!Number.isFinite(s.t) || (last != null && s.t <= last.t)) return;
-    this.samples.push({ ...s });
+    this.samples.push({ ...s, ...(s.diagnostics ? { diagnostics: { ...s.diagnostics } } : {}) });
     const cutoff = s.t - this.retentionSec * 1000;
     while (this.samples.length && this.samples[0].t < cutoff) this.samples.shift();
   }
@@ -432,7 +435,8 @@ export class MotionEvidenceBuffer {
    * die Gates und alle Parameter bleiben unangetastet.
    */
   samplesIn(fromMs: number, toMs: number): MotionWindowSample[] {
-    return this.samples.filter(s => s.t >= fromMs && s.t <= toMs).map(s => ({ ...s }));
+    return this.samples.filter(s => s.t >= fromMs && s.t <= toMs)
+      .map(s => ({ ...s, ...(s.diagnostics ? { diagnostics: { ...s.diagnostics } } : {}) }));
   }
 
   /** QA v2.1 — Zeitstempel des ältesten/jüngsten Samples, oder null. */
