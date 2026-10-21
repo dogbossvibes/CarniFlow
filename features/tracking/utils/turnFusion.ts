@@ -440,12 +440,13 @@ function evaluateApexPair(
     sharpness = 'unresolved';
   } else return null;   // sonst „angle_unclear": Beinahe-Umkehr oder fast gerade
 
-  // IMU: widerspricht sie der GPS-Richtung, ist der Paarungs-Scheitel kein
-  // hinreichender Beleg → verwerfen. Fehlt IMU, bleibt es beim GPS-Indiz.
+  // Only motion of the same quality required for confirmation may veto GPS.
+  // A handset yaw with no usable walking evidence remains neutral.
   const ev = turnEvidenceForDirection?.(a.t ?? null, dir) ?? turnEvidenceAt?.(a.t ?? null) ?? null;
   const md = ev && ev.available ? motionTurnDirection(ev) : null;
-  if (md != null && md !== dir) return null;
-  const agrees = md != null && md === dir && (ev?.evidence ?? 0) >= 0.5;
+  const reliableMotion = md != null && (ev?.evidence ?? 0) >= 0.5;
+  if (reliableMotion && md !== dir) return null;
+  const agrees = reliableMotion && md === dir;
   // Zwei-Segment-Ecke: der Scheitel ist unschärfer als bei einem einzelnen Wackel-Segment (nur GPS
   // wäre von Start-Wackeln nicht zu trennen, real: r1 bei 4,7 m). Alle GPS-Gates oben müssen
   // bestanden sein; zusätzlich muss die IMU die Richtung unabhängig BESTÄTIGEN. Motion erzeugt
