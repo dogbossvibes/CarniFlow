@@ -19,6 +19,33 @@ const press = async (id: string) => { const button = find(id); expect(button).to
 const inputs = () => (view.root as unknown as { findAllByType(type: unknown): { props: { value: string; onChangeText(v: string): void } }[] }).findAllByType(TextInput);
 beforeEach(() => { mockList.mockReset().mockResolvedValue({ data: [row('a'), row('b')], error: null }); mockSave.mockReset().mockResolvedValue({ data: row('a'), error: null }); mockSelect.mockReset(); mockCreate.mockReset(); });
 afterEach(() => { act(() => view?.unmount()); });
+it('offers one direct choice without numbered variants, reusing the latest identity for this dog', async () => {
+  await render({ singleChoicePerName: true, allowRename: false,
+    historyByIdentity: { a: { date: '2026-10-18', notes: 'Old' }, b: { date: '2026-10-20', notes: 'Recent' } } });
+  await press('exercise-group-revieren');
+  expect(mockSelect).toHaveBeenCalledWith(row('b'));
+  expect(find('exercise-variant-a')).toBeUndefined(); expect(find('exercise-variant-b')).toBeUndefined();
+  expect(find('exercise-group-revieren').props.accessibilityState.expanded).toBeUndefined();
+  expect(mockCreate).not.toHaveBeenCalled(); expect(mockSave).not.toHaveBeenCalled();
+});
+it('keeps a restored identity despite newer same-named history and uses it on repeated presses', async () => {
+  await render({ singleChoicePerName: true, selectedIds: ['a'],
+    historyByIdentity: { b: { date: '2026-10-20', notes: 'Recent' } } });
+  await press('exercise-group-revieren'); await press('exercise-group-revieren');
+  expect(mockSelect.mock.calls.map(call => call[0].id)).toEqual(['a', 'a']);
+});
+it('uses a stable existing fallback without dog history regardless of registry order', async () => {
+  mockList.mockResolvedValue({ data: [row('b'), row('a')], error: null });
+  await render({ singleChoicePerName: true }); await press('exercise-group-revieren');
+  expect(mockSelect).toHaveBeenCalledWith(row('a')); expect(mockCreate).not.toHaveBeenCalled();
+});
+it('retains consciously named exercises as separate choices and groups case/whitespace duplicates', async () => {
+  mockList.mockResolvedValue({ data: [row('a'), row('b', ' revieren '), row('c', 'Revieren mit Ablenkung')], error: null });
+  await render({ singleChoicePerName: true });
+  await press('exercise-group-revieren'); await press('exercise-group-revieren mit ablenkung');
+  expect(mockSelect.mock.calls.map(call => call[0].id)).toEqual(['a', 'c']);
+  expect(find('exercise-variant-b')).toBeUndefined();
+});
 it('shows one choice for two stored Revieren identities plus the matching preset, without merging records', async () => {
   await render();
   expect(find('exercise-group-revieren')).toBeDefined();
