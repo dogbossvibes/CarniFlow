@@ -99,6 +99,9 @@ jest.mock('@/components/ui/DogIcon', () => ({ DogIcon: () => null }));
 for (const name of ['Modal', 'TouchableOpacity', 'TextInput', 'KeyboardAvoidingView', 'ScrollView']) {
   Reflect.get(jest.requireActual('react-native'), name);
 }
+// TouchableOpacity's native animation resolves the renderer lazily on disabled
+// changes. Initialize that existing binding without rendering a product component.
+jest.requireActual<typeof import('react-native')>('react-native').findNodeHandle(null);
 
 const mounted: ReactTestRenderer[] = [];
 afterEach(async () => { await act(async () => { for (const node of mounted.splice(0)) node.unmount(); await Promise.resolve(); }); });
