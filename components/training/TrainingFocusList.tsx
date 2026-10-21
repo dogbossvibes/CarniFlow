@@ -4,7 +4,8 @@ import { useT } from '@/i18n';
 import { C } from '@/constants/colors';
 import { readTrainingFocuses, setTrainingFocusStatus, setTrainingFocusText, type TrainingFocus } from '@/features/training/documentation/focus';
 
-export function TrainingFocusList({ ownerId, dogId, discipline, originUnitId, onChange, availableUnitIds, onOpenSource, dogNames, collapsedByDefault = false }: {
+export function TrainingFocusList({ ownerId, dogId, discipline, originUnitId, onChange, availableUnitIds, onOpenSource, dogNames, collapsedByDefault = false, preparation = false }: {
+  preparation?: boolean;
   collapsedByDefault?: boolean;
   availableUnitIds?: ReadonlySet<string>; onOpenSource?: (id: string) => void; dogNames?: Record<string, string>;
   onChange?: () => void; ownerId: string; dogId?: string | null; discipline?: string | null; originUnitId?: string;
@@ -35,17 +36,18 @@ export function TrainingFocusList({ ownerId, dogId, discipline, originUnitId, on
   const filtered = loadedOwner === ownerId ? all.filter(f => (!dogNames || Object.prototype.hasOwnProperty.call(dogNames, f.dogId)) && (!dogId || f.dogId === dogId)
     && (!discipline || f.discipline === discipline) && (!originUnitId || f.originUnitId === originUnitId)) : [];
   const open = filtered.filter(f => f.status !== 'done');
-  const visible = expanded ? filtered : collapsedByDefault ? [] : open.slice(0, 3);
-  if (!filtered.length && !error) return null;
-  return <View style={s.card}>
-    <Text style={s.title}>{t('trainingDoc.openFocus')}</Text>
+  const ordered = [...open].sort((a, b) => b.originDate.localeCompare(a.originDate));
+  const visible = preparation ? (expanded ? ordered : ordered.slice(0, 1)) : expanded ? filtered : collapsedByDefault ? [] : open.slice(0, 3);
+  if (!(preparation ? open : filtered).length && !error) return null;
+  return <View style={[s.card, preparation && s.preparation]}>
+    <Text style={s.title}>{t(preparation ? 'trainingFlow.previousHint' : 'trainingDoc.openFocus')}</Text>
     <Text style={s.text}>{t('trainingDoc.focusLocal')}</Text>
     {error && <TouchableOpacity onPress={() => setRetry(v => v + 1)} accessibilityRole="button" style={s.button}>
       <Text style={s.text}>{t('trainingDoc.focusError')}</Text>
     </TouchableOpacity>}
     {visible.map(f => <View key={f.id} style={{ gap: 4 }}>
       <Text style={s.text}>{dogNames?.[f.dogId] ? `${dogNames[f.dogId]} · ` : ''}{f.originDate} · {f.discipline}{f.exerciseName ? ` · ${f.exerciseName}` : ''}</Text>
-      {expanded ? <TextInput value={f.text} style={s.input} multiline maxLength={500} editable={!busy}
+      {expanded && !preparation ? <TextInput value={f.text} style={s.input} multiline maxLength={500} editable={!busy}
         accessibilityLabel={t('trainingDoc.nextFocus')}
         onChangeText={text => {
           setAll(prev => prev.map(item => item.id === f.id ? { ...item, text } : item));
@@ -57,7 +59,7 @@ export function TrainingFocusList({ ownerId, dogId, discipline, originUnitId, on
       {availableUnitIds && (availableUnitIds.has(f.originUnitId) && onOpenSource ? <TouchableOpacity style={s.button}
         accessibilityRole="button" onPress={() => onOpenSource(f.originUnitId)}><Text style={s.text}>{t('trainingDoc.openHistory')}</Text></TouchableOpacity>
         : !availableUnitIds.has(f.originUnitId) ? <Text style={s.text}>{t('trainingDoc.sourceUnavailable')}</Text> : null)}
-      <View style={s.row}>{(['open', 'practice', 'done'] as const).map(status => <TouchableOpacity key={status}
+      <View style={s.row}>{(preparation ? ['done'] as const : ['open', 'practice', 'done'] as const).map(status => <TouchableOpacity key={status}
         disabled={busy || !f.text.trim()} accessibilityRole="button" accessibilityState={{ selected: f.status === status, disabled: busy || !f.text.trim() }}
         style={[s.button, f.status === status && { borderColor: C.accent }]}
         onPress={async () => {
@@ -68,16 +70,17 @@ export function TrainingFocusList({ ownerId, dogId, discipline, originUnitId, on
         <Text style={s.text}>{t(status === 'open' ? 'trainingDoc.focusOpen' : status === 'practice' ? 'trainingDoc.focusPractice' : 'trainingDoc.focusDone')}</Text>
       </TouchableOpacity>)}</View>
     </View>)}
-    <TouchableOpacity style={s.button}
+    {(!preparation || open.length > 1) && <TouchableOpacity style={s.button}
       onPress={() => setExpanded(v => !v)} accessibilityRole="button" accessibilityState={{ expanded }}>
       <Text style={s.text}>{t(expanded ? 'trainingDoc.less' : 'trainingDoc.more')} ({open.length})</Text>
-    </TouchableOpacity>
+    </TouchableOpacity>}
   </View>;
 }
 const s = StyleSheet.create({
+  preparation: { padding: 18, borderColor: C.accent, backgroundColor: C.cardAlt },
   card: { padding: 14, gap: 10, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   input: { minHeight: 44, backgroundColor: C.input, color: C.white, borderRadius: 8, padding: 8, fontSize: 14 },
-  title: { fontSize: 14, color: C.white, fontWeight: '600' }, text: { fontSize: 12, color: C.muted },
+  title: { fontSize: 16, color: C.white, fontWeight: '600' }, text: { fontSize: 12, color: C.muted },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   button: { minHeight: 44, paddingHorizontal: 8, justifyContent: 'center', borderColor: C.border, borderWidth: 1, borderRadius: 8 },
 });
