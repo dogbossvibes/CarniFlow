@@ -571,3 +571,25 @@ it('a joker-only track has no object waiting phase or missed-object penalty', as
   expect(result.foundObjectIndices).toEqual([]);
   expect(storeCalls.found).toEqual([]);
 });
+
+it('reports synchronous control acceptance for the watch without inventing a successful object find', async () => {
+  const { getRecorder } = mount(); await flushMicrotasks();
+  expect(getRecorder().getControlState()).toEqual({ recording: false, paused: false });
+  expect(getRecorder().setPaused(true)).toBe(false);
+  expect(getRecorder().markObject()).toBe(false);
+  act(() => {
+    getRecorder().start(undefined, { forceLocked: true });
+    expect(getRecorder().getControlState()).toEqual({ recording: true, paused: false });
+    expect(getRecorder().setPaused(true)).toBe(true);
+    expect(getRecorder().getControlState()).toEqual({ recording: true, paused: true });
+    expect(getRecorder().setPaused(true)).toBe(false);
+    expect(getRecorder().setPaused(false)).toBe(true);
+  });
+  walk(0, 40);
+  act(() => {
+    expect(getRecorder().markObject()).toBe(true);
+    expect(getRecorder().markObject()).toBe(true);
+    expect(getRecorder().markObject()).toBe(false);
+  });
+  expect(storeCalls.found).toEqual(['gegenstand-20', 'gegenstand-70']);
+});

@@ -16,8 +16,8 @@
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "53",
-      "runtimeVersion": "1.0.5-motion-v3",
+      "buildNumber": "54",
+      "runtimeVersion": "1.0.5-watch-v1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {

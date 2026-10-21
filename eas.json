@@ -106,6 +106,12 @@
       "env": {
         "ANYVO_NATIVE_SENSOR_XCTEST": "1"
       }
+    },
+    "native-watch-ios-simulator-r1": {
+      "extends": "native-widgets-ios-simulator",
+      "env": {
+        "ANYVO_NATIVE_SENSOR_XCTEST": "1"
+      }
     }
   },
   "submit": {

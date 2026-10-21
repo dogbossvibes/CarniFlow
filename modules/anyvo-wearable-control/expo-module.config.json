@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["AnyvoWearableControlModule"] },
+  "android": { "modules": ["expo.modules.anyvowearablecontrol.AnyvoWearableControlModule"] }
+}
