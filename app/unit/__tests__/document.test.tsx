@@ -93,6 +93,13 @@ jest.mock('@/components/ui/DogIcon', () => ({ DogIcon: () => null }));
 // ihr Interaktionsverhalten (Bewertung/Notiz, Sheet-Validierung, Speichern-für-
 // Zukunft) ist Teil dessen, was diese Tests abdecken sollen.
 
+// React Native exposes primitives through lazy getters. Resolve the preset's
+// native mocks during module setup so first-render assertions do not also time
+// Babel-transforming Modal/Animated internals. Keep the real component behavior.
+for (const name of ['Modal', 'TouchableOpacity', 'TextInput', 'KeyboardAvoidingView', 'ScrollView']) {
+  Reflect.get(jest.requireActual('react-native'), name);
+}
+
 const mounted: ReactTestRenderer[] = [];
 afterEach(async () => { await act(async () => { for (const node of mounted.splice(0)) node.unmount(); await Promise.resolve(); }); });
 function render(): ReactTestRenderer {
