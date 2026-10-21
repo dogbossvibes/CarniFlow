@@ -1,10 +1,14 @@
 import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Text, StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import Overview from '../index';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { FaehrtenHeader, StatTriple, TrackRow } from '@/features/tracking/components/FaehrtenChrome';
 import { trackOverlayColor } from '@/features/tracking/utils/trackOverlayColors';
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 const mockHistory = jest.fn(), mockPreview = jest.fn(), mockRefresh = jest.fn();
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true };
@@ -29,7 +33,7 @@ const row = (dog = 'd') => ({ id: `s-${dog}`, dog_id: dog, status: 'completed', 
 const gps = { lay: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8.001 }], markers: [] };
 const mount = async () => { await act(async () => { view = TestRenderer.create(<Overview />); }); };
 const texts = () => view.root.findAllByType(Text).flatMap((n: any) => n.props.children);
-beforeEach(() => { jest.clearAllMocks(); mockHistory.mockResolvedValue([row(), row('other')]); mockPreview.mockResolvedValue({}); });
+beforeEach(async () => { await AsyncStorage.clear(); jest.clearAllMocks(); mockHistory.mockResolvedValue([row(), row('other')]); mockPreview.mockResolvedValue({}); });
 afterEach(() => { if (view) act(() => view.unmount()); });
 it('shows an honest unavailable-GPS state and never substitutes a count-based line', async () => {
   await mount(); expect(texts()).toContain('track.preview.noGps');

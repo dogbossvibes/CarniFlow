@@ -1,6 +1,6 @@
 /**
- * Production-Native-Vertrag 1.0.4 (Live Activity V2, Schnellstart-Widget, App Intents):
- * eigener Runtime-Vertrag ggü. Store-Binary 1.0.3 (48). Keine Internal-Werte.
+ * Geprüfter iOS-TestFlight-55-Vertrag: vorhandene Motion-v4-Runtime erhalten.
+ * Eine Journal-OTA darf weder diese Binary-Bindung noch Android verändern.
  */
 import { readFileSync } from 'fs';
 
@@ -8,10 +8,11 @@ const app = JSON.parse(readFileSync('app.json', 'utf8')).expo;
 const eas = JSON.parse(readFileSync('eas.json', 'utf8'));
 
 describe('Production-Native-Vertrag', () => {
-  it('Version 1.0.4 → Runtime 1.0.4 (policy appVersion), iOS-Build 49', () => {
-    expect(app.version).toBe('1.0.4');
+  it('Version 1.0.5, iOS-Build 55 und explizite Motion-v4-Runtime bleiben gebunden', () => {
+    expect(app.version).toBe('1.0.5');
     expect(app.runtimeVersion).toEqual({ policy: 'appVersion' });
-    expect(app.ios.buildNumber).toBe('49');
+    expect(app.ios.buildNumber).toBe('55');
+    expect(app.ios.runtimeVersion).toBe('1.0.5-motion-v4');
     expect(eas.cli.appVersionSource).toBe('local');
     expect(eas.build.production.autoIncrement).toBe(false);
   });

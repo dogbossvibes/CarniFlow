@@ -21,9 +21,12 @@ describe('Track-Detail: Lifecycle schützt liegende Fährten', () => {
     expect(detail).not.toMatch(/if \(d\.dog_id\) useActiveFaehrten\.getState\(\)\.remove\(d\.dog_id\);/);
   });
 
-  it('Recovery-Karte direkt unter dem Header; gesperrt nur durch einen FINALEN Suchlauf', () => {
-    expect(detail).toContain('const canOfferResume = !hasFinalSearchRun(data);');
-    expect(detail).toContain('<TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />');
+  it('Recovery-Karte direkt unter dem Header; nur eigene offene Session ohne finalen Suchlauf', () => {
+    expect(detail).toContain('const ownRecoveryScope = !!authenticatedSession?.user.id && data?.id === id');
+    expect(detail).toContain('&& data?.owner_id === authenticatedSession.user.id;');
+    expect(detail).toContain('const canOfferResume = ownRecoveryScope && !hasFinalSearchRun(data)');
+    expect(detail).toContain("&& (completion.status === 'open' || completion.status === 'absent');");
+    expect(detail).toContain('{canOfferResume && <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={false} onVisibleChange={setRecoveryCardVisible} />');
     const scroll = detail.indexOf('<ScrollView contentContainerStyle={s.content}');
     const card = detail.indexOf('<TrackResumeCta ');
     const hero = detail.indexOf('<View style={[s.card, s.cardGlow, s.hero]}>');
