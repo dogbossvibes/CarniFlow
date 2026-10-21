@@ -143,7 +143,7 @@ export const HELP_TOPICS: Record<HelpTopicId, HelpTopic> = {
     id: 'document_training',
     title: 'Training dokumentieren',
     shortDescription:
-      'Erfasse eine Einheit nachträglich: Hund, Kategorie, Übungen mit Bewertung, Dauer und Notizen. Fotos, Videos und Sprachnotizen kannst du anhängen.',
+      'In drei Schritten: bisherigen Hinweis ansehen, heutige Übungen und Beobachtungen dokumentieren, einen Hinweis fürs nächste Mal speichern. Dauer, Bewertungen und Medien sind optional.',
     category: 'training',
   },
   start_training: {

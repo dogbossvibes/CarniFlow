@@ -58,3 +58,15 @@ test('a status response from old A cannot update the new A after A-B-A', async (
   await act(async () => { resolve({ data: { focus }, error: null }); });
   expect(mockRetry).not.toHaveBeenCalled(); expect(buttons('trainingDoc.focusDone')[0].props.disabled).toBe(false);
 });
+
+
+test('preparation expands read-only open hints, hides completed items and offers only explicit completion', async () => {
+  const older = { ...focus, id: 'older', source_date_snapshot: '2026-10-13', text: 'Older open hint' };
+  const done = { ...focus, id: 'done', status: 'done' as const, text: 'Completed hint' };
+  await show(<ServerTrainingFocusList preparation ownerId="owner-a" rows={[focus, older, done]} loading={false} error={false} limited={false} onRetry={mockRetry} onOpenSource={jest.fn()} />);
+  expect(texts()).toContain('Current target'); expect(texts()).not.toContain('Older open hint');
+  act(() => buttons('trainingDoc.more')[0].props.onPress());
+  expect(texts()).toContain('Older open hint'); expect(texts()).not.toContain('Completed hint');
+  expect(root().findAllByType(TextInput)).toHaveLength(0);
+  expect(buttons('trainingDoc.focusOpen')).toHaveLength(0); expect(buttons('trainingDoc.focusPractice')).toHaveLength(0);
+});
