@@ -5,6 +5,9 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "trainingDoc.savedVariants": "{count} gespeicherte Varianten",
+  "trainingDoc.variant": "Variante {number}",
+  "trainingDoc.renameError": "Umbenennen fehlgeschlagen. Bitte erneut versuchen.",
   "help.firstStepsTitle": "Erste Schritte",
   "help.firstStepsShort": "Lerne ANYVO ohne Probedaten kennen: Hund anlegen, Training dokumentieren und die erste Fährte vorbereiten.",
   "help.firstStepsBody1": "Melde dich in deinem Konto an und lege unter Hunde deinen Hund an. Prüfe im Profil deine Anmeldeart und die Kontoeinstellungen.",

@@ -6,6 +6,7 @@ import { TrainingPreparation } from '@/components/training/TrainingPreparation';
 
 const mockCreateDocumentedUnit = jest.fn();
 const mockAtomicSave = jest.fn();
+const mockListIdentities = jest.fn();
 const mockReplaySave = jest.fn();
 let mockUuidCounter = 0;
 const mockUpdateDocumentedUnit = jest.fn();
@@ -50,7 +51,7 @@ jest.mock('@/constants/disciplines', () => ({
 jest.mock('@/constants/sparten', () => ({ DEFAULT_SPARTEN: ['Fährte'] }));
 jest.mock('@/services/trainingDocumentService', () => ({
   saveAtomicTrainingDocument: (...args: unknown[]) => mockReplaySave(...args),
-  listExerciseIdentities: async () => ({ data: [], error: null }),
+  listExerciseIdentities: (...args: unknown[]) => mockListIdentities(...args),
   listServerTrainingFocuses: async () => ({ data: [], error: null }),
 }));
 const mockLegacySessions = jest.fn();
@@ -161,6 +162,7 @@ function inputByPlaceholder(node: ReactTestRenderer, placeholder: string) {
 beforeEach(async () => {
   jest.spyOn(AppState, 'addEventListener').mockImplementation(() => ({ remove: jest.fn() }));
   mockDocumentFocused = true;
+  mockListIdentities.mockReset().mockResolvedValue({ data: [], error: null });
   mockOwner = 'owner-1'; mockUuidCounter = 0; mockAtomicSave.mockReset(); mockReplaySave.mockReset();
   await AsyncStorage.clear();
   const legacyQuery = { eq: jest.fn(), or: jest.fn(), limit: jest.fn().mockResolvedValue({ data: [], error: null }) };
@@ -874,4 +876,23 @@ describe('DocumentScreen — atomic restore and exact duration', () => {
     expect(mockAtomicSave.mock.calls[0][2].duration_sec).toBe(97);
   });
 
+});
+
+
+describe('DocumentScreen — unified saved exercise selection', () => {
+  it('uses the selected existing identity in an atomic save without inserting another identity', async () => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
+    mockCreateDocumentedUnit.mockReset().mockResolvedValue({ data: { id: 'unit-id' }, error: null });
+    mockListIdentities.mockResolvedValue({ data: ['a', 'b'].map(id => ({ id, owner_id: 'owner-1', discipline_key: 'system:faehrte', display_name: 'Übung', revision: 1, archived_at: null })), error: null });
+    const node = render(); await flush();
+    expect(strings(node).filter(text => text === 'Übung')).toHaveLength(1);
+    selectExercise(node);
+    const variant = node.root.findAll(child => child.props.testID === 'exercise-variant-b' && typeof child.props.onPress === 'function')[0];
+    act(() => variant.props.onPress());
+    tap(node, 'trainingDoc.planned');
+    await act(async () => { await saveButton(node).props.onPress(); }); await flush();
+    expect(mockAtomicSave).toHaveBeenCalledTimes(1);
+    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_identity_id: 'b', exercise_name: 'Übung' })]);
+    expect(mockAtomicSave.mock.calls[0][5].identityChanges).toEqual([]);
+  });
 });

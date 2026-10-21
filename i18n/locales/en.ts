@@ -2,6 +2,9 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "trainingDoc.savedVariants": "{count} saved variants",
+  "trainingDoc.variant": "Variant {number}",
+  "trainingDoc.renameError": "Could not rename. Please try again.",
   "help.firstStepsTitle": "First steps",
   "help.firstStepsShort": "Get to know ANYVO without sample records: add a dog, document training and prepare your first track.",
   "help.firstStepsBody1": "Sign in to your account and add your dog under Dogs. Check your sign-in method and account settings in your profile.",
