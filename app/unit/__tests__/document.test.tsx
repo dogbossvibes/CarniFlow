@@ -924,6 +924,48 @@ describe('DocumentScreen — atomic restore and exact duration', () => {
 
 
 describe('DocumentScreen — unified saved exercise selection', () => {
+  it('continues the latest real identity and preserves the separate old hint, observation and next hint', async () => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
+    mockCreateDocumentedUnit.mockReset().mockResolvedValue({ data: { id: 'unit-id' }, error: null });
+    mockListIdentities.mockResolvedValue({ data: ['a', 'b'].map(id => ({ id, owner_id: 'owner-1', discipline_key: 'system:faehrte', display_name: 'Übung', revision: 1, archived_at: null })), error: null });
+    const oldUnits = ['a', 'b'].map((identity, i) => ({ id: `past-${identity}`, owner_id: 'owner-1', dog_id: 'dog-1', status: 'completed',
+      session_date: `2026-10-${18 + i}`, created_at: `2026-10-${18 + i}T12:00:00Z`, notes: null,
+      exercises: [{ id: `ex-${identity}`, discipline: 'Fährte', exercise_name: 'Übung', exercise_identity_id: identity,
+        discipline_key: 'system:faehrte', rating: 4, notes: `Old result ${identity}`, seq_index: 0 }] }));
+    const before = JSON.stringify(oldUnits);
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: oldUnits, error: null }) });
+    mockListFocuses.mockResolvedValue({ data: [{ id: 'old-hint', owner_id: 'owner-1', dog_id: 'dog-1', discipline_key: 'system:faehrte',
+      exercise_identity_id: 'a', source_unit_id: 'past-a', source_unit_snapshot_id: 'past-a', source_date_snapshot: '2026-10-18',
+      exercise_name_snapshot: 'Übung', text: 'Remember calm start', status: 'open', revision: 1 }], error: null });
+    const node = render(); await flush();
+    expect(strings(node)).toContain('Remember calm start');
+    await selectExercise(node);
+    expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('');
+    const card = node.root.findAll(n => n.props.name === 'Übung' && n.props.historical)[0];
+    expect(card.props.historical.notes).toBe('Old result b');
+    act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Today improved'));
+    await advanceToSave(node);
+    act(() => inputByPlaceholder(node, 'trainingFlow.hintPlaceholder').props.onChangeText('Next calm finish'));
+    await submitTraining(node);
+    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_identity_id: 'b', notes: 'Today improved', rating: null })]);
+    expect(mockAtomicSave.mock.calls[0][5].identityChanges).toEqual([]);
+    expect(mockAtomicSave.mock.calls[0][5].focusChanges[0].request.text).toBe('Next calm finish');
+    expect(mockCompleteFocus).not.toHaveBeenCalled();
+    expect(JSON.stringify(oldUnits)).toBe(before);
+  });
+  it('keeps one exercise and its observation after double press and choosing the same group again', async () => {
+    mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
+    mockCreateDocumentedUnit.mockReset().mockResolvedValue({ data: { id: 'unit-id' }, error: null });
+    mockListIdentities.mockResolvedValue({ data: ['a', 'b'].map(id => ({ id, owner_id: 'owner-1', discipline_key: 'system:faehrte', display_name: 'Übung', revision: 1, archived_at: null })), error: null });
+    const node = render(); await flush(); await openExercisePicker(node);
+    const choose = node.root.findAll(n => n.props.testID === 'exercise-group-übung' && typeof n.props.onPress === 'function')[0].props.onPress;
+    act(() => { choose(); choose(); }); await flush();
+    act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Keep my observation'));
+    await selectExercise(node);
+    expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Keep my observation');
+    await submitTraining(node);
+    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_identity_id: 'a', notes: 'Keep my observation' })]);
+  });
   it('uses the selected existing identity in an atomic save without inserting another identity', async () => {
     mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = []; mockParams = { dogId: 'dog-1' };
     mockCreateDocumentedUnit.mockReset().mockResolvedValue({ data: { id: 'unit-id' }, error: null });
@@ -932,12 +974,11 @@ describe('DocumentScreen — unified saved exercise selection', () => {
     await openExercisePicker(node);
     expect(strings(node).filter(text => text === 'Übung')).toHaveLength(1);
     await selectExercise(node);
-    const variant = node.root.findAll(child => child.props.testID === 'exercise-variant-b' && typeof child.props.onPress === 'function')[0];
-    act(() => variant.props.onPress());
+    expect(node.root.findAll(child => String(child.props.testID).startsWith('exercise-variant-'))).toHaveLength(0);
     expect(strings(node)).toContain('trainingFlow.trainedToday');
     await submitTraining(node); await flush();
     expect(mockAtomicSave).toHaveBeenCalledTimes(1);
-    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_identity_id: 'b', exercise_name: 'Übung' })]);
+    expect(mockAtomicSave.mock.calls[0][3]).toEqual([expect.objectContaining({ exercise_identity_id: 'a', exercise_name: 'Übung' })]);
     expect(mockAtomicSave.mock.calls[0][5].identityChanges).toEqual([]);
   });
 });

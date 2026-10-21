@@ -8,14 +8,14 @@ import { listExerciseIdentities, saveExerciseIdentity, type ExerciseIdentity } f
 const nameKey = (name: string) => name.trim().toLowerCase();
 type Props = {
   ownerId: string; disciplineKey: string; disciplineLabel: string; suggestions: string[];
-  selectedIds: string[]; selectedNames: string[]; disabled?: boolean; allowRename?: boolean;
+  selectedIds: string[]; selectedNames: string[]; disabled?: boolean; allowRename?: boolean; singleChoicePerName?: boolean;
   historyByIdentity?: Record<string, { date: string; notes: string | null }>;
   onSelect: (identity: ExerciseIdentity) => void; onCreate: (name: string) => void; onAddCustom: () => void;
 };
 
-// Names group presentation only. Choosing a stored variant always preserves its ID.
+// Grouping never rewrites saved identities or joins historical results by name.
 export function ExerciseIdentityList({ ownerId, disciplineKey, disciplineLabel, suggestions, selectedIds, selectedNames,
-  disabled = false, allowRename = true, historyByIdentity = {}, onSelect, onCreate, onAddCustom }: Props) {
+  disabled = false, allowRename = true, singleChoicePerName = false, historyByIdentity = {}, onSelect, onCreate, onAddCustom }: Props) {
   const { t } = useT();
   const scope = `${ownerId}:${disciplineKey}`;
   const identity = useRef({ scope, generation: 0 });
@@ -88,8 +88,14 @@ export function ExerciseIdentityList({ ownerId, disciplineKey, disciplineLabel, 
     {(load.scope !== scope || load.loading) && <Text accessibilityLiveRegion="polite" style={s.text}>{t('common.loading')}</Text>}
     {load.scope === scope && load.error && <TouchableOpacity style={s.button} accessibilityRole="button" onPress={() => setRevision(v => v + 1)}><Text style={s.text}>{t('trainingDoc.historyError')}</Text></TouchableOpacity>}
     {(expanded ? choices : choices.slice(0, 5)).map(([key, group]) => {
-      group.rows.sort((a, b) => a.id.localeCompare(b.id));
-      const multiple = group.rows.length > 1;
+      // Keep a restored selection, otherwise continue the most recent identity
+      // used by this dog. Without history, use a stable existing ID (no insert).
+      group.rows.sort((a, b) => singleChoicePerName
+        ? Number(selectedIds.includes(b.id)) - Number(selectedIds.includes(a.id))
+          || (historyByIdentity[b.id]?.date ?? '').localeCompare(historyByIdentity[a.id]?.date ?? '')
+          || a.id.localeCompare(b.id)
+        : a.id.localeCompare(b.id));
+      const multiple = !singleChoicePerName && group.rows.length > 1;
       const selected = group.rows.some(row => selectedIds.includes(row.id)) || selectedNames.some(name => nameKey(name) === key);
       return <View key={key} style={{ gap: 6 }}>
         <View style={s.row}>
