@@ -556,3 +556,74 @@ it('persists all Joker markers while finalizing only rubber as a scored article'
  expect(useTrackingStore.getState().markers.map(m=>m.material)).toEqual(['duebel','ball','gummi']);
  expect(finalizeLocalTrainingSession).toHaveBeenLastCalledWith('local',expect.objectContaining({articlesTotal:1}));
 });
+
+it.each([10_000, -10_000])('incident source-age audit: does not form an anchor from stale/future fixes (%s)', async age => {
+ await start();
+ const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;
+ anchor.mockClear();
+ for (const ms of [100,200,300,400]) feed(ms,5,100,0,age);
+ expect(anchor).not.toHaveBeenCalled();
+});
+
+it('incident source-age audit: accepts the exact five-second boundary for this session only',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [6000,7000,8000,9000]) feed(ms,5,0,0,5000);
+ expect(anchor).toHaveBeenCalledTimes(1);
+});
+it('incident source-age audit: rejects pre-session data even inside the age limit',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [100,200,300,400]) feed(ms,5,100,0,1000);
+ expect(anchor).not.toHaveBeenCalled();
+});
+it('incident source-age audit: rejects source ages just above the existing boundary',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [6000,7000,8000,9000]) feed(ms,5,100,0,5001);
+ expect(anchor).not.toHaveBeenCalled();
+});
+it('incident source-age audit: delayed historical fixes do not create a fallback anchor',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [20000,21000,22000,23000]) feed(ms,5,100,0,19000);
+ expect(anchor).not.toHaveBeenCalled();expect(useTrackingStore.getState().trackPoints).toHaveLength(0);
+});
+it('incident source-age audit: fresh anchor after stale inputs uses the real current position',async()=>{
+ await start();const anchor=useTrackingStore.getState().setStartAnchor as jest.Mock;anchor.mockClear();
+ for(const ms of [100,200,300,400]) feed(ms,5,100,0,10000);
+ for(const ms of [1000,2000,3000,4000]) feed(ms,5,25);
+ expect(anchor).toHaveBeenCalledTimes(1);
+ expect(anchor).toHaveBeenCalledWith(expect.objectContaining({lat:metersToLatitude(25)}));
+});
+
+// Independent review regressions: source age and receipt-time timeout are separate.
+it('does not release an existing anchor early through a future fix timestamp', async () => {
+  await start(); for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  expect(useTrackingStore.getState().startLockActive).toBe(true);
+  feed(500, 5, 0, 0, -20_000);
+  expect(useTrackingStore.getState().startLockActive).toBe(true);
+  expect(useTrackingStore.getState().trackPoints).toHaveLength(0);
+});
+
+it('uses twelve seconds of receipt time for fallback with an eligible two-second-old fix', async () => {
+  mockQaEnabled = true;
+  await start(); for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(12_000, 5, 0, 0, 2000);
+  expect(useTrackingStore.getState().startLockActive).toBe(false);
+  await act(async () => { current.finish(); await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.startupMovementDiagnostics).toMatchObject({ confirmationTSec: 12, confirmationSource: 'fallback' });
+});
+
+it('accepts native fractional milliseconds within the current truncated JS clock bucket', async () => {
+  const anchor = useTrackingStore.getState().setStartAnchor as jest.Mock; anchor.mockClear();
+  await start(); for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0, 0, -0.5);
+  expect(anchor).toHaveBeenCalledTimes(1);
+});
+
+it('preserves measurement time for the first line point and subsequent eligible queued fixes', async () => {
+  await start(); for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(12_000, 5, 0, 0, 2000);
+  feed(12_100, 5, 10, 0, 1100);
+  const times = useTrackingStore.getState().trackPoints.map(p => p.t);
+  expect(times[0]).toBe(1_010_000);
+  expect(times.at(-1)).toBe(1_011_000);
+  expect(times.every((t, i) => i === 0 || t >= times[i - 1])).toBe(true);
+});
