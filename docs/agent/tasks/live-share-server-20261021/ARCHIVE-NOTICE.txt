@@ -1,0 +1,21 @@
+Installed Live Share server source archive — 2026-10-21
+
+This directory preserves the exact reviewed/installed source bytes and selected sanitized evidence. It is documentation, not a release worktree or an executable deployment package.
+
+Installed source: 01-install-candidate.sql, SHA256 c066277c64884015761da148df877552f0b3393f2b5d9664545a17d244281982. Installation and fresh read-only postflight passed on project axkkhyqrjrtbkumaulta. General Live RPC EXECUTE remains revoked for authenticated/anon. QA gateway, OAuth callback changes, fixtures and general activation were NOT performed. See17-production-installation-result.json for actual boundaries.
+
+The preserved rollback source12 is reference-only. To stop a later authorized activation,05-disable-candidate.sql revokes general Live execution while preserving data. No automatic rollback, destructive cleanup, profile/entitlement rewrites, quota resets, staging operation, native build, OTA or Store release is authorized by this archive.
+
+Source review and tests: 40 local SQL integration scenarios, independently reproduced;11 mocked HTTP-runner and5 mocked OAuth-broker checks. These are not actual JWT/Store/device acceptance. Normal-JWT multiaccount, withdrawal, real expiry and actual scheduled retention proof still remain. The single additional QA/OAuth consent question is pending in Chat02.
+
+Retention distinction: API returns only positions at most10s old; display lease5s. The purge deadline is at most60s after reception (possibly earlier at grant/session expiry). Physical removal occurs on the next successful minute maintenance job; near120s plus scheduler jitter is possible in healthy operation, longer during outages. Do not claim a hard60s physical storage upper bound.
+
+Original package path (local operator reference only): outputs/live-share-05-20261021 under the ANYVO ChatGPT workspace. The original manifest is preserved byte-for-byte and records the source hashes, dependencies and scopes. It references more files than this selected archive.
+
+Intentionally retained only locally: personally bound QA plan06, QA gateway07 with real account bindings, OAuth broker09, HTTP runner10, command launcher, consent/operation narrative13 and live operator readiness/session artifacts. Do not commit account-bound run material, actual credentials, JWTs, codes, cookies or keys. Runtime node_modules are excluded; package version/integrity is referenced in the original manifest and dependency lock hash.
+
+Path-dependent harness warning:02-integration-tests.cjs and the unarchived09/10 use __dirname/HERE/ROOT and fixture paths relative to the ORIGINAL output directory. Copying source into docs does not make it runnable here. The archived integration test is exact reviewed source only. Reconstruct a reviewed runnable package in an explicitly chosen local test directory before future execution; never blindly run this archive against Production. No tests were rerun to create the archive.
+
+Git scope: only this newly created directory is intended for the isolated documentation commit. Existing subscription, transfer, monitoring and other worktree WIP must remain unstaged and unchanged. Base HEAD before archive commit34532974df3b74f10ac3b97c0e66fd6f41585066. MASTER00 coordinates a normal push to the existing configured remote, per the direct20Oct continuous GitHub-source-backup instruction recorded in canonical docs/agent/README.md. No merge or release is implied.
+
+Archive-fidelity check: the original16-install-postflight-readonly.sql has one whitespace-only line12. Standard git diff --check reports that one original trailing-space line. It is deliberately retained to preserve the exact executed script SHA; no product source whitespace is changed and no check result is represented as a clean standard diff check.

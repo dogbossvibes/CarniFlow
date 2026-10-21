@@ -1,0 +1,33 @@
+{
+  "status": "EXACT_INSTALLED_SOURCE_ARCHIVE_GENERAL_LIVE_DISABLED",
+  "createdAt": "2026-10-21T01:51:47.181573+00:00",
+  "originalPackageRelativePath": "outputs/live-share-05-20261021",
+  "originalManifestSha256": "f176c2009b126665875241d8fabfecf99cb872fd51e136b5d1aa71534afefab9",
+  "files": {
+    "16-install-postflight-readonly.sql": "7ca36796fd3278d15ae5dea47f17cc8408df7243f656c2bcd5b15a5e4ecc3540",
+    "02-integration-tests.cjs": "a0994249c81319de8eefecd80ef1c7bb2fb5dbbd9de059b1c3d5deee60efe0a7",
+    "04-activation-candidate.sql": "379b65f6bf521c227ccec30a26e870585108320ee67ee3e077a5c48a7a12432e",
+    "ARCHIVE-NOTICE.txt": "582fcba072c92e28ba142e64c54611b123f295e84863118c0251883a390a51ca",
+    "15-current-install-preflight-readonly.sql": "1d0086629f3b43c5d91b65b76522ba5f6734a0a07d929df3988c344cf195e80d",
+    "12-pre-install-live-source-backup.sql": "3fb29ef90fb88f28762290c35398374330cfbedb932f87bd42af47659d70ab15",
+    "08-close-qa-candidate.sql": "1aac429fddcf6a7f5acf3b33c9b8a6a44a9eda001ececfc12a90266ce70d4590",
+    "17-production-installation-result.json": "472d9ba75698fced2588e01a3010e6f4d1b9a505d94c63c41d95b35056c8f1de",
+    "03-integration-result.json": "bdde54521ada52b9ce715f34df46761590e09798e313259404601333659d003d",
+    "11-current-core-readonly.sql": "cb9860f873b9ec0340398c2fcf8b3e61c223ad2117007e351c46673c5892b8f1",
+    "manifest.json": "f176c2009b126665875241d8fabfecf99cb872fd51e136b5d1aa71534afefab9",
+    "independent-review-02.json": "7ed5141e900847d5e673c90259e51e90f100b8d84bd6b15012f66f570183cf10",
+    "05-disable-candidate.sql": "d0edc37ea86df1eac0fec6c68b1f79a97de5d3061ed9ff8bf9cb8e24f1aff37d",
+    "01-install-candidate.sql": "c066277c64884015761da148df877552f0b3393f2b5d9664545a17d244281982",
+    "function-freeze.json": "eac5527b3152ca3da70e48cc327282fa1f1977e019c31e51796819228ca86e94"
+  },
+  "sourceBytesUnchanged": true,
+  "secretsRuntimeCustomerRowsExcluded": true,
+  "pathDependentHarnessesExecutableFromArchive": false,
+  "normalJwtAcceptancePerformed": false,
+  "generalLiveActivationPerformed": false,
+  "standardDiffCheckKnownException": {
+    "file": "16-install-postflight-readonly.sql",
+    "line": 12,
+    "reason": "Preserve exact executed script bytes and SHA; one original whitespace-only line"
+  }
+}

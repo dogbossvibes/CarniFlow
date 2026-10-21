@@ -1,0 +1,63 @@
+{
+  "status": "PASS_INDEPENDENT_LOCAL_REVIEW_NO_HTTP_LOGIN_OR_PRODUCTION_WRITES",
+  "checkedAt": "2026-10-21T01:14:58.298316+00:00",
+  "manifestSha256": "f176c2009b126665875241d8fabfecf99cb872fd51e136b5d1aa71534afefab9",
+  "files": {
+    "01-install-candidate.sql": "c066277c64884015761da148df877552f0b3393f2b5d9664545a17d244281982",
+    "02-integration-tests.cjs": "a0994249c81319de8eefecd80ef1c7bb2fb5dbbd9de059b1c3d5deee60efe0a7",
+    "03-integration-result.json": "bdde54521ada52b9ce715f34df46761590e09798e313259404601333659d003d",
+    "04-activation-candidate.sql": "379b65f6bf521c227ccec30a26e870585108320ee67ee3e077a5c48a7a12432e",
+    "05-disable-candidate.sql": "d0edc37ea86df1eac0fec6c68b1f79a97de5d3061ed9ff8bf9cb8e24f1aff37d",
+    "06-qa-plan.json": "de5a439f9e2f5f61ed4ab63f2a34049f9fda5352e1ba0bc99c629e5a6cb5e7c0",
+    "07-bounded-qa-candidate.sql": "054ed517ca22da1f03fa26ca40decab1cd694fbc6ac6480e5d83348f04a2b4ee",
+    "08-close-qa-candidate.sql": "1aac429fddcf6a7f5acf3b33c9b8a6a44a9eda001ececfc12a90266ce70d4590",
+    "09-google-broker.mjs": "341caddf0b7438d6d773e63d8c8b44267d6cb36e827925959f5a6f1e74059f57",
+    "10-http-acceptance.py": "9a71d1774b2b4c1ecdfdb1f26ae37e4785bce956887a89aba24e27b4d52e22ee",
+    "11-current-core-readonly.sql": "cb9860f873b9ec0340398c2fcf8b3e61c223ad2117007e351c46673c5892b8f1",
+    "12-pre-install-live-source-backup.sql": "3fb29ef90fb88f28762290c35398374330cfbedb932f87bd42af47659d70ab15",
+    "13-approval-and-operations.txt": "c43e94c805e07166b12b7b805e5ecb2b9f8ff0fe3951ceec9dffd5985c8ac0bb",
+    "Live-Share-Abnahme.command": "cc12321598bbc57bb4a2affb57f8afb4e4d376b8e7486eabf3ccc2bdb70bffa5",
+    "runtime/package.json": "e36c0d65d810bc4f5b94d2fbe77b58af8a9978afe070ad67354d8b67942db823",
+    "runtime/package-lock.json": "d5a81786878f4cf636622864a95e0ec39583da2cd88dff0b848532cae392f78f"
+  },
+  "checks": {
+    "independentSql": 40,
+    "httpRunnerFakeApi": 11,
+    "oauthBrokerFakeSdkLoopback": 5
+  },
+  "findingsResolved": [
+    "QA and activation dependency/RLS/ACL drift guards added",
+    "Future-dated retention proof rejected"
+  ],
+  "productionWrites": false,
+  "realLogin": false,
+  "serverActivation": false,
+  "remaining": [
+    "Exact new bounded-QA/OAuth/test-fixture consent",
+    "Personal Google login and masked test passwords",
+    "Normal-JWT API/real expiry/cron acceptance",
+    "Close QA and remove exact callback before activation",
+    "Fresh release gates and platform packaging"
+  ],
+  "externalInputs": {
+    "anyvo-group-live-share-db/docs/agent/tasks/subscription-authority/10-integrated-tests.cjs": "38d38f11aa6396f717cdb04e9adb070dc1e88df62a1302f85106c63f3e4f329d",
+    "anyvo-group-live-share-db/docs/agent/tasks/subscription-authority/01-stage-server.sql": "f9b23df8fea83884331a7ed245c584d82488f4fbb56ef50c39bc3b0f9828978c",
+    "anyvo-group-live-share-db/docs/agent/tasks/group-live-share-db/02-group-live-core.sql": "713ec1bd5c657fc3eea3bff96b3185344071d3458a7ae9d6d35fc413a3b500d6",
+    "anyvo-group-live-share-db/docs/agent/tasks/track-transfer-db/17-cloud-safe-transfer-candidate.sql": "f462a1df21cff351691cbd31168cdb35e03635d853103933f6d864607fa8158d",
+    "anyvo-group-live-share-db/docs/agent/tasks/track-transfer-db/12-cloud-safety-preflight-result.json": "e576201b6f749b82d7fa03a9fce9fb345c25a14eeee9288479ecc020e8d23c76",
+    "anyvo-track-object-corrections-db/docs/agent/tasks/track-object-corrections-db/20-c1-insert-preflight.json": "c06c282b43676de6b3cee1a957a5a1cea85f1853207df7386e2b65e203c7a6d7",
+    "anyvo-group-live-share-db/supabase/migrations/20260913200000_protect_internal_tester_insert.sql": "4af2abedd11917579780a9e07b5e58932dcd3cd978240fc5f8ef41019cefa817",
+    "anyvo-group-live-share-db/FOUNDER_SLOT_LIFECYCLE_SETUP.sql": "90a3de02f8be41a18730d509386dd4b205044be9601ef61c84727e6b230fc794",
+    "anyvo-track-object-corrections-db/docs/agent/tasks/track-object-corrections-db/21-c1-api-harness.py": "547e5572449e257c204b9dfbad8a3893e6329608c1c37a2d020285ded9323cef",
+    "anyvo-track-object-corrections-db/docs/agent/tasks/track-object-corrections-db/17-c1-two-owner-fixture-plan.json": "ab529baab088483a2892883a4b00740c5e5142bff636d5f87072c3108ce72f44"
+  },
+  "metadataAddendum": "Runtime package/lock and ten external inputs added; all independently hash verified; reviewed SQL/HTTP/OAuth code unchanged.",
+  "previousInstallationManifestSha256": "12cca11c031e141840bb25494551189ce9a1ab1948c0245a0027566dda026b28",
+  "documentationRetentionClarification": {
+    "at": "2026-10-21T01:30:10.200325+00:00",
+    "onlyFile": "13-approval-and-operations.txt",
+    "meaning": "10-second API freshness, 5-second display lease, <=60-second purge deadline; physical deletion on next successful minute job, not hard60-second storage bound",
+    "previousManifestSha256": "12cca11c031e141840bb25494551189ce9a1ab1948c0245a0027566dda026b28",
+    "codeSqlThresholdCronProductionChanges": false
+  }
+}

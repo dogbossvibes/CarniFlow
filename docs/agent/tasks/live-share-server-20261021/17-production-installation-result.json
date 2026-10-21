@@ -1,0 +1,53 @@
+{
+  "status": "SERVER_INSTALLATION_PASS_GENERAL_LIVE_DISABLED_QA_OAUTH_NOT_INSTALLED",
+  "recordedAt": "2026-10-21T01:24:50.882094+00:00",
+  "project": "axkkhyqrjrtbkumaulta",
+  "authorization": "Direct human21.10 implementation request in Chat02 verified by read_thread; independent installer01 already in scope; new QA/OAuth consent remains pending",
+  "manifestSha256": "12cca11c031e141840bb25494551189ce9a1ab1948c0245a0027566dda026b28",
+  "installerSha256": "c066277c64884015761da148df877552f0b3393f2b5d9664545a17d244281982",
+  "installerBytes": 15436,
+  "installedVia": "Authenticated native Safari Supabase SQL editor, exact hash verified from local file read through native TextEdit",
+  "providerHealth": {
+    "statusPage": "https://status.supabase.com/incidents/01M5DN6V02FJHZTE9390XJM9YY",
+    "ongoingIncident": "Projects stuck restarting in us-east-2",
+    "anyvoRegion": "eu-west-1",
+    "anyvoDashboard": "Healthy",
+    "projectRestartOrSettingChange": false
+  },
+  "backup": {
+    "source": "Supabase Database Backups Scheduled tab read only",
+    "latestPhysicalBackupUTC": "2026-10-21T00:18:09+00:00",
+    "restoreControlVisible": true,
+    "restorePerformed": false,
+    "exactPreviousLiveSourceBackup": "12-pre-install-live-source-backup.sql"
+  },
+  "preflight": {
+    "result": "INSTALLATION_PREFLIGHT_PASS",
+    "serverCheckedAtUTC": "2026-10-21T01:21:28.692238+00:00",
+    "script": "15-current-install-preflight-readonly.sql",
+    "sha256": "1d0086629f3b43c5d91b65b76522ba5f6734a0a07d929df3988c344cf195e80d"
+  },
+  "installationResult": "Success. No rows returned.",
+  "postflight": {
+    "result": "SERVER_INSTALLED_LIVE_DISABLED",
+    "serverCheckedAtUTC": "2026-10-21T01:24:04.508521+00:00",
+    "script": "16-install-postflight-readonly.sql",
+    "sha256": "7ca36796fd3278d15ae5dea47f17cc8408df7243f656c2bcd5b15a5e4ecc3540",
+    "coreDependenciesPinned": 22,
+    "explicitFunctionSignatureSourceOwnerSecurityPins": 6,
+    "liveExecuteAuthenticated": false,
+    "liveExecuteAnon": false,
+    "accessRpcAuthenticatedOnly": true,
+    "privateHelperStillPrivate": true,
+    "authorityAndTesterProtectionUnchanged": true,
+    "privatePositionTablesRlsAndNoClientTableAccess": true,
+    "freshMaintenanceAndMonitorPassed": true,
+    "newQaFunctionAndTableAbsent": true
+  },
+  "fixtureWrites": false,
+  "oauthChanges": false,
+  "normalJwtLiveAcceptance": false,
+  "generalLiveActivation": false,
+  "otaBuildStoreAction": false,
+  "next": "Wait for the single concrete consent question in Chat02; prepare bounded QA and exact OAuth redirect only after human answer, then personal login and normal JWT acceptance; close both before general activation."
+}
