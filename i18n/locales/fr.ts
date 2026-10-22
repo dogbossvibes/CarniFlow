@@ -641,6 +641,10 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "greeting.morning": "Bonjour",
   "greeting.day":     "Bonjour",
   "greeting.evening": "Bonsoir",
+  "greeting.settingsTitle": "Accueil du jour",
+  "greeting.soundLabel": "Son de bienvenue",
+  "greeting.soundHint": "Facultatif lors de la première ouverture après le redémarrage de l’application. Les enregistrements et annonces sont prioritaires.",
+  "greeting.soundSaveError": "Le réglage du son n’a pas pu être enregistré.",
 
   // Terminkalender (Startseite)
   "calendar.viewAll":         "Tout afficher",

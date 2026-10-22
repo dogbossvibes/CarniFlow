@@ -1,3 +1,4 @@
+import { setAppAudioModeAsync } from '@/lib/greetingAudioSafety';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,7 +10,7 @@ import { ZoomableImage } from '@/components/ui/ZoomableImage';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { signMediaUrl } from '@/lib/mediaUrl';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
@@ -55,7 +56,7 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
       if (localRef.current) { FileSystem.deleteAsync(localRef.current, { idempotent: true }); localRef.current = null; }
       if (playingIdx === idx) { setPlayingIdx(null); return; }
       setPlayingIdx(idx);
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
       const localUri = FileSystem.cacheDirectory + `memo_${idx}_${Date.now()}.mp4`;
       const result   = await FileSystem.downloadAsync(await signMediaUrl(files[idx].url), localUri);
       if (result.status !== 200) throw new Error('Download fehlgeschlagen');

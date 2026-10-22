@@ -1,3 +1,4 @@
+import { setAppAudioModeAsync } from '@/lib/greetingAudioSafety';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView,
@@ -9,7 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  useAudioRecorder, useAudioPlayer, setAudioModeAsync, AudioModule, RecordingPresets,
+  useAudioRecorder, useAudioPlayer, AudioModule, RecordingPresets,
 } from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { C } from '@/constants/colors';
@@ -110,7 +111,7 @@ export default function ChatThreadScreen() {
     try {
       const { granted } = await AudioModule.requestRecordingPermissionsAsync();
       if (!granted) { Alert.alert(t('comments.microphoneRequired'), t('comments.microphonePermission')); return; }
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
       setRecording(true); setSeconds(0);
@@ -123,7 +124,7 @@ export default function ChatThreadScreen() {
     setRecording(false);
     try {
       await recorder.stop();
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
       const uri = recorder.uri;
       if (!uri) return;
       setSending(true);
@@ -238,7 +239,7 @@ function AudioBubble({ url, mine }: { url: string; mine: boolean }) {
     try {
       if (playing) { player.pause(); setPlaying(false); return; }
       setBusy(true);
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
       if (!localRef.current) {
         const remote = await signMediaUrl(url);
         const local  = FileSystem.cacheDirectory + `chat_audio_${Date.now()}.mp4`;
