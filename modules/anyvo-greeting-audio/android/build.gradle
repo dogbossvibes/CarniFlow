@@ -6,6 +6,9 @@ group = 'expo.modules.anyvogreetingaudio'
 version = '1.0.0'
 android {
   namespace 'expo.modules.anyvogreetingaudio'
-  defaultConfig { minSdkVersion 24 }
+  defaultConfig {
+    minSdkVersion 24
+    versionName project.version.toString()
+  }
 }
 dependencies { testImplementation 'junit:junit:4.13.2' }
