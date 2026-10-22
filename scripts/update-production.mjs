@@ -254,15 +254,27 @@ export function parseNativeBuild(buildJson) {
   };
 }
 
-/** Validierung des nativen Basis-Builds (Initial-Modus). Leere Liste = gültige Basis. */
-export function evaluateNativeBaseBuild({ build, buildId, platform, runtime }) {
+const appVersionFrom = (appJson, platform) => {
+  const expo = appJson?.expo;
+  const value = expo?.[platform] != null && Object.hasOwn(expo[platform], 'version')
+    ? expo[platform].version : expo?.version;
+  return typeof value === 'string' && value.trim() ? value : null;
+};
+
+/** Native Runtime-Overrides nur mit app.json vom unveränderlichen Build-Commit. */
+export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeAppJson, releaseAppVersion }) {
   if (!build) return [`EAS-Build ${buildId ?? '—'} nicht gefunden/lesbar`];
   const problems = [];
   if (build.id !== buildId) problems.push(`EAS-Build-ID ${build.id} ≠ angefragt ${buildId}`);
   if (build.status !== 'FINISHED') problems.push(`Basis-Build ${build.id}: Status ${build.status ?? '—'} ≠ FINISHED`);
   if (build.platform !== platform) problems.push(`Basis-Build ${build.id}: Plattform ${build.platform ?? '—'} ≠ Ziel ${platform}`);
   if (build.runtimeVersion !== runtime) problems.push(`Basis-Build ${build.id}: Runtime ${build.runtimeVersion ?? '—'} ≠ Ziel-Runtime ${runtime}`);
-  if (build.appVersion !== runtime) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion)`);
+  const declaredOverrideMatches = typeof build.appVersion === 'string' && !!build.appVersion.trim()
+    && resolveReleaseRuntime(nativeAppJson, platform) === runtime
+    && appVersionFrom(nativeAppJson, platform) === build.appVersion
+    && releaseAppVersion === build.appVersion;
+  if (build.appVersion !== runtime && !declaredOverrideMatches)
+    problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion oder belegter Override aus Build-Commit)`);
   if (build.channel !== PRODUCTION_CHANNEL) problems.push(`Basis-Build ${build.id}: Channel ${build.channel ?? '—'} ≠ ${PRODUCTION_CHANNEL}`);
   if (build.buildProfile !== 'production') problems.push(`Basis-Build ${build.id}: Profil ${build.buildProfile ?? '—'} ≠ production`);
   if (!/^[0-9a-f]{40}$/.test(build.gitCommitHash ?? '')) problems.push(`Basis-Build ${build.id}: kein gültiger gitCommitHash`);
@@ -472,6 +484,16 @@ function readNativeBuild(buildId) {
   catch { return null; }
 }
 
+function readNativeBuildAppJson(commit) {
+  if (!/^[0-9a-f]{40}$/.test(commit ?? '')) return null;
+  try {
+    const files = sh('git', ['ls-tree', '--name-only', commit]).split('\n');
+    // Never infer a static native contract when dynamic config can override it.
+    if (files.some(file => /^app\.config\.(js|ts|mjs|cjs)$/.test(file))) return null;
+    return JSON.parse(sh('git', ['show', `${commit}:app.json`]));
+  } catch { return null; }
+}
+
 /**
  * Baseline für den Release. Normal: OTA-Group genau (Plattform, Runtime).
  * Initial: nur zulässig, solange für (Plattform, Runtime) KEINE Group existiert — dann der
@@ -484,7 +506,11 @@ function readBaseline(platform, runtime, initial, buildId) {
     return { active: null, ownOta: own, problems: [`--initial-runtime-release unzulässig: für ${platform} / Runtime ${runtime} existiert bereits Production-Group ${own.group} — normalen Release ohne Initial-Flags verwenden`] };
   }
   const build = readNativeBuild(buildId);
-  const problems = evaluateNativeBaseBuild({ build, buildId, platform, runtime });
+  const needsProof = build && build.appVersion !== runtime;
+  const nativeAppJson = needsProof ? readNativeBuildAppJson(build.gitCommitHash) : undefined;
+  const releaseAppVersion = needsProof && existsSync('app.json')
+    ? appVersionFrom(JSON.parse(readFileSync('app.json', 'utf8')), platform) : undefined;
+  const problems = evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeAppJson, releaseAppVersion });
   return { active: build?.gitCommitHash ? nativeBaseline(build) : null, ownOta: null, problems };
 }
 
