@@ -778,6 +778,10 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'greeting.morning': 'Guete Morge',
   'greeting.day':     'Guete Tag',
   'greeting.evening': 'Guete Abig',
+  "greeting.settingsTitle": "Tagesgruess",
+  "greeting.soundLabel": "Begrüessigston",
+  "greeting.soundHint": "Optional bim erschte Öffne nach eme App-Neustart. Ufnahme und Aasage händ Vorrang.",
+  "greeting.soundSaveError": "D Toneistellig het nöd chönne gspeicheret werde.",
 
   // Terminkalender (Startseite)
   'calendar.viewAll':         'Alli aaluege',

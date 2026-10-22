@@ -1,7 +1,8 @@
+import { setAppAudioModeAsync } from '@/lib/greetingAudioSafety';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
-  useAudioRecorder, useAudioPlayer, useAudioPlayerStatus, setAudioModeAsync, AudioModule, RecordingPresets,
+  useAudioRecorder, useAudioPlayer, useAudioPlayerStatus, AudioModule, RecordingPresets,
 } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
@@ -80,7 +81,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
       const { granted } = await AudioModule.requestRecordingPermissionsAsync();
       if (!granted) { Alert.alert(t('comments.microphoneRequired'), t('comments.microphonePermission')); return; }
       if (player.playing) player.pause();
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       await recorder.prepareToRecordAsync();
       recorder.record();
       setIsRec(true); setRecSecs(0);
@@ -96,7 +97,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
     setIsRec(false);
     try {
       await recorder.stop();
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
       const uri = recorder.uri;
       if (!uri) return;
       setBusy(true);
@@ -129,7 +130,7 @@ export function CommentThread({ unitId }: { unitId: string }) {
       cleanupLocal();
       if (playingId === c.id) { setPlayingId(null); return; }
       setPlayingId(c.id);
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
+      await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
       const local = FileSystem.cacheDirectory + `c_${c.id}.m4a`;
       const r = await FileSystem.downloadAsync(await signMediaUrl(c.media_url), local);
       localRef.current = r.uri;
