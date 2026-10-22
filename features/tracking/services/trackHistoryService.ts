@@ -32,9 +32,10 @@ function canReadLocal(local: LocalTrainingSession, userId?: string | null) {
 
 // Detail einer noch nicht synchronisierten Fährte lokal (SQLite) zusammenbauen —
 // Fallback, wenn getTrackSessionById (remote) nichts liefert. null, wenn lokal unbekannt.
-export async function getLocalTrackDetail(localId: string, userId?: string | null): Promise<Record<string, any> | null> {
+export async function getLocalTrackDetail(localId: string, userId?: string | null, options?: { ownedOnly?: boolean }): Promise<Record<string, any> | null> {
   const local = await getLocalTrainingSessionById(localId).catch(() => null);
-  if (!local || !canReadLocal(local, userId)) return null;
+  if (!local || !canReadLocal(local, userId)
+    || (options?.ownedOnly && (!userId || local.user_id !== userId || !!local.deleted_at))) return null;
   const [points, markers] = await Promise.all([
     getTrackPointsBySession(localId).catch(() => []),
     getTrackMarkersBySession(localId).catch(() => []),

@@ -28,8 +28,8 @@ import { C } from '@/constants/colors';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { MarkerDetailSheet, type TrackDetailSelection } from '@/features/tracking/components/MarkerDetailSheet';
-import { buildTrackDetailMap } from '@/features/tracking/utils/trackDetailMap';
-import { TrackSketch } from '@/features/tracking/components/TrackSketch';
+import { buildTrackDetailDisplay } from '@/features/tracking/utils/trackDetailDisplay';
+import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { TrackScoreRing } from '@/features/tracking/components/TrackScoreRing';
 import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
 import { FaehrtenHeader, SectionLabel, relDate } from '@/features/tracking/components/FaehrtenChrome';
@@ -96,11 +96,14 @@ export default function TrackAuswertungScreen() {
   const { t } = useT();
   const { t: transferT } = useTranslation('trackTransfer');
   const authGeneration = useRef(0);
+  const evaluationDraftScope = useRef<{ id: string; userId: string | undefined } | null>(null);
   const [authEpoch, setAuthEpoch] = useState(0);
   useEffect(() => { const { data: auth } = supabase.auth.onAuthStateChange(event => {
-    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { authGeneration.current++; setData(null); setNotes(''); setLegs([]); setAuthEpoch(n => n + 1); }
+    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { authGeneration.current++; evaluationDraftScope.current = null; setData(null); setNotes(''); setLegs([]); setAuthEpoch(n => n + 1); }
   }); return () => auth.subscription.unsubscribe(); }, []);
   const [data, setData] = useState<any | null>(null);
+  const [displaySupplement, setDisplaySupplement] = useState<unknown>(null);
+  const [loadRevision, setLoadRevision] = useState(0);
   const { color: layColor } = useDogTrackColor(data?.dog_id);
   const completion = useTrackCompletion({ sessionId: data?.id === id ? String(id) : null,
     dogId: data?.dog_id, userId: authenticatedSession?.user.id, revision: authEpoch });
@@ -125,7 +128,10 @@ export default function TrackAuswertungScreen() {
     let alive = true;
     const loadEpoch = authGeneration.current;
     const userId = authenticatedSession?.user.id;
-    setData(null); setNotes(''); setLegs([]); setLoading(true);
+    const preserveEvaluation = loadRevision > 0 && evaluationDraftScope.current?.id === id
+      && evaluationDraftScope.current?.userId === userId;
+    if (!preserveEvaluation) { evaluationDraftScope.current = null; setNotes(''); setLegs([]); }
+    setData(null); setDisplaySupplement(null); setLoading(true);
     (async () => {
       const r = await getTrackSessionById(id);
       // Fällt remote nichts zurück (noch nicht synchronisiert / offline) → lokal (SQLite)
@@ -167,6 +173,11 @@ export default function TrackAuswertungScreen() {
         const picked = pickDetailMarkers(d.markers ?? [], local?.markers ?? []);
         if (picked.length > 0) d = { ...d, markers: picked };
       }
+      // Read-only display fallback for a partial point/run sync, including an
+      // existing empty track_runs row. Ownership/run/prefix guards are centralized
+      // in buildTrackDetailDisplay; canonical data and scores are never replaced.
+      const localDisplay = d && !localOnly && userId && d.owner_id === userId
+        ? await getLocalTrackDetail(id, userId, { ownedOnly: true }).catch(() => null) : null;
       if (!alive || loadEpoch !== authGeneration.current) return;
       if (localOnly && d && (!userId || d.owner_id !== userId || d.id !== id)) d = null;
       if (d?.track_data && Object.hasOwn(d.track_data, 'trackTransferReceipt')) {
@@ -176,6 +187,7 @@ export default function TrackAuswertungScreen() {
         } catch { d = null; }
       }
       setData(d);
+      setDisplaySupplement(localDisplay);
       setIsLocalOnly(localOnly);
       // Track-Open = Retry-Anlass: ist die lokale Session nicht 'synced', werden
       // fehlgeschlagene Queue-Items erneut versucht (nicht blockierend, egal von
@@ -187,8 +199,13 @@ export default function TrackAuswertungScreen() {
         // Default-Startwert in legsFromSession (siehe trackEvaluation.ts), eine
         // bereits gespeicherte manuelle Bewertung bleibt davon unberührt.
         // Dieselbe Quelle wie Warnhinweis/Analyse unten (trackAnalysisState.ts).
-        setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0, hasSearchGeometry(d)));
-        setNotes(d.notes ?? '');
+        // A map-only retry must not erase the user's unsaved manual evaluation.
+        // Changing account/route still initializes from that record as before.
+        if (!preserveEvaluation) {
+          setLegs(legsFromSession(d.track_data, d.corners_total ?? 0, d.articles_total ?? 0, hasSearchGeometry(d)));
+          setNotes(d.notes ?? '');
+        }
+        evaluationDraftScope.current = { id, userId };
         // Abschluss-Ansicht → die Fährte ist nicht mehr „offen" — aber nur, wenn
         // DIESE Session wirklich abgesucht wurde und der Registry-Eintrag zu ihr gehört.
         // Eine gelegte, noch liegende Fährte (oder eine andere Fährte desselben
@@ -200,7 +217,7 @@ export default function TrackAuswertungScreen() {
       setLoading(false);
     })().catch(() => { if (alive && loadEpoch === authGeneration.current) { setData(null); setLoading(false); } });
     return () => { alive = false; };
-  }, [id, authenticatedSession?.user.id, authEpoch]);
+  }, [id, authenticatedSession?.user.id, authEpoch, loadRevision]);
 
   const score = useMemo(() => overallScore(legs), [legs]);
   const verdict = scoreVerdict(score);
@@ -212,7 +229,7 @@ export default function TrackAuswertungScreen() {
     if (!data) return null;
     // Gespeicherte Geometrie und Markertypen bleiben erhalten; die angezeigten
     // Meter liegen auf derselben Referenzlinie wie bei der Absuche.
-    const detail = buildTrackDetailMap(data);
+    const detail = buildTrackDetailDisplay(data, displaySupplement, authenticatedSession?.user.id);
     const markers: MapMarker[] = detail.markers.map(m => ({ ...m }));
     const segments = coerceTrackSegments(data.track_data?.segments);
     const fitPoints = [
@@ -225,9 +242,11 @@ export default function TrackAuswertungScreen() {
     return {
       lay: detail.lay, run: detail.run, markers, segments, fitPoints,
       start: detail.start, end: detail.end, totalDistanceM: detail.totalDistanceM,
-      hasGps: detail.hasLay,
+      hasGps: detail.lay.length > 0 || detail.run.length > 0,
+      hasLay: splitContinuousPoints(detail.lay).some(part => part.length > 1),
+      hasRun: splitContinuousPoints(detail.run).some(part => part.length > 1),
     };
-  }, [data]);
+  }, [data, displaySupplement, authenticatedSession?.user.id]);
   // Punkt 14: rein additiv — `undefined` bei Fährten ohne Analyse (ältere
   // Sessions, Freilauf ohne Soll-Fährte, Recovery-Kurzpfad). Dieselbe
   // track_data.run-Quelle wie das bestehende segmentAnalysis oben (lokal via
@@ -474,7 +493,9 @@ export default function TrackAuswertungScreen() {
             <View style={[s.card, { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, marginBottom: 16, backgroundColor: C.trackWarning + '14', borderColor: C.trackWarning + '55', borderWidth: 1 }]}>
               <Ionicons name="information-circle" size={18} color={C.trackWarning} />
               <Text style={{ flex: 1, fontSize: 12, fontWeight: '700', color: C.trackText }}>
-                Automatische Auswertung nicht verfügbar — die Absuche hat keine verwertbare Suchspur aufgezeichnet. Die Punktzahl unten ist noch nicht bewertet, keine automatische Aussage über die Hundeleistung.
+                {map?.hasRun
+                  ? 'Die Suchspur ist in der Karte sichtbar. Für eine automatische Auswertung fehlen vollständige gespeicherte Analysedaten. Deine manuelle Bewertung bleibt unabhängig davon.'
+                  : 'Automatische Auswertung nicht verfügbar — die Absuche hat keine verwertbare Suchspur aufgezeichnet. Die Punktzahl unten ist noch nicht bewertet, keine automatische Aussage über die Hundeleistung.'}
               </Text>
             </View>
           )}
@@ -747,6 +768,7 @@ export default function TrackAuswertungScreen() {
               {map?.hasGps ? (
                 <TrackingMap
                   distractionTracks={distractionTracks}
+                  comparison
                   layColor={layColor}
                   layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
                   startAnchor={map.start} endPoint={map.end} endTotalDistanceM={map.totalDistanceM} fitToPoints={map.fitPoints}
@@ -757,15 +779,23 @@ export default function TrackAuswertungScreen() {
                   currentPosition={null} follow={false} mapType="hybrid"
                 />
               ) : (
-                <TrackSketch accent={layColor} points={map?.lay} legs={corners} objects={aTotal} w={320} h={190} progress={1} />
+                <View style={s.center}><Text style={s.muted}>{t('track.preview.noGps')}</Text></View>
               )}
             </View>
             <View style={s.legend}>
-              <Legend color={layColor} label="Fährte" />
-              <Legend color="#fff" label="Gegenstand" square />
-              <Legend color={C.trackWarning} label="Korrektur" />
+              <Legend color={layColor} label={t('track.replay.legendReference')} />
+              <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} dashed />
             </View>
           </View>
+
+          {map && (!map.hasLay || (!map.hasRun && hasFinalSearchRun(data))) && (
+            <View style={[s.card, { padding: 14, gap: 10, marginBottom: 16 }]}>
+              <Text style={s.muted}>{!map.hasLay ? 'Keine vollständige gelegte GPS-Spur verfügbar.' : 'Keine gespeicherte Suchspur verfügbar.'}</Text>
+              <Pressable accessibilityRole="button" testID="track-detail-reload-lines" onPress={() => setLoadRevision(n => n + 1)} style={{ minHeight: 44, justifyContent: 'center' }}>
+                <Text style={{ color: C.trackPrimary, fontWeight: '700' }}>Spuren neu laden</Text>
+              </Pressable>
+            </View>
+          )}
 
           <TrackAngleList markers={map?.markers ?? []} onSelect={marker => setDetailSel({ kind: 'marker', marker })} />
 
@@ -937,10 +967,15 @@ export default function TrackAuswertungScreen() {
               <View style={s.fullscreenHeaderButton} />
             </View>
           </View>
+          <View style={s.fullscreenLegend}>
+            <Legend color={layColor} label={t('track.replay.legendReference')} />
+            <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} dashed />
+          </View>
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
               <TrackingMap
                   distractionTracks={distractionTracks}
+                  comparison
                   layColor={layColor}
                 layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
                 startAnchor={map.start} endPoint={map.end} endTotalDistanceM={map.totalDistanceM} fitToPoints={map.fitPoints}
@@ -972,10 +1007,10 @@ function Tag({ children }: { children: React.ReactNode }) {
   return <View style={s.tag}><Text style={s.tagTxt}>{children}</Text></View>;
 }
 
-function Legend({ color, label, square }: { color: string; label: string; square?: boolean }) {
+function Legend({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
   return (
     <View style={s.legendItem}>
-      <View style={[s.legendDot, { backgroundColor: color, borderRadius: square ? 2 : 5, transform: square ? [{ rotate: '45deg' }] : undefined }]} />
+      <View style={[s.legendLine, !dashed && { backgroundColor: '#F5F7FA', padding: 1, borderRadius: 3 }]}>{(dashed ? [0, 1, 2] : [0]).map(i => <View key={i} style={{ backgroundColor: color, height: dashed ? 3 : 6, flex: 1, borderRadius: 2 }} />)}</View>
       <Text style={s.legendTxt}>{label}</Text>
     </View>
   );
@@ -1031,10 +1066,11 @@ const s = StyleSheet.create({
   fullscreenMap: { flex: 1 },
   fitButton: { position: 'absolute', left: 16, bottom: 18, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, borderRadius: 12, backgroundColor: C.trackPrimary, borderWidth: 1, borderColor: C.trackPrimaryDk },
   fitButtonText: { color: '#04110F', fontSize: 12, fontWeight: '800' },
-  legend:  { position: 'absolute', left: 14, bottom: 12, flexDirection: 'row', gap: 14 },
+  legend:  { position: 'absolute', left: 8, right: 8, bottom: 8, padding: 8, borderRadius: 10, backgroundColor: C.trackCard, flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  fullscreenLegend: { paddingHorizontal: 18, paddingVertical: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 14, backgroundColor: C.trackCard },
   legendItem:{ flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot: { width: 9, height: 9 },
-  legendTxt: { fontSize: 10, color: C.trackTextSec, fontWeight: '600' },
+  legendLine: { width: 24, flexDirection: 'row', alignItems: 'center', gap: 3 },
+  legendTxt: { fontSize: 12, color: C.trackTextSec, fontWeight: '600' },
 
   notesInput:{ fontSize: 14, color: C.trackText, lineHeight: 21, minHeight: 70, textAlignVertical: 'top' },
   shareCard: { padding: 16, marginBottom: 16, gap: 12 },

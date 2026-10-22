@@ -67,7 +67,7 @@ describe('Analyse-Zustand — eine Quelle', () => {
 describe('Fährtenverlauf — Marker-Datenquelle', () => {
   it('Karte bekommt ausschliesslich gespeicherte Marker (data.markers → buildTrackDetailMap → TrackingMap)', () => {
     const src = source();
-    expect(src).toContain('const detail = buildTrackDetailMap(data);');
+    expect(src).toContain('const detail = buildTrackDetailDisplay(data, displaySupplement, authenticatedSession?.user.id);');
     expect(src).toContain('const markers: MapMarker[] = detail.markers.map(m => ({');
     expect(src).toContain('layPoints={map.lay} runPoints={map.run} markers={map.markers}');
     // Keine Marker aus analytics.corners (nur atM, keine Koordinate, nicht gespeichert).

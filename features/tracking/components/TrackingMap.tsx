@@ -24,6 +24,7 @@ import { DistanceScaleLayer, type ScaleRegion } from '@/features/tracking/compon
 import { buildDistanceTicks, pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
 import { MapScaleBar } from './MapScaleBar';
 import { useMapScaleBar } from '../hooks/useMapScaleBar';
+import { TrackComparisonLines } from './TrackComparisonLines';
 import type { LL } from '@/features/tracking/utils/searchGeometry';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
@@ -88,6 +89,7 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
 });
 
 interface Props {
+  comparison?: boolean;
   layColor?: string;
   layPoints:        LatLng[];
   // Read-only Referenz-Fährten anderer eigener Hunde (nur Linie + Start-Label).
@@ -145,7 +147,7 @@ interface Props {
 const EMPTY_MARKERS: MapMarker[] = [];
 
 export function TrackingMap({
-  layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -359,7 +361,8 @@ export function TrackingMap({
         {/* Gelegte Fährte (Soll-Linie): IMMER solide ANYVO-Mint — auch während der
             Absuche. Kein Dash/Dimm (sonst mit der blauen Ist-Suchspur verwechselbar).
             Stil zentral über laidTrackStroke() (rein/testbar). */}
-        {laySegmentParts.length > 0 ? laySegmentParts.map(part => {
+        {comparison && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} />}
+        {!comparison && (laySegmentParts.length > 0 ? laySegmentParts.map(part => {
           const stroke = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
           return (
             <Polyline
@@ -375,7 +378,7 @@ export function TrackingMap({
           );
         }) : layParts.filter(part => part.length > 1).map((part, index) => (
           <Polyline key={`lay-${index}`} coordinates={part} strokeColor={layColor} strokeWidth={4} lineCap="round" lineJoin="round" />
-        ))}
+        )))}
         {/* Fährten-Maßstab: dezente Querstriche über der gelegten Linie (zIndex 4),
             Zahlen nur alle 10 m (bzw. ausgedünnt). Standard-Delta wie initialRegion. */}
         {scaleTicks && scaleTicks.ticks.length > 0 && (
@@ -389,7 +392,7 @@ export function TrackingMap({
           />
         )}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
-        {runParts.filter(part => part.length > 1).map((part, index) => (
+        {!comparison && runParts.filter(part => part.length > 1).map((part, index) => (
           <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={4} />
         ))}
 
