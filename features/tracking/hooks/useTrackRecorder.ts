@@ -644,12 +644,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const handleStartLock = useCallback((raw: Raw): boolean => {
     const s = store.getState();
     const now = raw.t;
-    const elapsed = now - startLockBeganRef.current;
+    const receivedAt = Date.now();
+    const elapsed = receivedAt - startLockBeganRef.current;
 
     // Gute Fixes für den Anker sammeln (nur akzeptable Genauigkeit).
     const previousAccepted = startFixesRef.current[startFixesRef.current.length - 1];
     const distinct = !previousAccepted || raw.t > previousAccepted.t;
-    const fresh = raw.t <= now && now - raw.t <= START_FIX_MAX_AGE_MS;
+    const fresh = raw.t >= startLockBeganRef.current && Math.floor(raw.t) <= receivedAt
+      && receivedAt - raw.t <= START_FIX_MAX_AGE_MS;
     const plausibleSpeed = !previousAccepted || (distinct
       && calculateDistance(previousAccepted, raw) / ((raw.t - previousAccepted.t) / 1000) <= MAX_SPEED_MPS);
     if (raw.accuracy != null && raw.accuracy <= START_ANCHOR_MAX_ACC_M && fresh && distinct && plausibleSpeed) {
@@ -666,23 +668,23 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     }
 
     const anchor = startAnchorRef.current;
-    const gaitSamples = motionBufRef.current.samplesIn(startLockBeganRef.current, now);
+    const gaitSamples = motionBufRef.current.samplesIn(startLockBeganRef.current, receivedAt);
     const movement = confirmLayMovement({ anchor, anchorAccuracyM: startAnchorAccRef.current,
       acceptedFixes: startFixesRef.current,
       gaitSamples,
-      sessionStartedMs: startLockBeganRef.current, nowMs: now, fallbackAfterMs: START_LOCK_MAX_MS });
+      sessionStartedMs: startLockBeganRef.current, nowMs: receivedAt, fallbackAfterMs: START_LOCK_MAX_MS });
     if (anchor && movement.displacementM != null && movement.displacementM > MIN_STEP_M && !movement.confirmed) {
       startDriftRejRef.current++; s.setStartDriftRejectedCount(startDriftRejRef.current);
     }
-    const moved = movement.confirmed && movement.source !== 'fallback';
+    const moved = fresh && movement.confirmed && movement.source !== 'fallback';
     if (moved) startupRef.current!.movementConfirmedTSec ??= startupSec();
-    startupRef.current!.movementConfirmationSource = movement.source;
-    startupRef.current!.movementConfirmationConfidence = movement.confidence;
+    startupRef.current!.movementConfirmationSource = fresh ? movement.source : null;
+    startupRef.current!.movementConfirmationConfidence = fresh ? movement.confidence : 0;
     startupRef.current!.movementGpsDisplacementM = movement.displacementM;
     startupRef.current!.movementStepDelta = movement.stepDelta;
     startupRef.current!.movementMotionState = movement.motionState;
 
-    const blocker = layStartBlockingReason({ anchorReady: !!anchor, movementConfirmed: moved,
+    const blocker = !fresh ? 'waiting_for_fresh_fix' : layStartBlockingReason({ anchorReady: !!anchor, movementConfirmed: moved,
       elapsedMs: elapsed, maximumMs: START_LOCK_MAX_MS });
     startupRef.current!.blockingReason = blocker;
     if (qaRef.current && startupRef.current!.recordingSessionStartedTSec != null) {
@@ -690,7 +692,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       const walking = gaitSamples.filter(g => g.movementState === 'walking' || g.movementState === 'running');
       const accelEvidence = walking.length
         ? walking.filter(g => g.accelerationMagnitude >= 0.1).length / walking.length : 0;
-      const tSec = Math.max(0, (now - startLockBeganRef.current) / 1000);
+      const tSec = Math.max(0, (receivedAt - startLockBeganRef.current) / 1000);
       const recorded = boundedPush(startupMovement.samples, {
         tSec, accuracyM: raw.accuracy ?? null,
         acceptedFix: !!(raw.accuracy != null && raw.accuracy <= START_ANCHOR_MAX_ACC_M && fresh && distinct && plausibleSpeed),
@@ -699,11 +701,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         locomotionEvidence: movement.stepDelta > 0 ? 'steps'
           : accelEvidence >= TURN_EVIDENCE_DEFAULTS.gaitAccelMinFraction ? 'gait_accel' : 'none',
         accelerationEvidence: Math.round(accelEvidence * 1000) / 1000,
-        candidateSource: movement.source, confirmed: movement.confirmed,
+        candidateSource: fresh ? movement.source : null, confirmed: fresh && movement.confirmed,
         rejectionReason: blocker ?? (!anchor ? 'anchor_unavailable' : !movement.confirmed ? 'movement_unconfirmed' : null),
       }, 100);
       if (!recorded) startupMovement.truncated = true;
-      if (movement.confirmed && startupMovement.confirmationTSec == null) {
+      if (fresh && movement.confirmed && startupMovement.confirmationTSec == null) {
         startupMovement.confirmationTSec = tSec;
         startupMovement.confirmationSource = movement.source;
         startupMovement.confirmationConfidence = movement.confidence;

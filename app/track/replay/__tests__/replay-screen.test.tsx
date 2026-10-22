@@ -10,10 +10,22 @@ import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import TrackReplayScreen from '@/app/track/replay/[id]';
 
+let mockAuthListener: ((event: string) => void) | undefined;
+const mockAuthUnsubscribe = jest.fn();
+let mockSession: { user: { id: string } } | null = { user: { id: 'owner' } };
+const mockLocalDetail = jest.fn();
+jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: mockSession }) }));
+
 jest.mock('@/features/tracking/hooks/useDogTrackColor', () => ({ useDogTrackColor: () => ({ color: '#15E6C3' }) }));
 // Isolate the existing pace-history boundary from live backend configuration.
 jest.mock('@/features/tracking/services/dogPaceHistoryService', () => ({ getDogPaceHistory: jest.fn(async () => []) }));
-jest.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: jest.fn(async () => ({ data: { session: null } })) } } }));
+jest.mock('@/lib/supabase', () => ({ supabase: { auth: {
+  getSession: jest.fn(async () => ({ data: { session: null } })),
+  onAuthStateChange: jest.fn((listener: (event: string) => void) => {
+    mockAuthListener = listener;
+    return { data: { subscription: { unsubscribe: () => mockAuthUnsubscribe() } } };
+  }),
+} } }));
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
@@ -28,7 +40,7 @@ jest.mock('@/features/tracking/services/trackService', () => ({
   getTrackSessionById: jest.fn(async () => ({ data: null, error: null })),
 }));
 jest.mock('@/features/tracking/services/trackHistoryService', () => ({
-  getLocalTrackDetail: jest.fn(async () => mockData),
+  getLocalTrackDetail: (...args: unknown[]) => mockLocalDetail(...args),
   getLocalRunSupplement: jest.fn(async () => null),
 }));
 
@@ -121,7 +133,29 @@ function pressableAncestor(node: TestNode): TestNode {
 }
 
 describe('TrackReplayScreen — Rendering & Interaktion (Punkt 22)', () => {
+  beforeEach(() => {
+    mockSession = { user: { id: 'owner' } };
+    mockAuthListener = undefined;
+    mockLocalDetail.mockReset().mockImplementation(async () => mockData);
+  });
   afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; mockData = null; jest.clearAllMocks(); });
+
+  it('ignores a pending previous-session response after logout and unsubscribes on unmount', async () => {
+    let finishOldRequest!: (data: unknown) => void;
+    mockLocalDetail.mockImplementation((_id: string, userId?: string) => userId === 'owner'
+      ? new Promise(resolve => { finishOldRequest = resolve; })
+      : Promise.resolve(null));
+    const root = await mount();
+    expect(mockLocalDetail).toHaveBeenCalledWith('sess-1', 'owner');
+    expect(mockAuthListener).toEqual(expect.any(Function));
+    await act(async () => { mockSession = null; mockAuthListener!('SIGNED_OUT'); });
+    expect(mockLocalDetail).toHaveBeenCalledWith('sess-1', undefined);
+    await act(async () => { finishOldRequest(trackWithReplay()); });
+    expect(textNodesWith(root, "Replay isn't available for this track.").length).toBeGreaterThan(0);
+    expect(asTestNode(root).findAll(node => node.props.accessibilityLabel === 'Start replay')).toHaveLength(0);
+    act(() => { root.unmount(); }); renderer = null;
+    expect(mockAuthUnsubscribe).toHaveBeenCalledTimes(1);
+  });
 
   it('alte Fährte ohne Replay-Daten (Punkt 18/21) → "not available", kein Crash', async () => {
     mockData = trackWithoutReplay();

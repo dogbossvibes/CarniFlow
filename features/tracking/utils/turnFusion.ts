@@ -354,17 +354,25 @@ function evaluateSplitApex(
   return null;
 }
 
-/** Die Segmente zwischen p und q drehen monoton in Richtung der Gesamtdrehung. */
-function monotoneTransition(points: readonly ShortLegPoint[], p: number, q: number, beforeDeg: number, headingDelta: number): boolean {
+/** Every transition segment must remain inside the measured turn sector.
+ * Requiring their bearings to increase monotonically rejects a real corner
+ * when short GPS segments wobble while still moving forward through the turn.
+ * Two segment bearings may each vary by the existing spread tolerance, so
+ * their relative backtrack is limited to twice that tolerance. Larger
+ * reversals still reject a zigzag, even when it fits inside the sector.
+ * Metre, leg-fit, concentration and directional Motion gates remain mandatory.
+ */
+function transitionWithinTurnSector(points: readonly ShortLegPoint[], p: number, q: number, beforeDeg: number, headingDelta: number): boolean {
   const sign = headingDelta >= 0 ? 1 : -1;
   const total = Math.abs(headingDelta);
-  let previous = -RESCUE_MAX_SPREAD_DEG;
+  let furthest = -RESCUE_MAX_SPREAD_DEG;
   for (let k = p; k < q; k++) {
     const seg = meanBearing(points, k, k + 1);
     if (!seg) continue;
     const progress = normalizeDeg(seg.deg - beforeDeg) * sign;
-    if (progress < previous || progress > total + RESCUE_MAX_SPREAD_DEG) return false;
-    previous = progress;
+    if (progress < -RESCUE_MAX_SPREAD_DEG || progress > total + RESCUE_MAX_SPREAD_DEG) return false;
+    if (furthest - progress > 2 * RESCUE_MAX_SPREAD_DEG) return false;
+    furthest = Math.max(furthest, progress);
   }
   return true;
 }
@@ -392,7 +400,7 @@ function evaluateApexPair(
   const magnitude = Math.abs(headingDelta);
   if (magnitude < Math.max(RESCUE_MIN_TURN_DEG, MIN_TURN_DEG)) return null;
   if (magnitude < Math.max(before.spreadDeg, after.spreadDeg, 4) * MIN_TURN_TO_NOISE) return null;
-  if (span > 1 && !monotoneTransition(points, p, q, before.bearingDeg, headingDelta)) return null;
+  if (span > 1 && !transitionWithinTurnSector(points, p, q, before.bearingDeg, headingDelta)) return null;
 
   // Konzentration: die Änderung muss unmittelbar an der Scheitel-NAHT liegen
   // (Vorher-Kurzfenster endet bei i, Nachher-Kurzfenster beginnt bei i+1).
@@ -432,12 +440,13 @@ function evaluateApexPair(
     sharpness = 'unresolved';
   } else return null;   // sonst „angle_unclear": Beinahe-Umkehr oder fast gerade
 
-  // IMU: widerspricht sie der GPS-Richtung, ist der Paarungs-Scheitel kein
-  // hinreichender Beleg → verwerfen. Fehlt IMU, bleibt es beim GPS-Indiz.
+  // Only motion of the same quality required for confirmation may veto GPS.
+  // A handset yaw with no usable walking evidence remains neutral.
   const ev = turnEvidenceForDirection?.(a.t ?? null, dir) ?? turnEvidenceAt?.(a.t ?? null) ?? null;
   const md = ev && ev.available ? motionTurnDirection(ev) : null;
-  if (md != null && md !== dir) return null;
-  const agrees = md != null && md === dir && (ev?.evidence ?? 0) >= 0.5;
+  const reliableMotion = md != null && (ev?.evidence ?? 0) >= 0.5;
+  if (reliableMotion && md !== dir) return null;
+  const agrees = reliableMotion && md === dir;
   // Zwei-Segment-Ecke: der Scheitel ist unschärfer als bei einem einzelnen Wackel-Segment (nur GPS
   // wäre von Start-Wackeln nicht zu trennen, real: r1 bei 4,7 m). Alle GPS-Gates oben müssen
   // bestanden sein; zusätzlich muss die IMU die Richtung unabhängig BESTÄTIGEN. Motion erzeugt
