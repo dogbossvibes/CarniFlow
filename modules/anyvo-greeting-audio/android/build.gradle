@@ -1,0 +1,11 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'expo.modules.anyvogreetingaudio'
+version = '1.0.0'
+android {
+  namespace 'expo.modules.anyvogreetingaudio'
+  defaultConfig { minSdkVersion 24 }
+}
+dependencies { testImplementation 'junit:junit:4.13.2' }

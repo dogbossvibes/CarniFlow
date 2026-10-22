@@ -1,14 +1,14 @@
-/** Android native release: preserve app identity and build the reviewed1.0.5 runtime. */
+/** Android native release: preserve app identity and build the reviewed Android greeting runtime. */
 import { readFileSync } from 'fs';
 
 const app = JSON.parse(readFileSync('app.json', 'utf8')).expo;
 const eas = JSON.parse(readFileSync('eas.json', 'utf8'));
 
 describe('Production-Native-Vertrag', () => {
-  it('Android native build uses1.0.5, versionCode48 and verified install hooks', () => {
+  it('Android native build uses1.0.5, versionCode49 and verified install hooks', () => {
     expect(app.version).toBe('1.0.5');
-    expect(app.android.runtimeVersion).toBe('1.0.5');
-    expect(app.android.versionCode).toBe(48);
+    expect(app.android.runtimeVersion).toBe('1.0.5-greeting-v1');
+    expect(app.android.versionCode).toBe(49);
     expect(eas.build.production.android.buildType).toBe('app-bundle');
     const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
     expect(pkg.scripts.postinstall).toBe('node scripts/patch-expo-task-manager.cjs');
