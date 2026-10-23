@@ -20,7 +20,7 @@ describe('TrackRunScreen arming flow', () => {
     expect(src).not.toMatch(/useEffect\([\s\S]{0,260}approach\.armed[\s\S]{0,260}beginSearchNow/);
     // approach.armed darf beginSearchNow nur innerhalb von handleManualStart
     // erreichen (explizite Nutzeraktion), nicht ausserhalb davon.
-    const handleManualStartBlock = src.slice(src.indexOf('const handleManualStart'), src.indexOf('}, [approach.armed, approach.distanceM, beginSearchNow]);'));
+    const handleManualStartBlock = src.slice(src.indexOf('const handleManualStart'), src.indexOf('}, [approach.armed, approach.distanceM, beginSearchNow, hasFreshApproachFix]);'));
     expect(handleManualStartBlock).toMatch(/approach\.armed[\s\S]{0,60}beginSearchNow/);
   });
 
@@ -38,7 +38,8 @@ describe('TrackRunScreen arming flow', () => {
   it('starts the search only from explicit user actions', () => {
     const src = source();
 
-    expect(src).toContain("if (approach.armed) { beginSearchNow('manual-at-start'); return; }");
+    expect(src).toContain("if (approach.armed && hasFreshApproachFix()) { beginSearchNow('manual-at-start'); return; }");
+    expect(src).toContain("if (mode !== 'manual-override' && !hasFreshApproachFix()) return;");
     expect(src).toContain("onPress: () => beginSearchNow('manual-override')");
     expect(src).toContain('onPress={handleManualStart}');
     expect(src).toContain('if (startedRef.current) return;');

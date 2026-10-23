@@ -390,7 +390,7 @@ export default function LegenScreen() {
   const [showReferenceTracks, setShowReferenceTracks] = useState(true);
 
   // Ein brauchbarer Fix ist Pflicht; langes Warten ersetzt keine Genauigkeit.
-  const gpsReady = isLaySessionWarmupReady(gpsAccuracy);
+  const gpsReady = rec.warmupReady && isLaySessionWarmupReady(gpsAccuracy);
   const canStart = gpsReady;
 
   // Erst nach bestätigter Disclosure die erste Android-Location-Permission und

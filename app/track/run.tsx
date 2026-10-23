@@ -41,6 +41,7 @@ import { hapticSuccess, hapticTap, hapticMarker } from '@/features/tracking/util
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
 import { useStartPointApproach } from '@/features/tracking/hooks/useStartPointApproach';
+import { isFreshStartTimestamp } from '@/features/tracking/utils/startFixFreshness';
 import { precisionLocationClient } from '@/features/tracking/native/precisionLocationClient';
 import {
   DEFAULT_APPROACH_CONFIG, nextStartZonePhase, type StartMode,
@@ -288,6 +289,11 @@ export default function TrackRunScreen() {
   approachPhaseRef.current = approach.phase;
   const approachArmedRef = useRef(approach.armed);
   approachArmedRef.current = approach.armed;
+  const approachFixTimeRef = useRef(approach.fixTimestampMs);
+  approachFixTimeRef.current = approach.fixTimestampMs;
+  const hasFreshApproachFix = useCallback(() => isFreshStartTimestamp(
+    approachFixTimeRef.current ?? NaN, Date.now(), DEFAULT_APPROACH_CONFIG.maxLocationAgeMs,
+  ), []);
   const approachDistanceRef = useRef(approach.distanceM);
   approachDistanceRef.current = approach.distanceM;
   if (arming && isQaDiagnosticsEnabled() && approachOriginRef.current != null) {
@@ -307,9 +313,9 @@ export default function TrackRunScreen() {
     requestVoice({ eventType: 'approach', text: t('track.voiceApproachReached'),
       language: speechLanguage(i18n.language as never), priority: 3,
       onceKey: 'approach-reached', phase: 'approach', distanceM: approachDistanceRef.current,
-      valid: () => approachPhaseRef.current === 'at_start' && approachArmedRef.current,
+      valid: () => approachPhaseRef.current === 'at_start' && approachArmedRef.current && hasFreshApproachFix(),
     });
-  }, [arming, voiceOn, approach.startReachedAtMs, t]);
+  }, [arming, voiceOn, approach.startReachedAtMs, t, hasFreshApproachFix]);
 
   // Bisher im Approach: präzise Ortung nur während der Annäherung anfragen.
   // Die Berechtigung kommt vom Recorder; kein zweiter Location-Start/Stop.
@@ -378,6 +384,7 @@ export default function TrackRunScreen() {
   // Fährtenansatz (Arming) bzw. beim Fortsetzen aufgerufen — NICHT beim Betreten.
   const beginSearchNow = useCallback((mode: StartMode = 'manual-at-start') => {
     if (startedRef.current) return;
+    if (mode !== 'manual-override' && !hasFreshApproachFix()) return;
     let boundRunId: string | null;
     try { assertTransfer(renderTransferIdentity); boundRunId = assertTransfer(currentTransfer()); }
     catch { Alert.alert('Fährte nicht verfügbar', 'Bitte öffne die übergebene Fährte erneut in deinem Konto.'); return; }
@@ -429,7 +436,7 @@ export default function TrackRunScreen() {
     if (dogId) useActiveFaehrten.getState().upsert(dogId, { status: 'searching', searchStartedAt: startMs });
     // Kein direkter Remote-Start mehr (RUN-SAVE2): track_runs wird beim Stop über die
     // Sync-Queue idempotent per runUuid upserted. runUuid ist bereits lokal geführt.
-  }, [s, voiceOn, dogId, searchHandlerDistanceM, t, assertTransfer, currentTransfer, renderTransferIdentity]);
+  }, [s, voiceOn, dogId, searchHandlerDistanceM, t, assertTransfer, currentTransfer, renderTransferIdentity, hasFreshApproachFix]);
 
   // Nach bestätigtem Ansatz und echter Abbewegung beginnt die Absuche ohne
   // weitere Zeit-Sperre. Der manuelle Override bleibt für GPS-Probleme erhalten.
@@ -446,7 +453,7 @@ export default function TrackRunScreen() {
   const handleManualStart = useCallback(() => {
     if (startedRef.current) return;
     hapticTap();
-    if (approach.armed) { beginSearchNow('manual-at-start'); return; }
+    if (approach.armed && hasFreshApproachFix()) { beginSearchNow('manual-at-start'); return; }
     const distTxt = approach.distanceM != null ? `ca. ${Math.round(approach.distanceM)} m` : 'unbekannt weit';
     Alert.alert(
       'Noch nicht am Startpunkt',
@@ -456,7 +463,7 @@ export default function TrackRunScreen() {
         { text: 'Trotzdem starten', style: 'destructive', onPress: () => beginSearchNow('manual-override') },
       ],
     );
-  }, [approach.armed, approach.distanceM, beginSearchNow]);
+  }, [approach.armed, approach.distanceM, beginSearchNow, hasFreshApproachFix]);
 
   // 2) Beim Betreten NICHT direkt starten: erst zum Fährtenansatz navigieren
   //    (Arming, Suchzeit läuft noch nicht). Ohne bekannten Startpunkt → Fallback:
