@@ -6,6 +6,7 @@ const src = (p: string) => readFileSync(p, 'utf8');
 
 const CLIENT_AI_FILES = [
   'services/aiAnalysis.ts',
+  'services/trainingContext.ts',
   'components/calendar/TrainingRecommendationCard.tsx',
   'features/ai/services/insightService.ts',
   'features/ai/services/semanticSearchService.ts',
