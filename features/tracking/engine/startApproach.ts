@@ -59,7 +59,7 @@ export const DEFAULT_APPROACH_CONFIG: ApproachConfig = {
 
 // Dynamischer Startradius aus der gemeldeten Genauigkeit. null ⇒ Accuracy unbekannt.
 export function effectiveRadiusM(accuracy: number | null | undefined, cfg: ApproachConfig): number | null {
-  if (accuracy == null) return null;
+  if (accuracy == null || !Number.isFinite(accuracy) || accuracy < 0) return null;
   const raw = accuracy * cfg.accuracyRadiusFactor;
   return Math.min(cfg.maxRadiusM, Math.max(cfg.minRadiusM, raw));
 }
@@ -76,13 +76,13 @@ export interface ApproachSample {
 // Frisch = nicht stale. Unbekanntes Alter wird NICHT als stale gewertet.
 export function isFreshFix(ageMs: number | null | undefined, cfg: ApproachConfig): boolean {
   if (ageMs == null) return true;
-  return ageMs >= 0 && ageMs <= cfg.maxLocationAgeMs;
+  return Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= cfg.maxLocationAgeMs;
 }
 
 // Plausible Bewegung. Unbekannte Geschwindigkeit (erster Fix) ist erlaubt.
 export function isPlausibleSpeed(jumpSpeedMps: number | null | undefined, cfg: ApproachConfig): boolean {
   if (jumpSpeedMps == null) return true;
-  return jumpSpeedMps <= cfg.maxJumpSpeedMps;
+  return Number.isFinite(jumpSpeedMps) && jumpSpeedMps >= 0 && jumpSpeedMps <= cfg.maxJumpSpeedMps;
 }
 
 // Ein Fix ist für die manuelle Startfreigabe gültig, wenn er
@@ -90,8 +90,8 @@ export function isPlausibleSpeed(jumpSpeedMps: number | null | undefined, cfg: A
 //   • frisch (nicht stale) und plausibel (keine unmögliche Sprungdistanz) ist,
 //   • innerhalb des DYNAMISCHEN Radius liegt.
 export function isEligible(sample: ApproachSample, cfg: ApproachConfig): boolean {
-  if (sample.accuracy == null || sample.accuracy > cfg.maxAccuracyM) return false;
-  if (sample.distanceM == null) return false;
+  if (sample.accuracy == null || !Number.isFinite(sample.accuracy) || sample.accuracy < 0 || sample.accuracy > cfg.maxAccuracyM) return false;
+  if (sample.distanceM == null || !Number.isFinite(sample.distanceM) || sample.distanceM < 0) return false;
   if (!isFreshFix(sample.ageMs, cfg)) return false;
   if (!isPlausibleSpeed(sample.jumpSpeedMps, cfg)) return false;
   const r = effectiveRadiusM(sample.accuracy, cfg);
@@ -107,15 +107,14 @@ export const INITIAL_APPROACH: ApproachState = { consecutive: 0, armed: false };
 
 /** The broad accuracy-based approach zone is UI-only; spoken "reached" is tighter. */
 export function reachedRadiusM(accuracyM: number | null): number | null {
-  if (accuracyM == null) return null;
+  if (accuracyM == null || !Number.isFinite(accuracyM) || accuracyM < 0) return null;
   return Math.min(4, Math.max(2.5, 2.5 + 0.2 * accuracyM));
 }
 
 export function isStableReachedFix(sample: ApproachSample, cfg: ApproachConfig): boolean {
   const radius = reachedRadiusM(sample.accuracy);
-  return radius != null && sample.accuracy != null && sample.accuracy <= cfg.maxAccuracyM
-    && sample.distanceM != null && sample.distanceM <= radius
-    && isFreshFix(sample.ageMs, cfg) && isPlausibleSpeed(sample.jumpSpeedMps, cfg);
+  return radius != null && isEligible(sample, cfg)
+    && sample.distanceM != null && sample.distanceM <= radius;
 }
 
 // Root-Cause-Fix (echtes iPhone, Build 43 — "'Ansatz erreicht' bei ca. 5,9 m,

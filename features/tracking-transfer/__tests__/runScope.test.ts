@@ -4,12 +4,15 @@ import fixture from './fixtures/backend-cloud-v1.json';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import ts from 'typescript';
+import { isFreshStartTimestamp } from '@/features/tracking/utils/startFixFreshness';
+import { DEFAULT_APPROACH_CONFIG } from '@/features/tracking/engine/startApproach';
 const receipt = parseTransferReceipt(fixture.accept.receipt);
 const pending = { transferReceipt: receipt, sessionId: receipt.ownSessionId, dogId: receipt.recipientDogId, runId: receipt.ownRunId };
 // Execute the actual native Alert callback bodies, not a duplicate implementation.
 const source = readFileSync(join(__dirname, '../../../app/track/run.tsx'), 'utf8');
 const part = (a: string, b: string) => source.slice(source.indexOf(a), source.indexOf(b, source.indexOf(a)));
-const callbacks = [part('  const showRecoveryDialog =', '  useEffect(() => { if (recovery)'),
+const callbacks = [part('  const hasFreshApproachFix =', '  const approachDistanceRef'),
+  part('  const showRecoveryDialog =', '  useEffect(() => { if (recovery)'),
   part('  const resumeSearch =', '  // Hundespur / Abriss'),
   part('  const confirmRecoveryEnd =', '  const handleFinish ='),
   part('  const beginSearchNow =', '  // Nach bestätigtem Ansatz')].join('\n');
@@ -27,6 +30,7 @@ function harness(identity = pending) {
     useActiveFaehrten: { getState: () => new Proxy({}, { get: () => write }) },
     s: { start, stop: write }, setRecovery: write, setPendingExit: write, setSnap: write,
     startedRef: ref(false), runIdRef: ref(), searchStartMsRef: ref(), prevOffTrackRef: ref(), segmentAnnouncementRef: ref(),
+    approachFixTimeRef: ref(Date.now()), isFreshStartTimestamp, DEFAULT_APPROACH_CONFIG,
     useCallback: (f: unknown) => f, voiceOn: false, searchHandlerDistanceM: 10, t: (s: string) => s };
   const js = ts.transpileModule(`${callbacks}\nreturn { showRecoveryDialog, resumeSearch, endSearch, discardSearch, beginSearchNow };`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
   const actions = new Function(...Object.keys(context), js)(...Object.values(context));
