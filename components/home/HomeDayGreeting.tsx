@@ -9,7 +9,7 @@ import { useTrackingStore } from '@/features/tracking/store/trackingStore';
 import { getActiveTrackingModes, subscribeActiveTrackingModes } from '@/features/tracking/utils/trackingWarmupState';
 import { useVoiceStore } from '@/features/voice/store/voiceStore';
 import { prepareGreetingAudio, finishGreetingAudio } from '@/lib/greetingAudioSafety';
-import { claimGreeting, firstName, greetingKey, GREETING_DURATION_MS, publicUsername } from '@/features/home/greetingModel';
+import { claimGreeting, firstName, greetingKey, GREETING_AUDIO_RELEASE_TIMEOUT_MS, GREETING_DURATION_MS, publicUsername } from '@/features/home/greetingModel';
 import { useGreetingSound } from '@/features/home/useGreetingSound';
 
 const originalSound = require('@/assets/audio/anyvo-greeting.mp3');
@@ -48,11 +48,14 @@ export function HomeDayGreeting({ ownerId, name, username, ready }: {
     let live = true;
     let player: AudioPlayer | null = null;
     let started = false;
+    let audioTimer: ReturnType<typeof setTimeout> | null = null;
     let audioCancelled = false;
     let status: { remove(): void } | null = null;
     const safe = () => live && !audioCancelled && AppState.currentState === 'active' && !blockedAudio();
     const stopSound = () => {
       audioCancelled = true;
+      if (audioTimer !== null) clearTimeout(audioTimer);
+      audioTimer = null;
       try { status?.remove(); } catch { /* Already released. */ }
       status = null;
       const previous = player; player = null;
@@ -66,8 +69,14 @@ export function HomeDayGreeting({ ownerId, name, username, ready }: {
       Animated.timing(dot, { toValue: 0, duration: 900, useNativeDriver: true }),
     ])));
     if (!accessibility.reduce) animation.start();
-    const stop = () => { live = false; animation.stop(); dots.forEach(dot => dot.setValue(0)); stopSound(); };
-    const timer = setTimeout(stop, GREETING_DURATION_MS);
+    const stopAnimation = () => { animation.stop(); dots.forEach(dot => dot.setValue(0)); };
+    const stop = () => { live = false; stopAnimation(); stopSound(); };
+    const timer = setTimeout(() => {
+      stopAnimation();
+      // Do not start a delayed greeting after its visual window. A playing clip
+      // may finish its full four seconds without extending the animation.
+      if (!started) stopSound();
+    }, GREETING_DURATION_MS);
     const state = AppState.addEventListener('change', value => { if (value !== 'active') stop(); });
     const onBusy = () => { if (blockedAudio()) stopSound(); };
     const unsubscribeTrack = useTrackingStore.subscribe(onBusy);
@@ -90,10 +99,16 @@ export function HomeDayGreeting({ ownerId, name, username, ready }: {
         const play = () => {
           if (!started && player?.isLoaded && safe()) {
             started = true;
-            try { player.play(); } catch { stopSound(); }
+            try {
+              player.play();
+              audioTimer = setTimeout(stopSound, GREETING_AUDIO_RELEASE_TIMEOUT_MS);
+            } catch { stopSound(); }
           }
         };
-        status = player.addListener('playbackStatusUpdate', play);
+        status = player.addListener('playbackStatusUpdate', playback => {
+          if (playback?.didJustFinish) stopSound();
+          else play();
+        });
         play();
       } catch { stopSound(); }
     })();

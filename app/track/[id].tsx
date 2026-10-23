@@ -416,10 +416,46 @@ export default function TrackAuswertungScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <FaehrtenHeader title="AUSWERTUNG" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} trailing={<HelpButton topicId="track_review" tint={C.trackTextSec} />} />
+      <FaehrtenHeader title="Fährte" onBack={() => (router.canGoBack() ? router.back() : router.replace('/track' as never))} trailing={<HelpButton topicId="track_review" tint={C.trackTextSec} />} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* Fährtenverlauf */}
+          <SectionLabel>Fährtenverlauf</SectionLabel>
+          <View style={[s.card, s.mapCard]}>
+            <View style={StyleSheet.absoluteFill}>
+              {map?.hasGps ? (
+                <TrackingMap
+                  distractionTracks={distractionTracks}
+                  comparison
+                  layColor={layColor}
+                  layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
+                  startAnchor={map.start} endPoint={map.end} endTotalDistanceM={map.totalDistanceM} fitToPoints={map.fitPoints}
+                  onStartPress={() => setDetailSel({ kind: 'start' })}
+                  onMarkerPress={(m) => setDetailSel({ kind: 'marker', marker: m })}
+                  onEndPress={() => setDetailSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
+                  onFullscreen={() => setFullscreenMap(true)}
+                  currentPosition={null} follow={false} mapType="hybrid"
+                />
+              ) : (
+                <View style={s.center}><Text style={s.muted}>{t('track.preview.noGps')}</Text></View>
+              )}
+            </View>
+            <View style={s.legend}>
+              <Legend color={layColor} label={t('track.replay.legendReference')} />
+              <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} dashed />
+            </View>
+          </View>
+
+          {map && (!map.hasLay || (!map.hasRun && hasFinalSearchRun(data))) && (
+            <View style={[s.card, { padding: 14, gap: 10, marginBottom: 16 }]}>
+              <Text style={s.muted}>{!map.hasLay ? 'Keine vollständige gelegte GPS-Spur verfügbar.' : 'Keine gespeicherte Suchspur verfügbar.'}</Text>
+              <Pressable accessibilityRole="button" testID="track-detail-reload-lines" onPress={() => setLoadRevision(n => n + 1)} style={{ minHeight: 44, justifyContent: 'center' }}>
+                <Text style={{ color: C.trackPrimary, fontWeight: '700' }}>Spuren neu laden</Text>
+              </Pressable>
+            </View>
+          )}
+
           {/* Recovery-Karte direkt unter dem Header: offene Fährte fortsetzen oder „Ohne App
               abgeschlossen". Ohne Karte zeigt der QA-Diagnosemodus den konkreten Grund. */}
           {canOfferResume && <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={false} onVisibleChange={setRecoveryCardVisible} />}
@@ -433,6 +469,7 @@ export default function TrackAuswertungScreen() {
               Bewertung" UNTER dem Ring (ausserhalb der Kreisgrafik), rechts die
               Notenstufe genau EINMAL prominent. Vorher lagen Label und Notenstufe
               zusätzlich IM Ring (Überlappung, doppelte Bewertung). */}
+          {hasFinalSearchRun(data) ? <>
           <View style={[s.card, s.cardGlow, s.hero]}>
             <View style={s.heroRingCol}>
               <TrackScoreRing value={score} size={96} stroke={9} showMax />
@@ -448,6 +485,7 @@ export default function TrackAuswertungScreen() {
               </View>
             </View>
           </View>
+          </> : <View style={s.card}><Text style={s.heroHeadline}>{surface}</Text><Text style={s.muted}>{dogName} · {relDate(data.session_date ?? data.created_at)}</Text><Text style={s.muted}>Gelegte Fährte · Noch keine abgeschlossene Absuche gespeichert</Text></View>}
 
           {[...(map?.lay ?? []), ...(map?.run ?? [])].some(p => p.breakBefore) && (
             <View style={s.card}><Text style={{ color: C.trackTextMut }}>{t('track.continuityNotice')}</Text></View>
@@ -759,42 +797,6 @@ export default function TrackAuswertungScreen() {
                 )}
               </View>
             </>
-          )}
-
-          {/* Fährtenverlauf */}
-          <SectionLabel>Fährtenverlauf</SectionLabel>
-          <View style={[s.card, s.mapCard]}>
-            <View style={StyleSheet.absoluteFill}>
-              {map?.hasGps ? (
-                <TrackingMap
-                  distractionTracks={distractionTracks}
-                  comparison
-                  layColor={layColor}
-                  layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
-                  startAnchor={map.start} endPoint={map.end} endTotalDistanceM={map.totalDistanceM} fitToPoints={map.fitPoints}
-                  onStartPress={() => setDetailSel({ kind: 'start' })}
-                  onMarkerPress={(m) => setDetailSel({ kind: 'marker', marker: m })}
-                  onEndPress={() => setDetailSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
-                  onFullscreen={() => setFullscreenMap(true)}
-                  currentPosition={null} follow={false} mapType="hybrid"
-                />
-              ) : (
-                <View style={s.center}><Text style={s.muted}>{t('track.preview.noGps')}</Text></View>
-              )}
-            </View>
-            <View style={s.legend}>
-              <Legend color={layColor} label={t('track.replay.legendReference')} />
-              <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} dashed />
-            </View>
-          </View>
-
-          {map && (!map.hasLay || (!map.hasRun && hasFinalSearchRun(data))) && (
-            <View style={[s.card, { padding: 14, gap: 10, marginBottom: 16 }]}>
-              <Text style={s.muted}>{!map.hasLay ? 'Keine vollständige gelegte GPS-Spur verfügbar.' : 'Keine gespeicherte Suchspur verfügbar.'}</Text>
-              <Pressable accessibilityRole="button" testID="track-detail-reload-lines" onPress={() => setLoadRevision(n => n + 1)} style={{ minHeight: 44, justifyContent: 'center' }}>
-                <Text style={{ color: C.trackPrimary, fontWeight: '700' }}>Spuren neu laden</Text>
-              </Pressable>
-            </View>
           )}
 
           <TrackAngleList markers={map?.markers ?? []} onSelect={marker => setDetailSel({ kind: 'marker', marker })} />

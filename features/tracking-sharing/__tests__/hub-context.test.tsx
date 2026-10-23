@@ -1,0 +1,37 @@
+import React from 'react';
+import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
+import SharingScreen from '../SharingScreen';
+import { SharingView } from '../SharingView';
+import { FaehrtenHeader } from '@/features/tracking/components/FaehrtenChrome';
+import { TrackHubTabs } from '@/features/tracking/components/TrackHubTabs';
+const mockRouter = { push: jest.fn(), replace: jest.fn(), canGoBack: () => true, back: jest.fn() };
+let mockParams: Record<string, string> = {};
+jest.mock('expo-router', () => ({ useRouter: () => mockRouter, useLocalSearchParams: () => mockParams }));
+jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: 'account' } } }) }));
+jest.mock('@/lib/supabase', () => ({ supabase: { auth: { onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) } } }));
+jest.mock('@/features/tracking-exchange/groups/releaseGate', () => ({ GROUP_DISTRACTION_RELEASE_READY: true }));
+jest.mock('@/features/tracking-transfer/TransferContactSearch', () => ({ TransferContactSearch: () => null }));
+jest.mock('../useSharingInbox', () => ({ useSharingInbox: () => ({ refresh: jest.fn(), epoch: 0, loading: false }) }));
+jest.mock('../SharingView', () => ({ SharingView: (p: any) => <>{p.moduleHeader}{p.context}</> }));
+jest.mock('@/features/tracking/components/FaehrtenChrome', () => ({ FaehrtenHeader: () => null }));
+jest.mock('@/features/tracking/components/TrackHubTabs', () => ({ TrackHubTabs: () => null }));
+let screen: ReactTestRenderer;
+afterEach(() => { act(() => screen?.unmount()); jest.clearAllMocks(); });
+it('retains the exact source for transfer and distraction without an unrelated dog selector', () => {
+  mockParams = { sourceId: 'source-for-yam', dogId: 'other-dog' };
+  act(() => { screen = TestRenderer.create(<SharingScreen />); });
+  const header = screen.root.findByType(FaehrtenHeader);
+  expect(header.props.onDog).toBeUndefined(); expect(header.props.dog).toBeUndefined();
+  act(() => screen.root.findByType(SharingView).props.onAction('transfer'));
+  expect(mockRouter.push).toHaveBeenLastCalledWith({ pathname: '/track/transfer', params: { sourceId: 'source-for-yam', compose: '1' } });
+  act(() => screen.root.findByType(SharingView).props.onAction('distraction'));
+  expect(mockRouter.push).toHaveBeenLastCalledWith({ pathname: '/track/share', params: { sourceId: 'source-for-yam', mode: 'compose' } });
+});
+it('uses dog context only to return to the correct list and leaves file import source-free', () => {
+  mockParams = { dogId: 'selected-dog' };
+  act(() => { screen = TestRenderer.create(<SharingScreen />); });
+  act(() => screen.root.findByType(TrackHubTabs).props.onSelect('tracks'));
+  expect(mockRouter.replace).toHaveBeenCalledWith({ pathname: '/track', params: { tab: 'tracks', dogId: 'selected-dog' } });
+  act(() => screen.root.findByType(SharingView).props.onAction('file'));
+  expect(mockRouter.push).toHaveBeenLastCalledWith({ pathname: '/track/share', params: { mode: 'file' } });
+});

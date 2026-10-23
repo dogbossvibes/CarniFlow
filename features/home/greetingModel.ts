@@ -1,4 +1,7 @@
 export const GREETING_DURATION_MS = 2040;
+export const GREETING_AUDIO_DURATION_MS = 4000;
+// Native completion is authoritative; bounded grace releases interrupted players.
+export const GREETING_AUDIO_RELEASE_TIMEOUT_MS = GREETING_AUDIO_DURATION_MS + 500;
 export function greetingKey(date: Date): 'greeting.morning' | 'greeting.day' | 'greeting.evening' {
   const hour = date.getHours();
   return hour >= 5 && hour < 11 ? 'greeting.morning' : hour >= 11 && hour < 18 ? 'greeting.day' : 'greeting.evening';

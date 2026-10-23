@@ -1,3 +1,7 @@
+import { Text, View } from 'react-native';
+import { C } from '@/constants/colors';
+import { FaehrtenHeader } from '@/features/tracking/components/FaehrtenChrome';
+import { TrackHubTabs } from '@/features/tracking/components/TrackHubTabs';
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSession } from '@/hooks/useSession';
@@ -16,10 +20,14 @@ export default function SharingScreen() {
   return <AccountSharing key={`${userId}:${epoch}`} userId={userId} />;
 }
 function AccountSharing({ userId }: { userId: string | null }) {
-  const router = useRouter(), params = useLocalSearchParams<{ sourceId?: string }>();
+  const router = useRouter(), params = useLocalSearchParams<{ sourceId?: string; dogId?: string }>();
   const [tab, setTab] = useState<SharingTab>('overview'), [contactsOpen, setContactsOpen] = useState(false);
   const data = useSharingInbox(userId);
-  return <SharingView {...data} tab={tab} contactsOpen={contactsOpen} signedIn={!!userId} groupsEnabled={GROUP_DISTRACTION_RELEASE_READY}
+  const moduleHeader = <>
+    <FaehrtenHeader title="Fährten" onBack={() => router.canGoBack() ? router.back() : router.replace('/track' as never)} />
+    <TrackHubTabs selected="together" onSelect={next => { if (next !== 'together') router.replace({ pathname: '/track', params: { tab: next, ...(typeof params.dogId === 'string' ? { dogId: params.dogId } : {}) } } as never); }} />
+  </>;
+  return <SharingView moduleHeader={moduleHeader} context={typeof params.sourceId === 'string' ? <View style={{ padding: 16, borderRadius: 18, backgroundColor: C.trackCard, marginBottom: 16 }}><Text style={{ color: C.trackText, fontWeight: '700' }}>Fährte ausgewählt</Text><Text style={{ color: C.trackTextSec, marginTop: 6 }}>Übergabe und Verleitungsanfrage beziehen sich auf die zuvor geöffnete Fährte.</Text></View> : undefined} {...data} tab={tab} contactsOpen={contactsOpen} signedIn={!!userId} groupsEnabled={GROUP_DISTRACTION_RELEASE_READY}
     onTab={next => { setTab(next); setContactsOpen(false); }} onContacts={() => setContactsOpen(true)}
     onBack={() => { if (contactsOpen || tab !== 'overview') { setContactsOpen(false); setTab('overview'); }
       else if (router.canGoBack()) router.back(); else router.replace('/track' as never); }}

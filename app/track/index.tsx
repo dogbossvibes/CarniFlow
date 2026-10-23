@@ -1,13 +1,15 @@
-import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
+import { TrackHubTabs } from '@/features/tracking/components/TrackHubTabs';
+import { useActiveFaehrtenList } from '@/features/tracking/hooks/useActiveFaehrte';
+import { ActiveFaehrteCard } from '@/features/tracking/components/ActiveFaehrteCard';
+import { hasFinalSearchRun } from '@/features/tracking/store/trackRecovery';
 import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
-import { ExchangeEntry } from '@/features/tracking-exchange/ExchangeEntry';
 import { HelpButton } from '@/components/help/HelpButton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { useDogs } from '@/hooks/useDogs';
@@ -16,7 +18,7 @@ import { deleteTrackSession } from '@/features/tracking/services/trackService';
 import { getTrackHistory } from '@/features/tracking/services/trackHistoryService';
 import { markTrainingAsDeleted } from '@/features/training/repositories/localTrainingRepository';
 import { retryFailedSync } from '@/features/sync/services/syncEngine';
-import { getRecentTrackPreviews } from '@/features/tracking/services/trackPreviewService';
+import { getRecentTrackPreviews, getTrackPreview } from '@/features/tracking/services/trackPreviewService';
 import { projectTrackSketch } from '@/features/tracking/utils/trackSketchGeometry';
 import { resolveTrackOverlayColorKey, trackOverlayColor } from '@/features/tracking/utils/trackOverlayColors';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
@@ -24,9 +26,8 @@ import {
   FaehrtenHeader, SectionLabel, StatTriple, TrackRow, fmtAge, relDate, type TrackRowData,
 } from '@/features/tracking/components/FaehrtenChrome';
 import { averageScore, dayStreak, trackScore } from '@/features/tracking/utils/trackScore';
-import { GlobalActiveFaehrtenBar } from '@/features/tracking/components/GlobalActiveFaehrtenBar';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
-import { resolveAutoResume } from '@/features/tracking/store/activeFaehrtenModel';
+import { reopenTarget, resolveAutoResume } from '@/features/tracking/store/activeFaehrtenModel';
 import { useToast } from '@/components/ui/Toast';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -54,6 +55,16 @@ let autoResumeConsumed = false;
 
 export default function TrackOverviewScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string; dogId?: string }>();
+  const [tab, setTab] = useState<'training' | 'tracks'>(params.tab === 'tracks' ? 'tracks' : 'training');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'open' | 'searched'>('all');
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [loadError, setLoadError] = useState(false);
+  const activeTracks = useActiveFaehrtenList();
+  const activeTracksRef = useRef(activeTracks);
+  activeTracksRef.current = activeTracks;
+  useEffect(() => { setTab(params.tab === 'tracks' ? 'tracks' : 'training'); }, [params.tab]);
   const { t } = useT();
   const { session } = useSession();
   const faehrtenHydrated = useActiveFaehrten(s => s.hydrated);
@@ -70,7 +81,8 @@ export default function TrackOverviewScreen() {
   const { dogs, refresh: refreshDogs } = useDogs();
   useFocusEffect(useCallback(() => { void refreshDogs(); }, [refreshDogs]));
 
-  const [dogId, setDogId]   = useState<string | null>(null);
+  const [dogId, setDogId]   = useState<string | null>(typeof params.dogId === 'string' ? params.dogId : null);
+  useEffect(() => { if (typeof params.dogId === 'string') setDogId(params.dogId); }, [params.dogId]);
   const [storedRows, setRows]     = useState<any[]>([]);
   const [previews, setPreviews] = useState<Awaited<ReturnType<typeof getRecentTrackPreviews>>>({});
   const loadVersion = useRef(0);
@@ -88,7 +100,7 @@ export default function TrackOverviewScreen() {
   const load = useCallback(async () => {
     const generation = ++loadVersion.current;
     const uid = session?.user.id;
-    setRows([]); setPreviews({});
+    setLoadError(false);
     if (!uid || !effectiveDogId) { setLoading(false); return; }
     setLoading(true);
     try {
@@ -98,7 +110,7 @@ export default function TrackOverviewScreen() {
       setRows(mine);
       const details = await getRecentTrackPreviews(mine, effectiveDogId, uid);
       if (generation === loadVersion.current) setPreviews(details);
-    } finally { if (generation === loadVersion.current) setLoading(false); }
+    } catch { if (generation === loadVersion.current) setLoadError(true); } finally { if (generation === loadVersion.current) setLoading(false); }
   }, [session?.user.id, effectiveDogId]);
 
   useFocusEffect(useCallback(() => {
@@ -111,6 +123,11 @@ export default function TrackOverviewScreen() {
   // beim nächsten Merge aus SQLite wieder auftauchen. Lokal-only → kein Remote-Delete
   // nötig (funktioniert offline).
   const confirmDelete = useCallback((id: string) => {
+    if (!faehrtenHydrated) { showToast('Offene Aufnahmen werden noch geladen. Bitte kurz warten.'); return; }
+    if (activeTracksRef.current.some(e => e.sessionId === id)) {
+      showToast('Diese Fährte ist noch offen. Bitte zuerst die Aufnahme öffnen.');
+      return;
+    }
     const version = loadVersion.current;
     const localOnly = !!rows.find(r => r.id === id)?.isLocalOnly;
     Alert.alert('Fährte löschen?', 'Möchtest du diese Fährte wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.', [
@@ -118,7 +135,7 @@ export default function TrackOverviewScreen() {
       {
         text: 'Löschen', style: 'destructive',
         onPress: async () => {
-          if (version !== loadVersion.current) return;
+          if (version !== loadVersion.current || activeTracksRef.current.some(e => e.sessionId === id)) return;
           const prev = rows;
           const wasHero = rows[0]?.id === id;
           setRows(rs => rs.filter(r => r.id !== id));
@@ -132,7 +149,7 @@ export default function TrackOverviewScreen() {
         },
       },
     ]);
-  }, [rows, showToast, load]);
+  }, [rows, showToast, load, faehrtenHydrated]);
 
   const syncLabel = useCallback(
     (state: 'pending' | 'failed') => t(state === 'failed' ? 'track.syncFailed' : 'track.syncPending'),
@@ -162,11 +179,41 @@ export default function TrackOverviewScreen() {
   const sketchObjects = useMemo(() => (scopedHero?.markers ?? []).filter(m => m.type === 'gegenstand').map(m => ({ lat: m.lat!, lng: m.lng! })), [scopedHero]);
 
   const startHref = (effectiveDogId ? `/track/legen?dogId=${effectiveDogId}` : '/track/legen') as never;
-  const actions: { icon: IconName; label: string; go: () => void; primary?: boolean }[] = [
-    { icon: 'play',          label: t('track.lay'), go: () => router.push(startHref), primary: true },
-    { icon: 'stats-chart',   label: 'Auswertung',   go: () => router.push((last ? `/track/${last.id}` : startHref) as never) },
-    { icon: 'layers',        label: 'Logbuch',      go: () => router.push('/track/historie' as never) },
-    { icon: 'sparkles',      label: 'Insights',     go: () => router.push('/analyse/insights' as never) },
+  const dogActive = activeTracks.filter(e => e.dogId === effectiveDogId);
+  const visibleHistory = history.filter(h => {
+    const row = rows.find(r => r.id === h.id);
+    const open = dogActive.some(e => e.sessionId === h.id);
+    const matchesState = filter === 'all' || (filter === 'open' ? open : hasFinalSearchRun(row));
+    return matchesState && `${h.surface} ${h.date}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
+  });
+  const previewIds = JSON.stringify((tab === 'tracks' ? visibleHistory.slice(0, visibleCount) : history.slice(0, 2)).map(h => h.id));
+  useEffect(() => {
+    if (loading || loadedScope !== scope || !session?.user.id || !effectiveDogId) return;
+    let cancelled = false;
+    const generation = loadVersion.current;
+    const ids: string[] = JSON.parse(previewIds);
+    const missing = ids.filter(id => !(id in previews));
+    void (async () => {
+      // Bound concurrent reads; no fetch-all history or cross-account preview cache.
+      for (let i = 0; i < missing.length; i += 4) {
+        if (cancelled || generation !== loadVersion.current) return;
+        const batch = await Promise.all(missing.slice(i, i + 4).map(async id => [id,
+          await getTrackPreview(id, effectiveDogId, session.user.id, rows.find(r => r.id === id)?.isLocalOnly).catch(() => null),
+        ] as const));
+        if (!cancelled && generation === loadVersion.current) setPreviews(previous => ({ ...previous, ...Object.fromEntries(batch) }));
+      }
+    })();
+    return () => { cancelled = true; };
+    // The request identity is the scoped visible ID list. Cache updates must not restart reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewIds, scope, loadedScope, loading]);
+  const chooseTab = (next: 'training' | 'tracks' | 'together') => {
+    if (next === 'together') router.push({ pathname: '/track/sharing', params: effectiveDogId ? { dogId: effectiveDogId } : {} } as never);
+    else { setTab(next); setVisibleCount(20); }
+  };
+  const actions: { icon: IconName; label: string; hint: string; go: () => void; primary?: boolean }[] = [
+    { icon: 'git-branch-outline', label: t('track.lay'), hint: 'Eigene Fährte aufzeichnen', go: () => router.push(startHref), primary: true },
+    { icon: 'navigate-outline', label: 'Fährte absuchen', hint: 'Vorhandene Fährte auswählen', go: () => { setFilter('all'); setQuery(''); chooseTab('tracks'); } },
   ];
 
   // NEWBIE hat 1 Fährte/Kalendermonat (serverautoritative Quota, siehe
@@ -180,13 +227,31 @@ export default function TrackOverviewScreen() {
         trailing={<HelpButton topicId="track_laying" tint={C.trackTextSec} />}
       />
 
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        {/* Globaler Status: offene Fährten (mehrere Hunde) → Logbuch-Liste */}
-        <GlobalActiveFaehrtenBar style={s.globalBar} />
-
+      <TrackHubTabs selected={tab} onSelect={chooseTab} />
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={loading && loadedScope === scope} onRefresh={() => void load()} tintColor={C.trackPrimary} />}>
+        {tab === 'training' && <Image source={require('../../assets/images/tracking-field-hero.jpg')} style={s.heroPhoto} resizeMode="cover" accessibilityLabel="Hund bei der Fährtenarbeit" />}
+        {loadError && <View style={s.notice}><Text style={s.emptyTxt}>Fährten konnten nicht vollständig geladen werden.</Text><TouchableOpacity accessibilityRole="button" onPress={() => void load()} style={s.retry}><Text style={s.link}>Erneut versuchen</Text></TouchableOpacity></View>}
+        {dogActive.map(entry => <View key={entry.dogId} style={s.globalBar}><ActiveFaehrteCard compact entry={entry} dogName={activeDog?.name} onOpen={() => router.push(reopenTarget(entry) as never)} /></View>)}
+        {activeTracks.some(e => e.dogId !== effectiveDogId) && <TouchableOpacity accessibilityRole="button" style={s.utility} onPress={() => router.push('/track/historie' as never)}><Text style={s.link}>Offene Fährten anderer Hunde</Text><Ionicons name="chevron-forward" color={C.trackPrimary} size={18} /></TouchableOpacity>}
+        {tab === 'training' && <>
+          <View style={s.actionsGrid}>{actions.map(a => <TouchableOpacity key={a.label} accessibilityRole="button" onPress={a.go} activeOpacity={0.85} style={[s.action, a.primary ? s.actionPrimary : s.actionCard]}>
+            {a.primary && <LinearGradient colors={[C.trackPrimary, C.trackPrimaryDk]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
+            <Ionicons name={a.icon} size={28} color={a.primary ? '#04201b' : C.trackText} />
+            <Text style={[s.actionLabel, { color: a.primary ? '#04201b' : C.trackText }]}>{a.label}</Text>
+            <Text style={[s.actionHint, { color: a.primary ? '#04201b' : C.trackTextSec }]}>{a.hint}</Text>
+          </TouchableOpacity>)}</View>
+          <PlannerEntry />
+          <SectionLabel action="Alle ansehen" onAction={() => chooseTab('tracks')}>Zuletzt gespeichert</SectionLabel>
+        </>}
+        {tab === 'tracks' && <>
+          <TextInput accessibilityLabel="Fährte suchen" placeholder="Nach Untergrund oder Datum suchen" placeholderTextColor={C.trackTextMut} value={query} onChangeText={setQuery} style={s.search} />
+          <View style={s.filters}>{([['all', 'Alle'], ['open', 'Offen'], ['searched', 'Abgesucht']] as const).map(([key, label]) => <TouchableOpacity accessibilityRole="button" accessibilityState={{ selected: filter === key }} key={key} onPress={() => setFilter(key)} style={[s.filter, filter === key && s.filterOn]}><Text style={{ color: filter === key ? C.trackBg : C.trackText }}>{label}</Text></TouchableOpacity>)}</View>
+        </>}
+        {tab === 'tracks' && !query && filter === 'all' && <>
         {/* ── grosse Karten-Card (letzte Fährte) ── */}
         <View style={s.mapCard}>
-          {loading ? (
+          {loading && loadedScope !== scope ? (
             <View style={s.mapEmpty}><ActivityIndicator color={C.trackPrimary} /></View>
           ) : !last ? (
             <View style={s.mapEmpty}>
@@ -215,43 +280,18 @@ export default function TrackOverviewScreen() {
           )}
         </View>
 
-        {/* ── Schnellaktionen 2×2 ── */}
-        <View style={s.actionsGrid}>
-          {actions.map((a, i) => (
-            <TouchableOpacity
-              key={i} onPress={a.go} activeOpacity={0.85}
-              style={[s.action, a.primary ? s.actionPrimary : s.actionCard]}
-            >
-              {a.primary && (
-                <LinearGradient
-                  colors={[C.trackPrimary, C.trackPrimaryDk]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              )}
-              <Ionicons name={a.icon} size={22} color={a.primary ? '#04201b' : C.trackText} />
-              <Text style={[s.actionLabel, { color: a.primary ? '#04201b' : C.trackText }]}>{a.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <DistractionEntry dogId={effectiveDogId} />
-        <PlannerEntry />
-        <ExchangeEntry />
-
-        {/* ── Verlauf ── */}
-        <SectionLabel action="Logbuch" onAction={() => router.push('/track/historie' as never)}>Verlauf</SectionLabel>
-        {loading ? (
-          <ActivityIndicator color={C.trackPrimary} style={{ marginTop: 20 }} />
-        ) : history.length === 0 ? (
-          <Text style={s.emptyTxt}>Deine abgeschlossenen Fährten erscheinen hier.</Text>
-        ) : (
-          <View style={{ gap: 10 }}>
-            {history.slice(0, 2).map(h => (
-              <TrackRow key={h.id} h={h} points={scopedPreviews[h.id]?.lay} accent={layColor} onPress={() => openTrack(h)} onLongPress={() => confirmDelete(h.id)} />
-            ))}
-          </View>
-        )}
-
+        </>}
+        {tab === 'tracks' && <SectionLabel>Gespeicherte Fährten</SectionLabel>}
+        {loading && loadedScope !== scope ? <ActivityIndicator color={C.trackPrimary} style={{ marginTop: 20 }} /> : (tab === 'training' ? history : visibleHistory).length === 0 ? (
+          <Text style={s.emptyTxt}>{query || filter !== 'all' ? 'Keine Fährten für diese Auswahl.' : 'Deine gespeicherten Fährten erscheinen hier. Offene Aufnahmen findest du oben.'}</Text>
+        ) : <View style={{ gap: 12 }}>{(tab === 'training' ? history.slice(0, 2) : visibleHistory.slice(0, visibleCount)).map(h => <View key={h.id}>
+          <TrackRow h={h} points={scopedPreviews[h.id]?.lay} accent={layColor} onPress={() => openTrack(h)} onLongPress={() => confirmDelete(h.id)} />
+          <Text style={s.rowStatus}>{hasFinalSearchRun(rows.find(r => r.id === h.id)) ? 'Absuche gespeichert · Auswertung ansehen' : dogActive.some(e => e.sessionId === h.id) ? 'Offene Fährte · Details ansehen' : 'Gespeichert · Details und Fortsetzen prüfen'}</Text>
+        </View>)}</View>}
+        {tab === 'tracks' && visibleHistory.length > visibleCount && <TouchableOpacity accessibilityRole="button" style={s.utility} onPress={() => setVisibleCount(n => n + 20)}><Text style={s.link}>Weitere Fährten anzeigen</Text></TouchableOpacity>}
+        {tab === 'training' && <TouchableOpacity accessibilityRole="button" style={s.utility} onPress={() => chooseTab('together')}><Ionicons name="people-outline" color={C.trackPrimary} size={24} /><Text style={s.link}>Gemeinsam trainieren</Text><Ionicons name="chevron-forward" color={C.trackPrimary} size={18} /></TouchableOpacity>}
+        <TouchableOpacity accessibilityRole="button" style={s.utility} onPress={() => router.push('/track/historie' as never)}><Ionicons name="journal-outline" color={C.trackTextSec} size={22} /><Text style={s.link}>Vollständiges Logbuch</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" style={s.utility} onPress={() => router.push('/analyse/insights' as never)}><Ionicons name="stats-chart-outline" color={C.trackTextSec} size={22} /><Text style={s.link}>Entwicklung & Auswertung</Text></TouchableOpacity>
         <View style={{ height: 40 }} />
       </ScrollView>
       {toast}
@@ -260,6 +300,17 @@ export default function TrackOverviewScreen() {
 }
 
 const s = StyleSheet.create({
+  heroPhoto: { width: '100%', aspectRatio: 1.5, borderRadius: 20, marginBottom: 16 },
+  actionHint: { fontSize: 13, lineHeight: 19 },
+  notice: { padding: 14, backgroundColor: C.trackCard, borderRadius: 16, marginBottom: 12 },
+  retry: { minHeight: 44, justifyContent: 'center' },
+  link: { color: C.trackPrimary, fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  utility: { minHeight: 56, padding: 16, borderRadius: 16, backgroundColor: C.trackCard, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+  search: { color: C.trackText, backgroundColor: C.trackCard, borderRadius: 16, padding: 16, minHeight: 48, marginBottom: 12 },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  filter: { minHeight: 44, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 24, backgroundColor: C.trackCard },
+  filterOn: { backgroundColor: C.trackPrimary },
+  rowStatus: { color: C.trackTextSec, fontSize: 12, lineHeight: 18, paddingHorizontal: 14, paddingTop: 5 },
   safe:    { flex: 1, backgroundColor: C.trackBg },
   content: { paddingHorizontal: 18, paddingBottom: 16 },
 
@@ -279,7 +330,7 @@ const s = StyleSheet.create({
   ovScore:   { fontSize: 24, color: C.trackPrimary, fontWeight: '900', letterSpacing: -0.5 },
 
   actionsGrid:{ flexDirection: 'row', flexWrap: 'wrap', gap: 11, marginBottom: 16 },
-  action:    { width: '47.5%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14, paddingVertical: 16, borderRadius: 20, overflow: 'hidden' },
+  action:    { width: '47.5%', flexGrow: 1, flexDirection: 'column', alignItems: 'flex-start', gap: 11, paddingHorizontal: 16, paddingVertical: 18, borderRadius: 20, overflow: 'hidden' },
   actionCard:{ backgroundColor: C.trackCard, borderWidth: 1, borderColor: C.trackBorder },
   actionPrimary: { shadowColor: C.trackPrimary, shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 },
   actionLabel:{ fontSize: 14.5, fontWeight: '900' },

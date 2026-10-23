@@ -32,7 +32,7 @@ jest.mock('../source',()=>({readExchangeSource:(...a:unknown[])=>mockRead(...a)}
 let screen:ReturnType<typeof TestRenderer.create>|undefined;
 async function mount(){await act(async()=>{screen=TestRenderer.create(<GroupTasksScreen/>);});}
 function maps(){return screen!.root.findAll(n=>n.props.currentPosition===null&&Array.isArray(n.props.distractionTracks));}
-async function press(label:string){const b=screen!.root.findAll(n=>n.props.label===label)[0];expect(b).toBeTruthy();await act(async()=>{b.props.onPress();});}
+async function press(label:string){const b=screen!.root.findAll(n=>n.props.label===label||n.props.accessibilityLabel===label)[0];expect(b).toBeTruthy();await act(async()=>{b.props.onPress();});}
 beforeEach(()=>{jest.clearAllMocks();mockChildren=[];mockParams.taskId=ids.task;mockEnsure.mockResolvedValue(undefined);mockReady=true;mockChanged=false;mockScope.current={userId:owner,epoch:0};mockDetail=detail();mockGet.mockImplementation(async()=>mockDetail);mockAccept.mockImplementation(async()=>({...mockDetail,task:{...mockDetail.task,acceptedAtMs:3000},reference:offer().reference}));mockReview.mockImplementation(async()=>mockDetail);mockRead.mockImplementation(async()=>{const r=offer().reference;if(mockChanged)r.points[0].lat+=0.1;return r;});mockApply.mockResolvedValue({duplicate:false});});
 afterEach(()=>{if(screen)act(()=>screen!.unmount());screen=undefined;});
 it('closed gate makes no group RPC and exposes no geometry',async()=>{mockReady=false;await mount();expect(mockCore.list).not.toHaveBeenCalled();expect(mockGet).not.toHaveBeenCalled();expect(maps()).toHaveLength(0);});
@@ -53,3 +53,12 @@ it('blur invalidates pending focus read before geometry arrives',async()=>{await
 
 it('superseded local preparation cannot restore recorder actions',async()=>{mockScope.current={userId:recipient,epoch:0};await mount();let finish!:()=>void;mockEnsure.mockImplementationOnce(()=>new Promise<void>(r=>{finish=r;}));await act(async()=>{mockFocus();});mockGet.mockRejectedValueOnce(new Error('GROUP_REVOKED'));await press('refreshTask');await act(async()=>{finish();});expect(maps()).toHaveLength(0);expect(screen!.root.findAll(n=>n.props.label==='record')).toHaveLength(0);});
 it('returning from recorder reloads current task and lists newly finished recording without sending',async()=>{mockScope.current={userId:recipient,epoch:0};await mount();delete mockParams.taskId;mockChildren=[{track:returned().contribution}];await act(async()=>{mockFocus();});expect(mockGet).toHaveBeenLastCalledWith(ids.task);expect(screen!.root.findAll(n=>n.props.label==='return').length).toBeGreaterThan(0);});
+
+it('keeps creation fields out of the group overview until explicitly requested',async()=>{
+ delete mockParams.taskId;await mount();
+ expect(screen!.root.findAll(n=>n.props.onChangeText)).toHaveLength(0);
+ await press('+ Gruppe erstellen');
+ expect(screen!.root.findAll(n=>n.props.accessibilityLabel==='groupName'&&n.props.onChangeText).length).toBeGreaterThan(0);
+ expect(screen!.root.findAll(n=>n.props.label==='createGroup')[0].props.disabled).toBe(true);
+ await press('Abbrechen');expect(screen!.root.findAll(n=>n.props.onChangeText)).toHaveLength(0);
+});

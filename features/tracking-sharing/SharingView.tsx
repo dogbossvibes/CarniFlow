@@ -12,6 +12,8 @@ export interface SharingViewProps {
   onBack(): void; onContacts(): void; onTab(tab: SharingTab): void; onRefresh(): void;
   onAction(action: 'transfer' | 'distraction' | 'groups' | 'file'): void; onItem(item: SharingItem): void;
   contactSearch?: ReactNode;
+  moduleHeader?: ReactNode;
+  context?: ReactNode;
 }
 type IconName = React.ComponentProps<typeof Feather>['name'];
 const Icon = ({ name, size = 20 }: { name: IconName; size?: number }) => <Feather name={name} size={size} color={palette.mint} accessible={false} importantForAccessibility="no-hide-descendants" />;
@@ -37,10 +39,12 @@ export function SharingView(p: SharingViewProps) {
   const file = <Pressable testID="sharing-file" accessibilityRole="button" onPress={() => p.onAction('file')} style={s.file}><Icon name="download" size={17} /><Text style={[s.detail, s.copy]}>{t('file')}</Text><Icon name="chevron-right" size={15} /></Pressable>;
   const list = p.tab === 'sent' ? p.outgoing : p.incoming;
   return <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
+    {p.moduleHeader}
     <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
       <View style={s.top}><Pressable accessibilityRole="button" onPress={p.onBack} style={s.back}><Icon name="chevron-left" size={19} /><Text style={s.backText}>{t(p.tab === 'overview' && !p.contactsOpen ? 'back' : 'overview')}</Text></Pressable>
         <Pressable testID="sharing-contacts" accessibilityRole="button" accessibilityLabel={t('contacts')} onPress={p.onContacts} style={s.contactButton}><Icon name="users" size={19} /></Pressable></View>
-      <Text accessibilityRole="header" style={s.title}>{t(title)}</Text><Text style={s.subtitle}>{t(subtitle)}</Text>
+      <Text accessibilityRole="header" style={s.title}>{p.moduleHeader && p.tab === 'overview' && !p.contactsOpen ? 'Gemeinsam' : t(title)}</Text><Text style={s.subtitle}>{t(subtitle)}</Text>
+      {!p.contactsOpen && p.tab === 'overview' && p.context}
       {!p.contactsOpen && <View accessibilityRole="tablist" style={[s.tabs, largeText && s.largeTabs]}>{(['overview', 'inbox', 'sent'] as const).map(tab => <Pressable key={tab} testID={`sharing-tab-${tab}`} accessibilityRole="tab" accessibilityState={{ selected: p.tab === tab }} onPress={() => p.onTab(tab)} style={[s.tab, largeText && s.largeTab, p.tab === tab && s.activeTab]}>
         <Text style={[s.tabText, p.tab === tab && s.activeText]}>{t(tab)}</Text>{tab === 'inbox' && p.complete && p.actionable > 0 && <Text accessibilityLabel={t('openCount', { count: p.actionable })} style={s.badge}>{p.actionable}{p.limited ? '+' : ''}</Text>}
       </Pressable>)}</View>}
