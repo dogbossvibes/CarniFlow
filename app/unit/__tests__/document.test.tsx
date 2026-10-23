@@ -652,6 +652,133 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     expect(mockCreateDocumentedUnit).toHaveBeenCalledWith('owner-1', expect.objectContaining({ duration_sec: null, photos: [], videos: [], shared_with_trainer: false }),
       [expect.objectContaining({ rating: null, notes: null, duration_sec: null })], 'unit-id', expect.any(Function));
   });
+  it('keeps the summary and user-selected exercises after a late preparation reuse response', async () => {
+    const old = { ...past(), exercises: [{ ...past().exercises[0], exercise_name: 'Old planned exercise' }] };
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [old], error: null }) });
+    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    let finish!: (value: unknown) => void;
+    mockGetTrainingUnits.mockReturnValueOnce({ limit: () => new Promise(resolve => { finish = resolve; }) });
+    tap(node, 'trainingDoc.buildOn');
+    // Continue through the real footer, choose today's exercise, then reach summary.
+    await selectExercise(node); await advanceToSave(node);
+    expect(strings(node)).toContain('trainingFlow.nextTitle');
+    expect(strings(node)).toContain('Übung');
+    await act(async () => { finish({ data: [old], error: null }); }); await flush();
+    expect(strings(node)).toContain('trainingFlow.nextTitle');
+    expect(strings(node)).not.toContain('trainingFlow.observeTitle');
+    expect(strings(node)).not.toContain('Old planned exercise');
+    expect(strings(node)).not.toContain('trainingDoc.planned');
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('permits a fresh reuse after leaving and returning, without reviving the superseded request', async () => {
+    const old = { ...past(), exercises: [{ ...past().exercises[0], exercise_name: 'Superseded plan' }] };
+    const fresh = { ...past(), exercises: [{ ...past().exercises[0], exercise_name: 'Fresh plan' }] };
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [old], error: null }) });
+    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    let finish!: (value: unknown) => void;
+    mockGetTrainingUnits.mockReturnValueOnce({ limit: () => new Promise(resolve => { finish = resolve; }) });
+    tap(node, 'trainingDoc.buildOn');
+    await act(async () => { await saveButton(node).props.onPress(); }); await flush();
+    expect(strings(node)).toContain('trainingFlow.observeTitle');
+    const back = node.root.findAll(n => n.props.accessibilityLabel === 'common.back' && typeof n.props.onPress === 'function')[0];
+    act(() => { back.props.onPress(); }); await flush();
+    expect(strings(node)).toContain('trainingFlow.prepareTitle');
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [fresh], error: null }) });
+    tap(node, 'trainingDoc.buildOn'); await flush();
+    expect(strings(node)).toContain('trainingFlow.observeTitle');
+    expect(strings(node)).toContain('Fresh plan');
+    await act(async () => { finish({ data: [old], error: null }); }); await flush();
+    expect(strings(node)).toContain('Fresh plan');
+    expect(strings(node)).not.toContain('Superseded plan');
+    expect(strings(node).filter(value => value === 'trainingDoc.planned')).toHaveLength(1);
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('does not seed a deleted history source and offers the existing history retry', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [], error: null }) });
+    tap(node, 'trainingDoc.buildOn'); await flush();
+    expect(strings(node)).toContain('trainingDoc.historyError');
+    expect(strings(node)).not.toContain('trainingDoc.planned');
+    expect(strings(node)).not.toContain('Past observation');
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('does not reuse a cached source after a failed reload', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: null, error: new Error('network') }) });
+    tap(node, 'trainingDoc.buildOn'); await flush();
+    expect(strings(node)).toContain('trainingDoc.historyError');
+    expect(strings(node)).not.toContain('trainingDoc.planned');
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('deduplicates double taps while revalidating a history selection', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    let finish!: (value: unknown) => void;
+    mockGetTrainingUnits.mockReturnValue({ limit: () => new Promise(resolve => { finish = resolve; }) });
+    const calls = mockGetTrainingUnits.mock.calls.length;
+    tap(node, 'trainingDoc.buildOn'); tap(node, 'trainingDoc.buildOn');
+    expect(mockGetTrainingUnits).toHaveBeenCalledTimes(calls + 1);
+    await act(async () => { finish({ data: [past()], error: null }); }); await flush();
+    // Only one planned row; saving remains an explicit separate action.
+    expect(strings(node).filter(value => value === 'trainingDoc.planned')).toHaveLength(1);
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('ignores a history draft that resolves after changing dogs', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    let finish!: (value: unknown) => void;
+    mockGetTrainingUnits.mockReturnValueOnce({ limit: () => new Promise(resolve => { finish = resolve; }) });
+    tap(node, 'trainingDoc.buildOn');
+    showContext(node); tap(node, 'Malu'); await flush();
+    await act(async () => { finish({ data: [past()], error: null }); }); await flush();
+    expect(strings(node)).not.toContain('trainingDoc.planned');
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('ignores history draft results when navigation loses focus', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    let finish!: (value: unknown) => void;
+    mockGetTrainingUnits.mockReturnValue({ limit: () => new Promise(resolve => { finish = resolve; }) });
+    tap(node, 'trainingDoc.buildOn');
+    mockDocumentFocused = false;
+    act(() => { node.update(<DocumentScreen />); }); await flush();
+    await act(async () => { finish({ data: [past()], error: null }); }); await flush();
+    expect(strings(node)).not.toContain('trainingDoc.planned');
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('discards an in-flight history draft after switching accounts', async () => {
+    mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+    const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+    let finish!: (value: unknown) => void;
+    mockGetTrainingUnits.mockReturnValueOnce({ limit: () => new Promise(resolve => { finish = resolve; }) });
+    tap(node, 'trainingDoc.buildOn');
+    mockOwner = 'owner-2'; update(node); await flush();
+    await act(async () => { finish({ data: [past()], error: null }); }); await flush();
+    expect(strings(node)).not.toContain('trainingDoc.planned');
+    expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('invalidates a reuse on background and permits a new attempt without waiting for the old response', async () => {
+    const listeners: ((state: AppStateStatus) => void)[] = [];
+    const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, callback) => {
+      listeners.push(callback); return { remove: jest.fn() };
+    });
+    try {
+      mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
+      const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
+      let finish!: (value: unknown) => void;
+      mockGetTrainingUnits.mockReturnValueOnce({ limit: () => new Promise(resolve => { finish = resolve; }) });
+      tap(node, 'trainingDoc.buildOn');
+      act(() => { for (const listener of listeners) listener('background'); });
+      act(() => { for (const listener of listeners) listener('active'); }); await flush();
+      tap(node, 'trainingDoc.buildOn'); await flush();
+      expect(strings(node)).toContain('trainingDoc.planned');
+      await act(async () => { finish({ data: [past()], error: null }); }); await flush();
+      expect(strings(node).filter(value => value === 'trainingDoc.planned')).toHaveLength(1);
+      expect(mockCreateDocumentedUnit).not.toHaveBeenCalled();
+    } finally { spy.mockRestore(); }
+  });
   it('zeigt gespeicherte Übungsnotizen schon in der Vorbereitung', async () => {
     mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [past()], error: null }) });
     const node = render(); await flush(); tap(node, 'trainingFlow.previousTraining');
