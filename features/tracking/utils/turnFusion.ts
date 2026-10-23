@@ -38,8 +38,8 @@
 // ──────────────────────────────────────────────────────────────────────────
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
 import {
-  detectShortLegCorners, stableLegWindow, spitzConsensus, meanBearing, nearIndex, normalizeDeg, clamp01, cornerConfidence,
-  ACCEPT_SCORE, CORNER_GAP_M, MIN_TURN_DEG, MIN_TURN_TO_NOISE, NORMAL_MIN, NORMAL_MAX, SPITZ_MIN, SPITZ_MAX,
+  detectShortLegCorners, legWindows, stableLegWindow, spitzConsensus, meanBearing, nearIndex, normalizeDeg, clamp01, cornerConfidence,
+  ACCEPT_SCORE, SCALES_M, MIN_LEG_M, MIN_SAMPLES_SHORT, CORNER_GAP_M, MIN_TURN_DEG, MIN_TURN_TO_NOISE, NORMAL_MIN, NORMAL_MAX, SPITZ_MIN, SPITZ_MAX,
   TURN_CONCENTRATION_M, STRAIGHT_TOL_DEG,
   type ShortLegPoint, type ShortLegDiagnostics, type TurnEvidenceLookup, type LegWindow,
   type DirectionalTurnEvidenceLookup,
@@ -506,6 +506,7 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
   const corners = base.corners.map(c => ({ ...c }));
   const turns: FusedTurn[] = [];
   let rescued = 0;
+  const pairedOriginalDiagnostics = new Map<number, ShortLegDiagnostics>();
   const lookup = opts.turnEvidenceAt;
 
   // GPS-confirmed but sign-ambiguous near-reversals can be recovered only when
@@ -568,6 +569,67 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
       turns.push(t);
     }
   }
+  // Additional evidence for a short dogleg: both chord views must
+  // agree on TWO opposite normal corners. A lone rescued bend remains rejected.
+  // No existing accepted corner can serve as the second half of the pair.
+  // Boundary-only failures cannot form a pair: both chord views still need
+  // the existing minimum distance and sample count on each side. Avoid two
+  // full-buffer scans unless at least two primary candidates can satisfy them.
+  let possiblePairedApexes = 0;
+  if (opts.splitApexRescue !== false) for (const d of diagnostics) {
+    if (d.rejectReason !== 'no_window_before' && d.rejectReason !== 'no_window_after') continue;
+    const i = d.apexIndex;
+    if (i + 1 < MIN_SAMPLES_SHORT || points.length - i < MIN_SAMPLES_SHORT) continue;
+    if (points[i].cumDist - points[0].cumDist < MIN_LEG_M
+      || points[points.length - 1].cumDist - points[i].cumDist < MIN_LEG_M) continue;
+    if (++possiblePairedApexes === 2) break;
+  }
+  if (possiblePairedApexes >= 2) {
+    const views = [0.75, 1].map(spacing => ({ spacing,
+      result: detectShortLegCorners(points, null, opts.turnEvidenceAt, opts.turnEvidenceForDirection, spacing) }));
+    const plateau = (windows: LegWindow[]) => windows.length >= 2 && windows.every(a =>
+      windows.every(b => Math.abs(normalizeDeg(a.bearingDeg - b.bearingDeg)) <= RESCUE_MAX_SPREAD_DEG));
+    const candidates: { turn: FusedTurn; diagnostic: ShortLegDiagnostics }[] = [];
+    for (const c of views[0].result.corners) {
+      const primary = byApex.get(c.apexIndex);
+      if (!primary || (primary.rejectReason !== 'no_window_before' && primary.rejectReason !== 'no_window_after')) continue;
+      if (turns.some(t => Math.abs(t.atM - c.atM) < CORNER_GAP_M)) continue;
+      const matches = views.map(v => v.result.corners.find(x => x.apexIndex === c.apexIndex && x.kind === c.kind));
+      if (matches.some(m => !m)) continue;
+      const d = views[0].result.diagnostics.find(x => x.apexIndex === c.apexIndex)!;
+      if (d.sharpness !== 'normal') continue;
+      const ev = opts.turnEvidenceForDirection?.(d.t ?? null, d.direction ?? 'rechts') ?? lookup?.(d.t ?? null) ?? null;
+      const turn = turnFromDiag(d, c.atM, ev, opts.turnEvidenceForDirection != null);
+      if (turn.motion.available && (turn.motion.evidence ?? 0) >= 0.5
+        && turn.motion.direction != null && turn.motion.direction !== turn.direction) continue;
+      if (!views.every(v => v.result.diagnostics.find(x => x.apexIndex === c.apexIndex)?.sharpness === 'normal'
+        && [false, true].every(forward => plateau(legWindows(points, c.apexIndex, forward, STRAIGHT_TOL_DEG, v.spacing))))) continue;
+      // An added candidate must never steal motion evidence from an existing turn.
+      if (turn.motionAssociationSource === 'nearest_episode' && turn.motionAssociationTimeMs != null
+        && turns.some(t => t.motionAssociationSource === 'nearest_episode' && t.motionAssociationTimeMs != null
+          && Math.abs(t.motionAssociationTimeMs - turn.motionAssociationTimeMs!) <= MOTION_EVENT_REUSE_GUARD_MS)) continue;
+      candidates.push({ turn, diagnostic: d });
+    }
+    // 8m is the detector's existing largest local leg window, not a new angle threshold.
+    const paired = candidates.filter(a => candidates.some(b => a !== b && a.turn.direction !== b.turn.direction
+      && Math.abs(a.turn.atM - b.turn.atM) >= CORNER_GAP_M && Math.abs(a.turn.atM - b.turn.atM) <= SCALES_M[SCALES_M.length - 1]))
+      .sort((a, b) => b.turn.confidence - a.turn.confidence || a.turn.apexIndex - b.turn.apexIndex);
+    const selected: typeof paired = [];
+    for (const item of paired) {
+      if (!selected.some(t => Math.abs(t.turn.atM - item.turn.atM) < CORNER_GAP_M)) selected.push(item);
+    }
+    for (const { turn, diagnostic } of selected) {
+      if (!selected.some(other => other.turn !== turn && other.turn.direction !== turn.direction
+        && Math.abs(other.turn.atM - turn.atM) >= CORNER_GAP_M && Math.abs(other.turn.atM - turn.atM) <= SCALES_M[SCALES_M.length - 1])) continue;
+      if (turns.some(t => Math.abs(t.atM - turn.atM) < CORNER_GAP_M)) continue;
+      turn.flags.push('paired_short_leg_rescue');
+      pairedOriginalDiagnostics.set(turn.apexIndex, { ...byApex.get(turn.apexIndex)! });
+      Object.assign(byApex.get(turn.apexIndex)!, diagnostic);
+      turns.push(turn);
+      corners.push({ kind: turn.kind, apexIndex: turn.apexIndex, atM: turn.atM });
+      rescued++;
+    }
+  }
   corners.sort((x, y) => x.atM - y.atM);
   turns.sort((x, y) => x.atM - y.atM);
 
@@ -590,6 +652,23 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
   if (duplicateApexes.size) {
     for (let i = turns.length - 1; i >= 0; i--) if (duplicateApexes.has(turns[i].apexIndex)) turns.splice(i, 1);
     for (let i = corners.length - 1; i >= 0; i--) if (duplicateApexes.has(corners[i].apexIndex)) corners.splice(i, 1);
+  }
+
+  // Final episode allocation may remove one member of an added pair. Recheck
+  // the final survivors, then restore the original rejected diagnostic/count
+  // for every removed addition, including members already removed by dedup.
+  const survivingPairs = turns.filter(t => pairedOriginalDiagnostics.has(t.apexIndex));
+  const orphanApexes = new Set(survivingPairs.filter(a => !survivingPairs.some(b => a !== b
+    && a.direction !== b.direction && Math.abs(a.atM - b.atM) >= CORNER_GAP_M
+    && Math.abs(a.atM - b.atM) <= SCALES_M[SCALES_M.length - 1])).map(t => t.apexIndex));
+  if (orphanApexes.size) {
+    for (let i = turns.length - 1; i >= 0; i--) if (orphanApexes.has(turns[i].apexIndex)) turns.splice(i, 1);
+    for (let i = corners.length - 1; i >= 0; i--) if (orphanApexes.has(corners[i].apexIndex)) corners.splice(i, 1);
+  }
+  for (const [apexIndex, original] of pairedOriginalDiagnostics) {
+    if (turns.some(t => t.apexIndex === apexIndex)) continue;
+    Object.assign(byApex.get(apexIndex)!, original);
+    rescued--;
   }
 
   // 3. IMU-only: nur Telemetrie.

@@ -278,16 +278,34 @@ export interface LegWindow {
  * Richtungsstreuung im Fenster unter der Toleranz bleibt. Dadurch endet das
  * Fenster von selbst am Nachbarwinkel — ohne feste Obergrenze.
  */
+/** Direction spread over minimum-length chords. All points still contribute to the robust fit.
+ * Used only as an additional paired-corner view; never replaces the regular gate. */
+function spatialLegBearing(points: readonly ShortLegPoint[], from: number, to: number, baselineM: number) {
+  const lo = Math.min(from, to), hi = Math.max(from, to);
+  let sx = 0, sy = 0;
+  const bearings: number[] = [];
+  for (let i = lo; i < hi; i++) {
+    let j = i + 1;
+    while (j <= hi && calculateDistance(points[i], points[j]) < baselineM) j++;
+    if (j > hi) continue;
+    const b = calculateHeading(points[i], points[j]);
+    bearings.push(b); sx += Math.sin(b * Math.PI / 180); sy += Math.cos(b * Math.PI / 180);
+  }
+  if (!bearings.length) return null;
+  const deg = (Math.atan2(sx, sy) * 180 / Math.PI + 360) % 360;
+  return { deg, spreadDeg: Math.max(...bearings.map(b => Math.abs(normalizeDeg(b - deg)))), segments: bearings.length };
+}
+
 export function stableLegWindow(
-  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number = STRAIGHT_TOL_DEG,
+  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number = STRAIGHT_TOL_DEG, headingBaselineM = 0,
 ): LegWindow | null {
-  const all = collectLegWindows(points, apexIndex, forward, straightTolDeg);
+  const all = collectLegWindows(points, apexIndex, forward, straightTolDeg, headingBaselineM);
   return all.length ? all[all.length - 1] : null;
 }
 
 /** Alle gültigen Fenster je Skala (aufsteigend) — dieselbe Schleife wie früher in stableLegWindow. */
 function collectLegWindows(
-  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number,
+  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number, headingBaselineM = 0,
 ): LegWindow[] {
   const apex = points[apexIndex];
   const found: LegWindow[] = [];
@@ -314,8 +332,11 @@ function collectLegWindows(
     const fit = robustBearing(points, apexIndex, end);
     if (!fit) continue;
     // Geradheit über das Fit-Residuum (dichteunabhängig, s. MAX_FIT_RESIDUAL_M).
-    // Die Segment-Streuung wird nur noch als Diagnosewert mitgeführt.
-    const mb = meanBearing(points, apexIndex, end);
+    // Segment direction spread remains a hard gate, not just telemetry.
+    const mb = headingBaselineM > 0
+      ? spatialLegBearing(points, apexIndex, end, headingBaselineM)
+      : meanBearing(points, apexIndex, end);
+    if (headingBaselineM > 0 && !mb) continue; // No chord is missing evidence, never zero spread.
     const spread = mb ? mb.spreadDeg : 0;
     if (spread > straightTolDeg) {
       // WICHTIG: nur abbrechen, wenn bereits ein gültiges (kleineres) Fenster
@@ -335,9 +356,9 @@ function collectLegWindows(
 
 /** Alle gültigen Schenkelfenster eines Scheitels, ohne Duplikate (gleicher Endpunkt = gleiche Evidenz). */
 export function legWindows(
-  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number = STRAIGHT_TOL_DEG,
+  points: readonly ShortLegPoint[], apexIndex: number, forward: boolean, straightTolDeg: number = STRAIGHT_TOL_DEG, headingBaselineM = 0,
 ): LegWindow[] {
-  return collectLegWindows(points, apexIndex, forward, straightTolDeg)
+  return collectLegWindows(points, apexIndex, forward, straightTolDeg, headingBaselineM)
     .filter((w, i, all) => all.findIndex(x => x.endIndex === w.endIndex) === i);
 }
 
@@ -364,10 +385,10 @@ export interface SpitzConsensus {
  * nur „spitz" ändert die persistierte Klasse.
  */
 export function spitzConsensus(
-  points: readonly ShortLegPoint[], beforeIndex: number, afterIndex: number,
+  points: readonly ShortLegPoint[], beforeIndex: number, afterIndex: number, headingBaselineM = 0,
 ): SpitzConsensus {
-  const before = legWindows(points, beforeIndex, false);
-  const after = legWindows(points, afterIndex, true);
+  const before = legWindows(points, beforeIndex, false, STRAIGHT_TOL_DEG, headingBaselineM);
+  const after = legWindows(points, afterIndex, true, STRAIGHT_TOL_DEG, headingBaselineM);
   const interiors: number[] = [];
   for (const b of before) for (const a of after) interiors.push(180 - Math.abs(normalizeDeg(a.bearingDeg - b.bearingDeg)));
   const maxInteriorDeg = interiors.length ? Math.max(...interiors) : null;
@@ -525,7 +546,7 @@ export function cornerConfidence(a: {
  */
 export function evaluateShortLegCorner(
   points: readonly ShortLegPoint[], apexIndex: number, lastCornerAtM: number, motion?: ShortLegMotion | null,
-  turnEvidenceAt?: TurnEvidenceLookup, turnEvidenceForDirection?: DirectionalTurnEvidenceLookup,
+  turnEvidenceAt?: TurnEvidenceLookup, turnEvidenceForDirection?: DirectionalTurnEvidenceLookup, headingBaselineM = 0,
 ): ShortLegCandidate {
   const apex = points[apexIndex];
   const reject = (r: ShortLegRejectReason): ShortLegCandidate =>
@@ -533,9 +554,9 @@ export function evaluateShortLegCorner(
 
   if (apex.cumDist - lastCornerAtM < CORNER_GAP_M) return reject('too_close_to_previous');
 
-  const before = stableLegWindow(points, apexIndex, false);
+  const before = stableLegWindow(points, apexIndex, false, STRAIGHT_TOL_DEG, headingBaselineM);
   if (!before) return reject('no_window_before');
-  const after = stableLegWindow(points, apexIndex, true);
+  const after = stableLegWindow(points, apexIndex, true, STRAIGHT_TOL_DEG, headingBaselineM);
   if (!after) return reject('no_window_after');
 
   const headingDelta = normalizeDeg(after.bearingDeg - before.bearingDeg);
@@ -632,7 +653,7 @@ export function evaluateShortLegCorner(
   const spitzKind: AngleKind = dir === 'rechts' ? 'spitz_rechts' : 'spitz_links';
   // Multi-Scale-Konsens: nur berechnet, wenn „spitz" überhaupt in Frage kommt.
   const consensusFor = () => {
-    const c = spitzConsensus(points, apexIndex, apexIndex);
+    const c = spitzConsensus(points, apexIndex, apexIndex, headingBaselineM);
     diag.sharpnessConsensusPairs = c.pairs;
     diag.sharpnessMaxInteriorDeg = c.maxInteriorDeg;
     return c.supported;
@@ -713,7 +734,7 @@ export function evaluateShortLegCorner(
  */
 export function detectShortLegCorners(
   rawPoints: readonly ShortLegPoint[], motion?: ShortLegMotion | null,
-  turnEvidenceAt?: TurnEvidenceLookup, turnEvidenceForDirection?: DirectionalTurnEvidenceLookup,
+  turnEvidenceAt?: TurnEvidenceLookup, turnEvidenceForDirection?: DirectionalTurnEvidenceLookup, headingBaselineM = 0,
 ): { corners: { kind: AngleKind; apexIndex: number; atM: number }[]; diagnostics: ShortLegDiagnostics[]; detectorPointCount: number } {
   // Räumliche Normalisierung ZUERST: ab hier ist die Punktfolge unabhängig
   // von der Fixrate (siehe resampleBySpacing).
@@ -736,7 +757,7 @@ export function detectShortLegCorners(
   // echte Ecken, ohne sie überhaupt zu bewerten (belegt bei 4 Hz).
   const scored: { c: ShortLegCandidate; kind: AngleKind; atM: number; conf: number }[] = [];
   for (let i = 1; i < points.length - 1; i++) {
-    const c = evaluateShortLegCorner(points, i, -Infinity, motion, turnEvidenceAt, turnEvidenceForDirection);
+    const c = evaluateShortLegCorner(points, i, -Infinity, motion, turnEvidenceAt, turnEvidenceForDirection, headingBaselineM);
     diagnostics.push(c.diagnostics);
     if (c.accepted && c.kind) scored.push({ c, kind: c.kind, atM: points[i].cumDist, conf: c.diagnostics.confidence });
   }
