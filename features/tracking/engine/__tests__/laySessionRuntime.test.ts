@@ -216,6 +216,18 @@ describe('Hintergrund vs. Vordergrund: fachliche Parität und erhaltene Legacy-G
       expect(h.points.filter(point => point.breakBefore)).toHaveLength(1);
       expect(h.persisted.filter(point => point.breakBefore)).toHaveLength(1);
       expect(h.distanceCalls.at(-1) ?? 0).toBeLessThan(golden.distance);
+    } else if (name === 'rejectMix') {
+      // The historical golden counted the rejected jump through the EMA.
+      // Check the independent clean-input contract through the real background
+      // task and persistence path, retaining foreground/background parity above.
+      __resetLaySessionRuntimeForTests();
+      const steps = sc.steps.filter(st => st.k !== 'fix' || (st.t - T0) % 1000 === 0);
+      expect(sc.steps.length - steps.length).toBe(3);
+      const clean = await runBackground({ ...sc, steps }, 'clean');
+      expect(h.points).toEqual(clean.points);
+      expect(h.persisted).toEqual(clean.persisted);
+      expect(h.distanceCalls).toEqual(clean.distanceCalls);
+      expect(h.distanceCalls.at(-1)).toBeLessThan(golden.distance);
     } else {
       expect(h.distanceCalls.at(-1) ?? 0).toBe(golden.distance);
     }

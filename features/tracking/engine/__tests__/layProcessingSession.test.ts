@@ -150,8 +150,7 @@ describe('P1: line smoothing uses the current accepted detector fix', () => {
       expect(f.wasTurn).toBe(true);
       expect(f.isTurn).toBe(true);
       expect(f.result.acceptedPoint).toBeNull();
-      expect(f.after?.lat).toBeCloseTo(f.before!.lat + (f.raw.lat - f.before!.lat) * 0.7, 12);
-      expect(f.after?.lng).toBeCloseTo(f.before!.lng + (f.raw.lng - f.before!.lng) * 0.7, 12);
+      expect(f.after).toEqual(f.before);
     }
   });
 });
@@ -199,7 +198,7 @@ describe('P1: existing real raw fixes through the production processor', () => {
 });
 
 describe('Original golden: unchanged distance, BUILD40 and straight geometry; CURRENT turn timing', () => {
-  it.each(processorScenarios.filter(s => !['badAccuracyAtCorner', 'longGapAndDuplicateTime', 'pausedMidRoute'].includes(s.name)).map(s => [s.name, s] as const))('%s', (name, sc) => {
+  it.each(processorScenarios.filter(s => !['badAccuracyAtCorner', 'longGapAndDuplicateTime', 'pausedMidRoute', 'rejectMix'].includes(s.name)).map(s => [s.name, s] as const))('%s', (name, sc) => {
     const golden = LAY_GOLDEN_B6BC114[name];
     const run = runScenario(sc);
     // CURRENT turn geometry intentionally changes with P1. Keep the historical
@@ -361,4 +360,49 @@ it('commits a normal corner only once when a later evaluation moves its apex wit
     expect(run.markers.map(m => m.distance_from_start)).toEqual([10, 14]);
     expect(run.angles).toEqual(['rechts', 'rechts']);
   } finally { spy.mockRestore(); }
+});
+
+
+describe('Rejected lay fixes cannot contaminate the next admitted measurement', () => {
+  it('keeps the rejected-mix legacy golden intact and matches the clean observed walk in CURRENT', () => {
+    const sc = scenarios.find(s => s.name === 'rejectMix')!;
+    const legacy = runScenario({ ...sc, engine: 'build40' });
+    const golden = LAY_GOLDEN_B6BC114.rejectMix;
+    expect(legacy.points).toHaveLength(golden.points);
+    expect(hash(legacy.points)).toBe(golden.pointsHash);
+    expect(legacy.distanceCalls.at(-1)).toBe(golden.distance);
+    // Exactly the three known injected rejects; every regular observed fix
+    // keeps its original timestamp (including distance-gated points).
+    const cleanSteps = sc.steps.filter(st => st.k !== 'fix' || (st.t - T0) % 1000 === 0);
+    expect(sc.steps.length - cleanSteps.length).toBe(3);
+    const actual = runScenario(sc);
+    const clean = runScenario({ ...sc, steps: cleanSteps });
+    expect(actual.angles).toEqual(golden.corners);
+    expect(actual.points).toEqual(clean.points);
+    expect(actual.distanceCalls).toEqual(clean.distanceCalls);
+    expect(actual.markers).toEqual(clean.markers);
+  });
+
+  it.each([
+    ['missing accuracy', null], ['poor accuracy', 80], ['implausible jump', 5],
+  ] as const)('%s leaves admitted line, distance and detector equal to the same walk without that fix', (_name, acc) => {
+    const sc = scenarios.find(s => s.name === 'right90 current')!;
+    const baseline = runScenario(sc);
+    const insertion = sc.steps.findIndex(s => s.k === 'fix' && s.t >= T0 + 20_000);
+    const anchor = sc.steps[insertion] as Extract<Scenario['steps'][number], { k: 'fix' }>;
+    const bad = { ...anchor, t: anchor.t + 100, x: anchor.x + 100, y: anchor.y + 100, acc };
+    const steps = [...sc.steps.slice(0, insertion + 1), bad, ...sc.steps.slice(insertion + 1)];
+    const actual = runScenario({ ...sc, steps });
+    expect(actual.results[insertion + 1].rejectReason).toBe(acc === 5 ? 'gps_outlier' : 'accuracy');
+    expect(actual.points).toEqual(baseline.points);
+    expect(actual.distanceCalls).toEqual(baseline.distanceCalls);
+    expect(actual.session.detectPointsRef.current).toEqual(baseline.session.detectPointsRef.current);
+    expect(actual.angles).toEqual(baseline.angles);
+    expect(actual.markers).toEqual(baseline.markers);
+    // The visible puck continues receiving raw positions independently.
+    const before = runScenario({ ...sc, steps: sc.steps.slice(0, insertion + 1) });
+    const rejected = runScenario({ ...sc, steps: steps.slice(0, insertion + 2) });
+    expect(rejected.session.puckRef.current).not.toEqual(before.session.puckRef.current);
+    expect(rejected.results.at(-1)!.distanceM).toBe(before.results.at(-1)!.distanceM);
+  });
 });

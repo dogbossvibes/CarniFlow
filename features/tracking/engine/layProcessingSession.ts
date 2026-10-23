@@ -557,7 +557,8 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       ? { lat: prevEma.lat + (raw.lat - prevEma.lat) * EMA_ALPHA, lng: prevEma.lng + (raw.lng - prevEma.lng) * EMA_ALPHA }
       : { lat: raw.lat, lng: raw.lng };
     emaRef.current = ema;
-    // Warmup, Pause und abgelehnte Fixes behalten ihren bisherigen EMA-Verlauf.
+    // Warmup und Pause behalten ihren bisherigen EMA-Verlauf. CURRENT setzt
+    // bei einem Accuracy-/Speed-Reject unten nur die Messwert-EMAs zurück.
     // Nach einem zugelassenen Detektor-Fix wird unten dessen aktuelle Zone genutzt.
     // Bei einem Zonenwechsel immer vom Zustand VOR diesem Fix neu berechnen,
     // damit derselbe Rohfix nicht zweimal in die Glättung eingeht.
@@ -613,10 +614,20 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       gpsQualityStateRef.current = qState;
     }
 
+    // Ein verworfener Fix darf auch den NÄCHSTEN zugelassenen Linienpunkt und
+    // dessen Distanz nicht verschieben. Der Puck und der Rohdatenmitschnitt
+    // bleiben unabhängig; BUILD40 behält seinen historischen Vergleichspfad.
+    const discardRejectedSmoothing = () => {
+      if (getTrackingEngineMode() === 'build40') return;
+      emaRef.current = prevEma;
+      lineEmaRef.current = prevLine;
+    };
+
     // 1) Zu ungenauer / unrealistischer Fix → kein Linienpunkt (Puck steht schon).
     out.rejectReason = 'accuracy';
     if (raw.accuracy == null || raw.accuracy > MAX_ACCURACY_M) {
       void recordBackgroundLayEvent(localSessionId.current, 'onFixRejected', 1, 'accuracy').catch(() => {});
+      discardRejectedSmoothing();
       rejectedRef.current++; return;
     }
     const prevRaw = lastRawRef.current;
@@ -626,6 +637,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       const dt = (raw.t - prevRaw.t) / 1000;
       if (dt > 0 && d / dt > MAX_SPEED_MPS) {
         void recordBackgroundLayEvent(localSessionId.current, 'onFixRejected', 1, 'gps_outlier').catch(() => {});
+        discardRejectedSmoothing();
         rejectedRef.current++; return;
       }   // unrealistischer Sprung
     }

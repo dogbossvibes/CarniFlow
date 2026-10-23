@@ -514,6 +514,10 @@ export function useSearchRecorder(opts: {
     };
 
     if (!decision.accepted) {
+      // Keep the visible puck responsive, but a rejected first-stage fix must
+      // not bias the next admitted point, distance, projection or end evidence.
+      // BUILD40 remains the unchanged historical comparison path.
+      if (getTrackingEngineMode() !== 'build40') smoothRef.current = prev;
       rejectedRef.current++;
       emitDiag(decision.reason === 'accuracy' ? 'REJECT_ACCURACY' : 'REJECT_SPEED', null);
       // Nur 'speed'-Rejects zählen als Evidenz für einen falschen Anker — ein

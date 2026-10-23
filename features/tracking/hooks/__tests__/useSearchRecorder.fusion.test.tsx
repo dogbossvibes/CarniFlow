@@ -129,6 +129,36 @@ describe('useSearchRecorder — Sensor-Fusion-Schutzschicht (Punkt 2 der Nachbes
   beforeEach(() => { feedSample = null; motionSampleCb = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null; jest.spyOn(Date, 'now').mockImplementation(() => simClockMs); });
   afterEach(() => { act(() => { activeRenderer?.unmount(); }); jest.restoreAllMocks(); });
 
+  it.each([80, 5])('first-stage reject (accuracy %s) cannot contaminate later search metrics or end evidence', async accuracy => {
+    const replay = async (inject: boolean) => {
+      simClockMs = 0;
+      const { getRecorder } = mount(denseLeg(0, 60, 0));
+      await act(async () => { await Promise.resolve(); });
+      act(() => { getRecorder().start(); });
+      const y = lockAndWalk(getRecorder, 5);
+      const distanceBefore = getRecorder().distanceM;
+      const positionBefore = getRecorder().position;
+      simClockMs += 100;
+      if (inject) {
+        act(() => feedSample!({ lat: (y + 100) / M_PER_DEG, lng: 100 / M_PER_DEG,
+          accuracy, speed: 0, course: null, t: simClockMs }));
+        expect(getRecorder().distanceM).toBe(distanceBefore);
+        expect(getRecorder().position).not.toEqual(positionBefore);
+      }
+      for (let i = 1; i <= 5; i++) feed(5, 0, y + i * 2);
+      const end = getRecorder().endHandlerFix;
+      const progressM = getRecorder().progressM;
+      const result = getRecorder().stop();
+      act(() => { activeRenderer?.unmount(); });
+      activeRenderer = null;
+      return { points: result.points, distanceM: result.distanceM, progressM, end,
+        score: result.score, replay: result.replayPoints, analytics: result.analyticsSamples };
+    };
+    const baseline = await replay(false);
+    const injected = await replay(true);
+    expect(injected).toEqual(baseline);
+  });
+
   it('normaler GPS-Fix (kein Motion-Widerspruch) → Linie bewegt sich normal weiter', async () => {
     const laidPoints = denseLeg(0, 60, 0);
     const { getRecorder } = mount(laidPoints);
