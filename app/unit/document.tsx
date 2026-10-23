@@ -24,9 +24,10 @@ import { TrainingFocusList } from '@/components/training/TrainingFocusList';
 import { ExerciseIdentityList } from '@/components/training/ExerciseIdentityList';
 import { loadTrainingPreparation, type PreparationUnit } from '@/services/trainingPreparation';
 import { historyDate } from '@/features/training/documentation/historyDate';
-import { planTemplate, readTemplateHints, templateEntryContext, type TemplateContext, type TemplateChoice } from '@/features/training/documentation/template';
+import { prepareTrainingHistoryDraft } from '@/services/trainingContext';
+import { planTemplate, readTemplateHints, templateEntryContext, templateExerciseKey, type TemplateContext, type TemplateChoice } from '@/features/training/documentation/template';
 import { TrainingPreparation } from '@/components/training/TrainingPreparation';
-import { planFromHistory, lastExerciseHistory, performedExercises, localDay, measuredMinutes, type PlannedExercise } from '@/features/training/documentation/model';
+import { lastExerciseHistory, performedExercises, localDay, measuredMinutes, type PlannedExercise } from '@/features/training/documentation/model';
 import { isConfirmedDocumentedRetry, trainingUnitFingerprint } from '@/features/training/documentation/retry';
 import { documentDraftKey, loadDocumentDraft, saveDocumentDraft, clearDocumentDraft } from '@/features/training/documentation/draft';
 import { SelectedExerciseCard } from '@/components/training/SelectedExerciseCard';
@@ -201,11 +202,25 @@ function DocumentForm() {
   const scrollRef = useRef<ScrollView>(null);
   const dogSwitchLock = useRef(false);
   useEffect(() => { dogSwitchLock.current = false; }, [dogId]);
-  const moveToStep = useCallback((step: number) => { Keyboard.dismiss(); setWorkflowStep(step); setPickerOpen(step === 1 && !selected.length); scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [selected.length]);
 
   const [shared, setShared] = useState<boolean | null>(null);
   const [historyRetry, setHistoryRetry] = useState(0);
+  const historyEpoch = useRef(0);
+  const reuseRequest = useRef<symbol | null>(null);
+  const reuseAllowed = useRef(false);
+  reuseAllowed.current = workflowStep === 0 && !editing && !saving && !pendingSave && !remoteCompleted && !saved && draftReady && !draftBlocked && !draftError && dogs.some(d => d.id === dogId);
   const [history, setHistory] = useState<{ scope: string; units: PreparationUnit[]; error: boolean; loading: boolean; limited: boolean }>({ scope: '', units: [], error: false, loading: false, limited: false });
+  const moveToStep = useCallback((step: number) => {
+    // The user advancing/backtracking supersedes any pending preparation action.
+    // Invalidate synchronously, even if they return before the old reply arrives.
+    if (reuseRequest.current) {
+      historyEpoch.current++;
+      reuseRequest.current = null;
+      setHistory(prev => ({ ...prev, loading: false }));
+    }
+    Keyboard.dismiss(); setWorkflowStep(step); setPickerOpen(step === 1 && !selected.length);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [selected.length]);
   useFocusEffect(useCallback(() => {
     if (editing || saved || workflowStep === 0) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -381,28 +396,37 @@ function DocumentForm() {
   }, [discLabel, discExercises, dogId, isCustomDiscipline, session?.user.id]);
 
   const historyScope = `${session?.user.id}:${dogId}:${disc?.label}`;
+  const historyContextKey = JSON.stringify([session?.user.id, dogId, disc?.key, disc?.label]);
+  const activeHistoryScope = useRef(historyContextKey);
+  activeHistoryScope.current = historyContextKey;
   const visibleHistory = history.scope === historyScope ? history : { units: [], error: false, loading: !!dogId, limited: false };
   useFocusEffect(useCallback(() => {
     if (!session?.user.id || !dogId || !discLabel) return;
     let cancelled = false;
+    const contextKey = historyContextKey;
     let requestVersion = historyRetry;
+    historyEpoch.current++;
+    reuseRequest.current = null;
     const owner = session.user.id; const dog = dogId; const label = discLabel;
     const load = async () => {
       const version = ++requestVersion;
+      historyEpoch.current++;
+      reuseRequest.current = null;
       setHistory(prev => prev.scope === historyScope ? { ...prev, loading: true, error: false } : { scope: historyScope, units: [], loading: true, error: false, limited: false });
       try {
         const result = await loadTrainingPreparation(owner, dog, label);
-        if (!cancelled && version === requestVersion) setHistory({ scope: historyScope, ...result, loading: false, error: false });
+        if (!cancelled && version === requestVersion && activeHistoryScope.current === contextKey) setHistory({ scope: historyScope, ...result, loading: false, error: false });
       } catch {
-        if (!cancelled && version === requestVersion) setHistory(prev => prev.scope === historyScope ? { ...prev, loading: false, error: true } : { scope: historyScope, units: [], loading: false, error: true, limited: false });
+        if (!cancelled && version === requestVersion && activeHistoryScope.current === contextKey) setHistory(prev => prev.scope === historyScope ? { ...prev, loading: false, error: true } : { scope: historyScope, units: [], loading: false, error: true, limited: false });
       }
     };
     void load();
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') void load();
+      else { historyEpoch.current++; reuseRequest.current = null; }
     });
-    return () => { cancelled = true; subscription.remove(); };
-  }, [historyScope, historyRetry, session?.user.id, dogId, discLabel]));
+    return () => { cancelled = true; historyEpoch.current++; reuseRequest.current = null; subscription.remove(); };
+  }, [historyScope, historyRetry, session?.user.id, dogId, discLabel, historyContextKey]));
 
   const openHistory = (unit: TrainingUnit) => {
     const source = unit as PreparationUnit;
@@ -410,10 +434,34 @@ function DocumentForm() {
     else router.push({ pathname: '/unit/detail', params: { id: unit.id } });
   };
 
-  const reuseExercises = (unit: TrainingUnit, exercises: NonNullable<TrainingUnit['exercises']>) => {
-    moveToStep(1);
-    setSelected(prev => [...prev, ...exercises.filter(e => !prev.some(p => p.sourceUnitId === unit.id && !!e.id && p.sourceExerciseId === e.id))
-      .map(e => ({ ...planFromHistory(unit, e, Crypto.randomUUID()), exerciseKey: e.exercise_identity_id ?? Crypto.randomUUID(), identityNew: !e.exercise_identity_id, disciplineKey: e.discipline_key ?? (disc && e.discipline === disc.label ? scopeKey(disc) : null) }))]);
+  const reuseExercises = async (unit: TrainingUnit, exercises: NonNullable<TrainingUnit['exercises']>) => {
+    if (reuseRequest.current || !reuseAllowed.current || !session?.user.id || !dogId || !disc || visibleHistory.loading || visibleHistory.error) return;
+    const token = Symbol('history-reuse');
+    const epoch = historyEpoch.current;
+    const requestScope = historyScope;
+    const requestContext = historyContextKey;
+    const current = () => alive.current && reuseAllowed.current && !saveLock.current
+      && !stopDraft.current && activeHistoryScope.current === requestContext
+      && historyEpoch.current === epoch && reuseRequest.current === token;
+    reuseRequest.current = token;
+    setHistory(prev => ({ ...prev, loading: true }));
+    try {
+      const plan = await prepareTrainingHistoryDraft(unit.id, {
+        owner: session.user.id, dog: dogId, discipline: disc.label, disciplineKey: scopeKey(disc),
+        exercises: exercises.map(templateExerciseKey), focuses: [],
+      }, Crypto.randomUUID, current);
+      if (!current()) return;
+      setSelected(prev => [...prev, ...plan.exercises.filter(e => !prev.some(p => p.sourceUnitId === e.sourceUnitId
+        && !!e.sourceExerciseId && p.sourceExerciseId === e.sourceExerciseId))]);
+      moveToStep(1);
+    } catch {
+      if (current()) setHistory(prev => prev.scope === requestScope ? { ...prev, units: [], error: true } : prev);
+    } finally {
+      if (alive.current && historyEpoch.current === epoch && reuseRequest.current === token) {
+        setHistory(prev => prev.scope === requestScope ? { ...prev, loading: false } : prev);
+      }
+      if (reuseRequest.current === token) reuseRequest.current = null;
+    }
   };
 
   // „Eigene Übung"-Kennzeichnung ohne neue Spalte: eine Übung gilt als eigen,
