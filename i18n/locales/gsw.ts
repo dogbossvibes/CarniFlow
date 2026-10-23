@@ -5,6 +5,17 @@ import { gswCH } from '../gsw-CH';
 // Fehlende Keys fallen automatisch auf `de` zurück (fallbackLng). Ergänzt um die
 // Plural-Referenzkeys im gsw-Stil.
 export const gsw = {
+  "trainingTemplate.resume": "Entwurf wiitermache",
+  "trainingTemplate.resumeHelp": "Für die Vorlag gits scho en Entwurf. Mach det wiiter; dini Iigabe bliibed erhalte.",
+
+  "trainingTemplate.open": "Als Vorlag übernäh",
+  "trainingTemplate.explanation": "Wähl Üebige und offeni Schwerpünkt für es neus Training. Bewertige, Beobachtige, Medie und Ziite bliibed im ursprüngliche Iitrag.",
+  "trainingTemplate.hints": "Offeni Schwerpünkt uswähle",
+  "trainingTemplate.noHints": "Kei offeni Schwerpünkt vorhande.",
+  "trainingTemplate.confirm": "Uswahl übernäh",
+  "trainingTemplate.context": "Vorlag vom {date}",
+  "trainingTemplate.contextHelp": "Die Hiwiis sind us früehere Trainings. Dokumentier drunder, wie s hüt gloffe isch.",
+
   "track.report.glyphNotice": "Es paar Zeiche werded als ? zeigt. D JSON-Datei enthält de vollständigi Text.",
   "track.export.title": "Uuswärtig exportiere",
   "track.export.privacy": "Exportdateien enthalten genaue Standorte, das Datum und den Hundenamen. Teile sie nur mit Personen, denen du diese Daten geben möchtest.",

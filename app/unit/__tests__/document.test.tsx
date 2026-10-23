@@ -1125,3 +1125,63 @@ it('guards consecutive context presses from one render without dropping another 
   showContext(node); tap(node, 'Malu'); await flush();
   expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Malu draft');
 });
+
+describe('explicit independent templates', () => {
+  const source = () => ({ id: 'past', owner_id: 'owner-1', dog_id: 'dog-1', status: 'completed', session_date: '2026-10-14', score: 10, notes: 'Private old result', duration_sec: 90, started_at: 'old-start', ended_at: 'old-end', photos: ['old-photo'], videos: ['old-video'], exercises: [{ id: 'past-row', exercise_identity_id: 'stable', discipline: 'Fährte', exercise_name: 'Übung', rating: 5, notes: 'old exercise result', duration_sec: 33, seq_index: 0 }] });
+  const params = () => ({ template: 'past', draftToken: 'entry-a', dogId: 'dog-1', discipline: 'faehrte', templateChoice: JSON.stringify({ owner: 'owner-1', dog: 'dog-1', discipline: 'Fährte', disciplineKey: 'system:faehrte', exercises: ['id:past-row'], focuses: [] }) });
+  const snapshots = async () => {
+    const keys = (await AsyncStorage.getAllKeys()).filter(k => k.startsWith('training_document_v1:'));
+    return Promise.all(keys.map(async key => ({ key, value: JSON.parse((await AsyncStorage.getItem(key))!).value })));
+  };
+  beforeEach(() => { mockDogs = [{ id: 'dog-1', name: 'Yam' }]; mockDogsLoading = false; mockCategories = []; mockParams = params(); mockGetTrainingUnitById.mockReset().mockResolvedValue({ data: source(), error: null }); });
+  it('persists a new blank plan without copying facts, timing or media', async () => {
+    const node = render(); await flush();
+    const draft = (await snapshots())[0].value;
+    expect(draft.unitId).not.toBe('past'); expect(draft.operationId).toBeDefined();
+    expect(draft).toMatchObject({ description: '', score: 0, durationMin: null, recordedDurationSec: null, photos: [], videos: [], audio: [] });
+    expect(draft.selected).toEqual([expect.objectContaining({ rating: null, notes: null, performed: false, sourceUnitId: 'past' })]);
+    expect(draft.templateContext).toMatchObject({ sourceId: 'past', hints: [] });
+    expect(strings(node)).not.toContain('Private old result'); expect(mockAtomicSave).not.toHaveBeenCalled();
+  });
+  it('saves today through the existing create contract, without rewriting the source or duplicating focus records', async () => {
+    mockParams.templateChoice = JSON.stringify({ ...JSON.parse(mockParams.templateChoice), focuses: ['server:h'] });
+    mockListFocuses.mockResolvedValue({ data: [{ id: 'h', owner_id: 'owner-1', dog_id: 'dog-1', discipline_key: 'system:faehrte', text: 'Next hint', status: 'open', source_date_snapshot: '2026-10-14', source_unit_snapshot_id: 'past', revision: 1 }], error: null });
+    mockCreateDocumentedUnit.mockResolvedValue({ error: null, data: { id: 'new' } });
+    const node = render(); await flush();
+    expect((await snapshots())[0].value.templateContext.hints[0].text).toBe('Next hint');
+    await act(async () => { await saveButton(node).props.onPress(); }); await flush();
+    tap(node, 'trainingDoc.planned'); await flush();
+    await submitTraining(node); await flush();
+    expect(mockAtomicSave).toHaveBeenCalledTimes(1);
+    const [owner, id, today, rows, mode, options] = mockAtomicSave.mock.calls[0];
+    expect(owner).toBe('owner-1'); expect(id).not.toBe('past'); expect(mode).toBe('create');
+    expect(today).toMatchObject({ notes: null, duration_sec: null, photos: [], videos: [] });
+    expect(today.started_at).not.toBe('old-start'); expect(rows[0]).toMatchObject({ notes: null, rating: null, duration_sec: null });
+    expect(options.focusChanges ?? []).toEqual([]); expect(mockUpdateDocumentedUnit).not.toHaveBeenCalled();
+  });
+  it('restores the same draft without refetching or replacing user changes', async () => {
+    const first = render(); await flush(); const [saved] = await snapshots();
+    const changed = { ...saved.value, description: 'New observation', workflowStep: 1 };
+    await AsyncStorage.setItem(saved.key, JSON.stringify({ version: 1, value: changed }));
+    act(() => first.unmount()); mockGetTrainingUnitById.mockClear();
+    render(); await flush();
+    expect(mockGetTrainingUnitById).not.toHaveBeenCalled(); expect((await snapshots())[0].value.description).toBe('New observation');
+  });
+  it('keeps ordinary drafts and a second template entry independent', async () => {
+    await AsyncStorage.setItem('training_document_v1:owner-1:new', JSON.stringify({ version: 1, value: { untouched: true } }));
+    const first = render(); await flush(); const a = (await snapshots()).find(d => d.value.unitId)!;
+    act(() => first.unmount()); mockParams = { ...params(), template: 'past-b', draftToken: 'entry-b' }; mockGetTrainingUnitById.mockResolvedValue({ data: { ...source(), id: 'past-b' }, error: null });
+    render(); await flush(); const all = await snapshots();
+    expect(all).toHaveLength(3); expect(all.find(d => d.key.endsWith(':new'))!.value).toEqual({ untouched: true });
+    expect(all.filter(d => d.value.unitId).map(d => d.value.unitId)).toContain(a.value.unitId);
+    expect(new Set(all.filter(d => d.value.unitId).map(d => d.value.unitId)).size).toBe(2);
+  });
+  it.each(['owner', 'dog', 'offline', 'malformed'])('blocks %s without persisting a partial template', async reason => {
+    if (reason === 'owner') mockGetTrainingUnitById.mockResolvedValue({ data: { ...source(), owner_id: 'foreign' }, error: null });
+    if (reason === 'dog') mockGetTrainingUnitById.mockResolvedValue({ data: { ...source(), dog_id: 'other' }, error: null });
+    if (reason === 'offline') mockGetTrainingUnitById.mockResolvedValue({ data: null, error: { message: 'offline' } });
+    if (reason === 'malformed') mockParams.templateChoice = '{broken';
+    const node = render(); await flush(); expect(strings(node)).toContain('trainingDoc.draftError');
+    expect(await snapshots()).toEqual([]); expect(mockAtomicSave).not.toHaveBeenCalled();
+  });
+});

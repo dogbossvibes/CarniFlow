@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { historyDate } from '@/features/training/documentation/historyDate';
 import type { TrainingUnit, TrainingExercise } from '@/types/trainingUnit';
 
 export function TrainingPreparation({ units, discipline, loading, error, limited, onRetry, onReuse, onOpen }: {
   units: TrainingUnit[]; discipline: string; loading: boolean; error: boolean; limited: boolean;
   onRetry: () => void; onReuse: (unit: TrainingUnit, exercises: TrainingExercise[]) => void; onOpen: (unit: TrainingUnit) => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const [expanded, setExpanded] = useState(false);
   const [count, setCount] = useState(5);
   const last = units[0];
@@ -18,11 +19,11 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
     {error && <TouchableOpacity onPress={onRetry} style={s.button} accessibilityRole="button"><Text style={s.text}>{t('trainingDoc.historyError')}</Text></TouchableOpacity>}
     {!last ? (!loading && !error ? <Text style={s.text}>{t(limited ? 'trainingDoc.limited' : 'trainingDoc.noHistory')}</Text> : null) : <>
         <TouchableOpacity onPress={() => onOpen(last)} style={s.button} accessibilityRole="button">
-          <Text style={s.text}>{last.session_date} · {discipline}</Text>
+          <Text style={s.text}>{historyDate(last.session_date, locale)} · {discipline}</Text>
         </TouchableOpacity>
         {last.notes?.trim() ? <Text style={s.text} numberOfLines={expanded ? undefined : 3}>{t('trainingDoc.historySessionNote')}: {last.notes}</Text> : null}
         {last.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <View key={exercise.id ?? i}>
-          <Text style={s.text}>{exercise.exercise_name}</Text>
+          <Text style={s.text}>{exercise.exercise_name}{exercise.rating != null ? ` · ${exercise.rating}/5` : ''}</Text>
           {exercise.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historyExerciseNote')}: {exercise.notes}</Text> : null}
         </View>)}
         <TouchableOpacity style={s.button} onPress={() => onReuse(last, last.exercises?.filter(e => e.discipline === discipline) ?? [])} accessibilityRole="button">
@@ -32,7 +33,7 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
           <Text style={s.action}>{t('trainingDoc.selectPast')}</Text>
         </TouchableOpacity>
         {expanded && units.slice(0, count).map(unit => <View key={unit.id}>
-          <TouchableOpacity onPress={() => onOpen(unit)} style={s.button} accessibilityRole="button"><Text style={s.text}>{unit.session_date}</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => onOpen(unit)} style={s.button} accessibilityRole="button"><Text style={s.text}>{historyDate(unit.session_date, locale)}</Text></TouchableOpacity>
           {unit.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historySessionNote')}: {unit.notes}</Text> : null}
           {unit.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <TouchableOpacity key={exercise.id ?? i} style={s.button}
             accessibilityRole="button" onPress={() => onReuse(unit, [exercise])}>

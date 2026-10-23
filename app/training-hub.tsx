@@ -16,6 +16,7 @@ import { RescheduleModal } from '@/components/calendar/RescheduleModal';
 import { TimelineView } from '@/components/calendar/TimelineView';
 import { WeekView } from '@/components/calendar/WeekView';
 import { MonthView } from '@/components/calendar/MonthView';
+import { canEditOwnEvent } from '@/features/calendar/eventEditing';
 import { EventActionsSheet } from '@/components/calendar/EventActionsSheet';
 import { useT } from '@/i18n';
 import { CreateEventModal } from '@/components/calendar/CreateEventModal';
@@ -169,7 +170,7 @@ function TrainingHubContent() {
           {loading ? (
             <ActivityIndicator color={ACCENT} style={{ marginVertical: 30 }} />
           ) : tab === 'timeline' ? (
-            <TimelineView events={events} onEventPress={onEventPress} />
+            <TimelineView events={events} onEventPress={onEventPress} userId={uid} onEdit={event => { if (uid && canEditOwnEvent(event, uid)) { setEditing(event); setCreateOpen(true); } }} />
           ) : tab === 'week' ? (
             <WeekView events={events} onEventPress={onEventPress} />
           ) : (
