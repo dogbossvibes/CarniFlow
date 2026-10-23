@@ -14,6 +14,7 @@ import { motionClient } from '../../native/motionClient';
 import { markMotionSample } from '../../utils/trackingWarmupState';
 import type { MotionSample } from '@/modules/anyvo-motion';
 import { MotionEvidenceBuffer } from '../../utils/motionTurnEvidence';
+import * as Location from 'expo-location';
 jest.mock('@/lib/diagnosticsAccessState', () => ({
   diagnosticsAccessToken: () => mockAccessToken,
   getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
@@ -146,6 +147,57 @@ function diagnosticEvents(): { name: string; count: number; reason?: string }[] 
     .filter(([key]) => typeof key === 'string' && key.includes('::event::'))
     .map(([, value]) => JSON.parse(value));
 }
+
+it('requires a fresh measurement at start tap, then accepts the next fresh fix immediately', async () => {
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  feed(0, 4, 0);
+  clockMs += 6000;
+  await act(async () => {
+    expect((await current.beginRecording({ localId: 'local', ownerId: 'owner' })).error).toBe('gps_not_ready');
+  });
+  feed(7000, 4, 0);
+  await act(async () => {
+    expect((await current.beginRecording({ localId: 'local', ownerId: 'owner' })).error).toBeNull();
+  });
+});
+
+it('does not replace the live warmup with a delayed cached position', async () => {
+  let resolveCached!: (location: Location.LocationObject) => void;
+  (Location.getLastKnownPositionAsync as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { resolveCached = resolve; }));
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  feed(100, 4, 0);
+  await act(async () => { resolveCached({ coords: { latitude: 1, longitude: 1, accuracy: 80 }, timestamp: 900_000 } as Location.LocationObject); });
+  await act(async () => {
+    expect((await current.beginRecording({ localId: 'local', ownerId: 'owner' })).error).toBeNull();
+  });
+});
+
+it('does not accept a stale cached warmup fix or negative accuracy as ready', async () => {
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  feed(0, 4, 0, 0, 6000);
+  await act(async () => { expect((await current.beginRecording({ localId: 'local', ownerId: 'owner' })).error).toBe('gps_not_ready'); });
+  feed(100, -1, 0);
+  await act(async () => { expect((await current.beginRecording({ localId: 'local', ownerId: 'owner' })).error).toBe('gps_not_ready'); });
+});
+
+it('updates visible warmup readiness immediately and expires it without another callback', async () => {
+  jest.useFakeTimers({ doNotFake: ['Date'] });
+  try {
+    await act(async () => { renderer = TestRenderer.create(<Harness />); });
+    await act(async () => { await current.startWarmup(); });
+    expect(current.warmupReady).toBe(false);
+    feed(0, 4, 0);
+    expect(current.warmupReady).toBe(true);
+    clockMs += 5001;
+    act(() => { jest.advanceTimersByTime(5001); });
+    expect(current.warmupReady).toBe(false);
+    feed(6000, 4, 0);
+    expect(current.warmupReady).toBe(true);
+  } finally { jest.useRealTimers(); }
+});
 
 it('counts accepted fixes, existing rejects and successful point flush without changing geometry', async () => {
   await start();

@@ -55,8 +55,9 @@ import { startFaehrteActivity, updateFaehrteActivity, stopFaehrteActivity } from
 import { classifyManualAngleGeometrySections } from '@/features/tracking/utils/manualAngleGeometry';
 import { voiceDiagnostics } from '@/features/tracking/utils/voiceEvents';
 import { isLaySessionWarmupReady } from '@/features/tracking/utils/layStartLock';
+import { isFreshStartTimestamp, isValidStartPosition } from '@/features/tracking/utils/startFixFreshness';
 import {
-  createLayProcessingState, createLayProcessor, type LayProcessingState,
+  createLayProcessingState, createLayProcessor, START_FIX_MAX_AGE_MS, type LayProcessingState,
 } from '@/features/tracking/engine/layProcessingSession';
 import {
   registerLaySession, getLaySessionStatus, deliverLayFix, stopLaySession, beginFinalizeLaySession,
@@ -107,6 +108,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const backgroundScheduledRef = useRef(false);
   const recordingRef = useRef(false);   // true ⇒ Fixes fliessen in die Linie
   const warmupAccuracyRef = useRef<number | null>(null);
+  const warmupFixMsRef = useRef<number | null>(null);
+  const warmupExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [warmupReady, setWarmupReady] = useState(false);
   const localSessionCreationRef = useRef<Promise<void> | null>(null);
   const bgActiveRef  = useRef(false);   // true ⇒ Hintergrund-Updates (Foreground-Service) laufen
 
@@ -255,6 +259,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     const wasRecording = recordingRef.current;
     recordingGenerationRef.current++;
     warmupGenerationRef.current++;
+    if (warmupExpiryRef.current) clearTimeout(warmupExpiryRef.current);
+    warmupExpiryRef.current = null;
+    warmupFixMsRef.current = null;
+    warmupAccuracyRef.current = null;
+    setWarmupReady(false);
     recordingEvidenceRef.current?.close();
     recordingEvidenceRef.current = null;
     recordingRef.current = false;
@@ -419,6 +428,19 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   // EIN Fix-Handler für Warmup UND Aufnahme.
   const onFix = useCallback((loc: Location.LocationObject) => {
+    if (!recordingRef.current) {
+      const now = Date.now();
+      if (!isValidStartPosition(loc.coords.latitude, loc.coords.longitude)
+        || !isFreshStartTimestamp(loc.timestamp, now, START_FIX_MAX_AGE_MS)
+        || (warmupFixMsRef.current != null && loc.timestamp <= warmupFixMsRef.current)) return;
+      warmupFixMsRef.current = loc.timestamp;
+      setWarmupReady(isLaySessionWarmupReady(loc.coords.accuracy));
+      if (warmupExpiryRef.current) clearTimeout(warmupExpiryRef.current);
+      warmupExpiryRef.current = setTimeout(() => {
+        warmupExpiryRef.current = null;
+        setWarmupReady(false);
+      }, Math.max(0, START_FIX_MAX_AGE_MS - (now - loc.timestamp)) + 1);
+    }
     warmupAccuracyRef.current = loc.coords.accuracy ?? null;
     // Aktive Aufnahme: über die Lay-Session-Runtime (kanalübergreifende Dedup,
     // Serialisierung mit Hintergrund-Fixes). Ohne laufende Arbeit synchron wie bisher.
@@ -433,6 +455,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (watchRef.current) return { error: null };
     const generation = ++warmupGenerationRef.current;
     warmupAccuracyRef.current = null;
+    warmupFixMsRef.current = null;
+    setWarmupReady(false);
     startupOriginRef.current ??= Date.now();
     startupRef.current!.warmupStartTSec ??= startupSec();
     // Persistierte QA-Einstellungen MÜSSEN geladen sein, bevor die
@@ -509,7 +533,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // laufenden Stream (→ onFix feuerte nie wieder, Spur blieb leer).
     // getLastKnownPositionAsync startet KEINE neue Anfrage und stört den Watch nicht.
     Location.getLastKnownPositionAsync()
-      .then(loc => { if (loc && generation === warmupGenerationRef.current) onFix(loc); })
+      .then(loc => {
+        // A live observation takes precedence even if the cache resolves later.
+        if (loc && generation === warmupGenerationRef.current && warmupFixMsRef.current == null) onFix(loc);
+      })
       .catch(() => { /* Stream liefert ohnehin laufend Fixes */ });
     return { error: null };
   }, [onFix]);
@@ -536,7 +563,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (w.error) return w;
     }
     if (generation !== recordingGenerationRef.current) return { error: 'cancelled' };
-    if (!isLaySessionWarmupReady(warmupAccuracyRef.current)) return { error: 'gps_not_ready' };
+    if (!isLaySessionWarmupReady(warmupAccuracyRef.current) || warmupFixMsRef.current == null
+      || !isFreshStartTimestamp(warmupFixMsRef.current, Date.now(), START_FIX_MAX_AGE_MS)) return { error: 'gps_not_ready' };
 
     const isCurrentRecording = () => recordingRef.current && recordingGenerationRef.current === generation && localSessionId.current === input.localId;
 
@@ -639,6 +667,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (sec % 3 === 0) updateFaehrteActivity({ elapsedS: sec, distanceM: st.distanceMeters, paused: st.isPaused });
     }, 1000);
     recordingRef.current = true;   // ← ab jetzt akzeptiert onFix die Fixes
+    if (warmupExpiryRef.current) clearTimeout(warmupExpiryRef.current);
+    warmupExpiryRef.current = null;
     // Fachliche Ownership: dieselbe Session (Processor + State) für Vordergrund UND Hintergrund-Task.
     // persist schreibt nur in GENAU diese Session (fail closed, falls der Hook inzwischen eine andere führt).
     registerLaySession({
@@ -983,5 +1013,5 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     })().finally(() => { finalizationRef.current = null; });
   }, [stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaMotionCaptureRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
 
-  return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug };
+  return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug, warmupReady };
 }

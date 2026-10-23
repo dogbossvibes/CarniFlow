@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { calculateDistance, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import type { SearchRecorder } from '@/features/tracking/hooks/useSearchRecorder';
+import { isFreshStartTimestamp, isValidStartPosition } from '@/features/tracking/utils/startFixFreshness';
 import {
   DEFAULT_APPROACH_CONFIG, INITIAL_APPROACH, effectiveRadiusM,
   reduceApproach, type ApproachConfig,
   isEligible,
   isStableReachedFix, reachedRadiusM,
+  isFreshFix, isPlausibleSpeed,
   nextStartZonePhase, type StartZonePhase,
 } from '@/features/tracking/engine/startApproach';
 
@@ -13,6 +15,7 @@ export interface StartApproach {
   position:       LatLng | null;   // aktuelle Position (nur während der Annäherung)
   distanceM:      number | null;   // Live-Distanz zum Fährtenansatz
   accuracy:       number | null;   // gemeldete GPS-Genauigkeit (m)
+  fixTimestampMs: number | null;   // original measurement time for action-time validation
   radiusM:        number | null;   // aktueller DYNAMISCHER Startradius (m)
   withinRadius:   boolean;         // aktuell im dynamischen Zielradius
   armed:          boolean;         // Startpunkt erreicht + stabil → Absuche darf starten
@@ -37,7 +40,7 @@ export interface ApproachFixEvent {
 }
 
 const IDLE: StartApproach = {
-  position: null, distanceM: null, accuracy: null, radiusM: null,
+  position: null, distanceM: null, accuracy: null, fixTimestampMs: null, radiusM: null,
   withinRadius: false, armed: false, fixesRemaining: DEFAULT_APPROACH_CONFIG.requiredFixes,
   phase: 'approaching', startZoneEnteredAtMs: null, startReachedAtMs: null, firstStableFixAtMs: null,
   armedAtMs: null, departedStartAtMs: null, reason: null,
@@ -60,11 +63,13 @@ export function useStartPointApproach(
   const approachRef = useRef(INITIAL_APPROACH);
   const lastFixRef  = useRef<{ lat: number; lng: number; t: number } | null>(null);
   const processedFixRef = useRef<SearchRecorder['liveFix']>(null);
+  const expiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phaseRef = useRef<StartApproach['phase']>('approaching');
   const enteredRef = useRef<number | null>(null);
   const reachedRef = useRef<number | null>(null);
   const reachedHitsRef = useRef(0);
   const departHitsRef = useRef(0);
+  const departureArmedRef = useRef(false);
   const stableRef = useRef<number | null>(null);
   const armedRef = useRef<number | null>(null);
   const departedRef = useRef<number | null>(null);
@@ -74,30 +79,61 @@ export function useStartPointApproach(
   const startLng = start?.lng;
 
   useEffect(() => {
+    if (expiryRef.current) clearTimeout(expiryRef.current);
+    expiryRef.current = null;
     setState(IDLE);
     approachRef.current = INITIAL_APPROACH;
     lastFixRef.current = null;
     processedFixRef.current = null;
     phaseRef.current = 'approaching'; enteredRef.current = null; reachedRef.current = null;
     reachedHitsRef.current = 0; departHitsRef.current = 0;
+    departureArmedRef.current = false;
     stableRef.current = null; armedRef.current = null; departedRef.current = null;
+    return () => { if (expiryRef.current) clearTimeout(expiryRef.current); };
   }, [active, startLat, startLng, config]);
 
   useEffect(() => {
     if (!active || startLat == null || startLng == null || !liveFix || processedFixRef.current === liveFix) return;
     processedFixRef.current = liveFix;   // UI-Renders zählen denselben Fix nicht erneut.
+    const now = Date.now();
+    const prev = lastFixRef.current;
+    if (!isValidStartPosition(liveFix.lat, liveFix.lng)
+      || !isFreshStartTimestamp(liveFix.t, now, config.maxLocationAgeMs)) {
+      reachedHitsRef.current = 0; departHitsRef.current = 0;
+      departureArmedRef.current = false;
+      approachRef.current = INITIAL_APPROACH;
+      phaseRef.current = 'approaching';
+      setState(s => ({ ...s, phase: 'approaching', armed: false, withinRadius: false, fixesRemaining: 2, reason: 'stale_or_jump' }));
+      return;
+    }
+    if (prev && liveFix.t <= prev.t) return;
+    // JS timers can be suspended. A newly delivered fix must invalidate the
+    // old reached proof before cancelling/replacing an overdue expiry timer.
+    if (prev && !isFreshStartTimestamp(prev.t, now, config.maxLocationAgeMs)) {
+      reachedHitsRef.current = 0; departHitsRef.current = 0;
+      departureArmedRef.current = false;
+      approachRef.current = INITIAL_APPROACH;
+      phaseRef.current = 'approaching';
+    }
     const pos: LatLng = { lat: liveFix.lat, lng: liveFix.lng };
     const acc = liveFix.accuracy ?? null;
-    const now = Date.now();
     const dist = calculateDistance(pos, { lat: startLat, lng: startLng });
-    const ageMs = liveFix.t ? Math.max(0, now - liveFix.t) : null;
+    const ageMs = Math.max(0, now - liveFix.t); // same native sub-ms clock bucket
     let jumpSpeedMps: number | null = null;
-    const prev = lastFixRef.current;
     if (prev) {
-      const dt = (now - prev.t) / 1000;
+      const dt = (liveFix.t - prev.t) / 1000;
       if (dt > 0) jumpSpeedMps = calculateDistance(pos, { lat: prev.lat, lng: prev.lng }) / dt;
     }
-    lastFixRef.current = { lat: pos.lat, lng: pos.lng, t: now };
+    lastFixRef.current = { lat: pos.lat, lng: pos.lng, t: liveFix.t };
+    if (expiryRef.current) clearTimeout(expiryRef.current);
+    expiryRef.current = setTimeout(() => {
+      expiryRef.current = null;
+      reachedHitsRef.current = 0; departHitsRef.current = 0;
+      departureArmedRef.current = false;
+      approachRef.current = INITIAL_APPROACH;
+      phaseRef.current = 'approaching';
+      setState(s => ({ ...s, phase: 'approaching', armed: false, withinRadius: false, fixesRemaining: 2, reason: 'stale_or_jump' }));
+    }, Math.max(0, config.maxLocationAgeMs - ageMs) + 1);
     const sample = { distanceM: dist, accuracy: acc, t: now, ageMs, jumpSpeedMps };
     const next = reduceApproach(approachRef.current, sample, config);
     approachRef.current = next;
@@ -106,11 +142,12 @@ export function useStartPointApproach(
     const reachedFix = isStableReachedFix(sample, config);
     reachedHitsRef.current = reachedFix ? reachedHitsRef.current + 1 : 0;
     const reached = reachedHitsRef.current >= 2;
-    if (reached) reachedRef.current ??= now;
+    if (reached) { reachedRef.current ??= now; departureArmedRef.current = true; }
     const reachedRadius = reachedRadiusM(acc);
-    const departedFix = reachedRef.current != null && reachedRadius != null
-      && dist >= reachedRadius + 1.5 && (ageMs == null || ageMs <= config.maxLocationAgeMs)
-      && (jumpSpeedMps == null || jumpSpeedMps <= config.maxJumpSpeedMps);
+    const departedFix = departureArmedRef.current && reachedRadius != null
+      && acc != null && Number.isFinite(acc) && acc >= 0 && acc <= config.maxAccuracyM
+      && dist >= reachedRadius + 1.5 && isFreshFix(ageMs, config)
+      && isPlausibleSpeed(jumpSpeedMps, config);
     departHitsRef.current = departedFix ? departHitsRef.current + 1 : 0;
     if (eligible) stableRef.current ??= now;
     const beforePhase = phaseRef.current;
@@ -126,8 +163,8 @@ export function useStartPointApproach(
         : beforePhase !== 'at_start' && phaseRef.current === 'at_start' ? 'entered_reached'
         : beforePhase === 'approaching' && phaseRef.current === 'start_zone_entered' ? 'entered_near' : null });
     setState({
-      position: pos, distanceM: dist, accuracy: acc, radiusM: r,
-      withinRadius: r != null && dist <= r, armed: reached,
+      position: pos, distanceM: dist, accuracy: acc, fixTimestampMs: liveFix.t, radiusM: r,
+      withinRadius: eligible, armed: reached,
       fixesRemaining: Math.max(0, 2 - reachedHitsRef.current),
       phase: phaseRef.current, startZoneEnteredAtMs: enteredRef.current, startReachedAtMs: reachedRef.current,
       firstStableFixAtMs: stableRef.current, armedAtMs: armedRef.current,

@@ -2,7 +2,8 @@
 export const LAY_SESSION_START_MAX_ACCURACY_M = 15;
 
 export function isLaySessionWarmupReady(accuracyM: number | null): boolean {
-  return accuracyM != null && accuracyM <= LAY_SESSION_START_MAX_ACCURACY_M;
+  return accuracyM != null && Number.isFinite(accuracyM) && accuracyM >= 0
+    && accuracyM <= LAY_SESSION_START_MAX_ACCURACY_M;
 }
 
 export function releaseLayStartLock(input: {
