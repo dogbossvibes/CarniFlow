@@ -14,6 +14,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '@/constants/colors';
+import { TrainingTemplateButton } from '@/components/training/TrainingTemplateButton';
 import { HeroImage } from '@/components/training/HeroImage';
 import { CommentThread } from '@/components/training/CommentThread';
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
@@ -272,6 +273,7 @@ export default function UnitDetailScreen() {
 
           {!isReadOnly && (
             <>
+              <TrainingTemplateButton unit={unit} />
               <TouchableOpacity style={s.editBtn} onPress={() => { tapHaptic(); router.push({ pathname: '/unit/document', params: { id: id! } }); }} activeOpacity={0.8}>
                 <Ionicons name="create-outline" size={18} color={C.accentText} />
                 <Text style={s.editTxt}>{t('common.edit')}</Text>

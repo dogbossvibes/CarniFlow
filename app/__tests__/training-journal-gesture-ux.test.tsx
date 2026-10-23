@@ -341,3 +341,16 @@ describe('Trainingsjournal Gesture UX v1 — Accessibility', () => {
     expect(actionsProp?.map((a) => a.name)).toEqual(['edit', 'delete']);
   });
 });
+
+describe('visible journal edit action', () => {
+  it.each(['unit', 'session'] as const)('opens the existing %s editor without a swipe', source => {
+    mockFeed = [mkUnit({ id: 'edit-me', source })]; const node = render();
+    const button = node.root.findAll(n => n.props.testID === 'journal-visible-edit' && typeof n.props.onPress === 'function')[0];
+    act(() => button.props.onPress());
+    expect(mockPush).toHaveBeenCalledWith(source === 'unit' ? { pathname: '/unit/document', params: { id: 'edit-me' } } : { pathname: '/training/[id]', params: { id: 'edit-me', edit: 'true' } });
+  });
+  it('does not offer a new editing path for GPS tracks', () => {
+    mockFeed = [mkTrack({ id: 'track' })]; const node = render();
+    expect(node.root.findAll(n => n.props.testID === 'journal-visible-edit')).toHaveLength(0);
+  });
+});

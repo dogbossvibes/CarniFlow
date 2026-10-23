@@ -5,6 +5,17 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "trainingTemplate.resume": "Entwurf fortsetzen",
+  "trainingTemplate.resumeHelp": "Für diese Vorlage gibt es bereits einen Entwurf. Setze ihn fort; deine Eingaben bleiben erhalten.",
+
+  "trainingTemplate.open": "Als Vorlage übernehmen",
+  "trainingTemplate.explanation": "Wähle Übungen und offene Schwerpunkte für ein neues Training. Bewertungen, Beobachtungen, Medien und Zeiten bleiben im ursprünglichen Eintrag.",
+  "trainingTemplate.hints": "Offene Schwerpunkte auswählen",
+  "trainingTemplate.noHints": "Keine offenen Schwerpunkte vorhanden.",
+  "trainingTemplate.confirm": "Auswahl übernehmen",
+  "trainingTemplate.context": "Vorlage vom {date}",
+  "trainingTemplate.contextHelp": "Diese Hinweise stammen aus früheren Trainings. Dokumentiere darunter, wie es heute lief.",
+
   "trainingFlow.prepareTitle": "Gut vorbereitet starten",
   "trainingFlow.observeTitle": "Wie lief es heute?",
   "trainingFlow.nextTitle": "Für das nächste Mal",
