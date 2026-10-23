@@ -2,6 +2,17 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "trainingTemplate.resume": "Continue draft",
+  "trainingTemplate.resumeHelp": "A draft for this template already exists. Continue it to keep your entries.",
+
+  "trainingTemplate.open": "Use as template",
+  "trainingTemplate.explanation": "Choose exercises and open focus points for a new session. Ratings, observations, media and times stay in the original record.",
+  "trainingTemplate.hints": "Choose open focus points",
+  "trainingTemplate.noHints": "No open focus points.",
+  "trainingTemplate.confirm": "Use selection",
+  "trainingTemplate.context": "Template from {date}",
+  "trainingTemplate.contextHelp": "These hints come from earlier sessions. Record how today went below.",
+
   "trainingFlow.prepareTitle": "Start prepared",
   "trainingFlow.observeTitle": "How did it go today?",
   "trainingFlow.nextTitle": "For next time",

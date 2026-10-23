@@ -1,13 +1,14 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
+import { canEditOwnEvent } from '@/features/calendar/eventEditing';
 import { DogEventCard } from '@/components/calendar/DogEventCard';
 import { dayHeadingFromKey } from '@/lib/eventFormat';
 import { localDayKey } from '@/hooks/useTrainingCalendar';
 import { useT } from '@/i18n';
 import type { CalendarEvent } from '@/types/calendar';
 
-export function TimelineView({ events, onEventPress }: { events: CalendarEvent[]; onEventPress: (e: CalendarEvent) => void }) {
+export function TimelineView({ events, onEventPress, onEdit, userId }: { events: CalendarEvent[]; onEventPress: (e: CalendarEvent) => void; onEdit?: (e: CalendarEvent) => void; userId?: string }) {
   const { t } = useT();
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const upcoming = events
@@ -38,7 +39,10 @@ export function TimelineView({ events, onEventPress }: { events: CalendarEvent[]
       {groups.map(g => (
         <View key={g.key} style={{ gap: 10 }}>
           <Text style={s.heading}>{dayHeadingFromKey(g.key)}</Text>
-          {g.items.map(e => <DogEventCard key={e.id} event={e} onPress={() => onEventPress(e)} />)}
+          {g.items.map(e => <View key={e.id}>
+            <DogEventCard event={e} onPress={() => onEventPress(e)} />
+            {onEdit && userId && canEditOwnEvent(e, userId) && <TouchableOpacity testID="calendar-visible-edit" style={s.edit} accessibilityRole="button" onPress={() => onEdit(e)}><Text style={s.editText}>{t('common.edit')}</Text></TouchableOpacity>}
+          </View>)}
         </View>
       ))}
     </View>
@@ -46,6 +50,8 @@ export function TimelineView({ events, onEventPress }: { events: CalendarEvent[]
 }
 
 const s = StyleSheet.create({
+  edit: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
+  editText: { color: C.accent, fontSize: 15, fontWeight: '600' },
   heading:  { fontSize: 12, color: '#00F5D4', fontWeight: '800', letterSpacing: 1 },
   empty:    { alignItems: 'center', paddingVertical: 50, gap: 8 },
   emptyTxt: { fontSize: 15, color: C.white, fontWeight: '700' },

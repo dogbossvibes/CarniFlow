@@ -452,6 +452,10 @@ function JournalCard({
         </Text> : null}
         {note ? <Text style={s.cardNote} numberOfLines={expanded ? undefined : 1}>{note}</Text> : null}
         {focus ? <Text style={s.cardNote} numberOfLines={expanded ? undefined : 1}>{t('trainingDoc.nextFocus')}: {focus}</Text> : null}
+        {!isTrack && onEdit && <TouchableOpacity testID="journal-visible-edit" onPress={onEdit} accessibilityRole="button"
+          accessibilityLabel={t('common.edit')} style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+          <Text style={s.cardNote}>{t('common.edit')}</Text>
+        </TouchableOpacity>}
         {!isTrack && <TouchableOpacity onPress={() => setExpanded(v => !v)} style={{ minHeight: 44, justifyContent: 'center' }}
           accessibilityRole="button" accessibilityState={{ expanded }}>
           <Text style={s.cardNote}>{t(expanded ? 'trainingDoc.less' : 'trainingDoc.more')}</Text>

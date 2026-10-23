@@ -6,6 +6,17 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "trainingTemplate.resume": "Reprendre le brouillon",
+  "trainingTemplate.resumeHelp": "Un brouillon existe déjà pour ce modèle. Reprenez-le pour conserver vos saisies.",
+
+  "trainingTemplate.open": "Utiliser comme modèle",
+  "trainingTemplate.explanation": "Choisissez les exercices et les points à travailler pour une nouvelle séance. Les évaluations, observations, médias et durées restent dans la séance originale.",
+  "trainingTemplate.hints": "Choisir les points à travailler",
+  "trainingTemplate.noHints": "Aucun point à travailler.",
+  "trainingTemplate.confirm": "Utiliser la sélection",
+  "trainingTemplate.context": "Modèle du {date}",
+  "trainingTemplate.contextHelp": "Ces indications viennent des séances précédentes. Notez ci-dessous comment la séance du jour s’est passée.",
+
   "trainingFlow.prepareTitle": "Bien préparer la séance",
   "trainingFlow.observeTitle": "Comment cela s’est-il passé ?",
   "trainingFlow.nextTitle": "Pour la prochaine fois",

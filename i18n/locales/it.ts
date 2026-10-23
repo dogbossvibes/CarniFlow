@@ -2,6 +2,17 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "trainingTemplate.resume": "Riprendi la bozza",
+  "trainingTemplate.resumeHelp": "Esiste già una bozza per questo modello. Riprendila per conservare i tuoi dati.",
+
+  "trainingTemplate.open": "Usa come modello",
+  "trainingTemplate.explanation": "Scegli esercizi e punti da migliorare per una nuova sessione. Valutazioni, osservazioni, media e tempi restano nella sessione originale.",
+  "trainingTemplate.hints": "Scegli i punti da migliorare",
+  "trainingTemplate.noHints": "Nessun punto da migliorare.",
+  "trainingTemplate.confirm": "Usa la selezione",
+  "trainingTemplate.context": "Modello del {date}",
+  "trainingTemplate.contextHelp": "Queste indicazioni provengono da sessioni precedenti. Annota qui sotto come è andata oggi.",
+
   "trainingFlow.prepareTitle": "Inizia preparato",
   "trainingFlow.observeTitle": "Come è andata oggi?",
   "trainingFlow.nextTitle": "Per la prossima volta",

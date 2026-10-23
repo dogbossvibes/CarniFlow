@@ -23,6 +23,8 @@ import { ServerTrainingFocusList, useServerTrainingFocuses } from '@/components/
 import { TrainingFocusList } from '@/components/training/TrainingFocusList';
 import { ExerciseIdentityList } from '@/components/training/ExerciseIdentityList';
 import { loadTrainingPreparation, type PreparationUnit } from '@/services/trainingPreparation';
+import { historyDate } from '@/features/training/documentation/historyDate';
+import { planTemplate, readTemplateHints, templateEntryContext, type TemplateContext, type TemplateChoice } from '@/features/training/documentation/template';
 import { TrainingPreparation } from '@/components/training/TrainingPreparation';
 import { planFromHistory, lastExerciseHistory, performedExercises, localDay, measuredMinutes, type PlannedExercise } from '@/features/training/documentation/model';
 import { isConfirmedDocumentedRetry, trainingUnitFingerprint } from '@/features/training/documentation/retry';
@@ -63,6 +65,7 @@ interface DocumentDraft {
   unitId: string; dogId: string | null; activeDisc: string; selected: PlannedExercise[];
   description: string; score: number; date: string; durationMin: number | null;
   photos: string[]; videos: string[]; audio: (AudioNote & { transcript?: string | null })[]; metrics: TrainingMetrics;
+  templateContext?: TemplateContext;
   otherDogs?: Record<string, Omit<DocumentDraft, 'otherDogs'>>;
   workflowStep?: number; shared: boolean; operationId?: string; recordedDurationSec?: number | null; atomic?: boolean; nextFocusDisciplineKey?: string; nextFocus?: string; nextFocusDiscipline?: string; focusId?: string; sourceFingerprint?: string; remoteCompleted?: boolean;
 }
@@ -96,6 +99,11 @@ function validDocumentDraft(value: unknown): value is DocumentDraft {
   if (!value || typeof value !== 'object') return false;
   const d = value as DocumentDraft;
   if (d.otherDogs && (typeof d.otherDogs !== 'object' || Array.isArray(d.otherDogs) || !Object.entries(d.otherDogs).every(([dog, value]) => value && value.dogId === dog && !('otherDogs' in value) && validDocumentDraft(value)))) return false;
+  if (d.templateContext) {
+    const c = d.templateContext;
+    if (typeof c.sourceId !== 'string' || typeof c.sourceDate !== 'string' || c.dogId !== d.dogId || typeof c.discipline !== 'string'
+        || !Array.isArray(c.hints) || !c.hints.every(h => h && typeof h.id === 'string' && typeof h.text === 'string' && typeof h.date === 'string')) return false;
+  }
   return typeof d.unitId === 'string' && !!d.unitId && typeof d.activeDisc === 'string'
     && (d.dogId == null || typeof d.dogId === 'string') && typeof d.description === 'string'
     && typeof d.shared === 'boolean' && Number.isFinite(d.score)
@@ -114,26 +122,26 @@ function validDocumentDraft(value: unknown): value is DocumentDraft {
 
 export default function DocumentScreen() {
   const { session, loading } = useSession();
-  const { id, dogId: entryDog, discipline: entryDiscipline } = useLocalSearchParams<{ id?: string; dogId?: string; discipline?: string }>();
+  const { id, dogId: entryDog, discipline: entryDiscipline, draftToken, template } = useLocalSearchParams<{ id?: string; dogId?: string; discipline?: string; draftToken?: string; template?: string }>();
   if (loading) return <ActivityIndicator />;
   if (!session) return <Redirect href="/(auth)/login" />;
   // A new account or edit target gets a fresh component; late reads cannot
   // repopulate another account's form.
-  return <DocumentForm key={`${session?.user.id ?? 'signed-out'}:${id ?? `new:${entryDog ?? ''}:${entryDiscipline ?? ''}`}`} />;
+  return <DocumentForm key={`${session?.user.id ?? 'signed-out'}:${id ?? `new:${entryDog ?? ''}:${entryDiscipline ?? ''}:${template ?? ''}:${draftToken ?? ''}`}`} />;
 }
 
 function DocumentForm() {
   const router = useRouter();
   const { t, locale } = useT();
-  const { id, duration, dogId: dogIdParam, discipline: discParam, note: noteParam } =
-    useLocalSearchParams<{ id?: string; duration?: string; dogId?: string; discipline?: string; note?: string }>();
+  const { id, duration, dogId: dogIdParam, discipline: discParam, note: noteParam, template, templateChoice, draftToken } =
+    useLocalSearchParams<{ id?: string; duration?: string; dogId?: string; discipline?: string; note?: string; template?: string; templateChoice?: string; draftToken?: string }>();
   const editing = !!id;
   // Vom Timer mitgegebene Dauer (Sekunden) → Minuten vorbefüllen.
-  const initialMin = measuredMinutes(duration);
+  const initialMin = template ? null : measuredMinutes(duration);
   const { dogs, loading: dogsLoading } = useDogs();
   const { session } = useSession();
-  const { profile } = useProfile();
-  const { categories } = useCustomCategories();
+  const { profile, loading: profileLoading } = useProfile();
+  const { categories, loading: categoriesLoading } = useCustomCategories();
 
   // Feste Sparten nach den im Profil aktivierten filtern. Fallback = Standard-
   // Sparten (nicht „alle"), konsistent mit dem Sparten-Hub (app/unit/start.tsx),
@@ -152,13 +160,14 @@ function DocumentForm() {
   const [dogId, setDogId] = useState<string | null>(dogIdParam ?? (dogs.length === 1 ? dogs[0].id : null));
   const [activeDisc, setActiveDisc] = useState<string>(initialDisc);
   const [selected, setSelected] = useState<PlannedExercise[]>([]);
+  const [templateContext, setTemplateContext] = useState<TemplateContext>();
   const [customSheetOpen, setCustomSheetOpen] = useState(false);
   const [recentNames, setRecentNames] = useState<string[]>([]);
-  const [description, setDescription] = useState(noteParam ?? '');
+  const [description, setDescription] = useState(template ? '' : noteParam ?? '');
   const [score, setScore] = useState(0);
   const [date, setDate] = useState(new Date());
   const [durationMin, setDurationMin] = useState(initialMin);
-  const recordedDurationSec = useRef(duration && Number.isFinite(Number(duration)) && Number(duration) > 0 ? Number(duration) : null);
+  const recordedDurationSec = useRef(!template && duration && Number.isFinite(Number(duration)) && Number(duration) > 0 ? Number(duration) : null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
   const [audio, setAudio] = useState<(AudioNote & { transcript?: string | null })[]>([]);
@@ -206,7 +215,14 @@ function DocumentForm() {
     });
     return () => subscription.remove();
   }, [editing, saved, workflowStep, saving, pendingSave, remoteCompleted, moveToStep]));
-  const entryContext = dogIdParam || discParam ? JSON.stringify([dogIdParam ?? null, discParam ?? null]) : undefined;
+  const entryContext = template ? templateEntryContext(template, dogIdParam ?? '', discParam ?? '')
+    : dogIdParam || discParam ? JSON.stringify([dogIdParam ?? null, discParam ?? null]) : undefined;
+  const templateReady = !template || (!dogsLoading && !profileLoading && !categoriesLoading);
+  const templateDogAllowed = !template || dogs.some(d => d.id === dogIdParam);
+  const templateDisc = template ? disciplines.find(d => d.key === discParam) : undefined;
+  const templateDiscKey = templateDisc?.key ?? '';
+  const templateDiscLabel = templateDisc?.label ?? '';
+  const templateScopeKey = templateDisc ? scopeKey(templateDisc) : '';
   const draftKey = session?.user.id ? documentDraftKey(session.user.id, id, entryContext) : null;
   const disciplineTouched = useRef(false);
   const resolvedInitialDisc = paramDiscKey ?? disciplines[0]?.key;
@@ -218,7 +234,7 @@ function DocumentForm() {
   const operationIdRef = useRef(Crypto.randomUUID());
 
   useEffect(() => {
-    if (!draftKey || !session?.user.id) return;
+    if (!draftKey || !session?.user.id || !templateReady) return;
     let cancelled = false;
     const owner = session.user.id;
     (async () => {
@@ -232,6 +248,27 @@ function DocumentForm() {
         return;
       }
       if (cancelled) return;
+      // An explicit template has its own durable entry key. Existing ordinary
+      // drafts are never replaced; returning to this entry restores user edits.
+      if (template && !draft) {
+        try {
+          if (editing || !draftToken || !templateChoice || !templateDogAllowed || !templateDiscKey) throw new Error('Template unavailable');
+          const choice: TemplateChoice = JSON.parse(templateChoice);
+          if (!templateDiscLabel || choice.dog !== dogIdParam || choice.discipline !== templateDiscLabel || choice.disciplineKey !== templateScopeKey) throw new Error('Template scope changed');
+          const result = await getTrainingUnitById(template);
+          if (cancelled) return;
+          if (result.error || !result.data || result.data.id !== template) throw new Error('Template unavailable');
+          const hints = choice.focuses?.length ? await readTemplateHints(owner, choice.dog, choice.discipline, choice.disciplineKey, () => !cancelled) : [];
+          if (cancelled) return;
+          const seed = planTemplate(result.data as TrainingUnit, owner, choice, hints, Crypto.randomUUID);
+          setDogId(choice.dog); setActiveDisc(templateDiscKey); setSelected(seed.exercises); setTemplateContext(seed.context);
+          disciplineTouched.current = true;
+          setWorkflowStep(0);
+        } catch {
+          if (!cancelled) { setDraftError(true); setDraftBlocked(true); setDraftReady(true); }
+          return;
+        }
+      }
       let restoringIntent = false;
       if (draft && typeof draft.unitId === 'string' && Array.isArray(draft.selected)
           && typeof draft.date === 'string' && Number.isFinite(new Date(draft.date).getTime())
@@ -251,6 +288,7 @@ function DocumentForm() {
         if (restoringIntent && pending) draft = draftFromIntent(draft, pending.request);
         setPendingSave(restoringIntent);
         setOtherDogDrafts(draft.otherDogs ?? {});
+        setTemplateContext(draft.templateContext);
         setWorkflowStep(restoringIntent || draft.remoteCompleted ? 2 : [0, 1, 2].includes(draft.workflowStep ?? -1) ? draft.workflowStep! : draft.selected.length ? 1 : 0);
         recordedDurationSec.current = draft.recordedDurationSec ?? null;
         setRemoteCompleted(draft.remoteCompleted ?? false);
@@ -301,13 +339,13 @@ function DocumentForm() {
       if (!cancelled) setDraftReady(true);
     })();
     return () => { cancelled = true; };
-  }, [draftKey, id, session?.user.id, loadRetry]);
+  }, [draftKey, id, session?.user.id, loadRetry, templateReady, templateDogAllowed, templateDiscKey, templateDiscLabel, templateScopeKey, dogIdParam, draftToken, editing, template, templateChoice]);
 
-  const draftSnapshot = useCallback((): DocumentDraft => ({ otherDogs: otherDogDrafts, workflowStep, unitId: unitIdRef.current, dogId, activeDisc, selected, description, score,
+  const draftSnapshot = useCallback((): DocumentDraft => ({ templateContext, otherDogs: otherDogDrafts, workflowStep, unitId: unitIdRef.current, dogId, activeDisc, selected, description, score,
     date: date.toISOString(), durationMin, recordedDurationSec: recordedDurationSec.current, photos, videos, audio, metrics,
     shared: shared ?? profile?.share_trainings_default ?? false, operationId: operationIdRef.current, atomic: !legacyCompletion.current,
     nextFocusDisciplineKey, nextFocus, nextFocusDiscipline, focusId: focusIdRef.current, sourceFingerprint: sourceFingerprint.current, remoteCompleted,
-  }), [otherDogDrafts, workflowStep, dogId, activeDisc, selected, description, score, date, durationMin, photos, videos, audio, metrics, shared, profile?.share_trainings_default, nextFocusDisciplineKey, nextFocus, nextFocusDiscipline, remoteCompleted]);
+  }), [templateContext, otherDogDrafts, workflowStep, dogId, activeDisc, selected, description, score, date, durationMin, photos, videos, audio, metrics, shared, profile?.share_trainings_default, nextFocusDisciplineKey, nextFocus, nextFocusDiscipline, remoteCompleted]);
   useEffect(() => {
     if (!draftReady || !draftKey || draftBlocked || stopDraft.current || (editing && !editLoaded)) return;
     void saveDocumentDraft(draftKey, draftSnapshot()).catch(() => { if (alive.current) setDraftError(true); });
@@ -457,7 +495,7 @@ function DocumentForm() {
     unitIdRef.current = next.unitId; operationIdRef.current = next.operationId ?? Crypto.randomUUID(); focusIdRef.current = next.focusId ?? Crypto.randomUUID();
     recordedDurationSec.current = next.recordedDurationSec ?? null;
     disciplineTouched.current = true;
-    setDogId(targetDog); setActiveDisc(next.activeDisc); setSelected(next.selected);
+    setDogId(targetDog); setActiveDisc(next.activeDisc); setSelected(next.selected); setTemplateContext(next.templateContext);
     setDescription(next.description); setScore(next.score); setDate(new Date(next.date)); setDurationMin(next.durationMin);
     setPhotos(next.photos); setVideos(next.videos); setAudio(next.audio); setMetrics(next.metrics); setShared(next.shared);
     setNextFocus(next.nextFocus ?? ''); setNextFocusDiscipline(next.nextFocusDiscipline ?? ''); setNextFocusDisciplineKey(next.nextFocusDisciplineKey ?? '');
@@ -686,6 +724,12 @@ function DocumentForm() {
             </View>
             </>}
           </View>
+
+          {!editing && templateContext && templateContext.dogId === dogId && templateContext.discipline === disc?.label && workflowStep < 2 && <View style={s.contextCard}>
+            <Text style={s.sectionTitle}>{t('trainingTemplate.context', { date: historyDate(templateContext.sourceDate, locale) })}</Text>
+            <Text style={s.flowHelp}>{t('trainingTemplate.contextHelp')}</Text>
+            {templateContext.hints.map(hint => <Text key={hint.id} style={s.flowHelp}>{hint.text} · {historyDate(hint.date, locale)}</Text>)}
+          </View>}
 
           {(editing || workflowStep === 0) && <>
           {session?.user.id && dogId && disc && <ServerTrainingFocusList preparation={!editing} key={`server:${historyScope}`} ownerId={session.user.id} {...serverFocuses}
