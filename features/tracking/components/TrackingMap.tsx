@@ -89,6 +89,8 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
 });
 
 interface Props {
+  /** Display-only intended route. Never included in fitting, distances or events. */
+  plannedPoints?: readonly { latitude: number; longitude: number }[];
   comparison?: boolean;
   layColor?: string;
   layPoints:        LatLng[];
@@ -147,7 +149,7 @@ interface Props {
 const EMPTY_MARKERS: MapMarker[] = [];
 
 export function TrackingMap({
-  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  comparison = false, plannedPoints, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -354,6 +356,7 @@ export function TrackingMap({
         {referenceOverlays && referenceOverlays.length > 0 && (
           <TrackReferenceOverlayLayer overlays={referenceOverlays} Polyline={Polyline} Marker={Marker} />
         )}
+        {plannedPoints && plannedPoints.length > 1 && <Polyline coordinates={plannedPoints.map(p => ({ latitude: p.latitude, longitude: p.longitude }))} strokeColor="#FFD166" strokeWidth={3} lineDashPattern={[8, 6]} zIndex={1} />}
         {/* Rohspur (Debug): grau, dünn, ungeglättet — zeigt GPS-Drift */}
         {rawCoords.length > 1 && (
           <Polyline coordinates={rawCoords} strokeColor="rgba(255,255,255,0.35)" strokeWidth={2} />
