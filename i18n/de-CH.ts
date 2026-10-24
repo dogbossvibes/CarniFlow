@@ -273,6 +273,7 @@ export const deCH = {
   'training.start':       'Training starten',
   'training.today':       'Heute trainieren',
   'training.timer':       'Timer',
+  "training.timerHint": "Zeit erfassen und Training festhalten",
   'training.title':       'Training',
   'training.newUnit':     'NEUE EINHEIT',
   'training.startTimer':  'Timer starten',
@@ -280,8 +281,8 @@ export const deCH = {
   'training.documentSub': 'Nachträglich mit Fotos, Videos & Notizen',
   'training.journal':     'Trainingsjournal',
   'training.journalSub':  'Alle Trainings deiner Hunde',
-  'training.faehrteGps':  'Fährte (GPS)',
-  'training.faehrteSub':  'Live legen & ausarbeiten',
+  "training.faehrteGps": "Fährten",
+  "training.faehrteSub": "Legen, absuchen und gemeinsam trainieren",
 
   // Auth / Login / Konto-Sicherheit
   'auth.login':                    'Anmelden',

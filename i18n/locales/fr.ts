@@ -266,6 +266,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "training.start":       "Démarrer l'entraînement",
   "training.today":       "S'entraîner aujourd'hui",
   "training.timer":       "Minuteur",
+  "training.timerHint": "Chronométrer et documenter la séance",
   "training.title":       "Entraînement",
   "training.newUnit":     "NOUVELLE SÉANCE",
   "training.startTimer":  "Démarrer le minuteur",
@@ -273,8 +274,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "training.documentSub": "Après coup, avec photos, vidéos et notes",
   "training.journal":     "Journal d'entraînement",
   "training.journalSub":  "Tous les entraînements de tes chiens",
-  "training.faehrteGps":  "Pistage (GPS)",
-  "training.faehrteSub":  "Poser et travailler en direct",
+  "training.faehrteGps": "Pistage",
+  "training.faehrteSub": "Poser, rechercher et s’entraîner ensemble",
 
   // Fährte legen / absuchen
   "track.record":    "Enregistrer une piste",
