@@ -5,7 +5,7 @@ import { hasFinalSearchRun } from '@/features/tracking/store/trackRecovery';
 import { PlannerEntry } from '@/features/tracking-planner/PlannerEntry';
 import { HelpButton } from '@/components/help/HelpButton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -230,7 +230,6 @@ export default function TrackOverviewScreen() {
       <TrackHubTabs selected={tab} onSelect={chooseTab} />
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={loading && loadedScope === scope} onRefresh={() => void load()} tintColor={C.trackPrimary} />}>
-        {tab === 'training' && <Image source={require('../../assets/images/tracking-field-hero.jpg')} style={s.heroPhoto} resizeMode="cover" accessibilityLabel="Hund bei der Fährtenarbeit" />}
         {loadError && <View style={s.notice}><Text style={s.emptyTxt}>Fährten konnten nicht vollständig geladen werden.</Text><TouchableOpacity accessibilityRole="button" onPress={() => void load()} style={s.retry}><Text style={s.link}>Erneut versuchen</Text></TouchableOpacity></View>}
         {dogActive.map(entry => <View key={entry.dogId} style={s.globalBar}><ActiveFaehrteCard compact entry={entry} dogName={activeDog?.name} onOpen={() => router.push(reopenTarget(entry) as never)} /></View>)}
         {activeTracks.some(e => e.dogId !== effectiveDogId) && <TouchableOpacity accessibilityRole="button" style={s.utility} onPress={() => router.push('/track/historie' as never)}><Text style={s.link}>Offene Fährten anderer Hunde</Text><Ionicons name="chevron-forward" color={C.trackPrimary} size={18} /></TouchableOpacity>}
@@ -300,7 +299,6 @@ export default function TrackOverviewScreen() {
 }
 
 const s = StyleSheet.create({
-  heroPhoto: { width: '100%', aspectRatio: 1.5, borderRadius: 20, marginBottom: 16 },
   actionHint: { fontSize: 13, lineHeight: 19 },
   notice: { padding: 14, backgroundColor: C.trackCard, borderRadius: 16, marginBottom: 12 },
   retry: { minHeight: 44, justifyContent: 'center' },
