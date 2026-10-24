@@ -41,7 +41,7 @@ import type { Dog } from '@/types';
 // EXPECTED values in the Läufigkeit-integration tests below, so assertions
 // verify "the UI shows what the real, existing calculation produces" rather
 // than a hand-derived number that could silently drift from the actual formula.
-import { durationDays as realDurationDays, fmtDate as realFmtDate, getHeatHistoryStats as realGetHeatHistoryStats, type HeatCycle } from '@/features/dogs/heatCycles';
+import { type HeatCycle } from '@/features/dogs/heatCycles';
 import type { HealthOverviewData } from '@/services/healthService';
 
 const mockLoadHealthOverview = jest.fn();
@@ -1582,30 +1582,10 @@ function findByAccessibilityLabelPrefix(node: ReactTestRenderer, prefix: string)
   return (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress?: () => void } }[] })
     .findAllByType(TouchableOpacity).find((c) => typeof c.props.accessibilityLabel === 'string' && c.props.accessibilityLabel.startsWith(prefix));
 }
-function findAllByAccessibilityLabelIncluding(node: ReactTestRenderer, substr: string) {
-  return (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress?: () => void; onLongPress?: () => void; testID?: string } }[] })
-    .findAllByType(TouchableOpacity).filter((c) => typeof c.props.accessibilityLabel === 'string' && c.props.accessibilityLabel.includes(substr));
-}
-// The HealthHeatCard's own accessibilityLabel also includes the most recent
-// cycle's formatted date range (see its own accessibilityLabel), so a bare
-// date-substring search can match the CARD itself, not just a Verlauf-
-// history row inside the opened sheet. Excludes the card explicitly by its
-// testID so these always resolve to the intended history row.
-function findHistoryRow(node: ReactTestRenderer, substr: string) {
-  return findAllByAccessibilityLabelIncluding(node, substr).find((r) => r.props.testID !== 'health-heat-card');
-}
 function findHeatCard(node: ReactTestRenderer) {
   return (node.root as unknown as { findAllByProps: (p: object) => { props: { onPress?: () => void } }[] })
     .findAllByProps({ testID: 'health-heat-card' })[0];
 }
-// Only valid when cycles are non-empty — the populated card's onPress opens
-// the Läufigkeit-Bereich sheet. The EMPTY-state card's onPress is `onAdd`
-// (navigates straight to /dog-heat-new instead), by design — see the
-// "Leerzustand" tests below, which exercise that path directly.
-function openHeatSheet(node: ReactTestRenderer) {
-  act(() => { findHeatCard(node)!.props.onPress?.(); });
-}
-
 describe('Digital Health Record — Läufigkeit: Gender-Gating', () => {
   it('Hündin → Läufigkeitskarte und Quick Action sichtbar', async () => {
     mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
@@ -1616,7 +1596,7 @@ describe('Digital Health Record — Läufigkeit: Gender-Gating', () => {
     expect(findByText(node, 'health.recordHeat')).toBeFalsy(); // Less frequent actions are collapsed.
     act(() => { findByText(node, 'Weiteren Eintrag hinzufügen').props.onPress(); });
     expect(findByText(node, 'health.recordHeat')).toBeTruthy(); // Quick Action
-    expect(findByAccessibilityLabelPrefix(node, 'heat.addFirst') ?? findByAccessibilityLabelPrefix(node, 'heat.title')).toBeTruthy(); // Karte (leer oder befüllt)
+    expect(findHeatCard(node)).toBeTruthy(); // Karte (leer oder befüllt)
   });
 
   it('Rüde → keine Läufigkeitskarte, keine Quick Action, kein Verlauf-Filter', async () => {
@@ -1640,245 +1620,33 @@ describe('Digital Health Record — Läufigkeit: Gender-Gating', () => {
   });
 });
 
-describe('Digital Health Record — Läufigkeit: Leerzustand', () => {
+describe('Digital Health Record — Läufigkeit: neuer eigenständiger Überblick', () => {
   beforeEach(() => {
     mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
     mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [], phases: [], observations: [] });
   });
-
-  it('keine Daten → korrekter Leerzustand auf der Karte', async () => {
-    const node = render();
-    await flush();
-    expect(strings(node)).toContain('heat.emptyTitle');
-  });
-
-  it('Tippen auf die leere Karte navigiert direkt zur bestehenden Erfassen-Route (kein Zwischenschritt über ein leeres Sheet nötig)', async () => {
-    const node = render();
-    await flush();
-    act(() => { findHeatCard(node)!.props.onPress?.(); });
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/dog-heat-new', params: { id: 'dog-1' } });
-  });
-
-  it('die dedizierte Läufigkeit-Bereichsansicht selbst zeigt denselben Leerzustand (Text/CTA), falls sie ohne Zyklen erreicht wird', () => {
-    // Direkter Komponententest von HealthHeatSheetContent — deckt den
-    // Leerzustand-Zweig ab, unabhängig davon, über welchen Weg er in der
-    // echten App je erreicht wird.
-    const { HealthHeatSheetContent } = require('@/components/dogs/HealthHeatSection');
-    let node!: ReactTestRenderer;
-    act(() => {
-      node = TestRenderer.create(
-        <HealthHeatSheetContent cycles={[]} phases={[]} observations={[]} prediction={null} stats={realGetHeatHistoryStats([])} isOwner onOpenCycle={() => {}} onDeleteCycle={() => {}} onAdd={() => {}} />,
-      );
-    });
-    expect(strings(node)).toContain('heat.emptyTitle');
-    expect(strings(node)).toContain('heat.emptyDesc');
-    expect(strings(node)).toContain('heat.addFirst');
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: eine abgeschlossene Läufigkeit', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('die Karte zeigt Zeitraum und Dauer der letzten Läufigkeit', async () => {
-    const node = render();
-    await flush();
-    const duration = realDurationDays(CYCLE_OLD.startDate, CYCLE_OLD.endDate);
-    // heat.days is rendered via t('heat.days'), which the i18n mock resolves
-    // to the raw key — matches the actual mocked-render output exactly.
-    expect(strings(node).some((t) => t.includes(`${duration} heat.days`))).toBe(true);
-  });
-
-  it('bei nur einer Läufigkeit: keine Prognose ("Noch keine Prognose verfügbar")', async () => {
-    const node = render();
-    await flush();
-    expect(strings(node)).toContain('Noch keine Prognose verfügbar');
-  });
-
-  it('bei nur einer Läufigkeit: kein Fake-Ø-Abstand in der Statistik', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const stats = realGetHeatHistoryStats([CYCLE_OLD]);
-    expect(stats.averageGapDays).toBeNull();
-    expect(strings(node).some((t) => t.includes('Ø Abstand'))).toBe(false);
-    expect(strings(node).some((t) => t === '1')).toBe(true); // Anzahl-Kachel
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: mehrere Läufigkeiten', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_NEW, CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('Verlauf ist chronologisch korrekt sortiert (neueste zuerst)', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const rendered = strings(node);
-    const idxNew = rendered.findIndex((t) => t.includes(realFmtDate(CYCLE_NEW.startDate) ?? ''));
-    const idxOld = rendered.findIndex((t) => t.includes(realFmtDate(CYCLE_OLD.startDate) ?? ''));
-    expect(idxNew).toBeGreaterThan(-1);
-    expect(idxOld).toBeGreaterThan(idxNew);
-  });
-
-  it('durchschnittliche Dauer wird korrekt aus den abgeschlossenen Zyklen berechnet', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const stats = realGetHeatHistoryStats([CYCLE_NEW, CYCLE_OLD]);
-    expect(stats.averageDays).not.toBeNull();
-    expect(strings(node).some((t) => t.includes(`${stats.averageDays} Tage`))).toBe(true);
-  });
-
-  it('durchschnittlicher Abstand wird korrekt aus den Start-zu-Start-Differenzen berechnet', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const stats = realGetHeatHistoryStats([CYCLE_NEW, CYCLE_OLD]);
-    expect(stats.averageGapDays).not.toBeNull();
-    expect(strings(node).some((t) => t.includes('Ø Abstand'))).toBe(true);
-  });
-
-  it('Anzahl dokumentierter Läufigkeiten ist korrekt', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    expect(strings(node)).toContain('2');
-    expect(strings(node)).toContain('Läufigkeiten');
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: offene/aktive Läufigkeit', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_ACTIVE, CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('die aktive Läufigkeit wird im Status-Hero als "aktuell" hervorgehoben, ohne erfundenes Enddatum', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const rendered = strings(node);
-    // Matches the established Health-screen eyebrow convention (t(key).toUpperCase()) already used elsewhere in this file.
-    expect(rendered).toContain('HEAT.CURRENTCYCLE');
-    expect(rendered).toContain('heat.active');
-    expect(rendered.some((t) => t.includes('31.12.2026') || t.includes('undefined'))).toBe(false); // kein Fake-Enddatum
-  });
-
-  it('die Karte auf der Übersicht zeigt ebenfalls den aktiven Status', async () => {
-    const node = render();
-    await flush();
-    expect(strings(node)).toContain('heat.active');
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: Tap öffnet korrekten Cycle (bestehende Detailansicht)', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_NEW, CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('Tap auf eine Verlaufskarte im Läufigkeit-Bereich navigiert zu /dog-heat/[exact id]', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findHistoryRow(node, realFmtDate(CYCLE_NEW.startDate) ?? '__nomatch__');
-    act(() => { row!.props.onPress?.(); });
-    expect(mockPush).toHaveBeenCalledWith('/dog-heat/cyc-new');
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: Long-Press nutzt vorhandenen Delete-Flow', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('Long Press löscht NICHT direkt — erst nach Bestätigung', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findAllByAccessibilityLabelIncluding(node, 'lange drücken zum Löschen')[0];
-    act(() => { row!.props.onLongPress?.(); });
+  it.each([[], [CYCLE_OLD], [CYCLE_NEW, CYCLE_OLD], [CYCLE_ACTIVE]].map(cycles => ({ cycles })))('öffnet für jeden Datenstand die neue Übersicht und bewahrt die Datensätze', async ({ cycles }) => {
+    const before = JSON.stringify(cycles);
+    mockGetHeatCycleDetails.mockResolvedValue({ cycles, phases: [], observations: [] });
+    const node = render(); await flush();
+    act(() => { findHeatCard(node).props.onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith('/dog-heat-overview/dog-1');
+    expect(JSON.stringify(cycles)).toBe(before);
     expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
   });
-
-  it('Bestätigung löscht exakt den gewählten Cycle über die bestehende deleteHeatCycle-Funktion', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => { buttons?.find((b) => b.style === 'destructive')?.onPress?.(); });
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findAllByAccessibilityLabelIncluding(node, 'lange drücken zum Löschen')[0];
-    act(() => { row!.props.onLongPress?.(); });
-    await flush();
-    expect(mockDeleteHeatCycle).toHaveBeenCalledWith('cyc-old');
-    alertSpy.mockRestore();
-  });
-
-  it('Abbrechen löscht nicht', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => { buttons?.find((b) => b.style === 'cancel')?.onPress?.(); });
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findAllByAccessibilityLabelIncluding(node, 'lange drücken zum Löschen')[0];
-    act(() => { row!.props.onLongPress?.(); });
-    await flush();
-    expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
-    alertSpy.mockRestore();
-  });
-
-  it('Nicht-Owner bekommt keine Delete-Aktion (kein onLongPress auf der Verlaufskarte)', async () => {
-    mockGetDogById.mockResolvedValue({ data: { ...DOG_FEMALE, owner_id: 'someone-else' }, error: null });
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findHistoryRow(node, realFmtDate(CYCLE_OLD.startDate) ?? '__nomatch__');
-    expect(row?.props.onLongPress).toBeUndefined();
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: Quick Action', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-  });
-
-  it('ohne aktive Läufigkeit navigiert die Quick Action zu /dog-heat-new', async () => {
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_OLD], phases: [], observations: [] });
-    const node = render();
-    await flush();
-    openQuickAction(node, 'health.recordHeat');
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/dog-heat-new', params: { id: 'dog-1' } });
-  });
-
-  it('bei bereits aktiver Läufigkeit öffnet die Quick Action stattdessen deren Detailansicht — kein zweiter Zyklus', async () => {
+  it('zeigt den tatsächlich erfassten aktiven Tag', async () => {
     mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_ACTIVE], phases: [], observations: [] });
-    const node = render();
-    await flush();
-    openQuickAction(node, 'health.recordHeat');
-    expect(mockPush).toHaveBeenCalledWith('/dog-heat/cyc-active');
-    expect(mockPush).not.toHaveBeenCalledWith(expect.objectContaining({ pathname: '/dog-heat-new' }));
+    const node = render(); await flush();
+    expect(strings(node).some(value => value.includes('Tag 1'))).toBe(true);
+  });
+  it('bietet bei leerem Verlauf einen verständlichen Einstieg', async () => {
+    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [], phases: [], observations: [] });
+    const node = render(); await flush(); expect(strings(node)).toContain('Keine Läufigkeit erfasst');
+  });
+  it('führt auch über die Quick Action zur Übersicht statt einen zweiten Zyklus zu erzeugen', async () => {
+    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_ACTIVE], phases: [], observations: [] });
+    const node = render(); await flush(); openQuickAction(node, 'health.recordHeat');
+    expect(mockPush).toHaveBeenCalledWith('/dog-heat-overview/dog-1');
   });
 });
 
@@ -2042,11 +1810,11 @@ describe('T-66 review regressions', () => {
     mockGetDogById.mockResolvedValue({ data: DOG_FEMALE, error: null });
     mockGetHeatCycleDetails.mockResolvedValueOnce({ cycles: [CYCLE_ACTIVE], phases: [], observations: [] }).mockRejectedValueOnce({ message: 'offline' });
     const node = render(); await flush();
-    expect(findByAccessibilityLabelPrefix(node, 'heat.title')).toBeTruthy();
+    expect(findHeatCard(node)).toBeTruthy();
     await act(async () => { await node.root.findByType(RefreshControl).props.onRefresh(); });
     expect(strings(node)).toContain('health.recordPartialLoad');
-    expect(findByAccessibilityLabelPrefix(node, 'heat.title')).toBeTruthy();
-    expect(findByAccessibilityLabelPrefix(node, 'heat.addFirst')).toBeFalsy();
+    expect(findHeatCard(node)).toBeTruthy();
+    expect(findByAccessibilityLabelPrefix(node, 'Beginn eintragen')).toBeFalsy();
     node.unmount();
   });
   it('labels the medication active switch and the separate dose-unit input', async () => {
@@ -2128,28 +1896,16 @@ describe('Medication date picker regression', () => {
 });
 
 
-describe('Heat history sheet escape path with long content', () => {
-  it('uses the bounded safe-area sheet and repeatedly closes/reopens without mutating history', async () => {
-    const cycles = Array.from({ length: 20 }, (_, i) => ({ ...CYCLE_OLD, id: `history-${i}` }));
+describe('Heat overview navigation with long history', () => {
+  it('opens the full screen repeatedly without mutating or deleting the history', async () => {
+    const cycles = Array.from({ length: 40 }, (_, i) => ({ ...CYCLE_OLD, id: `old-${i}` }));
     const original = JSON.stringify(cycles);
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    mockGetDogById.mockResolvedValue({ data: DOG_FEMALE, error: null });
     mockGetHeatCycleDetails.mockResolvedValue({ cycles, phases: [], observations: [] });
-    const node = render();
-    await flush();
-    const heatSheet = () => (node.root as unknown as { findAllByType: (type: unknown) => { props: { title?: string; visible: boolean; keyboardAware?: boolean; closeButton?: boolean; onClose: () => void } }[] })
-      .findAllByType(AnyvoBottomSheet).find(sheet => sheet.props.title === 'heat.title')!;
-    for (let i = 0; i < 3; i++) {
-      openHeatSheet(node);
-      await flush();
-      expect(heatSheet().props.visible).toBe(true);
-      expect(heatSheet().props.keyboardAware).toBe(true);
-      expect(heatSheet().props.closeButton).toBe(true);
-      act(() => { heatSheet().props.onClose(); });
-      expect(heatSheet().props.visible).toBe(false);
-    }
-    expect(JSON.stringify(cycles)).toBe(original);
-    expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
+    const node = render(); await flush();
+    for (let i = 0; i < 3; i++) act(() => { findHeatCard(node).props.onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith('/dog-heat-overview/dog-1');
+    expect(JSON.stringify(cycles)).toBe(original); expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
     act(() => node.unmount());
   });
 });

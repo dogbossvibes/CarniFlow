@@ -6,7 +6,7 @@ import { C } from '@/constants/colors';
 import { useDogs } from '@/hooks/useDogs';
 import { getHeatCycles, predictHeat, type HeatPrediction } from '@/features/dogs/heatCycles';
 
-const PINK = '#F472B6';
+const PINK = C.trackPrimary;
 
 interface HeatItem { dogId: string; dogName: string; pred: HeatPrediction }
 
@@ -38,7 +38,7 @@ export function HomeHeatCard({ onOpen }: { onOpen: (dogId: string) => void }) {
     return () => { alive = false; };
   }, [dogs]));
 
-  if (!item) return null;
+  if (!item || !dogs.some(d => d.id === item.dogId && d.gender === 'female')) return null;
   const { dogName, pred } = item;
   const text = pred.active
     ? `${dogName} ist an Tag ${pred.cycleDay} der Läufigkeit.`
@@ -59,8 +59,8 @@ export function HomeHeatCard({ onOpen }: { onOpen: (dogId: string) => void }) {
 }
 
 const s = StyleSheet.create({
-  card:  { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(244,114,182,0.32)', backgroundColor: 'rgba(244,114,182,0.1)', padding: 15, marginBottom: 24 },
-  icon:  { width: 34, height: 34, borderRadius: 11, backgroundColor: 'rgba(244,114,182,0.2)', alignItems: 'center', justifyContent: 'center' },
+  card:  { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(39,216,178,0.32)', backgroundColor: 'rgba(39,216,178,0.1)', padding: 15, marginBottom: 24 },
+  icon:  { width: 34, height: 34, borderRadius: 11, backgroundColor: 'rgba(39,216,178,0.2)', alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 11, color: PINK, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
   txt:   { fontSize: 14, color: C.trackText, fontWeight: '600', marginTop: 3, lineHeight: 19 },
 });
