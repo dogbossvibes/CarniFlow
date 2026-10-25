@@ -238,6 +238,7 @@ export default function LegenScreen() {
   const placeGegenstand = useCallback((material: MarkerMaterial) => {
     setGsPicker(false);
     const st = useTrackingStore.getState();
+    if (st.isPaused) { showToast(t('track.pauseMarkerHint')); return; }
     // Ohne Startanker UND valide aktuelle Position kein (koordinatenloser) Gegenstand.
     if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
     hapticMarker();                 // sofort, VOR dem Speichern
@@ -250,6 +251,7 @@ export default function LegenScreen() {
   // zuletzt gewählten Material. Nur während laufender Aufnahme.
   const quickAddArticle = useCallback(() => {
     if (phaseRef.current !== 'recording') return;
+    if (useTrackingStore.getState().isPaused) { showToast(t('track.pauseMarkerHint')); return; }
     if (!useTrackingStore.getState().startAnchor) { showToast(t('toast.startPointWait')); return; }
     hapticMarker();                 // sofort, VOR dem Speichern
     void rec.addMarker('gegenstand', { material: lastMaterialRef.current });
@@ -261,6 +263,7 @@ export default function LegenScreen() {
   const placeWinkel = useCallback((angleKind: AngleKind, geometry?: SpecialGeometry) => {
     if (phaseRef.current !== 'recording') return;
     const st = useTrackingStore.getState();
+    if (st.isPaused) { showToast(t('track.pauseMarkerHint')); return; }
     // Fachliche Annahme ZUERST: ohne Startanker UND ohne valide aktuelle Position
     // wird KEIN (koordinatenloser) Marker gesetzt und KEIN Erfolg gemeldet.
     if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
@@ -642,15 +645,19 @@ export default function LegenScreen() {
     }
   };
 
-  const togglePause = useCallback(() => {
+  const togglePause = useCallback((origin: 'longPress' | 'accessibility' | 'button' | 'unknown' = 'unknown') => {
     if (phaseRef.current !== 'recording') return;
     hapticTap();
     const nextPaused = !isPaused;
-    if (isPaused) rec.resume(); else rec.pause();
+    if (isPaused) rec.resume(origin); else rec.pause(origin === 'button' ? 'unknown' : origin);
     // Pausezustand bleibt in der Registry und damit in der bestehenden Recovery-Persistenz erhalten.
     const dId = activeDog?.id ?? null;
     if (dId && useActiveFaehrten.getState().get(dId)) useActiveFaehrten.getState().upsert(dId, { paused: nextPaused });
   }, [activeDog, isPaused, rec]);
+
+  useEffect(() => {
+    if (isPaused) { setGsPicker(false); setWinkelSheet(false); }
+  }, [isPaused]);
 
   const guardedBack = useCallback(() => {
     if (phaseRef.current !== 'recording') {
@@ -727,7 +734,7 @@ export default function LegenScreen() {
           >
             <Ionicons name="chevron-back" size={20} color={FT.text} />
           </Pressable>
-          {phase === 'recording' && (
+          {phase === 'recording' && !isPaused && (
             <View
               className="flex-row items-center gap-[7px] px-3 py-1.5 rounded-full"
               style={{ backgroundColor: 'rgba(255,93,108,0.24)', borderWidth: 1, borderColor: 'rgba(255,93,108,0.55)' }}
@@ -1047,7 +1054,7 @@ export default function LegenScreen() {
         {/* Gegenstand-Schnellauswahl: Inline-Popover über der Steuerleiste (kein
             Sheet). Tap auf Typ setzt sofort + schliesst; Backdrop-Tap schliesst
             ohne Marker. Dübel als roter Mini-Zylinder erkennbar. */}
-        {gsPicker && phase === 'recording' && (
+        {gsPicker && phase === 'recording' && !isPaused && (
           <>
             <Pressable accessibilityLabel={t('track.closeObjectPicker')} className="absolute inset-0" onPress={() => setGsPicker(false)} />
             <View
@@ -1091,7 +1098,7 @@ export default function LegenScreen() {
         {/* Winkel-Schnellwahl: Inline-Popover direkt über dem Winkel-Button — KEIN
             BottomSheet. Fachtyp und Richtung wählen; erst die Bestätigung setzt den Marker. Tap
             außerhalb (Backdrop) schliesst ohne Marker. */}
-        {winkelSheet && phase === 'recording' && (
+        {winkelSheet && phase === 'recording' && !isPaused && (
           <>
             <Pressable
               accessibilityLabel={t('track.closeAnglePicker')}
@@ -1113,6 +1120,16 @@ export default function LegenScreen() {
           </>
         )}
 
+        {phase === 'recording' && isPaused && (
+          <View accessibilityLiveRegion="polite" style={{ marginHorizontal: 18, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#FFD166', backgroundColor: '#29220f' }}>
+            <Text accessibilityRole="header" style={{ color: '#FFD166', fontSize: 18, fontWeight: '800' }}>{t('track.pauseVisibleTitle')}</Text>
+            <Text style={{ color: '#fff', marginTop: 6 }}>{t('track.pauseVisibleHint')}</Text>
+            <Pressable accessibilityRole="button" onPress={() => { if (useTrackingStore.getState().isPaused) togglePause('button'); }} style={{ minHeight: 48, justifyContent: 'center', marginTop: 8 }}>
+              <Text style={{ color: '#02dbc0', fontSize: 17, fontWeight: '700' }}>{t('track.resume')}</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Steuerung */}
         <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
           <Pressable
@@ -1127,7 +1144,7 @@ export default function LegenScreen() {
           <Pressable
             className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${gsPicker ? 'bg-ft-acc border-ft-acc' : 'bg-white/5 border-ft-line-strong'}`}
             accessibilityLabel={t('track.setObjectButton')}
-            onPress={() => { hapticTap(); setWinkelSheet(false); setGsPicker(v => !v); }} disabled={phase !== 'recording'}
+            onPress={() => { hapticTap(); setWinkelSheet(false); setGsPicker(v => !v); }} disabled={phase !== 'recording' || isPaused} accessibilityState={{ disabled: phase !== 'recording' || isPaused }} style={{ opacity: isPaused ? 0.4 : 1 }}
           >
             <Ionicons name="cube-outline" size={20} color={gsPicker ? FT.accText : FT.text} />
             <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${gsPicker ? 'text-ft-acc-text' : 'text-ft-text'}`}>GS</Text>
@@ -1136,7 +1153,7 @@ export default function LegenScreen() {
             accessibilityLabel={t('track.setAngleButton')}
             accessibilityHint={t('track.setAngleHint')}
             className={`flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] border ${winkelSheet ? 'bg-ft-acc border-ft-acc' : 'bg-white/5 border-ft-line-strong'}`}
-            onPress={() => { hapticTap(); setGsPicker(false); setWinkelSheet(v => !v); }} disabled={phase !== 'recording'}
+            onPress={() => { hapticTap(); setGsPicker(false); setWinkelSheet(v => !v); }} disabled={phase !== 'recording' || isPaused} accessibilityState={{ disabled: phase !== 'recording' || isPaused }} style={{ opacity: isPaused ? 0.4 : 1 }}
           >
             <Ionicons name="git-branch-outline" size={20} color={winkelSheet ? FT.accText : FT.text} />
             <Text numberOfLines={1} className={`text-[10.5px] font-extrabold ${winkelSheet ? 'text-ft-acc-text' : 'text-ft-text'}`}>{t('track.angle')}</Text>
@@ -1145,7 +1162,7 @@ export default function LegenScreen() {
             className="flex-1 h-[60px] rounded-[18px] items-center justify-center gap-[3px] bg-white/5 border border-ft-line-strong"
             accessibilityLabel={isPaused ? t('track.resume') : t('track.pause')}
             accessibilityHint="Zum Ändern gedrückt halten"
-            onPress={() => undefined} onLongPress={togglePause} onAccessibilityTap={togglePause} delayLongPress={1800} disabled={phase !== 'recording'}
+            onPress={() => undefined} onLongPress={() => togglePause('longPress')} onAccessibilityTap={() => togglePause('accessibility')} delayLongPress={1800} disabled={phase !== 'recording'}
           >
             <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color={FT.text} />
             <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{isPaused ? t('track.resume') : t('track.pause')}</Text>
@@ -1161,7 +1178,7 @@ export default function LegenScreen() {
       </SafeAreaView>
 
       <PocketLockOverlay
-        visible={pocketLock && phase === 'recording'}
+        visible={pocketLock && phase === 'recording' && !isPaused}
         duration={clock(durationSeconds)}
         distanceM={`${Math.round(distanceMeters)} m`}
         onUnlock={unlockPocket}

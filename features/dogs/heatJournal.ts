@@ -3,7 +3,7 @@ import { isFemaleDog } from '@/components/dogs/types';
 import { fromISODate, toISODate } from './dateInput';
 import type { HeatCycle, HeatObservation } from './heatCycles';
 
-export type DailyHeatDraft = { date: string; bleeding: string | null; behavior: string | null; standing: boolean; notes: string };
+export type DailyHeatDraft = { date: string; bleeding: string | null; behavior: string | null; standing: boolean; discharge?: string; notes: string };
 export type ObservationInput = Pick<HeatObservation, 'id' | 'date' | 'type' | 'value' | 'notes'>;
 
 // Use existing, language-independent legacy values; never translate stored data.
@@ -13,6 +13,7 @@ export function dailyHeatRows(draft: DailyHeatDraft, id: () => string): Observat
   if (draft.bleeding) add('Blutung', draft.bleeding);
   if (draft.behavior) add('Verhalten', draft.behavior);
   if (draft.standing) add('Standreflex', 'Beobachtet');
+  if (draft.discharge?.trim()) add('Ausfluss', draft.discharge.trim());
   if (draft.notes.trim()) add('Notiz', null, draft.notes.trim());
   return rows;
 }

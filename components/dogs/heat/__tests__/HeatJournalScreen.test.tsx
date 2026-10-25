@@ -1,6 +1,7 @@
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { Text, TextInput, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { HeatJournalScreen } from '../HeatJournalScreen';
+import { fmtDate } from '@/features/dogs/heatCycles';
 import type { Dog } from '@/types';
 const mockLoad = jest.fn(); const mockSave = jest.fn(); const mockEnd = jest.fn(); const mockPush = jest.fn(); const mockReplace = jest.fn(); const mockGuard = jest.fn();
 let mockUser = 'owner'; let mockCounter = 0;
@@ -24,7 +25,7 @@ const dog = { id: 'dog', name: 'Luna', gender: 'female', owner_id: 'owner' } as 
 const cycle = { id: 'cycle', dogId: 'dog', startDate: '2026-01-01', endDate: null, status: 'active', notes: 'Old cycle note', phase: 'custom legacy', createdAt: '' };
 const legacy = { id: 'observation', heatCycleId: 'cycle', date: '2026-01-02', type: 'Legacy custom', value: 'Original value', notes: 'Original note', createdAt: '' };
 let node: ReactTestRenderer;
-const nodesOf = (type: unknown) => (node.root as unknown as { findAllByType: (type: unknown) => { props: { children?: unknown; value?: string; accessibilityLabel?: string; onPress: () => void; disabled?: boolean } }[] }).findAllByType(type);
+const nodesOf = (type: unknown) => (node.root as unknown as { findAllByType: (type: unknown) => { props: { children?: unknown; value?: string; accessibilityLabel?: string; onPress: () => void; onChangeText?: (text: string) => void; disabled?: boolean } }[] }).findAllByType(type);
 const text = () => nodesOf(Text).map(n => Array.isArray(n.props.children) ? n.props.children.join('') : n.props.children).join(' ') + nodesOf(TextInput).map(n => n.props.value).join(' ');
 const button = (label: string) => nodesOf(TouchableOpacity).find(n => n.props.accessibilityLabel === label)!;
 async function tap(label: string) { await act(async () => { button(label).props.onPress(); }); }
@@ -81,4 +82,43 @@ it('cancel requires confirmation when a draft is dirty', async () => {
   await render(); await tap('Beobachtung hinzufügen'); await tap('Leicht'); await tap('Abbrechen');
   expect(spy).toHaveBeenCalledWith('Ungespeicherte Eingaben verwerfen?', undefined, expect.any(Array)); expect(button('Beobachtung speichern')).toBeDefined();
   expect(mockGuard).toHaveBeenLastCalledWith(true, expect.any(Function)); spy.mockRestore();
+});
+
+describe('restored forecast and breeding overview', () => {
+  beforeEach(() => { jest.useFakeTimers(); jest.setSystemTime(new Date(2026, 9, 24, 12)); });
+  afterEach(() => jest.useRealTimers());
+  const old = { ...cycle, id: 'old', startDate: '2026-01-01', endDate: '2026-01-20', status: 'completed' };
+  const last = { ...old, id: 'last', startDate: '2026-06-30', endDate: '2026-07-20' };
+  it('restores next date/countdown from historical intervals without writes, and keeps them on refresh failure', async () => {
+    mockLoad.mockResolvedValue({ cycles: [last, old], phases: [], observations: [] });
+    await render(); expect(text()).toContain(fmtDate('2026-12-27')!); expect(text()).toContain('In etwa 64 Tagen'); expect(text()).toContain('bisherigen Zyklusabständen');
+    expect(mockSave).not.toHaveBeenCalled(); expect(mockEnd).not.toHaveBeenCalled();
+    mockLoad.mockRejectedValue(new Error('offline')); await act(async () => node.root.findByType(RefreshControl).props.onRefresh());
+    expect(text()).toContain('In etwa 64 Tagen'); expect(text()).toContain('Daten konnten nicht geladen');
+  });
+  it('marks a single historical cycle as a rough estimate and ignores future starts for calculation', async () => {
+    mockLoad.mockResolvedValue({ cycles: [last, { ...old, id: 'future', startDate: '2027-01-01', endDate: null }], phases: [], observations: [] });
+    await render(); expect(text()).toContain('In etwa 64 Tagen'); expect(text()).toContain('Grobe Schätzung'); expect(text()).toContain(fmtDate('2027-01-01')!);
+  });
+  it.each([['2026-04-27', 'Voraussichtlich heute'], ['2026-04-26', 'Geschätzter Termin war gestern']])('handles countdown boundary %s', async (startDate, expected) => {
+    mockLoad.mockResolvedValue({ cycles: [{ ...old, startDate, endDate: '2026-05-10' }], phases: [], observations: [] });
+    await render(); expect(text()).toContain(expected);
+  });
+  it('does not fabricate a prediction for an empty history', async () => {
+    mockLoad.mockResolvedValue({ cycles: [], phases: [], observations: [] }); await render(); expect(text()).not.toContain('Nächste Läufigkeit');
+  });
+  it('opens existing calendar and owner correction details, displays recorded phases', async () => {
+    mockLoad.mockResolvedValue({ cycles: [last], phases: [{ id: 'phase', heatCycleId: 'last', phaseType: 'Östrus', startDate: '2026-07-09', endDate: '2026-07-15' }], observations: [] });
+    await render(); expect(text()).toContain(`Östrus · ${fmtDate('2026-07-09')} – ${fmtDate('2026-07-15')}`);
+    await tap('Kalender ansehen'); expect(mockPush).toHaveBeenLastCalledWith('/dog-heat-calendar/dog');
+    await tap('Eintrag bearbeiten oder löschen'); expect(mockPush).toHaveBeenLastCalledWith('/dog-heat/last');
+  });
+  it('saves explicitly observed standing and discharge on the selected date without ending the cycle', async () => {
+    await render(); await tap('Beobachtung hinzufügen');
+    await tap('Zuchtbeobachtungen'); await tap('Stehtag beobachtet');
+    await act(async () => nodesOf(TextInput).find(n => n.props.accessibilityLabel === 'Ausfluss (Farbe, Konsistenz, Geruch)')!.props.onChangeText!('klar, dünnflüssig'));
+    await tap('Beobachtung speichern');
+    expect(mockSave.mock.calls[0][3]).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'Standreflex', date: '2026-10-24' }), expect.objectContaining({ type: 'Ausfluss', value: 'klar, dünnflüssig', date: '2026-10-24' })]));
+    expect(mockEnd).not.toHaveBeenCalled();
+  });
 });

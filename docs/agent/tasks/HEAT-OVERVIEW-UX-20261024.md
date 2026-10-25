@@ -63,3 +63,23 @@ Kein Geräte-/Screenreader-/Audio-/Feldtest. Keine Live-DB-Mutation. Vor Veröff
 unabhängiger Review01 + Backendvertrag05 + kompletter Production-Preflight notwendig.
 SourceFreeze und geprüfte Belege liegen außerhalb Produktcode unter
 `outputs/heat-overview-ux-07-20261024/`.
+
+## Local correction after publication stop — 2026-10-24
+
+Human clarified that prior cycles remain in History; missing next-date/countdown is a display regression, not demonstrated deletion. Explicit permission: local correction and tests only. Further human request: breeding observations, calendar access, clear previous/next cycle overview on Home, and access to correction/deletion. OTA, DB/live QA, commit and push remain stopped.
+
+- Shared HeatForecast restores the existing predictHeat output on Overview, compact Dog/Health cards and Home: localized date, remaining days, today/past handling, rough estimate vs historical intervals. Future starts remain in history but are excluded from observed forecasting inputs. No algorithm change or mutation of records.
+- Home shows each female dog's last recorded cycle and next estimate. Strict reads preserve previous results on refresh failure; account changes discard old-account display.
+- Explicit breeding section captures observed standing days and free-text discharge via the existing atomic observation insert/retry path. Nothing is preselected or automatically saved.
+- Overview shows recorded cycle dates, legacy and structured phases, and dated standing/discharge observations. Calendar directly accessible. Owner correction action opens the existing detail screen with its confirmed deletion flow; no actual records deleted during work.
+- Four phases are explained automatically; no inferred current phase or fertile-day claim. Basis: https://www.vet.cornell.edu/dog-estrous-cycles (reviewed 2026-10-24).
+- 114 tests / 9 suites PASS, including real prediction calculation, boundary dates, future starts, empty history, refresh errors, breeding save, Home account switch, and existing deletion gates. Focused ESLint exit 0, no output. git diff --check PASS. Final Typecheck exit 0 after correcting test-only renderer type declarations. Evidence in local correction output.
+- No device checks; no independent external review yet. Automatic approval review rejected an attempted status message to 01 as unauthorized delegation. No retry or alternative channel used.
+- Original V2 freeze remains unchanged. This local delta requires a fresh review/integration before any later release.
+
+## Embedded overview calendar — 2026-10-25
+
+Explicit human request: show calendar directly in heat overview, not only a link.
+Added HeatOverviewCalendar above forecast/status, including current month even with no active cycle, month navigation, Today and estimated-start jumps, record/estimate/observation legend, selected day details and navigation to existing record details. Reuses buildHeatCalendarDays/getMonthGrid/predictHeat; no algorithm, backend, tracking, Live-Share or data changes. Forecast remains estimate-only; no invented future heat duration. Five locale labels and screen-reader day descriptions, selected state and non-colour markers.
+
+Validation: 50 tests / 6 suites PASS, Typecheck exit 0, focused ESLint exit 0, git diff --check PASS. No device tests. No commit/push/OTA by 07. Original correction freeze/source preserved; separate additive snapshot in outputs/heat-inline-calendar-07-20261025. Independent review of this delta pending with 01. 01 confirms prior narrow historical forecast review PASS, Android OTA still unpublished as of received report.

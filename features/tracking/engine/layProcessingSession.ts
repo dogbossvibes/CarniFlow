@@ -1,3 +1,4 @@
+import { QaPipelineDiagnostics } from '../utils/qaPipelineDiagnostics';
 import { QaMotionCapture } from '@/features/tracking/utils/qaMotionCapture';
 import { isRecordingGap, splitContinuousPoints } from '../utils/trackContinuity';
 import type * as Location from 'expo-location';
@@ -109,6 +110,7 @@ export interface LayProcessingState {
   angleDbgRef: Box<AngleDebug>;
   liveTurnsRef: Box<Map<number, FusedTurn>>;
   turnEvidenceRef: Box<Map<number, TurnEvidence>>;
+  qaPipelineRef: Box<QaPipelineDiagnostics>;
   qaMotionCaptureRef: Box<QaMotionCapture>;
   qaLastRejectRef: Box<string | null>;
   qaOriginRef: Box<{ lat: number; lng: number; t: number } | null>;
@@ -147,6 +149,7 @@ export function createLayProcessingState(): LayProcessingState {
     angleDbgRef: box<AngleDebug>({ count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null }),
     liveTurnsRef: box<Map<number, FusedTurn>>(new Map()),
     turnEvidenceRef: box<Map<number, TurnEvidence>>(new Map()),
+    qaPipelineRef: box(new QaPipelineDiagnostics()),
     qaMotionCaptureRef: box(new QaMotionCapture()),
     qaLastRejectRef: box<string | null>(null),
     qaOriginRef: box<{ lat: number; lng: number; t: number } | null>(null),
@@ -307,6 +310,9 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     }
     if (newlyAssociated) ({ corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection }));
 
+    if (qaRef.current) {
+      try { session.qaPipelineRef.current.observe(diagnostics, new Set(corners.map(c => c.apexIndex)), session.completedDetectorSectionsRef.current.length, Date.now()); } catch { /* Diagnostics never control recording. */ }
+    }
     // Observation only, including candidates rejected before a heading exists.
     if (qaRef.current && motionActiveRef.current) {
       qaMotionCaptureRef.current.observe(diagnostics, motionBufRef.current,

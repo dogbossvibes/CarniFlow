@@ -2,6 +2,10 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "track.pauseMarkerHint": "Registrazione in pausa. Riprendi prima.",
+  "track.pauseVisibleTitle": "Registrazione in pausa",
+  "track.pauseVisibleHint": "La pista non viene registrata. Oggetti e angoli sono disattivati.",
+
   "trainingTemplate.resume": "Riprendi la bozza",
   "trainingTemplate.resumeHelp": "Esiste già una bozza per questo modello. Riprendila per conservare i tuoi dati.",
 

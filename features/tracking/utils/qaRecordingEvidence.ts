@@ -27,7 +27,8 @@ export type QaRecordingEventName =
   | 'appActive' | 'appInactive' | 'appBackground' | 'appUnknown'
   | 'sourceObserved' | 'firstFix'
   | 'backgroundStartRequested' | 'backgroundStartSucceeded' | 'foregroundStreamRemoved'
-  | 'userPaused' | 'userResumed';
+  | 'userPaused' | 'userResumed'
+  | 'automaticAnglesEnabled' | 'automaticAnglesDisabled' | 'pauseLongPress' | 'pauseAccessibility' | 'pauseUnknown' | 'resumeButton' | 'resumeLongPress' | 'resumeAccessibility' | 'resumeUnknown' | 'markerRejectedPaused';
 
 export interface QaRecordingEvent {
   sequence: number;
@@ -92,6 +93,7 @@ export function assertQaRecordingEvidence(value: QaRecordingEvidence): void {
     'recordingStarted', 'recordingResumed', 'recordingStopped', 'recorderUnmounted',
     'appActive', 'appInactive', 'appBackground', 'appUnknown', 'sourceObserved', 'firstFix',
     'backgroundStartRequested', 'backgroundStartSucceeded', 'foregroundStreamRemoved', 'userPaused', 'userResumed',
+    'automaticAnglesEnabled', 'automaticAnglesDisabled', 'pauseLongPress', 'pauseAccessibility', 'pauseUnknown', 'resumeButton', 'resumeLongPress', 'resumeAccessibility', 'resumeUnknown', 'markerRejectedPaused',
   ];
   fields(value, ['schemaVersion', 'availability', 'lay', 'search']);
   if (value.schemaVersion !== 1) fail();

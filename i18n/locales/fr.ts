@@ -6,6 +6,10 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "track.pauseMarkerHint": "Enregistrement en pause. Reprenez d’abord.",
+  "track.pauseVisibleTitle": "Enregistrement en pause",
+  "track.pauseVisibleHint": "La piste n’est pas enregistrée. Les objets et les angles sont désactivés.",
+
   "trainingTemplate.resume": "Reprendre le brouillon",
   "trainingTemplate.resumeHelp": "Un brouillon existe déjà pour ce modèle. Reprenez-le pour conserver vos saisies.",
 

@@ -1,3 +1,4 @@
+import { QaPipelineDiagnostics } from '../qaPipelineDiagnostics';
 // QA-Export Schema v2 — Reproduzierbarkeit eines Feldlaufs nach dem Stop.
 //
 // ANLASS (Realdaten Teil A/B): der v1-Export konnte einen Lauf nicht
@@ -403,3 +404,13 @@ function v1Like(): QaTrackExportV1 {
     rawFixes: _r, detectorPoints: _dp, linePoints: _lp, autoDiagnostics: _ad, ...rest } = WITHOUT;
   return { ...rest, schemaVersion: 1 };
 }
+
+
+it('exports additive pipeline evidence and rejects private extra fields without changing old exports', () => {
+  const q = new QaPipelineDiagnostics(); q.reset(1000); q.fix(1100, 1120, 1, 5, 'paused', null);
+  const enriched = { ...WITH, pipelineDiagnostics: q.snapshot() };
+  expect(JSON.parse(serializeQaTrackExport(enriched)).pipelineDiagnostics.fixes[0].measurementMs).toBe(100);
+  assertNoAbsoluteData(enriched);
+  expect(() => assertNoAbsoluteData({ ...enriched, pipelineDiagnostics: { ...q.snapshot(), account: 'private' } as any })).toThrow();
+  expect(JSON.parse(serializeQaTrackExport(WITH)).pipelineDiagnostics).toBeUndefined();
+});

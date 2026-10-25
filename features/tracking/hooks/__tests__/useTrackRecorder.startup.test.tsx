@@ -470,6 +470,9 @@ it('keeps both private QA detector sections and marks the unobserved boundary af
   expect(capture.distances.detectorPathM).toBeGreaterThan(0);
   expect(capture.distances.detectorPathM).toBeCloseTo(capture.detectorPoints[capture.detectorPoints.length - 1].cumDistM, 2);
   expect(capture.reconstructionScope).toBe('current_detector_section');
+  expect(capture.pipelineDiagnostics.observedFixes).toBeGreaterThan(0);
+  expect(capture.pipelineDiagnostics.fixes.some((fix: { outcome: string }) => fix.outcome === 'accepted')).toBe(true);
+  expect(capture.pipelineDiagnostics.decisionSemantics).toBe('latest_observed_per_section_apex_not_persisted_markers');
 });
 
 
@@ -678,4 +681,25 @@ it('preserves measurement time for the first line point and subsequent eligible 
   expect(times[0]).toBe(1_010_000);
   expect(times.at(-1)).toBe(1_011_000);
   expect(times.every((t, i) => i === 0 || t >= times[i - 1])).toBe(true);
+});
+
+
+it('blocks paused markers despite a changing GPS position and accepts a fresh marker after resume', async () => {
+  await start();
+  const state = useTrackingStore.getState();
+  state.currentPosition = { lat: 47, lng: 8 };
+  state.distanceMeters = 114.2;
+  state.isPaused = true;
+  await act(async () => {
+    await current.addMarker('gegenstand', { material: 'holz' });
+    state.currentPosition = { lat: 47.001, lng: 8.001 };
+    await current.addMarker('gegenstand', { material: 'duebel' });
+    await current.addMarker('winkel', { angleKind: 'rechts' });
+  });
+  expect(state.markers).toHaveLength(0);
+  expect(createLocalTrackMarker).not.toHaveBeenCalled();
+  state.isPaused = false;
+  await act(async () => { await current.addMarker('gegenstand', { material: 'holz' }); });
+  expect(state.markers).toHaveLength(1);
+  expect(createLocalTrackMarker).toHaveBeenCalledTimes(1);
 });

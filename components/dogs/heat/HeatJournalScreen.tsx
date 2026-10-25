@@ -14,6 +14,8 @@ import { fromISODate, toISODate } from '@/features/dogs/dateInput';
 import { getHeatCycleDetails, fmtDate, heatCycleDay, durationDays, type HeatCycle, type HeatObservation } from '@/features/dogs/heatCycles';
 import { dailyHeatRows, recordedActiveCycle, saveDailyHeatRows, finishRecordedHeat, type ObservationInput } from '@/features/dogs/heatJournal';
 import { heatUxCopy } from '@/features/dogs/heatUxCopy';
+import { HeatOverviewCalendar } from './HeatOverviewCalendar';
+import { HeatForecast } from './HeatForecast';
 import type { Dog } from '@/types';
 
 type Details = Awaited<ReturnType<typeof getHeatCycleDetails>>;
@@ -40,6 +42,7 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
   const [bleeding, setBleeding] = useState<string | null>(null);
   const [behavior, setBehavior] = useState<string | null>(null);
   const [standing, setStanding] = useState(false);
+  const [discharge, setDischarge] = useState('');
   const [more, setMore] = useState(false);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -54,7 +57,7 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
   const isOwner = !!user?.id && dog.owner_id === user.id;
   const today = toISODate(new Date());
   const active = recordedActiveCycle(details.cycles, today);
-  const dirty = !!formCycle && (!!bleeding || !!behavior || standing || !!notes.trim());
+  const dirty = !!formCycle && (!!bleeding || !!behavior || standing || !!discharge.trim() || !!notes.trim());
   useEffect(() => () => { mounted.current = false; generation.current++; }, []);
   useEffect(() => { if (!capLoading && !isPro) router.replace('/premium' as never); }, [capLoading, isPro, router]);
   const load = useCallback(async () => {
@@ -82,7 +85,7 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
   };
   const save = async () => {
     if (!formCycle || !date || !user?.id || !isOwner || !isPro || writeLock.current) return;
-    const rows = pendingRows.current ?? dailyHeatRows({ date: toISODate(date), bleeding, behavior, standing, notes }, () => Crypto.randomUUID());
+    const rows = pendingRows.current ?? dailyHeatRows({ date: toISODate(date), bleeding, behavior, standing, discharge, notes }, () => Crypto.randomUUID());
     if (!rows.length) return;
     pendingRows.current = rows;
     writeLock.current = true; setSaving(true); setSaveFailed(false);
@@ -108,7 +111,7 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
   const todayRows = recent.filter(o => o.date === today);
   const locked = saving || !!pendingRows.current;
   const observationText = (o: HeatObservation) => {
-    const labels: Record<string, string> = { Blutung: copy.bleeding, Verhalten: copy.behavior, Notiz: copy.note, Standreflex: copy.standing };
+    const labels: Record<string, string> = { Blutung: copy.bleeding, Verhalten: copy.behavior, Notiz: copy.note, Standreflex: copy.standing, Ausfluss: copy.discharge };
     const values: Record<string, string> = { Keine: copy.none, Leicht: copy.light, Mittel: copy.medium, Stark: copy.strong, 'Wie üblich': copy.usual, Unruhig: copy.restless, Anhänglicher: copy.affectionate };
     return `${labels[o.type] ?? o.type}${o.value ? `: ${values[o.value] ?? o.value}` : ''}`;
   };
@@ -130,8 +133,8 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
             <DateField label={copy.date} value={date} onChange={setDate} minimumDate={fromISODate(formCycle.startDate) ?? undefined} maximumDate={formCycle.endDate ? fromISODate(formCycle.endDate) ?? new Date() : new Date()} />
             <View style={s.card}><Text style={s.section}>{copy.bleeding}</Text><View style={s.choices}>{BLEEDING.map((value, i) => <Choice key={value} label={[copy.none, copy.light, copy.medium, copy.strong][i]} selected={bleeding === value} disabled={locked} onPress={() => setBleeding(bleeding === value ? null : value)} />)}</View></View>
             <View style={s.card}><Text style={s.section}>{copy.behavior}</Text><View style={s.choices}>{BEHAVIOR.map((value, i) => <Choice key={value} label={[copy.usual, copy.restless, copy.affectionate][i]} selected={behavior === value} disabled={locked} onPress={() => setBehavior(behavior === value ? null : value)} />)}</View></View>
-            <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: more, disabled: locked }} disabled={locked} style={s.card} onPress={() => setMore(!more)}><Text style={s.body}>{copy.more} {more ? '−' : '+'}</Text></TouchableOpacity>
-            {more && <Choice label={copy.standing} selected={standing} disabled={locked} onPress={() => setStanding(!standing)} />}
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={copy.breeding} accessibilityState={{ expanded: more, disabled: locked }} disabled={locked} style={s.card} onPress={() => setMore(!more)}><Text style={s.body}>{copy.breeding} {more ? '−' : '+'}</Text></TouchableOpacity>
+            {more && <View style={s.card}><Choice label={copy.standing} selected={standing} disabled={locked} onPress={() => setStanding(!standing)} /><Text style={s.section}>{copy.discharge}</Text><TextInput accessibilityLabel={copy.discharge} editable={!locked} value={discharge} onChangeText={setDischarge} maxLength={500} multiline style={s.input} /><Text style={s.muted}>{copy.phaseCaution}</Text></View>}
             <View style={s.card}><Text style={s.section}>{copy.note}</Text><TextInput accessibilityLabel={copy.note} editable={!locked} value={notes} onChangeText={setNotes} maxLength={2000} multiline style={s.input} placeholder={copy.note} placeholderTextColor={C.trackTextMut} /></View>
           </View>
           {!dirty && <Text style={s.muted}>{copy.select}</Text>}
@@ -141,6 +144,9 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
         </> : loading ? <ActivityIndicator color={C.trackPrimary} /> : !loaded ? null : <>
           <View style={s.tabs}>{(['overview', 'history'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="tab" accessibilityState={{ selected: tab === value }} style={[s.tab, tab === value && s.selected]} onPress={() => setTab(value)}><Text style={[s.body, tab === value && s.selectedText]}>{copy[value]}</Text></TouchableOpacity>)}</View>
           {tab === 'overview' ? <>
+            <HeatOverviewCalendar cycles={details.cycles} phases={details.phases} observations={details.observations} onOpenCycle={openCycle} />
+            <HeatForecast cycles={details.cycles} />
+            <HeatButton label={copy.calendar} secondary onPress={() => router.push(`/dog-heat-calendar/${dog.id}` as never)} />
             <View style={s.card}>
               <Text style={s.mint}>{active ? copy.active : details.cycles.length ? copy.inactive : copy.empty}</Text>
               {active && <><Text style={s.day}>{copy.day} {heatCycleDay(active.startDate, today)}</Text><Text style={s.body}>{copy.since}: {fmtDate(active.startDate)}</Text><Text style={s.muted}>{copy.recorded}</Text></>}
@@ -150,6 +156,9 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
               <Text style={s.section}>{copy.latest}</Text><View style={s.card}>{recent.length ? observationRows(recent.slice(0, 3)) : <Text style={s.muted}>{copy.noToday}</Text>}<HeatButton label={copy.all} secondary onPress={() => openCycle(active)} /></View>
               {isOwner && !ending && <HeatButton label={copy.end} secondary onPress={() => { setEnding(active); setEndDate(new Date()); setSaveFailed(false); }} />}
             </>}
+            <View style={s.card}><Text style={s.section}>{copy.phaseGuide}</Text><Text style={s.body}>{copy.phaseSequence}</Text><Text style={s.muted}>{copy.phaseCaution}</Text></View>
+            <Text style={s.section}>{copy.records}</Text>
+            {[...details.cycles].sort((a, b) => b.startDate.localeCompare(a.startDate)).map(cycle => <View key={cycle.id} style={s.card}><Text style={s.body}>{fmtDate(cycle.startDate)}{cycle.endDate ? ` – ${fmtDate(cycle.endDate)}` : ''}</Text>{cycle.phase && <Text style={s.muted}>{copy.recordedPhases}: {cycle.phase}</Text>}{details.phases.filter(p => p.heatCycleId === cycle.id).map(p => <Text key={p.id} style={s.muted}>{copy.recordedPhases}: {p.phaseType} · {fmtDate(p.startDate)}{p.endDate ? ` – ${fmtDate(p.endDate)}` : ''}</Text>)}{observationRows(details.observations.filter(o => o.heatCycleId === cycle.id && ['Standreflex', 'Ausfluss'].includes(o.type)))}<HeatButton label={isOwner ? copy.manageEntry : copy.details} secondary onPress={() => openCycle(cycle)} /></View>)}
             {ending && <View style={s.card}><Text style={s.section}>{copy.end}</Text><Text style={s.body}>{copy.endBody}</Text><DateField label={copy.endDate} value={endDate} onChange={setEndDate} minimumDate={fromISODate(ending.startDate) ?? undefined} maximumDate={new Date()} />{saveFailed && <Text accessibilityRole="alert" style={s.error}>{copy.saveError}</Text>}<HeatButton label={copy.endConfirm} onPress={() => void finish()} disabled={!endDate || saving} /><HeatButton label={copy.cancel} secondary disabled={saving} onPress={() => setEnding(null)} /></View>}
           </> : <>
             <Text style={s.section}>{copy.records}</Text>

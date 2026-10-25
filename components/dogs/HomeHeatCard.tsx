@@ -4,58 +4,55 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { C } from '@/constants/colors';
 import { useDogs } from '@/hooks/useDogs';
-import { getHeatCycles, predictHeat, type HeatPrediction } from '@/features/dogs/heatCycles';
+import { getHeatCycles, fmtDate, type HeatCycle } from '@/features/dogs/heatCycles';
+
+import { toISODate } from '@/features/dogs/dateInput';
+import { HeatForecast } from './heat/HeatForecast';
+import { useT } from '@/i18n';
+import { heatUxCopy } from '@/features/dogs/heatUxCopy';
+import { useSession } from '@/lib/session-context';
 
 const PINK = C.trackPrimary;
 
-interface HeatItem { dogId: string; dogName: string; pred: HeatPrediction }
+interface HeatItem { dogId: string; dogName: string; cycles: HeatCycle[] }
 
-// Home-Info „Läufigkeit im Blick" — nur bei Hündinnen mit vorhandener Prognose.
-// Zeigt die relevanteste (aktive > bald anstehende > überfällige). Rendert null,
-// wenn nichts anzuzeigen ist (auch bei reinen Rüden-Haushalten).
+// Refresh on focus; never turn an unsuccessful read into an empty history.
 export function HomeHeatCard({ onOpen }: { onOpen: (dogId: string) => void }) {
   const { dogs } = useDogs();
-  const [item, setItem] = useState<HeatItem | null>(null);
-
+  const { user } = useSession();
+  const { locale } = useT();
+  const copy = heatUxCopy(locale);
+  const [state, setState] = useState<{ userId: string; items: HeatItem[]; failed: boolean } | null>(null);
   useFocusEffect(useCallback(() => {
     let alive = true;
-    (async () => {
-      const females = dogs.filter(d => d.gender === 'female');
-      const results = await Promise.all(females.map(async d => {
-        const pred = predictHeat(await getHeatCycles(d.id));
-        return pred ? { dogId: d.id, dogName: d.name, pred } : null;
-      }));
-      const valid = results.filter((x): x is HeatItem => x != null);
-      // Priorität: aktiv → nächste anstehende (kleinstes daysUntil ≥ 0) → am wenigsten überfällig.
-      valid.sort((a, b) => {
-        if (a.pred.active !== b.pred.active) return a.pred.active ? -1 : 1;
-        const ax = a.pred.daysUntil < 0 ? 1e6 - a.pred.daysUntil : a.pred.daysUntil;
-        const bx = b.pred.daysUntil < 0 ? 1e6 - b.pred.daysUntil : b.pred.daysUntil;
-        return ax - bx;
-      });
-      if (alive) setItem(valid[0] ?? null);
+    const userId = user?.id;
+    if (!userId) return;
+    void (async () => {
+      try {
+        const items = await Promise.all(dogs.filter(d => d.gender === 'female').map(async d => ({
+          dogId: d.id, dogName: d.name, cycles: await getHeatCycles(d.id, { throwOnError: true }),
+        })));
+        if (alive) setState({ userId, items, failed: false });
+      } catch {
+        if (alive) setState(previous => ({ userId, items: previous?.userId === userId ? previous.items : [], failed: true }));
+      }
     })();
     return () => { alive = false; };
-  }, [dogs]));
-
-  if (!item || !dogs.some(d => d.id === item.dogId && d.gender === 'female')) return null;
-  const { dogName, pred } = item;
-  const text = pred.active
-    ? `${dogName} ist an Tag ${pred.cycleDay} der Läufigkeit.`
-    : pred.daysUntil >= 0
-      ? `${dogName} wird voraussichtlich in ca. ${pred.daysUntil} Tagen läufig.`
-      : `${dogName}: nächste Läufigkeit ist voraussichtlich überfällig.`;
-
-  return (
-    <TouchableOpacity style={s.card} activeOpacity={0.85} onPress={() => onOpen(item.dogId)}>
-      <View style={s.icon}><Ionicons name="heart" size={16} color={PINK} /></View>
-      <View style={{ flex: 1 }}>
-        <Text style={s.title}>Läufigkeit im Blick</Text>
-        <Text style={s.txt} numberOfLines={2}>{text}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={C.trackTextMut} />
-    </TouchableOpacity>
-  );
+  }, [dogs, user?.id]));
+  if (!state || state.userId !== user?.id) return null;
+  return <View>
+    {state.failed && <Text accessibilityRole="alert" style={s.txt}>{copy.error}</Text>}
+    {state.items.filter(item => item.cycles.length && dogs.some(d => d.id === item.dogId && d.gender === 'female')).map(item => {
+      const last = [...item.cycles].filter(c => c.startDate <= toISODate(new Date())).sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+      return <TouchableOpacity key={item.dogId} style={s.card} accessibilityRole="button" onPress={() => onOpen(item.dogId)}>
+        <View style={{ flex: 1, gap: 10 }}><Text style={s.title}>{item.dogName} · {copy.title}</Text>
+          {last && <Text style={s.txt}>{copy.lastHeat}: {fmtDate(last.startDate)}{last.endDate ? ` – ${fmtDate(last.endDate)}` : ''}</Text>}
+          <HeatForecast cycles={item.cycles} compact />
+          <Text style={s.txt}>{copy.overview} · {copy.history}</Text>
+        </View><Ionicons name="chevron-forward" size={18} color={C.trackTextMut} />
+      </TouchableOpacity>;
+    })}
+  </View>;
 }
 
 const s = StyleSheet.create({

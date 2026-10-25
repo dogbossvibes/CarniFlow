@@ -1,3 +1,4 @@
+import { HeatForecast } from './heat/HeatForecast';
 import { heatUxCopy } from '@/features/dogs/heatUxCopy';
 import { recordedActiveCycle } from '@/features/dogs/heatJournal';
 import { toISODate } from '@/features/dogs/dateInput';
@@ -57,6 +58,7 @@ export function HealthHeatCard({
   const copy = heatUxCopy(locale);
   const active = recordedActiveCycle(cycles, toISODate(new Date()));
   return <TouchableOpacity testID="health-heat-card" style={hs.card} onPress={cycles.length ? onPress : onAdd} accessibilityRole="button" accessibilityLabel={copy.title}>
+    <HeatForecast cycles={cycles} compact />
     <View style={hs.cardHead}><View style={hs.icon}><Ionicons name="heart-outline" size={22} color={C.trackPrimary} /></View><View style={{ flex: 1 }}><Text style={hs.emptyTitle}>{copy.title}</Text><Text style={hs.rangeTxt}>{active ? `${copy.day} ${heatCycleDay(active.startDate)} · ${copy.recorded}` : cycles.length ? copy.inactive : copy.empty}</Text></View><Ionicons name="chevron-forward" size={20} color={C.trackTextSec} /></View>
   </TouchableOpacity>;
 }

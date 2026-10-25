@@ -1,3 +1,4 @@
+import { assertPipelineDiagnostics, type PipelineDiagnostics } from './qaPipelineDiagnostics';
 // QA-Export einer gelegten Fährte — anonymisiert, für Regressions-Fixtures.
 //
 // Zweck: die echten Punktfolgen eines Feldtests so aus dem Gerät holen, dass
@@ -97,7 +98,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -146,6 +147,7 @@ export interface QaTrackExport {
    * der Live-Entscheidung verwechseln (siehe candidateMotionEvidence).
    */
   autoDiagnostics: QaAutoDiagnostic[];
+  pipelineDiagnostics?: PipelineDiagnostics;
   reconstructionScope?: QaSessionCapture['reconstructionScope'];
 
   // ── QA v2.1 ─────────────────────────────────────────────────────────────
@@ -277,7 +279,7 @@ export function buildQaTrackExport(
   }
   const accs = anon.map(p => p.accuracy).filter((a): a is number => a != null);
   const motion = capture?.candidateMotionEvidence;
-  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 13 = motion?.some(row => row.samples.some(sample => sample.diagnostics)) ? 13
+  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 13 | 14 = capture?.pipelineDiagnostics ? 14 : motion?.some(row => row.samples.some(sample => sample.diagnostics)) ? 13
     : capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
     || capture?.startupDiagnostics?.motionFirstCallbackTSec !== undefined ? 7
     : capture?.startupMovementDiagnostics
@@ -334,6 +336,7 @@ export function buildQaTrackExport(
     linePoints: capture?.linePoints ?? [],
     autoDiagnostics: capture?.autoDiagnostics ?? [],
     reconstructionScope: capture?.reconstructionScope,
+    ...(capture?.pipelineDiagnostics ? { pipelineDiagnostics: capture.pipelineDiagnostics } : {}),
     candidateMotionEvidence: motion,
     motionCaptureDiagnostics: capture?.motionCaptureDiagnostics,
     motionCaptureAvailable: !!motion && motion.length > 0,
@@ -392,6 +395,7 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
     };
     visit(e.backgroundLayDiagnostics);
   }
+  if (e.pipelineDiagnostics) assertPipelineDiagnostics(e.pipelineDiagnostics);
   const json = JSON.stringify(e);
   for (const forbidden of ['latitude', 'longitude', 'lat"', 'lng"']) {
     if (json.includes(forbidden)) throw new Error(`QA-Export enthält unerlaubtes Feld: ${forbidden}`);

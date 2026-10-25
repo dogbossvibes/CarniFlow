@@ -5,6 +5,10 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "track.pauseMarkerHint": "Aufnahme pausiert. Bitte zuerst fortsetzen.",
+  "track.pauseVisibleTitle": "Aufnahme pausiert",
+  "track.pauseVisibleHint": "Die Fährte wird gerade nicht aufgezeichnet. Gegenstände und Winkel sind gesperrt.",
+
   "trainingTemplate.resume": "Entwurf fortsetzen",
   "trainingTemplate.resumeHelp": "Für diese Vorlage gibt es bereits einen Entwurf. Setze ihn fort; deine Eingaben bleiben erhalten.",
 

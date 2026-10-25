@@ -211,6 +211,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const localSessionId = useRef<string | null>(null);
   const diagnosticsReadyRef = useRef<Promise<void> | null>(null);
   const recordingEvidenceRef = useRef<QaRecordingObserver | null>(null);
+  useEffect(() => {
+    recordingEvidenceRef.current?.note(autoDetectRef.current ? 'automaticAnglesEnabled' : 'automaticAnglesDisabled');
+  }, [opts?.autoDetect]);
   const streamModesRef = useRef<{ engine: unknown; source: unknown } | undefined>(undefined);
   const foregroundPermissionRef = useRef<string | null>(null);
   const lastAppStateRef = useRef(AppState.currentState);
@@ -314,10 +317,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (!isQaDiagnosticsEnabled()) {
       qaRef.current = false;
       qaMotionCaptureRef.current.clear();
+      laySession.qaPipelineRef.current.reset(0);
       recordingEvidenceRef.current?.close();
       recordingEvidenceRef.current = null;
     }
-  }, [qaMotionCaptureRef]);
+  }, [qaMotionCaptureRef, laySession]);
   useEffect(() => subscribeQaDiagnostics(enforceQaCaptureAccess), [enforceQaCaptureAccess]);
 
   // Observation only: AppState does not start, stop, or restore recording.
@@ -421,10 +425,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const processFixWithQaAccess = useCallback((loc: Location.LocationObject) => {
     // Local check also covers suspended JS timers after a background lease expiry.
     enforceQaCaptureAccess();
+    const received = Date.now();
     const result = processor.processFix(loc);
+    if (qaRef.current && recordingRef.current) {
+      try { laySession.qaPipelineRef.current.fix(loc.timestamp, received, loc.coords.speed, loc.coords.accuracy, result.outcome, result.rejectReason); } catch { /* Observation only. */ }
+    }
     if (result.corners.length) refreshManualGeometry();
     return result;
-  }, [processor, enforceQaCaptureAccess, refreshManualGeometry]);
+  }, [processor, enforceQaCaptureAccess, refreshManualGeometry, laySession]);
 
   // EIN Fix-Handler für Warmup UND Aufnahme.
   const onFix = useCallback((loc: Location.LocationObject) => {
@@ -575,6 +583,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     pointsRef.current = []; continuityPendingRef.current = false; detectorOffsetRef.current = 0;
     emaRef.current = null;
     lineEmaRef.current = null;
+    laySession.qaPipelineRef.current.reset(Date.now());
     canonDistRef.current.reset();
     puckRef.current = null;
     lastRawRef.current = null;
@@ -613,6 +622,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     recordingEvidenceRef.current = qaRef.current
       ? startQaRecordingEvidence(input.localId, 'lay', false, streamModesRef.current)
       : null;
+    recordingEvidenceRef.current?.note(autoDetectRef.current ? 'automaticAnglesEnabled' : 'automaticAnglesDisabled');
     recordingEvidenceRef.current?.appState(AppState.currentState);
     const diagnosticsReady = beginBackgroundLayDiagnostics(input.localId).catch(() => {});
     diagnosticsReadyRef.current = diagnosticsReady;
@@ -754,16 +764,19 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     await localSessionCreationRef.current;
 
     return { error: null };
-  }, [startWarmup, store, flushPoints, processFixWithQaAccess, processor, completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
+  }, [laySession.qaPipelineRef, startWarmup, store, flushPoints, processFixWithQaAccess, processor, completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
 
-  const pause  = useCallback(() => { recordingEvidenceRef.current?.note('userPaused'); processor.interruptContinuity(); store.getState().pauseRecording(); }, [store, processor]);
-  const resume = useCallback(() => { recordingEvidenceRef.current?.note('userResumed'); processor.interruptContinuity(); store.getState().resumeRecording(); }, [store, processor]);
+  const pause  = useCallback((origin: 'longPress' | 'accessibility' | 'unknown' = 'unknown') => { recordingEvidenceRef.current?.note(origin === 'longPress' ? 'pauseLongPress' : origin === 'accessibility' ? 'pauseAccessibility' : 'pauseUnknown'); recordingEvidenceRef.current?.note('userPaused'); processor.interruptContinuity(); store.getState().pauseRecording(); }, [store, processor]);
+  const resume = useCallback((origin: 'longPress' | 'accessibility' | 'button' | 'unknown' = 'unknown') => { recordingEvidenceRef.current?.note(origin === 'button' ? 'resumeButton' : origin === 'longPress' ? 'resumeLongPress' : origin === 'accessibility' ? 'resumeAccessibility' : 'resumeUnknown'); recordingEvidenceRef.current?.note('userResumed'); processor.interruptContinuity(); store.getState().resumeRecording(); }, [store, processor]);
 
   const addMarker = useCallback(async (
     type: MarkerType,
     markerOpts?: SpecialGeometry & { note?: string; audioUrl?: string; material?: MarkerMaterial; angleKind?: AngleKind },
   ) => {
     const s = store.getState();
+    // A paused recorder still receives position fixes; its distance is frozen.
+    // Guard at the recorder boundary as hardware shortcuts also call this API.
+    if (s.isPaused) { recordingEvidenceRef.current?.note('markerRejectedPaused'); return; }
     const now = Date.now();
     const pos = s.currentPosition;
     // ── QA: manuell gesetzte Winkel bekommen eine EIGENE, klar abgegrenzte
@@ -928,6 +941,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           markers: qaMarkerMetaRef.current.slice(),
           autoDiagnostics,
           reconstructionScope: 'current_detector_section' as const,
+          pipelineDiagnostics: laySession.qaPipelineRef.current.snapshot(),
           ...qaMotionCaptureRef.current.snapshot(),
           turnFusion: associatedTurns.map(t => ({ ...toQaTurnFusion(t, originMs), apexIndex: detectorIndexOffset + t.apexIndex })),
           imuOnlyEvents: sweep.imuOnly.map(e => toQaImuOnlyEvent(e, originMs)),
@@ -1011,7 +1025,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })().finally(() => { finalizationRef.current = null; });
-  }, [stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaMotionCaptureRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
+  }, [laySession.qaPipelineRef,stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaMotionCaptureRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
 
   return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug, warmupReady };
 }

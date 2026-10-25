@@ -1,3 +1,4 @@
+import { HeatForecast } from './heat/HeatForecast';
 import { heatUxCopy } from '@/features/dogs/heatUxCopy';
 import { recordedActiveCycle } from '@/features/dogs/heatJournal';
 import { toISODate } from '@/features/dogs/dateInput';
@@ -32,7 +33,7 @@ export function DogHeatCard({
   const { t, locale } = useT();
   const copy = heatUxCopy(locale);
   const recorded = recordedActiveCycle(cycles, toISODate(new Date()));
-  if (onOpenOverview) return <TouchableOpacity accessibilityRole="button" accessibilityLabel={copy.title} style={s.emptyCard} onPress={onOpenOverview}><Ionicons name="heart-outline" size={24} color={C.trackPrimary} /><View style={s.emptyBody}><Text style={s.emptyTitleA}>{copy.title}</Text><Text style={s.emptyDescA}>{recorded ? `${copy.day} ${heatCycleDay(recorded.startDate)} · ${copy.recorded}` : cycles.length ? copy.inactive : copy.empty}</Text><Text style={s.emptyCta}>{copy.overview} · {copy.history}</Text></View><Ionicons name="chevron-forward" size={20} color={C.trackPrimary} /></TouchableOpacity>;
+  if (onOpenOverview) return <TouchableOpacity accessibilityRole="button" accessibilityLabel={copy.title} style={s.emptyCard} onPress={onOpenOverview}><Ionicons name="heart-outline" size={24} color={C.trackPrimary} /><View style={s.emptyBody}><Text style={s.emptyTitleA}>{copy.title}</Text><Text style={s.emptyDescA}>{recorded ? `${copy.day} ${heatCycleDay(recorded.startDate)} · ${copy.recorded}` : cycles.length ? copy.inactive : copy.empty}</Text><HeatForecast cycles={cycles} compact /><Text style={s.emptyCta}>{copy.overview} · {copy.history}</Text></View><Ionicons name="chevron-forward" size={20} color={C.trackPrimary} /></TouchableOpacity>;
   if (cycles.length === 0) {
     return (
       <TouchableOpacity

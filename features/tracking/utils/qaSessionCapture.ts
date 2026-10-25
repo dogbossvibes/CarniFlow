@@ -1,3 +1,4 @@
+import type { PipelineDiagnostics } from './qaPipelineDiagnostics';
 import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 // QA-Mitschnitt einer gelegten Fährte — ausschliesslich für Feldtest-Analysen.
 //
@@ -274,6 +275,7 @@ export interface QaSessionCapture {
   /** FINISH RECONSTRUCTED — Neuberechnung beim Stop, OHNE Motion. */
   autoDiagnostics: QaAutoDiagnostic[];
   /** Finish reconstruction covers only this section, unlike retained live Motion rows. */
+  pipelineDiagnostics?: PipelineDiagnostics;
   reconstructionScope?: 'current_detector_section';
   /** LIVE RECORDED + DERIVED — QA v2.1. Fehlt bei captureVersion 1. */
   candidateMotionEvidence?: QaCandidateMotion[];

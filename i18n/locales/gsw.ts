@@ -5,6 +5,10 @@ import { gswCH } from '../gsw-CH';
 // Fehlende Keys fallen automatisch auf `de` zurück (fallbackLng). Ergänzt um die
 // Plural-Referenzkeys im gsw-Stil.
 export const gsw = {
+  "track.pauseMarkerHint": "Ufnahm pausiert. Bitte zerscht wiitermache.",
+  "track.pauseVisibleTitle": "Ufnahm pausiert",
+  "track.pauseVisibleHint": "D Fährte wird grad nöd ufzeichnet. Gägeständ und Winkel sind gsperrt.",
+
   "trainingTemplate.resume": "Entwurf wiitermache",
   "trainingTemplate.resumeHelp": "Für die Vorlag gits scho en Entwurf. Mach det wiiter; dini Iigabe bliibed erhalte.",
 

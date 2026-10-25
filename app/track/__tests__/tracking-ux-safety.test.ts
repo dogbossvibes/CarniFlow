@@ -56,7 +56,7 @@ describe('tracking UX safety contract', () => {
   it('does not pause or finalize from a normal pocket touch', () => {
     expect(legen).toContain('onStop={finishTrack}');
     expect(legen).toContain("disabled={phase !== 'recording'}");
-    expect(legen).toContain('onPress={() => undefined} onLongPress={togglePause} onAccessibilityTap={togglePause} delayLongPress={1800}');
+    expect(legen).toContain("onPress={() => undefined} onLongPress={() => togglePause('longPress')} onAccessibilityTap={() => togglePause('accessibility')} delayLongPress={1800}");
     expect(run).toContain('onStop={handleFinish}');
     expect(run).toContain('disabled={finishing || arming}');
     expect(legen).not.toContain('requestStop');
@@ -73,8 +73,8 @@ describe('tracking UX safety contract', () => {
     expect(run).not.toContain('allowExitAfterConfirmedStopRef');
     expect(legen).not.toContain('navigation.dispatch(data.action)');
     expect(run).not.toContain('navigation.dispatch(data.action)');
-    expect(legen).toContain('rec.pause()');
-    expect(legen).toContain('rec.resume()');
+    expect(legen).toContain("rec.pause(origin === 'button' ? 'unknown' : origin)");
+    expect(legen).toContain('rec.resume(origin)');
     expect(run).toContain('s.stop()');
     expect(run).toContain('setSessionStatus(\'completed\')');
     expect(legen).toContain('onUnlock={unlockPocket}');

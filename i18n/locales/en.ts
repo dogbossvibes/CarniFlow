@@ -2,6 +2,10 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "track.pauseMarkerHint": "Recording paused. Resume first.",
+  "track.pauseVisibleTitle": "Recording paused",
+  "track.pauseVisibleHint": "Your track is not being recorded. Objects and turns are disabled.",
+
   "trainingTemplate.resume": "Continue draft",
   "trainingTemplate.resumeHelp": "A draft for this template already exists. Continue it to keep your entries.",
 
