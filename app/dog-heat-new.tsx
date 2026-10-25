@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useSession } from '@/lib/session-context';
+import { heatUxCopy } from '@/features/dogs/heatUxCopy';
+import { HeatDogGate } from '@/components/dogs/heat/HeatDogGate';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,13 +15,20 @@ import { addHeatCycle } from '@/features/dogs/heatCycles';
 import { useT } from '@/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
 
-const PINK = '#F472B6';
 
 // Neue Läufigkeit starten. Nach dem Speichern → Direkt in die Detailansicht.
 export default function DogHeatNew() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <HeatDogGate dogId={id}>{dog => <DogHeatNewContent resolvedDog={dog} />}</HeatDogGate>;
+}
+
+function DogHeatNewContent({ resolvedDog }: { resolvedDog: import('@/types').Dog }) {
   const router = useRouter();
   const { isPro, loading: capLoading } = useCapabilities();
-  const { id: dogId } = useLocalSearchParams<{ id: string }>();
+  const { id: dogId, historical } = useLocalSearchParams<{ id: string; historical?: string }>();
+  const { user } = useSession();
+  const isOwner = !!user?.id && resolvedDog.owner_id === user.id;
+  const copy = heatUxCopy(useT().locale);
   const { t } = useT();
   const insets = useSafeAreaInsets();
 
@@ -27,38 +37,48 @@ export default function DogHeatNew() {
   }, [capLoading, isPro, router]);
 
   const [start, setStart] = useState<Date | null>(new Date());
+  const [end, setEnd] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const writeLock = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
   const save = async () => {
-    if (!dogId || saving || !start) return;
+    if (!dogId || writeLock.current || !start || !isOwner || !isPro || capLoading || (historical === '1' && !end)) return;
+    if (end && toISODate(end) < toISODate(start)) { Alert.alert(t('common.error'), copy.endDate); return; }
+    writeLock.current = true;
     setSaving(true);
     try {
       const { data, error } = await addHeatCycle(dogId, {
         startDate: toISODate(start),
-        endDate: null,
-        status: 'active',
+        endDate: end ? toISODate(end) : null,
+        status: end ? 'completed' : 'active',
         notes: notes.trim() || null,
         phase: null,
       });
+      if (!mounted.current) return;
       if (error) { haptic.error(); Alert.alert(t('common.error'), t('dog.heatSaveFailedTable')); return; }
       haptic.success();
       // Navigate to the detail screen of the newly created cycle.
       const newId = data?.id;
       if (newId) {
-        router.replace(`/dog-heat/${newId}` as never);
+        router.replace(`/dog-heat-overview/${dogId}` as never);
       } else {
         router.back();
       }
     } catch {
+      if (!mounted.current) return;
       haptic.error();
       Alert.alert(t('common.error'), t('calendar.saveFailed'));
     } finally {
-      setSaving(false);
+      writeLock.current = false;
+      if (mounted.current) setSaving(false);
     }
   };
 
   if (!capLoading && !isPro) return null;
+  if (!isOwner) return <View style={s.root}><Text style={s.hint}>{copy.readonly}</Text><AnyvoButton label={copy.back} onPress={() => router.back()} /></View>;
 
   return (
     <View style={s.root}>
@@ -67,7 +87,7 @@ export default function DogHeatNew() {
           <TouchableOpacity style={s.iconBtn} onPress={() => router.back()} hitSlop={8}>
             <Ionicons name="chevron-back" size={20} color={C.trackText} />
           </TouchableOpacity>
-          <Text style={s.barTitle}>{t('heat.startNew')}</Text>
+          <Text style={s.barTitle}>{historical === '1' ? copy.earlier : copy.start}</Text>
           <View style={{ width: 38 }} />
         </View>
 
@@ -82,6 +102,7 @@ export default function DogHeatNew() {
 
             <Text style={s.label}>{t('dog.heatStart')}</Text>
             <DateField value={start} onChange={setStart} maximumDate={new Date()} />
+            {historical === '1' && <DateField label={copy.endDate} value={end} onChange={setEnd} minimumDate={start ?? undefined} maximumDate={new Date()} />}
 
             <Text style={s.label}>{t('dog.observationsOptional')}</Text>
             <TextInput
@@ -92,7 +113,7 @@ export default function DogHeatNew() {
             />
 
             <View style={{ height: 16 }} />
-            <AnyvoButton label={t('heat.startCycle')} icon="checkmark" onPress={save} loading={saving} />
+            <AnyvoButton label={historical === '1' ? t('common.save') : copy.start} icon="checkmark" onPress={save} loading={saving} />
             <Text style={s.disclaimer}>{t('dog.heatDisclaimer')}</Text>
           </ScrollView>
         </KeyboardAvoidingView>
