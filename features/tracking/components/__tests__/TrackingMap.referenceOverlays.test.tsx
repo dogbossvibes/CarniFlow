@@ -165,3 +165,18 @@ it('renders a dark custom RGB reference with a contrasting halo and unchanged pa
   const foreground = lines.find(p => p.strokeColor === '#000000E0');
   expect(foreground?.coordinates).toEqual(custom.points.map(p => ({ latitude: p.lat, longitude: p.lng })));
 });
+
+
+it('keeps the planned route separate from measured traces, markers and camera inputs', () => {
+ const baseline = renderMap();
+ const measured = polys(baseline);
+ const markerCount = markers(baseline).length;
+ const camera = mockCamera.mock.calls.at(-1)?.[0];
+ const plannedPoints = [{latitude: 48, longitude: 9}, {latitude: 48.001, longitude: 9.002}];
+ const node = renderMap({plannedPoints});
+ const lines = polys(node);
+ expect(lines.filter(p => p.strokeColor !== '#FFD166')).toEqual(measured);
+ expect(lines.find(p => p.strokeColor === '#FFD166')).toMatchObject({coordinates: plannedPoints, lineDashPattern: [8,6]});
+ expect(markers(node)).toHaveLength(markerCount);
+ expect(mockCamera.mock.calls.at(-1)?.[0]).toEqual(camera);
+});

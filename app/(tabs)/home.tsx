@@ -346,7 +346,7 @@ export default function HomeScreen() {
         <OfflineBanner />
 
         {/* ── LÄUFIGKEIT IM BLICK (kontextueller Hinweis, immer sichtbar) ── */}
-        <HomeHeatCard onOpen={(dogId) => router.push(`/dog/${dogId}` as never)} />
+        <HomeHeatCard onOpen={(dogId) => router.push(`/dog-heat-overview/${dogId}` as never)} />
 
         {/* ── KONFIGURIERBARE WIDGETS (Reihenfolge/Sichtbarkeit aus der Config) ── */}
         {visibleWidgets(config).map(renderWidget)}

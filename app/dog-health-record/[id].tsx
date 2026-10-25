@@ -32,7 +32,7 @@ import { weightChange, weightMeasurements } from '@/features/dogs/health';
 // (dog_heat_cycles/-phases/-observations, DOG_HEAT_CYCLES.sql) — kein
 // zweites Datenmodell. Detail-/Edit-/Phasen-/Beobachtungs-Verwaltung bleibt
 // vollständig in app/dog-heat/[id].tsx.
-import { getHeatCycleDetails, deleteHeatCycle, isActiveCycle, predictHeat, getHeatHistoryStats, type HeatCycle, type HeatPhase, type HeatObservation } from '@/features/dogs/heatCycles';
+import { getHeatCycleDetails, deleteHeatCycle, predictHeat, getHeatHistoryStats, type HeatCycle, type HeatPhase, type HeatObservation } from '@/features/dogs/heatCycles';
 import type { Dog } from '@/types';
 
 type Tab = 'overview' | 'timeline' | 'documents';
@@ -210,10 +210,8 @@ export default function DogHealthRecordRoute() {
   // gleichzeitigen Zyklus über die bestehende /dog-heat-new-Route
   // anzulegen — reuse, keine neue Läufigkeits-Erfassungslogik.
   const openHeatQuickAction = () => {
-    if (!isOwner) { showToast(healthT("health.uxOwnerEditOnly")); return; }
-    const active = heatCycles.find(isActiveCycle);
-    if (active) { openHeatCycle(active); return; }
-    router.push({ pathname: '/dog-heat-new', params: { id: dogId } } as never);
+    if (!isFemale || !dogId) return;
+    router.push(`/dog-heat-overview/${dogId}` as never);
   };
   // Long-Press-Standard (29.09.2026, dieselbe Copy/dieselbe deleteHeatCycle-
   // Logik wie app/dog-heat-calendar/[id].tsx und app/dog-heat/[id].tsx —
@@ -419,7 +417,7 @@ export default function DogHealthRecordRoute() {
           {Object.keys(data.sectionErrors ?? {}).length > 0 || heatFailed ? <View style={s.warning} accessibilityRole="alert"><Ionicons name="warning-outline" size={17} color={C.trackWarning} /><View style={s.flex}><Text style={s.warningText}>{t('health.recordPartialLoad')}</Text><AnyvoButton label={t('health.uxRetry')} variant="secondary" onPress={reload} loading={refreshing} /></View></View> : null}
           {healthHasLimitedData(data) ? <View style={s.warning} accessibilityRole="alert"><Text style={s.warningText}>{t('health.uxLimitedData', { limit: HEALTH_SECTION_LIMIT })}</Text></View> : null}
           {isOwner && reminderNotice?.reference.dogId === dogId ? <AnyvoCard><Text style={s.muted} accessibilityLiveRegion="polite">{t(reminderNotice.status === 'failed' ? 'health.uxReminderFailed' : reminderNotice.status === 'synced' ? 'health.uxCalendarOnly' : 'health.uxReminderNotNeeded')}</Text>{reminderNotice.status === 'failed' ? <AnyvoButton label={t('health.uxReminderRetry')} variant="secondary" onPress={retryReminder} loading={retryingReminder} /> : null}</AnyvoCard> : null}
-          {tab === 'overview' && <Overview dog={dog} status={status} due={due} data={data} measurements={measurements} trend={trend} onAction={openSheet} onTimeline={() => setTab('timeline')} onDetail={openHealthDetail} isOwner={isOwner} lastLoadedAt={lastLoadedAt} isFemale={isFemale} heatCycles={heatCycles} heatPrediction={heatPrediction} onOpenHeat={() => setHeatOpen(true)} onAddHeat={openHeatQuickAction} />}
+          {tab === 'overview' && <Overview dog={dog} status={status} due={due} data={data} measurements={measurements} trend={trend} onAction={openSheet} onTimeline={() => setTab('timeline')} onDetail={openHealthDetail} isOwner={isOwner} lastLoadedAt={lastLoadedAt} isFemale={isFemale} heatCycles={heatCycles} heatPrediction={heatPrediction} onOpenHeat={() => router.push(`/dog-heat-overview/${dogId}` as never)} onAddHeat={openHeatQuickAction} />}
           {tab === 'timeline' && <Timeline items={filteredTimeline} filter={filter} onFilter={setFilter} onDetail={openHealthDetail} onDelete={deleteItem} isOwner={isOwner} isFemale={isFemale} />}
           {tab === 'documents' && <DogDocumentsCard documents={documents} onAdd={isOwner ? () => router.push({ pathname: '/dog-document/[id]', params: { id: dogId, category: 'health' } } as never) : undefined} onOpen={openDocument} onDelete={isOwner ? deleteDocument : undefined} />}
         </ScrollView>

@@ -1,3 +1,5 @@
+import { useLayPlan } from '@/features/tracking-planner/useLayPlan';
+import { LayPlanControl } from '@/features/tracking-planner/LayPlanControl';
 import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { SpecialAnglePicker } from '@/features/tracking/components/SpecialAnglePicker';
 import { countLaidCorners, projectAngleMarkers, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
@@ -297,6 +299,7 @@ export default function LegenScreen() {
   }, [phase, volumeKeyArticle, quickAddArticle]);
 
   const activeDog = dogs.find(d => d.id === selectedDogId) ?? dogs[0] ?? null;
+  const layPlan = useLayPlan(activeDog?.id ?? null);
   const conflictShownRef = useRef(false);
   const quickPickerLayout = getTrackQuickPickerLayout({
     windowHeight,
@@ -742,6 +745,7 @@ export default function LegenScreen() {
         {/* QA-Diagnose: tatsächlich aktive Engine/Source. Rendert ausserhalb des
             QA-Modus nichts — auch keinen Abstand. */}
         <QaModeBadge />
+        {view === 'map' && <LayPlanControl plan={layPlan} locked={pocketLock} />}
 
         {/* Karte / Skizze */}
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
@@ -762,6 +766,7 @@ export default function LegenScreen() {
               showMapScale
               mapScaleBottom={mapOverlayLayout.scaleBottom}
               onMapScaleHeightChange={setMapScaleHeight}
+              plannedPoints={layPlan.selected?.plan.points}
               layPoints={trackPoints}
               distanceScaleLine={distanceScaleLine}
               referenceOverlays={showReferenceTracks ? referenceOverlays : NO_REFERENCE_OVERLAYS}
