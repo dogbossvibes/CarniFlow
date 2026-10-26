@@ -17,7 +17,7 @@ export const TrackComparisonLines = memo(function TrackComparisonLines({ Polylin
   const snapshot = useMemo(() => {
     const lay = buildTrackSegmentPolylines(layPoints.map(p => ({ ...p, t: 0 })), segments).map(part => ({
       coordinates: part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng })),
-      color: part.kind === 'normal' ? layColor : part.color, width: part.kind === 'normal' ? 9 : 11,
+      color: part.kind === 'normal' ? layColor : part.color, width: part.kind === 'normal' ? 6 : 8,
     }));
     const run = splitContinuousPoints(runPoints).map(part => removeGpsJitter(part))
       .filter(part => part.length > 1).map(part => part.map(p => ({ latitude: p.lat, longitude: p.lng })));
@@ -28,12 +28,12 @@ export const TrackComparisonLines = memo(function TrackComparisonLines({ Polylin
   }, [layPoints, runPoints, segments, layColor]);
   return <Fragment key={snapshot.key}>
     {snapshot.lay.map((part, i) => <Polyline key={`lay-outline-${i}`} coordinates={part.coordinates}
-      strokeColor={OUTLINE} strokeWidth={part.width + 3} zIndex={10} lineCap="round" lineJoin="round" />)}
+      strokeColor={OUTLINE} strokeWidth={part.width + 2} zIndex={10} lineCap="round" lineJoin="round" />)}
     {snapshot.lay.map((part, i) => <Polyline key={`lay-${i}`} testID="track-comparison-lay" coordinates={part.coordinates}
       strokeColor={part.color} strokeWidth={part.width} zIndex={11} lineCap="round" lineJoin="round" />)}
     {snapshot.run.map((part, i) => <Polyline key={`run-outline-${i}`} coordinates={part}
-      strokeColor={SEPARATOR} strokeWidth={6} zIndex={12} lineCap="round" lineJoin="round" />)}
+      strokeColor={SEPARATOR} strokeWidth={4} zIndex={12} lineCap="round" lineJoin="round" />)}
     {snapshot.run.map((part, i) => <Polyline key={`run-${i}`} testID="track-comparison-run" coordinates={part}
-      strokeColor={C.trackBlue} strokeWidth={3} lineDashPattern={DASH} zIndex={13} lineCap="round" lineJoin="round" />)}
+      strokeColor={C.trackBlue} strokeWidth={2} lineDashPattern={DASH} zIndex={13} lineCap="round" lineJoin="round" />)}
   </Fragment>;
 });
