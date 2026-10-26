@@ -234,8 +234,7 @@ export default function TrackRunScreen() {
   const [pendingExit, setPendingExit] = useState<string | null>(null);
   const [pocketLock, setPocketLock] = useState(false);
   const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
-  const [mapScaleHeight, setMapScaleHeight] = useState(44);
-  const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, mapScaleHeight, view === 'map');
+  const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, 0, false);
   const [arming, setArming] = useState(false);   // true = Navigation zum Fährtenansatz (Suchzeit läuft NICHT)
   // Persistierter Startanker (Fallback, wenn der Runtime-Store nach App-Neustart leer ist).
   const [anchorFallback, setAnchorFallback] = useState<{ lat: number; lng: number } | null>(null);
@@ -1255,11 +1254,7 @@ export default function TrackRunScreen() {
             <TrackingMap
               distractionTracks={distractionTracks}
                   layColor={layColor}
-              showMapScale
-              mapScaleBottom={mapOverlayLayout.scaleBottom}
-              onMapScaleHeightChange={setMapScaleHeight}
               layPoints={snapData.laidLatLng} dimLay
-              distanceScaleLine={snapData.laidPoints}
               runPoints={runPoints} markers={mapMarkers} segments={snapData.segments} breaks={breakPts}
               currentPosition={arming ? approach.position : curPos}
               smartFollow={!arming}

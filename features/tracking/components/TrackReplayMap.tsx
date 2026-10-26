@@ -93,7 +93,7 @@ export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, 
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <MapView
+      <MapView showsScale={false}
         ref={mapRef}
         provider={RNMaps.PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFill}

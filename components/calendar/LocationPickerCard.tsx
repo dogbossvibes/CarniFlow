@@ -52,7 +52,7 @@ export function LocationPickerCard({ value, onChange }: { value: string; onChang
         <View style={s.mapCard}>
           {MAPS_AVAILABLE && RNMaps ? (
             <SoftBoundary fallback={<View style={s.mapFallback}><Ionicons name="location" size={20} color={ACCENT} /></View>}>
-              <RNMaps.default
+              <RNMaps.default showsScale={false}
                 provider={RNMaps.PROVIDER_DEFAULT}
                 style={StyleSheet.absoluteFill}
                 pointerEvents="none"

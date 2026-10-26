@@ -15,7 +15,7 @@ const render=(p=props)=>act(()=>{view=TestRenderer.create(<TrackComparisonLines 
 it('keeps both paths distinguishable even with exactly overlapping geometry and blue dog color',()=>{
  render();const lay=tagged('track-comparison-lay')[0],run=tagged('track-comparison-run')[0];
  expect(lay.coordinates).toEqual(run.coordinates);expect(lay.strokeWidth).toBeGreaterThan(run.strokeWidth!+2);
- expect(lay.lineDashPattern).toBeUndefined();expect(run.lineDashPattern).toEqual([8,5]);
+ expect(lay.lineDashPattern).toBeUndefined();expect(run.lineDashPattern).toBeUndefined();
  const runOutline=polys().find(p=>p.zIndex===12)!;
  expect(runOutline.strokeColor).not.toBe(lay.strokeColor);expect(runOutline.strokeWidth).toBeLessThan(lay.strokeWidth!);
  expect(runOutline.strokeWidth).toBeGreaterThan(run.strokeWidth!);

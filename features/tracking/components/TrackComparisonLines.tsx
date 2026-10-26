@@ -6,7 +6,6 @@ import { removeGpsJitter, type LatLng } from '../utils/gpsFilter';
 import { splitContinuousPoints } from '../utils/trackContinuity';
 import { buildTrackSegmentPolylines, type TrackSegment } from '../utils/trackSegments';
 
-const DASH = [8, 5];
 const OUTLINE = '#F5F7FA';
 const SEPARATOR = '#101820';
 
@@ -34,6 +33,6 @@ export const TrackComparisonLines = memo(function TrackComparisonLines({ Polylin
     {snapshot.run.map((part, i) => <Polyline key={`run-outline-${i}`} coordinates={part}
       strokeColor={SEPARATOR} strokeWidth={4} zIndex={12} lineCap="round" lineJoin="round" />)}
     {snapshot.run.map((part, i) => <Polyline key={`run-${i}`} testID="track-comparison-run" coordinates={part}
-      strokeColor={C.trackBlue} strokeWidth={2} lineDashPattern={DASH} zIndex={13} lineCap="round" lineJoin="round" />)}
+      strokeColor={C.trackBlue} strokeWidth={2} zIndex={13} lineCap="round" lineJoin="round" />)}
   </Fragment>;
 });

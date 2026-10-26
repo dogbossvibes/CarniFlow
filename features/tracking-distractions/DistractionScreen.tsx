@@ -117,8 +117,8 @@ function DistractionContent({ parentId, data }: { parentId: string; data: Return
     <Button label={t('changeMain')} disabled={busy || recording} onPress={() => { recorder.current?.pause(); router.push('/track/verleitungen' as never); }} />
    </View>}
    {!!(error || data.error) && <Text accessibilityRole="alert" style={styles.error}>{t(distractionErrorKey(error || data.error))}</Text>}
-   {parent && <><View style={styles.map}><TrackingMap layColor={layColor} layPoints={mainPoints} markers={parent.map.markers} startAnchor={parent.map.start} endPoint={parent.map.end} distanceScaleLine={mainPoints.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) }))} fitToTrackToken={fitToken} distractionTracks={data.rows.filter(row => row.track.finishedAtMs !== null && !hidden[row.track.id]).map(row => row.track)}
-    distractionDraft={current?.track.finishedAtMs === null && !hidden[current.track.id] ? current.track : undefined} currentPosition={current?.track.points.at(-1) ?? null} follow={false} showMapScale
+   {parent && <><View style={styles.map}><TrackingMap layColor={layColor} layPoints={mainPoints} markers={parent.map.markers} startAnchor={parent.map.start} endPoint={parent.map.end} fitToTrackToken={fitToken} distractionTracks={data.rows.filter(row => row.track.finishedAtMs !== null && !hidden[row.track.id]).map(row => row.track)}
+    distractionDraft={current?.track.finishedAtMs === null && !hidden[current.track.id] ? current.track : undefined} currentPosition={current?.track.points.at(-1) ?? null} follow={false}
     fitToPoints={[...mainPoints, ...(current?.track.points ?? [])]} /></View>
    <View style={styles.row}><Text style={[styles.body, { color: layColor }]}>━ {t('mainTrack')}</Text><Text style={[styles.body, { color: C.trackPurple }]}>┄ {t('distractionLine')}</Text></View>
    <Button label={t('showAll')} onPress={() => setFitToken(n => n + 1)} /></>}

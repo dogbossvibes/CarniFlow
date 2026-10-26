@@ -443,7 +443,7 @@ export default function TrackAuswertungScreen() {
             </View>
             <View style={s.legend}>
               <Legend color={layColor} label={t('track.replay.legendReference')} />
-              <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} dashed />
+              <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} />
             </View>
           </View>
 
@@ -971,7 +971,7 @@ export default function TrackAuswertungScreen() {
           </View>
           <View style={s.fullscreenLegend}>
             <Legend color={layColor} label={t('track.replay.legendReference')} />
-            <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} dashed />
+            <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} />
           </View>
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
@@ -1009,13 +1009,11 @@ function Tag({ children }: { children: React.ReactNode }) {
   return <View style={s.tag}><Text style={s.tagTxt}>{children}</Text></View>;
 }
 
-function Legend({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
-  return (
-    <View style={s.legendItem}>
-      <View style={[s.legendLine, !dashed && { backgroundColor: '#F5F7FA', padding: 1, borderRadius: 3 }]}>{(dashed ? [0, 1, 2] : [0]).map(i => <View key={i} style={{ backgroundColor: color, height: dashed ? 3 : 6, flex: 1, borderRadius: 2 }} />)}</View>
-      <Text style={s.legendTxt}>{label}</Text>
-    </View>
-  );
+function Legend({ color, label }: { color: string; label: string }) {
+  return <View style={s.legendItem}>
+    <View style={[s.legendLine, { backgroundColor: color, height: 4, borderRadius: 2 }]} />
+    <Text style={s.legendTxt}>{label}</Text>
+  </View>;
 }
 
 const s = StyleSheet.create({
