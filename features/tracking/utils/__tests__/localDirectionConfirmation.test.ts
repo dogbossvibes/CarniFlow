@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { createLocalDirectionState, confirmLocalDirections } from '../localDirectionConfirmation';
-import { fuseTurns, appendLocalDirectionTurns } from '../turnFusion';
+import { fuseTurns, appendLocalDirectionTurns, probeLocalDirectionTurns } from '../turnFusion';
 import type { ShortLegPoint } from '../shortLegCornerDetection';
 function field(build: number): ShortLegPoint[] {
   const q = JSON.parse(fs.readFileSync(`features/tracking/utils/__tests__/fixtures/field-20261026-build${build}.json`, 'utf8'));
@@ -85,3 +85,22 @@ it('does not report Motion matching the extra GPS corner as IMU-only', () => {
   base.imuOnly = [matching, unmatched];
   expect(appendLocalDirectionTurns(points, base, state).imuOnly).toEqual([unmatched]);
 });
+
+it('bounded probing retains global apex indices after a long approach', () => {
+  const short = field(55), a = short[0], b = short[1];
+  const dy = (b.lat - a.lat) * 111320, dx = (b.lng - a.lng) * 111320 * Math.cos(47 * Math.PI / 180);
+  const length = Math.hypot(dx, dy), approach = 200;
+  const prefix: ShortLegPoint[] = Array.from({ length: approach }, (_, i) => ({
+    lat: a.lat - dy / length * (approach - i) / 111320,
+    lng: a.lng - dx / length * (approach - i) / (111320 * Math.cos(47 * Math.PI / 180)),
+    t: a.t! + i * 1000, cumDist: i, accuracy: a.accuracy,
+  }));
+  const points = [...prefix, ...short.map(p => ({ ...p, t: p.t! + approach * 1000, cumDist: p.cumDist + approach }))];
+  const state = createLocalDirectionState(), found: number[] = [];
+  for (let n = 3; n <= points.length; n++) {
+    const result = probeLocalDirectionTurns(points.slice(0, n), state);
+    for (const turn of result?.turns ?? []) if (turn.flags.includes('local_direction_confirmed')) found.push(turn.apexIndex);
+  }
+  expect(found).toEqual([approach + 18]);
+  expect(state.confirmed.get(approach + 18)?.classification).toBe('spitz_links');
+}, 120000);

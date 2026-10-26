@@ -711,3 +711,32 @@ export function appendLocalDirectionTurns(
     && Math.abs(t.t - e.t) <= IMU_ONLY_MATCH_S * 1000));
   return result;
 }
+
+/** Bounded extra work between ordinary line fixes. Only fresh detector support
+ * is inspected, using three existing maximum leg windows of context. A new
+ * proposal must still pass the full primary-conflict check before persistence. */
+export function probeLocalDirectionTurns(
+  points: readonly ShortLegPoint[], state: LocalDirectionState,
+  opts: Omit<FuseOptions, 'localDirectionState'> = {}, minimumAtM = -Infinity,
+): FusionResult | null {
+  const now = points.at(-1);
+  if (!now || now === state.lastPoint) return null;
+  const contextM = 3 * SCALES_M[SCALES_M.length - 1];
+  let offset = points.length - 1;
+  while (offset > 0 && now.cumDist - points[offset - 1].cumDist <= contextM) offset--;
+  const local = fuseTurns(points.slice(offset), opts);
+  const diagnostics = local.diagnostics.map(d => ({ ...d, apexIndex: d.apexIndex + offset }));
+  const corners = local.corners.map(c => ({ ...c, apexIndex: c.apexIndex + offset }));
+  const previous = new Set(state.confirmed.keys());
+  confirmLocalDirections(state, points, diagnostics, corners, opts.turnEvidenceAt);
+  const fresh = [...state.confirmed.keys()].filter(i => !previous.has(i));
+  for (const i of fresh) if (points[i].cumDist - minimumAtM < CORNER_GAP_M) state.confirmed.delete(i);
+  if (!fresh.some(i => state.confirmed.has(i))) return null;
+  const full = fuseTurns(points, opts);
+  for (const c of full.corners) state.primarySeen.set(c.apexIndex, c.atM);
+  // A provisional local candidate must not survive a conflicting global
+  // primary result and reappear later when that primary window changes.
+  for (const i of fresh) if (full.corners.some(c => Math.abs(c.atM - points[i].cumDist) < CORNER_GAP_M)) state.confirmed.delete(i);
+  if (!fresh.some(i => state.confirmed.has(i))) return null;
+  return appendLocalDirectionTurns(points, full, state, opts.turnEvidenceAt);
+}

@@ -15,7 +15,7 @@ import { legacyDetectCorner, type LegacyAcceptedPoint } from '@/features/trackin
 import {
   DETECTOR_INPUT, CORNER_GAP_M, type ShortLegPoint,
 } from '@/features/tracking/utils/shortLegCornerDetection';
-import { fuseTurns, appendLocalDirectionTurns, nearestCompatibleTurnEvidence, type FusedTurn, type FusionResult } from '@/features/tracking/utils/turnFusion';
+import { fuseTurns, appendLocalDirectionTurns, probeLocalDirectionTurns, nearestCompatibleTurnEvidence, type FusedTurn, type FusionResult } from '@/features/tracking/utils/turnFusion';
 import { lineGateStepM, lineEmaAlpha, inTurnZone } from '@/features/tracking/utils/turnAwareLineGate';
 import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDistance';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
@@ -279,21 +279,23 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     return [{ kind: r.kind, atM: r.apex.cumDist, apexIndex: null, source: 'build40' }];
   };
 
+  // Both decision paths use the same cache refresh: a stale weak observation
+  // must never hide stronger current contradictory evidence.
+  const refreshedTurnEvidenceAt = (t: number | null) => {
+    if (t == null) return null;
+    const current = motionBufRef.current.evidenceForTrailing(t);
+    const retained = turnEvidenceRef.current.get(t);
+    if (current.available && (!retained || (current.evidence ?? 0) > (retained.evidence ?? 0)))
+      turnEvidenceRef.current.set(t, current);
+    return turnEvidenceRef.current.get(t) ?? current;
+  };
+
   const persistShortLegCorners = (): LayCornerEvent[] => {
     // Motion-Confidence-Kopplung (±0,12): der Detector bekommt eine reine
     // NACHSCHLAGEFUNKTION für die Turn-Evidenz zum Kandidaten-Zeitpunkt. Läuft
     // kein Motion-Mitschnitt (z. B. ENGINE=BUILD40 oder Modul nicht verfügbar),
     // wird nichts übergeben und die Confidence bleibt exakt wie bisher.
-    const turnEvidenceAt = motionActiveRef.current
-      ? (t: number | null) => {
-        if (t == null) return null;
-        const current = motionBufRef.current.evidenceForTrailing(t);
-        const retained = turnEvidenceRef.current.get(t);
-        if (current.available && (!retained || (current.evidence ?? 0) > (retained.evidence ?? 0)))
-          turnEvidenceRef.current.set(t, current);
-        return turnEvidenceRef.current.get(t) ?? current;
-      }
-      : undefined;
+    const turnEvidenceAt = motionActiveRef.current ? refreshedTurnEvidenceAt : undefined;
     const turnEvidenceForDirection = motionActiveRef.current
       ? (t: number | null, direction: 'links' | 'rechts') => t == null ? null : nearestCompatibleTurnEvidence(t, direction, queryT => {
         if (queryT == null) return null;
@@ -716,12 +718,20 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       // Local confirmation needs fresh detector support even when display
       // geometry is distance-gated. This does not emit/persist baseline corners.
       if (autoDetectRef.current && getTrackingEngineMode() === 'current') {
-        const localResult = fuseTurns(detectPointsRef.current, {
-          localDirectionState: session.localDirectionRef.current,
-          turnEvidenceAt: motionActiveRef.current ? t => t == null ? null
-            : turnEvidenceRef.current.get(t) ?? motionBufRef.current.evidenceForTrailing(t) : undefined,
-        });
-        out.corners = persistCornerResults(localResult, true);
+        const localResult = probeLocalDirectionTurns(detectPointsRef.current, session.localDirectionRef.current, {
+          turnEvidenceAt: motionActiveRef.current ? refreshedTurnEvidenceAt : undefined,
+        }, lastCornerAtRef.current);
+        if (localResult) {
+          if (qaRef.current) {
+            try { session.qaPipelineRef.current.observe(localResult.diagnostics,
+              new Set(localResult.corners.map(c => c.apexIndex)), session.completedDetectorSectionsRef.current.length, Date.now());
+            } catch { /* Diagnostics never control recording. */ }
+            if (motionActiveRef.current) qaMotionCaptureRef.current.observe(localResult.diagnostics, motionBufRef.current,
+              qaOriginRef.current?.t ?? null, new Set(localResult.corners.map(c => c.apexIndex)),
+              session.completedDetectorSectionsRef.current.reduce((sum, section) => sum + section.length, 0));
+          }
+          out.corners = persistCornerResults(localResult, true);
+        }
       }
       void recordBackgroundLayEvent(localSessionId.current, 'onFixRejected', 1, 'distance_gate').catch(() => {});
       return;

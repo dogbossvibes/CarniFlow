@@ -1,3 +1,4 @@
+import * as shortLegDetector from '../../utils/shortLegCornerDetection';
 import * as turnFusion from '../../utils/turnFusion';
 import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, revokeDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
 // Sessiongebundener Lay-Processor: Foreground-Parität mit dem ORIGINALEN
@@ -41,7 +42,7 @@ interface Run {
 }
 
 /** Treibt den Processor wie useTrackRecorder nach beginRecording (Start-Lock scharf). */
-function runScenario(sc: Scenario, startLocked = true): Run {
+function runScenario(sc: Scenario, startLocked = true, beforeFix?: (run: Run, buf: MotionEvidenceBuffer, now: number) => void): Run {
   mockEngine = sc.engine ?? 'current';
   clock = T0;
   const run: Run = { lineFixes: [], session: createLayProcessingState(), results: [], points: [], distanceCalls: [], angles: [], markers: [], buffered: [], flushes: 0, storeLog: [] };
@@ -88,6 +89,7 @@ function runScenario(sc: Scenario, startLocked = true): Run {
       if (sc.qa) resolveDiagnosticsAccess('qa', getDiagnosticsAccessSnapshot().generation, true);
       const before = run.session.lineEmaRef.current;
       const wasTurn = run.session.lineTurnZoneRef.current;
+      beforeFix?.(run, motionBuf, clock);
       run.results.push(processor.processFix({
         coords: { latitude: LAT0 + st.y / M_LAT, longitude: LNG0 + st.x / M_LNG, accuracy: st.acc, altitude: null, speed: st.speed ?? 1, heading: null, altitudeAccuracy: null },
         timestamp: st.t,
@@ -352,7 +354,7 @@ it('commits a normal corner only once when a later evaluation moves its apex wit
   let calls = 0;
   const spy = jest.spyOn(turnFusion, 'fuseTurns').mockImplementation(() => {
     const atM = [10, 11.3, 14][Math.min(calls++, 2)];
-    return { corners: [{ kind: 'rechts', atM, apexIndex: 0 }], diagnostics: [], turns: [] } as unknown as ReturnType<typeof turnFusion.fuseTurns>;
+    return { corners: [{ kind: 'rechts', atM, apexIndex: 0 }], diagnostics: [], turns: [], imuOnly: [] } as unknown as ReturnType<typeof turnFusion.fuseTurns>;
   });
   try {
     const run = runScenario(scenarios.find(s => s.name === 'right90 current')!);
@@ -421,6 +423,10 @@ describe('local direction confirmation in live processor', () => {
     const confirmedAt = run.markers.find(m => m.angleKind === 'spitz_links')!.t;
     const stopped = runScenario({ name: 'stop immediately after SL', steps: steps.filter(s => s.k === 'fix' && s.t <= confirmedAt), qa: true }, false);
     expect(stopped.markers.filter(m => m.angleKind === 'spitz_links')).toHaveLength(1);
+    const apex = [...stopped.session.localDirectionRef.current.confirmed.keys()][0];
+    const decision = stopped.session.qaPipelineRef.current.snapshot().decisions.find(d => d.apexIndex === apex);
+    expect(decision?.acceptedCandidate).toBe(true);
+    expect(decision?.reason).toBeNull();
 
   });
   it('clears pending direction confirmation at a pause', () => {
@@ -430,4 +436,64 @@ describe('local direction confirmation in live processor', () => {
     expect(run.session.localDirectionRef.current.confirmed.size).toBe(0);
     expect(run.markers.some(m => m.angleKind === 'spitz_links')).toBe(false);
   });
+});
+
+
+it('local direction extra sweeps are bounded and stationary prefixes are not re-evaluated', () => {
+  const steps: Scenario['steps'] = [];
+  for (let i = 0; i < 70; i++) steps.push({ k: 'fix', x: 0, y: i, t: T0 + i * 1000, acc: 1 });
+  for (let i = 70; i < 100; i++) steps.push({ k: 'fix', x: 0, y: 69, t: T0 + i * 1000, acc: 1 });
+  const real = turnFusion.fuseTurns;
+  const detect = shortLegDetector.detectShortLegCorners;
+  const work: { time: number; span: number }[] = [];
+  jest.spyOn(shortLegDetector, 'detectShortLegCorners').mockImplementation((points, ...args) => {
+    work.push({ time: clock, span: (points.at(-1)?.cumDist ?? 0) - (points[0]?.cumDist ?? 0) });
+    return detect(points, ...args);
+  });
+  let repeated = 0, previous: unknown = null;
+  const lengths: number[] = [];
+  jest.spyOn(turnFusion, 'fuseTurns').mockImplementation((points, opts) => {
+    if (previous === points.at(-1)) repeated++;
+    previous = points.at(-1); lengths.push(points.length);
+    return real(points, opts);
+  });
+  const run = runScenario({ name: 'stationary prefix budget', steps }, false);
+  expect(repeated).toBe(0);
+  expect(run.markers).toHaveLength(0);
+  expect(run.session.detectPointsRef.current).toHaveLength(70);
+  // Internal bounded probes do not call the public full-route entry point.
+  expect(lengths.length).toBe(run.points.length);
+  for (let i = 0; i < run.results.length; i++) {
+    if (run.results[i].outcome === 'accepted') continue;
+    const step = steps[i];
+    if (step.k !== 'fix') continue;
+    expect(work.filter(w => w.time === step.t).every(w => w.span <= 24)).toBe(true);
+  }
+  // The original line EMA may still flush one ordinary line point at the
+  // first stationary fix. Only extra work on distance-gated stand fixes is new.
+  const stationaryGatedTimes = new Set(run.results.flatMap((r, i) => i >= 70 && r.outcome !== 'accepted'
+    ? [(steps[i] as Extract<Scenario['steps'][number], { k: 'fix' }>).t] : []));
+  expect(work.filter(w => stationaryGatedTimes.has(w.time))).toHaveLength(0);
+});
+
+it('local direction refreshes stronger contradictory Motion before confirming SL', () => {
+  const q = JSON.parse(readFileSync('features/tracking/utils/__tests__/fixtures/field-20261026-build55-raw.json', 'utf8'));
+  const steps: Scenario['steps'] = q.rawFixes.map((p: {x: number; y: number; tMs: number; accuracy: number}) => ({
+    k: 'fix', x: p.x, y: p.y, t: T0 + p.tMs, acc: p.accuracy,
+  }));
+  const reference = runScenario({ name: 'motion veto reference', steps }, false);
+  const confirmedAt = reference.markers.find(m => m.angleKind === 'spitz_links')!.t;
+  const apexTime = [...reference.session.localDirectionRef.current.confirmed.values()][0].t!;
+  const cut = steps.filter(s => s.k === 'fix' && s.t <= confirmedAt);
+  for (const cachedStrength of [0.1, 1]) {
+    const run = runScenario({ name: 'stronger contradictory Motion', steps: cut }, false, (r, buf, now) => {
+      if (now !== confirmedAt) return;
+      const original = buf.evidenceForTrailing.bind(buf);
+      const current = { ...original(apexTime), available: true, evidence: 1, signedNetYawDeg: -90,
+        netYawDeg: 90, grossYawDeg: 90, monotonicity: 1, yawShare: 1 };
+      r.session.turnEvidenceRef.current.set(apexTime, { ...current, evidence: cachedStrength });
+      buf.evidenceForTrailing = (t, ...args) => t === apexTime ? current : original(t, ...args);
+    });
+    expect(run.markers.filter(m => m.angleKind === 'spitz_links')).toHaveLength(0);
+  }
 });
