@@ -2,6 +2,7 @@
 // nach Zoom aus der gemeldeten Region, Lay-/Such-Linie und Multi-Dog-Overlays
 // (inkl. Hundefarben) unverändert; run.tsx misst auf der Search-Referenz.
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { readFileSync } from 'fs';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 
@@ -37,6 +38,7 @@ jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k }) }));
 jest.mock('@/components/ui/Toast', () => ({ useToast: () => ({ showToast: jest.fn(), toast: null }) }));
 
 /* eslint-disable import/first -- Mocks müssen vor den Imports registriert sein */
+import { MarkerDetailSheet } from '@/features/tracking/components/MarkerDetailSheet';
 import { TrackingMap, PinMarker } from '@/features/tracking/components/TrackingMap';
 import { DISTANCE_TICK_STROKE, DISTANCE_TICK_Z, DISTANCE_TICK_HALO } from '@/features/tracking/components/DistanceScaleLayer';
 import { referenceTrackStroke, REFERENCE_TRACK_HALO } from '@/features/tracking/components/TrackReferenceOverlayLayer';
@@ -254,16 +256,16 @@ it('refreshes the native marker snapshot after direction changes, then freezes i
 });
 
 it.each(['bw', 'ow', 'gw', 'abriss'] as const)('actual parent map shows saved direction and preserves unresolved %s labels', angleKind => {
-  const node = renderMap({markers:[{id:'special',type:'winkel',angleKind,lat:47,lng:8,geometryDirection:'links',geometrySharpness:'sharp'}]});
+  const node = renderMap({markers:[{id:'special',type:'winkel',angleKind,lat:LAY[20].lat,lng:8,geometryDirection:'links',geometrySharpness:'sharp'}]});
   const texts = () => node.root.findAll(n => (n as unknown as { type: unknown }).type === 'Text').map(n => n.props.children);
   expect(texts().some(text => typeof text === 'string' && text.split(' · ')[0] === (angleKind === 'abriss' ? 'A L' : `${angleKind.toUpperCase()} SL`))).toBe(true);
-  act(() => { node.update(<TrackingMap currentPosition={null} follow={false} layPoints={LAY} markers={[{id:'special',type:'winkel',angleKind,lat:47,lng:8,geometryDirection:'unresolved'}]}/>); });
+  act(() => { node.update(<TrackingMap currentPosition={null} follow={false} layPoints={LAY} markers={[{id:'special',type:'winkel',angleKind,lat:LAY[20].lat,lng:8,geometryDirection:'unresolved'}]}/>); });
   expect(texts().some(text => typeof text === 'string' && text.split(' · ')[0] === (angleKind === 'abriss' ? '×' : angleKind.toUpperCase()))).toBe(true);
 });
 
 // User-visible overlap regression: field G5 + angle, and final object + end.
 describe('TrackingMap overlapping feature access', () => {
-  it('shows both identities in a combined badge and opens all details without moving coordinates', () => {
+  it('keeps both identities accessible from a compact group and opens all details without moving coordinates', () => {
     const markers = [
       { id: 'g5', type: 'gegenstand', lat: LAY[20].lat, lng: 8, objectIndex: 5, material: 'stoff', distanceFromStart: 20 },
       { id: 'left', type: 'winkel', lat: LAY[20].lat + 0.08 / M_PER_DEG, lng: 8, angleKind: 'links', distanceFromStart: 20.08 },
@@ -317,4 +319,100 @@ it('uses the initial layout when markers arrive after mount and zooms them apart
  // No second layout event: native layout already happened before data arrived.
  act(() => { mapView(n).props.onRegionChangeComplete({ latitude: LAY[20].lat, longitude: 8, latitudeDelta: 0.2 / M_PER_DEG, longitudeDelta: 0.2 / M_PER_DEG }); });
  expect(grouped()).toBe(false);
+});
+
+
+// UI-only iOS49 backport: large L · R · SR +2 badge from the report.
+describe('compact marker groups', () => {
+  it('keeps all five entries, their coordinates and details through zooming and regrouping', () => {
+    const markers = [
+      { id: 'left', type: 'winkel' as const, lat: LAY[10].lat, lng: 8, angleKind: 'links' as const, distanceFromStart: 10 },
+      { id: 'right', type: 'winkel' as const, lat: LAY[11].lat, lng: 8, angleKind: 'rechts' as const, distanceFromStart: 11 },
+      { id: 'sharp-right', type: 'winkel' as const, lat: LAY[12].lat, lng: 8, angleKind: 'spitz_rechts' as const, distanceFromStart: 12 },
+    ];
+    const before = JSON.stringify(markers);
+    const onMarkerPress = jest.fn(), onStartPress = jest.fn(), onEndPress = jest.fn();
+    const n = renderMap({ markers, startAnchor: LAY[9], endPoint: LAY[13], endTotalDistanceM: 99,
+      onMarkerPress, onStartPress, onEndPress, currentPosition: null, follow: false });
+    const nativeMarkers = () => n.root.findAll(node => (node as unknown as { type: unknown }).type === RNMaps!.Marker);
+    const textOf = (node: ReactTestRenderer['root']) => node.findAll(x => (x as unknown as { type: unknown }).type === 'Text').map(x => x.props.children);
+    zoomTo(n, 100);
+    expect(nativeMarkers()).toHaveLength(1);
+    const group = nativeMarkers()[0];
+    expect(group.props.coordinate).toEqual({ latitude: markers[0].lat, longitude: 8 });
+    expect(textOf(group)).toEqual(['5']);
+    expect(group.props.accessibilityRole).toBe('button');
+    expect(group.props.accessibilityLabel).toContain('track.markerGroup.title: 5.');
+    expect(group.props.accessibilityLabel).toContain('track.startFlag');
+    expect(group.props.accessibilityLabel).toContain('track.detailTrackEnd');
+    const frame = group.props.children;
+    const dot = frame.props.children;
+    expect(StyleSheet.flatten(frame.props.style)).toMatchObject({ width: 48, height: 48, backgroundColor: 'transparent' });
+    expect(StyleSheet.flatten(dot.props.style)).toMatchObject({ width: 28, height: 28, borderRadius: 14 });
+    expect(StyleSheet.flatten(dot.props.style).backgroundColor).not.toBe('#EDEDED');
+    act(() => { group.props.onPress(); });
+    expect(n.root.findByType(MarkerDetailSheet).props.selection).toEqual({ kind: 'group', items: [
+      ...markers.map(marker => ({ kind: 'marker', marker })), { kind: 'start' }, { kind: 'end', totalDistanceM: 99 },
+    ] });
+    expect(textOf(n.root)).toContain('99 m');
+    act(() => { n.root.findByType(MarkerDetailSheet).props.onClose(); });
+    zoomTo(n, 3);
+    expect(nativeMarkers()).toHaveLength(5);
+    for (const marker of markers) {
+      const item = nativeMarkers().find(x => x.props.coordinate.latitude === marker.lat)!;
+      act(() => { item.props.onPress(); });
+      expect(onMarkerPress).toHaveBeenLastCalledWith(marker);
+    }
+    expect(nativeMarkers().map(x => x.props.coordinate.latitude).sort()).toEqual([...markers.map(x => x.lat), LAY[9].lat, LAY[13].lat].sort());
+    zoomTo(n, 100);
+    expect(nativeMarkers()).toHaveLength(1);
+    expect(textOf(nativeMarkers()[0])).toEqual(['5']);
+    expect(JSON.stringify(markers)).toBe(before);
+  });
+
+  it('bounds the visible count while retaining all 100 objects and their exact numbers', () => {
+    const markers = Array.from({ length: 100 }, (_, i) => ({ id: `object-${i}`, type: 'gegenstand' as const,
+      lat: 47, lng: 8, objectIndex: i + 1, material: 'holz' as const, distanceFromStart: i }));
+    const before = JSON.stringify(markers);
+    const n = renderMap({ layPoints: [], runPoints: [], markers, currentPosition: null, follow: false });
+    const group = n.root.findByType(RNMaps!.Marker);
+    expect(group.findAll(x => (x as unknown as { type: unknown }).type === 'Text').map(x => x.props.children)).toEqual(['99+']);
+    expect(group.props.accessibilityLabel).toContain('track.markerGroup.title: 100.');
+    expect(group.props.accessibilityLabel).toContain('G100');
+    act(() => { group.props.onPress(); });
+    const items = n.root.findByType(MarkerDetailSheet).props.selection.items;
+    expect(items.map((item: { marker: unknown }) => item.marker)).toEqual(markers);
+    expect(JSON.stringify(markers)).toBe(before);
+  });
+
+  it('refreshes details when group membership changes but its displayed count stays the same', () => {
+    const first = [{ id: 'g1', type: 'gegenstand' as const, lat: 47, lng: 8, objectIndex: 1 },
+      { id: 'left', type: 'winkel' as const, lat: 47, lng: 8, angleKind: 'links' as const }];
+    const next = [{ ...first[0], id: 'g2', objectIndex: 2 },
+      { ...first[1], id: 'right', angleKind: 'rechts' as const }];
+    const n = renderMap({ markers: first, layPoints: [], runPoints: [], currentPosition: null, follow: false });
+    act(() => { n.update(<TrackingMap markers={next} layPoints={[]} currentPosition={null} follow={false} />); });
+    const group = n.root.findByType(RNMaps!.Marker);
+    expect(group.props.accessibilityLabel).toContain('G2');
+    expect(group.props.accessibilityLabel).not.toContain('G1');
+    act(() => { group.props.onPress(); });
+    expect(n.root.findByType(MarkerDetailSheet).props.selection.items.map((item: { marker: unknown }) => item.marker)).toEqual(next);
+  });
+});
+
+
+it('preserves iOS49 Apple Maps and recorded lay/search gaps alongside compact groups', () => {
+  const lay = [{ lat: 47, lng: 8 }, { lat: 47.0001, lng: 8 },
+    { lat: 48, lng: 9, breakBefore: true }, { lat: 48.0001, lng: 9 }];
+  const run = [{ lat: 47, lng: 8.0001 }, { lat: 47.0001, lng: 8.0001 },
+    { lat: 48, lng: 9.0001, breakBefore: true }, { lat: 48.0001, lng: 9.0001 }];
+  const input = JSON.stringify({ lay, run });
+  const n = renderMap({ layPoints: lay, runPoints: run, currentPosition: null, follow: false,
+    markers: [{ id: 'object', type: 'gegenstand', objectIndex: 1, lat: 47, lng: 8 }] });
+  expect(mapView(n).props.provider).toBe(RNMaps!.PROVIDER_DEFAULT);
+  const coords = (points: typeof lay) => points.map(p => ({ latitude: p.lat, longitude: p.lng }));
+  expect(polys(n).map(p => p.coordinates)).toEqual([
+    coords(lay.slice(0, 2)), coords(lay.slice(2)), coords(run.slice(0, 2)), coords(run.slice(2)),
+  ]);
+  expect(JSON.stringify({ lay, run })).toBe(input);
 });
