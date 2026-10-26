@@ -6,6 +6,14 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "track.startStatus.searching": "Recherche de position",
+  "track.startStatus.ready": "GPS prêt",
+  "track.startStatus.inaccurate": "Position encore trop imprécise",
+  "track.startStatus.stale": "En attente d’une position récente",
+  "track.startStatus.permission": "Accès à la position requis",
+  "track.startAccuracy": "Précision estimée ±{{accuracy}} m",
+  "track.startOutdoorHint": "Avant de démarrer, attendez une position récente à ciel ouvert. Les bâtiments et les arbres peuvent réduire la réception.",
+
   "track.pauseMarkerHint": "Enregistrement en pause. Reprenez d’abord.",
   "track.pauseVisibleTitle": "Enregistrement en pause",
   "track.pauseVisibleHint": "La piste n’est pas enregistrée. Les objets et les angles sont désactivés.",

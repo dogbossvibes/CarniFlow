@@ -189,14 +189,37 @@ it('updates visible warmup readiness immediately and expires it without another 
     await act(async () => { renderer = TestRenderer.create(<Harness />); });
     await act(async () => { await current.startWarmup(); });
     expect(current.warmupReady).toBe(false);
+    expect(current.warmupStatus).toBe('searching');
     feed(0, 4, 0);
     expect(current.warmupReady).toBe(true);
+    expect(current.warmupStatus).toBe('ready');
     clockMs += 5001;
     act(() => { jest.advanceTimersByTime(5001); });
     expect(current.warmupReady).toBe(false);
+    expect(current.warmupStatus).toBe('stale');
     feed(6000, 4, 0);
     expect(current.warmupReady).toBe(true);
   } finally { jest.useRealTimers(); }
+});
+
+it('explains inaccurate fixes without loosening the start gate', async () => {
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.startWarmup(); });
+  feed(0, 40, 0);
+  expect(current.warmupStatus).toBe('inaccurate');
+  expect(current.warmupReady).toBe(false);
+  await act(async () => { expect((await current.beginRecording({ localId: 'local', ownerId: 'owner' })).error).toBe('gps_not_ready'); });
+  feed(100, 4, 0);
+  expect(current.warmupStatus).toBe('ready');
+  expect(current.warmupReady).toBe(true);
+});
+
+it('explains a denied location permission without starting the recorder', async () => {
+  jest.mocked(Location.requestForegroundPermissionsAsync).mockResolvedValueOnce({ status: 'denied' } as Location.LocationPermissionResponse);
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { expect((await current.startWarmup()).error).toBeTruthy(); });
+  expect(current.warmupStatus).toBe('permission');
+  expect(current.warmupReady).toBe(false);
 });
 
 it('counts accepted fixes, existing rejects and successful point flush without changing geometry', async () => {

@@ -111,6 +111,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const warmupFixMsRef = useRef<number | null>(null);
   const warmupExpiryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [warmupReady, setWarmupReady] = useState(false);
+  const [warmupStatus, setWarmupStatus] = useState<'searching' | 'ready' | 'inaccurate' | 'stale' | 'permission'>('searching');
   const localSessionCreationRef = useRef<Promise<void> | null>(null);
   const bgActiveRef  = useRef(false);   // true ⇒ Hintergrund-Updates (Foreground-Service) laufen
 
@@ -267,6 +268,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     warmupFixMsRef.current = null;
     warmupAccuracyRef.current = null;
     setWarmupReady(false);
+    setWarmupStatus('searching');
     recordingEvidenceRef.current?.close();
     recordingEvidenceRef.current = null;
     recordingRef.current = false;
@@ -443,10 +445,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         || (warmupFixMsRef.current != null && loc.timestamp <= warmupFixMsRef.current)) return;
       warmupFixMsRef.current = loc.timestamp;
       setWarmupReady(isLaySessionWarmupReady(loc.coords.accuracy));
+      setWarmupStatus(isLaySessionWarmupReady(loc.coords.accuracy) ? 'ready' : 'inaccurate');
       if (warmupExpiryRef.current) clearTimeout(warmupExpiryRef.current);
       warmupExpiryRef.current = setTimeout(() => {
         warmupExpiryRef.current = null;
         setWarmupReady(false);
+        setWarmupStatus('stale');
       }, Math.max(0, START_FIX_MAX_AGE_MS - (now - loc.timestamp)) + 1);
     }
     warmupAccuracyRef.current = loc.coords.accuracy ?? null;
@@ -465,6 +469,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     warmupAccuracyRef.current = null;
     warmupFixMsRef.current = null;
     setWarmupReady(false);
+    setWarmupStatus('searching');
     startupOriginRef.current ??= Date.now();
     startupRef.current!.warmupStartTSec ??= startupSec();
     // Persistierte QA-Einstellungen MÜSSEN geladen sein, bevor die
@@ -478,7 +483,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (generation !== warmupGenerationRef.current) return { error: 'cancelled' };
     foregroundPermissionRef.current = status;
     startupRef.current!.permissionEndTSec ??= startupSec();
-    if (status !== 'granted') return { error: 'Standortberechtigung fehlt. Bitte in den Einstellungen erlauben.' };
+    if (status !== 'granted') {
+      setWarmupStatus('permission');
+      return { error: 'Standortberechtigung fehlt. Bitte in den Einstellungen erlauben.' };
+    }
     // iOS: falls „Genauer Standort" reduziert ist, einmalig präzise Ortung
     // anfragen (nutzt NSLocationTemporaryUsageDescriptionDictionary). Best-effort;
     // no-op ohne natives Modul oder wenn bereits präzise.
@@ -1027,5 +1035,5 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     })().finally(() => { finalizationRef.current = null; });
   }, [laySession.qaPipelineRef,stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaMotionCaptureRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
 
-  return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug, warmupReady };
+  return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug, warmupReady, warmupStatus };
 }

@@ -5,6 +5,14 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "track.startStatus.searching": "Position wird gesucht",
+  "track.startStatus.ready": "GPS bereit",
+  "track.startStatus.inaccurate": "Position noch zu ungenau",
+  "track.startStatus.stale": "Warte auf aktuelle Position",
+  "track.startStatus.permission": "Standortzugriff erforderlich",
+  "track.startAccuracy": "Geschätzte Genauigkeit ±{{accuracy}} m",
+  "track.startOutdoorHint": "Warte vor dem Start unter freiem Himmel auf eine aktuelle Position. Gebäude und Bäume können den Empfang verschlechtern.",
+
   "track.pauseMarkerHint": "Aufnahme pausiert. Bitte zuerst fortsetzen.",
   "track.pauseVisibleTitle": "Aufnahme pausiert",
   "track.pauseVisibleHint": "Die Fährte wird gerade nicht aufgezeichnet. Gegenstände und Winkel sind gesperrt.",

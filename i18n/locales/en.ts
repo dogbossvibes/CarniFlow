@@ -2,6 +2,14 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "track.startStatus.searching": "Searching for position",
+  "track.startStatus.ready": "GPS ready",
+  "track.startStatus.inaccurate": "Position not accurate enough",
+  "track.startStatus.stale": "Waiting for a fresh position",
+  "track.startStatus.permission": "Location access required",
+  "track.startAccuracy": "Estimated accuracy ±{{accuracy}} m",
+  "track.startOutdoorHint": "Before starting, wait for a fresh position under open sky. Buildings and trees can reduce reception.",
+
   "track.pauseMarkerHint": "Recording paused. Resume first.",
   "track.pauseVisibleTitle": "Recording paused",
   "track.pauseVisibleHint": "Your track is not being recorded. Objects and turns are disabled.",

@@ -761,11 +761,167 @@ export default function LegenScreen() {
 
         {/* QA-Diagnose: tatsächlich aktive Engine/Source. Rendert ausserhalb des
             QA-Modus nichts — auch keinen Abstand. */}
-        <QaModeBadge />
+        {phase === 'recording' && <QaModeBadge />}
         {view === 'map' && <LayPlanControl plan={layPlan} locked={pocketLock} />}
 
-        {/* Karte / Skizze */}
-        <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
+          {/* Vorbereitung: GPS-Status, Bedingungen und Start ohne Kartenüberlagerung */}
+          {phase === 'warmup' && (
+            <View className="flex-1 bg-ft-bg">
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-start', paddingHorizontal: 24, paddingVertical: 22 }}
+              >
+                <View className="items-center gap-[8px]">
+                  {gpsReady
+                    ? <Ionicons name="checkmark-circle" size={40} color={FT.acc} />
+                    : <ActivityIndicator size="large" color={FT.acc} />}
+                  <Text className="text-[18px] text-ft-text font-extrabold mt-1.5">
+                    {t(`track.startStatus.${rec.warmupStatus}`)}
+                  </Text>
+                  <Text className="text-[14px] font-semibold mb-2" style={{ color: gpsReady ? FT.acc : FT.muted }}>
+                    {gpsAccuracy != null && Number.isFinite(gpsAccuracy) && gpsAccuracy >= 0 ? t('track.startAccuracy', { accuracy: Math.round(gpsAccuracy) }) : t('track.searchSatellites')}
+                  </Text>
+
+                  <Text style={{ color: FT.muted, fontSize: 13, lineHeight: 19, alignSelf: 'stretch', marginBottom: 12 }}>{t('track.startOutdoorHint')}</Text>
+                  {/* Hund */}
+                  {dogs.length > 0 && (
+                    <>
+                      <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.dog')}</Text>
+                      <View className="flex-row flex-wrap gap-2 self-start mb-1">
+                        {dogs.map(d => {
+                          const on = d.id === activeDog?.id;
+                          return (
+                            <Pressable key={d.id} onPress={() => setSelectedDogId(d.id)}
+                              className={`flex-row items-center gap-1.5 pl-1.5 pr-[12px] py-1.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                              <View className="w-[22px] h-[22px] rounded-full bg-ft-acc items-center justify-center">
+                                <Text className="text-[10px] font-extrabold text-ft-acc-text">{(d.name?.[0] ?? '?').toUpperCase()}</Text>
+                              </View>
+                              <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{d.name}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </>
+                  )}
+
+                  {/* Untergrund */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.surface')}</Text>
+                  <View className="flex-row flex-wrap gap-2 self-start mb-1">
+                    {SURFACES.map(sfc => {
+                      const on = surface === sfc;
+                      return (
+                        <Pressable key={sfc} onPress={() => setSurface(sfc)}
+                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{sfc}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Beschaffenheit */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.condition')}</Text>
+                  <View className="flex-row flex-wrap gap-2 self-start mb-1">
+                    {CONDITIONS.map(c => {
+                      const on = condition === c;
+                      return (
+                        <Pressable key={c} onPress={() => setCondition(on ? null : c)}
+                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{c}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  {/* Winkel-Erkennung: vollautomatisch vs. alles manuell.
+                      Gegenstände sind davon ausgenommen — die immer manuell. */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.angleDetection')}</Text>
+                  <View className="flex-row gap-2 self-stretch">
+                    {([['auto', t('track.auto'), 'flash'], ['manual', t('track.manual'), 'hand-left']] as const).map(([val, label, icon]) => {
+                      const on = autoDetect === (val === 'auto');
+                      return (
+                        <Pressable key={val} onPress={() => void setAutoDetect(val === 'auto')}
+                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          <Ionicons name={icon} size={15} color={on ? FT.acc : FT.muted} />
+                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text className="text-[11px] text-ft-faint self-start mb-1">
+                    {autoDetect
+                      ? t('track.autoHint')
+                      : t('track.manualHint')}
+                  </Text>
+
+                  {/* Sprachausgabe beim Legen (Default AUS). Gilt NUR fürs Legen —
+                      die Sprachführung der Absuche hat ihren eigenen Schalter.
+                      Marker/Haptik/Toast laufen unabhängig davon immer. */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.layVoiceToggle')}</Text>
+                  <View className="flex-row gap-2 self-stretch">
+                    {([[true, t('track.layVoiceOn'), 'volume-high'], [false, t('track.layVoiceOff'), 'volume-mute']] as const).map(([val, label, icon]) => {
+                      const on = layVoice.enabled === val;
+                      return (
+                        <Pressable
+                          key={String(val)}
+                          onPress={() => void layVoice.setEnabled(val)}
+                          disabled={!layVoice.loaded}
+                          accessibilityRole="switch"
+                          accessibilityState={{ checked: on }}
+                          accessibilityLabel={t('track.layVoiceToggle')}
+                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
+                          <Ionicons name={icon} size={15} color={on ? FT.acc : FT.muted} />
+                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text className="text-[11px] text-ft-faint self-start mb-1">{t('track.layVoiceToggleSub')}</Text>
+
+                  {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
+                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
+                  <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
+                    {weatherState === 'loading' ? (
+                      <View className="flex-row items-center gap-2">
+                        <ActivityIndicator size="small" color={FT.muted} />
+                        <Text className="text-[13px] font-semibold text-ft-muted">{t('track.weatherLoading')}</Text>
+                      </View>
+                    ) : weather ? (
+                      <>
+                        <View className="flex-row items-center gap-2 mb-1">
+                          <Ionicons name="partly-sunny-outline" size={17} color={FT.acc} />
+                          <Text className="text-[15px] font-extrabold text-ft-text">{weather.weatherCondition}</Text>
+                        </View>
+                        <View className="flex-row flex-wrap gap-x-4 gap-y-0.5">
+                          <Text className="text-[13px] font-semibold text-ft-muted">🌡️ {weather.temperature.toFixed(1)} °C</Text>
+                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h</Text>
+                          <Text className="text-[13px] font-semibold text-ft-muted">💧 {weather.humidity.toFixed(0)} %</Text>
+                        </View>
+                      </>
+                    ) : (
+                      <Text className="text-[13px] font-semibold text-ft-muted">{t('track.weatherUnavailable')}</Text>
+                    )}
+                  </View>
+
+                  <Text className="text-[12px] font-semibold text-ft-muted mt-3 self-start">
+                    {t(`track.startStatus.${rec.warmupStatus}`)}
+                  </Text>
+                  {/* Start mit brauchbarem Fix; unbrauchbare Warmup-Fixes bleiben Diagnose. */}
+                  <Pressable
+                    className={`flex-row items-center justify-center gap-2 mt-4 rounded-[16px] px-[20px] py-3 self-stretch ${canStart ? 'bg-ft-acc' : 'bg-white/10'}`}
+                    onPress={() => { if (canStart) handleStartPress(); }}
+                    disabled={!canStart}
+                  >
+                    <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
+                    <Text className={`text-[14px] font-extrabold ${canStart ? 'text-ft-acc-text' : 'text-ft-muted'}`}>
+                      {canStart ? t(params.id ? 'track.continuation.resume' : 'track.lay') : t('track.waitingGps')}
+                    </Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            </View>
+          )}
+        {/* Karte und Bedienelemente erst nach der Vorbereitung. */}
+        {phase !== 'warmup' && <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
           {phase === 'recording' && (
             <Pressable
               accessibilityLabel={pocketLock ? 'Aufnahme entsperren' : 'Aufnahme sperren'}
@@ -892,164 +1048,8 @@ export default function LegenScreen() {
             </View>
           )}
 
-          {/* Warmup-Overlay: GPS-Status + Bedingungen wählen + Start */}
-          {phase === 'warmup' && (
-            <View className="absolute inset-0 bg-black/75">
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 22 }}
-              >
-                <View className="items-center gap-[8px]">
-                  {gpsReady
-                    ? <Ionicons name="checkmark-circle" size={40} color={FT.acc} />
-                    : <ActivityIndicator size="large" color={FT.acc} />}
-                  <Text className="text-[18px] text-ft-text font-extrabold mt-1.5">
-                    {gpsReady ? t('track.gpsReady') : t('track.gpsStabilizing')}
-                  </Text>
-                  <Text className="text-[14px] font-semibold mb-2" style={{ color: gpsReady ? FT.acc : FT.muted }}>
-                    {gpsAccuracy != null ? `±${Math.round(gpsAccuracy)} m` : t('track.searchSatellites')}
-                  </Text>
 
-                  {/* Hund */}
-                  {dogs.length > 0 && (
-                    <>
-                      <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.dog')}</Text>
-                      <View className="flex-row flex-wrap gap-2 self-start mb-1">
-                        {dogs.map(d => {
-                          const on = d.id === activeDog?.id;
-                          return (
-                            <Pressable key={d.id} onPress={() => setSelectedDogId(d.id)}
-                              className={`flex-row items-center gap-1.5 pl-1.5 pr-[12px] py-1.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
-                              <View className="w-[22px] h-[22px] rounded-full bg-ft-acc items-center justify-center">
-                                <Text className="text-[10px] font-extrabold text-ft-acc-text">{(d.name?.[0] ?? '?').toUpperCase()}</Text>
-                              </View>
-                              <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{d.name}</Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </>
-                  )}
-
-                  {/* Untergrund */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.surface')}</Text>
-                  <View className="flex-row flex-wrap gap-2 self-start mb-1">
-                    {SURFACES.map(sfc => {
-                      const on = surface === sfc;
-                      return (
-                        <Pressable key={sfc} onPress={() => setSurface(sfc)}
-                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
-                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{sfc}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  {/* Beschaffenheit */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.condition')}</Text>
-                  <View className="flex-row flex-wrap gap-2 self-start mb-1">
-                    {CONDITIONS.map(c => {
-                      const on = condition === c;
-                      return (
-                        <Pressable key={c} onPress={() => setCondition(on ? null : c)}
-                          className={`px-[13px] py-2 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
-                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{c}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  {/* Winkel-Erkennung: vollautomatisch vs. alles manuell.
-                      Gegenstände sind davon ausgenommen — die immer manuell. */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.angleDetection')}</Text>
-                  <View className="flex-row gap-2 self-stretch">
-                    {([['auto', t('track.auto'), 'flash'], ['manual', t('track.manual'), 'hand-left']] as const).map(([val, label, icon]) => {
-                      const on = autoDetect === (val === 'auto');
-                      return (
-                        <Pressable key={val} onPress={() => void setAutoDetect(val === 'auto')}
-                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
-                          <Ionicons name={icon} size={15} color={on ? FT.acc : FT.muted} />
-                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <Text className="text-[11px] text-ft-faint self-start mb-1">
-                    {autoDetect
-                      ? t('track.autoHint')
-                      : t('track.manualHint')}
-                  </Text>
-
-                  {/* Sprachausgabe beim Legen (Default AUS). Gilt NUR fürs Legen —
-                      die Sprachführung der Absuche hat ihren eigenen Schalter.
-                      Marker/Haptik/Toast laufen unabhängig davon immer. */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.layVoiceToggle')}</Text>
-                  <View className="flex-row gap-2 self-stretch">
-                    {([[true, t('track.layVoiceOn'), 'volume-high'], [false, t('track.layVoiceOff'), 'volume-mute']] as const).map(([val, label, icon]) => {
-                      const on = layVoice.enabled === val;
-                      return (
-                        <Pressable
-                          key={String(val)}
-                          onPress={() => void layVoice.setEnabled(val)}
-                          disabled={!layVoice.loaded}
-                          accessibilityRole="switch"
-                          accessibilityState={{ checked: on }}
-                          accessibilityLabel={t('track.layVoiceToggle')}
-                          className={`flex-1 flex-row items-center justify-center gap-1.5 px-[13px] py-2.5 rounded-[12px] border ${on ? 'bg-ft-acc-dim border-[rgba(21,230,195,0.55)]' : 'bg-white/5 border-ft-line'}`}>
-                          <Ionicons name={icon} size={15} color={on ? FT.acc : FT.muted} />
-                          <Text className={`text-[13px] font-semibold ${on ? 'text-ft-acc' : 'text-ft-muted'}`}>{label}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                  <Text className="text-[11px] text-ft-faint self-start mb-1">{t('track.layVoiceToggleSub')}</Text>
-
-                  {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
-                  <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
-                  <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
-                    {weatherState === 'loading' ? (
-                      <View className="flex-row items-center gap-2">
-                        <ActivityIndicator size="small" color={FT.muted} />
-                        <Text className="text-[13px] font-semibold text-ft-muted">{t('track.weatherLoading')}</Text>
-                      </View>
-                    ) : weather ? (
-                      <>
-                        <View className="flex-row items-center gap-2 mb-1">
-                          <Ionicons name="partly-sunny-outline" size={17} color={FT.acc} />
-                          <Text className="text-[15px] font-extrabold text-ft-text">{weather.weatherCondition}</Text>
-                        </View>
-                        <View className="flex-row flex-wrap gap-x-4 gap-y-0.5">
-                          <Text className="text-[13px] font-semibold text-ft-muted">🌡️ {weather.temperature.toFixed(1)} °C</Text>
-                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h</Text>
-                          <Text className="text-[13px] font-semibold text-ft-muted">💧 {weather.humidity.toFixed(0)} %</Text>
-                        </View>
-                      </>
-                    ) : (
-                      <Text className="text-[13px] font-semibold text-ft-muted">{t('track.weatherUnavailable')}</Text>
-                    )}
-                  </View>
-
-                  <Text className="text-[12px] font-semibold text-ft-muted mt-3 self-start">
-                    {gpsAccuracy == null ? t('track.gpsPreparing') :
-                      canStart ? t('track.gpsReadyAccuracy', { accuracy: Math.round(gpsAccuracy) }) :
-                        t('track.gpsWaitingAccuracy', { accuracy: Math.round(gpsAccuracy) })}
-                  </Text>
-                  {/* Start mit brauchbarem Fix; unbrauchbare Warmup-Fixes bleiben Diagnose. */}
-                  <Pressable
-                    className={`flex-row items-center justify-center gap-2 mt-4 rounded-[16px] px-[20px] py-3 self-stretch ${canStart ? 'bg-ft-acc' : 'bg-white/10'}`}
-                    onPress={() => { if (canStart) handleStartPress(); }}
-                    disabled={!canStart}
-                  >
-                    <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
-                    <Text className={`text-[14px] font-extrabold ${canStart ? 'text-ft-acc-text' : 'text-ft-muted'}`}>
-                      {canStart ? t(params.id ? 'track.continuation.resume' : 'track.lay') : t('track.waitingGps')}
-                    </Text>
-                  </Pressable>
-                </View>
-              </ScrollView>
-            </View>
-          )}
-        </View>
+        </View>}
 
         {/* Gegenstand-Schnellauswahl: Inline-Popover über der Steuerleiste (kein
             Sheet). Tap auf Typ setzt sofort + schliesst; Backdrop-Tap schliesst
@@ -1131,7 +1131,7 @@ export default function LegenScreen() {
         )}
 
         {/* Steuerung */}
-        <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
+        {phase === 'recording' && <View className="flex-row gap-3 px-[18px] pt-[14px] pb-[26px]">
           <Pressable
             accessibilityLabel={activeSegment ? t('track.segmentStop') : t('track.segmentStart')}
             accessibilityHint={t('track.segmentStopHint')}
@@ -1174,7 +1174,7 @@ export default function LegenScreen() {
             containerClassName="h-[60px] rounded-[18px]"
             containerStyle={{ flex: 1.3 }}
           />
-        </View>
+        </View>}
       </SafeAreaView>
 
       <PocketLockOverlay

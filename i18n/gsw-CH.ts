@@ -5,6 +5,14 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "track.startStatus.searching": "Position wird gsuecht",
+  "track.startStatus.ready": "GPS bereit",
+  "track.startStatus.inaccurate": "Position no z ungenau",
+  "track.startStatus.stale": "Warte uf aktuelli Position",
+  "track.startStatus.permission": "Standortzugriff nötig",
+  "track.startAccuracy": "Gschätzti Genauigkeit ±{{accuracy}} m",
+  "track.startOutdoorHint": "Wart vor em Start under freiem Himmel uf e aktuelli Position. Gebäude und Bäum chönd de Empfang verschlechtere.",
+
   "track.pauseMarkerHint": "Ufnahm pausiert. Bitte zerscht wiitermache.",
   "track.pauseVisibleTitle": "Ufnahm pausiert",
   "track.pauseVisibleHint": "D Fährte wird grad nöd ufzeichnet. Gägeständ und Winkel sind gsperrt.",

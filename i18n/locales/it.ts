@@ -2,6 +2,14 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "track.startStatus.searching": "Ricerca della posizione",
+  "track.startStatus.ready": "GPS pronto",
+  "track.startStatus.inaccurate": "Posizione ancora imprecisa",
+  "track.startStatus.stale": "In attesa di una posizione recente",
+  "track.startStatus.permission": "Accesso alla posizione richiesto",
+  "track.startAccuracy": "Precisione stimata ±{{accuracy}} m",
+  "track.startOutdoorHint": "Prima di iniziare, attendi una posizione recente a cielo aperto. Edifici e alberi possono ridurre la ricezione.",
+
   "track.pauseMarkerHint": "Registrazione in pausa. Riprendi prima.",
   "track.pauseVisibleTitle": "Registrazione in pausa",
   "track.pauseVisibleHint": "La pista non viene registrata. Oggetti e angoli sono disattivati.",
