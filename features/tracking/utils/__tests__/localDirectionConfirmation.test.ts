@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { createLocalDirectionState, confirmLocalDirections } from '../localDirectionConfirmation';
-import { fuseTurns } from '../turnFusion';
+import { fuseTurns, appendLocalDirectionTurns } from '../turnFusion';
 import type { ShortLegPoint } from '../shortLegCornerDetection';
 function field(build: number): ShortLegPoint[] {
   const q = JSON.parse(fs.readFileSync(`features/tracking/utils/__tests__/fixtures/field-20261026-build${build}.json`, 'utf8'));
@@ -75,4 +75,13 @@ it('a contradictory reliable Motion direction blocks the extra GPS candidate', (
     confirmLocalDirections(state, prefix, base.diagnostics, base.corners, () => motion);
   }
   expect(state.confirmed.size).toBe(0);
+});
+
+it('does not report Motion matching the extra GPS corner as IMU-only', () => {
+  const points = field(55), { state } = replay(points), base = fuseTurns(points);
+  const matching = { t: points[18].t!, direction: 'links' as const, signedNetYawDeg: 90, evidence: 1,
+    persisted: false as const, reason: 'imu_only_no_gps_corner' as const };
+  const unmatched = { ...matching, t: points.at(-1)!.t! + 60000 };
+  base.imuOnly = [matching, unmatched];
+  expect(appendLocalDirectionTurns(points, base, state).imuOnly).toEqual([unmatched]);
 });

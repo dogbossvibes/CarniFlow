@@ -705,5 +705,9 @@ export function appendLocalDirectionTurns(
   }
   corners.sort((a, b) => a.atM - b.atM);
   turns.sort((a, b) => a.atM - b.atM);
+  // The baseline sweep classifies IMU-only events before this optional stage.
+  // An event matching the added GPS corner is no longer IMU-only in QA.
+  result.imuOnly = result.imuOnly.filter(e => !turns.some(t => t.t != null
+    && Math.abs(t.t - e.t) <= IMU_ONLY_MATCH_S * 1000));
   return result;
 }
