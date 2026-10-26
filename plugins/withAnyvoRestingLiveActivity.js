@@ -239,7 +239,7 @@ const withAnyvoRestingLiveActivity = config =>
       addVariantGroupToTarget(project, { name, languages, dirName: appName, groupKey: appGroup, targetKey: appKey });
     }
 
-    syncWidgetVersions(project, widgetKeys[0], cfg.version, cfg.ios?.buildNumber);
+    syncWidgetVersions(project, widgetKeys[0], cfg.ios?.version || cfg.version, cfg.ios?.buildNumber);
     addKnownRegions(project, KNOWN_REGIONS);
     fs.writeFileSync(bundlePath, patchWidgetBundle(fs.readFileSync(bundlePath, 'utf8')));
     return cfg;

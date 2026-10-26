@@ -59,6 +59,21 @@
       "env": {
         "EXPO_PUBLIC_BACKEND_ENV": "staging"
       }
+    },
+    "ios49-map-repair": {
+      "extends": "production",
+      "distribution": "store",
+      "environment": "production",
+      "channel": "production",
+      "autoIncrement": false,
+      "credentialsSource": "remote",
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "SENTRY_DISABLE_AUTO_RELEASE": "true"
+      }
     }
   },
   "submit": {
