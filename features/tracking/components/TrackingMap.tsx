@@ -20,10 +20,8 @@ import { buildTrackSegmentPolylines, laidTrackStroke } from '@/features/tracking
 import { useSmartTrackCamera } from '@/features/tracking/hooks/useSmartTrackCamera';
 import { TrackReferenceOverlayLayer } from '@/features/tracking/components/TrackReferenceOverlayLayer';
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
-import { DistanceScaleLayer, type ScaleRegion } from '@/features/tracking/components/DistanceScaleLayer';
-import { buildDistanceTicks, pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
-import { MapScaleBar } from './MapScaleBar';
-import { useMapScaleBar } from '../hooks/useMapScaleBar';
+import type { ScaleRegion } from '@/features/tracking/components/DistanceScaleLayer';
+import { pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
 import type { LL } from '@/features/tracking/utils/searchGeometry';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
@@ -53,7 +51,7 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress, accessibilityLabel }: {
-  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder' | 'ball';
+  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'group' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder' | 'ball';
   label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void; accessibilityLabel?: string;
 }) {
   const [track, setTrack] = useState(true);
@@ -77,6 +75,15 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
     </View>
   );
   else if (kind === 'angle') child = <View style={[s.angleBadge, acute && s.angleBadgeAcute]}><Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text></View>;
+  // Kleine sichtbare Fläche, großer transparenter Markerrahmen für die Auswahl.
+  // Die vollständigen Einträge bleiben im Detail-Sheet und Accessibility-Label.
+  else if (kind === 'group') child = (
+    <View collapsable={false} style={s.groupTouchArea}>
+      <View style={s.groupBadge}>
+        <Text style={s.groupBadgeTxt} numberOfLines={1} maxFontSizeMultiplier={1.2}>{label}</Text>
+      </View>
+    </View>
+  );
   else if (kind === 'object') child = <View style={[s.objectBadge, duebel && s.objectBadgeDuebel, label && label.length > 3 ? { width: 'auto', minWidth: 44, minHeight: 44, paddingHorizontal: 8 } : null]}><Text style={[s.objectBadgeTxt, duebel && s.objectBadgeTxtDuebel]}>{label}</Text></View>;
   // Dübel = ROTER ZYLINDER (keine G-Nummer): solid gefüllter Körper + Deckel-Ellipse.
   // Solide Füllflächen werden von react-native-maps zuverlässig gezeichnet (kein
@@ -95,10 +102,7 @@ interface Props {
   distractionTracks?: readonly DistractionTrack[];
   distractionDraft?: DistractionTrack;
   referenceOverlays?: readonly TrackReferenceOverlay[];
-  // Fährten-Maßstab (1/5/10-m-Distanzmarkierungen, adaptiv nach Zoom) entlang
-  // GENAU dieser Referenzlinie — die Search-Referenz (laidPoints), auf der auch
-  // Cursor/Progress und die kanonischen Ereignispositionen gemessen werden.
-  // Fehlt die Prop, bleibt die Karte unverändert (kein Region-Tracking).
+  /** Legacy scale props are accepted but ignored; no ruler is displayed. */
   distanceScaleLine?: readonly LL[];
   showMapScale?: boolean;
   mapScaleBottom?: number;
@@ -145,7 +149,7 @@ interface Props {
 const EMPTY_MARKERS: MapMarker[] = [];
 
 export function TrackingMap({
-  layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, distanceScaleLine, showMapScale = false, mapScaleBottom = 14, onMapScaleHeightChange, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -226,19 +230,8 @@ export function TrackingMap({
   // Fortlaufende Nummer je Gegenstand (G1, G2, …) — nach Index in markerList.
   // Dübel bekommt KEINE G-Nummer (roter Zylinder) → zählt nicht mit (objectNumbers).
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
-  // Maßstab: Ticks EINMAL je Referenzlinie (nicht pro GPS-Fix / Zoom); Zoom nur
-  // aus der gemeldeten Region (latitudeDelta) + Kartenhöhe, gedrosselt.
-  const scaleTicks = useMemo(
-    () => (distanceScaleLine && distanceScaleLine.length > 1 ? buildDistanceTicks(distanceScaleLine) : null),
-    [distanceScaleLine],
-  );
-  // Höhe/Region ab Mount messen, sobald der Maßstab angefordert ist — auch wenn die
-  // Referenzlinie erst später kommt (run.tsx lädt den Snapshot nach dem Mount; ein
-  // erst dann angehängtes onLayout feuert nie → Höhe 0 → Maßstab dauerhaft 'off').
-  const scaleRequested = distanceScaleLine !== undefined || showMapScale || markerList.length > 0;
   const [scaleRegion, setScaleRegion] = useState<ScaleRegion | null>(null);
   const [mapHeightPt, setMapHeightPt] = useState(0);
-  const [mapWidthPt, setMapWidthPt] = useState(0);
   const [groupSelection, setGroupSelection] = useState<TrackDetailSelection | null>(null);
   const markerGroups = useMemo(() => {
     const features: { key: string; lat: number; lng: number; label: string; selection: TrackDetailItem }[] = markerList.map((marker, index) => ({
@@ -257,19 +250,9 @@ export function TrackingMap({
     return groupMapFeatures(features, ptPerM > 0 ? 34 / ptPerM : 1.5).filter(group => group.length > 1);
   }, [markerList, objectNo, startAnchor, endPoint, endTotalDistanceM, layPoints, scaleRegion?.latitudeDelta, mapHeightPt, t]);
   const groupedKeys = useMemo(() => new Set(markerGroups.flatMap(group => group.map(feature => feature.key))), [markerGroups]);
-  const { scale: barScale, refresh: refreshMapScale, onRegionChange: updateMovingMapScale } = useMapScaleBar({ mapRef, enabled: showMapScale, ready: mapReady, width: mapWidthPt, height: mapHeightPt, bottom: mapScaleBottom });
   const onScaleRegion = useCallback((r: ScaleRegion) => {
     setScaleRegion(prev => (scaleRegionChanged(prev, r) ? r : prev));
-    if (showMapScale) refreshMapScale();
-  }, [showMapScale, refreshMapScale]);
-  // Zahlen weichen Winkeln/Gegenständen/Start/Ende aus (Marker bleiben lesbar).
-  const scaleAvoid = useMemo<LL[]>(() => {
-    if (!scaleTicks) return [];
-    const pts: LL[] = markerList.map(m => ({ latitude: m.lat as number, longitude: m.lng as number }));
-    if (startAnchor) pts.push({ latitude: startAnchor.lat, longitude: startAnchor.lng });
-    if (endPoint) pts.push({ latitude: endPoint.lat, longitude: endPoint.lng });
-    return pts;
-  }, [scaleTicks, markerList, startAnchor, endPoint]);
+  }, []);
   const initialFitCoords = useMemo(
     () => (fitToPoints ?? [])
       .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
@@ -315,7 +298,7 @@ export function TrackingMap({
   return (
     <View
       style={[StyleSheet.absoluteFill, style]}
-      onLayout={e => { setMapHeightPt(e.nativeEvent.layout.height); setMapWidthPt(e.nativeEvent.layout.width); }}
+      onLayout={e => { setMapHeightPt(e.nativeEvent.layout.height); }}
     >
       <MapView
         ref={mapRef}
@@ -330,9 +313,8 @@ export function TrackingMap({
         rotateEnabled
         pitchEnabled
         onMapReady={() => setMapReady(true)}
-        onRegionChange={showMapScale ? updateMovingMapScale : undefined}
-        showsScale={showMapScale ? false : undefined}
-        onRegionChangeComplete={scaleRequested ? onScaleRegion : undefined}
+        showsScale={false}
+        onRegionChangeComplete={markerList.length > 0 || startAnchor || layPoints.length > 0 || endPoint ? onScaleRegion : undefined}
         onPanDrag={() => {
           // Eigene Kartengeste ⇒ Auto-Follow SOFORT pausieren (kein
           // automatisches Zurückspringen). Der Recenter-Button holt sie zurück.
@@ -376,18 +358,6 @@ export function TrackingMap({
         }) : layParts.filter(part => part.length > 1).map((part, index) => (
           <Polyline key={`lay-${index}`} coordinates={part} strokeColor={layColor} strokeWidth={4} lineCap="round" lineJoin="round" />
         ))}
-        {/* Fährten-Maßstab: dezente Querstriche über der gelegten Linie (zIndex 4),
-            Zahlen nur alle 10 m (bzw. ausgedünnt). Standard-Delta wie initialRegion. */}
-        {scaleTicks && scaleTicks.ticks.length > 0 && (
-          <DistanceScaleLayer
-            Polyline={Polyline}
-            Marker={Marker}
-            ticks={scaleTicks}
-            ptPerM={pointsPerMeter(scaleRegion?.latitudeDelta ?? 0.0016, mapHeightPt)}
-            region={scaleRegion}
-            avoid={scaleAvoid}
-          />
-        )}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
         {runParts.filter(part => part.length > 1).map((part, index) => (
           <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={4} />
@@ -453,9 +423,9 @@ export function TrackingMap({
         })}
 
         {markerGroups.map(group => <PinMarker key={group.map(feature => feature.key).join('|')}
-          Marker={Marker} lat={group[0].lat} lng={group[0].lng} kind="object"
-          label={`${group.slice(0, 3).map(feature => feature.label).join(' · ')}${group.length > 3 ? ` +${group.length - 3}` : ''}`}
-          accessibilityLabel={group.map(feature => describeSelection(feature.selection, t).title).join(', ')}
+          Marker={Marker} lat={group[0].lat} lng={group[0].lng} kind="group"
+          label={group.length > 99 ? '99+' : String(group.length)}
+          accessibilityLabel={`${t('track.markerGroup.title')}: ${group.length}. ${group.map(feature => describeSelection(feature.selection, t).title).join(', ')}`}
           onPress={() => setGroupSelection({ kind: 'group', items: group.map(feature => feature.selection) })} />)}
 
         {/* Abriss-Marker (Ausarbeiten): rotes Kreuz-Symbol */}
@@ -487,7 +457,6 @@ export function TrackingMap({
       </MapView>
       <MarkerDetailSheet selection={groupSelection} onClose={() => setGroupSelection(null)} />
 
-      {showMapScale && mapHeightPt - mapScaleBottom >= 100 && <MapScaleBar scale={barScale} bottom={mapScaleBottom} onHeightChange={onMapScaleHeightChange} />}
 
       {/* Floating Buttons rechts */}
       {!hideControls && (
@@ -619,6 +588,10 @@ const s = StyleSheet.create({
   // Spitzwinkel: dünnere Umriss-Optik (dunkler Grund, Mint-Rand/-Text) → klar anders als 90°.
   angleBadgeAcute:    { backgroundColor: 'rgba(4,17,15,0.82)', borderColor: C.trackPrimary, borderWidth: 1 },
   angleBadgeTxtAcute: { color: C.trackPrimary },
+  // Sammelmarker: Anzahl statt breitem Textfeld; keine zusätzliche weiße Fläche.
+  groupTouchArea: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  groupBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#04110F', borderWidth: 1.5, borderColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center' },
+  groupBadgeTxt: { color: C.trackPrimary, fontSize: 11, fontWeight: '800', includeFontPadding: false, textAlign: 'center' },
   // Gegenstand: neutrales, helles Quadrat-Badge mit „G{n}" — bewusst anders als Winkel.
   objectBadge:      { width: 18, height: 18, borderRadius: 3, backgroundColor: '#EDEDED', borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   objectBadgeTxt:   { fontSize: 9, fontWeight: '900', color: '#101010' },

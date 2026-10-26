@@ -37,7 +37,7 @@ export function PlannerMap({ edit, dispatch, disabled }: { edit: PlanEdit; dispa
  if (!MAPS_AVAILABLE || !RNMaps) return <Text style={s.text}>{t('maps')}</Text>;
  const Map = RNMaps.default, { Marker, Polyline } = RNMaps;
  return <View style={s.wrap}>
-  <Map ref={map} style={s.map} mapType="hybrid" showsUserLocation={false} showsMyLocationButton={false}
+  <Map showsScale={false} ref={map} style={s.map} mapType="hybrid" showsUserLocation={false} showsMyLocationButton={false}
    onMapReady={() => setReady(true)} initialRegion={{ latitude: initial.current?.latitude ?? 47.3769, longitude: initial.current?.longitude ?? 8.5417, latitudeDelta: .004, longitudeDelta: .004 }}
    onPress={event => { if (!disabled && event.nativeEvent.action !== 'marker-press') dispatch({ type: 'add', point: { ...event.nativeEvent.coordinate, object: false } }); }}>
    {edit.points.length > 1 && <Polyline coordinates={edit.points} strokeColor={C.accent} strokeWidth={4} lineDashPattern={[8, 6]} />}

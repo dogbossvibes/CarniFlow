@@ -10,7 +10,7 @@ export function GroupPositionsMap({ positions }: { positions: readonly (LivePosi
   if (!positions.length) return null;
   const first = positions[0];
   return <View style={styles.frame}>
-    <MapView style={styles.map} accessibilityLabel={t('map')} showsUserLocation={false} showsMyLocationButton={false}
+    <MapView showsScale={false} style={styles.map} accessibilityLabel={t('map')} showsUserLocation={false} showsMyLocationButton={false}
       initialRegion={{ latitude: first.latitude, longitude: first.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }}>
       {positions.map(p => {
         const coordinate = { latitude: p.latitude, longitude: p.longitude };

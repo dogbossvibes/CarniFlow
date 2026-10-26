@@ -67,7 +67,7 @@ export function TrackMap({
       };
 
   return (
-    <MapView
+    <MapView showsScale={false}
       provider={Maps.PROVIDER_DEFAULT}
       style={[StyleSheet.absoluteFill, style]}
       mapType={mapType}

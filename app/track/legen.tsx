@@ -4,7 +4,7 @@ import { countLaidCorners, projectAngleMarkers, type SpecialGeometry } from '@/f
 import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
 import { loadLayRecovery } from '@/features/tracking/services/trackRecoveryService';
 import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -197,8 +197,7 @@ export default function LegenScreen() {
   const stoppingRef = useRef(false);   // Doppelklick-Guard für „Stoppen"
   const [pocketLock, setPocketLock] = useState(false);
   const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
-  const [mapScaleHeight, setMapScaleHeight] = useState(44);
-  const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, mapScaleHeight, view === 'map');
+  const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, 0, false);
   const [pendingExit, setPendingExit] = useState<{ href: string } | { back: true } | null>(null);
 
   // Automatisch erkannter Winkel (rechts/links/spitz) → Haptik + Hinweis.
@@ -373,7 +372,6 @@ export default function LegenScreen() {
     startAnchor, startLockActive, startDriftRejectedCount, segments,
     dogId: storeDogId, currentSessionId: storeSessionId,
   } = useTrackingStore();
-  const distanceScaleLine = useMemo(() => trackPoints.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })), [trackPoints]);
   const activeSegment = activeOrPlannedSegment(segments);
   const currentStep = metersToSteps(distanceMeters, stepLengthM);
 
@@ -769,11 +767,7 @@ export default function LegenScreen() {
           {view === 'map' ? (
             <TrackingMap
                   layColor={layColor}
-              showMapScale
-              mapScaleBottom={mapOverlayLayout.scaleBottom}
-              onMapScaleHeightChange={setMapScaleHeight}
               layPoints={trackPoints}
-              distanceScaleLine={distanceScaleLine}
               referenceOverlays={showReferenceTracks ? referenceOverlays : NO_REFERENCE_OVERLAYS}
               markers={mapMarkers}
               segments={segments}
