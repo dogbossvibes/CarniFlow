@@ -54,7 +54,7 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress, accessibilityLabel }: {
-  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder' | 'ball';
+  Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'group' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder' | 'ball';
   label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void; accessibilityLabel?: string;
 }) {
   const [track, setTrack] = useState(true);
@@ -78,6 +78,15 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
     </View>
   );
   else if (kind === 'angle') child = <View style={[s.angleBadge, acute && s.angleBadgeAcute]}><Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text></View>;
+  // Kleine sichtbare Fläche, großer transparenter Markerrahmen für die Auswahl.
+  // Die vollständigen Einträge bleiben im Detail-Sheet und Accessibility-Label.
+  else if (kind === 'group') child = (
+    <View collapsable={false} style={s.groupTouchArea}>
+      <View style={s.groupBadge}>
+        <Text style={s.groupBadgeTxt} numberOfLines={1} maxFontSizeMultiplier={1.2}>{label}</Text>
+      </View>
+    </View>
+  );
   else if (kind === 'object') child = <View style={[s.objectBadge, duebel && s.objectBadgeDuebel, label && label.length > 3 ? { width: 'auto', minWidth: 44, minHeight: 44, paddingHorizontal: 8 } : null]}><Text style={[s.objectBadgeTxt, duebel && s.objectBadgeTxtDuebel]}>{label}</Text></View>;
   // Dübel = ROTER ZYLINDER (keine G-Nummer): solid gefüllter Körper + Deckel-Ellipse.
   // Solide Füllflächen werden von react-native-maps zuverlässig gezeichnet (kein
@@ -459,9 +468,9 @@ export function TrackingMap({
         })}
 
         {markerGroups.map(group => <PinMarker key={group.map(feature => feature.key).join('|')}
-          Marker={Marker} lat={group[0].lat} lng={group[0].lng} kind="object"
-          label={`${group.slice(0, 3).map(feature => feature.label).join(' · ')}${group.length > 3 ? ` +${group.length - 3}` : ''}`}
-          accessibilityLabel={group.map(feature => describeSelection(feature.selection, t).title).join(', ')}
+          Marker={Marker} lat={group[0].lat} lng={group[0].lng} kind="group"
+          label={group.length > 99 ? '99+' : String(group.length)}
+          accessibilityLabel={`${t('track.markerGroup.title')}: ${group.length}. ${group.map(feature => describeSelection(feature.selection, t).title).join(', ')}`}
           onPress={() => setGroupSelection({ kind: 'group', items: group.map(feature => feature.selection) })} />)}
 
         {/* Abriss-Marker (Ausarbeiten): rotes Kreuz-Symbol */}
@@ -625,6 +634,10 @@ const s = StyleSheet.create({
   // Spitzwinkel: dünnere Umriss-Optik (dunkler Grund, Mint-Rand/-Text) → klar anders als 90°.
   angleBadgeAcute:    { backgroundColor: 'rgba(4,17,15,0.82)', borderColor: C.trackPrimary, borderWidth: 1 },
   angleBadgeTxtAcute: { color: C.trackPrimary },
+  // Sammelmarker: Anzahl statt breitem Textfeld; keine zusätzliche weiße Fläche.
+  groupTouchArea: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  groupBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#04110F', borderWidth: 1.5, borderColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center' },
+  groupBadgeTxt: { color: C.trackPrimary, fontSize: 11, fontWeight: '800', includeFontPadding: false, textAlign: 'center' },
   // Gegenstand: neutrales, helles Quadrat-Badge mit „G{n}" — bewusst anders als Winkel.
   objectBadge:      { width: 18, height: 18, borderRadius: 3, backgroundColor: '#EDEDED', borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   objectBadgeTxt:   { fontSize: 9, fontWeight: '900', color: '#101010' },
