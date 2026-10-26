@@ -300,7 +300,7 @@ function PrecisionLocationTestContent() {
               <Text style={[s.abBtnTxt, qaOn && s.abBtnTxtActive]}>EIN</Text>
             </TouchableOpacity>
           </View>
-          <Row label="Motion beim Legen" value={qaOn && engineMode === 'current' ? 'wird mitgeschnitten' : 'aus'} good={qaOn && engineMode === 'current'} />
+          <Row label="Zusätzliche Motion-Diagnose" value={qaOn && engineMode === 'current' ? 'Beim nächsten Fährtenstart aktiv' : 'Ausgeschaltet'} good={qaOn && engineMode === 'current'} stacked />
         </Section>
 
         <Section title="Motion">
@@ -627,12 +627,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, value, good, lines = 1 }: { label: string; value: string; good?: boolean; lines?: number }) {
+function Row({ label, value, good, lines = 1, stacked = false }: { label: string; value: string; good?: boolean; lines?: number; stacked?: boolean }) {
   const color = good === undefined ? C.white : good ? C.accent : C.muted;
   return (
-    <View style={s.row}>
-      <Text style={s.rowLabel}>{label}</Text>
-      <Text style={[s.rowValue, { color }]} numberOfLines={lines}>{value}</Text>
+    <View style={[s.row, stacked && s.rowStacked]}>
+      <Text style={[s.rowLabel, stacked && s.stackedText]}>{label}</Text>
+      <Text style={[s.rowValue, { color }, stacked && s.stackedText]} numberOfLines={stacked ? undefined : lines}>{value}</Text>
     </View>
   );
 }
@@ -651,6 +651,8 @@ const s = StyleSheet.create({
   sectionTitle: { fontSize: 12, color: C.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginLeft: 2 },
   card:    { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', padding: 6 },
   row:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10 },
+  rowStacked: { flexDirection: 'column', alignItems: 'stretch', gap: 6 },
+  stackedText: { maxWidth: '100%', textAlign: 'left', flexShrink: 1 },
   rowLabel:{ fontSize: 14, color: C.muted },
   rowValue:{ fontSize: 14, fontWeight: '700', maxWidth: '60%', textAlign: 'right' },
   note:    { fontSize: 13, color: C.muted, padding: 12, lineHeight: 18 },
