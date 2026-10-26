@@ -1,3 +1,4 @@
+import { createLocalDirectionState } from '../utils/localDirectionConfirmation';
 import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { attachSpecialGeometry, countLaidCorners, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
@@ -613,6 +614,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaMotionCaptureRef.current.clear();
     startupMovementRef.current = { samples: [], confirmationTSec: null, confirmationSource: null,
       confirmationConfidence: null, fallbackUsed: false, truncated: false };
+    laySession.localDirectionRef.current = createLocalDirectionState();
     liveTurnsRef.current.clear();
     turnEvidenceRef.current.clear();
     motionBufRef.current.clear();
@@ -772,7 +774,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     await localSessionCreationRef.current;
 
     return { error: null };
-  }, [laySession.qaPipelineRef, startWarmup, store, flushPoints, processFixWithQaAccess, processor, completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
+  }, [laySession.localDirectionRef, laySession.qaPipelineRef, startWarmup, store, flushPoints, processFixWithQaAccess, processor, completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
 
   const pause  = useCallback((origin: 'longPress' | 'accessibility' | 'unknown' = 'unknown') => { recordingEvidenceRef.current?.note(origin === 'longPress' ? 'pauseLongPress' : origin === 'accessibility' ? 'pauseAccessibility' : 'pauseUnknown'); recordingEvidenceRef.current?.note('userPaused'); processor.interruptContinuity(); store.getState().pauseRecording(); }, [store, processor]);
   const resume = useCallback((origin: 'longPress' | 'accessibility' | 'button' | 'unknown' = 'unknown') => { recordingEvidenceRef.current?.note(origin === 'button' ? 'resumeButton' : origin === 'longPress' ? 'resumeLongPress' : origin === 'accessibility' ? 'resumeAccessibility' : 'resumeUnknown'); recordingEvidenceRef.current?.note('userResumed'); processor.interruptContinuity(); store.getState().resumeRecording(); }, [store, processor]);
@@ -886,6 +888,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         // Hinweis: der Motion-Ringpuffer hält nur die letzten ~20 s — IMU-only-Ereignisse
         // decken deshalb nur das Ende der Aufnahme ab.
         const sweep = fuseTurns(detectPts, {
+          localDirectionState: laySession.localDirectionRef.current,
           turnEvidenceAt: motionActiveRef.current
             ? (t: number | null) => (t == null ? null : turnEvidenceRef.current.get(t)
               ?? motionBufRef.current.evidenceForTrailing(t))
@@ -1033,7 +1036,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       } catch (e) { console.warn('[trackRecorder] enqueue', e); return; }
       void syncNow().catch(() => { /* Queue bleibt pending → Retry später */ });
     })().finally(() => { finalizationRef.current = null; });
-  }, [laySession.qaPipelineRef,stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaMotionCaptureRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
+  }, [laySession.localDirectionRef, laySession.qaPipelineRef,stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaMotionCaptureRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
 
   return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug, warmupReady, warmupStatus };
 }

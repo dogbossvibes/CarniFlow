@@ -41,7 +41,7 @@ interface Run {
 }
 
 /** Treibt den Processor wie useTrackRecorder nach beginRecording (Start-Lock scharf). */
-function runScenario(sc: Scenario): Run {
+function runScenario(sc: Scenario, startLocked = true): Run {
   mockEngine = sc.engine ?? 'current';
   clock = T0;
   const run: Run = { lineFixes: [], session: createLayProcessingState(), results: [], points: [], distanceCalls: [], angles: [], markers: [], buffered: [], flushes: 0, storeLog: [] };
@@ -80,7 +80,7 @@ function runScenario(sc: Scenario): Run {
     startupSec: () => (clock - T0) / 1000,
   });
   // Wie beginRecording: Start-Lock scharf, Beginn = aktuelle Uhr.
-  run.session.startLockRef.current = true;
+  run.session.startLockRef.current = startLocked;
   run.session.startLockBeganRef.current = clock;
   for (const st of sc.steps) {
     if (st.k === 'fix') {
@@ -404,5 +404,30 @@ describe('Rejected lay fixes cannot contaminate the next admitted measurement', 
     const rejected = runScenario({ ...sc, steps: steps.slice(0, insertion + 2) });
     expect(rejected.session.puckRef.current).not.toEqual(before.session.puckRef.current);
     expect(rejected.results.at(-1)!.distanceM).toBe(before.results.at(-1)!.distanceM);
+  });
+});
+
+
+describe('local direction confirmation in live processor', () => {
+  const q = JSON.parse(readFileSync('features/tracking/utils/__tests__/fixtures/field-20261026-build55-raw.json', 'utf8'));
+  const steps: Scenario['steps'] = q.rawFixes.map((p: {x: number; y: number; tMs: number; accuracy: number}) => ({
+    k: 'fix', x: p.x, y: p.y, t: T0 + p.tMs, acc: p.accuracy,
+  }));
+  it('persists the recovered SL once and retains ordinary corners', () => {
+    const run = runScenario({ name: '55 raw after start lock', steps, qa: true }, false);
+    expect(run.angles).toEqual(['links', 'rechts', 'spitz_links', 'spitz_rechts']);
+    expect(run.markers.filter(m => m.angleKind === 'spitz_links')).toHaveLength(1);
+    expect([...run.session.liveTurnsRef.current.values()].filter(t => t.flags.includes('local_direction_confirmed'))).toHaveLength(1);
+    const confirmedAt = run.markers.find(m => m.angleKind === 'spitz_links')!.t;
+    const stopped = runScenario({ name: 'stop immediately after SL', steps: steps.filter(s => s.k === 'fix' && s.t <= confirmedAt), qa: true }, false);
+    expect(stopped.markers.filter(m => m.angleKind === 'spitz_links')).toHaveLength(1);
+
+  });
+  it('clears pending direction confirmation at a pause', () => {
+    const prefix = steps.filter(s => s.k === 'fix' && s.t < T0 + 37000);
+    const run = runScenario({ name: '55 pause', steps: [...prefix, { k: 'pause', on: true }], qa: true }, false);
+    expect(run.session.localDirectionRef.current.pending.size).toBe(0);
+    expect(run.session.localDirectionRef.current.confirmed.size).toBe(0);
+    expect(run.markers.some(m => m.angleKind === 'spitz_links')).toBe(false);
   });
 });

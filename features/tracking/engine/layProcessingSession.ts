@@ -1,3 +1,4 @@
+import { createLocalDirectionState, type LocalDirectionState } from '../utils/localDirectionConfirmation';
 import { QaPipelineDiagnostics } from '../utils/qaPipelineDiagnostics';
 import { QaMotionCapture } from '@/features/tracking/utils/qaMotionCapture';
 import { isRecordingGap, splitContinuousPoints } from '../utils/trackContinuity';
@@ -14,7 +15,7 @@ import { legacyDetectCorner, type LegacyAcceptedPoint } from '@/features/trackin
 import {
   DETECTOR_INPUT, CORNER_GAP_M, type ShortLegPoint,
 } from '@/features/tracking/utils/shortLegCornerDetection';
-import { fuseTurns, nearestCompatibleTurnEvidence, type FusedTurn } from '@/features/tracking/utils/turnFusion';
+import { fuseTurns, appendLocalDirectionTurns, nearestCompatibleTurnEvidence, type FusedTurn, type FusionResult } from '@/features/tracking/utils/turnFusion';
 import { lineGateStepM, lineEmaAlpha, inTurnZone } from '@/features/tracking/utils/turnAwareLineGate';
 import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDistance';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
@@ -83,6 +84,7 @@ export interface AngleDebug {
 
 /** Fachlicher (und verarbeitungsnaher Diagnose-)Zustand EINER Lay-Session. */
 export interface LayProcessingState {
+  localDirectionRef: Box<LocalDirectionState>;
   continuityPendingRef: Box<boolean>;
   detectorOffsetRef: Box<number>;
   completedDetectorSectionsRef: Box<ShortLegPoint[][]>;
@@ -122,6 +124,7 @@ export interface LayProcessingState {
 /** Anfangszustand — identisch zu den bisherigen useRef-Initialwerten. */
 export function createLayProcessingState(): LayProcessingState {
   return {
+    localDirectionRef: box(createLocalDirectionState()),
     continuityPendingRef: box(false),
     detectorOffsetRef: box(0),
     completedDetectorSectionsRef: box<ShortLegPoint[][]>([]),
@@ -238,6 +241,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     if (detectPointsRef.current.length) session.completedDetectorSectionsRef.current.push(detectPointsRef.current);
     session.detectorOffsetRef.current = detectPointsRef.current.at(-1)?.cumDist ?? session.detectorOffsetRef.current;
     detectPointsRef.current = []; detectEmaRef.current = null; rawTailRef.current = [];
+    session.localDirectionRef.current = createLocalDirectionState();
     liveTurnsRef.current.clear(); turnEvidenceRef.current.clear(); motionBufRef.current.clear();
     lineTurnZoneRef.current = false; lastCornerAtRef.current = -Infinity;
     canonDistRef.current.interrupt();
@@ -276,7 +280,6 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
   };
 
   const persistShortLegCorners = (): LayCornerEvent[] => {
-    const committed: LayCornerEvent[] = [];
     // Motion-Confidence-Kopplung (±0,12): der Detector bekommt eine reine
     // NACHSCHLAGEFUNKTION für die Turn-Evidenz zum Kandidaten-Zeitpunkt. Läuft
     // kein Motion-Mitschnitt (z. B. ENGINE=BUILD40 oder Modul nicht verfügbar),
@@ -299,7 +302,8 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       : undefined;
     // Turn-Fusion (GPS ∪ IMU): Regelpfad des Detektors + Split-Apex-Paarung +
     // Schärfe-Auflösbarkeit. Ohne Motion rein GPS-basiert.
-    let { corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection });
+    let fusion = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection });
+    let { corners, diagnostics, turns } = fusion;
     // Some candidates are inspected before the GPS corner is accepted. Save
     // their available evidence and re-evaluate the same GPS candidates once.
     let newlyAssociated = false;
@@ -308,7 +312,13 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       const ev = motionBufRef.current.evidenceForTrailing(d.t);
       if (ev.available) { turnEvidenceRef.current.set(d.t, ev); newlyAssociated = true; }
     }
-    if (newlyAssociated) ({ corners, diagnostics, turns } = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection }));
+    if (newlyAssociated) fusion = fuseTurns(detectPointsRef.current, { turnEvidenceAt, turnEvidenceForDirection });
+
+    // Advance delayed confirmation once after evidence association. Repeated
+    // evaluation of this prefix does not advance its confirmation counter.
+    ({ corners, diagnostics, turns } = appendLocalDirectionTurns(
+      detectPointsRef.current, fusion, session.localDirectionRef.current, turnEvidenceAt,
+    ));
 
     if (qaRef.current) {
       try { session.qaPipelineRef.current.observe(diagnostics, new Set(corners.map(c => c.apexIndex)), session.completedDetectorSectionsRef.current.length, Date.now()); } catch { /* Diagnostics never control recording. */ }
@@ -353,7 +363,13 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
         );
       }
     }
+    return persistCornerResults({ corners, diagnostics, turns });
+  };
+
+  const persistCornerResults = ({ corners, diagnostics, turns }: Pick<FusionResult, 'corners' | 'diagnostics' | 'turns'>, localOnly = false): LayCornerEvent[] => {
+    const committed: LayCornerEvent[] = [];
     for (const c of corners) {
+      if (localOnly && !turns.find(t => t.apexIndex === c.apexIndex)?.flags.includes('local_direction_confirmed')) continue;
       if (c.atM <= lastCornerAtRef.current) continue;   // schon gemeldet
       const fused = turns.find(t => t.apexIndex === c.apexIndex) ?? null;
       // Apply the detector's existing exclusion across evaluations as well as
@@ -378,7 +394,7 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
         const dir = (c.kind === 'rechts' || c.kind === 'spitz_rechts') ? 'rechts' : 'links';
         pushQaCandidateLine(
           `AUTO ${new Date(d?.t ?? Date.now()).toISOString().slice(11, 19)} ` +
-          `idx=${c.apexIndex} ${c.kind} (${dir}) src=${fused?.source ?? 'gps'} sharp=${fused?.sharpness ?? '—'} ` +
+          `idx=${c.apexIndex} ${c.kind} (${dir}) src=${fused?.flags.includes('local_direction_confirmed') ? 'gps_local_confirmed' : fused?.source ?? 'gps'} sharp=${fused?.sharpness ?? '—'} ` +
           `geo=${fused?.geometryQualityLevel ?? '—'}/${fused?.accuracyToLegRatio ?? '—'} ` +
           `innen=${d?.interiorAngleDeg?.toFixed(1) ?? '—'}° ` +
           `acc=${d?.accuracyM?.toFixed(1) ?? '—'}m ${trail} → accepted` +
@@ -697,6 +713,16 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     const gateM = getTrackingEngineMode() === 'build40' ? MIN_STEP_M : lineGateStepM(detectPointsRef.current, lastCornerAtRef.current);
     out.rejectReason = 'distance_gate';
     if (last && !beginsSection && step < gateM) {
+      // Local confirmation needs fresh detector support even when display
+      // geometry is distance-gated. This does not emit/persist baseline corners.
+      if (autoDetectRef.current && getTrackingEngineMode() === 'current') {
+        const localResult = fuseTurns(detectPointsRef.current, {
+          localDirectionState: session.localDirectionRef.current,
+          turnEvidenceAt: motionActiveRef.current ? t => t == null ? null
+            : turnEvidenceRef.current.get(t) ?? motionBufRef.current.evidenceForTrailing(t) : undefined,
+        });
+        out.corners = persistCornerResults(localResult, true);
+      }
       void recordBackgroundLayEvent(localSessionId.current, 'onFixRejected', 1, 'distance_gate').catch(() => {});
       return;
     }

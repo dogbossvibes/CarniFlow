@@ -36,6 +36,7 @@
 //
 // Reine Funktion, kein React/Native.
 // ──────────────────────────────────────────────────────────────────────────
+import { confirmLocalDirections, type LocalDirectionState } from './localDirectionConfirmation';
 import type { AngleKind } from '@/features/tracking/store/trackingStore';
 import {
   detectShortLegCorners, legWindows, stableLegWindow, spitzConsensus, meanBearing, nearIndex, normalizeDeg, clamp01, cornerConfidence,
@@ -154,6 +155,8 @@ export function associateLiveTurn(reconstructed: FusedTurn, live: readonly Fused
 }
 
 export interface FuseOptions {
+  /** Session-owned delayed confirmation; omitted for historical/offline sweeps. */
+  localDirectionState?: LocalDirectionState;
   /** Turn-Evidenz-Lookup (wie im Detektor) — bestätigt/widerspricht Richtung, stützt Schärfe. */
   turnEvidenceAt?: TurnEvidenceLookup;
   /** A bounded nearest-episode lookup; compatible GPS direction is required. */
@@ -679,5 +682,28 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
       .filter(e => !cornerTimes.some(ct => Math.abs(ct - e.t) <= IMU_ONLY_MATCH_S * 1000));
   }
 
-  return { corners, diagnostics, detectorPointCount: base.detectorPointCount, turns, imuOnly, rescued };
+  const result = { corners, diagnostics, detectorPointCount: base.detectorPointCount, turns, imuOnly, rescued };
+  return opts.localDirectionState ? appendLocalDirectionTurns(points, result, opts.localDirectionState, lookup) : result;
+}
+
+/** Extend an already evaluated prefix without repeating the baseline sweep. */
+export function appendLocalDirectionTurns(
+  points: readonly ShortLegPoint[], result: FusionResult, state: LocalDirectionState, lookup?: TurnEvidenceLookup,
+): FusionResult {
+  const { corners, diagnostics, turns } = result;
+  const byApex = new Map(diagnostics.map(d => [d.apexIndex, d]));
+  const additions = confirmLocalDirections(state, points, diagnostics, corners, lookup);
+  for (const d of additions) {
+    const atM = points[d.apexIndex].cumDist;
+    if (corners.some(c => Math.abs(c.atM - atM) < CORNER_GAP_M)) continue;
+    const turn = turnFromDiag(d, atM, null);
+    turn.flags.push('local_direction_confirmed');
+    turns.push(turn);
+    corners.push({ kind: turn.kind, apexIndex: turn.apexIndex, atM });
+    Object.assign(byApex.get(d.apexIndex)!, d);
+    result.rescued++;
+  }
+  corners.sort((a, b) => a.atM - b.atM);
+  turns.sort((a, b) => a.atM - b.atM);
+  return result;
 }
