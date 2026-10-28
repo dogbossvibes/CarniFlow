@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, UIManager, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MAPS_AVAILABLE, RNMaps } from '@/components/tracking/TrackMap';
 import { C } from '@/constants/colors';
 
 export const SWISSIMAGE_TEST_URL = 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg';
 /** Deliberately separate from all recording maps; no location request or track data. */
 export function SwissMapTest() {
+  const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const [imagery, setImagery] = useState(true);
   let supported = false;
@@ -18,8 +19,11 @@ export function SwissMapTest() {
     {supported ? <Pressable accessibilityRole="button" accessibilityLabel="Luftbilder testen" style={s.button} onPress={() => { setImagery(true); setOpen(true); }}><Text style={s.action}>Luftbilder testen</Text></Pressable>
       : <Text style={s.text}>Diese Testansicht wird vom installierten Kartenmodul nicht unterstützt.</Text>}
     <Modal visible={open} presentationStyle="fullScreen" animationType="slide" onRequestClose={() => setOpen(false)}>
-      <SafeAreaView style={s.screen}>
+      <SafeAreaView style={s.screen} edges={['bottom', 'left', 'right']}>
+        <View testID="swiss-map-header" style={{ paddingTop: insets.top + 8, flexShrink: 0 }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Luftbild-Test schließen" style={s.button} onPress={() => setOpen(false)}><Text style={s.action}>Schließen</Text></Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <Text style={s.title}>swisstopo · Testansicht</Text>
         <Text style={s.text}>Luftbilder verbessern die Orientierung, nicht die GPS-Messung. Nur Schweizer Abdeckung; bei fehlenden Bildern zur Standardkarte wechseln.</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={imagery ? 'Standardkarte anzeigen' : 'Schweizer Luftbilder anzeigen'} style={s.button} onPress={() => setImagery(v => !v)}><Text style={s.action}>{imagery ? 'Standardkarte anzeigen' : 'Schweizer Luftbilder anzeigen'}</Text></Pressable>
@@ -29,7 +33,8 @@ export function SwissMapTest() {
             {imagery ? <Tile urlTemplate={SWISSIMAGE_TEST_URL} maximumZ={18} maximumNativeZ={18} minimumZ={8} tileSize={256} flipY={false} shouldReplaceMapContent={false} /> : null}
           </Map> : null}
         </View>
-        <Text style={s.text}>© swisstopo · SWISSIMAGE · Bildstand regional unterschiedlich</Text>
+        {imagery && <Text style={s.text}>© swisstopo · SWISSIMAGE · Bildstand regional unterschiedlich</Text>}
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   </View>;
@@ -39,5 +44,5 @@ const s = StyleSheet.create({
   title: { color: C.trackText, fontWeight: '700', marginBottom: 8 },
   text: { color: C.trackTextSec, marginBottom: 10 },
   button: { minHeight: 48, justifyContent: 'center', padding: 10 }, action: { color: C.trackPrimary, fontWeight: '700' },
-  screen: { flex: 1, backgroundColor: C.card, paddingHorizontal: 16 }, map: { flex: 1, minHeight: 120, marginBottom: 10 },
+  screen: { flex: 1, backgroundColor: C.card, paddingHorizontal: 16 }, map: { flex: 1, minHeight: 240, marginBottom: 10 },
 });

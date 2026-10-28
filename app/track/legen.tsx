@@ -1,3 +1,4 @@
+import { WarmupMapPreview } from '@/features/tracking/components/WarmupMapPreview';
 import { useLayPlan } from '@/features/tracking-planner/useLayPlan';
 import { LayPlanControl } from '@/features/tracking-planner/LayPlanControl';
 import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
@@ -781,6 +782,7 @@ export default function LegenScreen() {
                   </Text>
 
                   <Text style={{ color: FT.muted, fontSize: 13, lineHeight: 19, alignSelf: 'stretch', marginBottom: 12 }}>{t('track.startOutdoorHint')}</Text>
+                  {view === 'map' && <WarmupMapPreview position={currentPosition} />}
                   {/* Hund */}
                   {dogs.length > 0 && (
                     <>

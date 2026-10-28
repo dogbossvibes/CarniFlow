@@ -10,7 +10,7 @@ export const deCH = {
   "track.startStatus.inaccurate": "Position noch zu ungenau",
   "track.startStatus.stale": "Warte auf aktuelle Position",
   "track.startStatus.permission": "Standortzugriff erforderlich",
-  "track.startAccuracy": "Geschätzte Genauigkeit ±{{accuracy}} m",
+  "track.startAccuracy": "Geschätzte Genauigkeit ±{accuracy} m",
   "track.startOutdoorHint": "Warte vor dem Start unter freiem Himmel auf eine aktuelle Position. Gebäude und Bäume können den Empfang verschlechtern.",
 
   "track.pauseMarkerHint": "Aufnahme pausiert. Bitte zuerst fortsetzen.",

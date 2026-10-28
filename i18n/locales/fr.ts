@@ -11,7 +11,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.startStatus.inaccurate": "Position encore trop imprécise",
   "track.startStatus.stale": "En attente d’une position récente",
   "track.startStatus.permission": "Accès à la position requis",
-  "track.startAccuracy": "Précision estimée ±{{accuracy}} m",
+  "track.startAccuracy": "Précision estimée ±{accuracy} m",
   "track.startOutdoorHint": "Avant de démarrer, attendez une position récente à ciel ouvert. Les bâtiments et les arbres peuvent réduire la réception.",
 
   "track.pauseMarkerHint": "Enregistrement en pause. Reprenez d’abord.",

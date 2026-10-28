@@ -10,7 +10,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "track.startStatus.inaccurate": "Position no z ungenau",
   "track.startStatus.stale": "Warte uf aktuelli Position",
   "track.startStatus.permission": "Standortzugriff nötig",
-  "track.startAccuracy": "Gschätzti Genauigkeit ±{{accuracy}} m",
+  "track.startAccuracy": "Gschätzti Genauigkeit ±{accuracy} m",
   "track.startOutdoorHint": "Wart vor em Start under freiem Himmel uf e aktuelli Position. Gebäude und Bäum chönd de Empfang verschlechtere.",
 
   "track.pauseMarkerHint": "Ufnahm pausiert. Bitte zerscht wiitermache.",

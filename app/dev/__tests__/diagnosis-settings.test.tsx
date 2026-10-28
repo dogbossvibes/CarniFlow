@@ -18,6 +18,11 @@ jest.mock('@/lib/diagnosticsAccessState', () => ({
   subscribeDiagnosticsAccess: () => () => {},
 }));
 jest.mock('@/components/DiagnosticsRouteGate', () => ({ DiagnosticsRouteGate: ({ children }: { children: React.ReactNode }) => children }));
+// The standalone screen fixture has no app-root SafeAreaProvider.
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }),
+}));
 jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }) }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.5', nativeBuildVersion: '52' }));

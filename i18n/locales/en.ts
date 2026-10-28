@@ -7,7 +7,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.startStatus.inaccurate": "Position not accurate enough",
   "track.startStatus.stale": "Waiting for a fresh position",
   "track.startStatus.permission": "Location access required",
-  "track.startAccuracy": "Estimated accuracy ±{{accuracy}} m",
+  "track.startAccuracy": "Estimated accuracy ±{accuracy} m",
   "track.startOutdoorHint": "Before starting, wait for a fresh position under open sky. Buildings and trees can reduce reception.",
 
   "track.pauseMarkerHint": "Recording paused. Resume first.",

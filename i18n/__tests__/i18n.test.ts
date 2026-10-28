@@ -107,3 +107,8 @@ describe('i18n Phase 1 — Intl-Formatter', () => {
     expect(formatDistance(1500, 'en')).toMatch(/1\.5\s?km/);
   });
 });
+
+it.each(['de','gsw','en','fr','it'] as const)('renders actual GPS accuracy in %s without template braces', locale => {
+ const text=translate('track.startAccuracy',{accuracy:13},locale);
+ expect(text).toContain('13');expect(text).not.toMatch(/[{}]/);
+});
