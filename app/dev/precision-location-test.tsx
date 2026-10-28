@@ -1,3 +1,4 @@
+import { SwissMapTest } from '@/features/tracking/components/SwissMapTest';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -465,6 +466,7 @@ function PrecisionLocationTestContent() {
         )}
 
         <PositionQualityDiagnostics />
+        <SwissMapTest />
         <ShellyDiagnosticsPanel />
 
         <Section title={`Separater Modultest · ${count} Updates`}>

@@ -17,6 +17,11 @@ export function PositionQualityDiagnostics() {
     <Text style={s.title}>Qualität der aktiven Fährtenquelle</Text>
     <Text style={s.line}>Quelle: {fix?.source ?? 'noch keine'} · {state.active ? 'aktiv' : 'gestoppt'}</Text>
     <Text style={s.line}>Letzter Fix: {age == null ? 'unbekannt' : `${(age / 1000).toFixed(1)} s`} · {fresh ? 'aktuell' : 'keine frische Messung'}</Text>
+    <Text style={s.line}>Messungen empfangen: {state.timing.received}</Text>
+    <Text style={s.line}>Letzter Messabstand: {state.timing.lastIntervalMs == null ? 'unbekannt' : `${(state.timing.lastIntervalMs / 1000).toFixed(1)} s`}</Text>
+    <Text style={s.line}>Größter Messabstand: {(state.timing.largestGapMs / 1000).toFixed(1)} s</Text>
+    <Text style={s.line}>Gleiche / rückläufige Zeitstempel: {state.timing.duplicates} / {state.timing.outOfOrder}</Text>
+    <Text style={s.note}>Seit Start dieser Positionsquelle. Ein Zeitabstand belegt allein keinen Satellitenausfall. Keine Koordinaten werden hierfür gespeichert.</Text>
     <Text style={s.line}>Lagegenauigkeit: {uncertainty(fix?.accuracy, 'm')}</Text>
     <Text style={s.line}>Höhengenauigkeit: {uncertainty(fix?.altitudeAccuracy, 'm')}</Text>
     <Text style={s.line}>Geschwindigkeitsgenauigkeit: {uncertainty(fix?.speedAccuracy, 'm/s')}</Text>
