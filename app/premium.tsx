@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
@@ -11,15 +11,17 @@ import { haptic } from '@/lib/haptics';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { supabase } from '@/lib/supabase';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, ensurePurchasesConfigured, isPurchaseAccountCurrent, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, buyPackage, restorePurchases, purchasesReady, hasStorePackageForProduct, restorePlanFromResult, getActiveStoreProductId, ensurePurchasesConfigured, isPurchaseAccountCurrent, getCurrentStoreSubscription, type EntitlementResult, type PurchasePackage } from '@/lib/purchases';
 import {
-  activatePlan, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial,
+  activatePlan, getFounderSlots, claimFounderSlot, getPlanSubscription, cancelTrial, type PlanSubscription,
 } from '@/services/subscriptionService';
 import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
 import { useT } from '@/i18n';
 import type { TranslationKey } from '@/i18n/de-CH';
 
 import { useAccess } from '@/hooks/useAccess';
+import { resolvePurchasePlan } from '@/features/subscription/purchaseState';
+import { useSession } from '@/hooks/useSession';
 import { useInternalTester } from '@/hooks/useInternalTester';
 
 // Apple 3.1.2 (Auto-Renewable Subscriptions): funktionierende Links zu den
@@ -58,9 +60,14 @@ export default function PremiumScreen() {
   const [laden, setLaden] = useState<SubscriptionPlan | null>(null);
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
   const [slots, setSlots] = useState<{ used: number; remaining: number }>({ used: 0, remaining: FOUNDER_SLOT_LIMIT });
-  const [currentPlan, setCurrentPlan] = useState<SubscriptionPlan | null>(null);
-  const [subStatus, setSubStatus] = useState<string | null>(null);
-  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [storedSubscription, setStoredSubscription] = useState<PlanSubscription | null>(null);
+  const [storeRead, setStoreRead] = useState<EntitlementResult | null>(null);
+  const currentPlan = resolvePurchasePlan(storedSubscription, storeRead);
+  const subStatus = storedSubscription?.status ?? null;
+  const trialEndsAt = storedSubscription?.trial_ends_at ?? null;
+  const { session } = useSession();
+  const uid = session?.user.id;
+  const loadGeneration = useRef(0);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const { access } = useAccess();
   const activeLifetime = access.planType === 'active_lifetime';
@@ -71,23 +78,34 @@ export default function PremiumScreen() {
   // ROOT FIX (Apple 2.1b): RevenueCat GARANTIERT initialisieren, BEVOR Offerings
   // geladen werden — sonst „no singleton" / leere Paywall. Danach erst getOfferings.
   const loadIap = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setIapLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    await ensurePurchasesConfigured(user?.id);
-    const pkgs = await getPackages();
-    setPackages(pkgs);
-    setSlots(await getFounderSlots());
-    if (user) {
-      const sub = await getPlanSubscription(user.id);
-      setCurrentPlan(sub?.plan ?? null);
-      setSubStatus(sub?.status ?? null);
-      setTrialEndsAt(sub?.trial_ends_at ?? null);
+    setPackages([]);
+    setStoreRead(null);
+    setStoredSubscription(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.id !== uid) return;
+      await ensurePurchasesConfigured(user.id);
+      const [pkgs, founderSlots, sub, native] = await Promise.all([
+        getPackages(), getFounderSlots(), getPlanSubscription(user.id), getCurrentStoreSubscription(user.id),
+      ]);
+      if (generation !== loadGeneration.current || !isPurchaseAccountCurrent(user.id)) return;
+      setPackages(pkgs);
+      setSlots(founderSlots);
+      setStoredSubscription(sub);
+      setStoreRead(native);
       setCancelAtPeriodEnd(sub?.cancel_at_period_end === true);
-    }
-    setIapLoading(false);
-  }, []);
+    } catch {
+      // Preserve the existing error/retry view; never leave an unhandled load.
+    } finally { if (generation === loadGeneration.current) setIapLoading(false); }
+  }, [uid]);
 
-  useEffect(() => { void loadIap(); }, [loadIap]);
+  const invalidateLoad = useCallback(() => { loadGeneration.current++; }, []);
+  useEffect(() => {
+    void loadIap().catch(() => {});
+    return invalidateLoad;
+  }, [loadIap, invalidateLoad]);
 
   const iapReady = purchasesReady() && packages.length > 0;
   // Nach dem Laden konfiguriert, aber keine Produkte → echter Ladefehler (Retry anbieten).
@@ -122,8 +140,9 @@ export default function PremiumScreen() {
 
   const finish = (plan: SubscriptionPlan) => {
     haptic.success();   // Kauf/Aktivierung erfolgreich
-    queryClient.invalidateQueries({ queryKey: ['capabilities'] });
-    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    queryClient.invalidateQueries({ queryKey: ['capabilities', uid] });
+    queryClient.invalidateQueries({ queryKey: ['profile', uid] });
+    queryClient.invalidateQueries({ queryKey: ['userAccess', uid] });
     Alert.alert(t('premium.activeTitle', { plan: PLAN_META[plan].name }), t('premium.unlocked'), [{ text: t('trainer.letsGo'), onPress: () => router.back() }]);
   };
 
@@ -138,9 +157,25 @@ export default function PremiumScreen() {
     }
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { Alert.alert(t('trainer.connectHintTitle'), t('premium.loginRequired')); return; }
+    if (user.id !== uid) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
+    let switchFrom = switchSourcePlan;
+    let storeFrom = storeRead?.ok ? storeRead.plan : null;
+    if (plan !== 'newbie' && purchasesReady()) {
+      const latest = await getCurrentStoreSubscription(user.id);
+      if (!latest.ok) { Alert.alert(t('common.notice'), t('premium.notLoaded')); return; }
+      if (!isPurchaseAccountCurrent(user.id)) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
+      setStoreRead(latest);
+      const freshPlan = resolvePurchasePlan(storedSubscription, latest);
+      if (!latest.plan && freshPlan && freshPlan !== 'newbie' && !access.isLifetime) {
+        Alert.alert(t('common.notice'), t('premium.syncPending'));
+        return;
+      }
+      storeFrom = latest.plan;
+      switchFrom = activeLifetime && freshPlan !== 'trainer' ? 'active' : freshPlan;
+    }
     // In-App nur erlaubte Upgrades. Downgrades/gesperrte Wechsel (inkl. Founder für
     // bestehende Zahler) laufen ausschliesslich über die Store-Abo-Verwaltung.
-    if (plan !== 'newbie' && switchSourcePlan && !canSwitchPlanInApp(switchSourcePlan, plan, { founderAvailable, platform: Platform.OS })) {
+    if (plan !== 'newbie' && switchFrom && !canSwitchPlanInApp(switchFrom, plan, { founderAvailable, platform: Platform.OS })) {
       Alert.alert(t('common.notice'), t('membership.switchViaStore'));
       return;
     }
@@ -181,7 +216,7 @@ export default function PremiumScreen() {
         // zweitem parallelem Abo. Fehlt er, würde Google doppelt abrechnen → dann
         // auf die Store-Abo-Verwaltung verweisen. iOS bleibt unverändert (Group).
         let oldProductIdentifier: string | null = null;
-        if (Platform.OS === 'android' && currentPlan && currentPlan !== 'newbie' && plan !== currentPlan) {
+        if (Platform.OS === 'android' && storeFrom && plan !== storeFrom) {
           oldProductIdentifier = await getActiveStoreProductId(user.id);
           if (!oldProductIdentifier) {
             haptic.warning();
@@ -192,10 +227,10 @@ export default function PremiumScreen() {
         const res = await buyPackage(pkg, { oldProductIdentifier, userId: user.id });
         if (res.cancelled) return;
         if (!res.ok) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), res.error?.startsWith('IAP_ACCOUNT_') ? t('premium.accountChanged') : (res.error ?? t('premium.purchaseIncomplete'))); return; }
-        const { error } = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration, providerProductId: meta.productId });
-        if (error) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), t(error === 'SUBSCRIPTION_SYNC_PENDING' ? 'premium.syncPending' : 'premium.activationFailed')); return; }
+        const activation = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration, providerProductId: meta.productId });
+        if (activation.error) { haptic.error(); Alert.alert(t('trainer.connectHintTitle'), t(activation.pending ? 'premium.syncPending' : 'premium.activationFailed')); return; }
         if (!isPurchaseAccountCurrent(user.id)) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
-        finish(plan);
+        finish(activation.plan ?? plan);
       } else if (purchasesReady()) {
         Alert.alert(t('trainer.connectHintTitle'), plan === 'trainer' ? t('premium.trainerPackageUnavailable') : t('premium.packageUnavailable'));
       } else if (__DEV__) {
@@ -222,6 +257,7 @@ export default function PremiumScreen() {
         { text: t('premium.cancel'), style: 'destructive', onPress: async () => {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
+          if (user.id !== uid) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
           const { error } = await cancelTrial(user.id);
           if (error) { Alert.alert(t('trainer.connectHintTitle'), t('premium.cancelError')); return; }
           setCancelAtPeriodEnd(true);
@@ -237,6 +273,7 @@ export default function PremiumScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { Alert.alert(t('common.notice'), t('premium.loginRequired')); return; }
+      if (user.id !== uid) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
       const res = await restorePurchases(user.id);
       if (!res.ok) { Alert.alert(t('common.notice'), t(res.error?.startsWith('IAP_ACCOUNT_') ? 'premium.accountChanged' : 'premium.activationFailed')); return; }
       const plan = restorePlanFromResult(res, currentPlan);
@@ -244,6 +281,9 @@ export default function PremiumScreen() {
       const activation = await activatePlan({ userId: user.id, plan, periodEndsAt: res.expiration });
       if (activation.error) { Alert.alert(t('common.notice'), t(activation.pending ? 'premium.syncPending' : 'premium.activationFailed')); return; }
       if (!isPurchaseAccountCurrent(user.id)) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
+      queryClient.invalidateQueries({ queryKey: ['capabilities', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['profile', user.id] });
+      queryClient.invalidateQueries({ queryKey: ['userAccess', user.id] });
       haptic.success();
       Alert.alert(t('premium.restored'), t('premium.restoredBody'), [{ text: 'OK', onPress: () => router.back() }]);
     } catch { Alert.alert(t('common.notice'), t('premium.activationFailed')); }
@@ -384,7 +424,7 @@ export default function PremiumScreen() {
                   <Text style={S.soldOutTxt}>{t('premium.notLoaded')}</Text>
                 </TouchableOpacity>
               ) : (
-                <AnimatedPressable style={[S.cta, !filled && S.ctaAlt]} scale={0.97} onPress={() => choose(card.plan)} disabled={busy}>
+                <AnimatedPressable accessibilityRole="button" accessibilityLabel={card.plan === 'newbie' ? t('premium.startFree') : t('premium.choosePlan', { plan: meta.name })} style={[S.cta, !filled && S.ctaAlt]} scale={0.97} onPress={() => choose(card.plan)} disabled={busy}>
                   {filled && <LinearGradient colors={['#00FFCC', '#00f0c8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
                   {busy ? <ActivityIndicator color={filled ? C.accentText : C.white} /> : (
                     <Text style={[S.ctaTxt, filled ? { color: C.accentText } : { color: C.white }]}>
