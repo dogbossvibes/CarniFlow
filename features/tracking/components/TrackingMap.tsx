@@ -74,7 +74,13 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
       <Text style={s.owTriTxt}>{label || 'OW'}</Text>
     </View>
   );
-  else if (kind === 'angle') child = <View style={[s.angleBadge, acute && s.angleBadgeAcute]}><Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute]}>{label}</Text></View>;
+  else if (kind === 'angle') {
+    // Only resolved directions get the simple badge; legacy and special labels retain their semantics.
+    const resolved = label === 'L' || label === 'R' || label === 'SR' || label === 'SL';
+    child = <View style={[s.angleBadge, acute && s.angleBadgeAcute, resolved && s.directionBadge]}>
+      <Text style={[s.angleBadgeTxt, acute && s.angleBadgeTxtAcute, resolved && s.directionBadgeText]}>{label}</Text>
+    </View>;
+  }
   // Kleine sichtbare Fläche, großer transparenter Markerrahmen für die Auswahl.
   // Die vollständigen Einträge bleiben im Detail-Sheet und Accessibility-Label.
   else if (kind === 'group') child = (
@@ -586,6 +592,8 @@ const s = StyleSheet.create({
   angleBadge:    { minWidth: 20, height: 17, paddingHorizontal: 4, borderRadius: 4, backgroundColor: C.trackPrimary, borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   angleBadgeTxt: { fontSize: 8.5, fontWeight: '900', color: '#04110F', letterSpacing: 0.2 },
   // Spitzwinkel: dünnere Umriss-Optik (dunkler Grund, Mint-Rand/-Text) → klar anders als 90°.
+  directionBadge: { minWidth: 26, height: 24, paddingHorizontal: 5, borderRadius: 6, backgroundColor: C.trackPrimary, borderColor: '#04110F', borderWidth: 1 },
+  directionBadgeText: { fontSize: 11, color: '#04110F', fontWeight: '800' },
   angleBadgeAcute:    { backgroundColor: 'rgba(4,17,15,0.82)', borderColor: C.trackPrimary, borderWidth: 1 },
   angleBadgeTxtAcute: { color: C.trackPrimary },
   // Sammelmarker: Anzahl statt breitem Textfeld; keine zusätzliche weiße Fläche.
