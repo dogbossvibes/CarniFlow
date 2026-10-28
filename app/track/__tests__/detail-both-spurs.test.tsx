@@ -1,6 +1,7 @@
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { findNodeHandle,TextInput } from 'react-native';
+import { findNodeHandle, TextInput } from 'react-native';
+import { TrackMapSummary } from '@/features/tracking/components/TrackMapSummary';
 import {LegBars} from '@/features/tracking/components/LegBars';
 import Detail from '@/app/track/[id]';
 import { TrackingMap } from '@/features/tracking/components/TrackingMap';
@@ -108,4 +109,26 @@ it('does not claim the search was never recorded when its persisted line is visi
  mockDetail.mockResolvedValue({data:remote,error:null});mockLocal.mockResolvedValue(saved());await mount();
  const text=JSON.stringify((view as unknown as {toJSON:()=>unknown}).toJSON());expect(text).toContain('Die Suchspur ist in der Karte sichtbar.');
  expect(text).not.toContain('die Absuche hat keine verwertbare Suchspur aufgezeichnet');
+});
+
+
+it('fullscreen controls preserve draft notes and both stored coordinate arrays across close and reopen', async () => {
+ mockDetail.mockResolvedValue({data:saved(),error:null}); mockLocal.mockResolvedValue(saved()); await mount();
+ act(()=>view.root.findByType(TextInput).props.onChangeText('Nicht verlieren'));
+ const initial=mapProps().at(-1);
+ act(()=>mapProps().find(p=>p.onFullscreen).onFullscreen());
+ expect(view.root.findAll(n=>n.props.presentationStyle==='fullScreen')[0].props.visible).toBe(true);
+ const layer=view.root.findAll(n=>typeof n.props.onPress==='function'&&n.props.accessibilityLabel==='Straßenkarte anzeigen')[0];
+ act(()=>layer.props.onPress());
+ expect(mapProps().at(-1).mapType).toBe('standard');
+ const fit=view.root.findAll(n=>typeof n.props.onPress==='function'&&n.props.accessibilityLabel==='Gesamte Fährte anzeigen')[0];
+ const token=mapProps().at(-1).fitToTrackToken; act(()=>fit.props.onPress());
+ expect(mapProps().at(-1).fitToTrackToken).toBe(token+1);
+ act(()=>view.root.findByType(TrackMapSummary).props.onAnalysis());
+ expect(view.root.findAll(n=>n.props.presentationStyle==='fullScreen')[0].props.visible).toBe(false);
+ expect(view.root.findByType(TextInput).props.value).toBe('Nicht verlieren');
+ act(()=>mapProps().find(p=>p.onFullscreen).onFullscreen());
+ expect(view.root.findAll(n=>n.props.presentationStyle==='fullScreen')[0].props.visible).toBe(true);
+ expect(mapProps().at(-1).layPoints).toEqual(initial.layPoints);
+ expect(mapProps().at(-1).runPoints).toEqual(initial.runPoints);
 });
