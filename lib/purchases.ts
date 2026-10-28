@@ -120,12 +120,9 @@ export function planFromCustomerInfo(info: any): RestorablePlan | null {
   }
   if (activeSubscriptionPlan) return activeSubscriptionPlan;
 
-  let legacyPurchasedPlan: RestorablePlan | null = null;
-  for (const identifier of info?.allPurchasedProductIdentifiers ?? []) {
-    legacyPurchasedPlan = betterPlan(legacyPurchasedPlan, rankIdentifier(identifier));
-  }
-
-  return legacyPurchasedPlan;
+  // Historical identifiers include expired/refunded purchases. Only current
+  // entitlements/subscriptions can select a paid restore; the server verifies it.
+  return null;
 }
 
 export function restorePlanFromResult(result: EntitlementResult, currentPlan: SubscriptionPlan | null): RestorablePlan | null {
@@ -254,6 +251,26 @@ export async function restorePurchases(userId: string): Promise<EntitlementResul
     return fromInfo(await purchaseAccount().run(userId, () => Purchases.restorePurchases()));
   } catch (e: any) {
     return { ok: false, tier: null, plan: null, expiration: null, error: e?.message ?? 'Wiederherstellen fehlgeschlagen' };
+  }
+}
+
+/** Fresh Store state is used only to present purchase actions, never to grant
+ * capabilities. The adapter rejects results from a previous account/session. */
+export async function getCurrentStoreSubscription(userId: string): Promise<EntitlementResult> {
+  if (!Purchases || !purchasesApiKey()) return { ok: false, tier: null, plan: null, expiration: null };
+  try {
+    const info = await purchaseAccount().run(userId, async () => {
+      await Purchases.invalidateCustomerInfoCache?.();
+      return Purchases.getCustomerInfo();
+    });
+    const result = fromInfo(info);
+    if (!result.plan && ((info as any)?.activeSubscriptions?.length ||
+      Object.keys((info as any)?.entitlements?.active ?? {}).length)) {
+      return { ok: false, tier: null, plan: null, expiration: null };
+    }
+    return result;
+  } catch {
+    return { ok: false, tier: null, plan: null, expiration: null };
   }
 }
 
