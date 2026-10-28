@@ -9,6 +9,7 @@ jest.mock('@/lib/supabase', () => ({ supabase: { auth: {
   onAuthStateChange: (cb: typeof mockAuthEvent) => { mockAuthEvent = cb; return { data: { subscription: { unsubscribe: jest.fn() } } }; },
 } } }));
 jest.mock('@/services/localeSync', () => ({ initLocaleSync: jest.fn(), stopLocaleSync: jest.fn() }));
+jest.mock('@/hooks/useSubscriptionSyncRecovery', () => ({ useSubscriptionSyncRecovery: jest.fn() }));
 jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
 let renderer: ReactTestRenderer | null;
 beforeEach(() => { jest.useFakeTimers(); setDiagnosticsSession(null); act(() => { renderer = TestRenderer.create(<SessionProvider>{null}</SessionProvider>); }); });
