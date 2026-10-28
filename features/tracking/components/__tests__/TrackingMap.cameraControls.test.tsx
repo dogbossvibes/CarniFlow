@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 // Real camera hook and rendered map controls must share the same follow state.
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -46,4 +47,21 @@ it('north and free controls agree with visible follow status',()=>{
  press('track.mapMode.free');expect(tree.root.findAll(n=>n.props.accessibilityLabel==='track.mapFollow.enableLabel').length).toBeGreaterThan(0);
  press('track.mapFollow.enableLabel');expect(tree.root.findAll(n=>n.props.accessibilityLabel==='track.mapFollow.disableLabel').length).toBeGreaterThan(0);
  expect(tree.root.findAll(n=>n.props.testID==='track-camera-mode').length).toBeGreaterThan(0);
+});
+
+it('switches all map layers without remounting the map or moving the camera', () => {
+ const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+ act(() => { tree = TestRenderer.create(<Harness/>); });
+ const originalMap = tree.root.findByType(RNMaps!.default);
+ const cameraCalls = mockMapApi.animateCamera.mock.calls.length;
+ for (const [current, next, index] of [['Hybrid', 'standard', 0], ['Standard', 'satellite', 1], ['Satellit', 'hybrid', 2]] as const) {
+  press(`Kartenart: ${current}. Ändern`);
+  const buttons = alert.mock.calls.at(-1)![2]!;
+  act(() => { buttons[index].onPress?.(); });
+  expect(tree.root.findByType(RNMaps!.default)).toBe(originalMap);
+  expect(originalMap.props.mapType).toBe(next);
+  expect(originalMap.props.showsScale).toBe(false);
+ }
+ expect(mockMapApi.animateCamera.mock.calls.length).toBe(cameraCalls);
+ alert.mockRestore();
 });

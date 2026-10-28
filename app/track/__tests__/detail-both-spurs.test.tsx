@@ -1,6 +1,6 @@
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { findNodeHandle, TextInput } from 'react-native';
+import { Alert, findNodeHandle, TextInput } from 'react-native';
 import { TrackMapSummary } from '@/features/tracking/components/TrackMapSummary';
 import {LegBars} from '@/features/tracking/components/LegBars';
 import Detail from '@/app/track/[id]';
@@ -118,9 +118,20 @@ it('fullscreen controls preserve draft notes and both stored coordinate arrays a
  const initial=mapProps().at(-1);
  act(()=>mapProps().find(p=>p.onFullscreen).onFullscreen());
  expect(view.root.findAll(n=>n.props.presentationStyle==='fullScreen')[0].props.visible).toBe(true);
- const layer=view.root.findAll(n=>typeof n.props.onPress==='function'&&n.props.accessibilityLabel==='Straßenkarte anzeigen')[0];
- act(()=>layer.props.onPress());
- expect(mapProps().at(-1).mapType).toBe('standard');
+ const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
+ for (const [label, index, value] of [['Hybrid',2,'hybrid'],['Hybrid',0,'standard'],['Standard',1,'satellite'],['Satellit',2,'hybrid']] as const) {
+  const layer=view.root.findAll(n=>typeof n.props.onPress==='function'&&n.props.accessibilityLabel===`Kartenart: ${label}. Ändern`)[0];
+  act(()=>layer.props.onPress());
+  const options=alert.mock.calls.at(-1)![2]!;
+  expect(options).toHaveLength(3);
+  act(()=>options[index].onPress?.());
+  expect(mapProps().at(-1).mapType).toBe(value);
+  expect(mapProps().at(-1).layPoints).toEqual(initial.layPoints);
+  expect(mapProps().at(-1).runPoints).toEqual(initial.runPoints);
+  expect(mapProps().at(-1).markers).toEqual(initial.markers);
+  expect(view.root.findByType(TextInput).props.value).toBe('Nicht verlieren');
+ }
+ alert.mockRestore();
  const fit=view.root.findAll(n=>typeof n.props.onPress==='function'&&n.props.accessibilityLabel==='Gesamte Fährte anzeigen')[0];
  const token=mapProps().at(-1).fitToTrackToken; act(()=>fit.props.onPress());
  expect(mapProps().at(-1).fitToTrackToken).toBe(token+1);

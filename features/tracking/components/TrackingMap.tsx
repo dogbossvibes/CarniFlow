@@ -1,3 +1,4 @@
+import { MapLayerButton, type TrackingMapLayer } from './MapLayerButton';
 import { isTrainingJoker, objectNumbers } from '@/features/tracking/utils/objectMarkers';
 import { groupMapFeatures } from '../utils/mapMarkerGroups';
 import { MarkerDetailSheet, describeSelection, type TrackDetailItem, type TrackDetailSelection } from './MarkerDetailSheet';
@@ -163,6 +164,7 @@ export function TrackingMap({
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
+  const [selectedLayer, setSelectedLayer] = useState<TrackingMapLayer | null>(null);
   const mapRef = useRef<any>(null);
   const initialFitDoneRef = useRef(false);
   const lastFitTokenRef = useRef<number | undefined>(undefined);
@@ -314,7 +316,7 @@ export function TrackingMap({
         ref={mapRef}
         provider={RNMaps.PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFill}
-        mapType={mapType}
+        mapType={selectedLayer ?? mapType}
         showsUserLocation={showUserLocation}
         showsCompass={false}
         showsMyLocationButton={false}
@@ -474,6 +476,7 @@ export function TrackingMap({
       {/* Floating Buttons rechts */}
       {!hideControls && (
         <View style={[s.fabCol, { top: controlsTop }]}>
+          <MapLayerButton value={selectedLayer ?? mapType} onChange={setSelectedLayer} />
           {onFullscreen && <Fab icon="expand-outline" onPress={onFullscreen} />}
           {onCompass && <Fab icon="compass-outline" onPress={onCompass} />}
 

@@ -1,3 +1,4 @@
+import { MapLayerButton, type TrackingMapLayer } from './MapLayerButton';
 import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -57,6 +58,7 @@ export const SEARCH_ROUTE_FULL_STROKE = C.trackBlue + '73';
 export const SEARCH_ROUTE_PLAYED_STROKE = C.trackBlue;
 
 export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, heatmapParts, puckPosition, runPoints = [], playedPoints = [], startAnchor, endPoint, onMarkerPress }: Props) {
+  const [mapLayer, setMapLayer] = useState<TrackingMapLayer>('hybrid');
   const mapRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   const fitDoneRef = useRef(false);
@@ -97,7 +99,7 @@ export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, 
         ref={mapRef}
         provider={RNMaps.PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFill}
-        mapType="hybrid"
+        mapType={mapLayer}
         showsUserLocation={false}
         showsCompass={false}
         showsMyLocationButton={false}
@@ -182,6 +184,7 @@ export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, 
           </Marker>
         )}
       </MapView>
+      <MapLayerButton value={mapLayer} onChange={setMapLayer} style={{ position: 'absolute', top: 12, right: 12 }} />
 
       {/* Legende Referenz vs. Absuche — dieselben Tokens wie die Polylines. */}
       <View style={s.legend} pointerEvents="none">

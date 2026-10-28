@@ -1,3 +1,4 @@
+import { MapLayerButton, type TrackingMapLayer } from '@/features/tracking/components/MapLayerButton';
 import { TrackMapSummary } from '@/features/tracking/components/TrackMapSummary';
 import { scoredObjectSummary } from '@/features/tracking/utils/scoredObjectProjection';
 import { isScoredObject, isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
@@ -280,7 +281,7 @@ export default function TrackAuswertungScreen() {
   const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
   const [fullscreenMap, setFullscreenMap] = useState(false);
   const [fullscreenSel, setFullscreenSel] = useState<TrackDetailSelection | null>(null);
-  const [fullscreenMapType, setFullscreenMapType] = useState<'hybrid' | 'standard'>('hybrid');
+  const [fullscreenMapType, setFullscreenMapType] = useState<TrackingMapLayer>('hybrid');
   const [fullscreenFitToken, setFullscreenFitToken] = useState(0);
   const [sharePickerOpen, setSharePickerOpen] = useState(false);
   const [trainers, setTrainers] = useState<Awaited<ReturnType<typeof listAcceptedTrainers>>>([]);
@@ -979,6 +980,9 @@ export default function TrackAuswertungScreen() {
             <Legend color={layColor} label={t('track.replay.legendReference')} />
             <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} />
           </View>
+          <Text style={s.fullscreenMeasurementNote}>
+            Absuche: Weg des aufzeichnenden Geräts. GPS-Abweichungen sind möglich.
+          </Text>
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
               <TrackingMap
@@ -994,14 +998,7 @@ export default function TrackAuswertungScreen() {
                 currentPosition={null} showUserLocation={false} follow={false} hideControls mapType={fullscreenMapType}
               />
             )}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={fullscreenMapType === 'hybrid' ? 'Straßenkarte anzeigen' : 'Satellitenkarte anzeigen'}
-              onPress={() => setFullscreenMapType(type => type === 'hybrid' ? 'standard' : 'hybrid')}
-              style={s.layerButton}
-            >
-              <Ionicons name="layers-outline" size={22} color={C.trackText} />
-            </Pressable>
+            <MapLayerButton value={fullscreenMapType} onChange={setFullscreenMapType} style={s.layerButton} />
             <Pressable
               accessibilityLabel="Gesamte Fährte anzeigen"
               accessibilityRole="button"
@@ -1093,7 +1090,8 @@ const s = StyleSheet.create({
   fullscreenTitle: { color: C.trackText, fontSize: 17, fontWeight: '800' },
   fullscreenMeta: { paddingHorizontal: 18, paddingBottom: 10, gap: 3 },
   fullscreenDog: { color: C.trackText, fontSize: 16, fontWeight: '700', flexShrink: 1 },
-  layerButton: { position: 'absolute', right: 16, top: 14, width: 48, height: 48, borderRadius: 14, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.trackBorder },
+  layerButton: { position: 'absolute', right: 16, top: 14, borderRadius: 14, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.trackBorder },
+  fullscreenMeasurementNote: { color: C.trackTextSec, backgroundColor: C.trackCard, paddingHorizontal: 18, paddingBottom: 8, fontSize: 12 },
   fullscreenMap: { flex: 1, minHeight: 100 },
   fitButton: { position: 'absolute', left: 16, bottom: 14, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, borderRadius: 12, backgroundColor: C.trackPrimary, borderWidth: 1, borderColor: C.trackPrimaryDk },
   fitButtonText: { color: '#04110F', fontSize: 12, fontWeight: '800' },
