@@ -37,12 +37,12 @@ describe('RevenueCat restore mapping', () => {
     expect(fromCustomerInfo(info([], ['anyvo_trainer_monthly_30.00'])).plan).toBe('trainer');
   });
 
-  it('liest Product-IDs auch aus allPurchasedProductIdentifiers', () => {
+  it('historische Product-IDs allein sind kein laufendes wiederherstellbares Abo', () => {
     expect(fromCustomerInfo({
       entitlements: { active: {} },
       activeSubscriptions: [],
       allPurchasedProductIdentifiers: ['anyvo_founder_active_monthly_8.00'],
-    }).plan).toBe('founder_active');
+    }).plan).toBeNull();
   });
 
   it('Trainer gewinnt bei mehreren Entitlements', () => {
@@ -117,4 +117,9 @@ describe('getActiveStoreProductId', () => {
   it('liefert null, wenn IAP nicht bereit ist (kein Crash)', async () => {
     await expect(getActiveStoreProductId('A')).resolves.toBeNull();
   });
+});
+
+describe('exact verified Google base plans',()=>{
+  test.each([['anyvo_active_monthly_10:anyvo-active-monthly-400','active'],['anyvo_trainer_monthly_30.00:anyvo-trainer-monthly-3000','trainer']])('active Store identifier %s resolves %s',(product,plan)=>expect(fromCustomerInfo(info([],[product])).plan).toBe(plan));
+  test('unknown base plan does not become a recognized purchase',()=>expect(fromCustomerInfo(info([],['anyvo_active_monthly_10:unknown-base-plan'])).plan).toBeNull());
 });

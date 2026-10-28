@@ -73,8 +73,15 @@ export interface EntitlementResult {
 }
 
 export function hasStorePackageForProduct(packages: PurchasePackage[], productId: string | null | undefined): boolean {
-  return !!productId && packages.some(p => p.productId === productId);
+  return !!productId && packages.some(p => canonicalStoreProduct(p.productId) === canonicalStoreProduct(productId));
 }
+
+// Exact base plans observed in the same ANYVO catalog; never strip arbitrary SKUs.
+const STORE_PRODUCT_ALIASES: Record<string, string> = {
+  'anyvo_active_monthly_10:anyvo-active-monthly-400': 'anyvo_active_monthly_10',
+  'anyvo_trainer_monthly_30.00:anyvo-trainer-monthly-3000': 'anyvo_trainer_monthly_30.00',
+};
+function canonicalStoreProduct(identifier: string): string { return STORE_PRODUCT_ALIASES[identifier] ?? identifier; }
 
 const TRAINER_IDS = new Set(['trainer', 'anyvo_trainer_monthly_30.00']);
 const FOUNDER_IDS = new Set(['founder', 'founder_active', 'anyvo_founder_active_monthly_8.00']);
@@ -83,6 +90,7 @@ const NEWBIE_IDS = new Set(['newbie', 'anyvo_newbie_monthly_0']);
 
 function rankIdentifier(id: string | null | undefined): RestorablePlan | null {
   if (!id) return null;
+  id = canonicalStoreProduct(id);
   if (NEWBIE_IDS.has(id)) return null;
   if (TRAINER_IDS.has(id)) return 'trainer';
   if (FOUNDER_IDS.has(id)) return 'founder_active';
@@ -119,12 +127,9 @@ export function planFromCustomerInfo(info: any): RestorablePlan | null {
   }
   if (activeSubscriptionPlan) return activeSubscriptionPlan;
 
-  let legacyPurchasedPlan: RestorablePlan | null = null;
-  for (const identifier of info?.allPurchasedProductIdentifiers ?? []) {
-    legacyPurchasedPlan = betterPlan(legacyPurchasedPlan, rankIdentifier(identifier));
-  }
-
-  return legacyPurchasedPlan;
+  // Historical identifiers include expired/refunded purchases. Only current
+  // entitlements/subscriptions can select a paid restore; the server verifies it.
+  return null;
 }
 
 export function restorePlanFromResult(result: EntitlementResult, currentPlan: SubscriptionPlan | null): RestorablePlan | null {
@@ -155,7 +160,7 @@ export async function getPackages(): Promise<PurchasePackage[]> {
     const offeringId = offerings.current?.identifier ?? '';
     const pkgs = offerings.current?.availablePackages ?? [];
     return pkgs.map((p: any) => {
-      const productId = p.product?.identifier ?? p.identifier;
+      const productId = canonicalStoreProduct(p.product?.identifier ?? p.identifier);
       return {
         id:          p.identifier,
         offeringId,
@@ -253,6 +258,26 @@ export async function restorePurchases(userId: string): Promise<EntitlementResul
     return fromInfo(await purchaseAccount().run(userId, () => Purchases.restorePurchases()));
   } catch (e: any) {
     return { ok: false, tier: null, plan: null, expiration: null, error: e?.message ?? 'Wiederherstellen fehlgeschlagen' };
+  }
+}
+
+/** Fresh Store state is used only to present purchase actions, never to grant
+ * capabilities. The adapter rejects results from a previous account/session. */
+export async function getCurrentStoreSubscription(userId: string): Promise<EntitlementResult> {
+  if (!Purchases || !purchasesApiKey()) return { ok: false, tier: null, plan: null, expiration: null };
+  try {
+    const info = await purchaseAccount().run(userId, async () => {
+      await Purchases.invalidateCustomerInfoCache?.();
+      return Purchases.getCustomerInfo();
+    });
+    const result = fromInfo(info);
+    if (!result.plan && ((info as any)?.activeSubscriptions?.length ||
+      Object.keys((info as any)?.entitlements?.active ?? {}).length)) {
+      return { ok: false, tier: null, plan: null, expiration: null };
+    }
+    return result;
+  } catch {
+    return { ok: false, tier: null, plan: null, expiration: null };
   }
 }
 
