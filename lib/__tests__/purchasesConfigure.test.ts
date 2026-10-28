@@ -1,8 +1,8 @@
-const mockConfigure=jest.fn(),mockIsConfigured=jest.fn(),mockLogIn=jest.fn(),mockGetID=jest.fn();
+const mockInfo=jest.fn(),mockInvalidateInfo=jest.fn(),mockConfigure=jest.fn(),mockIsConfigured=jest.fn(),mockLogIn=jest.fn(),mockGetID=jest.fn();
 let mockUser='A',mockNative='A';
 let mockAuthListener:(event:string,session:{user:{id:string}}|null)=>void=()=>{};
 jest.mock('@/lib/supabase',()=>({supabase:{auth:{getSession:async()=>({data:{session:{user:{id:mockUser}}},error:null}),getUser:async()=>({data:{user:{id:mockUser}},error:null}),onAuthStateChange:(callback:typeof mockAuthListener)=>{mockAuthListener=callback;}}}}));
-jest.mock('react-native-purchases',()=>({__esModule:true,default:{configure:(...a:unknown[])=>mockConfigure(...a),isConfigured:()=>mockIsConfigured(),getAppUserID:()=>mockGetID(),logIn:(uid:string)=>mockLogIn(uid)}}));
+jest.mock('react-native-purchases',()=>({__esModule:true,default:{getCustomerInfo:()=>mockInfo(),invalidateCustomerInfoCache:()=>mockInvalidateInfo(),configure:(...a:unknown[])=>mockConfigure(...a),isConfigured:()=>mockIsConfigured(),getAppUserID:()=>mockGetID(),logIn:(uid:string)=>mockLogIn(uid)}}));
 function load(key='appl_synthetic') {
   process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY=key;
   let mod:typeof import('@/lib/purchases');
@@ -11,7 +11,7 @@ function load(key='appl_synthetic') {
     mod=require('@/lib/purchases');
   });return mod!;
 }
-beforeEach(()=>{mockUser='A';mockNative='A';mockConfigure.mockReset();mockIsConfigured.mockReset().mockResolvedValue(false);mockGetID.mockReset().mockImplementation(async()=>mockNative);mockLogIn.mockReset().mockImplementation(async(uid:string)=>{mockNative=uid;});mockConfigure.mockImplementation(()=>{mockIsConfigured.mockResolvedValue(true);});});
+beforeEach(()=>{mockInfo.mockReset().mockResolvedValue({entitlements:{active:{active:{expirationDate:'2099-01-01'}}},activeSubscriptions:['anyvo_active_monthly_10']});mockInvalidateInfo.mockReset().mockResolvedValue(undefined);mockUser='A';mockNative='A';mockConfigure.mockReset();mockIsConfigured.mockReset().mockResolvedValue(false);mockGetID.mockReset().mockImplementation(async()=>mockNative);mockLogIn.mockReset().mockImplementation(async(uid:string)=>{mockNative=uid;});mockConfigure.mockImplementation(()=>{mockIsConfigured.mockResolvedValue(true);});});
 afterAll(()=>{delete process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY;});
 it('idempotent initialization awaits readiness and configures the authenticated account once',async()=>{
   const m=load();m.configurePurchases('A');await expect(m.ensurePurchasesConfigured('A')).resolves.toBe(true);
@@ -30,3 +30,7 @@ it('configure failure stays controlled and not ready',async()=>{const m=load();m
 it('logout invalidates readiness without creating an anonymous RevenueCat identity',async()=>{
   const m=load();await m.ensurePurchasesConfigured('A');mockAuthListener('SIGNED_OUT',null);expect(m.purchasesReady()).toBe(false);expect(m.isPurchaseAccountCurrent('A')).toBe(false);expect(mockConfigure).toHaveBeenCalledTimes(1);
 });
+
+it('fresh purchase UI state invalidates native cache and retains account checks',async()=>{const m=load();const result=await m.getCurrentStoreSubscription('A');expect(result.plan).toBe('active');expect(mockInvalidateInfo).toHaveBeenCalledTimes(1);expect(mockInvalidateInfo.mock.invocationCallOrder[0]).toBeLessThan(mockInfo.mock.invocationCallOrder[0])});
+it('account change during fresh customer info cannot return the former account plan',async()=>{const m=load();mockInfo.mockImplementation(async()=>{mockUser='B';mockAuthListener('SIGNED_IN',{user:{id:'B'}});return{entitlements:{active:{active:{}}},activeSubscriptions:['anyvo_active_monthly_10']}});expect((await m.getCurrentStoreSubscription('A')).ok).toBe(false)});
+it('unknown active Store product is not interpreted as absence of a subscription',async()=>{const m=load();mockInfo.mockResolvedValue({entitlements:{active:{}},activeSubscriptions:['unrecognized-active-product']});expect((await m.getCurrentStoreSubscription('A')).ok).toBe(false)});
