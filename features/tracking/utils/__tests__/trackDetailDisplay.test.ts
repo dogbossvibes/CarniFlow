@@ -109,3 +109,15 @@ it('a replay extension cannot bypass a known canonical gap even when both sides 
  const remote={...saved(),runs:[{id:'r',ended_at:'2026-10-22',run_points:canonical}],track_data:{run:{run_id:'r',run_points:canonical,replay_points:line.slice(0,2)}}};
  expect(buildTrackDetailDisplay(remote,local,'u').run).toEqual(buildTrackDetailMap(remote).run);
 });
+
+it('preserves historical objects beyond a truncated laid line without snapping or extending it', () => {
+ const markers = [1,2,3,4].map(i => ({id:`after-pause-${i}`,marker_type:'gegenstand',material:'holz',
+   latitude:47 + i / 1000,longitude:8 + i / 1000,distance_from_start:114.2}));
+ const historical = {...saved(), markers};
+ const original = copy(historical);
+ const result = buildTrackDetailDisplay(historical, null, 'u');
+ expect(result.lay).toHaveLength(line.length);
+ expect(result.markers.map(m => [m.lat,m.lng])).toEqual(
+   markers.map(m => [m.latitude,m.longitude]));
+ expect(historical).toEqual(original);
+});

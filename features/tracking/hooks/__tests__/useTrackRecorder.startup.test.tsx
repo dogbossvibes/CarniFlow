@@ -726,3 +726,58 @@ it('blocks paused markers despite a changing GPS position and accepts a fresh ma
   expect(state.markers).toHaveLength(1);
   expect(createLocalTrackMarker).toHaveBeenCalledTimes(1);
 });
+
+// Phase 1: a delayed UI/hardware callback must not write after the recorder closes.
+it('rejects a late manual marker after stopAll without mutating store or database', async () => {
+  await start();
+  const state = useTrackingStore.getState();
+  state.currentPosition = { lat: 47.001, lng: 8.001 };
+  act(() => { current.stopAll(false); });
+  const before = [...state.markers];
+  (createLocalTrackMarker as jest.Mock).mockClear();
+  await act(async () => {
+    await current.addMarker('gegenstand', { material: 'holz' });
+    await current.addMarker('winkel', { angleKind: 'spitz_links' });
+  });
+  expect(state.markers).toEqual(before);
+  expect(createLocalTrackMarker).not.toHaveBeenCalled();
+});
+
+it('rejects manual markers before a recording starts', async () => {
+  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { await current.addMarker('gegenstand', { material: 'holz' }); });
+  expect(useTrackingStore.getState().markers).toHaveLength(0);
+  expect(createLocalTrackMarker).not.toHaveBeenCalled();
+});
+
+it('keeps the final object but rejects callbacks after finish', async () => {
+  await start();
+  const state = useTrackingStore.getState();
+  state.currentPosition = { lat: 47.002, lng: 8.002 };
+  state.distanceMeters = 114.2;
+  await act(async () => { await current.addMarker('gegenstand', { material: 'holz' }); });
+  const before = [...state.markers];
+  act(() => { current.finish(); });
+  await act(async () => { await current.addMarker('gegenstand', { material: 'filz' }); });
+  expect(state.markers).toEqual(before);
+  expect(createLocalTrackMarker).toHaveBeenCalledTimes(1);
+  expect(createLocalTrackMarker).toHaveBeenCalledWith('local', expect.objectContaining({
+    latitude: 47.002, longitude: 8.002, distance_from_start: 114.2,
+  }));
+});
+
+it('background and foreground transitions do not pause or stop the laid recording', async () => {
+  const subscription = jest.spyOn(AppState, 'addEventListener');
+  await start();
+  const callbacks = subscription.mock.calls.filter(([event]) => event === 'change').map(([, callback]) => callback);
+  expect(callbacks.length).toBeGreaterThan(0);
+  const state = useTrackingStore.getState();
+  const stopCount = (state.stopRecording as jest.Mock).mock.calls.length;
+  await act(async () => { callbacks.forEach(callback => callback('background')); });
+  await act(async () => { callbacks.forEach(callback => callback('active')); });
+  expect(state.isPaused).toBe(false);
+  expect((state.stopRecording as jest.Mock).mock.calls.length).toBe(stopCount);
+  await act(async () => { await current.addMarker('gegenstand', { material: 'holz' }); });
+  expect(createLocalTrackMarker).toHaveBeenCalledTimes(1);
+  subscription.mockRestore();
+});

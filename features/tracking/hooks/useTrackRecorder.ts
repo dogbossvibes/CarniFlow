@@ -783,6 +783,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     type: MarkerType,
     markerOpts?: SpecialGeometry & { note?: string; audioUrl?: string; material?: MarkerMaterial; angleKind?: AngleKind },
   ) => {
+    // Delayed picker/hardware callbacks may arrive after stop or finalization.
+    // Do not append markers outside the active recording or its write barrier.
+    if (!recordingRef.current || finalizationRef.current) return;
     const s = store.getState();
     // A paused recorder still receives position fixes; its distance is frozen.
     // Guard at the recorder boundary as hardware shortcuts also call this API.
