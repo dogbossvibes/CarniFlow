@@ -25,6 +25,7 @@ import { RestingLiveActivitySync } from '@/features/tracking/components/RestingL
 import { LiveShareProvider } from '@/features/tracking-exchange/live/LiveShareProvider';
 import { DiagnosticsAccessSync } from '@/components/DiagnosticsAccessSync';
 import { useT } from '@/i18n';
+import { useDismissStartupSplash } from '@/hooks/useDismissStartupSplash';
 import { DailyWidgetSync } from '@/features/widgets/DailyWidgetSync';
 
 // Crash-/Error-Reporting initialisieren (no-op ohne DSN oder bei Opt-out).
@@ -39,10 +40,11 @@ void useActiveFaehrten.getState().hydrate();
 // Globaler Fehler-Fallback: fängt Render-Fehler im gesamten Baum ab,
 // meldet sie und bietet einen Neustart-Button (statt Blank-Crash).
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const dismissSplash = useDismissStartupSplash();
   const { t } = useT();
   useEffect(() => { captureError(error); }, [error]);
   return (
-    <View style={eb.wrap}>
+    <View style={eb.wrap} onLayout={dismissSplash}>
       <View style={eb.icon}><Ionicons name="alert-circle-outline" size={40} color={C.accent} /></View>
       <Text style={eb.title}>{t('common.appErrorTitle')}</Text>
       <Text style={eb.text}>{t('common.appErrorBody')}</Text>
@@ -63,8 +65,9 @@ const eb = StyleSheet.create({
 });
 
 export default function RootLayout() {
+  const dismissSplash = useDismissStartupSplash();
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }} onLayout={dismissSplash}>
     <QueryClientProvider client={queryClient}>
     <SessionProvider>
       <DiagnosticsAccessSync />
