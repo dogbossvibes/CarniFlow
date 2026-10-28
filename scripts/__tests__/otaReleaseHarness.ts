@@ -89,6 +89,13 @@ else if (a[0] === 'channel:view') {
   out((g ? g.entries : []).map(e => Object.assign({}, e, { group: g.group, branch: 'production', createdAt: g.createdAt || '2026-10-04T00:00:00.000Z' })));
 } else if (a[0] === 'update') {
   let s = load();
+  // Test-owned barrier keeps the publisher active until the parallel assertion completes.
+  const barrier = process.env.FAKE_UPDATE_RELEASE_FILE;
+  const barrierStart = Date.now();
+  while (barrier && !fs.existsSync(barrier)) {
+    if (Date.now() - barrierStart > 120000) process.exit(2);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+  }
   if (s.sleepMs) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, s.sleepMs);
   if (s.failUpdate) process.exit(1);
   s = load();
@@ -136,9 +143,15 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown } =
   mkdirSync(join(repo, 'scripts'), { recursive: true });
   for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
   if (opts.appJson !== undefined) writeFileSync(join(repo, 'app.json'), JSON.stringify(opts.appJson, null, 2));
-  else if (opts.appVersion) {
+  else {
     const app = JSON.parse(readFileSync('app.json', 'utf8'));
-    app.expo.version = opts.appVersion;
+    // Standard fixtures model one shared appVersion runtime. Explicit per-platform
+    // overrides are tested only through opts.appJson, never leaked from this worktree.
+    if (opts.appVersion) app.expo.version = opts.appVersion;
+    delete app.expo.ios?.runtimeVersion;
+    delete app.expo.android?.runtimeVersion;
+    delete app.expo.ios?.version;
+    delete app.expo.android?.version;
     writeFileSync(join(repo, 'app.json'), JSON.stringify(app, null, 2));
   }
   const releaseRuntime = opts.appVersion ?? RELEASE_RUNTIME;

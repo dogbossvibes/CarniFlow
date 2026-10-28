@@ -1,10 +1,13 @@
 import {syncSubscriptionAuthority} from '../subscriptionAuthorityService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+jest.mock('@react-native-async-storage/async-storage',()=>require('@react-native-async-storage/async-storage/jest/async-storage-mock')); // eslint-disable-line @typescript-eslint/no-require-imports -- Jest native persistence factory / isolated restart.
+jest.mock('@/lib/queryClient',()=>({queryClient:{invalidateQueries:jest.fn().mockResolvedValue(undefined)}}));
 /** @jest-environment node */
 const mockGetUser=jest.fn(),mockInvoke=jest.fn(),mockUnsubscribe=jest.fn();
 let mockListener: (event:string,session:{user:{id:string}}|null)=>void=()=>{};
 jest.mock('@/lib/supabase',()=>({supabase:{auth:{getUser:()=>mockGetUser(),onAuthStateChange:(callback:typeof mockListener)=>{mockListener=callback;return{data:{subscription:{unsubscribe:mockUnsubscribe}}};}},functions:{invoke:(...args:unknown[])=>mockInvoke(...args)}}}));
 const state=(plan='active',overrides={})=>({data:{version:1,state:{verified:true,plan,expiresAt:'2099-01-01T00:00:00Z',...overrides}},error:null});
-beforeEach(()=>{jest.useFakeTimers();mockGetUser.mockResolvedValue({data:{user:{id:'A'}},error:null});mockInvoke.mockReset();mockUnsubscribe.mockReset();});
+beforeEach(async()=>{jest.useFakeTimers();await AsyncStorage.clear();mockGetUser.mockResolvedValue({data:{user:{id:'A'}},error:null});mockInvoke.mockReset();mockUnsubscribe.mockReset();});
 afterEach(()=>jest.useRealTimers());
 async function settle<T>(promise:Promise<T>):Promise<T>{await jest.runAllTimersAsync();return promise;}
 test('confirmed canonical trainer satisfies active; only an empty body is sent to the authenticated endpoint',async()=>{
