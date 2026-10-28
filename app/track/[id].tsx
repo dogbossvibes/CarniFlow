@@ -1,3 +1,4 @@
+import { TrackMapSummary } from '@/features/tracking/components/TrackMapSummary';
 import { scoredObjectSummary } from '@/features/tracking/utils/scoredObjectProjection';
 import { isScoredObject, isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 import { TrackAngleList } from '@/features/tracking/components/TrackAngleList';
@@ -261,6 +262,7 @@ export default function TrackAuswertungScreen() {
   const [detailSel, setDetailSel] = useState<TrackDetailSelection | null>(null);
   const [fullscreenMap, setFullscreenMap] = useState(false);
   const [fullscreenSel, setFullscreenSel] = useState<TrackDetailSelection | null>(null);
+  const [fullscreenMapType, setFullscreenMapType] = useState<'hybrid' | 'standard'>('hybrid');
   const [fullscreenFitToken, setFullscreenFitToken] = useState(0);
   const [sharePickerOpen, setSharePickerOpen] = useState(false);
   const [trainers, setTrainers] = useState<Awaited<ReturnType<typeof listAcceptedTrainers>>>([]);
@@ -924,9 +926,17 @@ export default function TrackAuswertungScreen() {
               >
                 <Ionicons name="close" size={24} color={C.trackText} />
               </Pressable>
-              <Text style={s.fullscreenTitle}>Fährte</Text>
+              <Text accessibilityRole="header" style={s.fullscreenTitle}>Fährte</Text>
               <View style={s.fullscreenHeaderButton} />
             </View>
+          </View>
+          <View style={s.fullscreenMeta}>
+            <Text style={s.fullscreenDog}>{[data.dog?.name, data.surface_types?.[0]].filter(Boolean).join(' · ') || '—'}</Text>
+            <Text style={s.muted}>{relDate(data.session_date ?? data.created_at)}</Text>
+          </View>
+          <View style={s.fullscreenLegend}>
+            <Legend color={layColor} label={t('track.replay.legendReference')} />
+            <Legend color={C.trackBlue} label={t('track.replay.legendSearch')} />
           </View>
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
@@ -939,9 +949,17 @@ export default function TrackAuswertungScreen() {
                 onStartPress={() => setFullscreenSel({ kind: 'start' })}
                 onMarkerPress={(m) => setFullscreenSel({ kind: 'marker', marker: m })}
                 onEndPress={() => setFullscreenSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
-                currentPosition={null} showUserLocation={false} follow={false} hideControls mapType="hybrid"
+                currentPosition={null} showUserLocation={false} follow={false} hideControls mapType={fullscreenMapType}
               />
             )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={fullscreenMapType === 'hybrid' ? 'Straßenkarte anzeigen' : 'Satellitenkarte anzeigen'}
+              onPress={() => setFullscreenMapType(type => type === 'hybrid' ? 'standard' : 'hybrid')}
+              style={s.layerButton}
+            >
+              <Ionicons name="layers-outline" size={22} color={C.trackText} />
+            </Pressable>
             <Pressable
               accessibilityLabel="Gesamte Fährte anzeigen"
               accessibilityRole="button"
@@ -952,6 +970,20 @@ export default function TrackAuswertungScreen() {
               <Text style={s.fitButtonText}>Gesamte Fährte</Text>
             </Pressable>
           </View>
+          <TrackMapSummary
+            distanceM={map?.totalDistanceM ?? data.distance_meters ?? null}
+            corners={data.corners_total ?? null}
+            objects={correctedCounts ? correctedCounts.total : recordedCounts.total}
+            onDetails={map?.hasGps ? () => setFullscreenSel({
+              kind: 'group',
+              items: [
+                ...(map.start ? [{ kind: 'start' as const }] : []),
+                ...map.markers.map(marker => ({ kind: 'marker' as const, marker })),
+                ...(map.end ? [{ kind: 'end' as const, totalDistanceM: map.totalDistanceM }] : []),
+              ],
+            }) : undefined}
+            onAnalysis={() => { setFullscreenMap(false); setFullscreenSel(null); }}
+          />
           <MarkerDetailSheet selection={fullscreenSel} onClose={() => setFullscreenSel(null)} />
         </SafeAreaView>
       </Modal>
@@ -1014,13 +1046,17 @@ const s = StyleSheet.create({
   condValue: { fontSize: 15, lineHeight: 18, color: C.trackText, fontWeight: '800', marginTop: 1, flexShrink: 1 },
 
   mapCard: { height: 190, overflow: 'hidden', marginBottom: 16, padding: 0 },
+  fullscreenMeta: { paddingHorizontal: 18, paddingBottom: 10, gap: 3 },
+  fullscreenDog: { color: C.trackText, fontSize: 16, fontWeight: '700', flexShrink: 1 },
+  layerButton: { position: 'absolute', right: 16, top: 14, width: 48, height: 48, borderRadius: 14, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.trackBorder },
+  fullscreenLegend: { paddingHorizontal: 18, paddingVertical: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 14, backgroundColor: C.trackCard },
   fullscreen: { flex: 1, backgroundColor: C.trackBg },
   fullscreenHeader: { borderBottomWidth: 1, borderBottomColor: C.trackBorder, backgroundColor: C.trackBg },
-  fullscreenHeaderContent: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
-  fullscreenHeaderButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  fullscreenHeaderContent: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
+  fullscreenHeaderButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   fullscreenTitle: { color: C.trackText, fontSize: 17, fontWeight: '800' },
-  fullscreenMap: { flex: 1 },
-  fitButton: { position: 'absolute', left: 16, bottom: 18, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, borderRadius: 12, backgroundColor: C.trackPrimary, borderWidth: 1, borderColor: C.trackPrimaryDk },
+  fullscreenMap: { flex: 1, minHeight: 100 },
+  fitButton: { position: 'absolute', left: 16, bottom: 14, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, borderRadius: 12, backgroundColor: C.trackPrimary, borderWidth: 1, borderColor: C.trackPrimaryDk },
   fitButtonText: { color: '#04110F', fontSize: 12, fontWeight: '800' },
   legend:  { position: 'absolute', left: 14, bottom: 12, flexDirection: 'row', gap: 14 },
   legendItem:{ flexDirection: 'row', alignItems: 'center', gap: 5 },

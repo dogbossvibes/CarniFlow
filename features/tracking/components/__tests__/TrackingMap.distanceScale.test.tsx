@@ -415,3 +415,15 @@ describe('compact marker groups', () => {
     expect(n.root.findByType(MarkerDetailSheet).props.selection.items.map((item: { marker: unknown }) => item.marker)).toEqual(next);
   });
 });
+
+it.each(['L', 'R', 'SR', 'SL'])('renders resolved %s as a simple mint badge without changing marker coordinates or taps', label => {
+  const onPress = jest.fn(); let node!: ReactTestRenderer;
+  act(() => { node = TestRenderer.create(<PinMarker Marker={RNMaps!.Marker} lat={47.2} lng={8.3} kind="angle" label={label} acute={label.length === 2} onPress={onPress} />); });
+  const marker = node.root.findByType(RNMaps!.Marker);
+  expect(marker.props.coordinate).toEqual({ latitude: 47.2, longitude: 8.3 });
+  const text = node.root.findAll(n => (n as unknown as { type: unknown }).type === 'Text' && n.props.children === label)[0];
+  expect(StyleSheet.flatten(text.props.style).color).toBe('#04110F');
+  expect(node.root.findAll(n => typeof (n as unknown as { type: unknown }).type === 'string' && StyleSheet.flatten(n.props.style)?.backgroundColor === C.trackPrimary).length).toBeGreaterThan(0);
+  act(() => marker.props.onPress()); expect(onPress).toHaveBeenCalledTimes(1);
+  act(() => node.unmount());
+});
