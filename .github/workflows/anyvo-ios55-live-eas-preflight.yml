@@ -89,7 +89,7 @@ jobs:
             -H 'Accept: application/vnd.github+json' \
             -H "Authorization: Bearer $GH_API_TOKEN" \
             'https://api.github.com/repos/dogbossvibes/CarniFlow/environments/anyvo-ios55-eas-preflight/deployment-branch-policies?per_page=100')"
-          printf '%s\\n' "$policies" | jq -e '
+          printf '%s\n' "$policies" | jq -e '
             (.total_count == 1) and
             ([.branch_policies[]?.name] == ["main"])
           ' >/dev/null || {
