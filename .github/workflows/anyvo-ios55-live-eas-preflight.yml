@@ -115,6 +115,13 @@ jobs:
           );
           console.log('PASS: main-dispatch preflight dependency, pinned source, publish-denial fixtures, no OTA command.');
           NODE
+      - name: Independent offline workflow security scan (zizmor)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Pin a published stable scanner version. This job receives no Expo secret.
+          pipx run --spec zizmor==1.31.1 zizmor --offline --strict-collection \
+            --min-severity high .github/workflows/anyvo-ios55-live-eas-preflight.yml
 
   live-eas-preflight:
     needs: ci-safety-check
