@@ -1,0 +1,162 @@
+name: ANYVO iOS55 Live EAS Preflight (NO OTA)
+
+# Dedicated CI-only setup branch. The live job runs ONLY after this workflow
+# has been separately reviewed and explicitly integrated into default main.
+# No publish command, release token, DB write or automatic deployment.
+on:
+  push:
+    branches:
+      - ci/anyvo-ios55-eas-readonly-preflight-20261029
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: anyvo-ios55-eas-readonly-preflight
+  cancel-in-progress: false
+
+jobs:
+  ci-safety-check:
+    name: Verify CI workflow safeguards (no EAS)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/ci/anyvo-ios55-eas-readonly-preflight-20261029'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout CI-only setup branch
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify pinned source and manual-only live trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import assert from 'node:assert/strict';
+          const workflow = readFileSync('.github/workflows/anyvo-ios55-live-eas-preflight.yml', 'utf8');
+          assert.match(workflow, /workflow_dispatch:/);
+          assert.match(workflow, /github\.event_name == 'workflow_dispatch'/);
+          assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+          assert.match(workflow, /environment:\s*\n\s*name: anyvo-ios55-eas-preflight/);
+          assert.match(workflow, /RELEASE_SHA: 5bec4417fc85f79e67f387126386617536992df3/);
+          assert.match(workflow, /--dry-run/);
+          assert.doesNotMatch(workflow, /(?:^|\n)\s*(?:-|\s)*run:\s*(?:eas\s+update|npm\s+run\s+update:production)/m);
+          console.log('PASS: manual-only EAS job, pinned release source, no OTA command.');
+          NODE
+
+  live-eas-preflight:
+    name: Protected EAS runtime/Production PRE-FLIGHT (read-only)
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'dogbossvibes/CarniFlow' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: anyvo-ios55-eas-preflight
+      deployment: false
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      RELEASE_BASE: 0e16001d4f9aeeb9d06adf384c9b86376fae2250
+      RELEASE_SHA: 5bec4417fc85f79e67f387126386617536992df3
+
+    steps:
+      - name: Confirm protected GitHub environment BEFORE token use
+        shell: bash
+        env:
+          GH_API_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error --location \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_API_TOKEN" \
+            'https://api.github.com/repos/dogbossvibes/CarniFlow/environments/anyvo-ios55-eas-preflight')"
+          # An implicitly created GitHub environment has no protection; reject it.
+          printf '%s\n' "$response" | jq -e '
+            (.name == "anyvo-ios55-eas-preflight") and
+            (.deployment_branch_policy.custom_branch_policies == true) and
+            (any(.protection_rules[]?;
+              .type == "required_reviewers" and ((.reviewers // []) | length > 0)))
+          ' >/dev/null || {
+            echo "::error::STOP: Create a protected environment with selected branch main and required reviewers first."
+            exit 1
+          }
+          echo "PASS: protected environment exists. No Expo secret value printed."
+
+      - name: Checkout EXACT independently tested iOS55 candidate
+        uses: actions/checkout@v7
+        with:
+          ref: 5bec4417fc85f79e67f387126386617536992df3
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify pinned candidate ancestry, changed-file scope, clean source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test -z "$(git status --porcelain)"
+          git merge-base --is-ancestor "$RELEASE_BASE" HEAD
+          git diff --check "$RELEASE_BASE" HEAD
+          printf '%s\n' \
+            .github/workflows/anyvo-ios55-diagnostics-qa.yml \
+            .github/workflows/anyvo-ios55-ota-preflight.yml \
+            features/tracking/utils/__tests__/turnAwareLineGate.test.ts \
+            services/__tests__/diagnosticsAccessService.test.ts \
+            services/diagnosticsAccessService.ts \
+            | sort > "$RUNNER_TEMP/expected.txt"
+          git diff --name-only "$RELEASE_BASE" HEAD | sort > "$RUNNER_TEMP/actual.txt"
+          diff -u "$RUNNER_TEMP/expected.txt" "$RUNNER_TEMP/actual.txt"
+          git diff --exit-code "$RELEASE_BASE" HEAD -- \
+            app.json eas.json package.json package-lock.json \
+            scripts/update-production.mjs scripts/guard-prod-supabase.mjs \
+            modules features/tracking/engine features/tracking/hooks
+          echo "PASS: exact iOS55 code source, no native/tracking runtime changes."
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install locked app dependencies (NO Expo token)
+        run: npm ci --no-audit --no-fund
+
+      - name: Install pinned EAS CLI (NO Expo token)
+        run: npm install --global eas-cli@26.0.0 --no-audit --no-fund
+
+      - name: Read-only EAS Production preflight with original guarded wrapper
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${EXPO_TOKEN:-}" || {
+            echo "::error::STOP: EXPO_TOKEN is missing in the protected environment."
+            exit 1
+          }
+          # No printing of token or EAS production environment values.
+          eas whoami >/dev/null
+          node scripts/update-production.mjs \
+            --platform ios \
+            --runtime 1.0.5-motion-v4 \
+            --message "iOS55 diagnostics lease preflight - READ ONLY" \
+            --dry-run
+
+      - name: Explain remaining release gates
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## ANYVO iOS55 – EAS READ-ONLY Production preflight"
+            echo "Candidate: `5bec4417fc85f79e67f387126386617536992df3`"
+            echo "Runtime: `1.0.5-motion-v4` · Platform: iOS"
+            echo ""
+            echo "This workflow uses the repository Production wrapper with --dry-run."
+            echo "**NO OTA WAS PUBLISHED.**"
+            echo ""
+            echo "Independent review, normal-account/RLS device evidence, a NEW"
+            echo "fresh publish-time preflight, cross-host release serialization,"
+            echo "explicit publishing authorization and postflight CDN/device checks"
+            echo "are still required before a later Production OTA."
+          } >> "$GITHUB_STEP_SUMMARY"
