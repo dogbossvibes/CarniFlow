@@ -79,7 +79,7 @@ jobs:
           assert.equal(eas.build.production.channel, 'production');
           assert.equal(eas.build.production.environment, 'production');
           assert.equal(eas.build.production.distribution, 'store');
-          assert.equal(pkg.scripts['update:production:ios'], 'node scripts/update-production.mjs --platform ios --confirm');
+          assert.equal(pkg.scripts['update:production:ios'], 'node ./scripts/update-production.mjs --platform ios --confirm');
           assert.equal(pkg.dependencies['expo-updates'] != null, true);
           assert.equal(app.expo.updates.url, 'https://u.expo.dev/' + app.expo.extra.eas.projectId);
           assert.deepEqual(buildProductionUpdateArgs({
