@@ -246,6 +246,7 @@ export default function DogHubRoute() {
       actions={actions}
       aiUnlocked={isPremium}
       heat={{
+        onOpenOverview: () => router.push(`/dog-heat-overview/${id}` as never),
         cycles: heatCycles,
         prediction: heatPrediction,
         onAdd: () => router.push({ pathname: '/dog-heat-new', params: { id } } as never),

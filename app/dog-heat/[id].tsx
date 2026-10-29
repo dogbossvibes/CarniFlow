@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { heatUxCopy } from '@/features/dogs/heatUxCopy';
+import { HeatDogGate } from '@/components/dogs/heat/HeatDogGate';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -24,15 +26,21 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useSession } from '@/lib/session-context';
 import { getDogById } from '@/services/dogs';
 
-const PINK = '#F472B6';
-const PINK_DIM = 'rgba(244,114,182,0.14)';
+const PINK = C.trackPrimary;
+const PINK_DIM = 'rgba(39,216,178,0.12)';
 
 // Detailansicht einer einzelnen Läufigkeit mit Timeline, Phasen- und Beobachtungsverwaltung.
 export default function DogHeatDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <HeatDogGate cycleId={id}>{dog => <DogHeatDetailContent resolvedDog={dog} />}</HeatDogGate>;
+}
+
+function DogHeatDetailContent({ resolvedDog }: { resolvedDog: import('@/types').Dog }) {
   const router = useRouter();
   const { isPro, loading: capLoading } = useCapabilities();
   const { id: heatCycleId } = useLocalSearchParams<{ id: string }>();
-  const { t } = useT();
+  const { t, locale } = useT();
+  const copy = heatUxCopy(locale);
   const insets = useSafeAreaInsets();
   const { user } = useSession();
   // Ownership consistency fix (29.09.2026 audit): dog_heat_cycles RLS grants
@@ -41,7 +49,7 @@ export default function DogHeatDetail() {
   // shown the "Löschen" button unconditionally. HeatCycle carries no
   // owner_id, so ownership is resolved via the parent dog record, matching
   // app/dog-heat-calendar/[id].tsx's own check.
-  const [isOwner, setIsOwner] = useState(false);
+  const [isOwner, setIsOwner] = useState(resolvedDog.owner_id === user?.id);
 
   // Premium gate
   useEffect(() => {
@@ -53,6 +61,8 @@ export default function DogHeatDetail() {
   const [phases, setPhases] = useState<HeatPhase[]>([]);
   const [observations, setObservations] = useState<HeatObservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const loadGeneration = useRef(0);
 
   // Edit mode
   const [editing, setEditing] = useState(false);
@@ -80,20 +90,23 @@ export default function DogHeatDetail() {
 
   const load = useCallback(async () => {
     if (!heatCycleId) return;
+    const current = ++loadGeneration.current;
     try {
       const [c, p, o] = await Promise.all([
-        getHeatCycle(heatCycleId),
-        getHeatPhases(heatCycleId),
-        getHeatObservations(heatCycleId),
+        getHeatCycle(heatCycleId, { throwOnError: true }),
+        getHeatPhases(heatCycleId, { throwOnError: true }),
+        getHeatObservations(heatCycleId, { throwOnError: true }),
       ]);
+      if (current !== loadGeneration.current) return;
+      setLoadError(false);
       setCycle(c);
       setPhases(p);
       setObservations(o);
-    } catch { /* ignore */ }
-    setLoading(false);
+    } catch { if (current === loadGeneration.current) setLoadError(true); }
+    if (current === loadGeneration.current) setLoading(false);
   }, [heatCycleId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); return () => { loadGeneration.current++; }; }, [load]);
 
   useEffect(() => {
     if (!cycle?.dogId) { setIsOwner(false); return; }
@@ -105,7 +118,7 @@ export default function DogHeatDetail() {
   // ── Edit Cycle ────────────────────────────────────────────────────────────
 
   const startEdit = () => {
-    if (!cycle) return;
+    if (!cycle || !isOwner) return;
     setEditStart(new Date(cycle.startDate));
     setEditEnd(cycle.endDate ? new Date(cycle.endDate) : null);
     setEditNotes(cycle.notes ?? '');
@@ -113,7 +126,7 @@ export default function DogHeatDetail() {
   };
 
   const saveCycle = async () => {
-    if (!cycle || !editStart || saving) return;
+    if (!cycle || !isOwner || !editStart || saving) return;
     setSaving(true);
     try {
       const endIso = editEnd ? toISODate(editEnd) : null;
@@ -133,7 +146,7 @@ export default function DogHeatDetail() {
   // ── End Cycle ─────────────────────────────────────────────────────────────
 
   const handleEndCycle = () => {
-    if (!cycle) return;
+    if (!cycle || !isOwner) return;
     Alert.alert(
       t('heat.endTitle'),
       t('heat.endBody'),
@@ -151,7 +164,7 @@ export default function DogHeatDetail() {
   // ── Delete Cycle ──────────────────────────────────────────────────────────
 
   const handleDeleteCycle = () => {
-    if (!cycle) return;
+    if (!cycle || !isOwner) return;
     Alert.alert(
       t('dog.deleteHeatTitle'),
       t('dog.deleteEntryBody'),
@@ -175,6 +188,7 @@ export default function DogHeatDetail() {
   // ── Phase CRUD ────────────────────────────────────────────────────────────
 
   const openNewPhase = () => {
+    if (!isOwner) return;
     setEditingPhase(null);
     setPhaseType(null);
     setPhaseStart(new Date());
@@ -184,6 +198,7 @@ export default function DogHeatDetail() {
   };
 
   const openEditPhase = (p: HeatPhase) => {
+    if (!isOwner) return;
     setEditingPhase(p);
     setPhaseType(p.phaseType);
     setPhaseStart(new Date(p.startDate));
@@ -193,7 +208,7 @@ export default function DogHeatDetail() {
   };
 
   const savePhase = async () => {
-    if (!cycle || !phaseType || !phaseStart) return;
+    if (!cycle || !isOwner || !phaseType || !phaseStart) return;
     try {
       if (editingPhase) {
         await updateHeatPhase(editingPhase.id, {
@@ -229,6 +244,7 @@ export default function DogHeatDetail() {
   };
 
   const handleDeletePhase = (p: HeatPhase) => {
+    if (!isOwner) return;
     Alert.alert(t('heat.deletePhaseTitle'), t('heat.deletePhaseBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: async () => {
@@ -241,6 +257,7 @@ export default function DogHeatDetail() {
   // ── Observation CRUD ──────────────────────────────────────────────────────
 
   const openNewObs = () => {
+    if (!isOwner) return;
     setObsType(null);
     setObsDate(new Date());
     setObsValue('');
@@ -249,7 +266,7 @@ export default function DogHeatDetail() {
   };
 
   const saveObs = async () => {
-    if (!cycle || !obsType || !obsDate) return;
+    if (!cycle || !isOwner || !obsType || !obsDate) return;
     try {
       await addHeatObservation(cycle.id, {
         date: toISODate(obsDate),
@@ -266,6 +283,7 @@ export default function DogHeatDetail() {
   };
 
   const handleDeleteObs = (o: HeatObservation) => {
+    if (!isOwner) return;
     Alert.alert(t('heat.deleteObsTitle'), t('heat.deleteObsBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: async () => {
@@ -284,7 +302,8 @@ export default function DogHeatDetail() {
   if (!cycle) {
     return (
       <View style={s.center}>
-        <Text style={s.err}>{t('heat.notFound')}</Text>
+        <Text style={s.err}>{loadError ? copy.error : t('heat.notFound')}</Text>
+        {loadError && <AnyvoButton label={copy.retry} onPress={() => void load()} />}
         <TouchableOpacity onPress={() => router.back()}><Text style={s.link}>{t('common.back')}</Text></TouchableOpacity>
       </View>
     );
@@ -319,7 +338,7 @@ export default function DogHeatDetail() {
             <Ionicons name="chevron-back" size={20} color={C.trackText} />
           </TouchableOpacity>
           <Text style={s.barTitle}>{t('heat.title')}</Text>
-          <TouchableOpacity style={s.iconBtn} onPress={startEdit} hitSlop={8}>
+          <TouchableOpacity disabled={!isOwner} accessibilityState={{ disabled: !isOwner }} style={s.iconBtn} onPress={startEdit} hitSlop={8}>
             <Ionicons name="create-outline" size={18} color={C.trackText} />
           </TouchableOpacity>
         </View>
@@ -331,6 +350,7 @@ export default function DogHeatDetail() {
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             showsVerticalScrollIndicator={false}
           >
+            {loadError && <View style={s.editCard} accessibilityRole="alert"><Text style={s.err}>{copy.error}</Text><AnyvoButton label={copy.retry} onPress={() => void load()} /></View>}
             {/* Status Banner */}
             <View style={[s.banner, active && s.bannerActive]}>
               <View style={s.bannerRow}>
@@ -386,7 +406,7 @@ export default function DogHeatDetail() {
             )}
 
             {/* Action Buttons */}
-            {!editing && (
+            {!editing && isOwner && (
               <View style={s.actions}>
                 <TouchableOpacity style={s.actionBtn} onPress={openNewPhase} activeOpacity={0.85}>
                   <Ionicons name="add-circle-outline" size={18} color={PINK} />
@@ -447,7 +467,7 @@ export default function DogHeatDetail() {
                           <View style={s.tlContent}>
                             <View style={s.tlRow}>
                               <Text style={s.tlDate}>{fmtDate(p.startDate)}{p.endDate ? ` – ${fmtDate(p.endDate)}` : ''}</Text>
-                              <View style={s.tlPhaseActions}>
+                              <View style={s.tlPhaseActions} pointerEvents={isOwner ? 'auto' : 'none'} accessibilityElementsHidden={!isOwner} importantForAccessibility={isOwner ? 'auto' : 'no-hide-descendants'}>
                                 <TouchableOpacity onPress={() => openEditPhase(p)} hitSlop={6} style={s.tlAction}>
                                   <Ionicons name="create-outline" size={14} color={C.trackTextMut} />
                                 </TouchableOpacity>
@@ -472,7 +492,7 @@ export default function DogHeatDetail() {
                         <View style={s.tlContent}>
                           <View style={s.tlRow}>
                             <Text style={s.tlDate}>{fmtDate(o.date)}</Text>
-                            <TouchableOpacity onPress={() => handleDeleteObs(o)} hitSlop={6} style={s.tlAction}>
+                            <TouchableOpacity disabled={!isOwner} accessibilityElementsHidden={!isOwner} onPress={() => handleDeleteObs(o)} hitSlop={6} style={s.tlAction}>
                               <Ionicons name="trash-outline" size={14} color={C.trackTextMut} />
                             </TouchableOpacity>
                           </View>

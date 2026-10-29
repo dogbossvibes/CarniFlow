@@ -16,9 +16,9 @@
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "56",
-      "version": "1.0.5",
-      "runtimeVersion": "1.0.5-map49-v1",
+      "buildNumber": "57",
+      "version": "1.0.6",
+      "runtimeVersion": "1.0.6-map49-v1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {

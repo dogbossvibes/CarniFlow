@@ -28,6 +28,7 @@ import { genderLabel, type DogDocument, type DogHubVM, type DogTrainingItem } fr
 
 // Läufigkeit (nur Hündinnen) — lokal geladen, als eigenständiger Prop reingereicht.
 export interface DogHeatProps {
+  onOpenOverview?: () => void;
   cycles: HeatCycle[];
   prediction: HeatPrediction | null;
   onAdd: () => void;
@@ -375,7 +376,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                   {isFemale && heat && (
                     <>
                       <Text style={s.sectionLabel}>{t('dash.heat')}</Text>
-                      <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} currentPhases={heat.currentPhases} />
+                      <DogHeatCard onOpenOverview={heat.onOpenOverview} cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} currentPhases={heat.currentPhases} />
                     </>
                   )}
 
@@ -412,7 +413,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                 </>
               )}
               {tab === 'health'   && <DogHealthLoadCard health={vm.health} onAddEntry={actions.onAddHealth} />}
-              {tab === 'heat'     && heat && <DogHeatCard cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} onDelete={heat.onDelete} phaseCounts={heat.phaseCounts} obsCounts={heat.obsCounts} currentPhases={heat.currentPhases} />}
+              {tab === 'heat'     && isFemale && heat && <DogHeatCard onOpenOverview={heat.onOpenOverview} cycles={heat.cycles} prediction={heat.prediction} onAdd={heat.onAdd} onOpen={heat.onOpen} onOpenCalendar={heat.onOpenCalendar} onDelete={heat.onDelete} phaseCounts={heat.phaseCounts} obsCounts={heat.obsCounts} currentPhases={heat.currentPhases} />}
               {tab === 'trainer'  && <DogTrainerCard trainer={vm.trainer} onChat={actions.onChat} />}
             </View>
           </View>

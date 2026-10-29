@@ -1,0 +1,94 @@
+{
+  "task": "T-140",
+  "checkedUTC": "2026-10-29T22:14:28.400652+00:00",
+  "result": "PASS_SOURCE_AND_EXISTING_IPA_COMPATIBILITY_WITH_DEVICE_LIMITS",
+  "base": "17443616b5bad6d5a524804e48cc84a2cf9ef4c9",
+  "reviewFreezeSHA256": "63563045c433a8e1bd83a053ac86ffe559b057c84cf03ea872dfd3771b89e2f7",
+  "independentReviewSHA256": "0bb088eb4192d800a324a6126b7f14d5c34503d2fd34b9ff159526a760577ddd",
+  "existingBuild": {
+    "id": "442f7bc3-14f8-4ec0-9cf3-138a3dd6f79d",
+    "status": "FINISHED",
+    "platform": "IOS",
+    "gitCommitHash": "17443616b5bad6d5a524804e48cc84a2cf9ef4c9",
+    "appVersion": "1.0.4",
+    "appBuildVersion": "57",
+    "runtimeVersion": "1.0.6-map49-v1",
+    "buildProfile": "ios49-map-repair",
+    "channel": "production",
+    "createdAt": "2026-10-29T16:34:57.892Z",
+    "completedAt": "2026-10-29T16:43:32.921Z"
+  },
+  "ipa": {
+    "buildId": "442f7bc3-14f8-4ec0-9cf3-138a3dd6f79d",
+    "ipaSHA256": "7342b1b6b43c3fcbff025f6001afce875f0d9649104769a72ad1e094e8e02374",
+    "info": {
+      "CFBundleIdentifier": "com.anyvo.app",
+      "CFBundleShortVersionString": "1.0.6",
+      "CFBundleVersion": "57",
+      "MinimumOSVersion": "15.1",
+      "UIBackgroundModes": [
+        "bluetooth-central",
+        "location"
+      ],
+      "NSMotionUsageDescription": "ANYVO verwendet Bewegungssensoren w\u00e4hrend einer aktiven F\u00e4hrte, um GPS-Abweichungen zu erkennen und die Genauigkeit der aufgezeichneten Strecke zu verbessern.",
+      "NSLocationWhenInUseUsageDescription": "Anyvo nutzt deinen Standort, um F\u00e4hrten und Trainingswege w\u00e4hrend der aktiven Aufnahme aufzuzeichnen.",
+      "NSLocationAlwaysAndWhenInUseUsageDescription": "Anyvo kann deinen Standort w\u00e4hrend einer aktiven F\u00e4hrtenaufnahme weiter erfassen, auch wenn die App kurz im Hintergrund ist."
+    },
+    "updates": {
+      "EXUpdatesRuntimeVersion": "1.0.6-map49-v1",
+      "EXUpdatesURL": "https://u.expo.dev/e6475526-66fa-42fa-b2a4-e11afc349e7a",
+      "EXUpdatesEnabled": true,
+      "EXUpdatesRequestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
+    "extensions": [
+      "Payload/ANYVO.app/PlugIns/LiveActivity.appex/Info.plist"
+    ]
+  },
+  "resolvedConfig": {
+    "version": "1.0.4",
+    "ios": {
+      "version": "1.0.6",
+      "buildNumber": "57",
+      "runtimeVersion": "1.0.6-map49-v1",
+      "bundleIdentifier": "com.anyvo.app"
+    },
+    "sdkVersion": "54.0.0",
+    "newArchEnabled": true,
+    "pluginsCount": 23
+  },
+  "nativeDelta": {
+    "nativeSourcesPluginsDependenciesPermissionsUnchanged": true,
+    "onlyConfigChanges": [
+      "expo.ios.version:1.0.5\u21921.0.6",
+      "expo.ios.buildNumber:56\u219257",
+      "expo.ios.runtimeVersion:1.0.5-map49-v1\u21921.0.6-map49-v1"
+    ],
+    "heatNeedsNewNativeChanges": false
+  },
+  "versionDiscrepancy": "EAS appVersion uses general expo.version1.0.4; actual IPA CFBundleShortVersionString1.0.6 matches ios.version. No config change needed for this audit.",
+  "tests": {
+    "heat": 284,
+    "heatSuites": 15,
+    "nativeMapSourceChecks": 6,
+    "iosExtensionChecks": 19,
+    "typecheck": "PASS",
+    "eslintErrors": 0,
+    "eslintPreExistingWarnings": 11,
+    "diffCheck": "PASS"
+  },
+  "legacyToolLimitation": "check-native-changes.mjs falsely missed first porcelain app.json entry due trim; raw file allowlist and exact JSON/native source comparisons used instead. No out-of-scope tooling modification.",
+  "limits": [
+    "No device or full compiled app execution",
+    "No new native build or prebuild",
+    "Existing EAS gitCommitHash does not alone prove embedded JS; no full existing-vs-candidate bundle-parity claim",
+    "No fresh Production OTA/store preflight; publication forbidden by current user request"
+  ],
+  "actions": {
+    "newBuild": false,
+    "ota": false,
+    "dbWrite": false,
+    "originalWorktreeChanged": false
+  }
+}
