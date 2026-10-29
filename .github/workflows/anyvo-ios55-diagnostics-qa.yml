@@ -1,0 +1,70 @@
+name: ANYVO iOS55 Diagnostics QA (no deployment)
+
+on:
+  push:
+    branches:
+      - fix/diagnostics-profile-lease-ios55-20261029
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anyvo-ios55-diagnostics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostics-qa:
+    name: Jest, TypeScript, ESLint and diff
+    if: github.repository == 'dogbossvibes/CarniFlow' && github.ref == 'refs/heads/fix/diagnostics-profile-lease-ios55-20261029'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - name: Checkout exact branch commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm exact iOS55 ancestry, scope and whitespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=0e16001d4f9aeeb9d06adf384c9b86376fae2250
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor "$BASE" HEAD
+          git diff --check "$BASE" HEAD
+          printf '%s\n' \
+            .github/workflows/anyvo-ios55-diagnostics-qa.yml \
+            services/__tests__/diagnosticsAccessService.test.ts \
+            services/diagnosticsAccessService.ts \
+            | sort > "$RUNNER_TEMP/expected-files.txt"
+          git diff --name-only "$BASE" HEAD | sort > "$RUNNER_TEMP/actual-files.txt"
+          diff -u "$RUNNER_TEMP/expected-files.txt" "$RUNNER_TEMP/actual-files.txt"
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Diagnostics regression tests
+        run: >-
+          npm test -- --ci --runInBand --watch=false --runTestsByPath
+          services/__tests__/diagnosticsAccessService.test.ts
+          components/__tests__/DiagnosticsAccessSync.test.tsx
+
+      - name: Complete Jest unit test suite
+        run: npm test -- --ci --runInBand --watch=false
+
+      - name: TypeScript strict check
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
