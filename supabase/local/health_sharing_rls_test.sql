@@ -222,7 +222,7 @@ begin
   end;
   if inserted then
     raise exception 'RLS FAIL non-owner grant INSERT';
-  end;
+  end if;
 end $$;
 
 update public.dog_health_access_grants
