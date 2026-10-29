@@ -65,6 +65,7 @@ import { execFileSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { assertProductionSupabase, PROD_REF } from './guard-prod-supabase.mjs';
+import { validateQualityEvidence } from './release-quality-evidence.mjs';
 
 export const REQUIRED_PRODUCTION_ENV = Object.freeze([
   'EXPO_PUBLIC_BACKEND_ENV',
@@ -625,6 +626,16 @@ function main() {
   console.log(`git HEAD: ${head}`);
   console.log(`git status --short: ${dirty ? '\n' + dirty : '(sauber)'}`);
 
+  const qualityFiles = argValues(args, '--quality-evidence');
+  const qualityInput = () => ({
+    receiptPath: qualityFiles.length === 1 ? qualityFiles[0] : undefined,
+    head: sh('git', ['rev-parse', 'HEAD']).trim(),
+    tree: sh('git', ['rev-parse', 'HEAD^{tree}']).trim(),
+    platform,
+    runtime: resolveReleaseRuntime(JSON.parse(readFileSync('app.json', 'utf8')), platform),
+    repositoryRoot: sh('git', ['rev-parse', '--show-toplevel']).trim(),
+  });
+
   // 2. Staging-Leak-Guard (lokale Env-Quellen).
   if (!assertProductionSupabase()) {
     console.log('Abbruch: Production-Guard fehlgeschlagen. Kein Update veröffentlicht.');
@@ -729,6 +740,14 @@ function main() {
     console.log(dryRun ? 'Publish würde VERWEIGERT. --dry-run: nichts veröffentlicht.' : 'HARD STOP. Kein Update veröffentlicht. (Kein Auto-Rebase/-Merge — bewusst integrieren.)');
     process.exit(1);
   }
+  let quality;
+  try { quality = validateQualityEvidence(qualityInput()); }
+  catch { quality = { ok: false, problems: ['Quality-Quellenbindung nicht bestimmbar.'] }; }
+  if (!quality.ok) {
+    for (const problem of quality.problems) console.log(`❌ ${problem}`);
+    console.log('STOP: Keine vollständigen Quality-/Reviewbelege am exakten Release-Commit.');
+    process.exit(1);
+  }
   if (dryRun) { console.log('Publish würde ERLAUBT.'); console.log('--dry-run: nichts veröffentlicht.'); process.exit(0); }
 
   // 6. Zweiter EAS-Check DIREKT vor dem Publish — Production darf sich nicht verändert haben.
@@ -748,6 +767,15 @@ function main() {
     process.exit(1);
   }
   console.log('Zweiter EAS-Check: Production unverändert.');
+
+  // Rebind source AND evidence after the live preflight, before bundle export.
+  try {
+    if (sh('git', ['rev-parse', 'HEAD']).trim() !== head || sh('git', ['status', '--short']).trim()
+      || !validateQualityEvidence(qualityInput()).ok) throw new Error();
+  } catch {
+    console.log('STOP: Quelle oder Quality-Belege haben sich während der Vorbereitung verändert.');
+    process.exit(1);
+  }
 
   console.log(`Bestätigt. Veröffentliche Production-Update (${platform}): "${message}"`);
   // Release-Commit als NICHT geheimer Build-Metadatenwert ins OTA-Bundle (nur Anzeige in der Fährten-Diagnose).

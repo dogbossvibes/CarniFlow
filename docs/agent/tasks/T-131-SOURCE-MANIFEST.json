@@ -1,0 +1,25 @@
+{
+  "scope": "anyvo-development-process-20261025",
+  "historicalBase": "2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e",
+  "status": "COPY_ONLY_WIP_NOT_INTEGRATION_QA_OR_RELEASE_READY",
+  "originalUnchanged": true,
+  "sourceHashes": {
+    "docs/agent/tasks/_TEMPLATE.md": "96e467c11f70e0813f3967008c3d6d78769a72f28bb272b26ddd943b0b040f62",
+    "package.json": "fd7f7bd0e1fdc61a9e641cf489919b4fc3bce11989ee12b923e153780b3a72a4",
+    "scripts/__tests__/otaReleaseHarness.ts": "59095d1467e4c93113cbe3d11e4286cf08d1014d82de9977e0e1518c10b72625",
+    "scripts/__tests__/updateProductionRaceGuard.test.ts": "f71ebc6d8ec2fe80f407aff6bdd2b10b43689bbec02b10d16b4f7b7f61283043",
+    "scripts/agent-worktree.mjs": "5427417eed6cc0e000e307ae719f53a462f71c5d59084935ec1bb5460dfd0c08",
+    "scripts/check-native-changes.mjs": "7fd43b6c712959876ace641cb9b898d8b5aafa98c3c90be13545867234744b31",
+    "scripts/preflight.mjs": "87e60692b81ec9d4fa228218c96d3076f33b51ba611b390cced513ed91f671a8",
+    "scripts/update-production.mjs": "ed8cad939a58e514c6235fcd31461a1b3976dd2e33c46e3e7c2f0af2804ad2e8",
+    "docs/agent/tasks/T-69.md": "78cdef85b4004b343fbb75862d10a412bb673201bd5014cc18a842b5b84174e2",
+    "scripts/__tests__/developmentProcess.node.test.mjs": "0b3f49ad069d675ca32b6b3fad150d55e754a6af85455f75399de96824e81409",
+    "scripts/__tests__/releaseQualityEvidence.test.ts": "645643c9830fd4df3bd27db75874078b530d9ef58198b16ba1a86ec83e8845ec",
+    "scripts/development-snapshot.mjs": "992ed42d56b6132f64c698d42f9befe1b51c37eb031a87ccce782392ec5a7f3f",
+    "scripts/release-quality-evidence.mjs": "7ddbe8e5a1fc43f54b874b092cfc241f6e9a1eb32d3c804d293fdc9cf2601955",
+    "scripts/task-registry.mjs": "552932e1a296ae30045ea40889c404270db81386250f1183ff40e5d7c0d1bdcd"
+  },
+  "scan": "High-signal secrets/private-email/GPS/binary/symlink checksPASS; synthetic test values allowed",
+  "noFullTestsRerun": true,
+  "authorship": "Historical owner unverified, backup expressly authorized by human and Master; no authorship inference"
+}

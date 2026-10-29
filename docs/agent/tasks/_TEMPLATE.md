@@ -1,13 +1,15 @@
 # <TASK-ID> — <Kurztitel>
 
 > Per-Task-Report für **einen** unabhängigen Task in **einem** Worktree.
-> Kopiere diese Vorlage nach `docs/agent/tasks/<TASK-ID>.md` (die Helfer tun das automatisch).
+> Task-ID zuerst atomar in der gemeinsamen git-common-dir-Registry mit Owner,
+> Zweck und exakter Basis reservieren; historische NextID-Angaben reservieren nichts.
+> Danach diese Vorlage nach `docs/agent/tasks/<TASK-ID>.md` übernehmen (der Helfer tut das automatisch).
 > Diese Datei wird **nur im eigenen Task-Branch** gepflegt. Globale Dateien
 > (`TASKS.md`, `SESSION_HANDOFF.md`, `CURRENT_STATE.md`, `WORK_LOG.md`) werden **erst bei der
 > Integration** durch den dafür verantwortlichen Agenten aktualisiert — nicht parallel.
 >
 > Priorität bei Widerspruch:
-> **Repository state > Git state > Handoff documentation > Agent assumptions.**
+> **Repository/Git facts > current canonical MASTER_STATUS/ACTIVE_WORK > historical handoff/task files > agent assumptions.**
 
 | Feld | Wert |
 |---|---|

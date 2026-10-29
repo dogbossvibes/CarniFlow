@@ -132,7 +132,7 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
   it('6b. echter Parallelstart: zweiter Prozess wird gestoppt, solange der erste veröffentlicht', async () => {
     withState({});
     const releaseFile = join(h.dir, 'release-first-publisher');
-    const first = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'first'],
+    const first = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'first', '--quality-evidence', h.qualityEvidenceFile],
       { cwd: h.repo, env: h.baseEnv({ FAKE_UPDATE_RELEASE_FILE: releaseFile }) });
     const completed = new Promise<number | null>((resolve, reject) => {
       first.once('close', resolve);
@@ -168,7 +168,7 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
   });
   it('8b. Lock wird bei Abbruchsignal (SIGTERM an die Prozessgruppe) entfernt', async () => {
     withState({ sleepMs: 4000 });
-    const p = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'sig'], { cwd: h.repo, env: h.baseEnv(), detached: true });
+    const p = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'sig', '--quality-evidence', h.qualityEvidenceFile], { cwd: h.repo, env: h.baseEnv(), detached: true });
     for (let i = 0; i < 100 && !h.calls().some(a => a[0] === 'update'); i++) await sleep(50);
     expect(existsSync(h.lockPath)).toBe(true);
     process.kill(-p.pid!, 'SIGTERM');
