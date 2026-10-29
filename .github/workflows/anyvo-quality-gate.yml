@@ -1,0 +1,78 @@
+# Repository-wide quality gate for ANYVO. No deployment, EAS token, database access,
+# native build, or Production updates. The job runs even for docs-only PRs so a
+# future required status check cannot remain pending due to path filters.
+name: ANYVO Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anyvo-quality-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: ANYVO Quality Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+
+    steps:
+      - name: Checkout exact triggering revision without stored credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify commit and changed-file whitespace
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            # On pull_request GitHub supplies the tested synthetic merge commit.
+            # The first parent is the target main revision; compare the full PR.
+            git rev-parse --verify 'HEAD^2' >/dev/null
+            git diff --check 'HEAD^1' HEAD
+          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            # Include ALL commits from the push, not only HEAD^..HEAD.
+            if [[ ! "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ "$BEFORE_SHA" =~ ^0{40}$ ]]; then
+              echo "::error::Missing or invalid previous main commit."
+              exit 1
+            fi
+            git cat-file -e "$BEFORE_SHA^{commit}"
+            git diff --check "$BEFORE_SHA" HEAD
+          else
+            echo "::error::Unexpected workflow event."
+            exit 1
+          fi
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install dependencies exactly from package-lock
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Complete Jest test suite
+        run: npm test -- --ci --runInBand --watch=false
