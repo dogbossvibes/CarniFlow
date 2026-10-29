@@ -1,0 +1,112 @@
+{
+  "status": "EXACT_REMOTE_REFS_READ_BY_MASTER_2026_10_29",
+  "repository": "dogbossvibes/CarniFlow",
+  "meaning": "Source backup does not imply release readiness. Archival/author branches do not replace latest cumulative runtime release branches.",
+  "branches": [
+    {
+      "scope": "UI T109",
+      "ref": "refs/heads/fix/training-keyboard-scroll-20261029",
+      "commit": "62f749d737f524d2d4e5273910afc9f5d7949918",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/fix/training-keyboard-scroll-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "UI T110",
+      "ref": "refs/heads/fix/dog-today-actions-20261029",
+      "commit": "0e76110ee705615651893779f04c64c64b2e7b62",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/fix/dog-today-actions-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Sharing client T115",
+      "ref": "refs/heads/feat/shared-dogs-inbox-20261029",
+      "commit": "b1f18c57c6af233d7c6926ed7e22bd4a3302b357",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/feat/shared-dogs-inbox-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Sharing backend T115",
+      "ref": "refs/heads/feat/health-shared-recipient-db-20261029",
+      "commit": "d096342fc979ec592d2bc5b744ff0b5f2a19b861",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/feat/health-shared-recipient-db-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "iOS monitoring consent WIP",
+      "ref": "refs/heads/backup/ios03-monitoring-consent-20261029",
+      "commit": "1ae46f7eeda0da19c844a519b52f8b0ff2446780",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/backup/ios03-monitoring-consent-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "iOS Watch existing source",
+      "ref": "refs/heads/feat/ios-watch-session-control",
+      "commit": "9f009307ddc29081ede4cb6b0384e5ec4b4988f3",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/feat/ios-watch-session-control",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Website older local source snapshot",
+      "ref": "refs/heads/codex/anyvo-marketing-backup-20261029",
+      "commit": "487e9dd304443d4292b441eeab6847f12f706874",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/codex/anyvo-marketing-backup-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Intelligence WIP inactive",
+      "ref": "refs/heads/backup/intelligence-wip-20261029",
+      "commit": "c8735cd78ec3301d4c62b1aebae12d25f5598fe8",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/backup/intelligence-wip-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Android native diagnostics WIP",
+      "ref": "refs/heads/backup/android-diagnostics-20261029",
+      "commit": "ad96c483af28ab159e5561285ee52266ebbe95c2",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/backup/android-diagnostics-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Android QA characterization WIP",
+      "ref": "refs/heads/backup/android-field-qa-20261029",
+      "commit": "c1a72cf3e4444e3ae657dd6502237892c1d94b51",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/backup/android-field-qa-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Android quick widget WIP",
+      "ref": "refs/heads/backup/android-quick-widget-20261029",
+      "commit": "f901a78c4ca2ca5a7b216e48bb5c2ed5c8e79b1f",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/backup/android-quick-widget-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Android daily widget WIP",
+      "ref": "refs/heads/backup/android-daily-widget-20261029",
+      "commit": "7a036d6c77e653f7ec0ed77f88cb5d99d91dd055",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/backup/android-daily-widget-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Wear existing source",
+      "ref": "refs/heads/feat/wear-os-stage1",
+      "commit": "ed3818bd4905ca8f9aa5ff90c68aac7a2ada748a",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/feat/wear-os-stage1",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Diagnosis author snapshot",
+      "ref": "refs/heads/fix/diagnostics-access-retry-20261029",
+      "commit": "4aace9b7bf2602f10fed40cc433d0f3119779a7c",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/fix/diagnostics-access-retry-20261029",
+      "masterFreshRemoteVerified": true
+    },
+    {
+      "scope": "Diagnosis integration WIP snapshot",
+      "ref": "refs/heads/wip/chat01-diagnostics-access-ios55-20261029",
+      "commit": "2020060368fe6a548495a4a1e3c93daae5e056bc",
+      "url": "https://github.com/dogbossvibes/CarniFlow/tree/wip/chat01-diagnostics-access-ios55-20261029",
+      "masterFreshRemoteVerified": true
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "atUTC": "2026-10-29T08:09:55.600880+00:00",
+  "normalRefsFreshlyVerified": {
+    "refs/heads/backup/subscription-modern-20261029": "82d5aac053086f6c3dd2ad3a5ce2cff2ef2f21dc",
+    "refs/heads/backup/subscription-android103-20261029": "d451f11966fc130ae0658fb9e8b6fe81aa1f81f9",
+    "refs/heads/backup/subscription-ios103-20261029": "3b4363a7217e0123ee9ce5d8382373eaddf2e0af",
+    "refs/heads/backup/tooling-development-process-20261029": "67b7af24d392296ce0fcee45f94d4e8c40c26dc8",
+    "refs/heads/backup/tooling-one-approval-ota-20261029": "f7dc4fe21c1eb4468a54b6f7fc898200550d496c",
+    "refs/heads/release/source-0e16001d4f9a": "0e16001d4f9aeeb9d06adf384c9b86376fae2250"
+  },
+  "sourceBackups": [
+    {
+      "scope": "anyvo-subscription-lifecycle-20261028",
+      "branch": "backup/subscription-modern-20261029",
+      "head": "82d5aac053086f6c3dd2ad3a5ce2cff2ef2f21dc",
+      "sourceCount": 20,
+      "task": "T-133",
+      "normalPushFreshRemote": "PASS",
+      "sourceUnchanged": true,
+      "status": "WIP_ONLY_NO_RELEASE"
+    },
+    {
+      "scope": "anyvo-subscription-lifecycle-android103-20261028",
+      "branch": "backup/subscription-android103-20261029",
+      "head": "d451f11966fc130ae0658fb9e8b6fe81aa1f81f9",
+      "sourceCount": 30,
+      "task": "T-134",
+      "normalPushFreshRemote": "PASS",
+      "sourceUnchanged": true,
+      "status": "WIP_ONLY_NO_RELEASE"
+    },
+    {
+      "scope": "anyvo-subscription-lifecycle-ios103-20261028",
+      "branch": "backup/subscription-ios103-20261029",
+      "head": "3b4363a7217e0123ee9ce5d8382373eaddf2e0af",
+      "sourceCount": 37,
+      "task": "T-135",
+      "normalPushFreshRemote": "PASS",
+      "sourceUnchanged": true,
+      "status": "WIP_ONLY_NO_RELEASE"
+    },
+    {
+      "scope": "historical tooling development",
+      "branch": "backup/tooling-development-process-20261029",
+      "head": "67b7af24d392296ce0fcee45f94d4e8c40c26dc8",
+      "status": "COPY_ONLY_WIP_NO_QA_RELEASE"
+    },
+    {
+      "scope": "historical one-approval OTA tooling",
+      "branch": "backup/tooling-one-approval-ota-20261029",
+      "head": "f7dc4fe21c1eb4468a54b6f7fc898200550d496c",
+      "status": "COPY_ONLY_WIP_NO_QA_RELEASE"
+    }
+  ],
+  "noOriginalWorktreeChanges": true,
+  "noTestsOrNativeSecurityReleaseApprovalForLegacy103": true
+}

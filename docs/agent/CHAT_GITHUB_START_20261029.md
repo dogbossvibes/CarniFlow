@@ -1,0 +1,9 @@
+# Weiterarbeit mit ChatGPT und GitHub
+
+## Nächste drei kleine Schritte
+1. Zuerst RELEASE_HANDOFF_2026-10-29.md und das zugehörige Source-/Backupmanifest im Sicherungsbranch lesen; für Apparbeit den passenden aktuellen Runtime-Releasebranch wählen. Backup-WIPs niemals pauschal nach main übernehmen.
+2. Einen einzelnen offenen Scope wählen und dessen vorhandenen Taskbericht sowie Quellen aus GitHub lesen. T115: Installation bereits erledigt, normaler Auth-A/B-Lauf meldete ungeklärten STOP; keine Neuinstallation oder Verlängerung von Testgrants ohne konkrete Freigabe. Tracking-Rohspeicher und Legacy103 bleiben gesonderte unfreigegebene Integrationen.
+3. Nur diesen Scope lokal/offline prüfen bzw. einen konkreten sicheren nächsten Arbeitsauftrag erstellen. Vor jeder Productionaktion gültige konkrete Freigabe und frische Runtime-/Source-/Datenverträglichkeit prüfen. Nicht auf Mac-only-Berichte verlassen; fehlende Artefakte ausdrücklich benennen.
+
+## Kopierbarer Startauftrag
+Lies im Repository dogbossvibes/CarniFlow auf Branch backup/chat01-github-handoff-20261029 zuerst docs/agent/RELEASE_HANDOFF_2026-10-29.md, die dort verlinkten Manifeste und den zu meinem gewählten Thema gehörenden Taskbericht. Unterscheide veröffentlichte Runtimequellen, geprüfte Authorstände und ungeprüfte WIP-Sicherungen. Verwende für Appänderungen ausschließlich die passende aktuelle Runtimebasis und bewahre alle bestehenden Kunden-, Hunde-, Trainings-, Fährten-, Gesundheits-, Dokument-, Offline- und Entwurfsdaten. Nenne zunächst den belegten Iststand, die fehlenden Nachweise und die nächsten drei kleinen Schritte. Keine neuen Features, keine Datenlöschung/Resets und keine Push-, Merge-, OTA-, Build-, Store-, Account- oder DB-Aktion ohne jeweils passende ausdrückliche Freigabe. Wenn du keinen GitHub-Zugriff hast, bitte mich ausschließlich um die konkret benötigten nicht sensiblen Dateien; erfinde keine Inhalte und verlange keine Secrets oder Kundendaten.

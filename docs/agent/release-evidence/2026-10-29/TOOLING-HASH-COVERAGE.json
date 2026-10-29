@@ -1,0 +1,145 @@
+[
+  {
+    "scope": "anyvo-development-process-20261025",
+    "branch": "refs/heads/chore/development-process-20261025",
+    "baseHEAD": "2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e",
+    "coveredByMainSnapshot": [
+      "scripts/__tests__/otaReleaseHarness.ts",
+      "scripts/__tests__/updateProductionRaceGuard.test.ts",
+      "scripts/agent-worktree.mjs",
+      "scripts/check-native-changes.mjs",
+      "scripts/preflight.mjs",
+      "scripts/update-production.mjs",
+      "docs/agent/tasks/T-69.md",
+      "scripts/__tests__/developmentProcess.node.test.mjs",
+      "scripts/__tests__/releaseQualityEvidence.test.ts",
+      "scripts/development-snapshot.mjs",
+      "scripts/release-quality-evidence.mjs",
+      "scripts/task-registry.mjs"
+    ],
+    "unverifiedDistinctSource": [
+      {
+        "path": "docs/agent/tasks/_TEMPLATE.md",
+        "sha256": "96e467c11f70e0813f3967008c3d6d78769a72f28bb272b26ddd943b0b040f62",
+        "bytes": 2177
+      },
+      {
+        "path": "package.json",
+        "sha256": "fd7f7bd0e1fdc61a9e641cf489919b4fc3bce11989ee12b923e153780b3a72a4",
+        "bytes": 5990
+      }
+    ],
+    "status": "READ_ONLY_HASH_COMPARISON_NO_BACKUP_OR_QA_INFERRED"
+  },
+  {
+    "scope": "anyvo-one-approval-ota-20261026",
+    "branch": "refs/heads/chore/one-approval-ota-20261026",
+    "baseHEAD": "2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e",
+    "coveredByMainSnapshot": [
+      "scripts/agent-worktree.mjs",
+      "scripts/check-native-changes.mjs",
+      "scripts/__tests__/developmentProcess.node.test.mjs",
+      "scripts/development-snapshot.mjs",
+      "scripts/release-quality-evidence.mjs",
+      "scripts/task-registry.mjs"
+    ],
+    "unverifiedDistinctSource": [
+      {
+        "path": "docs/DEVELOPMENT_WORKFLOW.md",
+        "sha256": "7c4ddc2fdb81726ecc20c7e35d81e9d094c4b213447da87a034c288b2a27ffc3",
+        "bytes": 16879
+      },
+      {
+        "path": "package.json",
+        "sha256": "04233b09cb99f5540141fe86f66ba1930785b7354f780991b1ae903f5dbb0bf8",
+        "bytes": 6082
+      },
+      {
+        "path": "scripts/__tests__/otaReleaseHarness.ts",
+        "sha256": "089a0ee8490ccee38feb9dc66560e3cdf85ac3868c2d93168caedbb38857b303",
+        "bytes": 20890
+      },
+      {
+        "path": "scripts/__tests__/updateProduction.test.ts",
+        "sha256": "8a51053d7e34d042110c491ea805c16119127e27e0371e044b49412d9b1f91c3",
+        "bytes": 14760
+      },
+      {
+        "path": "scripts/__tests__/updateProductionInitialRuntime.test.ts",
+        "sha256": "385615a2731935083b1e61a181f103736bf4e0f3d905531d7d8b47cc6aeaefd0",
+        "bytes": 16546
+      },
+      {
+        "path": "scripts/__tests__/updateProductionMultiRuntime.test.ts",
+        "sha256": "04b96208c82bee5b1b31e9122383791a1a98494e3087adadf8f5ec60441327fc",
+        "bytes": 26159
+      },
+      {
+        "path": "scripts/__tests__/updateProductionNativeProfile.test.ts",
+        "sha256": "0f88b89211aa223956dcec32c532d29587a14ba42d288bd330337da76f6e4006",
+        "bytes": 6738
+      },
+      {
+        "path": "scripts/__tests__/updateProductionRaceGuard.test.ts",
+        "sha256": "65ddcbc85d7e8aa2759f6c4ab11ba0dfa89279d5d62f42fc518ebed52188fed9",
+        "bytes": 17220
+      },
+      {
+        "path": "scripts/guard-prod-supabase.mjs",
+        "sha256": "30d40bde2b82824ac24854144b5787c90a45f349f5c7530aef48c0cb7f90403f",
+        "bytes": 3831
+      },
+      {
+        "path": "scripts/preflight.mjs",
+        "sha256": "44c214729186095ed764787d3e0a0b73ae810b750f8374e3dbe1ead519bf983c",
+        "bytes": 3587
+      },
+      {
+        "path": "scripts/update-production.mjs",
+        "sha256": "c5448dbc5fb1c51701694825a63bc94e8ba876b9400e041eafe0ef9fb320a760",
+        "bytes": 56375
+      },
+      {
+        "path": "docs/agent/tasks/T-70.md",
+        "sha256": "1f6a12df01d1019dd89f10d4c0b9bca4155380677311be2e7038a9c37dc0e63e",
+        "bytes": 13055
+      },
+      {
+        "path": "scripts/__tests__/otaCandidate.node.test.mjs",
+        "sha256": "0e473baa88093dfcf6eec45c839ccbf5b9a7ceb20ddcca66d4cf023800ceca36",
+        "bytes": 8987
+      },
+      {
+        "path": "scripts/__tests__/otaOneApproval.test.ts",
+        "sha256": "2968efc0950c2cac16911f35b52b0472f0e74f3914d22fff31f74da7094a7637",
+        "bytes": 6267
+      },
+      {
+        "path": "scripts/__tests__/otaPreparation.node.test.mjs",
+        "sha256": "bcaeb46fd555094fb02b9b25937a20ef2fedf41a5af15c1dfc18dc1a2ef07ac4",
+        "bytes": 6646
+      },
+      {
+        "path": "scripts/__tests__/releaseQualityEvidence.test.ts",
+        "sha256": "86bd30c7dd7af0885af7e8c4e3a9bae16c68c793b7fda0180475cb9d257b3bd2",
+        "bytes": 1988
+      },
+      {
+        "path": "scripts/ota-candidate.mjs",
+        "sha256": "5d1650006ade3220661423e230e7e17b331e38ed391debc75e6bacf1f5c1648a",
+        "bytes": 11217
+      },
+      {
+        "path": "scripts/ota-delivery.mjs",
+        "sha256": "423008f4442ad4c83592801d423e783b7b81b7db1f21c277c763acea50cf48bc",
+        "bytes": 2772
+      },
+      {
+        "path": "scripts/ota-preflight.mjs",
+        "sha256": "50d6d1776e49d4ec6d5933f16a3d5baab6ab86442821c96fe75d470be819336f",
+        "bytes": 4568
+      }
+    ],
+    "status": "READ_ONLY_HASH_COMPARISON_NO_BACKUP_OR_QA_INFERRED"
+  }
+]

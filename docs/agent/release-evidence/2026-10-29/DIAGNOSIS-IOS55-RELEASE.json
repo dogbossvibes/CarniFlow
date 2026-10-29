@@ -1,0 +1,49 @@
+{
+  "status": "PASS_PUBLISHED_AND_ACTUAL_MANIFEST_BUNDLE_ALL_ASSET_ENTRIES_VERIFIED",
+  "atUTC": "2026-10-29T08:08:34.678776+00:00",
+  "sourceCommit": "0e16001d4f9aeeb9d06adf384c9b86376fae2250",
+  "sourceRef": "refs/heads/release/source-0e16001d4f9a",
+  "sourceUrl": "https://github.com/dogbossvibes/CarniFlow/tree/release/source-0e16001d4f9a",
+  "platform": "ios",
+  "runtime": "1.0.5-motion-v4",
+  "groupId": "838e8cc5-7910-41dc-9d89-15a37be934bc",
+  "updateId": "01a186b3-1ae2-7d35-a4a0-15474b7eb19e",
+  "channel": "production",
+  "environment": "production",
+  "branch": "production",
+  "tests": 29,
+  "typecheck": "PASS",
+  "lint": "PASS",
+  "independentSourceReview": "PASS",
+  "fullBundle": "PASS_ONLY2_RUNTIME_MODULES_CHANGED_ALL_OTHER_MODULES_ASSETS_RETAINED",
+  "bundleSHA256": "a475bcd0aa13d45a8bfd7f7090303f96988c2d0bc46aafdf8efb6b5fbd2d7c9c",
+  "personalServerGrant": {
+    "targetEnabled": 1,
+    "othersEnabled": 0,
+    "profilesRls": true,
+    "guardTriggerEnabled": true,
+    "exclusiveUniqueIndexValid": true,
+    "readOnlyAdminQuery": true,
+    "normalUserSessionRlsTest": false,
+    "rightsChanged": false
+  },
+  "deviceApplication": "NOT_VERIFIED",
+  "nativeBuild": false,
+  "storeRelease": false,
+  "databaseWrite": false,
+  "preserved": [
+    "Subscription",
+    "keyboard",
+    "field map and bounded motion QA",
+    "dashboard/calendar",
+    "tracking/sensors",
+    "LiveShare",
+    "existing customer data"
+  ],
+  "notIncluded": [
+    "SQLite archive",
+    "offline motion audit",
+    "angle correction",
+    "Health sharing"
+  ]
+}
