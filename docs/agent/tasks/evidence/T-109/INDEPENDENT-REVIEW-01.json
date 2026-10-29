@@ -1,0 +1,33 @@
+{
+  "status": "PASS_STATIC_SOURCE_REVIEW",
+  "at": "2026-10-29T00:48:36.700615+00:00",
+  "freezeSHA256": "0ee1e8b666e7257b1abf42ecef3488d2a9052ea4b1172932d0f1eb14862f5a8f",
+  "sourceFiles": {
+    "app/unit/document.tsx": "9535d86ef9d5a41318d2a6f9a476c68ece98118d5d9b6fe46fefb480a407f5d7",
+    "app/unit/__tests__/document.test.tsx": "133ffa89e1e4e33f0dc97293660ffde8b18d1f0dc228bf7b2167f9a9686c1e9d",
+    "docs/agent/tasks/T-109.md": "b4c307a58e54a8d8d6003fe6a96792d786b3491baa04071e21f55397a49a1fa1"
+  },
+  "base": "6f1556e449c5f872f6f61fae1f9f136846aaf5f6",
+  "findings": [],
+  "resolvedInitialFinding": "SafeArea top offset removed; default0 appropriate for headerless full-screen route",
+  "confirmed": [
+    "Footer and ScrollView share the same keyboard-adjusted container",
+    "Android height/iOS padding configured without native config changes",
+    "Scroll refs/handled taps retained and on-drag dismiss added",
+    "Entire source preceding layout identical to published base, including Save/Draft handlers",
+    "Actual49 Android adjustResize0x10 and edgeToEdge source inspected",
+    "Training form exact published55/Android49/Android50 baseline parity confirmed"
+  ],
+  "authorTests": {
+    "tests": 67,
+    "logSHA256": "cb4f0cbd096560733eab5a4a032f23d3e22bfe43a76b936334cbb0e366cb8cdf",
+    "independentDuplicateFullRun": false
+  },
+  "typecheck": "Author previous PASS; final rerun pending at review time",
+  "deviceQA": "NOT_EXECUTED; real keyboard, scroll geometry, font scaling and small-screen checks remain open",
+  "releaseAuthorized": false,
+  "references": [
+    "https://reactnative.dev/docs/0.81/keyboardavoidingview",
+    "https://docs.expo.dev/guides/keyboard-handling/"
+  ]
+}

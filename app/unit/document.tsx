@@ -700,8 +700,8 @@ function DocumentForm() {
       </View>
 
       {!editing && <View style={s.steps} accessibilityLabel={t('trainingFlow.step', { step: workflowStep + 1 })}>{(['prepare', 'observe', 'next'] as const).map((key, index) => <View key={key} style={[s.step, workflowStep === index && s.activeStep]}><Text style={[s.stepText, workflowStep === index && { color: C.white }]}>{index + 1} · {t(`trainingFlow.${key}`)}</Text></View>)}</View>}
-      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" pointerEvents={saving || remoteCompleted || pendingSave ? 'none' : 'auto'}>
+      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView ref={scrollRef} style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" pointerEvents={saving || remoteCompleted || pendingSave ? 'none' : 'auto'}>
 
           {draftError && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.draftError')}</Text>}
           {editing && !editLoaded && <TouchableOpacity accessibilityRole="button" style={s.chip} onPress={() => setLoadRetry(v => v + 1)}><Text style={s.chipTxt}>{t('common.retry')}</Text></TouchableOpacity>}
@@ -937,7 +937,6 @@ function DocumentForm() {
           </>}
           <View style={{ height: 24 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
 
       {/* Speichern — sticky/fixed CTA über dem Home Indicator */}
       <SafeAreaView edges={['bottom']} style={s.footer}>
@@ -954,6 +953,7 @@ function DocumentForm() {
           <Text style={s.saveTxt}>{saving ? t('common.saving') : remoteCompleted || pendingSave ? t('common.retry') : editing ? t('training.saveChanges') : t((['trainingFlow.start', 'trainingFlow.continue', 'training.saveUnit'] as const)[workflowStep])}</Text>
         </AnimatedPressable>
       </SafeAreaView>
+      </KeyboardAvoidingView>
 
       <CustomExerciseSheet
         visible={customSheetOpen}

@@ -1,0 +1,15 @@
+{
+  "status": "OFFSET_REVIEW_FIX_TESTS_PASS_FINAL_TYPECHECK_RUNNING",
+  "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-training-keyboard-scroll-20261029",
+  "branch": "fix/training-keyboard-scroll-20261029",
+  "head": "6f1556e449c5f872f6f61fae1f9f136846aaf5f6",
+  "files": {
+    "app/unit/document.tsx": "9535d86ef9d5a41318d2a6f9a476c68ece98118d5d9b6fe46fefb480a407f5d7",
+    "app/unit/__tests__/document.test.tsx": "133ffa89e1e4e33f0dc97293660ffde8b18d1f0dc228bf7b2167f9a9686c1e9d",
+    "docs/agent/tasks/T-109.md": "b4c307a58e54a8d8d6003fe6a96792d786b3491baa04071e21f55397a49a1fa1"
+  },
+  "testsPassed": 67,
+  "typecheck": "previous PASS; final rerun running",
+  "lint": "PASS",
+  "deviceQA": "NOT_EXECUTED"
+}
