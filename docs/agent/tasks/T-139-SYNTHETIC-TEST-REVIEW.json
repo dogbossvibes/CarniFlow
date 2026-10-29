@@ -1,0 +1,22 @@
+{
+  "reviewStatus": "SOURCE_PRIVACY_REVIEW_ALLOWLIST",
+  "reviewer": "00-01 MASTER",
+  "programBase": "633ad0029569ddd40004b976890ce9a31496f569",
+  "status": "UNMODIFIED_SYNTHETIC_TEST_SUPPLEMENT_WIP_NOT_RELEASE_READY",
+  "files": [
+    {
+      "group": "audit",
+      "sourcePath": "features/tracking/utils/__tests__/motionArrivalAudit.test.ts",
+      "matchingProgramBackup": "633ad0029569ddd40004b976890ce9a31496f569",
+      "sha256": "6932197fe59786425a7bc375a387855e316ea9b6ea9d20dfba6c76167711ba64",
+      "bytes": 1787,
+      "alreadyIdenticalInProgramBackup": false,
+      "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+      "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+      "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+    }
+  ],
+  "newTestsExecuted": false,
+  "sourceOriginalsUnchanged": true,
+  "notApproved": "Other fixtures/research/raw exports; no functional QA/activation/native/security/DB/release approval"
+}
