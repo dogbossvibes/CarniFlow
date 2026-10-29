@@ -1,0 +1,15 @@
+export const routeCopy = {
+  title: 'ANYVO Gespräch', back: 'Zurück', loading: 'Wird geladen …',
+  locked: 'Gespräch und Spracheingabe sind noch nicht freigeschaltet.',
+  detail: 'Du kannst diese Funktionen nutzen, sobald sie bereit und geprüft sind. Bis dahin kannst du ANYVO wie gewohnt weiterverwenden.',
+  login: 'Bitte melde dich an, um das Gespräch zu öffnen.', signIn: 'Anmelden',
+  chooseDog: 'Für welchen Hund möchtest du das Gespräch starten?',
+  dogsFailed: 'Deine Hunde konnten nicht geladen werden. Bitte prüfe deine Verbindung.',
+  noDogs: 'Lege zuerst einen Hund in ANYVO an.', retry: 'Erneut laden',
+  privacy: 'Datenschutz & Widerrufe',
+  privacyDetail: 'Hier kannst du bereits vorgemerkte Widerrufe übertragen. Dafür brauchst du keinen Hund und kein freigeschaltetes Gespräch.',
+  retryRevocations: 'Ausstehende Widerrufe übertragen', privacyChecking: 'Widerrufe werden geprüft …',
+  privacyConfirmed: 'Alle hier vorgemerkten Widerrufe sind bestätigt. Es ist keine Übertragung mehr offen.',
+  privacyPending: 'Die Übertragung ist noch nicht bestätigt. Bitte versuche es erneut, sobald du verbunden bist.',
+  unavailable: 'Das Gespräch ist gerade nicht verfügbar. Bitte versuche es später erneut.',
+};
