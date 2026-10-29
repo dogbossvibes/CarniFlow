@@ -1,0 +1,1361 @@
+{
+  "status": "READ_ONLY_HISTORICAL_INVENTORY_NOT_BACKUP_PROOF",
+  "date": "2026-10-29",
+  "registeredWorktrees": 415,
+  "dirtyWorktrees": 181,
+  "possibleSourceChanges": 150,
+  "excludedLocalNoiseOnly": 31,
+  "meaning": "A dirty worktree may be an obsolete authoring copy already preserved by another release. No remote coverage, ownership or safety approval inferred. Overlay final verified owner backup receipts before declaring gaps. Originals remain untouched.",
+  "scopes": [
+    {
+      "worktreeName": "canisflow",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/feat/track-module-rewrite",
+      "baseHead": "67d400610469e48c6e94b467167fc74a5d642b48",
+      "possibleSourcePathCount": 21,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-daily-widget",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/android-daily-widget",
+      "baseHead": "1a574212f6b7c1827bc03048f2eb5b5d662cd7a1",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-diagnostics",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/android-tracking-diagnostics",
+      "baseHead": "1a574212f6b7c1827bc03048f2eb5b5d662cd7a1",
+      "possibleSourcePathCount": 12,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-field-reliability-qa",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/android-field-reliability-qa",
+      "baseHead": "3f44b1d2793c7241ac2305fc6e05418ab1c07069",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-store-native-integration",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/android-store-native-integration-20261018",
+      "baseHead": "ccb98c5296e6021c6a0839ab4c16fc15848f8fff",
+      "possibleSourcePathCount": 10,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-tracking-field-20261022",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/android-tracking-field-20261022",
+      "baseHead": "ae3e372df017e1c1b600ea3878ef6934e3c5afec",
+      "possibleSourcePathCount": 14,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-tracking-p0",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/android-tracking-p0",
+      "baseHead": "3f44b1d2793c7241ac2305fc6e05418ab1c07069",
+      "possibleSourcePathCount": 19,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-wear-native-preflight",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/release/android-wear-native-preflight",
+      "baseHead": "19c8ea94559bd6f5f582d89378572b3ff734fc58",
+      "possibleSourcePathCount": 11,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-widget",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/android-quick-start-widget",
+      "baseHead": "bd94ff2e7e1f849eaccdfb33c3800f84fc50ff0f",
+      "possibleSourcePathCount": 5,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-appointment-form-ux",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/appointment-form-ux",
+      "baseHead": "91b77fc9ed7d7ce0f54868eb5421efa4db6f6397",
+      "possibleSourcePathCount": 42,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-audit-share-chat-ui",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/audit-share-chat-ui-20261024",
+      "baseHead": "d67773bec61fcc4999496db1095daf5da07776d2",
+      "possibleSourcePathCount": 14,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-c1-after-distractions",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-c1-after-distractions",
+      "baseHead": "e83eeb8dad894eeb65f4b1cb200a6ccfdd4a8569",
+      "possibleSourcePathCount": 24,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-c1-after-distractions-android",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-c1-after-distractions-android",
+      "baseHead": "84fafa8ea1e3dfb2115124d801297907d10a7252",
+      "possibleSourcePathCount": 24,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-care-training-backend",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/care-training-backend",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 12,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-companion-home-entry",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/companion-home-entry-20261024",
+      "baseHead": "d67773bec61fcc4999496db1095daf5da07776d2",
+      "possibleSourcePathCount": 5,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-corner-window-diagnostics-20261029",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/corner-window-diagnostics-20261029",
+      "baseHead": "8a560649612975bc2336c54efa9256cd638fb67b",
+      "possibleSourcePathCount": 6,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-development-process-20261025",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/chore/development-process-20261025",
+      "baseHead": "2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e",
+      "possibleSourcePathCount": 14,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-diagnostics-access-ios55-release-20261029",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/release/diagnostics-access-ios55-20261029",
+      "baseHead": "005999f2ab2cbe4fdf91c020f1fa3e7f22a830dc",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-dog-custom-color",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/dog-custom-color",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 23,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-dog-custom-color-db",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/dog-custom-color-db",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-dog-today-actions-20261029",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/dog-today-actions-20261029",
+      "baseHead": "6f1556e449c5f872f6f61fae1f9f136846aaf5f6",
+      "possibleSourcePathCount": 20,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-dog-training-document-action",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/dog-training-document-action",
+      "baseHead": "ec5c240854eb5f371b50b15e49219d3d03caecb4",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-export-continuity-adapter",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/export-continuity-adapter",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 12,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-export-ux-rows",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/export-ux-rows",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 10,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-group-client-acceptance",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/track-group-client-acceptance",
+      "baseHead": "422c2a9a746f2c8e4800358e929ccbc314f8898b",
+      "possibleSourcePathCount": 12,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-group-client-android104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/track-group-client-android104",
+      "baseHead": "6017f5dd158b90c56d244c9091bc64f6f70a69fe",
+      "possibleSourcePathCount": 12,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-group-distraction-db",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/group-distraction-db",
+      "baseHead": "34532974df3b74f10ac3b97c0e66fd6f41585066",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-group-live-share-db",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/group-live-share-db",
+      "baseHead": "23bdfa5e16c86fc8fc288c568878fc46ad33b0d6",
+      "possibleSourcePathCount": 33,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-group-training-panel",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/group-training-panel",
+      "baseHead": "34532974df3b74f10ac3b97c0e66fd6f41585066",
+      "possibleSourcePathCount": 2,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-heat-overview-ux",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/heat-overview-ux-20261024",
+      "baseHead": "86c3d1e2a09952148bfd35a84642ca69be820b78",
+      "possibleSourcePathCount": 22,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-heat-sheet-dismiss",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/heat-sheet-dismiss",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-help-first-steps",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/help-first-steps",
+      "baseHead": "7521d48609c3a5b246bc9e04cd20eade141bccbc",
+      "possibleSourcePathCount": 23,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-help-sheet-scroll",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/help-sheet-scroll",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-intelligence-analysis",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/anyvo-intelligence-conversation-ios-20261023",
+      "baseHead": "aa09a64f7b11c08eb334dc4808d4bda2ee1d2ce1",
+      "possibleSourcePathCount": 8,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-daily-widget-carplay",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/ios-daily-widget-carplay",
+      "baseHead": "a2361efea416badc118206f517a98875569f9561",
+      "possibleSourcePathCount": 15,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-field-reliability",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/audit/ios-field-reliability-2026-10-08",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 2,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-store-language-de",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/ios-app-store-language-de",
+      "baseHead": "8f0a497080fa3de2fec679aab856dd42c97a8630",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-watch-device-preparation",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/qa/ios-watch-device-preparation",
+      "baseHead": "3ac4e095454c69575a0e878d6d127fa96b7cba94",
+      "possibleSourcePathCount": 19,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-watch-session",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/ios-monitoring-consent-20261024",
+      "baseHead": "86c3d1e2a09952148bfd35a84642ca69be820b78",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios49-airmap-repair-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/ios49-airmap-repair-20261026",
+      "baseHead": "60f9e44e003bbea98ae35181628cb1500d1df9e3",
+      "possibleSourcePathCount": 8,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios49-map-fullscreen-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/ios49-map-fullscreen-20261026",
+      "baseHead": "2162033926f9f0b09971cef8c6ac6defc6132576",
+      "possibleSourcePathCount": 5,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios49-map-solid-no-scale-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/ios49-map-solid-no-scale-20261026",
+      "baseHead": "2162033926f9f0b09971cef8c6ac6defc6132576",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios55-compact-groups-cumulative-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/release/ios55-compact-groups-cumulative-20261026",
+      "baseHead": "f017f09bb9a97153c252d6bc0aa4e3634023a9e9",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios55-startup-layout-20261028",
+      "locationClass": "project-mirror",
+      "branch": null,
+      "baseHead": "d13181bb392c211551c636a86eb1bad35ffed2ca",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-logo-transparent-background",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/logo-transparent-background",
+      "baseHead": "91b77fc9ed7d7ce0f54868eb5421efa4db6f6397",
+      "possibleSourcePathCount": 5,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-manual-angle-edits-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/manual-angle-edits-20261026",
+      "baseHead": "72eaeb9871e5dd630603bb86ed548b4bab42afed",
+      "possibleSourcePathCount": 7,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-medication-date-picker",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/medication-date-picker",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 5,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-native-android-store-current",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/release/android-store-current",
+      "baseHead": "39964e1f073e34783fa80d7603b12c0591688826",
+      "possibleSourcePathCount": 16,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-one-approval-ota-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/chore/one-approval-ota-20261026",
+      "baseHead": "2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e",
+      "possibleSourcePathCount": 25,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-phase3-raw-journal-20261028",
+      "locationClass": "project-mirror",
+      "branch": null,
+      "baseHead": "d13181bb392c211551c636a86eb1bad35ffed2ca",
+      "possibleSourcePathCount": 13,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-qa-ios-watch-paired-runner",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/qa/ios-watch-paired-runner",
+      "baseHead": "a26a562ec9cc04239dc7df240f64748735e869f8",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-release-additional3-ios104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/candidate/additional3-continuity-ios104",
+      "baseHead": "839371d3f325f5a4923353029db5796b5d40bbc8",
+      "possibleSourcePathCount": 31,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-release-fn123-candidate",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/candidate/tracking-fn123-ios104",
+      "baseHead": "37418dbd404c7ead7d795dea7698810dbf8b030c",
+      "possibleSourcePathCount": 29,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-release-heat-dismiss-candidate",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/candidate/heat-dismiss-ios104",
+      "baseHead": "37418dbd404c7ead7d795dea7698810dbf8b030c",
+      "possibleSourcePathCount": 7,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-release-ui-ios105-motion-v2-live",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/release/ui-ios105-motion-v2-live",
+      "baseHead": "2ee256448fa8abbb6dbd5d2861813790be051dfd",
+      "possibleSourcePathCount": 51,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-review-jokers-ios52",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/review/jokers-client-ios52",
+      "baseHead": "fe1e383b9f7d13c8ec328e080889f8f1380f9e7d",
+      "possibleSourcePathCount": 77,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-sharing-groups-design",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/sharing-groups-design",
+      "baseHead": "7521d48609c3a5b246bc9e04cd20eade141bccbc",
+      "possibleSourcePathCount": 16,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-sync-owner-isolation-20261024",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/sync-owner-isolation-20261024",
+      "baseHead": "f809b71078a354c92efb853cb6c6944399b8c681",
+      "possibleSourcePathCount": 13,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-sync-single-flight",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/sync-single-flight",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-track-file-group-exchange",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/track-file-group-exchange",
+      "baseHead": "422c2a9a746f2c8e4800358e929ccbc314f8898b",
+      "possibleSourcePathCount": 13,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-track-file-group-exchange-android104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/track-file-group-exchange-android104",
+      "baseHead": "6017f5dd158b90c56d244c9091bc64f6f70a69fe",
+      "possibleSourcePathCount": 12,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-track-map-minimal-android49-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/track-map-minimal-android49-20261026",
+      "baseHead": "7c726144e6544ee9e8b43e1b863e7b23c39ec3fc",
+      "possibleSourcePathCount": 7,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-track-map-minimal-ios49-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/track-map-minimal-ios49-20261026",
+      "baseHead": "60f9e44e003bbea98ae35181628cb1500d1df9e3",
+      "possibleSourcePathCount": 7,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-track-map-minimal-ui-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/track-map-minimal-ui-20261026",
+      "baseHead": "72eaeb9871e5dd630603bb86ed548b4bab42afed",
+      "possibleSourcePathCount": 7,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-track-object-corrections-db",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/track-object-corrections-db",
+      "baseHead": "839371d3f325f5a4923353029db5796b5d40bbc8",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-active-initiation",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-active-initiation",
+      "baseHead": "9b8acb1dbd73c34379cff78d42a256aa2e427e59",
+      "possibleSourcePathCount": 35,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-angle-list",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-angle-list",
+      "baseHead": "71632a680115475dc84d2d1a968a71699245d4a5",
+      "possibleSourcePathCount": 12,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-detail-both-traces",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-detail-both-traces-20261022",
+      "baseHead": "6877011dc9bdc6cce17d42402fe5a2ae65f5e6c2",
+      "possibleSourcePathCount": 11,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-distraction-android-boundaries",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-distraction-android-boundaries",
+      "baseHead": "d620222682ade9abc5f2d1ba1408722ba04c2f64",
+      "possibleSourcePathCount": 60,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-distraction-flow",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-distraction-flow",
+      "baseHead": "a2361efea416badc118206f517a98875569f9561",
+      "possibleSourcePathCount": 21,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-distraction-recording-fix",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-distraction-recording",
+      "baseHead": "9e2060217ab5b3fba3e861d9441a5d506e476909",
+      "possibleSourcePathCount": 10,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-distraction-recording-fix-android104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-distraction-recording-android104",
+      "baseHead": "a4e0418c518f82836301a94907ce042c1dfee954",
+      "possibleSourcePathCount": 10,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-distractions",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-distractions",
+      "baseHead": "9b8acb1dbd73c34379cff78d42a256aa2e427e59",
+      "possibleSourcePathCount": 9,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-evaluation-footer",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-evaluation-footer",
+      "baseHead": "a5b2aadd5d6f6ac76e558dfb23c3425e08e5aa26",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-evaluation-footer-android101",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-evaluation-footer-android101",
+      "baseHead": "d9b5a87730554ae48468a6b20d68e66a01784891",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-field-corrections",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-field-corrections",
+      "baseHead": "71632a680115475dc84d2d1a968a71699245d4a5",
+      "possibleSourcePathCount": 30,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-field-corrections-android104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-field-corrections-android104",
+      "baseHead": "ccb98c5296e6021c6a0839ab4c16fc15848f8fff",
+      "possibleSourcePathCount": 30,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-fn1-fn2-field",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-fn1-fn2-field",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 13,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-group-live-share",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-group-live-share",
+      "baseHead": "34532974df3b74f10ac3b97c0e66fd6f41585066",
+      "possibleSourcePathCount": 33,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-android104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-android104",
+      "baseHead": "25dd497c188d1eddeb566ef6989343a4bfe8e085",
+      "possibleSourcePathCount": 73,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-android105-build47",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-android105-build47",
+      "baseHead": "39964e1f073e34783fa80d7603b12c0591688826",
+      "possibleSourcePathCount": 81,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-angle-objects",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-angle-objects",
+      "baseHead": "7521d48609c3a5b246bc9e04cd20eade141bccbc",
+      "possibleSourcePathCount": 84,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-ios104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-ios104",
+      "baseHead": "ce5a0fcffe9a97950e2610699441fe0455107c8f",
+      "possibleSourcePathCount": 70,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-ios105",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-ios105",
+      "baseHead": "9224483d7156cbc116ccb75aeff0c1dc582e5e53",
+      "possibleSourcePathCount": 70,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-ios52-after-help",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-ios52-after-help",
+      "baseHead": "d8bc3b7e4869d8022b6c23ec5a28c60b0ef2f757",
+      "possibleSourcePathCount": 78,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-native52-r2",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-native52-r2",
+      "baseHead": "fe1e383b9f7d13c8ec328e080889f8f1380f9e7d",
+      "possibleSourcePathCount": 70,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-r3-android104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-r3-android104",
+      "baseHead": "25dd497c188d1eddeb566ef6989343a4bfe8e085",
+      "possibleSourcePathCount": 80,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-r3-ios104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-r3-ios104",
+      "baseHead": "ce5a0fcffe9a97950e2610699441fe0455107c8f",
+      "possibleSourcePathCount": 77,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-r3-ios105",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-r3-ios105",
+      "baseHead": "9224483d7156cbc116ccb75aeff0c1dc582e5e53",
+      "possibleSourcePathCount": 77,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-jokers-r3-native52-r2",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-jokers-r3-native52-r2",
+      "baseHead": "fe1e383b9f7d13c8ec328e080889f8f1380f9e7d",
+      "possibleSourcePathCount": 77,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-line-ema-p1-android",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-line-ema-p1-android",
+      "baseHead": "b272f1f41b829aa6d199ae1a2fff1600f35a27aa",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-live-current-android104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-live-current-android104",
+      "baseHead": "a4e0418c518f82836301a94907ce042c1dfee954",
+      "possibleSourcePathCount": 44,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-live-current-ios104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-live-current-ios104",
+      "baseHead": "9e2060217ab5b3fba3e861d9441a5d506e476909",
+      "possibleSourcePathCount": 44,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-live-share-current",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/live-share-client-v1-20261023",
+      "baseHead": "aa09a64f7b11c08eb334dc4808d4bda2ee1d2ce1",
+      "possibleSourcePathCount": 5,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-live104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-live104",
+      "baseHead": "9b5290dfbc9ea83085d0585bf8ff8af2a74f93a0",
+      "possibleSourcePathCount": 24,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-map-direction",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-map-direction",
+      "baseHead": "a2361efea416badc118206f517a98875569f9561",
+      "possibleSourcePathCount": 5,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-native-sensor-quality",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-native-sensor-quality",
+      "baseHead": "ae09a659db8cec31de296e71dd5348306266ed5a",
+      "possibleSourcePathCount": 11,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-object-corrections",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-object-corrections",
+      "baseHead": "839371d3f325f5a4923353029db5796b5d40bbc8",
+      "possibleSourcePathCount": 9,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-object-review-v1",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-object-review-v1",
+      "baseHead": "87d5e2b3b3ed931b655464eec971b95225dcf0ff",
+      "possibleSourcePathCount": 31,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-pause-safety-20261025",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-pause-safety-20261025",
+      "baseHead": "2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e",
+      "possibleSourcePathCount": 20,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-planline-20261024",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-planline-20261024",
+      "baseHead": "86c3d1e2a09952148bfd35a84642ca69be820b78",
+      "possibleSourcePathCount": 8,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-planner-live",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-planner-live",
+      "baseHead": "9b5290dfbc9ea83085d0585bf8ff8af2a74f93a0",
+      "possibleSourcePathCount": 7,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-qa-rejected-motion",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-qa-rejected-motion",
+      "baseHead": "37418dbd404c7ead7d795dea7698810dbf8b030c",
+      "possibleSourcePathCount": 13,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-quality-20261026",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-quality-20261026",
+      "baseHead": "f0784761f84a562b45f626bd5f5babb2a6f82a78",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-quality-ios55-20261023",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-quality-ios55-20261023",
+      "baseHead": "67ae3548ad956d235c0110b36b702093cbf40a9d",
+      "possibleSourcePathCount": 6,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-recovery-ui",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-recovery-ui",
+      "baseHead": "a2361efea416badc118206f517a98875569f9561",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-reliability-20261023",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-reliability-20261023",
+      "baseHead": "6328890822a842cb94cd6819e483cc5e86056ed7",
+      "possibleSourcePathCount": 13,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-scale-follow-refresh",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-scale-follow-refresh",
+      "baseHead": "bc748ab1a4fec463976e9d13831db95cbd736ce3",
+      "possibleSourcePathCount": 7,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-sensor-study",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-sensor-study",
+      "baseHead": "f5557a8b6bb67c03ab80447f6beb146cc622e725",
+      "possibleSourcePathCount": 12,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-special-angle",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-special-angle-direction",
+      "baseHead": "a2361efea416badc118206f517a98875569f9561",
+      "possibleSourcePathCount": 34,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-special-angle-android104",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-special-angle-android104",
+      "baseHead": "d620222682ade9abc5f2d1ba1408722ba04c2f64",
+      "possibleSourcePathCount": 32,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-step-calibration",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-step-calibration",
+      "baseHead": "fe68e1290161f12838bde6480d7868147b295995",
+      "possibleSourcePathCount": 21,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-ux-flow-20261023",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/tracking-ux-flow-20261023",
+      "baseHead": "0eadfd078ecd9639accc23a626aeb956cdfa93d8",
+      "possibleSourcePathCount": 14,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-visible-map-scale",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/tracking-visible-map-scale",
+      "baseHead": "fe68e1290161f12838bde6480d7868147b295995",
+      "possibleSourcePathCount": 18,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-training-feedback-loop",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/training-feedback-loop",
+      "baseHead": "28355badd869b1bf4f022c2c1c13a0c0b2636eca",
+      "possibleSourcePathCount": 35,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-training-hub-20261024",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/training-hub-20261024",
+      "baseHead": "86c3d1e2a09952148bfd35a84642ca69be820b78",
+      "possibleSourcePathCount": 8,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-training-keyboard-scroll-20261029",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/training-keyboard-scroll-20261029",
+      "baseHead": "6f1556e449c5f872f6f61fae1f9f136846aaf5f6",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-training-template-ux-20261023",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/training-template-ux-20261023",
+      "baseHead": "6328890822a842cb94cd6819e483cc5e86056ed7",
+      "possibleSourcePathCount": 20,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-transfer-preview-fix",
+      "locationClass": "project-mirror",
+      "branch": null,
+      "baseHead": "9b8acb1dbd73c34379cff78d42a256aa2e427e59",
+      "possibleSourcePathCount": 2,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-wear-os-stage1",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/feat/wear-os-stage1",
+      "baseHead": "ed3818bd4905ca8f9aa5ff90c68aac7a2ada748a",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-yam-paired-corners-ios55-20261023",
+      "locationClass": "project-mirror",
+      "branch": "refs/heads/fix/yam-paired-corners-ios55-20261023",
+      "baseHead": "0d9634240346d37a5c43ae6c343fc8e5d83bb7ff",
+      "possibleSourcePathCount": 5,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-parity-1.0.3",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/release/android-parity-1.0.3",
+      "baseHead": "5a0610b6afc40625c768e5930e6c67fa4e25c6f2",
+      "possibleSourcePathCount": 13,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-android-play-policy",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/fix/android-play-background-location-2026-09-21",
+      "baseHead": "e90df201be3242f993d6915b9b908aa2e7aaec2d",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-feature-tracking-gps-quality-shelly",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/feat/tracking-gps-quality-shelly-diagnostics",
+      "baseHead": "53ecb207c5c452a3dc542ae43b379b0a2897f5b9",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-feature-tracking-preview-recovery-colors",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/feat/tracking-continuity-corrections",
+      "baseHead": "0c5a1ed37bba347257ea71729cf83780c0c6043a",
+      "possibleSourcePathCount": 79,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-internal-v2-final",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/release/ios-internal-v2",
+      "baseHead": "8205873a1c36ae46fe2daaa90565054d9ed3a629",
+      "possibleSourcePathCount": 2,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-qa-104",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/release/ios-qa-104",
+      "baseHead": "bd94ff2e7e1f849eaccdfb33c3800f84fc50ff0f",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-main",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/main",
+      "baseHead": "1a574212f6b7c1827bc03048f2eb5b5d662cd7a1",
+      "possibleSourcePathCount": 24,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-qa-v21",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/feat/qa-export-v2.1-motion",
+      "baseHead": "0aa57e4b18af7b50d65b0b55f2007d26e61d053e",
+      "possibleSourcePathCount": 2,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-recovery-finish",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/fix/recovery-finish-replay-data",
+      "baseHead": "bd26928a7e514f5bdc27965d659eea5440b839d2",
+      "possibleSourcePathCount": 38,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-replay-analysis-modes",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/fix/replay-analysis-modes",
+      "baseHead": "c3c67dda8d2b6e8a0ba549f8802a13439b573c37",
+      "possibleSourcePathCount": 19,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-subscription-lifecycle-20261028",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/codex/subscription-lifecycle-20261028",
+      "baseHead": "e8a754f34ca4bd58907a87b2d54182feaa0abd5c",
+      "possibleSourcePathCount": 20,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-subscription-lifecycle-android103-20261028",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/codex/subscription-lifecycle-android103-20261028",
+      "baseHead": "2f513dbd37fa4a012679f2a2c0d8df5b9c7d3c27",
+      "possibleSourcePathCount": 30,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-subscription-lifecycle-ios103-20261028",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/codex/subscription-lifecycle-ios103-20261028",
+      "baseHead": "7a1bfbb4dfa33bad92cf1660bc3048fc026f8ec4",
+      "possibleSourcePathCount": 37,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-track-b3",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/feat/track-b3-adaptive-transition-zone",
+      "baseHead": "0aa57e4b18af7b50d65b0b55f2007d26e61d053e",
+      "possibleSourcePathCount": 11,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-field-v6-1-1.0.3",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/fix/track-search-lifecycle-recovery-1.0.3",
+      "baseHead": "34b4b4cf3e5f65a8bb943e8907a9dbfeebc514a5",
+      "possibleSourcePathCount": 6,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-fusion-1.0.3",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/fix/tracking-fusion-reference-quality-1.0.3",
+      "baseHead": "0bac0258e43a48b1cbdb8dceb5f1430e35b4e47e",
+      "possibleSourcePathCount": 13,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-window-bakeoff",
+      "locationClass": "canonical-worktree",
+      "branch": "refs/heads/research/window-straightness-bakeoff",
+      "baseHead": "068fe5f5c24c2f5614576460113754857af1ebf9",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-diag-ota",
+      "locationClass": "legacy-checkout",
+      "branch": null,
+      "baseHead": "3de67c0b986ad0239b364b75d65964baf3c8efaa",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-health-followup",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/health-followup",
+      "baseHead": "1eafc8643826715591bcd415e9341b0e4648ccdc",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-light-dark-mode",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/feat/ios-light-dark-mode",
+      "baseHead": "67d400610469e48c6e94b467167fc74a5d642b48",
+      "possibleSourcePathCount": 192,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-ios-native",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/feat/ios-native-swiftui",
+      "baseHead": "66d03bb267c02b87849833bf3688ad2b57eef1d3",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-logbook-map-prod",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/integration/logbook-map-prod-aa40c4e",
+      "baseHead": "aa40c4e053b1be86f7c9c9b5a7af249e50715676",
+      "possibleSourcePathCount": 8,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-logbook-map-prod-tracking",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/integration/logbook-map-prod-ca61155",
+      "baseHead": "008ad5097395d75cd47e820143a14c0adb798ad5",
+      "possibleSourcePathCount": 1,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-prod-hotfix",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/prod-hotfix-supabase",
+      "baseHead": "8aedbe6c4127fe928a7355043aa1edb21a7dfd2d",
+      "possibleSourcePathCount": 3,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-rating-sync-fix",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/rating-sync-fix",
+      "baseHead": "0d7e08c00cee9a007d8293c3b5a4982e60344f5d",
+      "possibleSourcePathCount": 7,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-recovery-ota",
+      "locationClass": "legacy-checkout",
+      "branch": null,
+      "baseHead": "3de67c0b986ad0239b364b75d65964baf3c8efaa",
+      "possibleSourcePathCount": 4,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-subui-ota",
+      "locationClass": "legacy-checkout",
+      "branch": null,
+      "baseHead": "3de67c0b986ad0239b364b75d65964baf3c8efaa",
+      "possibleSourcePathCount": 8,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-track-guidance",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/track-guidance",
+      "baseHead": "86bff3e94b63f270fb96aeda5dff03b4f04717dd",
+      "possibleSourcePathCount": 9,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    },
+    {
+      "worktreeName": "anyvo-tracking-runtime",
+      "locationClass": "legacy-checkout",
+      "branch": "refs/heads/tracking-runtime",
+      "baseHead": "8c1bc51d8fa257a5cb52e9ed2649b10e2e4eea24",
+      "possibleSourcePathCount": 11,
+      "coverage": "UNVERIFIED_PENDING_OWNER_OR_SUCCESSOR_MATCH",
+      "gapReason": "Historical source provenance/secret/customer-data check and exact remote successor not established by inventory; do not blind-commit."
+    }
+  ]
+}

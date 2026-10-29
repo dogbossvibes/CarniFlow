@@ -1,0 +1,178 @@
+{
+  "sourceBase": "1a574212f6b7c1827bc03048f2eb5b5d662cd7a1",
+  "branch": "main",
+  "originalSourceUnchanged": true,
+  "frozenInventorySHA256": "3432c583a36afbac302a580615b8b9e688ad7833d87cfad053c69794f80c4154",
+  "copiedCount": 23,
+  "omittedCount": 1,
+  "files": [
+    {
+      "status": " M",
+      "path": "AGENTS.md",
+      "sha256": "26fdef5378c601eac1edee0aa36672083bba18bcff7318d7f62d5fdfeee0eead",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "docs/agent/ACTIVE_WORK.md",
+      "sha256": "f0b4eee8e5a82b61b8d4d0cfb6ba2c61ffc3c57240dcf7c011c05e6f316d9dc5",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "docs/agent/ANYVO_MASTER_STATUS.md",
+      "sha256": "16c489fd281a337ba9a999382359769cca15e4e4497a3733ae2859780940ef5d",
+      "copied": false,
+      "reason": "New personal account identifier in frozen text; excluded under privacy instruction. Original unchanged. See sanitized release handoff for current status."
+    },
+    {
+      "status": " M",
+      "path": "docs/agent/DECISIONS.md",
+      "sha256": "ae60dda8dad82cda1cdf397cf42b6bfc52f629e32e8870a4cd733fe3657191bb",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "docs/agent/PLATFORM_STATUS.md",
+      "sha256": "4125df8c49db2ff9fc8a274eb255f67f1619fe9ae4aa4ab252064404116f4f85",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "docs/agent/README.md",
+      "sha256": "088b90f71d810261dc6abb0cb03ecdadc096625111171f32d29290578b0873fa",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "docs/agent/tasks/_TEMPLATE.md",
+      "sha256": "dd533f4b287896b854c6ebdf101bd81d3253c361180fe940932cb6f1161a9b8a",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "package.json",
+      "sha256": "2c57e47f609ffd362790d245bf5a560ea330a67e6d17f69977c7e6588fe9e6d3",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "scripts/__tests__/otaReleaseHarness.ts",
+      "sha256": "59095d1467e4c93113cbe3d11e4286cf08d1014d82de9977e0e1518c10b72625",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "scripts/__tests__/updateProductionInitialRuntime.test.ts",
+      "sha256": "faabd16c7c758c4dae6b3978948d8386528858fe6f94290abdde330b19d1aed9",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "scripts/__tests__/updateProductionRaceGuard.test.ts",
+      "sha256": "f71ebc6d8ec2fe80f407aff6bdd2b10b43689bbec02b10d16b4f7b7f61283043",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "scripts/agent-worktree.mjs",
+      "sha256": "5427417eed6cc0e000e307ae719f53a462f71c5d59084935ec1bb5460dfd0c08",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "scripts/check-native-changes.mjs",
+      "sha256": "7fd43b6c712959876ace641cb9b898d8b5aafa98c3c90be13545867234744b31",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "scripts/preflight.mjs",
+      "sha256": "87e60692b81ec9d4fa228218c96d3076f33b51ba611b390cced513ed91f671a8",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": " M",
+      "path": "scripts/update-production.mjs",
+      "sha256": "ed8cad939a58e514c6235fcd31461a1b3976dd2e33c46e3e7c2f0af2804ad2e8",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "docs/agent/tasks/T-69.md",
+      "sha256": "78cdef85b4004b343fbb75862d10a412bb673201bd5014cc18a842b5b84174e2",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "docs/agent/tasks/TRACKING-DIAGNOSTICS-AUDIT-2026-10-08.md",
+      "sha256": "01da02e81a9bbe28a67f475964eb6ea56f8fe740599a527e710b3c8d19dd5e70",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "scripts/__tests__/developmentProcess.node.test.mjs",
+      "sha256": "0b3f49ad069d675ca32b6b3fad150d55e754a6af85455f75399de96824e81409",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "scripts/__tests__/releaseQualityEvidence.test.ts",
+      "sha256": "645643c9830fd4df3bd27db75874078b530d9ef58198b16ba1a86ec83e8845ec",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "scripts/__tests__/updateProductionNativeProfile.test.ts",
+      "sha256": "2b029c8b657cd9d639a73a6e85a3618336fbbe23f3fedc6346410f65a5bf5217",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "scripts/__tests__/updateProductionPlatformRuntime.test.ts",
+      "sha256": "0e318522afe80f51f60885c01c99f6fbae9ac1cfa31da505f978964ec01e1fc4",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "scripts/development-snapshot.mjs",
+      "sha256": "992ed42d56b6132f64c698d42f9befe1b51c37eb031a87ccce782392ec5a7f3f",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "scripts/release-quality-evidence.mjs",
+      "sha256": "7ddbe8e5a1fc43f54b874b092cfc241f6e9a1eb32d3c804d293fdc9cf2601955",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    },
+    {
+      "status": "??",
+      "path": "scripts/task-registry.mjs",
+      "sha256": "552932e1a296ae30045ea40889c404270db81386250f1183ff40e5d7c0d1bdcd",
+      "copied": true,
+      "authorship": "UNVERIFIED_HISTORICAL_AUTHOR; copy-only WIP, not integration or QA approval"
+    }
+  ]
+}

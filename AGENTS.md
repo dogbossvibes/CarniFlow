@@ -20,6 +20,105 @@ status change.
 Do not publish a Production OTA from a branch that does not contain the
 documented current Production baseline.
 
+## Zentrale ANYVO-Koordination (Nutzerauftrag 2026-10-08)
+
+Der aktive Chat `00-01 – ANYVO MAIN MASTER – Status & Entscheidungen` ist
+Eingang für Ideen, Probleme und Prioritäten und koordiniert die bestehenden
+Fachchats. Der Nutzer erlaubt Aufgabenweiterleitung und Ergebniseinholung im
+jeweils beauftragten Scope. Diese Erlaubnis erweitert weder den Produkt-Scope
+noch die Freigabe für Commit, Push, Merge, OTA, nativen Build, Store-Release oder
+DB-Write; jede dieser Aktionen braucht eine separate ausdrückliche Freigabe.
+
+Der Folgeauftrag vom 2026-10-08 erlaubt beauftragten bestehenden ANYVO-Fachchats
+auch Status-, Ergebnis- und Blockaden-Rückmeldungen an den MASTER
+`01a18309-ad36-7ef0-9950-1941ac2c816a` (Host `local`, Master-Ablösung auf direkten Nutzerauftrag 2026-10-28). Bei Weiterleitung diese
+direkte Nutzerfreigabe und Ziel-ID nachvollziehbar mitgeben; sie autorisiert
+keine anderen Empfänger, Produktänderungen oder Git-/Release-Aktionen.
+Der MASTER holt Ergebnisse selbst ab; Rückmeldungen lösen keine gegenseitigen
+automatischen Nachrichtenketten aus. Tool-Ablehnungen nicht umgehen.
+
+Vor jeder Weiterleitung: kanonische Dokumente, tatsächlichen Chat-Status,
+Worktree/Branch/HEAD/Working Tree, vorhandenen Task-Bericht und zuständigen
+Writer prüfen. `docs/agent/ACTIVE_WORK.md` enthält die Routing-Zuordnungen;
+Chat-cwd ist kein Beleg für den Code-Worktree. Laufende oder überlappende Arbeit
+fortsetzen/abstimmen, keine Doppelaufträge und keine fremden Änderungen.
+
+Der verbindliche Koordinationsablauf und Freigabegrenzen stehen in
+`docs/agent/README.md`, Abschnitt „Zentrale Koordination“. Fachchats lesen diese
+Regeln vor neuen Aufträgen aus `/Users/moyo/canisflow-worktrees/anyvo-main`, auch
+wenn ihr eigener Worktree eine ältere Dokumentkopie enthält. Bei Drift oder
+unklarer Zuständigkeit die betroffene Schreibaktion stoppen; unabhängige
+read-only Prüfungen fortsetzen.
+
+## Kundendatenerhalt (direkte Nutzeranforderung 2026-10-08)
+
+Präzisierung direkter Nutzerauftrag 2026-10-29 (Werkstatt Originalturn
+01a1855d-7fd5-74f2-8af6-e147ef2b1621): Niemals bestehende Kundendaten entfernen.
+Geschützt sind alle Kunden-/Hundedaten: Trainingserfassung/-dokumentation,
+Übungen/Bewertungen/Notizen, Fährten samt Geometrie/Markern/Gegenständen/Absuche/
+Verlauf, Gesundheitsakte/Medikamente sowie sämtliche Termine, Dokumente, Medien,
+Einträge und Verknüpfungen. Auch Altformate, Offline-/unsynchronisierte Einträge
+und Entwürfe erhalten. Keine Teil-/Volllöschung, destruktives Überschreiben,
+verlustbehaftete Migration oder Cache-/Storage-/Datenresets mit Verlust
+ungesicherter Einträge; keine Neuinstallation als Reparaturmaßnahme.
+Anzeige-/Filter-/Syncfehler nicht ungeprüft als Datenlöschung darstellen.
+Datenwirkung jeder Änderung/Integration/Update/Migration prüfen und vorhandene
+Persistenz-/Altformat-/Update-/Offline-/Sync-/Abbruch-/Recovery-Nachweise
+risikogerecht nutzen, keine redundanten Volltests ohne neuen Anlass.
+Bei ungeklärtem Datenverlustrisiko betroffene Änderung/Veröffentlichung STOP;
+Ursache und sichere Lösung melden. Keine absolute Verlustfreiheitsgarantie.
+Keine persönlichen Daten/Secrets in GitHub, Logs, Fixtures oder Übergaben.
+Keine produktiven Lösch-/Resetaktionen zu Testzwecken. Dieser Schutzauftrag
+ist keine Freigabe für Live-Korrektur, DB-Operation, persönlichen Datenexport,
+Restore oder Migration; bestehende Schutzmechanismen bewahren.
+
+
+Bestehende Kundendaten müssen bei Fehlerkorrekturen erhalten bleiben. Keine
+Datenlöschung, destruktives Überschreiben oder Resets als Bugfix; Neuinstallation
+und Löschen lokaler Daten sind keine Standardlösung. Bestehende Einträge,
+Datumswerte, Verläufe und ältere Datenformate weiterhin unterstützen. Insbesondere
+bei Medikamentenfixes vorhandene Einträge laden/bearbeiten/speichern, Abbrechen
+und Upgrade-Pfade soweit tatsächlich prüfbar testen; keine automatische
+historische Datenkorrektur ohne gesonderten Auftrag.
+
+Bei notwendiger Migration zuerst Sicherung, Wiederherstellbarkeit,
+Rückwärtskompatibilität und bestehende Freigaben prüfen. Bei ungeklärtem
+Datenverlustrisiko vor Integration/Veröffentlichung STOP. Diese Regel autorisiert
+keine Migration, Live-DB-Schreibaktion, Wiederherstellung oder neue Veröffentlichung.
+Nur ausgeführte Prüfungen melden; verbleibende Risiken/Geräteabnahmen offen
+kennzeichnen, keine absolute Sicherheitsgarantie behaupten.
+
+## Fortlaufende OTA-Freigabe (direkter Nutzerauftrag 2026-10-09)
+
+Direkte Nutzernachricht im MASTER: „bitte alle offenen OTA immer wieder freigeben,
+ich fahre jetzt weg und lasse es hier laufen“. Sie erteilt eine fortlaufende
+Production-OTA-Freigabe für die beauftragten ANYVO-Änderungen. Frühere Anweisung
+„vorher sauber committen“ gilt für die dafür nötigen isolierten Release-Commits.
+Keine erneute Nutzerfrage für dieselben OTA-Scopes, auch für die vorbereiteten
+Heat-/HelpSheet-Fixes. Keine Erlaubnis für ungeprüfte oder scopefremde Pakete.
+
+01 bleibt einziger Publisher. Vollständige sinnvolle Checks, nötige unabhängige
+Reviews, saubere Release-Quelle, frischer Production-/Runtime-/Ancestry-/Native-/DB-
+Preflight und tatsächliche Bundle-/Asset-/Live-/Manifest-CDN-Nachkontrolle bleiben
+Pflicht. Fertige bereits veröffentlichte Pakete nicht erneut ausliefern. STOP bei
+ungeklärter Quelle, fehlendem Check, Runtime-Inkompatibilität, Datenverlustrisiko
+oder automatischer Ablehnung; keine Umgehung.
+
+Diese direkte Freigabe ersetzt nur frühere Einzel-OTA-Freigabevorbehalte für
+beauftragte Scopes. Sie erweitert nicht die Freigabe für Push, main-Merge, native
+Builds, Store-Release, Live-DB-Write oder Restore. Frühere konkrete Freigaben dieser
+Aktionen gelten separat weiter, neue nicht aus der OTA-Freigabe ableiten.
+
+Aktiver MASTER-Heartbeat `anyvo-laufende-ota-koordination` prüft alle15Minuten
+kompakt neue Fachchat-Ergebnisse, koordiniert fertige Pakete mit01 und hält die
+bestehenden Statusdokumente aktuell. Kein zweiter Writer, keine neuen Chats oder
+Produktentwicklung im MASTER. Bei unverändertem Stand still; nur echte Abschlüsse,
+neue Blocker/Fehler oder nötige Nutzerentscheidungen melden. Kontingent im Blick
+behalten, unnötige wiederholte Prüfungen vermeiden. Rechner/Projekt/Anmeldung und
+laufende Desktop-App müssen verfügbar sein. Einrichtung und erster planmäßiger
+Heartbeat am 2026-10-09 um 08:00 Europe/Zurich sind belegt: main-Status und
+Fachchat-Ergebnisse wurden lesend abgeholt. Dies belegt keinen OTA-Geräteempfang.
+
 # Agent Handoff Protocol (ChatGPT + Codex; optional Claude fallback)
 
 ChatGPT + Codex are the primary ANYVO development workflow. Claude Code and
@@ -28,21 +127,25 @@ source of truth for all agents. Full guide:
 `docs/agent/README.md`.
 
 ## On start (Codex MUST do this, in order)
-1. Read `docs/agent/CURRENT_STATE.md`.
-2. Read `docs/agent/SESSION_HANDOFF.md`.
-3. Read `docs/agent/TASKS.md` — the active task IDs, their status, and the **next TASK-ID**.
-4. Skim relevant entries in `docs/agent/DECISIONS.md`.
-5. Check the worktree path and root (`pwd`; `git rev-parse --show-toplevel`).
-6. Run `git status --short`, `git branch --show-current`, and `git rev-parse HEAD`.
-7. Compare the repository state against the handoff: does the branch match? Do the
-   listed changed files actually exist? Are there additional local changes? Is the
-   handoff possibly stale (`npm run agent:status`)?
+1. Check the actual worktree/root, branch, HEAD and `git status --short`; preserve all existing WIPs.
+2. Read canonical `docs/agent/ANYVO_MASTER_STATUS.md` and `docs/agent/ACTIVE_WORK.md`
+   in `/Users/moyo/canisflow-worktrees/anyvo-main` for current scope, stops and owners.
+3. Read relevant `docs/agent/DECISIONS.md` entries and the existing task report.
+4. Consult `CURRENT_STATE.md`, `SESSION_HANDOFF.md` and `TASKS.md` only as historical
+   supporting context; compare every relevant claim with current repository/Git facts.
+5. Reuse the existing task/owner. Historical “next TASK-ID” text does not reserve an ID.
+   New IDs must be reserved atomically in the shared git-common-dir registry with
+   owner, purpose and exact base recorded. The reviewed registry tool is locally
+   integrated: use `node scripts/agent-worktree.mjs create <slug> --base <EXACT_BASE_COMMIT>
+   --owner "<Owner/Chat-ID>" --purpose "<bounded purpose>" --branch <branch>` only
+   within an authorized scope. See `docs/agent/tasks/T-69.md`. Never allocate IDs
+   from historical counters or infer permission to create worktrees from tool availability.
 
 Codex must **never** assume that uncommitted changes were made by itself.
 
 ## Priority rule (on any conflict)
 ```
-Repository state > Git state > Handoff documentation > Agent assumptions
+Repository/Git facts > current canonical MASTER_STATUS/ACTIVE_WORK > historical handoff/task files > agent assumptions
 ```
 The actual repository state always wins over handoff documentation.
 

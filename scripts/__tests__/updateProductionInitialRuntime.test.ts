@@ -122,7 +122,7 @@ describe('Initial-Runtime-Modus: Validierung des nativen Basis-Builds', () => {
     h.resetCalls();
     blocked({ builds: { [BUILD_44]: build44({ updateChannel: { name: 'preview' } }) } }, 'Channel preview ≠ production');
     h.resetCalls();
-    blocked({ builds: { [BUILD_44]: build44({ buildProfile: 'preview' }) } }, 'Profil preview ≠ production');
+    blocked({ builds: { [BUILD_44]: build44({ buildProfile: 'preview' }) } }, 'Profil preview ist kein belegtes Production-Store-Profil');
   });
   it('10. Build ohne gitCommitHash → BLOCK', () => blocked({ builds: { [BUILD_44]: build44({ gitCommitHash: null }) } }, 'kein gültiger gitCommitHash'));
   it('11. nativer Build-Commit kein Vorfahre von HEAD → BLOCK', () => {

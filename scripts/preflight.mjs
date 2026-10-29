@@ -18,11 +18,11 @@ const run = (cmd) => execSync(cmd, { stdio: 'pipe', encoding: 'utf8' });
 
 // 1–4: TypeScript / Lint / Doctor / Tests
 step('TypeScript (tsc --noEmit)', () => run('npx tsc --noEmit'));
-// Lint als Warnung: Style-/Lint-Fehler blockieren keinen Build/Update. Neue
-// Dateien sollten dennoch lint-sauber sein (im PR prüfen).
-step('ESLint (expo lint)', () => run('npx expo lint'), { critical: false });
+// ESLint errors are blocking; warnings stay visible in the command result.
+step('ESLint (expo lint)', () => run('npx expo lint'));
 step('Expo Doctor', () => run('npx expo-doctor'), { critical: false });
 step('Tests (jest)', () => run('npx jest --runInBand'));
+step('Development process guards (offline)', () => run('node --test scripts/__tests__/developmentProcess.node.test.mjs'));
 
 // 5: App-Config lädt sauber
 step('App-Config (expo config)', () => {
