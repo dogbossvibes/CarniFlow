@@ -33,7 +33,10 @@ export function MetricsInput({ value, onChange }: Props) {
                   style={[s.dot, n <= val && s.dotActive]}
                   onPress={() => set(key, n)}
                   activeOpacity={0.7}
-                />
+                  accessibilityRole="button"
+                  accessibilityLabel={`${METRIC_LABELS[key]}: ${n}/5`}
+                  accessibilityState={{ selected: val === n }}
+                ><Text style={[s.value, n <= val && s.valueActive]}>{n}</Text></TouchableOpacity>
               ))}
             </View>
           </View>
@@ -45,9 +48,11 @@ export function MetricsInput({ value, onChange }: Props) {
 
 const s = StyleSheet.create({
   wrap:  { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, gap: 12 },
-  row:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  label: { fontSize: 12, color: C.muted, fontWeight: '700', letterSpacing: 0.5, flex: 1 },
-  dots:  { flexDirection: 'row', gap: 8 },
-  dot:   { width: 18, height: 18, borderRadius: 9, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border },
+  row:   { gap: 8 },
+  label: { fontSize: 14, color: C.muted, fontWeight: '700', letterSpacing: 0.5 },
+  dots:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  dot:   { minWidth: 44, minHeight: 44, padding: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: C.cardAlt, borderWidth: 1, borderColor: C.border },
+  value: { color: C.white, fontSize: 16, fontWeight: '600' },
+  valueActive: { color: C.accentText },
   dotActive: { backgroundColor: C.accent, borderColor: C.accent },
 });

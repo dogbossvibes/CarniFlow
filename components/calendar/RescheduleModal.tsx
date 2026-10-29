@@ -1,5 +1,6 @@
+import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { useEffect, useState } from 'react';
-import { Alert, Keyboard, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Keyboard, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';

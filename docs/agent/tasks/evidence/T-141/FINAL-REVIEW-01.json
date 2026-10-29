@@ -1,0 +1,133 @@
+{
+  "task": "T-141",
+  "status": "PASS_SOURCE_AND_LOCAL_TECHNICAL_REVIEW_WITH_DEVICE_RUNTIME_CARET_LIMITS",
+  "reviewer": "Chat01 independent read-only review",
+  "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-training-entry-ux-20261029",
+  "branch": "fix/training-entry-ux-20261029",
+  "head": "d65997d06592af2b213f442651f3700ce3b9bc51",
+  "sourceFiles": {
+    "app/add-dog.tsx": "7a3a752987ba9122bba96a8d57e5a7f1f2d14be0a6631d199c0c0eae8cce1262",
+    "app/dog-backpack/[id].tsx": "e06b9a6d5cade27a87d73d02eeb87ccb4ec94188eeb7d515128bcfdf27cbc2e3",
+    "app/dog-command/edit.tsx": "a45b7a3a3d811e692965355af9811057775ca74a876090d2b21608a73e5a28f7",
+    "app/dog-document/[id].tsx": "6ed4189839b6da0691cddfde136aaa460a97eccc83ecdbff6d1cc1c5d5df6c08",
+    "app/dog-goal/[id].tsx": "e5615d1222cf4579a5eb840d810c0c2ecd5565f60eb3a13ab8f2f7b0f4767fd1",
+    "app/dog-health-record/[id].tsx": "97b0666c015e6c64632170a206137b09e002909cb9c1f5affa903c221b4412be",
+    "app/dog-health/[id].tsx": "11a1329a460029c573d89c5353868e75d02913790de5d38db8d5b032dde8d9b6",
+    "app/dog-heat-new.tsx": "3760d9b7721c92699221382bba2f892c7cd1feec6274964b931244cdbee290c6",
+    "app/dog-heat/[id].tsx": "cba39fe0b0886ca652df8b91443aa93849e3b9e971e18c129a5eb27d6723a491",
+    "app/edit-dog.tsx": "495809b3874ed626d413f3b4d00c8b3aec6e3d64400f7d0b5fb961a21f210a55",
+    "app/edit-profile.tsx": "5e8d7a3e53616260b9fa0ca6034196a9ef47e6b2f6539ae0ed21513e2bbbfb39",
+    "app/trainer/edit.tsx": "638b7c647e38efd82eb3b4306a94612118b3e31eea4c49d92f614c0c2a83d1f3",
+    "app/trainer/index.tsx": "08055422bf7ce0fd6f191fcde9daad014d29199133bf460b65ebf0fc08ad9a34",
+    "app/trainer/plan-neu.tsx": "8cfe1ee95937daba773dc2f72e7a96b6b5ade4dd28ff1ed6a683c535d204f031",
+    "app/trainer/registrieren.tsx": "3977ea7272c25d56807500c050b6ee93e4c0efb7bc6cc29e71f1af84aaa78ca8",
+    "app/training-journal.tsx": "d8c26fe3252a43c569cf76adbd1cea19b2c75177ba2e729000000c6f5b7b35fb",
+    "app/training/[id].tsx": "bee533d2cdb6c11711ebd7b9782b53ffbfecdaf1119f84eebe1b4d2f95a9df9e",
+    "app/umfrage/index.tsx": "0d7299ca657ac7c3792abd827316e1d445c8218596b0d0d2f45bc53e2bf97ecc",
+    "app/unit/__tests__/document.test.tsx": "75d369495cf06b64499dbef95a204e72cf07a6cb4a7bbc3afbd80204b4cd58f8",
+    "app/unit/detail.tsx": "99c623874b0e80b09db7f7bebfb1b46f928269518117b2ec4b10735bf1a6c96f",
+    "app/unit/document.tsx": "eada19a4ac92edf0387d2df9b495d204d69a244dbb305ca01894c81afa19fe12",
+    "app/unit/new-category.tsx": "75c5c49427fa1f400019323f9c1eee59ca1fa09c07be5179b6eac1ee54a498ba",
+    "app/unit/summary.tsx": "12780c37157bd060847a00bc2ec849701428d2d9dfe6b5cda654250ddd67f60b",
+    "components/calendar/CreateEventModal.tsx": "fb2721a24801001313cd4eb02aaf7496aa2fb9d44e17ad4f770af1ce20f4c6db",
+    "components/calendar/RescheduleModal.tsx": "2265b42f193d660d0b974994c277dab5eb6e3fb96687394ec49f88fb31735844",
+    "components/dogs/heat/HeatJournalScreen.tsx": "cd40707bf24e61f61910e57bbff3c0afff2abfc91a5f58ff3386b0c50a33e8d6",
+    "components/training/CustomExerciseSheet.tsx": "d1d18309be4a8f2718ff647e9f4ee3daabe5c83fa9b7dd2315203b4d894c84a2",
+    "components/training/MetricsInput.tsx": "b950daa051d64fe98811fdb039004e0ab9de6f9fcce8cecb02d948e510ee1855",
+    "components/training/__tests__/MetricsInput.test.tsx": "82421df0ec1e1a60362cae44b307b433788f94b7f379de2d21d01159dabe77b8",
+    "components/ui/KeyboardAwareScrollView.tsx": "28736ec655a718168cb48ff2a8233fe329090e5c5c5aff7750ed07db05b2dac2",
+    "components/ui/__tests__/KeyboardAwareScrollView.test.tsx": "3a8795fe78d278a8e66563bd3ca6dbe6ce69ae4b1a5cda8833ee3b2211157ca2"
+  },
+  "evidenceSHA256": {
+    "SOURCE-FREEZE-V3.json": "353636d501d316992c40ad9ad7a37b374b7c06e3436cd621a85c11b8e4b2744a",
+    "regression-v2.log": "c76c59eee3386a6e08d141e2f8c3a9eea2ff4079922d596c579f0c9d08f74f7f",
+    "final-tests-v3.log": "230458bd5c4e3e361dc195e511f6b2e1be77d7f7a881e56fdcad2284c286010c",
+    "drag-red.log": "f2181e96e42a82856a27918520d244f92a69754eeeae65f1c26e74402c821ba4",
+    "IMPORT-ONLY-AUDIT.json": "1c1052a2a4fb39436bddc165039a218175ae03f4cf7c2ee716ead3fe5b6d4b9a",
+    "V1-GEOMETRY-PROBE.json": "7c9a034cd47e0ec8ab148f031061d47fe206fe226acf7b13c94651543ef21035",
+    "SOURCE-FREEZE-V4.json": "4fd6bae8f684817b9f3dd5388b6e36534347cd7bee80dc52b4806a55aafe8a23",
+    "FINAL-CHECKS.json": "fa3a62d4a4cef66004d70caa722424128b284017d6e7079e358f4b17be214021",
+    "typecheck-verified.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "changed-lint-final.log": "69e5bc3bdedd2210151d76f3f42ee643334be3a3d660c08073161b406497b8c2",
+    "focus-verified.log": "f753a935e0ab4a7356ea2e9f593af7d89afdc68440f209e8a7cebe8894a7c375"
+  },
+  "findings": [],
+  "resolvedFindings": [
+    "Native inset-only viewport now bounded by keyboard coordinates without extra padding or double subtraction",
+    "Manual drag clears focus ownership; delayed show/layout cannot re-enable automatic movement until a new actual focus",
+    "Field beside or below floating keyboard is not incorrectly treated as occluded"
+  ],
+  "reviewed": [
+    "31 frozen file hashes verified",
+    "25 form modules retain byte-identical non-import statements",
+    "Score/metrics values and toggle-to-null/zero preserved; visible labels, wrapping,44pt targets and selection state added",
+    "Existing Save/Draft/PendingRetry/Auth/Offline handlers unchanged",
+    "Ref and event handlers forwarded; revision/identity/native-focus guards discard stale callbacks",
+    "Keyboard.show/frame/hide listeners cleaned; horizontal rows excluded",
+    "Existing inset/KAV ownership retained; no second padding logic",
+    "Native RN0.81 ScrollView/Keyboard/TextInput implementations inspected locally"
+  ],
+  "newProductWritesByReviewer": false,
+  "testsRepeatedByReviewer": false,
+  "independentProbe": "V1 production helper geometry case reproduced invalid 0 vs bounded242; V3 corresponding wrapper regressions inspected",
+  "ownerTests": {
+    "broad": "27 suites380 tests PASS before final test-only typing/floating-under keyboard delta",
+    "final": "3 suites71 tests PASS including19 geometry/focus cases; overlap, not additive"
+  },
+  "technicalGate": "PASS: owner final full TypeScript exit0 verified in FINAL-CHECKS.json; empty log independently read; 31 current hashes exact",
+  "limits": [
+    "No device/focus-bubbling/keyboard/large-font/screenreader execution",
+    "Tall multiline field aligns its first line; no caret-tracking or all-editing-state claim",
+    "No new build/export/OTA/native/backend action",
+    "Review is not a release authorization"
+  ],
+  "build": "NOT_STARTED",
+  "ota": "NOT_STARTED",
+  "v4Delta": "Only keyboard test subscription mock typing changed; real removable subscription from prebound nativeAddListener, removed by component cleanup; product source unchanged to V3",
+  "ownerFinalChecks": {
+    "task": "T-141",
+    "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-training-entry-ux-20261029",
+    "branch": "fix/training-entry-ux-20261029",
+    "head": "d65997d06592af2b213f442651f3700ce3b9bc51",
+    "freeze": "SOURCE-FREEZE-V4.json",
+    "freezeSha256": "4fd6bae8f684817b9f3dd5388b6e36534347cd7bee80dc52b4806a55aafe8a23",
+    "filesVerified": 31,
+    "typecheck": {
+      "command": "node_modules/.bin/tsc --noEmit",
+      "exitCode": 0,
+      "log": "typecheck-verified.log",
+      "execSession": 87556
+    },
+    "lint": {
+      "exitCode": 0,
+      "errors": 0,
+      "existingWarnings": 3,
+      "log": "changed-lint-final.log"
+    },
+    "tests": [
+      {
+        "suites": 27,
+        "passed": 380,
+        "log": "regression-v2.log",
+        "note": "preceded final floating-frame and test-typing refinement"
+      },
+      {
+        "suites": 3,
+        "passed": 71,
+        "log": "final-tests-v3.log",
+        "note": "overlaps broad regression; do not sum"
+      },
+      {
+        "suites": 1,
+        "passed": 19,
+        "log": "focus-verified.log",
+        "note": "final subscription typing, overlaps previous tests"
+      }
+    ],
+    "independentReview": "01 V4 static source PASS; device/runtime/caret not verified",
+    "deviceTests": "DEFERRED",
+    "release": "NOT_PUBLISHED",
+    "commit": "NOT_CREATED"
+  },
+  "completedUTC": "2026-10-29T22:41:53.817085+00:00"
+}

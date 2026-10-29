@@ -1,0 +1,45 @@
+{
+  "task": "T-141",
+  "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-training-entry-ux-20261029",
+  "branch": "fix/training-entry-ux-20261029",
+  "head": "d65997d06592af2b213f442651f3700ce3b9bc51",
+  "freeze": "SOURCE-FREEZE-V4.json",
+  "freezeSha256": "4fd6bae8f684817b9f3dd5388b6e36534347cd7bee80dc52b4806a55aafe8a23",
+  "filesVerified": 31,
+  "typecheck": {
+    "command": "node_modules/.bin/tsc --noEmit",
+    "exitCode": 0,
+    "log": "typecheck-verified.log",
+    "execSession": 87556
+  },
+  "lint": {
+    "exitCode": 0,
+    "errors": 0,
+    "existingWarnings": 3,
+    "log": "changed-lint-final.log"
+  },
+  "tests": [
+    {
+      "suites": 27,
+      "passed": 380,
+      "log": "regression-v2.log",
+      "note": "preceded final floating-frame and test-typing refinement"
+    },
+    {
+      "suites": 3,
+      "passed": 71,
+      "log": "final-tests-v3.log",
+      "note": "overlaps broad regression; do not sum"
+    },
+    {
+      "suites": 1,
+      "passed": 19,
+      "log": "focus-verified.log",
+      "note": "final subscription typing, overlaps previous tests"
+    }
+  ],
+  "independentReview": "01 V4 static source PASS; device/runtime/caret not verified",
+  "deviceTests": "DEFERRED",
+  "release": "NOT_PUBLISHED",
+  "commit": "NOT_CREATED"
+}

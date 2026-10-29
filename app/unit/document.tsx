@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import {
-  ActivityIndicator, Alert, AppState, BackHandler, Keyboard, KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, AppState, BackHandler, Keyboard, KeyboardAvoidingView, Platform,
+  StyleSheet, Text, TextInput, TouchableOpacity, View, type ScrollView as NativeScrollView,
 } from 'react-native';
+import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -189,7 +190,7 @@ function DocumentForm() {
   const [preparationOpen, setPreparationOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [otherDogDrafts, setOtherDogDrafts] = useState<NonNullable<DocumentDraft['otherDogs']>>({});
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<NativeScrollView>(null);
   const dogSwitchLock = useRef(false);
   useEffect(() => { dogSwitchLock.current = false; }, [dogId]);
   const moveToStep = useCallback((step: number) => { Keyboard.dismiss(); setWorkflowStep(step); setPickerOpen(step === 1 && !selected.length); scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [selected.length]);
@@ -818,8 +819,9 @@ function DocumentForm() {
                     onPress={() => { tapHaptic(); setScore(score === n ? 0 : n); }}
                     activeOpacity={0.8}
                     accessibilityRole="button"
-                    accessibilityLabel={String(n)}
-                  />
+                    accessibilityLabel={`${t('training.ratingLabel')}: ${n}/10`}
+                    accessibilityState={{ selected: score === n }}
+                  ><Text style={[s.scoreNumber, aktiv && { color: C.accentText }]}>{n}</Text></TouchableOpacity>
                 );
               })}
             </View>
@@ -915,10 +917,11 @@ const s = StyleSheet.create({
 
   textarea: { backgroundColor: C.input, borderRadius: 16, borderWidth: 1, borderColor: C.border, color: C.white, fontSize: 16, padding: 14, minHeight: 100, textAlignVertical: 'top' },
 
-  scoreCompact: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  scoreCompact: { gap: 12 },
   scoreValue:   { fontSize: 15, color: C.white, fontWeight: '900', minWidth: 46 },
-  scoreBar:     { flex: 1, flexDirection: 'row', gap: 4 },
-  scoreSeg:     { flex: 1, height: 26, borderRadius: 7, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
+  scoreBar:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  scoreSeg:     { minWidth: 44, minHeight: 44, padding: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
+  scoreNumber: { color: C.white, fontSize: 16, fontWeight: '600' },
   scoreSegActive:{ backgroundColor: C.accent, borderColor: C.accent },
 
   mediaCard: { backgroundColor: C.card, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14 },

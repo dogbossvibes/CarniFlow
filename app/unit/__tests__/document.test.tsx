@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
+import TestRenderer, { act, type ReactTestRenderer, type ReactTestInstance } from 'react-test-renderer';
 import { AppState, BackHandler, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, type AppStateStatus } from 'react-native';
 import DocumentScreen from '@/app/unit/document';
 import { TrainingPreparation } from '@/components/training/TrainingPreparation';
@@ -1142,5 +1142,26 @@ describe('training document keyboard reachability', () => {
     const scroll = keyboard.findByType(ScrollView);
     expect(scroll.props.keyboardDismissMode).toBe('on-drag');
     expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  });
+});
+
+
+describe('training document explicit score input', () => {
+  it('labels all ten values and preserves the selected score in the save request', async () => {
+    mockParams = {}; mockDogs = [{ id: 'dog-1', name: 'Luna' }]; mockDogsLoading = false;
+    mockCreateDocumentedUnit.mockResolvedValue({ data: {}, error: null });
+    const node = render(); await flush(); await selectExercise(node);
+    tap(node, 'trainingFlow.optionalDetails'); await flush();
+    const values = () => (node.root as unknown as { findAllByType: (type: unknown) => ReactTestInstance[] }).findAllByType(TouchableOpacity).filter(button =>
+      String(button.props.accessibilityLabel).startsWith('training.ratingLabel: '));
+    expect(values()).toHaveLength(10);
+    expect(values().map(button => button.findByType(Text).props.children)).toEqual([1,2,3,4,5,6,7,8,9,10]);
+    act(() => values()[6].props.onPress());
+    expect(values()[6].props.accessibilityState.selected).toBe(true);
+    act(() => values()[6].props.onPress());
+    expect(values()[6].props.accessibilityState.selected).toBe(false);
+    act(() => values()[7].props.onPress());
+    await submitTraining(node);
+    expect(mockAtomicSave.mock.calls[0][2].score).toBe(8);
   });
 });
