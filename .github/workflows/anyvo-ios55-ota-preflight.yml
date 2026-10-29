@@ -1,0 +1,119 @@
+name: ANYVO iOS55 OTA source preflight (READ ONLY)
+
+# No deployment, EAS login, Expo token, database access or Production writes.
+# GitHub's workflow_dispatch button requires this file on the default branch;
+# on the isolated fix branch, pushes trigger this source-only check.
+on:
+  push:
+    branches:
+      - fix/diagnostics-profile-lease-ios55-20261029
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: anyvo-ios55-source-preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-preflight:
+    name: Source/runtime/native boundary (NO OTA)
+    if: github.repository == 'dogbossvibes/CarniFlow' && github.ref == 'refs/heads/fix/diagnostics-profile-lease-ios55-20261029'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      RELEASE_BASE: 0e16001d4f9aeeb9d06adf384c9b86376fae2250
+
+    steps:
+      - name: Checkout exact source without persisted credentials
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Source lineage, changed-file allowlist, whitespace and clean tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+          git merge-base --is-ancestor "$RELEASE_BASE" HEAD
+          git diff --check "$RELEASE_BASE" HEAD
+          printf '%s\n' \
+            .github/workflows/anyvo-ios55-diagnostics-qa.yml \
+            .github/workflows/anyvo-ios55-ota-preflight.yml \
+            features/tracking/utils/__tests__/turnAwareLineGate.test.ts \
+            services/__tests__/diagnosticsAccessService.test.ts \
+            services/diagnosticsAccessService.ts \
+            | sort > "$RUNNER_TEMP/expected-paths.txt"
+          git diff --name-only "$RELEASE_BASE" HEAD | sort > "$RUNNER_TEMP/actual-paths.txt"
+          diff -u "$RUNNER_TEMP/expected-paths.txt" "$RUNNER_TEMP/actual-paths.txt"
+          # Config, native code, tracking, storage and the Production wrapper must stay unchanged.
+          git diff --exit-code "$RELEASE_BASE" HEAD -- app.json eas.json package.json package-lock.json scripts/update-production.mjs scripts/guard-prod-supabase.mjs
+
+      - name: Use known Node.js version without dependency cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Verify iOS55 runtime and safe production-wrapper arguments
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { resolveReleaseRuntime, buildProductionUpdateArgs } from './scripts/update-production.mjs';
+          const load = name => JSON.parse(readFileSync(name, 'utf8'));
+          const app = load('app.json');
+          const eas = load('eas.json');
+          const pkg = load('package.json');
+          const target = '1.0.5-motion-v4';
+          assert.equal(app.expo.version, '1.0.5');
+          assert.equal(app.expo.ios.buildNumber, '55');
+          assert.equal(app.expo.ios.bundleIdentifier, 'com.anyvo.app');
+          assert.equal(resolveReleaseRuntime(app, 'ios'), target);
+          assert.equal(eas.build.production.channel, 'production');
+          assert.equal(eas.build.production.environment, 'production');
+          assert.equal(eas.build.production.distribution, 'store');
+          assert.equal(pkg.scripts['update:production:ios'], 'node ./scripts/update-production.mjs --platform ios --confirm');
+          assert.equal(pkg.dependencies['expo-updates'] != null, true);
+          assert.equal(app.expo.updates.url, 'https://u.expo.dev/' + app.expo.extra.eas.projectId);
+          assert.deepEqual(buildProductionUpdateArgs({
+            platform: 'ios', message: 'iOS55 diagnostics access reliability'
+          }), [
+            'update', '--channel', 'production', '--environment', 'production',
+            '--platform', 'ios', '--message', 'iOS55 diagnostics access reliability',
+            '--non-interactive'
+          ]);
+          console.log('STATIC iOS55 source/runtime/wrapper check PASS. NO EAS call, NO OTA.');
+          NODE
+
+      - name: Verify no local staging environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/guard-prod-supabase.mjs
+
+      - name: Record mandatory remaining release blockers
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## ANYVO iOS Build 55 – SOURCE-ONLY preflight"
+            echo ""
+            echo "No Expo token, EAS server access or publishing action is used here."
+            echo "A green result proves static source/runtime/scope checks only."
+            echo ""
+            echo "**NOT RELEASE APPROVAL**. Before any OTA, require:"
+            echo "- Successful full Jest, typecheck, ESLint and independent review for the exact source."
+            echo "- Verified normal-user access behavior, expiry and account-switch regression coverage."
+            echo "- Exact source backup and fresh EAS Production channel/environment/runtime/ancestry checks."
+            echo "- Native/build and DB compatibility checks, release lock and wrapper live dry-run."
+            echo "- A separately authorized, controlled publish and actual OTA/CDN postflight."
+            echo "- Physical iPhone validation after installation (not implied by successful publish)."
+          } >> "$GITHUB_STEP_SUMMARY"

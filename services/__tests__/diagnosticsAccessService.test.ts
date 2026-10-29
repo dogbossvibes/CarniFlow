@@ -31,3 +31,56 @@ it('distinguishes server denial from network failure without granting either', a
   mockSingle.mockResolvedValueOnce({ data: { can_use_internal_tracking_diagnostics: false }, error: null });
   expect(await refreshDiagnosticsAccess()).toBe('denied'); expect(hasDiagnosticsAccess()).toBe(false);
 });
+
+it.each([0, 408, 429, 503])('keeps a still-valid grant on retryable status %i without renewing its lease', async status => {
+  setDiagnosticsSession('owner');
+  mockSingle.mockResolvedValueOnce({ data: { can_use_internal_tracking_diagnostics: true }, error: null, status: 200 });
+  expect(await refreshDiagnosticsAccess()).toBe('allowed');
+  const { expiresAt, generation } = getDiagnosticsAccessSnapshot();
+  jest.advanceTimersByTime(20_000);
+  mockSingle.mockResolvedValueOnce({ data: null, error: { message: 'temporary failure' }, status });
+  expect(await refreshDiagnosticsAccess()).toBe('unavailable');
+  expect(hasDiagnosticsAccess()).toBe(true);
+  expect(getDiagnosticsAccessSnapshot()).toMatchObject({ expiresAt, generation, allowed: true });
+  jest.advanceTimersByTime(40_001);
+  expect(hasDiagnosticsAccess()).toBe(false);
+});
+it.each([400, 401, 403, 406])('revokes an existing grant on nonretryable status %i', async status => {
+  setDiagnosticsSession('owner');
+  mockSingle.mockResolvedValueOnce({ data: { can_use_internal_tracking_diagnostics: true }, error: null, status: 200 });
+  await refreshDiagnosticsAccess();
+  mockSingle.mockResolvedValueOnce({ data: null, error: { message: 'request denied' }, status });
+  expect(await refreshDiagnosticsAccess()).toBe('unavailable');
+  expect(hasDiagnosticsAccess()).toBe(false);
+});
+it('revokes an existing grant after an explicit false or malformed successful response', async () => {
+  setDiagnosticsSession('owner');
+  mockSingle.mockResolvedValue({ data: { can_use_internal_tracking_diagnostics: true }, error: null, status: 200 });
+  await refreshDiagnosticsAccess();
+  mockSingle.mockResolvedValueOnce({ data: { can_use_internal_tracking_diagnostics: false }, error: null, status: 200 });
+  expect(await refreshDiagnosticsAccess()).toBe('denied');
+  expect(hasDiagnosticsAccess()).toBe(false);
+  await refreshDiagnosticsAccess();
+  mockSingle.mockResolvedValueOnce({ data: { can_use_internal_tracking_diagnostics: 'true' }, error: null, status: 200 });
+  expect(await refreshDiagnosticsAccess()).toBe('unavailable');
+  expect(hasDiagnosticsAccess()).toBe(false);
+});
+it('never grants access on an initial offline request, including after account change', async () => {
+  setDiagnosticsSession('owner');
+  mockSingle.mockResolvedValueOnce({ data: null, error: { message: 'offline' }, status: 0 });
+  expect(await refreshDiagnosticsAccess()).toBe('unavailable');
+  expect(hasDiagnosticsAccess()).toBe(false);
+  setDiagnosticsSession('other');
+  mockSingle.mockResolvedValueOnce({ data: null, error: { message: 'offline' }, status: 0 });
+  expect(await refreshDiagnosticsAccess()).toBe('unavailable');
+  expect(hasDiagnosticsAccess()).toBe(false);
+});
+it('does not restore an expired grant after an offline response', async () => {
+  setDiagnosticsSession('owner');
+  mockSingle.mockResolvedValueOnce({ data: { can_use_internal_tracking_diagnostics: true }, error: null, status: 200 });
+  await refreshDiagnosticsAccess();
+  jest.advanceTimersByTime(60_001);
+  mockSingle.mockResolvedValueOnce({ data: null, error: { message: 'offline' }, status: 0 });
+  expect(await refreshDiagnosticsAccess()).toBe('unavailable');
+  expect(hasDiagnosticsAccess()).toBe(false);
+});
