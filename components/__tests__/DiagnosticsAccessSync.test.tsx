@@ -35,3 +35,43 @@ it('checks periodically and expiry is fail-closed when JS timers were suspended'
   jest.setSystemTime(Date.now() + 61000); mockAllowed = false;
   await act(async () => mockAppState('active')); expect(diagnosticsAccessToken()).toBeNull();
 });
+it('retries a failed grant check while active and restores only after server approval', async () => {
+  mockAllowed = false;
+  await act(async () => jest.advanceTimersByTime(30000));
+  expect(hasDiagnosticsAccess()).toBe(false);
+  const calls = mockRefresh.mock.calls.length;
+  mockAllowed = true;
+  await act(async () => jest.advanceTimersByTime(30000));
+  expect(mockRefresh).toHaveBeenCalledTimes(calls + 1);
+  expect(hasDiagnosticsAccess()).toBe(true);
+});
+it('bounds denied retries and never grants ordinary accounts locally', async () => {
+  mockAllowed = false;
+  for (let i = 0; i < 5; i++) await act(async () => jest.advanceTimersByTime(30000));
+  const calls = mockRefresh.mock.calls.length;
+  await act(async () => jest.advanceTimersByTime(300000));
+  expect(mockRefresh).toHaveBeenCalledTimes(calls);
+  expect(hasDiagnosticsAccess()).toBe(false);
+  mockAllowed = true;
+  await act(async () => mockAppState('active'));
+  expect(hasDiagnosticsAccess()).toBe(true);
+});
+it('does not overlap a pending access read on resume or timer', async () => {
+  let finish!: () => void;
+  mockRefresh.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  await act(async () => mockAppState('active'));
+  const calls = mockRefresh.mock.calls.length;
+  await act(async () => { mockAppState('active'); jest.advanceTimersByTime(30000); });
+  expect(mockRefresh).toHaveBeenCalledTimes(calls);
+  await act(async () => finish());
+});
+it('does not hydrate a different account after an old read completes', async () => {
+  let finish!: () => void;
+  mockRefresh.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  await act(async () => mockAppState('active'));
+  const hydrations = mockHydrate.mock.calls.length;
+  setDiagnosticsSession('other');
+  await act(async () => finish());
+  expect(mockHydrate).toHaveBeenCalledTimes(hydrations);
+  expect(hasDiagnosticsAccess()).toBe(false);
+});
