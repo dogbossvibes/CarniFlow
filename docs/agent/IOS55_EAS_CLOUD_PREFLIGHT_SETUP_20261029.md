@@ -11,7 +11,7 @@ Die GitHub-Anbindung dieses Chats kann **keine Environments oder Secrets** einri
 2. Umgebung exakt **`anyvo-ios55-eas-preflight`** erstellen. **Deployment branches: Selected branches and tags → Branch `main`**; nicht „alle Branches“.
 3. **Required reviewers** aktivieren und einen berechtigten GitHub-Reviewer festlegen. „Prevent self-review“ nur aktivieren, wenn eine zweite prüfberechtigte Person die Freigabe tatsächlich übernehmen kann. Wo verfügbar, das Umgehen der Regeln durch Admins deaktivieren.
 4. In Expo unter `https://expo.dev/settings/access-tokens` einen gesonderten, möglichst eng berechtigten **Expo-Zugangstoken** für den bereits verbundenen ANYVO-EAS-Projektzugriff erstellen (Projekt/Account-Berechtigung prüfen).
-5. Unter **Environment secrets** der Umgebung (NICHT Repository secrets) einen Secret-Eintrag `EXPO_TOKEN` anlegen und den Wert **ausschließlich dort** einsetzen. Kein Personal Access Token von GitHub, keine Supabase-Schlüssel, kein Passwort. Wert niemals per Screenshot versenden.
+5. Unter **Environment secrets** der Umgebung (NICHT Repository secrets) wird der bereits vorhandene GitHub-Secret-Eintrag **`EXPO_TOKENS`** verwendet. Der Workflow übergibt dessen Wert ausschliesslich zur Laufzeit unter dem von EAS CLI erwarteten Umgebungsvariablennamen **`EXPO_TOKEN`**. Der geheime Wert darf niemals im Chat, in PR-Kommentaren oder Screenshots erscheinen. Es ist kein neuer Expo-Token nötig, sofern der bestehende gültig ist.
 6. Sichere Kette vor manueller Ausführung: Workflow als CI-only PR begutachten, dessen gesondertes Merge nach `main` ausdrücklich genehmigen, prüfen, dass Umgebungsschutz und Geheimnis vorhanden sind. **Keine Appcode- oder Release-Branch-Merges.**
 
 ## 2. Manuelles Prüfen vom iPhone
