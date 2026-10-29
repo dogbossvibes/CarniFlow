@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.Exceptions
@@ -36,6 +37,7 @@ class AnyvoPrecisionLocationModule : Module() {
 
   private var locationManager: LocationManager? = null
   private var locationListener: LocationListener? = null
+  private val diagnosticCounters = AndroidDiagnosticCounters()
 
   // Raw-GNSS (Phase 2)
   private var gnssStatusCallback: GnssStatus.Callback? = null
@@ -71,13 +73,22 @@ class AnyvoPrecisionLocationModule : Module() {
       promise.resolve(buildStatus())
     }
 
+    // Observation only; never starts a location source or changes permissions.
+    AsyncFunction("getAndroidTrackingDiagnostics") { promise: Promise ->
+      val snapshot = AndroidPlatformDiagnostics.snapshot(context)
+        .plus("precisionListener" to diagnosticCounters.snapshot(SystemClock.elapsedRealtime()))
+      promise.resolve(snapshot)
+    }
+
     AsyncFunction("startPrecisionTracking") { options: Map<String, Any?>, promise: Promise ->
       try {
         startUpdates(options)
         promise.resolve(null)
       } catch (e: SecurityException) {
+        diagnosticCounters.didStop("permission_denied")
         promise.reject("E_NO_PERMISSION", "Standortberechtigung fehlt", e)
       } catch (e: Exception) {
+        diagnosticCounters.didStop("start_failed")
         emitError("UNKNOWN_NATIVE_ERROR", e.message ?: "Start fehlgeschlagen", true)
         promise.reject("E_START_FAILED", e.message ?: "Start fehlgeschlagen", e)
       }
@@ -195,9 +206,10 @@ class AnyvoPrecisionLocationModule : Module() {
     }
     val minTime = (options["intervalMs"] as? Number)?.toLong() ?: 1000L
     stopUpdates()   // verhindert doppelte Listener bei Mehrfach-Start
+    val listenerGeneration = diagnosticCounters.begin(SystemClock.elapsedRealtime())
 
     val l = object : LocationListener {
-      override fun onLocationChanged(location: Location) = emitLocation(location)
+      override fun onLocationChanged(location: Location) = emitLocation(location, listenerGeneration)
       override fun onProviderEnabled(provider: String) { emitProviderStatus() }
       override fun onProviderDisabled(provider: String) { emitProviderStatus() }
       @Deprecated("Deprecated in Java")
@@ -205,11 +217,32 @@ class AnyvoPrecisionLocationModule : Module() {
     }
     locationListener = l
     manager().requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, 0f, l, Looper.getMainLooper())
+    diagnosticCounters.didStart()
 
     val enableRaw = (options["enableRawGnssAndroid"] as? Boolean) ?: false
     if (enableRaw) startRawGnss()
+    else if (options["enableGnssStatusAndroid"] == true) startGnssStatusOnly()
 
     emitProviderStatus()
+  }
+
+  // Status observation is independent of measurement capability and raw fusion.
+  private fun startGnssStatusOnly() {
+    try {
+      ensureGnssHandler()
+      val callback = object : GnssStatus.Callback() {
+        override fun onSatelliteStatusChanged(status: GnssStatus) = handleGnssStatus(status)
+      }
+      gnssStatusCallback = callback
+      val handler = gnssHandler ?: throw IllegalStateException("GNSS-Handler fehlt")
+      if (!manager().registerGnssStatusCallback(callback, handler)) {
+        emitError("GNSS_CALLBACK_FAILED", "GNSS status registration failed", true)
+      }
+    } catch (e: SecurityException) {
+      emitError("LOCATION_PERMISSION_MISSING", e.message ?: "Permission", false)
+    } catch (e: Exception) {
+      emitError("GNSS_CALLBACK_FAILED", e.message ?: "GNSS status unavailable", true)
+    }
   }
 
   private fun startRawGnss() {
@@ -258,6 +291,7 @@ class AnyvoPrecisionLocationModule : Module() {
   }
 
   private fun stopUpdates() {
+    diagnosticCounters.didStop("listener_stopped")
     locationListener?.let { try { manager().removeUpdates(it) } catch (e: Exception) { /* ignore */ } }
     locationListener = null
 
@@ -374,7 +408,11 @@ class AnyvoPrecisionLocationModule : Module() {
   }
 
   // ── Event-Emitter ──────────────────────────────────────────────
-  private fun emitLocation(location: Location) {
+  private fun validUncertainty(value: Float): Double? =
+    if (value.isFinite() && value >= 0f) value.toDouble() else null
+
+  private fun emitLocation(location: Location, listenerGeneration: Long) {
+    diagnosticCounters.received(listenerGeneration, location.elapsedRealtimeNanos, SystemClock.elapsedRealtime())
     sendEvent(
       "onPrecisionLocation",
       mapOf(
@@ -384,6 +422,9 @@ class AnyvoPrecisionLocationModule : Module() {
         "altitude" to if (location.hasAltitude()) location.altitude else null,
         "speed" to if (location.hasSpeed()) location.speed.toDouble() else null,
         "bearing" to if (location.hasBearing()) location.bearing.toDouble() else null,
+        "altitudeAccuracy" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && location.hasVerticalAccuracy()) validUncertainty(location.verticalAccuracyMeters) else null,
+        "speedAccuracy" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && location.hasSpeedAccuracy()) validUncertainty(location.speedAccuracyMetersPerSecond) else null,
+        "headingAccuracy" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && location.hasBearingAccuracy()) validUncertainty(location.bearingAccuracyDegrees) else null,
         "timestamp" to location.time,
         "provider" to (location.provider ?: LocationManager.GPS_PROVIDER),
         "source" to "native"

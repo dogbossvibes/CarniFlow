@@ -19,7 +19,7 @@ export interface PrecisionLocation {
   timestamp: number;          // ms seit Epoch
   provider:  string;          // 'gps' | 'ios_core_location' | 'expo-location' | …
   source:    'native' | 'expo-location';
-  // Phase 3 (additiv, optional — Android/Fallback setzen sie nicht):
+  // Additiv und optional; native Android-Unsicherheiten sind erst ab API 26 verfügbar.
   altitudeAccuracy?: number | null;
   speedAccuracy?:    number | null;
   heading?:          number | null;   // Kurs (iOS course); = bearing
