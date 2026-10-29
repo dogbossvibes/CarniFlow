@@ -1,0 +1,25 @@
+{
+  "reviewer": "Chat07",
+  "scope": "Independent static safety review of T115 local read-only authentication/RPC runner. Not SQL, live API or release acceptance.",
+  "result": "PASS_STATIC_READ_ONLY_HARNESS",
+  "sourceHashes": {
+    "t115-auth-preflight.py": "85dbb84604fa1ed31dbf023cf699c278dd0ad136c0dc41d63b94c9436b1cc1d4",
+    "T115-Zugang-pruefen.command": "9b7e3f1ee155ade7e49fa0e0f6c7974cc5e677bff34037a2db99b97d1d7acff4"
+  },
+  "findings": [],
+  "verified": [
+    "Fixed HTTPS Production host, certificate/hostname validation, no redirect following",
+    "TTY-only hidden input; no secrets or row payloads printed or written",
+    "HTTP allowlist permits only password authentication, user identity and fixed synthetic-ID RPC GETs",
+    "Exact A/B UID, email and confirmed-email checks",
+    "Missing RPC or missing positive grant stays OPEN; failures never become PASS",
+    "No application-table inserts, updates, deletes or grant modification endpoints"
+  ],
+  "remaining": [
+    "Independent SQL review by01",
+    "Fresh authenticated Supabase project/catalog check",
+    "Backend installation and real two-account run",
+    "Grant/readback fixture and expiry/revocation live coverage if separately authorized"
+  ],
+  "createdUTC": "2026-10-29T02:04:39.714071+00:00"
+}

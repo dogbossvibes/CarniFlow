@@ -1,0 +1,14 @@
+{
+  "task": "T-115",
+  "commit": "f9b9ea07bae0eb4b4d66af056d617451140499ae",
+  "branch": "feat/shared-dogs-inbox-20261029",
+  "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-dogs-inbox-20261029",
+  "status": "",
+  "frozenSourceMatch": true,
+  "fileCount": 23,
+  "sourceFreezeSHA256": "00ea62f2113609284a32865fdec00a83ca71bb62469d61c67ebd7f4bae960fa4",
+  "authorizedUserTurn": "01a1853a-950e-7e80-b0e3-14927957425f in Chat05",
+  "pushPerformed": false,
+  "otaPerformed": false,
+  "verifiedUTC": "2026-10-29T01:34:14.771331+00:00"
+}

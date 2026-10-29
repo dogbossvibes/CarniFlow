@@ -1,0 +1,52 @@
+{
+  "task": "T-115",
+  "createdUTC": "2026-10-29T01:32:46.004425+00:00",
+  "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-dogs-inbox-20261029",
+  "branch": "feat/shared-dogs-inbox-20261029",
+  "head": "6f1556e449c5f872f6f61fae1f9f136846aaf5f6",
+  "sourceHashes": {
+    "app/(tabs)/dogs.tsx": "42700b61fb48664e81cc48c50a44ee86b7ba1c97eb3a71b32a96944b77aa852f",
+    "app/__tests__/shared-dog.test.tsx": "929b97ac1ba4e4e73e6648f55a06a633d8218b83b2d7d7ac1303ab7ee8aa7402",
+    "app/dog-health-sharing/[id].tsx": "c310d19fb6b4d8b7a816386415b4db7ce0635ecb6c35709c8363455c212bca9c",
+    "app/shared-dog/[id].tsx": "bbb50a35de46eb2b1d119f83611546e69f7cf13db328b18a90287e4197f3b933",
+    "components/dogs/SharedDogsInbox.tsx": "a9df034bc87d862ea22553f62f1aa0021fc44d56d807489144d0848dce8c9235",
+    "components/dogs/SharedHealthRecord.tsx": "2204a1a57ef968a2445e5c69dc0eaa3989e2821faad341e69240155633a7c458",
+    "components/dogs/__tests__/SharedHealthRecord.test.tsx": "7536ccef31b99a7be5d8161227551d99b25a19ca471be9eb636780eddd0620c3",
+    "docs/agent/tasks/T-115.md": "d4e7a97d93346c33f1902c5f34bb041d2a002960a1ec7a3e175afc4651ffeec0",
+    "features/dogs/healthTimeline.ts": "431a8cacd74ca923d2a2ab19169510ed54ad2422ae9983836f7ca9ea9832e8ca",
+    "features/dogs/sharing/__tests__/model.test.ts": "09744e199038a1ae6ea98f327d25b89da1f273fd059c044cd81fd9c54e3aec97",
+    "features/dogs/sharing/model.ts": "2016a7825da6a82c0051db9ace00faffc0bb2dc791b235b8c1c57331c6b0c8e4",
+    "features/dogs/sharing/records.ts": "8865c591ce8f58f0099f80712353e55c7b37a44cbf47c34cd873e30312e4f2d7",
+    "hooks/__tests__/useSharedHealthDogs.test.tsx": "92a7ca5ed8138fc83675ab2e5159ca825f5afc769d547066c94d15f139e7ffb7",
+    "hooks/useSharedHealthDogs.ts": "34be40fc7df92497542491e907dc607cb264c55791199611093310c633f7ba15",
+    "i18n/de-CH.ts": "9a39b3c067aab3454164f842d9cd997309768d0938a8dda7c7156aca027aa905",
+    "i18n/gsw-CH.ts": "df5a31bd3a6754a2289e06e538bb63eaefb7fff6df92c4fd7d45a437af4ff36d",
+    "i18n/locales/en.ts": "5177f0b81f962e9a465ad17e16814f56ea1169dbe3228c27330aeea989475ba3",
+    "i18n/locales/fr.ts": "3af636d446ea15fb1a655d5de588aca386d7c85ecde2b0ad35d5a5d1519340bf",
+    "i18n/locales/it.ts": "d861d5605d44d20390608c2fe18c121ba496453daf1c4304b6de085b83f5c6e0",
+    "services/__tests__/healthOverviewLoad.test.ts": "66383e17c428ac231c4044151a3974fa873d95629416508acd88771659710559",
+    "services/__tests__/sharedHealthDogs.test.ts": "0218cc6e28d20aba01ed24f39d6405ecf6a1dd1c72b24d1de3b7d8fe7b2dfcb8",
+    "services/healthService.ts": "2c23e858e757b1d19383899fcf2968a7672cd3b5a5fbde2c6672c1651252c300",
+    "services/sharedHealthDogs.ts": "27726044006a07a8d175d553a13ab843a76b310aa49021867177f9cca0a994c1"
+  },
+  "checks": {
+    "jest": {
+      "suites": 8,
+      "tests": 168,
+      "exit": 0
+    },
+    "typecheckExit": 0,
+    "eslintErrors": 0,
+    "eslintWarnings": 0,
+    "diffCheckExit": 0
+  },
+  "independentClientReview": "Chat05 PASS after summary/emergency-only and weight-note fixes; source/type follow-up PASS. No live DB/device/OTA acceptance.",
+  "backendDependency": {
+    "commit": "59d1eab46daa5546ac93d8f132cb1506b906889b",
+    "rpc": "list_received_health_dogs(p_dog_id uuid default null)",
+    "installedLive": false
+  },
+  "commit": null,
+  "ota": null,
+  "deviceQA": "not performed"
+}
