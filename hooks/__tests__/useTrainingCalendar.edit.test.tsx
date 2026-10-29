@@ -1,7 +1,7 @@
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useTrainingCalendar } from '../useTrainingCalendar';
+import { useTrainingCalendar, nextEvent } from '../useTrainingCalendar';
 import { event } from '@/features/calendar/__tests__/fixture';
 let mockUser = 'owner-a';
 const mockGet = jest.fn();
@@ -33,4 +33,10 @@ it('does not put the previous account’s events into the next account’s calen
   await act(async () => { await current.refresh(); });
   expect(client.getQueryData(['calendar', 'owner-a'])).toEqual([event]);
   expect(client.getQueryData(['calendar', 'owner-b'])).toEqual([]);
+});
+
+it('does not present completed or cancelled future entries as the next appointment',()=>{
+ const start_at=new Date(Date.now()+86400000).toISOString();
+ expect(nextEvent([{...event,start_at,status:'completed'},{...event,id:'cancelled',start_at,status:'cancelled'}])).toBeNull();
+ const open={...event,id:'open',start_at};expect(nextEvent([{...event,start_at,status:'completed'},open])?.id).toBe('open');
 });

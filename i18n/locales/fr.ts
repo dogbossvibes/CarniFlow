@@ -6,6 +6,9 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "calendar.markCompleted": "Marquer comme terminé",
+  "calendar.cancelAppointment": "Annuler le rendez-vous",
+  "calendar.entryUnavailable": "Ce rendez-vous n’est plus disponible. Veuillez actualiser le calendrier.",
   "trainingFlow.prepareTitle": "Bien préparer la séance",
   "trainingFlow.observeTitle": "Comment cela s’est-il passé ?",
   "trainingFlow.nextTitle": "Pour la prochaine fois",

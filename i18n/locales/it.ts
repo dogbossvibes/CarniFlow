@@ -2,6 +2,9 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "calendar.markCompleted": "Segna come completato",
+  "calendar.cancelAppointment": "Annulla l’appuntamento",
+  "calendar.entryUnavailable": "Questo appuntamento non è più disponibile. Aggiorna il calendario.",
   "trainingFlow.prepareTitle": "Inizia preparato",
   "trainingFlow.observeTitle": "Come è andata oggi?",
   "trainingFlow.nextTitle": "Per la prossima volta",

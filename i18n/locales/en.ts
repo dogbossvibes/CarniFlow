@@ -2,6 +2,9 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "calendar.markCompleted": "Mark as completed",
+  "calendar.cancelAppointment": "Cancel appointment",
+  "calendar.entryUnavailable": "This appointment is no longer available. Please refresh the calendar.",
   "trainingFlow.prepareTitle": "Start prepared",
   "trainingFlow.observeTitle": "How did it go today?",
   "trainingFlow.nextTitle": "For next time",

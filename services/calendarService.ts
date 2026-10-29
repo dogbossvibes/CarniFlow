@@ -57,11 +57,21 @@ export function updateCalendarEvent(id: string, updates: Partial<CalendarEvent>)
 // Owner editor: update the same record, preserving identity, trainer negotiation,
 // source metadata and every field the form does not expose. RLS remains decisive.
 export async function updateOwnCalendarEvent(userId: string, original: CalendarEvent, changes: EventEditPatch) {
+  const patch = Object.fromEntries(EDITABLE_EVENT_FIELDS.filter(key => key in changes).map(key => [key, changes[key]]));
+  return updateOwnCalendarFields(userId, original, patch);
+}
+
+// Explicit user action only; retain the same ownership and stale-snapshot guards as the editor.
+export async function finishOwnCalendarEvent(userId: string, original: CalendarEvent, status: 'completed' | 'cancelled') {
+  if (status !== 'completed' && status !== 'cancelled') return { data: null, error: { message: 'CALENDAR_INVALID_STATUS' } };
+  return updateOwnCalendarFields(userId, original, { status });
+}
+
+async function updateOwnCalendarFields(userId: string, original: CalendarEvent, patch: Record<string, unknown>) {
   const { data: auth, error: authError } = await supabase.auth.getSession();
   if (authError || auth.session?.user.id !== userId || !canEditOwnEvent(original, userId)) {
     return { data: null, error: { message: 'CALENDAR_ACCESS_CHANGED' } };
   }
-  const patch = Object.fromEntries(EDITABLE_EVENT_FIELDS.filter(key => key in changes).map(key => [key, changes[key]]));
   if (!Object.keys(patch).length) return { data: original, error: null };
   let query = supabase.from('calendar_events').update(patch).eq('id', original.id).eq('owner_id', userId);
   // Fail closed when this snapshot was changed/deleted in another client.

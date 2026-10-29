@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFabBottom } from '@/hooks/useFabBottom';
 import { haptic } from '@/lib/haptics';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
 import { useTrainingCalendar, nextEvent } from '@/hooks/useTrainingCalendar';
@@ -16,10 +16,11 @@ import { RescheduleModal } from '@/components/calendar/RescheduleModal';
 import { TimelineView } from '@/components/calendar/TimelineView';
 import { WeekView } from '@/components/calendar/WeekView';
 import { MonthView } from '@/components/calendar/MonthView';
+import { canEditOwnEvent } from '@/features/calendar/eventEditing';
 import { EventActionsSheet } from '@/components/calendar/EventActionsSheet';
 import { useT } from '@/i18n';
 import { CreateEventModal } from '@/components/calendar/CreateEventModal';
-import { deleteCalendarEvent, updateCalendarEvent } from '@/services/calendarService';
+import { deleteCalendarEvent, updateCalendarEvent, finishOwnCalendarEvent } from '@/services/calendarService';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { getMyInvitations } from '@/services/umfrageService';
@@ -41,6 +42,8 @@ function TrainingHubContent() {
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const router = useRouter();
+  const { eventId } = useLocalSearchParams<{ eventId?: string }>();
+  const consumedEntry = useRef<string | null>(null);
   const fabBottom = useFabBottom();
   const { session } = useSession();
   const uid = session?.user.id;
@@ -49,13 +52,27 @@ function TrainingHubContent() {
   const [tab, setTab] = useState<Tab>('timeline');
   const [createOpen, setCreateOpen] = useState(false);
   const pendingEdit = useRef<CalendarEvent | null>(null);
+  const pendingSource = useRef<string | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
+  const statusBusy = useRef(false);
+  const [statusSaving, setStatusSaving] = useState(false);
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
   const [reschedule, setReschedule] = useState<CalendarEvent | null>(null);
   const { isTrainerModule } = useCapabilities();
   const [umfragen, setUmfragen] = useState<TrainerUmfrage[]>([]);
   useEffect(() => { if (uid) getMyInvitations(uid).then(setUmfragen); }, [uid]);
+
+  // Resolve only within this account's already authorized calendar query.
+  useFocusEffect(useCallback(() => {
+    if (!eventId) { consumedEntry.current = null; return; }
+    if (!uid || loading || typeof eventId !== 'string' || consumedEntry.current === eventId) return;
+    consumedEntry.current = eventId;
+    router.setParams({ eventId: undefined });
+    const event = events.find(item => item.id === eventId);
+    if (event) { setSelected(event); setActionsVisible(true); }
+    else Alert.alert(t('common.error'), t('calendar.entryUnavailable'));
+  }, [eventId, uid, loading, events, router, t]));
 
   // Trainer schlägt neue Zeit vor → Zeit aktualisieren, created_by auf den
   // Trainer setzen (Anfrage geht zur Bestätigung an die Kund:in zurück).
@@ -69,6 +86,7 @@ function TrainingHubContent() {
   const onEventPress = (event: CalendarEvent) => { setSelected(event); setActionsVisible(true); };
   const finishActions = () => {
     setSelected(null);
+    if (pendingSource.current) { const path = pendingSource.current; pendingSource.current = null; router.push(path as never); return; }
     if (pendingEdit.current) { setEditing(pendingEdit.current); pendingEdit.current = null; setCreateOpen(true); }
   };
   const closeActions = () => { setActionsVisible(false); if (Platform.OS !== 'ios') finishActions(); };
@@ -76,6 +94,29 @@ function TrainingHubContent() {
     if (!selected || !DEVICE_CALENDAR_AVAILABLE) return;
     const result = await addEventToDeviceCalendar(selected);
     if (alive.current && !result.ok) Alert.alert(t('common.error'), result.error ?? t('calendar.deviceCalendarFailed'));
+  };
+  const finishSelected = (status: 'completed' | 'cancelled') => {
+    const event = selected;
+    if (!uid || !event || !canEditOwnEvent(event, uid) || statusBusy.current) return;
+    const ownerId = uid;
+    const label = t(status === 'completed' ? 'calendar.markCompleted' : 'calendar.cancelAppointment');
+    Alert.alert(label, event.title, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: label, onPress: async () => {
+        if (!alive.current || statusBusy.current) return;
+        statusBusy.current = true; setStatusSaving(true);
+        try {
+          const result = await finishOwnCalendarEvent(ownerId, event, status);
+          if (!alive.current) return;
+          if (result.error || !result.data) { Alert.alert(t('common.error'), t('calendar.editFailed')); return; }
+          upsert(result.data);
+          await cancelEventReminders(event.id);
+          if (!alive.current) return;
+          closeActions(); void refresh();
+        } catch { if (alive.current) Alert.alert(t('common.error'), t('calendar.editFailed')); }
+        finally { statusBusy.current = false; if (alive.current) setStatusSaving(false); }
+      } },
+    ]);
   };
   const deleteSelected = () => {
     const event = selected;
@@ -186,7 +227,11 @@ function TrainingHubContent() {
 
       {selected && uid ? <EventActionsSheet visible={actionsVisible} event={selected} userId={uid} onClose={closeActions} onDismiss={finishActions}
         onEdit={() => { pendingEdit.current = selected; closeActions(); }}
-        onDelete={deleteSelected} onExport={exportSelected} /> : null}
+        onDelete={deleteSelected} onExport={exportSelected} busy={statusSaving}
+        onComplete={() => finishSelected('completed')} onCancelEvent={() => finishSelected('cancelled')}
+        onOpenSource={selected.source_type?.startsWith('health_') && selected.dog_id ? () => {
+          pendingSource.current = `/dog-health-record/${selected.dog_id}`; closeActions();
+        } : undefined} /> : null}
       <CreateEventModal visible={createOpen} event={editing} onClose={() => { setCreateOpen(false); setEditing(null); }} onCreated={event => { upsert(event); refresh(); }} />
       <RescheduleModal visible={!!reschedule} event={reschedule} onClose={() => setReschedule(null)} onSubmit={submitReschedule} />
     </SafeAreaView>

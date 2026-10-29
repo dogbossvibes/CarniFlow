@@ -1,4 +1,4 @@
-import { updateOwnCalendarEvent } from '../calendarService';
+import { updateOwnCalendarEvent, finishOwnCalendarEvent } from '../calendarService';
 import { event } from '@/features/calendar/__tests__/fixture';
 const mockSession = jest.fn(), mockFrom = jest.fn();
 jest.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: (...args: unknown[]) => mockSession(...args) }, from: (...args: unknown[]) => mockFrom(...args) } }));
@@ -51,4 +51,22 @@ it('does not bypass trainer negotiation even for the calendar owner', async () =
 it('does not rewrite trainer-created events as the owner', async () => {
   const result = await updateOwnCalendarEvent('owner-a', { ...event, created_by: 'trainer' }, { title: 'new' });
   expect(result.error).toBeTruthy(); expect(mockFrom).not.toHaveBeenCalled();
+});
+
+it.each(['completed','cancelled'] as const)('finishes in place as %s without changing historical dates or other fields', async status => {
+ query.maybeSingle.mockResolvedValue({ data: { ...event, status }, error: null });
+ const result = await finishOwnCalendarEvent('owner-a', event, status);
+ expect(result.data?.status).toBe(status); expect(query.update).toHaveBeenCalledWith({status});
+ expect(query.eq).toHaveBeenCalledWith('status',event.status); expect(query.eq).toHaveBeenCalledWith('start_at',event.start_at);
+ expect(query.eq).toHaveBeenCalledWith('owner_id','owner-a');
+});
+it.each([{...event,owner_id:'other'}, {...event,trainer_id:'trainer'}, {...event,source_type:'health_vaccination',source_id:'vaccination'}])('cannot mark noneditable or source-managed records completed', async original => {
+ expect((await finishOwnCalendarEvent('owner-a',original as typeof event,'completed')).error).toBeTruthy(); expect(mockFrom).not.toHaveBeenCalled();
+});
+it('keeps conflict, offline and changed-account status writes as failures', async () => {
+ query.maybeSingle.mockResolvedValue({data:null,error:null});
+ expect((await finishOwnCalendarEvent('owner-a',event,'completed')).error?.message).toBe('CALENDAR_CONFLICT');
+
+ mockSession.mockResolvedValue({data:{session:{user:{id:'other'}}},error:null});mockFrom.mockClear();
+ expect((await finishOwnCalendarEvent('owner-a',event,'completed')).error).toBeTruthy();expect(mockFrom).not.toHaveBeenCalled();
 });
