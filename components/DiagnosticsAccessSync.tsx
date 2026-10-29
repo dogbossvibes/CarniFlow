@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useSession } from '@/hooks/useSession';
-import { revokeDiagnosticsAccess, hasDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
+import { revokeDiagnosticsAccess, hasDiagnosticsAccess, getDiagnosticsAccessSnapshot } from '@/lib/diagnosticsAccessState';
 import { refreshDiagnosticsAccess } from '@/services/diagnosticsAccessService';
 import { hydrateQaModes } from '@/features/tracking/utils/qaModeBootstrap';
 
@@ -11,17 +11,35 @@ export function DiagnosticsAccessSync() {
   useEffect(() => {
     if (!userId) return;
     let active = true;
+    let inFlight = false;
+    let failures = 0;
+    let retryAt = 0;
     const refresh = async () => {
-      if (!active || AppState.currentState !== 'active') return;
-      await refreshDiagnosticsAccess();
-      if (active) await hydrateQaModes();
+      if (!active || inFlight || AppState.currentState !== 'active') return;
+      inFlight = true;
+      try {
+        const result = await refreshDiagnosticsAccess();
+        if (!active || getDiagnosticsAccessSnapshot().userId !== userId) return;
+        if (result === 'denied') { failures = 0; retryAt = Infinity; }
+        else if (result === 'allowed') { failures = 0; retryAt = Date.now() + 30_000; }
+        else { failures++; retryAt = Date.now() + Math.min(300_000, 30_000 * 2 ** Math.min(failures - 1, 4)); }
+        try { await hydrateQaModes(); } catch { /* Preferences cannot grant access. */ }
+      } catch {
+        if (active && getDiagnosticsAccessSnapshot().userId === userId) {
+          revokeDiagnosticsAccess();
+          failures++; retryAt = Date.now() + Math.min(300_000, 30_000 * 2 ** Math.min(failures - 1, 4));
+        }
+      } finally { inFlight = false; }
     };
     void refresh();
-    // Ordinary accounts need no continuous QA polling; recheck them at the next resume.
-    const timer = setInterval(() => { if (hasDiagnosticsAccess()) void refresh(); }, 30_000);
+    // Retry transient failures with bounded frequency; an explicit denial waits for resume.
+    const timer = setInterval(() => {
+      if (hasDiagnosticsAccess() || Date.now() >= retryAt) void refresh();
+    }, 30_000);
     const listener = AppState.addEventListener('change', state => {
       // Revalidate on resume. The bounded access lease also expires in the background.
       if (state === 'active') {
+        failures = 0; retryAt = 0;
         if (!hasDiagnosticsAccess()) revokeDiagnosticsAccess();
         void refresh();
       }
