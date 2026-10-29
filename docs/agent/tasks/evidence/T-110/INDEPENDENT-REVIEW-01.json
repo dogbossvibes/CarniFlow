@@ -1,0 +1,51 @@
+{
+  "status": "PASS_STATIC_SOURCE_REVIEW",
+  "reviewer": "Chat01 independent from writer Chat07",
+  "freezeSHA256": "b05030c9fa0ae725ee1558520ca09247b2215556df2e00aa9668f5a16caef4c1",
+  "sourceFiles": {
+    "app/dog/[id].tsx": "7de54a4fe677678db9d13d70cef3da56a3a5e961d2b4d124cf54fbdc0307f322",
+    "app/training-hub.tsx": "a22f42f0f07a97e3b005643032d1051947c97dabf5628588151937750efd53b5",
+    "components/calendar/EventActionsSheet.tsx": "95873781e7fa608d493c14547b9d231549896d354b6c0c78eed46bb69b31fa05",
+    "components/calendar/__tests__/AppointmentActions.test.tsx": "24a3553c925db68e6d751b2e358deaf6014ab08d5ce1f832196680e27006f369",
+    "components/calendar/__tests__/TrainingHub.edit-navigation.test.tsx": "e5367019645d2733e1b6fe74365b6a22f2976687ae1ca996875116b8ec4fb353",
+    "components/dogs/DogAppointmentsCard.tsx": "2fd6e756a5cd685241a853512ff2a60d8182b843482e5e08fe551e42df4a623e",
+    "components/dogs/DogTodayCard.tsx": "7154d964c83dad0c39681490315e09e99501b28193a5ce931e989b11216d17d2",
+    "features/dogs/DogHubScreen.tsx": "e82c87eed4b2e7f84a800d14b9767a16b783b9572e4471f9cf845b2a4839ab57",
+    "hooks/__tests__/useTrainingCalendar.edit.test.tsx": "8a547cab7169a0f18ecaa6deb8a99e2c28e12e009ffd8bdc722c0dcd811922c0",
+    "hooks/useTrainingCalendar.ts": "96dc8a4c70cd5de75da7f48e44d3a4d739c07407554cb38113faa6f43bfefb85",
+    "i18n/de-CH.ts": "9e554ebfe9e45919431bcdff8213eeea8eee5a24e412bb36cb4ed3fab1ee1b45",
+    "i18n/gsw-CH.ts": "6342666169884e18e06148ce430e784a6ad03f61fcf1fe853312126c13f7c8c5",
+    "i18n/locales/en.ts": "baaa087b0009bbda3c01e7189730c078c8c104c8d002020c6dba83ff1d587327",
+    "i18n/locales/fr.ts": "59991c199e2d667d9b570f4fb0675f07507144996287cf8f8f7a5ff4c81f93bb",
+    "i18n/locales/it.ts": "9be9f385299f34b10d10e7b5d3d69363c6775d52e545cae69f8072c7c9e155f0",
+    "services/__tests__/calendarEventEditing.test.ts": "7ce6ad68dc4124b2d68a11b80e3c862a126c17c7cb0b3e97d8bd862157f5806d",
+    "services/calendarService.ts": "fb0a950cb676f1f735c380378346ef6517bbc2429680826ea0c8d52becc55f89",
+    "app/__tests__/training-hub-entry.test.tsx": "f58358535c4c758ae240c9db65f1c2afb3d236c63ed07ca8621323fd47fe73d3",
+    "components/dogs/__tests__/DogTodayCard.actions.test.tsx": "cdc18a353d5f9314b598787f6daa5363d16d31d8109cb89bd8232e08470f2404",
+    "docs/agent/tasks/T-110.md": "735d7b40e7304df186ae50fe561849dff0141804e88397b3dc2aa81b51df5e7f"
+  },
+  "findings": [],
+  "reviewed": [
+    "Existing owner-only editing authority is reused for explicit status update; authenticated identity and exact old-value predicates prevent stale overwrites",
+    "Status patch is only completed/cancelled; existing ID, dates, notes, dog and source fields remain unchanged",
+    "Trainer and Health-source appointments retain their source-specific flows; no automatic historic status repair",
+    "TrainingHubContent already keyed by account; stale confirmation/async response returns after unmount",
+    "Exact event deep link resolves only through authorized calendar query after loading; missing IDs report unavailable",
+    "Successful update upserts account-specific cache then cancels reminders; failure preserves state and reminders; closed events excluded from next-event projection",
+    "Dashboard actions reuse existing hint/action models and current recent-training feed; default fallback actions and individual48pt touch targets",
+    "Existing database statuses and client contract support completed/cancelled; no new schema or migration"
+  ],
+  "limits": [
+    "Local mocks do not prove current live backend behavior; no live writes performed",
+    "Physical navigation/keyboard/accessibility/reminder QA not executed",
+    "Runtime-specific integration still required on each freshly active OTA basis"
+  ],
+  "at": "2026-10-29T02:22:36.919624+00:00",
+  "originalHumanAuthorization": {
+    "thread": "01a117fd-6000-78f0-ba54-7d944ee29fb5",
+    "turn": "01a1852c-0432-7d52-8c72-241e3dc1eb02",
+    "message": "01a1852c-056a-7880-bb31-231f950c8b00",
+    "request": "Overdue appointment editing/status correction; bugfix, OTA and commit",
+    "personallyReadByReviewer": true
+  }
+}

@@ -7,9 +7,10 @@ import type { CalendarEvent } from '@/types/calendar';
 import { fmtTime, relativeDayLabel } from '@/lib/eventFormat';
 import { DEVICE_CALENDAR_AVAILABLE } from '@/lib/deviceCalendar';
 
-export function EventActionsSheet({ visible, event, userId, onClose, onDismiss, onEdit, onDelete, onExport }: {
+export function EventActionsSheet({ visible, event, userId, onClose, onDismiss, onEdit, onDelete, onExport, onComplete, onCancelEvent, onOpenSource, busy = false }: {
   visible: boolean; onDismiss: () => void; event: CalendarEvent; userId: string; onClose: () => void;
   onEdit: () => void; onDelete: () => void; onExport: () => void;
+  onComplete?: () => void; onCancelEvent?: () => void; onOpenSource?: () => void; busy?: boolean;
 }) {
   const { t } = useT();
   const editable = canEditOwnEvent(event, userId);
@@ -19,16 +20,19 @@ export function EventActionsSheet({ visible, event, userId, onClose, onDismiss, 
       {event.dog?.name ? <Text style={s.detail}>{event.dog.name}</Text> : null}
       {event.location ? <Text style={s.detail}>{event.location}</Text> : null}
       {event.notes ? <Text style={s.detail}>{event.notes}</Text> : null}
-      {editable ? <Action label={t('common.edit')} onPress={onEdit} /> : null}
-      {DEVICE_CALENDAR_AVAILABLE ? <Action label={t('calendar.exportEvent')} onPress={onExport} /> : null}
-      {editable ? <Action label={t('calendar.deleteEvent')} onPress={onDelete} /> : null}
-      <Action label={t('common.cancel')} onPress={onClose} />
+      {editable && event.status !== 'completed' && event.status !== 'cancelled' && onComplete ? <Action label={t('calendar.markCompleted')} onPress={onComplete} disabled={busy} /> : null}
+      {editable ? <Action label={t('common.edit')} onPress={onEdit} disabled={busy} /> : null}
+      {editable && event.status !== 'completed' && event.status !== 'cancelled' && onCancelEvent ? <Action label={t('calendar.cancelAppointment')} onPress={onCancelEvent} disabled={busy} /> : null}
+      {onOpenSource ? <Action label={t('health.recordTitle')} onPress={onOpenSource} disabled={busy} /> : null}
+      {DEVICE_CALENDAR_AVAILABLE ? <Action label={t('calendar.exportEvent')} onPress={onExport} disabled={busy} /> : null}
+      {editable ? <Action label={t('calendar.deleteEvent')} onPress={onDelete} disabled={busy} /> : null}
+      <Action label={t('common.cancel')} onPress={onClose} disabled={busy} />
     </ScrollView>
   </AnyvoBottomSheet>;
 }
 
-function Action({ label, onPress }: { label: string; onPress: () => void }) {
-  return <TouchableOpacity accessibilityRole="button" onPress={onPress} style={s.action}><Text style={s.label}>{label}</Text></TouchableOpacity>;
+function Action({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
+  return <TouchableOpacity accessibilityRole="button" disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={s.action}><Text style={s.label}>{label}</Text></TouchableOpacity>;
 }
 const s = StyleSheet.create({
   body: { gap: 12, paddingBottom: 12 }, detail: { color: C.white, fontSize: 15 },
