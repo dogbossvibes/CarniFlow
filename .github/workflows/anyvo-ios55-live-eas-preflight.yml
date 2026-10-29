@@ -42,6 +42,8 @@ jobs:
           assert.match(workflow, /environment:\s*\n\s*name: anyvo-ios55-eas-preflight/);
           assert.match(workflow, /RELEASE_SHA: 5bec4417fc85f79e67f387126386617536992df3/);
           assert.match(workflow, /--dry-run/);
+          assert.match(workflow, /deployment-branch-policies/);
+          assert.match(workflow, /\.total_count == 1/);
           assert.doesNotMatch(workflow, /(?:^|\n)\s*(?:-|\s)*run:\s*(?:eas\s+update|npm\s+run\s+update:production)/m);
           console.log('PASS: manual-only EAS job, pinned release source, no OTA command.');
           NODE
@@ -81,7 +83,20 @@ jobs:
             echo "::error::STOP: Create a protected environment with selected branch main and required reviewers first."
             exit 1
           }
-          echo "PASS: protected environment exists. No Expo secret value printed."
+          # Selected-branch mode alone is insufficient: reject wildcards, tags,
+          # other branches, or an empty policy list. Require EXACTLY main.
+          policies="$(curl --fail --silent --show-error --location \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_API_TOKEN" \
+            'https://api.github.com/repos/dogbossvibes/CarniFlow/environments/anyvo-ios55-eas-preflight/deployment-branch-policies?per_page=100')"
+          printf '%s\\n' "$policies" | jq -e '
+            (.total_count == 1) and
+            ([.branch_policies[]?.name] == ["main"])
+          ' >/dev/null || {
+            echo "::error::STOP: Environment branch allowlist must contain ONLY exact main."
+            exit 1
+          }
+          echo "PASS: protected environment, required reviewer and exact main-only branch allowlist. No Expo secret value printed."
 
       - name: Checkout EXACT independently tested iOS55 candidate
         uses: actions/checkout@v7
@@ -149,8 +164,8 @@ jobs:
         run: |
           {
             echo "## ANYVO iOS55 – EAS READ-ONLY Production preflight"
-            echo "Candidate: `5bec4417fc85f79e67f387126386617536992df3`"
-            echo "Runtime: `1.0.5-motion-v4` · Platform: iOS"
+            echo 'Candidate: `5bec4417fc85f79e67f387126386617536992df3`'
+            echo 'Runtime: `1.0.5-motion-v4` · Platform: iOS'
             echo ""
             echo "This workflow uses the repository Production wrapper with --dry-run."
             echo "**NO OTA WAS PUBLISHED.**"
