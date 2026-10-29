@@ -20,7 +20,10 @@ concurrency:
 jobs:
   ci-safety-check:
     name: Verify CI workflow safeguards (no EAS)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/ci/anyvo-ios55-eas-readonly-preflight-20261029'
+    if: >-
+      github.repository == 'dogbossvibes/CarniFlow' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/ci/anyvo-ios55-eas-readonly-preflight-20261029') ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -44,11 +47,77 @@ jobs:
           assert.match(workflow, /--dry-run/);
           assert.match(workflow, /deployment-branch-policies/);
           assert.match(workflow, /\.total_count == 1/);
-          assert.doesNotMatch(workflow, /(?:^|\n)\s*(?:-|\s)*run:\s*(?:eas\s+update|npm\s+run\s+update:production)/m);
-          console.log('PASS: manual-only EAS job, pinned release source, no OTA command.');
+          // Check EXECUTABLE shell steps of the protected live job, including multiline blocks.
+          // The check also runs on manual main dispatch before the EAS job.
+          const parts = workflow.split('\n  live-eas-preflight:\n');
+          assert.equal(parts.length, 2, 'exactly one live EAS job is allowed');
+          const liveJob = parts[1];
+          assert.match(liveJob, /needs:\s*ci-safety-check/);
+          function extractRuns(job) {
+            const lines = job.split('\n');
+            const scripts = [];
+            for (let i = 0; i < lines.length; i++) {
+              const m = lines[i].match(/^(\s*)run:\s*(.*)$/);
+              if (!m) continue;
+              let script = m[2];
+              if (/^[|>][-+]?$/.test(script.trim())) {
+                const baseIndent = m[1].length;
+                const block = [];
+                let j = i + 1;
+                while (j < lines.length) {
+                  const line = lines[j];
+                  const indent = line.match(/^\s*/)[0].length;
+                  if (line.trim() && indent <= baseIndent) break;
+                  block.push(line);
+                  j++;
+                }
+                script = block.join('\n');
+                i = j - 1;
+              }
+              scripts.push(script);
+            }
+            return scripts;
+          }
+          function isPublishingScript(script) {
+            const normalized = script.replace(/\\\s*\n/g, ' ');
+            return /\beas\s+update\b/i.test(normalized)
+              || /\bnpm\s+run\s+update:production\b/i.test(normalized)
+              || /--confirm\b/i.test(normalized);
+          }
+          const liveRuns = extractRuns(liveJob);
+          assert.equal(liveRuns.length, 6, 'unexpected live-job shell step count');
+          assert.equal(liveRuns.some(isPublishingScript), false,
+            'live-job contains a publishing command');
+          assert.match(liveRuns.join('\n'), /node scripts\/update-production\.mjs/);
+          assert.match(liveRuns.join('\n'), /--dry-run/);
+          assert.deepEqual(
+            [...liveJob.matchAll(/^\s*uses:\s*(.+)$/gm)].map(m => m[1].trim()),
+            ['actions/checkout@v7', 'actions/setup-node@v7'],
+          );
+          // Negative controls: the guard MUST detect inline AND multiline publishing.
+          const blocked = [
+            '    run: ' + ['eas', 'update', '--channel', 'production'].join(' '),
+            ['    run: |', '      eas update --channel production'].join('\n'),
+            ['    run: |', '      npm run update:production:ios -- --message unsafe'].join('\n'),
+            ['    run: |', '      node scripts/update-production.mjs --platform ios \\',
+              '        --confirm --message unsafe'].join('\n'),
+          ];
+          for (const fixture of blocked) {
+            assert.equal(extractRuns(fixture).some(isPublishingScript), true,
+              'a publish fixture escaped the security guard');
+          }
+          assert.equal(
+            extractRuns(['    run: |',
+              '      node scripts/update-production.mjs --platform ios \\',
+              '        --dry-run'].join('\n')).some(isPublishingScript),
+            false,
+            'a safe dry-run was incorrectly blocked',
+          );
+          console.log('PASS: main-dispatch preflight dependency, pinned source, publish-denial fixtures, no OTA command.');
           NODE
 
   live-eas-preflight:
+    needs: ci-safety-check
     name: Protected EAS runtime/Production PRE-FLIGHT (read-only)
     if: github.event_name == 'workflow_dispatch' && github.repository == 'dogbossvibes/CarniFlow' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
