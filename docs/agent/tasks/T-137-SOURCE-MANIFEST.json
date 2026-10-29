@@ -1,0 +1,22 @@
+{
+  "sourceScope": "anyvo-corner-window-diagnostics-20261029",
+  "base": "4aace9b7bf2602f10fed40cc433d0f3119779a7c",
+  "status": "UNACTIVATED_MIXED_HISTORICAL_WIP_PROGRAM_SOURCE_ONLY",
+  "files": {
+    "features/tracking/utils/motionArrivalAudit.ts": "ac28c56dd3c16d14017ed943912d228e43e525c747f9d620cfd2149683bf463e"
+  },
+  "omitted": [
+    {
+      "path": "features/tracking/utils/__tests__/motionArrivalAudit.test.ts",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "node_modules",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    }
+  ],
+  "originalUnchanged": true,
+  "freeze": "Author02 explicit freeze; no parallel source writer",
+  "noTestsExecutedNoReadinessInferred": true,
+  "noRuntimeNativeSecurityDatabaseReleaseApproval": true
+}
