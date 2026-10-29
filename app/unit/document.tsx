@@ -524,8 +524,8 @@ function DocumentForm() {
         <HelpButton topicId="document_training" autoShow tint={C.white} />
       </View>
 
-      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" pointerEvents={saving || remoteCompleted || pendingSave ? 'none' : 'auto'}>
+      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" pointerEvents={saving || remoteCompleted || pendingSave ? 'none' : 'auto'}>
           <Text style={s.label}>{t('trainingDoc.localDraft')}</Text>
           {draftError && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.draftError')}</Text>}
           {editing && !editLoaded && <TouchableOpacity accessibilityRole="button" style={s.chip} onPress={() => setLoadRetry(v => v + 1)}><Text style={s.chipTxt}>{t('common.retry')}</Text></TouchableOpacity>}
@@ -740,7 +740,6 @@ function DocumentForm() {
           </>}
           <View style={{ height: 24 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
 
       {/* Speichern — sticky/fixed CTA über dem Home Indicator */}
       <SafeAreaView edges={['bottom']} style={s.footer}>
@@ -755,6 +754,7 @@ function DocumentForm() {
           <Text style={s.saveTxt}>{saving ? t('common.saving') : remoteCompleted ? t('common.retry') : editing ? t('training.saveChanges') : t('training.saveUnit')}</Text>
         </AnimatedPressable>
       </SafeAreaView>
+      </KeyboardAvoidingView>
 
       <CustomExerciseSheet
         visible={customSheetOpen}
