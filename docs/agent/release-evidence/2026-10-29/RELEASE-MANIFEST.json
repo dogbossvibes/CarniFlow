@@ -451,13 +451,29 @@
       "cdn": "PASS_ACTUAL_BUNDLE_AND_ALL_ASSET_ENTRIES",
       "sourceAndRuntimeNativeCompatibility": "PASS_AT_RELEASE",
       "deviceApply": "NOT_VERIFIED"
+    },
+    {
+      "scope": "diagnostics-access-release-01-20261029",
+      "target": "ios55",
+      "platform": "ios",
+      "runtime": "1.0.5-motion-v4",
+      "sourceCommit": "0e16001d4f9aeeb9d06adf384c9b86376fae2250",
+      "sourceRef": "refs/heads/release/source-0e16001d4f9a",
+      "sourceUrl": "https://github.com/dogbossvibes/CarniFlow/tree/release/source-0e16001d4f9a",
+      "groupId": "838e8cc5-7910-41dc-9d89-15a37be934bc",
+      "updateId": "01a186b3-1ae2-7d35-a4a0-15474b7eb19e",
+      "publishedAt": "2026-10-29T08:08:34.678776+00:00",
+      "tests": 29,
+      "cdn": "PASS_ACTUAL_BUNDLE_AND_ALL_ASSET_ENTRIES",
+      "sourceAndRuntimeNativeCompatibility": "PASS_AT_RELEASE",
+      "deviceApply": "NOT_VERIFIED"
     }
   ],
   "channel": "production",
   "environment": "production",
   "final12RuntimeMatrixVerifiedAt": "2026-10-29 after modern batch; later diagnosis request pending follow-up",
   "laterRequests": [
-    "Personal diagnosis recovery for iOS55 reauthorized and currently preparing; source4aace9b / WIP integration2020060; not yet published",
-    "T115 server installed, A/B runner STOP_INACTIVE_GRANT_RETURNED; no T115 client OTA"
+    "Diagnosis55 now fully published and CDNverified; see DIAGNOSIS-IOS55-RELEASE.json",
+    "T115 installed; liveA/B stillOPEN; human explicitly deferred second testgrant; NO T115OTA"
   ]
 }

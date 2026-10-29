@@ -1,12 +1,14 @@
 {
-  "atUTC": "2026-10-29T08:09:55.600880+00:00",
+  "atUTC": "2026-10-29T08:13:44.126118+00:00",
   "normalRefsFreshlyVerified": {
     "refs/heads/backup/subscription-modern-20261029": "82d5aac053086f6c3dd2ad3a5ce2cff2ef2f21dc",
     "refs/heads/backup/subscription-android103-20261029": "d451f11966fc130ae0658fb9e8b6fe81aa1f81f9",
     "refs/heads/backup/subscription-ios103-20261029": "3b4363a7217e0123ee9ce5d8382373eaddf2e0af",
     "refs/heads/backup/tooling-development-process-20261029": "67b7af24d392296ce0fcee45f94d4e8c40c26dc8",
     "refs/heads/backup/tooling-one-approval-ota-20261029": "f7dc4fe21c1eb4468a54b6f7fc898200550d496c",
-    "refs/heads/release/source-0e16001d4f9a": "0e16001d4f9aeeb9d06adf384c9b86376fae2250"
+    "refs/heads/release/source-0e16001d4f9a": "0e16001d4f9aeeb9d06adf384c9b86376fae2250",
+    "refs/heads/backup/tracking-motion-arrival-audit-20261029": "633ad0029569ddd40004b976890ce9a31496f569",
+    "refs/heads/backup/tracking-raw-journal-20261029": "144d98cbf21ca1687a2a1080ee4cd1730e654d45"
   },
   "sourceBackups": [
     {
@@ -50,6 +52,74 @@
       "branch": "backup/tooling-one-approval-ota-20261029",
       "head": "f7dc4fe21c1eb4468a54b6f7fc898200550d496c",
       "status": "COPY_ONLY_WIP_NO_QA_RELEASE"
+    },
+    {
+      "scope": "anyvo-phase3-raw-journal-20261028",
+      "branch": "backup/tracking-raw-journal-20261029",
+      "head": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+      "programSourceCount": 15,
+      "omitted": [
+        {
+          "path": "components/__tests__/DiagnosticsAccessSync.test.tsx",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "docs/agent/tasks/PHASE3-RAW-JOURNAL-20261028.md",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "features/tracking/storage/__tests__/localRawMeasurementJournal.test.ts",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "features/tracking/storage/__tests__/rawCaptureSqlite.test.ts",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "features/tracking/storage/__tests__/rawMeasurementJournal.test.ts",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "features/tracking/storage/__tests__/rawRecordingSession.test.ts",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "features/tracking/utils/__tests__/gnssConstellations.test.ts",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "lib/localDb/__tests__/objectReviewUpgrade.test.ts",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "node_modules",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        }
+      ],
+      "task": "T-136",
+      "normalPushFreshRemote": "PASS",
+      "originalUnchanged": true,
+      "status": "WIP_PROGRAM_ONLY_NO_RELEASE"
+    },
+    {
+      "scope": "anyvo-corner-window-diagnostics-20261029",
+      "branch": "backup/tracking-motion-arrival-audit-20261029",
+      "head": "633ad0029569ddd40004b976890ce9a31496f569",
+      "programSourceCount": 1,
+      "omitted": [
+        {
+          "path": "features/tracking/utils/__tests__/motionArrivalAudit.test.ts",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        },
+        {
+          "path": "node_modules",
+          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+        }
+      ],
+      "task": "T-137",
+      "normalPushFreshRemote": "PASS",
+      "originalUnchanged": true,
+      "status": "WIP_PROGRAM_ONLY_NO_RELEASE"
     }
   ],
   "noOriginalWorktreeChanges": true,

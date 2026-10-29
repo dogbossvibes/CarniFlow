@@ -4,7 +4,7 @@
 
 ## Start with these sources
 
-All26 completed release sources and freshly verified normal GitHub refs, full SHA/group/update/runtime/test metadata: [RELEASE-MANIFEST.json](release-evidence/2026-10-29/RELEASE-MANIFEST.json). Latest cumulative modern runtime sources at the end of the completed batch:
+All27 completed release sources and freshly verified normal GitHub refs, full SHA/group/update/runtime/test metadata: [RELEASE-MANIFEST.json](release-evidence/2026-10-29/RELEASE-MANIFEST.json). Latest cumulative modern runtime sources at the end of the completed batch:
 
 | Target | Runtime | Source | Update ID |
 |---|---|---|---|
@@ -15,7 +15,7 @@ All26 completed release sources and freshly verified normal GitHub refs, full SH
 | ios49 | 1.0.4 | [936131a1dd0c](https://github.com/dogbossvibes/CarniFlow/tree/release/source-936131a1dd0c) | 01a1858d-0e56-7060-b7ee-88cacee39a69 |
 | ios52 | 1.0.5-motion-v2 | [6c3049482aec](https://github.com/dogbossvibes/CarniFlow/tree/release/source-6c3049482aec) | 01a18597-e13a-7801-a861-247941f2a2c8 |
 | ios53 | 1.0.5-motion-v3 | [a4eb7ffeab4e](https://github.com/dogbossvibes/CarniFlow/tree/release/source-a4eb7ffeab4e) | 01a18594-3fbb-7c3e-a40b-07f4b93368d8 |
-| ios55 | 1.0.5-motion-v4 | [005999f2ab2c](https://github.com/dogbossvibes/CarniFlow/tree/release/source-005999f2ab2c) | 01a185a3-106e-7a65-a4c5-4ead59ed938a |
+| ios55 | 1.0.5-motion-v4 | [0e16001d4f9a](https://github.com/dogbossvibes/CarniFlow/tree/release/source-0e16001d4f9a) | 01a186b3-1ae2-7d35-a4a0-15474b7eb19e |
 | ios56 | 1.0.5-map49-v1 | [17443616b5ba](https://github.com/dogbossvibes/CarniFlow/tree/release/source-17443616b5ba) | 01a185a6-bfe2-7485-accc-2fabbe4e0e19 |
 | android50 | 1.0.5-gnss-v1 | [3e1c2ae32765](https://github.com/dogbossvibes/CarniFlow/tree/release/source-3e1c2ae32765) | 01a185ae-7638-790c-b8fb-bcd26f7c9248 |
 
@@ -51,3 +51,12 @@ Before an OTA: explicit scoped authorization, independent review and source-boun
 The new diagnosis55 OTA completed after the earlier12-runtime batch. It changes only personal diagnostics retry and retains all cumulative features.29tests/TS/lint, independent source review, currentProduction/runtime/native/DB/ancestry/environment, fullbundle/assets, normal source backup, once publish and actualCDN passed. Physical device display and normal-session RLS are not inferred from admin aggregates.
 
 T115 CURRENT STOP: installed backend source is now8b39655770d385f9bbdf6235d01bc80891da5043 on feat/health-shared-recipient-db-20261029 (supersedes earlier backup d096342). Harness fix has11local tests and independent07 review PASS, but no new live normalAuthA/B PASS. **Human explicitly chose later / create nothing now** for a second synthetic grant. Original grant expired. NO T115 OTA, NO new grant/extension/live test until a new concrete approved window and required API/client/runtime release gates. Do not misstate installation as missing or inactive-test failure as a proven Production permissions bug.
+
+
+## Tracking prototype source backup follow-up
+
+Author02 froze both originals and confirmed no parallel backup writer. Program-source-only snapshots are now freshly normal-push verified:
+- [Raw journal prototype](https://github.com/dogbossvibes/CarniFlow/tree/backup/tracking-raw-journal-20261029):144d98cbf21ca1687a2a1080ee4cd1730e654d45,15program files, base d13181bb392c211551c636a86eb1bad35ffed2ca; manifest/task T136 in that branch.
+- [Offline arrival audit](https://github.com/dogbossvibes/CarniFlow/tree/backup/tracking-motion-arrival-audit-20261029):633ad0029569ddd40004b976890ce9a31496f569,1program file, base4aace9b7bf2602f10fed40cc433d0f3119779a7c; manifest/task T137.
+
+These are UNACTIVATED HISTORICAL/MIXED WIPs, not tested integrations. Raw source includes superseded diagnostics-access code: do not use it to replace current0e16001. No new tests/runtime/native/security/DB/release approval. Exact omitted test/docs/dependency paths and privacy rationale are in ADDITIONAL-SOURCE-BACKUPS.json and each branch manifest. Unverified tracking tests/fixtures/task research remain local and intentionally unexported, not claimed backed up. No raw/GPS/sensor/customer measurements, local databases, logs, exports/media, keys, source maps or build artifacts were copied. Original worktrees unchanged. All7additional own backups (tooling2,subscription3,tracking2) have fresh remote bindings; this does not resolve other150scope ownership/successor gaps.
