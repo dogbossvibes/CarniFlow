@@ -138,6 +138,7 @@ class AnyvoPrecisionLocationModule : Module() {
     GnssStatus.CONSTELLATION_BEIDOU -> "BEIDOU"
     GnssStatus.CONSTELLATION_QZSS -> "QZSS"
     GnssStatus.CONSTELLATION_SBAS -> "SBAS"
+    7 -> "NAVIC" // IRNSS (API 29 constant); numeric value is safe on older Android.
     else -> "UNKNOWN"
   }
 
@@ -333,7 +334,17 @@ class AnyvoPrecisionLocationModule : Module() {
     var cn0Sum = 0.0
     var cn0Count = 0
     var cn0Max = Double.NEGATIVE_INFINITY
+    val observedBySystem = linkedMapOf<String, Int>()
+    val usedBySystem = linkedMapOf<String, Int>()
+    val frequenciesBySystem = linkedMapOf<String, MutableSet<Double>>()
     for (i in 0 until count) {
+      val system = constellationName(status.getConstellationType(i))
+      observedBySystem[system] = (observedBySystem[system] ?: 0) + 1
+      if (status.usedInFix(i)) usedBySystem[system] = (usedBySystem[system] ?: 0) + 1
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && status.hasCarrierFrequencyHz(i)) {
+        val hz = status.getCarrierFrequencyHz(i).toDouble()
+        if (hz.isFinite() && hz > 0) frequenciesBySystem.getOrPut(system) { linkedSetOf() }.add(hz)
+      }
       if (status.usedInFix(i)) used++
       // GnssStatus hat kein hasCn0DbHz(); getCn0DbHz() liefert immer einen Wert
       // (0, wenn nicht verfügbar) → nur positive Messwerte berücksichtigen.
@@ -356,6 +367,12 @@ class AnyvoPrecisionLocationModule : Module() {
     sendEvent(
       "onGnssStatus",
       mapOf(
+        "constellations" to observedBySystem.map { (system, observed) -> mapOf(
+          "constellation" to system,
+          "observed" to observed,
+          "used" to (usedBySystem[system] ?: 0),
+          "frequenciesHz" to (frequenciesBySystem[system]?.sorted() ?: emptyList<Double>())
+        ) },
         "satelliteCount" to count,
         "usedInFixCount" to used,
         "averageCn0DbHz" to avg,

@@ -1,3 +1,4 @@
+import { constellationLabel } from '../utils/gnssConstellations';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { C } from '@/constants/colors';
@@ -25,8 +26,13 @@ export function PositionQualityDiagnostics() {
     {Platform.OS === 'android' ? <>
       <Text style={s.line}>Satelliten beobachtet / verwendet: {gnssFresh ? `${state.gnss!.satelliteCount} / ${state.gnss!.usedInFixCount}` : 'unbekannt'}</Text>
       <Text style={s.line}>Signalstärke Ø / max: {gnssFresh ? `${uncertainty(state.gnss?.averageCn0DbHz, 'dBHz')} / ${uncertainty(state.gnss?.maxCn0DbHz, 'dBHz')}` : 'unbekannt'}</Text>
+      {gnssFresh && state.gnss?.constellations ? state.gnss.constellations.map(system => <View key={system.constellation}>
+        <Text style={s.line}>{constellationLabel(system.constellation)}: {system.observed} beobachtet · {system.used} verwendet</Text>
+        <Text style={s.note}>Gemeldete Frequenzen: {system.frequenciesHz.length ? system.frequenciesHz.map(hz => `${(hz / 1e6).toFixed(2)} MHz`).join(' · ') : 'nicht verfügbar'}</Text>
+      </View>) : <Text style={s.note}>Aufschlüsselung nach Satellitensystem und Frequenz: nicht verfügbar. Dafür werden aktuelle Daten eines unterstützten Android-Builds benötigt.</Text>}
+      <Text style={s.note}>Mehr Satellitensignale bedeuten nicht automatisch eine genauere Fährte. Angezeigt werden Empfangsdaten, keine garantierte Genauigkeit oder vollständige Geräteliste.</Text>
       <Text style={s.note}>Statusalter: {diagnosticAgeMs(state.gnss?.timestamp, now) == null ? 'unbekannt' : `${(diagnosticAgeMs(state.gnss?.timestamp, now)! / 1000).toFixed(1)} s`}. Ältere Binaries und Fallback können diese Werte nicht liefern.</Text>
-    </> : <Text style={s.note}>Satellitenstatus ist über diese iOS-/Fallback-Quelle nicht verfügbar.</Text>}
+    </> : <Text style={s.note}>iOS liefert hier keine einzelnen Satelliten oder GNSS-Rohmessungen. Das iPhone wählt unterstützte Satellitensysteme selbst. Lagegenauigkeit und Messalter stehen oben; Bewegungssensoren werden separat diagnostiziert.</Text>}
   </View>;
 }
 const s = StyleSheet.create({ card: { backgroundColor: C.card, padding: 16, borderRadius: 16, marginBottom: 16 }, title: { color: C.trackText, fontWeight: '700', marginBottom: 8 }, line: { color: C.trackText, marginVertical: 3 }, note: { color: C.trackTextSec, marginTop: 8 } });

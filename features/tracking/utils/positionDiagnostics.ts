@@ -1,3 +1,4 @@
+import { normalizeConstellations } from './gnssConstellations';
 import type { StreamSample } from './positionStream';
 import type { GnssStatusAndroid } from '@/features/tracking/native/types';
 import { normalizeFixQuality, validUncertainty, type LocationFixQuality } from './locationFixQuality';
@@ -32,7 +33,7 @@ export function recordGnssDiagnostics(id: number, status: GnssStatusAndroid): vo
   if (!Number.isInteger(status.satelliteCount) || status.satelliteCount < 0
     || !Number.isInteger(status.usedInFixCount) || status.usedInFixCount < 0 || status.usedInFixCount > status.satelliteCount
     || !Number.isFinite(status.timestamp)) return;
-  emit({ ...snapshot, gnss: { ...status, averageCn0DbHz: validUncertainty(status.averageCn0DbHz), maxCn0DbHz: validUncertainty(status.maxCn0DbHz) } });
+  emit({ ...snapshot, gnss: { ...status, constellations: normalizeConstellations(status.constellations, status.satelliteCount, status.usedInFixCount), averageCn0DbHz: validUncertainty(status.averageCn0DbHz), maxCn0DbHz: validUncertainty(status.maxCn0DbHz) } });
 }
 export function endPositionDiagnostics(id: number): void {
   if (id === generation) emit({ ...snapshot, active: false });

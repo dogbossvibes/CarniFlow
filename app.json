@@ -51,13 +51,13 @@
         "android.permission.READ_MEDIA_VIDEO"
       ],
       "package": "com.anyvo.app",
-      "versionCode": 49,
+      "versionCode": 50,
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCriuMb0ZKmtn52yNH7AjmfGWsaUEuNDdg"
         }
       },
-      "runtimeVersion": "1.0.5-greeting-v1"
+      "runtimeVersion": "1.0.5-gnss-v1"
     },
     "web": {
       "output": "static",
