@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { AppState, BackHandler, Text, TextInput, TouchableOpacity, type AppStateStatus } from 'react-native';
+import { AppState, BackHandler, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, type AppStateStatus } from 'react-native';
 import DocumentScreen from '@/app/unit/document';
 import { TrainingPreparation } from '@/components/training/TrainingPreparation';
 
@@ -1124,4 +1124,23 @@ it('guards consecutive context presses from one render without dropping another 
   expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Yam draft');
   showContext(node); tap(node, 'Malu'); await flush();
   expect(inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.value).toBe('Malu draft');
+});
+
+
+describe('training document keyboard reachability', () => {
+  const originalOS = Platform.OS;
+  afterEach(() => { Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS }); });
+  it.each(['ios', 'android'] as const)('keeps scroll content and bottom action in the same keyboard-adjusted viewport on %s', async os => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: os });
+    mockParams = {}; mockDogs = [{ id: 'dog-1', name: 'Luna' }]; mockDogsLoading = false;
+    const node = render(); await flush();
+    const keyboard = node.root.findByType(KeyboardAvoidingView);
+    expect(keyboard.props.behavior).toBe(os === 'ios' ? 'padding' : 'height');
+    // Both navigators hide their headers; no extra external-header offset belongs here.
+    expect(keyboard.props.keyboardVerticalOffset ?? 0).toBe(0);
+    expect(keyboard.findAll(n => n.props.testID === 'document-save').length).toBeGreaterThan(0);
+    const scroll = keyboard.findByType(ScrollView);
+    expect(scroll.props.keyboardDismissMode).toBe('on-drag');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  });
 });
