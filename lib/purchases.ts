@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { createPurchaseAccountAdapter } from './purchaseAccountAdapter';
 import { PRODUCT_IDS, type SubscriptionPlan } from '@/features/subscription/plans';
 import type { StoreTrialOffer } from '@/features/subscription/activeTrial';
 
@@ -21,54 +22,34 @@ export const ENTITLEMENTS = { pro: 'pro', trainer: 'trainer' } as const;
 export type Tier = 'pro' | 'trainer';
 export type RestorablePlan = Exclude<SubscriptionPlan, 'newbie'>;
 
-let configured = false;
-let configuredUserId: string | null = null;   // welcher User zuletzt konfiguriert/eingeloggt
-
+let accountAdapter: ReturnType<typeof createPurchaseAccountAdapter> | null = null;
 function purchasesApiKey(): string {
   return Platform.OS === 'ios' ? IOS_KEY : ANDROID_KEY;
 }
-
-// Idempotente Initialisierung. Erstkonfiguration genau EINMAL; bei bereits
-// konfiguriertem SDK + anderem User → RC-logIn (kein Re-configure). Wirft nie.
-export function configurePurchases(userId?: string) {
-  if (!Purchases) return;
-  const apiKey = purchasesApiKey();
-  if (!apiKey) return;
-  try {
-    if (!configured) {
-      // DEBUG-Log-Level nur in Dev (loggt keine Secrets).
-      if (__DEV__) { try { Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG); } catch { /* ignore */ } }
-      Purchases.configure({ apiKey, appUserID: userId });
-      configured = true;
-      configuredUserId = userId ?? null;
-    } else if (userId && userId !== configuredUserId) {
-      // Bereits konfiguriert, aber neuer/anderer User → sauberer RC-User-Switch.
-      void Purchases.logIn(userId);
-      configuredUserId = userId;
-    }
-  } catch { /* ignore */ }
+function purchaseAccount() {
+  if (!accountAdapter) {
+    // Lazy binding keeps pure product/price helpers usable without starting auth.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { supabase } = require('@/lib/supabase') as typeof import('@/lib/supabase');
+    accountAdapter = createPurchaseAccountAdapter(supabase.auth, Purchases, purchasesApiKey);
+  }
+  return accountAdapter;
 }
 
-// Garantiert (idempotent), dass RevenueCat vor jedem Store-Zugriff konfiguriert ist.
-// Der NATIVE Status (`isConfigured`) hat Vorrang vor dem lokalen JS-Flag. Wirft nie;
-// liefert false, wenn kein Key vorhanden ist (dann kann/darf configure nicht laufen).
+// Auth observations invalidate stale callers synchronously; identity changes and
+// native operations themselves use the same queue. Never configure anonymously.
+export function configurePurchases(userId?: string) {
+  void ensurePurchasesConfigured(userId);
+}
 export async function ensurePurchasesConfigured(userId?: string): Promise<boolean> {
   if (!Purchases || !purchasesApiKey()) return false;
-  try {
-    if (await Purchases.isConfigured()) {
-      configured = true;
-      if (userId && userId !== configuredUserId) {
-        try { await Purchases.logIn(userId); configuredUserId = userId; } catch { /* ignore */ }
-      }
-      return true;
-    }
-  } catch { /* isConfigured evtl. nicht verfügbar → lokal weiter */ }
-  configurePurchases(userId);
-  return configured;
+  try { return await purchaseAccount().ensure(userId); } catch { return false; }
 }
-
 export function purchasesReady(): boolean {
-  return PURCHASES_AVAILABLE && configured;
+  return PURCHASES_AVAILABLE && !!accountAdapter?.isReady();
+}
+export function isPurchaseAccountCurrent(userId: string): boolean {
+  return !!accountAdapter?.isCurrent(userId);
 }
 
 export interface PurchasePackage {
@@ -92,8 +73,15 @@ export interface EntitlementResult {
 }
 
 export function hasStorePackageForProduct(packages: PurchasePackage[], productId: string | null | undefined): boolean {
-  return !!productId && packages.some(p => p.productId === productId);
+  return !!productId && packages.some(p => canonicalStoreProduct(p.productId) === canonicalStoreProduct(productId));
 }
+
+// Exact base plans observed in the same ANYVO catalog; never strip arbitrary SKUs.
+const STORE_PRODUCT_ALIASES: Record<string, string> = {
+  'anyvo_active_monthly_10:anyvo-active-monthly-400': 'anyvo_active_monthly_10',
+  'anyvo_trainer_monthly_30.00:anyvo-trainer-monthly-3000': 'anyvo_trainer_monthly_30.00',
+};
+function canonicalStoreProduct(identifier: string): string { return STORE_PRODUCT_ALIASES[identifier] ?? identifier; }
 
 const TRAINER_IDS = new Set(['trainer', 'anyvo_trainer_monthly_30.00']);
 const FOUNDER_IDS = new Set(['founder', 'founder_active', 'anyvo_founder_active_monthly_8.00']);
@@ -102,6 +90,7 @@ const NEWBIE_IDS = new Set(['newbie', 'anyvo_newbie_monthly_0']);
 
 function rankIdentifier(id: string | null | undefined): RestorablePlan | null {
   if (!id) return null;
+  id = canonicalStoreProduct(id);
   if (NEWBIE_IDS.has(id)) return null;
   if (TRAINER_IDS.has(id)) return 'trainer';
   if (FOUNDER_IDS.has(id)) return 'founder_active';
@@ -138,12 +127,9 @@ export function planFromCustomerInfo(info: any): RestorablePlan | null {
   }
   if (activeSubscriptionPlan) return activeSubscriptionPlan;
 
-  let legacyPurchasedPlan: RestorablePlan | null = null;
-  for (const identifier of info?.allPurchasedProductIdentifiers ?? []) {
-    legacyPurchasedPlan = betterPlan(legacyPurchasedPlan, rankIdentifier(identifier));
-  }
-
-  return legacyPurchasedPlan;
+  // Historical identifiers include expired/refunded purchases. Only current
+  // entitlements/subscriptions can select a paid restore; the server verifies it.
+  return null;
 }
 
 export function restorePlanFromResult(result: EntitlementResult, currentPlan: SubscriptionPlan | null): RestorablePlan | null {
@@ -168,13 +154,13 @@ function tierOf(productId: string): Tier {
 }
 
 export async function getPackages(): Promise<PurchasePackage[]> {
-  if (!purchasesReady()) return [];
+  if (!Purchases || !purchasesApiKey()) return [];
   try {
-    const offerings = await Purchases.getOfferings();
+    const offerings = await purchaseAccount().readCurrent(() => Purchases.getOfferings()) as any;
     const offeringId = offerings.current?.identifier ?? '';
     const pkgs = offerings.current?.availablePackages ?? [];
     return pkgs.map((p: any) => {
-      const productId = p.product?.identifier ?? p.identifier;
+      const productId = canonicalStoreProduct(p.product?.identifier ?? p.identifier);
       return {
         id:          p.identifier,
         offeringId,
@@ -225,10 +211,10 @@ export function buildAndroidChangeInfo(
 // oldProductIdentifier). Quelle: CustomerInfo.activeSubscriptions; bevorzugt ein
 // bekanntes ANYVO-Produkt, sonst das erste aktive Abo. Wirft nie; null wenn IAP
 // nicht bereit ist oder kein aktives Abo besteht.
-export async function getActiveStoreProductId(): Promise<string | null> {
-  if (!purchasesReady()) return null;
+export async function getActiveStoreProductId(userId: string): Promise<string | null> {
+  if (!Purchases || !purchasesApiKey()) return null;
   try {
-    const info = await Purchases.getCustomerInfo();
+    const info = await purchaseAccount().run(userId, () => Purchases.getCustomerInfo()) as any;
     const subs: string[] = info?.activeSubscriptions ?? [];
     return subs.find(id => rankIdentifier(id) !== null) ?? subs[0] ?? null;
   } catch {
@@ -238,7 +224,7 @@ export async function getActiveStoreProductId(): Promise<string | null> {
 
 export async function buyPackage(
   pkg: PurchasePackage,
-  opts?: { oldProductIdentifier?: string | null },
+  opts: { userId: string; oldProductIdentifier?: string | null },
 ): Promise<EntitlementResult> {
   if (!Purchases) return { ok: false, tier: null, plan: null, expiration: null, error: 'IAP nicht verfügbar' };
   try {
@@ -246,9 +232,9 @@ export async function buyPackage(
     // Modus übergeben → echter Subscription-Wechsel statt zweitem parallelem Abo.
     // iOS/Neukauf: change === null → unveränderter Standard-Kaufaufruf.
     const change = buildAndroidChangeInfo(Platform.OS, opts?.oldProductIdentifier);
-    const { customerInfo } = change
-      ? await Purchases.purchasePackage(pkg.raw, null, change)
-      : await Purchases.purchasePackage(pkg.raw);
+    const { customerInfo } = await purchaseAccount().run(opts?.userId, () => change
+      ? Purchases.purchasePackage(pkg.raw, null, change)
+      : Purchases.purchasePackage(pkg.raw)) as { customerInfo: unknown };
     return fromInfo(customerInfo);
   } catch (e: any) {
     if (e?.userCancelled) return { ok: false, tier: null, plan: null, expiration: null, cancelled: true };
@@ -266,12 +252,32 @@ export async function buyPackage(
   }
 }
 
-export async function restorePurchases(): Promise<EntitlementResult> {
+export async function restorePurchases(userId: string): Promise<EntitlementResult> {
   if (!Purchases) return { ok: false, tier: null, plan: null, expiration: null, error: 'IAP nicht verfügbar' };
   try {
-    return fromInfo(await Purchases.restorePurchases());
+    return fromInfo(await purchaseAccount().run(userId, () => Purchases.restorePurchases()));
   } catch (e: any) {
     return { ok: false, tier: null, plan: null, expiration: null, error: e?.message ?? 'Wiederherstellen fehlgeschlagen' };
+  }
+}
+
+/** Fresh Store state is used only to present purchase actions, never to grant
+ * capabilities. The adapter rejects results from a previous account/session. */
+export async function getCurrentStoreSubscription(userId: string): Promise<EntitlementResult> {
+  if (!Purchases || !purchasesApiKey()) return { ok: false, tier: null, plan: null, expiration: null };
+  try {
+    const info = await purchaseAccount().run(userId, async () => {
+      await Purchases.invalidateCustomerInfoCache?.();
+      return Purchases.getCustomerInfo();
+    });
+    const result = fromInfo(info);
+    if (!result.plan && ((info as any)?.activeSubscriptions?.length ||
+      Object.keys((info as any)?.entitlements?.active ?? {}).length)) {
+      return { ok: false, tier: null, plan: null, expiration: null };
+    }
+    return result;
+  } catch {
+    return { ok: false, tier: null, plan: null, expiration: null };
   }
 }
 
@@ -328,7 +334,7 @@ export function freeTrialDaysFromProduct(product: any): number | null {
 // (noch) nichts konfiguriert hat. Wirft nie.
 export async function getActiveTrialOffer(): Promise<StoreTrialOffer> {
   const empty: StoreTrialOffer = { available: false, productId: null, priceString: null, period: null, freeTrialDays: null };
-  if (!purchasesReady()) return empty;
+  if (!await ensurePurchasesConfigured()) return empty;
   try {
     const pkgs = await getPackages();
     const pkg = pkgs.find(p => p.productId === PRODUCT_IDS.activeMonthly) ?? pkgs.find(p => p.tier === 'pro');
@@ -360,12 +366,12 @@ export async function getActiveTrialOffer(): Promise<StoreTrialOffer> {
 
 // ACTIVE-Trial kaufen (Store wickelt den 3-Tage-Free-Trial als Introductory Offer
 // ab). Reiner Reuse des bestehenden Kauf-Flows — kein Sonderpfad.
-export async function buyActiveTrial(): Promise<EntitlementResult> {
-  if (!purchasesReady()) return { ok: false, tier: null, plan: null, expiration: null, error: 'IAP nicht verfügbar' };
+export async function buyActiveTrial(userId: string): Promise<EntitlementResult> {
+  if (!await ensurePurchasesConfigured(userId)) return { ok: false, tier: null, plan: null, expiration: null, error: 'IAP nicht verfügbar' };
   const pkgs = await getPackages();
   const pkg = pkgs.find(p => p.productId === PRODUCT_IDS.activeMonthly) ?? pkgs.find(p => p.tier === 'pro');
   if (!pkg) return { ok: false, tier: null, plan: null, expiration: null, error: 'ACTIVE-Paket nicht verfügbar' };
-  return buyPackage(pkg);
+  return buyPackage(pkg, { userId });
 }
 
 // Store-Abo-Verwaltung: RevenueCat liefert die korrekte, plattformspezifische
@@ -373,9 +379,9 @@ export async function buyActiveTrial(): Promise<EntitlementResult> {
 // IAP nicht bereit ist, kein aktives Abo besteht oder der Store sie nicht liefert
 // → der Aufrufer nutzt dann einen Store-Fallback. Wirft nie.
 export async function getManagementURL(): Promise<string | null> {
-  if (!purchasesReady()) return null;
+  if (!Purchases || !purchasesApiKey()) return null;
   try {
-    const info = await Purchases.getCustomerInfo();
+    const info = await purchaseAccount().readCurrent(() => Purchases.getCustomerInfo()) as any;
     return info?.managementURL ?? null;
   } catch {
     return null;

@@ -36,7 +36,7 @@ function mapUserEntitlement(row: UserEntitlementRow): UserEntitlementRecord | nu
 }
 
 export function entitlementGrantsPro(e: UserEntitlementRecord): boolean {
-  return hasActiveUserEntitlement([e], 'lifetime');
+  return hasActiveUserEntitlement([e], 'lifetime') || hasActiveUserEntitlement([e], 'active_lifetime');
 }
 
 export function entitlementGrantsTrainer(e: UserEntitlementRecord): boolean {

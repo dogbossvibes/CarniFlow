@@ -3,8 +3,10 @@
 // impliziter status='trialing' für NEWBIE, kein trial_ends_at, und die alte
 // profiles-Spiegelung (hooks/usePlan.ts → aiUnlocked in app/dog/[id].tsx) markiert
 // NEWBIE nicht mehr fälschlich als 'premium'. ACTIVE/TRAINER bleiben unverändert.
+jest.mock('@/services/subscriptionAuthorityService', () => ({syncSubscriptionAuthority:jest.fn(async()=>({error:null}))}));
 jest.mock('@/lib/supabase', () => ({ supabase: { from: jest.fn() } }));
 
+import { syncSubscriptionAuthority } from '@/services/subscriptionAuthorityService';
 import { supabase } from '@/lib/supabase';
 import { activatePlan } from '@/services/subscriptionService';
 
@@ -58,31 +60,16 @@ describe('activatePlan — NEWBIE ist kein Trial mehr', () => {
     expect(calls.user_capabilities[0]).toMatchObject({ pro_member: false, trainer_module: false });
   });
 
-  it('ACTIVE bleibt unverändert: status active, profiles premium mit Ablaufdatum aus periodEndsAt', async () => {
-    const calls = mockTables();
-    await activatePlan({ userId: 'u1', plan: 'active', periodEndsAt: '2026-09-30T00:00:00.000Z' });
-    expect(calls.subscriptions[0]).toMatchObject({ plan: 'active', status: 'active' });
-    expect(calls.profiles[0]).toMatchObject({ plan: 'premium', plan_expires_at: '2026-09-30T00:00:00.000Z' });
-    expect(calls.user_capabilities[0]).toMatchObject({ pro_member: true, trainer_module: false });
+  it.each(['active','trainer','founder_active'] as const)('paid %s delegates to verified sync and never writes client mirrors', async plan => {
+    const calls=mockTables();
+    await activatePlan({userId:'u1',plan,periodEndsAt:'2099-01-01',providerProductId:'client-product'});
+    expect(syncSubscriptionAuthority).toHaveBeenCalledWith('u1',plan);
+    expect(calls.subscriptions).toEqual([]);expect(calls.profiles).toEqual([]);expect(calls.user_capabilities).toEqual([]);
   });
-
-  it('TRAINER bleibt unverändert: status active, profiles premium + is_trainer', async () => {
-    const calls = mockTables();
-    await activatePlan({ userId: 'u1', plan: 'trainer', periodEndsAt: '2026-09-30T00:00:00.000Z' });
-    expect(calls.subscriptions[0]).toMatchObject({ plan: 'trainer', status: 'active' });
-    expect(calls.profiles[0]).toMatchObject({ plan: 'premium', is_trainer: true });
-    expect(calls.user_capabilities[0]).toMatchObject({ pro_member: true, trainer_module: true });
-  });
-
-  it('FOUNDER_ACTIVE bleibt unverändert: profiles premium (wie jeder andere Premium-Plan)', async () => {
-    const calls = mockTables();
-    await activatePlan({ userId: 'u1', plan: 'founder_active', periodEndsAt: '2026-09-30T00:00:00.000Z' });
-    expect(calls.profiles[0]).toMatchObject({ plan: 'premium', plan_expires_at: '2026-09-30T00:00:00.000Z' });
-  });
-
-  it('ein expliziter args.status wird weiterhin respektiert (kein Verhalten entfernt, nur der NEWBIE-Default)', async () => {
-    const calls = mockTables();
-    await activatePlan({ userId: 'u1', plan: 'active', status: 'past_due' });
-    expect(calls.subscriptions[0]).toMatchObject({ status: 'past_due' });
+  it('untrusted paid status and expiry are not used as authority; pending propagates',async()=>{
+    (syncSubscriptionAuthority as jest.Mock).mockResolvedValueOnce({error:'SUBSCRIPTION_SYNC_PENDING',pending:true});
+    mockTables();
+    await expect(activatePlan({userId:'u1',plan:'active',status:'past_due',periodEndsAt:'2099-01-01'})).resolves.toEqual({error:'SUBSCRIPTION_SYNC_PENDING',pending:true});
+    expect(from).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import { type Session, type User } from '@supabase/supabase-js';
 import { router } from 'expo-router';
 import { supabase } from './supabase';
 import { initLocaleSync, stopLocaleSync } from '@/services/localeSync';
+import { useSubscriptionSyncRecovery } from '@/hooks/useSubscriptionSyncRecovery';
 
 type SessionCtx = {
   session: Session | null;
@@ -17,6 +18,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [recoveryMode, setRecoveryMode] = useState(false);
+  useSubscriptionSyncRecovery(session?.user.id);
 
   useEffect(() => {
     // Bootstrap-Abschluss GARANTIEREN: `loading` darf niemals dauerhaft true
@@ -46,6 +48,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Keep in sync with Supabase auth events (login, logout, token refresh).
     // Das erste INITIAL_SESSION-Event schließt den Bootstrap ebenfalls ab.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Do not let an older bootstrap restore an account after logout/switch.
+      done = true;
+      clearTimeout(safety);
       setSession(session);
       setLoading(false);
       if (event === 'PASSWORD_RECOVERY') {
