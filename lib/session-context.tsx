@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { supabase } from './supabase';
 import { setDiagnosticsSession } from '@/lib/diagnosticsAccessState';
 import { initLocaleSync, stopLocaleSync } from '@/services/localeSync';
+import { useSubscriptionSyncRecovery } from '@/hooks/useSubscriptionSyncRecovery';
 
 type SessionCtx = {
   session: Session | null;
@@ -18,6 +19,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [recoveryMode, setRecoveryMode] = useState(false);
+  useSubscriptionSyncRecovery(session?.user.id);
 
   useEffect(() => {
     // Bootstrap-Abschluss GARANTIEREN: `loading` darf niemals dauerhaft true

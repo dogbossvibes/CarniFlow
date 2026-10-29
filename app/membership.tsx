@@ -9,7 +9,7 @@ import { useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, restorePurchases, restorePlanFromResult, getManagementURL, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, restorePurchases, restorePlanFromResult, getManagementURL, isPurchaseAccountCurrent, type PurchasePackage } from '@/lib/purchases';
 import { getPlanSubscription, getFounderSlots, activatePlan } from '@/services/subscriptionService';
 import { newbieQuotaStatus } from '@/services/quotaService';
 import { PLAN_META, matchesStoreProduct, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
@@ -137,19 +137,22 @@ export default function MembershipScreen() {
   const founderAvailable = slots.remaining > 0 || visiblePlan === 'founder_active';
 
   const handleRestore = async () => {
+    if (!uid) { Alert.alert(t('common.notice'), t('premium.loginRequired')); return; }
     setBusy(true);
-    const res = await restorePurchases();
-    setBusy(false);
-    const restored = restorePlanFromResult(res, dbPlan);
-    if (restored && uid) {
-      await activatePlan({ userId: uid, plan: restored, periodEndsAt: res.expiration });
+    try {
+      const res = await restorePurchases(uid);
+      if (!res.ok) { Alert.alert(t('common.notice'), t(res.error?.startsWith('IAP_ACCOUNT_') ? 'premium.accountChanged' : 'premium.activationFailed')); return; }
+      const plan = restorePlanFromResult(res, dbPlan);
+      if (!plan) { Alert.alert(t('premium.noneFound'), t('premium.noneFoundBody')); return; }
+      const activation = await activatePlan({ userId: uid, plan, periodEndsAt: res.expiration });
+      if (activation.error) { Alert.alert(t('common.notice'), t(activation.pending ? 'premium.syncPending' : 'premium.activationFailed')); return; }
+      if (!isPurchaseAccountCurrent(uid)) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
       queryClient.invalidateQueries({ queryKey: ['capabilities'] });
       queryClient.invalidateQueries({ queryKey: ['userAccess'] });
       Alert.alert(t('premium.restored'), t('premium.restoredBody'));
-      const sub = await getPlanSubscription(uid); setDbPlan(sub?.plan ?? null);
-    } else {
-      Alert.alert(t('premium.noneFound'), res.error ?? t('premium.noneFoundBody'));
-    }
+      await loadPlanState();
+    } catch { Alert.alert(t('common.notice'), t('premium.activationFailed')); }
+    finally { setBusy(false); }
   };
 
   // „Abo verwalten" → bevorzugt die RevenueCat-Management-URL (korrekte Store-Abo-
