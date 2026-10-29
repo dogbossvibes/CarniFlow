@@ -54,6 +54,19 @@ describe('Ablage', () => {
     expect(await loadQaSessionCapture('ts_1')).toEqual(c);
   });
 
+  it('bewahrt die chronologische Sensordiagnose samt Empfangszeiten und Lücken', async () => {
+    const c = capture('timeline');
+    c.motionTimeline = { version: 1, limit: 4096, observed: 3, omitted: 1,
+      timeBasis: 'relative_to_first_recorded_fix', samples: [
+        { tMs: 900, receivedMs: 1000, headingDelta: 12, rotationMagnitude: 12, accelerationMagnitude: 0.1, stepDelta: 1, cadence: null, movementState: 'walking' },
+        { tMs: 800, receivedMs: 1100, headingDelta: -4, rotationMagnitude: 4, accelerationMagnitude: 0.1, stepDelta: 1, cadence: null, movementState: 'walking' },
+      ] };
+    await saveQaSessionCapture(c);
+    expect((await loadQaSessionCapture('timeline'))?.motionTimeline).toEqual(c.motionTimeline);
+    await clearQaSessionCaptures();
+    expect(await loadQaSessionCapture('timeline')).toBeNull();
+  });
+
   it('liegt in einem eigenen QA-Bereich, nicht in der Fährtenhistorie', async () => {
     await saveQaSessionCapture(capture('ts_1'));
     for (const key of mockStore.keys()) {
