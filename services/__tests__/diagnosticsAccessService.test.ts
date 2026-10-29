@@ -24,3 +24,10 @@ it('a later denial wins over an older delayed success', async () => {
   const old = refreshDiagnosticsAccess(); mockSingle.mockResolvedValueOnce({ data: null, error: {} }); await refreshDiagnosticsAccess();
   finish({ data: { can_use_internal_tracking_diagnostics: true }, error: null }); await old; expect(hasDiagnosticsAccess()).toBe(false);
 });
+it('distinguishes server denial from network failure without granting either', async () => {
+  setDiagnosticsSession('owner');
+  mockSingle.mockResolvedValueOnce({ data: null, error: { message: 'offline' } });
+  expect(await refreshDiagnosticsAccess()).toBe('unavailable'); expect(hasDiagnosticsAccess()).toBe(false);
+  mockSingle.mockResolvedValueOnce({ data: { can_use_internal_tracking_diagnostics: false }, error: null });
+  expect(await refreshDiagnosticsAccess()).toBe('denied'); expect(hasDiagnosticsAccess()).toBe(false);
+});
