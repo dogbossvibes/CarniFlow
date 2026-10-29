@@ -178,7 +178,16 @@ export interface QaMotionSample {
  *                       Der finish-Sweep in `autoDiagnostics` bleibt getrennt
  *                       und ist als Rekonstruktion gekennzeichnet.
  */
+export interface QaMotionTimeline {
+  version: 1; limit: number; observed: number; omitted: number;
+  timeBasis: 'relative_to_first_recorded_fix';
+  samples: (Omit<QaMotionSample, 'dtMs'> & { tMs: number; receivedMs: number })[];
+}
+
 export interface QaCandidateMotion {
+  firstObservedMs?: number | null;
+  lastObservedMs?: number | null;
+  strongestObservedMs?: number | null;
   /** Latest geometry verdict, independent of the retained strongest Motion window. */
   geometryAtLastEvaluation?: {
     rejectReason: import('./shortLegCornerDetection').ShortLegRejectReason | null;
@@ -273,6 +282,7 @@ export interface QaSessionCapture {
   /** Finish reconstruction covers only this section, unlike retained live Motion rows. */
   reconstructionScope?: 'current_detector_section';
   /** LIVE RECORDED + DERIVED — QA v2.1. Fehlt bei captureVersion 1. */
+  motionTimeline?: QaMotionTimeline;
   candidateMotionEvidence?: QaCandidateMotion[];
   motionCaptureDiagnostics?: QaMotionCaptureDiagnostics;
   /** QA v2.2 — Turn-Fusion je Ecke (FINISH RECONSTRUCTED, mit Motion, falls sie lief). */

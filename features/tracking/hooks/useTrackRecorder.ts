@@ -483,16 +483,21 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         startupRef.current!.motionSubscriptionStartedTSec ??= startupSec();
         motionSubRef.current = motionClient.onSample((m) => {
           if (generation !== warmupGenerationRef.current || !motionActiveRef.current) return;
+          const motionReceived = Date.now();
           markMotionSample();
           const callbackTime = startupSec();
           startupRef.current!.motionFirstCallbackTSec ??= callbackTime;
           startupRef.current!.pedometerFirstCallbackTSec ??= callbackTime;
           if (m.stepDelta > 0) startupRef.current!.firstNonZeroStepTSec ??= callbackTime;
-          motionBufRef.current.push({
+          const sample = {
             t: m.timestamp, headingDelta: m.headingDelta,
             rotationMagnitude: m.rotationMagnitude, accelerationMagnitude: m.accelerationMagnitude,
             stepDelta: m.stepDelta, cadence: m.cadence, movementState: m.movementState,
-          });
+          };
+          motionBufRef.current.push(sample);
+          if (qaRef.current && recordingRef.current) {
+            try { qaMotionCaptureRef.current.recordSample(sample, qaOriginRef.current?.t ?? null, motionReceived); } catch { /* Observation never controls tracking. */ }
+          }
         });
         startupRef.current!.pedometerSubscriptionStartedTSec ??= startupSec();
         void motionClient.start().then((started) => {
@@ -515,7 +520,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       .then(loc => { if (loc && generation === warmupGenerationRef.current) onFix(loc); })
       .catch(() => { /* Stream liefert ohnehin laufend Fixes */ });
     return { error: null };
-  }, [onFix]);
+  }, [onFix, qaMotionCaptureRef, qaOriginRef]);
 
   // Aufnahme scharf schalten (LOCAL-FIRST): führende clientUuid ist bereits erzeugt,
   // die lokale Session wird OHNE Netz/getUser angelegt (owner aus dem Session-Cache).

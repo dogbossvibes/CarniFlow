@@ -106,7 +106,8 @@ it('passes relative-only export and advertises schema 2.11 with retention metada
     distances: { rawPathM: 0, detectorPathM: 0, recordedLineM: 0, storeDistanceM: 0 },
     rawFixes: [], detectorPoints: [], linePoints: [], markers: [], autoDiagnostics: [], ...capture.snapshot() };
   const exported = buildQaTrackExport('local', [], [], stored);
-  expect(exported.schemaMinor).toBe(11);
+  expect(exported.schemaMinor).toBe(15);
+  expect(buildQaTrackExport('local', [], [], { ...stored, motionTimeline: undefined }).schemaMinor).toBe(11);
   expect(exported.motionCaptureDiagnostics).toEqual(stored.motionCaptureDiagnostics);
   expect(() => assertNoAbsoluteData(exported)).not.toThrow();
   exported.candidateMotionEvidence![0].samples[0].dtMs = Infinity;
@@ -140,4 +141,50 @@ it('enforces the session-wide candidate limit across multiple sections', () => {
   expect(snapshot.candidateMotionEvidence![0].apexIndex).toBe(42);
   expect(snapshot.candidateMotionEvidence!.at(-1)!.apexIndex).toBe(269);
   expect(snapshot.motionCaptureDiagnostics).toMatchObject({ evaluatedCandidateCount: 170, omittedCandidateCount: 42, truncated: true });
+});
+
+it('records arrival order separately from sensor time without changing the motion ring', () => {
+  const capture = new QaMotionCapture();
+  const sample = { t: T + 2000, headingDelta: 3, rotationMagnitude: .2, accelerationMagnitude: .1, stepDelta: 1, cadence: 100, movementState: 'walking' as const };
+  capture.recordSample(sample, T, T + 3000);
+  capture.recordSample({ ...sample, t: T + 1000 }, T, T + 4000);
+  capture.recordSample(sample, T, T + 5000);
+  const timeline = capture.snapshot().motionTimeline!;
+  expect(timeline.samples.map(s => [s.tMs, s.receivedMs])).toEqual([[2000,3000],[1000,4000],[2000,5000]]);
+  expect(timeline.observed).toBe(3); expect(timeline.omitted).toBe(0);
+  expect(JSON.stringify(timeline)).not.toContain(String(T));
+  timeline.samples[0].headingDelta = 999;
+  expect(capture.snapshot().motionTimeline!.samples[0].headingDelta).toBe(3);
+});
+it('bounds chronological capture and reports omitted events', () => {
+  const capture = new QaMotionCapture();
+  for(let i=0;i<4100;i++)capture.recordSample({ t:T+i, headingDelta:0,rotationMagnitude:0,accelerationMagnitude:0,stepDelta:0,cadence:null,movementState:'stationary' },T,T+i);
+  const t=capture.snapshot().motionTimeline!;
+  expect(t.samples).toHaveLength(4096);expect(t.observed).toBe(4100);expect(t.omitted).toBe(4);
+  revokeDiagnosticsAccess();expect(capture.snapshot()).toEqual({});
+});
+it('distinguishes candidate time, observation time and strongest evidence time', () => {
+  const capture = new QaMotionCapture(), buffer = new MotionEvidenceBuffer();add(buffer);
+  jest.setSystemTime(T+10000);capture.observe([candidate()],buffer,T,new Set());
+  jest.setSystemTime(T+12000);capture.observe([candidate()],buffer,T,new Set());
+  expect(capture.snapshot().candidateMotionEvidence![0]).toMatchObject({evaluatedAtMs:3000,firstObservedMs:10000,lastObservedMs:12000,strongestObservedMs:10000});
+});
+it('counts malformed sensor events as omitted and clears on a new recording', () => {
+  const capture = new QaMotionCapture();
+  const sample = { t: T + 2000, headingDelta: NaN, rotationMagnitude: .2, accelerationMagnitude: .1, stepDelta: 1, cadence: 100, movementState: 'walking' as const };
+  capture.recordSample(sample,T,T+3000);
+  expect(capture.snapshot().motionTimeline).toMatchObject({observed:1,omitted:1,samples:[]});
+  capture.recordSample({...sample,headingDelta:3},T+1000,T+3000);
+  expect(capture.snapshot().motionTimeline).toMatchObject({observed:1,omitted:0});
+  expect(capture.snapshot().motionTimeline!.samples[0].tMs).toBe(1000);
+});
+it('exports chronological samples and rejects an injected absolute timestamp', () => {
+ const capture=new QaMotionCapture();
+ capture.recordSample({t:T+1000,headingDelta:1,rotationMagnitude:.1,accelerationMagnitude:.2,stepDelta:1,cadence:100,movementState:'walking'},T,T+1200);
+ const stored:QaSessionCapture={captureVersion:2,sessionLocalId:'local',durationMs:2000,counts:{rawFixes:0,acceptedFixes:0,rejectedFixes:0,detectorPoints:0,linePoints:0},distances:{rawPathM:0,detectorPathM:0,recordedLineM:0,storeDistanceM:0},rawFixes:[],detectorPoints:[],linePoints:[],markers:[],autoDiagnostics:[],...capture.snapshot()};
+ const exported=buildQaTrackExport('local',[],[],stored);
+ expect(exported.motionTimeline!.samples[0]).toMatchObject({tMs:1000,receivedMs:1200});
+ expect(()=>assertNoAbsoluteData(exported)).not.toThrow();
+ exported.motionTimeline!.samples[0].receivedMs=T;
+ expect(()=>assertNoAbsoluteData(exported)).toThrow();
 });

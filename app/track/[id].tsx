@@ -26,7 +26,7 @@ import { C } from '@/constants/colors';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { MarkerDetailSheet, type TrackDetailSelection } from '@/features/tracking/components/MarkerDetailSheet';
-import { buildTrackDetailMap } from '@/features/tracking/utils/trackDetailMap';
+import { buildTrackDetailDisplay } from '@/features/tracking/utils/trackDetailDisplay';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { TrackScoreRing } from '@/features/tracking/components/TrackScoreRing';
 import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
@@ -99,6 +99,7 @@ export default function TrackAuswertungScreen() {
     if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { authGeneration.current++; setData(null); setNotes(''); setLegs([]); setAuthEpoch(n => n + 1); }
   }); return () => auth.subscription.unsubscribe(); }, []);
   const [data, setData] = useState<any | null>(null);
+  const [displaySupplement, setDisplaySupplement] = useState<unknown>(null);
   const { color: layColor } = useDogTrackColor(data?.dog_id);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -121,7 +122,7 @@ export default function TrackAuswertungScreen() {
     let alive = true;
     const loadEpoch = authGeneration.current;
     const userId = authenticatedSession?.user.id;
-    setData(null); setNotes(''); setLegs([]); setLoading(true);
+    setData(null); setDisplaySupplement(null); setNotes(''); setLegs([]); setLoading(true);
     (async () => {
       const r = await getTrackSessionById(id);
       // Fällt remote nichts zurück (noch nicht synchronisiert / offline) → lokal (SQLite)
@@ -163,6 +164,8 @@ export default function TrackAuswertungScreen() {
         const picked = pickDetailMarkers(d.markers ?? [], local?.markers ?? []);
         if (picked.length > 0) d = { ...d, markers: picked };
       }
+      const localDisplay = d && !localOnly && userId && d.owner_id === userId
+        ? await getLocalTrackDetail(id, userId, { ownedOnly: true }).catch(() => null) : null;
       if (!alive || loadEpoch !== authGeneration.current) return;
       if (d?.track_data && Object.hasOwn(d.track_data, 'trackTransferReceipt')) {
         try {
@@ -171,6 +174,7 @@ export default function TrackAuswertungScreen() {
         } catch { d = null; }
       }
       setData(d);
+      setDisplaySupplement(localDisplay);
       setIsLocalOnly(localOnly);
       // Track-Open = Retry-Anlass: ist die lokale Session nicht 'synced', werden
       // fehlgeschlagene Queue-Items erneut versucht (nicht blockierend, egal von
@@ -207,7 +211,7 @@ export default function TrackAuswertungScreen() {
     if (!data) return null;
     // Gespeicherte Geometrie und Markertypen bleiben erhalten; die angezeigten
     // Meter liegen auf derselben Referenzlinie wie bei der Absuche.
-    const detail = buildTrackDetailMap(data);
+    const detail = buildTrackDetailDisplay(data, displaySupplement, authenticatedSession?.user.id);
     const markers: MapMarker[] = detail.markers.map(m => ({ ...m }));
     const segments = coerceTrackSegments(data.track_data?.segments);
     const fitPoints = [
@@ -220,9 +224,9 @@ export default function TrackAuswertungScreen() {
     return {
       lay: detail.lay, run: detail.run, markers, segments, fitPoints,
       start: detail.start, end: detail.end, totalDistanceM: detail.totalDistanceM,
-      hasGps: detail.hasLay,
+      hasGps: detail.lay.length > 1 || detail.run.length > 1,
     };
-  }, [data]);
+  }, [data, displaySupplement, authenticatedSession?.user.id]);
   // Punkt 14: rein additiv — `undefined` bei Fährten ohne Analyse (ältere
   // Sessions, Freilauf ohne Soll-Fährte, Recovery-Kurzpfad). Dieselbe
   // track_data.run-Quelle wie das bestehende segmentAnalysis oben (lokal via
@@ -732,6 +736,7 @@ export default function TrackAuswertungScreen() {
             <View style={StyleSheet.absoluteFill}>
               {map?.hasGps ? (
                 <TrackingMap
+                  comparison
                   distractionTracks={distractionTracks}
                   layColor={layColor}
                   layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
@@ -923,9 +928,14 @@ export default function TrackAuswertungScreen() {
               <View style={s.fullscreenHeaderButton} />
             </View>
           </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, padding: 12 }}>
+            <Legend color={layColor} label="Gelegte Fährte" />
+            <Legend color={C.trackBlue} label="Gelaufene Absuche" />
+          </View>
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
               <TrackingMap
+                  comparison
                   distractionTracks={distractionTracks}
                   layColor={layColor}
                 layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
