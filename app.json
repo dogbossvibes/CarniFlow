@@ -154,6 +154,7 @@
         }
       ],
       "./plugins/withAnyvoManifestCleanup",
+      "./plugins/withAnyvoAndroidWidget",
       "expo-localization"
     ],
     "experiments": {

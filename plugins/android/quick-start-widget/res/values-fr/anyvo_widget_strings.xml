@@ -1,0 +1,8 @@
+<resources>
+  <string name="anyvo_widget_brand">ANYVO</string>
+  <string name="anyvo_widget_tracks">Pistes</string>
+  <string name="anyvo_widget_lay">Poser une piste</string>
+  <string name="anyvo_widget_logbook">Journal</string>
+  <string name="anyvo_widget_name">ANYVO Démarrage rapide</string>
+  <string name="anyvo_widget_description">Ouvre tes pistes, pose une piste ou ouvre le journal.</string>
+</resources>

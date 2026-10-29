@@ -1,0 +1,8 @@
+<resources>
+  <string name="anyvo_widget_brand">ANYVO</string>
+  <string name="anyvo_widget_tracks">Fährten</string>
+  <string name="anyvo_widget_lay">Fährte legen</string>
+  <string name="anyvo_widget_logbook">Logbuch</string>
+  <string name="anyvo_widget_name">ANYVO Schnellstart</string>
+  <string name="anyvo_widget_description">Fährten öffnen, Fährte legen oder Logbuch öffnen.</string>
+</resources>

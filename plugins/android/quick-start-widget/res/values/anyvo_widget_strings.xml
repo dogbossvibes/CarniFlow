@@ -1,0 +1,8 @@
+<resources>
+  <string name="anyvo_widget_brand">ANYVO</string>
+  <string name="anyvo_widget_tracks">Tracks</string>
+  <string name="anyvo_widget_lay">Lay track</string>
+  <string name="anyvo_widget_logbook">Logbook</string>
+  <string name="anyvo_widget_name">ANYVO Quick Start</string>
+  <string name="anyvo_widget_description">Open your tracks, lay a track or open the logbook.</string>
+</resources>

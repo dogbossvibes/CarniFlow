@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@android:id/background"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:padding="12dp" android:orientation="vertical" android:background="@drawable/anyvo_widget_background">
+  <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:text="@string/anyvo_widget_brand" android:textSize="12sp" android:textStyle="bold"
+    android:textColor="#15E6C3" android:importantForAccessibility="no" />
+  <LinearLayout android:layout_width="match_parent" android:layout_height="0dp"
+      android:layout_weight="1" android:layout_marginTop="8dp" android:orientation="horizontal">
+    <LinearLayout android:id="@+id/anyvo_widget_lay" android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:minWidth="48dp" android:minHeight="48dp" android:padding="8dp"
+      android:background="@drawable/anyvo_widget_tile" android:orientation="vertical"
+      android:gravity="center" android:contentDescription="@string/anyvo_widget_lay"
+      android:importantForAccessibility="yes" android:focusable="true" android:clickable="true">
+    <ImageView android:layout_width="24dp" android:layout_height="24dp"
+        android:src="@drawable/anyvo_widget_lay" android:importantForAccessibility="no" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="6dp" android:gravity="center" android:text="@string/anyvo_widget_lay"
+        android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="15sp"
+        android:maxLines="2" android:ellipsize="end" android:importantForAccessibility="no" />
+  </LinearLayout>
+  </LinearLayout>
+</LinearLayout>
