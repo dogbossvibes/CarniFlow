@@ -98,7 +98,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -160,6 +160,7 @@ export interface QaTrackExport {
    * `undefined`  = Mitschnitt stammt aus v2.0, Motion wurde nie erfasst.
    * Beides ist NICHT dasselbe wie „Motion sah keine Drehung".
    */
+  motionTimeline?: import('./qaSessionCapture').QaMotionTimeline;
   candidateMotionEvidence?: QaCandidateMotion[];
   motionCaptureDiagnostics?: QaSessionCapture['motionCaptureDiagnostics'];
   /** true, wenn Core Motion während der Aufnahme überhaupt lief. */
@@ -279,7 +280,7 @@ export function buildQaTrackExport(
   }
   const accs = anon.map(p => p.accuracy).filter((a): a is number => a != null);
   const motion = capture?.candidateMotionEvidence;
-  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 13 | 14 = capture?.pipelineDiagnostics ? 14 : motion?.some(row => row.samples.some(sample => sample.diagnostics)) ? 13
+  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 13 | 14 | 15 = capture?.motionTimeline ? 15 : capture?.pipelineDiagnostics ? 14 : motion?.some(row => row.samples.some(sample => sample.diagnostics)) ? 13
     : capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
     || capture?.startupDiagnostics?.motionFirstCallbackTSec !== undefined ? 7
     : capture?.startupMovementDiagnostics
@@ -337,6 +338,7 @@ export function buildQaTrackExport(
     autoDiagnostics: capture?.autoDiagnostics ?? [],
     reconstructionScope: capture?.reconstructionScope,
     ...(capture?.pipelineDiagnostics ? { pipelineDiagnostics: capture.pipelineDiagnostics } : {}),
+    ...(capture?.motionTimeline ? { motionTimeline: capture.motionTimeline } : {}),
     candidateMotionEvidence: motion,
     motionCaptureDiagnostics: capture?.motionCaptureDiagnostics,
     motionCaptureAvailable: !!motion && motion.length > 0,
@@ -413,7 +415,7 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
   // QA v2.1: alle Motion-Zeiten sind relativ — weder Kandidatenzeit noch
   // Sample-Zeit darf je absolut werden.
   for (const m of e.candidateMotionEvidence ?? []) {
-    for (const v of [m.evaluatedAtMs, m.windowStartMs, m.windowEndMs, m.firstSampleAgeMs, m.lastSampleAgeMs]) {
+    for (const v of [m.firstObservedMs, m.lastObservedMs, m.strongestObservedMs, m.evaluatedAtMs, m.windowStartMs, m.windowEndMs, m.firstSampleAgeMs, m.lastSampleAgeMs]) {
       if (v != null && (!Number.isFinite(v) || Math.abs(v) >= 1e12)) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
     }
     for (const sm of m.samples) {
@@ -422,6 +424,20 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
       for (const value of Object.values(sm.diagnostics ?? {})) {
         if (value != null && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) >= 1e8))
           throw new Error('QA-Export enthält ungültige native Motion-Diagnosedaten.');
+      }
+    }
+  }
+  if (e.motionTimeline) {
+    const timeline = e.motionTimeline;
+    if (timeline.version !== 1 || timeline.limit !== 4096 || timeline.timeBasis !== 'relative_to_first_recorded_fix'
+      || !Array.isArray(timeline.samples) || timeline.samples.length > timeline.limit
+      || !Number.isInteger(timeline.observed) || !Number.isInteger(timeline.omitted) || timeline.omitted < 0
+      || timeline.observed !== timeline.samples.length + timeline.omitted) throw new Error('Invalid motion timeline');
+    const allowed = ['tMs','receivedMs','headingDelta','rotationMagnitude','accelerationMagnitude','stepDelta','cadence','movementState','diagnostics'];
+    for (const sample of timeline.samples) {
+      if (Object.keys(sample).some(k => !allowed.includes(k))) throw new Error('Unexpected motion timeline field');
+      for (const value of [sample.tMs, sample.receivedMs, sample.headingDelta, sample.rotationMagnitude, sample.accelerationMagnitude, sample.stepDelta, sample.cadence, ...Object.values(sample.diagnostics ?? {})]) {
+        if (value != null && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) >= 1e8)) throw new Error('Invalid motion timeline value');
       }
     }
   }
