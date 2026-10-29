@@ -1,3 +1,4 @@
+import { RAW_CAPTURE_SCHEMA } from '@/features/tracking/storage/rawCaptureSchema';
 import { EXCHANGE_SCHEMA } from '@/features/tracking-exchange/schema';
 import { PLANNER_SCHEMA } from '@/features/tracking-planner/schema';
 import { DISTRACTION_SCHEMA } from '@/features/tracking-distractions/schema';
@@ -177,4 +178,5 @@ export const MIGRATIONS: LocalMigration[] = [
     owner_id text not null, session_id text not null, payload_json text not null, primary key(owner_id,session_id)
   );` },
   { version: 12, name: 'track_file_exchange', sql: EXCHANGE_SCHEMA },
+  { version: 13, name: 'isolated_raw_capture', sql: RAW_CAPTURE_SCHEMA },
 ];

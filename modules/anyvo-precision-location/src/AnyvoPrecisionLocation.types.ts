@@ -57,7 +57,16 @@ export interface GnssMeasurementBatchAndroid {
   measurements: GnssMeasurementAndroid[];
 }
 
+export interface GnssConstellationStatus {
+  constellation: string;
+  observed: number;
+  used: number;
+  frequenciesHz: number[];
+}
+
 export interface GnssStatusAndroid {
+  /** Optional: older native builds only report totals. Frequencies are observed, not hardware capabilities. */
+  constellations?: GnssConstellationStatus[];
   satelliteCount:     number;
   usedInFixCount:     number;
   averageCn0DbHz:     number | null;

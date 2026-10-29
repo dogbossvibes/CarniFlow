@@ -1,0 +1,64 @@
+{
+  "sourceScope": "anyvo-phase3-raw-journal-20261028",
+  "base": "d13181bb392c211551c636a86eb1bad35ffed2ca",
+  "status": "UNACTIVATED_MIXED_HISTORICAL_WIP_PROGRAM_SOURCE_ONLY",
+  "files": {
+    "components/DiagnosticsAccessSync.tsx": "6bcf12d898fb000f50abdec722ab96565e5289a4410a298ac613da555a809189",
+    "features/tracking/components/PositionQualityDiagnostics.tsx": "ee1cbc33a2c3be76e69ea6e99b961ad8d2ee73984e9aa43b45642624e5fdf623",
+    "features/tracking/storage/localRawCaptureRepository.ts": "8d1c4469bcbba5e48d99e9a620b91ce9a742cc14457fbf0ba85342d206cfd53c",
+    "features/tracking/storage/localRawMeasurementJournal.ts": "bfa76b5602bd6c39628c1ce21e88deabd5d8e829daa32b6dcd0a63afa510d936",
+    "features/tracking/storage/rawCaptureRepository.ts": "b490f2e1dda68c08a34b1d43a6c5ae5d1bb9d863a24221f9ebc227ac06582f52",
+    "features/tracking/storage/rawCaptureSchema.ts": "419ab2a54de4877a8e60134dbe8a7f5c7474991ee44a5ce039b72bcf3bb1044d",
+    "features/tracking/storage/rawMeasurementJournal.ts": "e9c47b5c57dea8b5d861a9d36be3c9237f9f68824e42357f5bb4994c8f44ba4d",
+    "features/tracking/storage/rawRecordingSession.ts": "5b6bf64f08c81da266fb310ec4e7d750397ca748267064c85efc4882273b37d1",
+    "features/tracking/storage/sqliteRawRecording.ts": "ac43912061b842f918a1ad504af1cec02624111f122d14ea99207c4de697a4d6",
+    "features/tracking/utils/gnssConstellations.ts": "6ce5cb1f0e6048b9eb853d0bcf512aee4d3d51ba8b9ebb9029fed977828e1c4f",
+    "features/tracking/utils/positionDiagnostics.ts": "5beb81674b2515344e6ede7b7df7468d2522a948f616c10133399ff652d99110",
+    "lib/localDb/client.ts": "10bf4f6000bd4e1f9dfd01e32f6db01a76949f6dbc5138d3679eddc462df25d5",
+    "lib/localDb/migrations.ts": "bbc8df8e661bfa1c08320d8e30feb695e2b47f16baee43db4375ae0e9c0f23ba",
+    "modules/anyvo-precision-location/android/src/main/java/expo/modules/anyvoprecisionlocation/AnyvoPrecisionLocationModule.kt": "dc31ed09d8dddab0e32802530a55951e10d45c314a9e5eb862db36eb0065c0d3",
+    "modules/anyvo-precision-location/src/AnyvoPrecisionLocation.types.ts": "82d8088fa01953254c9b201fc166059c8fce45f2f2bbcea749cf9ccfc713667f"
+  },
+  "omitted": [
+    {
+      "path": "components/__tests__/DiagnosticsAccessSync.test.tsx",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "docs/agent/tasks/PHASE3-RAW-JOURNAL-20261028.md",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "features/tracking/storage/__tests__/localRawMeasurementJournal.test.ts",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "features/tracking/storage/__tests__/rawCaptureSqlite.test.ts",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "features/tracking/storage/__tests__/rawMeasurementJournal.test.ts",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "features/tracking/storage/__tests__/rawRecordingSession.test.ts",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "features/tracking/utils/__tests__/gnssConstellations.test.ts",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "lib/localDb/__tests__/objectReviewUpgrade.test.ts",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    },
+    {
+      "path": "node_modules",
+      "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+    }
+  ],
+  "originalUnchanged": true,
+  "freeze": "Author02 explicit freeze; no parallel source writer",
+  "noTestsExecutedNoReadinessInferred": true,
+  "noRuntimeNativeSecurityDatabaseReleaseApproval": true
+}
