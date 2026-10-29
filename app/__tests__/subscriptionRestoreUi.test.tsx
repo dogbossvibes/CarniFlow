@@ -17,7 +17,7 @@ jest.mock('@/hooks/useAccess',()=>({useAccess:()=>({access:{planType:'newbie',is
 jest.mock('@/hooks/useInternalTester',()=>({useInternalTester:()=>({isInternalTester:false})}));
 jest.mock('@/services/quotaService',()=>({newbieQuotaStatus:async()=>({used:0,limit:1})}));
 jest.mock('@/services/subscriptionService',()=>({activatePlan:(...a:unknown[])=>mockActivate(...a),getFounderSlots:async()=>({used:0,remaining:11}),getPlanSubscription:async()=>({plan:'newbie'}),claimFounderSlot:jest.fn(),cancelTrial:jest.fn()}));
-jest.mock('@/lib/purchases',()=>({restorePurchases:(...a:unknown[])=>mockRestore(...a),restorePlanFromResult:(r:{plan:string})=>r.plan,buyPackage:(...a:unknown[])=>mockBuy(...a),getPackages:async()=>mockPackages,getManagementURL:async()=>null,purchasesReady:()=>true,ensurePurchasesConfigured:async()=>true,isPurchaseAccountCurrent:()=>mockCurrent,hasStorePackageForProduct:(packs:{productId:string}[],pid:string)=>packs.some(p=>p.productId===pid)}));
+jest.mock('@/lib/purchases',()=>({restorePurchases:(...a:unknown[])=>mockRestore(...a),restorePlanFromResult:(r:{plan:string})=>r.plan,buyPackage:(...a:unknown[])=>mockBuy(...a),getPackages:async()=>mockPackages,getManagementURL:async()=>null,getCurrentStoreSubscription:async()=>({ok:true,plan:null,tier:null,expiration:null}),getActiveStoreProductId:async()=>null,purchasesReady:()=>true,ensurePurchasesConfigured:async()=>true,isPurchaseAccountCurrent:()=>mockCurrent,hasStorePackageForProduct:(packs:{productId:string}[],pid:string)=>packs.some(p=>p.productId===pid)}));
 jest.mock('expo-router',()=>({useRouter:()=>({back:jest.fn(),replace:jest.fn(),push:jest.fn(),canGoBack:()=>true}),useFocusEffect:()=>{}}));
 jest.mock('expo-linear-gradient',()=>({LinearGradient:({children}:{children:React.ReactNode})=>children}));
 jest.mock('expo-image',()=>({Image:()=>null}));
@@ -54,6 +54,11 @@ describe.each([['premium',Premium,'premium.restore'],['membership',Membership,'m
   });
   test('confirmed restore reports success once',async()=>{
     await act(async()=>{await button(tree,label).props.onPress();});expect(mockActivate).toHaveBeenCalledWith(expect.objectContaining({userId:'A',plan:'active'}));expect(alert.mock.calls.filter(x=>x[0]==='premium.restored')).toHaveLength(1);
+  });
+  test('expired historical purchase with no current entitlement starts no paid activation',async()=>{
+    mockRestore.mockResolvedValue({ok:true,plan:null,tier:null,expiration:null});
+    await act(async()=>{await button(tree,label).props.onPress();});
+    expect(mockActivate).not.toHaveBeenCalled();expect(alert).toHaveBeenCalledWith('premium.noneFound','premium.noneFoundBody');
   });
   test('signed-out account starts no Store restore',async()=>{
     mockUid=null;await act(async()=>{tree.update(<Screen/>);});await act(async()=>{await button(tree,label).props.onPress();});expect(mockRestore).not.toHaveBeenCalled();
