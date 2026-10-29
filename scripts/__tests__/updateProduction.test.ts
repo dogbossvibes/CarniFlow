@@ -176,8 +176,9 @@ describe('Verschärft: argv, Dry-Run == echte Ausführung, npm-Script', () => {
     }
     expect(updateCalls()).toEqual([]);
   });
-  it('`npm run update:production:ios -- --message "Test"` genügt: --platform ios und --confirm setzt das Script selbst', () => {
-    const r = run(['--', '--message', 'Test'], undefined, ['npm', 'run', 'update:production:ios']);
+  it('npm iOS alias retains platform/confirm but additionally requires the approved candidate', () => {
+    const f = h.fixtureApproval(['--platform', 'ios', '--message', 'Test']);
+    const r = run(['--', '--message', 'Test', '--candidate', f.candidate, '--approval', f.approval], undefined, ['npm', 'run', 'update:production:ios']);
     expect(r.code).toBe(0);
     const calls = updateCalls();
     expect(calls).toHaveLength(1);

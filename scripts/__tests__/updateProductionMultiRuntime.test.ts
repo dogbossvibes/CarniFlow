@@ -118,7 +118,7 @@ describe('E2E: Hotfix für die ältere Runtime 1.0.3 (reale Regression 968884f �
     expect(dry.out).not.toMatch(/ACTIVE PRODUCTION[^\n]*g-fcd879d9-104/);
     expect(dry.out).toContain('Ancestry (aktiver Production-Commit ⊆ Release-HEAD): PASS');
     expect(dry.out).toContain('Runtime: Release 1.0.3 · erwartet 1.0.3 (--runtime)');
-    expect(dry.out).toContain('Publish würde ERLAUBT.');
+    expect(dry.out).toContain('Bestehende Guards bestanden; Freigabekandidat nur über --prepare.');
     // EAS wird serverseitig auf Plattform + Runtime gefiltert (ältere Runtimes fallen nicht aus der 50er-Seite)
     expect(listCalls(h)[0]).toEqual(expect.arrayContaining(['--platform', 'ios', '--runtime-version', '1.0.3']));
     expect(h.updateCalls()).toEqual([]);
@@ -320,7 +320,7 @@ describe('Härtung: erste OTA einer Runtime (--initial-runtime-release)', () => 
     expect(r.code).toBe(0);
     expect(r.out).toContain(`ACTIVE PRODUCTION (EAS, frisch): NATIVER BUILD ${IOS_BUILD} · ios · gitCommitHash ${h.base} · Runtime 1.0.5`);
     expect(r.out).not.toMatch(/ACTIVE PRODUCTION[^\n]*g-(android|ios)-/);
-    expect(r.out).toContain('Publish würde ERLAUBT.');
+    expect(r.out).toContain('Bestehende Guards bestanden; Freigabekandidat nur über --prepare.');
     expect(h.updateCalls()).toEqual([]);
   });
   it('G. kein gültiger nativer Basis-Build (unbekannt / andere Plattform) → fail closed, keine Ersatz-Basis', () => {
@@ -351,7 +351,7 @@ describe('Härtung: erste OTA einer Runtime (--initial-runtime-release)', () => 
     expect(r.code).toBe(0);
     const seq = h.calls().map(a => a[0]).filter(c => c !== 'env:list');
     // neueste Plattform-Group, aktive Group der Release-Runtime, neueste Group der anderen Plattform
-    expect(seq.slice(seq.indexOf('update') + 1)).toEqual(['update:list', 'update:view', 'update:list', 'update:view', 'update:list']);
+    expect(seq.slice(seq.indexOf('update') + 1)).toEqual(['update:list', 'update:view', 'update:list', 'update:view', 'update:list', 'channel:view']);
     expect(h.state().groups[0].entries[0]).toMatchObject({ runtimeVersion: '1.0.5', gitCommitHash: h.release });
   });
   it('J. Nachkontrolle blockiert falsche Runtime der neuen Group (Exit 2, kein Rollback, keine zweite OTA)', () => {

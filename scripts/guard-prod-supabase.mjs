@@ -53,7 +53,7 @@ export function assertProductionSupabase({ cwd = process.cwd(), log = console } 
   // wirft beim Start ohne EXPO_PUBLIC_BACKEND_ENV/_SUPABASE_URL/_SUPABASE_ANON_KEY;
   // deren Vorhandensein in der EAS-Environment prüft scripts/update-production.mjs.
   if (effective && !effective.includes(PROD_REF)) {
-    problems.push(`effektive ${KEY}=${effective} ist nicht Production (${PROD_REF})`);
+    problems.push(`effektive ${KEY} ist nicht Production (${PROD_REF}); Wert wird nicht ausgegeben`);
   }
 
   if (problems.length) {

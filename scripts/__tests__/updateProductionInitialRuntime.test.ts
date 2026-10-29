@@ -54,7 +54,7 @@ describe('Baseline-Auswahl: genau Plattform + Runtime', () => {
     expect(r.out).toContain('Baseline-Auswahl: neueste Production-Group mit Plattform android UND Runtime 1.0.3');
     expect(r.out).toMatch(/ACTIVE PRODUCTION \(EAS, frisch\): Group g-a-103-new · android/);
     expect(r.out).toContain('Ancestry (aktiver Production-Commit ⊆ Release-HEAD): PASS');
-    expect(r.out).toContain('Publish würde ERLAUBT');
+    expect(r.out).toContain('Bestehende Guards bestanden');
   });
   it('2. neuere OTA derselben Plattform, andere Runtime → ignoriert', () => {
     expect(call('selectBaselineGroupId', rows(['g-104', 'android', '1.0.4'], ['g-103', 'android', '1.0.3']), { platform: 'android', runtime: '1.0.3' })).toBe('g-103');
@@ -149,7 +149,7 @@ describe('Initial-Runtime-Modus: Android Build 44 (PASS) und Sicherheitsmechanis
     expect(r.out).toContain(`ACTIVE PRODUCTION (EAS, frisch): NATIVER BUILD ${BUILD_44} · android · gitCommitHash ${h.base} · Runtime 1.0.3`);
     expect(r.out).toContain('Ancestry (nativer Basis-Build-Commit ⊆ Release-HEAD): PASS');
     expect(r.out).not.toMatch(/ACTIVE PRODUCTION[^\n]*(g-android-101|g-ios-)/);
-    expect(r.out).toContain('Publish würde ERLAUBT');
+    expect(r.out).toContain('Bestehende Guards bestanden');
     expect(updateCalls()).toEqual([]);
   });
   it('12b/17/20. echter Lauf: genau EIN android-Publish, Runtime 1.0.3, gitCommitHash = HEAD, iOS unverändert', () => {
@@ -165,7 +165,11 @@ describe('Initial-Runtime-Modus: Android Build 44 (PASS) und Sicherheitsmechanis
     expect(st.groups.filter(g => g.entries.some(e => e.platform === 'ios')).map(g => g.group)).toEqual(['g-ios-104', 'g-ios-103']);
     // 19. zweiter Check + erneute Build-Validierung vor dem Publish
     const seq = h.calls().map(a => a[0]).filter(c => c !== 'env:list');
-    expect(seq.slice(0, seq.indexOf('update'))).toEqual(['channel:view', 'update:list', 'build:view', 'update:list', 'update:view', 'update:list', 'build:view']);
+    const before = seq.slice(0, seq.indexOf('update'));
+    expect(before.slice(0, 5)).toEqual(['channel:view', 'update:list', 'build:view', 'update:list', 'update:view']);
+    expect(before.filter(c => c === 'build:view').length).toBeGreaterThanOrEqual(5);
+    expect(before.slice(-4)).toEqual(['build:view', 'update:list', 'build:view', 'channel:view']);
+    expect(r.out).toContain('Zweiter EAS-Check: Production unverändert.');
   });
   it('17. normaler Pfad nach dem Erst-Publish: Ancestry gegen die neue Android-1.0.3-OTA', () => {
     withState({ groups: [group('g-a-103', 'android', h.base, '1.0.3'), ...reality()] });

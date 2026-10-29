@@ -6,9 +6,10 @@
 //   `update` (simuliert die Veröffentlichung, indem eine neue Group vorne angefügt wird).
 //   Jeder Aufruf wird als JSON-argv protokolliert.
 import { execFileSync, spawnSync, type SpawnSyncReturns } from 'child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { createHash } from 'crypto';
 
 // Runtime-Vertrag aus der ECHTEN Production-Konfiguration (app.json, policy appVersion →
 // expo.version). Kein fester Wert: eine Versionsanhebung (z. B. 1.0.4) hält die Guard-Tests
@@ -39,6 +40,7 @@ export interface FakeState {
   rollout?: boolean;
   raceAtList?: number;                 // beim n-ten update:list erscheint raceGroup (fremder Publish)
   raceGroup?: FakeGroup;
+  failDelivery?: boolean;
   failUpdate?: boolean;                // `eas update` schlägt fehl
   sleepMs?: number;                    // `eas update` dauert (Parallelstart-/Signal-Tests)
   publishHash?: string;                // simulierte Abweichung des veröffentlichten gitCommitHash
@@ -121,13 +123,15 @@ export interface Harness {
   other: string;     // KEIN Vorfahre von release
   lockPath: string;
   fullEnvFile: string;
+  qualityEvidenceFile: string;
   envFileWith(content: string): string;
   setState(s: FakeState): void;
   state(): FakeState;
   calls(): string[][];
   updateCalls(): string[][];
   resetCalls(): void;
-  run(args: string[], opts?: { envFile?: string; cmd?: string[]; env?: Record<string, string> }): { code: number | null; out: string };
+  fixtureApproval(args: string[], env?: Record<string, string>): { candidate: string; approval: string };
+  run(args: string[], opts?: { envFile?: string; cmd?: string[]; env?: Record<string, string>; qualityEvidence?: boolean; approval?: boolean }): { code: number | null; out: string };
   baseEnv(extra?: Record<string, string>): NodeJS.ProcessEnv;
   defaultState(): FakeState;
 }
@@ -142,7 +146,7 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown; ea
   const dir = mkdtempSync(join(tmpdir(), 'anyvo-ota-test-'));
   const repo = join(dir, 'repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
-  for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
+  for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'scripts/release-quality-evidence.mjs', 'scripts/check-native-changes.mjs', 'scripts/ota-candidate.mjs', 'scripts/ota-preflight.mjs', 'scripts/ota-delivery.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
   if (opts.easJson !== undefined) writeFileSync(join(repo, 'eas.json'), JSON.stringify(opts.easJson, null, 2));
   if (opts.appJson !== undefined) writeFileSync(join(repo, 'app.json'), JSON.stringify(opts.appJson, null, 2));
   else {
@@ -166,12 +170,42 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown; ea
   const release = git(repo, 'rev-parse', 'HEAD');
   const other = git(repo, 'commit-tree', `${base}^{tree}`, '-p', base, '-m', 'other');   // Seitenzweig ohne Checkout
 
+  // Synthetic offline attestations only; these are never production QA receipts.
+  const proof = join(dir, 'quality-fixture.log');
+  writeFileSync(proof, 'synthetic offline fixture evidence\n');
+  const artifact = { path: proof, sha256: createHash('sha256').update(readFileSync(proof)).digest('hex') };
+  const fixtureApp = JSON.parse(readFileSync(join(repo, 'app.json'), 'utf8')).expo;
+  const qualityPaths: Record<string, string> = {};
+  for (const platform of ['ios', 'android']) {
+    const rv = fixtureApp[platform]?.runtimeVersion ?? fixtureApp.runtimeVersion;
+    const runtime = typeof rv === 'string' ? rv : rv?.policy === 'appVersion' ? (fixtureApp[platform]?.version ?? fixtureApp.version) : 'UNRESOLVED';
+    const path = join(dir, `quality-${platform}.json`);
+    writeFileSync(path, JSON.stringify({ schemaVersion: 1, source: { commit: release, tree: git(repo, 'rev-parse', 'HEAD^{tree}') }, target: { platform, runtime }, producer: 'fixture-writer',
+      checks: { process: { exitCode: 0, evidence: artifact }, typecheck: { exitCode: 0, evidence: artifact }, eslint: { exitCode: 0, errors: 0, warnings: 0, evidence: artifact }, tests: { exitCode: 0, passed: 1, failed: 0, skipped: 0, evidence: artifact }, diff: { exitCode: 0, evidence: artifact } },
+      review: { status: 'PASS', sourceCommit: release, reviewer: 'fixture-reviewer', evidence: artifact } }));
+    qualityPaths[platform] = path;
+  }
+
   const callLog = join(dir, 'eas-calls.jsonl');
   const stateFile = join(dir, 'eas-state.json');
   const fakeEas = join(dir, 'eas');
   writeFileSync(fakeEas, FAKE_EAS);
   chmodSync(fakeEas, 0o755);
 
+  // Offline network boundary: production code has no test bypass. Node preloads
+  // this fixture-only transport; unexpected hosts can never reach the network.
+  const fakeNetwork = join(dir, 'offline-network.mjs');
+  writeFileSync(fakeNetwork, `import fs from 'node:fs';import {createHash} from 'node:crypto';
+    globalThis.fetch=async(url,options={})=>{
+      const u=new URL(url),s=JSON.parse(fs.readFileSync(process.env.FAKE_EAS_STATE));
+      if(s.failDelivery) throw new Error('synthetic CDN unavailable');
+      const bytes=fs.readFileSync(process.env.FAKE_DELIVERY_FILE);
+      if(u.hostname==='assets.eascdn.net') return new Response(bytes);
+      if(u.hostname!=='u.expo.dev') throw new Error('Fixture network denied');
+      const p=options.headers['expo-platform'],r=options.headers['expo-runtime-version'];
+      const e=s.groups.flatMap(g=>g.entries).find(e=>e.platform===p&&e.runtimeVersion===r);
+      return Response.json({id:e?.id,runtimeVersion:r,launchAsset:{url:'https://assets.eascdn.net/fixture',hash:createHash('sha256').update(bytes).digest('base64url')},assets:[]});
+    };`);
   let n = 0;
   const envFileWith = (content: string) => { const f = join(dir, `env-${++n}.txt`); writeFileSync(f, content); return f; };
   const fullEnvFile = envFileWith(FULL_ENV);
@@ -181,28 +215,71 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown; ea
       { platform: 'android', id: 'u-android', gitCommitHash: base, runtimeVersion: releaseRuntime },
     ] }],
   });
-  const setState = (s: FakeState) => writeFileSync(stateFile, JSON.stringify(s));
+  const syntheticBuilds = Object.fromEntries(['ios', 'android'].map(platform => {
+    const rv = fixtureApp[platform]?.runtimeVersion ?? fixtureApp.runtimeVersion;
+    const runtime = typeof rv === 'string' ? rv : fixtureApp.version;
+    return [`fixture-native-${platform}`, { id: `fixture-native-${platform}`, status: 'FINISHED', platform, runtimeVersion: runtime,
+      appVersion: fixtureApp[platform]?.version ?? fixtureApp.version, channel: 'production', buildProfile: 'production', gitCommitHash: base }];
+  }));
+  const setState = (s: FakeState) => writeFileSync(stateFile, JSON.stringify({ ...s, builds: { ...syntheticBuilds, ...s.builds } }));
   setState(defaultState());
 
   const calls = (): string[][] => (existsSync(callLog) ? readFileSync(callLog, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : []);
   const baseEnv = (extra: Record<string, string> = {}) => ({
-    ...process.env, PATH: `${dir}:${process.env.PATH}`,
+    ...process.env, PATH: `${dir}:${process.env.PATH}`, NODE_OPTIONS: `--import=${fakeNetwork}`, FAKE_DELIVERY_FILE: proof,
     FAKE_ENV_FILE: fullEnvFile, FAKE_EAS_LOG: callLog, FAKE_EAS_STATE: stateFile, FAKE_RELEASE_RUNTIME: releaseRuntime, ...extra,
   });
+  // Explicitly synthetic test attestations. Production has no auto-approval flag.
+  const fixtureApproval = (args: string[], extra: Record<string, string> = {}) => {
+    const platform = args[args.indexOf('--platform') + 1] || 'ios';
+    const qualityFile = qualityPaths[platform] ?? qualityPaths.ios;
+    const candidate = join(dir, `candidate-${platform}.json`), approval = join(dir, `approval-${platform}.json`);
+    const canon = (v: any): any => Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, canon(v[k])])) : v;
+    const hash = (v: any) => createHash('sha256').update(typeof v === 'string' ? v : JSON.stringify(canon(v))).digest('hex');
+    const environmentDigest = hash({ remote: readFileSync(fullEnvFile, 'utf8').trim().split(/\r?\n/).sort(),
+      local: readdirSync(repo).filter(n => /^\.env(\..*)?$/.test(n) && !n.endsWith('.example')).sort().map(n => [n, hash(readFileSync(join(repo, n), 'utf8'))]),
+      process: Object.entries(baseEnv(extra)).filter(([k]) => k.startsWith('EXPO_PUBLIC_') && k !== 'EXPO_PUBLIC_RELEASE_GIT_COMMIT').sort(([a], [b]) => a.localeCompare(b)) });
+    const input = { repo, dir, platform, qualityFile, candidate, approval, stateFile, fullEnvFile, base, release, artifact, environmentDigest, message: args.includes('--message') ? args[args.indexOf('--message') + 1] ?? '' : '',
+      initial: args.includes('--initial-runtime-release'), buildId: args[args.indexOf('--initial-runtime-build-id') + 1] };
+    const code = `import fs from 'node:fs';import {createCandidate,writeNew,digest,riskFor} from './scripts/ota-candidate.mjs';
+      import {resolveReleaseRuntime,parseActiveFromView,parseNativeBuild,nativeBaseline} from './scripts/update-production.mjs';
+      import {execFileSync} from 'node:child_process';
+      const p=JSON.parse(process.argv[1]),s=JSON.parse(fs.readFileSync(p.stateFile)),app=JSON.parse(fs.readFileSync('app.json')).expo;
+      const runtime=resolveReleaseRuntime({expo:app},p.platform)||'UNRESOLVED';
+      const view=g=>g?parseActiveFromView(g.entries.map(e=>({...e,group:g.group,branch:'production',createdAt:g.createdAt||'2026-10-04T00:00:00.000Z'})),p.platform):null;
+      const active=s.groups.find(g=>g.entries.some(e=>e.platform===p.platform&&e.runtimeVersion===runtime));
+      const otherPlatform=p.platform==='ios'?'android':'ios',og=s.groups.find(g=>g.entries.some(e=>e.platform===otherPlatform));
+      const other=og?parseActiveFromView(og.entries.map(e=>({...e,group:og.group,branch:'production',createdAt:og.createdAt||'2026-10-04T00:00:00.000Z'})),otherPlatform):null;
+      const nb=JSON.parse(fs.readFileSync(p.stateFile)).builds['fixture-native-'+p.platform];
+      const baseline=p.initial&&s.builds[p.buildId]?nativeBaseline(parseNativeBuild(s.builds[p.buildId])):view(active);
+      const paths=(()=>{try{return baseline?.gitCommitHash?execFileSync('git',['diff','--name-only','--no-renames','-z',baseline.gitCommitHash,p.release,'--'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).split('\\0').filter(Boolean).sort():[];}catch{return [];}})();
+      const plan={bundle:{status:'PASS',sourceCommit:p.release,platform:p.platform,runtime,environment:'production',evidence:p.artifact,launchAsset:p.artifact,assets:[]},nativeBuildId:nb.id,producer:'fixture-writer',changes:[{description:'Synthetic fixture only',risk:'low',areas:['ui']}],regressions:['Synthetic UI regression'],testRationale:'Synthetic fake EAS guard tests',sourceBackup:{status:'PASS',commit:p.release,repository:'dogbossvibes/CarniFlow',ref:'fixture-only',evidence:p.artifact}};
+      const context={source:{commit:p.release,tree:execFileSync('git',['rev-parse',p.release+'^{tree}'],{encoding:'utf8'}).trim(),branch:'main'},target:{platform:p.platform,runtime,appVersion:app[p.platform]?.version??app.version,channel:'production',environment:'production',message:p.message,updatesUrl:app.updates?.url??null},native:{buildId:nb.id,commit:nb.gitCommitHash,runtime:nb.runtimeVersion,platform:p.platform},production:{baseline},environmentDigest:p.environmentDigest,changedPaths:paths,risk:riskFor(paths,plan.changes)};
+      // Deliberately malformed fixtures must reach the old guard, not the factory.
+      let c;try{c=createCandidate({context,plan,qualityFile:p.qualityFile,root:p.repo});}catch{const body={schemaVersion:1,context,plan,quality:{path:p.qualityFile,sha256:'invalid'},recommendation:'READY',problems:[]};c={...body,digest:digest(body)};}
+      fs.writeFileSync(p.candidate,JSON.stringify(c));fs.writeFileSync(p.approval,JSON.stringify({schemaVersion:1,kind:'human-production-approval',decision:'PUBLISH_PRODUCTION_ONCE',scope:'production-ota-only',candidateDigest:c.digest,commit:p.release,platform:p.platform,runtime,humanMessageReference:'synthetic-fixture-not-a-human-approval',explicitStatement:'synthetic test only',approvedAt:new Date().toISOString()}));`;
+    try { execFileSync('node', ['--input-type=module', '-e', code, JSON.stringify(input)], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
+    catch { throw new Error('Synthetic candidate factory failed; arguments redacted.'); }
+    return { candidate, approval };
+  };
   const run: Harness['run'] = (args, opts = {}) => {
     const cmd = opts.cmd ?? ['node', 'scripts/update-production.mjs'];
     const a = [...cmd.slice(1), ...args];
+    if (opts.qualityEvidence !== false && !args.includes('--quality-evidence')) a.push('--quality-evidence', qualityPaths[args[args.indexOf('--platform') + 1]] ?? qualityPaths.ios);
     if (opts.envFile) a.push('--env-list-file', opts.envFile);
+    if (opts.approval !== false && opts.qualityEvidence !== false && args.includes('--confirm') && !args.includes('--dry-run') && !args.includes('--candidate') && ['ios', 'android'].includes(args[args.indexOf('--platform') + 1])) {
+      const f = fixtureApproval(args, opts.env);a.push('--candidate', f.candidate, '--approval', f.approval);
+    }
     const r: SpawnSyncReturns<string> = spawnSync(cmd[0], a, { cwd: repo, encoding: 'utf8', env: baseEnv(opts.env) });
     return { code: r.status, out: `${r.stdout}${r.stderr}` };
   };
   return {
     dir, repo, base, release, other,
     lockPath: join(repo, '.git', 'anyvo-production-ota.lock'),
-    fullEnvFile, envFileWith, setState,
+    fullEnvFile, qualityEvidenceFile: qualityPaths.ios, envFileWith, setState, fixtureApproval,
     state: () => JSON.parse(readFileSync(stateFile, 'utf8')),
     calls, updateCalls: () => calls().filter(a => a[0] === 'update'),
-    resetCalls: () => rmSync(callLog, { force: true }),
+    resetCalls: () => { rmSync(callLog, { force: true });rmSync(join(repo, '.git/anyvo-ota-attempts'), { recursive: true, force: true }); },
     run, baseEnv, defaultState,
   };
 }

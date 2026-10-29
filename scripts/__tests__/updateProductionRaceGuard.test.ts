@@ -132,7 +132,8 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
   it('6b. echter Parallelstart: zweiter Prozess wird gestoppt, solange der erste veröffentlicht', async () => {
     withState({});
     const releaseFile = join(h.dir, 'release-first-publisher');
-    const first = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'first'],
+    const approval = h.fixtureApproval(['--platform', 'ios', '--message', 'first']);
+    const first = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'first', '--quality-evidence', h.qualityEvidenceFile, '--candidate', approval.candidate, '--approval', approval.approval],
       { cwd: h.repo, env: h.baseEnv({ FAKE_UPDATE_RELEASE_FILE: releaseFile }) });
     const completed = new Promise<number | null>((resolve, reject) => {
       first.once('close', resolve);
@@ -168,7 +169,8 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
   });
   it('8b. Lock wird bei Abbruchsignal (SIGTERM an die Prozessgruppe) entfernt', async () => {
     withState({ sleepMs: 4000 });
-    const p = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'sig'], { cwd: h.repo, env: h.baseEnv(), detached: true });
+    const approval = h.fixtureApproval(['--platform', 'ios', '--message', 'sig']);
+    const p = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'sig', '--quality-evidence', h.qualityEvidenceFile, '--candidate', approval.candidate, '--approval', approval.approval], { cwd: h.repo, env: h.baseEnv(), detached: true });
     for (let i = 0; i < 100 && !h.calls().some(a => a[0] === 'update'); i++) await sleep(50);
     expect(existsSync(h.lockPath)).toBe(true);
     process.kill(-p.pid!, 'SIGTERM');
@@ -223,6 +225,7 @@ describe('Zweiter EAS-Check & Nachkontrolle', () => {
   it('10b. neue Group mit weiterer Plattform oder falscher Runtime → Nachkontrolle schlägt fehl', () => {
     withState({ publishExtraPlatform: 'android' });
     expect(confirmIos().out).toContain('Neue Group enthält weitere Plattformen');
+    h.resetCalls(); // new independent synthetic case; never production-ledger cleanup
     withState({ publishRuntime: NEWER_RUNTIME });
     expect(confirmIos().out).toContain(`POST-PUBLISH: Runtime ${NEWER_RUNTIME} ≠ ${RELEASE_RUNTIME}`);
   });
@@ -233,7 +236,7 @@ describe('Dry-Run (Preflight) und Quellen', () => {
     const r = dryIos();
     expect(r.code).toBe(0);
     for (const needle of [`RELEASE HEAD: ${h.release}`, `gitCommitHash ${h.base}`, 'Ancestry (aktiver Production-Commit ⊆ Release-HEAD): PASS',
-      `Runtime: Release ${RELEASE_RUNTIME} · erwartet ${RELEASE_RUNTIME}`, 'Platform: ios only · Channel/Branch: production/production', 'Release-Lock (', ': frei', 'Publish würde ERLAUBT.', '--dry-run: nichts veröffentlicht.']) {
+      `Runtime: Release ${RELEASE_RUNTIME} · erwartet ${RELEASE_RUNTIME}`, 'Platform: ios only · Channel/Branch: production/production', 'Release-Lock (', ': frei', 'Bestehende Guards bestanden; Freigabekandidat nur über --prepare.', '--dry-run: nichts veröffentlicht.']) {
       expect(r.out).toContain(needle);
     }
     expect(h.updateCalls()).toEqual([]);
@@ -272,11 +275,11 @@ describe('Dry-Run (Preflight) und Quellen', () => {
     const seq = h.calls().map(a => a[0]).filter(c => c !== 'env:list');
     // Check 1: Baseline + neueste Group der anderen Plattform; Check 2: Baseline;
     // Nachkontrolle: neueste Plattform-Group + aktive Group der Release-Runtime + andere Plattform
-    expect(seq).toEqual([
-      'channel:view', 'update:list', 'update:view', 'update:list', 'update:view',
-      'update:list', 'update:view', 'update',
-      'update:list', 'update:view', 'update:list', 'update:view', 'update:list', 'update:view',
-    ]);
+    const publishIndex = seq.indexOf('update');
+    expect(seq.slice(0, 5)).toEqual(['channel:view', 'update:list', 'update:view', 'update:list', 'update:view']);
+    expect(seq.slice(0, publishIndex).filter(c => c === 'build:view')).toHaveLength(3);
+    expect(seq.slice(publishIndex - 4, publishIndex)).toEqual(['build:view', 'update:list', 'update:view', 'channel:view']);
+    expect(seq.slice(publishIndex + 1)).toEqual(['update:list', 'update:view', 'update:list', 'update:view', 'update:list', 'update:view', 'channel:view']);
   });
   it('12b. Doku: Master-Status ist nur Snapshot, EAS ist die Live-Quelle; Multi-Dog ist NICHT Production', () => {
     const ms = readFileSync('docs/agent/ANYVO_MASTER_STATUS.md', 'utf8');

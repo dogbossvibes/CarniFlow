@@ -5,7 +5,7 @@ import { createHarness, destroyHarness, type Harness } from './otaReleaseHarness
 
 const RUNTIME = '1.0.5-motion-v2';
 const BUILD = '87a55197-8a18-487d-85a7-6ef16ae33168';
-const APP = { expo: { version: '1.0.5', runtimeVersion: { policy: 'appVersion' }, ios: { runtimeVersion: RUNTIME } } };
+const APP = { expo: { version: '1.0.5', updates: { url: 'https://u.expo.dev/fixture-project' }, runtimeVersion: { policy: 'appVersion' }, ios: { runtimeVersion: RUNTIME } } };
 const EAS = { build: {
   production: { channel: 'production', environment: 'production', distribution: 'store' },
   'native-sensor-ios': { extends: 'production' },
@@ -77,6 +77,7 @@ describe('Build-52-Guard über den echten CLI-Pfad', () => {
   it('veröffentlicht in der Simulation ausschließlich die belegte iOS-Runtime und prüft sie nach', () => {
     setup();
     const result = h.run(args, { env: { FAKE_RELEASE_RUNTIME: RUNTIME } });
+    if (result.code !== 0) throw new Error(result.out);
     expect(result.code).toBe(0);
     expect(result.out).toContain('Zweiter EAS-Check: Production unverändert.');
     expect(result.out).toContain(`Runtime: ${RUNTIME}`);

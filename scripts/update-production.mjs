@@ -60,11 +60,16 @@
 // Grenze: der Lock serialisiert nur Releases aus Worktrees DIESES lokalen Repos. Andere
 // Rechner, CI oder manuelle `eas update`-Aufrufe erfasst er nicht — dafür bleibt der
 // zweite EAS-Check Pflicht (Restfenster: Bundle-Export innerhalb von `eas update`).
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, realpathSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { hostname } from 'node:os';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, resolve, dirname, basename, relative } from 'node:path';
 import { assertProductionSupabase, PROD_REF } from './guard-prod-supabase.mjs';
+import { validateQualityEvidence } from './release-quality-evidence.mjs';
+import { inspectNativeChanges } from './check-native-changes.mjs';
+import { digest, readJson, externalFile, writeNew, riskFor, createCandidate, validateCandidate, validateHumanApproval, claimAttempt, formatApprovalReport } from './ota-candidate.mjs';
+import { runReleaseQuality } from './ota-preflight.mjs';
+import { verifyDelivery } from './ota-delivery.mjs';
 
 export const REQUIRED_PRODUCTION_ENV = Object.freeze([
   'EXPO_PUBLIC_BACKEND_ENV',
@@ -550,12 +555,43 @@ function printActive(label, a) {
   console.log(`${label}: Group ${a.group} · ${a.platform} Update ${a.id} · gitCommitHash ${a.gitCommitHash} · Runtime ${a.runtimeVersion} · ${a.createdAt}`);
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
+  const preparing = args.includes('--prepare');
+  const candidateFile = argValue(args, '--candidate');
+  const approvalFile = argValue(args, '--approval');
+  let candidate = null, plan = null, prepareDirectory = null, preparationComplete = false;
+  try {
+    for (const flag of ['--candidate', '--approval', '--plan', '--candidate-dir', '--quality-evidence']) {
+      if (argValues(args, flag).length > 1 || (args.includes(flag) && (!argValue(args, flag) || argValue(args, flag).startsWith('--')))) throw new Error();
+    }
+    if (preparing) {
+      if (candidateFile || approvalFile || args.includes('--confirm') || args.includes('--env-list-file')) throw new Error();
+      plan = readJson(externalFile(argValue(args, '--plan'), process.cwd()));
+      const requested = resolve(argValue(args, '--candidate-dir'));
+      prepareDirectory = join(realpathSync(dirname(requested)), basename(requested));
+      const roots = sh('git', ['worktree', 'list', '--porcelain']).split('\n').filter(s => s.startsWith('worktree ')).map(s => s.slice(9));
+      roots.push(gitCommonDir());
+      for (const root of roots) {
+        const rel = relative(realpathSync(root), prepareDirectory);
+        if (!isAbsolute(rel) && rel !== '..' && !rel.startsWith('../')) throw new Error();
+      }
+      mkdirSync(prepareDirectory, { mode: 0o700 });
+      process.on('exit', () => {
+        if (!preparationComplete) {
+          try { writeFileSync(join(prepareDirectory, 'BLOCKED.txt'), 'ANYVO OTA – Bereit zur Freigabe\nFreigabeempfehlung: BLOCKED\nPreflight nicht vollständig bestanden. Keine Production-Freigabe anfragen; Fehler oben prüfen.\n', { flag: 'wx', mode: 0o600 }); } catch { /* preserve previous evidence */ }
+        }
+      });
+    } else if (candidateFile) {
+      candidate = readJson(externalFile(candidateFile, process.cwd()));plan = candidate.plan;
+    }
+  } catch {
+    console.log('STOP: Kandidatenargumente, externe Belege oder neues Ausgabeziel ungültig. Nichts veröffentlicht.');process.exit(1);
+  }
   const confirmed = args.includes('--confirm');
-  const dryRun = args.includes('--dry-run');
+  const dryRun = args.includes('--dry-run') || preparing;
   const clearStale = args.includes('--clear-stale-lock');
-  const message = argValue(args, '--message') ?? '';
+  const message = argValue(args, '--message') ?? candidate?.context?.target?.message ?? '';
   const platform = argValue(args, '--platform');
   const runtimeFlag = argValue(args, '--runtime');
   const initialRuntimeRelease = args.includes('--initial-runtime-release');
@@ -608,6 +644,9 @@ function main() {
     console.log(`❌ --platform genau EINMAL angeben (war: ${platforms.join(', ')}). Nie beide Plattformen in einem Lauf. Kein Update veröffentlicht.`);
     process.exit(1);
   }
+  if (!dryRun && (!candidate || !approvalFile)) {
+    console.log('STOP: Geprüfter --candidate und ausdrücklicher --approval-Humanbeleg fehlen. --confirm allein ist keine Nutzerfreigabe.');process.exit(1);
+  }
   const initialProblems = evaluateInitialRuntimeRequest({ initialRuntimeRelease, buildId: initialBuildId });
   if (initialProblems.length) {
     for (const p of initialProblems) console.log(`❌ ${p}`);
@@ -624,6 +663,21 @@ function main() {
   } catch { /* best-effort */ }
   console.log(`git HEAD: ${head}`);
   console.log(`git status --short: ${dirty ? '\n' + dirty : '(sauber)'}`);
+
+  const qualityFiles = argValues(args, '--quality-evidence');
+  if (candidate && !qualityFiles.length) qualityFiles.push(candidate.quality.path);
+  if (candidate) {
+    try { if (externalFile(qualityFiles[0], process.cwd()) !== externalFile(candidate.quality.path, process.cwd())) throw new Error(); }
+    catch { console.log('STOP: Quality-Beleg passt nicht zum Kandidaten.');process.exit(1); }
+  }
+  const qualityInput = () => ({
+    receiptPath: qualityFiles.length === 1 ? qualityFiles[0] : undefined,
+    head: sh('git', ['rev-parse', 'HEAD']).trim(),
+    tree: sh('git', ['rev-parse', 'HEAD^{tree}']).trim(),
+    platform,
+    runtime: resolveReleaseRuntime(JSON.parse(readFileSync('app.json', 'utf8')), platform),
+    repositoryRoot: sh('git', ['rev-parse', '--show-toplevel']).trim(),
+  });
 
   // 2. Staging-Leak-Guard (lokale Env-Quellen).
   if (!assertProductionSupabase()) {
@@ -692,8 +746,8 @@ function main() {
     channel = readChannel();
     baseline = readBaseline(platform, target.runtime, initialRuntimeRelease, initialBuildId);
     otherBefore = readNewestPlatformProduction(otherPlatform);
-  } catch (e) {
-    console.log(`❌ Aktiver Production-Stand konnte nicht aus EAS gelesen werden (eas login / Netz? ${e?.message ?? ''}). Kein Update veröffentlicht.`);
+  } catch {
+    console.log('❌ Aktiver Production-Stand konnte nicht sicher aus EAS gelesen werden (Anmeldung/Netz/Serverfilter prüfen). Kein Update veröffentlicht.');
     process.exit(1);
   }
   const active = baseline.active;
@@ -729,7 +783,74 @@ function main() {
     console.log(dryRun ? 'Publish würde VERWEIGERT. --dry-run: nichts veröffentlicht.' : 'HARD STOP. Kein Update veröffentlicht. (Kein Auto-Rebase/-Merge — bewusst integrieren.)');
     process.exit(1);
   }
-  if (dryRun) { console.log('Publish würde ERLAUBT.'); console.log('--dry-run: nichts veröffentlicht.'); process.exit(0); }
+  let releaseContext = null;
+  let changedPaths = [];
+  const environmentDigest = () => digest({
+    remote: sh('eas', ['env:list', 'production', '--format', 'short']).trim().split(/\r?\n/).sort(),
+    local: readdirSync(process.cwd()).filter(n => /^\.env(\..*)?$/.test(n) && !n.endsWith('.example')).sort().map(n => [n, digest(readFileSync(n, 'utf8'))]),
+    process: Object.entries(process.env).filter(([k]) => k.startsWith('EXPO_PUBLIC_') && k !== 'EXPO_PUBLIC_RELEASE_GIT_COMMIT').sort(([a], [b]) => a.localeCompare(b)),
+  });
+  const freshContext = () => {
+    const source = { commit: sh('git', ['rev-parse', 'HEAD']).trim(), tree: sh('git', ['rev-parse', 'HEAD^{tree}']).trim(), branch: sh('git', ['branch', '--show-current']).trim() };
+    const app = JSON.parse(readFileSync('app.json', 'utf8')).expo;
+    if (!source.branch || sh('git', ['status', '--short']).trim()) throw new Error('DIRTY_OR_DETACHED_SOURCE');
+    if (typeof plan.nativeBuildId !== 'string' || !plan.nativeBuildId || plan.nativeBuildId.startsWith('-')) throw new Error('NATIVE_BUILD_ID_REQUIRED');
+    const build = readNativeBuild(plan.nativeBuildId);
+    const nativeProblems = evaluateNativeBaseBuild({ build, buildId: plan.nativeBuildId, platform, runtime: target.runtime,
+      nativeConfig: build ? readNativeBuildConfig(build.gitCommitHash) : null, releaseAppVersion: appVersionFrom({ expo: app }, platform) });
+    if (nativeProblems.length || gitIsAncestor(build?.gitCommitHash, source.commit) !== true) throw new Error('NATIVE_BUILD_COMPATIBILITY_UNPROVEN');
+    if (inspectNativeChanges({ base: build.gitCommitHash }).requiresNativeBuild) throw new Error('NATIVE_CHANGE_NOT_OTA');
+    changedPaths = sh('git', ['diff', '--name-only', '--no-renames', '-z', active.gitCommitHash, source.commit, '--']).split('\0').filter(Boolean).sort();
+    const risk = riskFor(changedPaths, plan.changes);
+    const freshBaseline = readBaseline(platform, target.runtime, initialRuntimeRelease, initialBuildId);
+    const freshChannel = readChannel();
+    if (freshChannel.problems.length || freshBaseline.problems.length || productionChanged(active, freshBaseline.active)) throw Object.assign(new Error('PRODUCTION_CHANGED'), { current: freshBaseline.ownOta ?? freshBaseline.active });
+    if (typeof app.updates?.url !== 'string' || !app.updates.url.startsWith('https://u.expo.dev/')) throw new Error('UPDATE_ENDPOINT_UNPROVEN');
+    return { source, target: { platform, runtime: target.runtime, appVersion: appVersionFrom({ expo: app }, platform), channel: PRODUCTION_CHANNEL, environment: 'production', message, updatesUrl: app.updates.url },
+      native: { buildId: build.id, commit: build.gitCommitHash, runtime: build.runtimeVersion, platform: build.platform },
+      production: { baseline: freshBaseline.active },
+      environmentDigest: environmentDigest(), changedPaths, risk };
+  };
+  if (plan) {
+    try {
+      releaseContext = freshContext();
+      if (preparing && !qualityFiles.length) qualityFiles.push(runReleaseQuality({ plan, directory: prepareDirectory, root: process.cwd(), source: releaseContext.source,
+        target: releaseContext.target, fullSuite: releaseContext.risk.level === 'high' || plan.fullSuite === true }));
+      const renewed = freshContext();
+      if (digest(renewed) !== digest(releaseContext)) throw new Error('SOURCE_OR_PRODUCTION_CHANGED_DURING_PREFLIGHT');
+      releaseContext = renewed;
+    } catch (error) {
+      if (error.message === 'PRODUCTION_CHANGED') {
+        console.log('HARD STOP: ' + PRODUCTION_CHANGED_MESSAGE);
+        printActive('   vorher', active);printActive('   jetzt ', error.current);
+      }
+      console.log('STOP: Zentraler Preflight, native Kompatibilität oder Kandidatenbindung nicht vollständig bestanden. Kein Publish.');process.exit(1);
+    }
+  }
+  let quality;
+  try { quality = validateQualityEvidence(qualityInput()); }
+  catch { quality = { ok: false, problems: ['Quality-Quellenbindung nicht bestimmbar.'] }; }
+  if (!quality.ok) {
+    for (const problem of quality.problems) console.log(`❌ ${problem}`);
+    console.log('STOP: Keine vollständigen Quality-/Reviewbelege am exakten Release-Commit.');
+    process.exit(1);
+  }
+  if (preparing) {
+    try {
+      candidate = createCandidate({ context: releaseContext, plan, qualityFile: qualityFiles[0], root: process.cwd() });
+      writeNew(join(prepareDirectory, 'candidate.json'), candidate);
+      const report = formatApprovalReport(candidate);
+      writeFileSync(join(prepareDirectory, 'FREIGABE.txt'), report, { flag: 'wx', mode: 0o600 });
+      console.log(report);preparationComplete = true;process.exit(candidate.recommendation === 'READY' ? 0 : 1);
+    } catch { console.log('STOP: Kandidat konnte nicht vollständig gebunden werden.');process.exit(1); }
+  }
+  if (candidate) {
+    try {
+      validateCandidate(candidate, releaseContext, process.cwd());
+      if (approvalFile) validateHumanApproval(readJson(externalFile(approvalFile, process.cwd())), candidate);
+    } catch { console.log('STOP: Kandidat, QA, Production-Basis oder ausdrückliche Humanfreigabe ungültig/verändert.');process.exit(1); }
+  }
+  if (dryRun) { console.log(candidate ? (approvalFile ? 'Unveränderter Kandidat: READY. Gebundener Humanbeleg gültig; keine neue Frage.' : 'Kandidat: READY. Genau eine ausdrückliche Production-Freigabe erforderlich.') : 'Bestehende Guards bestanden; Freigabekandidat nur über --prepare.'); console.log('--dry-run: nichts veröffentlicht.');process.exit(0); }
 
   // 6. Zweiter EAS-Check DIREKT vor dem Publish — Production darf sich nicht verändert haben.
   //    Initial-Fall: inzwischen eine Group für Plattform+Runtime → STOP (nie auf eine OTA-Basis
@@ -749,11 +870,27 @@ function main() {
   }
   console.log('Zweiter EAS-Check: Production unverändert.');
 
+  // Rebind source AND evidence after the live preflight, before bundle export.
+  try {
+    if (sh('git', ['rev-parse', 'HEAD']).trim() !== head || sh('git', ['status', '--short']).trim()
+      || !validateQualityEvidence(qualityInput()).ok) throw new Error();
+    validateCandidate(candidate, freshContext(), process.cwd());
+    validateHumanApproval(readJson(externalFile(approvalFile, process.cwd())), candidate);
+  } catch {
+    console.log('STOP: Quelle oder Quality-Belege haben sich während der Vorbereitung verändert.');
+    process.exit(1);
+  }
+
+  let attempt;
+  try { attempt = claimAttempt(gitCommonDir(), candidate); }
+  catch { console.log('STOP: Kandidat bereits versucht oder Status unklar. Kein erneuter Publish; keine automatische Ledgerbereinigung.');process.exit(1); }
+
   console.log(`Bestätigt. Veröffentliche Production-Update (${platform}): "${message}"`);
   // Release-Commit als NICHT geheimer Build-Metadatenwert ins OTA-Bundle (nur Anzeige in der Fährten-Diagnose).
   try {
     execFileSync('eas', easArgs, { stdio: 'inherit', env: buildPublishEnv(process.env, head) });
   } catch {
+    attempt.finish({ status: 'UNCONFIRMED', reason: 'EAS command failed or interrupted; server outcome not proven. No retry.' });
     console.log('❌ `eas update` ist fehlgeschlagen. Kein automatischer Neuversuch.');
     process.exit(1);
   }
@@ -775,6 +912,19 @@ function main() {
     console.log(`gitCommitHash: ${after.gitCommitHash}   Message: ${message}`);
   }
   const post = verifyPostPublish({ before: active, after, platform, releaseHead: head, releaseRuntime, afterForRuntime, otherBefore, otherAfter });
+  if (!after?.group || !after?.id) post.push('Tatsächliche Group-/Update-ID fehlt.');
+  try { post.push(...readChannel().problems); } catch { post.push('Production-Channel nach Publish nicht verifizierbar.'); }
+  let delivery = null;
+  if (!post.length) {
+    try { delivery = await verifyDelivery({ candidate, updateId: after.id }); }
+    catch { post.push('Manifest/CDN-/Bundle-/Asset-Nachkontrolle unvollständig oder abweichend.'); }
+  }
+  const result = { status: post.length ? 'UNCONFIRMED' : 'SUCCESS', commit: head, platform, runtime: releaseRuntime,
+    channel: PRODUCTION_CHANNEL, environment: 'production', updateGroupId: after?.group ?? null, platformUpdateId: after?.id ?? null,
+    verifiedProduction: post.length ? null : after, delivery, problems: post, deviceQA: candidate.deviceQAValidated ? 'PASS' : 'NOT_PROVIDED',
+    completedAt: new Date().toISOString(), followUp: post.length ? 'Manual investigation; no second OTA or automatic rollback.' : 'Server verification passed; device receipt is separate.' };
+  attempt.finish(result);
+  console.log('ANYVO OTA – Abschluss: ' + JSON.stringify(result));
   if (post.length) {
     for (const p of post) console.log(`❌ POST-PUBLISH: ${p}`);
     console.log('❌ Nachkontrolle FEHLGESCHLAGEN. Kein automatischer Rollback und keine zweite OTA — Rollback ist eine bewusste Freigabeentscheidung.');
@@ -783,4 +933,7 @@ function main() {
   console.log(`✅ Nachkontrolle: neue Group live, Plattform/Runtime/gitCommitHash exakt; ${otherPlatform} unverändert.`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try { await main(); }
+  catch { console.log('STOP: Release-Ausführung nicht vollständig bestätigt. Keine Secrets oder automatischen Wiederholungen.');process.exitCode = 2; }
+}

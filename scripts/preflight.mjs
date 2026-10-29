@@ -18,11 +18,12 @@ const run = (cmd) => execSync(cmd, { stdio: 'pipe', encoding: 'utf8' });
 
 // 1–4: TypeScript / Lint / Doctor / Tests
 step('TypeScript (tsc --noEmit)', () => run('npx tsc --noEmit'));
-// Lint als Warnung: Style-/Lint-Fehler blockieren keinen Build/Update. Neue
-// Dateien sollten dennoch lint-sauber sein (im PR prüfen).
-step('ESLint (expo lint)', () => run('npx expo lint'), { critical: false });
+// ESLint errors are blocking; warnings stay visible in the command result.
+step('ESLint (expo lint)', () => run('npx expo lint'));
 step('Expo Doctor', () => run('npx expo-doctor'), { critical: false });
 step('Tests (jest)', () => run('npx jest --runInBand'));
+step('Development process guards (offline)', () => run('node --test scripts/__tests__/developmentProcess.node.test.mjs'));
+step('One-approval OTA policy (offline)', () => run('node --test scripts/__tests__/otaCandidate.node.test.mjs scripts/__tests__/otaPreparation.node.test.mjs'));
 
 // 5: App-Config lädt sauber
 step('App-Config (expo config)', () => {
@@ -58,4 +59,4 @@ console.log(`Preflight: ${results.filter(r => r.ok).length}/${results.length} ok
   (warned.length ? `, ${warned.length} Warnung(en)` : '') +
   (failedCritical.length ? `, ${failedCritical.length} FEHLER` : ''));
 if (failedCritical.length) { console.log('❌ Kritische Fehler — kein Build/Update.'); process.exit(1); }
-console.log('✅ Bereit. (Kein Cloud-Build/Submit/Update ausgelöst.)');
+console.log('✅ Lokale Prüfungen bestanden. Production-Freigabe nur über update-production.mjs --prepare / --candidate / --approval. Kein Build/Update ausgelöst.');
