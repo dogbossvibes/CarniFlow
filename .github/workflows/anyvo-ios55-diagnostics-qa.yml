@@ -61,11 +61,13 @@ jobs:
           services/__tests__/diagnosticsAccessService.test.ts
           components/__tests__/DiagnosticsAccessSync.test.tsx
 
-      - name: Complete Jest unit test suite
-        run: npm test -- --ci --runInBand --watch=false
-
+      # Run code-quality checks before the full-suite baseline gate: the
+      # unrelated tracking contract failure must not mask TS/ESLint results.
       - name: TypeScript strict check
         run: npm run typecheck
 
       - name: ESLint
         run: npm run lint
+
+      - name: Complete Jest unit test suite
+        run: npm test -- --ci --runInBand --watch=false
