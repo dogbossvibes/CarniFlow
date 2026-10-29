@@ -275,5 +275,50 @@ set local request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
 select pg_temp.assert_count('vet signed-path authorization',
   (select count(*) from (select public.can_read_dog_document_path('11111111-1111-1111-1111-111111111111/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/90000000-0000-0000-0000-000000000001.pdf') as allowed) q where q.allowed), 1);
 
+-- The recipient list reveals only a valid grant and the two display names.
+-- It must not turn a Health grant into SELECT on the complete dog row.
+reset role;
+select pg_temp.assert_count('recipient RPC is not executable by anon',
+  (select count(*) from (select has_function_privilege('anon', 'public.list_received_health_dogs(uuid)', 'EXECUTE') as allowed) q where q.allowed), 0);
+set local role authenticated;
+set local request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+select pg_temp.assert_count('recipient list only own active grant',
+  (select count(*) from public.list_received_health_dogs() where dog_id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' and dog_name='Dog A'), 1);
+select pg_temp.assert_count('recipient detail dog filter',
+  (select count(*) from public.list_received_health_dogs('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')), 0);
+select pg_temp.assert_count('recipient receives only allowed permissions',
+  (select count(*) from public.list_received_health_dogs() where permissions=array['can_view_vaccinations','can_view_lab_results','can_view_health_documents']::text[]), 1);
+select pg_temp.assert_count('Health grant does not expose complete dog row',
+  (select count(*) from public.dogs where id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), 0);
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+update public.dog_health_access_grants set revoked_at=now() where id='a4000000-0000-0000-0000-000000000001';
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+select pg_temp.assert_count('revoked recipient list', (select count(*) from public.list_received_health_dogs()), 0);
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+update public.dog_health_access_grants set revoked_at=null,starts_at=now()+interval '1 hour' where id='a4000000-0000-0000-0000-000000000001';
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+select pg_temp.assert_count('future recipient list', (select count(*) from public.list_received_health_dogs()), 0);
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+update public.dog_health_access_grants set starts_at=now()-interval '2 hours',expires_at=now()-interval '1 hour' where id='a4000000-0000-0000-0000-000000000001';
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = '66666666-6666-6666-6666-666666666666';
+select pg_temp.assert_count('expired recipient list', (select count(*) from public.list_received_health_dogs()), 0);
+reset role;
+update public.connections set status='pending' where id='c2222222-2222-2222-2222-222222222222';
+set local role authenticated;
+set local request.jwt.claim.sub = '44444444-4444-4444-4444-444444444444';
+select pg_temp.assert_count('inactive connection recipient list', (select count(*) from public.list_received_health_dogs()), 0);
+
 do $$ begin raise notice 'HEALTH_SHARING_RLS|PASS'; end $$;
 rollback;
