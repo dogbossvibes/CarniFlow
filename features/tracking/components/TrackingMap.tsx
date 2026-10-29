@@ -1,5 +1,5 @@
 import { isTrainingJoker, objectNumbers } from '@/features/tracking/utils/objectMarkers';
-import { groupMapFeatures } from '../utils/mapMarkerGroups';
+import { mapFeatureGroupLabel, groupMapFeatures } from '../utils/mapMarkerGroups';
 import { MarkerDetailSheet, describeSelection, type TrackDetailItem, type TrackDetailSelection } from './MarkerDetailSheet';
 import { specialAngleBadge } from '../utils/specialAngleGeometry';
 import type { DistractionTrack } from '@/features/tracking-distractions/model';
@@ -23,6 +23,8 @@ import type { TrackReferenceOverlay } from '@/features/tracking/store/trackRefer
 import type { ScaleRegion } from '@/features/tracking/components/DistanceScaleLayer';
 import { pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
 import type { LL } from '@/features/tracking/utils/searchGeometry';
+
+import { TrackComparisonLines } from './TrackComparisonLines';
 
 const FALLBACK = { latitude: 47.3769, longitude: 8.5417 };
 
@@ -78,9 +80,9 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
   // Kleine sichtbare Fläche, großer transparenter Markerrahmen für die Auswahl.
   // Die vollständigen Einträge bleiben im Detail-Sheet und Accessibility-Label.
   else if (kind === 'group') child = (
-    <View collapsable={false} style={s.groupTouchArea}>
-      <View style={s.groupBadge}>
-        <Text style={s.groupBadgeTxt} numberOfLines={1} maxFontSizeMultiplier={1.2}>{label}</Text>
+    <View collapsable={false} style={[s.groupTouchArea, label && label.length > 3 ? s.namedGroupTouchArea : null]}>
+      <View style={[s.groupBadge, label && label.length > 3 ? s.namedGroupBadge : null]}>
+        <Text style={s.groupBadgeTxt} maxFontSizeMultiplier={1.2}>{label}</Text>
       </View>
     </View>
   );
@@ -95,6 +97,7 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
 });
 
 interface Props {
+  comparison?: boolean;
   layColor?: string;
   layPoints:        LatLng[];
   // Read-only Referenz-Fährten anderer eigener Hunde (nur Linie + Start-Label).
@@ -149,7 +152,7 @@ interface Props {
 const EMPTY_MARKERS: MapMarker[] = [];
 
 export function TrackingMap({
-  layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -341,7 +344,8 @@ export function TrackingMap({
         {/* Gelegte Fährte (Soll-Linie): IMMER solide ANYVO-Mint — auch während der
             Absuche. Kein Dash/Dimm (sonst mit der blauen Ist-Suchspur verwechselbar).
             Stil zentral über laidTrackStroke() (rein/testbar). */}
-        {laySegmentParts.length > 0 ? laySegmentParts.map(part => {
+        {comparison && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} />}
+        {!comparison && (laySegmentParts.length > 0 ? laySegmentParts.map(part => {
           const stroke = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
           return (
             <Polyline
@@ -357,9 +361,9 @@ export function TrackingMap({
           );
         }) : layParts.filter(part => part.length > 1).map((part, index) => (
           <Polyline key={`lay-${index}`} coordinates={part} strokeColor={layColor} strokeWidth={4} lineCap="round" lineJoin="round" />
-        ))}
+        )))}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
-        {runParts.filter(part => part.length > 1).map((part, index) => (
+        {!comparison && runParts.filter(part => part.length > 1).map((part, index) => (
           <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={4} />
         ))}
 
@@ -424,7 +428,7 @@ export function TrackingMap({
 
         {markerGroups.map(group => <PinMarker key={group.map(feature => feature.key).join('|')}
           Marker={Marker} lat={group[0].lat} lng={group[0].lng} kind="group"
-          label={group.length > 99 ? '99+' : String(group.length)}
+          label={mapFeatureGroupLabel(group)}
           accessibilityLabel={`${t('track.markerGroup.title')}: ${group.length}. ${group.map(feature => describeSelection(feature.selection, t).title).join(', ')}`}
           onPress={() => setGroupSelection({ kind: 'group', items: group.map(feature => feature.selection) })} />)}
 
@@ -591,6 +595,8 @@ const s = StyleSheet.create({
   // Sammelmarker: Anzahl statt breitem Textfeld; keine zusätzliche weiße Fläche.
   groupTouchArea: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   groupBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#04110F', borderWidth: 1.5, borderColor: C.trackPrimary, alignItems: 'center', justifyContent: 'center' },
+  namedGroupTouchArea: { width: 'auto', minWidth: 48, maxWidth: 220, height: 'auto', minHeight: 48 },
+  namedGroupBadge: { width: 'auto', minWidth: 28, height: 'auto', minHeight: 28, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
   groupBadgeTxt: { color: C.trackPrimary, fontSize: 11, fontWeight: '800', includeFontPadding: false, textAlign: 'center' },
   // Gegenstand: neutrales, helles Quadrat-Badge mit „G{n}" — bewusst anders als Winkel.
   objectBadge:      { width: 18, height: 18, borderRadius: 3, backgroundColor: '#EDEDED', borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },

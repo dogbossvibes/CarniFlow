@@ -1,4 +1,4 @@
-import { groupMapFeatures } from '../mapMarkerGroups';
+import { groupMapFeatures, mapFeatureGroupLabel } from '../mapMarkerGroups';
 import a from './fixtures/field20261012/a.json';
 import b from './fixtures/field20261012/b.json';
 const ll = (p: { x: number; y: number }) => ({ lat: p.y / 111320, lng: p.x / 111320 });
@@ -27,4 +27,12 @@ it('preserves nearby return legs and duplicate marker identities instead of dele
   const features = [{ id: 'a', lat: 0, lng: 0 }, { id: 'b', lat: 0, lng: 0 }, { id: 'c', lat: 1, lng: 1 }];
   expect(groupMapFeatures(features, 2).map(group => group.map(m => m.id))).toEqual([['a', 'b'], ['c']]);
   expect(groupMapFeatures(features, NaN)).toHaveLength(3);
+});
+
+it('names every grouped object and endpoint without changing their positions', () => {
+  const features = [{ label: 'G1', lat: 0, lng: 0 }, { label: 'G2', lat: 0, lng: 0 }, { label: 'G3', lat: 0, lng: 0 }, { label: 'Ende', lat: 0, lng: 0 }];
+  const original = JSON.stringify(features);
+  const groups = groupMapFeatures(features, 2);
+  expect(mapFeatureGroupLabel(groups[0])).toBe('G1 · G2 · G3 · Ende');
+  expect(JSON.stringify(features)).toBe(original);
 });
