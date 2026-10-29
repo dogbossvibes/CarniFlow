@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout CI-only setup branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Verify pinned source and manual-only live trigger
@@ -91,8 +91,8 @@ jobs:
           assert.match(liveRuns.join('\n'), /node scripts\/update-production\.mjs/);
           assert.match(liveRuns.join('\n'), /--dry-run/);
           assert.deepEqual(
-            [...liveJob.matchAll(/^\s*uses:\s*(.+)$/gm)].map(m => m[1].trim()),
-            ['actions/checkout@v7', 'actions/setup-node@v7'],
+            [...liveJob.matchAll(/^\s*uses:\s*(.+)$/gm)].map(m => m[1].trim().split(/\s+#/)[0]),
+            ['actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1', 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'],
           );
           // Negative controls: the guard MUST detect inline AND multiline publishing.
           const blocked = [
@@ -175,7 +175,7 @@ jobs:
           echo "PASS: protected environment, required reviewer and exact main-only branch allowlist. No Expo secret value printed."
 
       - name: Checkout EXACT independently tested iOS55 candidate
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: 5bec4417fc85f79e67f387126386617536992df3
           fetch-depth: 0
@@ -205,7 +205,7 @@ jobs:
           echo "PASS: exact iOS55 code source, no native/tracking runtime changes."
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
           package-manager-cache: false
