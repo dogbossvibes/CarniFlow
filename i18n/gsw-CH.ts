@@ -5,6 +5,24 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "sharing.noDisplayableSections": "Die Freigab enthält da kei aazeigbare Iiträg. Für Gesundheitsdate oder Dokument mues d besitzendi Person die entsprechende Bereich freigeh.",
+  "sharing.myDogs": "Mini Hunde",
+  "sharing.withMe": "Mit mir teilt",
+  "sharing.receivedFrom": "Freigegeh vo {{name}}",
+  "sharing.received": "Für dich freigegeh",
+  "sharing.readOnly": "Nur aaluege",
+  "sharing.inboxHelp": "Da findsch Hunde mit Gesundheitsbereich, wo für dis Konto freigegeh sind.",
+  "sharing.emptyTitle": "No kei Freigabe",
+  "sharing.emptyBody": "Freigabe erschiined da, sobald sie gültig sind. Prüef, ob du im richtige Konto agmäldet bisch.",
+  "sharing.loadFailed": "Freigabe händ nöd chöne prüeft werde. Bitte nomal versueche.",
+  "sharing.accessUnavailable": "Die Freigab isch nüme verfügbar oder no nöd gültig.",
+  "sharing.scopeHelp": "Du gsehsch nur die freigegehne Bereich. Änderige am Hund bliibed bi de besitzende Person.",
+  "sharing.yourAccess": "Din Zuegriff",
+  "sharing.ownerLocationHint": "D Person findet de Hund unter Hunde → Mit mir teilt, sobald d Freigab gültig isch. Sie gseht nur die usgwählte Bereich.",
+  "sharing.partialError": "Es paar freigegehni Iiträg händ nöd chöne glade werde. Bitte nomal lade.",
+  "sharing.limited": "Pro Bereich werded höchstens 120 Iiträg aazeigt.",
+  "sharing.noRecords": "Kei Iiträg i de gladene, freigegehne Bereich.",
+
   "track.startStatus.searching": "Position wird gsuecht",
   "track.startStatus.ready": "GPS bereit",
   "track.startStatus.inaccurate": "Position no z ungenau",

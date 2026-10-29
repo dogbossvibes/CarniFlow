@@ -5,7 +5,8 @@ jest.mock('@/services/calendarService', () => ({}));
 jest.mock('@/services/connectionService', () => ({}));
 import { HEALTH_SECTION_LIMIT, loadHealthOverview } from '../healthService';
 function query(result: unknown) {
-  const chain = { select: jest.fn(), eq: jest.fn(), order: jest.fn(), limit: jest.fn().mockResolvedValue(result) };
+  const chain = { select: jest.fn(), eq: jest.fn(), order: jest.fn(), limit: jest.fn(), returns: jest.fn().mockResolvedValue(result) };
+  chain.limit.mockReturnValue(Object.assign(Promise.resolve(result), { returns: chain.returns }));
   chain.select.mockReturnValue(chain); chain.eq.mockReturnValue(chain); chain.order.mockReturnValue(chain);
   return chain;
 }
@@ -30,4 +31,13 @@ describe('Health overview data boundaries', () => {
     expect(result.sectionErrors).toEqual({ vaccinations: 'offline' });
     expect(result.sectionLimits).toEqual({});
   });
+});
+
+it('reads only weight fields for shared access while preserving owner reads', async () => {
+  const weight = query({ data: [], error: null });
+  mockFrom.mockImplementation((table: string) => table === 'dog_health_entries' ? weight : query({ data: [], error: null }));
+  await loadHealthOverview('d', { weightFieldsOnly: true });
+  expect(weight.select).toHaveBeenLastCalledWith('id,dog_id,entry_date,weight_kg,created_at');
+  await loadHealthOverview('d');
+  expect(weight.select).toHaveBeenLastCalledWith('*');
 });
