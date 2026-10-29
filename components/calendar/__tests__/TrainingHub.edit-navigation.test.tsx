@@ -15,7 +15,7 @@ jest.mock('@/services/umfrageService', () => ({ getMyInvitations: async () => []
 jest.mock('@/services/calendarService', () => ({ deleteCalendarEvent: jest.fn(), updateCalendarEvent: jest.fn() }));
 jest.mock('@/lib/eventReminders', () => ({ cancelEventReminders: jest.fn() }));
 jest.mock('@/lib/deviceCalendar', () => ({ DEVICE_CALENDAR_AVAILABLE: true, addEventToDeviceCalendar: jest.fn() }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn(), push: jest.fn() }) }));
+jest.mock('expo-router', () => ({ useLocalSearchParams: () => ({}), useFocusEffect: (fn: () => void) => { const R=jest.requireActual('react');R.useEffect(fn,[fn]); }, useRouter: () => ({ back: jest.fn(), push: jest.fn() }) }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));

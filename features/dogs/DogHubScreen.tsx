@@ -44,7 +44,7 @@ export interface DogCommandsProps { commands: DogCommand[]; onAdd: () => void; o
 // Persönlicher Rucksack — Zusammenfassung (lokal geladen) + Öffnen-Aktion.
 export interface DogBackpackProps { dogName: string; total: number; active: number; packed: number; items?: DogBackpackItem[]; onOpen: () => void; onAdd?: () => void }
 // Dashboard-Termine (bereits gefiltert/sortiert im Route-Wrapper) + Kalender-Öffnen.
-export interface DogAppointmentsProps { items: DogAppointment[]; onOpenCalendar: () => void }
+export interface DogAppointmentsProps { items: DogAppointment[]; onOpenCalendar: () => void; onOpenAppointment?: (appointment: DogAppointment) => void }
 
 export interface DogHubActions {
   onBack:             () => void;
@@ -345,6 +345,18 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                     backpackPacked={backpack?.packed ?? 0}
                     lastTrainingLabel={vm.lastTrainingLabel}
                     localeTag={intlLocale}
+                    getHintAction={hint => {
+                      switch (hint.kind) {
+                        case 'appointment_today':
+                        case 'appointment_overdue': return hint.appointment && appointments?.onOpenAppointment
+                          ? () => appointments.onOpenAppointment!(hint.appointment!) : appointments?.onOpenCalendar;
+                        case 'heat': return heat?.onOpenOverview;
+                        case 'goal': return actions.onOpenGoals ?? actions.onEditGoal;
+                        case 'backpack': return backpack?.onOpen;
+                        case 'last_activity': return vm.recentTrainings[0] && actions.onOpenTraining
+                          ? () => actions.onOpenTraining!(vm.recentTrainings[0]) : actions.onOpenJournal;
+                      }
+                    }}
                   />
 
                   {/* 2) Nächste Termine */}
@@ -353,6 +365,7 @@ export function DogHubScreen({ vm, actions, aiUnlocked, heat, commands, backpack
                       appointments={appointments.items}
                       localeTag={intlLocale}
                       onOpenCalendar={appointments.onOpenCalendar}
+                      onOpenAppointment={appointments.onOpenAppointment}
                     />
                   )}
 

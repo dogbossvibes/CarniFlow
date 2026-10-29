@@ -281,7 +281,8 @@ export default function DogHubRoute() {
       }}
       appointments={{
         items: appointments,
-        onOpenCalendar: () => router.push('/plaene' as never),
+        onOpenCalendar: () => router.push('/training-hub' as never),
+        onOpenAppointment: appointment => router.push({ pathname: '/training-hub', params: { eventId: appointment.id } } as never),
       }}
       trackingPanel={dog?.owner_id === userId ? <DogTrackingPanel key={`${userId}:${id}`} userId={userId} dogId={id} dogName={dog?.name ?? ''} lastTrackId={lastFaehrteId} /> : undefined}
       activeFaehrte={activeFaehrte}

@@ -23,3 +23,14 @@ it.each(['owner-b', 'trainer'])('does not expose owner edit/delete for %s', user
   expect(node.root.findAll(n => n.props.children === 'calendar.deleteEvent')).toHaveLength(0);
   expect(node.root.findAll(n => n.props.children === 'calendar.exportEvent').length).toBeGreaterThan(0);
 });
+
+it.each(['owner-a','owner-b'])('only editable owners see completion/cancellation actions (%s)', userId => {
+ act(()=>{node=TestRenderer.create(<EventActionsSheet visible event={event} userId={userId} onClose={()=>{}} onDismiss={()=>{}} onEdit={()=>{}} onDelete={()=>{}} onExport={()=>{}} onComplete={()=>{}} onCancelEvent={()=>{}} />);});
+ expect(node.root.findAll(n=>n.props.children==='calendar.markCompleted').length>0).toBe(userId==='owner-a');
+ expect(node.root.findAll(n=>n.props.children==='calendar.cancelAppointment').length>0).toBe(userId==='owner-a');
+});
+it('source-managed appointments offer their source and never mark a vaccination completed through calendar status',()=>{
+ act(()=>{node=TestRenderer.create(<EventActionsSheet visible event={{...event,source_type:'health_vaccination',source_id:'v'}} userId="owner-a" onClose={()=>{}} onDismiss={()=>{}} onEdit={()=>{}} onDelete={()=>{}} onExport={()=>{}} onComplete={()=>{}} onOpenSource={()=>{}} />);});
+ expect(node.root.findAll(n=>n.props.children==='calendar.markCompleted')).toHaveLength(0);
+ expect(node.root.findAll(n=>n.props.children==='health.recordTitle').length).toBeGreaterThan(0);
+});
