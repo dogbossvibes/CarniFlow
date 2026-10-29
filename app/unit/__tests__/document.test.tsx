@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
 import DocumentScreen from '@/app/unit/document';
 
 const mockCreateDocumentedUnit = jest.fn();
@@ -787,4 +787,23 @@ describe('DocumentScreen — atomic restore and exact duration', () => {
     expect(mockAtomicSave.mock.calls[0][2].duration_sec).toBe(97);
   });
 
+});
+
+
+describe('training document keyboard reachability', () => {
+  const originalOS = Platform.OS;
+  afterEach(() => { Object.defineProperty(Platform, 'OS', { configurable: true, value: originalOS }); });
+  it.each(['ios', 'android'] as const)('keeps scroll content and bottom action in the same keyboard-adjusted viewport on %s', async os => {
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: os });
+    mockParams = {}; mockDogs = [{ id: 'dog-1', name: 'Luna' }]; mockDogsLoading = false;
+    const node = render(); await flush();
+    const keyboard = node.root.findByType(KeyboardAvoidingView);
+    expect(keyboard.props.behavior).toBe(os === 'ios' ? 'padding' : 'height');
+    // Both navigators hide their headers; no extra external-header offset belongs here.
+    expect(keyboard.props.keyboardVerticalOffset ?? 0).toBe(0);
+    expect(keyboard.findAll(n => n.props.testID === 'document-save').length).toBeGreaterThan(0);
+    const scroll = keyboard.findByType(ScrollView);
+    expect(scroll.props.keyboardDismissMode).toBe('on-drag');
+    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
+  });
 });
