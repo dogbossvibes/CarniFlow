@@ -155,6 +155,7 @@ describe('TrackingMap overlapping feature access', () => {
     zoomTo(n, 100);
     const badge = (n.root as any).findAllByType(RNMaps!.Marker).find((node: any) => node.props.accessibilityLabel?.includes('G5'));
     expect(badge.props.coordinate).toEqual({ latitude: markers[0].lat, longitude: 8 });
+    expect(JSON.stringify(n.root.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children))).toContain('G5 · L');
     act(() => { badge.props.onPress(); });
     const text = JSON.stringify(n.root.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children));
     expect(text).toContain('track.markerGroup.title');
@@ -168,6 +169,7 @@ describe('TrackingMap overlapping feature access', () => {
     const n = renderMap({ endPoint: LAY[40], endTotalDistanceM: 39,
       markers: [{ id: 'g7', type: 'gegenstand', lat: LAY[40].lat, lng: 8, objectIndex: 7, material: 'holz' }] });
     const badge = (n.root as any).findAllByType(RNMaps!.Marker).find((node: any) => node.props.accessibilityLabel?.includes('G7'));
+    expect(JSON.stringify(n.root.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children))).toContain('G7 · track.endFlag');
     act(() => { badge.props.onPress(); });
     expect(JSON.stringify(n.root.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children))).toContain('39 m');
     expect(JSON.stringify(n.root.findAll(node => (node as unknown as { type: unknown }).type === 'Text').map(node => node.props.children))).toContain('track.detailTrackEnd');

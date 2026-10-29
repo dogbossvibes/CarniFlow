@@ -19,3 +19,10 @@ export function groupMapFeatures<T extends { lat: number; lng: number }>(feature
   });
   return [...groups.values()];
 }
+
+/** Show the identities inside a cluster, rather than an unexplained count.
+ * Coordinates and the complete pressable detail list remain unchanged. */
+export function mapFeatureGroupLabel(features: readonly { label: string }[]): string {
+  if (features.length > 4) return features.length > 99 ? '99+' : String(features.length);
+  return features.map(feature => feature.label).join(' · ');
+}
