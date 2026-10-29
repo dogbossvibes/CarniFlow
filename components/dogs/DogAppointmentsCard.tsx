@@ -9,11 +9,12 @@ import { isSameDay, isTomorrow, type DogAppointment } from '@/features/dogs/dash
 // Nächste hundebezogene Termine (max. 3). Überfällige klar gekennzeichnet.
 // CTA öffnet den bestehenden Kalender-/Terminbereich. Keine neue Kalenderarchitektur.
 export function DogAppointmentsCard({
-  appointments, localeTag, onOpenCalendar,
+  appointments, localeTag, onOpenCalendar, onOpenAppointment,
 }: {
   appointments: DogAppointment[];
   localeTag: string;
   onOpenCalendar: () => void;
+  onOpenAppointment?: (appointment: DogAppointment) => void;
 }) {
   const { t } = useT();
   const visible = appointments.slice(0, 3);
@@ -53,7 +54,7 @@ export function DogAppointmentsCard({
           {visible.map(a => {
             const meta = eventMeta(a.type as EventType);
             return (
-              <TouchableOpacity key={a.id} style={s.row} onPress={onOpenCalendar} activeOpacity={0.85}
+              <TouchableOpacity key={a.id} style={s.row} onPress={() => onOpenAppointment ? onOpenAppointment(a) : onOpenCalendar()} activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel={`${a.title}. ${a.overdue ? `${t('dash.overdue')}. ` : ''}${whenLabel(a.startAt)}${a.discipline ? `. ${a.discipline}` : ''}`}>
                 <View style={[s.rowIcon, { backgroundColor: `${meta.color}22`, borderColor: `${meta.color}55` }]}>

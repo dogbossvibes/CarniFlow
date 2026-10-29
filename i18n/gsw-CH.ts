@@ -5,6 +5,9 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "calendar.markCompleted": "Als erledigt markiere",
+  "calendar.cancelAppointment": "Termin absäge",
+  "calendar.entryUnavailable": "Dä Termin isch nüm verfügbar. Bitte de Kalender aktualisiere.",
   "track.startStatus.searching": "Position wird gsuecht",
   "track.startStatus.ready": "GPS bereit",
   "track.startStatus.inaccurate": "Position no z ungenau",

@@ -43,7 +43,7 @@ export function localDayKey(iso: string): string {
 export function nextEvent(events: CalendarEvent[]): CalendarEvent | null {
   const now = Date.now();
   const upcoming = events
-    .filter(e => e.status !== 'cancelled' && new Date(e.start_at).getTime() >= now)
+    .filter(e => e.status !== 'cancelled' && e.status !== 'completed' && new Date(e.start_at).getTime() >= now)
     .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
   return upcoming[0] ?? null;
 }
