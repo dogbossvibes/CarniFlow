@@ -5,6 +5,9 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "calendar.markCompleted": "Als erledigt markieren",
+  "calendar.cancelAppointment": "Termin absagen",
+  "calendar.entryUnavailable": "Dieser Termin ist nicht mehr verfügbar. Bitte aktualisiere den Kalender.",
   "trainingTemplate.resume": "Entwurf fortsetzen",
   "trainingTemplate.resumeHelp": "Für diese Vorlage gibt es bereits einen Entwurf. Setze ihn fort; deine Eingaben bleiben erhalten.",
 
