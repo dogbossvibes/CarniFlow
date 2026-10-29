@@ -1,0 +1,27 @@
+<resources>
+  <string name="anyvo_daily_name">Alltag</string>
+  <string name="anyvo_daily_brand">ANYVO · Alltag</string>
+  <string name="anyvo_daily_open">ANYVO öffnen</string>
+  <string name="anyvo_daily_login">In der App anmelden</string>
+  <string name="anyvo_daily_refresh">In der App aktualisieren</string>
+  <string name="anyvo_daily_no_appointment">Termine in der App</string>
+  <string name="anyvo_daily_appointment">Termin %1$s</string>
+  <string name="anyvo_daily_pending">Anfrage %1$s</string>
+  <string name="anyvo_daily_offline">Offline</string>
+  <string name="anyvo_daily_error">Aktualisierung fehlgeschlagen</string>
+  <string name="anyvo_daily_stale">Aktualisierung nötig</string>
+  <string name="anyvo_daily_partial">Auszug</string>
+  <string name="anyvo_daily_as_of">Stand %1$s</string>
+  <string name="anyvo_daily_description">Anstehende Termine und Erinnerungen. Keine Gesundheitsdetails.</string>
+  <plurals name="anyvo_daily_dogs"><item quantity="one">%1$d Hund</item><item quantity="other">%1$d Hunde</item></plurals>
+  <plurals name="anyvo_daily_reminders"><item quantity="one">%1$d Erinnerung</item><item quantity="other">%1$d Erinnerungen</item></plurals>
+  <plurals name="anyvo_daily_for_dogs"><item quantity="one">für %1$d Hund</item><item quantity="other">für %1$d Hunde</item></plurals>
+  <string name="anyvo_daily_configure">Widget-Hund wählen</string>
+  <string name="anyvo_daily_all_dogs">Alle Hunde</string>
+  <string name="anyvo_daily_choose_dog">Eigenen Hund auswählen oder alle Hunde anzeigen.</string>
+  <string name="anyvo_daily_save">Speichern</string>
+  <string name="anyvo_daily_cancel">Abbrechen</string>
+  <string name="anyvo_daily_dog_slot">Hund %1$d</string>
+  <string name="anyvo_daily_selection_unavailable">Auswahl nicht verfügbar</string>
+  <string name="anyvo_daily_configuration_changed">Konto oder Auswahl wurde geändert. Bitte erneut auswählen.</string>
+</resources>
