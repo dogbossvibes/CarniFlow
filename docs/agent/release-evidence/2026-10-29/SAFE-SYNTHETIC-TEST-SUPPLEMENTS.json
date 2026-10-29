@@ -1,0 +1,138 @@
+{
+  "atUTC": "2026-10-29T08:35:17.132032+00:00",
+  "scope": "Exactly9previously omitted files; MASTER provenance/privacy allowlist; no other data approval",
+  "freshRemoteRefs": {
+    "refs/heads/backup/tracking-audit-synthetic-tests-20261029": "86a9fa60ae7f90017011ffa1920a1810455e3d05",
+    "refs/heads/backup/tracking-raw-synthetic-tests-20261029": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
+  },
+  "supplements": [
+    {
+      "group": "raw",
+      "branch": "backup/tracking-raw-synthetic-tests-20261029",
+      "head": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f",
+      "programBase": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+      "fileCount": 8,
+      "files": [
+        {
+          "group": "raw",
+          "sourcePath": "components/__tests__/DiagnosticsAccessSync.test.tsx",
+          "matchingProgramBackup": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+          "sha256": "809e97f8fd08ca9e2f64760e30a4da37ef4cf41ae35be65b45087ab05efe2641",
+          "bytes": 4543,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        },
+        {
+          "group": "raw",
+          "sourcePath": "docs/agent/tasks/PHASE3-RAW-JOURNAL-20261028.md",
+          "matchingProgramBackup": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+          "sha256": "89939e79197f75de355b67887050763a1b6b91359ae711bcdb2ea942d140a072",
+          "bytes": 11078,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        },
+        {
+          "group": "raw",
+          "sourcePath": "features/tracking/storage/__tests__/localRawMeasurementJournal.test.ts",
+          "matchingProgramBackup": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+          "sha256": "d9898c3dbc00462201e34eacf1db29682e055604a378a6e0c5682b4c12c70245",
+          "bytes": 879,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        },
+        {
+          "group": "raw",
+          "sourcePath": "features/tracking/storage/__tests__/rawCaptureSqlite.test.ts",
+          "matchingProgramBackup": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+          "sha256": "6a9b75a82fbb20c134572b9de8ca591512c614c8920b99f1160176e36bb750f2",
+          "bytes": 11393,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        },
+        {
+          "group": "raw",
+          "sourcePath": "features/tracking/storage/__tests__/rawMeasurementJournal.test.ts",
+          "matchingProgramBackup": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+          "sha256": "9eef5a4693ab71d5214a6713ebefe1858c3092f23c44b783b2b7d1b8e496814b",
+          "bytes": 8781,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        },
+        {
+          "group": "raw",
+          "sourcePath": "features/tracking/storage/__tests__/rawRecordingSession.test.ts",
+          "matchingProgramBackup": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+          "sha256": "2360ba8d5eed82cb9aedac94caf98003c8aadac23c6b5ef611c677fef6e4c691",
+          "bytes": 5118,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        },
+        {
+          "group": "raw",
+          "sourcePath": "features/tracking/utils/__tests__/gnssConstellations.test.ts",
+          "matchingProgramBackup": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+          "sha256": "9981ac23d0745c401c2f5e61dd238786a4c748981a3405e13a6528379b817d5d",
+          "bytes": 1015,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        },
+        {
+          "group": "raw",
+          "sourcePath": "lib/localDb/__tests__/objectReviewUpgrade.test.ts",
+          "matchingProgramBackup": "144d98cbf21ca1687a2a1080ee4cd1730e654d45",
+          "sha256": "9413fd2722d13b9a6bf195135ac8464963010b19c30f03de7ac16eb50377806f",
+          "bytes": 6349,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        }
+      ],
+      "task": "T-138",
+      "freshRemote": "PASS",
+      "testsExecuted": false,
+      "originalsUnchanged": true,
+      "status": "SYNTHETIC_TEST_WIP_BACKUP_NOT_RELEASE_READY"
+    },
+    {
+      "group": "audit",
+      "branch": "backup/tracking-audit-synthetic-tests-20261029",
+      "head": "86a9fa60ae7f90017011ffa1920a1810455e3d05",
+      "programBase": "633ad0029569ddd40004b976890ce9a31496f569",
+      "fileCount": 1,
+      "files": [
+        {
+          "group": "audit",
+          "sourcePath": "features/tracking/utils/__tests__/motionArrivalAudit.test.ts",
+          "matchingProgramBackup": "633ad0029569ddd40004b976890ce9a31496f569",
+          "sha256": "6932197fe59786425a7bc375a387855e316ea9b6ea9d20dfba6c76167711ba64",
+          "bytes": 1787,
+          "alreadyIdenticalInProgramBackup": false,
+          "decision": "ALLOW_UNMODIFIED_WIP_BACKUP",
+          "privacyReview": "Full source read by MASTER: data constructed by literals/maps/functions and mocked accounts, no imported real traces; doc technical history only. No credentials/personal/health data identified.",
+          "functionalQA": "NOT_EXECUTED_IN_THIS_REVIEW"
+        }
+      ],
+      "task": "T-139",
+      "freshRemote": "PASS",
+      "testsExecuted": false,
+      "originalsUnchanged": true,
+      "status": "SYNTHETIC_TEST_WIP_BACKUP_NOT_RELEASE_READY"
+    }
+  ],
+  "noNewTestsOrProductReadiness": true
+}

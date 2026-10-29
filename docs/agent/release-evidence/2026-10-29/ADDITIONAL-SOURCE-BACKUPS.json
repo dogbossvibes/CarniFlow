@@ -61,35 +61,59 @@
       "omitted": [
         {
           "path": "components/__tests__/DiagnosticsAccessSync.test.tsx",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-raw-synthetic-tests-20261029",
+          "supplementCommit": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
         },
         {
           "path": "docs/agent/tasks/PHASE3-RAW-JOURNAL-20261028.md",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-raw-synthetic-tests-20261029",
+          "supplementCommit": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
         },
         {
           "path": "features/tracking/storage/__tests__/localRawMeasurementJournal.test.ts",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-raw-synthetic-tests-20261029",
+          "supplementCommit": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
         },
         {
           "path": "features/tracking/storage/__tests__/rawCaptureSqlite.test.ts",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-raw-synthetic-tests-20261029",
+          "supplementCommit": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
         },
         {
           "path": "features/tracking/storage/__tests__/rawMeasurementJournal.test.ts",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-raw-synthetic-tests-20261029",
+          "supplementCommit": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
         },
         {
           "path": "features/tracking/storage/__tests__/rawRecordingSession.test.ts",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-raw-synthetic-tests-20261029",
+          "supplementCommit": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
         },
         {
           "path": "features/tracking/utils/__tests__/gnssConstellations.test.ts",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-raw-synthetic-tests-20261029",
+          "supplementCommit": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
         },
         {
           "path": "lib/localDb/__tests__/objectReviewUpgrade.test.ts",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-raw-synthetic-tests-20261029",
+          "supplementCommit": "16a6a0e811fccab9b39c6eecfdbe95c83bfe176f"
         },
         {
           "path": "node_modules",
@@ -109,7 +133,10 @@
       "omitted": [
         {
           "path": "features/tracking/utils/__tests__/motionArrivalAudit.test.ts",
-          "reason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded"
+          "initialExclusionReason": "Not on program-source allowlist; tests/fixtures/docs/data not inspected for measurement/customer content; node_modules excluded",
+          "currentStatus": "NOW_BACKED_UP_UNMODIFIED_AFTER_TARGETED_SYNTHETIC_PROVENANCE_PRIVACY_REVIEW",
+          "supplementBranch": "backup/tracking-audit-synthetic-tests-20261029",
+          "supplementCommit": "86a9fa60ae7f90017011ffa1920a1810455e3d05"
         },
         {
           "path": "node_modules",
@@ -123,5 +150,6 @@
     }
   ],
   "noOriginalWorktreeChanges": true,
-  "noTestsOrNativeSecurityReleaseApprovalForLegacy103": true
+  "noTestsOrNativeSecurityReleaseApprovalForLegacy103": true,
+  "syntheticTestSupplementReceipt": "SAFE-SYNTHETIC-TEST-SUPPLEMENTS.json"
 }
