@@ -1,0 +1,36 @@
+{
+  "status": "PASS_STATIC_SQL_SECURITY_REVIEW_RUNTIME_AND_INSTALLATION_GATES_OPEN",
+  "reviewer": "Chat01 independent from sole SQL writer Chat05",
+  "at": "2026-10-29T02:01:50.400285+00:00",
+  "commit": "59d1eab46daa5546ac93d8f132cb1506b906889b",
+  "migrationPath": "supabase/migrations/20261029110000_list_received_health_dogs.sql",
+  "migrationSHA256": "d0f89a9cc509d27690861c3cd4c4a8dc375cd482fe5a0028be46c85feaac1356",
+  "baselineHelperSHA256": "aa597eefdf5ab871335409879545a4b4b94d469f446e0600e18c6ff20da88b51",
+  "localRLSTestSHA256": "57881d56731ebbb489bb3f8f9fb1dc3a83b14a45a1c5c2f6b06733fc550326c7",
+  "findings": [],
+  "verified": [
+    "security definer is scoped by non-null auth.uid and exact grantee equality, never caller-supplied owner or recipient",
+    "empty search_path; table/helper references explicitly schema-qualified; typed UUID dog filter; no dynamic SQL",
+    "grant must be active at transaction time, not revoked, started, not expired, with at least one actual true permission",
+    "dog still owned by grant owner; profile join yields only owner display name, not full rows or contact/account fields",
+    "existing health_grant_connection_valid requires accepted directed owner/grantee connection when a connection is specified; null connection intentionally follows existing direct-grant contract",
+    "returns only grant and dog identifiers, dog/owner display names, validity times and explicit permission-name allowlist; no underlying Health/Docs rows",
+    "PUBLIC/anon function privileges revoked, EXECUTE granted to authenticated; no added table SELECT grants or RLS policy weakening",
+    "migration contains only new read function and privilege DDL; no customer-row INSERT/UPDATE/DELETE, destructive migration, cache reset or historical data correction",
+    "local RLS test fixture is explicitly LOCAL/CI ONLY, begins transaction and rolls back synthetic identities; new cases cover recipient isolation, dog filter, permission mask, no full dog-row read, revocation, future/expired grants and inactive connection"
+  ],
+  "runtimeTestsExecutedByReviewer": false,
+  "whyNotRuntimePass": "No PostgreSQL/Docker runtime supplied by SQL author; Supabase CLI unavailable/killed in author checks. Static reading does not execute function/RLS.",
+  "productionStateFreshlyVerified": false,
+  "openRequiredGates": [
+    "Authenticated read-only production catalog/function/helper/column/index/privilege contract check, including any existing same-signature function",
+    "Actual isolated PostgreSQL/Supabase RLS-suite execution and resulting evidence; do not run local fixture against Production",
+    "Concrete authorized non-destructive installation plan for exact migration; preserve existing customer rows and grants; no DB permission inferred from broad OTA request",
+    "Post-install readback and authenticated owner/recipient/outside-account A/B plus expiry/revocation/no-underlying-row-leak checks using explicitly confirmed test identities/data scope",
+    "Client runtime-specific integration preserving current T109/Tracking/LiveShare, full bundle/native/production preflight and actual CDN before OTA"
+  ],
+  "databaseOrCustomerWriteByReviewer": false,
+  "liveInstallationPerformed": false,
+  "otaReadiness": "BLOCKED_BACKEND_NOT_INSTALLED_OR_RUNTIME_VERIFIED",
+  "customerDataRetentionConflict": "NONE found in this exact additive read-only RPC migration; no absolute guarantee or live-data modification claimed"
+}
