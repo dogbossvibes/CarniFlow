@@ -27,9 +27,12 @@
     {
       "scope": "Sharing backend T115",
       "ref": "refs/heads/feat/health-shared-recipient-db-20261029",
-      "commit": "d096342fc979ec592d2bc5b744ff0b5f2a19b861",
+      "commit": "8b39655770d385f9bbdf6235d01bc80891da5043",
       "url": "https://github.com/dogbossvibes/CarniFlow/tree/feat/health-shared-recipient-db-20261029",
-      "masterFreshRemoteVerified": true
+      "masterFreshRemoteVerified": true,
+      "previousBackupCommit": "d096342fc979ec592d2bc5b744ff0b5f2a19b861",
+      "releaseAgentFreshRemoteVerified": true,
+      "releaseAgentVerifiedAtUTC": "2026-10-29T08:15:36.743498+00:00"
     },
     {
       "scope": "iOS monitoring consent WIP",
