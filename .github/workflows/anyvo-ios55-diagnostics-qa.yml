@@ -40,6 +40,7 @@ jobs:
           printf '%s\n' \
             .github/workflows/anyvo-ios55-diagnostics-qa.yml \
             .github/workflows/anyvo-ios55-ota-preflight.yml \
+            features/tracking/utils/__tests__/turnAwareLineGate.test.ts \
             services/__tests__/diagnosticsAccessService.test.ts \
             services/diagnosticsAccessService.ts \
             | sort > "$RUNNER_TEMP/expected-files.txt"
