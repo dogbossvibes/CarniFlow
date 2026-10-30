@@ -28,3 +28,13 @@ it('preserves nearby return legs and duplicate marker identities instead of dele
   expect(groupMapFeatures(features, 2).map(group => group.map(m => m.id))).toEqual([['a', 'b'], ['c']]);
   expect(groupMapFeatures(features, NaN)).toHaveLength(3);
 });
+
+it('does not swallow a chain of individually separable markers into one distant badge', () => {
+  const features = Array.from({ length: 10 }, (_, id) => ({ id, lat: id / 111320, lng: 0 }));
+  const groups = groupMapFeatures(features, 1.5);
+  expect(groups.flat().map(m => m.id)).toEqual(features.map(m => m.id));
+  for (const group of groups) {
+    const spanM = Math.abs(group.at(-1)!.lat - group[0].lat) * 111320;
+    expect(spanM).toBeLessThanOrEqual(1.51);
+  }
+});
