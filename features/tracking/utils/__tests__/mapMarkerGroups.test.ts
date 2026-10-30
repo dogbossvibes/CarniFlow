@@ -36,3 +36,13 @@ it('names every grouped object and endpoint without changing their positions', (
   expect(mapFeatureGroupLabel(groups[0])).toBe('G1 · G2 · G3 · Ende');
   expect(JSON.stringify(features)).toBe(original);
 });
+
+it('does not swallow a chain of individually separable markers into one distant badge', () => {
+  const features = Array.from({ length: 10 }, (_, id) => ({ id, lat: id / 111320, lng: 0 }));
+  const groups = groupMapFeatures(features, 1.5);
+  expect(groups.flat().map(m => m.id)).toEqual(features.map(m => m.id));
+  for (const group of groups) {
+    const spanM = Math.abs(group.at(-1)!.lat - group[0].lat) * 111320;
+    expect(spanM).toBeLessThanOrEqual(1.51);
+  }
+});

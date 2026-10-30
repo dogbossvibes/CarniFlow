@@ -1245,6 +1245,7 @@ export default function TrackRunScreen() {
           )}
           {view === 'map' ? (
             <TrackingMap
+              comparison
               distractionTracks={distractionTracks}
                   layColor={layColor}
               layPoints={snapData.laidLatLng} dimLay
