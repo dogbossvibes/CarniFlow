@@ -2,7 +2,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
-import { canEditOwnEvent } from '@/features/calendar/eventEditing';
+import { canDeleteOwnEvent, canEditOwnEvent } from '@/features/calendar/eventEditing';
 import type { CalendarEvent } from '@/types/calendar';
 import { fmtTime, relativeDayLabel } from '@/lib/eventFormat';
 import { DEVICE_CALENDAR_AVAILABLE } from '@/lib/deviceCalendar';
@@ -25,14 +25,14 @@ export function EventActionsSheet({ visible, event, userId, onClose, onDismiss, 
       {editable && event.status !== 'completed' && event.status !== 'cancelled' && onCancelEvent ? <Action label={t('calendar.cancelAppointment')} onPress={onCancelEvent} disabled={busy} /> : null}
       {onOpenSource ? <Action label={t('health.recordTitle')} onPress={onOpenSource} disabled={busy} /> : null}
       {DEVICE_CALENDAR_AVAILABLE ? <Action label={t('calendar.exportEvent')} onPress={onExport} disabled={busy} /> : null}
-      {editable ? <Action label={t('calendar.deleteEvent')} onPress={onDelete} disabled={busy} /> : null}
+      {canDeleteOwnEvent(event, userId) ? <Action label={t('calendar.deleteEvent')} onPress={onDelete} disabled={busy} destructive /> : null}
       <Action label={t('common.cancel')} onPress={onClose} disabled={busy} />
     </ScrollView>
   </AnyvoBottomSheet>;
 }
 
-function Action({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
-  return <TouchableOpacity accessibilityRole="button" disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={s.action}><Text style={s.label}>{label}</Text></TouchableOpacity>;
+function Action({ label, onPress, disabled = false, destructive = false }: { label: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
+  return <TouchableOpacity accessibilityRole="button" disabled={disabled} accessibilityState={{ disabled }} onPress={onPress} style={s.action}><Text style={[s.label, destructive && { color: C.danger }]}>{label}</Text></TouchableOpacity>;
 }
 const s = StyleSheet.create({
   body: { gap: 12, paddingBottom: 12 }, detail: { color: C.white, fontSize: 15 },

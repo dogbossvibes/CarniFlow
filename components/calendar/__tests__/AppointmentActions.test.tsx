@@ -34,3 +34,17 @@ it('source-managed appointments offer their source and never mark a vaccination 
  expect(node.root.findAll(n=>n.props.children==='calendar.markCompleted')).toHaveLength(0);
  expect(node.root.findAll(n=>n.props.children==='health.recordTitle').length).toBeGreaterThan(0);
 });
+
+
+it('offers deletion for an owned trainer appointment without enabling owner editing', () => {
+  act(() => { node = TestRenderer.create(<EventActionsSheet visible event={{...event,trainer_id:'trainer',created_by:'trainer'}} userId="owner-a" onClose={()=>{}} onDismiss={()=>{}} onEdit={()=>{}} onDelete={()=>{}} onExport={()=>{}} />); });
+  expect(node.root.findAll(n=>n.props.children==='calendar.deleteEvent').length).toBeGreaterThan(0);
+  expect(node.root.findAll(n=>n.props.children==='common.edit')).toHaveLength(0);
+});
+it('never offers source deletion or deletion during a busy mutation', () => {
+  const remove=jest.fn();
+  act(() => { node = TestRenderer.create(<EventActionsSheet visible event={{...event,source_id:'health-source'}} userId="owner-a" onClose={()=>{}} onDismiss={()=>{}} onEdit={()=>{}} onDelete={remove} onExport={()=>{}} />); });
+  expect(node.root.findAll(n=>n.props.children==='calendar.deleteEvent')).toHaveLength(0);
+  act(() => { node.update(<EventActionsSheet visible event={event} userId="owner-a" busy onClose={()=>{}} onDismiss={()=>{}} onEdit={()=>{}} onDelete={remove} onExport={()=>{}} />); });
+  expect(node.root.findAll(n=>n.props.accessibilityRole==='button').every(n=>n.props.accessibilityState?.disabled)).toBe(true);
+});
