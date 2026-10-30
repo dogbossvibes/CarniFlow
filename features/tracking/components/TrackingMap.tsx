@@ -150,9 +150,10 @@ interface Props {
 }
 
 const EMPTY_MARKERS: MapMarker[] = [];
+const EMPTY_SEGMENTS: TrackSegment[] = [];
 
 export function TrackingMap({
-  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = [], breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
+  comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
   smartFollow = false, courseDeg, speedMps,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
@@ -211,7 +212,9 @@ export function TrackingMap({
     [layPoints],
   );
   const laySegmentParts = useMemo(
-    () => buildTrackSegmentPolylines(layPoints.map(p => ({ ...p, t: 0 })), segments),
+    () => buildTrackSegmentPolylines(layPoints.map(p => ({ ...p, t: 0 })), segments).map(part => ({
+      ...part, mapCoordinates: part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng })),
+    })),
     [layPoints, segments],
   );
   const runParts = useMemo(
@@ -350,7 +353,7 @@ export function TrackingMap({
           return (
             <Polyline
               key={part.id}
-              coordinates={part.coordinates.map(p => ({ latitude: p.lat, longitude: p.lng }))}
+              coordinates={part.mapCoordinates}
               strokeColor={stroke.strokeColor}
               strokeWidth={stroke.strokeWidth}
               lineDashPattern={stroke.lineDashPattern}
@@ -364,7 +367,7 @@ export function TrackingMap({
         )))}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
         {!comparison && runParts.filter(part => part.length > 1).map((part, index) => (
-          <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={4} />
+          <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={2} zIndex={4} />
         ))}
 
         {/* Verworfene Punkte (Debug): kleine rote Marker */}
