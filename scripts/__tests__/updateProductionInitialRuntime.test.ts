@@ -237,7 +237,7 @@ describe('Reine Logik', () => {
   });
   it('evaluateNativeBaseBuild: Build 44 gültig; parseNativeBuild normalisiert die EAS-Felder', () => {
     const b = call('parseNativeBuild', build44());
-    expect(b).toEqual({ id: BUILD_44, status: 'FINISHED', platform: 'android', runtimeVersion: '1.0.3', appVersion: '1.0.3', appBuildVersion: '44', channel: 'production', buildProfile: 'production', gitCommitHash: h.base });
+    expect(b).toEqual({ id: BUILD_44, status: 'FINISHED', platform: 'android', runtimeVersion: '1.0.3', appVersion: '1.0.3', appBuildVersion: '44', channel: 'production', buildProfile: 'production', gitCommitHash: h.base, fingerprintHash: null });
     expect(call('evaluateNativeBaseBuild', { build: b, buildId: BUILD_44, platform: 'android', runtime: '1.0.3' })).toEqual([]);
     expect(call('parseNativeBuild', null)).toBeNull();
   });

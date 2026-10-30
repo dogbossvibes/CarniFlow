@@ -1,0 +1,19 @@
+{
+  "buildId": "442f7bc3-14f8-4ec0-9cf3-138a3dd6f79d",
+  "nativeFingerprint": "809a188f97cb15040d5b9fa07f427af370cdd99f",
+  "localGeneration": "eas fingerprint:generate --platform ios --build-profile ios49-map-repair --json --non-interactive",
+  "localSource": "19cacfa plus JS-only T142 control; T142 excluded from actual T144 release",
+  "exactMatch": true,
+  "ipaVersion": "1.0.6",
+  "ipaBuild": "57",
+  "runtime": "1.0.6-map49-v1",
+  "rawFingerprintContentsExported": false,
+  "guardTests": {
+    "suites": 6,
+    "passed": 125,
+    "failed": 0
+  },
+  "independentFingerprintTests": 22,
+  "nativeBuildStarted": false,
+  "otaStarted": false
+}

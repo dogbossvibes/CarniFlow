@@ -65,6 +65,7 @@ import { execFileSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { assertProductionSupabase, PROD_REF } from './guard-prod-supabase.mjs';
+import { validateQualityEvidence } from './release-quality-evidence.mjs';
 
 export const REQUIRED_PRODUCTION_ENV = Object.freeze([
   'EXPO_PUBLIC_BACKEND_ENV',
@@ -244,6 +245,7 @@ export function parseNativeBuild(buildJson) {
     channel: buildJson.updateChannel?.name ?? buildJson.channel ?? null,
     buildProfile: buildJson.buildProfile ?? null,
     gitCommitHash: buildJson.gitCommitHash ?? null,
+    fingerprintHash: buildJson.fingerprint?.hash ?? null,
   };
 }
 
@@ -281,9 +283,10 @@ export function resolveProductionBuildProfile(easJson, name, platform) {
 const appVersionFrom = (config, platform) => config?.expo?.[platform]?.version ?? config?.expo?.version ?? null;
 
 /** Validierung des nativen Basis-Builds (Initial-Modus). Leere Liste = gültige Basis.
- * Abweichende Runtime/Profil nur mit Konfiguration vom unveränderlichen EAS-Build-Commit.
+ * Override proof: immutable build config OR fresh exact native fingerprint.
+ * Both paths retain all platform/runtime/channel/profile/ancestry guards.
  */
-export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeConfig, releaseAppVersion }) {
+export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeConfig, releaseAppVersion, nativeFingerprint }) {
   if (!build) return [`EAS-Build ${buildId ?? '—'} nicht gefunden/lesbar`];
   const problems = [];
   if (build.id !== buildId) problems.push(`EAS-Build-ID ${build.id} ≠ angefragt ${buildId}`);
@@ -291,23 +294,21 @@ export function evaluateNativeBaseBuild({ build, buildId, platform, runtime, nat
   if (build.platform !== platform) problems.push(`Basis-Build ${build.id}: Plattform ${build.platform ?? '—'} ≠ Ziel ${platform}`);
   if (build.runtimeVersion !== runtime) problems.push(`Basis-Build ${build.id}: Runtime ${build.runtimeVersion ?? '—'} ≠ Ziel-Runtime ${runtime}`);
   const needsConfig = build.appVersion !== runtime || build.buildProfile !== 'production';
-  const sourceVersion = appVersionFrom(nativeConfig?.appJson, platform);
-  const sourceExpo = nativeConfig?.appJson?.expo;
-  // EAS managed metadata can collect the root version while the signed iOS app
-  // uses its explicit override. Only accept that exact immutable-source case,
-  // including the explicitly configured build number; never normalize the build.
-  const iosCollectorMatches = platform === 'ios'
-    && typeof sourceExpo?.ios?.version === 'string'
-    && typeof sourceExpo?.ios?.buildNumber === 'string'
-    && build.appVersion === sourceExpo.version
-    && build.appBuildVersion === sourceExpo.ios.buildNumber;
   const configMatches = !!nativeConfig && typeof build.appVersion === 'string' && !!build.appVersion.trim()
     && resolveReleaseRuntime(nativeConfig.appJson, platform) === runtime
-    && (sourceVersion === build.appVersion || iosCollectorMatches)
-    && releaseAppVersion === sourceVersion;
-  if (build.appVersion !== runtime && !configMatches) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion oder belegter Override)`);
+    && appVersionFrom(nativeConfig.appJson, platform) === build.appVersion
+    && releaseAppVersion === build.appVersion;
+  const fingerprintMatches = !!nativeFingerprint
+    && /^[0-9a-f]{40}$/.test(build.fingerprintHash ?? '')
+    && nativeFingerprint.hash === build.fingerprintHash
+    && nativeFingerprint.buildId === build.id
+    && nativeFingerprint.platform === platform
+    && nativeFingerprint.runtime === runtime
+    && nativeFingerprint.buildProfile === build.buildProfile
+    && !!releaseAppVersion && nativeFingerprint.releaseAppVersion === releaseAppVersion;
+  if (build.appVersion !== runtime && !configMatches && !fingerprintMatches) problems.push(`Basis-Build ${build.id}: App-Version ${build.appVersion ?? '—'} passt nicht zur Ziel-Runtime ${runtime} (policy appVersion oder belegter Override)`);
   if (build.channel !== PRODUCTION_CHANNEL) problems.push(`Basis-Build ${build.id}: Channel ${build.channel ?? '—'} ≠ ${PRODUCTION_CHANNEL}`);
-  if (needsConfig && !configMatches) problems.push(`Basis-Build ${build.id}: App-Version/Runtime nicht durch Build-Commit-Konfiguration und Release-App-Version belegt`);
+  if (needsConfig && !configMatches && !fingerprintMatches) problems.push(`Basis-Build ${build.id}: App-Version/Runtime nicht durch Build-Commit-Konfiguration und Release-App-Version belegt`);
   if (needsConfig && !resolveProductionBuildProfile(nativeConfig?.easJson, build.buildProfile, platform))
     problems.push(`Basis-Build ${build.id}: Profil ${build.buildProfile ?? '—'} ist kein belegtes Production-Store-Profil`);
   if (!/^[0-9a-f]{40}$/.test(build.gitCommitHash ?? '')) problems.push(`Basis-Build ${build.id}: kein gültiger gitCommitHash`);
@@ -546,8 +547,37 @@ function readBaseline(platform, runtime, initial, buildId) {
   const nativeConfig = needsConfig ? readNativeBuildConfig(build.gitCommitHash) : undefined;
   const releaseAppVersion = needsConfig && existsSync('app.json')
     ? appVersionFrom(JSON.parse(readFileSync('app.json', 'utf8')), platform) : undefined;
-  const problems = evaluateNativeBaseBuild({ build, buildId, platform, runtime, nativeConfig, releaseAppVersion });
+  const input = { build, buildId, platform, runtime, nativeConfig, releaseAppVersion };
+  const nativeFingerprint = evaluateNativeBaseBuild(input).length
+    ? readLocalNativeFingerprint(build, platform, runtime, releaseAppVersion) : null;
+  if (nativeFingerprint) console.log(`Native Fingerprint (fresh build/profile comparison): PASS ${nativeFingerprint.hash}`);
+  const problems = evaluateNativeBaseBuild({ ...input, nativeFingerprint });
   return { active: build?.gitCommitHash ? nativeBaseline(build) : null, ownOta: null, problems };
+}
+
+/** Fresh native contract proof, never a user-supplied hash or relaxed version check.
+ * EAS computes this from the current dependency tree/config under the exact
+ * production store build profile. The second initial-baseline read reruns it.
+ * Capture stdout only: fingerprints include source/env contents, never log them.
+ */
+export function readLocalNativeFingerprint(build, platform, runtime, releaseAppVersion) {
+  try {
+    if (!build || build.status !== 'FINISHED' || build.platform !== platform
+      || build.channel !== PRODUCTION_CHANNEL || build.runtimeVersion !== runtime
+      || !/^[0-9a-f]{40}$/.test(build.fingerprintHash ?? '')
+      || !/^[0-9a-f]{40}$/.test(build.gitCommitHash ?? '') || !releaseAppVersion) return null;
+    const appJson = JSON.parse(readFileSync('app.json', 'utf8'));
+    const easJson = JSON.parse(readFileSync('eas.json', 'utf8'));
+    if (resolveReleaseRuntime(appJson, platform) !== runtime
+      || appVersionFrom(appJson, platform) !== releaseAppVersion
+      || !resolveProductionBuildProfile(easJson, build.buildProfile, platform)) return null;
+    const local = parseJsonOutput(execFileSync('eas', ['fingerprint:generate', '--platform', platform,
+      '--build-profile', build.buildProfile, '--json', '--non-interactive'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024, timeout: 180000 }));
+    if (!/^[0-9a-f]{40}$/.test(local.hash ?? '') || local.hash !== build.fingerprintHash) return null;
+    return { hash: local.hash, buildId: build.id, platform, runtime,
+      releaseAppVersion, buildProfile: build.buildProfile };
+  } catch { return null; }
 }
 
 function readChannel() {
@@ -634,6 +664,16 @@ function main() {
   } catch { /* best-effort */ }
   console.log(`git HEAD: ${head}`);
   console.log(`git status --short: ${dirty ? '\n' + dirty : '(sauber)'}`);
+
+  const qualityFiles = argValues(args, '--quality-evidence');
+  const qualityInput = () => ({
+    receiptPath: qualityFiles.length === 1 ? qualityFiles[0] : undefined,
+    head: sh('git', ['rev-parse', 'HEAD']).trim(),
+    tree: sh('git', ['rev-parse', 'HEAD^{tree}']).trim(),
+    platform,
+    runtime: resolveReleaseRuntime(JSON.parse(readFileSync('app.json', 'utf8')), platform),
+    repositoryRoot: sh('git', ['rev-parse', '--show-toplevel']).trim(),
+  });
 
   // 2. Staging-Leak-Guard (lokale Env-Quellen).
   if (!assertProductionSupabase()) {
@@ -739,6 +779,14 @@ function main() {
     console.log(dryRun ? 'Publish würde VERWEIGERT. --dry-run: nichts veröffentlicht.' : 'HARD STOP. Kein Update veröffentlicht. (Kein Auto-Rebase/-Merge — bewusst integrieren.)');
     process.exit(1);
   }
+  let quality;
+  try { quality = validateQualityEvidence(qualityInput()); }
+  catch { quality = { ok: false, problems: ['Quality-Quellenbindung nicht bestimmbar.'] }; }
+  if (!quality.ok) {
+    for (const problem of quality.problems) console.log(`❌ ${problem}`);
+    console.log('STOP: Keine vollständigen Quality-/Reviewbelege am exakten Release-Commit.');
+    process.exit(1);
+  }
   if (dryRun) { console.log('Publish würde ERLAUBT.'); console.log('--dry-run: nichts veröffentlicht.'); process.exit(0); }
 
   // 6. Zweiter EAS-Check DIREKT vor dem Publish — Production darf sich nicht verändert haben.
@@ -758,6 +806,15 @@ function main() {
     process.exit(1);
   }
   console.log('Zweiter EAS-Check: Production unverändert.');
+
+  // Rebind source AND evidence after the live preflight, before bundle export.
+  try {
+    if (sh('git', ['rev-parse', 'HEAD']).trim() !== head || sh('git', ['status', '--short']).trim()
+      || !validateQualityEvidence(qualityInput()).ok) throw new Error();
+  } catch {
+    console.log('STOP: Quelle oder Quality-Belege haben sich während der Vorbereitung verändert.');
+    process.exit(1);
+  }
 
   console.log(`Bestätigt. Veröffentliche Production-Update (${platform}): "${message}"`);
   // Release-Commit als NICHT geheimer Build-Metadatenwert ins OTA-Bundle (nur Anzeige in der Fährten-Diagnose).

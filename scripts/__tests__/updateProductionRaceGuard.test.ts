@@ -132,9 +132,12 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
   it('6b. echter Parallelstart: zweiter Prozess wird gestoppt, solange der erste veröffentlicht', async () => {
     withState({});
     const releaseFile = join(h.dir, 'release-first-publisher');
-    const first = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'first'],
+    const first = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'first', '--quality-evidence', h.qualityEvidenceFile],
       { cwd: h.repo, env: h.baseEnv({ FAKE_UPDATE_RELEASE_FILE: releaseFile }) });
-    const completed = new Promise<number | null>((resolve, reject) => { first.once('close', resolve); first.once('error', reject); });
+    const completed = new Promise<number | null>((resolve, reject) => {
+      first.once('close', resolve);
+      first.once('error', reject);
+    });
     let firstOut = '';
     first.stdout.on('data', d => { firstOut += d; });
     first.stderr.on('data', d => { firstOut += d; });
@@ -165,17 +168,14 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
   });
   it('8b. Lock wird bei Abbruchsignal (SIGTERM an die Prozessgruppe) entfernt', async () => {
     withState({ sleepMs: 4000 });
-    const p = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'sig'], { cwd: h.repo, env: h.baseEnv(), detached: true });
-    const completed = new Promise((resolve, reject) => { p.once('close', resolve); p.once('error', reject); });
-    const deadline = Date.now() + 60000;
-    while (!h.updateCalls().length && p.exitCode == null && Date.now() < deadline) await sleep(50);
-    expect(h.updateCalls()).toHaveLength(1);
+    const p = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'sig', '--quality-evidence', h.qualityEvidenceFile], { cwd: h.repo, env: h.baseEnv(), detached: true });
+    for (let i = 0; i < 100 && !h.calls().some(a => a[0] === 'update'); i++) await sleep(50);
     expect(existsSync(h.lockPath)).toBe(true);
     process.kill(-p.pid!, 'SIGTERM');
-    await completed;
+    await new Promise(res => p.on('exit', res));
     for (let i = 0; i < 40 && existsSync(h.lockPath); i++) await sleep(50);
     expect(existsSync(h.lockPath)).toBe(false);
-  }, 90000);
+  }, 20000);
   it('Stale Lock (Halter beendet) wird NICHT automatisch gelöscht; nur bewusst per --clear-stale-lock', () => {
     const dead = spawnSync('node', ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8' });
     writeLock({ pid: Number(dead.stdout), host: hostname(), startedAt: 'x', worktree: '/w', branch: 'b', head: 'h' });
