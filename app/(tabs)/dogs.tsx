@@ -12,9 +12,11 @@ import { quotaAllowsNew } from "@/features/subscription/plans";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { SharedDogsInbox } from "@/components/dogs/SharedDogsInbox";
 import {
     ActivityIndicator,
+    TouchableOpacity,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -25,6 +27,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HundeScreen() {
   const router = useRouter();
+  const [section, setSection] = useState<"owned" | "shared">("owned");
   const { t } = useT();
   const { dogs, loading, error, refresh } = useDogs();
   const { isPro, loading: capLoading } = useCapabilities();
@@ -66,7 +69,10 @@ export default function HundeScreen() {
         </AnimatedPressable>
       </View>
 
-      {loading ? (
+      <View style={s.segments}>
+        {(['owned', 'shared'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="tab" accessibilityState={{ selected: section === value }} style={[s.segment, section === value && s.segmentActive]} onPress={() => setSection(value)}><Text style={[s.segmentText, section === value && s.segmentTextActive]}>{t(value === 'owned' ? 'sharing.myDogs' : 'sharing.withMe')}</Text></TouchableOpacity>)}
+      </View>
+      {section === 'shared' ? <SharedDogsInbox /> : loading ? (
         <View style={s.mitte}>
           <ActivityIndicator size="large" color={C.accent} />
         </View>
@@ -144,6 +150,11 @@ export default function HundeScreen() {
 }
 
 const s = StyleSheet.create({
+  segments: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 16, padding: 5, borderRadius: 18, backgroundColor: C.card, gap: 6 },
+  segment: { flex: 1, minHeight: 48, padding: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  segmentActive: { backgroundColor: C.accent },
+  segmentText: { color: C.muted, fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  segmentTextActive: { color: C.accentText },
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1 },
 

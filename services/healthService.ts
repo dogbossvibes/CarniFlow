@@ -51,6 +51,9 @@ export interface HealthOverviewData {
   sectionLimits?: Partial<Record<HealthSection, boolean>>;
 }
 
+export type HealthWeightEntry = Pick<DogHealthEntryRow, 'id' | 'dog_id' | 'entry_date' | 'weight_kg' | 'created_at'>;
+export type SharedHealthOverviewData = Omit<HealthOverviewData, 'entries'> & { entries: HealthWeightEntry[] };
+
 async function ownerId(): Promise<string> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Nicht eingeloggt');
@@ -63,9 +66,11 @@ async function readOptional<T>(query: PromiseLike<{ data: T[] | null; error: { m
   return { data: rows.slice(0, HEALTH_SECTION_LIMIT), limited: !error && rows.length > HEALTH_SECTION_LIMIT, ...(error ? { error: error.message } : {}) };
 }
 
-export async function loadHealthOverview(dogId: string): Promise<HealthOverviewData> {
+export function loadHealthOverview(dogId: string, options: { weightFieldsOnly: true }): Promise<SharedHealthOverviewData>;
+export function loadHealthOverview(dogId: string): Promise<HealthOverviewData>;
+export async function loadHealthOverview(dogId: string, options: { weightFieldsOnly?: boolean } = {}): Promise<HealthOverviewData | SharedHealthOverviewData> {
   const [entries, vaccinations, medications, conditions, parasites, vetVisits, documents] = await Promise.all([
-    readOptional<DogHealthEntryRow>(supabase.from('dog_health_entries').select('*').eq('dog_id', dogId).order('entry_date', { ascending: false }).order('created_at', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
+    readOptional<DogHealthEntryRow | HealthWeightEntry>(supabase.from('dog_health_entries').select(options.weightFieldsOnly ? 'id,dog_id,entry_date,weight_kg,created_at' : '*').eq('dog_id', dogId).order('entry_date', { ascending: false }).order('created_at', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1).returns<(DogHealthEntryRow | HealthWeightEntry)[]>()),
     readOptional<HealthVaccinationRow>(supabase.from('dog_health_vaccinations').select('*').eq('dog_id', dogId).order('administered_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
     readOptional<HealthMedicationRow>(supabase.from('dog_health_medications').select('*').eq('dog_id', dogId).order('starts_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
     readOptional<HealthConditionRow>(supabase.from('dog_health_conditions').select('*').eq('dog_id', dogId).order('started_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
