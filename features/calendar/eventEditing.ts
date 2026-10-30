@@ -5,6 +5,12 @@ export function canEditOwnEvent(event: CalendarEvent, userId?: string): boolean 
   return !!userId && event.owner_id === userId && event.created_by === userId && !event.trainer_id && !event.source_type && !event.source_id;
 }
 
+// Owners may delete their own calendar appointment, including trainer-created
+// appointments. Source-managed health records keep their source-specific flow.
+export function canDeleteOwnEvent(event: CalendarEvent, userId?: string): boolean {
+  return !!userId && event.owner_id === userId && !event.source_type && !event.source_id;
+}
+
 export const EDITABLE_EVENT_FIELDS = ['title', 'type', 'types', 'dog_id', 'dog_ids', 'start_at', 'end_at', 'location', 'notes', 'reminder_minutes'] as const;
 export type EventEditPatch = Partial<Pick<CalendarEvent, typeof EDITABLE_EVENT_FIELDS[number]>>;
 
