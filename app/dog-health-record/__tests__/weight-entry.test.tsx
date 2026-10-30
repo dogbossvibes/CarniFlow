@@ -4,6 +4,12 @@
 // test in this file is unaffected by it being present.
 import 'react-native-gesture-handler/jestSetup';
 
+// Native picker is exercised separately; this screen suite runs in Android Jest too.
+jest.mock('@react-native-community/datetimepicker', () => ({
+  __esModule: true, default: 'DateTimePicker',
+  DateTimePickerAndroid: { open: jest.fn(), dismiss: jest.fn() },
+}));
+
 // RC-Fix "Digital Health Record — Gewicht erfassen" (TestFlight Build 46),
 // parts 1–3 (systemic fix for ALL Health quick-action forms).
 // Part 1 root cause: the shared quick-action AnyvoBottomSheet never opted

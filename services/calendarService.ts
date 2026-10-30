@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type { CalendarEvent, NewCalendarEvent, EventStatus } from '@/types/calendar';
 import { notifyDailyWidgetDataChanged } from '@/features/widgets/dailyWidgetRefresh';
 
-import { canEditOwnEvent, EDITABLE_EVENT_FIELDS, type EventEditPatch } from '@/features/calendar/eventEditing';
+import { canDeleteOwnEvent, canEditOwnEvent, EDITABLE_EVENT_FIELDS, type EventEditPatch } from '@/features/calendar/eventEditing';
 
 const SELECT = '*, dog:dogs(name, photo_url)';
 
@@ -99,4 +99,23 @@ export function setEventStatus(id: string, status: EventStatus) {
 export function deleteCalendarEvent(id: string) {
   return supabase.from('calendar_events').delete().eq('id', id)
     .then(result => { if (!result.error) notifyDailyWidgetDataChanged(); return result; });
+}
+
+export async function deleteOwnCalendarEvent(userId: string, original: CalendarEvent) {
+  const { data: auth, error: authError } = await supabase.auth.getSession();
+  if (authError || auth.session?.user.id !== userId || !canDeleteOwnEvent(original, userId)) {
+    return { data: null, error: { message: 'CALENDAR_ACCESS_CHANGED' } };
+  }
+  let query = supabase.from('calendar_events').delete().eq('id', original.id).eq('owner_id', userId);
+  // A changed or newly source-linked record must be reopened before deletion.
+  for (const key of [...EDITABLE_EVENT_FIELDS, 'status', 'trainer_id', 'created_by', 'source_type', 'source_id'] as const) {
+    const value = original[key];
+    if (value == null) query = query.is(key, null);
+    else if (Array.isArray(value)) query = query.filter(key, 'eq', `{${value.map(item => JSON.stringify(item)).join(',')}}`);
+    else query = query.eq(key, value);
+  }
+  const result = await query.select('id').maybeSingle();
+  if (result.error || !result.data) return { data: null, error: result.error ?? { message: 'CALENDAR_CONFLICT' } };
+  notifyDailyWidgetDataChanged();
+  return { data: result.data, error: null };
 }
