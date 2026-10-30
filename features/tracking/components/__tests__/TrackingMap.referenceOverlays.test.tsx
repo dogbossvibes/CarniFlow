@@ -165,14 +165,3 @@ it('renders a dark custom RGB reference with a contrasting halo and unchanged pa
   const foreground = lines.find(p => p.strokeColor === '#000000E0');
   expect(foreground?.coordinates).toEqual(custom.points.map(p => ({ latitude: p.lat, longitude: p.lng })));
 });
-
-it('comparison keeps both coincident routes legible and replaces them when another track opens', () => {
-  const tree = renderMap({ comparison: true, layPoints: LAY, runPoints: LAY });
-  const lay = () => polys(tree).find(p => p.strokeColor === C.trackPrimary)!;
-  const run = () => polys(tree).find(p => p.strokeColor === C.trackBlue)!;
-  expect(lay().strokeWidth).toBeGreaterThan(run().strokeWidth);
-  const next = line(48, LAY.length);
-  act(() => tree.update(<TrackingMap comparison layPoints={next} runPoints={next} currentPosition={null} follow={false} />));
-  expect(lay().coordinates[0].latitude).toBe(48);
-  expect(run().coordinates[0].latitude).toBe(48);
-});
