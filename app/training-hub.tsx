@@ -16,11 +16,11 @@ import { RescheduleModal } from '@/components/calendar/RescheduleModal';
 import { TimelineView } from '@/components/calendar/TimelineView';
 import { WeekView } from '@/components/calendar/WeekView';
 import { MonthView } from '@/components/calendar/MonthView';
-import { canEditOwnEvent } from '@/features/calendar/eventEditing';
+import { canDeleteOwnEvent, canEditOwnEvent } from '@/features/calendar/eventEditing';
 import { EventActionsSheet } from '@/components/calendar/EventActionsSheet';
 import { useT } from '@/i18n';
 import { CreateEventModal } from '@/components/calendar/CreateEventModal';
-import { deleteCalendarEvent, updateCalendarEvent, finishOwnCalendarEvent } from '@/services/calendarService';
+import { deleteOwnCalendarEvent, updateCalendarEvent, finishOwnCalendarEvent } from '@/services/calendarService';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { getMyInvitations } from '@/services/umfrageService';
@@ -83,7 +83,7 @@ function TrainingHubContent() {
     refresh();
   };
 
-  const onEventPress = (event: CalendarEvent) => { setSelected(event); setActionsVisible(true); };
+  const onEventPress = (event: CalendarEvent) => { if (!statusBusy.current) { setSelected(event); setActionsVisible(true); } };
   const finishActions = () => {
     setSelected(null);
     if (pendingSource.current) { const path = pendingSource.current; pendingSource.current = null; router.push(path as never); return; }
@@ -120,19 +120,24 @@ function TrainingHubContent() {
   };
   const deleteSelected = () => {
     const event = selected;
-    if (!event || event.owner_id !== uid || event.source_type || event.source_id) return;
-    Alert.alert(t('calendar.deleteEvent'), t('calendar.deleteConfirm'), [
+    if (!uid || !event || !canDeleteOwnEvent(event, uid) || statusBusy.current) return;
+    const ownerId = uid;
+    Alert.alert(t('calendar.deleteEvent'), `${event.title}\n\n${t('calendar.deleteConfirm')}`, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: async () => {
-        if (!alive.current) return;
+        if (!alive.current || statusBusy.current) return;
+        statusBusy.current = true; setStatusSaving(true);
         try {
-          const result = await deleteCalendarEvent(event.id);
-          if (!alive.current) return;
-          if (result.error) throw result.error;
+          const result = await deleteOwnCalendarEvent(ownerId, event);
+          if (result.error || !result.data) throw result.error ?? new Error('CALENDAR_CONFLICT');
+          if (alive.current) remove(event.id);
+          // A confirmed deletion still needs event-bound notification cleanup
+          // after navigation/account change; never touch the new account's UI.
           await cancelEventReminders(event.id);
           if (!alive.current) return;
-          remove(event.id); closeActions(); refresh();
-        } catch { if (alive.current) Alert.alert(t('common.error'), t('calendar.saveFailed')); }
+          closeActions(); void refresh();
+        } catch { if (alive.current) Alert.alert(t('common.error'), t('calendar.deleteFailed')); }
+        finally { statusBusy.current = false; if (alive.current) setStatusSaving(false); }
       } },
     ]);
   };
@@ -225,7 +230,7 @@ function TrainingHubContent() {
         <Ionicons name="add" size={30} color="#001210" />
       </TouchableOpacity>
 
-      {selected && uid ? <EventActionsSheet visible={actionsVisible} event={selected} userId={uid} onClose={closeActions} onDismiss={finishActions}
+      {selected && uid ? <EventActionsSheet visible={actionsVisible} event={selected} userId={uid} onClose={() => { if (!statusBusy.current) closeActions(); }} onDismiss={finishActions}
         onEdit={() => { pendingEdit.current = selected; closeActions(); }}
         onDelete={deleteSelected} onExport={exportSelected} busy={statusSaving}
         onComplete={() => finishSelected('completed')} onCancelEvent={() => finishSelected('cancelled')}
