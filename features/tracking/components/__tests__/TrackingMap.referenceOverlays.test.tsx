@@ -180,3 +180,38 @@ it('keeps the planned route separate from measured traces, markers and camera in
  expect(markers(node)).toHaveLength(markerCount);
  expect(mockCamera.mock.calls.at(-1)?.[0]).toEqual(camera);
 });
+
+it('keeps coincident live routes distinct without remounting overlays as a long search grows', () => {
+  const lay = line(47, 5000);
+  const node = renderMap({ layPoints: lay, runPoints: lay.slice(0, 2) });
+  const polylines = (): { props: any }[] => (node.root as any).findAllByType(RNMaps!.Polyline);
+  const laid = polylines().find(p => p.props.strokeColor === C.trackPrimary)!;
+  const run = polylines().find(p => p.props.strokeColor === C.trackBlue)!;
+  expect(laid.props.strokeWidth).toBeGreaterThan(run.props.strokeWidth);
+  const coordinates = laid.props.coordinates;
+  for (let length = 100; length <= 5000; length += 100) {
+    act(() => node.update(<TrackingMap layPoints={lay} runPoints={lay.slice(0, length)} currentPosition={null} follow={false} />));
+    expect(polylines().find(p => p.props.strokeColor === C.trackPrimary)).toBe(laid);
+    expect(laid.props.coordinates).toBe(coordinates);
+    expect(polylines().find(p => p.props.strokeColor === C.trackBlue)).toBe(run);
+  }
+});
+
+it('retains all three object badges while searching, after finishing, switching tracks and reopening', () => {
+  const objects = [0, 1, 2].map(i => ({ id: `object-${i}`, type: 'gegenstand' as const,
+    lat: 47 + (i + 1) * 0.003, lng: 8, material: 'holz' as const, objectIndex: i + 1 }));
+  const original = JSON.stringify(objects);
+  const node = renderMap({ markers: objects });
+  const labels = () => markers(node).map((m: { props: { accessibilityLabel?: string } }) => m.props.accessibilityLabel).filter(Boolean);
+  const expectAll = () => expect(labels()).toEqual(expect.arrayContaining(['G1', 'G2', 'G3']));
+  expectAll();
+  act(() => node.update(<TrackingMap layPoints={LAY} runPoints={LAY} markers={objects} currentPosition={null} follow={false} />));
+  expectAll();
+  act(() => node.update(<TrackingMap layPoints={LAY} runPoints={LAY} markers={objects} currentPosition={null} follow={false} />));
+  expectAll();
+  act(() => node.update(<TrackingMap layPoints={line(48)} markers={[]} currentPosition={null} follow={false} />));
+  expect(labels()).not.toEqual(expect.arrayContaining(['G1', 'G2', 'G3']));
+  act(() => node.update(<TrackingMap layPoints={LAY} runPoints={LAY} markers={objects} currentPosition={null} follow={false} />));
+  expectAll();
+  expect(JSON.stringify(objects)).toBe(original);
+});
