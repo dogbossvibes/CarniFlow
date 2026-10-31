@@ -4,7 +4,8 @@ import { Text, TouchableOpacity, Text as MockText, TouchableOpacity as MockTouch
 import SharedDogRoute from '../shared-dog/[id]';
 const mockLoad = jest.fn(); const mockHealth = jest.fn();
 let mockDog: Record<string, unknown> | undefined;
-jest.mock('@/lib/session-context', () => ({ useSession: () => ({ user: { id: 'recipient' } }) }));
+let mockUserId = 'recipient';
+jest.mock('@/lib/session-context', () => ({ useSession: () => ({ user: { id: mockUserId } }) }));
 jest.mock('@/hooks/useSharedHealthDogs', () => ({ useSharedHealthDogs: () => ({ dogs: mockDog ? [mockDog] : [], loading: false, error: false, reload: jest.fn() }) }));
 jest.mock('@/services/sharedHealthDogs', () => ({ loadReceivedHealthDogs: (...args: unknown[]) => mockLoad(...args) }));
 jest.mock('@/services/healthService', () => ({ loadHealthOverview: (...args: unknown[]) => mockHealth(...args) }));
@@ -21,6 +22,7 @@ let node: ReactTestRenderer;
 const text = () => node.root.findAll(n => (n as unknown as { type: unknown }).type === Text).map(n => n.props.children).flat().join(' ');
 const press = async (label: string) => { const button = node.root.findAll(n => (n as unknown as { type: unknown }).type === TouchableOpacity).find(n => n.findAll(n => (n as unknown as { type: unknown }).type === Text).some(t => t.props.children === label)); if (!button) throw new Error(label); await act(async () => { await button.props.onPress(); }); };
 beforeEach(() => {
+  mockUserId = 'recipient';
   mockDog = { id: 'd', name: 'Shared Yam', ownerName: 'Owner', grants: [grant], permissions: ['can_view_weight'] };
   mockLoad.mockReset().mockResolvedValue([grant]); mockHealth.mockReset().mockResolvedValue(empty);
 });
@@ -60,4 +62,29 @@ it.each(['can_view_health_summary', 'can_view_emergency_info'])('does not sugges
   expect(text()).toContain('sharing.noDisplayableSections');
   expect(text()).not.toContain('health.uxOverviewTitle');
   expect(text()).not.toContain('sharing.noRecords');
+});
+
+it('does not show a late shared-weight result after the account changes', async () => {
+  let resolve!: (value: unknown) => void;
+  mockHealth.mockReturnValue(new Promise(done => { resolve = done; }));
+  await act(async () => { node = TestRenderer.create(<SharedDogRoute />); });
+  await press('health.uxOverviewTitle');
+  expect(mockHealth).toHaveBeenCalledTimes(1);
+  mockUserId = 'other-recipient';
+  await act(async () => { node.update(<SharedDogRoute />); });
+  await act(async () => { resolve({ ...empty, entries: [{ id: 'w', dog_id: 'd', entry_date: '2026-10-30', weight_kg: 37.3 }] }); });
+  expect(text()).not.toContain('37.3');
+});
+
+it('does not restore a late shared-weight result after access disappears', async () => {
+  let resolve!: (value: unknown) => void;
+  mockHealth.mockReturnValue(new Promise(done => { resolve = done; }));
+  await act(async () => { node = TestRenderer.create(<SharedDogRoute />); });
+  await press('health.uxOverviewTitle');
+  expect(mockHealth).toHaveBeenCalledTimes(1);
+  mockDog = undefined;
+  await act(async () => { node.update(<SharedDogRoute />); });
+  await act(async () => { resolve({ ...empty, entries: [{ id: 'w', dog_id: 'd', entry_date: '2026-10-30', weight_kg: 37.3 }] }); });
+  expect(text()).toContain('sharing.accessUnavailable');
+  expect(text()).not.toContain('37.3');
 });

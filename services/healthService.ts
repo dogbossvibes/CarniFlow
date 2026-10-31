@@ -66,11 +66,37 @@ async function readOptional<T>(query: PromiseLike<{ data: T[] | null; error: { m
   return { data: rows.slice(0, HEALTH_SECTION_LIMIT), limited: !error && rows.length > HEALTH_SECTION_LIMIT, ...(error ? { error: error.message } : {}) };
 }
 
+function isSharedWeightEntry(value: unknown, dogId: string): value is HealthWeightEntry {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.id === 'string' && row.id.length > 0 && row.dog_id === dogId &&
+    typeof row.entry_date === 'string' && Number.isFinite(Date.parse(row.entry_date)) &&
+    typeof row.weight_kg === 'number' && Number.isFinite(row.weight_kg) &&
+    (row.created_at === null || (typeof row.created_at === 'string' && Number.isFinite(Date.parse(row.created_at))));
+}
+
+async function readSharedWeightEntries(dogId: string) {
+  // The server RPC must authorize and project this read. Never fall back to the
+  // base table: a client-side column selection cannot restrict server access.
+  const result = await supabase.rpc('list_shared_dog_weights', { p_dog_id: dogId }).returns<HealthWeightEntry[]>();
+  if (result.error) return { data: null, error: result.error };
+  if (!Array.isArray(result.data) || !result.data.every(row => isSharedWeightEntry(row, dogId))) {
+    return { data: null, error: { message: 'SHARED_WEIGHT_RESPONSE_INVALID' } };
+  }
+  // Keep the client result narrow too; never forward unexpected response fields.
+  return { data: result.data.map(row => ({
+    id: row.id, dog_id: row.dog_id, entry_date: row.entry_date,
+    weight_kg: row.weight_kg, created_at: row.created_at,
+  })), error: null };
+}
+
 export function loadHealthOverview(dogId: string, options: { weightFieldsOnly: true }): Promise<SharedHealthOverviewData>;
 export function loadHealthOverview(dogId: string): Promise<HealthOverviewData>;
 export async function loadHealthOverview(dogId: string, options: { weightFieldsOnly?: boolean } = {}): Promise<HealthOverviewData | SharedHealthOverviewData> {
   const [entries, vaccinations, medications, conditions, parasites, vetVisits, documents] = await Promise.all([
-    readOptional<DogHealthEntryRow | HealthWeightEntry>(supabase.from('dog_health_entries').select(options.weightFieldsOnly ? 'id,dog_id,entry_date,weight_kg,created_at' : '*').eq('dog_id', dogId).order('entry_date', { ascending: false }).order('created_at', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1).returns<(DogHealthEntryRow | HealthWeightEntry)[]>()),
+    readOptional<DogHealthEntryRow | HealthWeightEntry>(options.weightFieldsOnly
+      ? readSharedWeightEntries(dogId)
+      : supabase.from('dog_health_entries').select('*').eq('dog_id', dogId).order('entry_date', { ascending: false }).order('created_at', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1).returns<DogHealthEntryRow[]>()),
     readOptional<HealthVaccinationRow>(supabase.from('dog_health_vaccinations').select('*').eq('dog_id', dogId).order('administered_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
     readOptional<HealthMedicationRow>(supabase.from('dog_health_medications').select('*').eq('dog_id', dogId).order('starts_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
     readOptional<HealthConditionRow>(supabase.from('dog_health_conditions').select('*').eq('dog_id', dogId).order('started_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
