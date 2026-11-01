@@ -2,6 +2,25 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "sharing.noDisplayableSections": "This view does not yet support the areas included in this share.",
+  "sharing.unavailableAreas": "The summary and emergency information are not yet available in this view.",
+  "sharing.myDogs": "My dogs",
+  "sharing.withMe": "Shared with me",
+  "sharing.receivedFrom": "Shared by {name}",
+  "sharing.received": "Shared with you",
+  "sharing.readOnly": "View only",
+  "sharing.inboxHelp": "Find dogs whose health information has been shared with your account here.",
+  "sharing.emptyTitle": "No shared dogs yet",
+  "sharing.emptyBody": "Shares appear here when they become valid. Check that you are signed into the right account.",
+  "sharing.loadFailed": "Sharing access could not be checked. Please retry.",
+  "sharing.accessUnavailable": "This share is no longer available or is not yet valid.",
+  "sharing.scopeHelp": "You can only see the shared sections. Only the owner can change the dog’s information.",
+  "sharing.yourAccess": "Your access",
+  "sharing.ownerLocationHint": "Once the share is active, the recipient finds the dog under Dogs → Shared with me and sees only the selected sections.",
+  "sharing.partialError": "Some shared records could not be loaded. Please refresh.",
+  "sharing.limited": "Up to 120 records are shown per section.",
+  "sharing.noRecords": "No records in the loaded shared sections.",
+
   "weightJournal.open": "View weight history",
   "weightJournal.month": "1 month",
   "weightJournal.quarter": "3 months",
