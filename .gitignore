@@ -83,3 +83,9 @@ assets/images/backpackscreenshot.png
 assets/images/smartanalysescreenshot.png
 design_handoff_faehrten/screen3.jpg
 faehrten 6/design_handoff_faehrten/abriss.png
+
+# BMAD personal settings and reproducible render cache
+_bmad/config.user.toml
+_bmad/custom/config.user.toml
+_bmad/render/
+**/__pycache__/

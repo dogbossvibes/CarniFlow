@@ -1,0 +1,42 @@
+[
+  {
+    "path": "/Users/moyo/canisflow/canisflow/AGENTS.md",
+    "sha256": "10e67e2220fdeb69380b5527b4f360997bd90a0f0be347f24b6717e1dfba6ee7",
+    "bytes": 4659
+  },
+  {
+    "path": "/Users/moyo/canisflow/canisflow/CLAUDE.md",
+    "sha256": "f3edeffff53444569754b5fceabffa5ed908246576c174797c5a8dc0acc37425",
+    "bytes": 1788
+  },
+  {
+    "path": "/Users/moyo/canisflow/canisflow/docs/agent/BMAD.md",
+    "sha256": "69e8d119a4cf56d91d5cc5d01380f59d926149e64447b580942bae9523cf2644",
+    "bytes": 4323
+  },
+  {
+    "path": "/Users/moyo/canisflow/canisflow/docs/agent/CURRENT_STATE.md",
+    "sha256": "0a77b54d2b28c99cc6e3f09e2cf1c7b0fade09ae63c7cd3587a9fdcdb309d726",
+    "bytes": 41686
+  },
+  {
+    "path": "/Users/moyo/canisflow/canisflow/docs/agent/TASKS.md",
+    "sha256": "40238646bf412b4e47d83399a78c34dba3cb42e535db7ca67523495c752d473a",
+    "bytes": 39678
+  },
+  {
+    "path": "/Users/moyo/canisflow-worktrees/anyvo-main/docs/agent/ANYVO_MASTER_STATUS.md",
+    "sha256": "a5e438db7d6bb4e87b3a52261cf583a199a71eb676196b67610754522b8ab054",
+    "bytes": 925220
+  },
+  {
+    "path": "/Users/moyo/canisflow-worktrees/anyvo-main/docs/agent/ACTIVE_WORK.md",
+    "sha256": "0bcbc056cb39a92142ed2e1af190fd2a30f93b11726bab385e5561e98032e61d",
+    "bytes": 471472
+  },
+  {
+    "path": "/Users/moyo/canisflow-worktrees/anyvo-main/docs/agent/PLATFORM_STATUS.md",
+    "sha256": "4125df8c49db2ff9fc8a274eb255f67f1619fe9ae4aa4ab252064404116f4f85",
+    "bytes": 100617
+  }
+]

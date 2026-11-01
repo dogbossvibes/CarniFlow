@@ -1,0 +1,38 @@
+[
+  {
+    "id": "01a19630-adb8-77fb-b2e0-575d6c4c56c3",
+    "createdAt": "2026-11-01T08:18:55.032Z",
+    "group": "fb22d170-2dd9-43eb-b63d-f96d4924fe0e",
+    "branch": "production",
+    "message": "Gewichtsjournal: Verlauf und Messungen übersichtlich bearbeiten",
+    "runtimeVersion": "1.0.6-map49-v1",
+    "platform": "ios",
+    "manifestPermalink": "https://u.expo.dev/update/01a19630-adb8-77fb-b2e0-575d6c4c56c3",
+    "isRollBackToEmbedded": false,
+    "gitCommitHash": "4a13945539c6bc60f623bb8888f3abc3dd95fdec"
+  },
+  {
+    "id": "01a19634-6948-752f-a92c-a42e332ab9e4",
+    "createdAt": "2026-11-01T08:22:59.656Z",
+    "group": "44aa5717-7708-455b-84d8-781b8e20b3b1",
+    "branch": "production",
+    "message": "Gewichtsjournal: Verlauf und Messungen übersichtlich bearbeiten",
+    "runtimeVersion": "1.0.5-greeting-v1",
+    "platform": "android",
+    "manifestPermalink": "https://u.expo.dev/update/01a19634-6948-752f-a92c-a42e332ab9e4",
+    "isRollBackToEmbedded": false,
+    "gitCommitHash": "32510f7a03ca49eef6440b1d28f584b6dd09f446"
+  },
+  {
+    "id": "01a19637-7db8-71ce-a3b7-5fffb8d3552f",
+    "createdAt": "2026-11-01T08:26:21.496Z",
+    "group": "a32df3fd-23a2-4415-b3c1-f8091e24b5d5",
+    "branch": "production",
+    "message": "Gewichtsjournal: Verlauf und Messungen übersichtlich bearbeiten",
+    "runtimeVersion": "1.0.5-gnss-v1",
+    "platform": "android",
+    "manifestPermalink": "https://u.expo.dev/update/01a19637-7db8-71ce-a3b7-5fffb8d3552f",
+    "isRollBackToEmbedded": false,
+    "gitCommitHash": "b27f76192a9d24e85827a194f471af9a475c70e5"
+  }
+]

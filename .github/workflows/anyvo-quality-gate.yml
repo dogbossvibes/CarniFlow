@@ -68,6 +68,9 @@ jobs:
       - name: Install dependencies exactly from package-lock
         run: npm ci --no-audit --no-fund
 
+      - name: Offline process and package regression tests
+        run: npm run test:process
+
       - name: TypeScript typecheck
         run: npm run typecheck
 
