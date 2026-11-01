@@ -1,0 +1,80 @@
+{
+  "status": "INDEPENDENT_LOCAL_PG17_51_PASS_SOURCE_ARCHIVE_NOT_PRODUCTION_APPROVAL",
+  "migrationSHA256": "f0d1ee015746c17201e80ae86c8ee6b053cad75e8e44d3fc4341d95d9f9c5d45",
+  "independentChecks": 51,
+  "productionActions": false,
+  "existingDataPreserved": true,
+  "delta": "Guard accepts exactly observed existing postgres/authenticated/service_role EXECUTE with postgres grantor and no grant option; validates observed SUPERUSER/BYPASSRLS flags. Policy predicate identical to v1. No ACL or role DDL in migration.",
+  "review": "00 independently read SQL and test controller and ran exact51 cases in fresh isolated PostgreSQL17 cluster, no network, host volumes or published ports; synthetic data only, finally removes container.",
+  "checks": [
+    "setup",
+    "replicate_production_postgres_role_flags_from_separate_admin",
+    "function_execution_scopes",
+    "public_pseudorole_inquiry",
+    "existing_policy_owner_insert_returning_reproduces_42501",
+    "same_owner_insert_without_returning_succeeds",
+    "stored_row_visible_after_separate_statement",
+    "seed_local_read_scopes",
+    "reject_baseline_select_predicate_drift",
+    "reject_select_roles_drift",
+    "reject_unexpected_select_policy",
+    "reject_unexpected_all_policy",
+    "reject_insert_policy_drift",
+    "reject_disabled_rls",
+    "reject_forced_rls_drift",
+    "reject_function_volatility_drift",
+    "reject_helper_security_invoker_drift",
+    "reject_helper_body_drift",
+    "reject_public_helper_execute_drift",
+    "reject_service_role_bypass_loss",
+    "reject_service_role_superuser_drift",
+    "reject_authenticated_bypass_drift",
+    "reject_authenticated_superuser_drift",
+    "reject_postgres_bypass_loss",
+    "reject_postgres_superuser_drift",
+    "reject_existing_service_role_execute_loss",
+    "reject_service_role_extra_grant_option",
+    "reject_custom_role_owner_helper_execute_drift",
+    "reject_authenticated_insert_privilege_loss",
+    "reject_unexpected_document_trigger",
+    "postcondition_failure_rolls_back_policy",
+    "exact_guarded_owner_fast_path_migration",
+    "existing_server_execute_and_anon_public_denial_preserved",
+    "migration_preserves_all_local_stored_rows",
+    "no_unreviewed_replay",
+    "all_seeded_owner_recipient_outsider_visibility_unchanged",
+    "owner_insert_returning_succeeds_after_policy_fix",
+    "recipient_cannot_insert_owner_row",
+    "recipient_cannot_insert_own_row_for_other_owners_dog",
+    "recipient_can_insert_only_own_dog_document",
+    "outsider_cannot_insert_owner_row",
+    "anonymous_cannot_insert",
+    "anonymous_cannot_select",
+    "recipient_cannot_update_owner_document",
+    "recipient_cannot_delete_owner_document",
+    "scoped_recipient_reads_only_general_health_document",
+    "scoped_recipient_cannot_read_lab_or_vet_report",
+    "legacy_nonhealth_connection_read_retained",
+    "revoke_only_local_synthetic_grant",
+    "revoked_recipient_cannot_read_health_document",
+    "legacy_nonhealth_read_retained_after_health_revocation"
+  ],
+  "sources": [
+    {
+      "file": "setup.sql",
+      "sha256": "cd1061f510766fa875065de9d961cd7c748f21f546426400a267e63216f447ee"
+    },
+    {
+      "file": "run-local-repro.py",
+      "sha256": "ce9b9eb09f2d79e186934b3c164eb5d374f1d10edb733ca44467aeb1dea6dcdc"
+    },
+    {
+      "file": "REPO-FUNCTION-BODY-HASHES.json",
+      "sha256": "19baae7a3598b06a9cfc60551255244687a5d6bae77f14deaeb076cc887cb6e4"
+    },
+    {
+      "file": "20261101213000_dog_documents_owner_returning_select.sql",
+      "sha256": "f0d1ee015746c17201e80ae86c8ee6b053cad75e8e44d3fc4341d95d9f9c5d45"
+    }
+  ]
+}

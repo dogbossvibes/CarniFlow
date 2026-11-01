@@ -1,0 +1,22 @@
+{
+  "health_dog_owner_matches": {
+    "bodyMD5": "608febdba1b74dc18708cd45fae80ec8",
+    "bytes": 110
+  },
+  "health_grant_connection_valid": {
+    "bodyMD5": "8d07f254b4f77758d6ff3257f3a51a98",
+    "bytes": 244
+  },
+  "can_view_dog_health": {
+    "bodyMD5": "10dc59202360526af22bbbcffe63a2a3",
+    "bytes": 1652
+  },
+  "can_view_legacy_dog_document": {
+    "bodyMD5": "79b5decbbfeb7316032c4bd4167b0063",
+    "bytes": 223
+  },
+  "can_view_dog_document": {
+    "bodyMD5": "caf0b0f5a099bd5ef356f36333b37f7b",
+    "bytes": 1623
+  }
+}
