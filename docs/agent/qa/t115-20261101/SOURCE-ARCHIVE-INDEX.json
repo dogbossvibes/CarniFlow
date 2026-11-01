@@ -1,0 +1,129 @@
+{
+  "status": "REVIEWED_LOCAL_QA_SOURCE_ARCHIVE_NOT_EXECUTABLE_OR_PRODUCTION_APPROVAL",
+  "scope": "T115 source-code backup only; no live receipts, credentials, environment files, bundles, customer records or logs",
+  "pathNormalization": "Only three local filesystem prefixes were replaced by symbolic placeholders; restoring operator-known prefixes reproduces every original source hash exactly. No actual local prefix values are stored in this archive.",
+  "execution": "Do not execute archive copies. The reviewed local launcher and pinned original source manifest are the approved candidate; all Production policy/test permissions and actual postflight gates remain separate.",
+  "migrationScope": "Only Stage B owner-only migration may be proposed for new installation. Stage A narrow RPC migration is already installed; included as source reference only, never replay it.",
+  "sources": [
+    {
+      "archivePath": "t115-integration-review-01-20261101/t115-sections-coordinator-01.py",
+      "originalSHA256": "77c1048c1021958463afc17f8dae18b9459477f4861d9b61f44b850f065cf5e5",
+      "archiveSHA256": "e84c8589765d4e7777a5f754d72203ca86235726196c0a7fe463c1a5a1d0a320",
+      "localPathsRedacted": true,
+      "originalReconstructionVerified": true,
+      "bytes": 22652
+    },
+    {
+      "archivePath": "t115-health-sharing-db-05-20261029/t115-stage-b-postflight-review-only.py",
+      "originalSHA256": "d82f68fa9a07dd9d2566e5993600dd922758fc8707631db017047961723ccfe6",
+      "archiveSHA256": "d82f68fa9a07dd9d2566e5993600dd922758fc8707631db017047961723ccfe6",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 18735
+    },
+    {
+      "archivePath": "t115-health-sharing-db-05-20261029/t115-sections-readback-review-only.py",
+      "originalSHA256": "a6322c9dd737468c36f4cc935968b3e42c2baed1be797fcbe034d793effe0421",
+      "archiveSHA256": "a6322c9dd737468c36f4cc935968b3e42c2baed1be797fcbe034d793effe0421",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 9890
+    },
+    {
+      "archivePath": "t115-health-sharing-db-05-20261029/t115-auth-preflight.py",
+      "originalSHA256": "5a4c4265fa8f712b18abbe8e71f5b978f08ed9b433187049116df57e9ab4090e",
+      "archiveSHA256": "5a4c4265fa8f712b18abbe8e71f5b978f08ed9b433187049116df57e9ab4090e",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 8775
+    },
+    {
+      "archivePath": "t115-health-sharing-db-05-20261029/t115-weight-only-normal-jwt-review-only.py",
+      "originalSHA256": "706fba5bbc2c26e3a311658d6a94870c66148eeb31deedcb8918d3329ed9e925",
+      "archiveSHA256": "706fba5bbc2c26e3a311658d6a94870c66148eeb31deedcb8918d3329ed9e925",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 20653
+    },
+    {
+      "archivePath": "t115-health-sharing-db-05-20261029/t115-expanded-readback-review-only.py",
+      "originalSHA256": "fbf9f315e931d1c98d8675f324b6c4dd3ff33df40bfe22fe9a8c162a57c86857",
+      "archiveSHA256": "fbf9f315e931d1c98d8675f324b6c4dd3ff33df40bfe22fe9a8c162a57c86857",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 9775
+    },
+    {
+      "archivePath": "t142-calendar-delete-db-05-20261030/t142-normal-jwt-delete-review-only.py",
+      "originalSHA256": "90f9d27792d7dccd4b2adfed7c82cf1b1bc8306958df27218e701c01dcc94d01",
+      "archiveSHA256": "02da09a37e4112048d997dd0407e617166e97f51999c538ffac2ef2341a16f9a",
+      "localPathsRedacted": true,
+      "originalReconstructionVerified": true,
+      "bytes": 6059
+    },
+    {
+      "archivePath": "t115-health-sharing-db-05-20261029/T115-HEALTH-SECTIONS-FIXTURES-REVIEW-20261101.json",
+      "originalSHA256": "4aee07b66570f3e163da536416c3453748e35d1bd7377f06b452887ee8ea02c7",
+      "archiveSHA256": "4aee07b66570f3e163da536416c3453748e35d1bd7377f06b452887ee8ea02c7",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 3888
+    },
+    {
+      "archivePath": "t115-health-sharing-db-05-20261029/t115-health-synthetic-1x1.png",
+      "originalSHA256": "2aa4fa20701cdd6d8d56046069001186b5267e3ee7d0ef618ad2f4a683723e11",
+      "archiveSHA256": "2aa4fa20701cdd6d8d56046069001186b5267e3ee7d0ef618ad2f4a683723e11",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 68
+    },
+    {
+      "archivePath": "policy/20261030101000_dog_health_entries_owner_only_select.sql",
+      "originalSHA256": "eb5f4e7575df83b18a6a70916dee6e65874bf699d385213e0cc672848c593d40",
+      "archiveSHA256": "eb5f4e7575df83b18a6a70916dee6e65874bf699d385213e0cc672848c593d40",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 2269
+    },
+    {
+      "archivePath": "t115-integration-review-01-20261101/t115-final-qa-01.py",
+      "originalSHA256": "c7aa0fc40ca32073ba3912863ac905657bfca45a2daf7c0aebd6e1773e8af485",
+      "archiveSHA256": "17d6c532ea516c2b6ea37da83bf64c5b268f6fccc84e6bf651b73214158989fa",
+      "localPathsRedacted": true,
+      "originalReconstructionVerified": true,
+      "bytes": 10427
+    },
+    {
+      "archivePath": "t115-integration-review-01-20261101/test_final_qa_launcher_01.py",
+      "originalSHA256": "88f9f4f57929aef8f92a184d1d1c61100011ccdcc5e8148d5d2bd06205369f4d",
+      "archiveSHA256": "88f9f4f57929aef8f92a184d1d1c61100011ccdcc5e8148d5d2bd06205369f4d",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 8193
+    },
+    {
+      "archivePath": "t115-integration-review-01-20261101/test_sections_coordinator_01.py",
+      "originalSHA256": "c8bb075c168613ba8a03745e19c8bc839b6cf0a2a669aca321aa1c86af9b28c5",
+      "archiveSHA256": "c8bb075c168613ba8a03745e19c8bc839b6cf0a2a669aca321aa1c86af9b28c5",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 12795
+    },
+    {
+      "archivePath": "t115-integration-review-01-20261101/STAGE-B-INSTALL-RECEIPT-SCHEMA-01.json",
+      "originalSHA256": "4461c4f9ea556cc2534aeb05cc6ed6290c6a083cbf6956deb71eb33739d074c5",
+      "archiveSHA256": "4461c4f9ea556cc2534aeb05cc6ed6290c6a083cbf6956deb71eb33739d074c5",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 1362
+    },
+    {
+      "archivePath": "policy/20261030100000_list_shared_dog_weights.sql",
+      "originalSHA256": "c8f1be36e0a91d31a848f184d3be440acdbc673c5ebcf7317f5cd1900398efa9",
+      "archiveSHA256": "c8f1be36e0a91d31a848f184d3be440acdbc673c5ebcf7317f5cd1900398efa9",
+      "localPathsRedacted": false,
+      "originalReconstructionVerified": true,
+      "bytes": 2751
+    }
+  ]
+}
