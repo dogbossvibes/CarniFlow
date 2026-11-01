@@ -17,7 +17,7 @@ import { DogDocumentsCard } from '@/components/dogs/DogDocumentsCard';
 import { HealthHeatCard, HealthHeatSheetContent } from '@/components/dogs/HealthHeatSection';
 import type { DogDocument } from '@/components/dogs/types';
 import { isFemaleDog } from '@/components/dogs/types';
-import { TrendLine } from '@/components/analytics/TrendLine';
+import { WeightJournal } from '@/components/dogs/WeightJournal';
 import { useToast } from '@/components/ui/Toast';
 import { useT, translate as healthT, type TranslationKey } from '@/i18n';
 import { getDogById } from '@/services/dogs';
@@ -61,7 +61,7 @@ const ACTIONS: { key: QuickAction; labelKey: TranslationKey; icon: React.Compone
 // openSheet/save() unverändert bleiben.
 const HEAT_ACTION: { key: 'heat'; labelKey: TranslationKey; icon: React.ComponentProps<typeof Ionicons>['name'] } = { key: 'heat', labelKey: 'health.recordHeat', icon: 'heart-outline' };
 
-export default function DogHealthRecordRoute() {
+export default function DogHealthRecordRoute({ weightJournalOnly = false }: { weightJournalOnly?: boolean }) {
   const router = useRouter();
   const { t, locale } = useT();
   const { user } = useSession();
@@ -197,7 +197,7 @@ export default function DogHealthRecordRoute() {
     if (item.kind === 'parasite') { const row = data.parasites.find(value => value.id === id); if (!row) return; setSheet('parasite'); setText1(row.product ?? ''); setText2(row.note ?? ''); setDate1(new Date(row.treatment_date)); setDate2(row.next_due_date ? new Date(row.next_due_date) : null); setParasiteType(row.treatment_type ?? 'deworming'); }
     if (item.kind === 'medication') { const row = data.medications.find(value => value.id === id); if (!row) return; setSheet('medication'); setText1(row.name); setText2(row.dosage ?? ''); setText3(row.frequency ?? ''); setText4(row.note ?? ''); setText5(row.administration_route ?? ''); setText6(row.prescribing_vet ?? ''); setDate1(fromISODate(row.starts_on)); setDate2(fromISODate(row.ends_on)); setActiveMedication(row.is_active); }
     if (item.kind === 'vet') { const row = data.vetVisits.find(value => value.id === id); if (!row) return; setSheet('vet'); setText1(row.clinic_name ?? ''); setText2(row.reason ?? ''); setText3(row.note ?? ''); setDate1(new Date(row.appointment_at)); }
-    if (item.kind === 'weight') { const row = data.entries.find(value => value.id === id); if (!row) return; setSheet('weight'); setText1(String(row.weight_kg ?? '')); setText2(row.note ?? ''); setDate1(new Date(row.entry_date)); }
+    if (item.kind === 'weight') { const row = data.entries.find(value => value.id === id); if (!row) return; setSheet('weight'); setText1(String(row.weight_kg ?? '')); setText2(row.note ?? ''); setDate1(fromISODate(row.entry_date)); }
     if (item.kind === 'condition') { const row = data.conditions.find(value => value.id === id); if (!row) return; setSheet(row.kind); setText1(row.name); setText2(row.note ?? ''); setDate1(row.started_on ? new Date(row.started_on) : new Date()); }
   };
 
@@ -408,19 +408,20 @@ export default function DogHealthRecordRoute() {
   return (
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.flex}>
-        <View style={s.header}><TouchableOpacity style={s.iconButton} hitSlop={8} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('common.back')}><Ionicons name="chevron-back" size={20} color={C.trackText} /></TouchableOpacity><View style={s.headerText}><Text style={s.headerTitle} numberOfLines={1}>{t('health.recordTitle')}</Text><Text style={s.headerDog} numberOfLines={1} ellipsizeMode="tail">{dog.name}</Text></View>{isOwner ? <TouchableOpacity style={s.iconButton} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('health.shareTitle')} onPress={() => router.push({ pathname: '/dog-health-sharing/[id]', params: { id: dogId } } as never)}><Ionicons name="people-outline" size={20} color={C.trackText} /></TouchableOpacity> : <View style={s.iconButton} />}</View>
+        <View style={s.header}><TouchableOpacity style={s.iconButton} hitSlop={8} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('common.back')}><Ionicons name="chevron-back" size={20} color={C.trackText} /></TouchableOpacity><View style={s.headerText}><Text style={[s.headerTitle, weightJournalOnly && { fontSize: 26, fontWeight: '600' }]} numberOfLines={weightJournalOnly ? undefined : 1}>{t(weightJournalOnly ? 'health.recordWeight' : 'health.recordTitle')}</Text><Text style={s.headerDog} numberOfLines={1} ellipsizeMode="tail">{dog.name}</Text></View>{isOwner ? <TouchableOpacity style={s.iconButton} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('health.shareTitle')} onPress={() => router.push({ pathname: '/dog-health-sharing/[id]', params: { id: dogId } } as never)}><Ionicons name="people-outline" size={20} color={C.trackText} /></TouchableOpacity> : <View style={s.iconButton} />}</View>
         <ScrollView
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={C.trackPrimary} colors={[C.trackPrimary]} />}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[s.scroll, { paddingBottom: 32 + insets.bottom }]}
         >
-          <View style={s.tabs}>{(['overview', 'timeline', 'documents'] as Tab[]).map(key => <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{ selected: tab === key }} onPress={() => setTab(key)} style={[s.tab, tab === key && s.tabActive]}><Text style={[s.tabText, tab === key && s.tabTextActive]}>{key === 'overview' ? t('health.recordOverview') : key === 'timeline' ? t('health.recordTimeline') : t('health.recordDocuments')}</Text></TouchableOpacity>)}</View>
+          {!weightJournalOnly && <View style={s.tabs}>{(['overview', 'timeline', 'documents'] as Tab[]).map(key => <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{ selected: tab === key }} onPress={() => setTab(key)} style={[s.tab, tab === key && s.tabActive]}><Text style={[s.tabText, tab === key && s.tabTextActive]}>{key === 'overview' ? t('health.recordOverview') : key === 'timeline' ? t('health.recordTimeline') : t('health.recordDocuments')}</Text></TouchableOpacity>)}</View>}
           {Object.keys(data.sectionErrors ?? {}).length > 0 || heatFailed ? <View style={s.warning} accessibilityRole="alert"><Ionicons name="warning-outline" size={17} color={C.trackWarning} /><View style={s.flex}><Text style={s.warningText}>{t('health.recordPartialLoad')}</Text><AnyvoButton label={t('health.uxRetry')} variant="secondary" onPress={reload} loading={refreshing} /></View></View> : null}
           {healthHasLimitedData(data) ? <View style={s.warning} accessibilityRole="alert"><Text style={s.warningText}>{t('health.uxLimitedData', { limit: HEALTH_SECTION_LIMIT })}</Text></View> : null}
           {isOwner && reminderNotice?.reference.dogId === dogId ? <AnyvoCard><Text style={s.muted} accessibilityLiveRegion="polite">{t(reminderNotice.status === 'failed' ? 'health.uxReminderFailed' : reminderNotice.status === 'synced' ? 'health.uxCalendarOnly' : 'health.uxReminderNotNeeded')}</Text>{reminderNotice.status === 'failed' ? <AnyvoButton label={t('health.uxReminderRetry')} variant="secondary" onPress={retryReminder} loading={retryingReminder} /> : null}</AnyvoCard> : null}
-          {tab === 'overview' && <Overview dog={dog} status={status} due={due} data={data} measurements={measurements} trend={trend} onAction={openSheet} onTimeline={() => setTab('timeline')} onDetail={openHealthDetail} isOwner={isOwner} lastLoadedAt={lastLoadedAt} isFemale={isFemale} heatCycles={heatCycles} heatPrediction={heatPrediction} onOpenHeat={() => router.push(`/dog-heat-overview/${dogId}` as never)} onAddHeat={openHeatQuickAction} />}
-          {tab === 'timeline' && <Timeline items={filteredTimeline} filter={filter} onFilter={setFilter} onDetail={openHealthDetail} onDelete={deleteItem} isOwner={isOwner} isFemale={isFemale} />}
-          {tab === 'documents' && <DogDocumentsCard documents={documents} onAdd={isOwner ? () => router.push({ pathname: '/dog-document/[id]', params: { id: dogId, category: 'health' } } as never) : undefined} onOpen={openDocument} onDelete={isOwner ? deleteDocument : undefined} />}
+          {weightJournalOnly ? <WeightJournal key={dog.id} entries={data.entries} profileWeight={dog.weight_kg} isOwner={isOwner} onAdd={() => openSheet('weight')} onEdit={entry => { if (isOwner) openEdit({ id: `weight:${entry.id}`, kind: 'weight', title: t('health.recordWeight'), date: entry.entry_date, detail: null }); }} /> : null}
+          {!weightJournalOnly && tab === 'overview' && <Overview dog={dog} status={status} due={due} data={data} measurements={measurements} trend={trend} onAction={openSheet} onTimeline={() => setTab('timeline')} onOpenWeight={() => router.push({ pathname: '/dog-weight/[id]', params: { id: dogId } } as never)} onDetail={openHealthDetail} isOwner={isOwner} lastLoadedAt={lastLoadedAt} isFemale={isFemale} heatCycles={heatCycles} heatPrediction={heatPrediction} onOpenHeat={() => router.push(`/dog-heat-overview/${dogId}` as never)} onAddHeat={openHeatQuickAction} />}
+          {!weightJournalOnly && tab === 'timeline' && <Timeline items={filteredTimeline} filter={filter} onFilter={setFilter} onDetail={openHealthDetail} onDelete={deleteItem} isOwner={isOwner} isFemale={isFemale} />}
+          {!weightJournalOnly && tab === 'documents' && <DogDocumentsCard documents={documents} onAdd={isOwner ? () => router.push({ pathname: '/dog-document/[id]', params: { id: dogId, category: 'health' } } as never) : undefined} onOpen={openDocument} onDelete={isOwner ? deleteDocument : undefined} />}
         </ScrollView>
       </SafeAreaView>
       {/* ROOT CAUSE HISTORY (Digital Health Record "Gewicht erfassen" keyboard
@@ -576,7 +577,7 @@ export default function DogHealthRecordRoute() {
   );
 }
 
-function Overview({ dog, status, due, data, measurements, trend, onAction, onTimeline, onDetail, isOwner, lastLoadedAt, isFemale, heatCycles, heatPrediction, onOpenHeat, onAddHeat }: { dog: Dog; status: string; due: HealthDueItem[]; data: HealthOverviewData; measurements: ReturnType<typeof weightMeasurements>; trend: ReturnType<typeof weightChange>; onAction: (action: QuickAction) => void; onTimeline: () => void; onDetail: (item: HealthTimelineItem) => void; isOwner: boolean; lastLoadedAt: Date | null; isFemale: boolean; heatCycles: HeatCycle[]; heatPrediction: ReturnType<typeof predictHeat>; onOpenHeat: () => void; onAddHeat: () => void }) {
+function Overview({ dog, status, due, data, measurements, trend, onAction, onTimeline, onOpenWeight, onDetail, isOwner, lastLoadedAt, isFemale, heatCycles, heatPrediction, onOpenHeat, onAddHeat }: { dog: Dog; status: string; due: HealthDueItem[]; data: HealthOverviewData; measurements: ReturnType<typeof weightMeasurements>; trend: ReturnType<typeof weightChange>; onAction: (action: QuickAction) => void; onTimeline: () => void; onOpenWeight: () => void; onDetail: (item: HealthTimelineItem) => void; isOwner: boolean; lastLoadedAt: Date | null; isFemale: boolean; heatCycles: HeatCycle[]; heatPrediction: ReturnType<typeof predictHeat>; onOpenHeat: () => void; onAddHeat: () => void }) {
   const { t } = useT();
   const { width, fontScale } = useWindowDimensions();
   const [moreActions, setMoreActions] = useState(false);
@@ -597,7 +598,19 @@ function Overview({ dog, status, due, data, measurements, trend, onAction, onTim
     {due.length ? (allDue ? due : due.slice(0, 3)).map(item => <DueRow key={item.id} item={item} onPress={() => openDue(item)} />) : <Empty text={t(healthHasLimitedData(data) ? 'health.uxNoLoadedDue' : 'health.recordNoDue')} />}
     {due.length > 3 ? <AnyvoButton label={t(allDue ? 'health.uxShowLess' : healthHasLimitedData(data) ? 'health.uxShowLoadedDue' : 'health.uxShowAllDue', { count: due.length })} variant="secondary" onPress={() => setAllDue(value => !value)} /> : null}
     {isOwner ? <><Text style={s.section}>{t('health.recordQuickActions')}</Text><View style={s.actionGrid}>{shownActions.map(action => <TouchableOpacity key={action.key} style={[s.action, { width: actionWidth }]} accessibilityRole="button" accessibilityLabel={t(action.labelKey)} onPress={() => action.key === 'heat' ? onAddHeat() : onAction(action.key)}><View style={s.actionIcon}><Ionicons name={action.icon} size={19} color={C.trackPrimary} /></View><Text style={s.actionText}>{t(action.labelKey)}</Text></TouchableOpacity>)}</View><AnyvoButton label={t(moreActions ? 'health.uxShowLess' : 'health.uxMoreActions')} variant="secondary" onPress={() => setMoreActions(value => !value)} /><AnyvoButton label={t('health.recordEmergencyTitle')} variant="secondary" icon="alert-circle-outline" onPress={() => onAction('emergency')} /></> : <AnyvoButton label={t('health.recordEmergencyTitle')} variant="secondary" onPress={() => onAction('emergency')} />}
-    <Text style={s.section}>{t('health.recordCurrentValues')}</Text><AnyvoCard><View style={s.valueHeader}><View style={s.valueCopy}><Text style={s.eyebrow}>{t('health.recordWeight').toUpperCase()}</Text>{latestWeight != null ? <Text style={s.value}>{latestWeight} kg</Text> : <><Text style={s.weightEmptyPrimary}>{t('health.uxNoWeight')}</Text>{isOwner ? <TouchableOpacity style={s.weightAdd} accessibilityRole="button" onPress={() => onAction('weight')}><Text style={s.weightAddText}>{t('health.uxAddWeight')}</Text><Ionicons name="arrow-forward" size={15} color={C.trackPrimary} /></TouchableOpacity> : null}</>}{latestMeasurement ? <Text style={s.muted}>{formatDate(latestMeasurement.entry_date)}{trend?.delta != null ? ` · ${trend.delta >= 0 ? '+' : ''}${trend.delta.toFixed(1)} kg` : ''}</Text> : null}</View><Ionicons name="scale-outline" size={26} color={C.trackPrimary} /></View>{measurements.length > 1 ? <TrendLine points={measurements.slice(-8).map(entry => ({ date: entry.entry_date, score: entry.weight_kg! }))} width={Math.max(200, width - 64)} /> : null}</AnyvoCard>
+    <Text style={s.section}>{t('health.recordCurrentValues')}</Text>
+    <AnyvoCard>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={t('weightJournal.open')} onPress={onOpenWeight} style={s.valueHeader}>
+        <View style={s.valueCopy}>
+          <Text style={s.eyebrow}>{t('health.recordWeight').toUpperCase()}</Text>
+          {latestWeight != null ? <Text style={s.value}>{latestWeight} kg</Text> : <Text style={s.weightEmptyPrimary}>{t('health.uxNoWeight')}</Text>}
+          {latestMeasurement ? <Text style={s.muted}>{formatDate(latestMeasurement.entry_date)}{trend?.delta != null ? ` · ${trend.delta >= 0 ? '+' : ''}${trend.delta.toFixed(1)} kg` : ''}</Text> : null}
+          <Text style={s.weightAddText}>{t('weightJournal.open')}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={22} color={C.trackPrimary} />
+      </TouchableOpacity>
+      {latestWeight == null && isOwner ? <TouchableOpacity style={s.weightAdd} accessibilityRole="button" onPress={() => onAction('weight')}><Text style={s.weightAddText}>{t('health.uxAddWeight')}</Text><Ionicons name="arrow-forward" size={15} color={C.trackPrimary} /></TouchableOpacity> : null}
+    </AnyvoCard>
     {isFemale ? <><Text style={s.section}>{t('heat.title')}</Text>{!isOwner && !heatCycles.length ? <Empty text={t('health.recordNoActivities')} /> : <HealthHeatCard cycles={heatCycles} prediction={heatPrediction} onPress={onOpenHeat} onAdd={onAddHeat} />}</> : null}
     <Text style={s.section}>{t('health.recordRecent')}</Text>{recent.slice(0, 4).map(item => <TimelineRow key={item.id} item={item} onPress={() => onDetail(item)} onDelete={() => {}} deletable={false} />)}{recent.length === 0 ? <Empty text={t('health.recordNoActivities')} /> : <AnyvoButton label={t('health.uxFullTimeline')} variant="secondary" onPress={onTimeline} />}
   </View>;

@@ -33,6 +33,7 @@ import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
 import { Alert, InputAccessoryView, Keyboard, Platform, RefreshControl, ScrollView, Switch, Text, TextInput, TouchableOpacity } from 'react-native';
 import DogHealthRecordRoute from '@/app/dog-health-record/[id]';
+import DogWeightRoute from '@/app/dog-weight/[id]';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
 import { DateField } from '@/components/ui/DateField';
 import { AnyvoChip } from '@/components/ui/AnyvoChip';
@@ -121,7 +122,7 @@ jest.mock('@/lib/session-context', () => ({ useSession: () => ({ user: { id: 'ow
 // a test. Not what these tests are about; stub it out.
 jest.mock('@/components/ui/Toast', () => ({ useToast: () => ({ showToast: jest.fn(), toast: null }) }));
 jest.mock('@/hooks/useProfile', () => ({ useProfile: () => ({ profile: mockProfile }) }));
-jest.mock('@/i18n', () => ({ getLocale: () => 'de', useT: () => ({ t: (key: string, params?: Record<string, unknown>) => { if (!key.startsWith('health.ux')) return key; let value = jest.requireActual('@/i18n/de-CH').deCH[key] ?? key; for (const [name, replacement] of Object.entries(params ?? {})) value = value.replace(`{${name}}`, String(replacement)); return value; } }), translate: (key: string, params?: Record<string, unknown>) => { let value = jest.requireActual('@/i18n/de-CH').deCH[key] ?? key; for (const [name, replacement] of Object.entries(params ?? {})) value = value.replace(`{${name}}`, String(replacement)); return value; } }));
+jest.mock('@/i18n', () => ({ getLocale: () => 'de', useT: () => ({ t: (key: string, params?: Record<string, unknown>) => { if (!key.startsWith('health.ux') && !key.startsWith('weightJournal.')) return key; let value = jest.requireActual('@/i18n/de-CH').deCH[key] ?? key; for (const [name, replacement] of Object.entries(params ?? {})) value = value.replace(`{${name}}`, String(replacement)); return value; } }), translate: (key: string, params?: Record<string, unknown>) => { let value = jest.requireActual('@/i18n/de-CH').deCH[key] ?? key; for (const [name, replacement] of Object.entries(params ?? {})) value = value.replace(`{${name}}`, String(replacement)); return value; } }));
 jest.mock('@/services/dogs', () => ({ getDogById: (...a: unknown[]) => mockGetDogById(...a) }));
 jest.mock('@/services/dogHub', () => ({ deleteDogDocument: jest.fn(), getDogDocumentUrl: jest.fn() }));
 jest.mock('@/services/healthService', () => ({
@@ -1908,4 +1909,129 @@ describe('Heat overview navigation with long history', () => {
     expect(JSON.stringify(cycles)).toBe(original); expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
     act(() => node.unmount());
   });
+});
+
+
+describe('Weight journal: existing record integration and data preservation', () => {
+  const entries = [
+    { id: 'old', dog_id: 'dog-1', entry_date: '2026-10-01', weight_kg: 31.6, note: 'Alte Notiz', load_level: 'mittel' as const, is_rest_day: false, is_intense: true, created_at: '2026-10-01T08:00:00Z' },
+    { id: 'recent', dog_id: 'dog-1', entry_date: '2026-10-15', weight_kg: 31.6, note: 'Gleiche Waage', load_level: 'hoch' as const, is_rest_day: false, is_intense: true, created_at: '2026-10-15T08:00:00Z' },
+  ];
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, entries });
+    mockCreateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'new' }, error: null, reminderSync: 'not_required' });
+    mockUpdateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'recent' }, error: null, reminderSync: 'not_required' });
+    mockDeleteWeightEntry.mockReset();
+  });
+  async function journal() {
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<DogWeightRoute />); });
+    await flush();
+    return node;
+  }
+  function measurementButton(node: ReactTestRenderer, day: string) {
+    return node.root.findAll(n => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function' && String(n.props.accessibilityLabel).startsWith('Messung vom') && String(n.props.accessibilityLabel).includes(day))[0];
+  }
+  it('opens a separate native-navigation weight screen from the health summary', async () => {
+    const node = render(); await flush();
+    act(() => { findByText(node, 'Gewichtsverlauf ansehen').props.onPress(); });
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/dog-weight/[id]', params: { id: 'dog-1' } });
+    act(() => node.unmount());
+  });
+  it('opens the exact saved record directly and updates only weight/date/note through the existing service', async () => {
+    const node = await journal();
+    expect(measurementButton(node, '1. Oktober')).toBeTruthy();
+    act(() => measurementButton(node, '15. Oktober').props.onPress());
+    expect(weightInput(node).props.value).toBe('31.6');
+    expect(allInputs(node).some(input => input.props.value === 'Gleiche Waage')).toBe(true);
+    const selectedDate = node.root.findAll(field => field.props.value instanceof Date && typeof field.props.onChange === 'function')[0].props.value;
+    expect([selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()]).toEqual([2026, 9, 15]);
+    act(() => weightInput(node).props.onChangeText('31,8'));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockUpdateWeightEntry).toHaveBeenCalledWith('recent', { entry_date: '2026-10-15', weight_kg: 31.8, note: 'Gleiche Waage' });
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled(); expect(mockDeleteWeightEntry).not.toHaveBeenCalled();
+    expect(entries[0].note).toBe('Alte Notiz'); expect(entries[1].load_level).toBe('hoch'); expect(entries[1].is_intense).toBe(true);
+    act(() => node.unmount());
+  });
+  it('cancel leaves saved records intact, and a fresh add cannot reuse the previous edit id', async () => {
+    const node = await journal();
+    act(() => measurementButton(node, '15. Oktober').props.onPress());
+    act(() => weightInput(node).props.onChangeText('40'));
+    act(() => node.root.findAll(sheet => sheet.props.visible && typeof sheet.props.onClose === 'function')[0].props.onClose());
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled(); expect(measurementButton(node, '1. Oktober')).toBeTruthy();
+    act(() => findByText(node, 'Gewicht eintragen').props.onPress());
+    act(() => weightInput(node).props.onChangeText('31.6'));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateWeightEntry).toHaveBeenCalledWith('dog-1', expect.objectContaining({ weight_kg: 31.6 }));
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+  it('keeps the editor, old records, input date and note after an offline save failure, then retries the same id', async () => {
+    mockUpdateWeightEntry.mockResolvedValueOnce({ data: null, error: new Error('offline') });
+    const node = await journal();
+    act(() => measurementButton(node, '15. Oktober').props.onPress());
+    act(() => weightInput(node).props.onChangeText('31,9'));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(weightInput(node).props.value).toBe('31,9');
+    expect(node.root.findAll(sheet => sheet.props.visible && typeof sheet.props.onClose === 'function').length > 0).toBe(true);
+    expect(allInputs(node).some(input => input.props.value === 'Gleiche Waage')).toBe(true);
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockUpdateWeightEntry).toHaveBeenNthCalledWith(2, 'recent', { entry_date: '2026-10-15', weight_kg: 31.9, note: 'Gleiche Waage' });
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled(); expect(mockDeleteWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+  it('preserves loaded measurement history if refresh fails while an editor is open', async () => {
+    const node = await journal();
+    act(() => measurementButton(node, '15. Oktober').props.onPress());
+    act(() => weightInput(node).props.onChangeText('32,1'));
+    mockLoadHealthOverview.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => { await node.root.findAll(control => typeof control.props.onRefresh === 'function')[0].props.onRefresh(); });
+    expect(weightInput(node).props.value).toBe('32,1');
+    expect(measurementButton(node, '1. Oktober')).toBeTruthy();
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+  it('does not offer add/edit controls or notes to non-owners', async () => {
+    mockGetDogById.mockResolvedValue({ data: { ...DOG, owner_id: 'another-owner' }, error: null });
+    const node = await journal();
+    expect(measurementButton(node, '15. Oktober')).toBeUndefined();
+    expect(findByText(node, 'Gewicht eintragen')).toBeUndefined();
+    expect(strings(node)).not.toContain('Gleiche Waage');
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled(); expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+  it('keeps the profile weight separate from actual measurements', async () => {
+    mockGetDogById.mockResolvedValue({ data: { ...DOG, weight_kg: 31.6 }, error: null });
+    mockLoadHealthOverview.mockResolvedValue(EMPTY_OVERVIEW);
+    const node = await journal();
+    expect(strings(node)).toContain('Aus dem Hundeprofil · noch keine Messung');
+    expect(measurementButton(node, 'Oktober')).toBeUndefined();
+    act(() => node.unmount());
+  });
+  it('filters only chart points and keeps both measurements and selected-tab accessibility state', async () => {
+    const node = await journal();
+    const tabs = node.root.findAll(n => n.props.accessibilityRole === 'tab' && typeof n.props.onPress === 'function');
+    const all = tabs.find(tab => tab.props.accessibilityLabel === 'journal.period.all')!;
+    act(() => all.props.onPress());
+    expect(all.props.accessibilityState.selected).toBe(true);
+    expect(measurementButton(node, '1. Oktober')).toBeTruthy(); expect(measurementButton(node, '15. Oktober')).toBeTruthy();
+    act(() => node.unmount());
+  });
+  it('reveals every loaded historical measurement without changing records when the chart period changes', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, entries: [
+      { ...entries[0], id: 'historic-2024', entry_date: '2024-01-01' },
+      { ...entries[0], id: 'historic-2025', entry_date: '2025-01-01' },
+      ...entries,
+    ] });
+    const node = await journal();
+    expect(measurementButton(node, '1. Januar 2024')).toBeUndefined();
+    act(() => findByText(node, 'Alle anzeigen (4)').props.onPress());
+    expect(measurementButton(node, '1. Januar 2024')).toBeTruthy();
+    act(() => node.root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === '1 Monat')[0].props.onPress());
+    expect(measurementButton(node, '1. Januar 2024')).toBeTruthy();
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled(); expect(mockUpdateWeightEntry).not.toHaveBeenCalled(); expect(mockDeleteWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+
 });

@@ -5,6 +5,21 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "weightJournal.open": "Gewichtsverlauf ansehen",
+  "weightJournal.month": "1 Monat",
+  "weightJournal.quarter": "3 Monate",
+  "weightJournal.year": "1 Jahr",
+  "weightJournal.measurements": "Messungen",
+  "weightJournal.showAll": "Alle anzeigen ({count})",
+  "weightJournal.add": "Gewicht eintragen",
+  "weightJournal.noMeasurements": "Noch keine Messungen.",
+  "weightJournal.noPeriod": "Keine Messungen in diesem Zeitraum.",
+  "weightJournal.chartUnit": "Messungen in kg",
+  "weightJournal.profileValue": "Aus dem Hundeprofil · noch keine Messung",
+  "weightJournal.since": "seit {date}",
+  "weightJournal.editMeasurement": "Messung vom {date}: {weight} kg. Bearbeiten.",
+  "weightJournal.chartSummary": "{count} Messungen in Kilogramm. Erste Messung: {firstDate}, {firstWeight} kg. Letzte Messung: {lastDate}, {lastWeight} kg.",
+
   "calendar.markCompleted": "Als erledigt markieren",
   "calendar.cancelAppointment": "Termin absagen",
   "calendar.entryUnavailable": "Dieser Termin ist nicht mehr verfügbar. Bitte aktualisiere den Kalender.",
