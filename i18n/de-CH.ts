@@ -5,6 +5,25 @@
 //
 // Namensschema der Keys: <bereich>.<name>  (technisch, NIE übersetzen).
 export const deCH = {
+  "sharing.noDisplayableSections": "Für diese Freigabe gibt es in dieser Ansicht noch keine Darstellung.",
+  "sharing.unavailableAreas": "Zusammenfassung und Notfallinfos sind in dieser Ansicht noch nicht verfügbar.",
+  "sharing.myDogs": "Meine Hunde",
+  "sharing.withMe": "Mit mir geteilt",
+  "sharing.receivedFrom": "Freigegeben von {name}",
+  "sharing.received": "Für dich freigegeben",
+  "sharing.readOnly": "Nur ansehen",
+  "sharing.inboxHelp": "Hier findest du Hunde, deren Gesundheitsbereiche für dein Konto freigegeben sind.",
+  "sharing.emptyTitle": "Noch keine Freigaben",
+  "sharing.emptyBody": "Freigaben erscheinen hier, sobald sie gültig sind. Prüfe, ob du mit dem richtigen Konto angemeldet bist.",
+  "sharing.loadFailed": "Freigaben konnten nicht geprüft werden. Bitte erneut versuchen.",
+  "sharing.accessUnavailable": "Diese Freigabe ist nicht mehr verfügbar oder noch nicht gültig.",
+  "sharing.scopeHelp": "Du siehst nur die freigegebenen Bereiche. Änderungen am Hund bleiben bei der besitzenden Person.",
+  "sharing.yourAccess": "Dein Zugriff",
+  "sharing.ownerLocationHint": "Die Person findet den Hund unter Hunde → Mit mir geteilt, sobald die Freigabe gültig ist. Sie sieht nur die ausgewählten Bereiche.",
+  "sharing.partialError": "Einige freigegebene Einträge konnten nicht geladen werden. Bitte erneut laden.",
+  "sharing.limited": "Pro Bereich werden höchstens 120 Einträge angezeigt.",
+  "sharing.noRecords": "Keine Einträge in den geladenen, freigegebenen Bereichen.",
+
   "weightJournal.open": "Gewichtsverlauf ansehen",
   "weightJournal.month": "1 Monat",
   "weightJournal.quarter": "3 Monate",

@@ -1,3 +1,4 @@
+import { HealthRouteGate } from '@/components/dogs/HealthRouteGate';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, InputAccessoryView, Keyboard, Linking, Platform, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -61,6 +62,11 @@ const ACTIONS: { key: QuickAction; labelKey: TranslationKey; icon: React.Compone
 const HEAT_ACTION: { key: 'heat'; labelKey: TranslationKey; icon: React.ComponentProps<typeof Ionicons>['name'] } = { key: 'heat', labelKey: 'health.recordHeat', icon: 'heart-outline' };
 
 export default function DogHealthRecordRoute({ weightJournalOnly = false }: { weightJournalOnly?: boolean }) {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <HealthRouteGate dogId={typeof id === 'string' ? id : ''}><DogHealthRecordContent weightJournalOnly={weightJournalOnly} /></HealthRouteGate>;
+}
+
+function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOnly?: boolean }) {
   const router = useRouter();
   const { t, locale } = useT();
   const { user } = useSession();

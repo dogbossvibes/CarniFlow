@@ -45,6 +45,9 @@ import type { Dog } from '@/types';
 import { type HeatCycle } from '@/features/dogs/heatCycles';
 import type { HealthOverviewData } from '@/services/healthService';
 
+// Owner-screen regression fixture: access-gate behavior is covered independently in HealthRouteGate.test.tsx.
+jest.mock('@/components/dogs/HealthRouteGate', () => ({ HealthRouteGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
+
 const mockLoadHealthOverview = jest.fn();
 const mockRetryHealthReminder = jest.fn();
 // Läufigkeit-in-Gesundheitsakte-Integration (29.09.2026): captured so tests

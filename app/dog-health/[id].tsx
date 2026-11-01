@@ -1,3 +1,4 @@
+import { HealthRouteGate } from '@/components/dogs/HealthRouteGate';
 import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +26,11 @@ const LOADS: Load[] = ['leicht', 'mittel', 'hoch'];
 // Editor: Gesundheits-/Belastungs-Eintrag (dog_health_entries) + optional
 // nächster Tierarzttermin (dog_vet_appointments).
 export default function DogHealthEditor() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <HealthRouteGate dogId={typeof id === 'string' ? id : ''}><DogHealthEditorContent /></HealthRouteGate>;
+}
+
+function DogHealthEditorContent() {
   const router = useRouter();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { showToast, toast } = useToast();
