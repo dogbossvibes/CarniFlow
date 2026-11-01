@@ -531,3 +531,61 @@ it('persists all Joker markers while finalizing only rubber as a scored article'
  expect(useTrackingStore.getState().markers.map(m=>m.material)).toEqual(['duebel','ball','gummi']);
  expect(finalizeLocalTrainingSession).toHaveBeenLastCalledWith('local',expect.objectContaining({articlesTotal:1}));
 });
+
+
+it('captures a QA reference at the tap, independently of selection and without creating a track marker', async () => {
+  mockQaEnabled = true;
+  await start();
+  feed(100, 5, 0);
+  feed(1500, 5, 10);
+  clockMs = 1_002_000;
+  const handle = current.markQaReference();
+  expect(handle).not.toBeNull();
+  const expectedTime = handle!.mark.tMs;
+  expect(expectedTime).toBe(1900);
+  clockMs = 1_006_000;
+  current.labelQaReference(handle!, 'spitz_links');
+  expect(handle!.mark).toEqual({ tMs: expectedTime, kind: 'spitz_links' });
+  expect(useTrackingStore.getState().markers).toHaveLength(0);
+  useTrackingStore.getState().isPaused = true;
+  expect(current.markQaReference()).toBeNull();
+  useTrackingStore.getState().isPaused = false;
+  await act(async () => { await current.finish(); });
+  expect((saveQaSessionCapture as jest.Mock).mock.calls[0][0].referenceMarks).toEqual([{ tMs: expectedTime, kind: 'spitz_links' }]);
+});
+
+it('rejects reference marking without diagnostic authorization and while paused', async () => {
+  mockQaEnabled = true;
+  await start();
+  feed(100, 5, 0);
+  mockAccessToken = null;
+  expect(current.markQaReference()).toBeNull();
+  mockAccessToken = 'authorized-fixture';
+  useTrackingStore.getState().isPaused = true;
+  expect(current.markQaReference()).toBeNull();
+  expect(useTrackingStore.getState().markers).toHaveLength(0);
+});
+
+it('bounds reference marks, rejects changed authority, and stops labeling after finish', async () => {
+  mockQaEnabled = true;
+  await start();
+  feed(100, 5, 0);
+  feed(1500, 5, 10);
+  clockMs = 1_002_000;
+  const handle = current.markQaReference()!;
+  expect(handle).not.toBeNull();
+  mockAccessToken = 'changed-authority';
+  current.labelQaReference(handle, 'rechts');
+  expect(handle.mark.kind).toBe('unbekannt');
+  mockAccessToken = 'authorized-fixture';
+  for (let i = 1; i < 256; i++) expect(current.markQaReference()).not.toBeNull();
+  expect(current.markQaReference()).toBeNull();
+  await act(async () => { await current.finish(); });
+  current.labelQaReference(handle, 'links');
+  expect(handle.mark.kind).toBe('unbekannt');
+  expect(current.markQaReference()).toBeNull();
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.referenceMarks).toHaveLength(256);
+  expect(capture.referenceMarksTruncated).toBe(true);
+  expect(useTrackingStore.getState().markers).toHaveLength(0);
+});

@@ -156,6 +156,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const releaseQaModesRef = useRef<(() => void) | null>(null);
   const qaFinishModeRef = useRef(false);
   const qaRef = useRef(false);
+  const qaReferenceRef = useRef<import('@/features/tracking/utils/qaSessionCapture').QaReferenceMark[]>([]);
+  const qaReferenceTruncatedRef = useRef(false);
   // ── QA-Mitschnitt (nur im Diagnosemodus befüllt) ──
   // Ursprung für die Anonymisierung: der erste eingegangene Rohfix.
   const qaMarkerMetaRef = useRef<QaMarkerMeta[]>([]);
@@ -303,6 +305,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const enforceQaCaptureAccess = useCallback(() => {
     if (!isQaDiagnosticsEnabled()) {
       qaRef.current = false;
+      qaReferenceRef.current = [];
+      qaReferenceTruncatedRef.current = false;
       qaMotionCaptureRef.current.clear();
       recordingEvidenceRef.current?.close();
       recordingEvidenceRef.current = null;
@@ -572,6 +576,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaRawCountRef.current = 0;
     qaAcceptedCountRef.current = 0;
     qaMarkerMetaRef.current = [];
+    qaReferenceRef.current = [];
+    qaReferenceTruncatedRef.current = false;
     markerWritesRef.current = createMarkerWriteBarrier();
     qaMotionCaptureRef.current.clear();
     startupMovementRef.current = { samples: [], confirmationTSec: null, confirmationSource: null,
@@ -736,6 +742,23 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   const pause  = useCallback(() => { recordingEvidenceRef.current?.note('userPaused'); processor.interruptContinuity(); store.getState().pauseRecording(); }, [store, processor]);
   const resume = useCallback(() => { recordingEvidenceRef.current?.note('userResumed'); processor.interruptContinuity(); store.getState().resumeRecording(); }, [store, processor]);
+
+  // QA-only ground truth; this never creates a track marker or changes detection.
+  const markQaReference = useCallback((): { mark: import('@/features/tracking/utils/qaSessionCapture').QaReferenceMark; token: string } | null => {
+    if (!qaRef.current || !isQaDiagnosticsEnabled() || !diagnosticsAccessToken() || !recordingRef.current || store.getState().isPaused || !qaOriginRef.current) return null;
+    if (qaReferenceRef.current.length >= 256) { qaReferenceTruncatedRef.current = true; return null; }
+    const elapsed = Date.now() - qaOriginRef.current.t;
+    if (!Number.isFinite(elapsed) || Math.abs(elapsed) >= 1e8) return null;
+    const token = diagnosticsAccessToken();
+    if (!token) return null;
+    const mark: import('@/features/tracking/utils/qaSessionCapture').QaReferenceMark = { tMs: elapsed, kind: 'unbekannt' };
+    qaReferenceRef.current.push(mark);
+    return { mark, token };
+  }, [qaOriginRef, store]);
+  const labelQaReference = useCallback((handle: { mark: import('@/features/tracking/utils/qaSessionCapture').QaReferenceMark; token: string }, kind: import('@/features/tracking/utils/qaSessionCapture').QaReferenceKind) => {
+    if (!qaRef.current || !isQaDiagnosticsEnabled() || !diagnosticsAccessToken() || !recordingRef.current) return;
+    if (handle.token === diagnosticsAccessToken() && qaReferenceRef.current.includes(handle.mark)) handle.mark.kind = kind;
+  }, []);
 
   const addMarker = useCallback(async (
     type: MarkerType,
@@ -904,6 +927,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           detectorPoints,
           linePoints,
           markers: qaMarkerMetaRef.current.slice(),
+          referenceMarks: qaReferenceRef.current.map(m => ({ ...m })),
+          referenceMarksTruncated: qaReferenceTruncatedRef.current,
           autoDiagnostics,
           reconstructionScope: 'current_detector_section' as const,
           ...qaMotionCaptureRef.current.snapshot(),
@@ -991,5 +1016,5 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     })().finally(() => { finalizationRef.current = null; });
   }, [stopAll, store, flushPoints, completedDetectorSectionsRef, persistConfirmedCorner, commitMarker, qaRel, angleDbgRef, detectPointsRef, lastCornerAtRef, liveTurnsRef, pointsRef, qaAcceptedCountRef, qaMotionCaptureRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, turnEvidenceRef]);
 
-  return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug };
+  return { startWarmup, beginRecording, noteUserTapStart, pause, resume, addMarker, finish, stopAll, gpsDebug, markQaReference, labelQaReference };
 }

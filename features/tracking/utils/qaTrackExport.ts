@@ -22,6 +22,20 @@ import type {
 } from '@/features/tracking/utils/qaSessionCapture';
 
 const M_PER_DEG = 111320;
+const REFERENCE_KINDS = ['rechts', 'links', 'spitz_rechts', 'spitz_links', 'unbekannt'] as const;
+
+function projectReferenceMarks(value: unknown): import('./qaSessionCapture').QaReferenceMark[] {
+  if (!Array.isArray(value) || value.length > 256) throw new Error('Ungültige QA-Referenzmarkierungen');
+  return value.map((item: unknown) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error('Ungültige QA-Referenzmarkierung');
+    const entry = item as Record<string, unknown>;
+    if (typeof entry.tMs !== 'number' || !Number.isFinite(entry.tMs) || Math.abs(entry.tMs) >= 1e8 ||
+        typeof entry.kind !== 'string' || !REFERENCE_KINDS.includes(entry.kind as typeof REFERENCE_KINDS[number])) {
+      throw new Error('Ungültige QA-Referenzmarkierung');
+    }
+    return { tMs: entry.tMs, kind: entry.kind as typeof REFERENCE_KINDS[number] };
+  });
+}
 
 /** Rohpunkt, wie ihn `local_track_points` liefert. */
 export interface RawLayPoint {
@@ -97,7 +111,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 15;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 15 | 16;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -116,6 +130,8 @@ export interface QaTrackExport {
   // ── v2: alles, was zur Reproduktion eines Feldlaufs fehlte ──────────────
   /** false = Session ohne QA-Mitschnitt (QA-Modus war aus oder Altbestand). */
   qaCaptureAvailable: boolean;
+  referenceMarks?: import('./qaSessionCapture').QaReferenceMark[];
+  referenceMarksTruncated?: boolean;
   /**
    * Je Pipeline EINE benannte Zahl. Nie wieder „die Distanz":
    *   rawPathM       ungeglättet, alle eingegangenen Fixe
@@ -278,7 +294,7 @@ export function buildQaTrackExport(
   }
   const accs = anon.map(p => p.accuracy).filter((a): a is number => a != null);
   const motion = capture?.candidateMotionEvidence;
-  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 15 = capture?.motionTimeline ? 15 : capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
+  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 15 | 16 = capture?.referenceMarks ? 16 : capture?.motionTimeline ? 15 : capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
     || capture?.startupDiagnostics?.motionFirstCallbackTSec !== undefined ? 7
     : capture?.startupMovementDiagnostics
     || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
@@ -314,6 +330,7 @@ export function buildQaTrackExport(
     markers: anonymizeMarkers(markers, points[0], capture?.markers),
 
     qaCaptureAvailable: !!capture,
+    ...(capture?.referenceMarks !== undefined ? { referenceMarks: projectReferenceMarks(capture.referenceMarks), referenceMarksTruncated: capture.referenceMarksTruncated === undefined ? false : validateReferenceTruncated(capture.referenceMarksTruncated) } : {}),
     distances: {
       rawPathM: capture?.distances.rawPathM ?? null,
       detectorPathM: capture?.distances.detectorPathM ?? null,
@@ -380,7 +397,19 @@ export function serializeQaTrackExport(e: QaTrackExport): string {
  * Geokoordinaten noch absolute Zeitstempel enthält. Wird vor dem Teilen
  * aufgerufen — lieber gar kein Export als ein Standortleck.
  */
+function validateReferenceTruncated(value: unknown): boolean {
+  if (typeof value !== 'boolean') throw new Error('Ungültiger QA-Referenzstatus');
+  return value;
+}
+
 export function assertNoAbsoluteData(e: QaTrackExport): void {
+  if (e.referenceMarks !== undefined) {
+    projectReferenceMarks(e.referenceMarks);
+    for (const mark of e.referenceMarks) {
+      if (Object.keys(mark).sort().join(',') !== 'kind,tMs') throw new Error('Ungültige QA-Referenzfelder');
+    }
+  }
+  if (e.referenceMarksTruncated !== undefined) validateReferenceTruncated(e.referenceMarksTruncated);
   if (e.recordingEvidence) assertQaRecordingEvidence(e.recordingEvidence);
   if (e.backgroundLayDiagnostics) {
     const visit = (value: unknown): void => {
