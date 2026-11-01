@@ -1,0 +1,53 @@
+{
+  "status": "INDEPENDENT_41_OFFLINE_TESTS_PASS_NOT_LIVE_ACCEPTANCE",
+  "tests": 41,
+  "review": "00 read source delta, reran9+12+20 offline tests; checked9 frozen hashes and manifest references. Immutable historical install hash and invariants remain; live CSV full metadata fingerprint, raw hash, exact timestamp and explicit user-confirmed project provenance are checked with10min freshness. Date, nonce, approval, both-phase gates and overall900s cap preserved. CSV fixture entirely synthetic and standalone. No live receipts, source CSV or approval records included.",
+  "normalization": "Private project root replaced by ${PROJECT_ROOT}; reverse reconstruction byte exact; archive review only.",
+  "sources": [
+    {
+      "file": "t115-stage-b-post-policy-capped-01.py",
+      "originalSHA256": "eea5b68ead59b0be226c75344b93035d924caa6324d2e48c86601a274cc13033",
+      "archiveSHA256": "eea5b68ead59b0be226c75344b93035d924caa6324d2e48c86601a274cc13033"
+    },
+    {
+      "file": "test_stage_b_post_policy_capped_01.py",
+      "originalSHA256": "0630e22aaf0a85cdc77ee7b478c72d562b6dca0c0b50ec58754154085011e28d",
+      "archiveSHA256": "0630e22aaf0a85cdc77ee7b478c72d562b6dca0c0b50ec58754154085011e28d"
+    },
+    {
+      "file": "t115-sections-post-policy-01.py",
+      "originalSHA256": "9b7e090c904c1a37914b2bc55239ad5ef5eba7f105ad16eafab1bef505bed184",
+      "archiveSHA256": "4b4b9856ccd2cc372a5ab694443ccbf22f80d1b9ec8bf24c1af76d126ca594f6"
+    },
+    {
+      "file": "test_sections_post_policy_01.py",
+      "originalSHA256": "9753fb3f7abc809477987ad51cb05e10e7f94a1748736e1b420dcef0e070353d",
+      "archiveSHA256": "9753fb3f7abc809477987ad51cb05e10e7f94a1748736e1b420dcef0e070353d"
+    },
+    {
+      "file": "t115-final-qa-post-policy-01.py",
+      "originalSHA256": "93509d6ba760effd82e549fa5f36191802b459a006c9c262c9194ccafb09f601",
+      "archiveSHA256": "93509d6ba760effd82e549fa5f36191802b459a006c9c262c9194ccafb09f601"
+    },
+    {
+      "file": "test_final_qa_post_policy_01.py",
+      "originalSHA256": "2ef7a1a635a702a490aefcf335d9bfc05f36123994100acf2855b83e8307e44d",
+      "archiveSHA256": "2ef7a1a635a702a490aefcf335d9bfc05f36123994100acf2855b83e8307e44d"
+    },
+    {
+      "file": "QA-SOURCE-MANIFEST-POST-POLICY-01.json",
+      "originalSHA256": "3d4a55bcb1de8eab64b4002b0341a3c7fa7eec1cb9ed7670382cdc6b1be53aa7",
+      "archiveSHA256": "ec56f541c35c92084178ece58c1f46225011ca56fdc5ee59f2c68eaaf60ab075"
+    },
+    {
+      "file": "T115-FRESH-POST-POLICY-QA-SCOPE-01.json",
+      "originalSHA256": "17480eacf3f6e2cc75d33addad5282ab4b5089811571db47297ef92a5af28ff2",
+      "archiveSHA256": "17480eacf3f6e2cc75d33addad5282ab4b5089811571db47297ef92a5af28ff2"
+    },
+    {
+      "file": "T115-DOCUMENT-OWNER-SELECT-POSTFLIGHT-SCHEMA-01.json",
+      "originalSHA256": "d5f61213c4657b539474af34971314b2807511e0427378d5690b2891d86f9760",
+      "archiveSHA256": "4888257d5331ba4da8c34ffaabb8b9d56efaf82c18c9803c836832a77c569d0b"
+    }
+  ]
+}
