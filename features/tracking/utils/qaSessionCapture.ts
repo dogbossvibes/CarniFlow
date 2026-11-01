@@ -224,7 +224,12 @@ export interface QaCandidateMotion {
  *  nachrechenbar sind. */
 export const QA_MOTION_CONTEXT_MS = 2000;
 
+export type QaReferenceKind = 'rechts' | 'links' | 'spitz_rechts' | 'spitz_links' | 'unbekannt';
+export interface QaReferenceMark { tMs: number; kind: QaReferenceKind }
+
 export interface QaSessionCapture {
+  referenceMarks?: QaReferenceMark[];
+  referenceMarksTruncated?: boolean;
   /** 1 = Schema v2.0 (ohne Motion), 2 = v2.1 (mit candidateMotionEvidence). */
   captureVersion: 1 | 2;
   sessionLocalId: string;
