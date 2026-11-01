@@ -1,0 +1,21 @@
+{
+  "status": "REVIEWED_SOURCE_ARCHIVE_NOT_PRODUCTION_APPROVAL",
+  "scope": "Single guarded ALTER POLICY dog_documents_select. No row DML, helper/ACL/grant/storage changes. Local synthetic repro only.",
+  "review": "00 read exact SQL and controller; independent PostgreSQL17 run passed41 checks using networknone/noports/novolumes; old initial review retained.",
+  "tests": "baseline42501, ownerreturningafterfix, recipient/outsider/anon boundaries, preservation,14 baseline driftSTOPs,postconditionRollback,noReplay",
+  "migrationSHA256": "eb379471b650ebef4c71c19b8f83c45b26e2fd58c3f185c608ff1248c6721ae1",
+  "sources": [
+    {
+      "path": "setup.sql",
+      "sha256": "1774a7a106477021cd410ca9e61d6de2ed332f309f323e42f113c61375d818d0"
+    },
+    {
+      "path": "run-local-repro.py",
+      "sha256": "973d5472cd70f2d28902fa4c35ab78b2f280ba5c38e0364b90cf9b7f2697d5ae"
+    },
+    {
+      "path": "20261101210000_dog_documents_owner_returning_select.sql",
+      "sha256": "eb379471b650ebef4c71c19b8f83c45b26e2fd58c3f185c608ff1248c6721ae1"
+    }
+  ]
+}
