@@ -2,6 +2,25 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "sharing.noDisplayableSections": "Questa vista non supporta ancora le sezioni incluse nella condivisione.",
+  "sharing.unavailableAreas": "Il riepilogo e le informazioni di emergenza non sono ancora disponibili in questa vista.",
+  "sharing.myDogs": "I miei cani",
+  "sharing.withMe": "Condivisi con me",
+  "sharing.receivedFrom": "Condiviso da {name}",
+  "sharing.received": "Condiviso con te",
+  "sharing.readOnly": "Solo lettura",
+  "sharing.inboxHelp": "Qui trovi i cani le cui informazioni sanitarie sono condivise con il tuo account.",
+  "sharing.emptyTitle": "Nessun cane condiviso",
+  "sharing.emptyBody": "Le condivisioni appaiono qui quando sono valide. Verifica di aver effettuato l’accesso con l’account corretto.",
+  "sharing.loadFailed": "Impossibile verificare le condivisioni. Riprova.",
+  "sharing.accessUnavailable": "Questa condivisione non è più disponibile o non è ancora valida.",
+  "sharing.scopeHelp": "Vedi solo le sezioni condivise. Solo il proprietario può modificare le informazioni del cane.",
+  "sharing.yourAccess": "Il tuo accesso",
+  "sharing.ownerLocationHint": "Quando la condivisione è attiva, il destinatario trova il cane in Cani → Condivisi con me e vede solo le sezioni selezionate.",
+  "sharing.partialError": "Alcuni dati condivisi non sono stati caricati. Aggiorna.",
+  "sharing.limited": "Vengono mostrate al massimo 120 voci per sezione.",
+  "sharing.noRecords": "Nessuna voce nelle sezioni condivise caricate.",
+
   "weightJournal.open": "Vedi andamento del peso",
   "weightJournal.month": "1 mese",
   "weightJournal.quarter": "3 mesi",
