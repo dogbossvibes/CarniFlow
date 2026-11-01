@@ -1,0 +1,21 @@
+{
+  "status": "REVIEWED_SOURCE_ARCHIVE_NOT_EXECUTABLE_OR_EXECUTION_APPROVAL",
+  "scope": "Two reviewed resume source/test files only; no live receipts, environment, credentials or customer data",
+  "change": "new one-shot login-only STOP continuation; fresh post-auth receipts required; original c7aa and mutation components unchanged",
+  "localPathPlaceholder": "PRIVATE_TMP denotes operator-known private temporary directory, never execute archive copies",
+  "sources": [
+    {
+      "path": "t115-final-qa-resume-01.py",
+      "originalSHA256": "03f7c0b53acec420defd2113bd4a3d204ec19b74d0d834c794fd284259aa68cc",
+      "archiveSHA256": "475800e72857441544529912e0fe44cc3e5272e687459a7a161436921b6c06c8",
+      "reconstructionVerified": true
+    },
+    {
+      "path": "test_final_qa_resume_01.py",
+      "originalSHA256": "2d9e2a5ebc030c979d37b6c46d4ee274c50671ecbeaaf3ac5f3a5e5b2e06cf07",
+      "archiveSHA256": "2d9e2a5ebc030c979d37b6c46d4ee274c50671ecbeaaf3ac5f3a5e5b2e06cf07",
+      "reconstructionVerified": true
+    }
+  ],
+  "review": "00 independently ran18 offline tests plus3 additional failclosed probes; not a live PASS"
+}
