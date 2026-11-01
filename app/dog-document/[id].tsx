@@ -13,6 +13,7 @@ import { toISODate } from '@/features/dogs/dateInput';
 import { DateField } from '@/components/ui/DateField';
 import { DOC_CATEGORIES } from '@/features/dogs/documentCategories';
 import { useT } from '@/i18n';
+import { haptic } from '@/lib/haptics';
 
 type PickedFile = { uri: string; name: string; mime: string };
 
@@ -51,6 +52,7 @@ export default function DogDocumentEditor() {
         issued_on: issuedOn ? toISODate(issuedOn) : null, note: note.trim() || null,
       });
       if (error) throw error;
+      haptic.success();
       router.back();
     } catch {
       showToast(t('media.uploadFailed'));

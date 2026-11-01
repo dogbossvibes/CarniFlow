@@ -1,6 +1,18 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
+import * as Haptics from 'expo-haptics';
+import { AnyvoButton } from '@/components/ui/AnyvoButton';
+
+jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
+jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
+
+jest.mock('@/components/ui/AnimatedPressable', () => ({
+  AnimatedPressable: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => {
+    const { Pressable } = jest.requireActual('react-native');
+    return <Pressable {...props}>{children}</Pressable>;
+  },
+}));
 
 // expo-haptics mocken, damit der zentrale Service (@/lib/haptics) zählbar wird.
 jest.mock('expo-haptics', () => ({
@@ -11,16 +23,12 @@ jest.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success', Warning: 'warning', Error: 'error' },
 }));
 
-import * as Haptics from 'expo-haptics';
-import { AnyvoButton } from '@/components/ui/AnyvoButton';
-
 const impactAsync = Haptics.impactAsync as jest.Mock;
 
 beforeEach(() => impactAsync.mockClear());
 
 function press(node: ReactTestRenderer) {
-  // Die einzige TouchableOpacity der Komponente antippen.
-  const btn = node.root.findByType(TouchableOpacity);
+  const btn = node.root.findByType(AnimatedPressable);
   act(() => { btn.props.onPress?.(); });
 }
 
@@ -41,7 +49,7 @@ describe('AnyvoButton – zentrale Klick-Haptik', () => {
     let node!: ReactTestRenderer;
     act(() => { node = TestRenderer.create(<AnyvoButton label="Dokument hinzufügen" variant="secondary" onPress={() => {}} />); });
 
-    const btn = node.root.findByType(TouchableOpacity);
+    const btn = node.root.findByType(AnimatedPressable);
     expect(JSON.stringify(btn.props.style)).toContain('"paddingHorizontal":24');
   });
 
@@ -65,6 +73,9 @@ describe('AnyvoButton – zentrale Klick-Haptik', () => {
 
     expect(impactAsync).not.toHaveBeenCalled();
     expect(onPress).not.toHaveBeenCalled();
+    const btn = node.root.findByType(AnimatedPressable);
+    expect(btn.props.accessibilityState).toEqual({ busy: true });
+    expect(btn.props.accessibilityLabel).toBe('OK');
   });
 
   it('führt onPress trotz Haptik-Fehler aus', () => {
