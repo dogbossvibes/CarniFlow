@@ -6,6 +6,21 @@ import type { TranslationKey } from '../de-CH';
 // sind im Abschlussbericht separat aufgeführt. Fehlende Keys → Fallback `de`.
 // Werte in Double-Quotes wegen französischer Apostrophe.
 export const fr: Partial<Record<TranslationKey, string>> & Record<string, string> = {
+  "weightJournal.open": "Voir le suivi du poids",
+  "weightJournal.month": "1 mois",
+  "weightJournal.quarter": "3 mois",
+  "weightJournal.year": "1 an",
+  "weightJournal.measurements": "Mesures",
+  "weightJournal.showAll": "Tout afficher ({count})",
+  "weightJournal.add": "Saisir le poids",
+  "weightJournal.noMeasurements": "Aucune mesure pour le moment.",
+  "weightJournal.noPeriod": "Aucune mesure pour cette période.",
+  "weightJournal.chartUnit": "Mesures en kg",
+  "weightJournal.profileValue": "Du profil du chien · pas encore de mesure",
+  "weightJournal.since": "depuis le {date}",
+  "weightJournal.editMeasurement": "Mesure du {date} : {weight} kg. Modifier.",
+  "weightJournal.chartSummary": "{count} mesures en kilogrammes. Première mesure : {firstDate}, {firstWeight} kg. Dernière mesure : {lastDate}, {lastWeight} kg.",
+
   "calendar.markCompleted": "Marquer comme terminé",
   "calendar.cancelAppointment": "Annuler le rendez-vous",
   "calendar.entryUnavailable": "Ce rendez-vous n’est plus disponible. Veuillez actualiser le calendrier.",

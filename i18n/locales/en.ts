@@ -2,6 +2,21 @@ import type { TranslationKey } from '../de-CH';
 
 // Complete English locale: all productive runtime keys are explicitly defined.
 export const en: Record<TranslationKey, string> & Record<string, string> = {
+  "weightJournal.open": "View weight history",
+  "weightJournal.month": "1 month",
+  "weightJournal.quarter": "3 months",
+  "weightJournal.year": "1 year",
+  "weightJournal.measurements": "Measurements",
+  "weightJournal.showAll": "Show all ({count})",
+  "weightJournal.add": "Record weight",
+  "weightJournal.noMeasurements": "No measurements yet.",
+  "weightJournal.noPeriod": "No measurements in this period.",
+  "weightJournal.chartUnit": "Measurements in kg",
+  "weightJournal.profileValue": "From dog profile · no measurement yet",
+  "weightJournal.since": "since {date}",
+  "weightJournal.editMeasurement": "Measurement on {date}: {weight} kg. Edit.",
+  "weightJournal.chartSummary": "{count} measurements in kilograms. First measurement: {firstDate}, {firstWeight} kg. Latest measurement: {lastDate}, {lastWeight} kg.",
+
   "calendar.markCompleted": "Mark as completed",
   "calendar.cancelAppointment": "Cancel appointment",
   "calendar.entryUnavailable": "This appointment is no longer available. Please refresh the calendar.",
