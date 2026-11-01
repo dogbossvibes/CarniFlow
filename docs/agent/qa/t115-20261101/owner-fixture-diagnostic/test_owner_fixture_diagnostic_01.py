@@ -63,3 +63,14 @@ class StrictErrorRedaction(unittest.TestCase):
   self.assertEqual(globals()['s']['safe_error'](TimeoutError('PRIVATE_INPUT')),'NETWORK_REQUEST_FAILED_OR_TIMEOUT')
   self.assertEqual(globals()['s']['safe_error'](RuntimeError('PRIVATE_INPUT')),'UNEXPECTED_DIAGNOSTIC_ERROR')
   self.assertEqual(globals()['s']['safe_error'](globals()['s']['Stop']('PRIVATE_INPUT')),'UNEXPECTED_DIAGNOSTIC_ERROR')
+
+class SourceAndMetadataGuards(unittest.TestCase):
+ def test_common_source_drift_stops_before_loading_or_login(self):
+  with patch.dict(s['load_verified'].__globals__,{'COMMON_SHA':'0'*64}):
+   with self.assertRaisesRegex(s['Stop'],'COMMON_SOURCE_DRIFT'):s['load_verified']()
+ def test_independent_metadata_receipt_hash_drift_stops(self):
+  with patch.dict(s['load_verified'].__globals__,{'POST_SHA':'0'*64}):
+   with self.assertRaisesRegex(s['Stop'],'INDEPENDENT_CLEAN_STATE_REQUIRED'):s['load_verified']()
+ def test_actual_prior_stop_hash_drift_stops(self):
+  with patch.dict(s['load_verified'].__globals__,{'PRIOR_SHA':'0'*64}):
+   with self.assertRaisesRegex(s['Stop'],'ACTUAL_OWNER_INSERT_STOP_REQUIRED'):s['load_verified']()
