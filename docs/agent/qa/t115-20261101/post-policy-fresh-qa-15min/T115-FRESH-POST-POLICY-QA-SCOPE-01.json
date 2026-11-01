@@ -1,0 +1,30 @@
+{
+  "status": "LOCAL_EXACT_FRESH_QA_SCOPE_NOT_EXECUTION_APPROVAL",
+  "project_ref": "axkkhyqrjrtbkumaulta",
+  "qaDateZurich": "2026-11-01",
+  "testAccounts": {
+    "A": "68910959-e849-4860-b408-ebc234fec611",
+    "B": "0327d914-99e4-4e6e-b89e-3b642586a3b8"
+  },
+  "syntheticDog": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+  "freshWeightFixture": "f7f84cac-4f40-4774-8190-578525c8ad1d",
+  "freshWeightOnlyGrant": "33a9ee49-9eaa-41ac-87cd-b74629cec4db",
+  "originalRevokedGrantNeverReused": "9e984c75-db12-4105-ac31-c566240fb73a",
+  "sectionsGrantPreviouslyNeverCreated": "9a6ef3f7-adf1-4835-99a8-b0cc7be85368",
+  "originalSectionFixtureManifestSHA256": "4aee07b66570f3e163da536416c3453748e35d1bd7377f06b452887ee8ea02c7",
+  "sectionFixturesAndSixDeniedProbesUnchanged": true,
+  "oneOriginalSyntheticPNGOnly": true,
+  "maxMinutesPerGrant": 5,
+  "maxMinutesPerPhase": 10,
+  "normalTestAccountJWTOnly": true,
+  "customerDataActions": false,
+  "backendMigrationReplay": false,
+  "requiresSeparateApprovedDocumentPolicyInstallation": true,
+  "documentPolicyMigrationSHA256": "f0d1ee015746c17201e80ae86c8ee6b053cad75e8e44d3fc4341d95d9f9c5d45",
+  "cleanup": "Only newly created strict-identity/content-verified fixed fixtures/probes/PNG; revoke only the two new test grants and preserve audit records. No old grant reactivation.",
+  "oneDeliberateAttemptNoAutoRetry": true,
+  "OTA": "Only after full actual functional PASS, independent cleanup and fresh per-target release guards; iOS57 and Android49/50, then separate iOS57 map fix.",
+  "maxOverallTestMinutesAfterLogin": 15,
+  "bothPhaseDeadlinesCappedByOverallDeadline": true,
+  "afterDeadlineOnlyExactCleanupAndRevocationAllowed": true
+}

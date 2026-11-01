@@ -1,0 +1,25 @@
+{
+  "status": "SCHEMA_ONLY_NOT_ACTUAL_POSTFLIGHT_OR_EXECUTION_APPROVAL",
+  "expectedFields": {
+    "status": "PASS_DOCUMENT_OWNER_SELECT_METADATA_POSTFLIGHT_NOT_FUNCTIONAL_QA",
+    "project_ref": "axkkhyqrjrtbkumaulta",
+    "migration_sha256": "f0d1ee015746c17201e80ae86c8ee6b053cad75e8e44d3fc4341d95d9f9c5d45",
+    "select_policy_name": "dog_documents_select",
+    "select_policy_qual": "(((owner_id = auth.uid()) AND health_dog_owner_matches(dog_id, owner_id)) OR can_view_dog_document(id))",
+    "select_policy_roles": [
+      "public"
+    ],
+    "select_all_policy_count": 1,
+    "rls_enabled": true,
+    "rls_forced": false,
+    "table_acl_unchanged": true,
+    "other_policies_unchanged": true,
+    "helpers_unchanged": true,
+    "document_view_helper_body_md5": "caf0b0f5a099bd5ef356f36333b37f7b",
+    "owner_match_helper_body_md5": "608febdba1b74dc18708cd45fae80ec8",
+    "checked_at_utc": "ACTUAL_READ_ONLY_SERVER_CHECK_TIME_REQUIRED"
+  },
+  "actualReceiptPath": "${PROJECT_ROOT}/outputs/t115-integration-review-01-20261101/T115-DOCUMENT-OWNER-SELECT-POSTFLIGHT-20261101.json",
+  "freshnessMaxMinutes": 15,
+  "note": "Only Chat05 may populate the actual receipt after separately approved guarded policy execution and actual readback; this schema is never an actual PASS."
+}

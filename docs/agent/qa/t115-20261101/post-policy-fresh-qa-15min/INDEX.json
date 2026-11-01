@@ -1,0 +1,54 @@
+{
+  "status": "INDEPENDENT_LOCAL_38_TESTS_PASS_NOT_LIVE_APPROVAL",
+  "tests": 38,
+  "review": "00 independently read deadline delta and ran9 StageB/12 Sections/17 launcher tests. Both phases use same monotonic900s cap after login and retain shorter10min phase cap. Expiry blocks new data actions, exact cleanup and revocation remain available. Original05 runner unchanged. No live QA, production receipt or human approval included.",
+  "manifestSourceCount": 16,
+  "normalization": "Private project prefix replaced by ${PROJECT_ROOT}; byte-exact reverse reconstruction checked; review-only archive.",
+  "sources": [
+    {
+      "file": "t115-stage-b-post-policy-capped-01.py",
+      "originalSHA256": "eea5b68ead59b0be226c75344b93035d924caa6324d2e48c86601a274cc13033",
+      "archiveSHA256": "eea5b68ead59b0be226c75344b93035d924caa6324d2e48c86601a274cc13033"
+    },
+    {
+      "file": "test_stage_b_post_policy_capped_01.py",
+      "originalSHA256": "0630e22aaf0a85cdc77ee7b478c72d562b6dca0c0b50ec58754154085011e28d",
+      "archiveSHA256": "0630e22aaf0a85cdc77ee7b478c72d562b6dca0c0b50ec58754154085011e28d"
+    },
+    {
+      "file": "t115-sections-post-policy-01.py",
+      "originalSHA256": "9b7e090c904c1a37914b2bc55239ad5ef5eba7f105ad16eafab1bef505bed184",
+      "archiveSHA256": "4b4b9856ccd2cc372a5ab694443ccbf22f80d1b9ec8bf24c1af76d126ca594f6"
+    },
+    {
+      "file": "test_sections_post_policy_01.py",
+      "originalSHA256": "9753fb3f7abc809477987ad51cb05e10e7f94a1748736e1b420dcef0e070353d",
+      "archiveSHA256": "9753fb3f7abc809477987ad51cb05e10e7f94a1748736e1b420dcef0e070353d"
+    },
+    {
+      "file": "t115-final-qa-post-policy-01.py",
+      "originalSHA256": "4be7fc2c39b91dbca829f668430ef29117ee67086362338ff79df5fe8a9a204c",
+      "archiveSHA256": "4be7fc2c39b91dbca829f668430ef29117ee67086362338ff79df5fe8a9a204c"
+    },
+    {
+      "file": "test_final_qa_post_policy_01.py",
+      "originalSHA256": "1dd58da4f8083e5d655000fda467e261327941fa87e6ec89c42abaabbf151c15",
+      "archiveSHA256": "1dd58da4f8083e5d655000fda467e261327941fa87e6ec89c42abaabbf151c15"
+    },
+    {
+      "file": "QA-SOURCE-MANIFEST-POST-POLICY-01.json",
+      "originalSHA256": "3d4a55bcb1de8eab64b4002b0341a3c7fa7eec1cb9ed7670382cdc6b1be53aa7",
+      "archiveSHA256": "ec56f541c35c92084178ece58c1f46225011ca56fdc5ee59f2c68eaaf60ab075"
+    },
+    {
+      "file": "T115-FRESH-POST-POLICY-QA-SCOPE-01.json",
+      "originalSHA256": "17480eacf3f6e2cc75d33addad5282ab4b5089811571db47297ef92a5af28ff2",
+      "archiveSHA256": "17480eacf3f6e2cc75d33addad5282ab4b5089811571db47297ef92a5af28ff2"
+    },
+    {
+      "file": "T115-DOCUMENT-OWNER-SELECT-POSTFLIGHT-SCHEMA-01.json",
+      "originalSHA256": "d5f61213c4657b539474af34971314b2807511e0427378d5690b2891d86f9760",
+      "archiveSHA256": "4888257d5331ba4da8c34ffaabb8b9d56efaf82c18c9803c836832a77c569d0b"
+    }
+  ]
+}
