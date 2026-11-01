@@ -44,6 +44,7 @@ import { getSpeechLocale } from '@/i18n';
 import { metersToSteps } from '@/features/tracking/utils/steps';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import { QaModeBadge } from '@/features/tracking/components/QaModeBadge';
+import { QaReferenceMarker } from '@/features/tracking/components/QaReferenceMarker';
 import type { GpsStats } from '@/features/tracking/engine/types';
 import { useToast } from '@/components/ui/Toast';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
@@ -745,6 +746,7 @@ export default function LegenScreen() {
         {/* QA-Diagnose: tatsächlich aktive Engine/Source. Rendert ausserhalb des
             QA-Modus nichts — auch keinen Abstand. */}
         <QaModeBadge />
+        {phase === 'recording' && <QaReferenceMarker hidden={pocketLock} paused={isPaused} mark={rec.markQaReference} label={rec.labelQaReference} />}
         {view === 'map' && <LayPlanControl plan={layPlan} locked={pocketLock} />}
 
         {/* Karte / Skizze */}
