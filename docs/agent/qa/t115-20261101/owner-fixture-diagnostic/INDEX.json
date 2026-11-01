@@ -1,0 +1,16 @@
+{
+  "status": "REVIEWED_SOURCE_ARCHIVE_NOT_EXECUTION_APPROVAL",
+  "scope": "Owner A only, fixed ten synthetic fixture bodies, no B/grants/storage/schema/OTA. No live receipts, credentials, customer data or private paths.",
+  "review": "00 read full source and ran12 offline tests PASS; diagnostic is not full T115 acceptance",
+  "repository": "Nested canisflow repository; isolated archive branch preserves existing local changes",
+  "sources": [
+    {
+      "path": "t115-owner-fixture-diagnostic-01.py",
+      "sha256": "fcd5a81c7f10e9e403c167304b7d01730de0560b91dd2454103a68750df9a06c"
+    },
+    {
+      "path": "test_owner_fixture_diagnostic_01.py",
+      "sha256": "981d403fe851aac70141f21ede8800f38a32dd83cbcd49469eb50979fb5e3851"
+    }
+  ]
+}
