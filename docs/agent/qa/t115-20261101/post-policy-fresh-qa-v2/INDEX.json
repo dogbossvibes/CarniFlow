@@ -1,0 +1,52 @@
+{
+  "status": "INDEPENDENT_32_OFFLINE_TESTS_PASS_NOT_LIVE_APPROVAL",
+  "delta": "Only document migration SHA v2 and dependent scope/manifest hashes updated. No grant, fixture, deadline or execution logic change. Independent 00 reran32 tests and checked9 frozen files+16 referenced hashes.",
+  "normalization": "Private project prefix replaced by ${PROJECT_ROOT}; reverse reconstruction byte exact. Review-only archive.",
+  "sources": [
+    {
+      "file": "t115-stage-b-post-policy-05.py",
+      "originalSHA256": "f6503e230877cfb6a3e8f1d83fe116b104319e3756d95e1424e07c2bb973ba44",
+      "archiveSHA256": "f6503e230877cfb6a3e8f1d83fe116b104319e3756d95e1424e07c2bb973ba44"
+    },
+    {
+      "file": "test_stage_b_post_policy_05.py",
+      "originalSHA256": "7dafd7089a1c4a8d397103bb0ca3400f1a65917b6186bb16dff4ee254f454d56",
+      "archiveSHA256": "7dafd7089a1c4a8d397103bb0ca3400f1a65917b6186bb16dff4ee254f454d56"
+    },
+    {
+      "file": "t115-sections-post-policy-01.py",
+      "originalSHA256": "8cb912d97072cd1119e0a0262ec9bc7c04f1b1cdc0328c2019c741308f9a49e0",
+      "archiveSHA256": "7a13a3f4816459f502890a4a8c43ef5cf3a1362aa98ce6e48c37c1fa2624356f"
+    },
+    {
+      "file": "test_sections_post_policy_01.py",
+      "originalSHA256": "f2bee4c4c7bfae50b245b3f886b7b752096e2bb297b825af602a3fd532e66464",
+      "archiveSHA256": "f2bee4c4c7bfae50b245b3f886b7b752096e2bb297b825af602a3fd532e66464"
+    },
+    {
+      "file": "t115-final-qa-post-policy-01.py",
+      "originalSHA256": "e64e8374184be5fd3627b6434203f0e9bb45a01a1ff12445e0c6328ac20d3757",
+      "archiveSHA256": "e64e8374184be5fd3627b6434203f0e9bb45a01a1ff12445e0c6328ac20d3757"
+    },
+    {
+      "file": "test_final_qa_post_policy_01.py",
+      "originalSHA256": "29f750fc3e4faa1e9b467c10d48101e9a7c1f6be9e9c0d73f37742e2f22f8fc4",
+      "archiveSHA256": "29f750fc3e4faa1e9b467c10d48101e9a7c1f6be9e9c0d73f37742e2f22f8fc4"
+    },
+    {
+      "file": "QA-SOURCE-MANIFEST-POST-POLICY-01.json",
+      "originalSHA256": "6e23b6c39262039aeb35ea260bf0ec786cf3f1d9164bff1bb68b948d8189088f",
+      "archiveSHA256": "244dc647dd903585ad6fe2ad0f25bcd48a4e8cd8dd2e654c1883f2769a374773"
+    },
+    {
+      "file": "T115-FRESH-POST-POLICY-QA-SCOPE-01.json",
+      "originalSHA256": "823d012d2b6985a30fa78ad4365292fd43cdf304c51a123b510d4a6c7784feda",
+      "archiveSHA256": "823d012d2b6985a30fa78ad4365292fd43cdf304c51a123b510d4a6c7784feda"
+    },
+    {
+      "file": "T115-DOCUMENT-OWNER-SELECT-POSTFLIGHT-SCHEMA-01.json",
+      "originalSHA256": "d5f61213c4657b539474af34971314b2807511e0427378d5690b2891d86f9760",
+      "archiveSHA256": "4888257d5331ba4da8c34ffaabb8b9d56efaf82c18c9803c836832a77c569d0b"
+    }
+  ]
+}
