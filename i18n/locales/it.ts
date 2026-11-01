@@ -2,6 +2,21 @@ import type { TranslationKey } from '../de-CH';
 
 // Italiano completo: tutte le chiavi produttive sono definite esplicitamente.
 export const it: Record<TranslationKey, string> & Record<string, string> = {
+  "weightJournal.open": "Vedi andamento del peso",
+  "weightJournal.month": "1 mese",
+  "weightJournal.quarter": "3 mesi",
+  "weightJournal.year": "1 anno",
+  "weightJournal.measurements": "Misurazioni",
+  "weightJournal.showAll": "Mostra tutte ({count})",
+  "weightJournal.add": "Registra peso",
+  "weightJournal.noMeasurements": "Nessuna misurazione.",
+  "weightJournal.noPeriod": "Nessuna misurazione in questo periodo.",
+  "weightJournal.chartUnit": "Misurazioni in kg",
+  "weightJournal.profileValue": "Dal profilo del cane · nessuna misurazione",
+  "weightJournal.since": "dal {date}",
+  "weightJournal.editMeasurement": "Misurazione del {date}: {weight} kg. Modifica.",
+  "weightJournal.chartSummary": "{count} misurazioni in chilogrammi. Prima misurazione: {firstDate}, {firstWeight} kg. Ultima misurazione: {lastDate}, {lastWeight} kg.",
+
   "calendar.markCompleted": "Segna come completato",
   "calendar.cancelAppointment": "Annulla l’appuntamento",
   "calendar.entryUnavailable": "Questo appuntamento non è più disponibile. Aggiorna il calendario.",

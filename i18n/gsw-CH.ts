@@ -5,6 +5,21 @@ import type { TranslationKey } from './de-CH';
 // nicht verspielt. Keine Formen wie „luegsch/machsch/wotsch/Hündli" in festen
 // UI-Elementen. Fehlende Keys fallen automatisch auf de-CH zurück.
 export const gswCH: Partial<Record<TranslationKey, string>> = {
+  "weightJournal.open": "Gwichtsverlauf aluege",
+  "weightJournal.month": "1 Monet",
+  "weightJournal.quarter": "3 Mönet",
+  "weightJournal.year": "1 Jahr",
+  "weightJournal.measurements": "Messige",
+  "weightJournal.showAll": "Alli azeige ({count})",
+  "weightJournal.add": "Gwicht iitrage",
+  "weightJournal.noMeasurements": "No kei Messige.",
+  "weightJournal.noPeriod": "Kei Messige i dem Zitraum.",
+  "weightJournal.chartUnit": "Messige in kg",
+  "weightJournal.profileValue": "Us em Hundeprofil · no kei Messig",
+  "weightJournal.since": "sit {date}",
+  "weightJournal.editMeasurement": "Messig vom {date}: {weight} kg. Bearbeite.",
+  "weightJournal.chartSummary": "{count} Messige in Kilogramm. Erschti Messig: {firstDate}, {firstWeight} kg. Letschti Messig: {lastDate}, {lastWeight} kg.",
+
   "calendar.markCompleted": "Als erledigt markiere",
   "calendar.cancelAppointment": "Termin absäge",
   "calendar.entryUnavailable": "Dä Termin isch nüm verfügbar. Bitte de Kalender aktualisiere.",
