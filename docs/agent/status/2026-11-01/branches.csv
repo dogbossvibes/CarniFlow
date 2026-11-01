@@ -1,0 +1,520 @@
+branch,sha,commit_date,upstream,on_github,in_remote_main,subject
+codex/t115-qa-archive-20261101,90de7cb1d504c7a90fd12c64ef3400c43969ac0a,2026-11-01T15:40:03+01:00,origin/codex/t115-qa-archive-20261101,True,False,docs: archive reviewed T115 backend and synthetic QA sources
+feat/shared-recipient-android50-20261101,2c8c102e39e404dd99f055006b445808303ca4f3,2026-11-01T14:47:18+01:00,,True,False,feat(health): add read-only recipient access for android50 (T115)
+feat/shared-recipient-android49-20261101,ef67627ecef96004271ec740e00b52f25b307182,2026-11-01T14:47:16+01:00,,True,False,feat(health): add read-only recipient access for android49 (T115)
+feat/shared-recipient-ui-20261101,9325758ef5d31b5207fc23428c939d58fd9185ce,2026-11-01T14:47:16+01:00,,True,False,feat(health): add read-only recipient access for ios57 (T115)
+release/weight-journal-android50-20261101,b27f76192a9d24e85827a194f471af9a475c70e5,2026-11-01T09:04:05+01:00,,True,False,feat(health): port weight journal to android50
+release/weight-journal-android49-20261101,32510f7a03ca49eef6440b1d28f584b6dd09f446,2026-11-01T09:04:04+01:00,,True,False,feat(health): port weight journal to android49
+feat/weight-journal-20261101,4a13945539c6bc60f623bb8888f3abc3dd95fdec,2026-11-01T08:56:26+01:00,,True,False,feat(health): add dedicated weight journal
+release/time-mark-android49-20261101,b32254408ea88ec76277b58700a3eb0217a390a1,2026-11-01T07:52:32+01:00,,True,False,feat(tracking): add authorized QA reference time marks
+release/time-mark-android50-20261101,0d4d3de622125b078d5f69a96d679c969cb65713,2026-11-01T07:52:32+01:00,,True,False,feat(tracking): add authorized QA reference time marks
+release/time-mark-ios57-20261101,2687e04ccb885131119ffb9bebf3af36e1f21cb3,2026-11-01T07:52:32+01:00,,True,False,feat(tracking): add authorized QA reference time marks
+fix/ios57-map-render-20261030,439525f7df062296d5d1c4dac0fd0eefb1bb136e,2026-11-01T07:44:01+01:00,,False,False,fix(tracking): constrain QA reference export fields
+fix/shared-weight-android50-20261031,952b5fed3e677c135be598d9f97c73061a33cd34,2026-10-31T22:54:24+01:00,,True,False,fix: keep live search and laid lines distinguishable (android50)
+release/live-lines-android50-20261031,952b5fed3e677c135be598d9f97c73061a33cd34,2026-10-31T22:54:24+01:00,,True,False,fix: keep live search and laid lines distinguishable (android50)
+fix/shared-weight-android49-20261031,2503bb52ea3845cb0bf5e4e8df45cd39d0221e77,2026-10-31T22:54:23+01:00,,True,False,fix: keep live search and laid lines distinguishable (android49)
+fix/shared-weight-ios57-20261031,01e5c13553fc2793011f9b85b36fca7aa1319b8c,2026-10-31T22:54:23+01:00,,True,False,fix: keep live search and laid lines distinguishable (ios57)
+release/live-lines-android49-20261031,2503bb52ea3845cb0bf5e4e8df45cd39d0221e77,2026-10-31T22:54:23+01:00,,True,False,fix: keep live search and laid lines distinguishable (android49)
+release/live-lines-ios57-20261031,01e5c13553fc2793011f9b85b36fca7aa1319b8c,2026-10-31T22:54:23+01:00,,True,False,fix: keep live search and laid lines distinguishable (ios57)
+fix/shared-weight-rpc-client-20261030,608b4fc44fab29a85d47d00885fa1aead1d92907,2026-10-31T09:52:34+01:00,,True,False,fix(sharing): read shared weights through scoped RPC
+release/calendar-delete-only-android50-20261030,051b4de7123b0bc1b182f0bc1ca19c7bbc2d6c66,2026-10-30T09:50:46+01:00,,True,False,fix: restore owner appointment deletion (android50)
+release/calendar-delete-only-android49-20261030,f97d830ada5179ca3e1733f9278bf25656c867aa,2026-10-30T09:50:45+01:00,,True,False,fix: restore owner appointment deletion (android49)
+release/calendar-delete-only-ios57-20261030,ec22c7f64e220ba714ac7994a8eb20d0c7590d22,2026-10-30T09:50:44+01:00,,True,False,fix: restore owner appointment deletion (ios57)
+release/map-marker-android50-20261030,7217e9ff1196c86612b582e44d66f51f6cb1009d,2026-10-30T09:07:37+01:00,,True,False,fix: bound map marker group distances (android50)
+release/map-marker-android49-20261030,419288f1540ed0db170d8f81b38c0f9b81d93240,2026-10-30T09:07:36+01:00,,True,False,fix: bound map marker group distances (android49)
+release/sharing-calendar-android50-20261030,59b72b204491960c1ac377b682819b70a5f2d5d5,2026-10-30T08:59:54+01:00,,True,False,fix: shared health inbox and owner event deletion (android50)
+release/sharing-calendar-android49-20261030,634e0cb6d158cfd6b13354fde410b4bdfeacb8ec,2026-10-30T08:59:53+01:00,,True,False,fix: shared health inbox and owner event deletion (android49)
+release/sharing-calendar-ios57-20261030,79dd0e7fe56e2901d012929110ad1bca9ea76eeb,2026-10-30T08:59:53+01:00,,True,False,fix: shared health inbox and owner event deletion (ios57)
+fix/ios57-native-fingerprint-guard-20261030,588003780897399b974ad2ed759cd606551c7505,2026-10-30T04:58:12+01:00,,True,False,Verify exact native fingerprints for initial production OTA
+fix/training-entry-ux-20261029,19cacfa6868707ce05eafa31258c802e4607e9bd,2026-10-30T00:18:13+01:00,,True,False,Fix keyboard focus visibility and clarify training ratings
+release/ios57-t141-t142-20261030,19cacfa6868707ce05eafa31258c802e4607e9bd,2026-10-30T00:18:13+01:00,,True,False,Fix keyboard focus visibility and clarify training ratings
+fix/dog-appointment-delete-20261030,d65997d06592af2b213f442651f3700ce3b9bc51,2026-10-29T23:14:29+01:00,,True,False,Integrate reviewed heat overview corrections for iOS build 57
+review/ios57-heat-integration-20261029,d65997d06592af2b213f442651f3700ce3b9bc51,2026-10-29T23:14:29+01:00,,True,False,Integrate reviewed heat overview corrections for iOS build 57
+backup/chat01-github-handoff-20261029,79bc4a5c34b5a46712c0615cc89dc2515c3ee3ef,2026-10-29T09:35:17+01:00,,True,False,docs: record approved synthetic-test backup supplements and resolved gaps
+backup/tracking-audit-synthetic-tests-20261029,86a9fa60ae7f90017011ffa1920a1810455e3d05,2026-10-29T09:34:25+01:00,,True,False,"WIP backup: add privacy-reviewed synthetic audit tests, no execution"
+backup/tracking-raw-synthetic-tests-20261029,16a6a0e811fccab9b39c6eecfdbe95c83bfe176f,2026-10-29T09:34:20+01:00,,True,False,"WIP backup: add privacy-reviewed synthetic raw tests, no execution"
+backup/tracking-motion-arrival-audit-20261029,633ad0029569ddd40004b976890ce9a31496f569,2026-10-29T09:12:29+01:00,,True,False,"WIP backup: preserve frozen motion-arrival-audit program source, exclude private data"
+backup/tracking-raw-journal-20261029,144d98cbf21ca1687a2a1080ee4cd1730e654d45,2026-10-29T09:12:25+01:00,,True,False,"WIP backup: preserve frozen raw-journal program source, exclude private data"
+backup/subscription-ios103-20261029,3b4363a7217e0123ee9ce5d8382373eaddf2e0af,2026-10-29T09:08:05+01:00,,True,False,WIP backup: preserve ios103 subscription author source; no release
+backup/subscription-android103-20261029,d451f11966fc130ae0658fb9e8b6fe81aa1f81f9,2026-10-29T09:07:56+01:00,,True,False,WIP backup: preserve android103 subscription author source; no release
+backup/subscription-modern-20261029,82d5aac053086f6c3dd2ad3a5ce2cff2ef2f21dc,2026-10-29T09:07:47+01:00,,True,False,WIP backup: preserve modern subscription author source; no release
+backup/tooling-one-approval-ota-20261029,f7dc4fe21c1eb4468a54b6f7fc898200550d496c,2026-10-29T09:05:40+01:00,,True,False,WIP backup: preserve historical one-approval OTA tooling source only
+backup/tooling-development-process-20261029,67b7af24d392296ce0fcee45f94d4e8c40c26dc8,2026-10-29T09:05:33+01:00,,True,False,WIP backup: preserve historical development tooling source only
+feat/health-shared-recipient-db-20261029,8b39655770d385f9bbdf6235d01bc80891da5043,2026-10-29T09:04:16+01:00,origin/feat/health-shared-recipient-db-20261029,True,False,docs: record T115 QA deferral and local parser fix
+release/diagnostics-access-final-ios55-20261029,0e16001d4f9aeeb9d06adf384c9b86376fae2250,2026-10-29T09:02:24+01:00,,True,False,Recover personal diagnostics access after transient failures on ios55
+backup/android-daily-widget-20261029,7a036d6c77e653f7ec0ed77f88cb5d99d91dd055,2026-10-29T09:01:27+01:00,,True,False,backup(android): preserve android-daily-widget WIP source
+backup/android-field-qa-20261029,c1a72cf3e4444e3ae657dd6502237892c1d94b51,2026-10-29T09:01:26+01:00,,True,False,backup(android): preserve android-field-reliability-qa WIP source
+backup/android-quick-widget-20261029,f901a78c4ca2ca5a7b216e48bb5c2ed5c8e79b1f,2026-10-29T09:01:26+01:00,,True,False,backup(android): preserve android-widget WIP source
+backup/android-diagnostics-20261029,ad96c483af28ab159e5561285ee52266ebbe95c2,2026-10-29T09:01:25+01:00,,True,False,backup(android): preserve android-diagnostics WIP source
+feat/anyvo-intelligence-conversation-ios-20261023,c8735cd78ec3301d4c62b1aebae12d25f5598fe8,2026-10-29T09:00:43+01:00,,True,False,wip(intelligence): preserve guarded companion and client source
+backup/ios03-monitoring-consent-20261029,1ae46f7eeda0da19c844a519b52f8b0ff2446780,2026-10-29T08:58:42+01:00,origin/backup/ios03-monitoring-consent-20261029,True,False,chore(ios): back up frozen monitoring fix and handoff [skip ci]
+release/diagnostics-access-ios55-20261029,2020060368fe6a548495a4a1e3c93daae5e056bc,2026-10-29T08:48:41+01:00,,True,False,WIP backup: isolate iOS55 diagnostics access recovery; no release
+feat/shared-dogs-inbox-20261029,b1f18c57c6af233d7c6926ed7e22bd4a3302b357,2026-10-29T08:48:11+01:00,,True,False,docs(sharing): preserve reviewed T115 recovery evidence
+fix/dog-today-actions-20261029,0e76110ee705615651893779f04c64c64b2e7b62,2026-10-29T08:48:07+01:00,,True,False,fix(dogs): open dashboard appointments and finish own events
+fix/training-keyboard-scroll-20261029,62f749d737f524d2d4e5273910afc9f5d7949918,2026-10-29T08:48:03+01:00,,True,False,fix(training): preserve keyboard reachability with recovery evidence
+fix/corner-window-diagnostics-20261029,4aace9b7bf2602f10fed40cc433d0f3119779a7c,2026-10-29T08:47:25+01:00,,True,False,fix(diagnostics): retry transient personal access checks
+release/dog-actions-android50-20261029,3e1c2ae32765cfbba9ba1aed04176045c543e7dc,2026-10-29T03:44:03+01:00,,True,False,Make dog hints and calendar actions reachable on android50
+release/dog-actions-android49-20261029,3bb2f4606e1641352d79a7832fcab7bb10e1875d,2026-10-29T03:44:02+01:00,,True,False,Make dog hints and calendar actions reachable on android49
+release/dog-actions-ios56-20261029,17443616b5bad6d5a524804e48cc84a2cf9ef4c9,2026-10-29T03:44:00+01:00,,True,False,Make dog hints and calendar actions reachable on ios56
+release/keyboard-android48-20261029,e2957bd836d6ae5ae7799043cef2ccbbabe617eb,2026-10-29T03:35:34+01:00,,True,False,Keep training form and save action reachable above keyboard on android48
+release/keyboard-android104-20261029,e0198c71bf0fc695cdf31c702573d0f63142ba11,2026-10-29T03:35:33+01:00,,True,False,Keep training form and save action reachable above keyboard on android104
+release/keyboard-ios52-20261029,6c3049482aecf3de42824a13c67080abae11bd32,2026-10-29T03:35:30+01:00,,True,False,Keep training form and save action reachable above keyboard on ios52
+release/dog-actions-ios55-20261029,005999f2ab2cbe4fdf91c020f1fa3e7f22a830dc,2026-10-29T03:33:00+01:00,,True,False,Make dog hints and calendar actions reachable on ios55
+release/keyboard-ios53-20261029,a4eb7ffeab4e7f857090123e4884be58ac265860,2026-10-29T03:30:37+01:00,,True,False,Keep training form and save action reachable above keyboard on ios53
+release/keyboard-ios105-20261029,6789598121a6d6ea00a081fbba1d86327b381c75,2026-10-29T03:30:35+01:00,,True,False,Keep training form and save action reachable above keyboard on ios105
+release/keyboard-ios49-20261029,936131a1dd0c87b6dc8c46f654aee1fcaa436c55,2026-10-29T03:30:33+01:00,,True,False,Keep training form and save action reachable above keyboard on ios49
+release/field-ios55-20261029,2500744d10646e088820f55727832049e48ee292,2026-10-29T03:22:32+01:00,,True,False,Preserve saved field map detail and add bounded personal QA timeline on ios55
+release/field-ios56-20261029,82c63fb58392cf5cb39332f3c564eca713b93bc7,2026-10-29T03:20:32+01:00,,True,False,Preserve saved field map detail and add bounded personal QA timeline on ios56
+release/keyboard-android50-20261029,9f3e38ec7c5c10c34abab7d775eddc9a0060d272,2026-10-29T03:14:01+01:00,,True,False,Keep training form and save action reachable above keyboard on android50
+fix/field-display-ios56-20261029,187a1c076adfec797ad5550269e192ac50f47953,2026-10-29T02:55:22+01:00,,True,False,Add chronological QA motion capture for iOS 56 without changing sensor processing
+release/keyboard-android49-20261029,6d44e6c61e06ee58032310b6f7fec5caeb840206,2026-10-29T02:03:37+01:00,,True,False,Keep training form and save action reachable above keyboard on android49
+release/keyboard-ios56-20261029,f47deeeb55232765fc170f51007f45132e221e48,2026-10-29T02:03:36+01:00,,True,False,Keep training form and save action reachable above keyboard on ios56
+release/keyboard-ios55-20261029,5626aba46d173bcf515e67f662afdb83564c9dc6,2026-10-29T02:03:35+01:00,,True,False,Keep training form and save action reachable above keyboard on ios55
+release/ios55-satellite-20261028,6f1556e449c5f872f6f61fae1f9f136846aaf5f6,2026-10-29T01:29:56+01:00,,True,False,Add bounded satellite diagnostics for ios55
+release/android50-satellite-aab-20261028,c4649ad59e92708db9ee51301812051aff92f33f,2026-10-29T01:27:51+01:00,,True,False,Add bounded satellite diagnostics for android50
+release/subscription-lifecycle-ios56-20261028,9b85e0fd1b03f232a1ff134235343643aa719a3f,2026-10-28T16:52:36+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/subscription-lifecycle-ios52-20261028,6dd2b2691346a808e85b6392e1ce7f22f64eaf37,2026-10-28T15:45:42+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/subscription-lifecycle-android49-20261028,d41ab8ee80dff8a997fed6c89dddc390d5dadc9e,2026-10-28T15:21:27+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/subscription-lifecycle-android48-20261028,86e7ca1b6d7eb1a4d5471bca1dd9d9b5d231dbdd,2026-10-28T15:21:25+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/subscription-lifecycle-android104-20261028,0f13e4a041863bb9886238dcf16f4a53cd85127a,2026-10-28T15:21:24+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/subscription-lifecycle-ios55-20261028,89c217709969bc1ebdaf03b3363c2bb606c30203,2026-10-28T15:21:21+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/subscription-lifecycle-ios53-20261028,5cdf4d9cf2aaff95f108abd81ab26df5e7a0369f,2026-10-28T15:21:19+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/subscription-lifecycle-ios105-20261028,847e869d6b060a5e1555ba6ec215bddedeef2bdd,2026-10-28T15:21:18+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/subscription-lifecycle-ios49-20261028,42554354593ea15bf4ed9a7bd46ad95c0b1133f0,2026-10-28T15:21:17+01:00,,True,False,fix(subscription): reconcile expired plans and recover pending activations
+release/android49-startup-guard-20261028,22ec5f5c3074a2f9399e5a468feb089f79a56502,2026-10-28T14:53:11+01:00,,True,False,fix(boot): dismiss startup splash after first root layout
+release/ios55-startup-guard-20261028,f5c4753648d68b49b7f8e5ee5978e8c7ffb4bcf0,2026-10-28T14:27:30+01:00,,True,False,fix(boot): dismiss startup splash after first root layout
+release/ios55-warmup-swiss-ui-20261028,d13181bb392c211551c636a86eb1bad35ffed2ca,2026-10-28T13:52:06+01:00,,True,False,fix(tracking-ui): restore warmup map and safe Swiss header
+release/ios55-phase3-diagnostics-20261028,26e69a3d1c7cf23aaaac3747387e02e909a0a85c,2026-10-28T10:43:54+01:00,,True,False,feat(diagnostics): add timing metrics and isolated Swiss imagery test
+release/ios55-map-layers-20261028,291392d1aa5d5ed0e427aa01f7ccbe7e9b8138f5,2026-10-28T10:25:16+01:00,,True,False,feat(tracking): select standard satellite or hybrid maps
+release/ios55-marker-lifecycle-20261028,a0c72081ffb1ef42c5ba136ed8f91bb7ce01bb93,2026-10-28T09:53:36+01:00,,True,False,fix(tracking): reject manual markers outside active recording
+release/map-ui-android49-20261028,df4f656597f5ca647c9f5418b7c2c50e1f3bfd46,2026-10-28T09:38:53+01:00,,True,False,feat(tracking): simplify saved track map overview for android49
+release/map-ui-ios49-20261028,83cfd2a46128201ec691e9d359e70695f09cbdcf,2026-10-28T09:38:52+01:00,,True,False,feat(tracking): simplify saved track map overview for ios49
+release/map-ui-ios55-20261028,62b8d8c27a3149cc0c46416515f39b3e3452d985,2026-10-28T09:38:51+01:00,,True,False,feat(tracking): simplify saved track map overview for ios55
+codex/subscription-lifecycle-20261028,e8a754f34ca4bd58907a87b2d54182feaa0abd5c,2026-10-26T20:38:21+01:00,,True,False,fix(ios): guard legacy map children and prepare build 56
+release/ios49-map-repair-build56,e8a754f34ca4bd58907a87b2d54182feaa0abd5c,2026-10-26T20:38:21+01:00,,True,False,fix(ios): guard legacy map children and prepare build 56
+feat/track-map-minimal-ios49-20261026,60f9e44e003bbea98ae35181628cb1500d1df9e3,2026-10-26T19:58:12+01:00,,True,False,fix(tracking): compact markers and remove map rulers on iOS49
+fix/ios49-airmap-repair-20261026,60f9e44e003bbea98ae35181628cb1500d1df9e3,2026-10-26T19:58:12+01:00,,True,False,fix(tracking): compact markers and remove map rulers on iOS49
+release/ios49-solid-no-scale-20261026,60f9e44e003bbea98ae35181628cb1500d1df9e3,2026-10-26T19:58:12+01:00,,True,False,fix(tracking): compact markers and remove map rulers on iOS49
+feat/manual-angle-edits-20261026,72eaeb9871e5dd630603bb86ed548b4bab42afed,2026-10-26T19:56:18+01:00,,True,False,fix(tracking-ui): use solid search lines and remove map scales
+feat/track-map-minimal-ui-20261026,72eaeb9871e5dd630603bb86ed548b4bab42afed,2026-10-26T19:56:18+01:00,,True,False,fix(tracking-ui): use solid search lines and remove map scales
+fix/track-map-solid-no-scale-20261026,72eaeb9871e5dd630603bb86ed548b4bab42afed,2026-10-26T19:56:18+01:00,,True,False,fix(tracking-ui): use solid search lines and remove map scales
+release/ios55-solid-no-scale-20261026,72eaeb9871e5dd630603bb86ed548b4bab42afed,2026-10-26T19:56:18+01:00,,True,False,fix(tracking-ui): use solid search lines and remove map scales
+fix/local-direction-ios55-20261026,f017f09bb9a97153c252d6bc0aa4e3634023a9e9,2026-10-26T19:25:37+01:00,,True,False,fix(tracking): bound local turn probes and refresh motion evidence
+release/ios55-angle-release-20261026,f017f09bb9a97153c252d6bc0aa4e3634023a9e9,2026-10-26T19:25:37+01:00,,True,False,fix(tracking): bound local turn probes and refresh motion evidence
+release/ios55-compact-groups-cumulative-20261026,f017f09bb9a97153c252d6bc0aa4e3634023a9e9,2026-10-26T19:25:37+01:00,,True,False,fix(tracking): bound local turn probes and refresh motion evidence
+fix/ios55-compact-groups-20261026,b7daad8e23668403f16aabaa03c3f5773788d4d9,2026-10-26T18:27:51+01:00,,True,False,fix(tracking): compact grouped map markers for ios55
+fix/ios49-compact-groups-20261026,85b8cd866f877876e94f3d7fc40d484b2f87c34d,2026-10-26T18:27:49+01:00,,True,False,fix(tracking): compact grouped map markers for ios49
+feat/track-map-minimal-android49-20261026,7c726144e6544ee9e8b43e1b863e7b23c39ec3fc,2026-10-26T18:27:46+01:00,,True,False,fix(tracking): compact grouped map markers for android49
+fix/android49-compact-groups-20261026,7c726144e6544ee9e8b43e1b863e7b23c39ec3fc,2026-10-26T18:27:46+01:00,,True,False,fix(tracking): compact grouped map markers for android49
+fix/acute-markers-20261026,a9e4d5d7990b1cd5bf42d64348932026d720345b,2026-10-26T15:40:33+01:00,,False,False,fix(tracking): wait for map readiness before freezing marker snapshots
+fix/field-corners-20261026,25cbe12f3d1a50b54878fbbd29358f51e3452ea2,2026-10-26T15:15:54+01:00,,True,False,fix(tracking): slim saved comparison lines and preserve field regression evidence
+release/ios55-lay-preparation-20261026,3b1a7b94be8e604387068f08e547ed147bde64aa,2026-10-26T09:25:11+01:00,,True,False,fix(tracking): separate laying preparation and explain GPS readiness
+feat/tracking-quality-20261026,f0784761f84a562b45f626bd5f5babb2a6f82a78,2026-10-26T09:07:34+01:00,,False,False,fix(tracking): separate laying preparation and explain GPS readiness
+release/android49-view-20261026,4bc7d7a967fb330124e89bf937e790c2cba6a324,2026-10-26T08:39:52+01:00,,True,False,fix: keep plan selector controls and diagnostic status readable
+release/ios55-view-20261026,421de7db38eb786981e907c55da52f8d0f5784d9,2026-10-26T08:39:50+01:00,,True,False,fix: keep plan selector controls and diagnostic status readable
+feat/module-personalization-20261026,79f0435e73c56fa5476a45bbd1e3d01ca6c5af7c,2026-10-25T23:45:13+01:00,,True,False,feat(ios): preserve paused recording and add diagnostics with heat forecast calendar
+release/ios55-pause-diagnostics-heat-20261025,79f0435e73c56fa5476a45bbd1e3d01ca6c5af7c,2026-10-25T23:45:13+01:00,,True,False,feat(ios): preserve paused recording and add diagnostics with heat forecast calendar
+release/android49-planline-heat-20261025,0976c4530488e005e89a38327effd36da30ce410,2026-10-25T22:16:42+01:00,,True,False,feat(android): retain tracking with planline and complete heat overview
+release/android48-planline-heat-20261025,8198bb9fcdf4187bd391c9ed368c13e1f24b1d02,2026-10-25T22:16:41+01:00,,True,False,feat(android): retain tracking with planline and complete heat overview
+release/planline-android49-20261024,d5c7d88e80e0249722a427b14bf30b91edee9d4e,2026-10-24T13:43:14+02:00,,False,False,feat(tracking): add display-only planline on Android
+release/planline-android105-20261024,81502f71edecc40477832ea17070d26ce2611cc5,2026-10-24T13:43:13+02:00,,False,False,feat(tracking): add display-only planline on Android
+chore/development-process-20261025,2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e,2026-10-24T13:32:43+02:00,,True,False,feat(health): add female heat overview and observation journal
+chore/one-approval-ota-20261026,2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e,2026-10-24T13:32:43+02:00,,True,False,feat(health): add female heat overview and observation journal
+fix/tracking-pause-safety-20261025,2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e,2026-10-24T13:32:43+02:00,,True,False,feat(health): add female heat overview and observation journal
+release/ios55-heat-overview-cumulative-20261024,2dc58312b9c1308cd59e4da4d61eb73a4d0fff8e,2026-10-24T13:32:43+02:00,,True,False,feat(health): add female heat overview and observation journal
+fix/sync-owner-isolation-20261024,f809b71078a354c92efb853cb6c6944399b8c681,2026-10-24T12:53:24+02:00,,True,False,feat(tracking): show isolated planned route while laying
+release/ios55-lay-planline-20261024,f809b71078a354c92efb853cb6c6944399b8c681,2026-10-24T12:53:24+02:00,,True,False,feat(tracking): show isolated planned route while laying
+feat/companion-home-entry-20261024,d67773bec61fcc4999496db1095daf5da07776d2,2026-10-24T10:57:34+02:00,,True,False,feat(training): compact hub and refine apportierholz icon
+fix/audit-share-chat-ui-20261024,d67773bec61fcc4999496db1095daf5da07776d2,2026-10-24T10:57:34+02:00,,True,False,feat(training): compact hub and refine apportierholz icon
+release/ios55-heat-overview-20261024,d67773bec61fcc4999496db1095daf5da07776d2,2026-10-24T10:57:34+02:00,,True,False,feat(training): compact hub and refine apportierholz icon
+release/ios55-training-hub-20261024,d67773bec61fcc4999496db1095daf5da07776d2,2026-10-24T10:57:34+02:00,,True,False,feat(training): compact hub and refine apportierholz icon
+feat/heat-overview-ux-20261024,86c3d1e2a09952148bfd35a84642ca69be820b78,2026-10-24T09:41:26+02:00,,True,False,fix(tracking): remove oversized training photo
+feat/tracking-planline-20261024,86c3d1e2a09952148bfd35a84642ca69be820b78,2026-10-24T09:41:26+02:00,,True,False,fix(tracking): remove oversized training photo
+feat/training-hub-20261024,86c3d1e2a09952148bfd35a84642ca69be820b78,2026-10-24T09:41:26+02:00,,True,False,fix(tracking): remove oversized training photo
+fix/ios-monitoring-consent-20261024,86c3d1e2a09952148bfd35a84642ca69be820b78,2026-10-24T09:41:26+02:00,,True,False,fix(tracking): remove oversized training photo
+release/ios55-remove-photo-20261024,86c3d1e2a09952148bfd35a84642ca69be820b78,2026-10-24T09:41:26+02:00,,True,False,fix(tracking): remove oversized training photo
+release/ios55-tracking-ux-tone-20261024,23fad2540e3871117d153b1e9d5bb3181a790a15,2026-10-24T00:35:49+02:00,,True,False,feat(tracking): simplify tracking hub and retain greeting clip playback
+feat/tracking-ux-flow-20261023,0eadfd078ecd9639accc23a626aeb956cdfa93d8,2026-10-23T23:30:55+02:00,,True,False,fix(tracking): recover paired short corners and skip impossible extra scans
+release/ios55-yam-r3-20261023,0eadfd078ecd9639accc23a626aeb956cdfa93d8,2026-10-23T23:30:55+02:00,,True,False,fix(tracking): recover paired short corners and skip impossible extra scans
+fix/yam-paired-corners-ios55-20261023,0d9634240346d37a5c43ae6c343fc8e5d83bb7ff,2026-10-23T11:29:26+02:00,,True,False,fix(tracking): preserve accepted smoothing after rejected GPS fixes
+release/ios55-gps-protection-20261023,0d9634240346d37a5c43ae6c343fc8e5d83bb7ff,2026-10-23T11:29:26+02:00,,True,False,fix(tracking): preserve accepted smoothing after rejected GPS fixes
+release/live-share-android49-20261023,5b52e7037ea2523af55508e39116a49317ddb2f8,2026-10-23T09:12:23+02:00,,True,False,feat: enable reviewed foreground group live sharing (android49)
+release/live-share-android48-20261023,a60601201e7628b873ce48ebc87a7cdfbf7f49ad,2026-10-23T09:12:22+02:00,,True,False,feat: enable reviewed foreground group live sharing (android48)
+release/live-share-ios55-20261023,631577a4874f05c85092ec0db43592d6a10b61e7,2026-10-23T09:12:22+02:00,,True,False,feat: enable reviewed foreground group live sharing (ios55)
+fix/ios49-map-fullscreen-20261026,2162033926f9f0b09971cef8c6ac6defc6132576,2026-10-23T09:12:21+02:00,,True,False,feat: enable reviewed foreground group live sharing (ios104)
+fix/ios49-map-solid-no-scale-20261026,2162033926f9f0b09971cef8c6ac6defc6132576,2026-10-23T09:12:21+02:00,,True,False,feat: enable reviewed foreground group live sharing (ios104)
+release/live-share-ios104-20261023,2162033926f9f0b09971cef8c6ac6defc6132576,2026-10-23T09:12:21+02:00,,True,False,feat: enable reviewed foreground group live sharing (ios104)
+release/ios55-quality-20261023,f115f828518f598d57b36c17a347d8cad50d6649,2026-10-23T07:55:46+02:00,,False,False,fix(tracking): prevent rejected fixes from biasing smoothing
+release/intelligence-adapter-android48-20261023,9e38718300b601299020ef64bfb4eab39a3b40d8,2026-10-23T07:16:53+02:00,,True,False,feat(training): revalidate scoped history before drafting
+release/intelligence-adapter-android49-20261023,46106ff6fdffcf744ff0e94d831318192b448cea,2026-10-23T07:16:53+02:00,,True,False,feat(training): revalidate scoped history before drafting
+feat/live-share-client-v1-20261023,aa09a64f7b11c08eb334dc4808d4bda2ee1d2ce1,2026-10-23T07:16:52+02:00,,True,False,feat(training): revalidate scoped history before drafting
+release/intelligence-adapter-ios55-20261023,aa09a64f7b11c08eb334dc4808d4bda2ee1d2ce1,2026-10-23T07:16:52+02:00,,True,False,feat(training): revalidate scoped history before drafting
+feat/anyvo-intelligence-adapters-ios-20261023,67ae3548ad956d235c0110b36b702093cbf40a9d,2026-10-23T04:57:32+02:00,,True,False,feat(training): reuse history as independent training templates
+fix/tracking-quality-ios55-20261023,67ae3548ad956d235c0110b36b702093cbf40a9d,2026-10-23T04:57:32+02:00,,True,False,feat(training): reuse history as independent training templates
+release/tracking-r2-android48-20261023,89ee1509f9cec93b266ab54f6b60584d3f5019e3,2026-10-23T04:57:32+02:00,,True,False,feat(training): reuse history as independent training templates
+release/tracking-r2-android49-20261023,81c066682d63bebd1a171410c440f4d2b870b644,2026-10-23T04:57:32+02:00,,True,False,feat(training): reuse history as independent training templates
+release/tracking-r2-ios55-20261023,67ae3548ad956d235c0110b36b702093cbf40a9d,2026-10-23T04:57:32+02:00,,True,False,feat(training): reuse history as independent training templates
+fix/android49-initial-runtime-proof-20261023,670db9d694c990314b53500919404ee877cbd12c,2026-10-23T00:41:40+02:00,,True,False,fix(release): prove initial native runtime overrides from build source
+release/android-greeting-native-20261022,f2ed8d78b116310464cb67bcddce58d6179a858b,2026-10-23T00:04:38+02:00,,True,False,fix(android): define greeting module version for Expo Gradle configuration
+fix/android-greeting-silent-mode,51f45dcbe834ed991a37b490be4bd8c2862093d2,2026-10-23T00:02:12+02:00,,False,False,fix(android): declare greeting module version for Expo Gradle
+feat/training-template-ux-20261023,6328890822a842cb94cd6819e483cc5e86056ed7,2026-10-23T00:02:06+02:00,,True,False,fix(tracking): preserve both saved traces and canonical display guards
+fix/tracking-reliability-20261023,6328890822a842cb94cd6819e483cc5e86056ed7,2026-10-23T00:02:06+02:00,,True,False,fix(tracking): preserve both saved traces and canonical display guards
+release/ios55-both-traces-20261022,6328890822a842cb94cd6819e483cc5e86056ed7,2026-10-23T00:02:06+02:00,,True,False,fix(tracking): preserve both saved traces and canonical display guards
+release/home-day-greeting-ios104,601edfdd57e5d306075b480a51d469e5ee64840c,2026-10-22T20:37:39+02:00,,True,False,feat(home): backport reviewed daily greeting to iOS49 with verified audio and test contracts
+release/android-store-tracking-20261022,f0b050e4164355f9489ea8a194f730b1cc0eb57b,2026-10-22T20:19:29+02:00,,True,False,fix(android): ship reviewed tracking corrections in build 48 with current release test contracts
+feat/anyvo-intelligence-analysis,6877011dc9bdc6cce17d42402fe5a2ae65f5e6c2,2026-10-22T19:31:18+02:00,,True,False,feat(home): deliver reviewed daily greeting on iOS55 journal baseline
+fix/tracking-detail-both-traces-20261022,6877011dc9bdc6cce17d42402fe5a2ae65f5e6c2,2026-10-22T19:31:18+02:00,,True,False,feat(home): deliver reviewed daily greeting on iOS55 journal baseline
+release/home-day-greeting-ios55,6877011dc9bdc6cce17d42402fe5a2ae65f5e6c2,2026-10-22T19:31:18+02:00,,True,False,feat(home): deliver reviewed daily greeting on iOS55 journal baseline
+test/ios55-release-contracts,8d6641333848a5252a7544ceecea99d7af4fa69f,2026-10-21T23:58:18+02:00,,True,False,test(release): repair verified iOS55 baseline contracts and mocks
+feat/home-day-greeting,f24743398694831db6080a2a1d16e70a579c00c0,2026-10-21T23:49:12+02:00,,True,False,feat(home): add personal day greeting with optional original sound
+release/journal-single-choice-ios55,b2303aa1b296434d8c6a3adaa831626590769400,2026-10-21T23:35:44+02:00,,True,False,fix(training): deliver single exercise choice on preserved iOS55 tracking base
+fix/android-tracking-field-20261022,ae3e372df017e1c1b600ea3878ef6934e3c5afec,2026-10-21T19:41:59+02:00,,True,False,fix(training): select each exercise name once in guided journal for android105
+release/journal-single-choice-android105,ae3e372df017e1c1b600ea3878ef6934e3c5afec,2026-10-21T19:41:59+02:00,,True,False,fix(training): select each exercise name once in guided journal for android105
+release/journal-single-choice-ios104,e9827f65dc21f07245f0bff45421f2a7e2de3e29,2026-10-21T19:41:58+02:00,,True,False,fix(training): select each exercise name once in guided journal for ios104
+release/journal-single-choice-ios53,d6442ac1257b080ecd2e596b3653b195c6764208,2026-10-21T19:41:57+02:00,,True,False,fix(training): select each exercise name once in guided journal for ios53
+fix/journal-all-disciplines,83111365f32377c980e4c0e08f58f66c011121f1,2026-10-21T19:35:53+02:00,,True,False,fix(training): select duplicate exercise names once in guided journal
+release/ios-tracking-native-timefix,d153e6cc2aaad6269408ee2eb9946de7ad049b09,2026-10-21T18:41:21+02:00,,True,False,fix(ios): prepare native motion delivery and clock test candidate
+fix/tracking-field-incident-20261021,345ce27e139609bd625dbfffff20caec3c815767,2026-10-21T18:08:17+02:00,,True,False,fix(tracking): associate v3 steps with their original source intervals
+release/guided-documentation-android105,67eda5012da4794a028d8f2e77775e9fcca09f79,2026-10-21T16:55:28+02:00,,True,False,feat(training): deliver reviewed three-step journal for android105
+release/guided-documentation-ios104,f04f32e4ce49262203a220bad5a1bd36519850cf,2026-10-21T16:55:27+02:00,,True,False,feat(training): deliver reviewed three-step journal for ios104
+release/guided-documentation-ios53,b03ed4b9eef7bd94448b7a1c9d34850933e57da2,2026-10-21T16:55:27+02:00,,True,False,feat(training): deliver reviewed three-step journal for ios53
+release/android-wear-native-preflight,19c8ea94559bd6f5f582d89378572b3ff734fc58,2026-10-21T11:04:42+02:00,,True,False,fix(training): deliver reviewed exercise picker for android105
+release/exercise-choice-android105,19c8ea94559bd6f5f582d89378572b3ff734fc58,2026-10-21T11:04:42+02:00,,True,False,fix(training): deliver reviewed exercise picker for android105
+release/exercise-choice-ios104,45768f0f857fb6815fc2d7e296dea26bcf97fa9f,2026-10-21T11:04:42+02:00,,True,False,fix(training): deliver reviewed exercise picker for ios104
+qa/ios-watch-device-preparation,3ac4e095454c69575a0e878d6d127fa96b7cba94,2026-10-21T11:04:41+02:00,,True,False,fix(training): deliver reviewed exercise picker for ios53
+release/exercise-choice-ios53,3ac4e095454c69575a0e878d6d127fa96b7cba94,2026-10-21T11:04:41+02:00,,True,False,fix(training): deliver reviewed exercise picker for ios53
+feat/wear-os-stage1,ed3818bd4905ca8f9aa5ff90c68aac7a2ada748a,2026-10-21T10:37:32+02:00,,True,False,feat(android): add connected Wear OS control and phone transport
+feat/group-live-share-db,23bdfa5e16c86fc8fc288c568878fc46ad33b0d6,2026-10-21T03:53:08+02:00,,False,False,docs(backend): archive verified live-share server package
+qa/ios-watch-paired-runner,a26a562ec9cc04239dc7df240f64748735e869f8,2026-10-21T03:41:54+02:00,,True,False,build(ios): integrate reviewed watch control for unsigned simulator validation
+release/ios-watch-simulator-r1,a26a562ec9cc04239dc7df240f64748735e869f8,2026-10-21T03:41:54+02:00,,True,False,build(ios): integrate reviewed watch control for unsigned simulator validation
+feat/tracking-live-share-current,00b380014a4733629fd366c976fe0732673b8ec2,2026-10-21T03:32:20+02:00,,True,False,feat(tracking): prepare gated live sharing on current client
+feat/tracking-wearable-control,15dd3e8852e2133899b57514de56c6da66274b13,2026-10-21T03:31:27+02:00,,True,False,feat(tracking): add scoped wearable session controls
+feat/ios-watch-session-control,9f009307ddc29081ede4cb6b0384e5ec4b4988f3,2026-10-21T03:19:25+02:00,,True,False,test(ios): verify idle watch state invalidates active controls
+release/journal-android105,0daed02fee2f0e1f650138d5242ac3a0311f325a,2026-10-20T22:32:11+02:00,,True,False,fix(training): deliver reviewed journal and preparation package for android105
+release/journal-ios104,004316b3c40a68e44b90c9cb0131305f0795eb65,2026-10-20T22:32:10+02:00,,True,False,fix(training): deliver reviewed journal and preparation package for ios104
+release/journal-ios53,fb81698baced0a166432b175c5c37bdc39c6f192,2026-10-20T22:32:09+02:00,,True,False,fix(training): deliver reviewed journal and preparation package for ios53
+release/p1-android105,c0534dbfa91e6392649b97c6f0feec6790ad2c9e,2026-10-20T15:50:23+02:00,,True,False,fix(tracking): apply current turn smoothing on android105 production basis
+release/p1-android104,c9a06799c4022395595ab403d5c52d30b4b18dcc,2026-10-20T15:50:22+02:00,,True,False,fix(tracking): apply current turn smoothing on android104 production basis
+release/p1-ios53,42d28edb532e02fdf5746b3e819c4630573bf7c4,2026-10-20T15:45:52+02:00,,True,False,fix(tracking): apply current turn smoothing on ios53 production basis
+release/p1-ios52,73ba10c66114e2f94d2b3e44abcc6b4260f2772b,2026-10-20T15:45:51+02:00,,True,False,fix(tracking): apply current turn smoothing on ios52 production basis
+release/p1-ios105,e81967c08f7ba0ab044d88102acecddba1ad28b7,2026-10-20T15:44:56+02:00,,True,False,fix(tracking): apply current turn smoothing on ios105 production basis
+release/p1-ios104,647751672abcf151dd406088b115e0e4864106bc,2026-10-20T15:44:55+02:00,,True,False,fix(tracking): apply current turn smoothing on ios104 production basis
+fix/tracking-line-ema-p1,57a6c5e33d41629bced42632aacf889c890f2063,2026-10-20T13:30:08+02:00,,True,False,fix(tracking): apply current turn-zone smoothing without a fix delay
+release/ios-map-crash-testflight-next,82786fdf79d74a1599fb65e165fff145388d2b81,2026-10-20T13:26:41+02:00,,True,False,release(ios): prepare maps crash fix for TestFlight 53 with isolated native runtime
+fix/ios-map-nil-child-crash,b7293b14712c84cfa0ce1ac34582ad1b625f7b57,2026-10-20T13:13:42+02:00,origin/fix/ios-map-nil-child-crash,True,False,fix(ios): guard AIRMap against nil native children
+release/jokers-ios52,49a578453a7bf6c7d8d5f41a88dc6c21f9d378fa,2026-10-20T12:49:39+02:00,,True,False,feat(tracking): deliver joker and rubber materials while retaining iOS 52 help and sharing
+release/jokers-android104,1e13b50745e696e461af2f11d48492d6d9031031,2026-10-20T12:45:43+02:00,,True,False,feat(tracking): deliver reviewed joker and rubber material contracts for android104
+release/jokers-ios105,a3d5dab070328f09e8b6d800c64bb5fbaacfcfc1,2026-10-20T12:45:40+02:00,,True,False,feat(tracking): deliver reviewed joker and rubber material contracts for ios105
+release/jokers-ios104,e8fe2606554c59a52c023fdd39b9afe49f5dfd57,2026-10-20T12:45:39+02:00,,True,False,feat(tracking): deliver reviewed joker and rubber material contracts for ios104
+fix/tracking-line-ema-p1-android,b272f1f41b829aa6d199ae1a2fff1600f35a27aa,2026-10-20T12:45:35+02:00,,True,False,feat(tracking): deliver reviewed joker and rubber material contracts for Android 47
+release/android47-jokers-after-ui,b272f1f41b829aa6d199ae1a2fff1600f35a27aa,2026-10-20T12:45:35+02:00,,True,False,feat(tracking): deliver reviewed joker and rubber material contracts for Android 47
+feat/tracking-jokers-ios52-after-help,d8bc3b7e4869d8022b6c23ec5a28c60b0ef2f757,2026-10-18T10:22:18+02:00,,True,False,release(ios): add sharing hub and first-steps help for build 52
+release/ios52-help-sharing,d8bc3b7e4869d8022b6c23ec5a28c60b0ef2f757,2026-10-18T10:22:18+02:00,,True,False,release(ios): add sharing hub and first-steps help for build 52
+release/android47-open-ota,41ed7362caf6a29e6285de88c223c405e59f0589,2026-10-18T09:21:27+02:00,,True,False,release(android): add sharing hub and first-steps help for build 47
+feat/tracking-jokers-android105-build47,39964e1f073e34783fa80d7603b12c0591688826,2026-10-18T03:32:55+02:00,,True,False,release(android): prepare cumulative 1.0.5 (47) production AAB source
+release/android-store-current,39964e1f073e34783fa80d7603b12c0591688826,2026-10-18T03:32:55+02:00,,True,False,release(android): prepare cumulative 1.0.5 (47) production AAB source
+feat/tracking-jokers-ios105,9224483d7156cbc116ccb75aeff0c1dc582e5e53,2026-10-18T03:10:48+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+feat/tracking-jokers-r3-ios105,9224483d7156cbc116ccb75aeff0c1dc582e5e53,2026-10-18T03:10:48+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+release/field-r2-ios105current,9224483d7156cbc116ccb75aeff0c1dc582e5e53,2026-10-18T03:10:48+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+feat/tracking-jokers-ios104,ce5a0fcffe9a97950e2610699441fe0455107c8f,2026-10-18T03:10:45+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+feat/tracking-jokers-r3-ios104,ce5a0fcffe9a97950e2610699441fe0455107c8f,2026-10-18T03:10:45+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+release/field-r2-ios104current,ce5a0fcffe9a97950e2610699441fe0455107c8f,2026-10-18T03:10:45+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+feat/tracking-jokers-native52-r2,fe1e383b9f7d13c8ec328e080889f8f1380f9e7d,2026-10-18T03:05:02+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+feat/tracking-jokers-r3-native52-r2,fe1e383b9f7d13c8ec328e080889f8f1380f9e7d,2026-10-18T03:05:02+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+release/field-r2-ios105motionv2current,fe1e383b9f7d13c8ec328e080889f8f1380f9e7d,2026-10-18T03:05:02+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+review/jokers-client-ios52,fe1e383b9f7d13c8ec328e080889f8f1380f9e7d,2026-10-18T03:05:02+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+feat/tracking-jokers-android104,25dd497c188d1eddeb566ef6989343a4bfe8e085,2026-10-18T03:04:57+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+feat/tracking-jokers-r3-android104,25dd497c188d1eddeb566ef6989343a4bfe8e085,2026-10-18T03:04:57+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+release/field-r2-android104current,25dd497c188d1eddeb566ef6989343a4bfe8e085,2026-10-18T03:04:57+02:00,,True,False,fix(tracking): align reference distances and stabilize field marker presentation
+release/ui-android104-current,b6380abc099caf86103f202d1a38f9482d190342,2026-10-18T02:37:13+02:00,,True,False,fix(ui): preserve current release and complete appointment and dog documentation flows
+release/ui-ios105-current,5db986ad1f83c53937365014bda5c086f821f476,2026-10-18T02:37:13+02:00,,True,False,fix(ui): preserve current release and complete appointment and dog documentation flows
+release/ui-ios104-current,cdeb0046ae66af0a950a28879c4bb94482332dfc,2026-10-18T02:37:12+02:00,,True,False,fix(ui): preserve current release and complete appointment and dog documentation flows
+feat/help-first-steps,7521d48609c3a5b246bc9e04cd20eade141bccbc,2026-10-18T02:36:59+02:00,,True,False,fix(ui): preserve current release and complete appointment and dog documentation flows
+feat/sharing-groups-design,7521d48609c3a5b246bc9e04cd20eade141bccbc,2026-10-18T02:36:59+02:00,,True,False,fix(ui): preserve current release and complete appointment and dog documentation flows
+feat/tracking-jokers-angle-objects,7521d48609c3a5b246bc9e04cd20eade141bccbc,2026-10-18T02:36:59+02:00,,True,False,fix(ui): preserve current release and complete appointment and dog documentation flows
+release/ui-ios105-motion-v2-current,7521d48609c3a5b246bc9e04cd20eade141bccbc,2026-10-18T02:36:59+02:00,,True,False,fix(ui): preserve current release and complete appointment and dog documentation flows
+fix/support-end-diagnostics-ios105-motion,c4900e2c50cc3c72dadfcd6fcab95e2c63351b85,2026-10-18T02:03:51+02:00,,True,False,fix(tracking): simplify diagnosis settings and clarify standard location mode
+fix/dog-training-document-action,ec5c240854eb5f371b50b15e49219d3d03caecb4,2026-10-18T01:50:26+02:00,,True,False,"fix(ui): ship appointment editing, saved angle list and transparent brand mark"
+release/group-training-ios105,ec5c240854eb5f371b50b15e49219d3d03caecb4,2026-10-18T01:50:26+02:00,,True,False,"fix(ui): ship appointment editing, saved angle list and transparent brand mark"
+feat/android-store-native-integration-20261018,ccb98c5296e6021c6a0839ab4c16fc15848f8fff,2026-10-18T01:50:25+02:00,,True,False,"fix(ui): ship appointment editing, saved angle list and transparent brand mark"
+fix/tracking-field-corrections-android104,ccb98c5296e6021c6a0839ab4c16fc15848f8fff,2026-10-18T01:50:25+02:00,,True,False,"fix(ui): ship appointment editing, saved angle list and transparent brand mark"
+release/group-training-android104,ccb98c5296e6021c6a0839ab4c16fc15848f8fff,2026-10-18T01:50:25+02:00,,True,False,"fix(ui): ship appointment editing, saved angle list and transparent brand mark"
+release/group-training-ios104,80f860c8a2d9067538c18089fc2f236333efb3be,2026-10-18T01:50:24+02:00,,True,False,"fix(ui): ship appointment editing, saved angle list and transparent brand mark"
+release/ui-ios105-motion-v2,58dce7ac7c0d188dcd90e44943be61963bb4e492,2026-10-18T01:50:22+02:00,,True,False,"fix(ui): ship appointment editing, saved angle list and transparent brand mark"
+release/ui-ios105-motion-v2-live,2ee256448fa8abbb6dbd5d2861813790be051dfd,2026-10-18T01:32:54+02:00,,True,False,fix(tracking): capture support end events and validate native OTA baselines
+fix/tracking-angle-list,71632a680115475dc84d2d1a968a71699245d4a5,2026-10-18T00:11:06+02:00,,True,False,fix(ios): isolate native sensor quality runtime for build 52
+fix/tracking-field-corrections,71632a680115475dc84d2d1a968a71699245d4a5,2026-10-18T00:11:06+02:00,,True,False,fix(ios): isolate native sensor quality runtime for build 52
+release/native-sensor-ios-next,71632a680115475dc84d2d1a968a71699245d4a5,2026-10-18T00:11:06+02:00,,True,False,fix(ios): isolate native sensor quality runtime for build 52
+fix/appointment-form-ux,91b77fc9ed7d7ce0f54868eb5421efa4db6f6397,2026-10-16T06:15:32+02:00,,True,False,fix(tracking): isolate fresh motion evidence across recorder lifecycles
+fix/logo-transparent-background,91b77fc9ed7d7ce0f54868eb5421efa4db6f6397,2026-10-16T06:15:32+02:00,,True,False,fix(tracking): isolate fresh motion evidence across recorder lifecycles
+fix/tracking-native-sensor-quality,ae09a659db8cec31de296e71dd5348306266ed5a,2026-10-16T00:17:02+02:00,,True,False,fix(subscription): serialize account identity and confirm paid state on server
+fix/tracking-sensor-study,f5557a8b6bb67c03ab80447f6beb146cc622e725,2026-10-15T20:49:33+02:00,,True,False,Enable reviewed group tasks after normal two-account backend acceptance
+release/training-documentation-ios105,28057309315a70f508db8abdd5da3c45ded42e87,2026-10-15T18:14:49+02:00,,True,False,Add reviewed atomic training documentation and private follow-up focus
+release/training-documentation-android104,e37a4bceae40412225f839785d6393b2167a88fa,2026-10-15T18:14:45+02:00,,True,False,Add reviewed atomic training documentation and private follow-up focus
+release/training-documentation-ios104,a37bfd6c1b0f36ff77e19094c8f2e056efa9cd67,2026-10-15T18:14:34+02:00,,True,False,Add reviewed atomic training documentation and private follow-up focus
+release/group-distraction-android104,694503167b8274c4f1f77db5fb2ea5de9f5ecad6,2026-10-15T16:22:24+02:00,,False,False,Prepare reviewed group-task client; keep production activation gated
+release/group-distraction-ios104,e8bac9454862fb11f16e23a2b99ca8598d6b9259,2026-10-15T16:22:18+02:00,,False,False,Prepare reviewed group-task client; keep production activation gated
+release/track-file-exchange-ios105,3f39e78f900ef5bbff96f3e3b2206097d1765e6c,2026-10-15T15:44:40+02:00,,True,False,build(ios): prepare production-profile 1.0.5(51) with widgets and file exchange
+release/track-file-exchange-android104,cd3aa0e621388820cc55dc880ef99905fe929fe2,2026-10-14T15:24:09+02:00,,True,False,Add reviewed local track file exchange; keep group activation gated
+release/track-file-exchange-ios104,1644e819c06a5e396370a4c9530d4f87d225c7d9,2026-10-14T15:24:08+02:00,,True,False,Add reviewed local track file exchange; keep group activation gated
+release/native-widgets-ios105-current,465f2680da11628f5355851fe2a2ebfb9b2547e9,2026-10-14T14:01:15+02:00,,True,False,Prepare iOS widgets TestFlight source preserving current recording hotfix
+feat/track-file-group-exchange-android104,6017f5dd158b90c56d244c9091bc64f6f70a69fe,2026-10-14T13:42:06+02:00,,True,False,Fix distraction recording with native fractional GPS timestamps
+feat/track-group-client-android104,6017f5dd158b90c56d244c9091bc64f6f70a69fe,2026-10-14T13:42:06+02:00,,True,False,Fix distraction recording with native fractional GPS timestamps
+release/distraction-recording-android104,6017f5dd158b90c56d244c9091bc64f6f70a69fe,2026-10-14T13:42:06+02:00,,True,False,Fix distraction recording with native fractional GPS timestamps
+feat/track-file-group-exchange,422c2a9a746f2c8e4800358e929ccbc314f8898b,2026-10-14T13:40:17+02:00,,True,False,Fix distraction recording with native fractional GPS timestamps
+feat/track-group-client-acceptance,422c2a9a746f2c8e4800358e929ccbc314f8898b,2026-10-14T13:40:17+02:00,,True,False,Fix distraction recording with native fractional GPS timestamps
+release/distraction-recording-ios104,422c2a9a746f2c8e4800358e929ccbc314f8898b,2026-10-14T13:40:17+02:00,,True,False,Fix distraction recording with native fractional GPS timestamps
+release/native-widgets-ios105,718b8bd3dec717f9044eca034912607ebb750d71,2026-10-14T13:12:06+02:00,,False,False,Fix daily widget Swift availability helper for native compile
+release/native-widgets-android105,c3f4a63e8af7bf6c2af7e622d7dfa98146b83ab2,2026-10-14T13:07:03+02:00,,False,False,Fix daily widget Android library publication version for native compile
+feat/tracking-live-current-android104,a4e0418c518f82836301a94907ce042c1dfee954,2026-10-14T11:02:56+02:00,,True,False,"Complete tracking camera, distraction workflow and special-angle direction"
+fix/tracking-distraction-recording-android104,a4e0418c518f82836301a94907ce042c1dfee954,2026-10-14T11:02:56+02:00,,True,False,"Complete tracking camera, distraction workflow and special-angle direction"
+release/tracking-finish-android104,a4e0418c518f82836301a94907ce042c1dfee954,2026-10-14T11:02:56+02:00,,True,False,"Complete tracking camera, distraction workflow and special-angle direction"
+feat/tracking-live-current-ios104,9e2060217ab5b3fba3e861d9441a5d506e476909,2026-10-14T10:26:27+02:00,,True,False,"Complete tracking camera, distraction workflow and special-angle direction"
+fix/tracking-distraction-recording,9e2060217ab5b3fba3e861d9441a5d506e476909,2026-10-14T10:26:27+02:00,,True,False,"Complete tracking camera, distraction workflow and special-angle direction"
+release/tracking-finish-ios104,9e2060217ab5b3fba3e861d9441a5d506e476909,2026-10-14T10:26:27+02:00,,True,False,"Complete tracking camera, distraction workflow and special-angle direction"
+fix/tracking-distraction-android-boundaries,d620222682ade9abc5f2d1ba1408722ba04c2f64,2026-10-14T03:14:41+02:00,,True,False,Hide technical recovery status bar in track evaluation
+fix/tracking-special-angle-android104,d620222682ade9abc5f2d1ba1408722ba04c2f64,2026-10-14T03:14:41+02:00,,True,False,Hide technical recovery status bar in track evaluation
+release/tracking-recovery-ui-android104,d620222682ade9abc5f2d1ba1408722ba04c2f64,2026-10-14T03:14:41+02:00,,True,False,Hide technical recovery status bar in track evaluation
+release/tracking-recovery-ui-ios104,ecc5b4c67f1f16173c2bd78f38034140349bda24,2026-10-14T03:14:38+02:00,,True,False,Hide technical recovery status bar in track evaluation
+release/tracking-planner-android104,1529e5fb3febadd333c10e92427a8403e459cc41,2026-10-13T23:21:08+02:00,,True,False,Add local track planner and owner-isolated map templates
+feat/ios-daily-widget-carplay,a2361efea416badc118206f517a98875569f9561,2026-10-13T23:21:06+02:00,,True,False,Add local track planner and owner-isolated map templates
+feat/tracking-distraction-flow,a2361efea416badc118206f517a98875569f9561,2026-10-13T23:21:06+02:00,,True,False,Add local track planner and owner-isolated map templates
+fix/tracking-map-direction,a2361efea416badc118206f517a98875569f9561,2026-10-13T23:21:06+02:00,,True,False,Add local track planner and owner-isolated map templates
+fix/tracking-recovery-ui,a2361efea416badc118206f517a98875569f9561,2026-10-13T23:21:06+02:00,,True,False,Add local track planner and owner-isolated map templates
+fix/tracking-special-angle-direction,a2361efea416badc118206f517a98875569f9561,2026-10-13T23:21:06+02:00,,True,False,Add local track planner and owner-isolated map templates
+release/tracking-planner-ios104,a2361efea416badc118206f517a98875569f9561,2026-10-13T23:21:06+02:00,,True,False,Add local track planner and owner-isolated map templates
+release/tracking-c1-android104,6b875ba165b945187de1bda318094e914e0dbd5a,2026-10-13T21:44:53+02:00,,True,False,Add non-destructive object corrections with durable offline review
+feat/tracking-live104,9b5290dfbc9ea83085d0585bf8ff8af2a74f93a0,2026-10-13T21:44:50+02:00,,True,False,Add non-destructive object corrections with durable offline review
+feat/tracking-planner-live,9b5290dfbc9ea83085d0585bf8ff8af2a74f93a0,2026-10-13T21:44:50+02:00,,True,False,Add non-destructive object corrections with durable offline review
+release/tracking-c1-ios104,9b5290dfbc9ea83085d0585bf8ff8af2a74f93a0,2026-10-13T21:44:50+02:00,,True,False,Add non-destructive object corrections with durable offline review
+feat/tracking-c1-after-distractions-android,84fafa8ea1e3dfb2115124d801297907d10a7252,2026-10-13T20:33:49+02:00,,True,False,Add independent local distraction tracks with durable foreground recording
+release/tracking-distractions-android104,84fafa8ea1e3dfb2115124d801297907d10a7252,2026-10-13T20:33:49+02:00,,True,False,Add independent local distraction tracks with durable foreground recording
+feat/tracking-c1-after-distractions,e83eeb8dad894eeb65f4b1cb200a6ccfdd4a8569,2026-10-13T20:33:48+02:00,,True,False,Add independent local distraction tracks with durable foreground recording
+release/tracking-distractions-ios104,e83eeb8dad894eeb65f4b1cb200a6ccfdd4a8569,2026-10-13T20:33:48+02:00,,True,False,Add independent local distraction tracks with durable foreground recording
+release/transfer-cloud-safe-android104,1d3ef9ea258a294d73aced561cf8488d068640aa,2026-10-11T22:42:31+02:00,,True,False,Fix received-track preview viewport and keep acceptance controls reachable
+release/transfer-cloud-safe-ios104,10ec33b72371ba4ca87d02ac5f4d1bd454811469,2026-10-11T22:42:28+02:00,,True,False,Fix received-track preview viewport and keep acceptance controls reachable
+feat/tracking-active-initiation,9b8acb1dbd73c34379cff78d42a256aa2e427e59,2026-10-11T19:43:43+02:00,,True,False,fix(transfer): preserve own cloud data on ios 1.0.4
+feat/tracking-distractions,9b8acb1dbd73c34379cff78d42a256aa2e427e59,2026-10-11T19:43:43+02:00,,True,False,fix(transfer): preserve own cloud data on ios 1.0.4
+release/c1-after-colors-android104,904db737a51004f175f8d4e2932d099b7ee45df7,2026-10-11T14:55:11+02:00,,False,False,feat(tracking): prepare object corrections retaining active colors and calibration
+release/c1-after-colors-ios104,2581ade20f88d9215ce7dd11876813aae8d72295,2026-10-11T14:53:21+02:00,,False,False,feat(tracking): prepare object corrections retaining active colors and calibration
+release/custom-colors-android104,3e667d10e9f6fdb6b474f85e5e3ea73855b96a71,2026-10-10T07:35:49+02:00,,True,False,feat(dog): support opaque custom track colors preserving existing data
+release/custom-colors-ios104,1221904ba0ff67d152063bfa0b29133da3ebdb33,2026-10-10T07:31:58+02:00,,True,False,feat(dog): support opaque custom track colors preserving existing data
+release/evaluation-footer-android101,6070f02c695ad1f116c7c16f06b8d37534029ad5,2026-10-10T07:30:02+02:00,,True,False,fix(android): keep evaluation actions above system navigation
+codex/subscription-lifecycle-android103-20261028,2f513dbd37fa4a012679f2a2c0d8df5b9c7d3c27,2026-10-10T07:19:45+02:00,,True,False,fix(android): keep evaluation actions above system navigation
+release/evaluation-footer-android103,2f513dbd37fa4a012679f2a2c0d8df5b9c7d3c27,2026-10-10T07:19:45+02:00,,True,False,fix(android): keep evaluation actions above system navigation
+release/evaluation-footer-android104,022bda53d2f98581dc399b4cbcecb4974cb937a9,2026-10-10T07:19:31+02:00,,True,False,fix(android): keep evaluation actions above system navigation
+release/c1-after-calibration-android103,945a34e7aa24946d5eeaa853783778a52a1d565a,2026-10-10T06:59:25+02:00,,False,False,fix(tracking): prepare object corrections preserving current map and calibration
+release/c1-after-calibration-android104,c50ba28dc2a8f698b806b1f353ffa884f6930ffb,2026-10-10T06:59:17+02:00,,False,False,fix(tracking): prepare object corrections preserving current map and calibration
+release/c1-after-calibration-ios104,ff57cb371e9ef7cdda562e9821481fa2f0310a36,2026-10-10T06:59:08+02:00,,False,False,fix(tracking): prepare object corrections preserving current map and calibration
+release/calibration-after-scale-android103,44f76469f3976cd86022ac96748459f403a99d7b,2026-10-10T03:45:27+02:00,,True,False,fix(tracking): add safe step calibration while retaining current map fixes
+fix/tracking-evaluation-footer,a5b2aadd5d6f6ac76e558dfb23c3425e08e5aa26,2026-10-10T03:45:25+02:00,,True,False,fix(tracking): add safe step calibration while retaining current map fixes
+release/calibration-after-scale-android104,a5b2aadd5d6f6ac76e558dfb23c3425e08e5aa26,2026-10-10T03:45:25+02:00,,True,False,fix(tracking): add safe step calibration while retaining current map fixes
+feat/group-distraction-db,34532974df3b74f10ac3b97c0e66fd6f41585066,2026-10-10T03:45:22+02:00,,True,False,fix(tracking): add safe step calibration while retaining current map fixes
+feat/group-training-panel,34532974df3b74f10ac3b97c0e66fd6f41585066,2026-10-10T03:45:22+02:00,,True,False,fix(tracking): add safe step calibration while retaining current map fixes
+feat/tracking-group-live-share,34532974df3b74f10ac3b97c0e66fd6f41585066,2026-10-10T03:45:22+02:00,,True,False,fix(tracking): add safe step calibration while retaining current map fixes
+release/calibration-after-scale-ios104,34532974df3b74f10ac3b97c0e66fd6f41585066,2026-10-10T03:45:22+02:00,,True,False,fix(tracking): add safe step calibration while retaining current map fixes
+release/visible-map-scale-ios104,7e84be084a3ea7228bd6817646d409da755cf715,2026-10-10T03:29:22+02:00,,True,False,fix(tracking): refresh map ruler during camera follow without request growth
+release/visible-map-scale-android103,43da5d2e753c83f164d0bee67b72404018831c7b,2026-10-10T03:29:20+02:00,,True,False,fix(tracking): refresh map ruler during camera follow without request growth
+release/visible-map-scale-android104,14ec07671abc876e19d4dbbc114112676299a477,2026-10-10T03:29:04+02:00,,True,False,fix(tracking): refresh map ruler during camera follow without request growth
+fix/tracking-scale-follow-refresh,bc748ab1a4fec463976e9d13831db95cbd736ce3,2026-10-09T19:43:56+02:00,,True,False,fix(tracking): show map ruler and visible meter ticks in lay and search
+codex/subscription-lifecycle-ios103-20261028,7a1bfbb4dfa33bad92cf1660bc3048fc026f8ec4,2026-10-09T10:59:51+02:00,,True,False,fix(tracking): make step calibration explicit and preserve saved preferences
+release/step-calibration-ios103,7a1bfbb4dfa33bad92cf1660bc3048fc026f8ec4,2026-10-09T10:59:51+02:00,,True,False,fix(tracking): make step calibration explicit and preserve saved preferences
+release/step-calibration-android103,0a6d953b94f8ff164cc23dd5e642953ef0444380,2026-10-09T10:59:50+02:00,,False,False,fix(tracking): make step calibration explicit and preserve saved preferences
+release/step-calibration-android104,9b101bda7f91bfb608ed9a1bdab4e1412fd84c83,2026-10-09T10:59:50+02:00,,False,False,fix(tracking): make step calibration explicit and preserve saved preferences
+release/step-calibration-ios104,43bac13fef5322e5e1a9b5089ce081583a0f5202,2026-10-09T10:59:49+02:00,,False,False,fix(tracking): make step calibration explicit and preserve saved preferences
+release/object-review-c1-android103,6971317574c6b68c4c73326eb84131cf5972068a,2026-10-09T10:52:07+02:00,,False,False,feat(tracking): add durable object corrections preserving Android recording
+release/object-review-c1-android104,8e03d87506c04244aa48a3c5560472585fe3cf3d,2026-10-09T10:51:49+02:00,,False,False,feat(tracking): add durable object corrections preserving Android recording
+release/object-review-c1-ios104,08cdb2fa748f0fa3c167ea19fe06a54e466dad79,2026-10-09T10:36:08+02:00,,False,False,feat(tracking): add durable object corrections with offline intents
+release/object-snapshot-android103,7280444cf48470494d85a5778a1bab1d13e5de0a,2026-10-09T09:10:17+02:00,,True,False,feat(tracking): preserve Android original object snapshot (1.0.3)
+release/object-snapshot-android104,e24861d0d8d5a9923139f9208178f42a2fa870f0,2026-10-09T09:10:15+02:00,,True,False,feat(tracking): preserve Android original object snapshot (1.0.4)
+fix/tracking-step-calibration,fe68e1290161f12838bde6480d7868147b295995,2026-10-09T08:21:44+02:00,,True,False,feat(tracking): preserve original object snapshot for new completed searches
+fix/tracking-visible-map-scale,fe68e1290161f12838bde6480d7868147b295995,2026-10-09T08:21:44+02:00,,True,False,feat(tracking): preserve original object snapshot for new completed searches
+release/object-snapshot-ios104,fe68e1290161f12838bde6480d7868147b295995,2026-10-09T08:21:44+02:00,,True,False,feat(tracking): preserve original object snapshot for new completed searches
+release/ui-dialog-ios103,d454a06b2b36121316f933ddd12ddada419a287a,2026-10-09T08:08:01+02:00,,True,False,fix(ui): keep heat and help dialogs accessible (ios103)
+release/ui-dialog-android103,b4ab8a5c08a185f844aa380e1297857776b14acd,2026-10-09T08:08:00+02:00,,True,False,fix(ui): keep heat and help dialogs accessible (android103)
+release/ui-dialog-android104,208bc19329236af23729f007f12c74a0e94688bd,2026-10-09T08:07:58+02:00,,True,False,fix(ui): keep heat and help dialogs accessible (android104)
+release/ui-dialog-ios104,35b6c88be94b9107171200a30405e97abe259c1e,2026-10-09T08:07:56+02:00,,True,False,fix(ui): keep heat and help dialogs accessible (ios104)
+feat/tracking-object-review-v1,87d5e2b3b3ed931b655464eec971b95225dcf0ff,2026-10-09T00:10:53+02:00,,True,False,fix: field tracking displays and isolated section-aware QA motion capture
+release/fn123-qa-ios104,87d5e2b3b3ed931b655464eec971b95225dcf0ff,2026-10-09T00:10:53+02:00,,True,False,fix: field tracking displays and isolated section-aware QA motion capture
+release/fn123-android104,54f7203e579b366ecad1b3063d60c5dc563e0662,2026-10-09T00:05:20+02:00,,True,False,fix: field-informed tracking badges object counts and history preview
+release/fn123-android103,085a55c7ec74cb05bb17d2ab963befc9bba92115,2026-10-09T00:05:19+02:00,,True,False,fix: field-informed tracking badges object counts and history preview
+candidate/additional3-continuity-ios104,839371d3f325f5a4923353029db5796b5d40bbc8,2026-10-08T23:29:51+02:00,,True,False,fix(ota): preserve tracking continuity accuracy and partial exports
+feat/track-object-corrections-db,839371d3f325f5a4923353029db5796b5d40bbc8,2026-10-08T23:29:51+02:00,,True,False,fix(ota): preserve tracking continuity accuracy and partial exports
+feat/tracking-object-corrections,839371d3f325f5a4923353029db5796b5d40bbc8,2026-10-08T23:29:51+02:00,,True,False,fix(ota): preserve tracking continuity accuracy and partial exports
+release/continuity-export-ios-104,839371d3f325f5a4923353029db5796b5d40bbc8,2026-10-08T23:29:51+02:00,,True,False,fix(ota): preserve tracking continuity accuracy and partial exports
+release/open-js-fixes-ios-103,5465f1fda0367d1977942f48a25d70d958295b1c,2026-10-08T22:58:41+02:00,,True,False,fix(ios103): preserve baseline and stabilize medication dates and sync
+release/open-js-fixes-android-104,472c4eca45e4988fab8f0c949a9ae4feb636c30e,2026-10-08T22:50:48+02:00,,True,False,fix(android104): retain native45 diagnostics and add qualified JS OTA fixes
+release/open-js-fixes-android-103,b353bffb11910e222e46471d2970a6e905dbabff,2026-10-08T22:48:57+02:00,,True,False,fix(android): preserve durable tracking writes and qualified shared OTA fixes
+candidate/heat-dismiss-ios104,37418dbd404c7ead7d795dea7698810dbf8b030c,2026-10-08T22:47:45+02:00,,True,False,fix(ota): stabilize medication dates sync admission and export actions
+candidate/tracking-fn123-ios104,37418dbd404c7ead7d795dea7698810dbf8b030c,2026-10-08T22:47:45+02:00,,True,False,fix(ota): stabilize medication dates sync admission and export actions
+fix/tracking-qa-rejected-motion,37418dbd404c7ead7d795dea7698810dbf8b030c,2026-10-08T22:47:45+02:00,,True,False,fix(ota): stabilize medication dates sync admission and export actions
+release/open-js-fixes-ios-104,37418dbd404c7ead7d795dea7698810dbf8b030c,2026-10-08T22:47:45+02:00,,True,False,fix(ota): stabilize medication dates sync admission and export actions
+release/android-native-production-104,d901332d1a8d6d2fc9b30d33c218e26cd71f0129,2026-10-08T22:42:57+02:00,,True,False,release(android): preserve verified native 1.0.4 build45 source
+feat/android-field-reliability-qa,3f44b1d2793c7241ac2305fc6e05418ab1c07069,2026-10-08T20:00:10+02:00,,True,False,Test authorized Android engine and source modes explicitly
+fix/android-tracking-p0,3f44b1d2793c7241ac2305fc6e05418ab1c07069,2026-10-08T20:00:10+02:00,,True,False,Test authorized Android engine and source modes explicitly
+release/tracking-preview-diagnostics-android-103,3f44b1d2793c7241ac2305fc6e05418ab1c07069,2026-10-08T20:00:10+02:00,,True,False,Test authorized Android engine and source modes explicitly
+feat/android-personal-diagnostics,05873f85c4c74c8f2a25eb1a3a60833f59261391,2026-10-08T19:54:53+02:00,,False,False,Test authorized Android engine and source modes explicitly
+audit/ios-field-reliability-2026-10-08,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+feat/care-training-backend,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+feat/dog-custom-color,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+feat/dog-custom-color-db,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+feat/export-ux-rows,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+feat/training-feedback-loop,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+fix/export-continuity-adapter,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+fix/heat-sheet-dismiss,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+fix/help-sheet-scroll,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+fix/medication-date-picker,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+fix/sync-single-flight,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+fix/tracking-fn1-fn2-field,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+release/tracking-preview-diagnostics-ios-104,28355badd869b1bf4f022c2c1c13a0c0b2636eca,2026-10-08T19:50:46+02:00,,True,False,Verify authorized GPS source and actual engine matrix in release tests
+feat/internal-diagnostics-access,be92f46ad0796162198fa37aa0ee030c7ada6161,2026-10-08T19:23:46+02:00,,False,False,Document verified personal diagnostics production activation
+feat/tracking-continuity-corrections,0c5a1ed37bba347257ea71729cf83780c0c6043a,2026-10-08T18:35:52+02:00,,False,False,fix(tracking): restore profile recovery and show truthful dog-colored previews
+feat/tracking-preview-recovery-colors,0c5a1ed37bba347257ea71729cf83780c0c6043a,2026-10-08T18:35:52+02:00,,False,False,fix(tracking): restore profile recovery and show truthful dog-colored previews
+release/health-export-active-android-103,e1fbf6f48abf1d08012bdea55e7394f4c614e95a,2026-10-08T18:30:05+02:00,,True,False,test(subscription): correct AppState and renderer test types
+release/health-export-active-ios-104,9ae21dba63e925ac6d073e8bc9e80efa35286dae,2026-10-08T18:29:47+02:00,,True,False,test(subscription): correct AppState and renderer test types
+feat/active-lifetime-access,65c91f1ef4232bb598c64723a8ab7a77d5617d36,2026-10-08T18:28:57+02:00,,False,False,test(subscription): correct AppState and renderer test types
+feat/tracking-gps-quality-shelly-diagnostics,53ecb207c5c452a3dc542ae43b379b0a2897f5b9,2026-10-08T17:44:30+02:00,,False,False,docs(help): explain Shelly tracking accessory limitations
+feat/tracking-analysis-export,469c5af1345c81607febb7a8f58096fd1d4ce04d,2026-10-08T17:33:48+02:00,,False,False,feat(tracking): add report exports and quality-aware pace comparison
+release/health-ux-android-103,40106daab51dfdddd76f8ff8d09e905f271a2a5b,2026-10-08T17:28:00+02:00,,True,False,chore(release): limit Metro bundling to one worker
+release/health-ux-ios-104,418847effe68250d3232199e52c1b866f7b5d508,2026-10-08T17:27:56+02:00,,True,False,chore(release): limit Metro bundling to one worker
+feat/tracking-qa-session-evidence,069e82bc993fc1bd944244b30b94981e05251e21,2026-10-08T17:06:25+02:00,,False,False,feat(tracking): add QA recording evidence and background export
+feat/health-ux-priorities,ca36d27567ad992567772fdba3035c9e25b6c402,2026-10-08T17:04:07+02:00,,False,False,feat(health): improve overview reliability and accessible sharing
+release/scale-mount-android-103,60ae4d5ea77d8c7c93c36eb61c9e8c3d349d96ec,2026-10-08T15:11:15+02:00,,True,False,fix(tracking): render distance scale after reference loading
+release/scale-mount-ios-104,9c176959d08c839a799464efd47b1d3f8108555a,2026-10-08T15:11:15+02:00,,True,False,fix(tracking): render distance scale after reference loading
+feat/android-daily-widget,1a574212f6b7c1827bc03048f2eb5b5d662cd7a1,2026-10-08T14:47:01+02:00,,True,False,docs(agent): document task routing and result collection
+feat/android-tracking-diagnostics,1a574212f6b7c1827bc03048f2eb5b5d662cd7a1,2026-10-08T14:47:01+02:00,,True,False,docs(agent): document task routing and result collection
+main,1a574212f6b7c1827bc03048f2eb5b5d662cd7a1,2026-10-08T14:47:01+02:00,,True,False,docs(agent): document task routing and result collection
+release/tracking-end-android-103-2026-10-08,122aee5b2f066b3064bcb7de9f10b94d177bbb6b,2026-10-08T11:15:13+02:00,,True,False,feat(tracking): preserve GPS quality and add foreground BLE diagnostics
+release/tracking-end-ios-104-2026-10-08,9453d5b946d639ed23ec190fb80ff071337bef43,2026-10-08T11:15:09+02:00,,True,False,feat(tracking): preserve GPS quality and add foreground BLE diagnostics
+fix/tracking-end-detection,9a926a73a9569d1bb72b08590656fd2c94ded4e1,2026-10-08T09:18:38+02:00,,True,False,fix(tracking): stabilize end detection and final object handling
+feat/android-quick-start-widget,bd94ff2e7e1f849eaccdfb33c3800f84fc50ff0f,2026-10-07T23:46:31+02:00,,True,False,docs(agent): record Android native preparation integration
+release/ios-qa-104,bd94ff2e7e1f849eaccdfb33c3800f84fc50ff0f,2026-10-07T23:46:31+02:00,,True,False,docs(agent): record Android native preparation integration
+fix/android-native-build-preparation-1.0.4,2316e7cfd06149f0b0a7a1b2baa04430b88b867f,2026-10-07T23:44:22+02:00,,True,False,fix(android): prepare native 1.0.4 build with optional BLE
+integration/production-points-2026-10-07-v3,41e51734053fbc9c04c5de527edd6bf464cce66e,2026-10-07T21:31:30+02:00,,True,True,chore(repo): ignore local workspaces and QA artifacts
+codex/android-subscription-release-1.0.3,8bdef736a8a5c2083155ea62c01f858956d3148a,2026-10-07T20:56:58+02:00,,False,False,docs(release): record published subscription update identifiers
+codex/android-subscription-product-matching,853f435cad372bc081161f6f0fa509aa45916b4f,2026-10-07T20:37:08+02:00,,False,False,fix(subscription): match Android base plan product identifiers
+integration/production-points-2026-10-07,570bd1ebaa2d6fa9b1c0b664bc2a0d9d40cdc715,2026-10-07T20:32:15+02:00,,False,False,chore(repo): ignore local workspaces and QA artifacts
+chore/integrate-track-module-repo-hygiene,9ba2ec365d0c5b4c471a7927ba57f4a6a2db2730,2026-10-07T14:46:05+02:00,origin/main,False,False,chore(repo): ignore local workspaces and QA artifacts
+fix/integrate-heat-schema-restore,d00b8f1c6ef1a6aaddabc4aefbb122bf3c755937,2026-10-07T14:40:56+02:00,origin/main,False,False,fix(db): restore canonical heat schema migration
+fix/tracking-distance-scale-visible,d3037b163002150e0483a4426e94af2f73fe65b2,2026-10-07T14:28:44+02:00,,False,False,fix(tracking): render adaptive distance scale reliably
+feat/integrate-accuracy-aware-search,4b11825413a80d5a892d731461fff88986fb1a46,2026-10-07T12:13:27+02:00,origin/main,False,False,fix(tracking): make search scoring accuracy aware
+fix/background-lay-persistence-1.0.5,fd0c727a4d252e531dc95ad9592040265cf12418,2026-10-07T11:48:18+02:00,origin/main,True,True,fix(tracking): process background lay fixes by session
+feat/accuracy-aware-search-analysis,696cf26141009915cccd3a73ff467c7c8b0a90f5,2026-10-07T10:43:17+02:00,,False,False,fix(tracking): make search scoring accuracy aware
+fix/restore-heat-schema-migration,3cccb70e6cd610b9985af2566003ccee577d5c1f,2026-10-06T23:44:05+02:00,,False,False,fix(db): restore canonical heat schema migration
+fix/ios-app-store-language-de,8f0a497080fa3de2fec679aab856dd42c97a8630,2026-10-06T17:17:01+02:00,,True,True,docs(tracking): fix trailing whitespace in canonical parity note
+fix/production-canonical-reconcile,8f0a497080fa3de2fec679aab856dd42c97a8630,2026-10-06T17:17:01+02:00,,True,True,docs(tracking): fix trailing whitespace in canonical parity note
+fix/android-production-parity-1.0.3,68b23f186ca0f527dc04cf7426d80736d74a7ff2,2026-10-06T16:22:05+02:00,,True,True,fix(release): validate initial OTA against native runtime build
+release/ios-production-native-next,54a74c400b09f643ff220a856310309db8747284,2026-10-06T16:12:09+02:00,,True,True,fix(release): harden initial runtime OTA releases
+release/ios-internal-v2,8205873a1c36ae46fe2daaa90565054d9ed3a629,2026-10-05T23:43:39+02:00,,False,False,"Revert ""feat(ios): add parallel internal app variant"""
+release/ios-internal-native-v2,5ade7766ecc4f36d6f934c143dfdfe239b08cbaa,2026-10-05T20:15:49+02:00,,False,False,chore(ios): prepare internal native build 1.0.4 (49) with live activity v2
+fix/dogs-insert-rls-security,2fff7f42ecdab4310345764e2ca447dee9cbf33f,2026-10-05T18:33:27+02:00,,False,False,fix(security): restrict dog inserts to owners
+feat/track-overlay-colors-1.0.3,968884f712544f45b35ebf8900ab64332b45ff7d,2026-10-05T16:44:33+02:00,,True,True,feat(tracking): add dog colors to track overlays
+feat/live-activity-v2-1.0.3,272c135a8f86e48b24e606ac1fc37be96966e942,2026-10-05T16:13:40+02:00,,False,False,chore(ios): bump build number to 49 for live activity v2 testflight build
+release/live-activity-v2-ota-1.0.3,5e7220fd67d016500c0a4ce5513decaa84ff8b78,2026-10-05T16:09:06+02:00,,True,True,fix(ios): harden live activity v2 compact timer and document v1 fallback
+fix/resting-hold-to-abort-1.0.3,e4b7ed5b7b268d3a4869f02014c57d985681fb62,2026-10-05T12:38:42+02:00,,True,True,feat(tracking): require hold to abort resting track
+fix/resting-background-ux-1.0.3,94c46ed2af1e9e36640fefa186525893f1599a64,2026-10-05T11:02:17+02:00,,True,True,fix(tracking): simplify resting background flow
+release/open-track-continuation-fix-1.0.3,5517871c62e73b2035648af42846c98ff5427e39,2026-10-05T00:21:13+02:00,,True,True,fix(tracking): finalize track continuation recovery
+fix/continuation-identity-1.0.3,10d987293bd7570d1fcd1a6b8548a2fa0736a6b5,2026-10-05T00:13:42+02:00,,False,False,fix(tracking): preserve track identity when continuing
+fix/cancelled-track-card-polish-1.0.3,e8d8027ed36666b4be99a1ae2025e1f492fd19cd,2026-10-05T00:01:12+02:00,,False,False,fix(tracking): polish cancelled track recovery card
+fix/open-track-continuation-1.0.3,9efaef3a15eee897296d4fd2c350c5d01d8ad9e1,2026-10-04T18:10:48+02:00,,True,True,fix(tracking): finalize open track continuation flow
+fix/recovery-cancelled-1.0.3,013dfe0980221e36de0122b420a7422fb801cb74,2026-10-04T17:40:03+02:00,,False,False,fix(tracking): prevent valid recovery from being cancelled
+feat/multi-dog-track-overlays-production-1.0.3,c9049556e96275405938b77f2a19f07a2c535136,2026-10-04T16:54:52+02:00,,True,True,feat(tracking): integrate multi-dog track overlays
+chore/production-ota-guard,63204007154ba26af94d6b4793b26acafc8dcfac,2026-10-04T16:46:32+02:00,,True,True,chore(release): harden production OTA guard
+release/customer-track-diagnosis-1.0.3,34e618519b2da670fc5e7efd4ec43e08afc4ed53,2026-10-04T16:10:30+02:00,,True,True,fix(tracking): localize customer track diagnosis
+feat/customer-track-diagnosis-1.0.3,618087cb20993d6db5e94c3782c1219922734146,2026-10-04T16:00:47+02:00,,False,False,fix(tracking): localize customer track diagnosis
+fix/track-search-lifecycle-recovery-1.0.3,34b4b4cf3e5f65a8bb943e8907a9dbfeebc514a5,2026-10-04T15:26:34+02:00,,True,True,fix(tracking): recover interrupted search lifecycle
+feat/multi-dog-track-overlays-1.0.3,78322cfe65a3d5a95bf59edc33b651a896f6c9f8,2026-10-04T15:07:13+02:00,,False,False,feat(tracking): add multi-dog track reference overlays
+fix/track-resume-recovery-1.0.3,94dd576be8dd117238246f9e2bdbf7bac678448a,2026-10-04T12:41:27+02:00,,True,True,fix(tracking): add resilient track recovery
+feat/customer-track-diagnostics-1.0.3,1f6d7dccec884784b50c23935939a44c43c87a4e,2026-10-04T00:43:12+02:00,origin/feat/customer-track-diagnostics-1.0.3,True,True,feat(tracking): add customer support diagnostics
+feat/tracking-search-qa-accuracy-1.0.3,0b24e7da3a9754ac9699603691e97a8e6101fe0b,2026-10-04T00:13:54+02:00,,True,True,chore(update): announce tracking improvements
+fix/tracking-v6-2-1-hardening-1.0.3,8ada75cf63a4c4bd4c7fdefdeeae52f4ae119664,2026-10-03T23:45:24+02:00,,True,True,fix(tracking): require sharpness consensus
+fix/production-continuity-1.0.3,26d5074bcb9a2f4493439eb0c75cc46b5993a0c6,2026-10-03T09:01:23+02:00,origin/fix/production-continuity-1.0.3,True,True,docs(agent): add canonical ANYVO master status
+fix/tracking-field-v6-1-1.0.3,15c9f464936ad967dc59b415c8005893ac66cfa6,2026-10-03T01:42:24+02:00,origin/fix/tracking-field-v6-1-1.0.3,True,True,feat(home): add global ANYVO A quick action
+feat/home-anyvo-a-button,7f6734de91bde064a2a3d85e36fad1087d804893,2026-10-02T07:59:48+02:00,,False,False,docs(agent): record local cleanup integrations
+chore/sql-documentation-2026-10-02,10ac4b5ccdf059fc49cb804034b0f0e7f3d56ab3,2026-10-02T07:39:04+02:00,,False,False,docs(db): correct migration inventory and catalog root SQL
+chore/structure-cleanup-2026-10-01,11a37c9baa3c7da3cc638f2e6becdec5abb929ae,2026-10-01T23:51:22+02:00,,False,False,chore(repo): remove unused starter assets and empty docs
+fix/tracking-field-v6-1.0.3,8d8ffd85b21486305d6c4fd01d83262808c22897,2026-10-01T19:58:59+02:00,origin/fix/tracking-field-v6-1.0.3,True,True,fix(tracking): clarify diagnostic location source
+fix/tracking-real-fixtures-1fn-2fn-1.0.3,5a0610b6afc40625c768e5930e6c67fa4e25c6f2,2026-10-01T12:06:51+02:00,,True,True,feat(tracking): update field protocol and release notes
+release/android-parity-1.0.3,5a0610b6afc40625c768e5930e6c67fa4e25c6f2,2026-10-01T12:06:51+02:00,,True,True,feat(tracking): update field protocol and release notes
+fix/tracking-fusion-reference-quality-1.0.3,0bac0258e43a48b1cbdb8dceb5f1430e35b4e47e,2026-09-30T22:25:15+02:00,,False,False,feat(updates): add customer update experience
+feat/gesture-ux-training,95aade7d7d7acbb9a3428a7e3a81d2baa13fb1bf,2026-09-30T12:22:51+02:00,,False,False,feat(training): add gesture actions to journal entries
+feat/gesture-ux-v1,ffb332b407d97924a85443d57aa8d798eaff9dd5,2026-09-29T22:16:17+02:00,,False,False,fix(ui): harden swipe actions for async operations
+release/ios-health-testflight-2026-09-23,68cc6c3e223dc372454b2549dc3f336d8a4a124f,2026-09-28T16:35:24+02:00,,True,True,feat(health): integrate female heat history into health record
+feat/digital-health-record,288f7bc1d6bd0801d3dd0b29e6f9cf773a5aa956,2026-09-23T15:52:19+02:00,,False,False,test(health): extend granular access validation
+release/android-play-policy-2026-09-22,29d5d398f1f8b27fa026d1dc98c8a7c6479ba19b,2026-09-22T14:24:18+02:00,,False,False,fix(android): add Play-compliant background location disclosure
+release/tracking-canonical-runtime-1.0.2,70c8912f9e735bfc8191dc28509ebfcddfaf65fc,2026-09-17T22:50:13+02:00,,True,True,chore(release): align canonical tracking release with iOS 1.0.2 build 43
+fix/search-trace-replay-1.0.2,5e7507f5670f46f1a3ae3e17295e5e3034955648,2026-09-17T11:29:14+02:00,origin/fix/search-trace-replay-1.0.2,True,False,fix(tracking): keep search location stream alive after arming
+release/track-analysis-v3-runtime-1.0.2,f006c4732fdb19eaefe3ce201830a568a5b65694,2026-09-16T23:10:28+02:00,,False,False,chore(track): expose QA mode diagnostics for integrated pipeline
+feat/track-analysis-v2-object-contact,94ce9437391b36f54f00d35a2d6a4efc7962dac0,2026-09-15T15:27:16+02:00,origin/release/track-motion-replay-native-2026-09-07,False,False,feat(analytics): associate object contacts with corners and track end
+fix/replay-analysis-modes,c3c67dda8d2b6e8a0ba549f8802a13439b573c37,2026-09-14T09:31:15+02:00,,True,True,fix(tracking): prevent live cursor jumps at self crossings
+release/live-cursor-self-crossing-2026-09-14,c3c67dda8d2b6e8a0ba549f8802a13439b573c37,2026-09-14T09:31:15+02:00,,True,True,fix(tracking): prevent live cursor jumps at self crossings
+fix/live-search-cursor-self-crossing,c0b512af52832efde49d33ee6df4454ecb654010,2026-09-14T09:30:53+02:00,,False,False,fix(tracking): prevent live cursor jumps at self crossings
+fix/recovery-finish-replay-data,bd26928a7e514f5bdc27965d659eea5440b839d2,2026-09-13T23:29:26+02:00,,True,True,fix(tracking): show full search route in replay
+release/replay-full-search-route-2026-09-13,bd26928a7e514f5bdc27965d659eea5440b839d2,2026-09-13T23:29:26+02:00,,True,True,fix(tracking): show full search route in replay
+fix/replay-map-full-search-route,6abdb66237f63502138d6cf890d4fca76f66a70b,2026-09-13T23:26:44+02:00,,False,False,fix(tracking): show full search route in replay
+release/sync-retry-local-missing-2026-09-13,1807b1c216f21f607df25caf3c60515aca30c094,2026-09-13T23:02:45+02:00,,True,True,fix(sync): retry failed sessions and surface missing local data
+fix/sync-retry-failed-and-coach-wording,aeaf688333e897952d903faebf5a05cc0e56ec28,2026-09-13T23:01:16+02:00,,False,False,fix(sync): retry failed sessions and surface missing local data
+release/evaluation-canonical-2026-09-13,35dc74701cf9529fcc1aa77066eeb92367361a85,2026-09-13T22:18:18+02:00,,True,True,fix(tracking): make canonical arc projection traversal-aware
+fix/canonical-arc-order-aware,f43f467c2a7b78236e45d90dc9f0a297f45891ce,2026-09-13T22:17:58+02:00,,False,False,fix(tracking): make canonical arc projection traversal-aware
+fix/track-evaluation-screen,06950d546b78aee87f24f6a0a2a2265c2ad2d1f4,2026-09-13T22:11:28+02:00,,False,False,fix(tracking): align evaluation analysis state and layout
+test/track-spitz-fixture-qa-0ec8c4ca,8203a4c0d535531f605a27bae16204bdcad2f11f,2026-09-13T20:49:15+02:00,,False,False,test(tracking): add acute-corner canonical arc regression fixture
+release/track-marker-sync-2026-09-13,80f7838edb124484cb987e9de6ece32860d43147,2026-09-13T20:22:43+02:00,,True,True,fix(sync): preserve runs and local markers on marker sync failure
+fix/track-marker-sync-constraints,760f00bd2e7ddb5c1837d2f7935ee18002d5869f,2026-09-13T20:19:43+02:00,,False,False,fix(sync): preserve runs and local markers on marker sync failure
+release/diagnostics-access-2026-09-13,2e068a272f609a70a11413c6197bf70559111318,2026-09-13T19:11:06+02:00,,True,True,fix(profile): restrict diagnostics to internal testers
+feat/profile-diagnostics-access,3414eb051d92561139a595387ffcee02506c3a64,2026-09-13T19:09:35+02:00,,False,False,fix(profile): restrict diagnostics to internal testers
+release/track-search-stability-2026-09-13,610441b2fcd63f58922fc1514469ee670a29094c,2026-09-13T17:36:23+02:00,,True,True,fix(qa): refresh and identify track export sessions
+release/qa-export-session-selection-2026-09-13,e361da122151be0bf4262a1660029529b5e855ae,2026-09-13T17:15:14+02:00,origin/feat/qa-export-v2.1-motion,False,False,fix(qa): refresh and identify track export sessions
+fix/qa-track-session-selection,d461089318636095d093cabfcc91c92827499fc7,2026-09-13T16:59:56+02:00,,False,False,fix(qa): refresh and identify track export sessions
+feat/track-search-guidance-activation,8fad9e70a8ab886ee6a452e7f88d12bd33277c3b,2026-09-13T15:48:00+02:00,,False,False,fix(tracking): gate search guidance until start lock
+feat/track-search-recovery-state,4eeb361762cc51ad8c4a3a53bc9d172ae937e42b,2026-09-13T11:20:25+02:00,,False,False,fix(tracking): persist search recovery state
+feat/track-canonical-reference-progress,7cc2cc66d9eeb69cec64bdd14943a900459de645,2026-09-13T08:02:19+02:00,,False,False,fix(tracking): canonicalize search event progress
+feat/track-diagnostics-phase2,480bce8b3982dfdc24cef99199dee962e2cf072f,2026-09-13T03:11:51+02:00,,False,False,feat(diagnostics): add offline track diagnostics capture
+feat/track-diagnostics-backend-v2,16481a153e6440ea0bc90d5593855bc7033381a4,2026-09-12T23:58:49+02:00,,False,False,feat(diagnostics): add secure track diagnostics backend
+feat/track-diagnostics-backend,d7e0581c9892fd8f93f52a963eb940ed67dbedb1,2026-09-12T23:38:49+02:00,origin/release/track-motion-replay-native-2026-09-07,False,False,fix: secure diagnostics admin access
+feat/qa-export-v2.1-motion,0aa57e4b18af7b50d65b0b55f2007d26e61d053e,2026-09-12T16:27:59+02:00,origin/feat/qa-export-v2.1-motion,True,True,feat(track): capture live motion evidence in QA export v2.1
+feat/track-b3-adaptive-transition-zone,0aa57e4b18af7b50d65b0b55f2007d26e61d053e,2026-09-12T16:27:59+02:00,,True,True,feat(track): capture live motion evidence in QA export v2.1
+release/track-motion-replay-native-2026-09-07,068fe5f5c24c2f5614576460113754857af1ebf9,2026-09-11T20:23:28+02:00,origin/release/track-motion-replay-native-2026-09-07,True,True,feat(track): add reproducible QA capture export
+research/window-straightness-bakeoff,068fe5f5c24c2f5614576460113754857af1ebf9,2026-09-11T20:23:28+02:00,,True,True,feat(track): add reproducible QA capture export
+investigate/trainer-connect-runtime,7fe9eb8a03d4f5eeac4cb88ce56707299ca9f76b,2026-09-11T18:11:12+02:00,origin/investigate/trainer-connect-runtime,True,False,chore(trainer): add runtime diagnostics for trainer connect
+feat/track-segment-replay,539e975ccbe965929fdf1f1b4f12cc98e1e3ea85,2026-09-07T16:53:01+02:00,,True,True,feat(track): add segment analysis replay and heatmaps
+fix/ios-native-autolinking-targets,330e51f990d8c481ea97a8a59079fc0b7bfcaecb,2026-09-07T16:50:37+02:00,,True,False,fix(ios): align native module deployment targets
+feat/core-motion-track-fusion,2b9d9f52746d675dd335c508fbe3d1936dd06c18,2026-09-07T13:33:38+02:00,,True,True,feat(track): add iOS motion fusion and track analytics
+feat/dog-detail-training-doc-button,d9b5a87730554ae48468a6b20d68e66a01784891,2026-09-07T09:15:23+02:00,,True,False,feat(dog): add document training action to dog detail
+fix/tracking-evaluation-footer-android101,d9b5a87730554ae48468a6b20d68e66a01784891,2026-09-07T09:15:23+02:00,,True,False,feat(dog): add document training action to dog detail
+fix/search-start-real-position-regression,c7eba84b87d9e8ee049b6ad97855665bfd712e85,2026-09-06T15:48:27+02:00,,True,True,fix(tracking): allow search start acquisition while stationary
+fix/restore-pocket-lock-hold-stop,527217d6a6955c7f333b2a3c484845fe98480a8e,2026-09-06T13:32:07+02:00,,True,True,fix(tracking): gate search start acquisition to resolve ambiguous track association
+fix/search-start-acquisition,527217d6a6955c7f333b2a3c484845fe98480a8e,2026-09-06T13:32:07+02:00,,True,True,fix(tracking): gate search start acquisition to resolve ambiguous track association
+fix/single-document-upload-regression,f3c2d484e4946980f4494f65eb7e099c018bbbf7,2026-09-05T02:18:06+02:00,,False,False,fix(dogs): align dog_documents.kind check-constraint with current categories
+feat/ios-light-dark-mode,67d400610469e48c6e94b467167fc74a5d642b48,2026-09-05T01:31:58+02:00,,False,False,Add padding to iconless buttons
+feat/track-module-rewrite,67d400610469e48c6e94b467167fc74a5d642b48,2026-09-05T01:31:58+02:00,origin/feat/track-module-rewrite,False,False,Add padding to iconless buttons
+feat/multi-document-upload,535aaa0fdff8baea11135db44de71c09242812f0,2026-09-04T17:14:08+02:00,,False,False,feat(dogs): allow selecting and uploading multiple documents at once
+cherry/permission-onto-3e48152,553cd4180186cdb0f8e1ab44dd0ba61c4f6c9c77,2026-09-04T16:28:01+02:00,,False,False,fix(dogs): correct permission copy + add Settings/limited-access handling
+fix/custom-exercise-document,3e4815296d43695bdbdc80169e7bb6e7c7322e1f,2026-09-03T22:35:33+02:00,,True,True,"fix(training): make ""Eigene Übung"" in document.tsx add reliably"
+combine/keyboard-plus-permission,bb36901c22a6788055c358dd605aa62130904b9f,2026-09-03T22:18:58+02:00,,False,False,fix(dogs): correct permission copy + add Settings/limited-access handling
+fix/photo-picker-permission-ux,fb2bbacafbaabde33bb0a72aca6d06db087c286b,2026-09-03T21:54:26+02:00,,False,False,fix(dogs): correct permission copy + add Settings/limited-access handling
+release/production-consolidated-2026-08-31,679ffdce8dd4827fcfecdb002ec283c754e53edd,2026-09-03T21:42:07+02:00,origin/release/production-consolidated-2026-08-31,False,False,fix(dogs): keep the command editor's Save button reachable above the keyboard
+fix/dog-command-keyboard,221ee095c5bf0ed1f53c8e912d5182366eb14f6e,2026-09-03T21:41:18+02:00,,True,True,fix(dogs): keep the command editor's Save button reachable above the keyboard
+tracking-runtime,8c1bc51d8fa257a5cb52e9ed2649b10e2e4eea24,2026-08-28T03:26:29+02:00,origin/tracking-runtime,True,True,fix(tracking): restore direct stop flow
+release/fullscreen-safearea-prod,ce23652d3366cceaab0236c345daef42b31a5b81,2026-08-28T00:41:28+02:00,origin/release/fullscreen-safearea-prod,True,False,fix(tracking): correct fullscreen safe area
+integration/logbook-map-prod-ca61155,008ad5097395d75cd47e820143a14c0adb798ad5,2026-08-27T23:07:12+02:00,origin/integration/logbook-map-prod-ca61155,True,False,fix(i18n): carry final localization fixes into production
+integration/trajectory-prod-2026-08-27,ca012191a2635f9ae50b5b846061b8ab7679e0a6,2026-08-27T21:12:21+02:00,origin/integration/trajectory-prod-2026-08-27,True,False,feat(tracking): enable trajectory turn engine
+backup/tracking-pre-trajectory-2026-08-27,f9ded06a914cdc375a6a10307044059d0651e083,2026-08-27T18:46:50+02:00,,True,True,feat(tracking): add pocket lock and safe stop guards
+feat/heat-calendar,d1617f4a2bc6529cc8b80624332db565d6e6c643,2026-08-27T00:51:34+02:00,,False,False,feat(dogs): add heat cycle calendar and phase timeline
+integration/logbook-map-prod-aa40c4e,aa40c4e053b1be86f7c9c9b5a7af249e50715676,2026-08-26T00:52:23+02:00,,True,False,docs(database): preserve production and staging schema snapshots
+track-guidance,86bff3e94b63f270fb96aeda5dff03b4f04717dd,2026-08-25T23:45:10+02:00,,False,False,wip(tracking): preserve guidance and search improvements
+hotfix/prod-supabase-faehrten-2026-08-22,e626b7ef0a9f005e1664b61a31e1f54591e7a6cb,2026-08-25T23:42:09+02:00,origin/hotfix/prod-supabase-faehrten-2026-08-22,False,False,wip(tracking): preserve golden capture and geometry diagnostics
+dog-ui,10a3e2ef4c8bdccf97ca90725275e697e31997ae,2026-08-25T23:40:34+02:00,,False,False,wip(dogs): preserve T-61 dog hub follow-up
+health-followup,1eafc8643826715591bcd415e9341b0e4648ccdc,2026-08-25T23:38:27+02:00,,False,False,wip(health): preserve T-60 follow-up redesign
+feat/android-compose-pilot,4fd1fbe8e5910f9dde7d10be9204e44fbbcfae75,2026-08-25T23:34:02+02:00,,False,False,wip(android): preserve Compose pilot T-64
+rating-sync-fix,0d7e08c00cee9a007d8293c3b5a4982e60344f5d,2026-08-22T12:11:14+02:00,,True,True,chore(release): guard production OTA against staging supabase
+backup/tracking-pre-gps-quality-2026-08-22,ca8005fa243f1fdc46406928a1d435b6699d7974,2026-08-22T08:06:20+02:00,,True,True,feat(tracking): add adaptive corner confidence
+prod-hotfix-supabase,8aedbe6c4127fe928a7355043aa1edb21a7dfd2d,2026-08-21T19:25:24+02:00,,True,False,Merge commit '65eceeb' into prod-hotfix-supabase
+backup/tracking-pre-confidence-2026-08-22,65eceeb6f56f74f7d00c3362eb9a4288fa7fd8b1,2026-08-21T18:27:37+02:00,,True,True,feat(tracking): add track completion and recovery
+integration/t62-swiftui,26fe24934a7296b6db3913fb5f44267f53bcfc71,2026-08-20T17:53:47+02:00,,False,False,chore(agent): integrate T-61 dog hub
+feat/ios-native-swiftui,66d03bb267c02b87849833bf3688ad2b57eef1d3,2026-08-20T09:28:54+02:00,,False,False,feat(ios): add native SwiftUI pilot
+release/build38-hotfix,f7a5997021a3d95805758e46d15e295ab79fdb21,2026-08-02T03:21:31+02:00,,False,False,fix(tracking): finalize quick pickers and manual search start
+audit/tracking-regression-2026-09-17,e90df201be3242f993d6915b9b908aa2e7aaec2d,2026-07-24T00:03:22+02:00,origin/main,True,True,chore(release): build 37 (buildNumber/versionCode 36->37)
+fix/android-play-background-location-2026-09-21,e90df201be3242f993d6915b9b908aa2e7aaec2d,2026-07-24T00:03:22+02:00,origin/main,True,True,chore(release): build 37 (buildNumber/versionCode 36->37)
+feat/capability-connection-model,89581a9f2e8444813c1c7abcc5a01c2d338a1c1c,2026-06-10T23:42:37+02:00,origin/feat/capability-connection-model,True,True,RevenueCat: iOS SDK-Key in EAS-Build-Profile
+feat/roles-subscriptions-phases-2-5,f0fbd9f0848dac9b18b50f783f893f66484b60d5,2026-06-09T21:21:32+02:00,origin/feat/roles-subscriptions-phases-2-5,True,True,"Fix Google OAuth ""invalid flow state"" durch Doppel-Exchange"
+feature/auth-profil-faehrte-fixes,01ef0260d032012a28d72918601d42862be0f2ab,2026-06-09T16:50:00+02:00,origin/feature/auth-profil-faehrte-fixes,True,True,Abos Phase 1: Zwei Stufen (Kunde/Trainer) via RevenueCat

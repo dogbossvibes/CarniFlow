@@ -14,11 +14,10 @@ Full guide: `docs/agent/README.md`. The shared NEVER/ALWAYS rules live in
 `AGENTS.md` (imported above) and apply to Claude too.
 
 ### On starting new work, Claude checks
-- `docs/agent/CURRENT_STATE.md`
-- `docs/agent/SESSION_HANDOFF.md`
-- `docs/agent/TASKS.md` — active task IDs, statuses, and the next TASK-ID
-- `git status --short`
-- `git branch --show-current`
+Follow the current startup sequence in AGENTS.md: actual worktree, branch, HEAD,
+local changes, canonical MASTER_STATUS/ACTIVE_WORK, current task and owner.
+CURRENT_STATE.md, SESSION_HANDOFF.md and TASKS.md are historical supporting
+context; never allocate a task ID from their old counters.
 
 ### When taking over from Codex
 Claude must **first verify that the changes named in the handoff actually exist in
@@ -30,7 +29,7 @@ its own state. Unrelated uncommitted work is preserved.
 
 ### Priority rule (on any conflict)
 ```
-Repository state > Git state > Handoff documentation > Agent assumptions
+Repository/Git facts > current canonical MASTER_STATUS/ACTIVE_WORK > historical handoff/task files > agent assumptions
 ```
 If the handoff and the repository disagree, the actual repository state wins.
 
@@ -40,6 +39,14 @@ updates the manual sections of `SESSION_HANDOFF.md`, then runs
 `npm run agent:handoff -- --agent=claude`, then re-checks `git status --short`.
 Without the slash command, run that npm command manually.
 No commit and no push are performed by the handoff.
+
+## BMAD and transfer from Codex
+
+Claude Code is a supported working agent. Read `docs/agent/BMAD.md` and use the
+local `.claude/skills/` automatically where useful. Keep repository-based context
+shared with Codex. `docs/agent/audits/2026-11-01.md` records the dated backup and
+integration audit; current canonical status and fresh Git/EAS facts take precedence.
+Verify uv and skill discovery in a fresh Claude session before implementation.
 
 ## ANYVO Production OTA — zwingende Regel
 

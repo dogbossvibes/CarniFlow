@@ -1,0 +1,16 @@
+{
+  "checked_at_utc": "2026-11-01T18:01:49.136041+00:00",
+  "remote_main": "1d084b8d87ad3c3fee688546ccb20fd85681b551",
+  "current_head": "67d400610469e48c6e94b467167fc74a5d642b48",
+  "current_branch": "feat/track-module-rewrite",
+  "local_branches": 519,
+  "live_github_heads": 222,
+  "local_tips_on_github": 426,
+  "local_tips_not_on_github": 93,
+  "worktrees": 459,
+  "worktree_status_counts": {
+    "clean": 279,
+    "dirty": 180
+  },
+  "commits_not_reachable_from_github": 141
+}

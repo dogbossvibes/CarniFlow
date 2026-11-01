@@ -9,6 +9,7 @@ import { execFileSync, spawnSync, type SpawnSyncReturns } from 'child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { createHash } from 'crypto';
 
 // Runtime-Vertrag aus der ECHTEN Production-Konfiguration (app.json, policy appVersion →
 // expo.version). Kein fester Wert: eine Versionsanhebung (z. B. 1.0.4) hält die Guard-Tests
@@ -89,6 +90,14 @@ else if (a[0] === 'channel:view') {
   out((g ? g.entries : []).map(e => Object.assign({}, e, { group: g.group, branch: 'production', createdAt: g.createdAt || '2026-10-04T00:00:00.000Z' })));
 } else if (a[0] === 'update') {
   let s = load();
+  // Test-owned barrier: keep the first publisher inside update until the
+  // parallel-start assertion has finished, independent of machine speed.
+  const barrier = process.env.FAKE_UPDATE_RELEASE_FILE;
+  const barrierStart = Date.now();
+  while (barrier && !fs.existsSync(barrier)) {
+    if (Date.now() - barrierStart > 120000) process.exit(2);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+  }
   if (s.sleepMs) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, s.sleepMs);
   if (s.failUpdate) process.exit(1);
   s = load();
@@ -113,13 +122,14 @@ export interface Harness {
   other: string;     // KEIN Vorfahre von release
   lockPath: string;
   fullEnvFile: string;
+  qualityEvidenceFile: string;
   envFileWith(content: string): string;
   setState(s: FakeState): void;
   state(): FakeState;
   calls(): string[][];
   updateCalls(): string[][];
   resetCalls(): void;
-  run(args: string[], opts?: { envFile?: string; cmd?: string[]; env?: Record<string, string> }): { code: number | null; out: string };
+  run(args: string[], opts?: { envFile?: string; cmd?: string[]; env?: Record<string, string>; qualityEvidence?: boolean }): { code: number | null; out: string };
   baseEnv(extra?: Record<string, string>): NodeJS.ProcessEnv;
   defaultState(): FakeState;
 }
@@ -130,15 +140,20 @@ export interface Harness {
  * z. B. um einen Hotfix für eine ältere, parallel aktive Runtime zu modellieren.
  * `appJson`: komplett eigene app.json (z. B. nicht bestimmbare Runtime).
  */
-export function createHarness(opts: { appVersion?: string; appJson?: unknown } = {}): Harness {
+export function createHarness(opts: { appVersion?: string; appJson?: unknown; easJson?: unknown } = {}): Harness {
   const dir = mkdtempSync(join(tmpdir(), 'anyvo-ota-test-'));
   const repo = join(dir, 'repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
-  for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
+  for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'scripts/release-quality-evidence.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
+  if (opts.easJson !== undefined) writeFileSync(join(repo, 'eas.json'), JSON.stringify(opts.easJson, null, 2));
   if (opts.appJson !== undefined) writeFileSync(join(repo, 'app.json'), JSON.stringify(opts.appJson, null, 2));
-  else if (opts.appVersion) {
+  else {
     const app = JSON.parse(readFileSync('app.json', 'utf8'));
-    app.expo.version = opts.appVersion;
+    // Standard-Fixtures modellieren eine gemeinsame appVersion-Runtime.
+    // Plattform-Overrides nur über explizites appJson in den Test aufnehmen.
+    if (opts.appVersion) app.expo.version = opts.appVersion;
+    delete app.expo.ios?.runtimeVersion;
+    delete app.expo.android?.runtimeVersion;
     writeFileSync(join(repo, 'app.json'), JSON.stringify(app, null, 2));
   }
   const releaseRuntime = opts.appVersion ?? RELEASE_RUNTIME;
@@ -152,6 +167,22 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown } =
   git(repo, 'commit', '-q', '-m', 'release');
   const release = git(repo, 'rev-parse', 'HEAD');
   const other = git(repo, 'commit-tree', `${base}^{tree}`, '-p', base, '-m', 'other');   // Seitenzweig ohne Checkout
+
+  // Synthetic offline attestations only; these are never production QA receipts.
+  const proof = join(dir, 'quality-fixture.log');
+  writeFileSync(proof, 'synthetic offline fixture evidence\n');
+  const artifact = { path: proof, sha256: createHash('sha256').update(readFileSync(proof)).digest('hex') };
+  const fixtureApp = JSON.parse(readFileSync(join(repo, 'app.json'), 'utf8')).expo;
+  const qualityPaths: Record<string, string> = {};
+  for (const platform of ['ios', 'android']) {
+    const rv = fixtureApp[platform]?.runtimeVersion ?? fixtureApp.runtimeVersion;
+    const runtime = typeof rv === 'string' ? rv : rv?.policy === 'appVersion' ? (fixtureApp[platform]?.version ?? fixtureApp.version) : 'UNRESOLVED';
+    const path = join(dir, `quality-${platform}.json`);
+    writeFileSync(path, JSON.stringify({ schemaVersion: 1, source: { commit: release, tree: git(repo, 'rev-parse', 'HEAD^{tree}') }, target: { platform, runtime }, producer: 'fixture-writer',
+      checks: { typecheck: { exitCode: 0, evidence: artifact }, eslint: { exitCode: 0, errors: 0, warnings: 0, evidence: artifact }, tests: { exitCode: 0, passed: 1, failed: 0, skipped: 0, evidence: artifact }, diff: { exitCode: 0, evidence: artifact } },
+      review: { status: 'PASS', sourceCommit: release, reviewer: 'fixture-reviewer', evidence: artifact } }));
+    qualityPaths[platform] = path;
+  }
 
   const callLog = join(dir, 'eas-calls.jsonl');
   const stateFile = join(dir, 'eas-state.json');
@@ -179,6 +210,7 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown } =
   const run: Harness['run'] = (args, opts = {}) => {
     const cmd = opts.cmd ?? ['node', 'scripts/update-production.mjs'];
     const a = [...cmd.slice(1), ...args];
+    if (opts.qualityEvidence !== false && !args.includes('--quality-evidence')) a.push('--quality-evidence', qualityPaths[args[args.indexOf('--platform') + 1]] ?? qualityPaths.ios);
     if (opts.envFile) a.push('--env-list-file', opts.envFile);
     const r: SpawnSyncReturns<string> = spawnSync(cmd[0], a, { cwd: repo, encoding: 'utf8', env: baseEnv(opts.env) });
     return { code: r.status, out: `${r.stdout}${r.stderr}` };
@@ -186,7 +218,7 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown } =
   return {
     dir, repo, base, release, other,
     lockPath: join(repo, '.git', 'anyvo-production-ota.lock'),
-    fullEnvFile, envFileWith, setState,
+    fullEnvFile, qualityEvidenceFile: qualityPaths.ios, envFileWith, setState,
     state: () => JSON.parse(readFileSync(stateFile, 'utf8')),
     calls, updateCalls: () => calls().filter(a => a[0] === 'update'),
     resetCalls: () => rmSync(callLog, { force: true }),
