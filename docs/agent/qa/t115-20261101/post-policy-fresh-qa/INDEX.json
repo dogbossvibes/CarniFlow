@@ -1,0 +1,53 @@
+{
+  "status": "INDEPENDENT_LOCAL_REVIEW_PASS_SOURCE_ARCHIVE_NOT_EXECUTION_APPROVAL",
+  "review": "00 independently ran all32 offline tests; verified all9 frozen sources and16 manifest references. Launcher approval binds actual launcher bytes before credentials and both mutation phases; source and fresh receipt gates rechecked before each phase. No live execution or approval record included.",
+  "normalization": "Private project prefix replaced by ${PROJECT_ROOT}; reverse reconstruction verified byte exact. Archive is review-only, not executable.",
+  "tests": 32,
+  "sources": [
+    {
+      "file": "t115-stage-b-post-policy-05.py",
+      "originalSHA256": "f6503e230877cfb6a3e8f1d83fe116b104319e3756d95e1424e07c2bb973ba44",
+      "archiveSHA256": "f6503e230877cfb6a3e8f1d83fe116b104319e3756d95e1424e07c2bb973ba44"
+    },
+    {
+      "file": "test_stage_b_post_policy_05.py",
+      "originalSHA256": "7dafd7089a1c4a8d397103bb0ca3400f1a65917b6186bb16dff4ee254f454d56",
+      "archiveSHA256": "7dafd7089a1c4a8d397103bb0ca3400f1a65917b6186bb16dff4ee254f454d56"
+    },
+    {
+      "file": "t115-sections-post-policy-01.py",
+      "originalSHA256": "8cb912d97072cd1119e0a0262ec9bc7c04f1b1cdc0328c2019c741308f9a49e0",
+      "archiveSHA256": "7a13a3f4816459f502890a4a8c43ef5cf3a1362aa98ce6e48c37c1fa2624356f"
+    },
+    {
+      "file": "test_sections_post_policy_01.py",
+      "originalSHA256": "f2bee4c4c7bfae50b245b3f886b7b752096e2bb297b825af602a3fd532e66464",
+      "archiveSHA256": "f2bee4c4c7bfae50b245b3f886b7b752096e2bb297b825af602a3fd532e66464"
+    },
+    {
+      "file": "t115-final-qa-post-policy-01.py",
+      "originalSHA256": "c8acdd8e87fab2a8d6378187a0afd9b99d1f3f6ec68fcbdb7e10ed37f5bfda49",
+      "archiveSHA256": "c8acdd8e87fab2a8d6378187a0afd9b99d1f3f6ec68fcbdb7e10ed37f5bfda49"
+    },
+    {
+      "file": "test_final_qa_post_policy_01.py",
+      "originalSHA256": "cf384351a7be510857482b0834c64320d4312f0e200b7675ae914e37b90ed513",
+      "archiveSHA256": "cf384351a7be510857482b0834c64320d4312f0e200b7675ae914e37b90ed513"
+    },
+    {
+      "file": "QA-SOURCE-MANIFEST-POST-POLICY-01.json",
+      "originalSHA256": "0715c8897f29359ee0c4fd7342e590c068ab92ea3325e7a6b652cb1b6afa4721",
+      "archiveSHA256": "3ce213bae194e04f9f73cfb9b3d6b2c699cf50c6048efe68f04db2fbf2b7fc72"
+    },
+    {
+      "file": "T115-FRESH-POST-POLICY-QA-SCOPE-01.json",
+      "originalSHA256": "12d49b924202dc15a7d77919ea4e67f594f7a38de08c64b8f08b74355191485e",
+      "archiveSHA256": "12d49b924202dc15a7d77919ea4e67f594f7a38de08c64b8f08b74355191485e"
+    },
+    {
+      "file": "T115-DOCUMENT-OWNER-SELECT-POSTFLIGHT-SCHEMA-01.json",
+      "originalSHA256": "e62627aa89eba0ffdbe2413c4116ab76742363dc2ee802236d6e8cef3b442a52",
+      "archiveSHA256": "976b8731ae5e32dca74ce56c97e91d682dbd69db156ce29f516c395927d0d468"
+    }
+  ]
+}

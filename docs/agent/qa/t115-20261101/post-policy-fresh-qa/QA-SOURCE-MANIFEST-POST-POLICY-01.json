@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "status": "LOCAL_FROZEN_QA_SOURCES_NOT_EXECUTION_APPROVAL",
+  "productionProject": "axkkhyqrjrtbkumaulta",
+  "qaDateZurich": "2026-11-01",
+  "sources": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-integration-review-01-20261101/t115-sections-coordinator-01.py",
+      "sha256": "77c1048c1021958463afc17f8dae18b9459477f4861d9b61f44b850f065cf5e5"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-stage-b-postflight-review-only.py",
+      "sha256": "d82f68fa9a07dd9d2566e5993600dd922758fc8707631db017047961723ccfe6"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-sections-readback-review-only.py",
+      "sha256": "a6322c9dd737468c36f4cc935968b3e42c2baed1be797fcbe034d793effe0421"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-auth-preflight.py",
+      "sha256": "5a4c4265fa8f712b18abbe8e71f5b978f08ed9b433187049116df57e9ab4090e"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-weight-only-normal-jwt-review-only.py",
+      "sha256": "706fba5bbc2c26e3a311658d6a94870c66148eeb31deedcb8918d3329ed9e925"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-expanded-readback-review-only.py",
+      "sha256": "fbf9f315e931d1c98d8675f324b6c4dd3ff33df40bfe22fe9a8c162a57c86857"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t142-calendar-delete-db-05-20261030/t142-normal-jwt-delete-review-only.py",
+      "sha256": "90f9d27792d7dccd4b2adfed7c82cf1b1bc8306958df27218e701c01dcc94d01"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/T115-HEALTH-SECTIONS-FIXTURES-REVIEW-20261101.json",
+      "sha256": "4aee07b66570f3e163da536416c3453748e35d1bd7377f06b452887ee8ea02c7"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-health-synthetic-1x1.png",
+      "sha256": "2aa4fa20701cdd6d8d56046069001186b5267e3ee7d0ef618ad2f4a683723e11"
+    },
+    {
+      "path": "${PROJECT_ROOT}/anyvo-health-shared-recipient-db-20261029/supabase/migrations/20261030101000_dog_health_entries_owner_only_select.sql",
+      "sha256": "eb5f4e7575df83b18a6a70916dee6e65874bf699d385213e0cc672848c593d40"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-integration-review-01-20261101/t115-fixture-identity-01.py",
+      "sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-integration-review-01-20261101/t115-sections-readback-time-aware-01.py",
+      "sha256": "f7f791742e0bf23686ee707811e8e937d83a4b6e25a4f242abd0297e0d5fdd70"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-integration-review-01-20261101/t115-sections-coordinator-time-aware-01.py",
+      "sha256": "895c7581e420bc70c84ce1c3a1668066f5cb51b1acd318561f5fc759f45970f5"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-integration-review-01-20261101/t115-stage-b-post-policy-05.py",
+      "sha256": "f6503e230877cfb6a3e8f1d83fe116b104319e3756d95e1424e07c2bb973ba44"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-integration-review-01-20261101/t115-sections-post-policy-01.py",
+      "sha256": "8cb912d97072cd1119e0a0262ec9bc7c04f1b1cdc0328c2019c741308f9a49e0"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-integration-review-01-20261101/T115-FRESH-POST-POLICY-QA-SCOPE-01.json",
+      "sha256": "12d49b924202dc15a7d77919ea4e67f594f7a38de08c64b8f08b74355191485e"
+    }
+  ],
+  "originalCoordinatorSHA256": "de1542ab0218026b8afda2bf00dd3b24fca49ba7519fe28099e969aa7f6ff115",
+  "integrationDelta": [
+    "component import BASE points to unchanged author artifacts",
+    "post-TTL URL requires explicit denial status, unexpected HTTP errors fail",
+    "safe_result returns its private receipt path",
+    "direct CLI always inert; only the reviewed one-shot launcher may invoke run"
+  ]
+}
