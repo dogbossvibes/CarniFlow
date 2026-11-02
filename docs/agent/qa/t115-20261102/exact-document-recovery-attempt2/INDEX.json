@@ -1,0 +1,15 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL",
+  "independent_tests_passed": 11,
+  "delta": "Only four attempt-specific receipt/nonce/result paths; test import updated. SQL unchanged.",
+  "files": [
+    {
+      "file": "t115-exact-document-recovery-attempt2-review-only-20261102.py",
+      "sha256": "79db45577f8442b0ae76682ca09976d69ae10990d2f45bc1e2b221e6d15951f2"
+    },
+    {
+      "file": "test_t115_exact_document_recovery_attempt2_review_only_20261102.py",
+      "sha256": "dd7b84b14f47647dfe6e0af5494088ed027d403ae8b73503d92efbaa2e94d502"
+    }
+  ]
+}
