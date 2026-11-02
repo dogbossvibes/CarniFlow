@@ -1,0 +1,17 @@
+{
+  "status": "INDEPENDENT_SOURCE_DELTA_REVIEW_12_OFFLINE_TESTS_PASS_NOT_LIVE_RESULT",
+  "review": "00 independently ran12 offline tests and read delta to Attempt2. New nonce3, explicit OwnerA account display and exact QA Stop-class normalization, one unchanged login request with bounded HTTP/status and four allowlisted error codes only. No credential/token/body logging and no automatic auth retry. Request hook restored in finally. Existing exact-file/5min/source/freshness/independent0 guards unchanged; original attempts preserved.",
+  "normalization": "Source-only review archive with private project prefix replaced by ${PROJECT_ROOT}, reverse byte-exact. No real auth receipts, credentials or CSV included.",
+  "sources": [
+    {
+      "file": "t115-exact-png-cleanup-attempt3-review-only-20261102.py",
+      "originalSHA256": "488f21541db3b784da5d4451784629b6178d6d771cb68b764b5b5eb550b07ee4",
+      "archiveSHA256": "488f21541db3b784da5d4451784629b6178d6d771cb68b764b5b5eb550b07ee4"
+    },
+    {
+      "file": "test_t115_exact_png_cleanup_attempt3_review_only_20261102.py",
+      "originalSHA256": "0bef9acc93b95c9cf00b7cc003823d27c6f16b3aba6105f36347fe7f8ca4bc0e",
+      "archiveSHA256": "0bef9acc93b95c9cf00b7cc003823d27c6f16b3aba6105f36347fe7f8ca4bc0e"
+    }
+  ]
+}
