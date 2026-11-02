@@ -1,0 +1,103 @@
+{
+  "status": "REVIEW_ONLY_NO_LIVE_EXECUTION_NO_USER_START",
+  "project": "axkkhyqrjrtbkumaulta",
+  "qaDateZurich": "2026-11-03",
+  "packagingAuthor": "Chat01",
+  "priorFull7Immutable": true,
+  "previousFull7NeverExecuted": true,
+  "sameUnconsumed19Ids": true,
+  "newOneShotAbsent": true,
+  "approvalAbsent": true,
+  "offlineTestsPassed": 71,
+  "sourcePriorFreeze": {
+    "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/FULL7-SOURCE-FREEZE-REVIEW-ONLY.json",
+    "sha256": "dd65e8bad4f92a7a8e2185556472bfa61e8465a46b6159757a1b28df5869bd11"
+  },
+  "change": "Exact next-day date, local artifact paths, fixture dates, dependent hashes; offline clocks explicitly mocked in 4 old tests; reviewed Swiss midnight boundaries tested. Original historical timestamp regression unchanged. No production change.",
+  "files": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/ANYVO-T115-FULL7-Abnahme-20261103.command",
+      "sha256": "8cba5e3c82ec5ff71b0ab436921011ca189bd8a4fd7a7428b50cd2e4c614c134"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/PLAN-REVIEW-ONLY.json",
+      "sha256": "5d2e95d0339013f6776dabc3017de4106624520812eebf67484f488f6a023c34"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/QA-SOURCE-MANIFEST-FULL7-05.json",
+      "sha256": "82fa4ab958defa743436fb0c7573a7cdd027924e787f6e3bad6c4344e98e4c02"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/T115-FULL7-PREFLIGHT-READONLY-20261103.sql",
+      "sha256": "aeaf431866ec628b00771d8b0919d3ee8cb560a7c14b0a98d0b4a4292527e6b9"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/T115-HEALTH-SECTIONS-FIXTURES-FULL7-20261103.json",
+      "sha256": "b16dc7484c049d8e6812b4bd45043ea26f994c077587d117584ce0ee0e60f746"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/build_readonly_receipts.py",
+      "sha256": "da2f9f24601bfc34eec4a8ef526516ccd6e59aaa5b67d54fef34d38ee1fa3384"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/receipt_time.py",
+      "sha256": "c669d4059697ad49d352d2d0caf159d5455671ca410604bd54cf0a0211989549"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/t115-final-qa-full7-05.py",
+      "sha256": "9f4913c199df09e0d317fc0e5275feeab30d10ebd7976ab53688149a0e8a080e"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/t115-fixture-identity-01.py",
+      "sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/t115-review-full7-snapshot-05.py",
+      "sha256": "a210ac5bfe3076086f76f56acc7d4fca33d414661d00ee127a530befd5466cd5"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/t115-sections-readback-time-aware-01.py",
+      "sha256": "a74e303fa703a12b14f2755b686742cca3bb3a33f752b5e1331bea14181f8586"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/t115-sections-storage-diagnostics-01.py",
+      "sha256": "4e3726d108be4958d4b510025cd513e0763b75fdc7bb98d5cf3c485116ab5047"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/t115-stage-b-post-policy-capped-01.py",
+      "sha256": "cbb9cf72e75bc6d4f08713b9ca4c092d9c0e3630fb8790f9aa704cb203cce287"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/test_auth_diagnostic_full7_05.py",
+      "sha256": "9bb88e03c3a8f7625961a0e30caf39bb8d0571e670328f000f5775babb141962"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/test_final_qa_full7_05.py",
+      "sha256": "b557f559f4028a5d814f5c225afff903b66b21508369e1f990b6681fb0906021"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/test_full7_contract.py",
+      "sha256": "e2f6763755c3de1d33579c09cf41df7f0d9029322c18a3dbaddb30ff803ad61a"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/test_full7_snapshot_05.py",
+      "sha256": "252de390681e985c5fdc76213be53d2d4aa8ad1e88537115f9dbeb866ca30b16"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/test_receipt_builder.py",
+      "sha256": "91f22b01847b7f37e1f07e5fb494cfa9073d3810e76fa240acb983e45f76a683"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/test_receipt_time.py",
+      "sha256": "0c787281e948cf1fdc543f52baaebb36213e999e1663dae81d973c80e5054fd7"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/test_sections_storage_diagnostics_01.py",
+      "sha256": "4c23e58a3b462fdfad514e5589759a36acea91f065320cd677c9d1ef8d98de29"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261103/test_stage_b_post_policy_capped_01.py",
+      "sha256": "300a014e3123afd6ccb16c7a421b93d5baf0d6fa14c484764d07ded47b815fdb"
+    }
+  ]
+}
