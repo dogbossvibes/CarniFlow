@@ -1,0 +1,87 @@
+{
+  "status": "REVIEW_ONLY_NO_LIVE_EXECUTION_NO_USER_START",
+  "project": "axkkhyqrjrtbkumaulta",
+  "qaDateZurich": "2026-11-02",
+  "packagingAuthor": "Chat01",
+  "classifierAuthor": "Chat05",
+  "priorFull5Immutable": true,
+  "newOneShotAbsent": true,
+  "newResultAbsent": true,
+  "approvalAbsent": true,
+  "offlineTestsPassed": 65,
+  "deletePublicResponseBody": "NOT_CAPTURED; future real response must match strict structured classifier",
+  "files": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/ANYVO-T115-FULL6-Abnahme-20261102.command",
+      "sha256": "d311432945e0f34ac568939e8c338e12fc558f49a4c8c4b65fb35d251533308f"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/FULL6-ID-MAP-REVIEW-ONLY.json",
+      "sha256": "6870cadafddcfcb2b1724c0c144b07f8eaa73706139fe3a59eb5ecad6375c6d9"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/PLAN-REVIEW-ONLY.json",
+      "sha256": "305e9118bdbe67f661cdbb678f09feb72ec45ad4ff5354910f1b2685db5ab3d0"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/QA-SOURCE-MANIFEST-FULL6-05.json",
+      "sha256": "805f141dd3da909f73952d64241165c076a4132b9e99dd40ec2fd18fc1d6d733"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/T115-FULL6-PREFLIGHT-READONLY-20261102.sql",
+      "sha256": "3c56850ba5575b91be1968e4e0d1301e5e832d6300cb5e7f8b30aaf8040bf8b3"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/T115-HEALTH-SECTIONS-FIXTURES-FULL6-20261102.json",
+      "sha256": "c064acb75c94e79075b2d9dc7f407430cff24946aa0a48f4ef94f543910b5386"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-final-qa-full6-05.py",
+      "sha256": "512406459e73f3e091703011d0ede6f368659d64a85342dd15893829f86c9d52"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-fixture-identity-01.py",
+      "sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-review-full6-snapshot-05.py",
+      "sha256": "110977d19762079b146748ae54b19cc8c68072d15efd01198c08a206fc3c1fa1"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-sections-readback-time-aware-01.py",
+      "sha256": "d445168bd01365420d96cc18e9d9459167345e7ee8f0457d55a7bf6fb2cd9c80"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-sections-storage-diagnostics-01.py",
+      "sha256": "87be8fbc212fe4f9130db1fdd6ee30a7dd0e009fb6f9bad55bfff9f253ec2804"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-stage-b-post-policy-capped-01.py",
+      "sha256": "bd8c23031b1b652d0b5745e17962a752bd8e695ebda4a3cbaffd0f29831860b6"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/test_auth_diagnostic_full6_05.py",
+      "sha256": "e73a589cd30e602065e2ae0338aa31f95834122f89eaa6fd4abc9bf255718004"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/test_final_qa_full6_05.py",
+      "sha256": "65581da6cf2e62d567fbc742b8ee9abb2149537afdf4d45cc9ba618de29a0a06"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/test_full6_contract.py",
+      "sha256": "db761f62171c477ee2c1f0b879b375e7433b57143219ee905351a8cc5cd1b302"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/test_full6_snapshot_05.py",
+      "sha256": "3bc9ce499227e5d895cb32261f453f6e7950b3775f716c3282a94fd7e98fea80"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/test_sections_storage_diagnostics_01.py",
+      "sha256": "0a0527f46279c08c268d6d80f3e4a8cdafa688e5d8a917fdc0e1e43cb84ac7ff"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/test_stage_b_post_policy_capped_01.py",
+      "sha256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL_NOT_OTA_PASS",
+  "rootIndependentOfflineTests": 65,
+  "privatePaths": "Restore ${PROJECT_ROOT} before use; original hash bindings remain unchanged.",
+  "deleteResponseBody": "NOT_CAPTURED; strict live test pending",
+  "files": [
+    {
+      "file": "ANYVO-T115-FULL6-Abnahme-20261102.command",
+      "originalSHA256": "d311432945e0f34ac568939e8c338e12fc558f49a4c8c4b65fb35d251533308f",
+      "archiveSHA256": "f9781432baad92f17dbe77b92ec8f502f739d04ddfc64c46869f83b3cb797e79"
+    },
+    {
+      "file": "FULL6-ID-MAP-REVIEW-ONLY.json",
+      "originalSHA256": "6870cadafddcfcb2b1724c0c144b07f8eaa73706139fe3a59eb5ecad6375c6d9",
+      "archiveSHA256": "6870cadafddcfcb2b1724c0c144b07f8eaa73706139fe3a59eb5ecad6375c6d9"
+    },
+    {
+      "file": "PLAN-REVIEW-ONLY.json",
+      "originalSHA256": "305e9118bdbe67f661cdbb678f09feb72ec45ad4ff5354910f1b2685db5ab3d0",
+      "archiveSHA256": "361b2a06063fb04abd46b9f96e2e5bad45f1c9e6cc758668dd3e125ef404cbaf"
+    },
+    {
+      "file": "QA-SOURCE-MANIFEST-FULL6-05.json",
+      "originalSHA256": "805f141dd3da909f73952d64241165c076a4132b9e99dd40ec2fd18fc1d6d733",
+      "archiveSHA256": "aa35c4da9d39b6f6c3fb0c69370ee565e3653323e076d130fdc6e7d5e030654a"
+    },
+    {
+      "file": "T115-FULL6-PREFLIGHT-READONLY-20261102.sql",
+      "originalSHA256": "3c56850ba5575b91be1968e4e0d1301e5e832d6300cb5e7f8b30aaf8040bf8b3",
+      "archiveSHA256": "3c56850ba5575b91be1968e4e0d1301e5e832d6300cb5e7f8b30aaf8040bf8b3"
+    },
+    {
+      "file": "T115-HEALTH-SECTIONS-FIXTURES-FULL6-20261102.json",
+      "originalSHA256": "c064acb75c94e79075b2d9dc7f407430cff24946aa0a48f4ef94f543910b5386",
+      "archiveSHA256": "c064acb75c94e79075b2d9dc7f407430cff24946aa0a48f4ef94f543910b5386"
+    },
+    {
+      "file": "t115-final-qa-full6-05.py",
+      "originalSHA256": "512406459e73f3e091703011d0ede6f368659d64a85342dd15893829f86c9d52",
+      "archiveSHA256": "512406459e73f3e091703011d0ede6f368659d64a85342dd15893829f86c9d52"
+    },
+    {
+      "file": "t115-fixture-identity-01.py",
+      "originalSHA256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49",
+      "archiveSHA256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "file": "t115-review-full6-snapshot-05.py",
+      "originalSHA256": "110977d19762079b146748ae54b19cc8c68072d15efd01198c08a206fc3c1fa1",
+      "archiveSHA256": "110977d19762079b146748ae54b19cc8c68072d15efd01198c08a206fc3c1fa1"
+    },
+    {
+      "file": "t115-sections-readback-time-aware-01.py",
+      "originalSHA256": "d445168bd01365420d96cc18e9d9459167345e7ee8f0457d55a7bf6fb2cd9c80",
+      "archiveSHA256": "4cf3b54c1167eed2cf4f78ec157c2dcc6b67d47258e9f5e97b97e85bc896f759"
+    },
+    {
+      "file": "t115-sections-storage-diagnostics-01.py",
+      "originalSHA256": "87be8fbc212fe4f9130db1fdd6ee30a7dd0e009fb6f9bad55bfff9f253ec2804",
+      "archiveSHA256": "0279903759e6224ca1903ccc70de154d63985bbb3514d63ad67bd849587849a9"
+    },
+    {
+      "file": "t115-stage-b-post-policy-capped-01.py",
+      "originalSHA256": "bd8c23031b1b652d0b5745e17962a752bd8e695ebda4a3cbaffd0f29831860b6",
+      "archiveSHA256": "bd8c23031b1b652d0b5745e17962a752bd8e695ebda4a3cbaffd0f29831860b6"
+    },
+    {
+      "file": "test_auth_diagnostic_full6_05.py",
+      "originalSHA256": "e73a589cd30e602065e2ae0338aa31f95834122f89eaa6fd4abc9bf255718004",
+      "archiveSHA256": "e73a589cd30e602065e2ae0338aa31f95834122f89eaa6fd4abc9bf255718004"
+    },
+    {
+      "file": "test_final_qa_full6_05.py",
+      "originalSHA256": "65581da6cf2e62d567fbc742b8ee9abb2149537afdf4d45cc9ba618de29a0a06",
+      "archiveSHA256": "65581da6cf2e62d567fbc742b8ee9abb2149537afdf4d45cc9ba618de29a0a06"
+    },
+    {
+      "file": "test_full6_contract.py",
+      "originalSHA256": "db761f62171c477ee2c1f0b879b375e7433b57143219ee905351a8cc5cd1b302",
+      "archiveSHA256": "db761f62171c477ee2c1f0b879b375e7433b57143219ee905351a8cc5cd1b302"
+    },
+    {
+      "file": "test_full6_snapshot_05.py",
+      "originalSHA256": "3bc9ce499227e5d895cb32261f453f6e7950b3775f716c3282a94fd7e98fea80",
+      "archiveSHA256": "3bc9ce499227e5d895cb32261f453f6e7950b3775f716c3282a94fd7e98fea80"
+    },
+    {
+      "file": "test_sections_storage_diagnostics_01.py",
+      "originalSHA256": "0a0527f46279c08c268d6d80f3e4a8cdafa688e5d8a917fdc0e1e43cb84ac7ff",
+      "archiveSHA256": "0a0527f46279c08c268d6d80f3e4a8cdafa688e5d8a917fdc0e1e43cb84ac7ff"
+    },
+    {
+      "file": "test_stage_b_post_policy_capped_01.py",
+      "originalSHA256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112",
+      "archiveSHA256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112"
+    },
+    {
+      "file": "FULL6-SOURCE-FREEZE-REVIEW-ONLY.json",
+      "originalSHA256": "00b964f002135f370315a969b4dec867560481c729a3134a220a950ff6913893",
+      "archiveSHA256": "3fc9ba8e47a3cecb9fe009bd70fc08bce85211df123a5f64443a52d05f7afdb7"
+    }
+  ]
+}

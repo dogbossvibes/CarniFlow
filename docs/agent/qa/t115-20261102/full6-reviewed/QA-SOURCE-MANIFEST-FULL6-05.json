@@ -1,0 +1,60 @@
+{
+  "productionProject": "axkkhyqrjrtbkumaulta",
+  "qaDateZurich": "2026-11-02",
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-stage-b-post-policy-capped-01.py",
+      "sha256": "bd8c23031b1b652d0b5745e17962a752bd8e695ebda4a3cbaffd0f29831860b6"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-sections-readback-time-aware-01.py",
+      "sha256": "d445168bd01365420d96cc18e9d9459167345e7ee8f0457d55a7bf6fb2cd9c80"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-sections-storage-diagnostics-01.py",
+      "sha256": "87be8fbc212fe4f9130db1fdd6ee30a7dd0e009fb6f9bad55bfff9f253ec2804"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-fixture-identity-01.py",
+      "sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/t115-review-full6-snapshot-05.py",
+      "sha256": "110977d19762079b146748ae54b19cc8c68072d15efd01198c08a206fc3c1fa1"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/T115-FULL6-PREFLIGHT-READONLY-20261102.sql",
+      "sha256": "3c56850ba5575b91be1968e4e0d1301e5e832d6300cb5e7f8b30aaf8040bf8b3"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/PLAN-REVIEW-ONLY.json",
+      "sha256": "305e9118bdbe67f661cdbb678f09feb72ec45ad4ff5354910f1b2685db5ab3d0"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/T115-HEALTH-SECTIONS-FIXTURES-FULL6-20261102.json",
+      "sha256": "c064acb75c94e79075b2d9dc7f407430cff24946aa0a48f4ef94f543910b5386"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-auth-preflight.py",
+      "sha256": "5a4c4265fa8f712b18abbe8e71f5b978f08ed9b433187049116df57e9ab4090e"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-weight-only-normal-jwt-review-only.py",
+      "sha256": "706fba5bbc2c26e3a311658d6a94870c66148eeb31deedcb8918d3329ed9e925"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-expanded-readback-review-only.py",
+      "sha256": "fbf9f315e931d1c98d8675f324b6c4dd3ff33df40bfe22fe9a8c162a57c86857"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/t115-health-synthetic-1x1.png",
+      "sha256": "2aa4fa20701cdd6d8d56046069001186b5267e3ee7d0ef618ad2f4a683723e11"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t142-calendar-delete-db-05-20261030/t142-normal-jwt-delete-review-only.py",
+      "sha256": "90f9d27792d7dccd4b2adfed7c82cf1b1bc8306958df27218e701c01dcc94d01"
+    }
+  ],
+  "status": "REVIEW_ONLY_NOT_EXECUTION_APPROVAL"
+}

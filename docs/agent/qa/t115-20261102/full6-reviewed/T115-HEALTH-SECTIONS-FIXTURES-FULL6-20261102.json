@@ -1,0 +1,108 @@
+{
+  "fixtures": {
+    "dog_deworming_entries": [
+      {
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "e31a82bc-5742-40d2-bd53-e2020d847790",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "product": "T115 synthetic QA only",
+        "treatment_date": "2026-11-02",
+        "treatment_type": "other"
+      }
+    ],
+    "dog_documents": [
+      {
+        "category": "health",
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "file_url": "68910959-e849-4860-b408-ebc234fec611/b4991851-e569-51fc-a0af-4e0172f2bc63/t115-health-7820b9c9-ef27-4f2b-98f0-91f4bc8be063.png",
+        "id": "7820b9c9-ef27-4f2b-98f0-91f4bc8be063",
+        "kind": "gesundheit",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "subtype": "other",
+        "title": "T115 synthetic QA only"
+      },
+      {
+        "category": "health",
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "61dd89da-2bdb-40ff-9087-d323521a476c",
+        "kind": "gesundheit",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "subtype": "lab",
+        "title": "T115 synthetic QA only"
+      },
+      {
+        "category": "health",
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "2683c293-2c07-4ba7-9d7b-6a57090d11d8",
+        "kind": "tierarzt",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "subtype": "vet_report",
+        "title": "T115 synthetic QA only"
+      }
+    ],
+    "dog_health_conditions": [
+      {
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "cf61fc80-06b7-4ca4-a3c9-29c13e97e5f0",
+        "kind": "diagnosis",
+        "name": "T115 synthetic QA only",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "started_on": "2026-11-02",
+        "status": "historical"
+      },
+      {
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "dbdb8cda-bb3b-4ca3-8cae-d5d91af62634",
+        "kind": "allergy",
+        "name": "T115 synthetic QA only",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "started_on": "2026-11-02",
+        "status": "historical"
+      },
+      {
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "2227bbee-a421-4390-866c-68802e8b2ef2",
+        "kind": "intolerance",
+        "name": "T115 synthetic QA only",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "started_on": "2026-11-02",
+        "status": "historical"
+      }
+    ],
+    "dog_health_medications": [
+      {
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "35162c2f-be9f-4ca1-ba30-e5c2b46edae1",
+        "is_active": false,
+        "name": "T115 synthetic QA only",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "starts_on": "2026-11-02"
+      }
+    ],
+    "dog_health_vaccinations": [
+      {
+        "administered_on": "2026-11-02",
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "9e7562ca-8c88-468c-9f15-9ce0bc95cff3",
+        "note": "T115 synthetic QA only",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "vaccine_type": "qa_only"
+      }
+    ],
+    "dog_vet_appointments": [
+      {
+        "appointment_at": "2026-11-02T15:00:00Z",
+        "dog_id": "b4991851-e569-51fc-a0af-4e0172f2bc63",
+        "id": "57225bff-a1f2-4191-b417-ccd08dac685e",
+        "owner_id": "68910959-e849-4860-b408-ebc234fec611",
+        "reason": "T115 synthetic QA only",
+        "status": "completed"
+      }
+    ]
+  },
+  "png_path": "68910959-e849-4860-b408-ebc234fec611/b4991851-e569-51fc-a0af-4e0172f2bc63/t115-health-7820b9c9-ef27-4f2b-98f0-91f4bc8be063.png",
+  "png_sha256": "2aa4fa20701cdd6d8d56046069001186b5267e3ee7d0ef618ad2f4a683723e11",
+  "png_size_bytes": 68,
+  "production_project": "axkkhyqrjrtbkumaulta",
+  "status": "REVIEW_ONLY_NO_EXECUTION"
+}
