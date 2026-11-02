@@ -1,0 +1,93 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL_NOT_OTA_PASS",
+  "independent_tests_passed": 62,
+  "additional_independent_boundary_checks": 2,
+  "review": "Exact known RLS-403 forms only; unknown400 fails. Single DELETE with bounded65s absence reads including ambiguous response; changed bytes or timeout fails closed. Auth, scope, revoke and signed URL expiry retained.",
+  "files": [
+    {
+      "file": "ANYVO-T115-FULL4-Abnahme-20261102.command",
+      "original_sha256": "2ce2415899c87848ea566c544244b5da4b4e3c003be3a7ec6c62b8987b4b7002",
+      "archive_sha256": "1e46b4113f6ea4aa8b3e83ac2ba06782968eadc8a5ed2f0affc20f2abe30794d"
+    },
+    {
+      "file": "PLAN-REVIEW-ONLY.json",
+      "original_sha256": "882c624c3bb602df67dbf327de90864b017523a9121a0054fff1ed05af1ce9ce",
+      "archive_sha256": "f59f1281691f44d239d03a3c054b966da91852ce61f86abc5a3bf15eb2783c30"
+    },
+    {
+      "file": "QA-SOURCE-MANIFEST-FULL4-05.json",
+      "original_sha256": "a3b2eeb601a147732ab21c03c9217a9e218b8b0b977e872a35b609f06e9bdba7",
+      "archive_sha256": "b99add675a845fac6215a4cd9a6eaa5e948c069198fa579cc3a0fcb7c70a5713"
+    },
+    {
+      "file": "T115-FULL4-PREFLIGHT-READONLY-20261102.sql",
+      "original_sha256": "dea4545c9e0f09f6a9741713cf61a4e5c4f9c8656275a2916f56d4ff4dc6fc65",
+      "archive_sha256": "dea4545c9e0f09f6a9741713cf61a4e5c4f9c8656275a2916f56d4ff4dc6fc65"
+    },
+    {
+      "file": "T115-HEALTH-SECTIONS-FIXTURES-FULL4-20261102.json",
+      "original_sha256": "5f5c48e05fb3379aba21b4bb8c85244e2dbba1241004812a76da62deb292445f",
+      "archive_sha256": "5f5c48e05fb3379aba21b4bb8c85244e2dbba1241004812a76da62deb292445f"
+    },
+    {
+      "file": "t115-final-qa-full4-05.py",
+      "original_sha256": "3a54d6d6140c523eb8f309a0f835771b86fcf13cdc2b2424f8d4a97eb12c4294",
+      "archive_sha256": "3a54d6d6140c523eb8f309a0f835771b86fcf13cdc2b2424f8d4a97eb12c4294"
+    },
+    {
+      "file": "t115-fixture-identity-01.py",
+      "original_sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49",
+      "archive_sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "file": "t115-review-full4-snapshot-05.py",
+      "original_sha256": "f0199a0cd49362a58c274e9a15d5df5b818a2e61c60ff1d2de038be16c2a88d4",
+      "archive_sha256": "f0199a0cd49362a58c274e9a15d5df5b818a2e61c60ff1d2de038be16c2a88d4"
+    },
+    {
+      "file": "t115-sections-readback-time-aware-01.py",
+      "original_sha256": "390640b2e78d478db66c9f9a9e28fe25b994a11281bea77ef757c7befe5d1cad",
+      "archive_sha256": "90c4c9faed9374daac453b1d3908f864cdff4a72882d9c1167d30a315e080537"
+    },
+    {
+      "file": "t115-sections-storage-diagnostics-01.py",
+      "original_sha256": "95bd29e8331d7519573f9e40f3c5f08e053dc01b7da4f760bf1e0385c38b0cc5",
+      "archive_sha256": "9a517173318767a1d8719c909fc4b962be650560a4a825a394cdac28f6c9fb59"
+    },
+    {
+      "file": "t115-stage-b-post-policy-capped-01.py",
+      "original_sha256": "75e79c0453814a54be7e37e2af193bc1ed498d1fe8747e0bce46d74f55b4566f",
+      "archive_sha256": "75e79c0453814a54be7e37e2af193bc1ed498d1fe8747e0bce46d74f55b4566f"
+    },
+    {
+      "file": "test_auth_diagnostic_full4_05.py",
+      "original_sha256": "21ef2d94163812ba3309936939cd8162b4ab0d46b8aa25ad1d09ec866228a727",
+      "archive_sha256": "21ef2d94163812ba3309936939cd8162b4ab0d46b8aa25ad1d09ec866228a727"
+    },
+    {
+      "file": "test_final_qa_full4_05.py",
+      "original_sha256": "7a4697651727645fed2071fa022ee2abd7b10fa68b608f05b95d11d9869d9c59",
+      "archive_sha256": "7a4697651727645fed2071fa022ee2abd7b10fa68b608f05b95d11d9869d9c59"
+    },
+    {
+      "file": "test_full4_contract.py",
+      "original_sha256": "ef3382c8a17bc0aaf5ea1825bcfa24589a3c76a300a48298ac3567635cf8879e",
+      "archive_sha256": "ef3382c8a17bc0aaf5ea1825bcfa24589a3c76a300a48298ac3567635cf8879e"
+    },
+    {
+      "file": "test_full4_snapshot_05.py",
+      "original_sha256": "e47d3f269f01308cf6fe4668b6850b4644a17bf5e3de04a15f5eedede4be4308",
+      "archive_sha256": "e47d3f269f01308cf6fe4668b6850b4644a17bf5e3de04a15f5eedede4be4308"
+    },
+    {
+      "file": "test_sections_storage_diagnostics_01.py",
+      "original_sha256": "781593d10fea88ba890f375489da35b83469edeb7181cb19a407af02fe88f41c",
+      "archive_sha256": "781593d10fea88ba890f375489da35b83469edeb7181cb19a407af02fe88f41c"
+    },
+    {
+      "file": "test_stage_b_post_policy_capped_01.py",
+      "original_sha256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112",
+      "archive_sha256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112"
+    }
+  ]
+}
