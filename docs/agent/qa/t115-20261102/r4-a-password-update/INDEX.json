@@ -1,0 +1,15 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL",
+  "independent_tests_passed": 12,
+  "scope": "Human-run local password-only update of exact R4 A account; secrets entered via getpass only; no T115 cleanup or OTA approval",
+  "files": [
+    {
+      "file": "t115-r4-a-admin-password-update-review-only-20261102.py",
+      "sha256": "59e4e7e7d4be1f2cf3fa95d5a27cc94874a2ab9eacc1f56cadee51930858b22f"
+    },
+    {
+      "file": "test_t115_r4_a_admin_password_update_review_only_20261102.py",
+      "sha256": "8fb94aaebb896eb3b5e36334d14ec0240a83e730e9c1ae4565a0419e81621551"
+    }
+  ]
+}
