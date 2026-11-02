@@ -1,0 +1,17 @@
+{
+  "status": "INDEPENDENT_MINIMAL_ATTEMPT2_REVIEW_11_TESTS_PASS_NOT_LIVE_RESULT",
+  "review": "00 independently read exact diff and ran11 offline tests. Only nonce filename and test import change; original a0ef script and old nonce remain unchanged. New attempt explicitly requested by user. Same exact synthetic PNG, OwnerA only, no grant or policy changes. Actual fresh preflight required again; old result is not reused.",
+  "normalization": "Review-only source archive. Private project prefix normalized to ${PROJECT_ROOT}, reverse reconstruction exact; no live receipts or approval data included.",
+  "sources": [
+    {
+      "file": "t115-exact-png-cleanup-attempt2-review-only-20261102.py",
+      "originalSHA256": "57dd350ae1e02a699729eeb024e4d50bf6f7adb1b129d3eb8e45347ad94defe3",
+      "archiveSHA256": "57dd350ae1e02a699729eeb024e4d50bf6f7adb1b129d3eb8e45347ad94defe3"
+    },
+    {
+      "file": "test_t115_exact_png_cleanup_attempt2_review_only_20261102.py",
+      "originalSHA256": "d577a1620884d39331163c3a206627b6606dc21a1c5c54e4c24c42bb07cd6b20",
+      "archiveSHA256": "d577a1620884d39331163c3a206627b6606dc21a1c5c54e4c24c42bb07cd6b20"
+    }
+  ]
+}
