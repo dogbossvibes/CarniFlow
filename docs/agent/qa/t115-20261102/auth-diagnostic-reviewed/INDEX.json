@@ -1,0 +1,23 @@
+{
+  "status": "SOURCE_ONLY_INERT_NO_LIVE_APPROVAL",
+  "review": "Exact four allowlisted auth codes and per-account login phase; no data-phase calls on each of four auth failures; unknown text remains redacted",
+  "independent_test_methods_passed": 2,
+  "auth_failure_cases": 4,
+  "files": [
+    {
+      "file": "t115-final-qa-auth-diagnostic-review-05.py",
+      "original_sha256": "d9bb892899aec9e97aa4f46964aa046ac93846c1e9921154b6cb9346314eea30",
+      "archive_sha256": "d9bb892899aec9e97aa4f46964aa046ac93846c1e9921154b6cb9346314eea30"
+    },
+    {
+      "file": "test_auth_diagnostic_review_05.py",
+      "original_sha256": "0c31c9338f17d92c1aaefd020b20996888cd9a2abf2eb92b933440bc900ee050",
+      "archive_sha256": "0c31c9338f17d92c1aaefd020b20996888cd9a2abf2eb92b933440bc900ee050"
+    },
+    {
+      "file": "DIAGNOSTIC-SOURCE-FREEZE-REVIEW-ONLY.json",
+      "original_sha256": "68b320486ad5ae51745ba2ce7a68938271b8a7d244a2f612db7218e7812c2fda",
+      "archive_sha256": "68b320486ad5ae51745ba2ce7a68938271b8a7d244a2f612db7218e7812c2fda"
+    }
+  ]
+}

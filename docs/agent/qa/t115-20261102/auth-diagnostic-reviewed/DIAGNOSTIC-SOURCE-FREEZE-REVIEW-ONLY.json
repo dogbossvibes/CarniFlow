@@ -1,0 +1,16 @@
+{
+  "base_full2_launcher_sha256": "18e06d5e053b61ec9e6b179eaf964f17945b58dd50b08f827589c1973db040c7",
+  "files": [
+    {
+      "name": "t115-final-qa-auth-diagnostic-review-05.py",
+      "sha256": "d9bb892899aec9e97aa4f46964aa046ac93846c1e9921154b6cb9346314eea30"
+    },
+    {
+      "name": "test_auth_diagnostic_review_05.py",
+      "sha256": "0c31c9338f17d92c1aaefd020b20996888cd9a2abf2eb92b933440bc900ee050"
+    }
+  ],
+  "offline_tests_passed": 2,
+  "scope": "Only four fixed auth error codes and login_A/login_B phase; no credential/response logging",
+  "status": "REVIEW_ONLY_NOT_EXECUTABLE_NOT_LIVE_APPROVAL"
+}
