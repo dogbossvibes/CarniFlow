@@ -1,0 +1,23 @@
+{
+  "status": "REVIEW_ONLY_NO_LIVE_EXECUTION",
+  "exactDocId": "8f1ba3f3-1fa4-48f3-99b7-ccb7b1250824",
+  "exactPngAbsentPoststop": true,
+  "sourcePoststopCsvSha256": "726e4b11de2dfcaafd570f2594a33c12e41e804d3c825c7eb8cfebcde3d3f593",
+  "offlineTestsPassed": 11,
+  "nonceAbsent": true,
+  "resultAbsent": true,
+  "files": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full3-orphan-recovery-05-20261102/T115-FULL3-ORPHAN-RECOVERY-PREFLIGHT-READONLY-20261102.sql",
+      "sha256": "be5bbcb2ef49db6247e2ebf1c19eb6ca36d84e3d78002e8652d9ba97cc95f2a4"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full3-orphan-recovery-05-20261102/t115-full3-orphan-recovery-review-only-20261102.py",
+      "sha256": "4a1ba11006b3953b98a26862f6b6d32b10ece74910cdb0ae53b3f358a352ef19"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full3-orphan-recovery-05-20261102/test_t115_full3_orphan_recovery_review_only_20261102.py",
+      "sha256": "5e0eab9b9cf34bba9ded5de52cae95a217d281f2318ae822b3f4d4069ee0d31d"
+    }
+  ]
+}

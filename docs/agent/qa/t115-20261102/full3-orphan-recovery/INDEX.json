@@ -1,0 +1,27 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL",
+  "independent_tests_passed": 11,
+  "scope": "Exact surviving synthetic Full3 document only; Owner A normal JWT; no storage writes, grants or admin operations; unchanged reviewed recovery behavior",
+  "files": [
+    {
+      "file": "T115-FULL3-ORPHAN-RECOVERY-PREFLIGHT-READONLY-20261102.sql",
+      "original_sha256": "be5bbcb2ef49db6247e2ebf1c19eb6ca36d84e3d78002e8652d9ba97cc95f2a4",
+      "archive_sha256": "be5bbcb2ef49db6247e2ebf1c19eb6ca36d84e3d78002e8652d9ba97cc95f2a4"
+    },
+    {
+      "file": "t115-full3-orphan-recovery-review-only-20261102.py",
+      "original_sha256": "4a1ba11006b3953b98a26862f6b6d32b10ece74910cdb0ae53b3f358a352ef19",
+      "archive_sha256": "4a1ba11006b3953b98a26862f6b6d32b10ece74910cdb0ae53b3f358a352ef19"
+    },
+    {
+      "file": "test_t115_full3_orphan_recovery_review_only_20261102.py",
+      "original_sha256": "5e0eab9b9cf34bba9ded5de52cae95a217d281f2318ae822b3f4d4069ee0d31d",
+      "archive_sha256": "5e0eab9b9cf34bba9ded5de52cae95a217d281f2318ae822b3f4d4069ee0d31d"
+    },
+    {
+      "file": "FULL3-ORPHAN-RECOVERY-SOURCE-FREEZE-REVIEW-ONLY.json",
+      "original_sha256": "82930436d6237df19c789c248e5b728ecf1a5cc210f947450409f97404814542",
+      "archive_sha256": "ef62606bb1feaa064f716a1217b48057e50a642e2780778c0b975e224ef58420"
+    }
+  ]
+}
