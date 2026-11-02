@@ -1,0 +1,92 @@
+{
+  "status": "INDEPENDENT_LOCAL_SOURCE_REVIEW_PASS_NOT_LIVE_QA_OR_RELEASE",
+  "tests": {
+    "launcherAndPhases": 44,
+    "snapshotReviewer": 5
+  },
+  "scope": "Date02Nov and19 new unique IDs only for synthetic fixtures/probes/two grants. Accounts/dog unchanged;5min per grant/15min overall. Independent00 verified date/ID-only fixture transformation, dependency hashes, runtime source delta, SQL SELECT-only scope and all49 offline tests. Historical installation remains immutable; entire metadata fingerprint plus13 strict count checks, exact SQL/plan/fixture source binding and explicit verified origin remain gated.",
+  "manifestReferences": 19,
+  "normalization": "Private project prefix replaced by ${PROJECT_ROOT}; byte-exact reverse reconstruction verified. Review-only archive; no live CSV/receipts/approval/private configuration included.",
+  "sources": [
+    {
+      "file": "t115-stage-b-post-policy-capped-01.py",
+      "originalSHA256": "2af8cbe8835f3fbf98120391abf9dcf9dfe06c23df3409a0ff950e1d5533ee97",
+      "archiveSHA256": "2af8cbe8835f3fbf98120391abf9dcf9dfe06c23df3409a0ff950e1d5533ee97"
+    },
+    {
+      "file": "test_stage_b_post_policy_capped_01.py",
+      "originalSHA256": "0e9de845923dae8e1f5b69c0ace58bd0bca633f2431d9a28edd8133c8bd97ae0",
+      "archiveSHA256": "0e9de845923dae8e1f5b69c0ace58bd0bca633f2431d9a28edd8133c8bd97ae0"
+    },
+    {
+      "file": "t115-sections-post-policy-01.py",
+      "originalSHA256": "c1be5b2456c262d83ea749a739ad09302e5a1055a3128a263db401f91a0e8447",
+      "archiveSHA256": "838e49f35c27ad7f6eb5e09b55de7b054da5684773a0ad43b24535dbf9c16892"
+    },
+    {
+      "file": "test_sections_post_policy_01.py",
+      "originalSHA256": "8c03ea7262325ac15b772b45e7d263e2ee2a3bfe714768285e1050f7d67ab2a4",
+      "archiveSHA256": "8c03ea7262325ac15b772b45e7d263e2ee2a3bfe714768285e1050f7d67ab2a4"
+    },
+    {
+      "file": "t115-final-qa-post-policy-01.py",
+      "originalSHA256": "51b314f6d8214cc3f3dfdff725e4bb3023b7c35b294f3e3d7f2ff7deceb47311",
+      "archiveSHA256": "51b314f6d8214cc3f3dfdff725e4bb3023b7c35b294f3e3d7f2ff7deceb47311"
+    },
+    {
+      "file": "test_final_qa_post_policy_01.py",
+      "originalSHA256": "929893636967a8c133eb9fd01aaeb54692e95ca9fca297d34400f4f998b445d3",
+      "archiveSHA256": "929893636967a8c133eb9fd01aaeb54692e95ca9fca297d34400f4f998b445d3"
+    },
+    {
+      "file": "QA-SOURCE-MANIFEST-POST-POLICY-01.json",
+      "originalSHA256": "60331deb4a4a55135a38cfb8b08b1f770931fb8b7b9516e2cdbeb98b5780d59f",
+      "archiveSHA256": "e73ff9f663d4abb6fa4b2a44f5fb200913c5bf6c40d4687d8a798a5e9c92f76a"
+    },
+    {
+      "file": "T115-FRESH-POST-POLICY-QA-SCOPE-01.json",
+      "originalSHA256": "7a2ea187935aa5d0bd011c363b55adc4c69951e8e70871ead1c9ddb87804bbc2",
+      "archiveSHA256": "7a2ea187935aa5d0bd011c363b55adc4c69951e8e70871ead1c9ddb87804bbc2"
+    },
+    {
+      "file": "T115-DOCUMENT-OWNER-SELECT-POSTFLIGHT-SCHEMA-01.json",
+      "originalSHA256": "d5f61213c4657b539474af34971314b2807511e0427378d5690b2891d86f9760",
+      "archiveSHA256": "4888257d5331ba4da8c34ffaabb8b9d56efaf82c18c9803c836832a77c569d0b"
+    },
+    {
+      "file": "t115-fixture-identity-01.py",
+      "originalSHA256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49",
+      "archiveSHA256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "file": "t115-sections-readback-time-aware-01.py",
+      "originalSHA256": "2eb9425abd46c3fd71783c232751f06864ec8f11e275d15f909ab46f9db1dcde",
+      "archiveSHA256": "30951f7355dfb4275e0a258d466c46b75dfe1a1aef6a17391f0ba1834a54c040"
+    },
+    {
+      "file": "T115-REFRESH-PLAN-20261102.json",
+      "originalSHA256": "2f8cc046a31971eaff24a6d5c7c51d1003c05c72cdaf101093a186669038ade1",
+      "archiveSHA256": "d50f63c73b75711eae47616bf98138c5f4c3c8251a8f9575cdcb7761706ca1c3"
+    },
+    {
+      "file": "T115-HEALTH-SECTIONS-FIXTURES-REVIEW-20261102.json",
+      "originalSHA256": "f9c8f8e8bfe80c3ab3d419fb8228ee8ff0f9d0e6e2cb21331d7f585e2024e468",
+      "archiveSHA256": "f9c8f8e8bfe80c3ab3d419fb8228ee8ff0f9d0e6e2cb21331d7f585e2024e468"
+    },
+    {
+      "file": "T115-FRESH-QA-GATES-AND-COLLISIONS-READONLY-20261102.sql",
+      "originalSHA256": "6ef39f9e73456e9a802b34e08b8c248199c25dbc6dc5b930105a43493e66e030",
+      "archiveSHA256": "6ef39f9e73456e9a802b34e08b8c248199c25dbc6dc5b930105a43493e66e030"
+    },
+    {
+      "file": "t115-review-fresh-qa-snapshot-20261102-05.py",
+      "originalSHA256": "a5137695631d3e0ee276f7d9e13c6d368820020faa48207bf537a591bd39f935",
+      "archiveSHA256": "a5137695631d3e0ee276f7d9e13c6d368820020faa48207bf537a591bd39f935"
+    },
+    {
+      "file": "test_t115_fresh_qa_snapshot_20261102_05.py",
+      "originalSHA256": "5dc03bdd337d10109156c99d09da737923e56b68643aabf113e3ee30a5780566",
+      "archiveSHA256": "5dc03bdd337d10109156c99d09da737923e56b68643aabf113e3ee30a5780566"
+    }
+  ]
+}
