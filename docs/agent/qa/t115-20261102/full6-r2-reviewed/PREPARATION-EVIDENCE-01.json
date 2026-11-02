@@ -1,0 +1,19 @@
+{
+  "status": "SEPARATE_USER_INITIATED_RETRY_PREPARATION_NO_EXECUTION",
+  "originalSourceSHA256": "512406459e73f3e091703011d0ede6f368659d64a85342dd15893829f86c9d52",
+  "same13FrozenComponentSources": true,
+  "samePreviouslyUnusedFixtureIds": true,
+  "reasonReuseSafe": "Prior exact run stopped in login_A before any data phase; fresh zero-collision/Storage preflight remains mandatory.",
+  "originalNonceAndReceiptsPreserved": true,
+  "freshSnapshotRequired": true,
+  "evidence": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-qa-05-20261102/T115-FINAL-QA-RESULT-FULL6-20261102T220247061928Z.json",
+      "sha256": "c02bb1f746d530f9c7e9c4088efb5932c22dbbc6b2863254ddcbc87c95d53124"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-a-login-check-01-20261102/A-LOGIN-RESULT-20261102T223224061113Z.json",
+      "sha256": "5c369d17c9231ec14e9f6c8a9dff24b5c1bfce2db5b88cf439bbf83812773e4e"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL_NOT_OTA_PASS",
+  "rootIndependentOfflineTests": 26,
+  "review": "Diff only isolates launcher output/approval/receipt paths; 13 original sources verified; evidence hashes verified.",
+  "files": [
+    {
+      "file": "ANYVO-T115-FULL6-R2-Abnahme-20261102.command",
+      "originalSHA256": "6abbdbb34c542efc6ea999acf81762ef25cccc964e29683dfae7d07f342b445b",
+      "archiveSHA256": "29c5b3467c4701ec8e1e5f3db31882568a1a8600112274db38a1ecbf00352a82"
+    },
+    {
+      "file": "PREPARATION-EVIDENCE-01.json",
+      "originalSHA256": "f381f78d49fa52ce8a0ba168153353f4006c9c219b3a6ac3b6b1409d4081e389",
+      "archiveSHA256": "d24f545196576220cedb3f51dd53c64af5eacc1d8ed4da8b566f255dba827665"
+    },
+    {
+      "file": "t115-final-qa-full6-r2-01.py",
+      "originalSHA256": "3ee656ae75164cf94bc1f81d71c876277262066fbbd5d1ee7e6f6ad0c0f700ca",
+      "archiveSHA256": "a5e85029e3fceb50b959bbd01097c2b0d72f5214fde8a7bdbb234001d55b8bcf"
+    },
+    {
+      "file": "test_auth_diagnostic_full6_05.py",
+      "originalSHA256": "53e96c6b3e65a962b67bc4c91fef3fcae8f498e271c6d8c9708b309c90e37b29",
+      "archiveSHA256": "53e96c6b3e65a962b67bc4c91fef3fcae8f498e271c6d8c9708b309c90e37b29"
+    },
+    {
+      "file": "test_final_qa_full6_05.py",
+      "originalSHA256": "86f72e08097c90038ec47d5a5d7fb76dd40eacfa4a50efc6eff2fcb05ac7b140",
+      "archiveSHA256": "86f72e08097c90038ec47d5a5d7fb76dd40eacfa4a50efc6eff2fcb05ac7b140"
+    },
+    {
+      "file": "FULL6-R2-SOURCE-FREEZE-REVIEW-ONLY.json",
+      "originalSHA256": "b219e38a6afca43087e3d628afc220ec8dee586d29b0f49177b4db67eeac3b60",
+      "archiveSHA256": "5243b33578e2592787b4ffdcbc9ba461734ba4ff3551f14b9ada6cff63a016b4"
+    }
+  ]
+}

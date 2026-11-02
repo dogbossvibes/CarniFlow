@@ -1,0 +1,29 @@
+{
+  "status": "REVIEW_ONLY_NO_LIVE_EXECUTION",
+  "author": "Chat01",
+  "scope": "Only isolated retry launcher and output/fresh-receipt namespace; same frozen source components and unused fixture scope",
+  "files": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-r2-01-20261102/ANYVO-T115-FULL6-R2-Abnahme-20261102.command",
+      "sha256": "6abbdbb34c542efc6ea999acf81762ef25cccc964e29683dfae7d07f342b445b"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-r2-01-20261102/PREPARATION-EVIDENCE-01.json",
+      "sha256": "f381f78d49fa52ce8a0ba168153353f4006c9c219b3a6ac3b6b1409d4081e389"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-r2-01-20261102/t115-final-qa-full6-r2-01.py",
+      "sha256": "3ee656ae75164cf94bc1f81d71c876277262066fbbd5d1ee7e6f6ad0c0f700ca"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-r2-01-20261102/test_auth_diagnostic_full6_05.py",
+      "sha256": "53e96c6b3e65a962b67bc4c91fef3fcae8f498e271c6d8c9708b309c90e37b29"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full6-r2-01-20261102/test_final_qa_full6_05.py",
+      "sha256": "86f72e08097c90038ec47d5a5d7fb76dd40eacfa4a50efc6eff2fcb05ac7b140"
+    }
+  ],
+  "newAttemptAbsent": true,
+  "freshServerSnapshotAbsent": true
+}
