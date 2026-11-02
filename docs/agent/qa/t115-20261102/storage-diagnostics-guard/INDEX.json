@@ -1,0 +1,18 @@
+{
+  "status": "INDEPENDENT_SOURCE_DELTA_REVIEW_15_TESTS_PASS_NOT_WIRED_OR_LIVE_APPROVAL",
+  "tests": 15,
+  "review": "00 independently ran15 offline tests and read exact delta against frozen c1be5b... runner. Bounded allowlisted primary failure survives cleanup exceptions; HTTP metadata excludes bodies/URLs/secrets; precise synthetic document row is preserved when file cleanup is uncertain. No permission/fixture/timeout changes, no live execution and no recovery claim.",
+  "normalization": "Private project prefix replaced by ${PROJECT_ROOT}; reverse reconstruction exact. Source-only review archive.",
+  "sources": [
+    {
+      "file": "t115-sections-storage-diagnostics-01.py",
+      "originalSHA256": "01d9182c300ab2f089f0270e741828ff3188d4f3299a426dcca18418d2f40c97",
+      "archiveSHA256": "9895e51b02d58447f492138dbf3b98846ec75ab6ef58d6f8276d65be5ea826da"
+    },
+    {
+      "file": "test_sections_storage_diagnostics_01.py",
+      "originalSHA256": "a7bfa7c34fccabb602213034f9ee5771cf5ae72b0ea312bee6de230f61f8df45",
+      "archiveSHA256": "a7bfa7c34fccabb602213034f9ee5771cf5ae72b0ea312bee6de230f61f8df45"
+    }
+  ]
+}
