@@ -1,0 +1,15 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL",
+  "independent_tests_passed": 11,
+  "delta": "Only four new canonical receipt/nonce/result paths; SQL and behavior unchanged",
+  "files": [
+    {
+      "file": "t115-exact-document-recovery-attempt3-review-only-20261102.py",
+      "sha256": "ed0a38d5adc7f508cd0b2194f05413679e03f0ae4a1ecc850ba871544dfd705e"
+    },
+    {
+      "file": "test_t115_exact_document_recovery_attempt3_review_only_20261102.py",
+      "sha256": "891741d0a4a718f0f40d505f3290a83841d1fda3e4e383215a9bfd45c2cab6c9"
+    }
+  ]
+}
