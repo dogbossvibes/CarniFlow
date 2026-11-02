@@ -1,0 +1,33 @@
+{
+  "status": "INDEPENDENT_ISOLATED_OFFLINE_SOURCE_REVIEW_PASS_NOT_LIVE_EXECUTION_OR_RELEASE",
+  "tests": 11,
+  "review": "Exact1syntheticPNG68bytes+hash, OwnerA only, one RAM token/full run max300s. Reviewed-source SHA, one-shot nonce, date and immutable dependencies, fresh preflight before/after login, exact prefix deletion, independent0 typedUTC/CSV/query/remove-receipt binding before document cleanup. No grant/ACL/schema/customer changes.",
+  "normalization": "Private project prefix replaced by ${PROJECT_ROOT}; exact reverse reconstruction verified. Review archive only; no live receipts, CSV, credentials or approval records.",
+  "sources": [
+    {
+      "file": "t115-exact-png-cleanup-review-only-20261102.py",
+      "originalSHA256": "a0ef2f5997b1986c5cffdb485150d221ddccf7d3db34ee75587ab90702a3c54c",
+      "archiveSHA256": "a0ef2f5997b1986c5cffdb485150d221ddccf7d3db34ee75587ab90702a3c54c"
+    },
+    {
+      "file": "test_t115_exact_png_cleanup_review_only_20261102.py",
+      "originalSHA256": "b85c0cb776ab0e055d5599068bbb97aafb260b3fb6e23a238d0845194f434582",
+      "archiveSHA256": "b85c0cb776ab0e055d5599068bbb97aafb260b3fb6e23a238d0845194f434582"
+    },
+    {
+      "file": "T115-EXACT-PNG-CLEANUP-PREFLIGHT-READONLY-20261102.sql",
+      "originalSHA256": "16f1adedd2bed48191466f73b15a8d00afde11e3f207c9ca26e3257e0b20fe40",
+      "archiveSHA256": "16f1adedd2bed48191466f73b15a8d00afde11e3f207c9ca26e3257e0b20fe40"
+    },
+    {
+      "file": "T115-EXACT-PNG-STORAGE-ZERO-READONLY-20261102.sql",
+      "originalSHA256": "a22e9d5b66132e1e4e839c3b6de3ef5b009a5fa037b0b52985b63162af6a4de2",
+      "archiveSHA256": "a22e9d5b66132e1e4e839c3b6de3ef5b009a5fa037b0b52985b63162af6a4de2"
+    },
+    {
+      "file": "T115-EXACT-SYNTHETIC-PNG-CLEANUP-PLAN-REVIEW-20261102.md",
+      "originalSHA256": "af0d91f6bf11726769be21e99507453a0fa476d3202f268150c9566b82d5cb42",
+      "archiveSHA256": "af0d91f6bf11726769be21e99507453a0fa476d3202f268150c9566b82d5cb42"
+    }
+  ]
+}
