@@ -1,0 +1,23 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL",
+  "independent_offline_tests": 11,
+  "result": "PASS",
+  "scope": "Owner A only; exact synthetic document row only; no Storage writes or permissions changes",
+  "files": [
+    {
+      "file": "t115-exact-document-recovery-review-only-20261102.py",
+      "source_sha256": "f15af21a1c0a8d6749339d6c597370f38ad08377673c8715fcb0bcdb555fdaca",
+      "archive_sha256": "f15af21a1c0a8d6749339d6c597370f38ad08377673c8715fcb0bcdb555fdaca"
+    },
+    {
+      "file": "test_t115_exact_document_recovery_review_only_20261102.py",
+      "source_sha256": "10c7e3a1199e8f29827d3fea0ffea58bcda7f347ad54abdcf48682a5f8e932f1",
+      "archive_sha256": "10c7e3a1199e8f29827d3fea0ffea58bcda7f347ad54abdcf48682a5f8e932f1"
+    },
+    {
+      "file": "T115-EXACT-DOCUMENT-RECOVERY-PREFLIGHT-READONLY-20261102.sql",
+      "source_sha256": "7f8bb574e92755fd1d47c9e26bc2b747e5fcd9dfdb52859eb4de9d8a33ad71ef",
+      "archive_sha256": "7f8bb574e92755fd1d47c9e26bc2b747e5fcd9dfdb52859eb4de9d8a33ad71ef"
+    }
+  ]
+}
