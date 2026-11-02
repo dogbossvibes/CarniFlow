@@ -1,0 +1,24 @@
+{
+  "a_account_changed": false,
+  "admin_update_fields": [
+    "password"
+  ],
+  "base_a_source_sha256": "59e4e7e7d4be1f2cf3fa95d5a27cc94874a2ab9eacc1f56cadee51930858b22f",
+  "credentials_recorded": false,
+  "files": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-r4-b-password-reset-05-20261102/t115-r4-b-admin-password-update-review-only-20261102.py",
+      "sha256": "90081c7e788f16dd02b0a818dee3226582348e20f872d0e09b938ccc999130b9"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-r4-b-password-reset-05-20261102/test_t115_r4_b_admin_password_update_review_only_20261102.py",
+      "sha256": "76cd3604a3198c280f6fae73a92fc02be9456a77b3bbb4b1e0a9fee7fc9c7143"
+    }
+  ],
+  "normal_login_verification": true,
+  "offline_tests_passed": 12,
+  "project": "axkkhyqrjrtbkumaulta",
+  "status": "SOURCE_ONLY_REVIEW_NOT_LIVE_EXECUTION_APPROVAL",
+  "target_email": "anyvo-r4-20261018-recipient-b@qa.anyvo.invalid",
+  "target_user_id": "0327d914-99e4-4e6e-b89e-3b642586a3b8"
+}

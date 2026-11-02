@@ -1,0 +1,22 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL",
+  "independent_tests_passed": 12,
+  "scope": "Human-run local password-only update of exact R4 B account; A source unchanged; no T115 data-phase or OTA approval",
+  "files": [
+    {
+      "file": "t115-r4-b-admin-password-update-review-only-20261102.py",
+      "original_sha256": "90081c7e788f16dd02b0a818dee3226582348e20f872d0e09b938ccc999130b9",
+      "archive_sha256": "90081c7e788f16dd02b0a818dee3226582348e20f872d0e09b938ccc999130b9"
+    },
+    {
+      "file": "test_t115_r4_b_admin_password_update_review_only_20261102.py",
+      "original_sha256": "76cd3604a3198c280f6fae73a92fc02be9456a77b3bbb4b1e0a9fee7fc9c7143",
+      "archive_sha256": "76cd3604a3198c280f6fae73a92fc02be9456a77b3bbb4b1e0a9fee7fc9c7143"
+    },
+    {
+      "file": "B-ONLY-SOURCE-FREEZE-REVIEW-ONLY.json",
+      "original_sha256": "b6b8d61c586a46399554113a1d2b8ff03c782d1f9f882a4a1d50b26391a48d92",
+      "archive_sha256": "75927a9723a1214b0cc47ad1c8a2f553d4b4e7ed3ffdafd4c9ed4d61f4c1454a"
+    }
+  ]
+}
