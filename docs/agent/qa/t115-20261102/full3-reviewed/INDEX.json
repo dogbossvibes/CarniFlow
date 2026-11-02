@@ -1,0 +1,97 @@
+{
+  "status": "SOURCE_ONLY_NOT_LIVE_APPROVAL_NOT_OTA_PASS",
+  "independent_tests_passed": 60,
+  "review": "All17 frozen hashes verified. Same fixture contents under19 new IDs. Runtime helpers unchanged except exact IDs/paths/bindings. Per-account login diagnostics; prior Full1 and Full2 cleanup gates. Two grants <=5 minutes; total15 minutes before login.",
+  "files": [
+    {
+      "file": "ANYVO-T115-FULL3-Abnahme-20261102.command",
+      "original_sha256": "eee4bc1a7a61e1acc6d545a7bb243a394b2a24899a2cdad68be5b683c85fcce3",
+      "archive_sha256": "0754966b01c33b906ea525a70fa3cb710d6d58e88eee1d58fd37f8a77ad67cd9"
+    },
+    {
+      "file": "PLAN-REVIEW-ONLY.json",
+      "original_sha256": "2566f292ec83971401770f8ac5ee9a8dc5ba5db0ee433896e86e43d4b65805eb",
+      "archive_sha256": "46f9fdb404e3bdd1de9828ad9341cdea7bf3c9c52bfaca1c65c8316fc6eb6ac7"
+    },
+    {
+      "file": "QA-SOURCE-MANIFEST-FULL3-05.json",
+      "original_sha256": "523bf98201ab03cb0add31cc61f7d0fb87bf4dd9f07a349012c1b5d9cff9f66f",
+      "archive_sha256": "1b9f6ddf39bc580f5d4600e6ac2f3895f5b5bd6821324058d1a318a19c51e7bb"
+    },
+    {
+      "file": "T115-FULL3-PREFLIGHT-READONLY-20261102.sql",
+      "original_sha256": "b23bfb7bd44a3a4fac254ab782cd333c6b7834f139a7b62a792a84b85c0179c4",
+      "archive_sha256": "b23bfb7bd44a3a4fac254ab782cd333c6b7834f139a7b62a792a84b85c0179c4"
+    },
+    {
+      "file": "T115-HEALTH-SECTIONS-FIXTURES-FULL3-20261102.json",
+      "original_sha256": "a80afdacf830c4814163ee88dd3cde05eed28d0ae38e0cc6639eaf0eb4c07466",
+      "archive_sha256": "a80afdacf830c4814163ee88dd3cde05eed28d0ae38e0cc6639eaf0eb4c07466"
+    },
+    {
+      "file": "t115-final-qa-full3-05.py",
+      "original_sha256": "a19dd275fb1cde9bdfd367a296db9c9a100d42d27bb711e962f34918f73d6668",
+      "archive_sha256": "a19dd275fb1cde9bdfd367a296db9c9a100d42d27bb711e962f34918f73d6668"
+    },
+    {
+      "file": "t115-fixture-identity-01.py",
+      "original_sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49",
+      "archive_sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "file": "t115-review-full3-snapshot-05.py",
+      "original_sha256": "0d586b50d7c7f0bdc3f77445d4ac9385e181dab0b2ed6a4f5de4f7b38d52a9d4",
+      "archive_sha256": "0d586b50d7c7f0bdc3f77445d4ac9385e181dab0b2ed6a4f5de4f7b38d52a9d4"
+    },
+    {
+      "file": "t115-sections-readback-time-aware-01.py",
+      "original_sha256": "cfa75c6c5225ad8ab9d5679431c77a1371bca19f5f8ba73c6814b180bfa7edd0",
+      "archive_sha256": "0cbace0148a451fd150b2810a6c1214d6855b0e431da53ee24f77f866396223f"
+    },
+    {
+      "file": "t115-sections-storage-diagnostics-01.py",
+      "original_sha256": "39d98942ae3f9dc41556d553236a9e32b7e0196f9061479aff8980ec9cd32400",
+      "archive_sha256": "7749d602e7a29fe4daad1e5fdeb76399d8a42c4fc9d94212a5c9813f4c3d13ee"
+    },
+    {
+      "file": "t115-stage-b-post-policy-capped-01.py",
+      "original_sha256": "75a79320c8de231cbc420e5f0834a470e15e1d530e92baeb6428c787efc23a91",
+      "archive_sha256": "75a79320c8de231cbc420e5f0834a470e15e1d530e92baeb6428c787efc23a91"
+    },
+    {
+      "file": "test_auth_diagnostic_full3_05.py",
+      "original_sha256": "dc9fc70a11ace916bde6b99a957632e1bf153420298f2cd0d6e436653ca945a0",
+      "archive_sha256": "dc9fc70a11ace916bde6b99a957632e1bf153420298f2cd0d6e436653ca945a0"
+    },
+    {
+      "file": "test_final_qa_full3_05.py",
+      "original_sha256": "1cc9f7b42753159e55e5b64dbf89de4fa3d42b3ec4b8b427f3b4c1fe9184efe7",
+      "archive_sha256": "1cc9f7b42753159e55e5b64dbf89de4fa3d42b3ec4b8b427f3b4c1fe9184efe7"
+    },
+    {
+      "file": "test_full3_contract.py",
+      "original_sha256": "b3e4037178a1b415188725f56adf443b5ef90bb2054c92a1f617206e783e8321",
+      "archive_sha256": "b3e4037178a1b415188725f56adf443b5ef90bb2054c92a1f617206e783e8321"
+    },
+    {
+      "file": "test_full3_snapshot_05.py",
+      "original_sha256": "505e76a53342402f9b3eff8d45658a27c4b9fa269598beb5a0437a305c7f0b90",
+      "archive_sha256": "505e76a53342402f9b3eff8d45658a27c4b9fa269598beb5a0437a305c7f0b90"
+    },
+    {
+      "file": "test_sections_storage_diagnostics_01.py",
+      "original_sha256": "ed2ca9d53dc95caa5df9eda46e720d92974d4bafbe3defd580a66fd671a6c729",
+      "archive_sha256": "ed2ca9d53dc95caa5df9eda46e720d92974d4bafbe3defd580a66fd671a6c729"
+    },
+    {
+      "file": "test_stage_b_post_policy_capped_01.py",
+      "original_sha256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112",
+      "archive_sha256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112"
+    },
+    {
+      "file": "FULL3-SOURCE-FREEZE-REVIEW-ONLY.json",
+      "original_sha256": "bb2d959c80c953053f58e22ea16f2961027c663554fb9b60459cf1e6bac8152c",
+      "archive_sha256": "20c12c0b4a64c8a03810442aaaac4a376baa09b4b4c5643ae39b7fc0c53b21cc"
+    }
+  ]
+}
