@@ -1,0 +1,101 @@
+{
+  "status": "REVIEW_ONLY_NO_LIVE_EXECUTION_NO_USER_START",
+  "project": "axkkhyqrjrtbkumaulta",
+  "qaDateZurich": "2026-11-02",
+  "packagingAuthor": "Chat01",
+  "priorFull6Immutable": true,
+  "newOneShotAbsent": true,
+  "approvalAbsent": true,
+  "offlineTestsPassed": 70,
+  "receiptFix": "Normalize actual UTC instant only; original CSV and snapshot preserved; strict actual downstream parser before credentials. No freshness relaxation.",
+  "independentR2Cleanup": {
+    "path": "${PROJECT_ROOT}/outputs/t115-health-sharing-db-05-20261029/T115-FULL6-R2-POSTSTOP-CLEANUP-READONLY-20261102.csv",
+    "sha256": "5ffb33d8ed7b2337e1a90494de44f3cc947dffea1b684c48cde53999e93a2a74"
+  },
+  "files": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/ANYVO-T115-FULL7-Abnahme-20261102.command",
+      "sha256": "55e45361728d5c9d1ffaf35bc2e5b2248301c95ade0daf9443ae0540409c91b2"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/PLAN-REVIEW-ONLY.json",
+      "sha256": "f5d6e78cfb53e80cf94b09e29ce3a8221ec414839e46008b856d838af5042dfb"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/QA-SOURCE-MANIFEST-FULL7-05.json",
+      "sha256": "42fef9f7b94389921e5215cd888fd5bc794c7dbf31ef99292464a98a6e3b247d"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/T115-FULL7-PREFLIGHT-READONLY-20261102.sql",
+      "sha256": "aeaf431866ec628b00771d8b0919d3ee8cb560a7c14b0a98d0b4a4292527e6b9"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/T115-HEALTH-SECTIONS-FIXTURES-FULL7-20261102.json",
+      "sha256": "11153b8fc2e1899a6ff5ded36ad96a8729b1be87a4b6aa0f6f24cbf8d6769262"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/build_readonly_receipts.py",
+      "sha256": "d960f7c8a653e217cb36102e0055985503485ac85b30bf7b1abde204d54d1ea0"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/receipt_time.py",
+      "sha256": "c669d4059697ad49d352d2d0caf159d5455671ca410604bd54cf0a0211989549"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/t115-final-qa-full7-05.py",
+      "sha256": "94b718fd6a9c63862a6c1a200e123dd2c9887c9f8515ba0b4efeeb56a37e7b21"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/t115-fixture-identity-01.py",
+      "sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/t115-review-full7-snapshot-05.py",
+      "sha256": "24728c96bb684ae84009a623faf7ed77064defbec0044f6111f737e74e2e3dd9"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/t115-sections-readback-time-aware-01.py",
+      "sha256": "3434cdd012ea2e5e829adf961112fc9c4c0c702e76cfb9e6b732017ada778fc0"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/t115-sections-storage-diagnostics-01.py",
+      "sha256": "5d7b2d4bce40ad2a2cf150631004010c3fc28225d09c53bcb432aac16b94a86b"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/t115-stage-b-post-policy-capped-01.py",
+      "sha256": "b8ec969b7f963fc90c7397f7b35e7bc99ce430c660331ec4b718a392eb356bcb"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/test_auth_diagnostic_full7_05.py",
+      "sha256": "9bb88e03c3a8f7625961a0e30caf39bb8d0571e670328f000f5775babb141962"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/test_final_qa_full7_05.py",
+      "sha256": "cfe029d34462961ad247b6f779aa4949f334016aa21e47fa234302c474fe2bb2"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/test_full7_contract.py",
+      "sha256": "ab9af62b7dc7f87615731f421d10d924555646c872ee40cf6e1bf7a363462264"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/test_full7_snapshot_05.py",
+      "sha256": "679deb3ea2ef5f33b0d8867766258fcb9fdb49bd6ac590177fdfbf28d3217e8c"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/test_receipt_builder.py",
+      "sha256": "3c5625744f0875c759573d8b4cc451b347357a72d6b1649023714981b61227a6"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/test_receipt_time.py",
+      "sha256": "0c787281e948cf1fdc543f52baaebb36213e999e1663dae81d973c80e5054fd7"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/test_sections_storage_diagnostics_01.py",
+      "sha256": "7d51a4d9ce2435ceb633daa7acbdce19ca73f0fa71bb2c143811338686c69be3"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full7-qa-01-20261102/test_stage_b_post_policy_capped_01.py",
+      "sha256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112"
+    }
+  ]
+}
