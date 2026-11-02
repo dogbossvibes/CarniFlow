@@ -1,0 +1,79 @@
+{
+  "status": "REVIEW_ONLY_NO_LIVE_EXECUTION_NO_USER_START",
+  "project": "axkkhyqrjrtbkumaulta",
+  "qaDateZurich": "2026-11-02",
+  "priorFull4Immutable": true,
+  "newOneShotAbsent": true,
+  "newResultAbsent": true,
+  "approvalAbsent": true,
+  "files": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/ANYVO-T115-FULL5-Abnahme-20261102.command",
+      "sha256": "7b19b71ec2217142d31a2b2d590ede29f79ec547dd42579685767187834f016f"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/PLAN-REVIEW-ONLY.json",
+      "sha256": "7d8696aa6c44e91fcd94708cf9c0640b9ecfcb4b05e73e35b55e1d4f0fe3f94c"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/QA-SOURCE-MANIFEST-FULL5-05.json",
+      "sha256": "f02b7b161c818d127f015f514be3d89c358d752608cc47e39e46896d585ea474"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/T115-FULL5-PREFLIGHT-READONLY-20261102.sql",
+      "sha256": "16d87caac927ebbfc86a0599927441b73483686884e862c33ea3897220182c5f"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/T115-HEALTH-SECTIONS-FIXTURES-FULL5-20261102.json",
+      "sha256": "6b30a1ee100cadae0e6b7c607a3544f26b0adf2f721cf57d9fa1ae9af0a96c1a"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/t115-final-qa-full5-05.py",
+      "sha256": "7e6a44d62a18bfcbb8fbec218ff8b843eb32c32e741a0b71267e5ff10930bad3"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/t115-fixture-identity-01.py",
+      "sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/t115-review-full5-snapshot-05.py",
+      "sha256": "270d57b4f662af87aabdae82817451e744f1fcf49aba4a861e9bc232d3198bd5"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/t115-sections-readback-time-aware-01.py",
+      "sha256": "d690652f8b62b1fd665956fb21af5055f407c975b66672afeb1adbf9a317e5c0"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/t115-sections-storage-diagnostics-01.py",
+      "sha256": "6f40e42f66a5b7fd94e0e4f82e618f8c6dcb55664b373873f1652e438d7b7d3d"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/t115-stage-b-post-policy-capped-01.py",
+      "sha256": "77340bc8c25785cc9ac18feea4e517334f5e5227b2eedc85f62c4bfe0d3bed5e"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/test_auth_diagnostic_full5_05.py",
+      "sha256": "199c69e52d9fb51a5aafb818b597c21dd307e349be6681793ee0f30eed17d34c"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/test_final_qa_full5_05.py",
+      "sha256": "26456fd77799eaaade9522fb1c231345f6b543332e4015b83d26d79f118cc77e"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/test_full5_contract.py",
+      "sha256": "65806979fade44e72d95d5e010a221ccbebf7afd23a25d20be551fce9686ba50"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/test_full5_snapshot_05.py",
+      "sha256": "3cb26eb52d0ef4fb6fb3aac2547cd0df9ef18738818cb7b66ba2414e46779af6"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/test_sections_storage_diagnostics_01.py",
+      "sha256": "a46ae8c5c92b9adc1b3864267387068e0a98555a59205159d10fd73653a3102c"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full5-qa-05-20261102/test_stage_b_post_policy_capped_01.py",
+      "sha256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112"
+    }
+  ]
+}
