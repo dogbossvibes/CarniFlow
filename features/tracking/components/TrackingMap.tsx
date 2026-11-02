@@ -347,7 +347,9 @@ export function TrackingMap({
         {/* Gelegte Fährte (Soll-Linie): IMMER solide ANYVO-Mint — auch während der
             Absuche. Kein Dash/Dimm (sonst mit der blauen Ist-Suchspur verwechselbar).
             Stil zentral über laidTrackStroke() (rein/testbar). */}
-        {comparison && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} />}
+        {/* The native saved-map host must be ready before its overlay children mount.
+            Live recording maps deliberately keep their existing render lifecycle. */}
+        {comparison && mapReady && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} />}
         {!comparison && (laySegmentParts.length > 0 ? laySegmentParts.map(part => {
           const stroke = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
           return (
