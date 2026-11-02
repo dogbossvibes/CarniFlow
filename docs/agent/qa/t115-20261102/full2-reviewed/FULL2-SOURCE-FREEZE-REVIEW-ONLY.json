@@ -1,0 +1,73 @@
+{
+  "dateZurich": "2026-11-02",
+  "files": [
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/ANYVO-T115-FULL2-Abnahme-20261102.command",
+      "sha256": "4711426267158b73011ca649571106806ae16eac7e6e92f21604f382799ab03f"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/PLAN-REVIEW-ONLY.json",
+      "sha256": "b7e7fd628eb4fa2b2cb380ea3d996aaeb8d5ec348748a5ada3128234ddd071bc"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/QA-SOURCE-MANIFEST-FULL2-05.json",
+      "sha256": "02805e642971c874accaeab5004934cdc2e32c9b511f014bd42f5c438e708950"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/T115-FULL2-PREFLIGHT-READONLY-20261102.sql",
+      "sha256": "59057665a6472fa144d650f3d5f54d41977ed5de7e13cb3493fe058a6875a11d"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/T115-HEALTH-SECTIONS-FIXTURES-FULL2-20261102.json",
+      "sha256": "507622c1e4f30e4298b3d8827f5cc3362dfccc686f3ba36613272d91b60120ef"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/t115-final-qa-full2-05.py",
+      "sha256": "18e06d5e053b61ec9e6b179eaf964f17945b58dd50b08f827589c1973db040c7"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/t115-fixture-identity-01.py",
+      "sha256": "9a8f2532eea162b89488aa6b2840b49274240ea6ef4c5b7c42c07bfaa8ac9c49"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/t115-review-full2-snapshot-05.py",
+      "sha256": "cd150d0a124aa9b9ed2b0aeca19bb8ac8299245570599358ee87b128922540f9"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/t115-sections-readback-time-aware-01.py",
+      "sha256": "6f35d9631483a8cc8b6145f55b4e8c4e5778cebee15f058a076fe3eb0e0f1768"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/t115-sections-storage-diagnostics-01.py",
+      "sha256": "2d20f8f2efc2490491f77d315b38c5fbcb5880774539a0d878102e38e3d7f4f9"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/t115-stage-b-post-policy-capped-01.py",
+      "sha256": "b7b58355bd3125ccf1ca2c1a7ce06292b98970a97b1a9a395604084585528b24"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/test_final_qa_full2_05.py",
+      "sha256": "7a0f353ffb8db085a46d8711e29635a90a24bb057fe424fc89e06f843a07a50c"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/test_full2_contract.py",
+      "sha256": "a5e7f5fcdd95a4c84fa880d7fb4419019fcc77f5023a19e41ef940820c365e73"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/test_full2_snapshot_05.py",
+      "sha256": "1adcdf30a82b5db422ee36b327f3c8a8091049489fd36ca8554933e6461bf536"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/test_sections_storage_diagnostics_01.py",
+      "sha256": "1d4b8c94c1449415e9fdd56cb4ff4c9a8e3cc918c3696d7329fad3324af4bec8"
+    },
+    {
+      "path": "${PROJECT_ROOT}/outputs/t115-full-qa-backend-05-20261102/test_stage_b_post_policy_capped_01.py",
+      "sha256": "b3cff89b1fd4bc526b29fa9929cb8672962199a6d2704390814422c58043e112"
+    }
+  ],
+  "liveActionsPerformed": false,
+  "offlineTestsPassed": 60,
+  "project": "axkkhyqrjrtbkumaulta",
+  "status": "REVIEW_ONLY_SOURCE_FREEZE_NO_LIVE_QA_NO_APPROVAL"
+}
