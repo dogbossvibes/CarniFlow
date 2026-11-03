@@ -40,7 +40,7 @@ export function AnyvoButton({
       {isPrimary && <LinearGradient colors={[C.trackPrimary, C.trackPrimaryDk]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
       {loading ? <ActivityIndicator color={txtColor} /> : (
         <View style={s.inner}>
-          {icon && <Ionicons name={icon} size={big ? 20 : 17} color={txtColor} />}
+          {icon && <Ionicons accessible={false} style={s.icon} name={icon} size={big ? 20 : 17} color={txtColor} />}
           <Text style={[s.label, big && s.labelBig, { color: txtColor }]}>{label}</Text>
         </View>
       )}
@@ -49,12 +49,13 @@ export function AnyvoButton({
 }
 
 const s = StyleSheet.create({
-  base:      { height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  big:       { height: 60, borderRadius: 20 },
+  base:      { minHeight: 48, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  big:       { minHeight: 60, paddingVertical: 18, borderRadius: 20 },
   secondary: { backgroundColor: C.trackCardAlt, borderWidth: 1, borderColor: C.trackBorder },
   danger:    { backgroundColor: 'rgba(255,77,77,0.12)', borderWidth: 1, borderColor: 'rgba(255,77,77,0.3)' },
   ghost:     { backgroundColor: 'transparent' },
-  inner:     { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  label:     { fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
+  inner:     { width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  icon:      { flexShrink: 0 },
+  label:     { flexShrink: 1, minWidth: 0, textAlign: 'center', fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
   labelBig:  { fontSize: 17, fontWeight: '900' },
 });
