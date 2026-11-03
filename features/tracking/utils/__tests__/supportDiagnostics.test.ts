@@ -44,9 +44,10 @@ const mockShareAsync = jest.fn(async () => undefined);
 const mockIsAvailableAsync = jest.fn(async () => true);
 jest.mock('expo-sharing', () => ({ isAvailableAsync: () => mockIsAvailableAsync(), shareAsync: (...a: unknown[]) => (mockShareAsync as any)(...a) }));
 const mockWritten: Record<string, string> = {};
+const mockWriteFile = jest.fn(async (uri: string, content: string) => { mockWritten[uri] = content; });
 jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/', documentDirectory: 'file:///docs/',
-  writeAsStringAsync: async (uri: string, content: string) => { mockWritten[uri] = content; },
+  writeAsStringAsync: (uri: string, content: string) => mockWriteFile(uri, content),
 }));
 
 const FIXDIR = path.join(__dirname, 'fixtures', 'fieldV62');
@@ -78,6 +79,7 @@ beforeEach(async () => {
   setDiagnosticsSession(null);
   await AsyncStorage.clear();
   for (const k of Object.keys(mockWritten)) delete mockWritten[k];
+  mockWriteFile.mockClear();
   mockShareAsync.mockClear(); mockIsAvailableAsync.mockClear(); mockIsAvailableAsync.mockImplementation(async () => true);
 });
 
@@ -292,7 +294,8 @@ describe('Ende-Ereignis im Kundenexport', () => {
     const exported = await buildSupportExportForSession('support-end');
     expect(exported?.qaCaptureAvailable).toBe(false);
     expect(exported?.searchDiagnostics?.end).toEqual(d.end);
-    expect(exported?.schemaMinor).toBe(12);
+    expect(exported?.schemaMinor).toBe(18);
+    expect(exported?.provenance?.schemaVersion).toBe(1);
     expect(() => assertSupportPrivacy(exported)).not.toThrow();
   });
 
@@ -318,4 +321,13 @@ describe('Ende-Ereignis im Kundenexport', () => {
     expect(exported.searchDiagnostics?.end).toMatchObject({ eventObservation: 'partial', eventCount: null });
     expect(d.end.eventCount).toBe(0);
   });
+});
+
+it('file write failure does not open the native sheet, releases the lock and allows an offline retry', async () => {
+  await saveQaSearchCapture('write-failure', toSupportCapture(diagFromField('F1')), 'support');
+  mockWriteFile.mockRejectedValueOnce(new Error('disk full'));
+  expect(await shareSupportDiagnostics('write-failure')).toEqual({ ok: false, reason: 'failed' });
+  expect(mockShareAsync).not.toHaveBeenCalled();
+  expect(await shareSupportDiagnostics('write-failure')).toMatchObject({ ok: true });
+  expect(mockShareAsync).toHaveBeenCalledTimes(1);
 });

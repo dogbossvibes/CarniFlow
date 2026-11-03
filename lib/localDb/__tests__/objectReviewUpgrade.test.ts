@@ -1,18 +1,31 @@
+jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
+jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.6', nativeBuildVersion: '57' }));
+jest.mock('expo-device', () => ({ modelName: 'Synthetic Phone', osVersion: '26.0' }));
+jest.mock('expo-updates', () => ({ isEnabled: false }));
+
 import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS } from '../migrations';
 
 let mockDb: DatabaseSync;
+let mockWipeFails = false;
+let mockDeleteGate: { promise: Promise<never>; entered: boolean } | null = null;
 jest.mock('expo-sqlite', () => ({ openDatabaseAsync: async () => ({
-  execAsync: async (sql: string) => mockDb.exec(sql),
-  getAllAsync: async (sql: string) => mockDb.prepare(sql).all(),
-  runAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).run(...args),
+  execAsync: async (sql: string) => { if (mockWipeFails && sql.startsWith('delete from')) throw new Error('synthetic wipe failure'); return mockDb.exec(sql); },
+  getFirstAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).get(...args),
+  getAllAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).all(...args),
+  runAsync: async (sql: string, ...args: any[]) => {
+    if (mockDeleteGate && sql.startsWith('update local_training_sessions set deleted_at')) {
+      const gate = mockDeleteGate; mockDeleteGate = null; gate.entered = true; return gate.promise;
+    }
+    return mockDb.prepare(sql).run(...args);
+  },
   withTransactionAsync: async (action: () => Promise<void>) => {
     mockDb.exec('BEGIN');
     try { await action(); mockDb.exec('COMMIT'); } catch (error) { mockDb.exec('ROLLBACK'); throw error; }
   },
 }) }));
 
-beforeEach(() => { jest.resetModules(); mockDb = new DatabaseSync(':memory:'); });
+beforeEach(() => { jest.resetModules(); mockWipeFails = false; mockDeleteGate = null; mockDb = new DatabaseSync(':memory:'); });
 afterEach(() => mockDb.close());
 
 function installed(version: number) {
@@ -22,7 +35,7 @@ function installed(version: number) {
     mockDb.prepare('insert into local_schema_migrations(version) values (?)').run(migration.version);
   }
   if (version < 1) return;
-  mockDb.exec(`insert into local_training_sessions(local_id,payload_json) values ('parent','{"original":true}');
+  mockDb.exec(`insert into local_training_sessions(local_id,user_id,payload_json) values ('parent','owner','{"original":true}');
     insert into sync_queue(id,entity_type,entity_local_id,operation,status) values ('pending','training_session','parent','update','pending');`);
   if (version >= 7) mockDb.exec(`insert into local_track_transfer_sync
     (session_id,receipt_id,user_id,receipt_json,revision,base_patch_json,pending_json)
@@ -79,4 +92,54 @@ it('includes correction cache and pending edits when explicitly clearing the loc
     expect(mockDb.prepare(`select count(*) as n from ${table}`).get()?.n).toBe(0);
   }
   expect(mockDb.prepare('select count(*) as n from local_schema_migrations').get()?.n).toBe(12);
+});
+
+// Actual existing wipe adapter + real migrated in-memory SQLite; no customer DB.
+it.each(['none', 'sql', 'metadata'])('ties new metadata cleanup to explicit local-wipe success, fault=%s', async fault => {
+  const failed = fault === 'sql';
+  installed(12);
+  const { getLocalDb, wipeLocalData } = jest.requireActual<typeof import('../client')>('../client');
+  await getLocalDb();
+  const access = jest.requireActual<typeof import('@/lib/diagnosticsAccessState')>('@/lib/diagnosticsAccessState');
+  const store = jest.requireActual<typeof import('@/features/tracking/utils/supportProvenanceStore')>('@/features/tracking/utils/supportProvenanceStore');
+  const storage = jest.requireMock('@react-native-async-storage/async-storage');
+  access.setDiagnosticsSession('owner');
+  await store.recordSupportProvenance('parent', 'lay', false);
+  const metadataKey = 'anyvo.support.provenance.v2::' + JSON.stringify(['owner', 'parent']);
+  const metadataBefore = await storage.getItem(metadataKey);
+  expect(metadataBefore).not.toBeNull();
+  await storage.setItem('existing-unrelated-key', 'unchanged');
+  mockWipeFails = failed;
+  if (fault === 'metadata') storage.multiRemove.mockRejectedValueOnce(new Error('synthetic metadata cleanup failure'));
+  if (failed) await expect(wipeLocalData()).rejects.toThrow('synthetic wipe failure');
+  else await wipeLocalData();
+  expect(await storage.getItem(metadataKey)).toBe(failed || fault === 'metadata' ? metadataBefore : null);
+  expect((await store.loadSupportRecordingProvenance('parent')).lay.availability).toBe(failed ? 'available' : 'unknown');
+  expect(mockDb.prepare('select count(*) as n from local_training_sessions').get()?.n).toBe(failed ? 1 : 0);
+  expect(await storage.getItem('existing-unrelated-key')).toBe('unchanged');
+  access.setDiagnosticsSession(null);
+});
+
+
+it('preserves readable metadata after overlapping real parent-delete and wipe failures', async () => {
+  installed(12);
+  const client = jest.requireActual<typeof import('../client')>('../client'); await client.getLocalDb();
+  const access = jest.requireActual<typeof import('@/lib/diagnosticsAccessState')>('@/lib/diagnosticsAccessState');
+  const store = jest.requireActual<typeof import('@/features/tracking/utils/supportProvenanceStore')>('@/features/tracking/utils/supportProvenanceStore');
+  const repo = jest.requireActual<typeof import('@/features/training/repositories/localTrainingRepository')>('@/features/training/repositories/localTrainingRepository');
+  access.setDiagnosticsSession('owner');
+  await store.recordSupportProvenance('parent', 'lay', false);
+  let rejectDelete!: (e: Error) => void;
+  const gate = { promise: new Promise<never>((_ok, fail) => { rejectDelete = fail; }), entered: false };
+  mockDeleteGate = gate;
+  const deleting = expect(repo.markTrainingAsDeleted('parent')).rejects.toThrow('synthetic parent SQL failure');
+  for (let i = 0; i < 60 && !gate.entered; i++) await Promise.resolve();
+  expect(gate.entered).toBe(true);
+  mockWipeFails = true;
+  await expect(client.wipeLocalData()).rejects.toThrow('synthetic wipe failure');
+  rejectDelete(new Error('synthetic parent SQL failure')); await deleting;
+  expect(mockDb.prepare('select deleted_at,payload_json from local_training_sessions where local_id=?').get('parent'))
+    .toMatchObject({ deleted_at: null, payload_json: '{"original":true}' });
+  expect((await store.loadSupportRecordingProvenance('parent')).lay.availability).toBe('available');
+  access.setDiagnosticsSession(null);
 });

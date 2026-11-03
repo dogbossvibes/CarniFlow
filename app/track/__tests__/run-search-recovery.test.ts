@@ -32,7 +32,7 @@ describe('run.tsx — Search-Recovery-State', () => {
     expect(resume).toContain('const runState = useTrackingStore.getState().searchRunState;');
     expect(resume).toContain('prevOffTrackRef.current = runState.offTrackState;');
     expect(resume).toContain('segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };');
-    expect(resume).toMatch(/s\.start\(\{ points: saved\.map\([^)]*\)\), startedAtMs: [^,]+, runState \}\)/);
+    expect(resume).toMatch(/s\.start\(\{ points: saved\.map\([^)]*\)\), startedAtMs: [^,]+, runState \}, \{ diagnosticAttemptKey: runIdRef\.current \?\? undefined \}\)/);
   });
 
   it('discard: Dedupe-Refs und Snapshot werden geleert (kein Überlauf in den nächsten Run)', () => {

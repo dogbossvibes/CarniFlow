@@ -1,3 +1,4 @@
+import { assertRecordingProvenance } from './diagnosticProvenance';
 // QA-Export einer gelegten Fährte — anonymisiert, für Regressions-Fixtures.
 //
 // Zweck: die echten Punktfolgen eines Feldtests so aus dem Gerät holen, dass
@@ -110,7 +111,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 12 | 16;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 12 | 16 | 18;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -295,7 +296,8 @@ export function buildQaTrackExport(
     || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
     : capture?.startupDiagnostics || capture?.manualAngleGeometryDiagnostics || capture?.voiceDiagnostics ? 5
     : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0;
-  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 | 7 | 8 | 12 = !search ? 0
+  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 | 7 | 8 | 12 | 18 = !search ? 0
+    : search.recordingContext ? 18
     : search.end?.eventObservation !== undefined ? 12
     // 8: additive Roh-Suchfix-Felder (accuracyM/accepted je Fix in geometry.raw); ältere Captures bleiben bei ihrer Stufe.
     : search.geometry?.raw?.some(p => p.accuracyM !== undefined) ? 8
@@ -437,6 +439,7 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
   // Meter. Absolute Unix-Sekunden wären ≥ 1e9.
   const sd = e.searchDiagnostics;
   if (sd) {
+    if (sd.recordingContext !== undefined) assertRecordingProvenance(sd.recordingContext);
     const secs: (number | null | undefined)[] = [
       sd.end.manualStopTSec, sd.end.eventFired?.tSec,
       ...sd.cursor.samples.map(c => c.tSec),
