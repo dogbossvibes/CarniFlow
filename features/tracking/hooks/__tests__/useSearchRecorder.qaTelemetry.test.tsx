@@ -290,3 +290,12 @@ describe('Support-Capture (normale Kunden, kein QA-Schalter)', () => {
     for (const l of imports) expect(l).not.toMatch(/useSearchRecorder|searchFix|trackFusionEngine|turnFusion|shortLeg|guidance|replay|voice|cursor/i);
   });
 });
+
+it('records a late search fix as diagnostic evidence without applying it to live geometry', async () => {
+  const fixes = [{ x: 0, y: 0, t: T0 }, { x: 2, y: 0, t: T0 + 2000 },
+    { x: 1, y: 0, t: T0 + 1000 }, { x: 4, y: 0, t: T0 + 3000 }];
+  const { res } = await runScenario(LAID, fixes);
+  expect(res.qa?.raw).toHaveLength(4);
+  expect(res.qa?.raw[2]).toMatchObject({ t: T0 + 1000, accepted: false, reason: 'time_late' });
+  expect(res.qa?.filtered).toHaveLength(3);
+});

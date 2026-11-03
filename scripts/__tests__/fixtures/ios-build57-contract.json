@@ -1,0 +1,13 @@
+{
+  "provenance": {
+    "buildId": "442f7bc3-14f8-4ec0-9cf3-138a3dd6f79d",
+    "sourceCommit": "17443616b5bad6d5a524804e48cc84a2cf9ef4c9",
+    "ipaSha256": "7342b1b6b43c3fcbff025f6001afce875f0d9649104769a72ad1e094e8e02374",
+    "checkedAt": "2026-11-02",
+    "method": "Read Info.plist and Expo.plist from the downloaded EAS IPA; not a device execution."
+  },
+  "bundleIdentifier": "com.anyvo.app",
+  "version": "1.0.6",
+  "buildNumber": "57",
+  "runtimeVersion": "1.0.6-map49-v1"
+}

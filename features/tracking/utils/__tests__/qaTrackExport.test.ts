@@ -290,3 +290,28 @@ describe('Datenquelle: ausschliesslich gelegte Punkte', () => {
     expect(fn.indexOf('buildQaTrackExport')).toBeLessThan(fn.indexOf('assertNoAbsoluteData'));
   });
 });
+
+it('rejects invalid GPS reception times and source while allowing relative values', () => {
+  const e = buildQaTrackExport('gps-delivery', rawLayPoints(), []);
+  e.rawFixes = [{ x: 0, y: 0, accuracy: 5, tMs: 10, receivedMs: 20, processedMs: 30, deliverySource: 'background' }];
+  expect(() => assertNoAbsoluteData(e)).not.toThrow();
+  e.rawFixes[0].receivedMs = T0_MS;
+  expect(() => assertNoAbsoluteData(e)).toThrow();
+  e.rawFixes[0].receivedMs = 20;
+  e.rawFixes[0].deliverySource = 'invalid' as never;
+  expect(() => assertNoAbsoluteData(e)).toThrow();
+});
+
+it('exports additive GPS receipt timing under schema 17 without inventing it for older captures', () => {
+  const point = { x: 0, y: 0, tMs: 0, accuracy: 5, receivedMs: 20, processedMs: 35, deliverySource: 'foreground' as const };
+  const capture = { captureVersion: 2 as const, sessionLocalId: 'fixture', durationMs: 100,
+    counts: { rawFixes: 1, acceptedFixes: 1, rejectedFixes: 0, detectorPoints: 1, linePoints: 0 },
+    distances: { rawPathM: 0, detectorPathM: 0, recordedLineM: 0, storeDistanceM: 0 },
+    rawFixes: [point], detectorPoints: [point], linePoints: [], markers: [], autoDiagnostics: [] };
+  const e = buildQaTrackExport('fixture', rawLayPoints(), [], capture);
+  expect(e.schemaMinor).toBe(17);
+  expect(e.detectorPoints[0]).toMatchObject({ receivedMs: 20, processedMs: 35, deliverySource: 'foreground' });
+  expect(() => serializeQaTrackExport(e)).not.toThrow();
+  const old = buildQaTrackExport('fixture', rawLayPoints(), [], { ...capture, rawFixes: [], detectorPoints: [] });
+  expect(old.schemaMinor).toBe(1);
+});

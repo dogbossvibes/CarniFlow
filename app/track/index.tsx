@@ -73,6 +73,7 @@ export default function TrackOverviewScreen() {
   const [storedRows, setRows]     = useState<any[]>([]);
   const [previews, setPreviews] = useState<Awaited<ReturnType<typeof getRecentTrackPreviews>>>({});
   const loadVersion = useRef(0);
+  const pendingDeletes = useRef(new Set<string>());
   const [loading, setLoading] = useState(true);
   const { showToast, toast } = useToast();
 
@@ -105,10 +106,8 @@ export default function TrackOverviewScreen() {
     return () => { loadVersion.current++; };
   }, [load]));
 
-  // Fährte per Long-Press löschen: erst bestätigen, dann optimistisch entfernen.
-  // Auch die LOKALE Kopie ausblenden (markTrainingAsDeleted), sonst würde die Fährte
-  // beim nächsten Merge aus SQLite wieder auftauchen. Lokal-only → kein Remote-Delete
-  // nötig (funktioniert offline).
+  // Only hide a track after remote/local deletion, including archive cleanup,
+  // has succeeded. A failed local-only delete stays visible for offline retry.
   const confirmDelete = useCallback((id: string) => {
     const version = loadVersion.current;
     const localOnly = !!rows.find(r => r.id === id)?.isLocalOnly;
@@ -117,17 +116,26 @@ export default function TrackOverviewScreen() {
       {
         text: 'Löschen', style: 'destructive',
         onPress: async () => {
-          if (version !== loadVersion.current) return;
-          const prev = rows;
+          const operation = `${version}:${id}`;
+          if (version !== loadVersion.current || pendingDeletes.current.has(operation)) return;
+          pendingDeletes.current.add(operation);
           const wasHero = rows[0]?.id === id;
-          setRows(rs => rs.filter(r => r.id !== id));
-          if (!localOnly) {
-            const { error } = await deleteTrackSession(id);
-            if (error) { if (version === loadVersion.current) setRows(prev); showToast('Fährte konnte nicht gelöscht werden.'); return; }
+          try {
+            if (!localOnly) {
+              const { error } = await deleteTrackSession(id);
+              if (error) throw new Error(String(error));
+            }
+            if (version !== loadVersion.current) return;
+            await markTrainingAsDeleted(id);
+            if (version !== loadVersion.current) return;
+            setRows(rs => rs.filter(r => r.id !== id));
+            showToast('Fährte gelöscht');
+            if (wasHero) void load().catch(() => {});
+          } catch {
+            if (version === loadVersion.current) showToast('Fährte konnte nicht gelöscht werden.');
+          } finally {
+            pendingDeletes.current.delete(operation);
           }
-          await markTrainingAsDeleted(id).catch(() => {});   // lokale Kopie ausblenden
-          showToast('Fährte gelöscht');
-          if (wasHero) load();
         },
       },
     ]);

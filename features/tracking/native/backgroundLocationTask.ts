@@ -74,7 +74,7 @@ function backgroundOutcomeEvents(sid: string | null, outcomes: readonly LayDeliv
   const events: Promise<void>[] = [];
   const processed = outcomes.filter(o => o.kind === 'processed').length;
   if (processed && !handlerPresent) events.push(recordBackgroundLayEvent(sid, 'backgroundProcessedWithoutHandler', processed));
-  const failures = outcomes.filter(o => o.kind === 'persist_failed').length;
+  const failures = outcomes.filter(o => o.kind === 'persist_failed' || o.archivePersisted === false).length;
   if (failures) events.push(recordBackgroundLayEvent(sid, 'backgroundPersistAwaitFailure', failures));
   const dropped = new Map<string, number>();
   for (const o of outcomes) if (o.kind === 'dropped') dropped.set(o.reason, (dropped.get(o.reason) ?? 0) + 1);

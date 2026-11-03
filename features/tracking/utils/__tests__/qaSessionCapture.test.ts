@@ -166,3 +166,15 @@ it('refuses a capture whose supplied creation token is no longer current', async
   await saveQaSessionCapture(capture('old-generation'), 'old-generation-token');
   expect(mockStore.size).toBe(0);
 });
+
+it('preserves optional relative GPS delivery timing across diagnostic storage', async () => {
+  const c = capture('gps-delivery');
+  c.rawFixes[0].receivedMs = 220;
+  c.rawFixes[0].processedMs = 250;
+  c.rawFixes[0].deliverySource = 'background';
+  c.detectorPoints[0].receivedMs = 220;
+  c.detectorPoints[0].processedMs = 250;
+  c.detectorPoints[0].deliverySource = 'background';
+  await saveQaSessionCapture(c);
+  expect(await loadQaSessionCapture('gps-delivery')).toEqual(c);
+});

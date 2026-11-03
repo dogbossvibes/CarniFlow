@@ -11,7 +11,7 @@ import {
 } from '../layProcessingSession';
 import {
   registerLaySession, bindBackgroundLaySession, deliverLayFix, beginFinalizeLaySession, stopLaySession,
-  getLaySessionStatus, __resetLaySessionRuntimeForTests, type LayDeliveryOutcome,
+  getLaySessionStatus, deliverBackgroundLocations, __resetLaySessionRuntimeForTests, type LayDeliveryOutcome,
 } from '../laySessionRuntime';
 import { MotionEvidenceBuffer } from '../../utils/motionTurnEvidence';
 import { useActiveFaehrten } from '../../store/activeFaehrten';
@@ -76,7 +76,7 @@ function startSession(sessionId: string, dogId: string | null, opts: { engine?: 
   session.startLockBeganRef.current = startedAtMs;
   registerLaySession({
     sessionId, dogId, startedAtMs,
-    processFix: loc => { const r = processor.processFix(loc); h.processCalls.push(r); return r; },
+    processFix: (loc, delivery) => { const r = processor.processFix(loc, delivery); h.processCalls.push(r); return r; },
     persist: () => h.persist(),
   });
   return h;
@@ -368,8 +368,11 @@ describe('Per-Session-Serialisierung', () => {
     let resolveWrite!: (ok: boolean) => void;
     h.persist.mockImplementationOnce(() => new Promise<boolean>(r => { resolveWrite = r; }));
     const n = h.processCalls.length;
+    clock = t;
     const p1 = deliverLayFix('s1', loc(t, 0, 12), 'background');
+    clock = t + 1000;
     const p2 = deliverLayFix('s1', loc(t + 1000, 0, 15), 'background');
+    clock = t + 1500;
     const pf = deliverLayFix('s1', loc(t + 1500, 0, 16), 'foreground');
     for (let i = 0; i < 10; i++) await Promise.resolve();
     expect(h.processCalls.length).toBe(n + 1);       // nur Fix 1 verarbeitet
@@ -435,4 +438,158 @@ describe('Finalize-Race', () => {
     expect(outs.every(o => o.kind === 'dropped')).toBe(true);
     expect(h.processCalls.length).toBe(n);
   });
+});
+
+it('preserves JS delivery time across a delayed background persistence queue', async () => {
+  let release!: (ok: boolean) => void;
+  const persist = jest.fn(() => new Promise<boolean>(resolve => { release = resolve; }));
+  const processFix = jest.fn((_loc: Location.LocationObject, _delivery?: import('../layProcessingSession').QaFixDelivery) => ({ outcome: 'accepted', rejectReason: null, anchorReleased: false,
+    acceptedPoint: null, corners: [], distanceM: 0, rejectedCount: 0 } as LayFixResult));
+  registerLaySession({ sessionId: 'timing', dogId: null, startedAtMs: T0, processFix, persist });
+  clock = T0 + 1000;
+  const first = deliverLayFix('timing', loc(T0 + 1000, 0, 0), 'background');
+  clock = T0 + 2000;
+  const second = deliverLayFix('timing', loc(T0 + 2000, 0, 1), 'foreground');
+  clock = T0 + 5000;
+  release(true);
+  await first;
+  await second;
+  expect(processFix.mock.calls[0][1]).toEqual({ source: 'background', receivedAtMs: T0 + 1000 });
+  expect(processFix.mock.calls[1][1]).toEqual({ source: 'foreground', receivedAtMs: T0 + 2000 });
+});
+
+it('archives duplicate deliveries and awaits background archive writes without blocking the live queue', async () => {
+  let release!: (saved: boolean) => void;
+  const slowWrite = new Promise<boolean>(resolve => { release = resolve; });
+  const observeFix = jest.fn(() => slowWrite);
+  const processFix = jest.fn(() => ({ outcome: 'rejected', rejectReason: 'distance_gate', anchorReleased: false,
+    acceptedPoint: null, corners: [], distanceM: 0, rejectedCount: 0 } as LayFixResult));
+  registerLaySession({ sessionId: 'archive', dogId: null, startedAtMs: T0, processFix, observeFix, persist: async () => true });
+  clock = T0 + 1000;
+  let backgroundDone = false;
+  const bg = deliverLayFix('archive', loc(clock, 0, 0), 'background').then(r => { backgroundDone = true; return r; });
+  const duplicate = await deliverLayFix('archive', loc(clock, 0, 0), 'foreground');
+  clock += 1000;
+  await deliverLayFix('archive', loc(clock, 0, 1), 'foreground');
+  expect(duplicate).toMatchObject({ kind: 'dropped', reason: 'duplicate' });
+  expect(observeFix).toHaveBeenCalledTimes(3);
+  expect(processFix).toHaveBeenCalledTimes(2);
+  expect(backgroundDone).toBe(false);
+  release(true);
+  expect(await bg).toMatchObject({ archivePersisted: true });
+});
+it('a synchronously failing observer never prevents live processing', async () => {
+  const processFix = jest.fn(() => ({ outcome: 'rejected', rejectReason: 'distance_gate', anchorReleased: false,
+    acceptedPoint: null, corners: [], distanceM: 0, rejectedCount: 0 } as LayFixResult));
+  registerLaySession({ sessionId: 'archive-fail', dogId: null, startedAtMs: T0, processFix,
+    observeFix: () => { throw new Error('storage'); }, persist: async () => true });
+  clock = T0 + 1000;
+  expect(await deliverLayFix('archive-fail', loc(clock, 0, 0), 'background')).toMatchObject({ kind: 'processed', archivePersisted: false });
+  expect(processFix).toHaveBeenCalledTimes(1);
+});
+
+it.each([true, false])('archives arrivals waiting behind geometry when finalize wins; raw write succeeds=%s', async archiveSaved => {
+  let releaseGeometry!: (saved: boolean) => void;
+  let releaseArchive!: (saved: boolean) => void;
+  const geometryWrite = new Promise<boolean>(resolve => { releaseGeometry = resolve; });
+  const archiveWrite = new Promise<boolean>(resolve => { releaseArchive = resolve; });
+  const observeFix = jest.fn((_loc: Location.LocationObject, _delivery: import('../layProcessingSession').QaFixDelivery) => archiveWrite);
+  const processFix = jest.fn(() => ({ outcome: 'accepted', rejectReason: null, anchorReleased: false,
+    acceptedPoint: null, corners: [], distanceM: 0, rejectedCount: 0 } as LayFixResult));
+  registerLaySession({ sessionId: 'finalize-archive', dogId: null, startedAtMs: T0,
+    processFix, observeFix, persist: () => geometryWrite });
+  clock = T0 + 1000;
+  let backgroundDone = false;
+  const first = deliverLayFix('finalize-archive', loc(clock, 0, 1), 'background');
+  clock += 1000;
+  const second = deliverLayFix('finalize-archive', loc(clock, 0, 2), 'background')
+    .then(outcome => { backgroundDone = true; return outcome; });
+  const input = loc(clock + 1, 0, 3);
+  const third = deliverLayFix('finalize-archive', input, 'foreground');
+  input.coords.latitude = 99;
+  expect(processFix).toHaveBeenCalledTimes(1);
+  expect(observeFix.mock.calls.map(([fix]) => fix.timestamp)).toEqual([T0 + 1000, T0 + 2000, T0 + 2001]);
+  expect(observeFix.mock.calls[2][0].coords.latitude).not.toBe(99);
+  expect(observeFix.mock.calls[1][1].receivedAtMs).toBe(T0 + 2000);
+
+  const finalized = beginFinalizeLaySession('finalize-archive');
+  const afterStop = deliverLayFix('finalize-archive', loc(clock + 2, 0, 4), 'background');
+  releaseGeometry(true);
+  await finalized; // Primary finalization must not depend on the unresolved raw write.
+  expect(await third).toMatchObject({ kind: 'dropped', reason: 'session_finalized' });
+  expect(await afterStop).toMatchObject({ kind: 'dropped', reason: 'session_finalized' });
+  expect(processFix).toHaveBeenCalledTimes(1);
+  expect(observeFix).toHaveBeenCalledTimes(3);
+  expect(backgroundDone).toBe(false);
+  releaseArchive(archiveSaved);
+  expect(await first).toMatchObject({ kind: 'processed', archivePersisted: archiveSaved });
+  expect(await second).toMatchObject({ kind: 'dropped', reason: 'session_finalized', archivePersisted: archiveSaved });
+});
+
+it('archives the complete admitted batch before a synchronous processor finalizes it', async () => {
+  const observeFix = jest.fn(async () => true);
+  const processFix = jest.fn(() => {
+    void beginFinalizeLaySession('batch-finalize');
+    return { outcome: 'rejected', rejectReason: 'distance_gate', anchorReleased: false,
+      acceptedPoint: null, corners: [], distanceM: 0, rejectedCount: 0 } as LayFixResult;
+  });
+  registerLaySession({ sessionId: 'batch-finalize', dogId: null, startedAtMs: T0,
+    processFix, observeFix, persist: async () => true });
+  bindBackgroundLaySession('batch-finalize', null);
+  clock = T0 + 3000;
+  const results = await deliverBackgroundLocations([loc(T0 + 1000, 0, 1), loc(T0 + 2000, 0, 2), loc(T0 + 3000, 0, 3)]);
+  expect(observeFix).toHaveBeenCalledTimes(3);
+  expect(processFix).toHaveBeenCalledTimes(1);
+  expect(results.map(result => result.kind)).toEqual(['processed', 'dropped', 'dropped']);
+  expect(results.every(result => result.archivePersisted === true)).toBe(true);
+});
+
+it('a rejected future fix does not enter channel deduplication and block its later valid delivery', async () => {
+  const h = startSession('future', null);
+  clock = T0 + 1000;
+  const measured = clock + 3600000;
+  const early = await deliverLayFix('future', loc(measured, 0, 0), 'background');
+  expect(early).toMatchObject({ kind: 'processed', result: { rejectReason: 'time_future' } });
+  clock = measured;
+  const later = await deliverLayFix('future', loc(measured, 0, 0), 'foreground');
+  expect(later.kind).toBe('processed');
+  expect(h.processCalls.at(-1)?.rejectReason).not.toBe('time_future');
+});
+
+it('dispatches a complete background batch while raw archive writes are pending', async () => {
+  let release!: (saved: boolean) => void;
+  const slowWrite = new Promise<boolean>(resolve => { release = resolve; });
+  const processFix = jest.fn(() => ({ outcome: 'rejected', rejectReason: 'distance_gate', anchorReleased: false,
+    acceptedPoint: null, corners: [], distanceM: 0, rejectedCount: 0 } as LayFixResult));
+  const observeFix = jest.fn(() => slowWrite);
+  registerLaySession({ sessionId: 'batch', dogId: null, startedAtMs: T0, processFix, observeFix, persist: async () => true });
+  bindBackgroundLaySession('batch', null);
+  clock = T0 + 3000;
+  let done = false;
+  const batch = deliverBackgroundLocations([loc(T0 + 1000, 0, 0), loc(T0 + 2000, 0, 1), loc(T0 + 3000, 0, 2)])
+    .then(out => { done = true; return out; });
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  try {
+    expect(processFix).toHaveBeenCalledTimes(3);
+    expect(observeFix).toHaveBeenCalledTimes(3);
+    expect(done).toBe(false);
+  } finally { release(true); }
+  expect((await batch).every(out => out.archivePersisted === true)).toBe(true);
+});
+
+it('keeps every batch fix bound to the entry resolved before synchronous processing rebinds the runtime', async () => {
+  const accepted = { outcome: 'rejected', rejectReason: 'distance_gate', anchorReleased: false,
+    acceptedPoint: null, corners: [], distanceM: 0, rejectedCount: 0 } as LayFixResult;
+  const replacement = jest.fn(() => accepted);
+  const original = jest.fn(() => {
+    registerLaySession({ sessionId: 'same', dogId: null, startedAtMs: T0, processFix: replacement, persist: async () => true });
+    bindBackgroundLaySession('same', null);
+    return accepted;
+  });
+  registerLaySession({ sessionId: 'same', dogId: null, startedAtMs: T0, processFix: original, persist: async () => true });
+  bindBackgroundLaySession('same', null);
+  clock = T0 + 2000;
+  await deliverBackgroundLocations([loc(T0 + 1000, 0, 0), loc(T0 + 2000, 0, 1)]);
+  expect(original).toHaveBeenCalledTimes(2);
+  expect(replacement).not.toHaveBeenCalled();
 });

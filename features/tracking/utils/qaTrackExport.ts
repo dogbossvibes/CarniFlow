@@ -111,7 +111,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 15 | 16;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 15 | 16 | 17;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -154,6 +154,7 @@ export interface QaTrackExport {
     /** Punkte, die tatsächlich in der Datenbank gelandet sind. */
     persistedPoints: number;
   };
+  rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   rawFixes: QaCapturePoint[];
   detectorPoints: QaCapturePoint[];
   linePoints: QaCapturePoint[];
@@ -294,7 +295,7 @@ export function buildQaTrackExport(
   }
   const accs = anon.map(p => p.accuracy).filter((a): a is number => a != null);
   const motion = capture?.candidateMotionEvidence;
-  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 15 | 16 = capture?.referenceMarks ? 16 : capture?.motionTimeline ? 15 : capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
+  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 15 | 16 | 17 = capture?.rawFixes?.some(p => p.receivedMs !== undefined || p.processedMs !== undefined) || capture?.detectorPoints?.some(p => p.receivedMs !== undefined || p.processedMs !== undefined) ? 17 : capture?.referenceMarks ? 16 : capture?.motionTimeline ? 15 : capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
     || capture?.startupDiagnostics?.motionFirstCallbackTSec !== undefined ? 7
     : capture?.startupMovementDiagnostics
     || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
@@ -346,6 +347,7 @@ export function buildQaTrackExport(
       linePoints: capture?.counts.linePoints ?? null,
       persistedPoints: anon.length,
     },
+    rawArchive: capture?.rawArchive,
     rawFixes: capture?.rawFixes ?? [],
     detectorPoints: capture?.detectorPoints ?? [],
     linePoints: capture?.linePoints ?? [],
@@ -432,6 +434,12 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
     for (const p of list) {
       if (Math.abs(p.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Zeitstempel.');
     }
+  }
+  for (const p of [...e.rawFixes, ...e.detectorPoints, ...e.linePoints]) {
+    for (const value of [p.receivedMs, p.processedMs]) {
+      if (value != null && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) >= 1e8)) throw new Error('Ungültige relative GPS-Zeit.');
+    }
+    if (p.deliverySource !== undefined && !['foreground', 'background', 'unknown'].includes(p.deliverySource)) throw new Error('Ungültige GPS-Zustellquelle.');
   }
   for (const d of e.autoDiagnostics) {
     if (d.tMs != null && Math.abs(d.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Zeitstempel.');

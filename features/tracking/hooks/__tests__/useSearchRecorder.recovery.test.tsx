@@ -65,6 +65,7 @@ function mount(objects: SearchObject[] = OBJECTS, points: LatLng[] = LINE): { ge
   act(() => { activeRenderer = TestRenderer.create(<Harness objects={objects} points={points} onReady={(s) => { latest = s; }} />); });
   return { getRecorder: () => latest };
 }
+const TEST_EPOCH_MS = 1_790_000_000_000;
 let simClockMs = 0;
 function feed(yNorthM: number, xEastM = 0.2, accuracy = 4) {
   if (!feedSample) throw new Error('positionSource callback not captured yet');
@@ -75,10 +76,11 @@ const flushMicrotasks = async () => { await act(async () => { await Promise.reso
 
 beforeEach(() => {
   feedSample = null; simClockMs = 0;
+  jest.spyOn(Date, 'now').mockImplementation(() => simClockMs || TEST_EPOCH_MS);
   storeCalls.progress = []; storeCalls.found = []; storeCalls.offTrack = [];
   storeState.searchRunState.offTrackState = 'on_track';
 });
-afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; });
+afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; jest.restoreAllMocks(); });
 
 // Handler läuft von yFrom bis yTo in 2-m-Schritten (MIN_SEGMENT 1,5 m → jeder Fix ein Linienpunkt).
 function walk(yFrom: number, yTo: number) { for (let y = yFrom; y <= yTo; y += 2) feed(y); }

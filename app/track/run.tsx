@@ -945,6 +945,8 @@ export default function TrackRunScreen() {
     hapticSuccess();
     setFinishing(true);
     const res = s.stop();   // ← Search-Recorder beenden (flusht letzten Puffer)
+    // Das separate Roharchiv schließt im Hintergrund. Sein Status darf die
+    // primäre Ergebnissicherung nicht blockieren (stop liefert einen Snapshot).
     // runUuid ist seit dem Start deterministisch vorhanden (kein Null-Race mehr);
     // defensiver Fallback, falls doch nicht gesetzt.
     const runId = runIdRef.current ?? Crypto.randomUUID();
@@ -1228,6 +1230,11 @@ export default function TrackRunScreen() {
         {(runPoints.some(p => p.breakBefore) || snapData.laidPoints.some(p => p.breakBefore)) && (
           <View className="mx-[14px] mb-2 px-3 py-2 rounded-xl bg-white/5" accessibilityLiveRegion="polite">
             <Text className="text-ft-muted text-[12px]">{t('track.continuityNotice')}</Text>
+          </View>
+        )}
+        {s.recording && !!dbg?.rawArchiveError && (
+          <View className="mx-[14px] mb-2 px-3 py-2 rounded-xl bg-white/5" accessibilityLiveRegion="polite">
+            <Text className="text-ft-warn text-[12px]">{t('track.rawArchiveIncomplete')}</Text>
           </View>
         )}
         {/* Karte / Skizze */}

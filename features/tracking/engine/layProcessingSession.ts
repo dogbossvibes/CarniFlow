@@ -1,3 +1,4 @@
+import { classifyLiveFixTime, GPS_FUTURE_TOLERANCE_MS } from '../utils/liveFixOrdering';
 import { QaMotionCapture } from '@/features/tracking/utils/qaMotionCapture';
 import { isRecordingGap, splitContinuousPoints } from '../utils/trackContinuity';
 import type * as Location from 'expo-location';
@@ -70,6 +71,7 @@ export const START_ANCHOR_MAX_ACC_M  = 20;     // nur Fixes ≤ 20 m fliessen in
 export const START_FIX_MAX_AGE_MS    = 5000;   // gecachte/stale Fixes bestätigen keine Bewegung
 
 export interface AcceptedPoint extends LatLng { t: number; accuracy: number | null; cumDist: number; }
+export type QaFixDelivery = { receivedAtMs: number; source: 'foreground' | 'background' | 'unknown'; positionSource?: 'native' | 'expo' | 'external' | 'unknown' };
 export type Raw = { lat: number; lng: number; accuracy: number | null; altitude: number | null; speed: number | null; t: number };
 
 export type Box<T> = { current: T };
@@ -82,6 +84,8 @@ export interface AngleDebug {
 
 /** Fachlicher (und verarbeitungsnaher Diagnose-)Zustand EINER Lay-Session. */
 export interface LayProcessingState {
+  liveMeasurementRef: Box<number | null>;
+  resumeNotBeforeRef: Box<number | null>;
   continuityPendingRef: Box<boolean>;
   detectorOffsetRef: Box<number>;
   completedDetectorSectionsRef: Box<ShortLegPoint[][]>;
@@ -111,6 +115,7 @@ export interface LayProcessingState {
   turnEvidenceRef: Box<Map<number, TurnEvidence>>;
   qaMotionCaptureRef: Box<QaMotionCapture>;
   qaLastRejectRef: Box<string | null>;
+  qaDetectorDeliveryRef: Box<WeakMap<ShortLegPoint, { receivedMs: number | null; processedMs: number | null; deliverySource: QaFixDelivery['source'] }>>;
   qaOriginRef: Box<{ lat: number; lng: number; t: number } | null>;
   qaRawFixesRef: Box<QaCapturePoint[]>;
   qaRawCountRef: Box<number>;
@@ -120,6 +125,8 @@ export interface LayProcessingState {
 /** Anfangszustand — identisch zu den bisherigen useRef-Initialwerten. */
 export function createLayProcessingState(): LayProcessingState {
   return {
+    liveMeasurementRef: box<number | null>(null),
+    resumeNotBeforeRef: box<number | null>(null),
     continuityPendingRef: box(false),
     detectorOffsetRef: box(0),
     completedDetectorSectionsRef: box<ShortLegPoint[][]>([]),
@@ -149,6 +156,7 @@ export function createLayProcessingState(): LayProcessingState {
     turnEvidenceRef: box<Map<number, TurnEvidence>>(new Map()),
     qaMotionCaptureRef: box(new QaMotionCapture()),
     qaLastRejectRef: box<string | null>(null),
+    qaDetectorDeliveryRef: box(new WeakMap()),
     qaOriginRef: box<{ lat: number; lng: number; t: number } | null>(null),
     qaRawFixesRef: box<QaCapturePoint[]>([]),
     qaRawCountRef: box(0),
@@ -197,7 +205,7 @@ export interface LayCornerEvent {
   source: 'auto' | 'auto_split_apex' | 'build40';
 }
 
-export type LayRejectReason = 'start_lock_active' | 'accuracy' | 'gps_outlier' | 'distance_gate';
+export type LayRejectReason = 'start_lock_active' | 'accuracy' | 'gps_outlier' | 'distance_gate' | 'time_late' | 'time_duplicate' | 'time_future' | 'time_invalid';
 
 /** Explizites Ergebnis eines Fixes (vorher implizit im Hook). */
 export interface LayFixResult {
@@ -521,7 +529,13 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
   };
 
   // EIN Fix-Handler für Warmup UND Aufnahme.
-  const runFix = (loc: Location.LocationObject, out: LayFixResult) => {
+  const runFix = (loc: Location.LocationObject, out: LayFixResult, delivery?: QaFixDelivery) => {
+    const receivedAtMs = delivery?.receivedAtMs ?? Date.now();
+    const processedAtMs = qaRef.current ? Date.now() : null;
+    let timing = classifyLiveFixTime({ measurementMs: loc.timestamp, receivedMs: receivedAtMs,
+      lastLiveMeasurementMs: session.liveMeasurementRef.current, allowedFutureSkewMs: GPS_FUTURE_TOLERANCE_MS });
+    if (timing.disposition === 'live' && session.resumeNotBeforeRef.current != null && loc.timestamp < session.resumeNotBeforeRef.current)
+      timing = { disposition: 'late', nextLiveMeasurementMs: session.liveMeasurementRef.current };
     startupRef.current!.firstRawFixTSec ??= startupSec();
     if (loc.coords.accuracy != null && loc.coords.accuracy <= START_ANCHOR_MAX_ACC_M)
       startupRef.current!.firstStableFixTSec ??= startupSec();
@@ -529,19 +543,28 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
     const s = store.getState();
     const raw: Raw = {
       lat: c.latitude, lng: c.longitude, accuracy: c.accuracy ?? null,
-      altitude: c.altitude ?? null, speed: c.speed ?? null, t: loc.timestamp || Date.now(),
+      altitude: c.altitude ?? null, speed: c.speed ?? null, t: loc.timestamp,
     };
-    if (recordingRef.current && !startLockRef.current
-      && (s.isPaused || isRecordingGap(lastRawRef.current?.t ?? null, raw.t))) interruptContinuity();
+
     if (__DEV__) console.log('[trackRecorder] fix', { accuracy: raw.accuracy, recording: recordingRef.current });
 
     // ── QA-Mitschnitt: JEDER eingegangene Rohfix, vor allen Gates. Nur im
     // Diagnosemodus; ausserhalb passiert hier nichts. ──
-    if (qaRef.current) {
+    if (qaRef.current && Number.isFinite(raw.t)) {
       if (!qaOriginRef.current) qaOriginRef.current = { lat: raw.lat, lng: raw.lng, t: raw.t };
       qaRawCountRef.current++;
-      qaRawFixesRef.current.push(qaRel(raw.lat, raw.lng, raw.t, raw.accuracy));
+      const relative = (value: number | null | undefined) => value != null && Number.isFinite(value) && Math.abs(value - qaOriginRef.current!.t) < 1e8 ? value - qaOriginRef.current!.t : null;
+      qaRawFixesRef.current.push({ ...qaRel(raw.lat, raw.lng, raw.t, raw.accuracy), timingDisposition: timing.disposition, receivedMs: relative(receivedAtMs), processedMs: relative(processedAtMs), deliverySource: delivery?.source ?? 'unknown' });
     }
+
+    if (timing.disposition !== 'live') {
+      out.outcome = 'rejected';
+      out.rejectReason = `time_${timing.disposition}`;
+      return;
+    }
+    session.liveMeasurementRef.current = timing.nextLiveMeasurementMs;
+    if (recordingRef.current && !startLockRef.current
+      && (s.isPaused || isRecordingGap(lastRawRef.current?.t ?? null, raw.t))) interruptContinuity();
 
     // EMA-Glättung der Position — IMMER (Warmup wie Aufnahme). So folgt der
     // Live-Puck stets der echten Position und friert NIE ein, auch bei mässigem
@@ -642,7 +665,13 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       const dLast = dPts[dPts.length - 1];
       const dStep = dLast ? calculateDistance(dLast, dEma) : 0;
       if (!dLast || dStep >= DETECTOR_INPUT.minStepM) {
-        dPts.push({ lat: dEma.lat, lng: dEma.lng, cumDist: (dLast?.cumDist ?? session.detectorOffsetRef.current) + dStep, accuracy: raw.accuracy, t: raw.t });
+        const detectorPoint = { lat: dEma.lat, lng: dEma.lng, cumDist: (dLast?.cumDist ?? session.detectorOffsetRef.current) + dStep, accuracy: raw.accuracy, t: raw.t };
+        dPts.push(detectorPoint);
+        if (qaRef.current && qaOriginRef.current) {
+          const origin = qaOriginRef.current.t;
+          const relative = (value: number | null | undefined) => value != null && Number.isFinite(value) && Math.abs(value - origin) < 1e8 ? value - origin : null;
+          session.qaDetectorDeliveryRef.current.set(detectorPoint, { receivedMs: relative(receivedAtMs), processedMs: relative(processedAtMs), deliverySource: delivery?.source ?? 'unknown' });
+        }
       }
       // Rohfix-Ring für den Stop-Flush (ungeglättet, kein Gate). Nur die
       // letzten Meter werden gebraucht — bewusst klein gehalten.
@@ -716,12 +745,12 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
   };
 
   /** Einen Fix verarbeiten — synchron, wie bisher der Fix-Handler im Hook. */
-  const processFix = (loc: Location.LocationObject): LayFixResult => {
+  const processFix = (loc: Location.LocationObject, delivery?: QaFixDelivery): LayFixResult => {
     const out: LayFixResult = {
       outcome: 'warmup', rejectReason: null, anchorReleased: false, acceptedPoint: null,
       corners: [], distanceM: 0, rejectedCount: 0,
     };
-    runFix(loc, out);
+    runFix(loc, out, delivery);
     out.distanceM = canonDistRef.current.total;
     out.rejectedCount = rejectedRef.current;
     return out;

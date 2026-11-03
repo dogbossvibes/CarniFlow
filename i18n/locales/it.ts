@@ -152,6 +152,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "track.pace.legend": "Più lento · simile · più veloce del ritmo di riferimento",
 
   "track.continuityNotice": "Registrazione interrotta · Il tratto mancante è escluso dalla distanza misurata. Vengono valutati solo i tratti osservati.",
+  "track.rawArchiveIncomplete": "Non è stato possibile salvare tutte le misurazioni GPS aggiuntive. La registrazione della pista continua.",
   "track.recoverySaveFailed": "Non è stato possibile salvare la ricerca. Rimane disponibile per riprenderla. Riprova.",
 
   "common.save": "Salva",

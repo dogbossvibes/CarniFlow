@@ -128,6 +128,41 @@ describe('useSearchRecorder — Sensor-Fusion-Schutzschicht (Punkt 2 der Nachbes
   beforeEach(() => { feedSample = null; motionSampleCb = null; mockStop.mockClear(); simClockMs = 0; activeRenderer = null; jest.spyOn(Date, 'now').mockImplementation(() => simClockMs); });
   afterEach(() => { act(() => { activeRenderer?.unmount(); }); jest.restoreAllMocks(); });
 
+  it('a late fix does not move live position backwards or count distance twice', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    lockAndWalk(getRecorder, 8);
+    const before = { liveFix: getRecorder().liveFix, position: getRecorder().position, distance: getRecorder().distanceM };
+    act(() => { feedSample!({ lat: 2 / M_PER_DEG, lng: 0, accuracy: 5, speed: 0, course: null, t: simClockMs - 3000 }); });
+    expect(getRecorder().liveFix).toEqual(before.liveFix);
+    expect(getRecorder().position).toEqual(before.position);
+    expect(getRecorder().distanceM).toBe(before.distance);
+  });
+
+  it('a duplicate timestamp cannot shift live position or count distance again', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    lockAndWalk(getRecorder, 8);
+    const before = { liveFix: getRecorder().liveFix, distance: getRecorder().distanceM };
+    act(() => { feedSample!({ lat: 2 / M_PER_DEG, lng: 0, accuracy: 5, speed: 0, course: null, t: simClockMs }); });
+    expect(getRecorder().liveFix).toEqual(before.liveFix);
+    expect(getRecorder().distanceM).toBe(before.distance);
+  });
+
+  it('a future timestamp cannot move live position or block the next valid fix', async () => {
+    const { getRecorder } = mount(denseLeg(0, 60, 0));
+    await act(async () => { await Promise.resolve(); });
+    act(() => { getRecorder().start(); });
+    const y = lockAndWalk(getRecorder, 8);
+    const before = getRecorder().liveFix;
+    act(() => { feedSample!({ lat: 2 / M_PER_DEG, lng: 0, accuracy: 5, speed: 0, course: null, t: simClockMs + 3600000 }); });
+    expect(getRecorder().liveFix).toEqual(before);
+    feed(5, 0, y + 2);
+    expect(getRecorder().liveFix?.t).toBe(simClockMs);
+  });
+
   it('normaler GPS-Fix (kein Motion-Widerspruch) → Linie bewegt sich normal weiter', async () => {
     const laidPoints = denseLeg(0, 60, 0);
     const { getRecorder } = mount(laidPoints);

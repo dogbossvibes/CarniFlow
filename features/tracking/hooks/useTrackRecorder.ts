@@ -1,3 +1,5 @@
+import { beginGpsCapture } from '@/features/tracking/storage/gpsCapture';
+import { classifyLiveFixTime, GPS_FUTURE_TOLERANCE_MS } from '@/features/tracking/utils/liveFixOrdering';
 import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { attachSpecialGeometry, countLaidCorners, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
@@ -113,6 +115,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const [gpsDebug, setGpsDebug] = useState<{
     source: LocationSourceKind | null; provider: string | null;
     isNativeAvailable: boolean; rawGnssSupported: boolean; rejectedCount: number;
+    rawArchiveError?: string | null;
     angleCount: number; acuteAngleCount: number;
     lastAngleType: AngleKind | null; lastAngleDeg: number | null;
     lastAngleDir: 'links' | 'rechts' | null; lastAngleReject: string | null;
@@ -206,6 +209,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
 
   // Offline-First: lokale SQLite-Session + Punkt-Puffer.
   const localSessionId = useRef<string | null>(null);
+  const rawCaptureRef = useRef<ReturnType<typeof beginGpsCapture> | null>(null);
+  const actualSourceRef = useRef<'native' | 'expo' | 'external' | 'unknown'>('unknown');
   const diagnosticsReadyRef = useRef<Promise<void> | null>(null);
   const recordingEvidenceRef = useRef<QaRecordingObserver | null>(null);
   const streamModesRef = useRef<{ engine: unknown; source: unknown } | undefined>(undefined);
@@ -267,6 +272,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       }
       void flushPoints();
     }
+    if (persistInterrupted) void rawCaptureRef.current?.close(false);
     stopLaySession(localSessionId.current);   // Runtime: keine weiteren Fixes; Bindung des Hintergrund-Tasks lösen
     startLockRef.current = false;
     watchRef.current?.remove(); watchRef.current = null;
@@ -307,11 +313,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       qaRef.current = false;
       qaReferenceRef.current = [];
       qaReferenceTruncatedRef.current = false;
+      laySession.qaDetectorDeliveryRef.current = new WeakMap();
       qaMotionCaptureRef.current.clear();
       recordingEvidenceRef.current?.close();
       recordingEvidenceRef.current = null;
     }
-  }, [qaMotionCaptureRef]);
+  }, [qaMotionCaptureRef, laySession]);
   useEffect(() => subscribeQaDiagnostics(enforceQaCaptureAccess), [enforceQaCaptureAccess]);
 
   // Observation only: AppState does not start, stop, or restore recording.
@@ -322,6 +329,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       const sid = localSessionId.current;
       if (!sid || !recordingRef.current) return;
       recordingEvidenceRef.current?.appState(next);
+      if (next !== 'active') void rawCaptureRef.current?.flush();
       if (next === 'active') {
         void recordBackgroundLayEvent(sid, 'foreground').catch(() => {});
         if (previous !== 'active') void recordBackgroundLayEvent(sid, 'resume').catch(() => {});
@@ -412,10 +420,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     motionActiveRef, motionBufRef, autoDetectRef, startupRef, startupMovementRef, startupSec,
   }), [laySession, store, flushPoints, commitMarker]);
   const qaRel = processor.qaRel;
-  const processFixWithQaAccess = useCallback((loc: Location.LocationObject) => {
+  const processFixWithQaAccess = useCallback((loc: Location.LocationObject, delivery?: import('@/features/tracking/engine/layProcessingSession').QaFixDelivery) => {
     // Local check also covers suspended JS timers after a background lease expiry.
     enforceQaCaptureAccess();
-    const result = processor.processFix(loc);
+    const result = processor.processFix(loc, delivery);
     if (result.corners.length) refreshManualGeometry();
     return result;
   }, [processor, enforceQaCaptureAccess, refreshManualGeometry]);
@@ -426,8 +434,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // Aktive Aufnahme: über die Lay-Session-Runtime (kanalübergreifende Dedup,
     // Serialisierung mit Hintergrund-Fixes). Ohne laufende Arbeit synchron wie bisher.
     const sid = localSessionId.current;
-    if (sid && getLaySessionStatus(sid) === 'active') { void deliverLayFix(sid, loc, 'foreground'); return; }
-    processFixWithQaAccess(loc);   // Warmup / keine aktive Session: unverändert direkt
+    if (sid && getLaySessionStatus(sid) === 'active') { void deliverLayFix(sid, loc, 'foreground', Date.now(), actualSourceRef.current); return; }
+    processFixWithQaAccess(loc, { receivedAtMs: Date.now(), source: 'foreground' });   // Warmup / keine aktive Session: unverändert direkt
   }, [processFixWithQaAccess]);
   onFixRef.current = onFix;
 
@@ -468,6 +476,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       // Zentrale Positionsquelle: natives Precision-Modul bevorzugt, expo-Fallback.
       const handle = await startPositionSource((s) => {
         if (generation !== warmupGenerationRef.current) return;
+        actualSourceRef.current = s.source ?? 'unknown';
         recordingEvidenceRef.current?.source(s.source, s.provider);
         // Debug (source/provider) nur bei Änderung setzen — kein Re-Render-Sturm.
         setGpsDebug(d => (d.source === s.source && d.provider === s.provider) ? d : { ...d, source: s.source, provider: s.provider });
@@ -562,6 +571,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     canonDistRef.current.reset();
     puckRef.current = null;
     lastRawRef.current = null;
+    laySession.liveMeasurementRef.current = null;
+    laySession.resumeNotBeforeRef.current = input.resume ? Date.now() : null;
     rejectedRef.current = 0;
     lastCornerAtRef.current = -Infinity;
     lastCornerRescuedRef.current = false;
@@ -573,6 +584,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     qaLastRejectRef.current = null;
     qaOriginRef.current = null;
     qaRawFixesRef.current = [];
+    laySession.qaDetectorDeliveryRef.current = new WeakMap();
     qaRawCountRef.current = 0;
     qaAcceptedCountRef.current = 0;
     qaMarkerMetaRef.current = [];
@@ -592,6 +604,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     angleDbgRef.current = { count: 0, acuteCount: 0, lastType: null, lastDeg: null, lastDir: null, lastReject: null };
     ptBuffer.current = [];
     // Führende lokale Session-ID SOFORT deterministisch setzen (kein Warten auf Remote/Netz).
+    void rawCaptureRef.current?.close(false);
     stopLaySession(localSessionId.current);   // eine evtl. vorherige Runtime-Session nimmt keine Fixes mehr an
     localSessionId.current = input.localId;
     isCurrentStoreOwnerRef.current = claimLayRecorderStore(store);
@@ -626,6 +639,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         if (i > 0 && !point.breakBefore) geometryM += calculateDistance(all[i - 1], point);
         return { ...point, accuracy: point.accuracy ?? null, cumDist: geometryM };
       });
+      // Nur echte gespeicherte Messzeiten übernehmen; keine Legacy-Zeiten erfinden.
+      const savedTimes = p.trackPoints.map(point => point.t).filter((t): t is number => typeof t === 'number' && Number.isFinite(t) && t <= Date.now());
+      laySession.liveMeasurementRef.current = savedTimes.length ? savedTimes.reduce((a, b) => Math.max(a, b)) : null;
       canonDistRef.current.restore(p.distanceMeters);
       detectorOffsetRef.current = p.distanceMeters;
       continuityPendingRef.current = p.trackPoints.length > 0;
@@ -648,16 +664,34 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         angleCount: a.count, acuteAngleCount: a.acuteCount,
         lastAngleType: a.lastType, lastAngleDeg: a.lastDeg, lastAngleDir: a.lastDir, lastAngleReject: a.lastReject,
         gpsQualityScore: q ? Math.round(q.score * 100) / 100 : null, gpsQualityLevel: q?.level ?? null,
-        gpsQualityValid: q?.valid ?? false, gpsQualitySamples: q?.sampleCount ?? 0, gpsQualityReasons: q?.reasons ?? [] }));
+        rawArchiveError: rawCaptureRef.current?.snapshot().error ?? null, gpsQualityValid: q?.valid ?? false, gpsQualitySamples: q?.sampleCount ?? 0, gpsQualityReasons: q?.reasons ?? [] }));
       // Live Activity gedrosselt aktualisieren (alle 3 s, nicht im Sekundentakt).
       if (sec % 3 === 0) updateFaehrteActivity({ elapsedS: sec, distanceM: st.distanceMeters, paused: st.isPaused });
     }, 1000);
     recordingRef.current = true;   // ← ab jetzt akzeptiert onFix die Fixes
     // Fachliche Ownership: dieselbe Session (Processor + State) für Vordergrund UND Hintergrund-Task.
     // persist schreibt nur in GENAU diese Session (fail closed, falls der Hook inzwischen eine andere führt).
+    void rawCaptureRef.current?.close(false);
+    const rawCapture = beginGpsCapture(input.localId, 'lay');
+    rawCaptureRef.current = rawCapture;
+    // Arrival classification is observational: the geometry queue may lag behind
+    // these callbacks or discard queued work during finalization.
+    let rawLiveMeasurementMs = laySession.liveMeasurementRef.current;
     registerLaySession({
-      sessionId: input.localId, dogId, startedAtMs: startLockBeganRef.current,
+      sessionId: input.localId, dogId, startedAtMs: input.resume && Number.isFinite(Date.parse(input.resume.startedAt))
+        ? Date.parse(input.resume.startedAt) : startLockBeganRef.current,
       processFix: processFixWithQaAccess,
+      observeFix: (loc, delivery) => {
+        let timing = classifyLiveFixTime({ measurementMs: loc.timestamp, receivedMs: delivery.receivedAtMs,
+          lastLiveMeasurementMs: rawLiveMeasurementMs, allowedFutureSkewMs: GPS_FUTURE_TOLERANCE_MS });
+        if (timing.disposition === 'live' && laySession.resumeNotBeforeRef.current != null && loc.timestamp < laySession.resumeNotBeforeRef.current)
+          timing = { disposition: 'late', nextLiveMeasurementMs: rawLiveMeasurementMs };
+        rawLiveMeasurementMs = timing.nextLiveMeasurementMs;
+        return rawCapture.capture({ measuredAtMs: loc.timestamp, receivedAtMs: delivery.receivedAtMs,
+          latitude: loc.coords.latitude, longitude: loc.coords.longitude, accuracy: loc.coords.accuracy ?? null,
+          altitude: loc.coords.altitude ?? null, speed: loc.coords.speed ?? null, heading: loc.coords.heading ?? null,
+          source: delivery.positionSource ?? 'unknown', delivery: delivery.source === 'background' ? 'background' : 'foreground', timing: timing.disposition });
+      },
       persist: async () => (localSessionId.current === input.localId ? flushPoints() : false),
     });
     startupRef.current!.recorderArmedTSec = startupSec();
@@ -738,10 +772,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     await localSessionCreationRef.current;
 
     return { error: null };
-  }, [startWarmup, store, flushPoints, processFixWithQaAccess, processor, completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
+  }, [startWarmup, store, flushPoints, processFixWithQaAccess, processor, laySession, completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, angleDbgRef, canonDistRef, detectEmaRef, detectPointsRef, emaRef, gpsQualityRef, gpsQualityStateRef, lastCornerAtRef, lastCornerRescuedRef, lastRawRef, lineEmaRef, lineTurnZoneRef, liveTurnsRef, pointsRef, puckRef, qaAcceptedCountRef, qaMotionCaptureRef, qaLastRejectRef, qaOriginRef, qaRawCountRef, qaRawFixesRef, rawTailRef, rejectedRef, startAnchorAccRef, startAnchorRef, startDriftRejRef, startFixesRef, startLockBeganRef, startLockRef, turnEvidenceRef]);
 
   const pause  = useCallback(() => { recordingEvidenceRef.current?.note('userPaused'); processor.interruptContinuity(); store.getState().pauseRecording(); }, [store, processor]);
-  const resume = useCallback(() => { recordingEvidenceRef.current?.note('userResumed'); processor.interruptContinuity(); store.getState().resumeRecording(); }, [store, processor]);
+  const resume = useCallback(() => { recordingEvidenceRef.current?.note('userResumed'); laySession.resumeNotBeforeRef.current = Date.now(); processor.interruptContinuity(); store.getState().resumeRecording(); }, [store, processor, laySession]);
 
   // QA-only ground truth; this never creates a track marker or changes detection.
   const markQaReference = useCallback((): { mark: import('@/features/tracking/utils/qaSessionCapture').QaReferenceMark; token: string } | null => {
@@ -902,12 +936,14 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         }));
         const detectorPoints = detectorSections.flatMap((section, sectionIndex) => section.map((p, index) => ({
           ...qaRel(p.lat, p.lng, p.t ?? 0, p.accuracy, p.cumDist),
+          ...laySession.qaDetectorDeliveryRef.current.get(p),
           ...(sectionIndex > 0 && index === 0 ? { breakBefore: true } : {}),
         })));
         const linePoints = linePts.map(p => ({ ...qaRel(p.lat, p.lng, p.t, p.accuracy, p.cumDist), ...(p.breakBefore ? { breakBefore: true } : {}) }));
         const rawFixes = qaRawFixesRef.current;
         const capture = {
           captureVersion: 2 as const,
+          rawArchive: rawCaptureRef.current?.snapshot() ?? null,
           sessionLocalId: localSessionId.current,
           durationMs: rawFixes.length ? rawFixes[rawFixes.length - 1].tMs : 0,
           counts: {
@@ -939,9 +975,12 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
           voiceDiagnostics: voiceDiagnostics(),
           manualAngleGeometryDiagnostics: classifyManualAngleGeometrySections(store.getState().markers, detectorSections),
         };
-        void pendingLocalMarkers.then(markersSaved => {
+        const captureArchive = rawCaptureRef.current;
+        void pendingLocalMarkers.then(async markersSaved => {
+          await captureArchive?.flush();
+          if (captureArchive?.snapshot().closed) await captureArchive.close(true);
           if (markersSaved && captureToken && captureToken === diagnosticsAccessToken() && captureSessionId === localSessionId.current && captureMarkers === qaMarkerMetaRef.current) {
-            void saveQaSessionCapture({ ...capture, markers: captureMarkers.slice() }, captureToken);
+            void saveQaSessionCapture({ ...capture, rawArchive: captureArchive?.snapshot() ?? null, markers: captureMarkers.slice() }, captureToken);
           }
         });
       } catch (e) {
@@ -949,6 +988,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       }
     }
 
+    // All admitted arrivals have already entered the archive queue. Its close
+    // drains that queue independently; pending/failing raw storage must not hold
+    // the primary line and marker save hostage.
+    void rawCaptureRef.current?.close(true);
     stopAll(false);
     const s = store.getState();
     s.stopRecording();

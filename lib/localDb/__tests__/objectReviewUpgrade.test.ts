@@ -2,6 +2,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { MIGRATIONS } from '../migrations';
 
 let mockDb: DatabaseSync;
+jest.mock('@/features/tracking/storage/gpsCapture', () => ({ wipeGpsCaptures: jest.fn(async () => {}) }));
+
 jest.mock('expo-sqlite', () => ({ openDatabaseAsync: async () => ({
   execAsync: async (sql: string) => mockDb.exec(sql),
   getAllAsync: async (sql: string) => mockDb.prepare(sql).all(),
@@ -22,8 +24,8 @@ function installed(version: number) {
     mockDb.prepare('insert into local_schema_migrations(version) values (?)').run(migration.version);
   }
   if (version < 1) return;
-  mockDb.exec(`insert into local_training_sessions(local_id,payload_json) values ('parent','{"original":true}');
-    insert into sync_queue(id,entity_type,entity_local_id,operation,status) values ('pending','training_session','parent','update','pending');`);
+  mockDb.exec(`insert into local_training_sessions(local_id,user_id,payload_json) values ('parent','owner','{"original":true}');`);
+  if (version >= 5) mockDb.exec(`insert into sync_queue(id,entity_type,entity_local_id,operation,status) values ('pending','training_session','parent','update','pending');`);
   if (version >= 7) mockDb.exec(`insert into local_track_transfer_sync
     (session_id,receipt_id,user_id,receipt_json,revision,base_patch_json,pending_json)
     values ('parent','receipt','owner','{"receipt":true}',3,'{}','{"notes":"offline"}');`);
@@ -42,7 +44,7 @@ function installed(version: number) {
     values ('child','owner','parent',2,123,'{"draft":true}');`);
 }
 
-it.each([0, 6, 7, 8, 9, 10, 11, 12])('upgrades schema %s without losing pending transfers, drafts or original data', async version => {
+it.each([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])('upgrades schema %s without losing pending transfers, drafts or original data', async version => {
   installed(version);
   const before = mockDb.prepare("select name from sqlite_master where type='table' and name!='local_schema_migrations'").all()
     .map(row => String(row.name));
@@ -50,7 +52,11 @@ it.each([0, 6, 7, 8, 9, 10, 11, 12])('upgrades schema %s without losing pending 
   const { getLocalDb } = jest.requireActual<typeof import('../client')>('../client');
   await getLocalDb();
   expect(mockDb.prepare('select version from local_schema_migrations order by version').all().map(row => row.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-  for (const [table, rows] of snapshots) expect(mockDb.prepare(`select * from ${table}`).all()).toEqual(rows);
+  for (const [table, rows] of snapshots) {
+    const after = mockDb.prepare(`select * from ${table}`).all();
+    expect(after).toHaveLength(rows.length);
+    rows.forEach((row, index) => expect(after[index]).toMatchObject(row)); // additive columns are allowed
+  }
   expect(mockDb.prepare('select count(*) as n from track_object_review_cache').get()?.n).toBe(version >= 9 ? 1 : 0);
   expect(mockDb.prepare('select count(*) as n from track_object_review_outbox').get()?.n).toBe(version >= 9 ? 1 : 0);
   await getLocalDb();

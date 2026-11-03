@@ -137,5 +137,25 @@ export function useStartPointApproach(
     });
   }, [active, startLat, startLng, liveFix, config]);
 
+  // Freshness expires independently of deliveries: late callbacks no longer
+  // replace liveFix, and a suspended source must not keep start readiness armed.
+  useEffect(() => {
+    if (!active || startLat == null || startLng == null || !liveFix || !Number.isFinite(liveFix.t)) return;
+    const timer = setTimeout(() => {
+      approachRef.current = INITIAL_APPROACH;
+      reachedHitsRef.current = 0;
+      departHitsRef.current = 0;
+      reachedRef.current = null; // old arrival cannot authorize a later departure
+      phaseRef.current = 'approaching';
+      enteredRef.current = null; stableRef.current = null;
+      armedRef.current = null; departedRef.current = null;
+      setState(previous => ({ ...previous, armed: false, fixesRemaining: 2,
+        phase: 'approaching', reason: 'stale_or_jump', startZoneEnteredAtMs: null,
+        startReachedAtMs: null, firstStableFixAtMs: null, armedAtMs: null, departedStartAtMs: null }));
+      // No synthetic GPS fix, distance update, or departure diagnostic.
+    }, Math.max(0, liveFix.t + config.maxLocationAgeMs + 1 - Date.now()));
+    return () => clearTimeout(timer);
+  }, [active, startLat, startLng, liveFix, config.maxLocationAgeMs]);
+
   return state;
 }

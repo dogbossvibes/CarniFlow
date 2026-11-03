@@ -1,3 +1,5 @@
+import { deleteGpsCaptures } from '@/features/tracking/storage/gpsCapture';
+import { gpsCaptureScope } from '@/features/tracking/storage/gpsCaptureScope';
 import { readSpecialGeometry, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { getLocalDb } from '@/lib/localDb/client';
 import { newLocalId, nowIso } from '@/lib/localDb/ids';
@@ -57,10 +59,13 @@ export async function getSearchPointsBySession(sessionId: string): Promise<Local
 
 // Nur die Absuche-Punkte einer Session löschen (P2 „Verwerfen"). Die gelegten
 // Punkte (point_type='lay') bleiben unberührt.
-export async function deleteSearchPointsBySession(sessionId: string, assertScope?: () => void): Promise<void> {
+export async function deleteSearchPointsBySession(sessionId: string, assertScope?: () => void, archivalAttemptId?: string): Promise<void> {
+  assertScope?.();
   const db = await getLocalDb();
   assertScope?.();
   await db.runAsync(`delete from local_track_points where session_local_id=? and point_type='search'`, sessionId);
+  assertScope?.();
+  if (gpsCaptureScope().userId && archivalAttemptId) await deleteGpsCaptures(sessionId, 'search', archivalAttemptId);
 }
 
 export interface NewTrackMarker extends SpecialGeometry {

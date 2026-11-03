@@ -589,3 +589,35 @@ it('bounds reference marks, rejects changed authority, and stops labeling after 
   expect(capture.referenceMarksTruncated).toBe(true);
   expect(useTrackingStore.getState().markers).toHaveLength(0);
 });
+
+it('captures GPS delivery separately from measurement for raw and detector points only in QA', async () => {
+  mockQaEnabled = true;
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10);
+  feed(2500, 5, 12, 0, 100);
+  await act(async () => { current.finish(); for (let i = 0; i < 10; i++) await Promise.resolve(); });
+  const capture = (saveQaSessionCapture as jest.Mock).mock.calls[0][0];
+  expect(capture.rawFixes.at(-1)).toMatchObject({ tMs: 2300, receivedMs: 2400, processedMs: 2400, deliverySource: 'foreground' });
+  expect(capture.detectorPoints.at(-1)).toMatchObject({ tMs: 2300, receivedMs: 2400, processedMs: 2400, deliverySource: 'foreground' });
+});
+
+it('does not move the laid live position for a cached fix measured during an explicit pause', async () => {
+  await start();
+  for (const ms of [100, 200, 300, 400]) feed(ms, 5, 0);
+  feed(1500, 5, 10); feed(2500, 5, 12);
+  const state = useTrackingStore.getState();
+  Object.assign(state, { pauseRecording: () => { state.isPaused = true; }, resumeRecording: () => { state.isPaused = false; } });
+  act(() => current.pause());
+  clockMs += 5000;
+  act(() => current.resume());
+  const count = (state.setCurrentPosition as jest.Mock).mock.calls.length;
+  const distance = state.distanceMeters;
+  const stored = state.trackPoints.length;
+  feed(8000, 5, 99, 1, 2000);
+  expect(state.setCurrentPosition).toHaveBeenCalledTimes(count);
+  expect(state.distanceMeters).toBe(distance);
+  expect(state.trackPoints).toHaveLength(stored);
+  feed(9000, 5, 14, 1);
+  expect((state.setCurrentPosition as jest.Mock).mock.calls.length).toBeGreaterThan(count);
+});

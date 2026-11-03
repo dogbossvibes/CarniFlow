@@ -336,7 +336,7 @@ describe('discardSearchAttempt („Absuche verwerfen")', () => {
     useTrackingStore.setState({ dogId: 'dog-A', currentSessionId: 'sess-A', trackPoints: [{ lat: 1, lng: 1, t: 1 }], isRecording: false, sessionStatus: 'searching', searchRunId: 'run-1', searchStartedAt: LAY_END + 1000 });
     const r = await discardSearchAttempt('sess-A', 'dog-A');
     expect(r).toEqual({ ok: true, target: '/track/liegen?dogId=dog-A&id=sess-A' });
-    expect(mockDeleteSearch).toHaveBeenCalledWith('sess-A');
+    expect(mockDeleteSearch).toHaveBeenCalledWith('sess-A', undefined, String(LAY_END + 1000));
     const p = await loadPending('dog-A');
     expect(p).toMatchObject({ sessionId: 'sess-A', status: 'resting', runId: null, searchStartedAt: null });
     expect(p!.trackPoints).toHaveLength(3);

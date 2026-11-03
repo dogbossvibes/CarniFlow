@@ -55,7 +55,14 @@ function Harness({ onReady }: { onReady: (s: SearchRecorder) => void }) {
   return null;
 }
 let activeRenderer: ReactTestRenderer | null = null;
-afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; });
+const TEST_EPOCH_MS = 1_700_000_000_000;
+let receptionMs = TEST_EPOCH_MS;
+beforeEach(() => {
+  receptionMs = TEST_EPOCH_MS;
+  progress.length = 0;
+  jest.spyOn(Date, 'now').mockImplementation(() => receptionMs);
+});
+afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; jest.restoreAllMocks(); });
 
 it('qa-0ec8c4ca im Recorder: kein Rückweg-Sprung, mittlerer Abschnitt erhält Fortschritt, Samples decken 5…18,7 m ab, Ende erreicht', async () => {
   let rec!: SearchRecorder;
@@ -65,6 +72,7 @@ it('qa-0ec8c4ca im Recorder: kein Rückweg-Sprung, mittlerer Abschnitt erhält F
   act(() => { rec.start(undefined, { forceLocked: true }); });
   for (const p of run.runPoints as { x: number; y: number; t: number }[]) {
     const q = ll(p.x, p.y);
+    receptionMs = t0 + p.t * 1000;
     act(() => { feedSample!({ lat: q.latitude, lng: q.longitude, accuracy: 4, speed: 0.6, course: null, t: t0 + p.t * 1000 }); });
   }
   let res!: ReturnType<SearchRecorder['stop']>;
@@ -99,7 +107,7 @@ describe('Resume direkt vor engem Rückweg (Recorder)', () => {
     act(() => { rec.start({ points: resumed, startedAtMs: t0 - 20_000, runState: { maxCursorM: 4, devSumM: 2, devCount: 3, foundObjectIds: [], voiceFiredIds: [], hapticFiredIds: [], endFired: false, segmentAnnouncements: {}, breaks: [], offTrackState: 'on_track' } as any }); });
     expect(rec.progressM).toBe(4);
     // Fixes 0,7 m Richtung Rückweg (Rückweg 0,3 m, Hinweg 0,7 m entfernt); EMA + MIN_SEGMENT → erster akzeptierter Punkt bei ~6 m.
-    const feedAt = (y: number, t: number) => { const q = ll(0.7, y); act(() => { feedSample!({ lat: q.latitude, lng: q.longitude, accuracy: 4, speed: 1, course: null, t }); }); };
+    const feedAt = (y: number, t: number) => { receptionMs = t; const q = ll(0.7, y); act(() => { feedSample!({ lat: q.latitude, lng: q.longitude, accuracy: 4, speed: 1, course: null, t }); }); };
     feedAt(6, t0 + 1000); feedAt(8, t0 + 2000); feedAt(10, t0 + 3000);
     const cursorAfterFirstFix = progress[0];
     console.log(`Recorder-Resume-Pins: cursorBeforeResume=4 cursorAfterFirstFix=${cursorAfterFirstFix?.toFixed(2)} progress=${progress.map(v => v.toFixed(2)).join(' ')}`);

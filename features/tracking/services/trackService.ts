@@ -1,3 +1,5 @@
+import { deleteGpsCaptures } from '@/features/tracking/storage/gpsCapture';
+import { gpsCaptureScope } from '@/features/tracking/storage/gpsCaptureScope';
 import { mutateOwnTransfer } from '@/features/tracking-transfer/runtime';
 import { restoreLayContinuity } from '../utils/trackContinuity';
 import { supabase } from '@/lib/supabase';
@@ -289,11 +291,19 @@ export async function finishTrackRun(runId: string, sessionId: string, summary: 
 
 // Fährte verwerfen (Abbrechen): Session + Punkte/Marker/Runs (FK-Cascade) löschen.
 export async function deleteTrackSession(id: string): Promise<Result<null>> {
+  const scope = gpsCaptureScope();
+  const check = () => { if (scope.userId && (gpsCaptureScope().userId !== scope.userId || gpsCaptureScope().epoch !== scope.epoch)) throw new Error('ACCOUNT_CHANGED'); };
   try {
     const transfer = await mutateOwnTransfer(id, 'delete');
-    if (transfer.handled) return { data: null, error: transfer.error };
+    check();
+    if (transfer.handled) {
+      if (!transfer.error && scope.userId) await deleteGpsCaptures(id);
+      return { data: null, error: transfer.error };
+    }
     const { error } = await supabase.from('training_sessions').delete().eq('id', id);
     if (error) return fail('deleteTrackSession', error);
+    check();
+    if (scope.userId) await deleteGpsCaptures(id);
     return { data: null, error: null };
   } catch (e) { return fail('deleteTrackSession', e); }
 }

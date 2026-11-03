@@ -156,6 +156,7 @@ export const deCH = {
 
 
   "track.continuityNotice": "Aufzeichnung unterbrochen · Die Lücke zählt nicht zur gemessenen Strecke. Bewertet werden nur beobachtete Abschnitte.",
+  "track.rawArchiveIncomplete": "Zusätzliche GPS-Messdaten konnten nicht vollständig gesichert werden. Die Fährtenaufnahme läuft weiter.",
   "track.recoverySaveFailed": "Die Absuche konnte nicht sicher gespeichert werden. Sie bleibt zum Fortsetzen erhalten. Bitte erneut versuchen.",
   // Allgemeine Aktionen / Buttons
   'common.save':      'Speichern',

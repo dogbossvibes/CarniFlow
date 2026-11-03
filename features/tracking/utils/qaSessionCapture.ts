@@ -35,6 +35,11 @@ export interface QaCapturePoint {
   y: number;
   accuracy: number | null;
   tMs: number;
+  /** JavaScript-Runtime-Eingang und Verarbeitung, relativ zum ersten Rohfix. */
+  receivedMs?: number | null;
+  timingDisposition?: import('./liveFixOrdering').LiveFixTimeDecision['disposition'];
+  processedMs?: number | null;
+  deliverySource?: 'foreground' | 'background' | 'unknown';
   /** Nur für Detektor-/Linienpunkte: kumulierte Weglänge DIESER Pipeline. */
   cumDistM?: number;
   /** Explicit unobserved boundary; no diagnostic line may bridge it. */
@@ -258,6 +263,7 @@ export type QaReferenceKind = 'rechts' | 'links' | 'spitz_rechts' | 'spitz_links
 export interface QaReferenceMark { tMs: number; kind: QaReferenceKind }
 
 export interface QaSessionCapture {
+  rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   referenceMarks?: QaReferenceMark[];
   referenceMarksTruncated?: boolean;
   /** 1 = Schema v2.0 (ohne Motion), 2 = v2.1 (mit candidateMotionEvidence). */

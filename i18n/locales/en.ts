@@ -152,6 +152,7 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.pace.legend": "Slower · similar · faster than the reference pace",
 
   "track.continuityNotice": "Recording interrupted · The gap is excluded from the measured distance. Only observed sections are assessed.",
+  "track.rawArchiveIncomplete": "Additional GPS measurements could not be fully saved. Track recording continues.",
   "track.recoverySaveFailed": "The search could not be saved safely. It remains available to resume. Please try again.",
 
   "common.save": "Save",

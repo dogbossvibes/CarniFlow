@@ -362,3 +362,26 @@ it('commits a normal corner only once when a later evaluation moves its apex wit
     expect(run.angles).toEqual(['rechts', 'rechts']);
   } finally { spy.mockRestore(); }
 });
+
+
+describe('Paket A: Zeitordnung vor allen Live-Seiteneffekten', () => {
+  it.each(['late', 'duplicate', 'future'] as const)('%s bleibt im QA-Mitschnitt, ohne Puck/Linie/Distanz/Detektor zu ändern', kind => {
+    const source = scenarios.find(s => s.name === 'right90 current')!;
+    const fixes = source.steps.filter((st): st is Extract<Scenario['steps'][number], { k: 'fix' }> => st.k === 'fix');
+    const last = fixes.at(-1)!;
+    const received = last.t + 1000;
+    const badT = kind === 'future' ? received + 3_600_000 : kind === 'late' ? last.t - 1000 : last.t;
+    const bad = { ...last, t: badT, ageMs: received - badT, x: 999, y: 999 };
+    const next = { ...last, t: received + 1000, x: last.x + 2 };
+    const control = runScenario({ ...source, qa: true, steps: [...source.steps, next] });
+    const actual = runScenario({ ...source, qa: true, steps: [...source.steps, bad, next] });
+    expect(actual.results.at(-2)).toMatchObject({ outcome: 'rejected', rejectReason: `time_${kind}`, corners: [], acceptedPoint: null });
+    expect(actual.session.qaRawFixesRef.current).toHaveLength(control.session.qaRawFixesRef.current.length + 1);
+    expect(actual.points).toEqual(control.points);
+    expect(actual.angles).toEqual(control.angles);
+    expect(actual.distanceCalls).toEqual(control.distanceCalls);
+    expect(actual.storeLog).toEqual(control.storeLog);
+    expect(actual.session.puckRef.current).toEqual(control.session.puckRef.current);
+    expect(actual.session.detectPointsRef.current).toEqual(control.session.detectPointsRef.current);
+  });
+});

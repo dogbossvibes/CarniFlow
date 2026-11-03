@@ -753,6 +753,12 @@ export default function LegenScreen() {
         <QaModeBadge />
         {phase === 'recording' && <QaReferenceMarker hidden={pocketLock} paused={isPaused} mark={rec.markQaReference} label={rec.labelQaReference} />}
 
+        {phase === 'recording' && !!dbg?.rawArchiveError && (
+          <View className="mx-[14px] mb-2 px-3 py-2 rounded-xl bg-white/5" accessibilityLiveRegion="polite">
+            <Text className="text-ft-warn text-[12px]">{t('track.rawArchiveIncomplete')}</Text>
+          </View>
+        )}
+
         {/* Karte / Skizze */}
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
           {phase === 'recording' && (

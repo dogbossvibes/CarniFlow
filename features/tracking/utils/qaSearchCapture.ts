@@ -66,7 +66,7 @@ export interface QaEndEligibilitySample {
 }
 
 // ── Recorder-Telemetrie (nur im Speicher, absolute Werte) ────────────────
-export interface SearchQaRawFix { lat: number; lng: number; accuracy: number | null; t: number; accepted: boolean; reason: string | null }
+export interface SearchQaRawFix { lat: number; lng: number; accuracy: number | null; t: number; receivedAtMs?: number; accepted: boolean; reason: string | null }
 export interface SearchQaPoint { lat: number; lng: number; tSec: number }
 export interface SearchQaCursorSample {
   tSec: number;
@@ -78,6 +78,7 @@ export interface SearchQaCursorSample {
 }
 export interface SearchQaObjectApproach { index: number; minHandlerDistM: number | null; progressAtClosestM: number | null }
 export interface SearchQaTelemetry {
+  rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   /**
    * 'qa' = interner QA-Modus (Vollumfang). 'support' = Minimal-Capture für normale Kunden
    * (nur Beobachtung: kein Dwell-Mitschnitt, keine UX-Diagnosen). Fehlt = 'qa' (Altbestand).
@@ -123,7 +124,7 @@ export interface QaRelPoint { x: number; y: number; tSec: number }
  * (Meter, rein diagnostisch) + das Ergebnis von evaluateSearchFix. `accepted: true` markiert die akzeptierten
  * Fixes — es gibt bewusst keinen zweiten Strom. `rejectReason` nur bei abgelehnten Fixes.
  */
-export interface QaRawSearchPoint extends QaRelPoint { accuracyM: number | null; accepted: boolean; rejectReason?: string }
+export interface QaRawSearchPoint extends QaRelPoint { receivedTSec?: number | null; accuracyM: number | null; accepted: boolean; rejectReason?: string }
 export interface QaGapStats { max: number | null; mean: number | null; p95: number | null }
 
 export interface QaSearchStreamStats {
@@ -156,6 +157,7 @@ export interface QaSearchTurnParity {
 }
 
 export interface QaSearchDiagnostics {
+  rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   /** QA v2.5: additive UX diagnostics. */
   voiceDiagnostics?: { events: VoiceDiagnostic[]; truncated: boolean };
   startApproachDiagnostics?: QaStartApproachDiagnostics;
@@ -397,6 +399,7 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
       replayUnfillableGaps: tel.replayUnfillableGaps.slice(0, 100),
       replayUnfillableGapsTruncated: tel.replayUnfillableGaps.length > 100 } : {}),
     partial: input.resumed || tel.resumed,
+    rawArchive: tel.rawArchive,
     rawSearchPointCount: tel.raw.length,
     acceptedSearchPointCount: tel.raw.filter(r => r.accepted).length,
     rejectedSearchPointCount: tel.raw.filter(r => !r.accepted).length,
@@ -422,6 +425,7 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
         x: round(p.x, 3), y: round(p.y, 3), tSec: round(p.tSec ?? 0, 1),
         accuracyM: p.meta.accuracy == null ? null : round(p.meta.accuracy, 2),
         accepted: p.meta.accepted,
+        ...(p.meta.receivedAtMs === undefined ? {} : { receivedTSec: Number.isFinite(p.meta.receivedAtMs) ? round((p.meta.receivedAtMs - tel.startedAtMs) / 1000, 3) : null }),
         ...(p.meta.accepted || !p.meta.reason ? {} : { rejectReason: p.meta.reason }),
       })),
       filtered: thin(filteredXY, SEARCH_QA_LIMITS.maxExportedPoints).map(p => ({ x: round(p.x, 3), y: round(p.y, 3), tSec: round(p.tSec ?? 0, 1) })),

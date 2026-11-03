@@ -133,6 +133,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "track.export.privacy": "Cha genaui Standört, Datum und Hundename enthalte.",
 
   "track.continuityNotice": "Uufzeichnig unterbroche · D Lücke zählt nöd zur gmessene Strecki. Bewertet wärded nur beobachteti Abschnitt.",
+  "track.rawArchiveIncomplete": "Zuesätzlechi GPS-Mässdate händ nöd vollständig chönne gsiicheret werde. D Fährteufnahm lauft wiiter.",
   "track.recoverySaveFailed": "D Suechi het nöd sicher chönne gspeicheret werde. Sie bliibt zum Wiitermache erhalte. Bitte nomal probiere.",
 
   // Allgemeine Aktionen / Buttons

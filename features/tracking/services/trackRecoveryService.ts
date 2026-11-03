@@ -176,7 +176,9 @@ export async function discardSearchAttempt(sessionId: string | null | undefined,
     if (opts.assertScope) await discardSearchBuffer(sessionId, opts.assertScope);
     else await discardSearchBuffer(sessionId);
     opts.assertScope?.();
-    if (opts.assertScope) await deleteSearchPointsBySession(sessionId, opts.assertScope);
+    const archiveAttemptId = typeof pending?.searchStartedAt === 'number' && Number.isFinite(pending.searchStartedAt) ? String(pending.searchStartedAt) : undefined;
+    if (archiveAttemptId) await deleteSearchPointsBySession(sessionId, opts.assertScope, archiveAttemptId);
+    else if (opts.assertScope) await deleteSearchPointsBySession(sessionId, opts.assertScope);
     else await deleteSearchPointsBySession(sessionId);   // nur point_type='search'
     opts.assertScope?.();
     await writePendingNow(dogId, d.pending);

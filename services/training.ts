@@ -1,3 +1,5 @@
+import { deleteGpsCaptures } from '@/features/tracking/storage/gpsCapture';
+import { gpsCaptureScope } from '@/features/tracking/storage/gpsCaptureScope';
 import { supabase } from '@/lib/supabase';
 import type { NewTrainingSession, TrainingSession } from '@/types';
 
@@ -42,6 +44,12 @@ export function updateTrainingSession(sessionId: string, updates: Partial<Omit<T
     .single();
 }
 
-export function deleteTrainingSession(sessionId: string) {
-  return supabase.from('training_sessions').delete().eq('id', sessionId);
+export async function deleteTrainingSession(sessionId: string) {
+  const scope = gpsCaptureScope();
+  const result = await supabase.from('training_sessions').delete().eq('id', sessionId);
+  if (!result.error && scope.userId) {
+    if (gpsCaptureScope().userId !== scope.userId || gpsCaptureScope().epoch !== scope.epoch) throw new Error('ACCOUNT_CHANGED');
+    await deleteGpsCaptures(sessionId);
+  }
+  return result;
 }

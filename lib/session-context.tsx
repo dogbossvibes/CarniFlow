@@ -1,3 +1,4 @@
+import { setGpsCaptureAccount } from '@/features/tracking/storage/gpsCaptureScope';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type Session, type User } from '@supabase/supabase-js';
 import { router } from 'expo-router';
@@ -30,6 +31,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const finish = (s: Session | null) => {
       if (done) return;
       done = true;
+      setGpsCaptureAccount(s?.user.id ?? null);
       setDiagnosticsSession(s?.user.id ?? null);
       setSession(s);
       setLoading(false);
@@ -53,6 +55,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // A delayed bootstrap response must not restore an earlier account after logout/switch.
       done = true;
       clearTimeout(safety);
+      setGpsCaptureAccount(session?.user.id ?? null, event === 'SIGNED_OUT');
       setDiagnosticsSession(session?.user.id ?? null);
       setSession(session);
       setLoading(false);
@@ -65,7 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (session?.user) initLocaleSync(session.user.id); else stopLocaleSync();
     });
 
-    return () => { clearTimeout(safety); subscription.unsubscribe(); setDiagnosticsSession(null); };
+    return () => { clearTimeout(safety); subscription.unsubscribe(); setGpsCaptureAccount(null); setDiagnosticsSession(null); };
   }, []);
 
   return (

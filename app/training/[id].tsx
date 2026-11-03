@@ -1,5 +1,5 @@
 import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,7 @@ import { PhotoPicker } from '@/components/ui/PhotoPicker';
 import { VideoUpload } from '@/components/ui/VideoUpload';
 import { AudioRecorder } from '@/components/ui/AudioRecorder';
 import { ShareSheet } from '@/components/ShareSheet';
+import { gpsCaptureScope } from '@/features/tracking/storage/gpsCaptureScope';
 import type { AudioNote, TrainingCategory, TrainingSession, TrainingType } from '@/types';
 
 // ─── Konstanten ───────────────────────────────────────────────────────────────
@@ -108,6 +109,12 @@ function SterneAnzeige({ wert }: { wert: number | null }) {
 export default function TrainingDetailScreen() {
   const router           = useRouter();
   const { id, edit }     = useLocalSearchParams<{ id: string; edit?: string }>();
+  const deleteGeneration = useRef(0);
+  const pendingDelete = useRef(false);
+  useEffect(() => {
+    const generation = ++deleteGeneration.current;
+    return () => { deleteGeneration.current = generation + 1; };
+  }, [id]);
 
   const [einheit,      setEinheit]      = useState<TrainingSession | null>(null);
   const [laden,        setLaden]        = useState(true);
@@ -192,6 +199,13 @@ export default function TrainingDetailScreen() {
   };
 
   const handleLoeschen = () => {
+    if (!id || pendingDelete.current) return;
+    const generation = deleteGeneration.current;
+    const scope = gpsCaptureScope();
+    const isCurrent = () => {
+      const current = gpsCaptureScope();
+      return generation === deleteGeneration.current && current.userId === scope.userId && current.epoch === scope.epoch;
+    };
     Alert.alert(
       'Einheit entfernen',
       'Möchtest du diese Trainingseinheit wirklich entfernen?',
@@ -201,8 +215,17 @@ export default function TrainingDetailScreen() {
           text: 'Entfernen',
           style: 'destructive',
           onPress: async () => {
-            await deleteTrainingSession(id!);
-            router.back();
+            if (!isCurrent() || pendingDelete.current) return;
+            pendingDelete.current = true;
+            try {
+              const { error } = await deleteTrainingSession(id);
+              if (error) throw error;
+              if (isCurrent()) router.back();
+            } catch {
+              if (isCurrent()) Alert.alert('Fehler', 'Einheit konnte nicht entfernt werden. Bitte erneut versuchen.');
+            } finally {
+              pendingDelete.current = false;
+            }
           },
         },
       ]

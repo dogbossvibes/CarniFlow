@@ -156,6 +156,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "track.pace.legend": "Plus lent · similaire · plus rapide que le rythme de référence",
 
   "track.continuityNotice": "Enregistrement interrompu · La coupure est exclue de la distance mesurée. Seules les sections observées sont évaluées.",
+  "track.rawArchiveIncomplete": "Les mesures GPS supplémentaires n’ont pas pu être enregistrées intégralement. L’enregistrement de la piste continue.",
   "track.recoverySaveFailed": "La recherche n’a pas pu être enregistrée. Elle reste disponible pour être reprise. Veuillez réessayer.",
 
   // Allgemeine Aktionen / Buttons

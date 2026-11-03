@@ -236,6 +236,31 @@ describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search locati
     expect(mode === 'precision' ? mockNativeStop : mockExpoRemove).toHaveBeenCalledTimes(1);
   });
 
+  it('expires start readiness without new callbacks and requires fresh confirmation after resume', async () => {
+    await mount();
+    feed(2); feed(2);
+    expect(approach.armed).toBe(true);
+    const oldArmedAt = approach.armedAtMs;
+    const events = approachEvents.length;
+    const pos = approach.position;
+    act(() => { jest.advanceTimersByTime(5001); });
+    clockMs = Date.now();
+    expect(approach.armed).toBe(false);
+    expect(approach.phase).toBe('approaching');
+    expect(approach.armedAtMs).toBeNull();
+    expect(approach.startReachedAtMs).toBeNull();
+    expect(approach.firstStableFixAtMs).toBeNull();
+    expect(approach.position).toEqual(pos);
+    expect(approachEvents).toHaveLength(events); // no invented GPS or departure event
+    feed(5); feed(5);
+    expect(approach.phase).not.toBe('departed_start');
+    feed(2);
+    expect(approach.armed).toBe(false);
+    feed(2);
+    expect(approach.armed).toBe(true);
+    expect(approach.armedAtMs!).toBeGreaterThan(oldArmedAt!);
+  });
+
   it('keeps raw coordinates, unrounded accuracy, freshness and consecutive-fix arming', async () => {
     await mount();
     feed(2, 4.4);
@@ -250,8 +275,16 @@ describe.each<LocationSourceMode>(['precision', 'legacy'])('single Search locati
     expect(approach.position!.lat).not.toBe(recorder.position!.latitude); // not EMA
     feed(3, 4.4);
     expect(approach.armed).toBe(true);
+    const eventsBeforeLate = approachEvents.length;
+    const lastLive = recorder.liveFix;
     feed(3, 4.4, 6000);
-    expect(approach.armed).toBe(false);
+    expect(recorder.liveFix).toBe(lastLive);
+    expect(approachEvents).toHaveLength(eventsBeforeLate);
+    expect(approach.armed).toBe(true); // last accepted fix is still fresh
+    act(() => { jest.advanceTimersByTime(5001); });
+    clockMs = Date.now();
+    expect(approach.armed).toBe(false); // expires without replaying the stale delivery
+    expect(approachEvents).toHaveLength(eventsBeforeLate);
     feed(3, 13); // accuracy cap unchanged
     expect(approach.fixesRemaining).toBe(2);
     feed(100); // implausible jump / outside radius
