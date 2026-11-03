@@ -1,0 +1,30 @@
+{
+  "status": "IOS57_MAP_READY_OTA_PUBLISHED_AND_INDEPENDENTLY_VERIFIED",
+  "completedUTC": "2026-11-02T23:47:03.370761+00:00",
+  "channel": "production",
+  "environment": "production",
+  "sourceCommit": "02545d851cec2f6ddee0f053aa2c4626971789fe",
+  "target": {
+    "sourceCommit": "02545d851cec2f6ddee0f053aa2c4626971789fe",
+    "runtime": "1.0.6-map49-v1",
+    "platform": "ios",
+    "groupId": "12ebbaf5-b71f-4eaf-9f5d-4970b580fb98",
+    "updateId": "01a19ea6-c76b-7988-83d5-61e3b42b79db",
+    "createdAt": "2026-11-02T23:44:52.587Z",
+    "branch": "production",
+    "message": "Gespeicherte F\u00e4hrte: Vergleichslinien nach Kartenbereitschaft anzeigen",
+    "readbackUTC": "2026-11-02T23:45:13.834412+00:00"
+  },
+  "assetEntries": 52,
+  "bundleSHA256": "f96275f95ac57fb09640662159a424a4401e11fac29dc7903a6867519e696c1a",
+  "T115Retained": true,
+  "liveShareRetained": true,
+  "trackingAlgorithmsUnchanged": true,
+  "nativeChanges": false,
+  "deviceQA": "NOT_VERIFIED_DEFERRED_BY_USER",
+  "sourceGitHubRef": "release/source-02545d851cec",
+  "originalFinalReportSHA256": "3508b84ef5184088b0d37d9e84912c6e7ff2deebc1ad2c0bb0248b07cb2b4cec",
+  "independentPostflightSHA256": "160f8360c54db65dea00cabb345e44543f961912602e539f7d357360f6094ace",
+  "rootIndependentMapTests": 43,
+  "rootActualCDNBundleHashVerified": true
+}
