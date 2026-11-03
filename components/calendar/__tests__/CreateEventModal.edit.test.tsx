@@ -1,6 +1,6 @@
 import React from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet, Text } from 'react-native';
 import { CreateEventModal } from '../CreateEventModal';
 import { event } from '@/features/calendar/__tests__/fixture';
 
@@ -108,4 +108,24 @@ it('only changes reminders after an explicit user choice on a legacy null event'
   act(() => { reminder.props.setPushOn(true); reminder.props.onToggle(60); });
   await act(async () => { await save(); });
   expect(mockUpdate).toHaveBeenCalledWith('owner-a', legacy, { reminder_minutes: [60] });
+});
+
+
+it('reserves an unshrinking close target beside a fully wrapping calendar title', async () => {
+  await render();
+  const closeButton = node.root.findAll(n => n.props.accessibilityLabel === 'common.close')[0];
+  const heading = node.root.findAllByType(Text).find(n => n.props.children === 'calendar.editEvent')!;
+  const headerStyle = StyleSheet.flatten(heading.props.style);
+  const closeStyle = StyleSheet.flatten(closeButton.props.style);
+  expect(headerStyle.flex).toBe(1);
+  expect(headerStyle.minWidth).toBe(0);
+  expect(heading.props.numberOfLines).toBeUndefined();
+  expect(heading.props.allowFontScaling).not.toBe(false);
+  expect(heading.props.maxFontSizeMultiplier).toBeUndefined();
+  expect(closeStyle.flexShrink).toBe(0);
+  expect(closeStyle.width).toBeGreaterThanOrEqual(48);
+  expect(closeStyle.height).toBeGreaterThanOrEqual(48);
+  act(() => closeButton.props.onPress());
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(mockCreate).not.toHaveBeenCalled(); expect(mockUpdate).not.toHaveBeenCalled();
 });
