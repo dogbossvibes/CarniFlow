@@ -227,6 +227,125 @@ beforeEach(() => {
   mockPush.mockReset();
 });
 
+describe('T174 health save and medication request races', () => {
+  let node: ReactTestRenderer;
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [MEDICATION_ROW, { ...MEDICATION_ROW, id: 'med-2', name: 'Cortison' }] });
+    mockCreateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'entry-1' }, error: null, reminderSync: 'not_required' });
+  });
+  afterEach(() => { act(() => node?.unmount()); });
+
+  it('T174 saves one weight entry for two presses before the next render', async () => {
+    node = render(); await flush(); openWeightSheet(node);
+    act(() => weightInput(node).props.onChangeText('24,5'));
+    const press = findByText(node, 'Speichern').props.onPress;
+    await act(async () => { await Promise.all([press(), press()]); });
+    expect(mockCreateWeightEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it('T174 saves one administration for two presses before the next render', async () => {
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => findByText(node, 'Gabe dokumentieren').props.onPress());
+    const press = findByText(node, 'Speichern').props.onPress;
+    await act(async () => { await Promise.all([press(), press()]); });
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(1);
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledWith('dog-1', 'med-1', expect.anything());
+  });
+
+  it('T174 ignores a late administration response from a previously opened medication', async () => {
+    let finish!: (value: unknown) => void;
+    mockLoadMedicationAdministrations.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValue({ data: [{ ...administrationRow({ id: 'admin-b', administered_at: '2026-10-01T08:00:00Z', note: 'ONLY_MEDICATION_B' }), medication_id: 'med-2' }], error: null });
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => node.root.findAllByType(AnyvoBottomSheet).find(sheet => sheet.props.visible && sheet.props.title === 'Rimadyl')!.props.onClose());
+    act(() => findByText(node, 'Cortison').props.onPress()); await flush();
+    expect(strings(node)).toContain('ONLY_MEDICATION_B');
+    await act(async () => { finish({ data: [administrationRow({ id: 'admin-a', administered_at: '2026-09-01T08:00:00Z', note: 'ONLY_MEDICATION_A' })], error: null }); });
+    expect(strings(node)).toContain('ONLY_MEDICATION_B');
+    expect(strings(node)).not.toContain('ONLY_MEDICATION_A');
+    expect(mockCreateMedicationAdministration).not.toHaveBeenCalled();
+    expect(mockUpdateMedicationAdministration).not.toHaveBeenCalled();
+  });
+
+  it('T174 distinguishes a failed administration read from a truly empty history and offers retry', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValueOnce({ data: [], error: { message: 'offline' } });
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    expect(strings(node)).not.toContain('Noch keine Gaben dokumentiert.');
+    expect(strings(node)).toContain('Gesundheitsdaten konnten nicht geladen werden.');
+    expect(findByText(node, 'Erneut versuchen')).toBeTruthy();
+    mockLoadMedicationAdministrations.mockResolvedValue({ data: [administrationRow({ id: 'admin-retry', administered_at: '2026-10-01T08:00:00Z', note: 'RETRY_RESULT' })], error: null });
+    await act(async () => { await findByText(node, 'Erneut versuchen').props.onPress(); });
+    expect(strings(node)).toContain('RETRY_RESULT');
+    expect(strings(node)).not.toContain('Gesundheitsdaten konnten nicht geladen werden.');
+  });
+
+  it('T174 unlocks a failed weight save for retry while retaining the entered value', async () => {
+    mockCreateWeightEntry.mockRejectedValueOnce(new Error('offline'));
+    node = render(); await flush(); openWeightSheet(node);
+    act(() => weightInput(node).props.onChangeText('24,5'));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(weightInput(node).props.value).toBe('24,5');
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateWeightEntry).toHaveBeenCalledTimes(2);
+    expect(mockCreateWeightEntry).toHaveBeenLastCalledWith('dog-1', expect.objectContaining({ weight_kg: 24.5 }));
+  });
+
+  it('T174 unlocks a failed administration save for retry without touching the parent medication', async () => {
+    mockCreateMedicationAdministration.mockRejectedValueOnce(new Error('offline'));
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => findByText(node, 'Gabe dokumentieren').props.onPress());
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(node.root.findAllByType(AnyvoBottomSheet).some(s => s.props.visible && s.props.title === 'Gabe dokumentieren')).toBe(true);
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(2);
+    expect(mockUpdateMedication).not.toHaveBeenCalled();
+    expect(mockCreateMedication).not.toHaveBeenCalled();
+  });
+
+  it('T174 keeps the last loaded history if the refresh after a committed save rejects, then retries only the read', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValue({ data: [administrationRow({ id: 'known', administered_at: '2026-10-01T08:00:00Z', note: 'LAST_KNOWN_HISTORY' })], error: null });
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    mockLoadMedicationAdministrations.mockRejectedValueOnce(new Error('offline'));
+    act(() => findByText(node, 'Gabe dokumentieren').props.onPress());
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(strings(node)).toContain('LAST_KNOWN_HISTORY');
+    expect(strings(node)).toContain('Gesundheitsdaten konnten nicht geladen werden.');
+    expect(strings(node)).not.toContain('Noch keine Gaben dokumentiert.');
+    await act(async () => { await findByText(node, 'Erneut versuchen').props.onPress(); });
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(1);
+    expect(strings(node)).not.toContain('Gesundheitsdaten konnten nicht geladen werden.');
+  });
+
+  it('T174 still shows a genuinely empty history as empty without a failure notice', async () => {
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    expect(strings(node)).toContain('Noch keine Gaben dokumentiert.');
+    expect(strings(node)).not.toContain('Gesundheitsdaten konnten nicht geladen werden.');
+  });
+
+  it('T174 rejects an earlier response even after reopening the same medication via another one', async () => {
+    let finish!: (value: unknown) => void;
+    mockLoadMedicationAdministrations.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: [administrationRow({ id: 'current-a', administered_at: '2026-10-01T08:00:00Z', note: 'CURRENT_A' })], error: null });
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => node.root.findAllByType(AnyvoBottomSheet).find(s => s.props.visible)!.props.onClose());
+    act(() => findByText(node, 'Cortison').props.onPress()); await flush();
+    act(() => node.root.findAllByType(AnyvoBottomSheet).find(s => s.props.visible)!.props.onClose());
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    await act(async () => { finish({ data: [administrationRow({ id: 'outdated-a', administered_at: '2026-09-01T08:00:00Z', note: 'OUTDATED_A' })], error: null }); });
+    expect(strings(node)).toContain('CURRENT_A');
+    expect(strings(node)).not.toContain('OUTDATED_A');
+  });
+});
+
 describe('Digital Health Record: "Gewicht erfassen" weight entry', () => {
   beforeEach(() => {
     mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });

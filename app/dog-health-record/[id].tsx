@@ -87,6 +87,9 @@ function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOn
   const [detail, setDetail] = useState<HealthTimelineItem | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // State updates render asynchronously; block repeated presses immediately.
+  const saveLock = useRef(false);
+  const adminSaveLock = useRef(false);
   const [reminderNotice, setReminderNotice] = useState<{ reference: HealthReminderReference; status: HealthMutationResult<unknown>['reminderSync'] } | null>(null);
   const [retryingReminder, setRetryingReminder] = useState(false);
   const retryReminder = async () => {
@@ -284,6 +287,8 @@ function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOn
   // any other administration.
   const [administrations, setAdministrations] = useState<HealthMedicationAdministrationRow[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
+  const [adminLoadError, setAdminLoadError] = useState(false);
+  const adminRequests = useRef({ medicationId: null as string | null, generation: 0 });
   const [adminSheetOpen, setAdminSheetOpen] = useState(false);
   const [adminEditId, setAdminEditId] = useState<string | null>(null);
   const [adminSaving, setAdminSaving] = useState(false);
@@ -298,15 +303,33 @@ function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOn
   const medicationDetailId = detail?.kind === 'medication' ? detail.id.split(':')[1] : null;
 
   const loadAdministrations = useCallback(async (medicationId: string) => {
+    // Also reject refreshes requested by a completed save for a closed detail.
+    const scope = adminRequests.current;
+    if (scope.medicationId !== medicationId) return;
+    const request = ++scope.generation;
+    const current = () => scope.medicationId === medicationId && scope.generation === request;
     setAdminLoading(true);
-    const result = await loadMedicationAdministrations(medicationId);
-    setAdministrations(result.error ? [] : result.data);
-    setAdminLoading(false);
+    setAdminLoadError(false);
+    try {
+      const result = await loadMedicationAdministrations(medicationId);
+      if (!current()) return;
+      if (result.error) setAdminLoadError(true);
+      else setAdministrations(result.data);
+    } catch {
+      if (current()) setAdminLoadError(true);
+    } finally {
+      if (current()) setAdminLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (medicationDetailId) loadAdministrations(medicationDetailId);
-    else setAdministrations([]);
+    const scope = adminRequests.current;
+    scope.medicationId = medicationDetailId;
+    setAdministrations([]);
+    setAdminLoadError(false);
+    setAdminLoading(false);
+    if (medicationDetailId) void loadAdministrations(medicationDetailId);
+    return () => { scope.medicationId = null; ++scope.generation; };
   }, [medicationDetailId, loadAdministrations]);
 
   const openAdminForm = () => {
@@ -321,7 +344,8 @@ function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOn
     setAdminSheetOpen(true);
   };
   const saveAdmin = async () => {
-    if (!medicationDetailId || !dogId || adminSaving || !adminDate || !adminTime) return;
+    if (!medicationDetailId || !dogId || adminSaveLock.current || !adminDate || !adminTime) return;
+    adminSaveLock.current = true;
     setAdminSaving(true);
     try {
       const amountValue = adminAmount.trim() ? Number(adminAmount.replace(',', '.')) : null;
@@ -337,7 +361,7 @@ function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOn
       await loadAdministrations(medicationDetailId);
       showToast(adminEditId ? healthT("health.uxAdministrationUpdated") : healthT("health.uxAdministrationSaved"));
     } catch (cause) { showToast(cause instanceof Error ? cause.message : healthT("health.uxAdministrationSaveFailed")); }
-    finally { setAdminSaving(false); }
+    finally { adminSaveLock.current = false; setAdminSaving(false); }
   };
   const deleteAdmin = (row: HealthMedicationAdministrationRow) => {
     Alert.alert(healthT("health.uxAdministrationDeleteTitle"), healthT("health.uxAdministrationDeleteBody"), [
@@ -351,7 +375,8 @@ function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOn
   };
 
   const save = async () => {
-    if (!dogId || !sheet || saving || !isOwner) return;
+    if (!dogId || !sheet || saveLock.current || !isOwner) return;
+    saveLock.current = true;
     setSaving(true);
     try {
       let reminderSync: HealthMutationResult<unknown>['reminderSync'] = 'not_required';
@@ -389,7 +414,7 @@ function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOn
       if (reference) setReminderNotice({ reference, status: reminderSync });
       setSheet(null); setEditId(null); showToast(reminderSync === 'failed' ? healthT("health.uxCalendarSyncFailed") : editId ? healthT("health.uxUpdated") : healthT("health.recordSaved")); await reload();
     } catch (cause) { showToast(cause instanceof Error ? cause.message : healthT("health.uxSaveFailed")); }
-    finally { setSaving(false); }
+    finally { saveLock.current = false; setSaving(false); }
   };
 
   const documents: DogDocument[] = data.documents.map(row => ({ id: row.id, title: row.title?.trim() || healthT("health.uxHealthDocument"), category: row.category || row.kind, fileUrl: row.file_url, fileType: fileType(row.file_url), issuedOn: row.issued_on, createdAt: row.created_at }));
@@ -555,7 +580,8 @@ function DogHealthRecordContent({ weightJournalOnly = false }: { weightJournalOn
         ) : detail ? (
           <DetailBody
             detail={detail} data={data} isOwner={isOwner} onOpenDocument={id => { const doc = documents.find(row => row.id === id); if (doc) void openDocument(doc); }}
-            administrations={administrations} adminLoading={adminLoading}
+            administrations={administrations} adminLoading={adminLoading} adminLoadError={adminLoadError}
+            onRetryAdministrations={() => { if (medicationDetailId) void loadAdministrations(medicationDetailId); }}
             onEdit={openEdit} onDelete={deleteItem}
             onOpenAdminForm={openAdminForm} onEditAdmin={openAdminEdit} onDeleteAdmin={deleteAdmin}
           />
@@ -671,9 +697,10 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return <View style={s.detailRow}><Text style={s.detailLabel}>{label}</Text><Text style={s.detailText}>{value}</Text></View>;
 }
 
-function DetailBody({ detail, data, isOwner, administrations, adminLoading, onEdit, onDelete, onOpenAdminForm, onEditAdmin, onDeleteAdmin, onOpenDocument }: {
+function DetailBody({ detail, data, isOwner, administrations, adminLoading, adminLoadError, onRetryAdministrations, onEdit, onDelete, onOpenAdminForm, onEditAdmin, onDeleteAdmin, onOpenDocument }: {
   detail: HealthTimelineItem; data: HealthOverviewData; isOwner: boolean; onOpenDocument: (id: string) => void;
   administrations: HealthMedicationAdministrationRow[]; adminLoading: boolean;
+  adminLoadError: boolean; onRetryAdministrations: () => void;
   onEdit: (item: HealthTimelineItem) => void; onDelete: (item: HealthTimelineItem) => void;
   onOpenAdminForm: () => void; onEditAdmin: (row: HealthMedicationAdministrationRow) => void; onDeleteAdmin: (row: HealthMedicationAdministrationRow) => void;
 }) {
@@ -723,7 +750,8 @@ function DetailBody({ detail, data, isOwner, administrations, adminLoading, onEd
         <Text style={s.gabenHeading}>Gaben</Text>
         {isOwner ? <AnyvoButton label={healthT("health.uxAdministrationAdd")} icon="add" variant="secondary" onPress={onOpenAdminForm} /> : null}
         {adminLoading ? <Text style={s.muted}>Lädt…</Text> : null}
-        {!adminLoading && administrations.length === 0 ? <Text style={s.muted}>Noch keine Gaben dokumentiert.</Text> : null}
+        {adminLoadError ? <View><Text accessibilityRole="alert" style={s.muted}>{healthT("health.uxLoadFailed")}</Text><AnyvoButton label={healthT("common.retry")} variant="secondary" onPress={onRetryAdministrations} loading={adminLoading} /></View> : null}
+        {!adminLoading && !adminLoadError && administrations.length === 0 ? <Text style={s.muted}>Noch keine Gaben dokumentiert.</Text> : null}
         {administrations.map(entry => (
           <View key={entry.id} style={s.adminRow}>
             <View style={{ flex: 1 }}>
