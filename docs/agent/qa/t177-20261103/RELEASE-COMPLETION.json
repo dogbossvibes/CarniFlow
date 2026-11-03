@@ -1,0 +1,61 @@
+{
+  "status": "THREE_T177_LARGE_FONT_OTAS_PUBLISHED_ALL_ASSETS_AND_INDEPENDENT_REVIEWS_PASS",
+  "completedUTC": "2026-11-03T20:16:56.201694+00:00",
+  "channel": "production",
+  "targets": [
+    {
+      "target": "ios57",
+      "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-ui-20261101",
+      "branch": "release/t177-ios57-20261103",
+      "sourceCommit": "3d21d664d356dcacbee3c87f40589b3e740709f2",
+      "sourceGitHubRef": "release/source-3d21d664d356",
+      "runtime": "1.0.6-map49-v1",
+      "groupId": "328c64f6-c150-4ed6-8afe-6c81c33a3038",
+      "updateId": "01a1a2fe-9932-741d-b295-fc5d201641ce",
+      "bundleSHA256": "437b33a935871316a70e191f67b724d4aa52a3362146a3c100a51b62d4bcaa6f",
+      "testsPassed": 70,
+      "additionalAndroidPresetTests": 0,
+      "assetEntries": 52,
+      "independentPostflightReviewer": "07"
+    },
+    {
+      "target": "android49",
+      "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-android49-20261101",
+      "branch": "release/t177-android49-20261103",
+      "sourceCommit": "da715fc7c558684713ce3d8cca4bb7feeed6d4cc",
+      "sourceGitHubRef": "release/source-da715fc7c558",
+      "runtime": "1.0.5-greeting-v1",
+      "groupId": "765ff6a8-2e47-4ee8-b357-b0e3d2d912c9",
+      "updateId": "01a1a305-5f9e-7479-94c3-039e7e5b887c",
+      "bundleSHA256": "d30dcf6f79ab7b3fbadc05a695607943faaed3635eb77d376dfefe130440d2ee",
+      "testsPassed": 74,
+      "additionalAndroidPresetTests": 13,
+      "assetEntries": 52,
+      "independentPostflightReviewer": "07"
+    },
+    {
+      "target": "android50",
+      "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-android50-20261101",
+      "branch": "release/t177-android50-20261103",
+      "sourceCommit": "21c04eee535abed61bc79b1f2485b0adf56fdd30",
+      "sourceGitHubRef": "release/source-21c04eee535a",
+      "runtime": "1.0.5-gnss-v1",
+      "groupId": "6b52516b-399f-458a-b225-56451eae8c5c",
+      "updateId": "01a1a30d-0b22-726f-b43c-2a978f9895d9",
+      "bundleSHA256": "d34a823781ea5a13b95d7ea6ea98d7ae68a5a7b961dc8ea0783b540f49ced2bd",
+      "testsPassed": 74,
+      "additionalAndroidPresetTests": 13,
+      "assetEntries": 52,
+      "independentPostflightReviewer": "07"
+    }
+  ],
+  "originalFinalReportSHA256": "a17354648da9826b565e4651c36d6dec60dbfa8cb325c153da1bb58021c73bcf",
+  "independentClosureSHA256": "5d585ebeec4944d32100c91e803ebb24cc2ad3794062355332d0b711c0fa5946",
+  "productScope": "Home slogan/statistics and calendar close button at large text",
+  "onlyTwoProductModulesChangedPerTarget": true,
+  "existingFunctionsAndAssetsRetainedInReviewedBundles": true,
+  "nativeBuildStarted": false,
+  "databaseWritePerformed": false,
+  "storeReleasePerformed": false,
+  "deviceAndScreenreaderQA": "NOT_VERIFIED"
+}
