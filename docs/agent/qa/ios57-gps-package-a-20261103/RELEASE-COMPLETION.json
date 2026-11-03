@@ -1,0 +1,36 @@
+{
+  "status": "IOS57_GPS_PACKAGE_A_OTA_PUBLISHED_AND_INDEPENDENTLY_VERIFIED",
+  "completedUTC": "2026-11-03T00:32:30.752405+00:00",
+  "channel": "production",
+  "environment": "production",
+  "sourceCommit": "bb09bf625bb7305f4e8e619d1148d2685e79afd6",
+  "sourceTree": "8c2c4d0c3f789b3af203c36e2c920ad2cc8e8b62",
+  "sourceGitHubRef": "release/source-bb09bf625bb7",
+  "baseCommit": "02545d851cec2f6ddee0f053aa2c4626971789fe",
+  "target": {
+    "platform": "ios",
+    "buildNumber": 57,
+    "runtime": "1.0.6-map49-v1",
+    "groupId": "ad87c408-5b5a-4459-990f-3916807498ba",
+    "updateId": "01a19ecf-5804-7349-87ea-752ad6edb51f",
+    "createdAt": "2026-11-03T00:29:11.044Z",
+    "branch": "production"
+  },
+  "tests": {
+    "completeSuites": 548,
+    "completeTests": 6323,
+    "failed": 0,
+    "serialProcesses": 7
+  },
+  "bundleSHA256": "91360e30cfa6bfddeab5012ac53f8e28cb6c04c47bc8ac73878ace0f63b7c7de",
+  "manifestAssetEntries": 52,
+  "actualCDNBundleAndAllAssetEntriesVerified": true,
+  "independentPostflight": "PASS",
+  "independentPostflightSHA256": "1c5a4873151117d5bae2d94be953b01e092aa3289673e3a453c5ab86691ec725",
+  "T115Retained": true,
+  "mapFixRetained": true,
+  "liveShareRetained": true,
+  "nativeChanges": false,
+  "androidChangedByThisUpdate": false,
+  "deviceQA": "NOT_VERIFIED"
+}
