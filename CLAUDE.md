@@ -42,9 +42,10 @@ No commit and no push are performed by the handoff.
 
 ## BMAD and transfer from Codex
 
-Claude Code is a supported working agent. Read `docs/agent/BMAD.md` and use the
-local `.claude/skills/` automatically where useful. Keep repository-based context
-shared with Codex. `docs/agent/audits/2026-11-01.md` records the dated backup and
+Claude Code is a supported working agent. Always consider BMAD for every task
+and scale its scope to complexity and risk, including small tasks. Read
+`docs/agent/BMAD.md`; use the local `.claude/skills/` for the selected workflow.
+Keep repository-based context shared with Codex. `docs/agent/audits/2026-11-01.md` records the dated backup and
 integration audit; current canonical status and fresh Git/EAS facts take precedence.
 Verify uv and skill discovery in a fresh Claude session before implementation.
 

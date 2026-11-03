@@ -6,13 +6,32 @@ Kompatibilitäts-Shims. `uv` ist als notwendiges Hilfsprogramm installiert.
 
 ## Start
 
-BMAD wird bei Anyvo automatisch eingesetzt, wenn es zur Aufgabe passt; eine
-ausdrückliche Aufforderung ist nicht nötig. Das gilt für substanzielle Funktionen,
-nicht triviale Fehlerbehebungen und Architekturänderungen. Fragen, Tippfehler,
-Formatierung und andere einfache mechanische Änderungen direkt bearbeiten.
-Immer den kleinsten passenden Ablauf wählen und dessen Verwendung kurz nennen.
-Die Wahl von BMAD benötigt keine zusätzliche Bestätigung; bestehende Freigaben
-für einzelne Aktionen bleiben unverändert. Diese Regel gilt für Codex und Claude.
+BMAD bei jedem Anyvo-Auftrag automatisch berücksichtigen und den Umfang nach
+Komplexität und Risiko wählen, ohne gesonderte Aufforderung. Das gilt für Codex
+und Claude. BMAD läuft als Arbeitsweise im jeweiligen Auftrag, nicht als
+Hintergrunddienst. Bestehende Freigabegrenzen bleiben unverändert.
+
+- Bei jeder Aufgabe Ziel und Erfolgskriterium klären, betroffene Stellen und
+  Auswirkungen prüfen, im beauftragten Umfang arbeiten und angemessen
+  verifizieren. Reine Prüfaufträge bleiben lesend.
+- Für kleine klare Aufgaben mit geringem Risiko reichen diese Grundschritte
+  kompakt im Arbeitsablauf und Abschlussbericht. Keine separate Spezifikation
+  allein wegen BMAD und keine künstlichen Rollenwechsel.
+- Komplexität und Risiko getrennt bewerten: Auch eine kleine Änderung an Auth,
+  Berechtigungen, Kundendaten, Persistenz oder Tracking kann vertiefte Analyse,
+  Regressionstests und ein Review erfordern.
+- Bei unklaren Anforderungen oder größeren Funktionen den passenden
+  Spezifikations-/Umsetzungsablauf nutzen; Architektur und vertiefte Reviews
+  nach Bedarf ergänzen. Vorhandene Spezifikationen und Prüfbelege wiederverwenden.
+- Den gewählten Umfang kurz nennen; bei kleinen Aufgaben genügt eine knappe
+  Arbeitsankündigung. Dafür keine zusätzliche Bestätigung verlangen.
+- Vor Nutzung den tatsächlichen Skill unter `.agents/skills/<name>/SKILL.md`
+  (Codex) bzw. `.claude/skills/<name>/SKILL.md` (Claude) lesen. Fehlt er in der
+  Werkzeugliste, die lokale Anleitung und referenzierte Dateien direkt lesen.
+  Fehlende Installation offen benennen, keine BMAD-Ausführung vortäuschen.
+- Zusätzliche Agenten, parallele Reviews und Party Mode nur auf ausdrücklichen
+  Nutzerwunsch. Ohne Delegationsfreigabe die nötigen Prüfschritte nacheinander
+  im aktuellen Agenten bearbeiten und fehlende unabhängige Prüfung benennen.
 
 Im jeweils vereinbarten aktuellen Anyvo-Checkout arbeiten (`package.json` mit
 `name: anyvo`); nicht im äußeren Expo-Starter oder ungeprüft im alten September-Zweig.
@@ -65,8 +84,9 @@ für den aktuellen Stand.
 4. Der übernehmende Agent prüft Branch, Dateien und `npm run agent:status`.
 
 Die bestehenden Freigabegrenzen bleiben gültig, auch falls ein BMAD-Workflow
-Commits oder Veröffentlichung vorschlägt. Installation ist lokal und uncommitted;
-andere Checkouts erhalten sie erst durch einen später freigegebenen Transfer.
+Commits oder Veröffentlichung vorschlägt. Die Installation wurde mit PR #11
+in `main` integriert. Andere Checkouts erhalten Änderungen erst durch einen
+gezielten Transfer; fremde lokale Änderungen dabei bewahren.
 
 ## Wartung
 
