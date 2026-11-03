@@ -362,9 +362,12 @@ export async function clearQaSessionCaptures(): Promise<void> {
     try {
       for (const id of ids) {
         if (accessToken !== diagnosticsAccessToken()) return;
-        await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
+        await AsyncStorage.removeItem(keyFor(id));
       }
-      if (accessToken === diagnosticsAccessToken()) { await AsyncStorage.removeItem(INDEX_KEY); await metadata.commit(); }
+      // Keep the exact retry identities until captures AND metadata are removed.
+      // In particular, an intent-write failure must remain retryable after restart.
+      if (accessToken !== diagnosticsAccessToken() || !await metadata.commit()) return;
+      if (accessToken === diagnosticsAccessToken()) await AsyncStorage.removeItem(INDEX_KEY);
     } finally { metadata.cancel(); }
   } catch { /* best-effort */ }
 }
