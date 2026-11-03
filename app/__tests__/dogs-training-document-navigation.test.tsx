@@ -11,6 +11,7 @@ const mockDogs = [{ id: 'dog-yam', name: 'Yam' }, { id: 'dog-malu', name: 'Malu'
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }), useFocusEffect: jest.fn() }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: mockDogs, loading: false, refresh: jest.fn() }) }));
 jest.mock('@/hooks/useCapabilities', () => ({ useCapabilities: () => ({ isPro: true, loading: false }) }));
+jest.mock('@/components/dogs/SharedDogsInbox', () => ({ SharedDogsInbox: 'SharedDogsInbox' }));
 jest.mock('@/components/dogs/DogCompactCard', () => ({ DogCompactCard: 'DogCard' }));
 jest.mock('@/components/dogs/types', () => ({ dogToIdentity: (dog: unknown) => dog }));
 jest.mock('@/components/ui/AnimatedPressable', () => ({ AnimatedPressable: 'AnimatedPressable' }));
