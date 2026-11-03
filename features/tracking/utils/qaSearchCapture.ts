@@ -78,6 +78,8 @@ export interface SearchQaCursorSample {
 }
 export interface SearchQaObjectApproach { index: number; minHandlerDistM: number | null; progressAtClosestM: number | null }
 export interface SearchQaTelemetry {
+  /** Coordinate-free identity of this actual observed segment, captured at start. */
+  recordingContext?: import('./diagnosticProvenance').RecordingProvenance;
   rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   /**
    * 'qa' = interner QA-Modus (Vollumfang). 'support' = Minimal-Capture für normale Kunden
@@ -157,6 +159,8 @@ export interface QaSearchTurnParity {
 }
 
 export interface QaSearchDiagnostics {
+  /** Internal capture context; projected only into the validated support provenance block. */
+  recordingContext?: import('./diagnosticProvenance').RecordingProvenance;
   rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   /** QA v2.5: additive UX diagnostics. */
   voiceDiagnostics?: { events: VoiceDiagnostic[]; truncated: boolean };
@@ -400,6 +404,7 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
       replayUnfillableGapsTruncated: tel.replayUnfillableGaps.length > 100 } : {}),
     partial: input.resumed || tel.resumed,
     rawArchive: tel.rawArchive,
+    ...(tel.recordingContext ? { recordingContext: tel.recordingContext } : {}),
     rawSearchPointCount: tel.raw.length,
     acceptedSearchPointCount: tel.raw.filter(r => r.accepted).length,
     rejectedSearchPointCount: tel.raw.filter(r => !r.accepted).length,

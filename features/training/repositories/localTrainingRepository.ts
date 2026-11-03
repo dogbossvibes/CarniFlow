@@ -252,33 +252,40 @@ export async function updateLocalTrackEvaluation(localId: string, input: {
 }
 
 export async function markTrainingAsDeleted(localId: string): Promise<void> {
-  // Capture identity before any async work, including opening the primary DB.
+  // Fence only the new diagnostic sidecar; source training/GPS deletion stays unchanged.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { gpsCaptureScope } = require('@/features/tracking/storage/gpsCaptureScope') as typeof import('@/features/tracking/storage/gpsCaptureScope');
-  const scope = gpsCaptureScope();
-  const check = () => {
-    const current = gpsCaptureScope();
-    if (current.userId !== scope.userId || current.epoch !== scope.epoch) throw new Error('RAW_ACCOUNT_CHANGED');
-  };
-  const db = await getLocalDb();
-  check();
-  const parent = await db.getFirstAsync<{ user_id: string | null; remote_id: string | null }>(
-    'select user_id,remote_id from local_training_sessions where local_id=?', localId);
-  check();
-  if (!parent) return;
-  if (parent.user_id) {
-    if (scope.userId !== parent.user_id) throw new Error('RAW_ACCOUNT_CHANGED');
-    // Keep the parent visible and retryable if cleanup fails. Raw tombstones are
-    // idempotent; a later primary-write failure can safely retry this same action.
+  const { beginSupportProvenanceDeletion } = require('@/features/tracking/utils/supportProvenanceStore') as typeof import('@/features/tracking/utils/supportProvenanceStore');
+  const provenance = beginSupportProvenanceDeletion([localId]);
+  try {
+    // Capture identity before any async work, including opening the primary DB.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { deleteGpsCaptures } = require('@/features/tracking/storage/gpsCapture') as typeof import('@/features/tracking/storage/gpsCapture');
-    await deleteGpsCaptures(localId);
+    const { gpsCaptureScope } = require('@/features/tracking/storage/gpsCaptureScope') as typeof import('@/features/tracking/storage/gpsCaptureScope');
+    const scope = gpsCaptureScope();
+    const check = () => {
+      const current = gpsCaptureScope();
+      if (current.userId !== scope.userId || current.epoch !== scope.epoch) throw new Error('RAW_ACCOUNT_CHANGED');
+    };
+    const db = await getLocalDb();
     check();
-    if (parent.remote_id && parent.remote_id !== localId) await deleteGpsCaptures(parent.remote_id);
+    const parent = await db.getFirstAsync<{ user_id: string | null; remote_id: string | null }>(
+      'select user_id,remote_id from local_training_sessions where local_id=?', localId);
     check();
-  }
-  await db.runAsync(`update local_training_sessions set deleted_at=?, sync_status='deleted_pending', updated_at=? where local_id=? and user_id is ?`, nowIso(), nowIso(), localId, parent.user_id);
-  check();
+    if (!parent) return;
+    if (parent.user_id) {
+      if (scope.userId !== parent.user_id) throw new Error('RAW_ACCOUNT_CHANGED');
+      // Keep the parent visible and retryable if cleanup fails. Raw tombstones are
+      // idempotent; a later primary-write failure can safely retry this same action.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { deleteGpsCaptures } = require('@/features/tracking/storage/gpsCapture') as typeof import('@/features/tracking/storage/gpsCapture');
+      await deleteGpsCaptures(localId);
+      check();
+      if (parent.remote_id && parent.remote_id !== localId) await deleteGpsCaptures(parent.remote_id);
+      check();
+    }
+    await db.runAsync(`update local_training_sessions set deleted_at=?, sync_status='deleted_pending', updated_at=? where local_id=? and user_id is ?`, nowIso(), nowIso(), localId, parent.user_id);
+    check();
+    await provenance.commit();
+  } finally { provenance.cancel(); }
 }
 
 export async function getLocalTrainingSessions(userId: string, opts: { type?: string; dogId?: string } = {}): Promise<LocalTrainingSession[]> {

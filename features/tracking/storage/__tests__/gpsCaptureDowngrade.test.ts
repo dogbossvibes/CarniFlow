@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as mockJoin } from 'node:path';
 import type { GpsCaptureRecord } from '../gpsCapture';
+jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 type Param = string | number | null;
 type Adapter = {

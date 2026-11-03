@@ -16,6 +16,7 @@
 import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
 import type { BackgroundLayDiagnostics } from './backgroundLayDiagnostics';
 import { assertQaRecordingEvidence, type QaRecordingEvidence } from './qaRecordingEvidence';
+import { assertRecordingProvenance } from './diagnosticProvenance';
 import type {
   QaSessionCapture, QaCapturePoint, QaMarkerSource, QaDistanceScale, QaAutoDiagnostic, QaTurnFusion, QaImuOnlyEvent,
   QaCandidateMotion,
@@ -111,7 +112,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 15 | 16 | 17;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 15 | 16 | 17 | 18;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -301,7 +302,8 @@ export function buildQaTrackExport(
     || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
     : capture?.startupDiagnostics || capture?.manualAngleGeometryDiagnostics || capture?.voiceDiagnostics ? 5
     : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0;
-  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 | 7 | 8 | 12 = !search ? 0
+  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 | 7 | 8 | 12 | 18 = !search ? 0
+    : search.recordingContext ? 18
     // 12: Beobachtungsumfang des Ende-Ereignisses; unbekannte Anzahl bleibt null.
     : search.end?.eventObservation !== undefined ? 12
     // 8: additive Roh-Suchfix-Felder (accuracyM/accepted je Fix in geometry.raw); ältere Captures bleiben bei ihrer Stufe.
@@ -479,6 +481,7 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
   // Meter. Absolute Unix-Sekunden wären ≥ 1e9.
   const sd = e.searchDiagnostics;
   if (sd) {
+    if (sd.recordingContext !== undefined) assertRecordingProvenance(sd.recordingContext);
     const secs: (number | null | undefined)[] = [
       sd.end.manualStopTSec, sd.end.eventFired?.tSec,
       ...sd.cursor.samples.map(c => c.tSec),

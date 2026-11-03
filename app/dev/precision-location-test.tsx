@@ -40,6 +40,7 @@ import {
 } from '@/features/tracking/services/qaTrackExportService';
 import { useQaLaySessions } from '@/features/tracking/hooks/useQaLaySessions';
 import { FIELD_TEST_PROFILES, getFieldTestProfile } from '@/features/tracking/utils/fieldTestProfiles';
+import { SupportDiagnosticsRow } from '@/features/tracking/components/SupportDiagnosticsRow';
 import { trackingEngineDisplayLabel, trackingLocationDiagnosticDisplay } from '@/features/tracking/utils/trackingDiagnosticDisplay';
 import type { MotionStatus } from '@/modules/anyvo-motion';
 import { buildOtaIdentity } from '@/features/tracking/utils/buildOtaIdentity';
@@ -454,10 +455,10 @@ function PrecisionLocationTestContent() {
 
         <Section title="Fährten-QA Export">
           <Text style={s.note}>
-            Exportiert die GELEGTE Spur einer Fährte (nur point_type lay,
-            keine Absuche) als anonymisiertes JSON: erster Punkt wird (0,0),
-            alles Weitere lokale x/y-Meter, Zeitstempel relativ. Keine
-            Koordinaten, keine Konto-, Hunde- oder Standortdaten.
+            Für TrackLab „Diagnosedaten teilen“ verwenden. Enthalten sind die gespeicherte
+            gelegte Linie und je nach Verfügbarkeit Absuche und zusätzliche Diagnosen.
+            Positionen und Zeiten sind relativ; persönliche IDs und absolute Standorte
+            werden nicht exportiert. „QA-JSON“ ist der separate interne Diagnoseexport.
           </Text>
           {qaSessions.length === 0 ? (
             <Text style={s.note}>Keine gelegte Fährte mit Punkten gefunden.</Text>
@@ -468,6 +469,7 @@ function PrecisionLocationTestContent() {
                   label={i === 0 ? 'Letzte gelegte Fährte' : `Fährte ${i + 1}`}
                   value={formatQaSessionRow(q)}
                 />
+                <SupportDiagnosticsRow sessionLocalId={q.localId} detail={null} />
                 <View style={s.abRow}>
                   <TouchableOpacity
                     style={[s.abBtn, s.abBtnActive]}
@@ -476,7 +478,7 @@ function PrecisionLocationTestContent() {
                     activeOpacity={0.85}
                   >
                     <Text style={[s.abBtnTxt, s.abBtnTxtActive]}>
-                      {qaBusy === q.localId ? '…' : 'JSON teilen'}
+                      {qaBusy === q.localId ? '…' : 'QA-JSON teilen'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity

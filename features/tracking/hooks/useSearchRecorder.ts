@@ -1,4 +1,6 @@
 import { beginGpsCapture } from '@/features/tracking/storage/gpsCapture';
+import { captureDiagnosticEnvironment, recordSupportProvenance } from '@/features/tracking/utils/supportProvenanceStore';
+import { observedRecordingProvenance } from '@/features/tracking/utils/diagnosticProvenance';
 import { classifyLiveFixTime, GPS_FUTURE_TOLERANCE_MS } from '@/features/tracking/utils/liveFixOrdering';
 import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 /**
@@ -185,7 +187,7 @@ export interface SearchRecorder {
   // fortsetzen (P2) — Punkte/Distanz/Timer werden fortgeführt, keine neue Session.
   // `runState` (Search-Recovery-State) seedet Fortschritt/Funde/Abrisse/Abweichung/
   // Off-Track desselben Runs; fehlt er (Legacy-Puffer) → wie bisher ab 0.
-  start: (resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState; pointsTimeSec?: number[] }, opts?: { forceLocked?: boolean }) => void;
+  start: (resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState; pointsTimeSec?: number[] }, opts?: { forceLocked?: boolean; diagnosticAttemptKey?: string }) => void;
   stop: () => SearchResult;
   flushRawCapture: () => Promise<import('../storage/gpsCapture').GpsCaptureSnapshot | null>;
   setPaused: (p: boolean) => void;
@@ -1152,7 +1154,7 @@ export function useSearchRecorder(opts: {
   }, [recording, paused]);
 
   // ── Steuerung ──
-  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState; pointsTimeSec?: number[] }, opts?: { forceLocked?: boolean }) => {
+  const start = useCallback((resume?: { points: LatLng[]; startedAtMs: number; runState?: SearchRunState; pointsTimeSec?: number[] }, opts?: { forceLocked?: boolean; diagnosticAttemptKey?: string }) => {
     motionLatestRef.current = null;
     motionActivityAgeMsRef.current = null;
     motionNotBeforeRef.current = Date.now();
@@ -1261,6 +1263,8 @@ export function useSearchRecorder(opts: {
     if (rs?.endFired) objectStatusesRef.current = objectStatusesRef.current.map(statusAtConfirmedEnd);
     setActiveObjectWait(false);
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
+    const diagnosticEnvironment = captureDiagnosticEnvironment();
+    if (sessionIdRef.current) void recordSupportProvenance(sessionIdRef.current, 'search', !!resume, opts?.diagnosticAttemptKey, diagnosticEnvironment);
     void rawCaptureRef.current?.close(false);
     rawCaptureRef.current = sessionIdRef.current
       ? beginGpsCapture(sessionIdRef.current, 'search', String(startMsRef.current)) : null;
@@ -1279,6 +1283,7 @@ export function useSearchRecorder(opts: {
     recordingEvidenceRef.current?.appState(AppState.currentState);
     qaTelRef.current = (qaOn || isSupportCaptureEnabled())
       ? { captureLevel: qaOn ? 'qa' : 'support',
+          recordingContext: observedRecordingProvenance(diagnosticEnvironment, !!resume),
           startedAtMs: startMsRef.current, resumed: resumePts.length > 0, raw: [], filtered: [], display: [], cursorSamples: [], objectApproach: [],
           ...(qaOn ? { objectDwellCandidates: [] } : {}),
           minDistToEndM: null, progressAtMinEndM: null, truncated: { raw: false, cursor: false } }

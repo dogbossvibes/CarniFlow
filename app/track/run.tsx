@@ -412,7 +412,7 @@ export default function TrackRunScreen() {
     // (forceLocked), statt zusätzlich noch die interne Akquisition zu
     // verlangen. 'manual-at-start' (Ansatz bereits per approach.armed
     // bestätigt) durchläuft weiterhin die normale Akquisition unverändert.
-    s.start(undefined, { forceLocked: mode === 'manual-override' });
+    s.start(undefined, { forceLocked: mode === 'manual-override', diagnosticAttemptKey: runUuid });
     // Status 'searching' + Suchzeit-Start + FRISCHER Run-State. runUuid wird hier
     // mitgegeben (vorher `null` → überschrieb die Zeile davor und der Puffer verlor
     // die runId; Resume erzeugte dadurch eine NEUE Run-ID statt derselben).
@@ -557,7 +557,8 @@ export default function TrackRunScreen() {
     segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };
     const startedAtMs = pending.searchStartedAt ?? Date.now();
     s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
-      pointsTimeSec: saved.map(p => Math.max(0, (p.t - startedAtMs) / 1000)), startedAtMs, runState });
+      pointsTimeSec: saved.map(p => Math.max(0, (p.t - startedAtMs) / 1000)), startedAtMs, runState },
+    { diagnosticAttemptKey: runIdRef.current ?? undefined });
   };
 
   // Beenden: vorhandene Suchpunkte speichern + Session sauber abschliessen.

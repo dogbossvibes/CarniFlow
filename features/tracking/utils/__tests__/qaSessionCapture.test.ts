@@ -28,6 +28,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: async (k: string) => mockStore.get(k) ?? null,
   setItem: async (k: string, v: string) => { mockStore.set(k, v); },
   removeItem: async (k: string) => { mockStore.delete(k); },
+  getAllKeys: async () => [...mockStore.keys()],
+  multiRemove: async (keys: string[]) => { keys.forEach(k => mockStore.delete(k)); },
 }));
 
 function capture(id: string): QaSessionCapture {

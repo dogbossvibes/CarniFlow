@@ -133,6 +133,8 @@ describe('QA-Telemetrie: Inhalt', () => {
     expect(q.objectApproach[0].minHandlerDistM as number).toBeLessThan(4);
     expect(q.minDistToEndM).not.toBeNull();
     expect(q.resumed).toBe(false);
+    expect(q.recordingContext?.segments[0].source).toBe('recording_start');
+    expect(q.recordingContext?.partial).toBe(false);
     expect(q.truncated).toEqual({ raw: false, cursor: false });
   });
 
@@ -146,6 +148,8 @@ describe('QA-Telemetrie: Inhalt', () => {
   it('Resume: Telemetrie ist als resumed markiert', async () => {
     const { res } = await runScenario(LAID, fixesL(), undefined, true);
     expect(res.qa?.resumed).toBe(true);
+    expect(res.qa?.recordingContext?.segments[0].source).toBe('recording_resume');
+    expect(res.qa?.recordingContext?.partial).toBe(true);
     expect(res.replayPoints).toBeUndefined();   // Legacy-Replay auf run_points
   });
 });

@@ -62,12 +62,19 @@ export async function localCounts(): Promise<Record<string, number>> {
 
 // Beim Logout optional alle lokalen Daten löschen.
 export async function wipeLocalData(): Promise<void> {
-  invalidateGpsCaptures();
-  const db = await getLocalDb();
-  await db.execAsync(`delete from local_track_group_tasks; delete from local_track_exchange_receipts; delete from local_track_exchange; delete from local_distraction_parents; delete from local_track_plans; delete from track_object_review_outbox; delete from track_object_review_cache; delete from local_track_distractions; delete from local_track_transfer_sync; delete from local_track_points; delete from local_track_markers;
-    delete from local_media_files; delete from local_training_sessions; delete from sync_queue;`);
-  // Lazy require avoids a client/archive import cycle.
+  // Existing explicit wipe only: retire the newly introduced metadata after success.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { wipeGpsCaptures } = require('@/features/tracking/storage/gpsCapture') as typeof import('@/features/tracking/storage/gpsCapture');
-  await wipeGpsCaptures();
+  const { beginSupportProvenanceWipe } = require('@/features/tracking/utils/supportProvenanceStore') as typeof import('@/features/tracking/utils/supportProvenanceStore');
+  const finishProvenanceWipe = beginSupportProvenanceWipe();
+  try {
+    invalidateGpsCaptures();
+    const db = await getLocalDb();
+    await db.execAsync(`delete from local_track_group_tasks; delete from local_track_exchange_receipts; delete from local_track_exchange; delete from local_distraction_parents; delete from local_track_plans; delete from track_object_review_outbox; delete from track_object_review_cache; delete from local_track_distractions; delete from local_track_transfer_sync; delete from local_track_points; delete from local_track_markers;
+      delete from local_media_files; delete from local_training_sessions; delete from sync_queue;`);
+    // Lazy require avoids a client/archive import cycle.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { wipeGpsCaptures } = require('@/features/tracking/storage/gpsCapture') as typeof import('@/features/tracking/storage/gpsCapture');
+    await wipeGpsCaptures();
+    await finishProvenanceWipe.commit();
+  } finally { finishProvenanceWipe.cancel(); }
 }

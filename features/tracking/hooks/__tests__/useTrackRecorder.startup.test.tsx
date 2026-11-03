@@ -13,9 +13,10 @@ import { AppState } from 'react-native';
 import { motionClient } from '../../native/motionClient';
 import { markMotionSample } from '../../utils/trackingWarmupState';
 import type { MotionSample } from '@/modules/anyvo-motion';
+jest.mock('@/lib/localDb/client', () => ({ getLocalDb: async () => ({ getFirstAsync: async (_sql: string, id: string, _remote: string, owner: string) => ({ local_id: id, user_id: owner, deleted_at: null }) }) }));
 jest.mock('@/lib/diagnosticsAccessState', () => ({
   diagnosticsAccessToken: () => mockAccessToken,
-  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'owner', generation: 1, allowed: true }),
   hasDiagnosticsAccess: () => true,
   subscribeDiagnosticsAccess: () => () => {},
   assertDiagnosticsAccess: () => {},
@@ -145,6 +146,17 @@ function diagnosticEvents(): { name: string; count: number; reason?: string }[] 
     .filter(([key]) => typeof key === 'string' && key.includes('::event::'))
     .map(([, value]) => JSON.parse(value));
 }
+
+it('adds one recording-start metadata snapshot without enabling internal QA', async () => {
+  await start();
+  const calls = (AsyncStorage.setItem as jest.Mock).mock.calls.filter(([key]) => key === 'anyvo.support.provenance.v2::' + JSON.stringify(['owner', 'local']));
+  expect(calls).toHaveLength(1);
+  const phase = JSON.parse(calls[0][1]).lay;
+  expect(phase.availability).toBe('available');
+  expect(phase.segments[0].source).toBe('recording_start');
+  expect(phase.segments[0].environment.platform).toBe('ios');
+  expect(mockQaEnabled).toBe(false);
+});
 
 it('counts accepted fixes, existing rejects and successful point flush without changing geometry', async () => {
   await start();

@@ -1,0 +1,177 @@
+{
+  "exportType": "support",
+  "diagnosticsSource": "persisted",
+  "schemaVersion": 2,
+  "schemaMinor": 18,
+  "pointType": "lay",
+  "pointCount": 4,
+  "durationMs": 15000,
+  "totalDistanceM": 30,
+  "samplingIntervalMs": 5000,
+  "accuracy": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+  },
+  "markerTypes": [
+    "gegenstand",
+    "winkel"
+  ],
+  "points": [
+    {
+      "x": 0,
+      "y": 0,
+      "accuracy": 3,
+      "tMs": 0
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "accuracy": 3,
+      "tMs": 5000
+    },
+    {
+      "x": 10,
+      "y": 10,
+      "accuracy": 3,
+      "tMs": 10000
+    },
+    {
+      "x": 20,
+      "y": 10,
+      "accuracy": 3,
+      "tMs": 15000
+    }
+  ],
+  "markers": [
+    {
+      "type": "winkel",
+      "angleKind": "rechts",
+      "material": null,
+      "x": 0,
+      "y": 10,
+      "atM": 10,
+      "tMs": 5000,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    },
+    {
+      "type": "gegenstand",
+      "angleKind": null,
+      "material": "Stoff",
+      "x": 15,
+      "y": 10,
+      "atM": 25,
+      "tMs": 12500,
+      "source": "unknown",
+      "scale": "unknown",
+      "apexIndex": null
+    }
+  ],
+  "qaCaptureAvailable": false,
+  "distances": {
+    "rawPathM": null,
+    "detectorPathM": null,
+    "recordedLineM": 30,
+    "storeDistanceM": null
+  },
+  "counts": {
+    "rawFixes": null,
+    "acceptedFixes": null,
+    "rejectedFixes": null,
+    "detectorPoints": null,
+    "linePoints": null,
+    "persistedPoints": 4
+  },
+  "rawFixes": [],
+  "detectorPoints": [],
+  "linePoints": [],
+  "autoDiagnostics": [],
+  "motionCaptureAvailable": false,
+  "persistedSearch": {
+    "pointCount": 3,
+    "points": [
+      {
+        "x": 0,
+        "y": 0,
+        "tMs": 0
+      },
+      {
+        "x": 0,
+        "y": 10,
+        "tMs": 8000
+      },
+      {
+        "x": 20,
+        "y": 10,
+        "tMs": 15000
+      }
+    ],
+    "durationS": 15,
+    "distanceM": 30,
+    "articlesFound": 1,
+    "totalObjects": 1,
+    "averageDeviationM": 2.5
+  },
+  "provenance": {
+    "schemaVersion": 1,
+    "recording": {
+      "lay": {
+        "availability": "available",
+        "scope": "phase_history",
+        "partial": false,
+        "omittedSegments": 0,
+        "segments": [
+          {
+            "source": "recording_start",
+            "environment": {
+              "platform": "ios",
+              "appVersion": "0.0.0",
+              "nativeBuildVersion": "0",
+              "osVersion": "0.0",
+              "deviceModel": "Synthetic iPhone",
+              "runtimeVersion": "synthetic-runtime",
+              "launch": "ota",
+              "otaUpdateId": "11111111-1111-4111-8111-111111111111"
+            }
+          }
+        ]
+      },
+      "search": {
+        "availability": "available",
+        "scope": "phase_history",
+        "partial": false,
+        "omittedSegments": 0,
+        "segments": [
+          {
+            "source": "recording_start",
+            "environment": {
+              "platform": "android",
+              "appVersion": "0.0.0",
+              "nativeBuildVersion": "0",
+              "osVersion": "0.0",
+              "deviceModel": "Synthetic Android",
+              "runtimeVersion": "synthetic-runtime",
+              "launch": "ota",
+              "otaUpdateId": "22222222-2222-4222-8222-222222222222"
+            }
+          }
+        ]
+      }
+    },
+    "exporter": {
+      "source": "runtime_at_export",
+      "environment": {
+        "platform": "ios",
+        "appVersion": "0.0.0",
+        "nativeBuildVersion": "1",
+        "osVersion": "0.0",
+        "deviceModel": "Synthetic Exporter",
+        "runtimeVersion": "synthetic-runtime",
+        "launch": "ota",
+        "otaUpdateId": "33333333-3333-4333-8333-333333333333"
+      }
+    }
+  }
+}

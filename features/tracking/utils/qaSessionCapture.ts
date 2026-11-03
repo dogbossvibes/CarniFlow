@@ -394,11 +394,17 @@ export async function clearQaSessionCaptures(): Promise<void> {
   if (!accessToken) return;
   try {
     const ids = await listQaSessionCaptureIds();
-    for (const id of ids) {
-      if (accessToken !== diagnosticsAccessToken()) return;
-      await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
-    }
-    if (accessToken === diagnosticsAccessToken()) await AsyncStorage.removeItem(INDEX_KEY);
+    // Lazy load avoids a diagnostic-store/client cycle.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { beginSupportProvenanceDeletion } = require('./supportProvenanceStore') as typeof import('./supportProvenanceStore');
+    const metadata = beginSupportProvenanceDeletion(ids);
+    try {
+      for (const id of ids) {
+        if (accessToken !== diagnosticsAccessToken()) return;
+        await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
+      }
+      if (accessToken === diagnosticsAccessToken()) { await AsyncStorage.removeItem(INDEX_KEY); await metadata.commit(); }
+    } finally { metadata.cancel(); }
   } catch { /* best-effort */ }
 }
 
