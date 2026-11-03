@@ -286,13 +286,6 @@ export default function HomeScreen() {
             pointerEvents="none"
           />
 
-          {/* ── SLOGAN ── */}
-          <View style={s.slogan} pointerEvents="none">
-            <Text style={s.sloganZeile}>TRAIN.</Text>
-            <Text style={[s.sloganZeile, s.sloganGrau]}>ANALYZE.</Text>
-            <Text style={[s.sloganZeile, s.sloganGold]}>IMPROVE.</Text>
-          </View>
-
           <View style={s.heroKopf}>
             <HomeDayGreeting key={user?.id ?? 'signed-out'} ownerId={user?.id}
               ready={!profileLoading}
@@ -312,6 +305,13 @@ export default function HomeScreen() {
                 <Ionicons name="options-outline" size={20} color={C.white} />
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* ── SLOGAN ── */}
+          <View style={s.slogan} pointerEvents="none">
+            <Text style={s.sloganZeile}>TRAIN.</Text>
+            <Text style={[s.sloganZeile, s.sloganGrau]}>ANALYZE.</Text>
+            <Text style={[s.sloganZeile, s.sloganGold]}>IMPROVE.</Text>
           </View>
 
           <View style={s.heroStats}>
@@ -401,7 +401,7 @@ const s = StyleSheet.create({
   },
 
   hero: {
-    height: 380,
+    minHeight: 380,
     marginBottom: 20,
     justifyContent: "space-between",
     overflow: "hidden",
@@ -409,10 +409,11 @@ const s = StyleSheet.create({
   heroImg: { ...StyleSheet.absoluteFillObject },
 
   slogan: {
-    position: "absolute",
-    bottom: 80,
-    left: 20,
-    zIndex: 10,
+    // Normal flow reserves space for scaled text before the statistics.
+    marginTop: "auto",
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   sloganZeile: {
     fontSize: 24,

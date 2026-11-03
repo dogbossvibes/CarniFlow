@@ -192,9 +192,9 @@ function EventForm({ visible, event, onClose, onCreated, ownerId }: Props & { ow
 
 const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle: { fontSize: 20, color: C.white, fontWeight: '900' },
-  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
+  headerTitle: { flex: 1, minWidth: 0, fontSize: 20, color: C.white, fontWeight: '900' },
+  closeBtn: { width: 48, height: 48, flexShrink: 0, borderRadius: 24, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   body:   { paddingHorizontal: 20, paddingTop: 6 },
   label:  { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10 },
   input:  { backgroundColor: C.input, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 12, color: C.white, fontSize: 15 },
