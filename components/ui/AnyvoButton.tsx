@@ -1,4 +1,5 @@
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { AnimatedPressable } from './AnimatedPressable';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C } from '@/constants/colors';
@@ -29,10 +30,12 @@ export function AnyvoButton({
   };
 
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       style={[s.base, big && s.big, variant === 'secondary' && s.secondary, variant === 'danger' && s.danger,
         variant === 'ghost' && s.ghost, (disabled || loading) && { opacity: 0.45 }, style]}
-      onPress={handlePress} disabled={disabled || loading} activeOpacity={0.85}
+      onPress={handlePress} disabled={disabled || loading}
+      accessibilityRole="button" accessibilityLabel={label}
+      accessibilityState={{ busy: !!loading }}
     >
       {isPrimary && <LinearGradient colors={[C.trackPrimary, C.trackPrimaryDk]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />}
       {loading ? <ActivityIndicator color={txtColor} /> : (
@@ -41,7 +44,7 @@ export function AnyvoButton({
           <Text style={[s.label, big && s.labelBig, { color: txtColor }]}>{label}</Text>
         </View>
       )}
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 }
 

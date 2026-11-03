@@ -3,6 +3,7 @@ import TestRenderer, { act, type ReactTestInstance } from 'react-test-renderer';
 import * as Native from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
+import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { TrackEvaluationLayout } from '../TrackEvaluationLayout';
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
@@ -66,12 +67,12 @@ it('keeps the inset-protected Android footer outside the bounded scroll viewport
 it('preserves save/logbook callbacks and prevents another save while saving', () => {
   mount();
   const buttons = root().findAllByType(AnyvoButton);
-  act(() => buttons[0].findByType(Native.TouchableOpacity).props.onPress());
-  act(() => buttons[1].findByType(Native.TouchableOpacity).props.onPress());
+  act(() => buttons[0].findByType(AnimatedPressable).props.onPress());
+  act(() => buttons[1].findByType(AnimatedPressable).props.onPress());
   expect(logbook).toHaveBeenCalledTimes(1);
   expect(save).toHaveBeenCalledTimes(1);
   act(() => renderer.update(screen(true)));
-  const saveButton = root().findAllByType(AnyvoButton)[1].findByType(Native.TouchableOpacity);
+  const saveButton = root().findAllByType(AnyvoButton)[1].findByType(AnimatedPressable);
   expect(saveButton.props.disabled).toBe(true);
   act(() => saveButton.props.onPress());
   expect(save).toHaveBeenCalledTimes(1);
