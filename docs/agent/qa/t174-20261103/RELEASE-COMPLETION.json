@@ -1,0 +1,54 @@
+{
+  "status": "THREE_T174_HEALTH_OTAS_PUBLISHED_ALL_ASSETS_AND_INDEPENDENT_REVIEWS_PASS",
+  "completedUTC": "2026-11-03T19:16:52.497538+00:00",
+  "channel": "production",
+  "targets": [
+    {
+      "target": "ios57",
+      "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-ui-20261101",
+      "branch": "release/t174-ios57-20261103",
+      "sourceCommit": "708f3d65508d0d2475056701ba263c9c5dcf70bb",
+      "sourceGitHubRef": "release/source-708f3d65508d",
+      "runtime": "1.0.6-map49-v1",
+      "groupId": "30e6a7ca-2f16-495f-98fd-f7ad74a76336",
+      "updateId": "01a1a2cd-495b-7ef2-aa23-75ba982aa3a8",
+      "bundleSHA256": "4c365554db4d69ff6805372e55bfbe970bad92f4d6735c6e51ce13975787a45a",
+      "assetEntries": 52,
+      "independentPostflightReviewer": "07"
+    },
+    {
+      "target": "android49",
+      "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-android49-20261101",
+      "branch": "release/t174-android49-20261103",
+      "sourceCommit": "c74e9914e0460410cd94ac6bbd3441640b6caf0d",
+      "sourceGitHubRef": "release/source-c74e9914e046",
+      "runtime": "1.0.5-greeting-v1",
+      "groupId": "0c80972b-6aae-41f7-9644-7b62d8810270",
+      "updateId": "01a1a2d0-aba9-7c20-85dc-e099c4488811",
+      "bundleSHA256": "324f989fa58807d84ff2b7896be7ff00aa90034d53abfb8efbca0b3252ac9c53",
+      "assetEntries": 52,
+      "independentPostflightReviewer": "07"
+    },
+    {
+      "target": "android50",
+      "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-android50-20261101",
+      "branch": "release/t174-android50-20261103",
+      "sourceCommit": "8264673365c9dbd59fbf265a2b75235639959da8",
+      "sourceGitHubRef": "release/source-8264673365c9",
+      "runtime": "1.0.5-gnss-v1",
+      "groupId": "d494ff1d-b404-4926-8fff-6931cf3aee19",
+      "updateId": "01a1a2d4-c7bc-79dc-ae1d-6d5255faea9e",
+      "bundleSHA256": "66808698fdb8aa91d28d9c08b2cdb4c5048c12ddbc20bf9b62482bd6a0041ee6",
+      "assetEntries": 52,
+      "independentPostflightReviewer": "00"
+    }
+  ],
+  "testsPassedPerTarget": 165,
+  "originalFinalReportSHA256": "0ea9caa073303a81c8b18bddcb4e8766afddaec1b8ef2817f971128d37da0a2c",
+  "rootAndroid50PostflightSHA256": "8cfce418ab3a61a901dab7b2234f8754496c90542c21c74b003b64255c0cf0ef",
+  "previousFunctionsAndDataPreservedInReviewedBundle": true,
+  "nativeBuildStarted": false,
+  "databaseWritePerformed": false,
+  "storeReleasePerformed": false,
+  "deviceQA": "NOT_VERIFIED"
+}
