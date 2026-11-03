@@ -68,13 +68,13 @@ export function Button({ label, onPress, variant = 'primary', loading, disabled,
 }
 
 const s = StyleSheet.create({
-  base:     { height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, overflow: 'hidden' },
+  base:     { minHeight: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 16, overflow: 'hidden' },
   outline:  { borderWidth: 1, borderColor: C.borderLight, backgroundColor: 'transparent' },
   ghost:    { backgroundColor: 'transparent' },
   danger:   { backgroundColor: C.dangerDim, borderWidth: 1, borderColor: `${C.danger}40` },
   disabled: { opacity: 0.35 },
 
-  label:        { fontSize: 16, fontWeight: '800', letterSpacing: 0.3, color: C.white },
+  label:        { maxWidth: '100%', minWidth: 0, flexShrink: 1, textAlign: 'center', fontSize: 16, fontWeight: '800', letterSpacing: 0.3, color: C.white },
   labelPrimary: { color: C.accentText },
   labelGhost:   { color: C.accent },
   labelDanger:  { color: C.danger },
