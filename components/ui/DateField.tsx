@@ -67,15 +67,19 @@ export function DateField({
   return (
     <View style={style}>
       {label ? <Text style={s.label}>{label}</Text> : null}
-      <Pressable style={s.field} onPress={open} testID="date-field" accessibilityRole="button" accessibilityLabel={[label, value ? format(value) : ph].filter(Boolean).join(': ')} accessibilityState={{ expanded: showIOS }}>
-        <Ionicons name={icon} size={18} color={C.accent} />
-        <Text style={[s.value, !value && s.placeholder]} numberOfLines={1}>{value ? format(value) : ph}</Text>
+      <View style={s.field}>
+        <Pressable style={s.fieldBody} onPress={open} testID="date-field" accessibilityRole="button" accessibilityLabel={[label, value ? format(value) : ph].filter(Boolean).join(': ')} accessibilityState={{ expanded: showIOS }}>
+          <Ionicons accessible={false} name={icon} size={18} color={C.accent} />
+          <Text style={[s.value, !value && s.placeholder]} numberOfLines={1}>{value ? format(value) : ph}</Text>
+          {!(value && onClear) && <Ionicons accessible={false} name={showIOS ? 'chevron-up' : 'chevron-down'} size={16} color={C.muted} />}
+        </Pressable>
         {value && onClear ? (
-          <Pressable onPress={e => { e.stopPropagation(); onClear(); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.delete')}><Ionicons name="close-circle" size={18} color={C.muted} /></Pressable>
-        ) : (
-          <Ionicons name={showIOS ? 'chevron-up' : 'chevron-down'} size={16} color={C.muted} />
-        )}
-      </Pressable>
+          <Pressable style={s.clearButton} onPress={e => { e.stopPropagation(); onClear(); }}
+            accessibilityRole="button" accessibilityLabel={[t('common.delete'), label ?? ph, format(value)].join(': ')}>
+            <Ionicons accessible={false} name="close-circle" size={18} color={C.textMuted} />
+          </Pressable>
+        ) : null}
+      </View>
 
       {Platform.OS === 'ios' && showIOS && (
         <View style={s.iosWrap}>
@@ -98,10 +102,12 @@ export function DateField({
 }
 
 const s = StyleSheet.create({
-  label:      { fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
-  field:      { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 14 },
-  value:      { flex: 1, fontSize: 15, color: C.white, fontWeight: '600' },
-  placeholder:{ color: C.muted, fontWeight: '500' },
+  label:      { fontSize: 10, color: C.textMuted, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 8 },
+  field:      { minHeight: 48, flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14 },
+  fieldBody:  { flex: 1, minWidth: 0, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  clearButton:{ minWidth: 48, minHeight: 48, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  value:      { flex: 1, minWidth: 0, paddingVertical: 14, fontSize: 15, color: C.white, fontWeight: '600' },
+  placeholder:{ color: C.textMuted, fontWeight: '500' },
   iosWrap:    { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, marginTop: 8, padding: 6 },
   done:       { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 8 },
   doneTxt:    { fontSize: 15, color: C.accent, fontWeight: '800' },

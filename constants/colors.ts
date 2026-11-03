@@ -15,6 +15,10 @@ export const C = {
   muted:       '#777777',
   subtle:      '#444444',
   placeholder: '#333333',
+  // Normal small text on bg/card/input and tracking panels; decorative grey
+  // tokens above stay unchanged. Contrast checked against the actual panels.
+  textMuted: '#8A8A8A',
+  textPlaceholder: '#8A8A8A',
 
   // Brand — aquamarine
   accent:     '#00FFCC',
