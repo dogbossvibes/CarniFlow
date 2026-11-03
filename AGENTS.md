@@ -208,10 +208,12 @@ never clean/reset foreign changes, and never push or merge without explicit appr
 
 # BMAD — schlanker Anyvo-Ablauf / Claude-Übergang
 
-Use the installed BMAD 6.12.4 workflows automatically when useful for substantial
-features, non-trivial fixes or architectural changes. Skip them for questions,
-typos and mechanical maintenance. Choose the smallest suitable workflow and
-briefly name it. Read `docs/agent/BMAD.md` before using BMAD.
+Always consider BMAD for every ANYVO task and scale its scope to complexity
+and risk without a separate user request. For small, low-risk tasks, clarify
+the goal, inspect affected areas, act within scope and verify the result in a
+compact workflow. Even small changes may require deeper review when risk is high.
+Read `docs/agent/BMAD.md` for the appropriate scope; briefly name the approach.
+For small tasks, a short work announcement is sufficient; no mandatory spec.
 Current canonical MASTER_STATUS/ACTIVE_WORK and the atomic task registry remain
 authoritative; do not duplicate the backlog or allocate historical task IDs.
 The dated audit `docs/agent/audits/2026-11-01.md` is supporting evidence, not a
