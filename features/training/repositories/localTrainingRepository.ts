@@ -250,8 +250,15 @@ export async function updateLocalTrackEvaluation(localId: string, input: {
 }
 
 export async function markTrainingAsDeleted(localId: string): Promise<void> {
-  const db = await getLocalDb();
-  await db.runAsync(`update local_training_sessions set deleted_at=?, sync_status='deleted_pending', updated_at=? where local_id=?`, nowIso(), nowIso(), localId);
+  // Only the new metadata follows the existing explicit deletion.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { beginSupportProvenanceDeletion } = require('@/features/tracking/utils/supportProvenanceStore') as typeof import('@/features/tracking/utils/supportProvenanceStore');
+  const provenance = beginSupportProvenanceDeletion([localId]);
+  try {
+    const db = await getLocalDb();
+    await db.runAsync(`update local_training_sessions set deleted_at=?, sync_status='deleted_pending', updated_at=? where local_id=?`, nowIso(), nowIso(), localId);
+    await provenance.commit();
+  } finally { provenance.cancel(); }
 }
 
 export async function getLocalTrainingSessions(userId: string, opts: { type?: string; dogId?: string } = {}): Promise<LocalTrainingSession[]> {

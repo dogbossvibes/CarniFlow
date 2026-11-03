@@ -83,7 +83,8 @@ describe('Pins: Canonical Reference + Search Recovery State unverändert', () =>
     const resume = block('const resumeSearch', 'const endSearch');
     expect(resume).toContain('prevOffTrackRef.current = runState.offTrackState;');
     expect(resume).toContain('segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };');
-    expect(resume).toMatch(/runState \}\)/);
+    // Recovery payload stays in the first argument; the second is diagnostic-only.
+    expect(resume).toMatch(/runState \},\s*\{ diagnosticAttemptKey: runIdRef\.current \?\? undefined \}\)/);
     for (const s of ['initialAnnouncedIds: snapData.recovery?.voiceFiredIds', 'initialFiredIds: snapData.recovery?.hapticFiredIds',
       'initialFired: snapData.recovery?.endFired ?? false', 'noteSearchVoiceFired(id)', 'noteSearchHapticFired(id)', 'noteSearchEndFired()',
       'setSearchSegmentAnnouncements(result.state)']) expect(run).toContain(s);

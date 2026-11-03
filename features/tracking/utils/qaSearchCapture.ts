@@ -78,6 +78,8 @@ export interface SearchQaCursorSample {
 }
 export interface SearchQaObjectApproach { index: number; minHandlerDistM: number | null; progressAtClosestM: number | null }
 export interface SearchQaTelemetry {
+  /** Observed recording context; validated before support export. */
+  recordingContext?: import('./diagnosticProvenance').RecordingProvenance;
   /**
    * 'qa' = interner QA-Modus (Vollumfang). 'support' = Minimal-Capture für normale Kunden
    * (nur Beobachtung: kein Dwell-Mitschnitt, keine UX-Diagnosen). Fehlt = 'qa' (Altbestand).
@@ -156,6 +158,8 @@ export interface QaSearchTurnParity {
 }
 
 export interface QaSearchDiagnostics {
+  /** Observed recording context; validated before support export. */
+  recordingContext?: import('./diagnosticProvenance').RecordingProvenance;
   /** QA v2.5: additive UX diagnostics. */
   voiceDiagnostics?: { events: VoiceDiagnostic[]; truncated: boolean };
   startApproachDiagnostics?: QaStartApproachDiagnostics;
@@ -397,6 +401,7 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
       replayUnfillableGaps: tel.replayUnfillableGaps.slice(0, 100),
       replayUnfillableGapsTruncated: tel.replayUnfillableGaps.length > 100 } : {}),
     partial: input.resumed || tel.resumed,
+    ...(tel.recordingContext ? { recordingContext: tel.recordingContext } : {}),
     rawSearchPointCount: tel.raw.length,
     acceptedSearchPointCount: tel.raw.filter(r => r.accepted).length,
     rejectedSearchPointCount: tel.raw.filter(r => !r.accepted).length,

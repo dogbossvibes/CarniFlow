@@ -1,3 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadSupportRecordingProvenance } from '../../utils/supportProvenanceStore';
+jest.mock('@/lib/localDb/client', () => ({ getLocalDb: async () => ({ getFirstAsync: async (_sql: string, id: string, _remote: string, owner: string) => ({ local_id: id, user_id: owner, deleted_at: null }) }) }));
 
 import React from 'react';
 import { Platform } from 'react-native';
@@ -16,7 +19,7 @@ import * as Location from 'expo-location';
 let mockAccessToken: string | null = 'authorized-fixture';
 jest.mock('@/lib/diagnosticsAccessState', () => ({
   diagnosticsAccessToken: () => mockAccessToken,
-  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'owner', generation: 1, allowed: true }),
   hasDiagnosticsAccess: () => true,
   subscribeDiagnosticsAccess: () => () => {},
   assertDiagnosticsAccess: () => {},
@@ -113,7 +116,9 @@ function feed(afterTapMs: number, accuracy: number, northM: number, speed = 0, a
   clockMs = 1_000_000 + afterTapMs;
   act(() => { feedFix?.({ lat: metersToLatitude(northM), lng: 0, accuracy, speed, t: clockMs - ageMs }); });
 }
-beforeEach(() => {
+beforeEach(async () => {
+  await loadSupportRecordingProvenance('local');
+  (AsyncStorage.setItem as jest.Mock).mockClear();
   mockAccessToken = 'authorized-fixture';
   clockMs = 1_000_000;
   (motionClient.start as jest.Mock).mockReset().mockResolvedValue(true);
@@ -592,4 +597,15 @@ it('bounds reference marks, rejects changed authority, and stops labeling after 
   expect(capture.referenceMarks).toHaveLength(256);
   expect(capture.referenceMarksTruncated).toBe(true);
   expect(useTrackingStore.getState().markers).toHaveLength(0);
+});
+
+it('adds one recording-start metadata snapshot without enabling internal QA', async () => {
+  await start();
+  const calls = (AsyncStorage.setItem as jest.Mock).mock.calls.filter(([key]) => key === 'anyvo.support.provenance.v2::' + JSON.stringify(['owner', 'local']));
+  expect(calls).toHaveLength(1);
+  const phase = JSON.parse(calls[0][1]).lay;
+  expect(phase.availability).toBe('available');
+  expect(phase.segments[0].source).toBe('recording_start');
+  expect(phase.segments[0].environment.platform).toBe(Platform.OS);
+  expect(mockQaEnabled).toBe(false);
 });

@@ -1,3 +1,4 @@
+import { captureDiagnosticEnvironment, recordSupportProvenance } from '@/features/tracking/utils/supportProvenanceStore';
 import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { attachSpecialGeometry, countLaidCorners, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
 import { claimLayRecorderStore } from '@/features/tracking/utils/layRecorderOwnership';
@@ -1101,6 +1102,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     ptBuffer.current = [];
     // Führende lokale Session-ID SOFORT deterministisch setzen (kein Warten auf Remote/Netz).
     localSessionId.current = input.localId;
+    const supportEnvironment = captureDiagnosticEnvironment();
     isCurrentStoreOwnerRef.current = claimLayRecorderStore(store);
     recordingEvidenceRef.current?.close();
     recordingEvidenceRef.current = qaRef.current
@@ -1157,6 +1159,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       ? createLocalTrainingSession(localSessionInputRef.current).then(() => {})
         .catch(e => { console.warn('[trackRecorder] local session', e); })
       : Promise.resolve();
+    void recordSupportProvenance(input.localId, 'lay', false, undefined, supportEnvironment,
+      { parentReady: localSessionCreationRef.current, expectedOwner: input.ownerId });
     input.onSessionStarted?.();
 
     // ── Hintergrund-Aufnahme: auf Foreground-Service-GPS umschalten, damit die

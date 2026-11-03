@@ -14,7 +14,10 @@ const mockAvailability = jest.fn();
 const mockShareCustomer = jest.fn();
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('@/features/tracking/services/supportDiagnosticsService', () => ({
-  customerDiagnosticsAvailability: (...a: unknown[]) => mockAvailability(...a),
+  customerDiagnosticsOverview: async (...a: unknown[]) => {
+    const value = await mockAvailability(...a);
+    return typeof value === 'string' ? { availability: value, partial: false, reduced: false } : value;
+  },
   shareCustomerDiagnostics: (...a: unknown[]) => mockShareCustomer(...a),
   hasSupportDiagnostics: jest.fn(),
   shareSupportDiagnostics: jest.fn(),
@@ -41,6 +44,41 @@ beforeEach(() => { mockAvailability.mockReset(); mockShareCustomer.mockReset(); 
 afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.restoreAllMocks(); });
 
 describe('CustomerTrackDiagnosisCard', () => {
+  it('zeigt TrackLab, unbekannte Aufnahmeangaben und die Grenzen einer Teilaufnahme', async () => {
+    mockAvailability.mockResolvedValue({ availability: 'capture', partial: true, reduced: true });
+    const r = await mount();
+    expect(texts(r)).toContain('Als JSON-Datei für TrackLab');
+    expect(texts(r)).toContain('Legen: Build/Gerät unbekannt');
+    expect(texts(r)).toContain('Absuche: Build/Gerät unbekannt');
+    expect(texts(r)).toContain('nur einen Teil der Absuche');
+    expect(texts(r)).toContain('ausgedünnt');
+  });
+  it('verhindert Doppeltippen auch vor einem erneuten Rendern und behandelt Abbruch ohne Fehler', async () => {
+    mockAvailability.mockResolvedValue('persisted');
+    let done!: (value: unknown) => void;
+    mockShareCustomer.mockImplementationOnce(() => new Promise(resolve => { done = resolve; }));
+    const r = await mount();
+    const press = button(r).props.onPress;
+    await act(async () => {
+      const pending = press();
+      await press();
+      expect(mockShareCustomer).toHaveBeenCalledTimes(1);
+      done({ ok: true, source: 'persisted', fileName: 'synthetic.json' });
+      await pending;
+    });
+    expect(Alert.alert).not.toHaveBeenCalled();
+    expect(button(r).props.accessibilityState).toEqual({ disabled: false, busy: false });
+  });
+  it('zeigt bei gespeicherten Aufnahmeständen niemals die aktuelle Exportversion als Aufnahme', async () => {
+    mockAvailability.mockResolvedValue({ availability: 'persisted', partial: false, reduced: false, recording: {
+      lay: { availability: 'available', partial: false, segments: [{ source: 'recording_start',
+        environment: { appVersion: '1.0.6', nativeBuildVersion: '57', deviceModel: 'Synthetic Phone' } }] },
+      search: { availability: 'unknown', segments: [] },
+    } });
+    const r = await mount();
+    expect(texts(r)).toContain('Legen: 1.0.6 (57) · Synthetic Phone');
+    expect(texts(r)).toContain('Absuche: Build/Gerät unbekannt');
+  });
   it('normaler Kunde: Fährtendiagnose mit Zusammenfassung + Teilen (Capture)', async () => {
     mockAvailability.mockResolvedValue('capture');
     mockShareCustomer.mockResolvedValue({ ok: true, fileName: 'x.json', source: 'capture' });
