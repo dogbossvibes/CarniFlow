@@ -2,6 +2,24 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
+## GitHub-Upload nach Aufgaben (direkte Nutzerfreigabe 2026-11-05)
+
+Der Nutzer hat ausdrücklich beauftragt, vor ANYVO-Codearbeiten den frischen GitHub-
+Stand (main, relevanten Arbeits-/Runtime-Branch und offene Pull Requests) zu prüfen
+und abgeschlossene, geprüfte Aufgaben **automatisch auf GitHub zu sichern**.
+Dies ist eine eng begrenzte fortlaufende Freigabe für **Task-Commits und normale
+Pushes ausschliesslich auf dem eigenen, korrekt zugeordneten Task-Branch** nach
+relevanten Tests, TypeScript, ESLint, Diff-/Secret-Prüfung und Owner-Abgleich.
+Verbindlicher Ablauf und STOP-Bedingungen: `docs/agent/GITHUB_AUTOSYNC.md`.
+Nach geprüftem Task-Commit: `npm run agent:github:push`.
+Kein automatischer Upload fremder WIP-Dateien; bei unsauberem Worktree STOP.
+Diese Freigabe umfasst **keine** Commits/Pushes auf main, Release-/Backup-/
+Integrationsbranches, keinen Merge, keine OTA, keinen Build, kein Store-Release,
+keine Live-DB- oder Kundendatenaktion. Ein reiner Handoff bleibt ohne Push.
+Die alten allgemeinen Freigabeverbote gelten ausserhalb dieses engen Scopes weiter.
+Falls lokale Worktree-/Owner-Prüfungen nicht möglich sind, keine automatische
+Freigabe unterstellen und keinen lokalen Sync als erfolgt melden.
+
 ## ANYVO project status
 
 Before substantial ANYVO work, read:
