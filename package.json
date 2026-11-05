@@ -42,8 +42,9 @@
     "build:prod:android": "eas build --profile production --platform android",
     "postinstall": "node scripts/patch-expo-task-manager.cjs",
     "eas-build-post-install": "node scripts/patch-expo-task-manager.cjs --check",
-    "test:process": "node --test scripts/__tests__/developmentProcess.node.test.mjs scripts/__tests__/packagePreparation.node.test.mjs",
-    "agent:snapshot": "node scripts/development-snapshot.mjs"
+    "test:process": "node --test scripts/__tests__/developmentProcess.node.test.mjs scripts/__tests__/packagePreparation.node.test.mjs scripts/__tests__/agentGithubPush.node.test.mjs",
+    "agent:snapshot": "node scripts/development-snapshot.mjs",
+    "agent:github:push": "node scripts/agent-github-push.mjs"
   },
   "jest": {
     "preset": "jest-expo",
