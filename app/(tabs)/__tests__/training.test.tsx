@@ -4,7 +4,7 @@ import TrainingScreen from '@/app/(tabs)/training';
 import { deCH } from '@/i18n/de-CH';
 import { gswCH } from '@/i18n/gsw-CH';
 import { fr } from '@/i18n/locales/fr';
-import { it } from '@/i18n/locales/it';
+import { it as itLocale } from '@/i18n/locales/it';
 import { en } from '@/i18n/locales/en';
 
 const mockPush = jest.fn();
@@ -105,7 +105,7 @@ describe('Training-Tab — Trainingstagebuch-Karte', () => {
     ['DE', deCH as unknown as Record<string, string>],
     ['gsw-CH', gswCH as unknown as Record<string, string>],
     ['FR', fr as unknown as Record<string, string>],
-    ['IT', it as unknown as Record<string, string>],
+    ['IT', itLocale as unknown as Record<string, string>],
     ['EN', en as unknown as Record<string, string>],
   ])('zeigt korrekte Übersetzung (%s) ohne rohe Keys', (_label, labels) => {
     const node = render(labels);
