@@ -1,0 +1,78 @@
+# Isolated SDK 58 UI regression gate. No EAS, OTA, App Store or production secrets.
+# Never substitute this scoped UI gate for device QA or the full release preflight.
+name: ANYVO iOS60 Training UI Review
+
+on:
+  push:
+    branches:
+      - feat/ios60-training-ui-review-20261106
+  pull_request:
+    branches:
+      - upgrade/sdk58-ios60-from57-20261105
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios60-training-ui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scoped-mobile-checks:
+    name: SDK58 Training UI Checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - name: Checkout exact Git revision (no saved credentials)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify origin baseline and strictly bounded UI diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=1dcdf213a93158c5a23c24b0057445d87c775570
+          git cat-file -e "$BASE^{commit}"
+          git merge-base --is-ancestor "$BASE" HEAD
+          git diff --check "$BASE" HEAD
+          while IFS= read -r changed; do
+            case "$changed" in
+              'app/(tabs)/training.tsx'|'app/(tabs)/__tests__/training.test.tsx'|'i18n/de-CH.ts'|'i18n/gsw-CH.ts'|'i18n/locales/fr.ts'|'i18n/locales/it.ts'|'i18n/locales/en.ts'|'.github/workflows/ios60-training-ui-review.yml')
+                echo "In scope: $changed" ;;
+              *)
+                echo "::error::Out-of-scope path: $changed"
+                exit 1 ;;
+            esac
+          done < <(git diff --name-only "$BASE" HEAD)
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install locked SDK58 dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript compile check
+        run: npm run typecheck
+
+      - name: Scoped lint (no new training UI errors)
+        run: npx eslint 'app/(tabs)/training.tsx' 'app/(tabs)/__tests__/training.test.tsx'
+
+      - name: Regression tests - training routes, journal and tracking leave
+        run: |
+          npm test -- --ci --runInBand --watch=false --runTestsByPath \
+            'app/(tabs)/__tests__/training.test.tsx' \
+            'app/__tests__/training-hub-entry.test.tsx' \
+            'app/__tests__/training-journal.test.tsx' \
+            'app/__tests__/training-journal-gesture-ux.test.tsx' \
+            'app/track/__tests__/liegen-leave-semantics.test.tsx'
+
+      - name: Check SDK58 native patch test contracts
+        run: node --test scripts/native-tests/*.test.cjs
