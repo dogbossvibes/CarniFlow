@@ -9,7 +9,7 @@
 // jedem Fall vollständig ohne Motion, dasselbe Muster wie
 // anyvo-precision-location.
 
-import type { EventSubscription } from 'expo-modules-core';
+import type { EventSubscription } from 'expo';
 import Native from './src/AnyvoMotionModule';
 import type { MotionSample, MotionStatus, MotionError, MotionUpdateOptions } from './src/AnyvoMotion.types';
 

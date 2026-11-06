@@ -143,7 +143,7 @@ export function AnyvoBottomSheet({
 }
 
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)' },
   sheet:    { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.trackSurface, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   keyboardRoot: { flex: 1 },
   keyboardAnchor: { flex: 1, justifyContent: 'flex-end' },

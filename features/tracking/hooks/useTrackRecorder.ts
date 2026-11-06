@@ -614,7 +614,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     recordingEvidenceRef.current = qaRef.current
       ? startQaRecordingEvidence(input.localId, 'lay', false, streamModesRef.current)
       : null;
-    recordingEvidenceRef.current?.appState(AppState.currentState);
+    recordingEvidenceRef.current?.appState(AppState.currentState as string);
     const diagnosticsReady = beginBackgroundLayDiagnostics(input.localId).catch(() => {});
     diagnosticsReadyRef.current = diagnosticsReady;
     if (AppState.currentState === 'active') void recordBackgroundLayEvent(input.localId, 'foreground').catch(() => {});

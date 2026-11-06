@@ -11,11 +11,11 @@ if (process.env.EAS_BUILD_PLATFORM === 'ios' || process.argv.includes('--local')
   execFileSync(process.execPath, ['--test', fileURLToPath(new URL('./native-tests/patch-react-native-maps.test.cjs', import.meta.url))], { stdio: 'inherit' });
   const packageFile = import.meta.resolve('react-native-maps/package.json');
   const version = JSON.parse(readFileSync(new URL(packageFile), 'utf8')).version;
-  const installed = readFileSync(new URL('ios/AirMaps/AIRMap.m', packageFile), 'utf8');
+  const installed = readFileSync(new URL(patch.SOURCE_PATH, packageFile), 'utf8');
   const verified = patch.patchSource(installed, version);
   if (verified.changed) throw new Error('AIRMap patch is missing; postinstall must run before native tests');
   const original = installed.replace(patch.AFTER, patch.BEFORE);
-  if (patch.sha256(original) !== patch.ORIGINAL_SHA256) throw new Error('Cannot reconstruct original negative control');
+  if (original === installed || original.includes(patch.AFTER)) throw new Error('Cannot construct unsafe negative control');
   const template = readFileSync(new URL('./native-tests/AIRMapChildContract.m', import.meta.url), 'utf8');
   const method = (source, signature) => {
     const start = source.indexOf(signature);

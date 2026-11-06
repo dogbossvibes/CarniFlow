@@ -5,10 +5,9 @@ import PlannerScreen from '../PlannerScreen';
 let mockScope = {userId:'owner',epoch:0};
 const mockScopeRef = { get current() { return mockScope; } };
 const mockRepo = {list:jest.fn(),save:jest.fn(),remove:jest.fn()};
-const mockBack=jest.fn(),mockDispatch=jest.fn();let mockPrevent:(arg:any)=>void;
+const mockBack=jest.fn(),mockRepeat=jest.fn();let mockPrevent:(arg:any)=>void;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-jest.mock('expo-router',()=>({useRouter:()=>({back:mockBack}),useFocusEffect:(cb:any)=>require('react').useEffect(cb,[cb])}));
-jest.mock('@react-navigation/native',()=>({useNavigation:()=>({dispatch:mockDispatch}),usePreventRemove:(_flag:boolean,cb:any)=>{mockPrevent=cb;}}));
+jest.mock('expo-router',()=>({useRouter:()=>({back:mockBack}),useFocusEffect:(cb:any)=>require('react').useEffect(cb,[cb]),usePreventRemove:(_flag:boolean,cb:any)=>{mockPrevent=cb;}}));
 jest.mock('../usePlannerScope',()=>({usePlannerScope:()=>({userId:mockScope.userId,epoch:mockScope.epoch,repository:mockRepo,scope:mockScopeRef})}));
 jest.mock('../PlannerMap',()=>({PlannerMap:()=>null}));
 jest.mock('../i18n',()=>({}));
@@ -40,6 +39,12 @@ it('requires explicit discard and delete confirmation',async()=>{
  expect(tree.root.findByType(TextInput).props.value).toBe('Unsaved');act(()=>button('remove').props.onPress());expect(mockRepo.remove).not.toHaveBeenCalled();
  const actions=(Alert.alert as jest.Mock).mock.calls.at(-1)[2];await act(async()=>actions[1].onPress());await flush();expect(mockRepo.remove).toHaveBeenCalledWith('one',1);
 });
+it('SDK58: discard confirmation releases the guard with repeat',async()=>{
+ await mount();act(()=>button('Existing').props.onPress());act(()=>tree.root.findByType(TextInput).props.onChangeText('Unsaved'));
+ const repeat=jest.fn();act(()=>mockPrevent({data:{action:{type:'GO_BACK'}},repeat}));
+ const actions=(Alert.alert as jest.Mock).mock.calls.at(-1)[2];await act(async()=>actions[1].onPress());
+ expect(repeat).toHaveBeenCalledTimes(1);
+});
 it('does not display a late previous-account load',async()=>{
  let resolve!:(v:unknown)=>void;mockRepo.list.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));await mount();
  mockScope.userId='other';mockScope.epoch++;mockRepo.list.mockResolvedValue([]);
@@ -47,5 +52,5 @@ it('does not display a late previous-account load',async()=>{
 });
 it('does not trap an account-change navigation behind a dirty prompt',async()=>{
  await mount();act(()=>button('Existing').props.onPress());act(()=>tree.root.findByType(TextInput).props.onChangeText('Unsaved'));
- mockScope.userId='other';act(()=>mockPrevent({data:{action:{type:'RESET'}}}));expect(mockDispatch).toHaveBeenCalledWith({type:'RESET'});
+ mockScope.userId='other';act(()=>mockPrevent({data:{action:{type:'RESET'}},repeat:mockRepeat}));expect(mockRepeat).toHaveBeenCalledTimes(1);
 });

@@ -15,13 +15,15 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
 let mockParams: Record<string, string | undefined> = {};
-let mockBeforeRemove: ((e: unknown) => void) | null = null;
+let mockPreventCallback: ((opts: { data: { action: unknown }; repeat: () => void }) => void) | null = null;
+const mockRepeat = jest.fn();
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ replace: (...a: unknown[]) => mockReplace(...a), push: jest.fn(), back: jest.fn(), canGoBack: () => true }),
+  usePreventRemove: (_condition: boolean, cb: (opts: { data: { action: unknown }; repeat: () => void }) => void) => { mockPreventCallback = cb; return () => {}; },
   useNavigation: () => ({
-    addListener: (name: string, fn: (e: unknown) => void) => { if (name === 'beforeRemove') mockBeforeRemove = fn; return () => {}; },
+    addListener: () => () => {},
     dispatch: jest.fn(),
   }),
 }));
@@ -89,7 +91,7 @@ const holdAbort = () => {
 beforeAll(async () => { await i18n.changeLanguage('de'); });
 beforeEach(async () => {
   await AsyncStorage.clear();
-  mockBeforeRemove = null;
+  mockPreventCallback = null; mockRepeat.mockClear();
   [mockReplace, mockEndNotification, mockRecordCancelled].forEach(m => m.mockClear());
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   useTrackingStore.setState({ dogId: null, currentSessionId: null, sessionStatus: 'idle', trackPoints: [], layStartedAt: null, isRecording: false } as never);
@@ -161,7 +163,7 @@ describe('Liegezeit-Identität (Benachrichtigung / Live Activity)', () => {
   });
   it('9. „Im Hintergrund weiterlaufen" nach Deep-Link bleibt write-safe (kein cancelled, kein Marker, Registry unverändert)', async () => {
     await mount({ id: 'sess-A' });
-    act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } }); });
+    act(() => { mockPreventCallback!({ data: { action: { type: 'GO_BACK' } }, repeat: mockRepeat }); });
     tapDialog('resting-leave-background');
     expect(mockEndNotification).not.toHaveBeenCalled();
     expect(mockRecordCancelled).not.toHaveBeenCalled();
@@ -171,7 +173,7 @@ describe('Liegezeit-Identität (Benachrichtigung / Live Activity)', () => {
   });
   it('10/H. endgültiger Abbruch (Hold) nach Deep-Link betrifft NUR die richtige Session (A), nie B', async () => {
     await mount({ id: 'sess-A' });
-    act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } }); });
+    act(() => { mockPreventCallback!({ data: { action: { type: 'GO_BACK' } }, repeat: mockRepeat }); });
     holdAbort();
     expect(alertSpy).not.toHaveBeenCalled();   // Hold ist die Bestätigung
     expect(mockRecordCancelled).toHaveBeenCalledTimes(1);

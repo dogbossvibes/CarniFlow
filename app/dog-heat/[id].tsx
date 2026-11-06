@@ -709,7 +709,7 @@ const s = StyleSheet.create({
   chipTxtOn:  { color: '#2a0a1c', fontWeight: '800' },
 
   // Modal (full-screen overlay for phase/obs forms)
-  modal:      { ...StyleSheet.absoluteFillObject, backgroundColor: C.trackBg, zIndex: 100 },
+  modal:      { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.trackBg, zIndex: 100 },
   modalInner: { flex: 1 },
   modalScroll:{ padding: 16, gap: 4 },
   modalBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 },

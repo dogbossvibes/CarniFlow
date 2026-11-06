@@ -1280,7 +1280,7 @@ export function useSearchRecorder(opts: {
           engine: getTrackingEngineMode(), source: streamSourceModeRef.current ?? 'unknown',
         })
       : null;
-    recordingEvidenceRef.current?.appState(AppState.currentState);
+    recordingEvidenceRef.current?.appState(AppState.currentState as string);
     qaTelRef.current = (qaOn || isSupportCaptureEnabled())
       ? { captureLevel: qaOn ? 'qa' : 'support',
           recordingContext: observedRecordingProvenance(diagnosticEnvironment, !!resume),

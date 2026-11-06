@@ -316,7 +316,7 @@ const s = StyleSheet.create({
   emptyTxt:   { fontSize: 13, color: C.subtle, textAlign: 'center' },
 
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { backgroundColor: C.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.border, paddingHorizontal: 20, paddingBottom: 8, paddingTop: 12 },
   griff: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: 12 },
   sheetTitle: { fontSize: 18, color: C.white, fontWeight: '800', marginBottom: 4 },

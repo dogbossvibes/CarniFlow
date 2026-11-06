@@ -47,11 +47,11 @@ it('keeps greeting, slogan and statistics in distinct growing flow blocks', () =
   const slogan = nodes.find(n => n.type === 'View' && texts(n).join('|') === 'TRAIN.|ANALYZE.|IMPROVE.')!;
   const stats = nodes.find(n => n.type === 'View' && texts(n).join('|') === '1|HUNDE|0|EINHEITEN|0|SERIE')!;
   const hero = nodes.find(n => children(n).includes(slogan) && children(n).includes(stats))!;
-  const heroStyle = StyleSheet.flatten(hero.props.style);
+  const heroStyle = StyleSheet.flatten(hero.props.style)!;
   expect(heroStyle.height).toBeUndefined();
   expect(heroStyle.maxHeight).toBeUndefined();
-  expect(StyleSheet.flatten(slogan.props.style).position).not.toBe('absolute');
-  expect(StyleSheet.flatten(stats.props.style).position).not.toBe('absolute');
+  expect(StyleSheet.flatten(slogan.props.style)!.position).not.toBe('absolute');
+  expect(StyleSheet.flatten(stats.props.style)!.position).not.toBe('absolute');
   const blocks = children(hero);
   expect(blocks.indexOf(slogan)).toBeLessThan(blocks.indexOf(stats));
   expect(blocks.findIndex(n => all(n).some(v => v.type === 'HomeDayGreeting'))).toBeLessThan(blocks.indexOf(slogan));

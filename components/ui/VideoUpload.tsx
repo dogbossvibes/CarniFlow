@@ -40,7 +40,6 @@ function VideoPlayer({ uri, onReplace, onDelete }: {
         <VideoView
           player={player}
           style={S.video}
-          allowsFullscreen={true}
           allowsPictureInPicture={false}
           contentFit="cover"
           nativeControls={true}

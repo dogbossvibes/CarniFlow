@@ -193,7 +193,7 @@ export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, 
 }
 
 const s = StyleSheet.create({
-  fallback:    { ...StyleSheet.absoluteFillObject, backgroundColor: C.trackSurface, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  fallback:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.trackSurface, alignItems: 'center', justifyContent: 'center', gap: 10 },
   fallbackTxt: { fontSize: 13, color: C.trackTextMut },
   legend:      { position: 'absolute', left: 12, bottom: 10, flexDirection: 'row', gap: 12, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: 'rgba(4,17,15,0.62)' },
   legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 6 },

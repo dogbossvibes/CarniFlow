@@ -32,7 +32,7 @@ function DetailVideo({ uri }: { uri: string }) {
   const signed = useSignedUrl(uri);
   const player = useVideoPlayer(signed, p => { p.loop = false; p.muted = true; });
   useEffect(() => { if (signed) player.replace(signed); }, [signed, player]);
-  return <VideoView player={player} style={s.video} contentFit="cover" nativeControls allowsFullscreen />;
+  return <VideoView player={player} style={s.video} contentFit="cover" nativeControls />;
 }
 
 // Read-only Audio-Wiedergabe. Datei wird lokal geladen (Supabase-CDN ohne
@@ -353,7 +353,7 @@ const s = StyleSheet.create({
   statsRow:  { flexDirection: 'row', gap: 10, marginTop: 8 },
   statCard:  { flex: 1, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingVertical: 18, alignItems: 'center', gap: 6 },
   cardGlass: { backgroundColor: 'transparent', overflow: 'hidden' },
-  glassBg:   { ...StyleSheet.absoluteFillObject },
+  glassBg:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   statVal:   { fontSize: 20, color: C.white, fontWeight: '900', letterSpacing: -0.5 },
   statLabel: { fontSize: 9, color: C.muted, fontWeight: '700', letterSpacing: 1 },
 

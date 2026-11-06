@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useRef } from 'react';
-import { Keyboard, ScrollView, TextInput, type KeyboardMetrics, type ScrollViewProps } from 'react-native';
+import { Keyboard, ScrollView, TextInput, type KeyboardMetrics, type ScrollViewInstance, type ScrollViewProps } from 'react-native';
 
 /** Move only as far as necessary; very tall notes keep their first line visible. */
 export function inputVisibilityOffset(offset: number, top: number, height: number, viewportTop: number, viewportHeight: number): number {
@@ -15,10 +15,10 @@ export function inputVisibilityOffset(offset: number, top: number, height: numbe
 // focused field in that smaller viewport (especially with a sticky footer).
 // This opt-in wrapper measures the actual remaining viewport after layout.
 // It adds no keyboard inset of its own and never changes input values.
-export const KeyboardAwareScrollView = forwardRef<ScrollView, ScrollViewProps>(function KeyboardAwareScrollView(
+export const KeyboardAwareScrollView = forwardRef<ScrollViewInstance, ScrollViewProps>(function KeyboardAwareScrollView(
   { onFocus, onBlur, onLayout, onScroll, onScrollBeginDrag, ...props }, forwardedRef,
 ) {
-  const scroll = useRef<ScrollView | null>(null);
+  const scroll = useRef<ScrollViewInstance | null>(null);
   const focused = useRef<ReturnType<typeof TextInput.State.currentlyFocusedInput> | null>(null);
   const offset = useRef(0);
   const frame = useRef<number | null>(null);

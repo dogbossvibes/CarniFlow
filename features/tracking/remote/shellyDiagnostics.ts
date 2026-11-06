@@ -123,7 +123,7 @@ export const shellyDiagnostics = createShellyDiagnostics({
     try { const results = await PermissionsAndroid.requestMultiple(permissions); return permissions.every(p => results[p] === PermissionsAndroid.RESULTS.GRANTED); }
     catch { return false; }
   },
-  appState: () => AppState.currentState,
+  appState: () => AppState.currentState as string | null,
   onAppState: fn => AppState.addEventListener('change', fn),
   now: Date.now,
 });

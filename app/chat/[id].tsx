@@ -2,7 +2,7 @@ import { setAppAudioModeAsync } from '@/lib/greetingAudioSafety';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  StyleSheet, Text, TextInput, TouchableOpacity, View, type ScrollViewInstance,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,7 +46,7 @@ export default function ChatThreadScreen() {
   const [sending, setSending]   = useState(false);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds]   = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const recorder  = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 

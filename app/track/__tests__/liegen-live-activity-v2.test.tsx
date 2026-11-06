@@ -17,13 +17,15 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
 let mockParams: Record<string, string | undefined> = {};
-let mockBeforeRemove: ((e: unknown) => void) | null = null;
+let mockPreventCallback: ((opts: { data: { action: unknown }; repeat: () => void }) => void) | null = null;
+const mockRepeat = jest.fn();
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ replace: (...a: unknown[]) => mockReplace(...a), push: jest.fn(), back: jest.fn(), canGoBack: () => true }),
+  usePreventRemove: (_condition: boolean, cb: (opts: { data: { action: unknown }; repeat: () => void }) => void) => { mockPreventCallback = cb; return () => {}; },
   useNavigation: () => ({
-    addListener: (name: string, fn: (e: unknown) => void) => { if (name === 'beforeRemove') mockBeforeRemove = fn; return () => {}; },
+    addListener: () => () => {},
     dispatch: jest.fn(),
   }),
 }));
@@ -101,13 +103,13 @@ const mount = async (params: Record<string, string | undefined>) => {
   await settle();
 };
 const byTestId = (id: string) => renderer.root.findAll((n: Rendered) => n.props.testID === id)[0];
-const leave = () => act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } }); });
+const leave = () => act(() => { mockPreventCallback!({ data: { action: { type: 'GO_BACK' } }, repeat: mockRepeat }); });
 const urlParams = (url: string) => Object.fromEntries(new URL(url).searchParams) as Record<string, string>;
 
 beforeAll(async () => { await i18n.changeLanguage('de'); });
 beforeEach(async () => {
   await AsyncStorage.clear();
-  mockActs.length = 0; mockEnds.length = 0; mockDogsOnline = true; mockBeforeRemove = null; mockReplace.mockClear();
+  mockActs.length = 0; mockEnds.length = 0; mockDogsOnline = true; mockPreventCallback = null; mockRepeat.mockClear(); mockReplace.mockClear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   useTrackingStore.setState({ dogId: null, currentSessionId: null, sessionStatus: 'resting', trackPoints: [], layStartedAt: null, isRecording: false } as never);
   useActiveFaehrten.setState({ byDog: {}, hydrated: true });

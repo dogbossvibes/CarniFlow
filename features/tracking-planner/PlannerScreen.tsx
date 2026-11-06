@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import { useRouter, useFocusEffect, usePreventRemove } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as Crypto from 'expo-crypto';
 import { C } from '@/constants/colors';
@@ -19,18 +18,19 @@ export default function PlannerScreen() {
  return <PlannerContent key={`${scope.userId}:${scope.epoch}`} {...scope} />;
 }
 function PlannerContent({ userId, epoch, repository, scope }: ReturnType<typeof usePlannerScope>) {
- const { t } = useTranslation('trackPlanner'); const router = useRouter(), navigation = useNavigation();
+ const { t } = useTranslation('trackPlanner'); const router = useRouter();
  const [rows, setRows] = useState<StoredPlan[]>([]), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [message, setMessage] = useState<string | null>(null);
+ const [allowLeave, setAllowLeave] = useState(false);
  const [draft, setDraft] = useState<StoredPlan | null>(null), [name, setName] = useState('');
  const [edit, setEdit] = useState<PlanEdit>({ points: [], undo: [], selected: null });
  const alive = useRef(true), generation = useRef(0), mutation = useRef(false);
  const current = useCallback(() => alive.current && scope.current.userId === userId && scope.current.epoch === epoch, [scope, userId, epoch]);
  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
  const dirty = !!draft && (name !== draft.plan.name || JSON.stringify(edit.points) !== JSON.stringify(draft.plan.points));
- usePreventRemove(dirty || busy, ({ data }) => {
-  if (!current()) { navigation.dispatch(data.action); return; }
+ usePreventRemove((dirty || busy) && !allowLeave, ({ repeat }) => {
+  if (!current()) { repeat(); return; }   // Scope weg: blockierte Aktion freigeben
   if (busy) return;
-  Alert.alert(t('unsaved'), t('discardQuestion'), [{ text: t('cancel'), style: 'cancel' }, { text: t('discard'), style: 'destructive', onPress: () => { if (current()) navigation.dispatch(data.action); } }]);
+  Alert.alert(t('unsaved'), t('discardQuestion'), [{ text: t('cancel'), style: 'cancel' }, { text: t('discard'), style: 'destructive', onPress: () => { if (current()) { setAllowLeave(true); repeat(); } } }]);
  });
  const refresh = useCallback(async () => {
   const token = ++generation.current; setLoading(true);
@@ -40,7 +40,7 @@ function PlannerContent({ userId, epoch, repository, scope }: ReturnType<typeof 
   finally { if (current() && token === generation.current) setLoading(false); }
  }, [repository, current, t]);
  useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current++; }; }, [refresh]));
- const open = (value: StoredPlan) => { setDraft(value); setName(value.plan.name); setEdit({ points: value.plan.points, undo: [], selected: null }); setMessage(null); };
+ const open = (value: StoredPlan) => { setAllowLeave(false); setDraft(value); setName(value.plan.name); setEdit({ points: value.plan.points, undo: [], selected: null }); setMessage(null); };
  const close = () => {
   if (!current() || mutation.current) return;
   const leave = () => { if (current()) { setDraft(null); setMessage(null); } };

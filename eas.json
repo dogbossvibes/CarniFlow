@@ -74,6 +74,24 @@
         "SENTRY_DISABLE_AUTO_UPLOAD": "true",
         "SENTRY_DISABLE_AUTO_RELEASE": "true"
       }
+    },
+    "sdk58-testflight-60": {
+      "extends": "production",
+      "distribution": "store",
+      "environment": "production",
+      "channel": "production",
+      "developmentClient": false,
+      "autoIncrement": false,
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true",
+        "SENTRY_DISABLE_AUTO_RELEASE": "true",
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_PUBLIC_BACKEND_ENV": "production"
+      },
+      "credentialsSource": "remote"
     }
   },
   "submit": {

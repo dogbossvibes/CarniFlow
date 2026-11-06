@@ -79,6 +79,6 @@ const s = StyleSheet.create({
   input:     { flex: 1, color: C.white, fontSize: 15, paddingVertical: 12 },
   gpsBtn:    { width: 48, borderRadius: 12, borderWidth: 1, borderColor: `${ACCENT}55`, backgroundColor: 'rgba(0,245,212,0.1)', alignItems: 'center', justifyContent: 'center' },
   mapCard:   { height: 120, borderRadius: 20, overflow: 'hidden', marginTop: 12, borderWidth: 1, borderColor: C.border, backgroundColor: '#0A0A10' },
-  mapFallback:{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 6, flexDirection: 'row' },
+  mapFallback:{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 6, flexDirection: 'row' },
   mapTxt:    { fontSize: 13, color: C.white, fontWeight: '600' },
 });

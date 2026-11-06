@@ -1085,7 +1085,7 @@ describe('DocumentScreen — approved three-step training flow', () => {
   it('uses Android system back for the previous step without losing observations', async () => {
     let handler: (() => boolean | null | undefined) | undefined;
     const remove = jest.fn();
-    const spy = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, callback) => { handler = callback; return { remove }; });
+    const spy = jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, callback) => { handler = () => callback({} as never); return { remove }; });
     const node = render(); await flush(); await selectExercise(node);
     act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('Keep this observation'));
     await advanceToSave(node);

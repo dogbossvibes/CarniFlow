@@ -8,7 +8,7 @@
 
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
-import type { EventSubscription } from 'expo-modules-core';
+import type { EventSubscription } from 'expo';
 
 import Native from './src/AnyvoPrecisionLocationModule';
 import type {

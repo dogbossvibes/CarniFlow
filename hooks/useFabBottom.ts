@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
+import { BottomTabBarHeightContext } from 'expo-router/js-tabs';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Zentraler Bottom-Abstand für ALLE schwebenden Elemente (FABs, Sticky Bars,

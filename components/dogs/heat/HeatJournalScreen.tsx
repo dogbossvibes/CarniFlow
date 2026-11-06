@@ -2,8 +2,7 @@ import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardA
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import { useFocusEffect, usePreventRemove, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Crypto from 'expo-crypto';
 import { C } from '@/constants/colors';
@@ -26,7 +25,6 @@ const BEHAVIOR = ['Wie üblich', 'Unruhig', 'Anhänglicher'] as const;
 
 export function HeatJournalScreen({ dog }: { dog: Dog }) {
   const router = useRouter();
-  const navigation = useNavigation();
   const { user } = useSession();
   const { locale } = useT();
   const copy = heatUxCopy(locale);
@@ -47,6 +45,7 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
   const [more, setMore] = useState(false);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [allowLeave, setAllowLeave] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [notice, setNotice] = useState('');
   const [ending, setEnding] = useState<HeatCycle | null>(null);
@@ -71,9 +70,13 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
     finally { if (mounted.current && current === generation.current) { setLoading(false); setRefreshing(false); } }
   }, [dog.id]);
   useFocusEffect(useCallback(() => { if (isPro && !capLoading) void load(); return () => { generation.current++; }; }, [load, isPro, capLoading]));
-  usePreventRemove(dirty || saving, ({ data }) => {
+  usePreventRemove((dirty || saving) && !allowLeave, ({ repeat }) => {
     if (saving) return;
-    Alert.alert(copy.discard, undefined, [{ text: copy.cancel, style: 'cancel' }, { text: copy.discardYes, style: 'destructive', onPress: () => navigation.dispatch(data.action) }]);
+    Alert.alert(copy.discard, undefined, [{ text: copy.cancel, style: 'cancel' }, {
+      text: copy.discardYes,
+      style: 'destructive',
+      onPress: () => { setAllowLeave(true); repeat(); },   // SDK 58: repeat statt dispatch
+    }]);
   });
   const closeForm = () => {
     if (saving) return;
@@ -82,6 +85,7 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
   };
   const openForm = (cycle: HeatCycle) => {
     if (!isOwner || writeLock.current) return;
+    setAllowLeave(false);
     setFormCycle(cycle); setDate(new Date()); setBleeding(null); setBehavior(null); setStanding(false); setDischarge(''); setNotes(''); setMore(false); setSaveFailed(false); setNotice(''); pendingRows.current = null;
   };
   const save = async () => {

@@ -1,11 +1,11 @@
 import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
 import { countLaidCorners } from '@/features/tracking/utils/specialAngleGeometry';
 import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
+import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { FT } from '@/constants/colors';
 import { useT } from '@/i18n';
@@ -120,10 +120,10 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   const { t } = useT();
   useKeepAwake();   // Timer/Anzeige während der Liegezeit anlassen (Bildschirm nicht sperren)
 
-  const navigation = useNavigation();
-  const allowLeaveRef = useRef(false);   // true ⇒ erlaubte Navigation (Absuche / bestätigt) — kein Abbruch-Dialog
-  // Offener Verlassen-Dialog mit der zurückgehaltenen Navigation aus dem beforeRemove-Event (null = zu).
-  const [leave, setLeave] = useState<{ action: unknown } | null>(null);
+  // Offener Verlassen-Dialog mit der von Expo Router gelieferten repeat-Funktion
+  // (null = zu). repeat() hebt die Sperre auf und wiederholt die blockierte Navigation.
+  const [leave, setLeave] = useState<{ repeat: () => void } | null>(null);
+  const [allowLeave, setAllowLeave] = useState(false);   // true ⇒ beabsichtigte Navigation (Absuche / bestätigt)
 
   // Store hat die gelegte Fährte noch → sofort die zeitstempelbasierte Liegezeit-
   // Basis (layStartedAt, Fallback layFinishedAt) nutzen. Sonst (App wurde in der
@@ -141,6 +141,12 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   const hasStore = matchesRestingIdentity(identity, { dogId: st0.dogId, sessionId: st0.currentSessionId }, regSessionId)
     && (st0.trackPoints.length > 0 || st0.layStartedAt != null);
   const [unresolved, setUnresolved] = useState(false);   // vorgegebene Session lokal nicht ladbar → keine Ersatzanzeige
+  // Expo Router SDK 58: beforeRemove wurde entfernt. usePreventRemove blockiert die
+  // Entfernung; repeat() setzt die Sperre zurück und wiederholt exakt die blockierte
+  // Aktion. Direktes navigation.dispatch() würde erneut blockiert (Endlosschleife/Absturz).
+  const disableLeavePrevention = usePreventRemove(!unresolved && !allowLeave, ({ repeat }) => {
+    setLeave({ repeat });
+  });
   const [startMs, setStartMs] = useState<number | null>(() =>
     regEntry?.layStartedAt != null ? regEntry.layStartedAt
     : hasStore ? (useTrackingStore.getState().layStartedAt ?? useTrackingStore.getState().layFinishedAt ?? Date.now())
@@ -234,36 +240,37 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
   const startSearch = async () => {
     if (starting || startMs == null) return;   // erst starten, wenn Liegezeit-Start feststeht
     setStarting(true);
-    allowLeaveRef.current = true;   // beabsichtigte Navigation → kein Abbruch-Dialog
     void endLiegezeitNotification(activityIdentity());   // Liegezeit-Anzeige DIESER Fährte entfernen (Übergang → Absuche)
     const minutes = Math.max(0, Math.round((Date.now() - startMs) / 60000));
     if (id) await setTrackLyingTime(id, minutes).catch(() => {});
     // Bewusst KEIN Statuswechsel auf 'searching' hier: die Suchzeit startet erst am
     // Fährtenansatz (Arming im Run-Screen). Bis dahin bleibt die Fährte 'resting'.
+    // SDK 58: beabsichtigte Navigation zuerst freigeben, sonst blockiert usePreventRemove sie.
+    setAllowLeave(true);
+    disableLeavePrevention();
     router.replace((id ? `/track/run?id=${id}&dogId=${dogId}` : `/track/run?dogId=${dogId}`) as never);
   };
 
   // ── Abbruchschutz: kein stiller Abbruch bei Back/Swipe/Header-Back ──
   // „Im Hintergrund weiterlaufen" verlässt nur den Screen: Liegezeit, Benachrichtigung/Live Activity,
   // Registry und Puffer bleiben unverändert — die Fährte bleibt offen und über „Fährte fortsetzen" erreichbar.
-  const keepRunningInBackground = (action: unknown) => {
+  const keepRunningInBackground = (repeat: () => void) => {
     setLeave(null);
-    allowLeaveRef.current = true;
-    // @ts-expect-error react-navigation action aus dem beforeRemove-Event
-    navigation.dispatch(action);
+    setAllowLeave(true);
+    repeat();   // hebt die SDK-58-Sperre auf und wiederholt die blockierte Navigation
   };
   // Endgültiger Abbruch: separate, destruktive Aktion mit ehrlicher Folge. Auslösung per Touch nur über
   // 1,5-s-Hold im Dialog (der Hold IST die bewusste Bestätigung). Bedienungshilfen (VoiceOver/TalkBack)
   // können nicht halten → „Aktivieren" öffnet stattdessen diese ausdrückliche Bestätigung.
-  const confirmFinalAbort = (action: unknown) => {
+  const confirmFinalAbort = (repeat: () => void) => {
     setLeave(null);
     Alert.alert(t('track.continuation.finalAbortTitle'), t('track.continuation.finalAbortText'), [
       { text: t('track.continuation.no'), style: 'cancel' },   // Event ist bereits verhindert → auf dem Screen bleiben
-      { text: t('track.continuation.finalAbortConfirm'), style: 'destructive', onPress: () => performFinalAbort(action) },
+      { text: t('track.continuation.finalAbortConfirm'), style: 'destructive', onPress: () => performFinalAbort(repeat) },
     ]);
   };
   // Die bestehende endgültige Abbruchlogik (unverändert) — nur noch nach Hold bzw. Bestätigung erreichbar.
-  function performFinalAbort(action: unknown) {
+  function performFinalAbort(repeat: () => void) {
     setLeave(null);
     // Nur die Fährte DIESES Screens beenden: der Store wird nur mitgeändert, wenn er zu ihr
     // gehört (Deep-Link ohne dogId kann die Fährte eines anderen Hundes im Store halten).
@@ -280,22 +287,12 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
     // die Recovery bietet diese Fährte danach nur noch über „Fährte wieder öffnen" an.
     void recordTrackCancelled(target.sessionId, target.dogId, 'resting_abort');
     void endLiegezeitNotification({ dogId: target.dogId ?? dogId, sessionId: target.sessionId });   // nur DIESE Activity (cancelled)
-    allowLeaveRef.current = true;
-    // @ts-expect-error react-navigation action aus dem beforeRemove-Event
-    navigation.dispatch(action);
+    setAllowLeave(true);
+    repeat();   // hebt die SDK-58-Sperre auf und wiederholt die blockierte Navigation
   }
-  useEffect(() => {
-    const unsub = navigation.addListener('beforeRemove', (e: any) => {
-      if (allowLeaveRef.current) return;   // erlaubte Navigation → durchlassen
-      e.preventDefault();                   // Standard-Back/Swipe/Header-Back blocken
-      setLeave({ action: e.data.action });  // Verlassen-Dialog öffnen
-    });
-    return unsub;
-  }, [navigation]);
 
-
-  // Vorgegebene Session nicht (mehr) lokal ladbar: keine Ersatzanzeige, Verlassen ohne Abbruch-Dialog.
-  useEffect(() => { if (unresolved) allowLeaveRef.current = true; }, [unresolved]);
+  // Vorgegebene Session nicht (mehr) lokal ladbar: keine Ersatzanzeige, Verlassen ohne Abbruch-Dialog
+  // (usePreventRemove ist dann bereits über !unresolved deaktiviert).
   if (unresolved) return <RestingIdentityMissing />;
 
   return (
@@ -407,6 +404,7 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
             className="h-[60px] rounded-[18px] flex-row items-center justify-center gap-2 bg-ft-acc"
             style={starting || startMs == null ? { opacity: 0.5 } : undefined}
             onPress={startSearch} disabled={starting || startMs == null}
+            testID="resting-start-search"
           >
             <Ionicons name="play" size={18} color={FT.accText} />
             <Text className="text-[14px] font-extrabold text-ft-acc-text">{t('track.search')}</Text>
@@ -416,9 +414,9 @@ function TrackLiegenContent({ id, dogId }: { id?: string; dogId: string }) {
 
       <RestingLeaveDialog
         visible={leave !== null}
-        onBackground={() => { if (leave) keepRunningInBackground(leave.action); }}
-        onHoldAbort={() => { if (leave) performFinalAbort(leave.action); }}
-        onAccessibleAbort={() => { if (leave) confirmFinalAbort(leave.action); }}
+        onBackground={() => { if (leave) keepRunningInBackground(leave.repeat); }}
+        onHoldAbort={() => { if (leave) performFinalAbort(leave.repeat); }}
+        onAccessibleAbort={() => { if (leave) confirmFinalAbort(leave.repeat); }}
         onBack={() => setLeave(null)}   // Dialog schliessen, auf dem Liegezeit-Screen bleiben
       />
     </View>

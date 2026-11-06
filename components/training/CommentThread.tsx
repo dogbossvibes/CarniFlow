@@ -28,7 +28,7 @@ function VideoBubble({ uri }: { uri: string }) {
   const signed = useSignedUrl(uri);
   const player = useVideoPlayer(signed, p => { p.loop = false; p.muted = true; });
   useEffect(() => { if (signed) player.replace(signed); }, [signed, player]);
-  return <VideoView player={player} style={s.video} contentFit="cover" nativeControls allowsFullscreen />;
+  return <VideoView player={player} style={s.video} contentFit="cover" nativeControls />;
 }
 
 // Messenger-artiger Kommentar-Thread an einer Trainingseinheit (Trainer ↔ Kunde).

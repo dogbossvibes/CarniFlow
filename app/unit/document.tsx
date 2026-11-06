@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Crypto from 'expo-crypto';
 import {
   ActivityIndicator, Alert, AppState, BackHandler, Keyboard, KeyboardAvoidingView, Platform,
-  StyleSheet, Text, TextInput, TouchableOpacity, View, type ScrollView as NativeScrollView,
+  StyleSheet, Text, TextInput, TouchableOpacity, View, type ScrollViewInstance,
 } from 'react-native';
 import { KeyboardAwareScrollView as ScrollView } from '@/components/ui/KeyboardAwareScrollView';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -190,7 +190,7 @@ function DocumentForm() {
   const [preparationOpen, setPreparationOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [otherDogDrafts, setOtherDogDrafts] = useState<NonNullable<DocumentDraft['otherDogs']>>({});
-  const scrollRef = useRef<NativeScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const dogSwitchLock = useRef(false);
   useEffect(() => { dogSwitchLock.current = false; }, [dogId]);
   const moveToStep = useCallback((step: number) => { Keyboard.dismiss(); setWorkflowStep(step); setPickerOpen(step === 1 && !selected.length); scrollRef.current?.scrollTo({ y: 0, animated: false }); }, [selected.length]);

@@ -1053,7 +1053,7 @@ const s = StyleSheet.create({
   feedbackInput: { minHeight: 54, color: C.trackText, fontSize: 14, lineHeight: 20, textAlignVertical: 'top', borderWidth: 1, borderColor: C.trackBorder, borderRadius: 12, padding: 10 },
   shareSheet: { backgroundColor: C.trackCard, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12, borderWidth: 1, borderColor: C.trackBorder },
   sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
-  sheetBackdrop: { ...StyleSheet.absoluteFillObject },
+  sheetBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   shareSheetTitle: { color: C.trackText, fontSize: 20, fontWeight: '900' },
   trainerOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
   trainerOptionText: { flex: 1, color: C.trackText, fontSize: 14, fontWeight: '700' },

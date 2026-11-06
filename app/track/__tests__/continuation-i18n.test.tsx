@@ -13,11 +13,13 @@ jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
-let mockBeforeRemove: ((e: unknown) => void) | null = null;
+let mockPreventCallback: ((opts: { data: { action: unknown }; repeat: () => void }) => void) | null = null;
+const mockRepeat = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'sess-A', dogId: 'dog-A' }),
   useRouter: () => ({ replace: jest.fn(), push: jest.fn(), back: jest.fn(), canGoBack: () => true }),
-  useNavigation: () => ({ addListener: (n: string, fn: (e: unknown) => void) => { if (n === 'beforeRemove') mockBeforeRemove = fn; return () => {}; }, dispatch: jest.fn() }),
+  usePreventRemove: (_condition: boolean, cb: (opts: { data: { action: unknown }; repeat: () => void }) => void) => { mockPreventCallback = cb; return () => {}; },
+  useNavigation: () => ({ addListener: () => () => {}, dispatch: jest.fn() }),
 }));
 jest.mock('@/features/tracking/native/liegezeitNotification', () => ({
   startLiegezeitNotification: jest.fn(async () => undefined), updateLiegezeitNotification: jest.fn(async () => undefined), endLiegezeitNotification: jest.fn(async () => undefined),
@@ -90,7 +92,7 @@ describe.each(LANGS)('Sprache %s', lng => {
   it('Liegezeit-Dialog (Hold-to-Abort) + Bestätigung für Bedienungshilfen übersetzt, keine rohen Keys', async () => {
     useTrackingStore.setState({ dogId: 'dog-A', currentSessionId: 'sess-A', sessionStatus: 'resting', trackPoints: [{ lat: 47, lng: 8, t: 1 } as never], layStartedAt: Date.now() } as never);
     const r = await render(<LiegenScreen />);
-    act(() => { mockBeforeRemove!({ preventDefault: jest.fn(), data: { action: {} } }); });
+    act(() => { mockPreventCallback!({ data: { action: {} }, repeat: mockRepeat }); });
     const dialog = r.root.findAll((n: Rendered) => n.props.testID === 'resting-leave-dialog')[0];
     const dTexts: string[] = dialog.findAllByType('Text' as never).map((n: Rendered) => [].concat(n.props.children).join(''));
     expect(dTexts[0]).toBe(e.leave);

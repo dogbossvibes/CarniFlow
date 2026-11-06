@@ -406,7 +406,7 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     overflow: "hidden",
   },
-  heroImg: { ...StyleSheet.absoluteFillObject },
+  heroImg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 
   slogan: {
     // Normal flow reserves space for scaled text before the statistics.
@@ -505,7 +505,7 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   cardGlass: { backgroundColor: "transparent", overflow: "hidden" },
-  glassBg:   { ...StyleSheet.absoluteFillObject },
+  glassBg:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   wocheLabel: {
     fontSize: 9,
     color: C.muted,

@@ -78,7 +78,7 @@ export function UnitListCard({ unit, onPress, clientName }: { unit: TrainingUnit
 const s = StyleSheet.create({
   card:    { backgroundColor: C.card, borderRadius: 24, borderWidth: 1, borderColor: C.border, padding: 18, marginBottom: 12, gap: 14 },
   cardGlass: { backgroundColor: 'transparent', overflow: 'hidden' },
-  glassBg:   { ...StyleSheet.absoluteFillObject, borderRadius: 24 },
+  glassBg:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 24 },
   clientRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: -4 },
   clientName: { fontSize: 13, color: C.accent, fontWeight: '800', letterSpacing: 0.2 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

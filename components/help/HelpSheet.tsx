@@ -125,7 +125,7 @@ export function HelpSheet({
 }
 
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
   wrap: { flex: 1, justifyContent: 'flex-end' },
   safe: { paddingHorizontal: 16, flexShrink: 1 },
   card: {

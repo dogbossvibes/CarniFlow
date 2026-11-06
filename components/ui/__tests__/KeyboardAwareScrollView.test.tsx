@@ -1,6 +1,6 @@
 import { createRef } from 'react';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
-import { Keyboard, ScrollView, TextInput, type KeyboardEvent } from 'react-native';
+import { Keyboard, ScrollView, TextInput, type KeyboardEvent, type ScrollViewInstance } from 'react-native';
 import { KeyboardAwareScrollView, inputVisibilityOffset } from '../KeyboardAwareScrollView';
 
 const mockScrollTo = jest.fn();
@@ -38,7 +38,7 @@ describe('focused input visibility', () => {
   });
   afterEach(() => { act(() => node?.unmount()); jest.restoreAllMocks(); });
   function render() {
-    const ref = createRef<ScrollView>();
+    const ref = createRef<ScrollViewInstance>();
     act(() => { node = TestRenderer.create(<KeyboardAwareScrollView ref={ref}><TextInput /></KeyboardAwareScrollView>); });
     return { props: node.root.findByType(ScrollView).props, ref };
   }

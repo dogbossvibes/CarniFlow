@@ -575,7 +575,7 @@ function Fab({ icon, onPress, active, accessibilityLabel, accessibilityHint }: {
 }
 
 const s = StyleSheet.create({
-  fallback:    { ...StyleSheet.absoluteFillObject, backgroundColor: C.trackSurface, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  fallback:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.trackSurface, alignItems: 'center', justifyContent: 'center', gap: 10 },
   fallbackTxt: { fontSize: 13, color: C.trackTextMut },
   fabCol:      { position: 'absolute', right: 14, top: 14, gap: 10, alignItems: 'flex-end' },
   modeLabel: { maxWidth: 150, color: C.trackText, backgroundColor: 'rgba(13,13,13,0.9)', borderRadius: 10, padding: 7, fontSize: 12, fontWeight: '700', textAlign: 'right' },

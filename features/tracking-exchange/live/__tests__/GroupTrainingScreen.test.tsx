@@ -14,8 +14,7 @@ serverNowMs: 1_000_000, verifiedAt: 0, sessions: [{ sessionId: 's', groupId: 'g'
 session: { sessionId: 's', groupId: 'g', participants: [{ userId: 'A', dogId: 'dog-a', displayName: 'A' }, { userId: 'B', dogId: 'dog-b', displayName: 'B' }] } };
 jest.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 jest.mock('@/lib/supabase', () => ({ supabase: {} }));
-jest.mock('@react-navigation/native', () => ({ useIsFocused: () => true }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ back: jest.fn() }), useIsFocused: () => true }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'share-new' }));
 jest.mock('@/hooks/useSession', () => ({ useSession: () => ({ session: { user: { id: 'A' } } }) }));
 jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: mockDogs, refresh: jest.fn() }) }));

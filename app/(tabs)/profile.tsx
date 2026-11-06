@@ -967,7 +967,7 @@ const s = StyleSheet.create({
     marginBottom: 24,
   },
   glassTransparent: { backgroundColor: "transparent" },
-  glassBg:          { ...StyleSheet.absoluteFillObject },
+  glassBg:          { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   zeile: { flexDirection: "row", alignItems: "center", padding: 16, gap: 12 },
   zeileIcon: {
     width: 36,

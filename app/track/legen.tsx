@@ -9,8 +9,7 @@ import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Te
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
+import { useFocusEffect, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { requestVoice, resetVoiceEvents } from '@/features/tracking/utils/voiceEvents';
 import { C, FT } from '@/constants/colors';

@@ -6,11 +6,19 @@ import type { Dog } from '@/types';
 const mockLoad = jest.fn(); const mockSave = jest.fn(); const mockEnd = jest.fn(); const mockPush = jest.fn(); const mockReplace = jest.fn(); const mockGuard = jest.fn();
 let mockUser = 'owner'; let mockCounter = 0;
 const mockRouter = { push: mockPush, replace: mockReplace, back: jest.fn() };
+let mockPreventCallback: ((opts: { data: { action: unknown }; repeat: () => void }) => void) | null = null;
 jest.mock('expo-router', () => {
   const React = jest.requireActual('react');
-  return { useRouter: () => mockRouter, useFocusEffect: (fn: () => unknown) => React.useEffect(fn, [fn]) };
+  return {
+    useRouter: () => mockRouter,
+    useFocusEffect: (fn: () => unknown) => React.useEffect(fn, [fn]),
+    usePreventRemove: (condition: boolean, cb: (opts: { data: { action: unknown }; repeat: () => void }) => void) => {
+      mockGuard(condition, cb);
+      mockPreventCallback = cb;
+      return jest.fn();
+    },
+  };
 });
-jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ dispatch: jest.fn() }), usePreventRemove: (...a: unknown[]) => mockGuard(...a) }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => `uuid-${++mockCounter}` }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ bottom: 0 }) }));
@@ -30,7 +38,7 @@ const text = () => nodesOf(Text).map(n => Array.isArray(n.props.children) ? n.pr
 const button = (label: string) => nodesOf(TouchableOpacity).find(n => n.props.accessibilityLabel === label)!;
 async function tap(label: string) { await act(async () => { button(label).props.onPress(); }); }
 async function render() { await act(async () => { node = TestRenderer.create(<HeatJournalScreen dog={dog} />); }); }
-beforeEach(() => { mockUser = 'owner'; mockCounter = 0; mockLoad.mockReset().mockResolvedValue({ cycles: [cycle], phases: [], observations: [legacy] }); mockSave.mockReset().mockResolvedValue(undefined); mockEnd.mockReset().mockResolvedValue(undefined); mockPush.mockReset(); mockGuard.mockReset(); });
+beforeEach(() => { mockUser = 'owner'; mockCounter = 0; mockLoad.mockReset().mockResolvedValue({ cycles: [cycle], phases: [], observations: [legacy] }); mockSave.mockReset().mockResolvedValue(undefined); mockEnd.mockReset().mockResolvedValue(undefined); mockPush.mockReset(); mockGuard.mockReset(); mockPreventCallback = null; });
 afterEach(() => { if (node) act(() => node.unmount()); });
 it('shows actual records and opens observation details without altering them', async () => {
   await render(); expect(text()).toContain('Luna'); expect(text()).toContain('Original note'); expect(text()).toContain('Original value');
@@ -82,6 +90,18 @@ it('cancel requires confirmation when a draft is dirty', async () => {
   await render(); await tap('Beobachtung hinzufügen'); await tap('Leicht'); await tap('Abbrechen');
   expect(spy).toHaveBeenCalledWith('Ungespeicherte Eingaben verwerfen?', undefined, expect.any(Array)); expect(button('Beobachtung speichern')).toBeDefined();
   expect(mockGuard).toHaveBeenLastCalledWith(true, expect.any(Function)); spy.mockRestore();
+});
+
+it('SDK 58: discard confirmation releases the guard with repeat, not dispatch', async () => {
+  const repeat = jest.fn();
+  const spy = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    buttons?.find(b => b.text === 'Verwerfen')?.onPress?.();
+  });
+  await render(); await tap('Beobachtung hinzufügen'); await tap('Leicht');
+  act(() => mockPreventCallback!({ data: { action: { type: 'GO_BACK' } }, repeat }));
+  expect(spy).toHaveBeenCalledTimes(1);
+  expect(repeat).toHaveBeenCalledTimes(1);
+  spy.mockRestore();
 });
 
 describe('restored forecast and breeding overview', () => {

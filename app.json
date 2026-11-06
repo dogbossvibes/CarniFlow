@@ -2,12 +2,11 @@
   "expo": {
     "name": "ANYVO",
     "slug": "anyvo",
-    "version": "1.0.4",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "anyvo",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "updates": {
       "url": "https://u.expo.dev/e6475526-66fa-42fa-b2a4-e11afc349e7a"
     },
@@ -16,9 +15,9 @@
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anyvo.app",
-      "buildNumber": "57",
-      "version": "1.0.6",
-      "runtimeVersion": "1.0.6-map49-v1",
+      "buildNumber": "60",
+      "version": "1.0.8",
+      "runtimeVersion": "1.0.8-sdk58-v1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationTemporaryUsageDescriptionDictionary": {
@@ -33,7 +32,6 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#09090F"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
