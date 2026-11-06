@@ -138,8 +138,15 @@ describe('Training-Tab — überarbeitete Darstellung ohne neue Geschäftslogik'
     const labels = deCH as unknown as Record<string, string>;
     const node = render(labels);
     expect(allStrings(node)).toContain(labels['training.timerHint']);
-    expect(cards(node)).toHaveLength(4);
-    expect(cards(node).every((card) => (card as unknown as { props: { accessibilityRole?: string } }).props.accessibilityRole === 'button')).toBe(true);
+    // React Native's Pressable may expose several renderer nodes per single button.
+    // Count distinct visible actions, not testID occurrences in the Fiber tree.
+    expect(pressableTexts(node)).toHaveLength(4);
+    for (const key of ['training.startTimer', 'training.document', 'training.journal', 'training.faehrteGps']) {
+      const accessible = cards(node).some((card) =>
+        textOf(card).includes(labels[key]) &&
+        (card as unknown as { props: { accessibilityRole?: string } }).props.accessibilityRole === 'button');
+      expect(accessible).toBe(true);
+    }
   });
 
   it('öffnet die Trainingsstatistik über ihren eigenen Button', () => {
