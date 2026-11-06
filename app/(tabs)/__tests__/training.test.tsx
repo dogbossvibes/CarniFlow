@@ -116,7 +116,7 @@ describe('Training-Tab — Trainingstagebuch-Karte', () => {
     expect(rawKeys).toEqual([]);
   });
 });
- 
+
 describe('Training-Tab — überarbeitete Darstellung ohne neue Geschäftslogik', () => {
   beforeEach(() => { mockPush.mockReset(); });
 
