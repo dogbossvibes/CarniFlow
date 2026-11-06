@@ -248,6 +248,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'training.start':       'Training starte',
   'training.today':       'Hüt trainiere',
   'training.timer':       'Timer',
+  "training.timerHint": "Ziit erfasse und Training festhalte",
   'training.title':       'Training',
   'training.newUnit':     'NEUI EIHEIT',
   'training.startTimer':  'Timer starte',

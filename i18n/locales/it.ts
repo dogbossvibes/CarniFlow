@@ -254,6 +254,7 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "training.start": "Avvia allenamento",
   "training.today": "Allenati oggi",
   "training.timer": "Cronometro",
+  "training.timerHint": "Misura il tempo e documenta la sessione",
   "training.title": "Allenamento",
   "training.newUnit": "NUOVA SESSIONE",
   "training.startTimer": "Avvia timer",

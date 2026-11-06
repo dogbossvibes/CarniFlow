@@ -270,6 +270,7 @@ export const deCH = {
   'training.start':       'Training starten',
   'training.today':       'Heute trainieren',
   'training.timer':       'Timer',
+  "training.timerHint": "Zeit erfassen und Training festhalten",
   'training.title':       'Training',
   'training.newUnit':     'NEUE EINHEIT',
   'training.startTimer':  'Timer starten',

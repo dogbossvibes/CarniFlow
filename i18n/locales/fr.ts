@@ -263,6 +263,7 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "training.start":       "Démarrer l'entraînement",
   "training.today":       "S'entraîner aujourd'hui",
   "training.timer":       "Minuteur",
+  "training.timerHint": "Chronométrer et documenter la séance",
   "training.title":       "Entraînement",
   "training.newUnit":     "NOUVELLE SÉANCE",
   "training.startTimer":  "Démarrer le minuteur",
