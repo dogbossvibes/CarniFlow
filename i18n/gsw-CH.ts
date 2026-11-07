@@ -256,7 +256,7 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'training.documentSub': 'Nachträglich mit Föteli, Video & Notize',
   'training.journal':     'Trainingstagebuech',
   'training.journalSub':  'Alli Traininge vo dine Hünd',
-  'training.faehrteGps':  'Fährte (GPS)',
+  'training.faehrteGps':  'Fährten',
   'training.faehrteSub':  'Live lege & usschaffe',
 
   // Auth / Login / Konto-Sicherheit
