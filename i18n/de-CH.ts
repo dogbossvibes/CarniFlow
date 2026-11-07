@@ -277,7 +277,7 @@ export const deCH = {
   'training.documentSub': 'Nachträglich mit Fotos, Videos & Notizen',
   'training.journal':     'Trainingsjournal',
   'training.journalSub':  'Alle Trainings deiner Hunde',
-  'training.faehrteGps':  'Fährte (GPS)',
+  'training.faehrteGps':  'Fährten',
   'training.faehrteSub':  'Live legen & ausarbeiten',
 
   // Auth / Login / Konto-Sicherheit
