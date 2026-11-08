@@ -4,6 +4,14 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before 
 
 ## GitHub-Upload nach Aufgaben (direkte Nutzerfreigabe 2026-11-05)
 
+> **AUSGESETZT seit 2026-11-08 (Nutzerentscheidung, bis auf Widerruf).** Die unten
+> beschriebene fortlaufende Freigabe gilt nicht mehr, für Codex, Claude Code, OpenCode
+> und jeden anderen Agenten. Jeder Commit und jeder Push, auch auf dem eigenen
+> Task-Branch und auch über `npm run agent:github:push`, braucht eine ausdrückliche
+> Einzelfreigabe der Nutzerin. Codex und OpenCode erhalten vorerst keine neuen
+> Schreibaufträge. Details: `docs/agent/ANYVO_COLLABORATION_RULES.md` Abschnitt 1a.
+> Der folgende Text bleibt nur als historischer Beleg stehen.
+
 Der Nutzer hat ausdrücklich beauftragt, vor ANYVO-Codearbeiten den frischen GitHub-
 Stand (main, relevanten Arbeits-/Runtime-Branch und offene Pull Requests) zu prüfen
 und abgeschlossene, geprüfte Aufgaben **automatisch auf GitHub zu sichern**.
