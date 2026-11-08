@@ -1,5 +1,13 @@
 # ANYVO – Sicherer GitHub-Upload nach einem Entwicklungsauftrag
 
+> [!IMPORTANT]
+> **Ausgesetzt durch Nutzerentscheidung vom 2026-11-08:** Die unten beschriebene stehende
+> Freigabe für Commits und Pushes ohne erneute Rückfrage gilt bis auf Widerruf **nicht
+> mehr**. Jeder Commit und jeder Push (auch `npm run agent:github:push`) braucht eine
+> ausdrückliche Einzelfreigabe der Nutzerin. Die übrigen Prüfschritte dieses Dokuments
+> (Preflight, Scope-Prüfung, keine `git add .`, kein Force-Push) gelten weiter.
+> Siehe `docs/agent/ANYVO_COLLABORATION_RULES.md` Abschnitt 1a.
+
 **Direkter Nutzerauftrag vom 2026-11-05:** Vor ANYVO-Codearbeit den tatsächlichen aktuellen GitHub-Stand prüfen und beauftragte, geprüfte Arbeit anschliessend ohne erneute Freigabeschleife auf GitHub sichern. Die Freigabe ist **eng begrenzt** auf normale Commits und normale Pushes im eigenen, klar zugeordneten Task-Branch. Sie ist keine Freigabe für `main`, Release-/Backup-/Integrationsbranches, fremde Worktrees, Merges, OTA, Builds, Store-Uploads, Live-DB-Aktionen oder Kundendaten.
 
 ## Start jeder Entwicklung (lesend)

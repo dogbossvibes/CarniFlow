@@ -176,14 +176,19 @@ The actual repository state always wins over handoff documentation.
 - push, merge, or commit without explicit user permission
 - publish an OTA, start a build, or release to a store without explicit user permission
 - run destructive SQL or write to Production Supabase/DB without explicit user permission
+- weaken, skip or adapt tests to hide failures; change a test only for a
+  documented requirement change and name it in the report
 
 ## ALWAYS
 - inspect `git status` before editing
 - preserve unrelated work
 - preserve working tracking/GPS behavior; review field evidence and continuity
   before replacing tracking logic
+- treat as specially protected: Fährtenaufzeichnung (highest priority), GPS/IMU,
+  Supabase RLS, RevenueCat, subscription sync and existing customer features
 - for product-code changes, run relevant tests, TypeScript typecheck, ESLint,
   and `git diff --check` (report any justified limitation)
+- check every change for regressions in affected and adjacent features
 - document remaining issues
 - update the handoff before stopping when appropriate
 

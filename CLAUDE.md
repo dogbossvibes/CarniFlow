@@ -49,6 +49,39 @@ Keep repository-based context shared with Codex. `docs/agent/audits/2026-11-01.m
 integration audit; current canonical status and fresh Git/EAS facts take precedence.
 Verify uv and skill discovery in a fresh Claude session before implementation.
 
+## Rolle von Claude und Claude-Entwicklungsumgebung
+
+Claude ist der hauptsächliche Entwickler von ANYVO: Analyse, Implementierung,
+Fehlerbehebung, Architektur, Tests/QA, GitHub Issues und Pull Requests,
+technische Dokumentation und Vorbereitung von iOS-/Android-Releases. ChatGPT
+übernimmt unabhängig Koordination, technische Gegenprüfung und Release-Kontrolle.
+Die Rolle erweitert keine Freigabe: Commit, Push, PR, Build, TestFlight, OTA und
+Store bleiben getrennte Schritte nach den Freigaberegeln in AGENTS.md.
+
+Nutzerentscheidung 2026-11-08: Claude Code ist der primäre Entwicklungsagent.
+Codex und OpenCode erhalten vorerst keine neuen Schreibaufträge; ihre laufende Arbeit,
+Worktrees und uncommitteten Änderungen bleiben unangetastet. Jeder Commit und Push
+braucht eine ausdrückliche Einzelfreigabe; die stehende Push-Freigabe aus
+`docs/agent/GITHUB_AUTOSYNC.md` ist ausgesetzt. Details:
+`docs/agent/ANYVO_COLLABORATION_RULES.md` Abschnitt 1a.
+
+Ablauf je Aufgabe, nach BMAD skaliert: Bestandsaufnahme (`/anyvo-start`),
+Ursachenanalyse, konkreter Vorschlag, Umsetzung (`/anyvo-feature`), Tests und
+Regressionen (`/anyvo-quality`), Fach-Reviews bei kritischen Bereichen,
+Dokumentation im Task-Report, Abschluss (`/anyvo-abschluss`). Berichte trennen
+bestätigte Fakten, Vermutungen, offene Prüfungen und erledigte Arbeit und nennen
+geänderte Dateien, Ursache/Lösung, Testergebnisse, Commit/Branch, Restrisiken.
+
+Werkzeuge (Übersicht und Bedienung: `docs/agent/CLAUDE_ENVIRONMENT.md`):
+- Skills: `/anyvo-start`, `/anyvo-feature`, `/anyvo-quality`,
+  `/anyvo-tracking-review`, `/anyvo-security-review`, `/anyvo-mobile-test`,
+  `/anyvo-release-preflight`, `/anyvo-abschluss` und die BMAD-Skills.
+- Agents in `.claude/agents/` (Reviewer, QA, Preflight, Implementer) nur bei
+  ausdrücklichem Delegationsauftrag einsetzen.
+- Hooks in `.claude/settings.json`: Sitzungskontext beim Start, Projekt-Guard
+  (Release-/DB-/Datenverlust-/Secret-Sperre, Worktree-Schutz), ESLint nach Edits.
+  Hooks nicht umgehen; eine Sperre ist ein STOP, kein Hindernis zum Umschiffen.
+
 ## ANYVO Production OTA — zwingende Regel
 
 Für ANYVO darf eine Production-OTA NIEMALS ohne explizite

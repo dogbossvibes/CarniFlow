@@ -1,5 +1,75 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.*.local)",
+      "Read(./google-play-service-account.json)",
+      "Bash(eas update *)",
+      "Bash(eas build *)",
+      "Bash(eas submit *)",
+      "Bash(supabase db push *)",
+      "Bash(supabase db reset *)",
+      "Bash(gh pr merge *)",
+      "mcp__plugin_expo_expo__build_run",
+      "mcp__plugin_expo_expo__build_submit",
+      "mcp__plugin_expo_expo__build_cancel",
+      "mcp__plugin_expo_expo__workflow_run",
+      "mcp__plugin_expo_expo__workflow_cancel",
+      "mcp__plugin_expo_expo__appstore_reply_review",
+      "mcp__plugin_expo_expo__appstore_delete_review_response",
+      "mcp__plugin_expo_expo__playstore_reply_review",
+      "mcp__plugin_expo_expo__usage_budget_create"
+    ],
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(git worktree add *)",
+      "Bash(npm install *)",
+      "Bash(npm ci *)",
+      "Bash(npx expo install *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/anyvo-session-context.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/anyvo-guard.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/anyvo-post-edit-lint.mjs\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
   }
 }
