@@ -20,6 +20,20 @@ Die alten allgemeinen Freigabeverbote gelten ausserhalb dieses engen Scopes weit
 Falls lokale Worktree-/Owner-Prüfungen nicht möglich sind, keine automatische
 Freigabe unterstellen und keinen lokalen Sync als erfolgt melden.
 
+## Keine OTA vergessen (direkter Nutzerauftrag 2026-11-09)
+
+Vor jedem **neuen nativen Build** und vor der **ersten OTA auf einer neuen
+Runtime** prüfen, ob alle früheren Production-OTAs (alle Runtimes) im Kandidaten
+enthalten sind: `npm run release:check:ota-coverage` (bzw.
+`node scripts/check-ota-coverage.mjs --live --candidate <ref> --platform <ios|android>`).
+`build:prod:*` und `update-production.mjs --initial-runtime-release` erzwingen das;
+Builds mit eigenen Profilen direkt über `eas build` müssen die Prüfung vorher
+ausdrücklich laufen lassen. Fehlende OTAs nachziehen oder in
+`docs/agent/ota-coverage-exceptions.json` mit Begründung, `decidedBy` und Datum
+ausnehmen (z. B. alte Fährtenlogik, durch Build-58-Basis ersetzt). Verzeichnis
+aller OTAs: `docs/agent/ota-ledger.json` (`npm run release:refresh:ota-ledger`).
+Normale OTAs derselben Runtime sichert weiterhin der Ancestry-Guard des Wrappers.
+
 ## ANYVO project status
 
 Before substantial ANYVO work, read:
