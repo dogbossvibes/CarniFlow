@@ -1,5 +1,46 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git fetch *)",
+      "Bash(npm test *)",
+      "Bash(npm run test *)",
+      "Bash(npm run test:process *)",
+      "Bash(npm run typecheck *)",
+      "Bash(npm run lint *)",
+      "Bash(npm run agent:status *)",
+      "Bash(npx jest *)",
+      "Bash(npx tsc --noEmit *)",
+      "Bash(eas update:list *)",
+      "Bash(npx eas update:list *)",
+      "Bash(eas build:list *)",
+      "Bash(npx eas build:list *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git reset *)",
+      "Bash(git clean *)",
+      "Bash(gh pr merge *)",
+      "Bash(eas update *)",
+      "Bash(npx eas update *)",
+      "Bash(eas build *)",
+      "Bash(npx eas build *)",
+      "Bash(eas submit *)",
+      "Bash(npx eas submit *)",
+      "Bash(npm run update:production *)",
+      "Bash(npm run update:production:ios *)",
+      "Bash(node scripts/update-production.mjs *)",
+      "Bash(supabase *)",
+      "Bash(npx supabase *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./google-play-service-account.json)"
+    ]
   }
 }
