@@ -145,6 +145,10 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown; ea
   const repo = join(dir, 'repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
   for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'scripts/release-quality-evidence.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
+  // This harness isolates the pre-existing runtime/race/quality guards. The new
+  // entry gate is exercised without mocks by releaseEntry.node.test.mjs.
+  // Fixture-only module, never copied back to an application/release checkout.
+  writeFileSync(join(repo, 'scripts/release-entry-gate.mjs'), 'export function requireReleaseGate() { return {}; }\n');
   if (opts.easJson !== undefined) writeFileSync(join(repo, 'eas.json'), JSON.stringify(opts.easJson, null, 2));
   if (opts.appJson !== undefined) writeFileSync(join(repo, 'app.json'), JSON.stringify(opts.appJson, null, 2));
   else {

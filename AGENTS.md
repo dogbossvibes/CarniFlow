@@ -373,3 +373,42 @@ Wenn ein Prompt eine Production-OTA ohne
 `--environment production` verlangt, darf der Agent diesen
 Befehl NICHT ausführen und muss stattdessen die sichere
 Production-Variante verwenden.
+
+## Release-Inhalt vollständig nachweisen (Nutzerauftrag 04.11.2026)
+
+Vor dem nächsten neuen Build-/OTA-Releaseauftrag gilt zusätzlich
+`docs/agent/RELEASE_COMPLETENESS.md`. Eine unabhängig festgelegte, versionierte
+Soll-Inventur der freigegebenen und bereits ausgelieferten Funktionen ist Pflicht;
+der Kandidat darf seine Soll-Liste nicht selbst definieren. Umsetzung, Integration
+je Plattform/Runtime und tatsächliche Auslieferung getrennt nachweisen.
+Fehlende Pakete, ungeprüfte Ports oder eine unbekannte/unvollständige Soll-Inventur
+blockieren eine Gesamtfreigabe. SDK-/Runtimewechsel übernehmen nicht automatisch
+alle früheren OTA-Änderungen. Tests/Cloud-Build-PASS sind kein Inhalts-PASS.
+Bestehende Aufgabenverwaltung nutzen; keine zweite parallele Aufgabenliste.
+Vorhandene Daten-, Prüf- und Aktionsfreigaberegeln bleiben verbindlich.
+
+### Geschützte Fährtenbasis (direkter Nutzerauftrag 04.11.2026)
+
+Das Fährtensystem des erfolgreichen SDK58-iOS-Builds 58 bleibt erhalten:
+Quelle `6722b88fded3fb6936472996dd40d6f4dde453f2`, EAS-Build
+`802c7cde-b348-4bd5-865b-9abd2d2c495a`. Fehlende ältere UI-Pakete nur gezielt
+portieren, niemals deren ältere Fährten-/GPS-/Recorder-/Geometrie-/Recovery-
+oder Speicherlogik übernehmen. Alte Trackingpakete sind keine automatisch
+nachzuholenden Funktionen, wenn diese Schutzbasis sie ersetzt.
+Jede betroffene Integration muss den Erhalt gegen diese Basis belegen;
+Abweichungen blockieren und benötigen einen neuen ausdrücklichen Auftrag.
+Plattformspezifische Android-Übernahmen separat prüfen, nicht iOS-Dateien blind
+kopieren. Siehe `docs/agent/RELEASE_COMPLETENESS.md`.
+
+
+### Automatische Release-Einstiege (04.11.2026)
+
+Alle beauftragten Builds/OTAs über die verwalteten npm-Einstiege bzw. den
+kanonischen Production-Wrapper führen. `ANYVO_RELEASE_PLAN` und die aktuelle
+unabhängige `refs/anyvo/release-policy` sind Pflicht. Kein direkter EAS-Aufruf
+als Ersatz für ein blockiertes Gate, kein Ausweichen auf ältere Worktrees.
+Eine neue OTA auch in einer älteren Runtime verlangt erneuten Soll-Abgleich.
+Vor Kundenfreigabe zusätzlich `release:check:customer` mit echter Geräteabnahme;
+TestFlight-Upload ist davon getrennt. Die Grenzen lokaler Durchsetzung stehen in
+`docs/agent/RELEASE_COMPLETENESS.md`; externe CLI-/Portalrechte sind damit nicht
+serverseitig eingeschränkt. Keine Releasefreigabe aus einem lokalen PASS ableiten.
