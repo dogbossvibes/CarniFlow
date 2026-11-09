@@ -18,7 +18,7 @@ und ersetzt diese Regeln nicht.
 | **Claude** | Hauptentwickler: Analyse, Umsetzung, Tests, Dokumentation, Issues/PRs, Release-Vorbereitung |
 | **ChatGPT** | unabhängige Kontrolle: Architektur-Review, QA, Risikoanalyse, Release-Koordination |
 | **Codex** | bisheriger Entwicklungsagent, viele bestehende Worktrees und Owner-Rollen (Werkstatt, 01 Publisher, 07 Review laut Projektdoku). **Seit 2026-11-08 keine neuen Schreibaufträge** (siehe 1a) |
-| **OpenCode** | Entwicklungsagent der SDK-58-/iOS60-Linie (T-179, T-180). Die drei iOS-OTAs vom 2026-11-07 wurden nachweislich aus Worktrees veröffentlicht, in denen OpenCode arbeitete [B: Zeitstempel der `dist/`-Exporte und `.opencode/`-Ordner]. **Seit 2026-11-08 keine neuen Schreibaufträge** (siehe 1a) |
+| **OpenCode** | Entwicklungsagent der SDK-58-/iOS60-Linie (T-179, T-180). Die drei iOS-OTAs vom 2026-11-07 wurden nachweislich aus Worktrees veröffentlicht, in denen OpenCode arbeitete [B: Zeitstempel der `dist/`-Exporte und `.opencode/`-Ordner]. **Seit 2026-11-08 Ausweichlösung mit DeepSeek:** arbeitet nur auf ausdrücklichen Auftrag der Nutzerin (siehe 1a) |
 | **GitHub** `dogbossvibes/CarniFlow` | zentrale versionierte Codebasis (**öffentliches** Repository) |
 | **EAS** | tatsächliche Build- und OTA-Production-Stände |
 | **Nutzerin** | Produktentscheidungen, alle Freigaben (Commit/Push/Merge/Build/OTA/Store/DB) |
@@ -26,9 +26,12 @@ und ersetzt diese Regeln nicht.
 ## 1a. Entscheidungen der Nutzerin vom 2026-11-08 [N, verbindlich]
 
 - **Claude Code ist der primäre Entwicklungsagent für ANYVO.**
-- **Codex und OpenCode erhalten vorerst keine neuen Schreibaufträge.** Laufende
+- **Codex erhält vorerst keine neuen Schreibaufträge.** Laufende
   Arbeiten werden nicht automatisch abgebrochen oder verändert; ihre Worktrees und
   uncommitteten Änderungen bleiben unangetastet.
+- **Der Wechsel zu Claude Code ist vollzogen.** OpenCode mit DeepSeek ist die
+  Ausweichlösung und arbeitet nur auf ausdrücklichen Auftrag der Nutzerin; die
+  Freigaberegeln gelten dann unverändert.
 - **Jeder Commit, Push, Merge, Build, jedes OTA, jede Store- und jede
   Datenbankänderung braucht eine ausdrückliche Einzelfreigabe der Nutzerin.** Die
   stehende Push-Freigabe für Task-Branches aus `GITHUB_AUTOSYNC.md` (2026-11-05) gilt

@@ -59,8 +59,9 @@ Die Rolle erweitert keine Freigabe: Commit, Push, PR, Build, TestFlight, OTA und
 Store bleiben getrennte Schritte nach den Freigaberegeln in AGENTS.md.
 
 Nutzerentscheidung 2026-11-08: Claude Code ist der primäre Entwicklungsagent.
-Codex und OpenCode erhalten vorerst keine neuen Schreibaufträge; ihre laufende Arbeit,
-Worktrees und uncommitteten Änderungen bleiben unangetastet. Jeder Commit und Push
+Codex erhält vorerst keine neuen Schreibaufträge; OpenCode mit DeepSeek ist die
+Ausweichlösung und arbeitet nur auf ausdrücklichen Auftrag der Nutzerin. Laufende Arbeit,
+Worktrees und uncommittete Änderungen bleiben unangetastet. Jeder Commit und Push
 braucht eine ausdrückliche Einzelfreigabe; die stehende Push-Freigabe aus
 `docs/agent/GITHUB_AUTOSYNC.md` ist ausgesetzt. Details:
 `docs/agent/ANYVO_COLLABORATION_RULES.md` Abschnitt 1a.

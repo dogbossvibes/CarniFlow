@@ -8,8 +8,8 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before 
 > beschriebene fortlaufende Freigabe gilt nicht mehr, für Codex, Claude Code, OpenCode
 > und jeden anderen Agenten. Jeder Commit und jeder Push, auch auf dem eigenen
 > Task-Branch und auch über `npm run agent:github:push`, braucht eine ausdrückliche
-> Einzelfreigabe der Nutzerin. Codex und OpenCode erhalten vorerst keine neuen
-> Schreibaufträge. Details: `docs/agent/ANYVO_COLLABORATION_RULES.md` Abschnitt 1a.
+> Einzelfreigabe der Nutzerin. Codex erhält vorerst keine neuen Schreibaufträge;
+> OpenCode (DeepSeek) arbeitet nur auf ausdrücklichen Auftrag der Nutzerin. Details: `docs/agent/ANYVO_COLLABORATION_RULES.md` Abschnitt 1a.
 > Der folgende Text bleibt nur als historischer Beleg stehen.
 
 Der Nutzer hat ausdrücklich beauftragt, vor ANYVO-Codearbeiten den frischen GitHub-
@@ -157,8 +157,10 @@ Fachchat-Ergebnisse wurden lesend abgeholt. Dies belegt keinen OTA-Geräteempfan
 
 # Agent Handoff Protocol (Codex and Claude Code)
 
-Codex and Claude Code are supported ANYVO development agents. The user plans
-a move to Claude Code. OpenCode remains an optional fallback. This repository is the shared
+Since 2026-11-08 Claude Code is the primary ANYVO development agent (switch
+completed by user decision). OpenCode with DeepSeek is the fallback agent and works
+only on an explicit user assignment. Codex gets no new write tasks; its existing
+worktrees and uncommitted work stay untouched. This repository is the shared
 source of truth for all agents. Full guide:
 `docs/agent/README.md`.
 
@@ -240,8 +242,10 @@ Core rule:
 - Helper: `npm run agent:wt:create|list|finish|remove`. `remove` refuses to delete a
   **dirty** worktree and never uses `--force`.
 - Tool-neutral roles: Primary Agent, Implementation Agent, Review Agent, QA Agent,
-  Subagent. Codex and Claude Code are supported Primary Agents. OpenCode remains
-  optional. Existing coordinator, writer and publisher assignments still apply.
+  Subagent. Claude Code is the Primary Agent; OpenCode with DeepSeek is the
+  fallback (explicit user assignment only); Codex gets no new write tasks.
+  Existing coordinator, writer and publisher assignments grant no commit, push,
+  merge, build, OTA or store approval; each needs an explicit single approval.
 
 The NEVER/ALWAYS rules above apply unchanged in every worktree. In addition, a parallel
 agent must never delete or reset another worktree's or the main tree's uncommitted work,
