@@ -28,6 +28,7 @@ historische Übergaben > Annahmen.
 | Builds, Runtimes, OTA-Herkunft | [ANYVO_RELEASE_HISTORY.md](ANYVO_RELEASE_HISTORY.md) |
 | Production-Quellen und Sicherung | [PRODUCTION_SOURCE_AUDIT_2026-11-08.md](PRODUCTION_SOURCE_AUDIT_2026-11-08.md) |
 | Worktrees und Repository-Zahlen | [REPOSITORY_INVENTORY.md](REPOSITORY_INVENTORY.md) |
+| **Alle wichtigen Verzeichnisse mit absoluten Pfaden, Branch, Status und Änderungsrecht** | [ANYVO_DIRECTORY_MAP.md](ANYVO_DIRECTORY_MAP.md) |
 | Claude-Werkzeuge (Skills, Hooks, Agents) | [CLAUDE_ENVIRONMENT.md](CLAUDE_ENVIRONMENT.md) |
 | Koordinationsstand (kanonisch, im main-Worktree) | `ANYVO_MASTER_STATUS.md`, `ACTIVE_WORK.md` |
 | Verständnisbericht und Widersprüche 09.11. | [audits/2026-11-09-verstaendnisbericht.md](audits/2026-11-09-verstaendnisbericht.md) |
