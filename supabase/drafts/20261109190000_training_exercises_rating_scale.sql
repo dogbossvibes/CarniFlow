@@ -17,20 +17,27 @@
 --      App es nicht mitsendet (Build 57 löscht die Markierung also nicht).
 --   insert übernimmt rating_scale automatisch über (ex).*.
 --
--- Hinweis: td_snapshot(u) bestimmt Laden ('get') und Token. Enthält es die Übungs-
--- zeilen vollständig (z. B. to_jsonb(e)), kommt rating_scale automatisch mit, und alle
--- Dokument-Token ändern sich einmalig nach der Migration (offene Bearbeitungen
--- erhalten dann einmal CONFLICT und laden neu). Vor Ausführung prüfen:
---   select pg_get_functiondef(p.oid) from pg_proc p where p.proname in ('td_snapshot','td_request');
+-- Geprüft am 2026-11-09 (Definitionen aus Production):
+--   td_request(r, keys): unbekannte Schlüssel → 'INVALID_REQUEST'. Ohne diese Migration
+--     scheitert das Speichern einer Lernstufe (kein stiller Datenverlust).
+--   td_snapshot(u): to_jsonb(e) je Übung → rating_scale kommt beim Laden automatisch mit;
+--     keine Anpassung nötig. Folge: alle Dokument-Token ändern sich einmalig; offene
+--     Bearbeitungen erhalten einmal CONFLICT bzw. „bitte prüfen“, Entwürfe bleiben erhalten.
+--
+-- Nach Ausführung prüfen (nur lesend):
+--   select column_name, is_nullable from information_schema.columns
+--     where table_schema='public' and table_name='training_exercises' and column_name='rating_scale';
+--   select count(*) from public.training_exercises where rating_scale is not null;  -- erwartet 0
+--   select pg_get_functiondef('public.training_document_v1(text,jsonb)'::regprocedure) ~ 'rating_scale=ex.rating_scale';
 --
 -- STATUS: NUR VORBEREITET – NICHT AUSFÜHREN. Liegt in supabase/drafts/, damit
 -- automatische Migrationsläufe die Datei nicht anfassen. Ausführung ausschliesslich
 -- nach ausdrücklicher Nutzerfreigabe über den MASTER, VOR der OTA, zuerst auf Staging.
--- Der Abbruchblock unten wird erst nach der td_snapshot-Prüfung entfernt.
+-- Der Abbruchblock unten wird erst mit der Ausführungsfreigabe entfernt.
 
 do $$
 begin
-  raise exception 'T-184: td_snapshot noch nicht geprüft und keine Ausführungsfreigabe. Nicht ausführen.';
+  raise exception 'T-184: keine Ausführungsfreigabe. Nicht ausführen.';
 end
 $$;
 
