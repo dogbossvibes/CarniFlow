@@ -38,35 +38,33 @@ status change.
 Do not publish a Production OTA from a branch that does not contain the
 documented current Production baseline.
 
-## Zentrale ANYVO-Koordination (Nutzerauftrag 2026-10-08)
+## Zentrale ANYVO-Koordination mit Claude (direkter Nutzerauftrag 2026-11-09)
 
-Der aktive Chat `00-01 – ANYVO MAIN MASTER – Status & Entscheidungen` ist
-Eingang für Ideen, Probleme und Prioritäten und koordiniert die bestehenden
-Fachchats. Der Nutzer erlaubt Aufgabenweiterleitung und Ergebniseinholung im
-jeweils beauftragten Scope. Diese Erlaubnis erweitert weder den Produkt-Scope
-noch die Freigabe für Commit, Push, Merge, OTA, nativen Build, Store-Release oder
-DB-Write; jede dieser Aktionen braucht eine separate ausdrückliche Freigabe.
+Die Nutzerin hat von ChatGPT/Codex zu Claude gewechselt. Die früheren Codex-Rollen
+(MASTER-Chat `00-01 – ANYVO MAIN MASTER`, ID `01a18309-…`, Fachchats, Publisher „01“,
+Heartbeat `anyvo-laufende-ota-koordination`) sind **beendet und historisch**; ihre
+Freigaben gelten nicht weiter. `docs/agent/README.md` „Zentrale Koordination“ ist
+insoweit historisch.
 
-Der Folgeauftrag vom 2026-10-08 erlaubt beauftragten bestehenden ANYVO-Fachchats
-auch Status-, Ergebnis- und Blockaden-Rückmeldungen an den MASTER
-`01a18309-ad36-7ef0-9950-1941ac2c816a` (Host `local`, Master-Ablösung auf direkten Nutzerauftrag 2026-10-28). Bei Weiterleitung diese
-direkte Nutzerfreigabe und Ziel-ID nachvollziehbar mitgeben; sie autorisiert
-keine anderen Empfänger, Produktänderungen oder Git-/Release-Aktionen.
-Der MASTER holt Ergebnisse selbst ab; Rückmeldungen lösen keine gegenseitigen
-automatischen Nachrichtenketten aus. Tool-Ablehnungen nicht umgehen.
+**MASTER** ist eine lokale Claude-Code-Sitzung „ANYVO MASTER“ auf dem Mac der Nutzerin
+im Worktree `/Users/moyo/canisflow-worktrees/anyvo-main`. Der MASTER
+- ist einziger Writer für `ANYVO_MASTER_STATUS.md` und `ACTIVE_WORK.md`,
+- ist einziger **Publisher** für Production-OTAs (Regeln unten unverändert),
+- pflegt das GitHub-Projekt „ANYVO – Produkt & Entwicklung“ und die Release-Karten,
+- arbeitet nur auf Anfrage der Nutzerin: kein Heartbeat, keine zeitgesteuerten
+  Prüfschleifen, keine wiederholten Vollprüfungen ohne neuen Anlass (Kontingent sparen).
 
-Vor jeder Weiterleitung: kanonische Dokumente, tatsächlichen Chat-Status,
-Worktree/Branch/HEAD/Working Tree, vorhandenen Task-Bericht und zuständigen
-Writer prüfen. `docs/agent/ACTIVE_WORK.md` enthält die Routing-Zuordnungen;
-Chat-cwd ist kein Beleg für den Code-Worktree. Laufende oder überlappende Arbeit
-fortsetzen/abstimmen, keine Doppelaufträge und keine fremden Änderungen.
+**Weitere Claude-Sitzungen** (Cloud oder lokal) arbeiten je Aufgabe auf eigenem
+Task-Branch, melden Ergebnis/Blocker im zugehörigen GitHub-Issue oder PR und schreiben
+nicht in MASTER_STATUS/ACTIVE_WORK. Sie veröffentlichen keine OTA.
 
-Der verbindliche Koordinationsablauf und Freigabegrenzen stehen in
-`docs/agent/README.md`, Abschnitt „Zentrale Koordination“. Fachchats lesen diese
-Regeln vor neuen Aufträgen aus `/Users/moyo/canisflow-worktrees/anyvo-main`, auch
-wenn ihr eigener Worktree eine ältere Dokumentkopie enthält. Bei Drift oder
-unklarer Zuständigkeit die betroffene Schreibaktion stoppen; unabhängige
-read-only Prüfungen fortsetzen.
+**Normaler Claude-Chat im Projekt ANYVO** (ohne Claude Code, z. B. wenn das Code-Kontingent
+aufgebraucht ist) dient Planung, Entscheidungen, Issue-Texten, Reviews eingefügter Diffs
+und Arbeitsanweisungen für die Nutzerin. Er führt keine Git-, OTA- oder DB-Aktionen aus
+und meldet nichts als erledigt, was nicht nachweislich im Repo/Board steht.
+
+Bei unklarer Zuständigkeit Schreibaktion stoppen und die Nutzerin fragen; read-only
+Prüfungen dürfen weiterlaufen.
 
 ## Kundendatenerhalt (direkte Nutzeranforderung 2026-10-08)
 
@@ -106,43 +104,24 @@ keine Migration, Live-DB-Schreibaktion, Wiederherstellung oder neue Veröffentli
 Nur ausgeführte Prüfungen melden; verbleibende Risiken/Geräteabnahmen offen
 kennzeichnen, keine absolute Sicherheitsgarantie behaupten.
 
-## Fortlaufende OTA-Freigabe (direkter Nutzerauftrag 2026-10-09)
+## OTA-Freigabe ab 2026-11-09 (direkter Nutzerauftrag)
 
-Direkte Nutzernachricht im MASTER: „bitte alle offenen OTA immer wieder freigeben,
-ich fahre jetzt weg und lasse es hier laufen“. Sie erteilt eine fortlaufende
-Production-OTA-Freigabe für die beauftragten ANYVO-Änderungen. Frühere Anweisung
-„vorher sauber committen“ gilt für die dafür nötigen isolierten Release-Commits.
-Keine erneute Nutzerfrage für dieselben OTA-Scopes, auch für die vorbereiteten
-Heat-/HelpSheet-Fixes. Keine Erlaubnis für ungeprüfte oder scopefremde Pakete.
-
-01 bleibt einziger Publisher. Vollständige sinnvolle Checks, nötige unabhängige
-Reviews, saubere Release-Quelle, frischer Production-/Runtime-/Ancestry-/Native-/DB-
-Preflight und tatsächliche Bundle-/Asset-/Live-/Manifest-CDN-Nachkontrolle bleiben
-Pflicht. Fertige bereits veröffentlichte Pakete nicht erneut ausliefern. STOP bei
-ungeklärter Quelle, fehlendem Check, Runtime-Inkompatibilität, Datenverlustrisiko
-oder automatischer Ablehnung; keine Umgehung.
-
-Diese direkte Freigabe ersetzt nur frühere Einzel-OTA-Freigabevorbehalte für
-beauftragte Scopes. Sie erweitert nicht die Freigabe für Push, main-Merge, native
-Builds, Store-Release, Live-DB-Write oder Restore. Frühere konkrete Freigaben dieser
-Aktionen gelten separat weiter, neue nicht aus der OTA-Freigabe ableiten.
-
-Aktiver MASTER-Heartbeat `anyvo-laufende-ota-koordination` prüft alle15Minuten
-kompakt neue Fachchat-Ergebnisse, koordiniert fertige Pakete mit01 und hält die
-bestehenden Statusdokumente aktuell. Kein zweiter Writer, keine neuen Chats oder
-Produktentwicklung im MASTER. Bei unverändertem Stand still; nur echte Abschlüsse,
-neue Blocker/Fehler oder nötige Nutzerentscheidungen melden. Kontingent im Blick
-behalten, unnötige wiederholte Prüfungen vermeiden. Rechner/Projekt/Anmeldung und
-laufende Desktop-App müssen verfügbar sein. Einrichtung und erster planmäßiger
-Heartbeat am 2026-10-09 um 08:00 Europe/Zurich sind belegt: main-Status und
-Fachchat-Ergebnisse wurden lesend abgeholt. Dies belegt keinen OTA-Geräteempfang.
+Die fortlaufende OTA-Freigabe vom 2026-10-09 galt dem Codex-MASTER und ist beendet.
+Der Claude-MASTER veröffentlicht eine Production-OTA nur nach ausdrücklicher Freigabe
+der Nutzerin **für die konkrete Charge** (Inhalt und Ziele genannt). Vollständige
+sinnvolle Checks, saubere Release-Quelle, frischer Production-/Runtime-/Ancestry-/
+Native-/DB-Preflight und tatsächliche Bundle-/Asset-/Live-/Manifest-CDN-Nachkontrolle
+bleiben Pflicht. Bereits veröffentlichte Pakete nicht erneut ausliefern. STOP bei
+ungeklärter Quelle, fehlendem Check, Runtime-Inkompatibilität, Datenverlustrisiko oder
+automatischer Ablehnung; keine Umgehung. Die Freigabe umfasst nicht Push auf main,
+Merge, native Builds, Store-Release, Live-DB-Write oder Restore.
 
 ## Release-Karte nach jeder Production-OTA (direkter Nutzerauftrag 2026-11-09)
 
 Übersicht über OTA-Stände führt das GitHub-Projekt „ANYVO – Produkt & Entwicklung“
 (https://github.com/users/dogbossvibes/projects/1, Projekt-ID `PVT_kwHOEQw4F84BqlcJ`).
 Nach jeder Production-OTA, deren Nachkontrolle laut Wrapper bestanden ist, legt der
-Publisher (01) oder der berichtende Agent genau **eine** Release-Karte pro Charge an:
+Publisher (Claude-MASTER) oder der berichtende Agent genau **eine** Release-Karte pro Charge an:
 
 1. Issue in `dogbossvibes/CarniFlow` mit Vorlage `.github/ISSUE_TEMPLATE/ota-release-card.md`,
    Titel `OTA JJJJ-MM-TT · <Inhalt> (<Ziele>)`. Alle Ziele derselben Charge in eine Karte.
