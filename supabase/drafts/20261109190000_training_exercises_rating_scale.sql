@@ -30,6 +30,16 @@
 --   select count(*) from public.training_exercises where rating_scale is not null;  -- erwartet 0
 --   select pg_get_functiondef('public.training_document_v1(text,jsonb)'::regprocedure) ~ 'rating_scale=ex.rating_scale';
 --
+-- KUNDENDATENSCHUTZ (verbindlich):
+--   * Vor Ausführung: aktuelles Backup/PITR-Zeitpunkt im Supabase-Dashboard bestätigen
+--     und notieren; zuerst Staging, dann Production.
+--   * Die Migration läuft in einer Transaktion (begin/commit): bei jedem Fehler bleibt
+--     der vorherige Zustand vollständig erhalten.
+--   * Rückweg OHNE Datenverlust: nur die Funktion auf die versionierte Ausgangsdefinition
+--     (training_document_v1.production-2026-11-09.sql) zurücksetzen. Die Spalte
+--     rating_scale wird NIE gelöscht (drop column würde Lernstufen-Markierungen
+--     unwiderruflich vernichten); sie stört ältere Apps nicht.
+--
 -- STATUS: NUR VORBEREITET – NICHT AUSFÜHREN. Liegt in supabase/drafts/, damit
 -- automatische Migrationsläufe die Datei nicht anfassen. Ausführung ausschliesslich
 -- nach ausdrücklicher Nutzerfreigabe über den MASTER, VOR der OTA, zuerst auf Staging.
