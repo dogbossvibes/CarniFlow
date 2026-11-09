@@ -587,6 +587,7 @@ function DocumentForm() {
     if (!alive.current) return;
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
+    queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     if (editing) router.replace({ pathname: '/unit/detail', params: { id: id! } });
     else setSaved(true);

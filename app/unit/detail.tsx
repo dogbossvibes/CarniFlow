@@ -130,6 +130,7 @@ export default function UnitDetailScreen() {
           const { error } = await deleteTrainingUnit(id);
           if (error) { Alert.alert(t('common.error'), error.message); return; }
           queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
+          queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
           router.back();
         },
       },

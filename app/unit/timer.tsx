@@ -106,6 +106,7 @@ function TimerForm() {
     }
     successHaptic();
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
+    queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     queryClient.invalidateQueries({ queryKey: ['clientActivity'] });
     router.replace('/(tabs)/home');
     } catch {
