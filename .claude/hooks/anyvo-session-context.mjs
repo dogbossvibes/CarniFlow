@@ -50,6 +50,7 @@ export function buildContext(cwd) {
   if (behind !== null) out.push(`- Gegenüber origin/main (lokaler Stand, letzter main-Commit ${lastFetch}): ${behind} zurück, ${ahead} voraus${behind > 50 ? ' — veraltete Basis, vor Code-Arbeit Basis klären' : ''}`);
   if (reports.length) out.push(`- Offene Task-Reports in diesem Worktree: ${reports.join(', ')}`);
   if (resolve(root) === MAIN_WORKTREE) out.push('- Achtung: kanonischer main-Worktree. Aufgaben in eigenem Task-Worktree ausführen (npm run agent:wt:create).');
+  if (existsSync(join(root, 'docs/agent/ANYVO_MASTER_CONTEXT.md'))) out.push('- Einstieg zuerst lesen: docs/agent/ANYVO_MASTER_CONTEXT.md (Rollen, Builds 49/57/60, alle Production-Runtimes, Dokumentenlandkarte)');
   out.push(`- Kanonische Regeln/Status: ${MAIN_WORKTREE}/docs/agent/ANYVO_MASTER_STATUS.md und ACTIVE_WORK.md`);
   out.push('- Werkzeuge: /anyvo-start, /anyvo-quality, /anyvo-mobile-test, /anyvo-release-preflight; Guard: .claude/hooks/anyvo-guard.mjs');
   return out.join('\n');

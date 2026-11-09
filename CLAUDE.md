@@ -2,6 +2,11 @@
 
 ## ANYVO project status
 
+**Entry point for every session:** `docs/agent/ANYVO_MASTER_CONTEXT.md`. It covers roles,
+the product, the reference builds 49/57/60, all production runtimes, critical areas and
+a map of the detail documents. Read it before any refactoring, unification of release
+lines or backend change.
+
 Before substantial ANYVO work, Claude reads `docs/agent/ANYVO_MASTER_STATUS.md`
 (canonical production baseline and open work; see "ANYVO project status" in the
 imported `AGENTS.md`). Task files under `docs/agent/tasks` do not override it.
