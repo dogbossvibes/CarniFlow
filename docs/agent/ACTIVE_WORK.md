@@ -1,5 +1,28 @@
 # ANYVO – Active Work
 
+## Tooling-Änderungen erledigt / main synchronisiert – 2026-11-09
+
+**Erledigt (in `origin/main`):**
+- PR #23 (`1e6c782e`): Wechsel zu Claude-MASTER; Claude ersetzt die Codex-Koordination.
+- PR #22 (`083b306f`): Neue Regel „Release-Karte nach jeder Production-OTA“.
+
+**Sync:** Lokales `main` in `anyvo-main` wurde auf direkten Nutzerauftrag auf
+`origin/main` (`1e6c782e`) gesetzt. Die 7 früheren lokalen Commits
+(`cd8cd827`…`1a574212`, 07./08.10.: Android-1.0.4-Vorbereitung, Fährten-End-Erkennung
+Phase 1, Doku) liegen weiterhin auf GitHub in `backup/*-20261029`-Branches. Ob sie
+noch in `main` gehören, ist ungeprüft (Fährtenschutzbasis Build58 beachten).
+
+**Offen – nicht vergessen:** Die bisher uncommittete Release-Vollständigkeitsarbeit
+vom 04.11.2026 (RELEASE_COMPLETENESS.md, BUILD59_CONTENT_AUDIT.md,
+release-policy.json, Release-Entry-Gate/-Command-Skripte + Tests, Anpassungen
+preflight/update-production/package.json) ist gesichert auf
+`backup/release-completeness-20261104` (`b6d9db87`, auch auf GitHub). Sie basiert
+auf altem Stand und muss sauber auf aktuelles `origin/main` übertragen werden
+(Fassungen aus #22/#23 von AGENTS/CLAUDE/README und neuere package.json-Einträge
+behalten). Achtung: Das Gate blockiert nach Integration alle Builds/OTAs, solange
+`release-policy.json` `complete: false` ist. Build59-Befund: Trainings-Hub-Paket
+vom 24.10. fehlt im Build. Keine Freigabe für Commit/Push/OTA/Build aus diesem Eintrag.
+
 ## Gewichtsjournal veröffentlicht – 2026-11-01
 
 T163/T164/T165: drei Commits auf GitHub gesichert, drei OTAs durch01 einmalig
