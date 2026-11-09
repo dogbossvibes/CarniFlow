@@ -2,409 +2,409 @@
   {
     "group": "8abde02c-c05a-428b-8759-5df44661cb36",
     "reason": "Nutzerentscheid Build-60-Abgleich #1: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (Build 38 tracking, forms and Google sign-in fixes)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "ed746533-d71f-4102-a2b8-a03e59293d97",
     "reason": "Nutzerentscheid Build-60-Abgleich #2: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (Build 38 manual search start and picker display fixes)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "04e15f7d-39fc-47f9-bff1-d1ed54a2819c",
     "reason": "Nutzerentscheid Build-60-Abgleich #3: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (fix(prod): restore production supabase after tracking ota)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "687107bf-d02b-4f2c-a065-9fed6c732c2f",
     "reason": "Nutzerentscheid Build-60-Abgleich #3: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (fix(prod): restore production supabase after tracking ota)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "06180554-5828-4c1e-9bab-7a44c8931b1c",
     "reason": "Nutzerentscheid Build-60-Abgleich #4: Diagnose-/Entwicklerwerkzeug, für Kunden nicht nötig (tracking: recall and GPS geometry hotfix)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "2a01a93a-8f70-4d85-a75d-22590fed11f7",
     "reason": "Nutzerentscheid Build-60-Abgleich #5: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (tracking: track completion and evaluation fixes)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "15886d6b-fa86-4fb5-9985-6c7753d6261a",
     "reason": "Nutzerentscheid Build-60-Abgleich #6: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (dogs: heat cycle phases, observations and editing)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "34bfa1a9-61b7-45b2-b47c-eb4f43a2d940",
     "reason": "Nutzerentscheid Build-60-Abgleich #7: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (tracking: interactive logbook map)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "85ac64f1-dea5-4d56-b0c2-0de1cf0dd37a",
     "reason": "Nutzerentscheid Build-60-Abgleich #8: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (feat(dogs): add heat cycle calendar and phase timeline)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "5c826802-fa9f-46cc-b94e-977ba7ce6249",
     "reason": "Nutzerentscheid Build-60-Abgleich #9: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (feat(tracking): fullscreen saved track map)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "44e81e0c-ee0f-4df5-8d60-664cc37418db",
     "reason": "Nutzerentscheid Build-60-Abgleich #10: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (tracking: trajectory turn engine)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "b77d2aaf-d6cc-4819-a9b9-1afdd83e0f10",
     "reason": "Nutzerentscheid Build-60-Abgleich #11: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (fix(tracking): keep fullscreen control above native map)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "cf0fa71a-ece9-46f8-b1cc-a788a3a0aa12",
     "reason": "Nutzerentscheid Build-60-Abgleich #12: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (feat(i18n): add French Italian and English localization)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "f5d5e792-6948-43d1-8498-7fafdcb3bfc8",
     "reason": "Nutzerentscheid Build-60-Abgleich #13: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (fix(tracking): correct fullscreen safe area)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "e2e54646-60b1-4d6a-9dc2-c58b4ebcce50",
     "reason": "Nutzerentscheid Build-60-Abgleich #14: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (Kommando-Karten: Long-Press- und Swipe-Aktionen)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "eedd1bef-cc02-4c71-af7f-c09feef43e41",
     "reason": "Nutzerentscheid Build-60-Abgleich #15: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (Dokumenten-CTA ohne Plus-Icon)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "01febd77-a911-4ef1-bccb-390f4b110f3b",
     "reason": "Nutzerentscheid Build-60-Abgleich #16: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (Dokumenten-CTA mit besserem Abstand)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "54abc413-afbb-4408-8deb-5894902e4528",
     "reason": "Nutzerentscheid Build-60-Abgleich #17: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (Button-Textabstand verbessert)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "15f9dcef-c18c-423e-89a9-8150dd2eaafc",
     "reason": "Nutzerentscheid Build-60-Abgleich #18: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (feat(dog): add document training action to dog detail (d9b5a87))",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "b1773fd2-c7f0-4ccf-9e38-93430fdeb0ca",
     "reason": "Nutzerentscheid Build-60-Abgleich #19: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (Diagnostics only: trainer connect runtime (7fe9eb8))",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "f2b3c185-f219-4534-a803-3f0c14acd626",
     "reason": "Nutzerentscheid Build-60-Abgleich #20: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (feat(track): analytics v3, object context and final-corner fix)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "9bd0fd96-3e26-434f-ae75-b029d1abe7d7",
     "reason": "Nutzerentscheid Build-60-Abgleich #21: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (feat(updates): add customer update experience)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "fce1c140-8aa0-48ff-9d26-5e615d6ae4eb",
     "reason": "Nutzerentscheid Build-60-Abgleich #22: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (feat(tracking): add customer track diagnosis and sharing)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "0218a4a4-5195-45ef-92a4-6ccd2fe2dc03",
     "reason": "Nutzerentscheid Build-60-Abgleich #23: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (fix: medication calendar dates and sync single flight)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "ca90fbc0-b360-4dfd-a0a5-f8283180e26f",
     "reason": "Nutzerentscheid Build-60-Abgleich #24: alte Runtime 1.0.1–1.0.4, Code seither überarbeitet (Heat history dismissal and HelpSheet scrolling)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "68f5bfac-31fc-4617-b44f-61b7be19269c",
     "reason": "Nutzerentscheid Build-60-Abgleich #25: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Training documentation: atomic saves, exercise history and private fol)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "d2dbeccc-35ce-417c-abb5-8a35519a645c",
     "reason": "Nutzerentscheid Build-60-Abgleich #26: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Group tracking tasks: explicit invitations, accepted reference, review)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "babff0e7-724e-45e0-91ea-7d40b7ee79a0",
     "reason": "Nutzerentscheid Build-60-Abgleich #27: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Subscription account safety: verified server purchase and restore, pro)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "301e4fe5-b447-4c17-8bb6-d717b64a586c",
     "reason": "Nutzerentscheid Build-60-Abgleich #28: Diagnose-/Entwicklerwerkzeug, für Kunden nicht nötig (Tracking support: record actual end events and distinguish incomplete )",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "7ac19f4c-d2b6-4aad-9923-35166fa34417",
     "reason": "Nutzerentscheid Build-60-Abgleich #29: Diagnose-/Entwicklerwerkzeug, für Kunden nicht nötig (Tracking diagnosis: clarify standard GPS mode and simplify comparison )",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "9275eeab-9e28-4ce6-a7d1-fd2717a87c2d",
     "reason": "Nutzerentscheid Build-60-Abgleich #30: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Appointment editing and keyboard forms; saved angles and object labels)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "db69a8c7-d637-4491-b8d7-6558ef77d48c",
     "reason": "Nutzerentscheid Build-60-Abgleich #31: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Calendar editing and keyboard forms, saved angles, transparent logo an)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "88b84a59-75af-4eab-a90c-4d44e5755348",
     "reason": "Nutzerentscheid Build-60-Abgleich #31: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Calendar editing and keyboard forms, saved angles, transparent logo an)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "e04317fd-85a3-4a86-84d0-583c15e1e777",
     "reason": "Nutzerentscheid Build-60-Abgleich #32: bewusst nicht für Build 60 übernommen (Build52: new sharing and groups hub, first steps and contextual help; )",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "24c826dd-7409-4d37-bcd3-164759fabcf9",
     "reason": "Nutzerentscheid Build-60-Abgleich #33: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (Joker and rubber materials: scoring-safe objects, stable recovery, gui)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "9925c3cf-8bf9-4280-a92a-11d87c1bca6c",
     "reason": "Nutzerentscheid Build-60-Abgleich #33: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (Joker and rubber materials: scoring-safe objects, stable recovery, gui)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "0b336b13-3978-4580-9b49-03f2265c2756",
     "reason": "Nutzerentscheid Build-60-Abgleich #34: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Journal and preparation: focus/resume refresh, complete note display, )",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "23dcdc9b-bfdc-4eba-b5a1-51172059c164",
     "reason": "Nutzerentscheid Build-60-Abgleich #35: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Exercise choices: one picker, existing variant identity preserved, exp)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "085e8b8f-db0f-4ad0-b6c6-0fb08e3472ae",
     "reason": "Nutzerentscheid Build-60-Abgleich #36: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Training journal: prepare, document observations, retain next-session )",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "358061e3-9662-43e4-a46a-e72425740449",
     "reason": "Nutzerentscheid Build-60-Abgleich #37: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Fährtenauswertung: beide gespeicherten Spuren sichtbar; Tracking, Jour)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "dcf2b737-0848-4a57-8351-4fff62065c07",
     "reason": "Nutzerentscheid Build-60-Abgleich #39: bewusst nicht für Build 60 übernommen (Trainingshistorie vor Übernahme frisch prüfen; verspätete Antworten si)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "374a28f9-8120-4439-af3d-634cee910317",
     "reason": "Nutzerentscheid Build-60-Abgleich #40: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Gemeinsam trainieren: geprüfte zeitlich begrenzte Standortfreigabe mit)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "f28a7944-1098-48a3-8aa7-d223b0961885",
     "reason": "Nutzerentscheid Build-60-Abgleich #41: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (GPS-Schutz: verworfene Fixes beeinflussen akzeptierte Messungen nicht;)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "2408f10f-101e-42c2-b91d-6fb298244e29",
     "reason": "Nutzerentscheid Build-60-Abgleich #42: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (Fährten: geprüfte kurze Winkelpaare und weniger unnötige Langspur-Prüf)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "78ac55df-576c-4746-85cd-d0770b653e00",
     "reason": "Nutzerentscheid Build-60-Abgleich #43: bewusst nicht für Build 60 übernommen (Neue Fährtenoberfläche und App-Ton; geprüftes Tracking und LiveShare e)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "4c55a132-7389-4087-b416-82f97c4d95ab",
     "reason": "Nutzerentscheid Build-60-Abgleich #44: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Fährten: Trainingsfoto entfernt; Aktionen direkt erreichbar, Tracking )",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "b00124eb-f81e-443b-a137-efb09c35a36a",
     "reason": "Nutzerentscheid Build-60-Abgleich #45: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Training: kompakter Hub und Apportierholz-Icon; Tracking und LiveShare)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "2e8615b1-ca71-4b84-be26-150d5e0fc609",
     "reason": "Nutzerentscheid Build-60-Abgleich #46: bewusst nicht für Build 60 übernommen (Legen: separate gelb gestrichelte Planlinie; Tracking und LiveShare er)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "62f4bbd0-3c0b-4f5f-9d7c-1fe300e76ea6",
     "reason": "Nutzerentscheid Build-60-Abgleich #47: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Läufigkeit: Übersicht, Verlauf und tägliche Beobachtungen; bestehende )",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "68c115e3-14cd-4c02-9c06-2ccdcf1db85b",
     "reason": "Nutzerentscheid Build-60-Abgleich #48: bewusst nicht für Build 60 übernommen (Fährte: klare Pause und erweiterte Diagnose; Läufigkeitsprognose und K)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "a9c12517-d38f-428f-97c4-754bbd4d5361",
     "reason": "Nutzerentscheid Build-60-Abgleich #49: bewusst nicht für Build 60 übernommen (Fährtenansicht: sichere Planauswahl und vollständig sichtbarer Diagnos)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "4e6abe7b-e96a-4986-81ad-1f797841c9a4",
     "reason": "Nutzerentscheid Build-60-Abgleich #50: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Fährte legen: klare Vorbereitung und verständlicher GPS-Status; Planau)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "1f5aad54-eeb4-44e3-a9d5-462be7904914",
     "reason": "Nutzerentscheid Build-60-Abgleich #51: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (fix(tracking): improve saved track comparison line clarity for iOS 55)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "7c054caf-0840-42e1-9b84-73d659b643b9",
     "reason": "Nutzerentscheid Build-60-Abgleich #52: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (Fährten: lokal bestätigte Spitzwinkel, begrenzte Zusatzprüfung und kon)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "062abf85-4093-424c-a10c-09f4e6052c76",
     "reason": "Nutzerentscheid Build-60-Abgleich #53: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Fährtenkarte: durchgezogene Spuren, kompakte Marker und keine Maßstäbe)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "810575b5-20a8-4221-b9c4-57286a9b60e3",
     "reason": "Nutzerentscheid Build-60-Abgleich #54: bewusst nicht für Build 60 übernommen (Fährtenkarte: klare Übersicht, Kartentypwechsel und kompakte Richtungs)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "8fcb0b4f-d218-495f-9768-e0a31bfa9b56",
     "reason": "Nutzerentscheid Build-60-Abgleich #54: bewusst nicht für Build 60 übernommen (Fährtenkarte: klare Übersicht, Kartentypwechsel und kompakte Richtungs)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "b63be15e-ce69-43a2-99c3-28b2b7a14bb0",
     "reason": "Nutzerentscheid Build-60-Abgleich #55: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (Fährtenaufnahme: verspätete Marker nach Stop und Abschluss abweisen)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "56c8f685-7c1c-4a0f-8310-e3d214cec6b0",
     "reason": "Nutzerentscheid Build-60-Abgleich #57: Diagnose-/Entwicklerwerkzeug, für Kunden nicht nötig (Fährten-Diagnose: Messabstände und separate Schweizer Kartenvorschau)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "8053504c-6935-4f90-919e-91a86fe6ce0f",
     "reason": "Nutzerentscheid Build-60-Abgleich #58: bewusst nicht für Build 60 übernommen (Fährtenstart: Vorschau und Genauigkeit, Schweizer Karte mit sichtbarem)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "ba355515-65e5-4d97-a8dc-a290f0b81526",
     "reason": "Nutzerentscheid Build-60-Abgleich #60: Diagnose-/Entwicklerwerkzeug, für Kunden nicht nötig (Satellitendiagnose: klare iOS-Verfügbarkeit; Tracking, LiveShare und A)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "20a40a68-c5c9-4c7c-9c47-cdad59c1d275",
     "reason": "Nutzerentscheid Build-60-Abgleich #61: alte Fährten-/GPS-Logik, durch Build-58-Fährtenbasis ersetzt (Fährtenansicht: Gegenstände und beide Spuren; begrenzte persönliche Be)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "ec80870a-15ee-4868-8d40-69093a8858cb",
     "reason": "Nutzerentscheid Build-60-Abgleich #62: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Trackin)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "76827060-84b1-424d-bee0-90ad702ec593",
     "reason": "Nutzerentscheid Build-60-Abgleich #62: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Trackin)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "87dd058e-4dc0-458f-b5cd-b625eecd4d4e",
     "reason": "Nutzerentscheid Build-60-Abgleich #63: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (Hundedashboard: Hinweise und Termine direkt öffnen; eigene Termine exp)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "838e8cc5-7910-41dc-9d89-15a37be934bc",
     "reason": "Nutzerentscheid Build-60-Abgleich #64: Diagnose-/Entwicklerwerkzeug, für Kunden nicht nötig (Fährtendiagnose: persönlichen Zugriff nach Verbindungsfehler zuverläss)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "574f82ad-cd28-43af-a1a0-76c434503099",
     "reason": "Nutzerentscheid Build-60-Abgleich #65: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (fix(ui): keep training unit cards opaque on iOS 59)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   },
   {
     "group": "faceddf5-725a-4adb-a6a7-98d682b2dbcb",
     "reason": "Nutzerentscheid Build-60-Abgleich #38: GPS-Start-Logik durch Build-58-Fährtenbasis geschützt; Trainingsvorlagen werden in Trainingsdoku neu (T-184) neu bewertet (GPS-Start abgesichert; Trainingsvorlagen und sichtbares Bear)",
-    "decidedBy": "Nutzer (Sandra) via MASTER-Chat",
+    "decidedBy": "Nutzer via MASTER-Chat",
     "date": "2026-11-09"
   }
 ]
