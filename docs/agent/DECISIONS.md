@@ -1,5 +1,19 @@
 # ANYVO — Agent Decisions
 
+## 2026-10-11 — Fährtenfreigabe und Übergabe nur für ACTIVE · `accepted`
+
+Direkte Nutzervorgabe im bestehenden Workshop-Chat01a1182a-51e4-7832-8dfb-38c5036917e8, Nachricht01a12c65-9cd0-7180-b05a-5493c6cbf20b: „fährtenfreigabe / übergabe nur für Active freigeben“. MASTER hat die menschliche Nachricht selbst gelesen. Neue Freigabe-/Übergabeaktionen sollen an die kanonische ACTIVE-Berechtigung gebunden werden; bestehende Kundendaten/Fährten bleiben erhalten. Workshop hat02 als Trackingwriter,06 zur Entitlementklärung und05 zur serverseitigen Absicherung beauftragt. Die genaue Sender-/Empfänger-/Tier-Vererbung ist noch gegen bestehende Regeln zu klären; keine unbelegte Semantik ableiten. Umsetzung/Review/Tests dieses neuen Deltas nicht bestätigt; kein neuer Production-DB-/OTA-/Build-/Store-/Push-/Mergeauftrag aus dieser Produktvorgabe ableiten. Bereits veröffentlichte Transfer-OTAs vom11.Oktober werden dadurch nicht rückwirkend als ACTIVE-beschränkt behauptet.
+
+## 2026-10-11 — Konto-zu-Konto-Fährtenübergabe · `accepted`
+
+Der Nutzer wählt in02 die direkte Übergabe einer Fährte zwischen zwei ANYVO-Konten.
+Beleg: outputs/TRACK-ACCOUNT-HANDOFF-PRODUCT-DECISION-2026-10-11.json.
+Die Produktrichtung ist bestätigt; konkrete Transfer-/Import-/Receipt-/UI-Verträge
+sind noch nicht fertig. Blindmodus-Default, Ablauf/Retention und hundeunabhängiges
+Neulegen bleiben unbeschlossen. Kein Deployment- oder Release-PASS daraus ableiten;
+die laufende Gruppen-Core-Installation behält ihren separaten Scope.
+
+
 > Nur relevante technische Entscheidungen. Kein Kleinklein.
 > Status: `accepted` · `temporary` · `superseded`.
 
@@ -219,3 +233,13 @@ Status: accepted
   Warum: Der Web-Export bricht (`react-native-maps` importiert native-only Module). Production-OTA läuft daher
   plattformweise (`--platform ios|android`) auf Channel/Environment `production`, Runtime 1.0.1. Kein Mobile-Blocker;
   der Web-Bruch wird **nicht** im Rahmen von Mobile-Fixes nebenbei behoben.
+
+
+## 2026-10-08 — Tracking-Continuity: ehrliche Aufzeichnungslücken · accepted Produktvertrag
+
+- Direkte Nutzerentscheidung inChat02, Antwort `01a11c94-0b12-7ac3-87a3-9055639fb7aa`, vomMASTER selbst gelesen: „Ja, Lücken ehrlich ausweisen“ zur konkret erklärten Continuity-Regel. Ersetzt den bisher offenen Produktvertrag, nicht die noch ausstehende technische Ausgestaltung oder Geräteabnahme.
+- Nach ausdrücklicherPause, App-/Recorder-Neustart oder erkannterAufzeichnungslücke beginnt ein neuerSpurabschnitt. Unbekannter Zwischenweg ist nicht gemesseneDistanz und nicht bewerteteSuche. Enderkennung muss nachUnterbrechung frischeGPS-Evidenz sammeln. Keine erfundene Verbindungsstrecke, keine Annahme über den unaufgezeichneten Weg.
+- KonkreteLückenschwellen, Persistenz/Rekonstruktion, bestehendeSegment-/Score-/Distanz-/Enddetector-Datenflüsse zuerst auf tatsächlichen iOS-/Android-Pipelines analysieren und durch Regressionen/Feldtests belegen. ExistierendeRohdaten, lokaleSave-Erfolgsschwelle und idempotenteSync-Queue erhalten. NeueRegel ist noch nicht als implementiert oder veröffentlicht belegt.
+- Neue getrennteFeaturearbeit durch02; aktuelleOTA-Kandidaten und05-Android-Diagnoseadapter nicht nachträglich verändern. AktiveAndroidRuntime1.0.3 besitzt ältereInlineLay-/BackgroundPipeline als aktuelleriOSStand; nicht pauschal iOS-LayPipeline übertragen. Finaler Paritäts-/Native-/DB-/Release-Preflight bleibt nötig.
+- DirektePriorität ausNutzerauftrag `01a11c92-0c74-7d41-8dfb-0f1672dc3cbb`: Continuity → Gegenstandskorrekturen → GPS-/Shelly-Praxis → Planer/Verleitungen → Watch/gemeinsamesTraining. DTW zuerst Nutzenvergleich gegenüber bestehenderANYVO-Auswertung, kein weitererScore beschlossen. Umsetzung beauftragt; zukünftigeCommits/Integrationen/OTA/nativeBuild/Store/DB-Writes daraus nicht pauschal freigeben.
+- Hardwarestand ausderselben direktenAntwort: Apple-Watch-Testperson plusSimulator verfügbar lautNutzer, WearOS nurSimulator. Shelly-Modell und externerGNSS-Empfänger nicht angegeben; kein vorhandenerPraxisnachweis. Uhr-App-/Signierungs-/Storevorbereitung eigener spätererNativeScope, kein Handy-OTA-Nachweis oder neueBuild-/Storefreigabe.

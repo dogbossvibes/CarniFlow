@@ -11,13 +11,14 @@
 // untracked Änderungen). Fremde Worktrees und der Haupt-Tree werden nie verändert.
 //
 // Kommandos:
-//   node scripts/agent-worktree.mjs create <slug> [--branch <name>] [--base <ref>] [--task T-XX]
+//   node scripts/agent-worktree.mjs create <slug> --base <ref> --owner <owner> --purpose <purpose> [--branch <name>] [--task T-XX]
 //   node scripts/agent-worktree.mjs list
 //   node scripts/agent-worktree.mjs finish <slug>
 //   node scripts/agent-worktree.mjs remove <slug>
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
+import { reserveTask, finishReservation } from './task-registry.mjs';
 
 // ── Git-Helfer (nur explizit erlaubte Kommandos) ──────────────────────────
 function git(args, opts = {}) {
@@ -79,22 +80,20 @@ function branchExists(name) {
   catch { return false; }
 }
 
-function nextTaskId(explicit) {
-  if (explicit) {
-    if (!/^T-\d+$/.test(explicit)) fail(`Ungültige --task "${explicit}". Format: T-<Zahl>.`);
-    return explicit;
-  }
-  let max = 60; // Fallback: nächste freie laut TASKS.md ist T-61
-  if (existsSync(TASKS_DIR)) {
-    for (const f of readdirSync(TASKS_DIR)) {
-      const m = /^T-(\d+)\.md$/.exec(f);
-      if (m) max = Math.max(max, Number(m[1]));
+function existingTaskIds() {
+  const ids = new Set();
+  for (const item of worktrees()) {
+    const dir = resolve(item.path, 'docs/agent/tasks');
+    if (!existsSync(dir)) continue;
+    for (const name of readdirSync(dir)) {
+      const match = /^(T-\d+)\.md$/.exec(name);
+      if (match) ids.add(match[1]);
     }
   }
-  return `T-${max + 1}`;
+  return [...ids];
 }
 
-function scaffoldTaskReport(destWorktree, { taskId, slug, branch, base, worktreeRel }) {
+function scaffoldTaskReport(destWorktree, { taskId, slug, branch, base, owner, worktreeRel }) {
   if (!existsSync(TEMPLATE)) { info(`Hinweis: Vorlage ${TEMPLATE} fehlt — überspringe Task-Report.`); return null; }
   const tpl = readFileSync(TEMPLATE, 'utf8');
   const today = new Date().toISOString().slice(0, 10);
@@ -104,6 +103,8 @@ function scaffoldTaskReport(destWorktree, { taskId, slug, branch, base, worktree
     .replace('`../anyvo-<slug>`', '`' + worktreeRel + '`')
     .replace('`<branch>`', '`' + branch + '`')
     .replace('`<explizit, z. B. feat/track-module-rewrite>`', '`' + base + '`')
+    .replace('`<explizit: main@SHA; ältere Runtime nur mit belegter Release-Basis>`', '`' + base + '`')
+    .replace('`<opencode-primary \\| engineering-lead \\| codex \\| …>`', '`' + owner + '`')
     + `\n<!-- angelegt ${today} via agent:wt:create -->\n`;
   const destDir = resolve(destWorktree, 'docs/agent/tasks');
   mkdirSync(destDir, { recursive: true });
@@ -129,22 +130,38 @@ function cmdCreate(argv) {
     process.exit(1);
   }
   const base = String(flags.base);
-  const taskId = nextTaskId(flags.task && flags.task !== true ? String(flags.task) : null);
+  if (flags.task === true) fail('--task verlangt eine explizite Task-ID.');
   const dir = resolve(ROOT, '..', `anyvo-${slug}`);
   const worktreeRel = `../anyvo-${slug}`;
 
   if (existsSync(dir)) fail(`Zielordner existiert bereits: ${dir}. Anderen <slug> wählen oder zuerst entfernen.`);
   if (branchExists(branch)) fail(`Branch "${branch}" existiert bereits. Mit --branch <name> einen freien Namen wählen.`);
   // Basis muss auflösbar sein
-  try { git(['rev-parse', '--verify', '--quiet', base + '^{commit}']); }
+  let baseCommit;
+  try { baseCommit = git(['rev-parse', '--verify', '--end-of-options', base + '^{commit}']); }
   catch { fail(`Basis-Ref "${base}" ist nicht auflösbar. Beispiel: --base main`); }
 
+  const commonDir = resolve(ROOT, git(['rev-parse', '--git-common-dir']));
+  let reservation;
+  try {
+    reservation = reserveTask({ commonDir, requestedId: typeof flags.task === 'string' ? flags.task : undefined,
+      existingIds: existingTaskIds(), owner: flags.owner, purpose: flags.purpose, branch, worktree: dir, baseCommit });
+  } catch { fail('Task-ID nicht reserviert. Owner/Zweck, vorhandene IDs und Registry prüfen; nichts überschrieben.'); }
+  const taskId = reservation.taskId;
+
   // Neuer Worktree + neuer Branch. Kein Wechsel/Reset im Haupt-Tree.
-  git(['worktree', 'add', '-b', branch, dir, base]);
+  try {
+    git(['worktree', 'add', '-b', branch, dir, baseCommit]);
+    finishReservation(commonDir, reservation, 'created');
+  } catch {
+    // Never remove partial worktrees or reuse the reservation after uncertainty.
+    try { finishReservation(commonDir, reservation, 'creation_failed'); } catch { /* retain evidence */ }
+    fail('Worktree-Erstellung nicht vollständig bestätigt. Vorhandene Dateien und Task-ID bleiben erhalten.');
+  }
   ok(`Worktree erstellt: ${dir}`);
   info(`Branch: ${branch}   Basis: ${base}   Task-ID: ${taskId}`);
 
-  const report = scaffoldTaskReport(dir, { taskId, slug, branch, base, worktreeRel });
+  const report = scaffoldTaskReport(dir, { taskId, slug, branch, base: baseCommit, owner: reservation.owner, worktreeRel });
   if (report) ok(`Task-Report angelegt: ${report.replace(ROOT + '/', '')}`.replace(dir + '/', worktreeRel + '/'));
 
   // .opencode-Verfügbarkeit prüfen (versioniert -> sollte im Worktree vorhanden sein)
@@ -235,7 +252,7 @@ switch (cmd) {
   case 'remove': cmdRemove(argv); break;
   default:
     console.log('ANYVO Worktree-Helfer');
-    console.log('  node scripts/agent-worktree.mjs create <slug> --base <ref> [--branch <name>] [--task T-XX]');
+    console.log('  node scripts/agent-worktree.mjs create <slug> --base <ref> --owner <chat/owner> --purpose <zweck> [--branch <name>] [--task T-XX]');
     console.log('    (--base ist Pflicht: explizite Ausgangsbasis, z. B. der aktuelle Integrationsbranch)');
     console.log('  node scripts/agent-worktree.mjs list');
     console.log('  node scripts/agent-worktree.mjs finish <slug>');

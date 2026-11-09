@@ -130,21 +130,35 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
     expect(existsSync(h.lockPath)).toBe(true);
   });
   it('6b. echter Parallelstart: zweiter Prozess wird gestoppt, solange der erste veröffentlicht', async () => {
-    withState({ sleepMs: 2500 });
-    const first = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'first'], { cwd: h.repo, env: h.baseEnv() });
+    withState({});
+    const releaseFile = join(h.dir, 'release-first-publisher');
+    const first = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'first', '--quality-evidence', h.qualityEvidenceFile],
+      { cwd: h.repo, env: h.baseEnv({ FAKE_UPDATE_RELEASE_FILE: releaseFile }) });
+    const completed = new Promise<number | null>((resolve, reject) => {
+      first.once('close', resolve);
+      first.once('error', reject);
+    });
     let firstOut = '';
     first.stdout.on('data', d => { firstOut += d; });
-    for (let i = 0; i < 100 && !h.calls().some(a => a[0] === 'update'); i++) await sleep(50);
-    expect(existsSync(h.lockPath)).toBe(true);
-    const second = confirmIos();
-    expect(second.code).toBe(1);
-    expect(second.out).toContain('HARD STOP: Release-Lock ist belegt');
-    const code = await new Promise<number | null>(res => first.on('exit', c => res(c)));
+    first.stderr.on('data', d => { firstOut += d; });
+    let code: number | null = null;
+    try {
+      const deadline = Date.now() + 60000;
+      while (!h.updateCalls().length && first.exitCode == null && Date.now() < deadline) await sleep(50);
+      expect(h.updateCalls()).toHaveLength(1);
+      expect(existsSync(h.lockPath)).toBe(true);
+      const second = confirmIos();
+      expect(second.code).toBe(1);
+      expect(second.out).toContain('HARD STOP: Release-Lock ist belegt');
+    } finally {
+      writeFileSync(releaseFile, 'release');
+      code = await completed;
+    }
     expect(code).toBe(0);
     expect(firstOut).toContain('✅ Nachkontrolle');
     expect(h.updateCalls()).toHaveLength(1);
     expect(existsSync(h.lockPath)).toBe(false);
-  }, 20000);
+  }, 180000);
   it('8. Lock wird bei Publish-Fehler entfernt (kein dauerhafter Lock)', () => {
     withState({ failUpdate: true });
     const r = confirmIos();
@@ -154,7 +168,7 @@ describe('Gemeinsamer Release-Lock (git-common-dir)', () => {
   });
   it('8b. Lock wird bei Abbruchsignal (SIGTERM an die Prozessgruppe) entfernt', async () => {
     withState({ sleepMs: 4000 });
-    const p = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'sig'], { cwd: h.repo, env: h.baseEnv(), detached: true });
+    const p = spawn('node', ['scripts/update-production.mjs', '--platform', 'ios', '--confirm', '--message', 'sig', '--quality-evidence', h.qualityEvidenceFile], { cwd: h.repo, env: h.baseEnv(), detached: true });
     for (let i = 0; i < 100 && !h.calls().some(a => a[0] === 'update'); i++) await sleep(50);
     expect(existsSync(h.lockPath)).toBe(true);
     process.kill(-p.pid!, 'SIGTERM');
