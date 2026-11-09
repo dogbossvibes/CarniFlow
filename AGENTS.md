@@ -58,10 +58,29 @@ im Worktree `/Users/moyo/canisflow-worktrees/anyvo-main`. Der MASTER
 Task-Branch, melden Ergebnis/Blocker im zugehörigen GitHub-Issue oder PR und schreiben
 nicht in MASTER_STATUS/ACTIVE_WORK. Sie veröffentlichen keine OTA.
 
-**Normaler Claude-Chat im Projekt ANYVO** (ohne Claude Code, z. B. wenn das Code-Kontingent
-aufgebraucht ist) dient Planung, Entscheidungen, Issue-Texten, Reviews eingefügter Diffs
-und Arbeitsanweisungen für die Nutzerin. Er führt keine Git-, OTA- oder DB-Aktionen aus
-und meldet nichts als erledigt, was nicht nachweislich im Repo/Board steht.
+**Claude-Chat im Projekt ANYVO mit Werkzeugen** (Claude-App ohne Claude Code, aber mit
+Mac-Verbindung über die Claude-Desktop-App und/oder angebundenem GitHub-Repo; direkter
+Nutzerauftrag 2026-11-09) gilt als „weitere Claude-Sitzung“ im Sinne des vorigen Absatzes:
+- **Über GitHub (Cloud-Klon):** Ein Änderungsauftrag der Nutzerin in diesem Chat ist die
+  Einzelfreigabe, für genau diese Aufgabe ab frischem `origin/main` einen eigenen
+  Task-Branch anzulegen, nach den Pflichtprüfungen (relevante Tests, TypeScript, ESLint,
+  `git diff --check`, Secret-/Diff-Prüfung, Abgleich mit offenen PRs) zu committen, diesen
+  Branch zu pushen und einen PR gegen `main` zu öffnen. Merge entscheidet die Nutzerin.
+- **Über die Mac-Verbindung:** nur im ausdrücklich freigegebenen lokalen Ordner lesen und
+  ändern. Dort ohne gesonderte Freigabe kein Commit/Push; fremde lokale Änderungen,
+  Worktrees und WIP bleiben unangetastet.
+- Ausgeschlossen bleiben: Push auf `main` und Release-/Backup-/Integrationsbranches, Merge,
+  OTA, Build, Store-Release, Live-DB-/Kundendatenaktionen sowie Schreiben in
+  MASTER_STATUS/ACTIVE_WORK.
+- Task-IDs der lokalen Registry sind aus der Cloud nicht reservierbar; Zuordnung dann über
+  Branch und PR, eine ID vergibt bei Bedarf der MASTER.
+- Der PR nennt ausgeführte Prüfungen und Grenzen offen (z. B. keine Geräteprüfung, keine
+  Board-Felder ohne GraphQL-Zugang).
+
+**Claude-Chat ohne Werkzeuge** (weder Mac-Verbindung noch angebundenes Repo) dient Planung,
+Entscheidungen, Issue-Texten, Reviews eingefügter Diffs und Arbeitsanweisungen für die
+Nutzerin. Er führt keine Git-, OTA- oder DB-Aktionen aus und meldet nichts als erledigt,
+was nicht nachweislich im Repo/Board steht.
 
 Bei unklarer Zuständigkeit Schreibaktion stoppen und die Nutzerin fragen; read-only
 Prüfungen dürfen weiterlaufen.
