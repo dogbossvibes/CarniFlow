@@ -18,14 +18,14 @@ labels: []
 | Android 50 | | | | | live |
 
 ## Enthalten
-- 
+-
 
 ## Nicht enthalten
-- 
+-
 
 ## Prüfungen
 - Publish je Ziel genau einmal über den Production-Wrapper (`--environment production`)
-- Nachkontrolle (Channel, Branch, Environment, Platform, Runtime, IDs, gitCommitHash, Message): 
+- Nachkontrolle (Channel, Branch, Environment, Platform, Runtime, IDs, gitCommitHash, Message):
 - Testweg: Vorher / Nachher
 - Gerätetest: offen / bestanden am …
 
@@ -33,4 +33,4 @@ labels: []
 <!-- Je Ziel: vorherige Update-ID oder Release-Karte -->
 
 ## Belege
-- 
+-
