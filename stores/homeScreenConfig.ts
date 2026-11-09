@@ -116,7 +116,8 @@ export const HOME_QUICK_ACTIONS_META: Record<HomeQuickActionId, { label: string;
   track_gps:         { label: 'Fährten GPS',     icon: 'navigate-outline',    route: '/track' },
   lay_track:         { label: 'Fährte legen',    icon: 'git-branch-outline',  route: '/track/legen' },
   document_training: { label: 'Dokumentieren',   icon: 'create-outline',      route: '/unit/document' },
-  start_obedience:   { label: 'Unterordnung',    icon: 'ribbon-outline',      route: '/unit/start' },
+  // T-184: direkt in den neuen Erfassen-Screen mit Sparte Unterordnung (nicht Live-Ablauf mit Sternen).
+  start_obedience:   { label: 'Unterordnung',    icon: 'ribbon-outline',      route: '/unit/document?discipline=unterordnung' },
   show_analysis:     { label: 'Analyse',         icon: 'sparkles-outline',    route: '/analyse/insights' },
   training_journal:  { label: 'Journal',         icon: 'book-outline',        route: '/training-journal' },
   dog_backpack:     { label: 'Backpack',         icon: 'bag-handle-outline',   route: '/dog-backpack/[id]' },
