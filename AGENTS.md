@@ -116,6 +116,16 @@ kennzeichnen, keine absolute Sicherheitsgarantie behaupten.
 
 ## Fortlaufende OTA-Freigabe (direkter Nutzerauftrag 2026-10-09)
 
+> **AUSGESETZT seit 2026-11-08 (Nutzerentscheidung, bis auf Widerruf).** Die unten
+> beschriebene fortlaufende Production-OTA-Freigabe gilt nicht mehr, für Codex,
+> Claude Code, OpenCode und jeden anderen Agenten, auch nicht für bereits vorbereitete
+> Scopes. Jedes OTA braucht eine ausdrückliche Einzelfreigabe der Nutzerin; auch die
+> Publisher-Rolle „01“ und der MASTER-Heartbeat begründen keine Freigabe. Die
+> Pflicht-Prüfungen (Wrapper, `--environment production`, frischer
+> Production-/Runtime-/Ancestry-Preflight, Nachkontrolle; siehe CLAUDE.md) gelten
+> unverändert. Details: `docs/agent/ANYVO_COLLABORATION_RULES.md` Abschnitt 1a.
+> Der folgende Text bleibt nur als historischer Beleg stehen.
+
 Direkte Nutzernachricht im MASTER: „bitte alle offenen OTA immer wieder freigeben,
 ich fahre jetzt weg und lasse es hier laufen“. Sie erteilt eine fortlaufende
 Production-OTA-Freigabe für die beauftragten ANYVO-Änderungen. Frühere Anweisung
