@@ -5,7 +5,7 @@ import { specialAngleBadge } from '../utils/specialAngleGeometry';
 import type { DistractionTrack } from '@/features/tracking-distractions/model';
 import { DistractionLines } from '@/features/tracking-distractions/DistractionLayer';
 import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '@/constants/colors';
@@ -22,7 +22,12 @@ import { TrackReferenceOverlayLayer } from '@/features/tracking/components/Track
 import type { TrackReferenceOverlay } from '@/features/tracking/store/trackReferenceOverlays';
 import type { ScaleRegion } from '@/features/tracking/components/DistanceScaleLayer';
 import { pointsPerMeter, scaleRegionChanged } from '@/features/tracking/utils/distanceScale';
-import type { LL } from '@/features/tracking/utils/searchGeometry';
+import { buildArc, type LL } from '@/features/tracking/utils/searchGeometry';
+import {
+  SEARCH_VIEW, appleAltitudeForSpanM, distanceToNextEventM, googleZoomForSpanM, isEventPassed,
+  lookAheadFractionForInsets, placeSearchLabels, searchLaidStroke, searchViewSpanM, trackHeadingAtProgress,
+  type LabelFeature, type PlacedLabel,
+} from '@/features/tracking/utils/searchMapView';
 
 import { TrackComparisonLines } from './TrackComparisonLines';
 
@@ -44,7 +49,27 @@ export function markerColor(m: MapMarker): string {
   return MARKER_COLOR[m.type];
 }
 
-export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null; distanceFromStart?: number | null; note?: string | null; objectIndex?: number | null; legIndex?: number | null; geometryDirection?: 'links' | 'rechts' | 'unresolved'; geometrySharpness?: 'normal' | 'sharp' | 'unresolved' }
+export interface MapMarker { id?: string; type: MarkerType; lat: number | null; lng: number | null; angleKind?: AngleKind | null; material?: MarkerMaterial | null; distanceFromStart?: number | null; note?: string | null; objectIndex?: number | null; legIndex?: number | null; geometryDirection?: 'links' | 'rechts' | 'unresolved'; geometrySharpness?: 'normal' | 'sharp' | 'unresolved';
+  /** Kanonische Bogenlänge auf der gelegten Linie (nur Absuche-Kartenansicht; reine Anzeige). */
+  arcM?: number | null }
+
+/**
+ * Absuche-Kartenansicht (Issue #33) — setzt ausschliesslich app/track/run.tsx.
+ * Reine Darstellung: Fährten-Zoom, Laufrichtung aus der gelegten Fährte,
+ * Kürzel neben der Linie, ein Button «Kartenansicht». Alle Werte sind bereits
+ * vorhandene Anzeigewerte; nichts fliesst in Recorder/Erkennung zurück.
+ */
+export interface SearchMapView {
+  /** Fortschritt des Hundeführers auf der Soll-Fährte (m). */
+  handlerProgressM: number;
+  /** Fortschritt der virtuellen Hundeposition (m) — passierte Kürzel werden blasser. */
+  dogProgressM: number;
+  /** true ⇒ Kamera fällt auf die GPS-Positionsfolge zurück. */
+  offTrack: boolean;
+  /** Von Info-Karten verdeckte Kartenhöhe oben/unten (pt). */
+  topInsetPt?: number;
+  bottomInsetPt?: number;
+}
 
 // Persistenter Marker: verhindert das „Verschwinden". react-native-maps verwirft
 // bei tracksViewChanges=false und häufigen Re-Renders/Region-Wechseln sonst das
@@ -52,12 +77,14 @@ export interface MapMarker { id?: string; type: MarkerType; lat: number | null; 
 // stabile ID sorgen dafür, dass der Marker NICHT bei jedem GPS-Fix neu erzeugt wird
 // → Winkel/Gegenstände bleiben während der ganzen Aufnahme sichtbar.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress, accessibilityLabel }: {
+export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label, acute, duebel, color, onPress, accessibilityLabel, faded }: {
   Marker: any; lat: number; lng: number; kind: 'abriss' | 'angle' | 'object' | 'group' | 'dot' | 'gw' | 'ow' | 'bw' | 'cylinder' | 'ball';
   label?: string; acute?: boolean; duebel?: boolean; color?: string; onPress?: () => void; accessibilityLabel?: string;
+  /** Absuche: bereits passiertes Kürzel blasser zeichnen (Form/Farbe/Grösse unverändert). */
+  faded?: boolean;
 }) {
   const [track, setTrack] = useState(true);
-  useEffect(() => { setTrack(true); const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, [kind, label, acute, duebel, color]);
+  useEffect(() => { setTrack(true); const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, [kind, label, acute, duebel, color, faded]);
   let child;
   // Abriss: bordertes Kästchen MIT Symbol — eine inhaltsleere Custom-Marker-View
   // wird von react-native-maps (v. a. Android, nach tracksViewChanges=false) nicht
@@ -93,6 +120,7 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
   else if (kind === 'ball') child = <View style={[s.objectBadge, { borderRadius: 20 }]}><Ionicons name="tennisball" size={24} color={C.trackWarning} /></View>;
   else if (kind === 'cylinder') child = <View style={s.cylBody}><View style={s.cylTop} /></View>;
   else child = <View style={[s.markerDot, { backgroundColor: color }]} />;
+  if (faded) child = <View collapsable={false} style={s.fadedMarker}>{child}</View>;
   return <Marker coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={track} onPress={onPress} accessibilityLabel={accessibilityLabel ?? label} accessibilityRole={onPress ? "button" : undefined}>{child}</Marker>;
 });
 
@@ -144,6 +172,8 @@ interface Props {
   onCompass?:       () => void;
   onFullscreen?:    () => void;        // gespeicherte Detailkarte: Fullscreen-Entry im Map-Control-Stack
   onUserPan?:       () => void;   // Nutzer verschiebt die Karte selbst → Aufrufer schaltet Follow aus
+  /** Absuche-Kartenansicht (Issue #33); wirkt nur zusammen mit `smartFollow`. */
+  searchView?:      SearchMapView | null;
   hideControls?:    boolean;   // FAB-Spalte ausblenden (z. B. für Live-Overlays)
   controlsTop?:     number;    // Abstand der FAB-Spalte von oben (um Overlays wie die Hunde-Pille zu umgehen)
   style?:           StyleProp<ViewStyle>;
@@ -151,18 +181,61 @@ interface Props {
 
 const EMPTY_MARKERS: MapMarker[] = [];
 const EMPTY_SEGMENTS: TrackSegment[] = [];
+const EMPTY_LINE: LL[] = [];
+const EMPTY_PLACED: Map<string, PlacedLabel> = new Map();
 
 export function TrackingMap({
   comparison = false, layPoints, layColor = C.trackPrimary, referenceOverlays, distractionTracks, distractionDraft, runPoints, rawPoints, rejectedPoints, markers = EMPTY_MARKERS, segments = EMPTY_SEGMENTS, breaks, startAnchor, endPoint, endTotalDistanceM, fitToPoints, fitToTrackToken, onStartPress, onMarkerPress, onEndPress, currentPosition, showUserLocation = true, dogPosition, heading,
-  smartFollow = false, courseDeg, speedMps,
+  smartFollow = false, courseDeg, speedMps, searchView = null,
   follow, mapType = 'hybrid', onToggleFollow, onCompass, onFullscreen, onUserPan, hideControls, controlsTop = 14, style,
 }: Props) {
   const mapRef = useRef<any>(null);
   const initialFitDoneRef = useRef(false);
   const lastFitTokenRef = useRef<number | undefined>(undefined);
   const [mapReady, setMapReady] = useState(false);
+  const [mapHeightPt, setMapHeightPt] = useState(0);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const { t } = useT();
   const { showToast, toast } = useToast();
+
+  // ── Absuche-Kartenansicht (Issue #33) — reine Darstellung ──
+  // Blickrichtung aus der GELEGTEN Fährte, Zoomstufe und Look-ahead werden aus
+  // bereits vorhandenen Anzeigewerten abgeleitet (searchMapView.ts, rein/testbar).
+  const searchActive = !!searchView && smartFollow;
+  const searchLine = useMemo<LL[]>(
+    () => (searchActive ? layPoints.map(p => ({ latitude: p.lat, longitude: p.lng, ...((p as { breakBefore?: boolean }).breakBefore ? { breakBefore: true } : {}) })) : EMPTY_LINE),
+    [searchActive, layPoints],
+  );
+  const searchArc = useMemo(() => buildArc(searchLine), [searchLine]);
+  const searchEventArcs = useMemo(() => {
+    const corners: number[] = [], all: number[] = [];
+    if (searchActive) for (const m of markers) {
+      if (m.arcM == null || !Number.isFinite(m.arcM)) continue;
+      if (m.type === 'winkel') { corners.push(m.arcM); all.push(m.arcM); }
+      else if (m.type === 'gegenstand') all.push(m.arcM);
+    }
+    return { corners, all };
+  }, [searchActive, markers]);
+  const trackHeadingDeg = searchView && searchActive && !searchView.offTrack
+    ? trackHeadingAtProgress(searchLine, searchArc.cum, searchView.handlerProgressM, searchEventArcs.corners)
+    : null;
+  // Zoomstufe mit Hysterese: der vorherige Ausschnitt ist State (kein Ref im Render);
+  // die Anpassung während des Renderns ist das von React vorgesehene Muster.
+  const [prevSearchSpanM, setPrevSearchSpanM] = useState<number | null>(null);
+  const searchSpanM = searchView && searchActive
+    ? searchViewSpanM(prevSearchSpanM, distanceToNextEventM(searchEventArcs.all, searchView.handlerProgressM))
+    : null;
+  if (searchSpanM !== prevSearchSpanM) setPrevSearchSpanM(searchSpanM);
+  // Erst mit bekannter Kartenhöhe zoomen (Android braucht sie für die Zoomstufe).
+  const cameraSpanM = searchSpanM != null && mapHeightPt > 0 ? searchSpanM : undefined;
+  const zoomLatitude = Math.round((currentPosition?.lat ?? layPoints[0]?.lat ?? FALLBACK.latitude) * 10) / 10;
+  const cameraZoom = useMemo(
+    () => (cameraSpanM == null ? null : { altitude: appleAltitudeForSpanM(cameraSpanM), zoom: googleZoomForSpanM(cameraSpanM, zoomLatitude, mapHeightPt) }),
+    [cameraSpanM, zoomLatitude, mapHeightPt],
+  );
+  const searchLookAhead = searchView && searchActive
+    ? lookAheadFractionForInsets(mapHeightPt, searchView.topInsetPt ?? 0, searchView.bottomInsetPt ?? 0)
+    : undefined;
 
   // Smart Follow (nur während aktiver Aufnahme/Absuche): navigationsartige
   // Kamera — Laufrichtung oben, eigene Position im unteren Drittel, weiche
@@ -173,6 +246,12 @@ export function TrackingMap({
     courseDeg: courseDeg ?? null,
     speedMps: speedMps ?? null,
     enabled: smartFollow && mapReady && follow,
+    trackHeadingDeg,
+    courseMinStepM: searchActive ? SEARCH_VIEW.offTrackMinStepM : undefined,
+    viewportSpanM: cameraSpanM,
+    lookAheadFraction: searchLookAhead,
+    cameraZoom,
+    reportTravelHeading: searchActive,
   });
   const attachCameraMap = camera.attachMap;
   useEffect(() => { attachCameraMap(mapRef.current); }, [attachCameraMap, mapReady]);
@@ -237,7 +316,23 @@ export function TrackingMap({
   // Dübel bekommt KEINE G-Nummer (roter Zylinder) → zählt nicht mit (objectNumbers).
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
   const [scaleRegion, setScaleRegion] = useState<ScaleRegion | null>(null);
-  const [mapHeightPt, setMapHeightPt] = useState(0);
+  // Absuche: Winkel- und G-Kürzel NEBEN die Fährte stellen (Knick bleibt frei).
+  // Versatz für den Absuche-Zoom berechnet und danach stabil — die Marker
+  // springen nicht bei jedem Fix/Zoomwechsel (Vorgeschichte: verschwindende Marker).
+  const placedLabels = useMemo(() => {
+    if (!searchActive || mapHeightPt <= 0) return EMPTY_PLACED;
+    const features: LabelFeature[] = [];
+    markerList.forEach((m, index) => {
+      const numberedObject = m.type === 'gegenstand' && m.material !== 'ball' && m.material !== 'duebel';
+      if (m.type !== 'winkel' && !numberedObject) return;
+      features.push({ key: `marker:${index}`, kind: m.type === 'winkel' ? 'angle' : 'object', lat: m.lat!, lng: m.lng!, arcM: m.arcM });
+    });
+    return placeSearchLabels(searchLine, features, SEARCH_VIEW.spanM / mapHeightPt);
+  }, [searchActive, markerList, searchLine, mapHeightPt]);
+  const labelLeaders = useMemo(() => [...placedLabels.values()].map(p => {
+    const anchor = { latitude: p.anchor.lat, longitude: p.anchor.lng };
+    return { key: p.key, anchor, coordinates: [anchor, { latitude: p.label.lat, longitude: p.label.lng }] };
+  }), [placedLabels]);
   const [groupSelection, setGroupSelection] = useState<TrackDetailSelection | null>(null);
   const markerGroups = useMemo(() => {
     const features: { key: string; lat: number; lng: number; label: string; selection: TrackDetailItem }[] = markerList.map((marker, index) => ({
@@ -253,8 +348,10 @@ export function TrackingMap({
     if (endPoint) features.push({ key: 'end', ...endPoint, label: t('track.endFlag'), selection: { kind: 'end',
       totalDistanceM: endTotalDistanceM ?? null } });
     const ptPerM = pointsPerMeter(scaleRegion?.latitudeDelta ?? 0.0016, mapHeightPt);
-    return groupMapFeatures(features, ptPerM > 0 ? 34 / ptPerM : 1.5).filter(group => group.length > 1);
-  }, [markerList, objectNo, startAnchor, endPoint, endTotalDistanceM, layPoints, scaleRegion?.latitudeDelta, mapHeightPt, t]);
+    // Neben die Linie gestellte Kürzel (Absuche) werden nicht zu Sammelmarkern verdichtet.
+    const groupable = placedLabels.size > 0 ? features.filter(feature => !placedLabels.has(feature.key)) : features;
+    return groupMapFeatures(groupable, ptPerM > 0 ? 34 / ptPerM : 1.5).filter(group => group.length > 1);
+  }, [markerList, objectNo, startAnchor, endPoint, endTotalDistanceM, layPoints, scaleRegion?.latitudeDelta, mapHeightPt, t, placedLabels]);
   const groupedKeys = useMemo(() => new Set(markerGroups.flatMap(group => group.map(feature => feature.key))), [markerGroups]);
   const onScaleRegion = useCallback((r: ScaleRegion) => {
     setScaleRegion(prev => (scaleRegionChanged(prev, r) ? r : prev));
@@ -298,6 +395,13 @@ export function TrackingMap({
   }
 
   const MapView = RNMaps.default, Polyline = RNMaps.Polyline, Marker = RNMaps.Marker;
+  const Circle = (RNMaps as { Circle?: React.ComponentType<any> }).Circle;
+  // Positionspfeil: in der Absuche zeigt er die Laufrichtung (im Modus
+  // «Laufrichtung» also nach oben). Das Ionicons-Glyph «navigate» zeigt nach
+  // rechts oben → 45° Korrektur. Ausserhalb der Absuche unverändert.
+  const arrowRotationDeg = searchActive
+    ? (camera.travelHeadingDeg != null ? camera.travelHeadingDeg - 45 : null)
+    : (heading ?? null);
   const start = layPoints[0] ?? null;
   const initial = currentPosition ?? start;
 
@@ -351,22 +455,36 @@ export function TrackingMap({
             Live recording maps deliberately keep their existing render lifecycle. */}
         {comparison && mapReady && <TrackComparisonLines Polyline={Polyline} layPoints={layPoints} runPoints={runPoints ?? []} segments={segments} layColor={layColor} />}
         {!comparison && (laySegmentParts.length > 0 ? laySegmentParts.map(part => {
-          const stroke = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
+          const base = laidTrackStroke(part.kind, part.kind === 'normal' ? layColor : part.color);
+          // Absuche: breitere Linie mit dunkler Kontur — weiterhin solide, nie gedimmt.
+          const emphasis = searchActive && !base.lineDashPattern ? searchLaidStroke(base) : null;
+          const stroke = emphasis ?? base;
           return (
-            <Polyline
-              key={part.id}
-              coordinates={part.mapCoordinates}
-              strokeColor={stroke.strokeColor}
-              strokeWidth={stroke.strokeWidth}
-              lineDashPattern={stroke.lineDashPattern}
-              lineCap="round"
-              lineJoin="round"
-              zIndex={part.kind === 'segment' ? 3 : 2}
-            />
+            <Fragment key={part.id}>
+              {emphasis && (
+                <Polyline coordinates={part.mapCoordinates} strokeColor={emphasis.outlineColor} strokeWidth={emphasis.outlineWidth}
+                  lineCap="round" lineJoin="round" zIndex={part.kind === 'segment' ? 2 : 1} />
+              )}
+              <Polyline
+                coordinates={part.mapCoordinates}
+                strokeColor={stroke.strokeColor}
+                strokeWidth={stroke.strokeWidth}
+                lineDashPattern={base.lineDashPattern}
+                lineCap="round"
+                lineJoin="round"
+                zIndex={part.kind === 'segment' ? 3 : 2}
+              />
+            </Fragment>
           );
-        }) : layParts.filter(part => part.length > 1).map((part, index) => (
-          <Polyline key={`lay-${index}`} coordinates={part} strokeColor={layColor} strokeWidth={4} lineCap="round" lineJoin="round" />
-        )))}
+        }) : layParts.filter(part => part.length > 1).map((part, index) => {
+          const emphasis = searchActive ? searchLaidStroke({ strokeColor: layColor, strokeWidth: 4 }) : null;
+          return (
+            <Fragment key={`lay-${index}`}>
+              {emphasis && <Polyline coordinates={part} strokeColor={emphasis.outlineColor} strokeWidth={emphasis.outlineWidth} lineCap="round" lineJoin="round" />}
+              <Polyline coordinates={part} strokeColor={layColor} strokeWidth={emphasis?.strokeWidth ?? 4} lineCap="round" lineJoin="round" />
+            </Fragment>
+          );
+        }))}
         {/* Gelaufene Ist-Suchspur: blau, durchgezogen — separat von der gelegten Fährte */}
         {!comparison && runParts.filter(part => part.length > 1).map((part, index) => (
           <Polyline key={`run-${index}`} coordinates={part} strokeColor={C.trackBlue} strokeWidth={2} zIndex={4} />
@@ -404,12 +522,24 @@ export function TrackingMap({
           </Marker>
         )}
 
-        {/* Marker: Winkel = mint Geometrie-Badge (L/R · SL/SR), Gegenstand =
+        {/* Marker: Winkel = mint Geometrie-Badge (90 L/90 R · SL/SR), Gegenstand =
             neutrales Quadrat-Badge (G1, G2 …), Abriss = Kästchen. Klar getrennt.
             Über PinMarker (memo + stabile ID) bleiben sie dauerhaft sichtbar. */}
+        {/* Absuche: kleiner Punkt am Knick/Ablagepunkt + kurzer Verbindungsstrich
+            zum daneben stehenden Kürzel (Polyline/Circle — keine zusätzlichen Marker-Views). */}
+        {labelLeaders.map(leader => (
+          <Fragment key={`leader-${leader.key}`}>
+            <Polyline coordinates={leader.coordinates} strokeColor="rgba(255,255,255,0.92)" strokeWidth={2} zIndex={5} />
+            {Circle && <Circle center={leader.anchor} radius={0.6} fillColor="#FFFFFF" strokeColor="#04110F" strokeWidth={1.5} zIndex={6} />}
+          </Fragment>
+        ))}
+
         {markerList.map((m, i) => {
           if (groupedKeys.has(`marker:${i}`)) return null;
-          const lat = m.lat as number, lng = m.lng as number;
+          // Absuche: das Kürzel steht neben der Linie; sonst exakt auf dem Punkt.
+          const placedLabel = placedLabels.get(`marker:${i}`);
+          const lat = placedLabel ? placedLabel.label.lat : m.lat as number, lng = placedLabel ? placedLabel.label.lng : m.lng as number;
+          const faded = !!placedLabel && !!searchView && isEventPassed(m.arcM, searchView.dogProgressM);
           const key = m.id ?? `mk-${i}`;
           // Logbuch: Tap auf einen gespeicherten Marker öffnet die Detailanzeige.
           const onPress = onMarkerPress ? () => onMarkerPress(m) : undefined;
@@ -418,15 +548,15 @@ export function TrackingMap({
             const ak = angleMarkerKind(m.angleKind);
             if (ak !== 'angle') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind={ak}
               label={ak === 'abriss' && m.geometryDirection !== 'links' && m.geometryDirection !== 'rechts' ? undefined : specialAngleBadge(m) ?? undefined}
-              onPress={onPress} />;
+              onPress={onPress} faded={faded} />;
             const label = (m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠';
             const acute = m.angleKind === 'spitz_links' || m.angleKind === 'spitz_rechts' || m.angleKind === 'spitz';
-            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} onPress={onPress} />;
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} onPress={onPress} faded={faded} />;
           }
           if (m.type === 'gegenstand') {
             if (m.material === 'ball') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="ball" onPress={onPress} />;
             if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" onPress={onPress} />;
-            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${m.objectIndex ?? objectNo.get(i) ?? ''}`} onPress={onPress} />;
+            return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${m.objectIndex ?? objectNo.get(i) ?? ''}`} onPress={onPress} faded={faded} />;
           }
           return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="dot" color={markerColor(m)} onPress={onPress} />;
         })}
@@ -449,7 +579,7 @@ export function TrackingMap({
             <View style={s.posGlow}>
               <View style={s.posCore}>
                 <Ionicons name="navigate" size={16} color="#04110F"
-                  style={heading != null ? { transform: [{ rotate: `${heading}deg` }] } : undefined} />
+                  style={arrowRotationDeg != null ? { transform: [{ rotate: `${arrowRotationDeg}deg` }] } : undefined} />
               </View>
             </View>
           </Marker>
@@ -475,7 +605,48 @@ export function TrackingMap({
 
           {/* Kartenmodi (nur während aktiver Aufnahme/Absuche): Laufrichtung /
               Norden / Frei — kompakt gestapelt im bestehenden FAB-Stil. */}
-          {smartFollow && (
+          {/* Absuche: EIN Button «Kartenansicht» statt der Spalte — rechts bleibt
+              die kommende Fährte frei. Recenter nur, wenn Follow pausiert ist. */}
+          {searchActive && (
+            <>
+              <View style={s.viewMenuRow}>
+                {viewMenuOpen && (
+                  <View style={s.viewMenu} accessibilityRole="menu" testID="track-map-view-menu">
+                    {(['heading', 'north', 'free'] as const).map(mode => (
+                      <ViewMenuRow
+                        key={mode}
+                        icon={mode === 'heading' ? 'navigate' : mode === 'north' ? 'compass' : 'hand-left-outline'}
+                        label={t(`track.mapMode.${mode}`)}
+                        selected={camera.mode === mode}
+                        onPress={() => { selectCameraMode(mode); setViewMenuOpen(false); showToast(t(`track.mapMode.${mode}`)); }}
+                      />
+                    ))}
+                    <ViewMenuRow
+                      icon="cube-outline"
+                      label={t('track.mapView.perspective')}
+                      selected={camera.pitched}
+                      onPress={() => { camera.togglePitch(); setViewMenuOpen(false); }}
+                    />
+                  </View>
+                )}
+                <Fab
+                  icon="layers-outline"
+                  active={viewMenuOpen}
+                  accessibilityLabel={t('track.mapView.title')}
+                  onPress={() => setViewMenuOpen(open => !open)}
+                />
+              </View>
+              {camera.mode !== 'free' && (camera.paused || !follow) && (
+                <Fab
+                  icon="locate"
+                  active
+                  accessibilityLabel={t('track.mapMode.resumeFollow')}
+                  onPress={() => { resumeCamera(); showToast(t('track.mapMode.resumeFollow')); }}
+                />
+              )}
+            </>
+          )}
+          {smartFollow && !searchActive && (
             <>
               <Text style={s.modeLabel} accessibilityLiveRegion="polite" testID="track-camera-mode">
                 {t(`track.mapMode.${camera.mode}`)}{camera.mode !== 'free' && (camera.paused || !follow) ? ` · ${t('track.pause')}` : ''}
@@ -513,7 +684,7 @@ export function TrackingMap({
           )}
 
           {!smartFollow && <Fab icon="locate" onPress={recenter} />}
-          {onToggleFollow && (
+          {onToggleFollow && !searchActive && (
             <Fab
               icon={follow ? 'eye' : 'eye-off'}
               active={follow}
@@ -552,6 +723,26 @@ function PitchFab({ pitched, onPress, label }: { pitched: boolean; onPress: () =
   );
 }
 
+// Eintrag der Auswahl «Kartenansicht» (Absuche): Symbol + Text, gewählter Eintrag markiert.
+function ViewMenuRow({ icon, label, selected, onPress }: {
+  icon: React.ComponentProps<typeof Ionicons>['name']; label: string; selected: boolean; onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[s.viewMenuItem, selected && s.viewMenuItemOn]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+    >
+      <Ionicons name={icon} size={17} color={selected ? C.trackPrimary : C.trackText} />
+      <Text style={[s.viewMenuTxt, selected && s.viewMenuTxtOn]} maxFontSizeMultiplier={1.3}>{label}</Text>
+      {selected && <Ionicons name="checkmark" size={15} color={C.trackPrimary} />}
+    </TouchableOpacity>
+  );
+}
+
 function Fab({ icon, onPress, active, accessibilityLabel, accessibilityHint }: {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   onPress: () => void;
@@ -579,6 +770,13 @@ const s = StyleSheet.create({
   fallbackTxt: { fontSize: 13, color: C.trackTextMut },
   fabCol:      { position: 'absolute', right: 14, top: 14, gap: 10, alignItems: 'flex-end' },
   modeLabel: { maxWidth: 150, color: C.trackText, backgroundColor: 'rgba(13,13,13,0.9)', borderRadius: 10, padding: 7, fontSize: 12, fontWeight: '700', textAlign: 'right' },
+  viewMenuRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  viewMenu:    { minWidth: 178, padding: 6, gap: 2, borderRadius: 14, backgroundColor: 'rgba(13,13,13,0.94)', borderWidth: 1, borderColor: C.trackBorder },
+  viewMenuItem:   { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, borderRadius: 10 },
+  viewMenuItemOn: { backgroundColor: 'rgba(21,230,195,0.12)' },
+  viewMenuTxt:    { flex: 1, fontSize: 13.5, fontWeight: '700', color: C.trackText },
+  viewMenuTxtOn:  { color: C.trackPrimary },
+  fadedMarker: { opacity: SEARCH_VIEW.passedOpacity },
   fab:         { width: 46, height: 46, borderRadius: 14, backgroundColor: 'rgba(13,13,13,0.9)', borderWidth: 1, borderColor: C.trackBorder, alignItems: 'center', justifyContent: 'center' },
   fabActive:   { backgroundColor: C.trackPrimary, borderColor: C.trackPrimary },
   pitchTxt:       { fontSize: 13, fontWeight: '900', color: C.white, letterSpacing: 0.5 },
@@ -591,7 +789,7 @@ const s = StyleSheet.create({
   endFlag:        { width: 26, height: 26, borderRadius: 13, backgroundColor: C.trackDanger, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   endFlagLabel:   { marginTop: 2, fontSize: 9, fontWeight: '800', color: '#fff', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4, overflow: 'hidden' },
   markerDot:   { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#04110F' },
-  // Winkel: kompaktes, geometrisches Mint-Badge mit Kurzlabel (L/R, SL/SR).
+  // Winkel: kompaktes, geometrisches Mint-Badge mit Kurzlabel (90 L/90 R, SL/SR).
   angleBadge:    { minWidth: 20, height: 17, paddingHorizontal: 4, borderRadius: 4, backgroundColor: C.trackPrimary, borderWidth: 1.5, borderColor: '#04110F', alignItems: 'center', justifyContent: 'center' },
   angleBadgeTxt: { fontSize: 8.5, fontWeight: '900', color: '#04110F', letterSpacing: 0.2 },
   // Spitzwinkel: dünnere Umriss-Optik (dunkler Grund, Mint-Rand/-Text) → klar anders als 90°.
