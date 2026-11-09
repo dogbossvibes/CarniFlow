@@ -137,6 +137,38 @@ laufende Desktop-App müssen verfügbar sein. Einrichtung und erster planmäßig
 Heartbeat am 2026-10-09 um 08:00 Europe/Zurich sind belegt: main-Status und
 Fachchat-Ergebnisse wurden lesend abgeholt. Dies belegt keinen OTA-Geräteempfang.
 
+## Release-Karte nach jeder Production-OTA (direkter Nutzerauftrag 2026-11-09)
+
+Übersicht über OTA-Stände führt das GitHub-Projekt „ANYVO – Produkt & Entwicklung“
+(https://github.com/users/dogbossvibes/projects/1, Projekt-ID `PVT_kwHOEQw4F84BqlcJ`).
+Nach jeder Production-OTA, deren Nachkontrolle laut Wrapper bestanden ist, legt der
+Publisher (01) oder der berichtende Agent genau **eine** Release-Karte pro Charge an:
+
+1. Issue in `dogbossvibes/CarniFlow` mit Vorlage `.github/ISSUE_TEMPLATE/ota-release-card.md`,
+   Titel `OTA JJJJ-MM-TT · <Inhalt> (<Ziele>)`. Alle Ziele derselben Charge in eine Karte.
+2. Je Ziel eine Tabellenzeile mit Runtime, Source-Commit, Update Group ID, Platform Update ID
+   und Status – ausschliesslich aus der tatsächlichen Wrapper-/EAS-Nachkontrolle, nie aus
+   Erinnerung, MASTER_STATUS oder einem früheren Preflight.
+3. „Enthalten“ und „Nicht enthalten“ (Tasks/Scopes) ausdrücklich nennen, ebenso den
+   vorherigen Production-Stand je Ziel.
+4. Board-Felder setzen: Bereich = Release, Ziel, Task, Testweg.
+   Status: Testweg „Nachher“ → „Live – Nachkontrolle offen“; Testweg „Vorher“ mit
+   belegtem Gerätetest → „Veröffentlicht“. Nach erfolgter Gerätenachkontrolle Karte
+   ergänzen und auf „Veröffentlicht“ setzen.
+5. Testweg nach Risiko: Daten, Tracking/GPS, Abo/Bezahlung, Migrationen und grosse
+   Umbauten → „Vorher“ (Gerätetest vor der Production-OTA); kleine risikoarme
+   Änderungen (Texte, Layout, kleine UI-Fixes) → „Nachher“.
+6. Das Repo ist öffentlich: keine Kunden-, Personen- oder Zugangsdaten, keine Secrets.
+7. MASTER_STATUS verweist auf die Karte (Issue-Nummer) statt den Release ausführlich
+   zu beschreiben.
+
+Ohne Zugriff auf GitHub Projects (z. B. Cloud-Sitzung ohne GraphQL/Browser) die Karte
+trotzdem als Issue anlegen – sie gelangt automatisch ins Board (Status Backlog) – und im
+Bericht offen melden, dass Board-Felder/Status noch zu setzen sind; nicht als erledigt
+melden. Diese Regel erlaubt nur Issue- und Board-Pflege. Sie erweitert keine Freigabe für
+OTA, Push, Merge, Build, Store-Release oder DB-Aktionen; die Production-OTA-Regel unten
+bleibt unverändert vorrangig.
+
 # Agent Handoff Protocol (Codex and Claude Code)
 
 Codex and Claude Code are supported ANYVO development agents. The user plans
