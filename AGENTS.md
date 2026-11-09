@@ -20,6 +20,19 @@ Die alten allgemeinen Freigabeverbote gelten ausserhalb dieses engen Scopes weit
 Falls lokale Worktree-/Owner-Prüfungen nicht möglich sind, keine automatische
 Freigabe unterstellen und keinen lokalen Sync als erfolgt melden.
 
+## Doku-PRs selbst mergen (direkte Nutzerfreigabe 2026-11-09)
+
+Der Nutzer erlaubt fortlaufend, **reine Doku-PRs** selbst nach `main` zu mergen,
+ohne erneute Einzelfreigabe. Reiner Doku-PR heißt: ausschließlich `*.md`-Dateien
+unter `docs/`, nicht `docs/agent/release-policy.json` oder andere Nicht-Markdown-
+Dateien, Basis `main`, alle Checks grün. Merge nur mit
+`gh pr merge <Nr> --squash --delete-branch --match-head-commit <voller SHA>`;
+kein `--admin`, kein Umgehen von Branch-Schutz. Claude Code erzwingt das lokal über
+`~/.claude/hooks/anyvo-release-guard.py` (prüft Dateien, Checks und Head-Commit
+direkt vor dem Merge). Alle anderen PRs (Code, Skripte, `package.json`, `AGENTS.md`,
+`CLAUDE.md`, Konfiguration) brauchen weiterhin eine ausdrückliche Merge-Freigabe.
+Diese Regel erteilt keine OTA-, Build-, Store-, DB- oder Push-auf-main-Freigabe.
+
 ## ANYVO project status
 
 Before substantial ANYVO work, read:
@@ -184,7 +197,8 @@ The actual repository state always wins over handoff documentation.
 - `git reset`
 - `git checkout` modified files
 - `git clean`
-- push, merge, or commit without explicit user permission
+- push, merge, or commit without explicit user permission (exception: docs-only
+  PR merges per "Doku-PRs selbst mergen" above)
 - publish an OTA, start a build, or release to a store without explicit user permission
 - run destructive SQL or write to Production Supabase/DB without explicit user permission
 
