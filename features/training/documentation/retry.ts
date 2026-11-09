@@ -29,6 +29,7 @@ export function isConfirmedDocumentedRetry(existing: TrainingUnit, ownerId: stri
   if (Object.entries(unit).some(([k, v]) => !equal((existing as unknown as Record<string, unknown>)[k] ?? null, v ?? null))) return false;
   const fields = (e: Omit<TrainingExercise, 'id' | 'unit_id' | 'created_at'>) => ({
     discipline: e.discipline, exercise_name: e.exercise_name, rating: e.rating ?? null,
+    rating_scale: e.rating_scale ?? null,
     notes: e.notes ?? null, duration_sec: e.duration_sec ?? null, seq_index: e.seq_index,
   });
   const sorted = (rows: readonly Omit<TrainingExercise, 'id' | 'unit_id' | 'created_at'>[]) =>

@@ -1,10 +1,16 @@
 import type { TrainingExercise, TrainingUnit } from '@/types/trainingUnit';
+import { LEARNING_SCALE, levelOf, LEVEL_VALUE, type RatingScale } from './learningLevel';
 
 export type PlannedExercise = {
   key: string;
   discipline: string;
   name: string;
   rating: number | null;
+  // 'lernstufe' nur, wenn rating ausdrücklich als Lernstufe gesetzt wurde.
+  ratingScale?: RatingScale | null;
+  // Ursprüngliche alte Sternebewertung beim Bearbeiten – wird wiederhergestellt,
+  // wenn eine neu gesetzte Lernstufe wieder entfernt wird (kein Datenverlust).
+  legacyRating?: number | null;
   notes: string | null;
   performed: boolean;
   durationSec?: number | null;
@@ -34,11 +40,16 @@ export function relevantUnits(units: readonly TrainingUnit[], ownerId: string, d
 }
 
 // Explicit reuse of a selected historical row. Never infer identity from its
-// display name, and never copy a past performance, media or trainer permission.
+// display name, and never copy notes, media or trainer permission.
+// Trainingsdoku neu (T-184): vorgewählte Übungen gelten als heute trainiert;
+// nur eine ausdrücklich als Lernstufe gespeicherte Bewertung wird vorbelegt –
+// alte Sterne nie.
 export function planFromHistory(unit: TrainingUnit, exercise: TrainingExercise, key: string): PlannedExercise {
+  const level = levelOf(exercise);
   return {
     key, discipline: exercise.discipline, name: exercise.exercise_name,
-    rating: null, notes: null, performed: false,
+    rating: level ? LEVEL_VALUE[level] : null, ratingScale: level ? LEARNING_SCALE : null,
+    notes: null, performed: true,
     sourceUnitId: unit.id, sourceExerciseId: exercise.id,
     exerciseKey: exercise.exercise_identity_id ?? undefined,
     disciplineKey: exercise.discipline_key,
@@ -61,6 +72,8 @@ export function lastExerciseHistory(units: readonly TrainingUnit[], exercise: Pl
 export function performedExercises(selected: readonly PlannedExercise[]) {
   return selected.filter(e => e.performed).map((e, i) => ({
     discipline: e.discipline, exercise_name: e.name, rating: e.rating,
+    // Nur bei Lernstufe mitsenden; alte Sterne bleiben ohne Markierung.
+    ...(e.ratingScale === LEARNING_SCALE && e.rating != null ? { rating_scale: LEARNING_SCALE } : {}),
     notes: e.notes?.trim() || null, duration_sec: e.durationSec ?? null, seq_index: i,
   }));
 }

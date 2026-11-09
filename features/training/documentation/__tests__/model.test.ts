@@ -19,16 +19,27 @@ test('history is scoped to owner AND dog AND discipline AND completed status', (
 test('history ordering follows session date before creation date', () => {
   expect(relevantUnits([unit(), unit({ id: 'new', session_date: '2026-10-15' })], 'owner-a', 'dog-a', 'Obedience')[0].id).toBe('new');
 });
-test('explicit reuse copies only a plan and origin, no result, media or repetitions', () => {
+// T-184: vorgewählte Übungen gelten als heute trainiert (Spec-Entscheid 2).
+// Notizen, Medien und Dauer werden weiterhin nie kopiert; eine alte
+// Sternebewertung (ohne rating_scale) wird nie als Lernstufe vorbelegt.
+test('explicit reuse marks as trained but copies no notes, media, repetitions or legacy stars', () => {
   const planned = planFromHistory(unit(), exercise, 'new-key');
-  expect(planned).toMatchObject({ performed: false, rating: null, notes: null, sourceUnitId: 'unit-a', sourceExerciseId: 'row-a' });
+  expect(planned).toMatchObject({ performed: true, rating: null, ratingScale: null, notes: null, sourceUnitId: 'unit-a', sourceExerciseId: 'row-a' });
   expect(planned).not.toHaveProperty('photos');
   expect(planned).not.toHaveProperty('durationSec');
-  expect(performedExercises([planned])).toEqual([]);
+  expect(performedExercises([planned])).toEqual([expect.objectContaining({ rating: null, notes: null, duration_sec: null })]);
+  expect(performedExercises([planned])[0]).not.toHaveProperty('rating_scale');
+});
+test('reuse pre-fills only an explicitly marked learning level', () => {
+  const learned = { ...exercise, rating: 2, rating_scale: 'lernstufe' as const };
+  expect(planFromHistory(unit(), learned, 'k')).toMatchObject({ rating: 2, ratingScale: 'lernstufe', performed: true });
+  // 2 ohne Markierung ist eine alte Sternebewertung → keine Vorbelegung.
+  expect(planFromHistory(unit(), { ...exercise, rating: 2 }, 'k')).toMatchObject({ rating: null, ratingScale: null });
+  expect(performedExercises([planFromHistory(unit(), learned, 'k')])[0]).toMatchObject({ rating: 2, rating_scale: 'lernstufe' });
 });
 test('planned/not-trained exercises never enter performance rows', () => {
   const planned = planFromHistory(unit(), exercise, 'new-key');
-  expect(performedExercises([{ ...planned, rating: 5, notes: 'old' }])).toEqual([]);
+  expect(performedExercises([{ ...planned, performed: false, rating: 5, notes: 'old' }])).toEqual([]);
   expect(performedExercises([{ ...planned, performed: true, rating: 3 }])).toEqual([
     expect.objectContaining({ rating: 3, duration_sec: null, seq_index: 0 }),
   ]);

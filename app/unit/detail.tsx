@@ -27,6 +27,7 @@ import { queryClient } from '@/lib/queryClient';
 import { tapHaptic } from '@/lib/haptics';
 import type { TrainingUnit, AudioFile } from '@/types/trainingUnit';
 import { useT } from '@/i18n';
+import { ratingDisplay } from '@/features/training/documentation/learningLevel';
 
 function DetailVideo({ uri }: { uri: string }) {
   const signed = useSignedUrl(uri);
@@ -203,12 +204,18 @@ export default function UnitDetailScreen() {
                 <Text style={s.exDisc}>{ex.discipline}</Text>
                 {ex.notes?.trim() ? <Text style={s.notesTxt}>{ex.notes}</Text> : null}
               </View>
-              {ex.rating != null && (
-                <View style={s.exStars}>
-                  <Ionicons name="star" size={12} color={C.star} />
-                  <Text style={s.exRating}>{ex.rating}</Text>
-                </View>
-              )}
+              {(() => {
+                // T-184: Lernstufe nur mit rating_scale; alte Bewertungen bleiben Sterne.
+                const shown = ratingDisplay(ex);
+                if (shown?.kind === 'level') return <Text style={s.exRating}>{t(`trainingLevel.${shown.level}`)}</Text>;
+                if (shown?.kind === 'legacy') return (
+                  <View style={s.exStars}>
+                    <Ionicons name="star" size={12} color={C.star} />
+                    <Text style={s.exRating}>{shown.stars}</Text>
+                  </View>
+                );
+                return null;
+              })()}
             </View>
           ))}
 
