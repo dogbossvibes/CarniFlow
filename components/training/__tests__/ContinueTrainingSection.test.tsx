@@ -86,4 +86,10 @@ describe('ContinueTrainingSection (T-184 Etappe 2)', () => {
     expect(all).not.toContain('2026-11-01');
     expect(all).toContain('continueTraining.exerciseCountOne');
   });
+
+  test('„Verlauf ansehen“ öffnet den Verlauf des gewählten Hundes (Etappe 3)', () => {
+    render();
+    press('continueTraining.history');
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/unit/progress', params: { dogId: 'd1' } });
+  });
 });

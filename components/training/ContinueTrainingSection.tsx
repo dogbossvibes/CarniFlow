@@ -71,6 +71,11 @@ export function ContinueTrainingSection() {
         <Text style={s.nextTxt}>{t('continueTraining.next')}</Text>
       </TouchableOpacity>
 
+      {last && dogId && <TouchableOpacity onPress={() => router.push({ pathname: '/unit/progress', params: { dogId } })} style={s.row}
+        accessibilityRole="button" accessibilityLabel={t('continueTraining.history')}>
+        <Text style={s.link}>{t('continueTraining.history')}</Text>
+      </TouchableOpacity>}
+
       {!!data?.previous.length && <>
         <Text style={s.sub}>{t('continueTraining.earlier')}</Text>
         {data.previous.map(p => <TouchableOpacity key={p.id} onPress={() => openUnit(p.id, p.source)} style={s.row} accessibilityRole="button">
@@ -99,4 +104,5 @@ const s = StyleSheet.create({
   sub: { fontSize: 13, color: C.textMuted, fontWeight: '700', marginTop: 4 },
   row: { minHeight: 44, justifyContent: 'center' },
   muted: { fontSize: 14, color: C.textMuted },
+  link: { fontSize: 15, color: C.accent, fontWeight: '600' },
 });
