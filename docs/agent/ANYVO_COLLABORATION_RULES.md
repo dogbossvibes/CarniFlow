@@ -68,11 +68,11 @@ erledigte Arbeit** getrennt.
 | Verbindliche Agentenregeln | `AGENTS.md` (alle), `CLAUDE.md` (Claude) | Claude, nur nach Nutzerentscheidung | bei Regeländerung |
 | Einstieg und Übersicht | `docs/agent/ANYVO_MASTER_CONTEXT.md` | Claude | bei jeder bestätigten Statusänderung, die eine Sitzung kennen muss |
 | Produkt, Pläne, Rechte | `ANYVO_PRODUCT_CONTEXT.md`; Entscheidungen zusätzlich `DECISIONS.md` | Claude nach Nutzerentscheidung | bei Produktentscheidung |
-| Builds, Runtimes, OTAs | `ANYVO_RELEASE_HISTORY.md` | Claude | nach jedem Build, OTA oder Store-Schritt, mit frischen EAS-Daten |
+| Builds, Runtimes, OTAs | `ANYVO_RELEASE_HISTORY.md`; je Production-OTA zusätzlich eine Release-Karte (Issue + GitHub-Projekt, `AGENTS.md`) | Claude; Release-Karte durch den Publisher (Claude-MASTER) | nach jedem Build, OTA oder Store-Schritt, mit frischen EAS-Daten |
 | Architektur, kritische Bereiche | `ANYVO_ARCHITECTURE_AND_CRITICAL_AREAS.md` | Claude | bei Architekturänderung |
 | Kundenprobleme | `ANYVO_CUSTOMER_ISSUE_HISTORY.md` (ohne Personendaten) und GitHub-Issues | Claude | bei Meldung, Ursache, Fix, Test |
 | Verzeichnisse | `ANYVO_DIRECTORY_MAP.md` (öffentlich, `~`-Pfade), Vollfassung lokal im Backup | Claude | bei neuen relevanten Worktrees |
-| Laufende Aufgaben, Koordination | `ACTIVE_WORK.md`, `ANYVO_MASTER_STATUS.md` (kanonisch im main-Worktree) | Integrator, nur verifizierte Änderungen | nach bestätigtem Statuswechsel |
+| Laufende Aufgaben, Koordination | `ACTIVE_WORK.md`, `ANYVO_MASTER_STATUS.md` (kanonisch im main-Worktree) | nur der Claude-MASTER (Sitzung „ANYVO MASTER“ im main-Worktree, siehe `AGENTS.md`) | nach bestätigtem Statuswechsel |
 | Einzelaufgabe | `docs/agent/tasks/T-<n>.md` | Claude je Task | während und am Ende der Aufgabe |
 | Kontrolle und Gegenprüfung | Berichte unter `docs/agent/audits/` und PR-Beschreibungen | Claude erstellt, ChatGPT prüft | vor Merge und Release |
 | Code | GitHub `dogbossvibes/CarniFlow` (PR mit Quality Gate) | Claude | Commit/Push/PR nur mit Freigabe |

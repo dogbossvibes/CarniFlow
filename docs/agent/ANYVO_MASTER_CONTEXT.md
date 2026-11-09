@@ -35,7 +35,7 @@ Detaildokumente. Die Regeln in `AGENTS.md` und `CLAUDE.md` gelten weiter und geh
 | Production-Quellen und Sicherung | [PRODUCTION_SOURCE_AUDIT_2026-11-08.md](PRODUCTION_SOURCE_AUDIT_2026-11-08.md) |
 | Repository-Zahlen | [REPOSITORY_INVENTORY.md](REPOSITORY_INVENTORY.md) |
 | Claude-Werkzeuge (Skills, Hooks, Agents) | [CLAUDE_ENVIRONMENT.md](CLAUDE_ENVIRONMENT.md) |
-| Koordinationsstand (kanonisch, im main-Worktree, uncommittet) | `ANYVO_MASTER_STATUS.md`, `ACTIVE_WORK.md` |
+| Koordinationsstand (kanonisch, im main-Worktree; einziger Writer und OTA-Publisher ist der Claude-MASTER) | `ANYVO_MASTER_STATUS.md`, `ACTIVE_WORK.md`; OTA-Übersicht im GitHub-Projekt „ANYVO – Produkt & Entwicklung“ (Release-Karten) |
 | Verständnisbericht und Widersprüche | [audits/2026-11-09-verstaendnisbericht.md](audits/2026-11-09-verstaendnisbericht.md) |
 | Abschlussbericht der Einrichtung | [audits/2026-11-09-einrichtung-abschlussbericht.md](audits/2026-11-09-einrichtung-abschlussbericht.md) |
 
