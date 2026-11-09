@@ -61,6 +61,31 @@ und ersetzt diese Regeln nicht.
 In allen Berichten werden **bestätigte Fakten, Vermutungen, offene Prüfungen und
 erledigte Arbeit** getrennt.
 
+## 2a. Wo welche Information gepflegt wird
+
+| Information | Gepflegt in | Wer pflegt | Wann |
+|---|---|---|---|
+| Verbindliche Agentenregeln | `AGENTS.md` (alle), `CLAUDE.md` (Claude) | Claude, nur nach Nutzerentscheidung | bei Regeländerung |
+| Einstieg und Übersicht | `docs/agent/ANYVO_MASTER_CONTEXT.md` | Claude | bei jeder bestätigten Statusänderung, die eine Sitzung kennen muss |
+| Produkt, Pläne, Rechte | `ANYVO_PRODUCT_CONTEXT.md`; Entscheidungen zusätzlich `DECISIONS.md` | Claude nach Nutzerentscheidung | bei Produktentscheidung |
+| Builds, Runtimes, OTAs | `ANYVO_RELEASE_HISTORY.md` | Claude | nach jedem Build, OTA oder Store-Schritt, mit frischen EAS-Daten |
+| Architektur, kritische Bereiche | `ANYVO_ARCHITECTURE_AND_CRITICAL_AREAS.md` | Claude | bei Architekturänderung |
+| Kundenprobleme | `ANYVO_CUSTOMER_ISSUE_HISTORY.md` (ohne Personendaten) und GitHub-Issues | Claude | bei Meldung, Ursache, Fix, Test |
+| Verzeichnisse | `ANYVO_DIRECTORY_MAP.md` (öffentlich, `~`-Pfade), Vollfassung lokal im Backup | Claude | bei neuen relevanten Worktrees |
+| Laufende Aufgaben, Koordination | `ACTIVE_WORK.md`, `ANYVO_MASTER_STATUS.md` (kanonisch im main-Worktree) | Integrator, nur verifizierte Änderungen | nach bestätigtem Statuswechsel |
+| Einzelaufgabe | `docs/agent/tasks/T-<n>.md` | Claude je Task | während und am Ende der Aufgabe |
+| Kontrolle und Gegenprüfung | Berichte unter `docs/agent/audits/` und PR-Beschreibungen | Claude erstellt, ChatGPT prüft | vor Merge und Release |
+| Code | GitHub `dogbossvibes/CarniFlow` (PR mit Quality Gate) | Claude | Commit/Push/PR nur mit Freigabe |
+| Production-Stand | EAS (Builds/OTAs), Supabase, RevenueCat, Stores | Nutzerin gibt frei | nie aus der Doku ableiten, immer frisch lesen |
+
+**Änderungen dokumentieren:**
+- Jede Änderung bekommt einen Task-Report mit Ziel, geänderten Dateien, Ursache/Lösung,
+  Tests, Commit/Branch und Restrisiken.
+- Jede bestätigte Statusänderung kommt zusätzlich in das passende Dokument oben.
+- Angaben werden gekennzeichnet: [B] bestätigt mit Datum, [N] Nutzerangabe, [H] historisch,
+  [O] offen.
+- Personendaten, Kunden-IDs und Secrets kommen **nie** in das öffentliche Repository.
+
 ## 3. Arbeitsablauf (Kurzfassung)
 
 1. `/anyvo-start`: Ort, fremde Änderungen, frischer GitHub- und EAS-Stand, Owner;

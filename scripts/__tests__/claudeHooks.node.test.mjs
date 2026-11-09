@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkCommand, checkFile, evaluate, isSecretFile, DENY, ASK } from '../../.claude/hooks/anyvo-guard.mjs';
-import { buildContext, summarizeStatus } from '../../.claude/hooks/anyvo-session-context.mjs';
+import { buildContext, summarizeStatus, openCriticalTasks } from '../../.claude/hooks/anyvo-session-context.mjs';
 import { lintTarget } from '../../.claude/hooks/anyvo-post-edit-lint.mjs';
 import { analyzeDiffText, findSecretLikeLines } from '../claude/quality-check.mjs';
 import { versionFacts } from '../claude/release-preflight.mjs';
@@ -137,6 +137,18 @@ test('Sitzungskontext zählt Änderungen und bleibt lesend', () => {
   assert.match(ctx, /Lokale Änderungen: \d+ geändert, \d+ unversioniert/);
   const dir = mkdtempSync(join(tmpdir(), 'anyvo-nogit-'));
   try { assert.match(buildContext(dir), /kein Git-Repository/); } finally { rmSync(dir, { recursive: true }); }
+});
+
+test('Sitzungskontext zeigt Master-Kontext und offene P0-Aufgaben', () => {
+  const md = '## 10. Offene Aufgaben\n- **P0** Abo-Code sichern\n- **P1** GNSS\n  - **P0** Drift klären\n';
+  assert.deepEqual(openCriticalTasks(md), ['Abo-Code sichern', 'Drift klären']);
+  assert.deepEqual(openCriticalTasks(''), []);
+  assert.equal(openCriticalTasks(Array(10).fill('- **P0** x').join('\n')).length, 6);
+  const ctx = buildContext(ROOT);
+  assert.match(ctx, /ANYVO_MASTER_CONTEXT\.md/);
+  assert.match(ctx, /Offene P0-Aufgaben/);
+  assert.match(ctx, /ACTIVE_WORK\.md/);
+  assert.match(ctx, /Branch, HEAD und git status prüfen/);
 });
 
 test('Post-Edit-Lint wählt nur Projektquellcode', () => {

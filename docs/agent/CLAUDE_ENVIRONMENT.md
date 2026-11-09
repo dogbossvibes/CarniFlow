@@ -139,6 +139,59 @@ Store-Review- und Simulator-Werkzeuge); Vercel-Plugin-Server benötigt Anmeldung
 GitHub-Plugin-Server verbindet nicht (Authentifizierungs-Header) — `gh` CLI
 funktioniert und ist der Standardweg.
 
+## 7a. Prüfung 2026-11-09 (Vollständigkeitsprüfung)
+
+**Externe Systeme** (nur lesend):
+
+| System | Status | Beleg |
+|---|---|---|
+| GitHub | verbunden und geprüft | `gh` als `dogbossvibes`, API, Issues, PR-Checks |
+| EAS | verbunden und geprüft | `eas whoami` = `dog.boss.vibes`; `build:list`, `update:list`, `channel:list` |
+| Supabase Production | verbunden und geprüft | CLI-Login 09.11.; `functions list`/`download`, `db query --read-only` |
+| Supabase Staging | verbunden und geprüft | `functions list` (keine Functions deployed) |
+| RevenueCat | nicht verbunden | kein CLI/MCP. Daten nur über die Nutzerin aus dem Dashboard |
+| App Store Connect | nicht verbunden | keine Zugangsdaten für Claude (bewusst) |
+| Google Play Console | nicht verbunden | keine Zugangsdaten für Claude (bewusst) |
+| Sentry | nicht verbunden | App nutzt `@sentry/react-native` 7.2. Keine CLI und kein Token |
+| Vercel | verbunden, nicht geprüft | Vercel-Check läuft auf PRs. MCP in den Claude-Einstellungen gesperrt (deny), keine CLI |
+| Expo-MCP | nicht erreichbar | Server lehnt persönlichen Token ab („robot token“ nötig) |
+| GitHub-MCP | nicht erreichbar | Auth-Header-Fehler. Plugin ist deaktiviert, `gh` ist der Standardweg |
+
+**Toolchain:**
+- **Xcode fehlt** (nur CommandLineTools): kein iOS-Simulator, kein lokaler iOS-Build.
+- Android SDK unter `~/Library/Android/sdk` mit `adb` 1.0.41 (nicht im PATH) und 8 AVDs.
+  Aktuell ist kein Gerät und kein Emulator verbunden.
+- JDK 17, CocoaPods 1.16.2, EAS CLI 19.1.0, Node 24.15, npm 11.12. Maestro fehlt.
+- Bericht: `node scripts/claude/mobile-env-check.mjs`.
+
+**Worktree-Isolation und `node_modules`:**
+- Der Claude-Worktree nutzt per Symlink das `node_modules` von `anyvo-main`. Beide
+  sind SDK 54, das passt.
+- Die SDK-58-Worktrees (60, 59, iOS60-Label) haben ein **eigenes** `node_modules` mit
+  Expo 58.0.23.
+- Risiko: `npm install` im Claude-Worktree verändert das `node_modules` von `anyvo-main`.
+  Deshalb dort nichts installieren. Ein eigener Task-Worktree für Abhängigkeitsänderungen
+  braucht eine Freigabe.
+
+**Regeln, Hooks und Skills:**
+- Hook-Tests: 12/12 bestanden, inklusive des neuen Tests für die P0-Anzeige beim
+  Sitzungsstart.
+- Die 8 ANYVO-Skills und 6 Agents sind formal gültig (Name und Beschreibung vorhanden),
+  die referenzierten Skripte und npm-Skripte existieren.
+- `release-preflight.mjs` blockiert korrekt bei Ancestry-Bruch, nativen Änderungen und
+  schmutzigem Worktree. `mobile-env-check.mjs` meldet Xcode korrekt als fehlend.
+- **Frische Sitzung:** Ein Testlauf mit `claude -p` im Worktree scheiterte an
+  „OAuth session expired“ (CLI-Anmeldung abgelaufen). Daher ist es nicht praktisch
+  bestätigt, dass AGENTS.md, CLAUDE.md und der Sitzungsstart-Hook in einer neuen
+  Sitzung greifen. Die Hook-Ausgabe selbst ist per Skript belegt.
+- **Wichtig:** Eine Claude-Sitzung lädt Projektregeln und Hooks nur, wenn sie im
+  Worktree selbst gestartet wird. Eine Sitzung im Ordner `/Users/<name>/canisflow`
+  (alter Starter) lädt **nicht** die ANYVO-Regeln.
+- Die lokalen Erlaubnisregeln im Haupt-Checkout (`.claude/settings.local.json`) gelten
+  auch für alle Worktrees. Beim Start erscheinen dazu Warnungen zu Platzhaltern in
+  alten grep/rg-Allow-Regeln. Sie sind harmlos, sollten aber bereinigt werden
+  (eigener Auftrag).
+
 ## 8. Offene Punkte / Empfehlungen
 
 - Xcode installieren und auswählen, damit iOS-Simulator-Tests möglich sind.

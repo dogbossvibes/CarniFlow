@@ -1,57 +1,66 @@
 # ANYVO — Master-Kontext (Einstieg für jede Sitzung)
 
-Stand: **2026-11-09** · Erstellt von Claude aus der ChatGPT-Projektübergabe, abgeglichen
-mit Git, EAS und Supabase (nur lesend).
+Stand: **2026-11-09**. Erstellt von Claude aus der ChatGPT-Projektübergabe und abgeglichen
+mit Git, EAS und Supabase, ausschliesslich lesend.
 
 Dieses Dokument ist die **Einstiegsseite**. Es fasst zusammen und verweist auf die
-Detaildokumente. Es ersetzt keine Regel aus `AGENTS.md` und `CLAUDE.md`.
+Detaildokumente. Die Regeln in `AGENTS.md` und `CLAUDE.md` gelten weiter und gehen vor.
 
 **Kennzeichnung:**
-- **[B]** bestätigt am angegebenen Datum aus Git, EAS oder Supabase
+- **[B]** bestätigt am angegebenen Datum (Git, EAS, Supabase)
 - **[N]** Nutzerentscheidung oder Nutzerangabe
-- **[H]** historische Angabe (ChatGPT-Übergabe, alte Doku), nicht neu geprüft
+- **[H]** historisch, nicht neu geprüft
 - **[O]** offen oder widersprüchlich
 
-**Vorrang bei Widerspruch:** frische Git-, EAS- und Supabase-Fakten > Nutzerentscheidungen >
-kanonischer `ANYVO_MASTER_STATUS.md`/`ACTIVE_WORK.md` > dieses Dokument >
-historische Übergaben > Annahmen.
+**Vorrang bei Widerspruch:**
+1. frische Git-, EAS- und Supabase-Fakten
+2. Nutzerentscheidungen
+3. kanonische `ANYVO_MASTER_STATUS.md` und `ACTIVE_WORK.md`
+4. dieses Dokument
+5. historische Übergaben
+6. Annahmen
 
 ## 0. Landkarte der Dokumente
 
 | Thema | Dokument |
 |---|---|
 | Verbindliche Regeln (alle Agenten) | `AGENTS.md` |
-| Claude-spezifische Regeln, Production-OTA-Pflichten | `CLAUDE.md` |
-| Rollen, Nutzerentscheidungen vom 08.11. | [ANYVO_COLLABORATION_RULES.md](ANYVO_COLLABORATION_RULES.md) |
-| Produkt, Module, Pläne | [ANYVO_PRODUCT_CONTEXT.md](ANYVO_PRODUCT_CONTEXT.md) |
-| Architektur und kritische Bereiche | [ANYVO_ARCHITECTURE_AND_CRITICAL_AREAS.md](ANYVO_ARCHITECTURE_AND_CRITICAL_AREAS.md) |
-| Builds, Runtimes, OTA-Herkunft | [ANYVO_RELEASE_HISTORY.md](ANYVO_RELEASE_HISTORY.md) |
+| Claude-Regeln, Pflichten bei Production-OTAs | `CLAUDE.md` |
+| Rollen, Nutzerentscheidungen, wo was gepflegt wird | [ANYVO_COLLABORATION_RULES.md](ANYVO_COLLABORATION_RULES.md) |
+| Produkt, Zielgruppe, Pläne, Rechte, Module, Ideen | [ANYVO_PRODUCT_CONTEXT.md](ANYVO_PRODUCT_CONTEXT.md) |
+| Architektur und Datenflüsse aus dem Code | [ANYVO_ARCHITECTURE_AND_CRITICAL_AREAS.md](ANYVO_ARCHITECTURE_AND_CRITICAL_AREAS.md) |
+| Builds, Runtimes, OTAs, Linien 59/60, Backend-Drift | [ANYVO_RELEASE_HISTORY.md](ANYVO_RELEASE_HISTORY.md) |
+| Kundenprobleme und technische Fehler | [ANYVO_CUSTOMER_ISSUE_HISTORY.md](ANYVO_CUSTOMER_ISSUE_HISTORY.md) |
+| Alle wichtigen Verzeichnisse mit Pfad, Branch, Status und Änderungsrecht | [ANYVO_DIRECTORY_MAP.md](ANYVO_DIRECTORY_MAP.md) |
 | Production-Quellen und Sicherung | [PRODUCTION_SOURCE_AUDIT_2026-11-08.md](PRODUCTION_SOURCE_AUDIT_2026-11-08.md) |
-| Worktrees und Repository-Zahlen | [REPOSITORY_INVENTORY.md](REPOSITORY_INVENTORY.md) |
-| **Alle wichtigen Verzeichnisse mit absoluten Pfaden, Branch, Status und Änderungsrecht** | [ANYVO_DIRECTORY_MAP.md](ANYVO_DIRECTORY_MAP.md) |
+| Repository-Zahlen | [REPOSITORY_INVENTORY.md](REPOSITORY_INVENTORY.md) |
 | Claude-Werkzeuge (Skills, Hooks, Agents) | [CLAUDE_ENVIRONMENT.md](CLAUDE_ENVIRONMENT.md) |
-| Koordinationsstand (kanonisch, im main-Worktree) | `ANYVO_MASTER_STATUS.md`, `ACTIVE_WORK.md` |
-| Verständnisbericht und Widersprüche 09.11. | [audits/2026-11-09-verstaendnisbericht.md](audits/2026-11-09-verstaendnisbericht.md) |
+| Koordinationsstand (kanonisch, im main-Worktree, uncommittet) | `ANYVO_MASTER_STATUS.md`, `ACTIVE_WORK.md` |
+| Verständnisbericht und Widersprüche | [audits/2026-11-09-verstaendnisbericht.md](audits/2026-11-09-verstaendnisbericht.md) |
+| Abschlussbericht der Einrichtung | [audits/2026-11-09-einrichtung-abschlussbericht.md](audits/2026-11-09-einrichtung-abschlussbericht.md) |
 
 ## 1. Rollen [N]
 
 - **Claude Code**: primärer Entwicklungsagent. Er analysiert, setzt um, testet,
   dokumentiert und bereitet Releases vor.
-- **ChatGPT**: unabhängige Kontrolle (Reviews, Architektur, Sicherheit, Release-Koordination).
-  ChatGPT bestätigt Claudes Aussagen nicht einfach, sondern prüft sie selbst.
-- **Codex**: bekommt keine neuen Schreibaufträge. **OpenCode/DeepSeek** ist die
-  Ausweichlösung und arbeitet nur auf ausdrücklichen Auftrag.
-- **Nutzerin**: trifft Produktentscheidungen und **alle Freigaben**. Jeder Commit,
-  Push, Merge, Build, jedes OTA, jeder Store-Upload, jede Migration und jede Änderung
-  an Production-Daten braucht eine eigene, ausdrückliche Freigabe.
+- **ChatGPT**: unabhängige Kontrolle (Reviews, Architektur, Sicherheit,
+  Release-Koordination). Bestätigt Claude nicht einfach, sondern prüft selbst.
+- **Codex**: keine neuen Schreibaufträge.
+- **OpenCode/DeepSeek**: Ausweichlösung, nur auf ausdrücklichen Auftrag.
+- **GitHub**: versionierte Codebasis.
+- **EAS**: tatsächliche Build- und OTA-Stände.
+- **Nutzerin**: Produktentscheidungen und **alle Freigaben**, jeweils einzeln. Das gilt für
+  Commit, Push, Merge, Build, OTA, Store, Migration und Production-Daten.
 
-## 2. Produkt in einem Absatz [N][B]
+## 2. Produkt und Ziele [N][B]
 
-ANYVO ist eine All-in-one-App für Hundehalter, keine reine Trainings- oder Fährten-App.
-Sie umfasst:
+ANYVO ist eine All-in-one-App für den ganzen Hundealltag, nicht nur eine Trainings- oder
+Fährten-App.
+
+**Module:**
 - Hundeprofile
-- Training (IGP/Fährte, IBGH, Mondioring, Obedience, Agility)
-- GPS-Fährtenarbeit
+- Training (IGP, IBGH, Mondioring, Obedience, Agility, Rally, Mantrailing)
+- GPS-Fährte
 - Trainer Connect
 - Smart Coach/KI
 - Kalender
@@ -59,128 +68,143 @@ Sie umfasst:
 - Journal und Medien
 - Dokumente, Statistiken, Checklisten
 
-Pläne laut Code [B]: **NEWBIE** (kostenlos, Monatsquote 1 Hund / 2 Trainings / **1 Fährte**
-[N 08.11.]), **ACTIVE**, **FOUNDER_ACTIVE** (wie ACTIVE, begrenzte Plätze) und **TRAINER**
-(ACTIVE plus Trainer-Hub). Details: Produktkontext Abschnitt 3.
+**Sprachen:** Deutsch, Schweizerdeutsch, Französisch, Italienisch, Englisch.
+
+**Pläne laut Code:**
+- **NEWBIE**: kostenlos, Monatsquote 1 Hund, 2 Trainings und **1 Fährte**. Die Fährtenquote
+  ist auf Production bestätigt [B 09.11.].
+- **ACTIVE**
+- **FOUNDER_ACTIVE**: begrenzt
+- **TRAINER**: ACTIVE plus Trainer-Hub
+
+**Ziele:**
+- langfristig wartbares Produkt;
+- Stabilität und Datenintegrität vor Tempo;
+- neue Versionen bauen auf nachweislich funktionierenden Ständen auf.
 
 ## 3. Begriffe, die man nicht verwechseln darf
 
 | Begriff | Bedeutung |
 |---|---|
-| **Build-Nummer** | iOS `buildNumber` bzw. Android `versionCode`. **Getrennt pro Plattform**: iOS 49 ≠ Android 49 |
-| **App-Version** | Store-Version, z. B. 1.0.4. Mehrere Builds können dieselbe haben |
-| **Runtime** | bestimmt, welche OTAs ein installierter Build annimmt. Ein OTA erreicht nur Builds mit **gleicher** Runtime |
-| **OTA-Update** | JS-Bundle über EAS Update, Kanal `production` → Branch `production`. Ersetzt nichts Natives |
-| **Quell-Commit** | `gitCommitHash` eines Builds oder OTAs. **Kein** Production-Quell-Commit liegt in `main` |
+| **Build-Nummer** | iOS `buildNumber` bzw. Android `versionCode`, **getrennt je Plattform**: iOS 49 ≠ Android 49 |
+| **App-Version** | Store-Version. Mehrere Builds können sie teilen (iOS 49, 56 und 57 sind alle 1.0.4) |
+| **Runtime** | Ein OTA erreicht nur Builds mit **gleicher** Runtime |
+| **OTA-Update** | JS-Bundle über EAS Update (`production`). Ersetzt keinen nativen Code |
+| **Quell-Commit** | `gitCommitHash` eines Builds oder OTAs. **Keiner** der Production-Quell-Commits liegt in `main` |
+| **Store-Veröffentlichung** | eigener Schritt. Für Claude nicht einsehbar |
 
-## 4. Referenz-Builds 49, 57, 60 (und 59) [B: EAS + Git, 09.11.]
+## 4. Referenz-Builds [B: EAS + Git, 09.11.]
 
-**„Build 49“ ist zweideutig [O]:**
-- **iOS Build 49**: 1.0.4, Runtime `1.0.4`, 06.10., Commit `3f7c2e74` (in `main`).
-- **Android Build 49**: 1.0.5, Runtime `1.0.5-greeting-v1`, 22.10., Commit `f2ed8d78`.
+- **iOS 49** (1.0.4, Runtime `1.0.4`, `3f7c2e74`): Ausgangspunkt der Kundenlinie. Ein
+  Kartenproblem beim Öffnen einer Fährte im Journal wurde mit 56/57 behoben.
+- **iOS 57** (1.0.4, Runtime `1.0.6-map49-v1`, `17443616`): **Kundenreferenz**. Er stammt
+  über 56 von 49 ab. Aktuelles OTA `d11fcb37` (07.11.).
+- **iOS 60** (1.0.8, SDK 58, Runtime `1.0.8-sdk58-v1`, `3858c0ff`): SDK-58-Migration auf
+  Basis von 57. Aktuelles OTA `3bb78943` mit Trainingsübersicht und Fährten-Label.
+- **iOS 59** (1.0.7, SDK 58, `00376126` → OTA `bf0725d7`): zweite SDK-58-Linie mit
+  Zusatzfunktionen. Ihr fehlen die letzten zwei 57-OTAs. Liegt **nicht auf GitHub**. Wird
+  nicht ungeprüft mit 60 gemischt.
+- **Android 49/50** (1.0.5, Runtimes `greeting-v1`/`gnss-v1`). Achtung bei „Build 49“:
+  Damit ist meist iOS gemeint [O].
 
-Die Runtime `…-map49-…` und das Build-Profil `ios49-map-repair` meinen die
-**iOS-49-Linie**. Diese Doku verwendet „Build 49“ = iOS 49, solange die Nutzerin nichts anderes sagt.
+Details, Abstammungsbaum und Vergleich 59 und 60: [Release-Historie](ANYVO_RELEASE_HISTORY.md).
 
-### Abstammung iOS
+## 5. Production-Situation [B: EAS und Supabase, 09.11.]
 
-```
-iOS 49  (3f7c2e74, 1.0.4, rt 1.0.4)
- ├─ iOS 50–55 (1.0.5, native Sensor-/Watch-/Motion-Linie, rt 1.0.5 / motion-v2..v4)
- │     → NICHT Vorfahr von 56/57 (Seitenlinie)
- └─ iOS 56 (e8a754f3, 1.0.4, rt 1.0.5-map49-v1)   „Map-Reparatur der 49er-Linie“
-     └─ iOS 57 (17443616, 1.0.4, rt 1.0.6-map49-v1)   ← Kundenreferenz [N]
-         ├─ iOS 59 (00376126, 1.0.7, SDK 58, rt sdk58-customer-ios-v1)  nur lokal + Bundle
-         └─ iOS 60 (3858c0ff, 1.0.8, SDK 58, rt 1.0.8-sdk58-v1)   SDK-58-Migration auf 57
-```
+- **Mindestens 16 Runtimes** haben Production-OTAs, 10 auf iOS und 6 auf Android. Fünf
+  davon bekamen OTAs ab dem 03.11.
+  - iOS 57: `1.0.6-map49-v1`
+  - iOS 60: `1.0.8-sdk58-v1`
+  - iOS 59: `sdk58-customer-ios-v1`
+  - Android 50: `gnss-v1`
+  - Android 49: `greeting-v1`
+- Für die übrigen 11 stammt das letzte OTA vom 29.10. oder 10.10. Die Geräteverteilung ist
+  unbekannt [O].
+- **Ob die OTAs auf Geräten aktiv sind, ist nicht belegt.** iOS 60 meldete `launch=embedded` [O].
+- Supabase Production `axkkhyqrjrtbkumaulta`, Staging `cbhrxkjclakzlvajyvfn`.
+- RLS ist auf allen Tabellen in `public` aktiv.
+- **Migrations-Drift [O]:** `20261008190000` liegt in allen Live-Clients, ist aber nicht
+  angewendet. Zwei angewendete Migrationen liegen nur auf Seitenbranches.
+- **Der deployte Abo-Code liegt in keinem Git-Stand** [B]. Betroffen sind
+  `subscription-sync` v5 und die Webhooks v9/v8 (28.10.), dazu die DB-Funktionen
+  `subscription_*_v1`.
+- **Folge:** Jede Änderung an Backend, RLS oder Edge Functions muss mit **allen** diesen
+  Client-Ständen funktionieren, nicht nur mit `main`.
 
-- 57 ist der Merge-Base von 59 und 60. Die **59er- und die 60er-Linie sind getrennt** und
-  dürfen nicht ungeprüft zusammengeführt werden [B][N].
-- iOS 58 (1.0.6, `6722b88f`) war ein reiner SDK-58-QA-Build auf Kanal `sdk58-test` [B].
-- Die App-Version von 56/57 ist 1.0.4, also **gleich wie Build 49**. Das passt zur
-  Reparatur der 49er-Linie. Die Angabe „1.0.6 veröffentlicht“ in alter Doku meint
-  wahrscheinlich die Runtime [O].
+## 6. Architektur in Kürze
 
-### Abstammung Android
+- Expo/React Native (SDK 54, Linie 60: SDK 58), expo-router, TypeScript.
+- Backend: Supabase (Postgres mit RLS, Edge Functions, Storage).
+- Abos: RevenueCat.
+- Tracking: eigenes natives Modul `modules/anyvo-precision-location` plus
+  `features/tracking`.
+- Premium vergibt **nur der Server**: RevenueCat → `subscription-sync` und Webhooks →
+  `subscriptions`/`user_capabilities`/`profiles`. Die deployte Logik schaltet im Zweifel
+  nicht frei.
 
-`3f7c2e74` → Android 49 (`f2ed8d78`, Runtime greeting-v1) → Android 50 (`c4649ad5`, Runtime
-gnss-v1, Satelliten-Diagnose). Android 51 (1.0.6) ist ein reiner SDK-58-QA-Build.
+Details zu GPS/IMU, RLS, Abo, Trainer Connect, Auth, Offline, Resume und Datenschutz:
+[Architektur](ANYVO_ARCHITECTURE_AND_CRITICAL_AREAS.md).
 
-## 5. Production-Situation [B: EAS, 09.11.]
+## 7. Kritische Bereiche und Grundregeln
 
-**Wichtig: Nicht 5, sondern mindestens 16 Runtimes haben Production-OTAs.** Die Liste
-„5 Runtimes“ vom 08.11. enthielt nur die zuletzt aktualisierten. Für die übrigen wurde
-zuletzt am 29.10. oder früher ein OTA veröffentlicht. Geräte mit diesen Builds laufen weiter.
+1. **Fährte und GPS**
+   - Die gelegte Fährte geht vor Kartenkosmetik.
+   - GNSS- und IMU-Rohdaten bleiben von der Analyse getrennt.
+   - Keine Vereinfachung ohne Datenfluss-Analyse, Tests und Feldtest.
+2. **Abos, Rechte, RLS**: serverseitig. Kundendaten nie vermischen. Der alte
+   Client-Schreibpfad wird nicht reaktiviert.
+3. **Release**
+   - OTA nur über den Wrapper mit `--environment production` und Preflight.
+   - Ein Build ist keine Veröffentlichung, ein OTA ist kein nativer Build.
+4. **SDK-Migration ≠ Funktionsentwicklung.**
+5. **Öffentliches Repo**: keine Secrets, keine Personendaten, keine absoluten lokalen Pfade.
+6. **Fremde Worktrees**: nie verändern, aufräumen oder löschen.
 
-| Plattform | Runtime | Build(s) | letztes OTA (UTC) | Quelle | auf GitHub |
-|---|---|---|---|---|---|
-| iOS | `1.0.6-map49-v1` | 57 | 07.11. 16:29 | `d11fcb37` | ja |
-| iOS | `1.0.8-sdk58-v1` | 60 | 07.11. 16:26 | `3bb78943` | ja |
-| iOS | `sdk58-customer-ios-v1` | 59 | 04.11. | `bf0725d7` | **nein** (lokales Bundle) |
-| iOS | `1.0.5-map49-v1` | 56 | 29.10. 03:14 | `17443616` | ja |
-| iOS | `1.0.5-motion-v4` | 55 | 29.10. 08:07 | `0e16001d` | ja |
-| iOS | `1.0.5-motion-v3` | 53 | 29.10. 02:54 | `a4eb7ffe` | ja |
-| iOS | `1.0.5-motion-v2` | 52 | 29.10. 02:58 | `6c304948` | ja |
-| iOS | `1.0.5` | 50, 51 | 29.10. 02:50 | `67895981` | ja |
-| iOS | `1.0.4` | **49** | 29.10. 02:46 | `936131a1` | ja |
-| iOS | `1.0.3` | 46–48 | 10.10. | `7a1bfbb4` | ja |
-| Android | `1.0.5-gnss-v1` | 50 | 03.11. | `21c04eee` | ja |
-| Android | `1.0.5-greeting-v1` | **49** | 03.11. | `da715fc7` | ja |
-| Android | `1.0.5` | 47, 48 | 29.10. 03:06 | `e2957bd8` | ja |
-| Android | `1.0.4` | 45 | 29.10. 03:01 | `e0198c71` | ja |
-| Android | `1.0.3` | 42–44 | 10.10. | `2f513dbd` | ja |
-| Android | `1.0.1` | ≤41 | 10.10. | `6070f02c` | ja |
+## 8. Bekannte Kundenprobleme (Kurzfassung)
 
-Nicht bekannt [O]:
-- wie viele Geräte auf welcher Runtime laufen (EAS-Insights);
-- welche Builds im Store öffentlich sind und welche nur in TestFlight;
-- ob OTAs auf den Geräten tatsächlich aktiv sind. Auf iOS 60 meldete ein Gerät am 07.11.
-  `launch=embedded`.
+Vollständig mit Ursache, Fix, Teststatus und Risiko:
+[Kundenprobleme](ANYVO_CUSTOMER_ISSUE_HISTORY.md).
 
-**Folge:** Jede Änderung an Backend, Datenbank oder RLS muss mit **allen** diesen
-Client-Ständen verträglich sein, nicht nur mit `main`.
+- **ACTIVE-Freischaltung** (#7): Die zwei gemeldeten Kundinnen sind seit dem 28.10. ACTIVE
+  und laut Nutzerin wieder in Ordnung [B/N]. Offen ist der Webhook-Fehler
+  `INVALID_PROVIDER_DATE` vom 04.11. (betroffene Person unbekannt).
+- **OTA nicht aktiv** auf iOS 60 (`launch=embedded`) [O].
+- GPS-Abweichungen zwischen Geräten, Winkel- und Richtungswechsel,
+  Kartenfehler/Absturz in der 49er-Linie, Trainer Connect: siehe Detaildokument.
 
-## 6. Backend und Abos [B: Supabase, 09.11.]
+## 9. Verzeichnisse und Arbeitsort
 
-- Production-Supabase `axkkhyqrjrtbkumaulta`, Staging `cbhrxkjclakzlvajyvfn`
-  (Guard: `scripts/guard-prod-supabase.mjs`).
-- Die Live-Apps schalten bezahlte Pläne **nur serverseitig** frei: über `subscription-sync`
-  und die RevenueCat-Webhooks (iOS `revenuecat-webhook`, Android `revenuecat-webhook-google`).
-- **Der deployte Code dieser drei Edge Functions (Stand 28.10.) liegt in keinem Git-Stand [O].**
-  - Er arbeitet streng nach dem Prinzip „im Zweifel nicht freischalten“.
-  - Am 04.11. lehnte der iOS-Webhook mehrere Ereignisse mit `INVALID_PROVIDER_DATE` ab.
-  - Die zwei gemeldeten Kundinnen (Issue #7) sind seit dem 28.10. korrekt ACTIVE. Die
-    Nutzerin hat bestätigt, dass es in der App funktioniert.
-- Abo-Code nie auf den alten Client-Schreibpfad zurückbauen. Premium wird nur serverseitig vergeben.
+- Claude arbeitet im Worktree `~/canisflow-worktrees/anyvo-claude-dev-environment`.
+- Für neue Aufgaben gibt es eigene Task-Worktrees (`npm run agent:wt:create`, Anlegen nur
+  mit Freigabe).
+- `~/canisflow/canisflow` ist nur das Git-Verzeichnis, kein Arbeitsordner.
+- Alle Pfade: [Verzeichniskarte](ANYVO_DIRECTORY_MAP.md).
 
-## 7. Kritische Bereiche (Kurzfassung)
+## 10. Offene Aufgaben und Prioritäten
 
-1. **Fährte und GPS**: die tatsächlich gelegte Fährte geht vor Kartenkosmetik. Rohdaten
-   (GNSS, IMU) und Analyse bleiben getrennt. Keine Vereinfachung ohne Datenfluss-Analyse,
-   Tests und Feldtest.
-2. **Abos, Berechtigungen, RLS**: serverseitig. Kundendaten nie vermischen.
-3. **Release**: OTA nur über den Wrapper mit `--environment production` und Preflight
-   (`CLAUDE.md`). Ein Build ist keine Veröffentlichung, ein OTA ist kein nativer Build.
-4. **SDK-Migration ≠ Funktionsentwicklung**: getrennte Aufgaben, Branches und Freigaben.
+Diese Liste ist eine Priorisierung, **keine Umsetzungsfreigabe**. Der Sitzungsstart-Hook
+zeigt die P0-Punkte automatisch an.
 
-Details: Architektur-Dokument.
+- **P0** Offenen Sicherheitsbefund zu Schreibrechten auf Abo- und Berechtigungstabellen beheben (Details nur lokal bei der Nutzerin)
+- **P0** Webhook-Fehler `INVALID_PROVIDER_DATE` (04.11.) klären: Ist eine zahlende Person nicht freigeschaltet?
+- **P0** Deployten Abo-Code (Edge Functions und `subscription_*_v1`) in Git sichern
+- **P0** Migrations-Drift Production gegenüber Git klären (`20261008190000` u. a.)
+- **P0** Linie 59 (`bf0725d7`) auf GitHub sichern (separater Auftrag)
+- **P0** Geräteverteilung je Runtime und Store-Stände klären (Production-Transparenz)
+- **P0** Serverseitige Rechte und RLS gegen alle Live-Clients prüfen
+- P1 GPS/IMU-Qualität, Winkel- und Richtungswechsel, Fährtendarstellung
+- P1 Stabilität von Build 60 und OTA-Aktivierung (`launch=embedded`)
+- P1 iOS- und Android-Regressionstests. Xcode fehlt lokal, Android-Emulatoren sind vorhanden
+- P1 Trainer Connect: Rechte für ACTIVE prüfen
+- P2 Smart Coach/KI, UX, weitere Module, Website und Marketing
 
-## 8. Repository und Arbeitsweise [B: 08.11.]
+## 11. Grundsatz vor Refactorings und Vereinheitlichung
 
-- GitHub `dogbossvibes/CarniFlow` ist **öffentlich**. Keine Secrets und keine
-  personenbezogenen Daten committen.
-- Rund 476 Worktrees, davon etwa 160 mit uncommitteten Änderungen. Fremde Worktrees nie
-  verändern, nicht aufräumen, nicht löschen. Vollsicherung liegt lokal (siehe Audit).
-- `main` (`92ec7340`) ist **nicht** der Kundenstand.
-- Pro Aufgabe ein eigener Task-Worktree (`npm run agent:wt:create`). Vorher Branch, HEAD
-  und Status prüfen. Startablauf: `/anyvo-start`.
-
-## 9. Grundsatz vor Refactorings und Vereinheitlichung
-
-Bevor Linien zusammengeführt oder grössere Umbauten begonnen werden:
+Vor dem Zusammenführen von Linien oder grösseren Umbauten:
 1. Die Ziel-Runtimes und ihre Quell-Commits benennen.
-2. Für jede betroffene Linie die Unterschiede dokumentieren (Funktionen, native Module, Backend-Vertrag).
+2. Für jede betroffene Linie die Unterschiede dokumentieren (Funktionen, native Module,
+   Backend-Vertrag).
 3. Klären, welche installierten Builds weiter bedient werden müssen.
-4. Entscheidung der Nutzerin einholen.
+4. Die Entscheidung der Nutzerin einholen.
 
-Ohne diese Schritte keine Vereinheitlichung.
+Ohne diese Schritte gibt es keine Vereinheitlichung.

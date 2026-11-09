@@ -3,7 +3,7 @@
 // Ausschliesslich lesend und lokal: kein fetch, kein Schreiben, keine Secrets.
 // Ausgabe (stdout) wird von Claude Code als Sitzungskontext übernommen.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +28,16 @@ export function summarizeStatus(porcelain) {
   };
 }
 
+// Liest die offenen P0-Punkte aus dem Abschnitt „Offene Aufgaben“ des Master-Kontexts.
+// Erwartet Zeilen der Form „- **P0** …“. Begrenzt, damit der Sitzungskontext kurz bleibt.
+export function openCriticalTasks(masterContextText, limit = 6) {
+  return (masterContextText || '')
+    .split('\n')
+    .filter((l) => /^\s*-\s+\*\*P0\*\*/.test(l))
+    .slice(0, limit)
+    .map((l) => l.replace(/^\s*-\s+\*\*P0\*\*\s*/, '').trim());
+}
+
 export function buildContext(cwd) {
   const root = git(cwd, 'rev-parse', '--show-toplevel');
   if (!root) return 'ANYVO-Kontext: kein Git-Repository im Arbeitsverzeichnis gefunden.';
@@ -50,8 +60,15 @@ export function buildContext(cwd) {
   if (behind !== null) out.push(`- Gegenüber origin/main (lokaler Stand, letzter main-Commit ${lastFetch}): ${behind} zurück, ${ahead} voraus${behind > 50 ? ' — veraltete Basis, vor Code-Arbeit Basis klären' : ''}`);
   if (reports.length) out.push(`- Offene Task-Reports in diesem Worktree: ${reports.join(', ')}`);
   if (resolve(root) === MAIN_WORKTREE) out.push('- Achtung: kanonischer main-Worktree. Aufgaben in eigenem Task-Worktree ausführen (npm run agent:wt:create).');
-  if (existsSync(join(root, 'docs/agent/ANYVO_MASTER_CONTEXT.md'))) out.push('- Einstieg zuerst lesen: docs/agent/ANYVO_MASTER_CONTEXT.md (Rollen, Builds 49/57/60, alle Production-Runtimes, Dokumentenlandkarte)');
-  out.push(`- Kanonische Regeln/Status: ${MAIN_WORKTREE}/docs/agent/ANYVO_MASTER_STATUS.md und ACTIVE_WORK.md`);
+  const masterContext = join(root, 'docs/agent/ANYVO_MASTER_CONTEXT.md');
+  if (existsSync(masterContext)) {
+    out.push('- Einstieg zuerst lesen: docs/agent/ANYVO_MASTER_CONTEXT.md (Rollen, Builds 49/57/60, alle Production-Runtimes, Dokumentenlandkarte)');
+    let tasks = [];
+    try { tasks = openCriticalTasks(readFileSync(masterContext, 'utf8')); } catch { /* nie blockieren */ }
+    if (tasks.length) out.push(`- Offene P0-Aufgaben (keine Umsetzungsfreigabe): ${tasks.join(' · ')}`);
+  }
+  out.push(`- Kanonische Regeln/Status: ${MAIN_WORKTREE}/docs/agent/ANYVO_MASTER_STATUS.md und ACTIVE_WORK.md (laufende Aufgaben vor neuer Arbeit prüfen; aktuelle Fassung dort uncommittet)`);
+  out.push('- Vor jeder Änderung: Worktree, Branch, HEAD und git status prüfen; fremde Änderungen nie überschreiben. Commit/Push/Build/OTA/DB nur mit Einzelfreigabe.');
   out.push('- Werkzeuge: /anyvo-start, /anyvo-quality, /anyvo-mobile-test, /anyvo-release-preflight; Guard: .claude/hooks/anyvo-guard.mjs');
   return out.join('\n');
 }

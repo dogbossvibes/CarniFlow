@@ -21,7 +21,36 @@ Dieses Dokument verdichtet und verweist. Die ausführlichen Quellen bleiben mass
 ANYVO ist eine **All-in-one-App für Hundehalter** [N][H]. Sie ist ausdrücklich
 nicht auf Training oder Fährten reduziert.
 - Plattformen iOS und Android, Expo/React Native mit Supabase-Backend [B].
-- Sprachen: de-CH, gsw-CH, de-DE, en, fr, it [B] (`i18n/`).
+- **Sprachen** [N][B]: Die App gibt es in fünf Sprachen, nämlich Deutsch, Schweizerdeutsch,
+  Französisch, Italienisch und Englisch (`i18n/locales/{de,gsw,fr,it,en}.ts`). Dazu kommen
+  die Regionalvarianten `i18n/de-CH.ts`, `i18n/gsw-CH.ts` und `i18n/de-DE.ts`. Die
+  Übersetzungsparität war historisch mit 1'684 Keys bestätigt [H]. Bei Änderungen neu prüfen.
+- Theme-Einstellung: Light, Dark, System [N].
+
+### 1a. Positionierung, Zielgruppe, Ziele [N]
+
+- **Positionierung:** Begleiter für den gesamten Hundealltag. Hundeverwaltung, Alltag,
+  Gesundheit, Training, Dokumentation und Zusammenarbeit mit Trainern laufen in einer App
+  zusammen.
+- **Zielgruppe:**
+  - normale Hundehalter, die eine einfache, verständliche App brauchen;
+  - ambitionierte Sporthundeführer mit anspruchsvollen Trainingsfunktionen (Fährte, IGP);
+  - Trainer, die mit ihren Kunden arbeiten (TRAINER-Plan).
+- **Projektziele:**
+  - professionelles, langfristig wartbares All-in-one-Produkt;
+  - Stabilität und Datenintegrität vor Geschwindigkeit;
+  - neue Versionen bauen auf nachweislich funktionierenden Ständen auf.
+- **Design:**
+  - hochwertig, modern, ruhig, intuitiv;
+  - konsistenter Light- und Dark-Mode;
+  - grosse Touch-Ziele und klare Navigation;
+  - Barrierefreiheit (grosse Schrift);
+  - iOS und Android gleichwertig.
+
+### 1b. Trainingsdisziplinen [B: Begriffe im Code von Build 57]
+
+IGP (Unterordnung, Fährte, Schutzdienst), IBGH, Mondioring, Obedience, Agility, Rally
+und Mantrailing. Die **GPS-Fährte** ist das wichtigste Unterscheidungsmerkmal [N].
 
 ## 2. Module und ihre Verortung im Code
 
@@ -63,12 +92,8 @@ Kundenstand verstehen will, liest die jeweilige Release-Linie, nicht `main`.
   „allow one newbie track per month“ (2026-09-25).
 - `DECISIONS.md` nennt ebenfalls „1 Fährte“ [H]. Code, Doku und Entscheidung
   stimmen überein, eine Code-Änderung ist nicht nötig.
-- **Offen:** ob die Migration auf der Production-Datenbank angewendet ist [O].
-  - Eine frühere verhaltensbasierte Prüfung vom 2026-08-16 (vor dieser Migration)
-    ergab dort `track=0`.
-  - Ist die Migration nicht angewendet, blockiert der Server die Gratis-Fährte,
-    obwohl die App sie anbietet.
-  - Prüfen nur lesend; eine Anwendung nur mit ausdrücklicher Production-Freigabe.
+- **Geklärt am 2026-11-09 [B]:** Die Migration `20260925090000` ist auf Production
+  angewendet, und `newbie_quota_limit('track')` liefert `1`. Das wurde nur lesend geprüft.
 
 **Weitere offene Punkte zu Plänen:**
 - [O] Die Preisangaben im Code (`priceChf` 4/9/15) passen nicht zu den Produkt-IDs
@@ -82,6 +107,59 @@ RevenueCat → Webhooks (`revenuecat-webhook`, `revenuecat-webhook-google`) →
 `subscriptions`/`user_capabilities` → RLS und Server-RPCs. Ein Client-Gate allein
 genügt nie. Details: `docs/architecture/ENTITLEMENT_SYSTEM.md`,
 `docs/handbook-source/09_SUBSCRIPTIONS_AND_ROLES_INVENTORY.md`.
+
+### 3a. Funktionsrechte je Plan (Produktsicht) [N][B]
+
+| Funktion | NEWBIE | ACTIVE / FOUNDER_ACTIVE | TRAINER |
+|---|---|---|---|
+| Hunde | 1 | unbegrenzt | unbegrenzt |
+| Trainings | 2 pro Monat | unbegrenzt | unbegrenzt |
+| Fährtenaufzeichnung | **1 pro Monat** [N 08.11.; Production `newbie_quota_limit('track') = 1` B 09.11.] | ja | ja |
+| Journal und Gesundheit | ja | ja | ja |
+| Smart Coach / KI | nein | ja | ja |
+| Trainer Connect | nur lesend [H] | ja | ja |
+| Trainer-Hub (Kunden, Dashboard, Umfragen, Pläne) | nein | nein | ja |
+
+Die ChatGPT-Übergabe nannte für NEWBIE noch „keine Fährtenaufzeichnung“. Das ist überholt.
+
+### 3b. Monetarisierung [B][O]
+
+- Monatsabos über RevenueCat (App Store, Google Play), Produkt-IDs siehe Tabelle oben.
+- FOUNDER_ACTIVE ist ein begrenztes Kontingent (RPC `claim_founder_slot`).
+- Gültige Preise kommen aus dem Store. Die historischen Preisangaben im Code sind nicht
+  massgeblich [O].
+- Die Freischaltung erfolgt nur serverseitig, siehe Architektur-Dokument und Abschnitt 4
+  der [Kundenprobleme](ANYVO_CUSTOMER_ISSUE_HISTORY.md).
+
+## 3c. Weitere Module im Detail
+
+**Trainer Connect** [N][B]
+- Trainer und Halter tauschen Trainingsinformationen aus: Text, Sprachnachrichten, Video,
+  Fotos, Kommentare.
+- Gesundheitsdaten werden nur mit Freigabe geteilt (`app/dog-health-sharing`).
+- Gemeldet [H]: „ACTIVE-Nutzer können keinen Trainer hinzufügen“. Status siehe
+  Kundenprobleme.
+
+**Smart Coach und KI** [N]
+- Die KI ist ein sichtbarer Assistent und gibt dezente, hilfreiche Hinweise.
+- Sie ändert **keine** Trainingsdaten ungefragt.
+- Geplant:
+  - Hundegedächtnis aus freigegebenen Daten, mit Quellenbezug und Korrekturmöglichkeit;
+  - Spracheingabe als Entwurf mit Bestätigung;
+  - frühere Einheiten als Vorlage wiederaufnehmen, ohne alte Bewertungen ungeprüft zu
+    übernehmen.
+
+**Gesundheit und Alltag** [B]
+- Gewicht mit eigenem Gewichtsjournal (seit Linie 57).
+- Entwurmung, Läufigkeit, Gesundheitsakte mit Medikamenten- und Gabenhistorie.
+- Termine und Kalender, Dokumente, Checklisten und Rucksack.
+
+### 3d. Zukünftige Produktideen [N] (keine Umsetzungsfreigabe)
+
+- Bessere GNSS-Qualitätsdiagnose, Verbesserungen bei GPS und IMU
+- Umschalter Satellit/Hybrid-Karte, später swisstopo-Luftbilder
+- Hundegedächtnis und Smart-Coach-Ausbau (siehe oben)
+- Website und Marketing (`legal-web/`; `anyvo-web` nur auf GitHub)
 
 ## 4. Produktgrundsätze
 
