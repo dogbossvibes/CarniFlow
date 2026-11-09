@@ -85,6 +85,7 @@ context: ['{project-root}/_bmad-output/trainingsdoku-neu-spec.md', '{project-roo
 - Einstiege `/unit/start` → `/unit/document`: Coach (2×), leeres Journal, KI-Hub. `timer.tsx`, `live.tsx`, `summary.tsx`, `start.tsx`, `LiveTrainingBar` unverändert.
 - **Offen (extern):** RPC `training_document_v1` nicht im Repo – Definition muss lesend aus der DB kommen; die Migrationsdatei bricht bis dahin mit `raise exception` ab.
 - **Befund ausserhalb Scope:** Home-FAB „Training starten“ (`components/home/FabQuickAddSheet`) führt weiter auf `/unit/start` (Live-Ablauf mit Sternen); in der Entscheidung nicht genannt → Nutzerentscheid nötig.
+- Nachtrag (Nutzerentscheid 2026-11-09): Home-„Training starten“ (`stores/homeScreenConfig.ts`, FAB und Schnellbutton) führt auf `/unit/timer` statt `/unit/start`; Tests angepasst. Schnellzugriff „Unterordnung“ (`start_obedience` → `/unit/start`) bewusst unverändert, Nutzerentscheid offen.
 - Tests: neu `learningLevel.test.ts`; `model.test.ts` und `document.test.tsx` an Ein-Screen angepasst, Schutzaussagen erhalten; neue Fälle: Trend/Vorbelegung, Abwählen, alter `workflowStep: 2`-Entwurf, Sterne beim Bearbeiten ohne `rating_scale`.
 - Vorbestehend rot (nicht durch diese Änderung): `scripts/__tests__/productionNativeContract.test.ts` erwartet 1.0.6, Basis hat 1.0.8. ESLint `document.tsx`: 4 vorbestehende Fehler (Basis 6), keine neuen.
 
@@ -121,7 +122,7 @@ context: ['{project-root}/_bmad-output/trainingsdoku-neu-spec.md', '{project-roo
 | 23 | Rohes ISO-Datum / klein geschriebenes „alte Bewertung“ / Trend-A11y (blind) | low | Kosmetisch, bestehendes Muster. → abgelehnt |
 | 24 | Speichern ohne Hund-Existenzprüfung (blind) | false | `canSave` prüft `dogs.some(d => d.id === dogId)`. → abgelehnt |
 | 25 | Farb-/Routenänderungen „unbezogen“ (blind) | false | Kontrast und Einstiege sind Teil von Spec/Intent. → abgelehnt |
-| 26 | Home-FAB führt weiter zu `/unit/start` (eigener Befund) | – | Nicht im Intent genannt. → Nutzerentscheid |
+| 26 | Home-FAB führt weiter zu `/unit/start` (eigener Befund) | – | Nutzerentscheid: auf `/unit/timer` umgelenkt (Nachtrag). |
 
 ## Verification
 

@@ -409,7 +409,7 @@ describe('homeScreenConfig — Startbildschirm-Konfiguration', () => {
   });
 
   it('50) resolveQuickAction: Route, Hund (nur wenn vorhanden), hide/unknown → null', () => {
-    expect(resolveQuickAction('start_training', [])).toEqual({ type: 'route', route: '/unit/start' });
+    expect(resolveQuickAction('start_training', [])).toEqual({ type: 'route', route: '/unit/timer' });
     expect(resolveQuickAction('create_appointment', [])).toEqual({ type: 'route', route: '/training-hub' });
     expect(resolveQuickAction('add_dog', [])).toEqual({ type: 'route', route: '/add-dog' });
     expect(resolveQuickAction('open-dog:d1', [{ id: 'd1' }])).toEqual({ type: 'dog', dogId: 'd1' });

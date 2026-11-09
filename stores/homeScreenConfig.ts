@@ -126,7 +126,9 @@ export const HOME_QUICK_ACTIONS_META: Record<HomeQuickActionId, { label: string;
 // add_dog/open_backpack haben eigene Logik (Quota-Gate bzw. Hund-Kontext) im
 // FAB-Renderer — eine Quelle, keine duplizierten Switches.
 export const HOME_FAB_ACTIONS_META: Partial<Record<HomeFabActionId, { icon: string; route?: string }>> = {
-  start_training:       { icon: 'play',              route: '/unit/start' },
+  // T-184: Start führt über den einfachen Timer in den neuen Erfassen-Screen
+  // (nicht mehr in den Live-Ablauf mit Sternen).
+  start_training:       { icon: 'play',              route: '/unit/timer' },
   document_training:    { icon: 'create-outline',    route: '/unit/document' },
   training_journal:     { icon: 'book-outline',      route: '/training-journal' },
   start_track:          { icon: 'navigate-outline',  route: '/track' },
@@ -141,7 +143,7 @@ export const HOME_FAB_ACTIONS_META: Partial<Record<HomeFabActionId, { icon: stri
 // für die einfachen Routen-Aktionen (add_dog hat das Quota-Gate renderseitig,
 // hide_button blendet den Button aus). Hund-Aktionen nutzen das Profilbild.
 export const QUICK_BUTTON_ACTIONS_META: Partial<Record<QuickActionId, { icon: string; route?: string; labelKey: TranslationKey }>> = {
-  start_training:       { icon: 'play',             route: '/unit/start',       labelKey: 'quickButton.actions.startTraining' },
+  start_training:       { icon: 'play',             route: '/unit/timer',       labelKey: 'quickButton.actions.startTraining' },
   document_training:    { icon: 'create-outline',   route: '/unit/document',    labelKey: 'quickButton.actions.documentTraining' },
   training_journal:     { icon: 'book-outline',     route: '/training-journal', labelKey: 'quickButton.actions.trainingJournal' },
   start_track:          { icon: 'navigate-outline', route: '/track',            labelKey: 'quickButton.actions.startTrack' },

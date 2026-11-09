@@ -415,7 +415,7 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
   it('3) eine aktive Aktion: kurzer Tipp führt direkt aus', () => {
     mockDogs = []; // freie Hund-Kapazität → add_dog führt zu /add-dog
     const routeTests: Record<string, string> = {
-      start_training: '/unit/start',
+      start_training: '/unit/timer',
       document_training: '/unit/document',
       training_journal: '/training-journal',
       start_track: '/track',
@@ -453,7 +453,7 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     longPress(node);
     // Einstellungen öffnen, keine Aktion ausführen, keinen Fächer öffnen.
     expect(mockPush).toHaveBeenCalledWith('/home-customize');
-    expect(mockPush).not.toHaveBeenCalledWith('/unit/start');
+    expect(mockPush).not.toHaveBeenCalledWith('/unit/timer');
     expect(mockPush).not.toHaveBeenCalledWith('/dog/d1');
     expect(fanItems(node).length).toBe(0);
     // Accessibility-Hint aus T-42C (verschiebbar + langer Druck für Einstellungen).
@@ -469,7 +469,7 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     const item = rowWithLabel(node, deCH['quickButton.actions.startTraining']);
     expect(item).toBeDefined();
     act(() => { item?.props.onPress?.(); });
-    expect(mockPush).toHaveBeenCalledWith('/unit/start');
+    expect(mockPush).toHaveBeenCalledWith('/unit/timer');
     expect(fanItems(node).length).toBe(0);
   });
 
@@ -859,7 +859,7 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     const node = render();
     longPress(node);
     expect(mockPush).toHaveBeenCalledWith('/home-customize');
-    expect(mockPush).not.toHaveBeenCalledWith('/unit/start');
+    expect(mockPush).not.toHaveBeenCalledWith('/unit/timer');
   });
 
   it('42) langer Druck öffnet Einstellungen genau EINMAL (Release wiederholt nicht)', () => {
@@ -1006,7 +1006,7 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     expect(fabPosition(node).left).toBe(20);
     mockPush.mockClear();
     tap(node);
-    expect(mockPush).toHaveBeenCalledWith('/unit/start');
+    expect(mockPush).toHaveBeenCalledWith('/unit/timer');
   });
 
   // ── T-42D: Hover-by-drag im Aktionsfächer ─────────────────────────────────
@@ -1042,7 +1042,7 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     // Loslassen auf dem Button führt genau diese Aktion aus + schliesst den Fächer.
     fanRelease(node, c0.x, c0.y);
     expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith('/unit/start');
+    expect(mockPush).toHaveBeenCalledWith('/unit/timer');
     expect(fanItems(node).length).toBe(0);
   });
 
@@ -1149,7 +1149,7 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     fanGrant(node, c0.x - 80, c0.y - 80);
     fanMove(node, c0.x, c0.y);
     fanRelease(node, c0.x, c0.y);
-    expect(mockPush).toHaveBeenCalledWith('/unit/start');
+    expect(mockPush).toHaveBeenCalledWith('/unit/timer');
     expect(fabPosition(node)).toEqual(before);
     expect(lastSavedPosition()).toBeUndefined();
   });
@@ -1163,7 +1163,7 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     const item = rowWithLabel(node, deCH['quickButton.actions.startTraining']);
     expect(item).toBeDefined();
     act(() => { item?.props.onPress?.(); });
-    expect(mockPush).toHaveBeenCalledWith('/unit/start');
+    expect(mockPush).toHaveBeenCalledWith('/unit/timer');
     expect(fanItems(node).length).toBe(0);
   });
 
@@ -1225,6 +1225,6 @@ describe('QuickAddSheet (globaler Schnellbutton mit Aktionsfächer)', () => {
     act(() => { jest.advanceTimersByTime(400); });
     expect(itemSelected(node, 'start_training')).toBe(true);
     fanRelease(node, c0.x, c0.y);
-    expect(mockPush).toHaveBeenCalledWith('/unit/start');
+    expect(mockPush).toHaveBeenCalledWith('/unit/timer');
   });
 });
