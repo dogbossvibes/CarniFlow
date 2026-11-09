@@ -17,6 +17,8 @@ export const VERIFIED_PRODUCT_ALIASES: Record<string,string> = {
  'anyvo_trainer_monthly_30.00:anyvo-trainer-monthly-3000': 'anyvo_trainer_monthly_30.00',
 };
 const rank: Record<AuthorityPlan, number> = { newbie: 0, active: 1, founder_active: 2, trainer: 3 };
+/** Longest accepted lead of a renewal's purchase_date over the provider's request time. */
+export const MAX_RENEWAL_LEAD_MS = 72 * 60 * 60 * 1000;
 const object = (v: unknown): Record<string, unknown> => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('INVALID_PROVIDER_RESPONSE');
   return v as Record<string, unknown>;
@@ -80,7 +82,11 @@ export function normalizeAuthority(raw: unknown, now = Date.now(), productAliase
     if (rank[plan] < rank[result.plan]) continue;
     if (rank[plan] === rank[result.plan] && result.expiresAt && until <= Date.parse(result.expiresAt)) continue;
     const purchased = date(sub.purchase_date);
-    if (purchased > observedMs) throw new Error('INVALID_PROVIDER_DATE');
+    // A store renewal is charged before its period begins: V1 then reports the NEW
+    // period's purchase_date, which is still in the future (seen 2026-11-04, Apple renews
+    // up to 24 h early). Accept a bounded future start; provider-time maps it onto the
+    // independently read V2 period. Anything further ahead stays invalid (fail-closed).
+    if (purchased > observedMs + MAX_RENEWAL_LEAD_MS) throw new Error('INVALID_PROVIDER_DATE');
     result = { observedMs, plan, productId: canonicalProduct, providerProductId: product, store: sub.store as AuthoritySnapshot['store'], expiresAt: new Date(until).toISOString(),
       trialStartedAt: sub.period_type === 'trial' ? new Date(date(sub.purchase_date)).toISOString() : null,
       cancelAtPeriodEnd: sub.unsubscribe_detected_at != null, purchaseAt: new Date(purchased).toISOString(), terminalEvidence };
