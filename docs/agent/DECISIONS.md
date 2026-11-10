@@ -1,5 +1,20 @@
 # ANYVO — Agent Decisions
 
+## 2026-11-09/10 — Entscheide Trainingsdoku neu, Release-Ablauf und Datenschutz · `accepted`
+
+Direkte Nutzerentscheide im Claude-MASTER-Chat (09./10.11.2026):
+
+1. **Relevante iOS-Builds:** App Store = Build 57 (1.0.6), TestFlight = Build 60 (1.0.8); andere Builds ohne Release-Bedeutung. *Begründung:* klare Zielmenge für OTA-Abgleich und Planung.
+2. **Strenges Release-Gate (PR #28) bleibt offen.** *Begründung:* würde jede OTA bis zur Soll-Inventur sperren; laufende OTAs sind wichtiger. Stattdessen schlanke Prüfung „keine OTA vergessen“ (PR #30) vor nativen Builds und erster OTA einer neuen Runtime.
+3. **OTA-Abgleich Build 60:** 68 OTA-Gruppen bewusst ausgenommen (alte Fährtenlogik durch Build-58-Basis ersetzt, Diagnose-Werkzeuge, alte Runtimes, bewusst nicht übernommene UI), nachziehen: #56 Kartentyp, #59 Startlogo. *Begründung:* Nutzerentscheid je Zeile; dokumentiert in `docs/agent/ota-coverage-exceptions.json` (PR #30).
+4. **Doku-PRs darf Claude selbst mergen** (nur `docs/*.md`, alle Checks grün, exakter Head-Commit); technisch per Release-Guard erzwungen. *Begründung:* weniger manuelle Klicks ohne Risiko für Code/Releases.
+5. **Trainingsdoku Etappe 1:** Alt/neu-Bewertung über neue nullable Spalte `training_exercises.rating_scale` (`'lernstufe'`), rein additiv; Migration nur vorbereitet, Ausführung nach Freigabe über MASTER **vor** der OTA, zuerst Staging. *Begründung:* einzige sichere Unterscheidung; 1/2/4/5 sind auch gültige Sternwerte; die RPC lehnt unbekannte Felder ab.
+6. **Einstiege in den Live-Ablauf mit Sternen** (Coach, leeres Journal, KI-Hub, Home „Training starten“ → Timer, Kachel „Unterordnung“) führen in den neuen Erfassen-Screen; Live-Screens bleiben für laufende Trainings. *Begründung:* nur noch ein Erfassungsweg, keine neuen Sternwerte, laufende Trainings verlustfrei abschliessbar.
+7. **Etappen gestaffelt:** 2 und 3 (nur lesend) jetzt, gemeinsam mit 1 ausliefern; 4 und 5 erst nach Auslieferung von 1. *Begründung:* 4/5 schreiben Daten bzw. brauchen eine zweite Migration und berühren den geschützten Fährtenbereich.
+8. **Kombinierte OTA:** Begrüssungston + deckende Trainingskarten (Port `bf0725d7`) als eine OTA je Ziel (Build 57, Build 60). *Begründung:* Ton war noch nicht veröffentlicht, ein Zyklus weniger.
+9. **Kundendaten dürfen nie verloren gehen (Nutzerin, ausdrücklich):** Migration nur mit Backup, in Transaktion, Rückweg setzt nur die Funktion zurück – Spalte `rating_scale` wird nie gelöscht; WIP-Sicherungen nie öffentlich pushen (öffentliches Repo), sondern lokal (`refs/backup/…`, Bundle).
+10. **Prüfzentrum** für lokale Selbstprüfung (Code/DB/App) in eigener Sitzung aufbauen. *Begründung:* Änderungen vor Staging/Gerät selbst verifizieren, wie zuvor mit Codex.
+
 ## 2026-11-09 — Claude-Chat mit Werkzeugen arbeitet über Task-Branch und PR · `accepted`
 
 Direkter Nutzerauftrag im Claude-Projekt-Chat „ANYVO“: Änderungen an der App müssen auch

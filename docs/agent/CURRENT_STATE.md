@@ -13,6 +13,53 @@
 > Jede Aussage ist als **Verified / Assumed / Unknown** markiert.
 > **Repository state > Git state > Handoff documentation > Agent assumptions.**
 
+## Aktueller Stand — 2026-11-10 (Claude MASTER, verifiziert via git/EAS am 09./10.11.)
+
+> Gilt neben `ANYVO_MASTER_STATUS.md` (kanonisch). Nichts davon ist gepusht/gemergt/veröffentlicht, sofern nicht ausdrücklich genannt.
+
+### Live (Verified, EAS 09.11.)
+- **App Store:** iOS 1.0.6 = EAS-Build 57 (`442f7bc3…`, Runtime `1.0.6-map49-v1`, SDK54). Aktive Production-OTA: `d11fcb37` „Fährten-Label“.
+- **TestFlight:** iOS 1.0.8 (60) (`3b15fc9c…`, Runtime `1.0.8-sdk58-v1`, SDK58). Aktive Production-OTA: `3bb78943` „Fährten-Label“.
+- Alle anderen Builds ohne Release-Bedeutung (Nutzerentscheid).
+
+### Erledigt (Verified)
+- `main` = `origin/main` (Stand nach PR #32; enthält auch #24 Schutz der Abo-/Capability-Spalten und #29 Abo-Verlängerungsdatum – App-/DB-Auslieferung davon hier nicht geprüft). Lokale Alt-Commits 07./08.10. liegen nur auf `backup/*-20261029` (nicht in main; Fährten-Fix bereits in Build-58-Basis, Android-1.0.4-Vorbereitung offen).
+- Release-Vollständigkeits-Arbeit vom 04.11. gesichert (`backup/release-completeness-20261104`, `b6d9db87`) und als **PR #28** auf main portiert – **bewusst offen** (Gate würde alle OTAs sperren).
+- **PR #30** „keine OTA vergessen“ (`scripts/check-ota-coverage.mjs`, Ledger 418 OTAs, Ausnahmeliste mit Nutzerentscheiden: 68 ausgenommen, #56/#59 nachziehen) – offen, Merge durch Nutzerin.
+- **PR #27** Doku-PR-Selbstmerge-Regel (AGENTS.md) – offen; lokaler Release-Guard erlaubt Merge nur reiner `docs/*.md`-PRs.
+- WIP-Sicherung aller 237 Worktrees mit ungesicherten Ständen: `refs/backup/wip-20261109/*` + `~/canisflow-backups/anyvo-wip-20261109.bundle` (verifiziert), nicht gepusht.
+- Bestandsaufnahme Ordner: `docs/agent/CLEANUP_2026-11-09.md` (uncommitted).
+
+### In Arbeit
+- **OTA Begrüssungston + deckende Trainingskarten** (Nutzerfreigabe erteilt): Worktrees `~/canisflow-worktrees/anyvo-ios57-unit-cards-opaque` (`234da479`, T-186) und `…/anyvo-ios60-unit-cards-opaque` (`b70e294d`, T-185), Branches `fix/ios5{7,60}-unit-cards-opaque-20261109` auf GitHub; Review PASS, Quality-Belege unter `/Users/moyo/canisflow/outputs/greeting-cards-ota-20261109/` (Validator ok). **Publish durch Nutzerin im Terminal ausstehend** (Release-Guard sperrt Claude); danach Nachkontrolle + Release-Karte.
+- **Trainingsdoku neu (T-184, Issue #31)**, Worktree `~/canisflow-worktrees/anyvo-training-doku-neu`, Branch `feat/training-doku-neu-etappe1` (lokal, nicht gepusht), Basis `3bb78943`:
+  - **Etappe 1** fertig + Review (`74895d95`, `0a9d9dc2`, `18e0069c`): Ein-Screen-Erfassung, Lernstufe 1/2/4/5 + Trend, Home-Einstiege → Timer/Erfassen.
+  - **Migration vorbereitet, nicht ausgeführt** (`51613306`, `39ce28ec`, `bf569550`): `supabase/drafts/20261109190000_training_exercises_rating_scale.sql` (+ versionierte Prod-Definition `training_document_v1`), Abbruchblock bis Ausführungsfreigabe.
+  - **Etappe 2** fertig + Review + **fachlich abgenommen** (`f765156e`): Weitermachen im Training-Tab + Hundekarte (nur lesend). Auslieferung nur gemeinsam mit Etappe 1 (gleicher Branch).
+  - **Etappe 3** (Verlauf mit Übungs-Matrix) **angefangen, uncommitted** im selben Worktree: `app/unit/progress.tsx`, `features/training/continue/matrix.ts` (+ Tests), Einstieg in `ContinueTrainingSection.tsx`, `useDogTrainingHistory` in `hooks/useDogTrainingSummary.ts`, i18n, Spec `_bmad-output/implementation-artifacts/spec-gh-31-trainingsdoku-etappe3.md` (`in-progress`, Basis `f765156e`). Gezielte Tests grün (17); Gesamtlauf, ESLint-Vergleich, Review mit Prüfer-Agenten und Commit **offen** → Fortsetzung in neuer Sitzung.
+- **Prüfzentrum** (lokale Selbstprüfung Code/DB/App) in eigener Sitzung `local_f6af959f-…`, eigener Worktree/Branch; Gesamtlauf lief zuletzt.
+
+### Als Nächstes
+1. Nutzerin: kombinierte OTA (Ton + Karten) im Terminal publizieren → Claude: Nachkontrolle EAS + Release-Karte; danach #65-Ausnahme in PR #30 zurücknehmen.
+2. Etappe 3 abschliessen (neue Sitzung): Gesamtlauf `npx jest app components features hooks stores` (ohne Klammer-Filter!), ESLint gegen Basis, BMAD-Review, Commit.
+3. Migration `rating_scale`: lokal im Prüfzentrum → Staging (Freigabe über MASTER, Backup) → Geräteabnahme „Vorher“ (Etappen 1–3) → Production-Migration (eigene Freigabe) → OTA nur Build 60.
+4. Danach Etappe 4 (Sprachnotiz pro Übung), dann Etappe 5 (GPS-Verknüpfung, zweite Migration, Build-58-Schutz).
+5. PRs #27/#28/#30 entscheiden/mergen (Nutzerin).
+
+### Bekannte Probleme
+- `scripts/__tests__/productionNativeContract.test.ts` rot auf Build-60-Basis (erwartet 1.0.6, Basis 1.0.8) – vorbestehend.
+- `useTrackRecorder.startup.test.tsx` scheitert gelegentlich unter Last (einzeln grün).
+- Jest-Pfadfilter mit `app/(tabs)` matcht wegen Regex-Klammern nicht – ganze Ordner laufen lassen.
+- Release-Guard blockt auch Befehle, die nur *Text* wie `eas build`/`supabase db push` enthalten → Skriptdatei verwenden.
+- Am 09.11. 21:19 entfernte der Chat „Begrüssungston und Worktrees“ alle Worktree-Registrierungen; vom selben Chat repariert (481 registriert). Ordner selbst blieben erhalten.
+- Bestehende Lint-Fehler in `app/unit/document.tsx` (5), `detail.tsx` (2), `timer.tsx` (5) – vorbestehend, nicht neu.
+
+### Offene Fragen
+- Mockup-Notiz: soll „Weiter“ auf der Hundekarte die Knöpfe Training/Fährte/Statistik ganz **ersetzen**? (Aktuell nur „Training“ → „Weiter“.)
+- Android-1.0.4-Vorbereitung (`2316e7cf`) – noch nötig?
+- Build 57 bekommt Etappe 1–3 erst mit neuem Store-Build – Zeitpunkt offen.
+- PR #28 (striktes Release-Gate) dauerhaft offen lassen oder entschärfen?
+
 ## Aktueller Stand — 2026-08-17 (autoritativ, verifiziert via git) — MAßGEBLICH
 
 > Ergänzt nach der Codex-Übernahme: read-only NEWBIE-Quota-Production-Preflight + **committeter**
