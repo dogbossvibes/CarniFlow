@@ -3,6 +3,19 @@
 // Löst KEINE Cloud-Builds, Submits oder Updates aus. `npm run check`.
 import { execSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
+import { runContentPreflight } from './check-release-content.mjs';
+
+// Fail before costly checks. The coordinator pins inventory independently.
+const releaseContent = runContentPreflight(process.argv.slice(2));
+if (!releaseContent.ok) {
+  console.error('BLOCKED: Release-Inhaltsnachweis fehlt oder ist ungültig. Keine Build-/OTA-Freigabe.');
+  for (const problem of releaseContent.problems ?? []) console.error(problem);
+  process.exit(1);
+}
+console.log(releaseContent.releaseEligible
+  ? `Inhaltsprüfung: ${releaseContent.status}; technische und unabhängige Release-Gates bleiben Pflicht.`
+  : 'Nur Entwicklungsprüfungen; kein Inhaltsnachweis und keine Build-/OTA-Freigabe.');
+for (const item of releaseContent.deferred ?? []) console.log(`Zurückgestellt: ${item.id}: ${item.reason}`);
 
 const results = [];
 function step(name, fn, { critical = true } = {}) {
@@ -58,4 +71,6 @@ console.log(`Preflight: ${results.filter(r => r.ok).length}/${results.length} ok
   (warned.length ? `, ${warned.length} Warnung(en)` : '') +
   (failedCritical.length ? `, ${failedCritical.length} FEHLER` : ''));
 if (failedCritical.length) { console.log('❌ Kritische Fehler — kein Build/Update.'); process.exit(1); }
-console.log('✅ Bereit. (Kein Cloud-Build/Submit/Update ausgelöst.)');
+console.log(releaseContent.releaseEligible
+  ? 'Lokale und Inhaltsprüfungen bestanden. Production-Freigabe weiterhin nur über bestehenden Release-Wrapper und unabhängige Nachweise. Kein Build/Update ausgelöst.'
+  : 'Entwicklungsprüfungen bestanden. KEINE Release-Bereitschaft: Soll-Inventur/Inhaltsnachweis nicht geprüft. Kein Build/Update ausgelöst.');

@@ -71,10 +71,29 @@ im Worktree `/Users/moyo/canisflow-worktrees/anyvo-main`. Der MASTER
 Task-Branch, melden Ergebnis/Blocker im zugehörigen GitHub-Issue oder PR und schreiben
 nicht in MASTER_STATUS/ACTIVE_WORK. Sie veröffentlichen keine OTA.
 
-**Normaler Claude-Chat im Projekt ANYVO** (ohne Claude Code, z. B. wenn das Code-Kontingent
-aufgebraucht ist) dient Planung, Entscheidungen, Issue-Texten, Reviews eingefügter Diffs
-und Arbeitsanweisungen für die Nutzerin. Er führt keine Git-, OTA- oder DB-Aktionen aus
-und meldet nichts als erledigt, was nicht nachweislich im Repo/Board steht.
+**Claude-Chat im Projekt ANYVO mit Werkzeugen** (Claude-App ohne Claude Code, aber mit
+Mac-Verbindung über die Claude-Desktop-App und/oder angebundenem GitHub-Repo; direkter
+Nutzerauftrag 2026-11-09) gilt als „weitere Claude-Sitzung“ im Sinne des vorigen Absatzes:
+- **Über GitHub (Cloud-Klon):** Ein Änderungsauftrag der Nutzerin in diesem Chat ist die
+  Einzelfreigabe, für genau diese Aufgabe ab frischem `origin/main` einen eigenen
+  Task-Branch anzulegen, nach den Pflichtprüfungen (relevante Tests, TypeScript, ESLint,
+  `git diff --check`, Secret-/Diff-Prüfung, Abgleich mit offenen PRs) zu committen, diesen
+  Branch zu pushen und einen PR gegen `main` zu öffnen. Merge entscheidet die Nutzerin.
+- **Über die Mac-Verbindung:** nur im ausdrücklich freigegebenen lokalen Ordner lesen und
+  ändern. Dort ohne gesonderte Freigabe kein Commit/Push; fremde lokale Änderungen,
+  Worktrees und WIP bleiben unangetastet.
+- Ausgeschlossen bleiben: Push auf `main` und Release-/Backup-/Integrationsbranches, Merge,
+  OTA, Build, Store-Release, Live-DB-/Kundendatenaktionen sowie Schreiben in
+  MASTER_STATUS/ACTIVE_WORK.
+- Task-IDs der lokalen Registry sind aus der Cloud nicht reservierbar; Zuordnung dann über
+  Branch und PR, eine ID vergibt bei Bedarf der MASTER.
+- Der PR nennt ausgeführte Prüfungen und Grenzen offen (z. B. keine Geräteprüfung, keine
+  Board-Felder ohne GraphQL-Zugang).
+
+**Claude-Chat ohne Werkzeuge** (weder Mac-Verbindung noch angebundenes Repo) dient Planung,
+Entscheidungen, Issue-Texten, Reviews eingefügter Diffs und Arbeitsanweisungen für die
+Nutzerin. Er führt keine Git-, OTA- oder DB-Aktionen aus und meldet nichts als erledigt,
+was nicht nachweislich im Repo/Board steht.
 
 Bei unklarer Zuständigkeit Schreibaktion stoppen und die Nutzerin fragen; read-only
 Prüfungen dürfen weiterlaufen.
@@ -387,3 +406,42 @@ Wenn ein Prompt eine Production-OTA ohne
 `--environment production` verlangt, darf der Agent diesen
 Befehl NICHT ausführen und muss stattdessen die sichere
 Production-Variante verwenden.
+
+## Release-Inhalt vollständig nachweisen (Nutzerauftrag 04.11.2026)
+
+Vor dem nächsten neuen Build-/OTA-Releaseauftrag gilt zusätzlich
+`docs/agent/RELEASE_COMPLETENESS.md`. Eine unabhängig festgelegte, versionierte
+Soll-Inventur der freigegebenen und bereits ausgelieferten Funktionen ist Pflicht;
+der Kandidat darf seine Soll-Liste nicht selbst definieren. Umsetzung, Integration
+je Plattform/Runtime und tatsächliche Auslieferung getrennt nachweisen.
+Fehlende Pakete, ungeprüfte Ports oder eine unbekannte/unvollständige Soll-Inventur
+blockieren eine Gesamtfreigabe. SDK-/Runtimewechsel übernehmen nicht automatisch
+alle früheren OTA-Änderungen. Tests/Cloud-Build-PASS sind kein Inhalts-PASS.
+Bestehende Aufgabenverwaltung nutzen; keine zweite parallele Aufgabenliste.
+Vorhandene Daten-, Prüf- und Aktionsfreigaberegeln bleiben verbindlich.
+
+### Geschützte Fährtenbasis (direkter Nutzerauftrag 04.11.2026)
+
+Das Fährtensystem des erfolgreichen SDK58-iOS-Builds 58 bleibt erhalten:
+Quelle `6722b88fded3fb6936472996dd40d6f4dde453f2`, EAS-Build
+`802c7cde-b348-4bd5-865b-9abd2d2c495a`. Fehlende ältere UI-Pakete nur gezielt
+portieren, niemals deren ältere Fährten-/GPS-/Recorder-/Geometrie-/Recovery-
+oder Speicherlogik übernehmen. Alte Trackingpakete sind keine automatisch
+nachzuholenden Funktionen, wenn diese Schutzbasis sie ersetzt.
+Jede betroffene Integration muss den Erhalt gegen diese Basis belegen;
+Abweichungen blockieren und benötigen einen neuen ausdrücklichen Auftrag.
+Plattformspezifische Android-Übernahmen separat prüfen, nicht iOS-Dateien blind
+kopieren. Siehe `docs/agent/RELEASE_COMPLETENESS.md`.
+
+
+### Automatische Release-Einstiege (04.11.2026)
+
+Alle beauftragten Builds/OTAs über die verwalteten npm-Einstiege bzw. den
+kanonischen Production-Wrapper führen. `ANYVO_RELEASE_PLAN` und die aktuelle
+unabhängige `refs/anyvo/release-policy` sind Pflicht. Kein direkter EAS-Aufruf
+als Ersatz für ein blockiertes Gate, kein Ausweichen auf ältere Worktrees.
+Eine neue OTA auch in einer älteren Runtime verlangt erneuten Soll-Abgleich.
+Vor Kundenfreigabe zusätzlich `release:check:customer` mit echter Geräteabnahme;
+TestFlight-Upload ist davon getrennt. Die Grenzen lokaler Durchsetzung stehen in
+`docs/agent/RELEASE_COMPLETENESS.md`; externe CLI-/Portalrechte sind damit nicht
+serverseitig eingeschränkt. Keine Releasefreigabe aus einem lokalen PASS ableiten.

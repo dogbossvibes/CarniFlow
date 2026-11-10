@@ -1,5 +1,14 @@
 # ANYVO — Agent Decisions
 
+## 2026-11-09 — Claude-Chat mit Werkzeugen arbeitet über Task-Branch und PR · `accepted`
+
+Direkter Nutzerauftrag im Claude-Projekt-Chat „ANYVO“: Änderungen an der App müssen auch
+ohne Claude Code nur über den Chat möglich sein. Der Chat ist über die Claude-Desktop-App
+mit dem lokalen Repo verbunden und hat `dogbossvibes/CarniFlow` mit Schreibrecht angebunden.
+Regel in `AGENTS.md` („Claude-Chat im Projekt ANYVO mit Werkzeugen“): Änderungsauftrag =
+Einzelfreigabe für eigenen Task-Branch, Commit, Push dieses Branches und PR gegen `main`.
+Kein Merge, kein Push auf `main`, keine OTA/Build/Store/DB-Aktion; MASTER-Rolle unverändert.
+
 ## 2026-10-11 — Fährtenfreigabe und Übergabe nur für ACTIVE · `accepted`
 
 Direkte Nutzervorgabe im bestehenden Workshop-Chat01a1182a-51e4-7832-8dfb-38c5036917e8, Nachricht01a12c65-9cd0-7180-b05a-5493c6cbf20b: „fährtenfreigabe / übergabe nur für Active freigeben“. MASTER hat die menschliche Nachricht selbst gelesen. Neue Freigabe-/Übergabeaktionen sollen an die kanonische ACTIVE-Berechtigung gebunden werden; bestehende Kundendaten/Fährten bleiben erhalten. Workshop hat02 als Trackingwriter,06 zur Entitlementklärung und05 zur serverseitigen Absicherung beauftragt. Die genaue Sender-/Empfänger-/Tier-Vererbung ist noch gegen bestehende Regeln zu klären; keine unbelegte Semantik ableiten. Umsetzung/Review/Tests dieses neuen Deltas nicht bestätigt; kein neuer Production-DB-/OTA-/Build-/Store-/Push-/Mergeauftrag aus dieser Produktvorgabe ableiten. Bereits veröffentlichte Transfer-OTAs vom11.Oktober werden dadurch nicht rückwirkend als ACTIVE-beschränkt behauptet.

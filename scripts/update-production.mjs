@@ -66,6 +66,7 @@ import { hostname } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { assertProductionSupabase, PROD_REF } from './guard-prod-supabase.mjs';
 import { validateQualityEvidence } from './release-quality-evidence.mjs';
+import { requireReleaseGate } from './release-entry-gate.mjs';
 
 export const REQUIRED_PRODUCTION_ENV = Object.freeze([
   'EXPO_PUBLIC_BACKEND_ENV',
@@ -581,6 +582,10 @@ function main() {
 
   console.log('\n⚠️  PRODUCTION EAS UPDATE (Channel: production, Environment: production)\n');
 
+  // Even direct invocation must pass the cross-runtime content/device gate.
+  try { requireReleaseGate('production-ota', { platform, runtime: runtimeFlag }); }
+  catch (error) { console.error(`BLOCKED: ${error.message}`); process.exit(1); }
+
   const pkg = existsSync('package.json') ? JSON.parse(readFileSync('package.json', 'utf8')) : {};
   const hasUpdates = !!(pkg.dependencies?.['expo-updates'] || pkg.devDependencies?.['expo-updates']);
   if (!hasUpdates) {
@@ -780,6 +785,7 @@ function main() {
   console.log(`Bestätigt. Veröffentliche Production-Update (${platform}): "${message}"`);
   // Release-Commit als NICHT geheimer Build-Metadatenwert ins OTA-Bundle (nur Anzeige in der Fährten-Diagnose).
   try {
+    requireReleaseGate('production-ota', { platform, runtime: releaseRuntime });
     execFileSync('eas', easArgs, { stdio: 'inherit', env: buildPublishEnv(process.env, head) });
   } catch {
     console.log('❌ `eas update` ist fehlgeschlagen. Kein automatischer Neuversuch.');
