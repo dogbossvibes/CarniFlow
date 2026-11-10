@@ -460,8 +460,11 @@ export interface ShortLegDiagnostics {
   motionBoostSuppressed: boolean;
   /** Direction was resolved from a compatible Motion episode after GPS proved the corner. */
   motionDirectionOverride?: boolean;
-  /** Woher die Ecke stammt. Der Detektor setzt 'gps'; die Fusionsstufe kann 'gps_split_apex' setzen. */
-  fusionSource: 'gps' | 'gps_split_apex' | null;
+  /**
+   * Woher die Ecke stammt. Der Detektor setzt 'gps'; die Fusionsstufe kann
+   * 'gps_split_apex' oder 'gps_long_baseline' (longBaselineCorner.ts) setzen.
+   */
+  fusionSource: 'gps' | 'gps_split_apex' | 'gps_long_baseline' | null;
 }
 
 export interface ShortLegCandidate {

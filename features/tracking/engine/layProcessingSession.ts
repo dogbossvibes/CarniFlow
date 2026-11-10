@@ -15,6 +15,7 @@ import {
   DETECTOR_INPUT, CORNER_GAP_M, type ShortLegPoint,
 } from '@/features/tracking/utils/shortLegCornerDetection';
 import { fuseTurns, nearestCompatibleTurnEvidence, type FusedTurn } from '@/features/tracking/utils/turnFusion';
+import { LONG_BASELINE_EXCLUSION_M } from '@/features/tracking/utils/longBaselineCorner';
 import { lineGateStepM, lineEmaAlpha, inTurnZone } from '@/features/tracking/utils/turnAwareLineGate';
 import { createCanonicalDistance } from '@/features/tracking/utils/canonicalDistance';
 import { getTrackingEngineMode } from '@/features/tracking/utils/trackingEngineMode';
@@ -362,6 +363,10 @@ export function createLayProcessor(session: LayProcessingState, deps: LayProcess
       // within a sweep. Ordinary GPS apexes can shift with new evidence too.
       // Keep detector metres here; display/reference metres are a different scale.
       if (c.atM - lastCornerAtRef.current < CORNER_GAP_M) continue;
+      // Der Scheitel einer Long-Baseline-Ecke ist nur auf einige Meter genau und
+      // kann sich mit neuen Fixen verschieben. Innerhalb ihres Sperrabstands zur
+      // zuletzt gemeldeten Ecke ist sie dieselbe Ecke — nie ein zweiter Marker.
+      if (fused?.source === 'gps_long_baseline' && c.atM - lastCornerAtRef.current < LONG_BASELINE_EXCLUSION_M) continue;
       if (fused) liveTurnsRef.current.set(c.apexIndex, fused);
       lastCornerRescuedRef.current = fused?.source === 'gps_split_apex';
       lastCornerAtRef.current = c.atM;
