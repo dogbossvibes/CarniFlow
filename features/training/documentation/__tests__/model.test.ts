@@ -28,7 +28,7 @@ test('explicit reuse marks as trained but copies no notes, media, repetitions or
   expect(planned).not.toHaveProperty('photos');
   expect(planned).not.toHaveProperty('durationSec');
   expect(performedExercises([planned])).toEqual([expect.objectContaining({ rating: null, notes: null, duration_sec: null })]);
-  expect(performedExercises([planned])[0]).not.toHaveProperty('rating_scale');
+  expect(performedExercises([planned])[0]).toHaveProperty('rating_scale', null);
 });
 test('reuse pre-fills only an explicitly marked learning level', () => {
   const learned = { ...exercise, rating: 2, rating_scale: 'lernstufe' as const };
@@ -36,6 +36,12 @@ test('reuse pre-fills only an explicitly marked learning level', () => {
   // 2 ohne Markierung ist eine alte Sternebewertung → keine Vorbelegung.
   expect(planFromHistory(unit(), { ...exercise, rating: 2 }, 'k')).toMatchObject({ rating: null, ratingScale: null });
   expect(performedExercises([planFromHistory(unit(), learned, 'k')])[0]).toMatchObject({ rating: 2, rating_scale: 'lernstufe' });
+});
+test('rating_scale wird immer ausdrücklich gesendet: Sterne und gelöschte Stufe → null (T-184)', () => {
+  const planned = planFromHistory(unit(), exercise, 'k');
+  expect(performedExercises([{ ...planned, rating: 3, ratingScale: null }])[0]).toMatchObject({ rating: 3, rating_scale: null });
+  expect(performedExercises([{ ...planned, rating: null, ratingScale: 'lernstufe' }])[0]).toMatchObject({ rating: null, rating_scale: null });
+  expect(performedExercises([{ ...planned, rating: 4, ratingScale: 'lernstufe' }])[0]).toMatchObject({ rating: 4, rating_scale: 'lernstufe' });
 });
 test('planned/not-trained exercises never enter performance rows', () => {
   const planned = planFromHistory(unit(), exercise, 'new-key');
@@ -68,6 +74,9 @@ test('duration comes only from valid measured input, and dates use the local cal
 test('lost acknowledgement reconciliation accepts only the exact completed aggregate', () => {
   const payload = { dog_id: 'dog-a', notes: 'Past observation', photos: ['private-photo'] };
   expect(isConfirmedDocumentedRetry(unit(), 'owner-a', payload, [exercise])).toBe(true);
+  // T-184: ausdrückliches rating_scale null passt zur Zeile ohne Markierung; Lernstufe nicht.
+  expect(isConfirmedDocumentedRetry(unit(), 'owner-a', payload, [{ ...exercise, rating_scale: null }])).toBe(true);
+  expect(isConfirmedDocumentedRetry(unit(), 'owner-a', payload, [{ ...exercise, rating_scale: 'lernstufe' }])).toBe(false);
   expect(isConfirmedDocumentedRetry(unit({ exercises: [] }), 'owner-a', payload, [exercise])).toBe(false);
   expect(isConfirmedDocumentedRetry(unit(), 'other', payload, [exercise])).toBe(false);
   expect(isConfirmedDocumentedRetry(unit(), 'owner-a', { ...payload, notes: 'changed' }, [exercise])).toBe(false);

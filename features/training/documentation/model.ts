@@ -72,8 +72,11 @@ export function lastExerciseHistory(units: readonly TrainingUnit[], exercise: Pl
 export function performedExercises(selected: readonly PlannedExercise[]) {
   return selected.filter(e => e.performed).map((e, i) => ({
     discipline: e.discipline, exercise_name: e.name, rating: e.rating,
-    // Nur bei Lernstufe mitsenden; alte Sterne bleiben ohne Markierung.
-    ...(e.ratingScale === LEARNING_SCALE && e.rating != null ? { rating_scale: LEARNING_SCALE } : {}),
+    // Immer ausdrücklich senden: 'lernstufe' nur bei gesetzter Lernstufe, sonst null.
+    // Fehlt das Feld, behält der Server beim Bearbeiten die alte Markierung –
+    // Zurücksetzen auf Sterne bzw. Löschen einer Stufe muss sie aber entfernen.
+    // Setzt die rating_scale-Migration voraus (td_request kennt das Feld erst danach).
+    rating_scale: e.ratingScale === LEARNING_SCALE && e.rating != null ? LEARNING_SCALE : null,
     notes: e.notes?.trim() || null, duration_sec: e.durationSec ?? null, seq_index: i,
   }));
 }

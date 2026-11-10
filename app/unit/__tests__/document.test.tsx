@@ -762,8 +762,8 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
       started_at: '2026-10-14T10:00:00Z', ended_at: '2026-10-14T10:02:00Z',
       audio_files: [{ url: 'audio-a', duration: '0:10', transcript: 'Existing transcript' }],
     }), [expect.objectContaining({ duration_sec: 123, rating: 5, notes: 'Past result' })], expect.any(Function));
-    // Alte Sternebewertung bleibt ohne Lernstufen-Markierung (T-184).
-    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).not.toHaveProperty('rating_scale');
+    // Alte Sternebewertung bleibt ohne Lernstufen-Markierung (T-184): ausdrücklich null.
+    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).toHaveProperty('rating_scale', null);
   });
   it('prefills the last learning level, shows the trend and saves the new level (T-184)', async () => {
     const learned = { ...past(), exercises: [{ ...past().exercises[0], rating: 2, rating_scale: 'lernstufe' }] };
@@ -804,8 +804,18 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     act(() => radio('trainingLevel.festigen').props.onPress()); await flush();
     act(() => radio('trainingLevel.festigen').props.onPress()); await flush();
     await submitTraining(node);
-    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).toMatchObject({ rating: 5 });
-    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).not.toHaveProperty('rating_scale');
+    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).toMatchObject({ rating: 5, rating_scale: null });
+  });
+  it('clearing a saved learning level while editing removes the marker explicitly (T-184)', async () => {
+    mockParams = { id: 'edit-unit' };
+    const learned = { ...past(), exercises: [{ ...past().exercises[0], rating: 2, rating_scale: 'lernstufe' }] };
+    mockGetTrainingUnitById.mockResolvedValue({ data: learned, error: null });
+    mockUpdateDocumentedUnit.mockReset().mockResolvedValue({ error: null });
+    const node = render(); await flush();
+    const radio = (label: string) => node.root.findAll(n => n.props.accessibilityRole === 'radio' && n.props.accessibilityLabel === `Übung: ${label}` && typeof n.props.onPress === 'function')[0];
+    act(() => radio('trainingLevel.lernen').props.onPress()); await flush();
+    await submitTraining(node);
+    expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).toMatchObject({ rating: null, rating_scale: null });
   });
   it('loads an older three-step draft (workflowStep 2) completely into the single screen (T-184)', async () => {
     const node = render(); await flush(); await selectExercise(node);
