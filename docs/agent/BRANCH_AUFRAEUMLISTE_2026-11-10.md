@@ -1,0 +1,300 @@
+# CarniFlow – Branch-Aufräumliste (Stand 10.11.2026, 22:40)
+
+Nur angeschaut, nichts gelöscht. Erstellt aus dem Cloud-Chat; die Claude-Code-Sitzung kann diese Liste übernehmen, statt alles neu zu prüfen.
+
+Gesamt: 277 Branches
+
+## 1. Bedenkenlos löschbar (35)
+Inhalt ist vollständig in `main` oder der zugehörige PR wurde gemergt. Kein offener PR.
+
+- `chore/claude-master-20261109` – PR #23 gemergt
+- `chore/claude-permissions-20261109` – PR #25 gemergt
+- `chore/github-autosync-safe-20261105` – PR #13 gemergt
+- `chore/ota-release-card-rule-20261109` – PR #22 gemergt
+- `chore/verify-center` – alles in main
+- `ci/anyvo-general-quality-gate-20261029` – PR #10 gemergt
+- `codex/anyvo-fix-live-screenshot-delivery-20261025` – PR #6 gemergt
+- `codex/anyvo-v2-integration` – alles in main
+- `codex/anyvo-website-refresh-20261024` – PR #5 gemergt
+- `codex/bmad-risk-rules` – alles in main
+- `docs/claude-chat-tools-rule-20261109` – alles in main
+- `docs/docs-pr-merge-rule-20261109` – PR #27 gemergt
+- `docs/master-stand-20261110` – PR #34 gemergt
+- `docs/stale-pr-cleanup-rule-20261110` – alles in main
+- `feat/capability-connection-model` – alles in main
+- `feat/core-motion-track-fusion` – alles in main
+- `feat/customer-track-diagnostics-1.0.3` – alles in main
+- `feat/qa-export-v2.1-motion` – alles in main
+- `feat/release-completeness-gate` – alles in main
+- `feat/roles-subscriptions-phases-2-5` – alles in main
+- `feat/track-module-rewrite` – PR #3 gemergt
+- `feat/track-segment-replay` – alles in main
+- `feature/auth-profil-faehrte-fixes` – alles in main
+- `fix/guard-entitlement-columns-20261109` – alles in main
+- `fix/ios57-unit-cards-opaque-20261109` – PR #42 gemergt
+- `fix/ios60-bg-task-late-grant-20261110` – PR #40 gemergt
+- `fix/ios60-pocket-corner-fallback-20261110` – PR #39 gemergt
+- `fix/ios60-unit-cards-opaque-20261109` – PR #41 gemergt
+- `fix/production-continuity-1.0.3` – alles in main
+- `fix/search-start-acquisition` – alles in main
+- `fix/search-start-real-position-regression` – alles in main
+- `fix/subscription-renewal-date-20261109` – alles in main
+- `fix/tracking-field-v6-1-1.0.3` – alles in main
+- `fix/tracking-field-v6-1.0.3` – alles in main
+- `tracking-runtime` – alles in main
+
+## 2. Prüfen, bevor gelöscht wird (31)
+Enthält Commits, die nicht in `main` sind. Möglicherweise überholt, möglicherweise unfertige Arbeit. Nicht ungeprüft löschen.
+
+- `ci/anyvo-ios55-eas-readonly-preflight-20261029` – 10 Commits nicht in main, zuletzt 2026-10-29, PR #9 geschlossen
+- `codex/anyvo-marketing-backup-20261029` – 3 Commits nicht in main, zuletzt 2026-10-29, nie PR
+- `codex/subtle-feedback-20261101-01a198ec` – 31 Commits nicht in main, zuletzt 2026-11-01, nie PR
+- `codex/t115-qa-archive-20261101` – 103 Commits nicht in main, zuletzt 2026-11-03, nie PR
+- `feat/dog-detail-training-doc-button` – 1 Commits nicht in main, zuletzt 2026-09-07, nie PR
+- `feat/health-shared-recipient-db-20261029` – 87 Commits nicht in main, zuletzt 2026-10-29, nie PR
+- `feat/home-day-greeting` – 53 Commits nicht in main, zuletzt 2026-10-21, nie PR
+- `feat/ios-watch-session-control` – 51 Commits nicht in main, zuletzt 2026-10-21, nie PR
+- `feat/shared-dogs-inbox-20261029` – 85 Commits nicht in main, zuletzt 2026-10-29, nie PR
+- `feat/tracking-live-share-current` – 50 Commits nicht in main, zuletzt 2026-10-21, nie PR
+- `feat/tracking-wearable-control` – 50 Commits nicht in main, zuletzt 2026-10-21, nie PR
+- `feat/wear-os-stage1` – 53 Commits nicht in main, zuletzt 2026-10-21, nie PR
+- `fix/diagnostics-access-retry-20261029` – 84 Commits nicht in main, zuletzt 2026-10-29, nie PR
+- `fix/diagnostics-profile-lease-ios55-20261029` – 97 Commits nicht in main, zuletzt 2026-10-29, PR #8 geschlossen
+- `fix/dog-today-actions-20261029` – 84 Commits nicht in main, zuletzt 2026-10-29, nie PR
+- `fix/ios-map-nil-child-crash` – 46 Commits nicht in main, zuletzt 2026-10-20, nie PR
+- `fix/ios-native-autolinking-targets` – 1 Commits nicht in main, zuletzt 2026-09-07, nie PR
+- `fix/ios57-faehrten-label-20261107` – 75 Commits nicht in main, zuletzt 2026-11-07, nie PR
+- `fix/ios57-map-render-20261030` – 61 Commits nicht in main, zuletzt 2026-10-30, nie PR
+- `fix/ios57-native-fingerprint-guard-20261030` – 58 Commits nicht in main, zuletzt 2026-10-30, nie PR
+- `fix/ios60-faehrten-label-20261107` – 90 Commits nicht in main, zuletzt 2026-11-07, nie PR
+- `fix/journal-all-disciplines` – 55 Commits nicht in main, zuletzt 2026-10-21, nie PR
+- `fix/search-trace-replay-1.0.2` – 1 Commits nicht in main, zuletzt 2026-09-17, nie PR
+- `fix/tracking-field-incident-20261021` – 56 Commits nicht in main, zuletzt 2026-10-21, nie PR
+- `fix/tracking-line-ema-p1` – 46 Commits nicht in main, zuletzt 2026-10-20, nie PR
+- `fix/training-entry-ux-20261029` – 57 Commits nicht in main, zuletzt 2026-10-29, nie PR
+- `fix/training-keyboard-scroll-20261029` – 84 Commits nicht in main, zuletzt 2026-10-29, nie PR
+- `hotfix/prod-supabase-faehrten-2026-08-22` – 5 Commits nicht in main, zuletzt 2026-08-23, nie PR
+- `investigate/trainer-connect-runtime` – 1 Commits nicht in main, zuletzt 2026-09-11, nie PR
+- `review/ios57-heat-integration-20261029` – 56 Commits nicht in main, zuletzt 2026-10-29, nie PR
+- `wip/chat01-diagnostics-access-ios55-20261029` – 87 Commits nicht in main, zuletzt 2026-10-29, nie PR
+
+## 3. Sicherungs-/Release-Branches – behalten (203)
+`release/*` sind die Quellstände veröffentlichter OTAs/Builds. Werden sie gelöscht, können diese Commits auf GitHub verloren gehen, dann ist nicht mehr nachvollziehbar, was live ist. Empfehlung: behalten oder vorher in Tags umwandeln (eigener Auftrag). `backup/*` laut Projektregeln nicht anfassen.
+
+- `backup/android-daily-widget-20261029` – 8 eigene Commits
+- `backup/android-diagnostics-20261029` – 8 eigene Commits
+- `backup/android-field-qa-20261029` – 19 eigene Commits
+- `backup/android-quick-widget-20261029` – 4 eigene Commits
+- `backup/chat01-github-handoff-20261029` – 12 eigene Commits
+- `backup/intelligence-wip-20261029` – 60 eigene Commits
+- `backup/ios03-monitoring-consent-20261029` – 65 eigene Commits
+- `backup/release-completeness-20261104` – 8 eigene Commits
+- `backup/subscription-android103-20261029` – 27 eigene Commits
+- `backup/subscription-ios103-20261029` – 4 eigene Commits
+- `backup/subscription-modern-20261029` – 52 eigene Commits
+- `backup/tooling-development-process-20261029` – 68 eigene Commits
+- `backup/tooling-one-approval-ota-20261029` – 68 eigene Commits
+- `backup/tracking-audit-synthetic-tests-20261029` – 86 eigene Commits
+- `backup/tracking-motion-arrival-audit-20261029` – 85 eigene Commits
+- `backup/tracking-pre-confidence-2026-08-22` – Inhalt schon in main
+- `backup/tracking-pre-gps-quality-2026-08-22` – Inhalt schon in main
+- `backup/tracking-pre-trajectory-2026-08-27` – Inhalt schon in main
+- `backup/tracking-raw-journal-20261029` – 81 eigene Commits
+- `backup/tracking-raw-synthetic-tests-20261029` – 82 eigene Commits
+- `integration/logbook-map-prod-ca61155` – 12 eigene Commits
+- `integration/trajectory-prod-2026-08-27` – 1 eigene Commits
+- `release/diagnosis-ios56-20261029` – 54 eigene Commits
+- `release/fullscreen-safearea-prod` – 1 eigene Commits
+- `release/ios49-map-repair-build56` – 51 eigene Commits
+- `release/ios57-greeting-sound-20261109` – 79 eigene Commits
+- `release/ios60-greeting-sound-20261109` – 100 eigene Commits
+- `release/production-consolidated-2026-08-31` – Inhalt schon in main
+- `release/source-004316b3c40a` – 44 eigene Commits
+- `release/source-005999f2ab2c` – 86 eigene Commits
+- `release/source-01e5c13553fc` – 62 eigene Commits
+- `release/source-02545d851cec` – 66 eigene Commits
+- `release/source-051b4de7123b` – 74 eigene Commits
+- `release/source-07afc825f871` – 83 eigene Commits
+- `release/source-0976c4530488` – 64 eigene Commits
+- `release/source-0d4d3de62212` – 76 eigene Commits
+- `release/source-0d9634240346` – 61 eigene Commits
+- `release/source-0daed02fee2f` – 52 eigene Commits
+- `release/source-0e16001d4f9a` – 87 eigene Commits
+- `release/source-0eadfd078ecd` – 62 eigene Commits
+- `release/source-0f13e4a04186` – 50 eigene Commits
+- `release/source-1400bf6d5261` – 57 eigene Commits
+- `release/source-15b6b742b1ed` – 79 eigene Commits
+- `release/source-15b77b5f8e28` – 72 eigene Commits
+- `release/source-17443616b5ba` – 55 eigene Commits
+- `release/source-19c8ea94559b` – 53 eigene Commits
+- `release/source-1e13b50745e6` – 48 eigene Commits
+- `release/source-2162033926f9` – 49 eigene Commits
+- `release/source-21c04eee535a` – 85 eigene Commits
+- `release/source-22ec5f5c3074` – 68 eigene Commits
+- `release/source-23fad2540e38` – 63 eigene Commits
+- `release/source-2500744d1064` – 85 eigene Commits
+- `release/source-2503bb52ea38` – 74 eigene Commits
+- `release/source-25cbe12f3d1a` – 71 eigene Commits
+- `release/source-25dd497c188d` – 47 eigene Commits
+- `release/source-2687e04ccb88` – 63 eigene Commits
+- `release/source-26e69a3d1c7c` – 79 eigene Commits
+- `release/source-291392d1aa5d` – 78 eigene Commits
+- `release/source-2c8c102e39e4` – 78 eigene Commits
+- `release/source-2d7e49266489` – 71 eigene Commits
+- `release/source-2dc58312b9c1` – 67 eigene Commits
+- `release/source-2ee256448fa8` – 40 eigene Commits
+- `release/source-2f513dbd37fa` – 26 eigene Commits
+- `release/source-30e299067a43` – 80 eigene Commits
+- `release/source-32510f7a03ca` – 76 eigene Commits
+- `release/source-39964e1f073e` – 48 eigene Commits
+- `release/source-3ac4e095454c` – 50 eigene Commits
+- `release/source-3b1a7b94be8e` – 70 eigene Commits
+- `release/source-3bb2f4606e16` – 71 eigene Commits
+- `release/source-3d21d664d356` – 74 eigene Commits
+- `release/source-3e1c2ae32765` – 72 eigene Commits
+- `release/source-3e865d37aa0a` – 53 eigene Commits
+- `release/source-419288f1540e` – 72 eigene Commits
+- `release/source-41ed7362caf6` – 49 eigene Commits
+- `release/source-421de7db38eb` – 69 eigene Commits
+- `release/source-42554354593e` – 52 eigene Commits
+- `release/source-42d28edb532e` – 48 eigene Commits
+- `release/source-45768f0f857f` – 45 eigene Commits
+- `release/source-46106ff6fdff` – 62 eigene Commits
+- `release/source-49a578453a7b` – 45 eigene Commits
+- `release/source-4a13945539c6` – 64 eigene Commits
+- `release/source-4bc7d7a967fb` – 65 eigene Commits
+- `release/source-5626aba46d17` – 84 eigene Commits
+- `release/source-57b4bbe148dc` – 81 eigene Commits
+- `release/source-588d71edd7fe` – 82 eigene Commits
+- `release/source-58dce7ac7c0d` – 40 eigene Commits
+- `release/source-59b72b204491` – 73 eigene Commits
+- `release/source-5b52e7037ea2` – 63 eigene Commits
+- `release/source-5cdf4d9cf2aa` – 53 eigene Commits
+- `release/source-5db986ad1f83` – 41 eigene Commits
+- `release/source-601edfdd57e5` – 48 eigene Commits
+- `release/source-6070f02c695a` – 2 eigene Commits
+- `release/source-608b4fc44fab` – 86 eigene Commits
+- `release/source-60f9e44e003b` – 50 eigene Commits
+- `release/source-623ec1f628ec` – 70 eigene Commits
+- `release/source-627b1f7142d7` – 80 eigene Commits
+- `release/source-62b8d8c27a31` – 76 eigene Commits
+- `release/source-631577a4874f` – 60 eigene Commits
+- `release/source-6328890822a8` – 56 eigene Commits
+- `release/source-634e0cb6d158` – 72 eigene Commits
+- `release/source-647751672abc` – 43 eigene Commits
+- `release/source-670db9d694c9` – 59 eigene Commits
+- `release/source-6789598121a6` – 46 eigene Commits
+- `release/source-67ae3548ad95` – 58 eigene Commits
+- `release/source-67eda5012da4` – 54 eigene Commits
+- `release/source-6877011dc9bd` – 55 eigene Commits
+- `release/source-6c3049482aec` – 48 eigene Commits
+- `release/source-6d44e6c61e06` – 70 eigene Commits
+- `release/source-6dd2b2691346` – 47 eigene Commits
+- `release/source-6f1556e449c5` – 83 eigene Commits
+- `release/source-708f3d65508d` – 73 eigene Commits
+- `release/source-71632a680115` – 39 eigene Commits
+- `release/source-7217e9ff1196` – 73 eigene Commits
+- `release/source-72eaeb9871e5` – 75 eigene Commits
+- `release/source-73ba10c66114` – 46 eigene Commits
+- `release/source-7521d48609c3` – 42 eigene Commits
+- `release/source-79dd0e7fe56e` – 59 eigene Commits
+- `release/source-79f0435e73c5` – 68 eigene Commits
+- `release/source-7a1bfbb4dfa3` – 3 eigene Commits
+- `release/source-7c726144e654` – 66 eigene Commits
+- `release/source-7f3f58054109` – 82 eigene Commits
+- `release/source-80f860c8a2d9` – 39 eigene Commits
+- `release/source-8198bb9fcdf4` – 61 eigene Commits
+- `release/source-81c066682d63` – 61 eigene Commits
+- `release/source-8264673365c9` – 84 eigene Commits
+- `release/source-82786fdf79d7` – 47 eigene Commits
+- `release/source-82c63fb58392` – 54 eigene Commits
+- `release/source-83cfd2a46128` – 51 eigene Commits
+- `release/source-847e869d6b06` – 45 eigene Commits
+- `release/source-85b8cd866f87` – 50 eigene Commits
+- `release/source-86c3d1e2a099` – 64 eigene Commits
+- `release/source-86e7ca1b6d7e` – 62 eigene Commits
+- `release/source-89c217709969` – 82 eigene Commits
+- `release/source-89ee1509f9ce` – 58 eigene Commits
+- `release/source-8a56064` – 83 eigene Commits
+- `release/source-8d03486182d1` – 68 eigene Commits
+- `release/source-8d6641333848` – 54 eigene Commits
+- `release/source-9224483d7156` – 42 eigene Commits
+- `release/source-9325758ef5d3` – 65 eigene Commits
+- `release/source-936131a1dd0c` – 53 eigene Commits
+- `release/source-952b5fed3e67` – 75 eigene Commits
+- `release/source-979cf6a84074` – 73 eigene Commits
+- `release/source-9b85e0fd1b03` – 52 eigene Commits
+- `release/source-9e38718300b6` – 59 eigene Commits
+- `release/source-9f3e38ec7c5c` – 71 eigene Commits
+- `release/source-a0c72081ffb1` – 77 eigene Commits
+- `release/source-a26a562ec9cc` – 52 eigene Commits
+- `release/source-a3d5dab07032` – 43 eigene Commits
+- `release/source-a4eb7ffeab4e` – 54 eigene Commits
+- `release/source-a5d5be9a23b8` – 69 eigene Commits
+- `release/source-a60601201e76` – 60 eigene Commits
+- `release/source-aa09a64f7b11` – 59 eigene Commits
+- `release/source-addeec4e325b` – 43 eigene Commits
+- `release/source-ae3e372df017` – 55 eigene Commits
+- `release/source-b03ed4b9eef7` – 51 eigene Commits
+- `release/source-b19e5a37fc14` – 81 eigene Commits
+- `release/source-b272f1f41b82` – 50 eigene Commits
+- `release/source-b27f76192a9d` – 77 eigene Commits
+- `release/source-b32254408ea8` – 75 eigene Commits
+- `release/source-b6380abc099c` – 46 eigene Commits
+- `release/source-b7daad8e2366` – 72 eigene Commits
+- `release/source-bb09bf625bb7` – 67 eigene Commits
+- `release/source-c0534dbfa91e` – 51 eigene Commits
+- `release/source-c4649ad59e92` – 70 eigene Commits
+- `release/source-c4900e2c50cc` – 41 eigene Commits
+- `release/source-c4afb5a817e7` – 72 eigene Commits
+- `release/source-c74e9914e046` – 83 eigene Commits
+- `release/source-c9a06799c402` – 49 eigene Commits
+- `release/source-ccb98c5296e6` – 45 eigene Commits
+- `release/source-cdeb0046ae66` – 40 eigene Commits
+- `release/source-ce5a0fcffe9a` – 41 eigene Commits
+- `release/source-d13181bb392c` – 80 eigene Commits
+- `release/source-d153e6cc2aaa` – 52 eigene Commits
+- `release/source-d41ab8ee80df` – 69 eigene Commits
+- `release/source-d6442ac1257b` – 52 eigene Commits
+- `release/source-d67773bec61f` – 65 eigene Commits
+- `release/source-d8bc3b7e4869` – 44 eigene Commits
+- `release/source-da715fc7c558` – 84 eigene Commits
+- `release/source-df4f656597f5` – 67 eigene Commits
+- `release/source-e0198c71bf0f` – 51 eigene Commits
+- `release/source-e2957bd836d6` – 63 eigene Commits
+- `release/source-e3dc95558682` – 79 eigene Commits
+- `release/source-e81967c08f7b` – 44 eigene Commits
+- `release/source-e8fe2606554c` – 42 eigene Commits
+- `release/source-e9827f65dc21` – 47 eigene Commits
+- `release/source-ec22c7f64e22` – 61 eigene Commits
+- `release/source-ec5c240854eb` – 40 eigene Commits
+- `release/source-ef67627ecef9` – 77 eigene Commits
+- `release/source-f017f09bb9a9` – 74 eigene Commits
+- `release/source-f04f32e4ce49` – 46 eigene Commits
+- `release/source-f0b050e41643` – 56 eigene Commits
+- `release/source-f2ed8d78b116` – 58 eigene Commits
+- `release/source-f47deeeb5523` – 53 eigene Commits
+- `release/source-f4b4fe13fbf2` – 37 eigene Commits
+- `release/source-f518bef1192e` – 83 eigene Commits
+- `release/source-f5c4753648d6` – 81 eigene Commits
+- `release/source-f809b71078a3` – 66 eigene Commits
+- `release/source-f97d830ada51` – 73 eigene Commits
+- `release/source-fb538a717d41` – 78 eigene Commits
+- `release/source-fb81698baced` – 49 eigene Commits
+- `release/source-fe1e383b9f7d` – 43 eigene Commits
+- `release/track-motion-replay-native-2026-09-07` – Inhalt schon in main
+- `upgrade/sdk58-ios60-from57-20261105` – 78 eigene Commits
+
+## 4. Aktiv – behalten (8)
+
+- `chore/claude-dev-environment-20261108` – offener PR #17
+- `chore/revert-release-gate-pr28-20261110` – offener PR #37
+- `docs/master-status-ota-20261110` – offener PR #45
+- `feat/ios60-absuche-karte-issue33-20261109` – offener PR #35
+- `feat/ios60-faehrten-simulator-20261110` – offener PR #43
+- `feat/ios60-training-ui-review-20261106` – offener PR #16
+- `feat/ota-coverage-check` – offener PR #30
+- `main` – geschützt
+
+---
+Methode: GitHub-API, Vergleich jedes Branches mit `main` (`compare`) plus Abgleich mit allen PRs. Squash-Merges werden über den gemergten PR erkannt.
