@@ -817,6 +817,22 @@ describe('DocumentScreen — safe preparation and draft flow', () => {
     await submitTraining(node);
     expect(mockUpdateDocumentedUnit.mock.calls[0][2][0]).toMatchObject({ rating: null, rating_scale: null });
   });
+  it('never shows the own (restored) training as „Letztes Mal“ (T-184, render-safe unit id)', async () => {
+    const node = render(); await flush(); await selectExercise(node);
+    await flush(); act(() => node.unmount());
+    const key = (await AsyncStorage.getAllKeys()).find(k => k.startsWith('training_document_v1:owner-1:') && !k.includes(':edit:'))!;
+    const stored = JSON.parse((await AsyncStorage.getItem(key))!);
+    stored.value.selected[0].exerciseKey = 'ident-1';
+    const history = (unitId: string) => ({ ...past(), id: unitId, exercises: [{ ...past().exercises[0], exercise_identity_id: 'ident-1', discipline: stored.value.selected[0].discipline, exercise_name: stored.value.selected[0].name }] });
+    const historical = (n: ReactTestRenderer) => n.root.findAll(x => typeof x.props.onRatingChange === 'function' && 'historical' in x.props)[0].props.historical;
+    for (const [unitId, shown] of [[stored.value.unitId, false], ['other-unit', true]] as const) {
+      await AsyncStorage.setItem(key, JSON.stringify(stored));
+      mockGetTrainingUnits.mockReturnValue({ limit: () => Promise.resolve({ data: [history(unitId)], error: null }) });
+      const restored = render(); await flush(); await flush();
+      expect(!!historical(restored)).toBe(shown);
+      act(() => restored.unmount());
+    }
+  });
   it('loads an older three-step draft (workflowStep 2) completely into the single screen (T-184)', async () => {
     const node = render(); await flush(); await selectExercise(node);
     act(() => inputByPlaceholder(node, 'training.exerciseNotePlaceholder').props.onChangeText('From old step two'));

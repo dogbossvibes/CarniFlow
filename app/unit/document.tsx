@@ -210,7 +210,11 @@ function DocumentForm() {
   useEffect(() => {
     if (!editing && !disciplineTouched.current && resolvedInitialDisc) setActiveDisc(resolvedInitialDisc);
   }, [editing, resolvedInitialDisc]);
-  const unitIdRef = useRef(id ?? Crypto.randomUUID());
+  const [initialUnitId] = useState(() => id ?? Crypto.randomUUID());
+  const unitIdRef = useRef(initialUnitId);
+  // Render-sichere Kopie der eigenen Einheit-ID (nur für den „Letztes Mal“-Filter);
+  // wird an denselben Stellen wie unitIdRef nachgeführt.
+  const [ownUnitId, setOwnUnitId] = useState(initialUnitId);
   const focusIdRef = useRef(Crypto.randomUUID());
   const operationIdRef = useRef(Crypto.randomUUID());
 
@@ -233,7 +237,7 @@ function DocumentForm() {
       if (draft && typeof draft.unitId === 'string' && Array.isArray(draft.selected)
           && typeof draft.date === 'string' && Number.isFinite(new Date(draft.date).getTime())
           && Array.isArray(draft.photos) && Array.isArray(draft.videos) && Array.isArray(draft.audio)) {
-        unitIdRef.current = id ?? draft.unitId;
+        unitIdRef.current = id ?? draft.unitId; setOwnUnitId(unitIdRef.current);
         operationIdRef.current = draft.operationId ?? operationIdRef.current;
         focusIdRef.current = draft.focusId ?? focusIdRef.current;
         sourceFingerprint.current = draft.sourceFingerprint;
@@ -474,7 +478,7 @@ function DocumentForm() {
       if (dogId) result[dogId] = currentDraft;
       return result;
     });
-    unitIdRef.current = next.unitId; operationIdRef.current = next.operationId ?? Crypto.randomUUID(); focusIdRef.current = next.focusId ?? Crypto.randomUUID();
+    unitIdRef.current = next.unitId; setOwnUnitId(next.unitId); operationIdRef.current = next.operationId ?? Crypto.randomUUID(); focusIdRef.current = next.focusId ?? Crypto.randomUUID();
     recordedDurationSec.current = next.recordedDurationSec ?? null;
     disciplineTouched.current = true;
     setDogId(targetDog); setActiveDisc(next.activeDisc); setSelected(next.selected);
@@ -743,7 +747,7 @@ function DocumentForm() {
               <Text style={s.label}>{t('training.selectedCount', { count: selected.length })}</Text>
               <View style={s.selectedList}>
                 {selected.map((e, i) => {
-                  const previous = lastExerciseHistory(visibleHistory.units.filter(unit => unit.id !== id && unit.id !== unitIdRef.current
+                  const previous = lastExerciseHistory(visibleHistory.units.filter(unit => unit.id !== id && unit.id !== ownUnitId
                     && (!editing || unit.session_date < localDay(date))), e)[0];
                   return (
                   <SelectedExerciseCard
