@@ -54,7 +54,7 @@ Die Dateien existieren, aber die Änderung dieser OTA ist nicht auffindbar. Entw
 | 2026-10-26 | `1.0.5-motion-v4` | Fährtenkarte: durchgezogene Spuren, kompakte Marker und keine Maßstäbe | – | `062abf85` | ☐ nachziehen ☐ ausnehmen |
 | 2026-10-29 | `1.0.5`, `1.0.5-motion-v2` | Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Tracking und LiveShare erhalten | – | `ec80870a`, `76827060` | ☐ nachziehen ☐ ausnehmen |
 | 2026-10-29 | `1.0.5-motion-v4` | Hundedashboard: Hinweise und Termine direkt öffnen; eigene Termine explizit abschließen oder absagen | – | `87dd058e` | ☐ nachziehen ☐ ausnehmen |
-| 2026-11-04 | `sdk58-customer-ios-v1` | fix(ui): keep training unit cards opaque on iOS 59 | – | `574f82ad` | ☐ nachziehen ☐ ausnehmen |
+| 2026-11-04 | `sdk58-customer-ios-v1` | fix(ui): keep training unit cards opaque on iOS 59 | – | `574f82ad` | ☑ nachgezogen am 2026-11-10: Port `1c379884` in Build-60-OTA `b70e294d` (Release-Karte #44); Ausnahme zurückgenommen |
 
 ## 3. Empfehlung ausnehmen – alte Fährten-/GPS-Logik (8)
 

@@ -396,12 +396,6 @@
     "date": "2026-11-09"
   },
   {
-    "group": "574f82ad-cd28-43af-a1a0-76c434503099",
-    "reason": "Nutzerentscheid Build-60-Abgleich #65: bewusst nicht für Build 60 übernommen bzw. anders umgesetzt (fix(ui): keep training unit cards opaque on iOS 59)",
-    "decidedBy": "Nutzer via MASTER-Chat",
-    "date": "2026-11-09"
-  },
-  {
     "group": "faceddf5-725a-4adb-a6a7-98d682b2dbcb",
     "reason": "Nutzerentscheid Build-60-Abgleich #38: GPS-Start-Logik durch Build-58-Fährtenbasis geschützt; Trainingsvorlagen werden in Trainingsdoku neu (T-184) neu bewertet (GPS-Start abgesichert; Trainingsvorlagen und sichtbares Bear)",
     "decidedBy": "Nutzer via MASTER-Chat",
