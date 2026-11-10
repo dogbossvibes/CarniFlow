@@ -284,7 +284,8 @@ describe('Dry-Run (Preflight) und Quellen', () => {
     expect(ms).toContain('must **never** be used on its own as a release source');
     expect(ms).toContain('| Production HEAD (iOS) | `34e618519b2da670fc5e7efd4ec43e08afc4ed53` |');
     expect(ms).toContain('**Not in Production:** Multi-Dog Track Overlays (`78322cfe65a3d5a95bf59edc33b651a896f6c9f8`');
-    for (const f of ['AGENTS.md', 'CLAUDE.md']) expect(readFileSync(f, 'utf8')).toContain('Aktiven Production-Stand unmittelbar vor dem Publish FRISCH aus EAS lesen');
+    expect(readFileSync('AGENTS.md', 'utf8')).toContain('Aktiven Production-Stand unmittelbar vor dem Publish FRISCH aus EAS lesen');
+    expect(readFileSync('CLAUDE.md', 'utf8').split('\n')[0]).toBe('@AGENTS.md');
     const wf = readFileSync('docs/DEVELOPMENT_WORKFLOW.md', 'utf8');
     expect(wf).toContain('<git-common-dir>/anyvo-production-ota.lock');
     expect(wf).toContain('Andere Rechner, CI oder manuelle `eas update`-Aufrufe erfasst er nicht');

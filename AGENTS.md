@@ -2,115 +2,105 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
-## GitHub-Upload nach Aufgaben (direkte Nutzerfreigabe 2026-11-05)
+# ANYVO – Arbeitsregeln (Kurzfassung, Stand 2026-11-10)
 
-Der Nutzer hat ausdrücklich beauftragt, vor ANYVO-Codearbeiten den frischen GitHub-
-Stand (main, relevanten Arbeits-/Runtime-Branch und offene Pull Requests) zu prüfen
-und abgeschlossene, geprüfte Aufgaben **automatisch auf GitHub zu sichern**.
-Dies ist eine eng begrenzte fortlaufende Freigabe für **Task-Commits und normale
-Pushes ausschliesslich auf dem eigenen, korrekt zugeordneten Task-Branch** nach
-relevanten Tests, TypeScript, ESLint, Diff-/Secret-Prüfung und Owner-Abgleich.
-Verbindlicher Ablauf und STOP-Bedingungen: `docs/agent/GITHUB_AUTOSYNC.md`.
-Nach geprüftem Task-Commit: `npm run agent:github:push`.
-Kein automatischer Upload fremder WIP-Dateien; bei unsauberem Worktree STOP.
-Diese Freigabe umfasst **keine** Commits/Pushes auf main, Release-/Backup-/
-Integrationsbranches, keinen Merge, keine OTA, keinen Build, kein Store-Release,
-keine Live-DB- oder Kundendatenaktion. Ein reiner Handoff bleibt ohne Push.
-Die alten allgemeinen Freigabeverbote gelten ausserhalb dieses engen Scopes weiter.
-Falls lokale Worktree-/Owner-Prüfungen nicht möglich sind, keine automatische
-Freigabe unterstellen und keinen lokalen Sync als erfolgt melden.
+Ziel: schnell, klar und sicher arbeiten. Kleine, klare Aufgaben direkt umsetzen,
+ohne Planungsdokumente, Rollenwechsel oder wiederholte Vollprüfungen.
 
-## Doku-PRs selbst mergen (direkte Nutzerfreigabe 2026-11-09)
+## Ordner und Rollen
 
-Der Nutzer erlaubt fortlaufend, **reine Doku-PRs** selbst nach `main` zu mergen,
-ohne erneute Einzelfreigabe. Reiner Doku-PR heißt: ausschließlich `*.md`-Dateien
-unter `docs/`, nicht `docs/agent/release-policy.json` oder andere Nicht-Markdown-
-Dateien, Basis `main`, alle Checks grün. Merge nur mit
-`gh pr merge <Nr> --squash --delete-branch --match-head-commit <voller SHA>`;
-kein `--admin`, kein Umgehen von Branch-Schutz. Claude Code erzwingt das lokal über
-`~/.claude/hooks/anyvo-release-guard.py` (prüft Dateien, Checks und Head-Commit
-direkt vor dem Merge). Alle anderen PRs (Code, Skripte, `package.json`, `AGENTS.md`,
-`CLAUDE.md`, Konfiguration) brauchen weiterhin eine ausdrückliche Merge-Freigabe.
-Diese Regel erteilt keine OTA-, Build-, Store-, DB- oder Push-auf-main-Freigabe.
+- **Einziger Arbeitsordner:** `/Users/moyo/canisflow/canisflow` (Branch `main`).
+  Der äussere Ordner `/Users/moyo/canisflow` ist ein separates Expo-Starterprojekt.
+- **MASTER** = Claude-Code-Sitzung in diesem Ordner mit Worktree-Häkchen **aus**.
+  Einziger Writer für `docs/agent/ANYVO_MASTER_STATUS.md` und `docs/agent/ACTIVE_WORK.md`,
+  einziger Publisher für Production-OTAs, pflegt das GitHub-Projekt
+  „ANYVO – Produkt & Entwicklung“ und die Release-Karten. Arbeitet nur auf Anfrage:
+  kein Heartbeat, keine Prüfschleifen ohne neuen Anlass.
+- **Aufgaben-Sitzung** = Claude Code in diesem Ordner mit Worktree-Häkchen **an**
+  (eigener Worktree unter `.claude/worktrees/`) oder Cloud-Sitzung.
+  1 Aufgabe = 1 Branch = 1 PR. Ergebnis/Blocker im Issue oder PR melden.
+  Keine OTA, kein Schreiben in MASTER_STATUS/ACTIVE_WORK.
+- **Claude-Chat im Projekt ANYVO mit Werkzeugen** (Mac-Verbindung und/oder angebundenes
+  Repo) gilt als Aufgaben-Sitzung:
+  - Über GitHub (Cloud-Klon): Ein Änderungsauftrag der Nutzerin ist die Einzelfreigabe,
+    ab frischem `origin/main` einen eigenen Task-Branch anzulegen, nach den Pflichtprüfungen
+    zu committen, zu pushen und einen PR gegen `main` zu öffnen. Merge entscheidet die Nutzerin.
+  - Über die Mac-Verbindung: nur im freigegebenen Ordner lesen und ändern; ohne gesonderte
+    Freigabe kein Commit/Push; fremde lokale Änderungen und Worktrees bleiben unangetastet.
+  - Der PR nennt ausgeführte Prüfungen und Grenzen offen (z. B. keine Geräteprüfung).
+- **Claude-Chat ohne Werkzeuge:** Planung, Entscheidungen, Issue-Texte, Reviews eingefügter
+  Diffs, Anleitungen. Keine Git-, OTA- oder DB-Aktionen; nichts als erledigt melden, was nicht
+  nachweislich im Repo/Board steht.
+- Frühere ChatGPT/Codex-Rollen (MASTER-Chat, Fachchats, Publisher „01“, Heartbeat) sind
+  beendet; ihre Freigaben gelten nicht weiter.
+- Bei unklarer Zuständigkeit Schreibaktion stoppen und die Nutzerin fragen; read-only
+  Prüfungen dürfen weiterlaufen.
 
-## PR-Ordnung und Aufräumen (direkte Nutzerfreigabe 2026-11-10)
+## Start einer Sitzung
 
-Ziel: Die Nutzerin muss sich keine Sonderregeln merken. Jeder PR wird zeitnah
-entweder gemergt oder geschlossen; «bewusst offen lassen» gibt es nicht.
-- Am Ende jeder Aufgabe nennt der Agent pro PR in einem Satz die nötige Handlung:
-  «Mergen», «auf dem Gerät testen, dann mergen» oder «Schliessen».
-- Claude darf **veraltete PRs selbst schliessen** (nicht mergen), wenn sie
-  nachweislich überholt sind (z. B. Ziel-Build/Runtime ersetzt, Inhalt anderweitig
-  integriert). Pflicht: Kommentar mit Grund und Hinweis, dass der PR wieder geöffnet
-  werden kann. Branches werden dabei nicht gelöscht.
-- Code-, Skript-, Konfigurations-, Release- sowie `AGENTS.md`-/`CLAUDE.md`-PRs mergt
-  weiterhin nur die Nutzerin (siehe oben).
-- Bei Unklarheit, ob ein PR noch gebraucht wird: nicht schliessen, sondern fragen.
+1. Branch, HEAD und `git status --short` prüfen. Fremde/ungesicherte Änderungen bewahren
+   und nie als eigene ansehen.
+2. **Aufgaben-Sitzung:** Auftrag/Issue lesen, betroffenen Code prüfen, umsetzen.
+   `ANYVO_MASTER_STATUS.md` nur lesen, wenn die Aufgabe Release, Production-Stand,
+   Runtime-Ziele oder den Projektstatus betrifft.
+3. **MASTER:** `ANYVO_MASTER_STATUS.md` und `ACTIVE_WORK.md` lesen. Status nur bei
+   nachweislich geprüfter Änderung aktualisieren.
+4. Historische Hintergrunddateien (nicht der aktuelle Stand, keine Task-ID-Vergabe daraus):
+   `docs/agent/README.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md`, `TASKS.md`,
+   `WORKTREES.md`, `WORK_LOG.md`, `docs/agent/tasks/`. Nur bei konkretem Bedarf lesen.
 
-## ANYVO project status
+Priority rule (on any conflict):
+```
+Repository/Git facts > current canonical MASTER_STATUS/ACTIVE_WORK > historical handoff/task files > agent assumptions
+```
 
-Before substantial ANYVO work, read:
+## Arbeitsweise
 
-`docs/agent/ANYVO_MASTER_STATUS.md`
+- Kleine, klare Aufgaben direkt umsetzen. BMAD (`docs/agent/BMAD.md`) nur auf ausdrücklichen
+  Wunsch der Nutzerin oder bei grossen bzw. unklaren Funktionen. Risiko trotzdem beachten:
+  Änderungen an Auth, Berechtigungen, Kundendaten, Persistenz, Abo oder Tracking brauchen
+  vertiefte Prüfung und Regressionstests.
+- Sichtbare UI-Änderungen: zuerst ein Mockup zeigen.
+- Keine parallelen Agenten, Subagenten oder Party Mode ohne ausdrücklichen Wunsch.
+- Funktionierendes Tracking/GPS bewahren; Feldbelege und Kontinuität prüfen, bevor
+  Trackinglogik ersetzt wird.
+- Prüfen bei Produktcode: relevante Tests, TypeScript, ESLint, `git diff --check`
+  (begründete Einschränkungen offen nennen). Nur tatsächlich ausgeführte Prüfungen melden.
+- Abschluss: Ergebnis, ausgeführte Prüfungen, offene Gerätetests. Pro PR genau eine Handlung
+  nennen: «Mergen», «auf dem Gerät testen, dann mergen» oder «Schliessen».
 
-It is the canonical source for current production baseline, completed work,
-active work and open work.
+## Git, PRs und Merge
 
-Detailed task files under `docs/agent/tasks` are historical/technical sources
-and must not override the current master status.
+- **Task-Branch sichern** (Nutzerfreigabe 2026-11-05): Nach relevanten Tests, TypeScript,
+  ESLint, Diff-/Secret-Prüfung dürfen abgeschlossene Aufgaben auf dem **eigenen** Task-Branch
+  committet und gepusht werden (`npm run agent:github:push`, Ablauf und STOP-Bedingungen:
+  `docs/agent/GITHUB_AUTOSYNC.md`). Kein Upload fremder WIP-Dateien; bei unsauberem Worktree
+  STOP. Nicht erlaubt: Commit/Push auf `main`, Release-/Backup-/Integrationsbranches, Merge,
+  OTA, Build, Store-Release, Live-DB- oder Kundendatenaktion.
+- **Doku-PRs selbst mergen** (Nutzerfreigabe 2026-11-09): Reiner Doku-PR = ausschliesslich
+  `*.md`-Dateien unter `docs/` (nicht `docs/agent/release-policy.json` oder andere
+  Nicht-Markdown-Dateien), Basis `main`, alle Checks grün. Merge nur mit
+  `gh pr merge <Nr> --squash --delete-branch --match-head-commit <voller SHA>`; kein `--admin`,
+  kein Umgehen von Branch-Schutz. Lokal erzwungen durch `~/.claude/hooks/anyvo-release-guard.py`.
+- **Alle anderen PRs** (Code, Skripte, `package.json`, `AGENTS.md`, `CLAUDE.md`, Konfiguration,
+  Release) mergt nur die Nutzerin.
+- **PR-Ordnung** (Nutzerfreigabe 2026-11-10): Jeder PR wird zeitnah gemergt oder geschlossen,
+  «bewusst offen lassen» gibt es nicht. Claude darf nachweislich überholte PRs selbst
+  schliessen (nicht mergen), mit Kommentar zu Grund und Wiedereröffnung; Branches dabei nicht
+  löschen. Bei Unklarheit nicht schliessen, sondern fragen.
 
-Do not update the master status unless the task explicitly includes a verified
-status change.
-
-Do not publish a Production OTA from a branch that does not contain the
-documented current Production baseline.
-
-## Zentrale ANYVO-Koordination mit Claude (direkter Nutzerauftrag 2026-11-09)
-
-Die Nutzerin hat von ChatGPT/Codex zu Claude gewechselt. Die früheren Codex-Rollen
-(MASTER-Chat `00-01 – ANYVO MAIN MASTER`, ID `01a18309-…`, Fachchats, Publisher „01“,
-Heartbeat `anyvo-laufende-ota-koordination`) sind **beendet und historisch**; ihre
-Freigaben gelten nicht weiter. `docs/agent/README.md` „Zentrale Koordination“ ist
-insoweit historisch.
-
-**MASTER** ist eine lokale Claude-Code-Sitzung „ANYVO MASTER“ auf dem Mac der Nutzerin
-im Worktree `/Users/moyo/canisflow-worktrees/anyvo-main`. Der MASTER
-- ist einziger Writer für `ANYVO_MASTER_STATUS.md` und `ACTIVE_WORK.md`,
-- ist einziger **Publisher** für Production-OTAs (Regeln unten unverändert),
-- pflegt das GitHub-Projekt „ANYVO – Produkt & Entwicklung“ und die Release-Karten,
-- arbeitet nur auf Anfrage der Nutzerin: kein Heartbeat, keine zeitgesteuerten
-  Prüfschleifen, keine wiederholten Vollprüfungen ohne neuen Anlass (Kontingent sparen).
-
-**Weitere Claude-Sitzungen** (Cloud oder lokal) arbeiten je Aufgabe auf eigenem
-Task-Branch, melden Ergebnis/Blocker im zugehörigen GitHub-Issue oder PR und schreiben
-nicht in MASTER_STATUS/ACTIVE_WORK. Sie veröffentlichen keine OTA.
-
-**Claude-Chat im Projekt ANYVO mit Werkzeugen** (Claude-App ohne Claude Code, aber mit
-Mac-Verbindung über die Claude-Desktop-App und/oder angebundenem GitHub-Repo; direkter
-Nutzerauftrag 2026-11-09) gilt als „weitere Claude-Sitzung“ im Sinne des vorigen Absatzes:
-- **Über GitHub (Cloud-Klon):** Ein Änderungsauftrag der Nutzerin in diesem Chat ist die
-  Einzelfreigabe, für genau diese Aufgabe ab frischem `origin/main` einen eigenen
-  Task-Branch anzulegen, nach den Pflichtprüfungen (relevante Tests, TypeScript, ESLint,
-  `git diff --check`, Secret-/Diff-Prüfung, Abgleich mit offenen PRs) zu committen, diesen
-  Branch zu pushen und einen PR gegen `main` zu öffnen. Merge entscheidet die Nutzerin.
-- **Über die Mac-Verbindung:** nur im ausdrücklich freigegebenen lokalen Ordner lesen und
-  ändern. Dort ohne gesonderte Freigabe kein Commit/Push; fremde lokale Änderungen,
-  Worktrees und WIP bleiben unangetastet.
-- Ausgeschlossen bleiben: Push auf `main` und Release-/Backup-/Integrationsbranches, Merge,
-  OTA, Build, Store-Release, Live-DB-/Kundendatenaktionen sowie Schreiben in
-  MASTER_STATUS/ACTIVE_WORK.
-- Task-IDs der lokalen Registry sind aus der Cloud nicht reservierbar; Zuordnung dann über
-  Branch und PR, eine ID vergibt bei Bedarf der MASTER.
-- Der PR nennt ausgeführte Prüfungen und Grenzen offen (z. B. keine Geräteprüfung, keine
-  Board-Felder ohne GraphQL-Zugang).
-
-**Claude-Chat ohne Werkzeuge** (weder Mac-Verbindung noch angebundenes Repo) dient Planung,
-Entscheidungen, Issue-Texten, Reviews eingefügter Diffs und Arbeitsanweisungen für die
-Nutzerin. Er führt keine Git-, OTA- oder DB-Aktionen aus und meldet nichts als erledigt,
-was nicht nachweislich im Repo/Board steht.
-
-Bei unklarer Zuständigkeit Schreibaktion stoppen und die Nutzerin fragen; read-only
-Prüfungen dürfen weiterlaufen.
+## NEVER
+- overwrite unrelated uncommitted changes
+- delete unknown files
+- `git reset`
+- `git checkout` modified files
+- `git clean`
+- push, merge, or commit without explicit user permission (exceptions: own task branch per
+  "Git, PRs und Merge" above; docs-only PR merges; closing stale PRs)
+- publish an OTA, start a build, or release to a store without explicit user permission
+- run destructive SQL or write to Production Supabase/DB without explicit user permission
+- publish a Production OTA from a branch that does not contain the documented current
+  Production baseline
 
 ## Kundendatenerhalt (direkte Nutzeranforderung 2026-10-08)
 
@@ -193,114 +183,6 @@ Bericht offen melden, dass Board-Felder/Status noch zu setzen sind; nicht als er
 melden. Diese Regel erlaubt nur Issue- und Board-Pflege. Sie erweitert keine Freigabe für
 OTA, Push, Merge, Build, Store-Release oder DB-Aktionen; die Production-OTA-Regel unten
 bleibt unverändert vorrangig.
-
-# Agent Handoff Protocol (Codex and Claude Code)
-
-Codex and Claude Code are supported ANYVO development agents. The user plans
-a move to Claude Code. OpenCode remains an optional fallback. This repository is the shared
-source of truth for all agents. Full guide:
-`docs/agent/README.md`.
-
-## On start (Codex and Claude Code MUST do this, in order)
-1. Check the actual worktree/root, branch, HEAD and `git status --short`; preserve all existing WIPs.
-2. Read canonical `docs/agent/ANYVO_MASTER_STATUS.md` and `docs/agent/ACTIVE_WORK.md`
-   in `/Users/moyo/canisflow-worktrees/anyvo-main` for current scope, stops and owners.
-3. Read relevant `docs/agent/DECISIONS.md` entries and the existing task report.
-4. Consult `CURRENT_STATE.md`, `SESSION_HANDOFF.md` and `TASKS.md` only as historical
-   supporting context; compare every relevant claim with current repository/Git facts.
-5. Reuse the existing task/owner. Historical “next TASK-ID” text does not reserve an ID.
-   New IDs must be reserved atomically in the shared git-common-dir registry with
-   owner, purpose and exact base recorded. The reviewed registry tool is locally
-   integrated: use `node scripts/agent-worktree.mjs create <slug> --base <EXACT_BASE_COMMIT>
-   --owner "<Owner/Chat-ID>" --purpose "<bounded purpose>" --branch <branch>` only
-   within an authorized scope. See `docs/agent/tasks/T-69.md`. Never allocate IDs
-   from historical counters or infer permission to create worktrees from tool availability.
-
-Every agent must **never** assume that uncommitted changes were made by itself.
-
-## Priority rule (on any conflict)
-```
-Repository/Git facts > current canonical MASTER_STATUS/ACTIVE_WORK > historical handoff/task files > agent assumptions
-```
-The actual repository state always wins over handoff documentation.
-
-## NEVER
-- overwrite unrelated uncommitted changes
-- delete unknown files
-- `git reset`
-- `git checkout` modified files
-- `git clean`
-- push, merge, or commit without explicit user permission (exception: docs-only
-  PR merges per "Doku-PRs selbst mergen" above; closing stale PRs per
-  "PR-Ordnung und Aufräumen" above)
-- publish an OTA, start a build, or release to a store without explicit user permission
-- run destructive SQL or write to Production Supabase/DB without explicit user permission
-
-## ALWAYS
-- inspect `git status` before editing
-- preserve unrelated work
-- preserve working tracking/GPS behavior; review field evidence and continuity
-  before replacing tracking logic
-- for product-code changes, run relevant tests, TypeScript typecheck, ESLint,
-  and `git diff --check` (report any justified limitation)
-- document remaining issues
-- update the handoff before stopping when appropriate
-
-## When handing off between Codex and Claude
-1. Update the **manual** sections of `docs/agent/SESSION_HANDOFF.md`
-   (Current task, Goal, Work completed, Tests, Known issues, Important context,
-   Do not touch, Next recommended step, Relevant files, Open questions).
-2. Run `npm run agent:handoff -- --agent=<current-agent>` with `codex` for Codex or `claude` for Claude Code.
-3. Run `git status --short`.
-4. Do **not** commit or push. Then stop.
-
-The handoff script only rewrites the `AUTO-GENERATED` block of `SESSION_HANDOFF.md`;
-manual sections are never touched.
-
-# Parallel work with Git worktrees
-
-For running several independent tasks at the same time, ANYVO uses Git worktrees.
-Full guide: `docs/agent/WORKTREES.md`.
-
-Core rule:
-```
-1 task = 1 Task-ID (T-XX) = 1 branch = 1 worktree = 1 responsible Primary Agent
-```
-
-- Worktrees are sibling folders: `../anyvo-<slug>`. Multiple Primary Agents may work
-  in parallel, but **never in the same working tree**.
-- Each task keeps its own report in `docs/agent/tasks/<TASK-ID>.md`
-  (template: `docs/agent/tasks/_TEMPLATE.md`). The **global** files (`TASKS.md`,
-  `SESSION_HANDOFF.md`, `CURRENT_STATE.md`, `WORK_LOG.md`) are updated **only at
-  integration** by the responsible integration agent — not by parallel tasks.
-- Helper: `npm run agent:wt:create|list|finish|remove`. `remove` refuses to delete a
-  **dirty** worktree and never uses `--force`.
-- Tool-neutral roles: Primary Agent, Implementation Agent, Review Agent, QA Agent,
-  Subagent. Codex and Claude Code are supported Primary Agents. OpenCode remains
-  optional. Existing coordinator, writer and publisher assignments still apply.
-
-The NEVER/ALWAYS rules above apply unchanged in every worktree. In addition, a parallel
-agent must never delete or reset another worktree's or the main tree's uncommitted work,
-never clean/reset foreign changes, and never push or merge without explicit approval.
-
-# BMAD — schlanker Anyvo-Ablauf / Claude-Übergang
-
-Always consider BMAD for every ANYVO task and scale its scope to complexity
-and risk without a separate user request. For small, low-risk tasks, clarify
-the goal, inspect affected areas, act within scope and verify the result in a
-compact workflow. Even small changes may require deeper review when risk is high.
-Read `docs/agent/BMAD.md` for the appropriate scope; briefly name the approach.
-For small tasks, a short work announcement is sufficient; no mandatory spec.
-Current canonical MASTER_STATUS/ACTIVE_WORK and the atomic task registry remain
-authoritative; do not duplicate the backlog or allocate historical task IDs.
-The dated audit `docs/agent/audits/2026-11-01.md` is supporting evidence, not a
-replacement for the continuously maintained master status or fresh EAS checks.
-Keep specs, decisions and handoffs in repository files so Claude can take over.
-CLAUDE.md imports these rules; the same customer-data, release and writer rules
-apply to both tools. Installed BMAD roles do not authorize parallel subagents.
-User authorization for this preparation: no commit, push, merge or publication.
-Any later Git/release action needs applicable direct authorization; installation
-or a workflow suggestion alone does not provide it.
 
 ## ANYVO Production OTA — zwingende Regel
 
