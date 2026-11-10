@@ -35,6 +35,9 @@
 --     und notieren; zuerst Staging, dann Production.
 --   * Die Migration läuft in einer Transaktion (begin/commit): bei jedem Fehler bleibt
 --     der vorherige Zustand vollständig erhalten.
+--   * Sperr-Timeout 5 s: Ist public.training_exercises gerade gesperrt, bricht die
+--     Migration ab, statt alle Trainings-Speicherungen hinter sich warten zu lassen –
+--     kein Teilzustand; einfach später erneut ausführen.
 --   * Rückweg OHNE Datenverlust: nur die Funktion auf die versionierte Ausgangsdefinition
 --     (training_document_v1.production-2026-11-09.sql) zurücksetzen. Die Spalte
 --     rating_scale wird NIE gelöscht (drop column würde Lernstufen-Markierungen
@@ -52,6 +55,8 @@ end
 $$;
 
 begin;
+-- Nur für diese Transaktion: nicht unbegrenzt auf die Tabellensperre warten.
+set local lock_timeout = '5s';
 
 alter table public.training_exercises
   add column if not exists rating_scale text null;
