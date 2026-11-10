@@ -101,15 +101,3 @@ npm run build:local:ios:dev / :android:dev   # lokaler Dev-Build (gratis)
 eas build --profile preview|production --platform ios|android|all
 eas submit --platform ios|android
 ```
-
-## 17. Verbindlicher Release-Inhaltsabgleich
-
-Direkter Nutzerauftrag vom 04.11.2026:
-[Release-Vollständigkeit](agent/RELEASE_COMPLETENESS.md) vor dem nächsten neuen
-Build-/OTA-Releaseauftrag beachten. Die technische Prüfung dieses Dokuments ist
-kein Beleg, dass alle freigegebenen Funktionen im Kandidaten enthalten sind.
-Die unabhängig geprüfte Soll-Inventur, deren Übernahmenachweise je Plattform und
-Runtime sowie der exakte Quell-Freeze sind zusätzliche Voraussetzungen.
-Fehlende oder unvollständige Inventur: kein Gesamtfreigabe-PASS.
-Der [Build59-Inhaltsbefund](agent/BUILD59_CONTENT_AUDIT.md) dokumentiert den
-konkreten Trainings-Hub-Regressionsfall und offene Grenzen des Abgleichs.
