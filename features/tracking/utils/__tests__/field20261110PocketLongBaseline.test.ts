@@ -9,9 +9,9 @@
 // Positionen/Zeiten/IDs).
 //
 // SOLLFOLGE pocket-slow: zwei Rechtswinkel (bei ~36 m und ~92 m Detektor-Weg).
-// Sie ist aus der GPS-Geometrie der Aufnahme ABGELESEN (drei gerade Schenkel:
-// ~117° → ~200° → ~305°), nicht von der Hundeführerin als Protokoll geliefert.
-// Der seitliche Versatz bei 50–61 m (Legepause, ~5 m) gilt hier als KEIN Winkel.
+// Aus der GPS-Geometrie abgelesen (drei gerade Schenkel: ~117° → ~200° → ~305°)
+// und von der Hundeführerin am 2026-11-10 bestätigt: genau zwei Rechtswinkel.
+// Der seitliche Versatz bei 50–61 m (Legepause, ~5 m) ist damit KEIN Winkel.
 import * as fs from 'fs';
 import * as path from 'path';
 import { capturedDetectorBuffer } from './helpers/realSessionFixture';
