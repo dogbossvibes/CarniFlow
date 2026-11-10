@@ -2,25 +2,23 @@ import { readFileSync } from 'node:fs';
 
 const text = (path: string) => readFileSync(path, 'utf8');
 
-describe('BMAD und Claude: verbindliche Übergabequellen', () => {
-  it('kennzeichnet den tatsächlichen übergebenden Agenten', () => {
-    const handoff = text('AGENTS.md').split('## When handing off between Codex and Claude')[1]?.split('\n## ')[0] ?? '';
-    expect(handoff).toContain('--agent=<current-agent>');
-    expect(handoff).toContain('`claude` for Claude Code');
-    expect(handoff).toContain('`codex` for Codex');
+describe('BMAD und Claude: schlanke Arbeitsregeln', () => {
+  it('BMAD läuft nur auf Wunsch bzw. bei grossen/unklaren Funktionen', () => {
+    const agents = text('AGENTS.md');
+    expect(agents).toContain('BMAD (`docs/agent/BMAD.md`) nur auf ausdrücklichen');
+    expect(text('docs/agent/BMAD.md')).toContain('BMAD nur noch auf ausdrücklichen Wunsch');
   });
   it('verwendet aktuelle Arbeitsquellen statt historischer Handoffs als Aufgabenwahrheit', () => {
     const doc = text('docs/agent/BMAD.md');
     expect(doc).toContain('| Aktive Arbeit, Owner und Stops | `ACTIVE_WORK.md`');
-    expect(doc).toContain('| Aufgaben-IDs | Gemeinsame atomare Taskregistry');
     expect(doc).not.toContain('| Aktive Arbeit und Übergabe | `SESSION_HANDOFF.md`');
     expect(doc).toContain('| Historisches Task-Ledger | `TASKS.md`; keine ID-Vergabe daraus |');
   });
-  it('hält agentenspezifische BMAD-Ergänzungen außerhalb der identischen OTA-Regeln', () => {
+  it('CLAUDE.md importiert AGENTS.md; die OTA-Regel steht genau einmal in AGENTS.md', () => {
     const agents = text('AGENTS.md');const claude = text('CLAUDE.md');
     const heading = '## ANYVO Production OTA — zwingende Regel';
-    expect(agents.indexOf('# BMAD — schlanker Anyvo-Ablauf / Claude-Übergang')).toBeLessThan(agents.indexOf(heading));
-    expect(claude.indexOf('## BMAD and transfer from Codex')).toBeLessThan(claude.indexOf(heading));
-    expect(agents.slice(agents.indexOf(heading))).toBe(claude.slice(claude.indexOf(heading)));
+    expect(claude.split('\n')[0]).toBe('@AGENTS.md');
+    expect(agents.split(heading).length).toBe(2);
+    expect(agents.indexOf('## Arbeitsweise')).toBeLessThan(agents.indexOf(heading));
   });
 });
