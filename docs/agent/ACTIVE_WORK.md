@@ -1,5 +1,28 @@
 # ANYVO – Active Work
 
+## Stand nach OTA Begrüssungston + Karten – 2026-11-10
+
+**Erledigt:** Kombinierte OTA für iOS 57 und iOS 60 live, Release-Karte Issue #44
+(Status „Live – Nachkontrolle offen“, Gerätetest offen). Board-Feld „Ziel“ noch von Hand
+zu setzen (Mehrfachauswahl, über die CLI nicht setzbar).
+
+**Offen:**
+- **T-184 Trainingsdoku neu (#31):** Branch `feat/training-doku-neu-etappe1` @ `90f01f5d`
+  (lokal, nicht gepusht). Prüfzentrum: Code PASS (`7c6b0513`), DB-Suite PASS (`90f01f5d`).
+  Production-Migration `rating_scale` von der Nutzerin am 2026-11-10 freigegeben,
+  **noch nicht ausgeführt** (Ausführung durch die Nutzerin im Supabase-Dashboard, Checkliste
+  lokal ausserhalb des Repos). Danach: `b70e294d` in den Branch mergen (Probe-Merge
+  konfliktfrei), Qualitätsbeleg + Review am exakten Commit, OTA nur iOS 60 mit eigener
+  Freigabe, Gerätetest auf TestFlight. Der App-Stand darf erst nach der Migration auf Geräte.
+- **PR #37** (Revert des Release-Gates aus #28, T-189): Merge durch die Nutzerin. Solange
+  offen, sperrt das Gate auf `main` Production-Wrapper und verwaltete Build-Einstiege.
+- **PR #30** („keine OTA vergessen“): Konflikte mit `main`; Ausnahme #65 nach dieser OTA prüfen.
+- Lokaler Hinweis: altes `node_modules` direkt unter `~/canisflow/` stört SDK-58-Exporte
+  aus Worktrees, deren Abhängigkeiten dorthin verlinkt sind (iOS-60-Export scheiterte einmal,
+  nichts veröffentlicht; Quelle umgestellt). Aufräumen nur mit Freigabe der Nutzerin.
+
+Keine Freigabe für Commit/Push/OTA/Build/DB aus diesem Eintrag.
+
 ## Tooling-Änderungen erledigt / main synchronisiert – 2026-11-09
 
 **Erledigt (in `origin/main`):**

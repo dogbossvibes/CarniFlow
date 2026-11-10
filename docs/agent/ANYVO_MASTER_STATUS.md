@@ -1,5 +1,15 @@
 # ANYVO Master Status
 
+## OTA Begrüssungston + deckende Trainingskarten veröffentlicht – 2026-11-10
+
+Release-Karte: Issue #44 (alle IDs, Prüfungen und vorheriger Stand dort). Kurzfassung:
+- iOS 57 (App Store 1.0.6, Runtime `1.0.6-map49-v1`): Source `234da479`, Group `16afcfa2-dee5-4841-907e-fb997298b898`.
+- iOS 60 (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`): Source `b70e294d`, Group `0159b03c-cea1-42fa-8d95-210109c5f544`.
+Publish durch die Nutzerin über den Production-Wrapper; MASTER-Nachkontrolle frisch aus EAS
+bestanden (Channel/Branch/Runtime/IDs/Commit/Message). Testweg „Nachher“, Gerätetest offen.
+Kein Android, keine DB-/Native-/Store-Änderung. Dieser Abschnitt ist der aktuelle
+Production-Stand für iOS 57 und iOS 60 und ersetzt ältere widersprechende Angaben unten.
+
 ## Gewichtsjournal veröffentlicht – 2026-11-01
 
 T163/T164/T165: drei Commits auf GitHub gesichert, drei OTAs durch01 einmalig
