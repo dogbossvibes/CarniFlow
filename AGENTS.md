@@ -33,6 +33,20 @@ direkt vor dem Merge). Alle anderen PRs (Code, Skripte, `package.json`, `AGENTS.
 `CLAUDE.md`, Konfiguration) brauchen weiterhin eine ausdrückliche Merge-Freigabe.
 Diese Regel erteilt keine OTA-, Build-, Store-, DB- oder Push-auf-main-Freigabe.
 
+## PR-Ordnung und Aufräumen (direkte Nutzerfreigabe 2026-11-10)
+
+Ziel: Die Nutzerin muss sich keine Sonderregeln merken. Jeder PR wird zeitnah
+entweder gemergt oder geschlossen; «bewusst offen lassen» gibt es nicht.
+- Am Ende jeder Aufgabe nennt der Agent pro PR in einem Satz die nötige Handlung:
+  «Mergen», «auf dem Gerät testen, dann mergen» oder «Schliessen».
+- Claude darf **veraltete PRs selbst schliessen** (nicht mergen), wenn sie
+  nachweislich überholt sind (z. B. Ziel-Build/Runtime ersetzt, Inhalt anderweitig
+  integriert). Pflicht: Kommentar mit Grund und Hinweis, dass der PR wieder geöffnet
+  werden kann. Branches werden dabei nicht gelöscht.
+- Code-, Skript-, Konfigurations-, Release- sowie `AGENTS.md`-/`CLAUDE.md`-PRs mergt
+  weiterhin nur die Nutzerin (siehe oben).
+- Bei Unklarheit, ob ein PR noch gebraucht wird: nicht schliessen, sondern fragen.
+
 ## ANYVO project status
 
 Before substantial ANYVO work, read:
@@ -217,7 +231,8 @@ The actual repository state always wins over handoff documentation.
 - `git checkout` modified files
 - `git clean`
 - push, merge, or commit without explicit user permission (exception: docs-only
-  PR merges per "Doku-PRs selbst mergen" above)
+  PR merges per "Doku-PRs selbst mergen" above; closing stale PRs per
+  "PR-Ordnung und Aufräumen" above)
 - publish an OTA, start a build, or release to a store without explicit user permission
 - run destructive SQL or write to Production Supabase/DB without explicit user permission
 
