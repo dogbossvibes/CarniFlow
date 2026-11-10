@@ -8,10 +8,17 @@
 // Die Fixtures sind datenschutzreduziert (relative x/y/tMs, keine absoluten
 // Positionen/Zeiten/IDs).
 //
-// SOLLFOLGE pocket-slow: zwei Rechtswinkel (bei ~36 m und ~92 m Detektor-Weg).
-// Aus der GPS-Geometrie abgelesen (drei gerade Schenkel: ~117° → ~200° → ~305°)
-// und von der Hundeführerin am 2026-11-10 bestätigt: genau zwei Rechtswinkel.
-// Der seitliche Versatz bei 50–61 m (Legepause, ~5 m) ist damit KEIN Winkel.
+// SOLLFOLGE pocket-slow laut Hundeführerin (2026-11-10, aus der Erinnerung):
+// R → R → L → R. Zur GPS-Geometrie passt das so (Detektor-Weg):
+//   R  ~36 m   (~117° → ~200°), lange Schenkel
+//   R  ~51 m   (~200° → ~280°), danach nur ~5 m realer Schenkel mit Legepause
+//   L  ~61 m   (~280° → ~210°)
+//   R  ~92 m   (~210° → ~305°), lange Schenkel
+// Der Rückfall findet den ERSTEN und den LETZTEN Winkel. Die beiden mittleren
+// bleiben eine BEKANNTE LÜCKE: der Schenkel dazwischen ist real nur ~5 m lang,
+// bei 6–9 m Genauigkeit und Zittern in der Legepause (Hälften-Biegung 70–150°,
+// Sehne 1–4 m auf 5–8 m Pfad). Aus dem GPS allein ist dieser Versatz nicht von
+// Drift im Stand zu unterscheiden; die Gates werden dafür bewusst NICHT gelockert.
 import * as fs from 'fs';
 import * as path from 'path';
 import { capturedDetectorBuffer } from './helpers/realSessionFixture';
@@ -91,7 +98,7 @@ describe('pocket-slow: field failure shape', () => {
 describe('pocket-slow: long-baseline fallback', () => {
   const pts = () => capturedDetectorBuffer(pocket().detectorPoints);
 
-  it('finds exactly the two right corners, as normal corners', () => {
+  it('finds the two long-leg right corners (first and last of R-R-L-R), as normal corners', () => {
     const p = pts();
     const r = fuseTurns(p);
     expect(r.longBaseline).toBe(2);
@@ -110,9 +117,12 @@ describe('pocket-slow: long-baseline fallback', () => {
     }
   });
 
-  it('does not turn the lateral offset during the laying pause (50–61 m) into corners', () => {
+  it('KNOWN GAP: the two middle corners (R ~51 m, L ~61 m, ~5 m apart) are still not detected', () => {
+    // Dokumentiert den Ist-Zustand, kein Soll: 2 von 4 gelaufenen Winkeln fehlen weiterhin.
+    // Wer diese Lücke schliesst, ersetzt diesen Test durch die volle Folge R-R-L-R.
     const r = fuseTurns(pts());
     expect(r.corners.filter(c => c.atM > 44 && c.atM < 80)).toEqual([]);
+    expect(r.corners).toHaveLength(2);
   });
 
   it('marks the diagnostics of a rescued apex with its own source', () => {
