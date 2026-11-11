@@ -1,7 +1,7 @@
 // Prüfungsvorlagen beim Fährtenlegen (T-200): Auswahl vor dem Start und
 // Führungszeile während des Legens. Reine Anzeige — die Vorlage verändert weder
 // Aufzeichnung noch Marker und wird nicht gespeichert.
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import {
   EXAM_TEMPLATES, type ExamLayGuidance, type ExamNextAction, type ExamTemplate, type ExamTemplateId, type ExamWarning,
 } from '@/features/tracking/utils/examTemplates';
@@ -52,7 +52,8 @@ export function ExamTemplateChooser({ selected, onSelect, t }: {
   return (
     <View className="self-stretch">
       <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start mb-1.5">{t('track.exam.title')}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+      {/* Umbruch statt seitlichem Wischen: alle Stufen sind ohne Suchen sichtbar. */}
+      <View className="flex-row flex-wrap gap-2" accessibilityRole="radiogroup">
         {options.map(option => {
           const on = (selected?.id ?? null) === option.id;
           return (
@@ -64,7 +65,7 @@ export function ExamTemplateChooser({ selected, onSelect, t }: {
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
       <Text className="text-[11px] text-ft-faint self-start mt-1.5 mb-1">
         {selected ? examTemplateSummary(selected, t) : t('track.exam.noneHint')}
       </Text>
