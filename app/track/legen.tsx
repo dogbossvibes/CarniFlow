@@ -40,6 +40,8 @@ import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherServ
 import { angleEvent, objectEvent, trackEventLabelKey, type TrackEvent } from '@/features/tracking/utils/trackEventVoice';
 import { getSpeechLocale } from '@/i18n';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { ExamTemplateBanner, ExamTemplateChooser } from '@/features/tracking/components/ExamTemplateGuide';
+import { examLayGuidance, examTemplateById, type ExamTemplateId } from '@/features/tracking/utils/examTemplates';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import { QaModeBadge } from '@/features/tracking/components/QaModeBadge';
 import { QaReferenceMarker } from '@/features/tracking/components/QaReferenceMarker';
@@ -176,6 +178,8 @@ export default function LegenScreen() {
   const [surface, setSurface] = useState<string>('Acker');         // Untergrund
   const [condition, setCondition] = useState<string | null>(null); // Beschaffenheit
   const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (Open-Meteo)
+  // Prüfungsvorlage (T-200): reine Führungshilfe beim Legen, nicht gespeichert.
+  const [examTemplateId, setExamTemplateId] = useState<ExamTemplateId | null>(null);
   const [weatherState, setWeatherState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const weatherFetchedRef = useRef(false);
   const [gsPicker, setGsPicker] = useState(false);   // Gegenstand-Schnellauswahl (Inline, kein Sheet)
@@ -526,6 +530,14 @@ export default function LegenScreen() {
   const mapMarkers: MapMarker[] = projectAngleMarkers(markers).map(mk => ({ ...mk }));
   const gegenstaende = markers.filter(isScoredObject).length;
   const winkel = countLaidCorners(markers);
+  const examTemplate = examTemplateById(examTemplateId);
+  const examGuidance = examTemplate ? examLayGuidance(examTemplate, {
+    currentStep,
+    cornerSteps: projectAngleMarkers(markers)
+      .filter(m => m.type === 'winkel' && m.angleKind !== 'abriss' && m.angleKind !== 'absatz')
+      .map(m => metersToSteps(m.distance_from_start ?? 0, stepLengthM)),
+    articleSteps: markers.filter(isScoredObject).map(m => metersToSteps(m.distance_from_start ?? 0, stepLengthM)),
+  }) : null;
   // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
   const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
@@ -844,6 +856,12 @@ export default function LegenScreen() {
             </View>
           )}
 
+          {phase === 'recording' && !startLockActive && examTemplate && examGuidance && (
+            <View className="absolute top-[64px] left-0 right-0 items-center px-4" pointerEvents="none">
+              <ExamTemplateBanner template={examTemplate} guidance={examGuidance} t={t} />
+            </View>
+          )}
+
           {phase === 'recording' && activeSegment && (
             <View style={{ bottom: mapOverlayLayout.contentBottom }} className="absolute left-[14px] right-[14px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
               <View className="flex-row items-center justify-between gap-3">
@@ -992,6 +1010,8 @@ export default function LegenScreen() {
                     })}
                   </View>
                   <Text className="text-[11px] text-ft-faint self-start mb-1">{t('track.layVoiceToggleSub')}</Text>
+
+                  <ExamTemplateChooser selected={examTemplate} onSelect={setExamTemplateId} t={t} />
 
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
