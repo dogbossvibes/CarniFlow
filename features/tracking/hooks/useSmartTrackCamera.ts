@@ -98,8 +98,11 @@ export function useSmartTrackCamera(input: SmartTrackCameraInput): SmartTrackCam
 
   // Aktuelle Steuerwerte in Refs — damit der Kamera-Effect NICHT von wechselnden
   // Callback-Identitäten abhängt (das war die Ursache des Search-Recorder-Bugs).
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const modeRef = useRef(mode); modeRef.current = mode;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const followingRef = useRef(following); followingRef.current = following;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const pitchedRef = useRef(pitched); pitchedRef.current = pitched;
 
   const attachMap = useCallback((map: any | null) => {
