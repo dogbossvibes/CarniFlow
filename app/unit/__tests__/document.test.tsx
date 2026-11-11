@@ -987,6 +987,16 @@ describe('DocumentScreen — atomic restore and exact duration', () => {
     const second = render(); await flush(); await act(async () => { await saveButton(second).props.onPress(); });
     expect(mockAtomicSave.mock.calls[0][2].duration_sec).toBe(125);
   });
+  // ESLint-Fix (react-hooks/refs): Der Hinweis «bereits abgeschlossen» hängt an
+  // remoteCompleted UND einer alten, nicht-atomaren Fertigstellung – unverändert.
+  it.each([[false, true], [true, false]])('restored remoteCompleted draft with atomic=%s shows the legacy completion hint: %s', async (atomic, shown) => {
+    const first = render(); await flush(); await act(async () => first.unmount()); mounted.splice(mounted.indexOf(first), 1);
+    const key = 'training_document_v1:owner-1:edit:existing'; const saved = JSON.parse((await AsyncStorage.getItem(key))!);
+    saved.value.remoteCompleted = true; saved.value.atomic = atomic;
+    await AsyncStorage.setItem(key, JSON.stringify(saved));
+    const second = render(); await flush();
+    expect(strings(second).includes('trainingDoc.remoteCompleted')).toBe(shown);
+  });
   it('tapping the already selected dog leaves results and exercise duration intact', async () => {
     mockDogs = [{ id: 'dog-1', name: 'Yam' }, { id: 'dog-2', name: 'Other' }];
     const node = render(); await flush(); tap(node, 'Yam');

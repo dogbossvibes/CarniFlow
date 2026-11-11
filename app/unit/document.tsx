@@ -172,6 +172,8 @@ function DocumentForm() {
   const [nextFocusDisciplineKey, setNextFocusDisciplineKey] = useState('');
   const [pendingSave, setPendingSave] = useState(false);
   const legacyCompletion = useRef(false);
+  // Spiegel von legacyCompletion fürs Rendern (Refs dürfen im Render nicht gelesen werden).
+  const [legacyCompleted, setLegacyCompleted] = useState(false);
   const [saving, setSaving] = useState(false);
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -242,7 +244,7 @@ function DocumentForm() {
         focusIdRef.current = draft.focusId ?? focusIdRef.current;
         sourceFingerprint.current = draft.sourceFingerprint;
         setRemoteCompleted(draft.remoteCompleted ?? false);
-        legacyCompletion.current = !!draft.remoteCompleted && !draft.atomic;
+        legacyCompletion.current = !!draft.remoteCompleted && !draft.atomic; setLegacyCompleted(legacyCompletion.current);
         setNextFocusDisciplineKey(draft.nextFocusDisciplineKey ?? '');
         let pending;
         try { pending = await readTrainingSaveIntent(owner, id ?? draft.unitId); }
@@ -317,9 +319,9 @@ function DocumentForm() {
 
   // Genau einen Hund erst nach abgeschlossenem Load automatisch wählen. Die
   // Auswahl aus Navigation oder Edit-Modus bleibt dabei unverändert.
-  useEffect(() => {
-    if (!editing && !dogsLoading && !dogId && dogs.length === 1) setDogId(dogs[0].id);
-  }, [dogsLoading, dogs, editing, dogId]);
+  // Direkt beim Rendern statt im Effekt (React-Muster „State bei geänderter
+  // Eingabe anpassen“); die Bedingung ist danach falsch, also keine Schleife.
+  if (!editing && !dogsLoading && !dogId && dogs.length === 1) setDogId(dogs[0].id);
 
   const disc = disciplines.find(d => d.key === activeDisc) ?? disciplines[0];
   const [focusRevision, setFocusRevision] = useState(0);
@@ -331,11 +333,14 @@ function DocumentForm() {
 
   const discLabel = disc?.label;
   const discExercises = JSON.stringify(disc?.exercises ?? []);
+  // Vorschläge leeren, sobald sich ihr Kontext ändert – beim Rendern statt im Effekt.
+  const recentContext = JSON.stringify([discLabel, discExercises, dogId, isCustomDiscipline, session?.user.id]);
+  const [recentNamesContext, setRecentNamesContext] = useState(recentContext);
+  if (recentNamesContext !== recentContext) { setRecentNamesContext(recentContext); setRecentNames([]); }
   // Vorschläge aus der eigenen Trainingshistorie für FESTE Sparten (siehe
   // CustomExerciseSheet-Kommentar): kein neues Schema, rein lesende Query.
   useEffect(() => {
-    setRecentNames([]);
-    if (!discLabel || !dogId || isCustomDiscipline || !session?.user.id) { setRecentNames([]); return; }
+    if (!discLabel || !dogId || isCustomDiscipline || !session?.user.id) return;
     let cancelled = false;
     const currentExercises = JSON.parse(discExercises) as string[];
     getRecentExerciseNames(session.user.id, discLabel, 20, dogId ?? undefined).then(({ data }) => {
@@ -486,7 +491,7 @@ function DocumentForm() {
     setPhotos(next.photos); setVideos(next.videos); setAudio(next.audio); setMetrics(next.metrics); setShared(next.shared);
     setNextFocus(next.nextFocus ?? ''); setNextFocusDiscipline(next.nextFocusDiscipline ?? ''); setNextFocusDisciplineKey(next.nextFocusDisciplineKey ?? '');
     setPickerOpen(false); setContextOpen(false); setCustomSheetOpen(false); setRecentNames([]);
-    sourceFingerprint.current = undefined; legacyCompletion.current = false;
+    sourceFingerprint.current = undefined; legacyCompletion.current = false; setLegacyCompleted(false);
   };
 
   const hintDiscipline = disciplines.find(d => d.key === activeDisc && selected.some(e => e.performed && e.discipline === d.label))
@@ -645,7 +650,7 @@ function DocumentForm() {
           {editing && !editLoaded && <TouchableOpacity accessibilityRole="button" style={s.chip} onPress={() => setLoadRetry(v => v + 1)}><Text style={s.chipTxt}>{t('common.retry')}</Text></TouchableOpacity>}
           {editConflict && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.reviewSave')}</Text>}
           {pendingSave && <Text style={s.saveHint} accessibilityRole="alert">{t('trainingDoc.pendingSave')}</Text>}
-          {remoteCompleted && legacyCompletion.current && <Text style={s.saveHint}>{t('trainingDoc.remoteCompleted')}</Text>}
+          {remoteCompleted && legacyCompleted && <Text style={s.saveHint}>{t('trainingDoc.remoteCompleted')}</Text>}
           {/* Trainingskontext: Hund + Sparte kompakt in einer Card */}
           <View style={s.contextCard}>
             {!editing && dogId && dogs.some(d => d.id === dogId) && <><Text style={s.contextTitle}>{dogs.find(d => d.id === dogId)?.name} · {disc?.label}</Text><Text style={s.flowHelp}>{formatDate(date, undefined, locale ?? 'de')}</Text><TouchableOpacity style={s.contextToggle} accessibilityRole="button" accessibilityState={{ expanded: contextOpen }} onPress={() => setContextOpen(v => !v)}><Text style={s.actionText}>{t('trainingFlow.changeContext')}</Text></TouchableOpacity></>}

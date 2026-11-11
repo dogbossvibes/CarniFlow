@@ -53,27 +53,28 @@ function TimerForm() {
   const saveLock = useRef(false);
   const savePayload = useRef<Parameters<typeof createDocumentedUnit>[1] | null>(null);
   useEffect(() => () => { alive.current = false; }, []);
-  const unitIdRef = useRef(Crypto.randomUUID());   // stabile ID → idempotenter Quota-Claim
-  const baseRef = useRef(0);              // Sekunden aus abgeschlossenen Lauf-Segmenten
-  const segStartRef = useRef(Date.now()); // Start des aktuellen laufenden Segments
+  const [unitId] = useState(() => Crypto.randomUUID());   // stabile ID → idempotenter Quota-Claim
+  const [mountedAt] = useState(() => Date.now());
+  const [base, setBase] = useState(0);              // Sekunden aus abgeschlossenen Lauf-Segmenten
+  const [segStart, setSegStart] = useState(mountedAt); // Start des aktuellen laufenden Segments
   const [running, setRunning] = useState(true);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(mountedAt);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, []);
 
-  const elapsed = Math.floor(running ? baseRef.current + (now - segStartRef.current) / 1000 : baseRef.current);
+  const elapsed = Math.floor(running ? base + (now - segStart) / 1000 : base);
   const contextLabel = [dogName, discipline].filter(Boolean).join(' · ');
 
   const togglePause = () => {
     tapHaptic();
     if (running) {
-      baseRef.current += (Date.now() - segStartRef.current) / 1000;
+      setBase(base + (Date.now() - segStart) / 1000);
       setRunning(false);
     } else {
-      segStartRef.current = Date.now();
+      setSegStart(Date.now());
       setRunning(true);
     }
   };
@@ -98,7 +99,7 @@ function TimerForm() {
       shared_with_trainer: false,
       ...EMPTY_METRICS,
     };
-    const { error } = await createDocumentedUnit(ownerId, savePayload.current, [], unitIdRef.current, () => alive.current);
+    const { error } = await createDocumentedUnit(ownerId, savePayload.current, [], unitId, () => alive.current);
     if (!alive.current) return;
     if (error) {
       if (handleQuotaBlock(error, 'training', t, () => router.push('/premium' as never))) return;

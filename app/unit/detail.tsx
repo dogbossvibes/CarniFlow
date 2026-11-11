@@ -36,6 +36,9 @@ function DetailVideo({ uri }: { uri: string }) {
   return <VideoView player={player} style={s.video} contentFit="cover" nativeControls />;
 }
 
+// Eindeutiger Cache-Pfad pro Abspielvorgang (Zeitstempel ausserhalb der Komponente).
+const memoCachePath = (idx: number) => FileSystem.cacheDirectory + `memo_${idx}_${Date.now()}.mp4`;
+
 // Read-only Audio-Wiedergabe. Datei wird lokal geladen (Supabase-CDN ohne
 // Range-Support), dann via expo-audio abgespielt — gleiches Muster wie AudioRecorder.
 function AudioMemos({ files }: { files: AudioFile[] }) {
@@ -45,10 +48,16 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
   const localRef = useRef<string | null>(null);
 
+  // Wiedergabe-Ende: Anzeige direkt beim Rendern zurücksetzen (React-Muster
+  // „State bei geänderter Eingabe anpassen“), die Datei-Aufräumarbeit bleibt im Effekt.
+  const [seenFinish, setSeenFinish] = useState(status.didJustFinish);
+  if (seenFinish !== status.didJustFinish) {
+    setSeenFinish(status.didJustFinish);
+    if (status.didJustFinish) setPlayingIdx(null);
+  }
   useEffect(() => {
-    if (status.didJustFinish) {
-      setPlayingIdx(null);
-      if (localRef.current) { FileSystem.deleteAsync(localRef.current, { idempotent: true }); localRef.current = null; }
+    if (status.didJustFinish && localRef.current) {
+      FileSystem.deleteAsync(localRef.current, { idempotent: true }); localRef.current = null;
     }
   }, [status.didJustFinish]);
 
@@ -59,7 +68,7 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
       if (playingIdx === idx) { setPlayingIdx(null); return; }
       setPlayingIdx(idx);
       await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
-      const localUri = FileSystem.cacheDirectory + `memo_${idx}_${Date.now()}.mp4`;
+      const localUri = memoCachePath(idx);
       const result   = await FileSystem.downloadAsync(await signMediaUrl(files[idx].url), localUri);
       if (result.status !== 200) throw new Error('Download fehlgeschlagen');
       localRef.current = result.uri;
