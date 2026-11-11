@@ -49,9 +49,11 @@ export async function runSearch(input: SearchRunInput): Promise<SearchRunResult>
   const cornerMarkers = lay.corners.map((c, i) => ({ id: `winkel-${i}`, ...latLng(c.x, c.y), distance_from_start: c.atM, t: c.committedAtMs, angleKind: c.kind }));
   const objectMarkers = lay.objects.map((o, i) => ({ id: `gegenstand-${i}`, ...latLng(o.x, o.y), distance_from_start: o.atM, t: o.tMs, accuracy: o.accuracy }));
   const eventArcs = buildSearchEventArcs([...cornerMarkers, ...objectMarkers], laidPoints);
-  const laidObjects: SearchObject[] = objectMarkers.map((m, i) => ({
-    at: { latitude: m.lat, longitude: m.lng }, index: i, recoveryIndex: i, material: 'holz', id: m.id, atM: eventArcs[m.id]?.arcM ?? null,
-  }));
+  // accuracyM wie in run.tsx (T-196); auf älteren Ständen ignoriert der Recorder das Feld.
+  const laidObjects: SearchObject[] = objectMarkers.map((m, i) => {
+    const object: SearchObject = { at: { latitude: m.lat, longitude: m.lng }, index: i, recoveryIndex: i, material: 'holz', id: m.id, atM: eventArcs[m.id]?.arcM ?? null };
+    return Object.assign(object, { accuracyM: m.accuracy });
+  });
   const angleArcM = cornerMarkers.flatMap(m => { const at = eventArcs[m.id]?.arcM; return at == null ? [] : [at]; });
 
   searchBridge.feedFix = null; searchBridge.feedMotion = null;
