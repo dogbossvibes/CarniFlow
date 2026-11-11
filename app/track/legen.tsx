@@ -145,6 +145,7 @@ function localizedSegmentLabel(type: TrackSegmentType, t: (key: TranslationKey) 
 
 // Blinkender LIVE-Punkt (anyvoRec).
 function RecDot() {
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const op = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -174,6 +175,7 @@ export default function LegenScreen() {
   const { showToast, toast } = useToast();
 
   const [phase, setPhase] = useState<'warmup' | 'recording'>('warmup');
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const phaseRef = useRef(phase); phaseRef.current = phase;   // Stale-Closure-Schutz für Trigger
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [surface, setSurface] = useState<string>('Acker');         // Untergrund
@@ -212,6 +214,7 @@ export default function LegenScreen() {
   // zentral zugeordneten Begriff (trackEventVoice.ts) — identisch zur Absuche.
   const layVoice = useLayVoiceSetting();   // Sprachausgabe beim Legen (Default AUS)
   const layVoiceRef = useRef(false);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   layVoiceRef.current = layVoice.enabled;
   const announceEvent = useCallback((event: TrackEvent, mode: 'detected' | 'set') => {
     const label = t(trackEventLabelKey(event));
@@ -498,6 +501,7 @@ export default function LegenScreen() {
   // Die optionale Hintergrundberechtigung blockiert den Recorder nicht.
   useEffect(() => {
     if (startAfterClose && !showBgDisclosure) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       setStartAfterClose(false);
       void begin();
     }
@@ -682,6 +686,7 @@ export default function LegenScreen() {
 
   useEffect(() => {
     if (!pendingExit || phase === 'recording') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     setPendingExit(null);
     if ('href' in pendingExit) router.replace(pendingExit.href as never);
     else if (router.canGoBack()) router.back();
