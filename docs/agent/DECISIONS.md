@@ -219,3 +219,19 @@ Status: accepted
   Warum: Der Web-Export bricht (`react-native-maps` importiert native-only Module). Production-OTA läuft daher
   plattformweise (`--platform ios|android`) auf Channel/Environment `production`, Runtime 1.0.1. Kein Mobile-Blocker;
   der Web-Bruch wird **nicht** im Rahmen von Mobile-Fixes nebenbei behoben.
+
+## 2026-11-09 — Winkelkürzel wieder «90 R» / «90 L» (GitHub-Issue #33) · accepted
+
+- **Normale Winkel tragen auf allen Karten wieder das Kürzel «90 L» / «90 R»; Spitzwinkel bleiben «SL» / «SR».**
+  Warum: Produktentscheidung Sandra (2026-11-09) für die gewohnte Fährtenschreibweise. Die ios60-Linie hatte die «90»
+  entfernt, weil die richtungsbasierte Erkennung keine exakten 90° belegt. Das Kürzel ist eine reine Anzeige
+  (`ANGLE_SHORT` in `features/tracking/utils/angleClassify.ts`) und gilt überall, wo es verwendet wird (Absuche, Legen,
+  Logbuch, Replay). Winkelerkennung, gespeicherte Geometrie (`geometryDirection`/`geometrySharpness`), Sprachansagen und
+  Haptik bleiben unverändert; Sonderkürzel (GW/OW/BW/Abriss, `specialAngleBadge`) ebenfalls. Form, Farbe, Grösse und
+  Schrift der Badges sind unverändert.
+
+- **Absuche-Karte: Blickrichtung aus der gelegten Fährte, nicht aus GPS-Positionsdifferenzen.**
+  Warum: Bei ±5–20 m GPS-Streuung ist eine Richtung aus 3-m-Schritten vor allem Rauschen. Die Kamera peilt die
+  Soll-Fährte am Fortschritt des Hundeführers und dreht erst einige Meter nach einem Winkel; nur bei `off_track` fällt
+  sie auf die Positionsfolge (Mindestschritt 9 m) zurück. Reine Darstellung (`features/tracking/utils/searchMapView.ts`),
+  Datenrichtung Tracking-State → Karte; Recorder, Fortschritt, Off-Track-Logik, Voice/Haptik bleiben unberührt.
