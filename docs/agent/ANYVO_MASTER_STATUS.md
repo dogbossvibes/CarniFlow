@@ -1,5 +1,39 @@
 # ANYVO Master Status
 
+## iOS 60: Trainingsdoku neu, Winkel-Rückfall, Hintergrund-Ortung veröffentlicht – 2026-11-11
+
+Aktueller Production-Stand **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`):
+Source `b6ef690f`, Group `1d1def65-2c26-4234-8997-a84ace05debf`. Zwei Chargen am selben Tag:
+- Release-Karte Issue #49: T-190 (PR #39), T-191 (PR #40), T-195 (Lint-Kennzeichnung).
+  Source `b676b403`, Group `ebc045db-170f-41cb-8876-8adb509bcba7`.
+- Release-Karte Issue #51: T-184 Trainingsdoku neu (#31), baut auf `b676b403` auf.
+  Source `b6ef690f`, Group `dc7979a1-5dbf-411f-9b49-61f5c6419af4`; der Wrapper lief versehentlich
+  ein zweites Mal, die inhaltsgleiche Gruppe `1d1def65-2c26-4234-8997-a84ace05debf` ist jetzt aktiv
+  (gleicher Commit, gleiches Bundle, Nachtrag in der Karte).
+Alle IDs, Prüfungen und vorherigen Stände stehen in den Karten. Publish durch die Nutzerin
+über den Production-Wrapper; MASTER-Nachkontrolle frisch aus EAS bestanden. Gerätetest auf
+TestFlight offen (beide Karten „Live – Nachkontrolle offen“). Kein Android, kein Store-Release.
+iOS 57 unverändert (Stand Issue #44).
+
+**Production-DB:** Migration `rating_scale` (Spalte `training_exercises.rating_scale`,
+Funktion `training_document_v1`) am 2026-11-11 von der Nutzerin im Supabase-Dashboard
+ausgeführt. Vor-/Nachprüfung bestanden, 253 Zeilen vorher und nachher, Build 57 speichert normal.
+
+Die Release-Quellen `b676b403` (Branch `release/ios60-t190-t191-20261111`) und `b6ef690f`
+(Branch `feat/training-doku-neu-etappe1`) liegen nur lokal und sind nicht auf GitHub.
+Jede weitere iOS-60-OTA muss `b6ef690f` als Vorfahren enthalten.
+Dieser Abschnitt ersetzt für iOS 60 die Angabe im folgenden Abschnitt.
+
+## OTA Begrüssungston + deckende Trainingskarten veröffentlicht – 2026-11-10
+
+Release-Karte: Issue #44 (alle IDs, Prüfungen und vorheriger Stand dort). Kurzfassung:
+- iOS 57 (App Store 1.0.6, Runtime `1.0.6-map49-v1`): Source `234da479`, Group `16afcfa2-dee5-4841-907e-fb997298b898`.
+- iOS 60 (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`): Source `b70e294d`, Group `0159b03c-cea1-42fa-8d95-210109c5f544`.
+Publish durch die Nutzerin über den Production-Wrapper; MASTER-Nachkontrolle frisch aus EAS
+bestanden (Channel/Branch/Runtime/IDs/Commit/Message). Testweg „Nachher“, Gerätetest offen.
+Kein Android, keine DB-/Native-/Store-Änderung. Dieser Abschnitt ist der aktuelle
+Production-Stand für iOS 57 und iOS 60 und ersetzt ältere widersprechende Angaben unten.
+
 ## Gewichtsjournal veröffentlicht – 2026-11-01
 
 T163/T164/T165: drei Commits auf GitHub gesichert, drei OTAs durch01 einmalig
