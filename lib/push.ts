@@ -17,12 +17,14 @@ Notifications.setNotificationHandler({
 // Registriert den Expo-Push-Token am Profil. Best-effort (Simulator/abgelehnte
 // Berechtigung → still ok). Remote-Push braucht einen Dev-/Production-Build
 // (in Expo Go auf iOS nicht zuverlässig).
-export async function registerForPush(userId: string) {
+// `prompt: false` fragt die Berechtigung NICHT an, sondern registriert nur, wenn
+// sie bereits erteilt ist (z. B. nach „Nicht jetzt" in der Einführung).
+export async function registerForPush(userId: string, opts?: { prompt?: boolean }) {
   try {
     if (!Device.isDevice) return;
     const existing = await Notifications.getPermissionsAsync();
     let status = existing.status;
-    if (status !== 'granted') {
+    if (status !== 'granted' && opts?.prompt !== false) {
       status = (await Notifications.requestPermissionsAsync()).status;
     }
     if (status !== 'granted') return;
