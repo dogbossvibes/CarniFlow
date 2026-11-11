@@ -1,5 +1,27 @@
 # ANYVO – Active Work
 
+## Stand nach den iOS-60-OTAs – 2026-11-11
+
+**Erledigt:** Production-Migration `rating_scale` ausgeführt. iOS-60-OTAs live: Karte #49
+(T-190, T-191, T-195) und Karte #51 (T-184 Trainingsdoku neu). PR #37 und PR #30 gemergt.
+Dieser Abschnitt ersetzt die offenen Punkte zu T-184, PR #37 und PR #30 im Abschnitt darunter.
+
+**Offen:**
+- **Gerätetest TestFlight (Build 60)** für #49 und #51 durch die Nutzerin; danach Karten auf
+  „Veröffentlicht“. Bei #49 beobachten: möglicher zweiter Marker 2–8 m hinter einem neu
+  erkannten Winkel. Board-Feld „Ziel“ bei #49 und #51 von Hand setzen.
+- **Lokale Release-Quellen sichern:** `b676b403` und `b6ef690f` sind nicht auf GitHub.
+  Push bzw. Integration in die iOS-60-Linie und später `main` nur mit Freigabe der Nutzerin.
+- **Vor dem nächsten Store-Build klären:** Build 57 zeigt Lernstufen als Sterne und kann eine
+  Lernstufen-Übung nicht mit 3 Sternen speichern (kein Datenverlust).
+- **T-193** (Rechenzeit Winkel-Erkennung, Draft): nicht veröffentlicht, kein Review.
+- Prüfzentrum: `node scripts/verify-center.mjs` direkt starten. `npm run verify:center` im
+  Haupt-Checkout zieht eine alte Supabase-CLI aus `node_modules` und liefert in der DB-Ebene
+  überall „permission denied“ (Fehlalarm).
+- Altes `node_modules` direkt unter `~/canisflow/`: Aufräumen nur mit Freigabe der Nutzerin.
+
+Keine Freigabe für Commit/Push/OTA/Build/DB aus diesem Eintrag.
+
 ## Stand nach OTA Begrüssungston + Karten – 2026-11-10
 
 **Erledigt:** Kombinierte OTA für iOS 57 und iOS 60 live, Release-Karte Issue #44
