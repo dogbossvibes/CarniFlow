@@ -30,10 +30,12 @@ export interface WalkSpec {
   startStandS: number;
   /** Stehen am Ende (s). */
   endStandS: number;
+  /** Stehen beim Ablegen eines Gegenstands (s); 0 = im Gehen abgelegt (wie in der Prüfungsordnung). */
+  articleStopS: number;
 }
 
 export const DEFAULT_WALK: WalkSpec = {
-  speedMps: 1.0, speedJitterMps: 0.05, cornerRadiusM: 0.6, cornerSlow: 0.3, startStandS: 6, endStandS: 3,
+  speedMps: 1.0, speedJitterMps: 0.05, cornerRadiusM: 0.6, cornerSlow: 0.3, startStandS: 6, endStandS: 3, articleStopS: 0,
 };
 
 export interface TruthSample { tS: number; x: number; y: number; sM: number; headingDeg: number; speedMps: number }
@@ -57,15 +59,15 @@ export interface TruthCorner {
 
 export interface TruthArticle { index: number; atM: number; x: number; y: number; tS: number }
 
-export interface TruthTrack {
+/** Zeitlicher Ablauf einer Person (Fährtenleger oder Hundeführer) — Eingabe für GPS- und Bewegungsmodell. */
+export interface Timeline { dtS: number; durationS: number; samples: TruthSample[] }
+
+export interface TruthTrack extends Timeline {
   spec: TrackSpec;
   walk: WalkSpec;
-  dtS: number;
-  samples: TruthSample[];
   corners: TruthCorner[];
   articles: TruthArticle[];
   lengthM: number;
-  durationS: number;
   /** Dichter Weg (alle PATH_DS Meter) für Abstandsberechnungen. */
   path: { x: number[]; y: number[]; s: number[]; headingDeg: number[] };
 }
@@ -190,8 +192,10 @@ export function buildTruthTrack(spec: TrackSpec, walk: WalkSpec, rng: Rng): Trut
     record(v);
     const next = Math.min(lengthM, dist + v * TRUTH_DT_S);
     cornerS.forEach((cs, i) => { if (cornerT[i] == null && next >= cs) cornerT[i] = t; });
-    articleS.forEach((as, i) => { if (articleT[i] == null && next >= as) articleT[i] = t; });
+    let dropped = false;
+    articleS.forEach((as, i) => { if (articleT[i] == null && next >= as) { articleT[i] = t; dropped = true; } });
     dist = next; t += TRUTH_DT_S;
+    if (dropped) for (let i = 0, n = Math.round(walk.articleStopS / TRUTH_DT_S); i < n; i++) { record(0); t += TRUTH_DT_S; }
   }
   for (let i = 0, n = Math.max(1, Math.round(walk.endStandS / TRUTH_DT_S)); i < n; i++) { record(0); t += TRUTH_DT_S; }
 
@@ -209,7 +213,7 @@ export function buildTruthTrack(spec: TrackSpec, walk: WalkSpec, rng: Rng): Trut
 }
 
 /** Wahrer Zustand zu einer Zeit (Sekunden ab Simulationsbeginn), linear interpoliert. */
-export function truthAt(track: TruthTrack, tS: number): TruthSample {
+export function truthAt(track: Timeline, tS: number): TruthSample {
   const { samples, dtS } = track;
   const f = Math.max(0, Math.min(samples.length - 1, tS / dtS));
   const i = Math.floor(f), j = Math.min(samples.length - 1, i + 1), w = f - i;

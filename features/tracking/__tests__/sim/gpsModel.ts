@@ -9,7 +9,7 @@
 //   • Sprünge/Ausfälle   — seltene grobe Ausreisser und Lücken
 // Die gemeldete Genauigkeit folgt dem wahren Fehler nur ungefähr (wie im Feld).
 import { gauss, gaussMarkovStep, type Rng } from './rng';
-import { truthAt, type TruthTrack } from './truthTrack';
+import { truthAt, type Timeline } from './truthTrack';
 
 export interface GpsProfile {
   name: string;
@@ -63,7 +63,7 @@ export const LIVE_DELIVERY: DeliverySpec = { name: 'live', mode: 'live', latency
 /** Verhältnis 68-%-Radius zu Streuung je Achse bei kreisförmiger Normalverteilung. */
 const R68_PER_SIGMA = 1.51;
 
-export function simulateGps(truth: TruthTrack, profile: GpsProfile, delivery: DeliverySpec, rng: Rng, t0Ms: number): SimFix[] {
+export function simulateGps(truth: Timeline, profile: GpsProfile, delivery: DeliverySpec, rng: Rng, t0Ms: number): SimFix[] {
   const fixes: SimFix[] = [];
   const axis = () => ({
     slow: profile.slowSigmaM * gauss(rng), fast: profile.fastSigmaM * gauss(rng), burst: 0,

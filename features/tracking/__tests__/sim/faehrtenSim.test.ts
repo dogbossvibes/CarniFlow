@@ -2,7 +2,7 @@
 // Kontrolllauf durch die echte Lege-Verarbeitung. Läuft immer mit.
 import { IDEAL_GPS, LIVE_DELIVERY, simulateGps } from './gpsModel';
 import { SIM_T0_MS } from './layRunner';
-import { buildGroup, GROUPS, renderReport, runGroup } from './matrix';
+import { buildGroup, LAY_GROUPS, renderReport, runGroup } from './matrix';
 import { simulateMotion, stepLengthM } from './motionModel';
 import { ANDROID_BATCH_30S, gpsProfile, motionProfile } from './profiles';
 import { makeRng } from './rng';
@@ -131,7 +131,7 @@ describe('Lauf durch die echte Lege-Verarbeitung', () => {
   });
 
   test('Matrix und Bericht lassen sich aufbauen', () => {
-    for (const g of GROUPS) expect(buildGroup(g, 2).length).toBeGreaterThan(0);
+    for (const g of LAY_GROUPS) expect(buildGroup(g, 2).length).toBeGreaterThan(0);
     const cases = buildGroup('winkel', 1).filter(c => c.table.startsWith('Kontrolle') && c.col === '10 m').slice(0, 2);
     expect(cases).toHaveLength(2);
     const report = renderReport([{ ...runGroupOf(cases) }]);

@@ -3,7 +3,7 @@
 // FAEHRTEN_SIM gesetzt ist (z. B. FAEHRTEN_SIM=full); im normalen Testlauf wird sie übersprungen.
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { runGroup, writeGroupResult, type GroupName } from './matrix';
+import { isSearchGroup, runGroup, runSearchGroup, writeGroupResult, type GroupName } from './matrix';
 
 export function defineMatrixGroupTest(group: GroupName): void {
   const mode = process.env.FAEHRTEN_SIM;
@@ -11,8 +11,8 @@ export function defineMatrixGroupTest(group: GroupName): void {
   const seeds = Math.max(1, Number(process.env.FAEHRTEN_SIM_SEEDS) || 6);
   const outDir = process.env.FAEHRTEN_SIM_OUT || join(tmpdir(), 'anyvo-faehrten-sim');
   const examTracks = process.env.FAEHRTEN_SIM_TRACKS?.split(',').map((s: string) => s.trim()).filter(Boolean);
-  (enabled ? test : test.skip)(`Fährten-Simulator Matrix: ${group}`, () => {
-    const result = runGroup(group, seeds, examTracks);
+  (enabled ? test : test.skip)(`Fährten-Simulator Matrix: ${group}`, async () => {
+    const result = isSearchGroup(group) ? await runSearchGroup(group, seeds) : runGroup(group, seeds, examTracks);
     const reportPath = writeGroupResult(outDir, result);
     process.stdout.write(`\n[faehrten-sim] ${group}: ${result.runs} Läufe in ${result.elapsedS} s → ${reportPath}\n`);
     expect(result.runs).toBeGreaterThan(0);

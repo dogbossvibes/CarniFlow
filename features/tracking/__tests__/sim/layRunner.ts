@@ -20,10 +20,13 @@ export const toLocal = (lat: number, lng: number) => ({ x: (lng - LNG0) * M_LNG,
 
 export interface RecordedPoint { x: number; y: number; tMs: number; accuracy: number | null }
 export interface RecordedCorner { kind: AngleKind; x: number; y: number; atM: number; committedAtMs: number }
+/** Manuell gesetzter Gegenstand: Position = Live-Punkt der App im Moment des Antippens (wie addMarker). */
+export interface RecordedObject { index: number; x: number; y: number; accuracy: number | null; atM: number; tMs: number }
 
 export interface LayRunResult {
   line: RecordedPoint[];
   corners: RecordedCorner[];
+  objects: RecordedObject[];
   distanceM: number;
   fixesTotal: number;
   rejects: Partial<Record<LayRejectReason, number>>;
@@ -40,6 +43,8 @@ export interface LayRunInput {
   motion: readonly MotionWindowSample[];
   /** false = Gerät ohne nutzbare Bewegungssensorik (nur GPS). */
   motionActive?: boolean;
+  /** Zeitpunkte (ms), zu denen der Fährtenleger «Gegenstand» antippt. */
+  objectTapsMs?: readonly number[];
   t0Ms?: number;
 }
 
@@ -60,11 +65,13 @@ function startupDiagnostics(): NonNullable<LayProcessorDeps['startupRef']['curre
 export function runLay(input: LayRunInput): LayRunResult {
   const t0 = input.t0Ms ?? SIM_T0_MS;
   let clock = t0;
-  const result: LayRunResult = { line: [], corners: [], distanceM: 0, fixesTotal: 0, rejects: {}, anchor: null, anchorReleasedAtMs: null, fixComputeMaxMs: 0, fixComputeTotalMs: 0 };
+  const result: LayRunResult = { line: [], corners: [], objects: [], distanceM: 0, fixesTotal: 0, rejects: {}, anchor: null, anchorReleasedAtMs: null, fixComputeMaxMs: 0, fixComputeTotalMs: 0 };
   const markers: { marker: MarkerSample; at: number }[] = [];
+  let puck: { x: number; y: number; accuracy: number | null } | null = null;
+  const taps = [...(input.objectTapsMs ?? [])].sort((a, b) => a - b);
   const state: LayStoreFacade = {
     isPaused: false,
-    setCurrentPosition: () => {}, setStartAnchor: () => {}, setStartDriftRejectedCount: () => {},
+    setCurrentPosition: (p, accuracy) => { puck = { ...toLocal(p.lat, p.lng), accuracy }; }, setStartAnchor: () => {}, setStartDriftRejectedCount: () => {},
     setStartLockActive: () => {}, setDistanceMeters: () => {},
     // Die aufgezeichnete Linie, wie sie im Store landet — inklusive Startanker als erstem Punkt.
     addTrackPoint: p => { result.line.push({ ...toLocal(p.lat, p.lng), tMs: p.t, accuracy: p.accuracy ?? null }); },
@@ -105,6 +112,10 @@ export function runLay(input: LayRunInput): LayRunResult {
   console.log = () => {};
   try {
     for (const ev of events) {
+      while (taps.length && taps[0] <= ev.at) {
+        const tMs = taps.shift()!;
+        if (puck) result.objects.push({ index: result.objects.length, ...(puck as { x: number; y: number; accuracy: number | null }), atM: result.distanceM, tMs });
+      }
       clock = ev.at;
       if (ev.motion) { motionBuf.push(ev.motion); continue; }
       const fix = ev.fix!;

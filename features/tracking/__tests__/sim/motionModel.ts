@@ -7,14 +7,14 @@ import type { MotionWindowSample } from '../../utils/motionTurnEvidence';
 import { HAND, POCKET, simulate, type Program } from '../../utils/__tests__/helpers/motionScenarioSim';
 import type { MotionProfile } from './profiles';
 import type { Rng } from './rng';
-import { truthAt, type TruthTrack } from './truthTrack';
+import { truthAt, type Timeline } from './truthTrack';
 
 /** Schrittlänge aus dem Tempo (Ho 2016: 0,94 m/s → 0,60 m; 1,36 m/s → 0,69 m). */
 export function stepLengthM(speedMps: number): number {
   return 0.3845 + 0.2246 * speedMps;
 }
 
-export function simulateMotion(truth: TruthTrack, profile: MotionProfile, rng: Rng, seed: number, t0Ms: number): MotionWindowSample[] {
+export function simulateMotion(truth: Timeline, profile: MotionProfile, rng: Rng, seed: number, t0Ms: number): MotionWindowSample[] {
   const dt = truth.dtS;
   const program: Program = {
     yawRateDps: t => (truthAt(truth, t + dt).headingDeg - truthAt(truth, t).headingDeg) / dt,

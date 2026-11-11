@@ -1,4 +1,4 @@
-# Fährten-Simulator (T-192) — Stufe 1: Legen
+# Fährten-Simulator (T-192) — Stufe 1: Legen, Stufe 2: Absuche
 
 Reiner Testcode. Nichts in diesem Ordner wird von der App importiert oder
 ausgeliefert, und nichts hier verändert die Fährten-/GPS-/Recorder-Logik.
@@ -18,6 +18,9 @@ sehen würde, schickt das Ergebnis durch die **echte Lege-Verarbeitung der App**
 | `layRunner.ts` | Speist alles in die echte Engine und sammelt Linie, Winkel, Distanz, Rechenzeit. |
 | `scoring.ts` | Bewertung gegen die Wahrheit. |
 | `scenario.ts`, `matrix.ts` | Einzelszenario, Matrixgruppen, Bericht. |
+| `searchTruth.ts` | Wahre Absuche: Hund (Pendeln, Überlaufen, Kreisen, Verweisen) und Hundeführer an der Leine. |
+| `searchMocks.ts`, `searchBridge.ts`, `searchRunner.tsx` | Betreibt den echten `useSearchRecorder` ohne Gerät und wertet mit `computeTrackAnalyticsV3` aus, verdrahtet wie `app/track/run.tsx`. |
+| `searchScenario.ts` | Legen mit Gegenständen → Liegezeit → Absuche → Bewertung. |
 
 ## Ausführen
 
@@ -29,7 +32,8 @@ npx jest features/tracking/__tests__/sim/faehrtenSim
 FAEHRTEN_SIM=full FAEHRTEN_SIM_OUT=/pfad/zum/ausgabeordner npx jest features/tracking/__tests__/sim/layMatrix
 ```
 
-- `FAEHRTEN_SIM`: `full` oder einzelne Gruppen, z. B. `winkel,geraet` (Gruppen: `winkel`, `geraet`, `varianten`, `pruefung`).
+- `FAEHRTEN_SIM`: `full` oder einzelne Gruppen, z. B. `winkel,geraet` (Legen: `winkel`, `geraet`, `varianten`, `pruefung`; Absuche: `suche`, `suchvarianten`).
+- Such-Matrix: `FAEHRTEN_SIM=suche,suchvarianten npx jest features/tracking/__tests__/sim/searchMatrix` (Standard 6 Wiederholungen, ~7 min bei 8).
 - `FAEHRTEN_SIM_SEEDS`: Wiederholungen je Zelle (Standard 6).
 - `FAEHRTEN_SIM_TRACKS`: Prüfungsfährten der Gruppe `pruefung` (Standard `IGP-1,IGP-2,IGP-3`).
 - `FAEHRTEN_SIM_OUT`: Ausgabeordner für `group-*.json` und `REPORT.md` (Standard: Temp-Ordner).
@@ -43,6 +47,9 @@ Gleicher Seed ergibt exakt denselben Lauf.
 - **Linie:** Formfehler (seitlicher Abstand zur wahren Fährte nach Abzug der mittleren
   Verschiebung), Längenfehler, Startpunktfehler.
 - **Rechenzeit** der Engine je GPS-Messung.
+- **Absuche:** Abgang erkannt, Fährtenende erreicht, automatische Gegenstands-Erkennung (verwiesene und nicht
+  verwiesene Gegenstände), gemeldete Abweichung gegen die wahre Abweichung von Hund und Hundeführer,
+  Punktzahlen, Abweichungs-Ereignisse, Abrisse.
 
 ## Herkunft der Zahlen
 
@@ -71,8 +78,10 @@ Genauigkeit. Das passt zum langsam wandernden Fehlermodell.
 
 - **Kein Ersatz für Gerätetests.** Akku, echte Hintergrund-Abbrüche und
   herstellerspezifisches Verhalten zeigt nur das echte Handy.
-- **Nur das Legen.** Absuche, Hundeverhalten, Gegenstands-Platzierung und der
-  Vergleich Legen ↔ Suchen sind noch nicht abgebildet.
+- **Hundemodell ist eine Stellschraube, keine Wahrheit.** Für Sport-Fährtenhunde gibt es keine Messstudien;
+  die drei Hundetypen und die Leinenführung (Schleppkurve, Hundeführer geht am Gegenstand zum Hund) sind Annahmen.
+- **Nicht abgebildet in der Absuche:** manuelles Antippen eines Gegenstands, die Ende-Logik der App
+  (Gegenstand am Fährtenende zählt deshalb nicht in die Quote), Sprach-/Haptik-Führung, Pausen, Wiederaufnahme.
 - **Nicht an eigenen Daten geeicht.** Lange Fährten, Wald und Android fehlen in den
   vorhandenen Feldaufnahmen; die Modelle sind dort reine Literaturwerte.
 - **Winkelradius und Hosentaschen-Einfluss aufs GPS** sind Annahmen ohne Messdaten.
