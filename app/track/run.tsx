@@ -172,6 +172,7 @@ export default function TrackRunScreen() {
       laidPoints,
       laidAccuracies: st.trackPoints.map(p => p.accuracy ?? null),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number },
+        accuracyM: m.accuracy ?? null,   // T-196: Nähe-Toleranz der Auto-Erkennung
         index: i, recoveryIndex: m.recoveryIndex, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null })),
       laidMarkers: projectAngleMarkers(st.markers),
       eventArcs,
