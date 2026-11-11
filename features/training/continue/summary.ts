@@ -28,7 +28,7 @@ export interface TrainingSummary {
     exercises: ExerciseSummary[];
   } | null;
   previous: { id: string; source: 'unit' | 'session'; date: string; disciplines: string[]; exerciseCount: number }[];
-  openHint: { text: string; date: string } | null;
+  openHint: { id: string; text: string; date: string } | null;
 }
 
 const dayNumber = (day: string) => {
@@ -83,6 +83,6 @@ export function summarizeTraining(units: readonly SummaryUnit[], focuses: readon
     previous: older.slice(0, 3).map(u => ({
       id: u.id, source: u.source ?? 'unit', date: u.session_date, disciplines: disciplinesOf(u), exerciseCount: u.exercises?.length ?? 0,
     })),
-    openHint: open ? { text: open.text, date: open.source_date_snapshot } : null,
+    openHint: open ? { id: open.id, text: open.text, date: open.source_date_snapshot } : null,
   };
 }

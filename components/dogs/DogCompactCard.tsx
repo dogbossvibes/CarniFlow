@@ -8,9 +8,10 @@ import { useT } from '@/i18n';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 // Kompakte Listenkarte: Avatar · Name · Rasse/Alter/Geschlecht · Sparten-Badge ·
-// letztes Training + Schnellaktionen (Training/Fährte/Statistik). Tap → Dog Hub.
+// letztes Training + Zeile „Training von <Hund>“ + Schnellaktionen
+// (Training/Fährte/Statistik). Tap → Dog Hub.
 export function DogCompactCard({
-  identity, lastTrainingLabel, openHintLabel, onOpen, onTraining, onFaehrte, onStats, trackColor, trackColorLabel,
+  identity, lastTrainingLabel, openHintLabel, onOpen, onTraining, onTrainingPage, onFaehrte, onStats, trackColor, trackColorLabel,
 }: {
   trackColor?: string;
   trackColorLabel?: string;
@@ -20,6 +21,8 @@ export function DogCompactCard({
   openHintLabel?: string | null;
   onOpen: () => void;
   onTraining: () => void;
+  /** T-184 „Ein Ort pro Hund“: öffnet die Seite „Training von <Hund>“. */
+  onTrainingPage?: () => void;
   onFaehrte: () => void;
   onStats: () => void;
 }) {
@@ -27,8 +30,12 @@ export function DogCompactCard({
   const meta = [identity.breed, identity.ageLabel, genderLabel(identity.gender)].filter(Boolean).join(' · ');
 
   return (
-    <Pressable onPress={onOpen} style={({ pressed }) => [s.card, pressed && { opacity: 0.9 }]}>
-      <View style={s.top}>
+    // Karte selbst nicht als ein Element zusammenfassen, damit VoiceOver/TalkBack die
+    // Zeile „Training von …“ und die Schnellknöpfe einzeln erreicht; das Profil
+    // öffnet der obere Bereich per Bedienhilfen-Aktion.
+    <Pressable onPress={onOpen} accessible={false} style={({ pressed }) => [s.card, pressed && { opacity: 0.9 }]}>
+      <View style={s.top} accessible accessibilityRole="button" accessibilityLabel={[identity.name, meta, lastTrainingLabel, openHintLabel].filter(Boolean).join(', ')}
+        accessibilityActions={[{ name: 'activate' }]} onAccessibilityAction={e => { if (e.nativeEvent.actionName === 'activate') onOpen(); }}>
         <DogAvatar photoUrl={identity.photoUrl} size={58} />
         <View style={s.info}>
           <View style={s.nameRow}>
@@ -44,6 +51,14 @@ export function DogCompactCard({
         {trackColor && <View testID="dog-track-color-stripe" accessible accessibilityLabel={trackColorLabel} style={{ width: 5, height: 38, borderRadius: 3, borderWidth: 0.5, borderColor: '#888888', backgroundColor: trackColor }} />}
         <Ionicons name="chevron-forward" size={18} color={C.trackTextMut} />
       </View>
+
+      {onTrainingPage ? (
+        <TouchableOpacity style={s.page} onPress={onTrainingPage} activeOpacity={0.8} accessibilityRole="button"
+          accessibilityLabel={t('dogTraining.open', { name: identity.name })}>
+          <Text style={s.pageTxt} numberOfLines={1}>{t('dogTraining.open', { name: identity.name })}</Text>
+          <Ionicons name="chevron-forward" size={18} color={C.trackPrimary} />
+        </TouchableOpacity>
+      ) : null}
 
       <View style={s.actions}>
         <QuickIcon icon="barbell-outline" label={lastTrainingLabel ? t('continueTraining.next') : 'Training'}
@@ -75,6 +90,8 @@ const s = StyleSheet.create({
   meta:    { fontSize: 12.5, color: C.trackTextSec, fontWeight: '500' },
   last:    { fontSize: 12.5, color: C.trackTextSec, fontWeight: '600', marginTop: 1 },
   hint:    { fontSize: 12.5, color: C.trackPrimary, fontWeight: '600' },
+  page:    { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: C.trackBorder, paddingTop: 10 },
+  pageTxt: { flexShrink: 1, fontSize: 14.5, color: C.trackPrimary, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 8, borderTopWidth: 1, borderTopColor: C.trackBorder, paddingTop: 12 },
   qi:      { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.trackCardAlt, borderRadius: 12, paddingVertical: 10 },
   qiTxt:   { fontSize: 12, color: C.trackText, fontWeight: '700' },

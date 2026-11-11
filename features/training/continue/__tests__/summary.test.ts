@@ -29,7 +29,7 @@ describe('Weitermachen – Zusammenfassung (T-184 Etappe 2)', () => {
     ], [focus('Ruhiger Abschluss', '2026-11-06'), focus('Erledigt', '2026-11-07', 'done')], today);
     expect(s.last).toMatchObject({ id: 'b', daysAgo: 3, disciplines: ['Unterordnung'] });
     expect(s.previous.map(p => p.id)).toEqual(['c', 'd', 'a']);
-    expect(s.openHint).toEqual({ text: 'Ruhiger Abschluss', date: '2026-11-06' });
+    expect(s.openHint).toEqual({ id: expect.any(String), text: 'Ruhiger Abschluss', date: '2026-11-06' });
   });
 
   test('kein Training → kein letztes Training, kein Absturz', () => {

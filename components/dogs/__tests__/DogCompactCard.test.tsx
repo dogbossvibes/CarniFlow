@@ -2,7 +2,7 @@ import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { Text } from 'react-native';
 import { DogCompactCard } from '../DogCompactCard';
 
-jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string) => k }) }));
+jest.mock('@/i18n', () => ({ useT: () => ({ t: (k: string, p?: Record<string, unknown>) => (p ? `${k}:${JSON.stringify(p)}` : k) }) }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 jest.mock('../DogAvatar', () => ({ DogAvatar: 'Avatar' }));
 
@@ -29,5 +29,34 @@ describe('DogCompactCard – letztes Training (T-184 Etappe 2)', () => {
     render();
     expect(texts()).not.toContain('continueTraining.next');
     expect(texts()).toContain('Training');
+  });
+});
+
+describe('DogCompactCard – Zeile „Training von <Hund>“ (T-184 Etappe 3b)', () => {
+  test('Zeile öffnet die Trainingsseite, ohne den Kartentipp (Profil) auszulösen; Schnellknöpfe bleiben', () => {
+    const onTrainingPage = jest.fn(); const onOpen = jest.fn();
+    render({ onTrainingPage, onOpen });
+    const label = 'dogTraining.open:{"name":"Yam"}';
+    expect(texts()).toContain(label);
+    act(() => view.root.findAll(n => n.props.accessibilityLabel === label && typeof n.props.onPress === 'function')[0].props.onPress());
+    expect(onTrainingPage).toHaveBeenCalledTimes(1);
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(texts()).toEqual(expect.arrayContaining(['Training', 'Fährte', 'Statistik']));
+  });
+
+  test('ohne onTrainingPage keine Zeile (andere Verwendungen unverändert)', () => {
+    render();
+    expect(texts().some(x => x.startsWith('dogTraining.open'))).toBe(false);
+  });
+});
+
+describe('DogCompactCard – Bedienhilfen (T-184 Etappe 3b)', () => {
+  test('Karte fasst nicht alles zusammen; oberer Bereich öffnet das Profil per Aktion', () => {
+    const onOpen = jest.fn();
+    render({ onOpen, lastTrainingLabel: 'Letztes Training: heute · IGP' });
+    const top = view.root.findAll(n => n.props.accessibilityRole === 'button' && n.props.accessibilityLabel === 'Yam, Letztes Training: heute · IGP' && n.props.onAccessibilityAction)[0];
+    act(() => top.props.onAccessibilityAction({ nativeEvent: { actionName: 'activate' } }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(view.root.findAll(n => n.props.accessible === false && typeof n.props.onPress === 'function').length).toBeGreaterThan(0);
   });
 });

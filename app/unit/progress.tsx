@@ -7,11 +7,14 @@ import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { formatDate } from '@/i18n/format';
 import { useDogs } from '@/hooks/useDogs';
-import { useDogTrainingHistory } from '@/hooks/useDogTrainingSummary';
+import { useDogTrainingHistory, useDogTrainingSummary } from '@/hooks/useDogTrainingSummary';
+import { LastTrainingCard } from '@/components/training/LastTrainingCard';
 import { buildMatrix, type MatrixCell } from '@/features/training/continue/matrix';
 import type { LearningLevel } from '@/features/training/documentation/learningLevel';
 
 // Trainingsdoku neu, Etappe 3 (T-184): Verlauf mit Übungs-Matrix – nur lesend.
+// Etappe 3b „Ein Ort pro Hund“: dieselbe Route ist die Seite „Training von <Hund>“
+// mit Erfassen-Knopf und letztem Training oben, darunter Matrix und alle Trainings.
 // Farben aus dem Mockup; jede Stufe zusätzlich mit Symbol/Text (nie Farbe allein).
 // Helligkeit steigt/fällt klar von Stufe zu Stufe (neu hell → sitzt dunkel);
 // Symbol-Kontrast je Punkt ≥ 4,5:1 (siehe Test).
@@ -29,9 +32,10 @@ export default function ProgressScreen() {
   const router = useRouter();
   const { t, locale } = useT();
   const { dogId, discipline: initial } = useLocalSearchParams<{ dogId?: string; discipline?: string }>();
-  const { dogs } = useDogs();
+  const { dogs, loading: dogsLoading, error: dogsError, refresh: refreshDogs } = useDogs();
   const dog = dogs.find(d => d.id === dogId);
   const { data, isLoading, isError, refetch } = useDogTrainingHistory(dogId);
+  const { data: summary, isError: summaryError, refetch: refetchSummary } = useDogTrainingSummary(dogId);
   const [chosen, setTab] = useState<string | null>(initial ?? null);
   const today = useMemo(() => new Date(), []);
   const tabs = useMemo(() => buildMatrix(data?.units ?? [], null, today).disciplines, [data, today]);
@@ -42,10 +46,20 @@ export default function ProgressScreen() {
   const shortDay = (d: string) => `${Number(d.slice(8, 10))}.${Number(d.slice(5, 7))}`;
   // Hinweise hängen am Sparten-Schlüssel; im Sparten-Tab nur die Schlüssel dieser Sparte.
   const tabKeys = new Set((data?.units ?? []).flatMap(u => u.exercises ?? []).filter(e => e.discipline === tab && e.discipline_key).map(e => e.discipline_key));
-  const openHints = (data?.focuses ?? []).filter(f => (f.status === 'open' || f.status === 'practice') && (!tab || tabKeys.has(f.discipline_key)))
+  // Der neueste offene Hinweis steht schon beim letzten Training → hier nicht doppelt
+  // (nur wenn die Karte „Letztes Training“ wirklich angezeigt wird).
+  const shownHintId = summary?.last ? summary.openHint?.id : undefined;
+  const openHints = (data?.focuses ?? []).filter(f => (f.status === 'open' || f.status === 'practice') && (!tab || tabKeys.has(f.discipline_key)) && f.id !== shownHintId)
     .sort((a, b) => b.source_date_snapshot.localeCompare(a.source_date_snapshot) || b.revision - a.revision || b.id.localeCompare(a.id));
   const openUnit = (id: string, source: 'unit' | 'session') =>
     source === 'session' ? router.push(`/training/${id}` as never) : router.push({ pathname: '/unit/detail', params: { id } });
+  // Gewählter Tab (bzw. Sparte aus dem Link, solange der Verlauf lädt), sonst die
+  // erste Sparte des letzten Trainings; die Sparte steht sichtbar im Knopf.
+  const captureDiscipline = (tabs.length ? tab : chosen) ?? summary?.last?.disciplines[0];
+  const captureLabel = captureDiscipline ? `${t('dogTraining.capture')} · ${captureDiscipline}` : t('dogTraining.capture');
+  const capture = () => router.push({ pathname: '/unit/document', params: {
+    dogId: dogId as string, ...(captureDiscipline ? { discipline: captureDiscipline } : {}),
+  } });
   const cellLabel = (c: MatrixCell) => c.kind === 'level' ? `${t(`trainingLevel.${c.level}`)}${c.down ? `, ${t('progress.down')}` : ''}`
     : c.kind === 'legacy' ? t('trainingLevel.legacy', { value: c.stars })
     : c.kind === 'unrated' ? t('progress.unrated') : t('progress.notTrained');
@@ -57,11 +71,26 @@ export default function ProgressScreen() {
           <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <View style={s.flex}>
-          <Text style={s.eyebrow}>{t('progress.title')}</Text>
-          <Text style={s.title} accessibilityRole="header" numberOfLines={1}>{dog?.name ?? '—'}{tab ? ` · ${tab}` : ''}</Text>
+          <Text style={s.eyebrow} importantForAccessibility="no" accessibilityElementsHidden>{t('dogTraining.eyebrow')}</Text>
+          <Text style={s.title} accessibilityRole="header" numberOfLines={1}
+            accessibilityLabel={dog ? t('dogTraining.open', { name: dog.name }) : undefined}>{dog?.name ?? '—'}</Text>
         </View>
       </View>
+      {!dogsLoading && dogsError && !dog ? <View style={s.content}><TouchableOpacity onPress={() => void refreshDogs()} style={s.row} accessibilityRole="button">
+        <Text style={s.muted}>{t('continueTraining.loadError')}</Text>
+      </TouchableOpacity></View>
+      : !dogsLoading && !dog ? <View style={s.content}><Text style={s.muted} accessibilityRole="alert">{t('dogTraining.notFound')}</Text></View> :
       <ScrollView contentContainerStyle={s.content}>
+        <TouchableOpacity onPress={capture} style={s.capture} accessibilityRole="button" accessibilityLabel={captureLabel}>
+          <Ionicons name="play" size={18} color={C.accentText} />
+          <Text style={s.captureTxt} numberOfLines={1}>{captureLabel}</Text>
+        </TouchableOpacity>
+        {summary?.last && <LastTrainingCard last={summary.last} openHint={summary.openHint} onOpen={() => openUnit(summary.last!.id, summary.last!.source)} />}
+        {summary && !summary.last && <Text style={s.muted}>{t('continueTraining.none')}</Text>}
+        {summaryError && !summary && <TouchableOpacity onPress={() => refetchSummary()} style={s.row} accessibilityRole="button">
+          <Text style={s.muted}>{t('continueTraining.loadError')}</Text>
+        </TouchableOpacity>}
+
         {tabs.length > 0 && <View style={s.tabs} accessibilityRole="tablist">
           {[...tabs, null].map(d => {
             const active = tab === d;
@@ -76,7 +105,7 @@ export default function ProgressScreen() {
         {isError && !data && <TouchableOpacity onPress={() => refetch()} style={s.row} accessibilityRole="button">
           <Text style={s.muted}>{t('continueTraining.loadError')}</Text>
         </TouchableOpacity>}
-        {data && !matrix.columns.length && !matrix.trainings.length && <Text style={s.muted}>{t('progress.none')}</Text>}
+        {data && summary?.last && !matrix.columns.length && !matrix.trainings.length && <Text style={s.muted}>{t('progress.none')}</Text>}
 
         {matrix.columns.length > 0 && <View style={s.card}>
           <View style={s.cardHead}>
@@ -130,7 +159,7 @@ export default function ProgressScreen() {
           </TouchableOpacity>)}
         </View>}
         <View style={{ height: 40 }} />
-      </ScrollView>
+      </ScrollView>}
     </SafeAreaView>
   );
 }
@@ -182,5 +211,7 @@ const s = StyleSheet.create({
   trDate: { fontSize: 13, color: C.textMuted, fontWeight: '700' },
   trNames: { fontSize: 14, color: C.white, fontWeight: '600' },
   row: { minHeight: 44, justifyContent: 'center' },
+  capture: { minHeight: 52, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.accent, borderRadius: 16 },
+  captureTxt: { flexShrink: 1, fontSize: 16, color: C.accentText, fontWeight: '800' },
   muted: { fontSize: 13, color: C.textMuted },
 });

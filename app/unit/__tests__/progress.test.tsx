@@ -13,8 +13,14 @@ jest.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Icon' }));
 jest.mock('@/i18n', () => ({ useT: () => ({ locale: 'de', t: (k: string, p?: Record<string, unknown>) => (p ? `${k}:${JSON.stringify(p)}` : k) }) }));
 jest.mock('@/i18n/format', () => ({ formatDate: (d: Date) => `${d.getDate()}.${d.getMonth() + 1}.` }));
-jest.mock('@/hooks/useDogs', () => ({ useDogs: () => ({ dogs: [{ id: 'd1', name: 'Yam' }] }) }));
+const mockRefreshDogs = jest.fn();
+const mockRefetchSummary = jest.fn();
+let mockDogs: { dogs: { id: string; name: string }[]; loading: boolean; error?: string | null; refresh?: () => void } = { dogs: [{ id: 'd1', name: 'Yam' }], loading: false };
+let mockSummary: Record<string, unknown> | undefined;
+let mockSummaryError = false;
+jest.mock('@/hooks/useDogs', () => ({ useDogs: () => mockDogs }));
 jest.mock('@/hooks/useDogTrainingSummary', () => ({
+  useDogTrainingSummary: () => ({ data: mockSummary, isError: mockSummaryError, refetch: mockRefetchSummary }),
   useDogTrainingHistory: (dog: unknown) => { mockRequested.push(dog); return { refetch: mockRefetch, ...mockState }; },
 }));
 
@@ -38,6 +44,10 @@ beforeEach(() => {
   jest.useFakeTimers({ now: new Date(2026, 10, 20, 12) });
   mockPush.mockReset(); mockRefetch.mockReset(); mockRequested.length = 0; mockParams = { dogId: 'd1' };
   mockState = { data, isLoading: false, isError: false };
+  mockDogs = { dogs: [{ id: 'd1', name: 'Yam' }], loading: false, error: null, refresh: mockRefreshDogs };
+  mockRefreshDogs.mockReset(); mockRefetchSummary.mockReset(); mockSummaryError = false;
+  mockSummary = { last: { id: 'b', source: 'unit', date: '2026-11-05', daysAgo: 15, disciplines: ['Unterordnung'],
+    exercises: [{ name: 'Sitz', discipline: 'Unterordnung', level: 'lernen', legacyStars: null, trend: 'down' }] }, previous: [], openHint: null };
 });
 afterEach(() => jest.useRealTimers());
 const L = (h: string) => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(x => x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
@@ -75,9 +85,11 @@ describe('Verlauf mit Übungs-Matrix (T-184 Etappe 3)', () => {
     render();
     act(() => { view.root.findAll(n => typeof n.props.onPress === 'function' && n.findAllByType(Text).some(t => t.props.children === 'continueTraining.loadError'))[0].props.onPress(); });
     expect(mockRefetch).toHaveBeenCalled();
+    // Leerer Verlauf, aber ein letztes Training laut Zusammenfassung (z. B. Fenster-Grenze) → Matrix-Leertext.
     mockState = { data: { units: [], focuses: [] }, isLoading: false, isError: false };
     render();
     expect(texts()).toContain('progress.none');
+    expect(texts()).not.toContain('continueTraining.none');
     mockState = { data: undefined, isLoading: true, isError: false };
     render();
     expect(texts()).not.toContain('progress.none');
@@ -111,6 +123,7 @@ describe('Verlauf mit Übungs-Matrix (T-184 Etappe 3)', () => {
     mockState = { data: undefined, isLoading: false, isPending: true, isError: false };
     render();
     expect(view.root.findAll(n => n.props.accessibilityLabel === 'common.loading')).toHaveLength(0);
+    expect(texts()).toContain('dogTraining.notFound');
   });
 
   test('Stufenfarben: Symbol-Kontrast ≥ 4,5:1 und klar abgestufte Helligkeit', () => {
@@ -118,5 +131,99 @@ describe('Verlauf mit Übungs-Matrix (T-184 Etappe 3)', () => {
     for (const st of styles) expect(contrast(st.bg, st.fg)).toBeGreaterThanOrEqual(4.5);
     const lum = Object.values(LEVEL_STYLE).map(st => L(st.bg)).sort((a, b) => a - b);
     for (let i = 1; i < lum.length; i++) expect((lum[i] + 0.05) / (lum[i - 1] + 0.05)).toBeGreaterThanOrEqual(1.3);
+  });
+});
+
+describe('Ein Ort pro Hund – Seite „Training von <Hund>“ (T-184 Etappe 3b)', () => {
+  const order = () => texts().map(x => x.startsWith('dogTraining.capture') ? 'dogTraining.capture' : x).filter(x => ['dogTraining.capture', 'continueTraining.lastTitle', 'progress.matrixTitle', 'progress.allTrainings'].includes(x));
+  const captureBtn = () => view.root.findAll(n => typeof n.props.onPress === 'function' && n.props.accessibilityLabel?.startsWith('dogTraining.capture'))[0];
+  test('Reihenfolge: Erfassen, letztes Training, Matrix, alle Trainings; Kopf mit Hundename', () => {
+    render();
+    expect(order()).toEqual(['dogTraining.capture', 'continueTraining.lastTitle', 'progress.matrixTitle', 'progress.allTrainings']);
+    expect(texts()).toContain('dogTraining.eyebrow');
+    expect(texts()).toContain('Yam');
+    expect(texts()).toContain('Sitz · trainingLevel.lernen ↓');
+  });
+
+  test('Erfassen öffnet den Erfassen-Screen mit Hund und Sparte (letztes Training, sonst gewählter Tab)', () => {
+    render();
+    expect(captureBtn().props.accessibilityLabel).toBe('dogTraining.capture · Unterordnung');
+    act(() => { captureBtn().props.onPress(); });
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/unit/document', params: { dogId: 'd1', discipline: 'Unterordnung' } });
+    act(() => { view.root.findAll(n => n.props.accessibilityRole === 'tab' && n.findAllByType(Text).some(t => t.props.children === 'IGP'))[0].props.onPress(); });
+    expect(texts()).toContain('dogTraining.capture · IGP');
+    act(() => { captureBtn().props.onPress(); });
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/unit/document', params: { dogId: 'd1', discipline: 'IGP' } });
+  });
+
+  test('letztes Training öffnet das Detail; der Hinweis dort steht nicht doppelt in der Hinweisliste', () => {
+    mockSummary = { ...mockSummary, openHint: { id: 'f', text: 'Ruhig abschliessen', date: '2026-11-05' } };
+    render();
+    expect(texts().filter(x => x.includes('Ruhig abschliessen'))).toEqual(['continueTraining.openHint:{"text":"Ruhig abschliessen"}']);
+    expect(texts().some(x => x.startsWith('progress.openHints'))).toBe(false);
+    act(() => { view.root.findAll(n => typeof n.props.onPress === 'function' && n.props.accessibilityLabel?.startsWith('continueTraining.lastTitle'))[0].props.onPress(); });
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/unit/detail', params: { id: 'b' } });
+  });
+
+  test('Hund ohne Training: Erfassen + „Noch kein Training“, keine leere Matrix', () => {
+    mockSummary = { last: null, previous: [], openHint: null };
+    mockState = { data: { units: [], focuses: [] }, isLoading: false, isError: false };
+    render();
+    expect(texts()).toContain('dogTraining.capture');
+    expect(texts()).toContain('continueTraining.none');
+    expect(texts()).not.toContain('progress.none');
+    expect(texts()).not.toContain('progress.matrixTitle');
+  });
+
+  test('unbekannter Hund: „Hund nicht gefunden“; während die Hunde laden kein falscher Hinweis', () => {
+    mockParams = { dogId: 'weg' };
+    render();
+    expect(texts()).toContain('dogTraining.notFound');
+    expect(texts().some(x => x.startsWith('dogTraining.capture'))).toBe(false);
+    mockDogs = { dogs: [], loading: true };
+    mockParams = { dogId: 'd1' };
+    render();
+    expect(texts()).not.toContain('dogTraining.notFound');
+  });
+});
+
+describe('Hundeseite – Review-Nachträge (T-184 Etappe 3b)', () => {
+  test('Ladefehler der Hunde: Fehlertext mit Neu laden statt „Hund nicht gefunden“', () => {
+    mockDogs = { dogs: [], loading: false, error: 'offline', refresh: mockRefreshDogs };
+    render();
+    expect(texts()).not.toContain('dogTraining.notFound');
+    act(() => { view.root.findAll(n => typeof n.props.onPress === 'function' && n.findAllByType(Text).some(t => t.props.children === 'continueTraining.loadError'))[0].props.onPress(); });
+    expect(mockRefreshDogs).toHaveBeenCalled();
+  });
+
+  test('Ladefehler der Zusammenfassung: Fehlertext mit Erneut versuchen', () => {
+    mockSummary = undefined; mockSummaryError = true;
+    render();
+    act(() => { view.root.findAll(n => typeof n.props.onPress === 'function' && n.findAllByType(Text).some(t => t.props.children === 'continueTraining.loadError'))[0].props.onPress(); });
+    expect(mockRefetchSummary).toHaveBeenCalled();
+  });
+
+  test('alte Sterne im letzten Training lesbar; mehrere Sparten → erste; Session öffnet ihre Route', () => {
+    mockSummary = { last: { id: 'b', source: 'session', date: '2026-11-05', daysAgo: 15, disciplines: ['IGP', 'Unterordnung'],
+      exercises: [{ name: 'Platz', discipline: 'IGP', level: null, legacyStars: 4, trend: null }] }, previous: [], openHint: null };
+    mockState = { data: { units: [], focuses: [] }, isLoading: false, isError: false };
+    render();
+    expect(texts()).toContain('Platz · trainingLevel.legacy:{"value":4}');
+    act(() => { view.root.findAll(n => typeof n.props.onPress === 'function' && n.props.accessibilityLabel?.startsWith('dogTraining.capture'))[0].props.onPress(); });
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/unit/document', params: { dogId: 'd1', discipline: 'IGP' } });
+    act(() => { view.root.findAll(n => typeof n.props.onPress === 'function' && n.props.accessibilityLabel?.startsWith('continueTraining.lastTitle'))[0].props.onPress(); });
+    expect(mockPush).toHaveBeenLastCalledWith('/training/b');
+  });
+
+  test('ohne letztes Training wird der offene Hinweis nicht aus der Hinweisliste entfernt', () => {
+    mockSummary = { last: null, previous: [], openHint: { id: 'f', text: 'Ruhig abschliessen', date: '2026-11-05' } };
+    render();
+    expect(texts()).toContain('Ruhig abschliessen');
+  });
+
+  test('Screenreader: Kopf heisst „Training von <Hund>“; Karte nennt die Übungen', () => {
+    render();
+    expect(byLabel('dogTraining.open:{"name":"Yam"}').length).toBeGreaterThan(0);
+    expect(view.root.findAll(n => n.props.accessibilityLabel?.startsWith('continueTraining.lastTitle'))[0].props.accessibilityLabel).toContain('Sitz · trainingLevel.lernen ↓');
   });
 });

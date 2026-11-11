@@ -65,3 +65,8 @@ it('preserves the track and statistics routes for each dog', () => {
     expect(mockPush).toHaveBeenLastCalledWith(`/dog/${mockDogs[index].id}`);
   });
 });
+
+it.each(mockDogs.map((dog, index) => [dog.id, index] as const))('T-184 Etappe 3b: „Training von <Hund>“ öffnet die Seite des geklickten Hundes %s', (dogId, index) => {
+  act(() => cards()[index].props.onTrainingPage());
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/unit/progress', params: { dogId } });
+});
