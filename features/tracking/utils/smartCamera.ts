@@ -96,6 +96,8 @@ export interface CourseInput {
   deviceHeadingDeg?: number | null;
   /** Zuletzt als belastbar bewertete Laufrichtung. */
   lastCourseDeg?: number | null;
+  /** Mindestschritt der Positionsfolge (m); Standard COURSE_MIN_STEP_M. */
+  minStepM?: number;
 }
 
 export type CourseSource = 'gps_course' | 'position_delta' | 'device_heading' | 'hold';
@@ -127,7 +129,7 @@ export function resolveTravelHeading(input: CourseInput): CourseResult {
     return { headingDeg: normalizeHeading(courseDeg), source: 'gps_course', trustworthy: true };
   }
 
-  if (position && lastAnchor && cameraDistanceM(lastAnchor, position) >= COURSE_MIN_STEP_M) {
+  if (position && lastAnchor && cameraDistanceM(lastAnchor, position) >= (input.minStepM ?? COURSE_MIN_STEP_M)) {
     return { headingDeg: cameraBearing(lastAnchor, position), source: 'position_delta', trustworthy: true };
   }
 

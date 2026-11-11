@@ -22,12 +22,15 @@ for (const id of ['qa-9ca60ac3', 'qa-80049c56']) {
     expect(map.end).toEqual({ lat: lay[lay.length - 1].latitude, lng: lay[lay.length - 1].longitude });
   });
 }
-it('does not advertise a numeric angle for the captured direction-only corner', () => {
+// Produktentscheidung Sandra 2026-11-09 (GitHub-Issue #33): normale Winkel tragen wieder
+// die gewohnte Fährtenschreibweise «90 L» / «90 R». Das ist ein reines Anzeige-Kürzel —
+// die erfasste Erkennung (Richtung, unaufgelöste Schärfe, Geometrie) bleibt unverändert.
+it('shows the customary «90 L» label for the captured direction-only corner without retuning detection', () => {
   const data = read('qa-80049c56');
   const turn = data.turnFusion.find((t: { sharpness: string }) => t.sharpness === 'unresolved');
   expect(turn).toMatchObject({ kind: 'links', sharpness: 'unresolved', directionSource: 'motion_override_low_geometry' });
-  expect(ANGLE_SHORT[turn.kind as AngleKind]).toBe('L');
-  expect(ANGLE_SHORT[turn.kind as AngleKind]).not.toMatch(/\d/);
+  expect(ANGLE_SHORT[turn.kind as AngleKind]).toBe('90 L');
+  expect(ANGLE_SHORT.rechts).toBe('90 R');
   // Neither the detection nor its recorded 5.2° weak geometry is retuned.
   expect(turn.interiorAngleDeg).toBe(5.2);
   expect(ANGLE_SHORT.spitz_links).toBe('SL');

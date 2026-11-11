@@ -18,8 +18,14 @@ jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => ({
   __esModule: true,
   // Expose the native action slots; this is not a real gesture/visual test.
   default: ({ children, renderLeftActions, renderRightActions }: {
-    children: React.ReactNode; renderLeftActions(): React.ReactNode; renderRightActions(): React.ReactNode;
-  }) => jest.requireActual('react').createElement(jest.requireActual('react').Fragment, null, renderLeftActions(), children, renderRightActions()),
+    children: React.ReactNode;
+    renderLeftActions(progress: { value: number }, translation: { value: number }): React.ReactNode;
+    renderRightActions(progress: { value: number }, translation: { value: number }): React.ReactNode;
+  }) => jest.requireActual('react').createElement(
+    jest.requireActual('react').Fragment, null,
+    // Like the real component: every action receives (progress, translation); card at rest.
+    renderLeftActions({ value: 0 }, { value: 0 }), children, renderRightActions({ value: 0 }, { value: 0 }),
+  ),
 }));
 const unit: TrainingUnit = {
   id: 'synthetic-unit', owner_id: 'synthetic-owner', dog_id: 'synthetic-dog',
