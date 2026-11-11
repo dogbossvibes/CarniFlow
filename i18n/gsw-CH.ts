@@ -1406,6 +1406,8 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   'track.analysisQualityHint': 'GPS-/Sensor-Daten schränked belastbari Ussage ii; unsicheri Streckene sind nöd hart bewärtet worde.',
   'track.analysisReferenceHint': 'D gläget Fährte isch nume iigschränkt zueverlässig (tiefi GPS-Gnauigkeit oder scharfi Chnick ohni Winkel-Markierig). D Analyse-Grundlag isch entsprächend reduziert worde; dr Score blibt glich.',
   'track.analysisLineDeviation': 'Ø Linieabwiichig',
+  'track.analysisDeviationUncertainty': 'Mässunsicherheit',
+  'track.analysisDeviationUncertaintyHint': 'Chlineri Abwiichige cha s Handy-GPS nöd sicher vo Mässfähler underscheide.',
   'track.analysisAssessableDistance': 'Bewärtbari Strecki',
   'track.analysisFoundation': 'Analyse-Grundlag',
   'track.analysisNoRecoveryRequired': 'Kei Neuufnahm nötig',

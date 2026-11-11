@@ -1376,6 +1376,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "track.analysisQualityHint": "GPS/sensor quality limits reliable conclusions; uncertain sections were not scored as hard errors.",
   "track.analysisReferenceHint": "The laid track is only partly reliable (low GPS accuracy or sharp bends without an angle marker). The analysis foundation was reduced accordingly; the score is unchanged.",
   "track.analysisLineDeviation": "Avg. line deviation",
+  "track.analysisDeviationUncertainty": "Measurement uncertainty",
+  "track.analysisDeviationUncertaintyHint": "Phone GPS cannot reliably tell smaller deviations from measurement error.",
   "track.analysisAssessableDistance": "Assessable distance",
   "track.analysisFoundation": "Analysis quality",
   "track.analysisNoRecoveryRequired": "No reacquisition required",

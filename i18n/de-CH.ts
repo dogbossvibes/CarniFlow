@@ -1441,6 +1441,8 @@ export const deCH = {
   'track.analysisQualityHint': 'Die GPS-/Sensor-Grundlage schränkt belastbare Aussagen ein; unsichere Abschnitte wurden nicht hart bewertet.',
   'track.analysisReferenceHint': 'Die gelegte Fährte ist nur eingeschränkt belastbar (geringe GPS-Genauigkeit oder scharfe Knicke ohne Winkel-Markierung). Die Analyse-Grundlage wurde entsprechend reduziert; der Score bleibt unverändert.',
   'track.analysisLineDeviation': 'Ø Linienabweichung',
+  'track.analysisDeviationUncertainty': 'Messunsicherheit',
+  'track.analysisDeviationUncertaintyHint': 'Kleinere Abweichungen kann Handy-GPS nicht sicher von Messfehlern unterscheiden.',
   'track.analysisAssessableDistance': 'Bewertbare Strecke',
   'track.analysisFoundation': 'Analyse-Grundlage',
   'track.analysisNoRecoveryRequired': 'Keine Neuaufnahme erforderlich',

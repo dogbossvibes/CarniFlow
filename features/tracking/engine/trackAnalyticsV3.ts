@@ -22,6 +22,7 @@ import {
   computeTrackAnalyticsV2,
   type TrackAnalyticsV2,
 } from '@/features/tracking/engine/trackSegmentAnalysis';
+import { deviationUncertaintyM, medianAccuracyM } from '@/features/tracking/utils/deviationUncertainty';
 
 export const ANALYTICS_VERSION_V3 = 3 as const;
 
@@ -198,6 +199,12 @@ export interface TrackAnalyticsV3 extends Omit<TrackAnalyticsV2, 'analyticsVersi
    * keine gelegte Linie übergeben wurde.
    */
   referenceQuality?: ReferenceQuality;
+  /**
+   * Messunsicherheit der Linienabweichung in Metern (siehe deviationUncertainty.ts).
+   * Reine Anzeigehilfe; fliesst in keinen Score und keine Geometrie ein. Fehlt bei
+   * älteren Analysen und wenn die Absuche keine GPS-Genauigkeit liefert.
+   */
+  deviationUncertaintyM?: number;
 }
 
 function clamp01(value: number): number { return Math.max(0, Math.min(1, value)); }
@@ -696,6 +703,7 @@ export function computeTrackAnalyticsV3(input: TrackAnalyticsInput): TrackAnalyt
   const confidence = referenceQuality ? round2(clamp01(sampleConfidence * referenceQuality.confidenceFactor)) : sampleConfidence;
   const band: ConfidenceBand = confidenceBand(confidence);
   const { score, breakdown } = computeScore(deviationEvents, corners, pace, assessableDistance, sampleConfidence);
+  const uncertaintyM = deviationUncertaintyM(referenceQuality?.medianAccuracyM, medianAccuracyM(input.samples.map(sample => sample.accuracyM)));
   return {
     ...base,
     analyticsVersion: ANALYTICS_VERSION_V3,
@@ -712,6 +720,7 @@ export function computeTrackAnalyticsV3(input: TrackAnalyticsInput): TrackAnalyt
     deviationEvents,
     scoreBreakdown: breakdown,
     ...(referenceQuality ? { referenceQuality } : {}),
+    ...(uncertaintyM != null ? { deviationUncertaintyM: uncertaintyM } : {}),
     trackScore: input.samples.length >= TRACK_ANALYSIS_THRESHOLDS.minSamplesForAssessment ? score : 0,
     // V3 zeigt keine irreführende „niedrigste Abweichung“ und wertet einen
     // automatischen Kontaktstatus nie als bestätigtes Verweisen.
