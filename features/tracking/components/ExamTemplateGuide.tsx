@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import {
   EXAM_TEMPLATES, type ExamLayGuidance, type ExamNextAction, type ExamTemplate, type ExamTemplateId, type ExamWarning,
 } from '@/features/tracking/utils/examTemplates';
+import type { WindRelation } from '@/features/tracking/utils/windRelation';
 import type { TranslationKey } from '@/i18n/de-CH';
 
 type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
@@ -67,6 +68,20 @@ export function ExamTemplateChooser({ selected, onSelect, t }: {
       <Text className="text-[11px] text-ft-faint self-start mt-1.5 mb-1">
         {selected ? examTemplateSummary(selected, t) : t('track.exam.noneHint')}
       </Text>
+    </View>
+  );
+}
+
+const WIND_KEY: Record<WindRelation, TranslationKey> = {
+  headwind: 'track.wind.headwind', tailwind: 'track.wind.tailwind', cross_left: 'track.wind.crossLeft', cross_right: 'track.wind.crossRight',
+};
+
+/** Wind zur aktuellen Laufrichtung (T-201) — kleine Zeile während des Legens. */
+export function WindRelationPill({ relation, speedKmh, t }: { relation: WindRelation; speedKmh: number; t: Translate }) {
+  const text = `${t('track.wind.label')} ${Math.round(speedKmh)} km/h · ${t(WIND_KEY[relation])}`;
+  return (
+    <View className="px-3 py-1.5 rounded-full bg-ft-glass border border-ft-glass-line" accessibilityRole="text" accessibilityLabel={text}>
+      <Text className="text-[11px] font-bold text-ft-text">💨 {text}</Text>
     </View>
   );
 }
