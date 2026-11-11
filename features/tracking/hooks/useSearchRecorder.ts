@@ -38,7 +38,7 @@ import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import { getOffTrackThreshold, stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
-import { INITIAL_OBJECT_DWELL, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
+import { INITIAL_OBJECT_DWELL, objectReferenceToleranceM, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
 import type { TrackObjectScoreBasis } from '@/features/tracking/utils/trackObjectReview';
 import { statusAcrossGap, statusAfterProgress, statusAtConfirmedEnd, type ReferenceObjectStatus } from '@/features/tracking/utils/referenceObjectStatus';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
@@ -75,7 +75,9 @@ export interface GpsDebug {
 
 export type LatLng = { latitude: number; longitude: number; breakBefore?: boolean };
 // `id` = stabile Marker-ID (Recovery-Identität der Funde); fehlt sie, gilt der Index.
-export type SearchObject = { at: LatLng; index: number; material: string; id?: string; recoveryIndex?: number; atM?: number | null };
+export type SearchObject = { at: LatLng; index: number; material: string; id?: string; recoveryIndex?: number; atM?: number | null;
+  /** GPS-Genauigkeit des beim Legen gespeicherten Punkts (m); nur für die Nähe-Toleranz der Auto-Erkennung. */
+  accuracyM?: number | null };
 export type Break = {
   at: LatLng;
   t: number;               // Sekunden seit Start, wann der Abriss BESTÄTIGT wurde (Konvention unverändert, z. B. Map-Marker-Zeitpunkt)
@@ -240,12 +242,14 @@ export function useSearchRecorder(opts: {
   const laidObjects = useMemo(() => opts.laidObjects.map((o, i) => ({ ...o, recoveryIndex: o.recoveryIndex ?? i }))
     .filter(o => !isTrainingJoker(o.material)), [opts.laidObjects]);
   const onFixDiagRef = useRef(opts.onFixDiag);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   onFixDiagRef.current = opts.onFixDiag;
   const handlerDistanceM = opts.handlerDistanceM ?? DEFAULT_HANDLER_DISTANCE_M;
   const model = SCORE_MODEL[level] ?? SCORE_MODEL.training;
 
   // Ziel-Session der lokalen Absuche-Persistenz (immer aktueller via Ref).
   const sessionIdRef = useRef<string | null>(opts.sessionId ?? null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   sessionIdRef.current = opts.sessionId ?? null;
   const recordingEvidenceRef = useRef<QaRecordingObserver | null>(null);
   const streamSourceModeRef = useRef<unknown>(null);
@@ -717,6 +721,7 @@ export function useSearchRecorder(opts: {
           tMs: tNow, speedMps: dwellSpeed, accuracyM: accRaw,
           progressM: maxCursorMRef.current, trackLengthM: arc.total,
           distanceToReferenceM: distM(sm, object.at), driftFromStartM: distM(sm, origin),
+          referenceToleranceM: objectReferenceToleranceM(accRaw, object.accuracyM),
           nearAngle: (opts.angleArcM ?? []).some(a => Math.abs(a - maxCursorMRef.current) <= 3),
           searchActive: recordingRef.current, gpsOutlier: fusion.classification === 'gps_outlier',
         });
@@ -1067,6 +1072,7 @@ export function useSearchRecorder(opts: {
   // Prop-Identitäten immun — unabhängig davon, dass run.tsx die Identitäten
   // zusätzlich stabilisiert.
   const onFixRef = useRef(onFix);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   onFixRef.current = onFix;
   // Observation only: no start/stop/restore or React updates on lifecycle events.
   useEffect(() => {
@@ -1405,12 +1411,15 @@ export function useSearchRecorder(opts: {
   const dogProgressM = startLockedForDisplay ? estimateDogProgressM(snap.progressM, handlerDistanceM, arc.total) : snap.progressM;
   const estimatedDogPosition = startLockedForDisplay ? pointAtDistance(laidPoints, arc.cum, dogProgressM) : null;
 
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   return {
     ready, recording, paused,
     objectStatuses: snap.objectStatuses,
     points: snap.points, position, endHandlerFix, liveFix, continuityEpoch, deviationM: snap.deviationM,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     onTrack: !hasTrack || (offTrackReliableRef.current && offTrackRef.current.state === 'on_track'),
     breaks: snap.breaks, foundObjects: snap.found, totalObjects,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     autoDwellObjectIds: Array.from(autoDwellIdsRef.current), activeObjectWait,
     distanceM: snap.distanceM, offTrackState: snap.offTrackState, progressM: snap.progressM,
     dogProgressM, trackLengthM: arc.total, estimatedDogPosition,

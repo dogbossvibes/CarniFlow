@@ -56,7 +56,7 @@ import {
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
-import { formatApproxDeviationM } from '@/features/tracking/utils/formatDeviation';
+import { formatApproxDeviationM, formatDeviationUncertaintyM } from '@/features/tracking/utils/formatDeviation';
 import { useT, type TranslationKey } from '@/i18n';
 import {
   addTrackFeedback, deleteTrackFeedback, getTrackShare, listAcceptedTrainers, listTrackFeedback,
@@ -96,6 +96,7 @@ export default function TrackAuswertungScreen() {
   const authGeneration = useRef(0);
   const [authEpoch, setAuthEpoch] = useState(0);
   useEffect(() => { const { data: auth } = supabase.auth.onAuthStateChange(event => {
+    // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { authGeneration.current++; setData(null); setNotes(''); setLegs([]); setAuthEpoch(n => n + 1); }
   }); return () => auth.subscription.unsubscribe(); }, []);
   const [data, setData] = useState<any | null>(null);
@@ -122,6 +123,7 @@ export default function TrackAuswertungScreen() {
     let alive = true;
     const loadEpoch = authGeneration.current;
     const userId = authenticatedSession?.user.id;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     setData(null); setDisplaySupplement(null); setNotes(''); setLegs([]); setLoading(true);
     (async () => {
       const r = await getTrackSessionById(id);
@@ -291,6 +293,7 @@ export default function TrackAuswertungScreen() {
     } else setFeedback([]);
   }, [id]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   useEffect(() => { void refreshSharing(); }, [refreshSharing]);
 
   const openSharePicker = async () => {
@@ -671,6 +674,9 @@ export default function TrackAuswertungScreen() {
                 {analyseExpanded && (
                   <View style={{ marginTop: 10, gap: 10 }}>
                     {analyticsV3 && <Text style={s.analyseDetailLabel}>{t('track.analysisTechnical')} · {t('track.analysisLineDeviation')}: {formatApproxDeviationM(analytics.deviation.meanM)} · Median {formatApproxDeviationM(analytics.deviation.medianM)} · P95 {formatApproxDeviationM(analytics.deviation.p95M)}</Text>}
+                    {analyticsV3?.deviationUncertaintyM != null && (
+                      <Text style={s.analyseHintText}>{t('track.analysisDeviationUncertainty')}: {formatDeviationUncertaintyM(analyticsV3.deviationUncertaintyM)} · {t('track.analysisDeviationUncertaintyHint')}</Text>
+                    )}
                     {analyticsV3?.deviationEvents.map(event => (
                       <View key={event.id} style={s.analyseDetailRow}>
                         <Text style={s.analyseDetailLabel}>{t('track.analysisDeviationEvents')} · {event.startAlongTrackM.toFixed(0)} m</Text>

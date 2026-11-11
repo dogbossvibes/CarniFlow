@@ -40,6 +40,9 @@ import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherServ
 import { angleEvent, objectEvent, trackEventLabelKey, type TrackEvent } from '@/features/tracking/utils/trackEventVoice';
 import { getSpeechLocale } from '@/i18n';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { ExamTemplateBanner, ExamTemplateChooser, WindRelationPill } from '@/features/tracking/components/ExamTemplateGuide';
+import { compassLabel, walkBearingDeg, windRelation, WIND_RELATION_MIN_SPEED_KMH } from '@/features/tracking/utils/windRelation';
+import { examLayGuidance, examTemplateById, type ExamTemplateId } from '@/features/tracking/utils/examTemplates';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import { QaModeBadge } from '@/features/tracking/components/QaModeBadge';
 import { QaReferenceMarker } from '@/features/tracking/components/QaReferenceMarker';
@@ -142,6 +145,7 @@ function localizedSegmentLabel(type: TrackSegmentType, t: (key: TranslationKey) 
 
 // Blinkender LIVE-Punkt (anyvoRec).
 function RecDot() {
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const op = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -171,11 +175,14 @@ export default function LegenScreen() {
   const { showToast, toast } = useToast();
 
   const [phase, setPhase] = useState<'warmup' | 'recording'>('warmup');
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const phaseRef = useRef(phase); phaseRef.current = phase;   // Stale-Closure-Schutz für Trigger
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [surface, setSurface] = useState<string>('Acker');         // Untergrund
   const [condition, setCondition] = useState<string | null>(null); // Beschaffenheit
   const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (Open-Meteo)
+  // Prüfungsvorlage (T-200): reine Führungshilfe beim Legen, nicht gespeichert.
+  const [examTemplateId, setExamTemplateId] = useState<ExamTemplateId | null>(null);
   const [weatherState, setWeatherState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const weatherFetchedRef = useRef(false);
   const [gsPicker, setGsPicker] = useState(false);   // Gegenstand-Schnellauswahl (Inline, kein Sheet)
@@ -207,6 +214,7 @@ export default function LegenScreen() {
   // zentral zugeordneten Begriff (trackEventVoice.ts) — identisch zur Absuche.
   const layVoice = useLayVoiceSetting();   // Sprachausgabe beim Legen (Default AUS)
   const layVoiceRef = useRef(false);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   layVoiceRef.current = layVoice.enabled;
   const announceEvent = useCallback((event: TrackEvent, mode: 'detected' | 'set') => {
     const label = t(trackEventLabelKey(event));
@@ -493,6 +501,7 @@ export default function LegenScreen() {
   // Die optionale Hintergrundberechtigung blockiert den Recorder nicht.
   useEffect(() => {
     if (startAfterClose && !showBgDisclosure) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       setStartAfterClose(false);
       void begin();
     }
@@ -526,6 +535,17 @@ export default function LegenScreen() {
   const mapMarkers: MapMarker[] = projectAngleMarkers(markers).map(mk => ({ ...mk }));
   const gegenstaende = markers.filter(isScoredObject).length;
   const winkel = countLaidCorners(markers);
+  // Wind zur Laufrichtung (T-201): nur bei spürbarem Wind und sobald einige Meter gelegt sind.
+  const windRel = weather && weather.windSpeed >= WIND_RELATION_MIN_SPEED_KMH
+    ? windRelation(weather.windDirection, walkBearingDeg(trackPoints)) : null;
+  const examTemplate = examTemplateById(examTemplateId);
+  const examGuidance = examTemplate ? examLayGuidance(examTemplate, {
+    currentStep,
+    cornerSteps: projectAngleMarkers(markers)
+      .filter(m => m.type === 'winkel' && m.angleKind !== 'abriss' && m.angleKind !== 'absatz')
+      .map(m => metersToSteps(m.distance_from_start ?? 0, stepLengthM)),
+    articleSteps: markers.filter(isScoredObject).map(m => metersToSteps(m.distance_from_start ?? 0, stepLengthM)),
+  }) : null;
   // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
   const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
@@ -666,6 +686,7 @@ export default function LegenScreen() {
 
   useEffect(() => {
     if (!pendingExit || phase === 'recording') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     setPendingExit(null);
     if ('href' in pendingExit) router.replace(pendingExit.href as never);
     else if (router.canGoBack()) router.back();
@@ -844,6 +865,13 @@ export default function LegenScreen() {
             </View>
           )}
 
+          {phase === 'recording' && !startLockActive && ((examTemplate && examGuidance) || (windRel && weather)) && (
+            <View className="absolute top-[64px] left-0 right-0 items-center px-4 gap-1.5" pointerEvents="none">
+              {examTemplate && examGuidance && <ExamTemplateBanner template={examTemplate} guidance={examGuidance} t={t} />}
+              {windRel && weather && <WindRelationPill relation={windRel} speedKmh={weather.windSpeed} t={t} />}
+            </View>
+          )}
+
           {phase === 'recording' && activeSegment && (
             <View style={{ bottom: mapOverlayLayout.contentBottom }} className="absolute left-[14px] right-[14px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
               <View className="flex-row items-center justify-between gap-3">
@@ -993,6 +1021,8 @@ export default function LegenScreen() {
                   </View>
                   <Text className="text-[11px] text-ft-faint self-start mb-1">{t('track.layVoiceToggleSub')}</Text>
 
+                  <ExamTemplateChooser selected={examTemplate} onSelect={setExamTemplateId} t={t} />
+
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
                   <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
@@ -1009,7 +1039,7 @@ export default function LegenScreen() {
                         </View>
                         <View className="flex-row flex-wrap gap-x-4 gap-y-0.5">
                           <Text className="text-[13px] font-semibold text-ft-muted">🌡️ {weather.temperature.toFixed(1)} °C</Text>
-                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h</Text>
+                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h{compassLabel(weather.windDirection) ? ` ${t('track.wind.from')} ${compassLabel(weather.windDirection)}` : ''}</Text>
                           <Text className="text-[13px] font-semibold text-ft-muted">💧 {weather.humidity.toFixed(0)} %</Text>
                         </View>
                       </>

@@ -1,5 +1,7 @@
-import { isScoredObject, isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
-import { countLaidCorners, projectAngleMarkers } from '@/features/tracking/utils/specialAngleGeometry';
+import { isScoredObject, isTrainingJoker, objectNumbers } from '@/features/tracking/utils/objectMarkers';
+import { countLaidCorners, projectAngleMarkers, specialAngleBadge } from '@/features/tracking/utils/specialAngleGeometry';
+import { ANGLE_LABEL, ANGLE_SHORT } from '@/features/tracking/utils/angleClassify';
+import { nextSearchEvents, type SearchEvent } from '@/features/tracking/utils/searchMapView';
 import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
 import { useSession } from '@/hooks/useSession';
 import { useTransferRunScope } from '@/features/tracking-transfer/useRunScope';
@@ -83,6 +85,7 @@ const SHOW_GPS_DEBUG = __DEV__;
 
 // Blinkender LIVE-Punkt.
 function RecDot() {
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const op = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -170,6 +173,7 @@ export default function TrackRunScreen() {
       laidPoints,
       laidAccuracies: st.trackPoints.map(p => p.accuracy ?? null),
       laidObjects: objs.map((m, i) => ({ at: { latitude: m.lat as number, longitude: m.lng as number },
+        accuracyM: m.accuracy ?? null,   // T-196: Nähe-Toleranz der Auto-Erkennung
         index: i, recoveryIndex: m.recoveryIndex, material: m.material ?? '', id: m.id, atM: eventArcs[m.id]?.arcM ?? null })),
       laidMarkers: projectAngleMarkers(st.markers),
       eventArcs,
@@ -195,6 +199,7 @@ export default function TrackRunScreen() {
     const st = useTrackingStore.getState();
     return { transferReceipt: st.transferReceipt, sessionId: st.currentSessionId, dogId: st.dogId, runId: st.searchRunId };
   }, []);
+  // eslint-disable-next-line react-hooks/use-memo -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const renderTransferIdentity = useMemo(currentTransfer, [currentTransfer, transferToken, effectiveId, dogId, phase]);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
@@ -283,19 +288,30 @@ export default function TrackRunScreen() {
     }
   }, [arming]);
   const approachPhaseRef = useRef(approach.phase);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachPhaseRef.current = approach.phase;
   const approachArmedRef = useRef(approach.armed);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachArmedRef.current = approach.armed;
   const approachDistanceRef = useRef(approach.distanceM);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachDistanceRef.current = approach.distanceM;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   if (arming && isQaDiagnosticsEnabled() && approachOriginRef.current != null) {
     const rel = (ms: number | null) => ms == null ? null : Math.max(0, (ms - approachOriginRef.current!) / 1000);
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     approachQaRef.current = {
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startDistanceM: approachQaRef.current?.startDistanceM ?? approach.distanceM,
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       firstStableFixTSec: rel(approach.firstStableFixAtMs), armedTSec: rel(approach.armedAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startZoneEnteredTSec: rel(approach.startZoneEnteredAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       voiceTriggerTSec: rel(approach.startReachedAtMs), voiceQueuedTSec: null, voiceSpokenTSec: null,
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startReachedTSec: rel(approach.startReachedAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       departedStartTSec: rel(approach.departedStartAtMs), searchStartedTSec: null,
       reason: approach.reason,
     };
@@ -425,6 +441,7 @@ export default function TrackRunScreen() {
   // weitere Zeit-Sperre. Der manuelle Override bleibt für GPS-Probleme erhalten.
   useEffect(() => {
     if (arming && approach.phase === 'departed_start' && approach.startReachedAtMs != null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       beginSearchNow('automatic-departure');
   }, [arming, approach.phase, approach.startReachedAtMs, beginSearchNow]);
 
@@ -453,6 +470,7 @@ export default function TrackRunScreen() {
   //    kontrollierter Bestätigungsdialog. Kein Start bei ausstehendem Recovery-Dialog.
   useEffect(() => {
     if (phase !== 'ready' || startedRef.current || arming || recovery || !snap) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     if (startPoint) { setArming(true); return; }
     // RC-4: Kein Startpunkt (Runtime leer UND kein persistierter Anker) → NICHT
     // stillschweigend direkt starten. Kontrollierte Recovery-Auswahl anbieten.
@@ -515,8 +533,11 @@ export default function TrackRunScreen() {
   const showRecoveryDialog = (pending: PendingTrack) => {
     if (!allowedTransfer(pending)) return;
     Alert.alert('Laufende Absuche fortsetzen?', 'Es wurde eine unterbrochene Absuche gefunden.', [
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Fortsetzen', onPress: () => void resumeSearch(pending) },
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Beenden',    onPress: () => confirmRecoveryEnd(pending) },
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Verwerfen', style: 'destructive', onPress: () => discardSearch(pending) },
     ], { cancelable: false });
   };
@@ -648,9 +669,30 @@ export default function TrackRunScreen() {
   const breakPts  = useMemo(() => s.breaks.map(b => ({ lat: b.at.latitude, lng: b.at.longitude })), [s.breaks]);
   const curPos = s.position ? { lat: s.position.latitude, lng: s.position.longitude } : null;
 
-  const mapMarkers: MapMarker[] = snapData.laidMarkers.map(m => ({
-    ...m,
-  }));
+  // `arcM` = kanonische Bogenlänge (Snapshot) — nur für die Kartenansicht der
+  // Absuche (Kürzel-Platzierung, Laufrichtung, Zoom). Reine Anzeige.
+  const mapMarkers: MapMarker[] = useMemo(() => snapData.laidMarkers.map(m => ({
+    ...m, arcM: snapData.eventArcs[m.id]?.arcM ?? null,
+  })), [snapData.laidMarkers, snapData.eventArcs]);
+  // Ereignisse für den Hinweis «Nächstes Ereignis»: dieselben Kürzel wie auf der
+  // Karte (Winkel: 90 R/90 L/SR/SL/GW …, Gegenstände: G1, G2 …), nur geführte
+  // (bewertete) Gegenstände — wie Sprach- und Haptikführung.
+  const searchEvents = useMemo<SearchEvent[]>(() => {
+    const list = mapMarkers.filter(m => m.lat != null && m.lng != null);
+    const numbers = objectNumbers(list);
+    const events: SearchEvent[] = [];
+    list.forEach((m, index) => {
+      if (m.arcM == null) return;
+      const id = m.id ?? `mk-${index}`;
+      if (m.type === 'winkel') {
+        const undirectedAbriss = m.angleKind === 'abriss' && m.geometryDirection !== 'links' && m.geometryDirection !== 'rechts';
+        events.push({ id, arcM: m.arcM, label: undirectedAbriss ? ANGLE_LABEL.abriss : specialAngleBadge(m) ?? ((m.angleKind && ANGLE_SHORT[m.angleKind]) || '∠') });
+      } else if (isScoredObject(m)) {
+        events.push({ id, arcM: m.arcM, label: `G${m.objectIndex ?? numbers.get(index) ?? ''}` });
+      }
+    });
+    return events;
+  }, [mapMarkers]);
   const winkel = countLaidCorners(snapData.laidMarkers);
 
   // Hundebezogene Ansagen: Distanz relativ zur VIRTUELLEN HUNDEPOSITION (dogProgressM,
@@ -726,8 +768,10 @@ export default function TrackRunScreen() {
   // Ende-Logik selbst (useTrackEndGuidance/stepTrackEnd) bleibt unverändert; Haptik
   // und Voice feuern im selben Tick wie `onFired` (siehe useTrackEndGuidance).
   const sLatestRef = useRef(s);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   sLatestRef.current = s;
   const voiceOnRef = useRef(voiceOn);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   voiceOnRef.current = voiceOn;
   const noteEndFired = useCallback(() => {
     useTrackingStore.getState().noteSearchEndFired();
@@ -751,11 +795,13 @@ export default function TrackRunScreen() {
       : Math.max(0, (grace.endedAtMs - searchStartMsRef.current) / 1000);
     endConfirmationRef.current.finalObjectGraceReason = grace.reason;
   }, []);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const trackEndState = useTrackEndGuidance({
     recording: searchGuidanceActive,
     paused: s.paused,
     continuityEpoch: s.continuityEpoch,
     sessionId: effectiveId,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     runId: runIdRef.current,
     dogProgressM: s.dogProgressM,
     handlerProgressM: s.progressM,
@@ -876,6 +922,7 @@ export default function TrackRunScreen() {
     // blendet ein evtl. laufendes Recovery-Banner sofort wieder aus.
     if (recoveryTimerRef.current) { clearTimeout(recoveryTimerRef.current); recoveryTimerRef.current = null; }
     if (s.offTrackState === 'on_track') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       setRecoveryVisible(true);
       recoveryTimerRef.current = setTimeout(() => { setRecoveryVisible(false); recoveryTimerRef.current = null; }, 2600);
     } else {
@@ -1103,6 +1150,7 @@ export default function TrackRunScreen() {
 
   useEffect(() => {
     if (!pendingExit || s.recording) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     setPendingExit(null);
     router.replace(pendingExit as never);
   }, [pendingExit, router, s.recording]);
@@ -1156,6 +1204,17 @@ export default function TrackRunScreen() {
   const scaleReadout = !arming && s.recording ? searchDistanceReadout(s.dogProgressM, s.trackLengthM) : null;
   const nextObject = scaleReadout
     ? nextObjectDistance(snapData.laidObjects.map((o, i) => ({ atM: o.atM, status: s.objectStatuses[i] })), s.dogProgressM)
+    : null;
+
+  // Hinweis «Nächstes Ereignis» (reine Anzeige): Distanz relativ zur virtuellen
+  // Hundeposition (dogProgressM) — derselbe Maßstab wie die Sprachansagen.
+  // Off-Track-/Start-/Ende-Banner haben Vorrang.
+  const nextEvent = searchGuidanceActive && !offBanner && !recoveryVisible && !searchStartBanner && !trackEndReached
+    ? nextSearchEvents(searchEvents, s.dogProgressM)
+    : null;
+  const nextEventText = nextEvent
+    ? t('track.nextEvent.in', { label: nextEvent.next.label, meters: String(Math.max(1, Math.round(nextEvent.next.distanceM))) })
+      + (nextEvent.then ? ` · ${t('track.nextEvent.then', { label: nextEvent.then.label, meters: String(Math.max(1, Math.round(nextEvent.then.gapM))) })}` : '')
     : null;
 
   const metrics: { value: string; label: string; warn?: boolean }[] = [
@@ -1263,6 +1322,13 @@ export default function TrackRunScreen() {
               onToggleFollow={() => setFollow(f => !f)}
               onUserPan={() => setFollow(false)}
               controlsTop={124}
+              searchView={arming ? null : {
+                handlerProgressM: s.progressM,
+                dogProgressM: s.dogProgressM,
+                offTrack: s.offTrackState === 'off_track',
+                topInsetPt: 132,
+                bottomInsetPt: mapOverlayLayout.contentBottom + 44,
+              }}
             />
           ) : (
             <View className="flex-1 bg-[#08100e]"><TrackSketch accent={layColor} points={snapData.laidLatLng} angleMarkers={sketchAngleMarkers} objectMarkers={sketchObjectMarkers} legs={winkel} objects={s.totalObjects} w={360} h={520} progress={1} /></View>
@@ -1306,6 +1372,26 @@ export default function TrackRunScreen() {
               <View className="flex-row items-center gap-2 rounded-[16px] px-4 py-3 bg-ft-glass border border-ft-glass-line">
                 <Ionicons name="locate-outline" size={16} color={FT.acc} />
                 <Text className="flex-1 text-[13px] font-bold text-ft-text">{searchStartBanner}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Nächstes Ereignis (z. B. «90 R in 13 m · danach G2 nach 8 m») — am Platz
+              der Banner; unter 6 m mint hervorgehoben. Reine Anzeige. */}
+          {nextEvent && nextEventText && (
+            <View className="absolute top-[84px] left-[14px] right-[62px] flex-row" pointerEvents="none" testID="track-next-event">
+              <View
+                className={`flex-row items-center gap-2 rounded-[16px] px-4 py-2.5 border ${nextEvent.highlight ? '' : 'bg-ft-glass border-ft-glass-line'}`}
+                style={nextEvent.highlight ? { backgroundColor: 'rgba(21,230,195,0.16)', borderColor: 'rgba(21,230,195,0.55)' } : undefined}
+              >
+                <Ionicons name="arrow-up" size={15} color={FT.acc} />
+                <Text
+                  className={`shrink text-[13.5px] font-black ${nextEvent.highlight ? 'text-ft-acc' : 'text-ft-text'}`}
+                  style={{ fontVariant: ['tabular-nums'] }}
+                  numberOfLines={1}
+                >
+                  {nextEventText}
+                </Text>
               </View>
             </View>
           )}
