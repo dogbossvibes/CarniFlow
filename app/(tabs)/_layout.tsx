@@ -18,6 +18,7 @@ import { registerForPush } from '@/lib/push';
 import { configurePurchases } from '@/lib/purchases';
 import { QuickAddSheet } from '@/components/QuickAddSheet';
 import { UpdateExperience } from '@/features/updates/UpdateExperience';
+import { useOnboardingGate } from '@/hooks/useOnboardingGate';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -70,14 +71,21 @@ export default function TabLayout() {
   // Labels nicht verdeckt werden.
   const insets = useSafeAreaInsets();
 
-  // Push-Token registrieren, sobald eingeloggt (best-effort, nur Dev/Prod-Build).
   const uid = session?.user.id;
+  // Einführung beim ersten Start: nur für Konten ohne Hund, nie für bestehende
+  // Installationen (Entscheidung + Begründung in stores/onboarding.ts).
+  const { gate: onboardingGate, pushDeclined } = useOnboardingGate(uid);
+
   useEffect(() => {
-    if (uid) {
-      registerForPush(uid);
-      configurePurchases(uid);   // RevenueCat (Apple IAP) initialisieren
-    }
+    if (uid) configurePurchases(uid);   // RevenueCat (Apple IAP) initialisieren
   }, [uid]);
+
+  // Push-Token registrieren (best-effort, nur Dev/Prod-Build) — erst, wenn die
+  // Einführung nicht (mehr) ansteht: Dort wird die Berechtigung mit Begründung
+  // erfragt. Nach „Nicht jetzt" wird nicht erneut automatisch gefragt.
+  useEffect(() => {
+    if (uid && onboardingGate === 'skip') registerForPush(uid, { prompt: !pushDeclined });
+  }, [uid, onboardingGate, pushDeclined]);
 
   // Push-/Notification-Tap → in den passenden Bereich navigieren (data.type).
   useEffect(() => {
@@ -110,6 +118,15 @@ export default function TabLayout() {
   }
 
   if (!session) return <Redirect href="/(auth)/login" />;
+
+  if (onboardingGate === 'pending') {
+    return (
+      <View style={s.loader}>
+        <ActivityIndicator size="large" color={C.accent} />
+      </View>
+    );
+  }
+  if (onboardingGate === 'show') return <Redirect href="/onboarding" />;
 
   // Exakte Tab-Bar-Höhe (siehe tabBarStyle unten). useFabBottom() liest den
   // BottomTabBarHeightContext, der vom Tab-Navigator nur FÜR dessen Screens
