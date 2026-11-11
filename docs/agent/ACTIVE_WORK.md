@@ -6,15 +6,15 @@
 PR #45 gemergt. Dieser Abschnitt ergänzt den Abschnitt darunter.
 
 **Offen:**
-- **Gerätetests** durch die Nutzerin: Build 60 für #49, #51, #59 (Checkliste Fährten in
+- **Gerätetests** durch die Nutzerin: Build 60 für #49, #51, #59, #61 (Checkliste Fährten in
   Issue #57), Build 57 für #58 (ist das Rot an den Kartenecken weg?). Danach Karten auf
-  „Veröffentlicht“. Board-Feld „Ziel“ bei #49, #51, #58, #59 von Hand setzen.
-- **Lokale Release-Quellen sichern:** `51d7d706` (enthält `b6ef690f` und `b676b403`) ist nicht
-  auf GitHub. Push bzw. Zusammenführung mit `release/ios60-greeting-sound-20261109` nur mit
+  „Veröffentlicht“. Board-Feld „Ziel“ bei #49, #51, #58, #59, #61 von Hand setzen.
+- **Lokale Release-Quellen sichern:** `2f7a1e7f` (enthält `51d7d706`, `b6ef690f` und `b676b403`) ist
+  nicht auf GitHub. Push bzw. Zusammenführung mit `release/ios60-greeting-sound-20261109` nur mit
   Freigabe der Nutzerin. Solange offen, schlägt der Ancestry-Guard für jede OTA direkt aus
   der iOS60-Linie an.
-- **T-184 Etappe 3b** („Ein Ort pro Hund“, Commit `ee0a0ac9`, lokal): gebaut, nicht
-  veröffentlicht. Vor einer OTA `51d7d706` einmergen; eigene Freigabe nötig.
+- **T-184 Etappe 3b** („Ein Ort pro Hund“): am 2026-11-12 auf iOS 60 veröffentlicht, Karte #61
+  (Source `2f7a1e7f`, lokal). Gerätetest offen, besonders VoiceOver auf der Hundekarte.
 - **Wrapper doppelt gestartet:** Ein in der Claude-App abgesendeter Terminal-Befehl läuft im
   Terminal-Tab; zusätzlich im Tab getippt, läuft er zweimal (so bei #51 und #58 passiert).
   Publish-Befehle nur an einer Stelle eingeben.

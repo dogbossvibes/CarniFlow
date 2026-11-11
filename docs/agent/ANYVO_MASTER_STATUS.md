@@ -4,8 +4,10 @@
 
 Aktueller Production-Stand, frisch aus EAS nachkontrolliert. Ersetzt für iOS 57 und iOS 60
 die Angaben in den Abschnitten darunter.
-- **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`): Source `51d7d706`,
-  Group `c67550fb-80f5-4751-9e1d-e3886bf01b21`. Release-Karte Issue #59: T-196, T-197, T-200,
+- **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`): Source `2f7a1e7f`,
+  Group `fbb66083-011d-48db-a2e4-c9aafee37b51`. Release-Karte Issue #61 (2026-11-12): T-184
+  Etappe 3b «Ein Ort pro Hund», nur Ansicht und Navigation. Baut auf `51d7d706` auf
+  (Group `c67550fb-80f5-4751-9e1d-e3886bf01b21`). Dessen Release-Karte Issue #59: T-196, T-197, T-200,
   T-201 (Übergabe Issue #57), Absuche-Karte T-188 (PR #35), Trainingskarten ohne rote Ecken
   T-199 (PR #52), Simulator T-192 (nur Testcode). Baut auf `b6ef690f` (Karte #51) auf.
 - **iOS 57** (App Store 1.0.6, Runtime `1.0.6-map49-v1`): Source `91a17f97`,
@@ -15,9 +17,9 @@ die Angaben in den Abschnitten darunter.
 Publish jeweils durch die Nutzerin über den Production-Wrapper. Gerätetests offen, beide
 Karten „Live – Nachkontrolle offen“. Kein Android, kein Store-Release, keine DB-Änderung.
 
-Die iOS-60-Release-Quelle `51d7d706` (Branch `release/ios60-absuche-swipe-20261111`) liegt
-nur lokal. Sie enthält gegenüber der iOS60-Linie `910f1432` zusätzlich die Trainingsdoku
-(T-184) und Lint-Kennzeichnungen (nur Kommentare). Jede weitere iOS-60-OTA muss `51d7d706`
+Die iOS-60-Release-Quellen `51d7d706` (Branch `release/ios60-absuche-swipe-20261111`) und
+`2f7a1e7f` (Branch `feat/training-doku-neu-etappe1`) liegen nur lokal. Sie enthält gegenüber der iOS60-Linie `910f1432` zusätzlich die Trainingsdoku
+(T-184) und Lint-Kennzeichnungen (nur Kommentare). Jede weitere iOS-60-OTA muss `2f7a1e7f`
 als Vorfahren enthalten; die Linie `release/ios60-greeting-sound-20261109` allein tut das nicht.
 
 ## iOS 60: Trainingsdoku neu, Winkel-Rückfall, Hintergrund-Ortung veröffentlicht – 2026-11-11
