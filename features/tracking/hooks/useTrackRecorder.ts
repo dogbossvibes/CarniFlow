@@ -134,7 +134,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // (createLayProcessingState). Die Box-Namen entsprechen den bisherigen Refs;
   // beginRecording setzt sie wie bisher für jede Aufnahme zurück.
   const laySessionRef = useRef<LayProcessingState | null>(null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   if (!laySessionRef.current) laySessionRef.current = createLayProcessingState();
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   const laySession = laySessionRef.current;
   const {
     completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, pointsRef, emaRef, lineEmaRef, canonDistRef, puckRef, lastRawRef, lastCornerAtRef, lineTurnZoneRef,
@@ -200,6 +202,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Start-Lock (Stabilisierungsphase): Anker + Bewegungserkennung + Drift-Zähler.
   // Winkel-Debug (Teil E): Zähler + letzter Winkel + letzter Ablehnungsgrund.
   const onAngleRef    = useRef<TrackRecorderOptions['onAngle']>(opts?.onAngle);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   onAngleRef.current  = opts?.onAngle;
   // Phase 2: adaptive Confirmation-State-Machine (ein Kandidat zur Zeit). Persistiert
   // einen Winkel erst, wenn er final bestätigt ist (HIGH sofort, MEDIUM nach Beleg).
@@ -208,6 +211,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Confirmation-Anforderung. Beeinflusst NIE die Geometrie, verwirft nie allein.
   // Auto-Erkennung (Winkel/Spitzwinkel) ein/aus — live umschaltbar via Ref.
   const autoDetectRef = useRef<boolean>(opts?.autoDetect ?? true);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   autoDetectRef.current = opts?.autoDetect ?? true;
   // Stabile Brücke vom globalen Hintergrund-Task zum jeweils aktuellen onFix.
   const onFixRef      = useRef<(loc: Location.LocationObject) => void>(() => {});
@@ -244,6 +248,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // true = alles Gepufferte ist dauerhaft geschrieben (oder nichts offen); false = Write fehlgeschlagen
   // (Batch bleibt für den nächsten Versuch im Puffer). Die Hintergrund-Verarbeitung wartet darauf.
   const pointWriterRef = useRef<ReturnType<typeof createBufferedPointWriter> | null>(null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   if (!pointWriterRef.current) pointWriterRef.current = createBufferedPointWriter(ptBuffer, async batch => {
     const sid = localSessionId.current;
     if (!sid) throw new Error('No lay session for pending points');
@@ -429,6 +434,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // (features/tracking/engine/layProcessingSession). Der Hook bleibt Owner:
   // er erzeugt die Session, reicht Fixes durch und hält UI, Persistenz,
   // Hintergrund-Task und Lifecycle.
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   const processor = useMemo(() => createLayProcessor(laySession, {
     store, localSessionId, ptBuffer, flushPoints: async () => { await flushPoints(); }, commitMarker, onAngleRef, recordingRef, qaRef,
     motionActiveRef, motionBufRef, autoDetectRef, startupRef, startupMovementRef, startupSec,
@@ -451,6 +457,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (sid && getLaySessionStatus(sid) === 'active') { void deliverLayFix(sid, loc, 'foreground', Date.now(), actualSourceRef.current); return; }
     processFixWithQaAccess(loc, { receivedAtMs: Date.now(), source: 'foreground' });   // Warmup / keine aktive Session: unverändert direkt
   }, [processFixWithQaAccess]);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   onFixRef.current = onFix;
 
   // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
