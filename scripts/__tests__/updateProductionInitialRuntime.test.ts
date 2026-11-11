@@ -152,6 +152,13 @@ describe('Initial-Runtime-Modus: Android Build 44 (PASS) und Sicherheitsmechanis
     expect(r.out).toContain('Publish würde ERLAUBT');
     expect(updateCalls()).toEqual([]);
   });
+  it('OTA-Abdeckung: fehlt eine frühere Production-OTA → STOP vor jeder EAS-Abfrage, kein Publish', () => {
+    const r = h.run([...INITIAL, '--confirm', '--message', 'android 1.0.3'], { env: { FAKE_OTA_COVERAGE_EXIT: '1' } });
+    expect(r.code).not.toBe(0);
+    expect(r.out).toContain('STUB OTA-Abdeckung');
+    expect(r.out).toContain('STOP: OTA-Abdeckung nicht bestätigt');
+    expect(updateCalls()).toEqual([]);
+  });
   it('12b/17/20. echter Lauf: genau EIN android-Publish, Runtime 1.0.3, gitCommitHash = HEAD, iOS unverändert', () => {
     const r = confirmInitial();
     expect(r.code).toBe(0);

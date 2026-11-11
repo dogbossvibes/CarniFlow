@@ -7,6 +7,20 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before 
 Ziel: schnell, klar und sicher arbeiten. Kleine, klare Aufgaben direkt umsetzen,
 ohne Planungsdokumente, Rollenwechsel oder wiederholte Vollprüfungen.
 
+## Keine OTA vergessen (direkter Nutzerauftrag 2026-11-09)
+
+Vor jedem **neuen nativen Build** und vor der **ersten OTA auf einer neuen
+Runtime** prüfen, ob alle früheren Production-OTAs (alle Runtimes) im Kandidaten
+enthalten sind: `npm run release:check:ota-coverage` (bzw.
+`node scripts/check-ota-coverage.mjs --live --candidate <ref> --platform <ios|android>`).
+`build:prod:*` und `update-production.mjs --initial-runtime-release` erzwingen das;
+Builds mit eigenen Profilen direkt über `eas build` müssen die Prüfung vorher
+ausdrücklich laufen lassen. Fehlende OTAs nachziehen oder in
+`docs/agent/ota-coverage-exceptions.json` mit Begründung, `decidedBy` und Datum
+ausnehmen (z. B. alte Fährtenlogik, durch Build-58-Basis ersetzt). Verzeichnis
+aller OTAs: `docs/agent/ota-ledger.json` (`npm run release:refresh:ota-ledger`).
+Normale OTAs derselben Runtime sichert weiterhin der Ancestry-Guard des Wrappers.
+
 ## Ordner und Rollen
 
 - **Einziger Arbeitsordner:** `/Users/moyo/canisflow/canisflow` (Branch `main`).
