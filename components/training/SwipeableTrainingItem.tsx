@@ -2,8 +2,35 @@ import { useCallback, useRef } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
+
+export type SwipeActionSide = 'left' | 'right';
+
+// Die Lösch-Aktion liegt dauerhaft HINTER der Karte. Weil ihre Ecken anders
+// gerundet sind als die der Karte, schaute sie im Ruhezustand als roter Bogen
+// an den Kartenecken hervor. Sie ist deshalb nur sichtbar, solange die Karte
+// tatsächlich in ihre Richtung gezogen ist (links: translation > 0,
+// rechts: translation < 0).
+export function swipeActionOpacity(translation: number, side: SwipeActionSide): number {
+  'worklet';
+  const revealed = side === 'left' ? translation : -translation;
+  return revealed > 0.5 ? 1 : 0;
+}
+
+function SwipeActionReveal({
+  translation,
+  side,
+  children,
+}: {
+  translation: SharedValue<number>;
+  side: SwipeActionSide;
+  children: React.ReactNode;
+}) {
+  const style = useAnimatedStyle(() => ({ opacity: swipeActionOpacity(translation.value, side) }));
+  return <Animated.View style={[s.reveal, style]}>{children}</Animated.View>;
+}
 
 // Wiederverwendbarer Swipe-zum-Löschen-Wrapper für Trainingslisten.
 // Swipe nach links ODER rechts zeigt eine rote „Löschen"-Aktion; nach
@@ -51,17 +78,27 @@ export function SwipeableTrainingItem({
   }, [trainingId, onDelete, title, message, t]);
 
   // Rote Lösch-Aktion (gleich für links & rechts).
-  const renderAction = useCallback(() => (
-    <Pressable
-      style={[s.action, { marginBottom: bottomGap }]}
-      onPress={confirm}
-      accessibilityRole="button"
-      accessibilityLabel={t('training.deleteA11y')}
-    >
-      <Ionicons name="trash-outline" size={22} color="#fff" />
-      <Text style={s.actionTxt}>{t('training.delete')}</Text>
-    </Pressable>
+  const renderAction = useCallback((side: SwipeActionSide, translation: SharedValue<number>) => (
+    <SwipeActionReveal translation={translation} side={side}>
+      <Pressable
+        style={[s.action, { marginBottom: bottomGap }]}
+        onPress={confirm}
+        accessibilityRole="button"
+        accessibilityLabel={t('training.deleteA11y')}
+      >
+        <Ionicons name="trash-outline" size={22} color="#fff" />
+        <Text style={s.actionTxt}>{t('training.delete')}</Text>
+      </Pressable>
+    </SwipeActionReveal>
   ), [confirm, bottomGap, t]);
+  const renderLeft = useCallback(
+    (_progress: SharedValue<number>, translation: SharedValue<number>) => renderAction('left', translation),
+    [renderAction],
+  );
+  const renderRight = useCallback(
+    (_progress: SharedValue<number>, translation: SharedValue<number>) => renderAction('right', translation),
+    [renderAction],
+  );
 
   if (!enabled) return <View>{children}</View>;
 
@@ -73,8 +110,8 @@ export function SwipeableTrainingItem({
       rightThreshold={40}
       overshootLeft={false}
       overshootRight={false}
-      renderLeftActions={renderAction}
-      renderRightActions={renderAction}
+      renderLeftActions={renderLeft}
+      renderRightActions={renderRight}
     >
       {children}
     </ReanimatedSwipeable>
@@ -82,6 +119,8 @@ export function SwipeableTrainingItem({
 }
 
 const s = StyleSheet.create({
+  // Zeile, damit die Aktion (alignSelf: 'stretch') weiterhin die volle Kartenhöhe füllt.
+  reveal: { alignSelf: 'stretch', flexDirection: 'row' },
   action: {
     width: 96,
     borderRadius: 20,
