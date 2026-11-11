@@ -66,7 +66,7 @@ import { hostname } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { assertProductionSupabase, PROD_REF } from './guard-prod-supabase.mjs';
 import { validateQualityEvidence } from './release-quality-evidence.mjs';
-import { requireReleaseGate } from './release-entry-gate.mjs';
+import { main as checkOtaCoverage } from './check-ota-coverage.mjs';
 
 export const REQUIRED_PRODUCTION_ENV = Object.freeze([
   'EXPO_PUBLIC_BACKEND_ENV',
@@ -582,10 +582,6 @@ function main() {
 
   console.log('\n⚠️  PRODUCTION EAS UPDATE (Channel: production, Environment: production)\n');
 
-  // Even direct invocation must pass the cross-runtime content/device gate.
-  try { requireReleaseGate('production-ota', { platform, runtime: runtimeFlag }); }
-  catch (error) { console.error(`BLOCKED: ${error.message}`); process.exit(1); }
-
   const pkg = existsSync('package.json') ? JSON.parse(readFileSync('package.json', 'utf8')) : {};
   const hasUpdates = !!(pkg.dependencies?.['expo-updates'] || pkg.devDependencies?.['expo-updates']);
   if (!hasUpdates) {
@@ -619,6 +615,16 @@ function main() {
     for (const p of initialProblems) console.log(`❌ ${p}`);
     console.log('Kein Update veröffentlicht.');
     process.exit(1);
+  }
+  // Erste OTA einer neuen Runtime: alle früheren Production-OTAs (alle Runtimes)
+  // müssen im Release-HEAD enthalten oder begründet ausgenommen sein (Build-59-Lehre).
+  if (initialRuntimeRelease) {
+    console.log('\n🔎 OTA-Abdeckung: frühere Production-OTAs im Release-HEAD?');
+    const coverage = checkOtaCoverage(['--live', '--platform', platforms[0]], process.cwd());
+    if (coverage !== 0) {
+      console.log('❌ STOP: OTA-Abdeckung nicht bestätigt (siehe oben). Kein Update veröffentlicht.');
+      process.exit(1);
+    }
   }
 
   // 1. Release-Commit sichtbar machen (der Agent prüft, dass es der gewünschte ist).
@@ -785,7 +791,6 @@ function main() {
   console.log(`Bestätigt. Veröffentliche Production-Update (${platform}): "${message}"`);
   // Release-Commit als NICHT geheimer Build-Metadatenwert ins OTA-Bundle (nur Anzeige in der Fährten-Diagnose).
   try {
-    requireReleaseGate('production-ota', { platform, runtime: releaseRuntime });
     execFileSync('eas', easArgs, { stdio: 'inherit', env: buildPublishEnv(process.env, head) });
   } catch {
     console.log('❌ `eas update` ist fehlgeschlagen. Kein automatischer Neuversuch.');
