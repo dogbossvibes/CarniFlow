@@ -40,7 +40,8 @@ import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherServ
 import { angleEvent, objectEvent, trackEventLabelKey, type TrackEvent } from '@/features/tracking/utils/trackEventVoice';
 import { getSpeechLocale } from '@/i18n';
 import { metersToSteps } from '@/features/tracking/utils/steps';
-import { ExamTemplateBanner, ExamTemplateChooser } from '@/features/tracking/components/ExamTemplateGuide';
+import { ExamTemplateBanner, ExamTemplateChooser, WindRelationPill } from '@/features/tracking/components/ExamTemplateGuide';
+import { compassLabel, walkBearingDeg, windRelation, WIND_RELATION_MIN_SPEED_KMH } from '@/features/tracking/utils/windRelation';
 import { examLayGuidance, examTemplateById, type ExamTemplateId } from '@/features/tracking/utils/examTemplates';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import { QaModeBadge } from '@/features/tracking/components/QaModeBadge';
@@ -530,6 +531,9 @@ export default function LegenScreen() {
   const mapMarkers: MapMarker[] = projectAngleMarkers(markers).map(mk => ({ ...mk }));
   const gegenstaende = markers.filter(isScoredObject).length;
   const winkel = countLaidCorners(markers);
+  // Wind zur Laufrichtung (T-201): nur bei spürbarem Wind und sobald einige Meter gelegt sind.
+  const windRel = weather && weather.windSpeed >= WIND_RELATION_MIN_SPEED_KMH
+    ? windRelation(weather.windDirection, walkBearingDeg(trackPoints)) : null;
   const examTemplate = examTemplateById(examTemplateId);
   const examGuidance = examTemplate ? examLayGuidance(examTemplate, {
     currentStep,
@@ -856,9 +860,10 @@ export default function LegenScreen() {
             </View>
           )}
 
-          {phase === 'recording' && !startLockActive && examTemplate && examGuidance && (
-            <View className="absolute top-[64px] left-0 right-0 items-center px-4" pointerEvents="none">
-              <ExamTemplateBanner template={examTemplate} guidance={examGuidance} t={t} />
+          {phase === 'recording' && !startLockActive && ((examTemplate && examGuidance) || (windRel && weather)) && (
+            <View className="absolute top-[64px] left-0 right-0 items-center px-4 gap-1.5" pointerEvents="none">
+              {examTemplate && examGuidance && <ExamTemplateBanner template={examTemplate} guidance={examGuidance} t={t} />}
+              {windRel && weather && <WindRelationPill relation={windRel} speedKmh={weather.windSpeed} t={t} />}
             </View>
           )}
 
@@ -1029,7 +1034,7 @@ export default function LegenScreen() {
                         </View>
                         <View className="flex-row flex-wrap gap-x-4 gap-y-0.5">
                           <Text className="text-[13px] font-semibold text-ft-muted">🌡️ {weather.temperature.toFixed(1)} °C</Text>
-                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h</Text>
+                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h{compassLabel(weather.windDirection) ? ` ${t('track.wind.from')} ${compassLabel(weather.windDirection)}` : ''}</Text>
                           <Text className="text-[13px] font-semibold text-ft-muted">💧 {weather.humidity.toFixed(0)} %</Text>
                         </View>
                       </>
