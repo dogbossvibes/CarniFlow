@@ -38,7 +38,7 @@ import { calculateHeading } from '@/features/tracking/utils/gpsFilter';
 import { getOffTrackThreshold, stepOffTrack, initialOffTrack, type OffTrackSnapshot, type OffTrackState } from '@/features/tracking/utils/offTrack';
 import { useTrackingStore, type TrackPointSample } from '@/features/tracking/store/trackingStore';
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
-import { INITIAL_OBJECT_DWELL, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
+import { INITIAL_OBJECT_DWELL, objectReferenceToleranceM, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
 import type { TrackObjectScoreBasis } from '@/features/tracking/utils/trackObjectReview';
 import { statusAcrossGap, statusAfterProgress, statusAtConfirmedEnd, type ReferenceObjectStatus } from '@/features/tracking/utils/referenceObjectStatus';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
@@ -75,7 +75,9 @@ export interface GpsDebug {
 
 export type LatLng = { latitude: number; longitude: number; breakBefore?: boolean };
 // `id` = stabile Marker-ID (Recovery-Identität der Funde); fehlt sie, gilt der Index.
-export type SearchObject = { at: LatLng; index: number; material: string; id?: string; recoveryIndex?: number; atM?: number | null };
+export type SearchObject = { at: LatLng; index: number; material: string; id?: string; recoveryIndex?: number; atM?: number | null;
+  /** GPS-Genauigkeit des beim Legen gespeicherten Punkts (m); nur für die Nähe-Toleranz der Auto-Erkennung. */
+  accuracyM?: number | null };
 export type Break = {
   at: LatLng;
   t: number;               // Sekunden seit Start, wann der Abriss BESTÄTIGT wurde (Konvention unverändert, z. B. Map-Marker-Zeitpunkt)
@@ -717,6 +719,7 @@ export function useSearchRecorder(opts: {
           tMs: tNow, speedMps: dwellSpeed, accuracyM: accRaw,
           progressM: maxCursorMRef.current, trackLengthM: arc.total,
           distanceToReferenceM: distM(sm, object.at), driftFromStartM: distM(sm, origin),
+          referenceToleranceM: objectReferenceToleranceM(accRaw, object.accuracyM),
           nearAngle: (opts.angleArcM ?? []).some(a => Math.abs(a - maxCursorMRef.current) <= 3),
           searchActive: recordingRef.current, gpsOutlier: fusion.classification === 'gps_outlier',
         });
