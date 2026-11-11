@@ -107,6 +107,10 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   const recordingGenerationRef = useRef(0);
   const warmupGenerationRef = useRef(0);
   const backgroundScheduledRef = useRef(false);
+  // Startet den Hintergrund-Task der LAUFENDEN Aufnahme (höchstens einmal). Gesetzt von
+  // beginRecording, gelöscht von stopAll. Wird auch beim Zurückkehren in den Vordergrund
+  // genutzt, wenn die „Immer"-Freigabe erst nach dem Aufnahmestart erteilt wurde.
+  const startBackgroundTaskRef = useRef<(() => Promise<void>) | null>(null);
   const recordingRef = useRef(false);   // true ⇒ Fixes fliessen in die Linie
   const warmupAccuracyRef = useRef<number | null>(null);
   const localSessionCreationRef = useRef<Promise<void> | null>(null);
@@ -130,7 +134,9 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // (createLayProcessingState). Die Box-Namen entsprechen den bisherigen Refs;
   // beginRecording setzt sie wie bisher für jede Aufnahme zurück.
   const laySessionRef = useRef<LayProcessingState | null>(null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   if (!laySessionRef.current) laySessionRef.current = createLayProcessingState();
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   const laySession = laySessionRef.current;
   const {
     completedDetectorSectionsRef, continuityPendingRef, detectorOffsetRef, pointsRef, emaRef, lineEmaRef, canonDistRef, puckRef, lastRawRef, lastCornerAtRef, lineTurnZoneRef,
@@ -196,6 +202,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Start-Lock (Stabilisierungsphase): Anker + Bewegungserkennung + Drift-Zähler.
   // Winkel-Debug (Teil E): Zähler + letzter Winkel + letzter Ablehnungsgrund.
   const onAngleRef    = useRef<TrackRecorderOptions['onAngle']>(opts?.onAngle);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   onAngleRef.current  = opts?.onAngle;
   // Phase 2: adaptive Confirmation-State-Machine (ein Kandidat zur Zeit). Persistiert
   // einen Winkel erst, wenn er final bestätigt ist (HIGH sofort, MEDIUM nach Beleg).
@@ -204,6 +211,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // Confirmation-Anforderung. Beeinflusst NIE die Geometrie, verwirft nie allein.
   // Auto-Erkennung (Winkel/Spitzwinkel) ein/aus — live umschaltbar via Ref.
   const autoDetectRef = useRef<boolean>(opts?.autoDetect ?? true);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   autoDetectRef.current = opts?.autoDetect ?? true;
   // Stabile Brücke vom globalen Hintergrund-Task zum jeweils aktuellen onFix.
   const onFixRef      = useRef<(loc: Location.LocationObject) => void>(() => {});
@@ -240,6 +248,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // true = alles Gepufferte ist dauerhaft geschrieben (oder nichts offen); false = Write fehlgeschlagen
   // (Batch bleibt für den nächsten Versuch im Puffer). Die Hintergrund-Verarbeitung wartet darauf.
   const pointWriterRef = useRef<ReturnType<typeof createBufferedPointWriter> | null>(null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   if (!pointWriterRef.current) pointWriterRef.current = createBufferedPointWriter(ptBuffer, async batch => {
     const sid = localSessionId.current;
     if (!sid) throw new Error('No lay session for pending points');
@@ -280,6 +289,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     headRef.current?.remove();  headRef.current = null;
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
     const stoppedSessionId = localSessionId.current;
+    startBackgroundTaskRef.current = null;   // kein später Hintergrund-Start nach Stop
     if (backgroundScheduledRef.current) {
       backgroundScheduledRef.current = false;
       bgActiveRef.current = false;
@@ -322,7 +332,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   }, [qaMotionCaptureRef, laySession]);
   useEffect(() => subscribeQaDiagnostics(enforceQaCaptureAccess), [enforceQaCaptureAccess]);
 
-  // Observation only: AppState does not start, stop, or restore recording.
+  // AppState does not start, stop, or restore recording. Single exception: when the
+  // "Always" location permission was granted only AFTER recording started (iOS answers
+  // the first request with `denied` and shows the system dialog later), returning to
+  // `active` starts the background task once for the running recording. The permission
+  // is only READ here (never requested), so this cannot loop a system prompt.
   useEffect(() => {
     const sub = AppState.addEventListener('change', next => {
       const previous = lastAppStateRef.current;
@@ -339,7 +353,11 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
         void Location.getForegroundPermissionsAsync()
           .then(value => recordBackgroundLayEvent(sid, 'foregroundPermission', 1, value.status)).catch(() => {});
         void Location.getBackgroundPermissionsAsync()
-          .then(value => recordBackgroundLayEvent(sid, 'backgroundPermission', 1, value.status)).catch(() => {});
+          .then(value => {
+            void recordBackgroundLayEvent(sid, 'backgroundPermission', 1, value.status).catch(() => {});
+            if (value.status === 'granted' && !backgroundScheduledRef.current) return startBackgroundTaskRef.current?.();
+          })
+          .catch(e => { console.warn('[trackRecorder] background (late grant)', e); /* Fallback: Vordergrund-Watch bleibt */ });
       } else if (next === 'background' || next === 'inactive') {
         void recordBackgroundLayEvent(sid, next).catch(() => {});
       }
@@ -416,6 +434,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
   // (features/tracking/engine/layProcessingSession). Der Hook bleibt Owner:
   // er erzeugt die Session, reicht Fixes durch und hält UI, Persistenz,
   // Hintergrund-Task und Lifecycle.
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   const processor = useMemo(() => createLayProcessor(laySession, {
     store, localSessionId, ptBuffer, flushPoints: async () => { await flushPoints(); }, commitMarker, onAngleRef, recordingRef, qaRef,
     motionActiveRef, motionBufRef, autoDetectRef, startupRef, startupMovementRef, startupSec,
@@ -438,6 +457,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     if (sid && getLaySessionStatus(sid) === 'active') { void deliverLayFix(sid, loc, 'foreground', Date.now(), actualSourceRef.current); return; }
     processFixWithQaAccess(loc, { receivedAtMs: Date.now(), source: 'foreground' });   // Warmup / keine aktive Session: unverändert direkt
   }, [processFixWithQaAccess]);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b70e294d; Recorder-Logik bewusst unverändert (GPS-Kontinuität, T-195)
   onFixRef.current = onFix;
 
   // Berechtigung + EINEN GPS-Stream öffnen (Warmup). Idempotent.
@@ -720,6 +740,39 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
     // kleine Status-Anzeige (Android-Notification / iOS blaue Pille). Best-effort:
     // ohne „Immer"-Berechtigung bleibt der Vordergrund-Watch als Fallback aktiv.
     const sessionEvidence = recordingEvidenceRef.current;
+    // EIN Startpfad für den Hintergrund-Task dieser Aufnahme — sofort nach erteilter
+    // Freigabe ODER später beim Zurückkehren in den Vordergrund (AppState `active`),
+    // falls „Immer" erst im Systemdialog bestätigt wurde. `backgroundScheduledRef`
+    // garantiert genau einen Start; stopAll löscht die Referenz und räumt serialisiert auf.
+    const startBackgroundTask = async () => {
+      await diagnosticsReady;
+      if (backgroundScheduledRef.current || !isCurrentRecording()) return;
+      backgroundScheduledRef.current = true;
+      await serializeBackgroundTransition(async () => {
+        if (!isCurrentRecording()) return;
+        // Hintergrund-Task an GENAU diese Session binden; die Verarbeitung macht die Session-Runtime.
+        // Der Handler ist nur noch die optionale UI-Brücke (Live-Genauigkeit), kein Verarbeitungspfad.
+        bindBackgroundLaySession(input.localId, dogId);
+        setTrackFixHandler(loc => {
+          if (!isCurrentRecording()) return;
+          sessionEvidence?.source('expo', 'expo-location-task', 'background');
+          warmupAccuracyRef.current = loc.coords.accuracy ?? null;
+        }, input.localId);
+        sessionEvidence?.note('backgroundStartRequested');
+        await startBackgroundUpdates({
+          notificationTitle: '🐾 Fährte läuft',
+          notificationBody:  'Aufnahme aktiv – tippen, um ANYVO zu öffnen',
+          notificationColor: '#15E6C3',
+          diagnosticSessionId: input.localId,
+        });
+        if (!isCurrentRecording()) return; // stopAll already queued cleanup before any newer start
+        sessionEvidence?.note('backgroundStartSucceeded');
+        watchRef.current?.remove(); watchRef.current = null;   // Warmup-Watch ablösen
+        sessionEvidence?.note('foregroundStreamRemoved');
+        bgActiveRef.current = true;
+      });
+    };
+    startBackgroundTaskRef.current = startBackgroundTask;
     void (async () => { try {
       await diagnosticsReady;
       if (!isCurrentRecording()) return;
@@ -728,6 +781,8 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       // app/track/legen.tsx). beginRecording läuft erst nach „Weiter". Hier wird
       // die OS-Berechtigung nur noch angefragt, wenn bereits erteilt oder erneut
       // fragbar. Ohne „Immer"-Berechtigung bleibt der Vordergrund-Watch als Fallback.
+      // Die Anfrage erfolgt genau EINMAL je Aufnahme; eine später erteilte Freigabe
+      // wird nur noch gelesen (AppState-Listener) und startet den Task dort nach.
       const bgCurrent = await Location.getBackgroundPermissionsAsync();
       void recordBackgroundLayEvent(input.localId, 'backgroundPermission', 1, bgCurrent.status).catch(() => {});
       if (!isCurrentRecording()) return;
@@ -735,32 +790,7 @@ export function useTrackRecorder(opts?: TrackRecorderOptions) {
       if (mayRequest) {
         const bg = await Location.requestBackgroundPermissionsAsync();
         void recordBackgroundLayEvent(input.localId, 'backgroundPermission', 1, bg.status).catch(() => {});
-        if (bg.status === 'granted' && isCurrentRecording()) {
-          backgroundScheduledRef.current = true;
-          await serializeBackgroundTransition(async () => {
-          if (!isCurrentRecording()) return;
-          // Hintergrund-Task an GENAU diese Session binden; die Verarbeitung macht die Session-Runtime.
-          // Der Handler ist nur noch die optionale UI-Brücke (Live-Genauigkeit), kein Verarbeitungspfad.
-          bindBackgroundLaySession(input.localId, dogId);
-          setTrackFixHandler(loc => {
-            if (!isCurrentRecording()) return;
-            sessionEvidence?.source('expo', 'expo-location-task', 'background');
-            warmupAccuracyRef.current = loc.coords.accuracy ?? null;
-          }, input.localId);
-          sessionEvidence?.note('backgroundStartRequested');
-          await startBackgroundUpdates({
-            notificationTitle: '🐾 Fährte läuft',
-            notificationBody:  'Aufnahme aktiv – tippen, um ANYVO zu öffnen',
-            notificationColor: '#15E6C3',
-            diagnosticSessionId: input.localId,
-          });
-          if (!isCurrentRecording()) return; // stopAll already queued cleanup before any newer start
-          sessionEvidence?.note('backgroundStartSucceeded');
-          watchRef.current?.remove(); watchRef.current = null;   // Warmup-Watch ablösen
-          sessionEvidence?.note('foregroundStreamRemoved');
-          bgActiveRef.current = true;
-          });
-        }
+        if (bg.status === 'granted') await startBackgroundTask();
       }
     } catch (e) { console.warn('[trackRecorder] background', e); /* Fallback: Vordergrund-Watch bleibt */ } })();
 

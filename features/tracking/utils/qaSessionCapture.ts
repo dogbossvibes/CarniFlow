@@ -85,7 +85,7 @@ export interface QaTurnFusion {
   apexIndex: number;
   atM: number;
   tMs: number | null;
-  source: 'gps' | 'gps_split_apex';
+  source: 'gps' | 'gps_split_apex' | 'gps_long_baseline';
   direction: 'links' | 'rechts';
   directionSource?: 'gps' | 'motion_override_low_geometry';
   motionAssociationSource?: 'live_cached' | 'accepted_live_turn' | 'current_ring' | 'nearest_episode' | 'none';

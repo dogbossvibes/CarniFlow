@@ -29,6 +29,12 @@
 //      Nachher-Fenster(i+1). Die Fenster selbst werden NICHT gelockert (≥ 2 m,
 //      ≥ 3 Punkte, Streuung ≤ 26°) — am Puffer-Ende gibt es weiterhin keinen
 //      Rescue, weil dort kein Nachher-Fenster existiert.
+//   2b. LONG-BASELINE-RÜCKFALL (rein geometrisch, GPS): wo Regelpfad und
+//      Split-Apex keine Ecke liefern, weil das Segment-Geradheits-Gate bei
+//      verrauschten, langsam gelaufenen Spuren praktisch jedes Fenster
+//      verwirft, wird die Richtung über lange Schenkel (8/12/16 m) gemessen —
+//      mit eigenen, strengeren Gates (siehe longBaselineCorner.ts). Die
+//      Fenster des Regelpfads werden dafür NICHT gelockert.
 //   3. IMU-ONLY-Ereignisse (gerichtete Drehung ohne GPS-Ecke) werden nur
 //      PROTOKOLLIERT (`imuOnly`), nie persistiert: ohne GPS-Beleg ist ein
 //      Motion-Ereignis von Handy-Drehen im Gehen nicht zu unterscheiden
@@ -49,6 +55,7 @@ import {
   type MotionWindowSample, type TurnEvidence,
 } from '@/features/tracking/utils/motionTurnEvidence';
 import { turnGeometryQuality, type GeometryQualityLevel } from '@/features/tracking/utils/turnGeometryQuality';
+import { detectLongBaselineCorners } from '@/features/tracking/utils/longBaselineCorner';
 
 // ── Parameter ─────────────────────────────────────────────────────────────
 /** Split-Apex: höchstens ein Segment (m) zwischen Vorher- und Nachher-Scheitel. */
@@ -71,7 +78,7 @@ export const MOTION_EPISODE_ASSOCIATION_OFFSETS_MS = [0, -500, 500, -1000, 1000,
 export const MOTION_EVENT_REUSE_GUARD_MS = 1_500;
 
 export type TurnSharpness = 'normal' | 'spitz' | 'unresolved';
-export type TurnSource = 'gps' | 'gps_split_apex';
+export type TurnSource = 'gps' | 'gps_split_apex' | 'gps_long_baseline';
 
 export interface FusedTurnMotion {
   available: boolean;
@@ -137,6 +144,8 @@ export interface FusionResult {
   imuOnly: ImuOnlyEvent[];
   /** Anzahl der durch Split-Apex zusätzlich gefundenen Ecken. */
   rescued: number;
+  /** Anzahl der durch den Long-Baseline-Rückfall zusätzlich gefundenen Ecken. */
+  longBaseline: number;
 }
 
 /** Finish reconstruction may outlive the 20-second Motion ring. Prefer the
@@ -162,6 +171,8 @@ export interface FuseOptions {
   motionSamples?: readonly MotionWindowSample[];
   /** Split-Apex-Rescue. Default: an. */
   splitApexRescue?: boolean;
+  /** Long-Baseline-Rückfall für verrauschte/langsame Spuren. Default: an. */
+  longBaselineRescue?: boolean;
 }
 
 /** Choose the strongest direction-compatible motion window in a bounded
@@ -244,7 +255,8 @@ function turnFromDiag(d: ShortLegDiagnostics, atM: number, ev: TurnEvidence | nu
   // aus der GPS-Geometrie: auflösbar → GPS-Klasse, nicht auflösbar → 'unresolved'.
   const finalKind = kindFor(dir, sharpness === 'unresolved' ? 'normal' : sharpness);
   return {
-    apexIndex: d.apexIndex, atM, t: d.t, source: d.fusionSource === 'gps_split_apex' ? 'gps_split_apex' : 'gps',
+    apexIndex: d.apexIndex, atM, t: d.t,
+    source: d.fusionSource === 'gps_split_apex' || d.fusionSource === 'gps_long_baseline' ? d.fusionSource : 'gps',
     direction: dir, directionSource,
     motionAssociationSource: nearestEpisodeLookup && ev?.available && d.t != null
       && Math.abs((ev.windowStartMs + ev.windowEndMs) / 2 - d.t) >= 250 ? 'nearest_episode'
@@ -559,6 +571,34 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
       turns.push(t);
     }
   }
+
+  // 2b. Long-Baseline-Rückfall: nur dort, wo bisher KEINE Ecke liegt. Rein
+  // geometrisch; Motion fliesst nicht ein (siehe longBaselineCorner.ts).
+  let longBaseline = 0;
+  if (opts.longBaselineRescue !== false) {
+    for (const h of detectLongBaselineCorners(points, corners.map(c => c.atM))) {
+      const atM = points[h.apexIndex].cumDist;
+      const d = byApex.get(h.apexIndex);
+      if (!d) continue;
+      longBaseline++;
+      corners.push({ kind: h.direction, apexIndex: h.apexIndex, atM });
+      Object.assign(d, {
+        rejectReason: null, classification: h.direction, confidence: Math.round(h.confidence * 1000) / 1000,
+        confidenceBeforeMotion: Math.round(h.confidence * 1000) / 1000, motionAdjustment: 0,
+        headingDeltaDeg: Math.round(h.headingDeltaDeg * 10) / 10, interiorAngleDeg: Math.round(h.interiorAngleDeg * 10) / 10,
+        bearingBefore: Math.round(h.before.bearingDeg * 10) / 10, bearingAfter: Math.round(h.after.bearingDeg * 10) / 10,
+        legBeforeM: Math.round(h.before.lengthM * 100) / 100, legAfterM: Math.round(h.after.lengthM * 100) / 100,
+        sampleCountBefore: h.before.sampleCount, sampleCountAfter: h.after.sampleCount,
+        fitResidualBeforeM: Math.round(h.before.residualM * 100) / 100, fitResidualAfterM: Math.round(h.after.residualM * 100) / 100,
+        chosenScaleM: h.baselinesM[h.baselinesM.length - 1],
+        direction: h.direction, sharpness: h.sharpness, sharpnessDemoted: false,
+        fusionSource: 'gps_long_baseline' as const,
+      });
+      const t = turnFromDiag(d, atM, null);
+      t.flags.unshift('long_baseline', `baselines_${h.baselinesM.join('_')}m`);
+      turns.push(t);
+    }
+  }
   corners.sort((x, y) => x.atM - y.atM);
   turns.sort((x, y) => x.atM - y.atM);
 
@@ -591,5 +631,5 @@ export function fuseTurns(points: readonly ShortLegPoint[], opts: FuseOptions = 
       .filter(e => !cornerTimes.some(ct => Math.abs(ct - e.t) <= IMU_ONLY_MATCH_S * 1000));
   }
 
-  return { corners, diagnostics, detectorPointCount: base.detectorPointCount, turns, imuOnly, rescued };
+  return { corners, diagnostics, detectorPointCount: base.detectorPointCount, turns, imuOnly, rescued, longBaseline };
 }
