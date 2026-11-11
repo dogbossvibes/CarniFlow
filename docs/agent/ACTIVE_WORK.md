@@ -1,5 +1,29 @@
 # ANYVO – Active Work
 
+## Abendstand nach den OTAs #58 und #59 – 2026-11-11
+
+**Erledigt:** iOS 60 Fährten-Paket live (Karte #59), iOS 57 Trainingskarten live (Karte #58).
+PR #45 gemergt. Dieser Abschnitt ergänzt den Abschnitt darunter.
+
+**Offen:**
+- **Gerätetests** durch die Nutzerin: Build 60 für #49, #51, #59 (Checkliste Fährten in
+  Issue #57), Build 57 für #58 (ist das Rot an den Kartenecken weg?). Danach Karten auf
+  „Veröffentlicht“. Board-Feld „Ziel“ bei #49, #51, #58, #59 von Hand setzen.
+- **Lokale Release-Quellen sichern:** `51d7d706` (enthält `b6ef690f` und `b676b403`) ist nicht
+  auf GitHub. Push bzw. Zusammenführung mit `release/ios60-greeting-sound-20261109` nur mit
+  Freigabe der Nutzerin. Solange offen, schlägt der Ancestry-Guard für jede OTA direkt aus
+  der iOS60-Linie an.
+- **T-184 Etappe 3b** („Ein Ort pro Hund“, Commit `ee0a0ac9`, lokal): gebaut, nicht
+  veröffentlicht. Vor einer OTA `51d7d706` einmergen; eigene Freigabe nötig.
+- **Wrapper doppelt gestartet:** Ein in der Claude-App abgesendeter Terminal-Befehl läuft im
+  Terminal-Tab; zusätzlich im Tab getippt, läuft er zweimal (so bei #51 und #58 passiert).
+  Publish-Befehle nur an einer Stelle eingeben.
+- **Tests unter Last:** `useTrackRecorder.startup.test.tsx` läuft bei parallelen Läufen in die
+  15-s-Zeitgrenze; einzeln bzw. ohne Parallel-Last grün. Hängt mit T-193 (Rechenzeit) zusammen.
+- Weiter offen wie darunter: Lernstufen-Frage für Build 57 vor dem Store-Build, T-193.
+
+Keine Freigabe für Commit/Push/OTA/Build/DB aus diesem Eintrag.
+
 ## Stand nach den iOS-60-OTAs – 2026-11-11
 
 **Erledigt:** Production-Migration `rating_scale` ausgeführt. iOS-60-OTAs live: Karte #49
