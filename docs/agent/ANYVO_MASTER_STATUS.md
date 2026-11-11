@@ -3,11 +3,13 @@
 ## iOS 60: Trainingsdoku neu, Winkel-Rückfall, Hintergrund-Ortung veröffentlicht – 2026-11-11
 
 Aktueller Production-Stand **iOS 60** (TestFlight 1.0.8, Runtime `1.0.8-sdk58-v1`):
-Source `b6ef690f`, Group `dc7979a1-5dbf-411f-9b49-61f5c6419af4`. Zwei Chargen am selben Tag:
+Source `b6ef690f`, Group `1d1def65-2c26-4234-8997-a84ace05debf`. Zwei Chargen am selben Tag:
 - Release-Karte Issue #49: T-190 (PR #39), T-191 (PR #40), T-195 (Lint-Kennzeichnung).
   Source `b676b403`, Group `ebc045db-170f-41cb-8876-8adb509bcba7`.
 - Release-Karte Issue #51: T-184 Trainingsdoku neu (#31), baut auf `b676b403` auf.
-  Source `b6ef690f`, Group `dc7979a1-5dbf-411f-9b49-61f5c6419af4`.
+  Source `b6ef690f`, Group `dc7979a1-5dbf-411f-9b49-61f5c6419af4`; der Wrapper lief versehentlich
+  ein zweites Mal, die inhaltsgleiche Gruppe `1d1def65-2c26-4234-8997-a84ace05debf` ist jetzt aktiv
+  (gleicher Commit, gleiches Bundle, Nachtrag in der Karte).
 Alle IDs, Prüfungen und vorherigen Stände stehen in den Karten. Publish durch die Nutzerin
 über den Production-Wrapper; MASTER-Nachkontrolle frisch aus EAS bestanden. Gerätetest auf
 TestFlight offen (beide Karten „Live – Nachkontrolle offen“). Kein Android, kein Store-Release.
