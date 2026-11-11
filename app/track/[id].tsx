@@ -56,7 +56,7 @@ import {
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
-import { formatApproxDeviationM } from '@/features/tracking/utils/formatDeviation';
+import { formatApproxDeviationM, formatDeviationUncertaintyM } from '@/features/tracking/utils/formatDeviation';
 import { useT, type TranslationKey } from '@/i18n';
 import {
   addTrackFeedback, deleteTrackFeedback, getTrackShare, listAcceptedTrainers, listTrackFeedback,
@@ -671,6 +671,9 @@ export default function TrackAuswertungScreen() {
                 {analyseExpanded && (
                   <View style={{ marginTop: 10, gap: 10 }}>
                     {analyticsV3 && <Text style={s.analyseDetailLabel}>{t('track.analysisTechnical')} · {t('track.analysisLineDeviation')}: {formatApproxDeviationM(analytics.deviation.meanM)} · Median {formatApproxDeviationM(analytics.deviation.medianM)} · P95 {formatApproxDeviationM(analytics.deviation.p95M)}</Text>}
+                    {analyticsV3?.deviationUncertaintyM != null && (
+                      <Text style={s.analyseHintText}>{t('track.analysisDeviationUncertainty')}: {formatDeviationUncertaintyM(analyticsV3.deviationUncertaintyM)} · {t('track.analysisDeviationUncertaintyHint')}</Text>
+                    )}
                     {analyticsV3?.deviationEvents.map(event => (
                       <View key={event.id} style={s.analyseDetailRow}>
                         <Text style={s.analyseDetailLabel}>{t('track.analysisDeviationEvents')} · {event.startAlongTrackM.toFixed(0)} m</Text>
