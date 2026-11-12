@@ -25,6 +25,7 @@ import { useSearchRecorder, type Level } from '@/features/tracking/hooks/useSear
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
 import { useTrackVoiceGuidance, say, speechLanguage, type GuidanceAngle } from '@/features/tracking/hooks/useTrackVoiceGuidance';
 import { requestVoice, resetVoiceEvents, voiceDiagnostics } from '@/features/tracking/utils/voiceEvents';
+import { useTrackVoiceAudioSession } from '@/features/tracking/utils/trackVoiceAudioSession';
 import i18n from '@/i18n/config';
 import { offTrackTransitionFeedback, offTrackBanner } from '@/features/tracking/utils/offTrackFeedback';
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
@@ -225,12 +226,21 @@ export default function TrackRunScreen() {
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [follow, setFollow] = useState(true);   // Karte folgt der Live-Position; aus → frei zoombar
   const [voiceOn, setVoiceOn] = useState(true);
+  useTrackVoiceAudioSession(voiceOn);   // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm
   const autoDwellVoiceKey = s.autoDwellObjectIds.join('|');
+  // T-206: «Gegenstand erkannt» je Fund genau einmal pro Absuche — auch nach einem App-Neustart.
+  // resumeSearch seedet die schon gefundenen Gegenstände; die Merkliste der Sprachausgabe selbst
+  // lebt nur im Speicher und wäre nach dem Neustart leer.
+  const announcedDwellRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!voiceOn || !s.recording) return;
-    autoDwellVoiceKey.split('|').filter(Boolean).forEach(id => requestVoice({ eventType: 'object',
-      text: t('track.voiceObjectDetected'), language: speechLanguage(i18n.language as never),
-      priority: 6, onceKey: `auto_dwell:${id}`, phase: 'search' }));
+    autoDwellVoiceKey.split('|').filter(Boolean).forEach(id => {
+      if (announcedDwellRef.current.has(id)) return;
+      announcedDwellRef.current.add(id);
+      requestVoice({ eventType: 'object',
+        text: t('track.voiceObjectDetected'), language: speechLanguage(i18n.language as never),
+        priority: 6, onceKey: `auto_dwell:${id}`, phase: 'search' });
+    });
   }, [voiceOn, s.recording, autoDwellVoiceKey, t]);
   const [dogName, setDogName] = useState('Hund');
   const [finishing, setFinishing] = useState(false);
@@ -388,6 +398,7 @@ export default function TrackRunScreen() {
     try { assertTransfer(renderTransferIdentity); boundRunId = assertTransfer(currentTransfer()); }
     catch { Alert.alert('Fährte nicht verfügbar', 'Bitte öffne die übergebene Fährte erneut in deinem Konto.'); return; }
     startedRef.current = true;
+    announcedDwellRef.current = new Set();   // T-206: frische Absuche
     approachPhaseRef.current = nextStartZonePhase(approachPhaseRef.current, false, false, true);
     if (approachQaRef.current && approachOriginRef.current != null)
       approachQaRef.current.searchStartedTSec = (Date.now() - approachOriginRef.current) / 1000;
@@ -575,6 +586,7 @@ export default function TrackRunScreen() {
     const runState = useTrackingStore.getState().searchRunState;
     prevOffTrackRef.current = runState.offTrackState;
     segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };
+    announcedDwellRef.current = new Set(runState.autoDwellObjectIds);   // T-206: schon angesagte Funde
     const startedAtMs = pending.searchStartedAt ?? Date.now();
     s.start({ points: saved.map(p => ({ latitude: p.lat, longitude: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) })),
       pointsTimeSec: saved.map(p => Math.max(0, (p.t - startedAtMs) / 1000)), startedAtMs, runState },
@@ -757,6 +769,8 @@ export default function TrackRunScreen() {
   // der gelegten Fährte). DogLead bleibt nur eine Projektion. Beendet die
   // Absuche NICHT — nur Anzeige/Voice/Haptik; der Nutzer beendet weiterhin selbst.
   const endPoint = snapData.laidPoints.length ? snapData.laidPoints[snapData.laidPoints.length - 1] : null;
+  // T-207: Genauigkeit des gelegten Endpunkts für den Ende-Radius.
+  const endPointAccuracyM = snapData.laidAccuracies.length ? snapData.laidAccuracies[snapData.laidAccuracies.length - 1] ?? null : null;
   const finalObjectIndex = snapData.laidObjects.length - 1;
   const finalObject = finalObjectIndex >= 0 ? snapData.laidObjects[finalObjectIndex] : null;
   const finalObjectPendingNearEnd = !!(finalObject && endPoint && s.objectStatuses[finalObjectIndex] === 'pending'
@@ -811,6 +825,7 @@ export default function TrackRunScreen() {
     trackLengthM: s.trackLengthM,
     estimatedDogPosition: s.estimatedDogPosition,
     endPoint,
+    endPointAccuracyM,
     openMandatoryObjects,
     activeObjectWait: s.activeObjectWait,
     finalObjectPendingNearEnd,
@@ -829,13 +844,13 @@ export default function TrackRunScreen() {
       endQaHistoryRef.current = advanceEndFixHistory(endQaHistoryRef.current, {
         tMs: s.endHandlerFix.tMs, distanceToEndM: handlerDistanceToEndM,
         accuracyM: s.endHandlerFix.accuracyM, lastSegmentReached,
-        handlerProgressRatio: s.trackLengthM > 0 ? s.progressM / s.trackLengthM : 0,
+        handlerProgressRatio: s.trackLengthM > 0 ? s.progressM / s.trackLengthM : 0, endPointAccuracyM,
       });
     const history = endQaHistoryRef.current;
     const blockerReason = trackEndBlocker({ dogProgressM: s.dogProgressM, handlerProgressM: s.progressM,
       handlerDistanceToEndM, geomDistanceM: dogDistanceToEndM, trackLengthM: s.trackLengthM,
       openMandatoryObjects, activeObjectWait: s.activeObjectWait, searchActive: searchGuidanceActive,
-      accuracyM: s.endHandlerFix?.accuracyM ?? null, lastSegmentReached,
+      accuracyM: s.endHandlerFix?.accuracyM ?? null, endPointAccuracyM, lastSegmentReached,
       finalObjectGraceActive: finalObjectGraceQaRef.current.startedAtMs != null
         && finalObjectGraceQaRef.current.endedAtMs == null
         && finalObjectGraceQaRef.current.reason !== 'active_dwell',
@@ -847,7 +862,7 @@ export default function TrackRunScreen() {
         : Math.max(0, (history.firstInsideMs - searchStartMsRef.current) / 1000),
       stableFixCount: history.insideCount, requiredStableFixCount: 2,
       handlerDistanceM: handlerDistanceToEndM,
-      effectiveEndRadiusM: endRadiusM(s.endHandlerFix?.accuracyM ?? null),
+      effectiveEndRadiusM: endRadiusM(s.endHandlerFix?.accuracyM ?? null, endPointAccuracyM),
       lastSegmentReached, activeObjectWait: s.activeObjectWait,
       approachHistorySampleCount: history.approachSampleCount,
       approachHistoryStartDistanceM: history.approachStartDistanceM,

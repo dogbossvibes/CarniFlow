@@ -12,6 +12,7 @@ import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } fr
 import { useFocusEffect, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { requestVoice, resetVoiceEvents } from '@/features/tracking/utils/voiceEvents';
+import { useTrackVoiceAudioSession } from '@/features/tracking/utils/trackVoiceAudioSession';
 import { C, FT } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
@@ -213,6 +214,7 @@ export default function LegenScreen() {
   // Toast + Sprachbestätigung. Alle drei Rückmeldungen benutzen denselben,
   // zentral zugeordneten Begriff (trackEventVoice.ts) — identisch zur Absuche.
   const layVoice = useLayVoiceSetting();   // Sprachausgabe beim Legen (Default AUS)
+  useTrackVoiceAudioSession(layVoice.enabled);   // T-204: Ansage hörbar trotz Stummschalter und bei gesperrtem Bildschirm
   const layVoiceRef = useRef(false);
   // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   layVoiceRef.current = layVoice.enabled;
