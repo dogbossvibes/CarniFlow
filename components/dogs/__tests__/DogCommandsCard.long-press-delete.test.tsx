@@ -26,6 +26,14 @@ const SIT: DogCommand = {
   createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z',
 };
 
+// Jeden gerenderten Baum nach dem Test abbauen. Sonst läuft eine Animation
+// (AnimatedPressable) nach dem Ende der Testumgebung weiter und Jest endet mit
+// Fehlercode 1, obwohl alle Tests bestehen.
+const mounted: ReactTestRenderer[] = [];
+afterEach(() => {
+  act(() => { for (const node of mounted.splice(0)) node.unmount(); });
+});
+
 function render(props: Partial<Parameters<typeof DogCommandsCard>[0]> = {}): ReactTestRenderer {
   let node!: ReactTestRenderer;
   act(() => {
@@ -33,6 +41,7 @@ function render(props: Partial<Parameters<typeof DogCommandsCard>[0]> = {}): Rea
       <DogCommandsCard commands={[SIT]} onAdd={() => {}} onOpen={() => {}} onToggleFavorite={() => {}} {...props} />,
     );
   });
+  mounted.push(node);
   return node;
 }
 
