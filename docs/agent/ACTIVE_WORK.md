@@ -1,5 +1,31 @@
 # ANYVO – Active Work
 
+## Stand nach den iOS-60-OTAs #77, #79, #81 – 2026-11-12
+
+**Erledigt:** Drei iOS-60-OTAs live (Karten #77, #79, #81), Release-Quellen auf GitHub gesichert,
+Gerätetests #49, #51, #58, #59, #61, #77, #79 von der Nutzerin gemeldet. Dieser Abschnitt ersetzt
+die offenen Punkte zu Gerätetests und lokalen Release-Quellen im Abschnitt darunter.
+
+**Offen:**
+- **Gerätetest #81 (T-207)** auf Build 60: Haarnadel 4–8 m und 12 m, Spitzwinkel/Kreuzung,
+  langes Verweisen neben späterem Schenkel, Ende nahe Start, Fortsetzen nach Neustart.
+- **Board-Feld „Ziel“** ist ein Mehrfachauswahl-Feld: weder CLI noch GitHub-App können es setzen,
+  nur die Desktop-Webseite. Vorschlag an die Nutzerin: in ein Einfachauswahl-Feld umbauen.
+- **PR #67** (iOS 60 in `main`): enthält jetzt `a67cef9b`, aber noch nicht `e253a552`/`96e7f661`;
+  enthält zusätzlich Kontaktanfragen (#63, nicht live, neue Abhängigkeit `qrcode-generator`).
+  Vor dem Merge Live-Stand nachziehen; Merge nur als Merge-Commit.
+- **PR #68** (Lernstufen auf Build 57) gemergt in die Build-57-Linie, nicht veröffentlicht;
+  vor einer OTA Simulatorprüfung.
+- **PR #76** (Dateien beim Löschen eines Hundes): Kundendaten, Gerätetest mit Testhund vor Merge.
+- **Git-Anmeldung:** Im macOS-Schlüsselbund ist für github.com das Konto `shadesofym` gespeichert;
+  `git push` scheitert damit. Workaround: Push über `gh auth git-credential` (aktives Konto
+  `dogbossvibes`).
+- **Android:** Absuche bei ausgeschaltetem Bildschirm ohne Positionen (kein Vordergrund-Dienst),
+  eigene Aufgabe auf der Android-Linie.
+- Weiter offen: T-193, Tests unter Last (`useTrackRecorder.startup`).
+
+Keine Freigabe für Commit/Push/OTA/Build/DB aus diesem Eintrag.
+
 ## Abendstand nach den OTAs #58 und #59 – 2026-11-11
 
 **Erledigt:** iOS 60 Fährten-Paket live (Karte #59), iOS 57 Trainingskarten live (Karte #58).
