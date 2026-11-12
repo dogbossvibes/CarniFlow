@@ -45,6 +45,7 @@ export default function GroupTrainingScreen() {
   useEffect(() => {
     if (typeof requestedGroupId !== 'string' || preselected === requestedGroupId) return;
     if (!data.groups.some(g => g.groupId === requestedGroupId)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit main d505250f; Logik bewusst unverändert
     setPreselected(requestedGroupId);
     if (data.groupId !== requestedGroupId) chooseGroup(requestedGroupId);
   }, [chooseGroup, data.groupId, data.groups, preselected, requestedGroupId]);
