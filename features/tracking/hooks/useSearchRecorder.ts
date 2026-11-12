@@ -27,7 +27,7 @@ import {
   startPositionSource, sampleToLocationObject, type LocationSourceKind, type PositionSourceSample,
 } from '@/features/tracking/utils/positionSource';
 import {
-  DEFAULT_HANDLER_DISTANCE_M, buildArc, estimateDogProgressM, pointAtDistance, projectForward,
+  DEFAULT_HANDLER_DISTANCE_M, buildArc, pointAtDistance, projectForward,
   projectForwardCandidates, pickContinuousProjection, predictContinuityFoot, type LL as GeoLL,
 } from '@/features/tracking/utils/searchGeometry';
 import {
@@ -40,6 +40,7 @@ import { useTrackingStore, type TrackPointSample } from '@/features/tracking/sto
 import { searchObjectKey, type SearchRunState } from '@/features/tracking/store/searchRunState';
 import { INITIAL_OBJECT_DWELL, objectReferenceToleranceM, stepObjectDwell, type ObjectDwellState } from '@/features/tracking/utils/objectDwell';
 import type { TrackObjectScoreBasis } from '@/features/tracking/utils/trackObjectReview';
+import { dogProgressWithObjectHold } from '@/features/tracking/utils/dogObjectHold';
 import { statusAcrossGap, statusAfterProgress, statusAtConfirmedEnd, type ReferenceObjectStatus } from '@/features/tracking/utils/referenceObjectStatus';
 import { enqueueSearchPoint, flushSearchPoints, resetSearchBuffer } from '@/features/tracking/store/searchPersist';
 import { evaluateSearchFix, type SearchFixDecision, type SearchFixPrev, type SearchFixRejectedRecord } from '@/features/tracking/utils/searchFix';
@@ -126,6 +127,9 @@ const DEV_EMA = 0.25;            // Glättung der angezeigten Abweichung
 const LOOKAHEAD_M = 20;          // m — so weit voraus wird auf die Soll-Fährte projiziert
 const BACK_M = 4;                // m — kleine Toleranz nach hinten (Jitter)
 const ADVANCE_DEV_M = 12;        // m — nur bei Abweichung darunter rückt der Fortschritt vor
+const REACQUIRE_WALK_FACTOR = 1.5; // T-207: Abkürzen am Winkel — Fortschritt entlang der Fährte bis 1,5× der gegangenen Strecke
+const REACQUIRE_SLACK_M = 10;      // m — T-207: Spielraum für GPS-Versatz beim Wiedereinstieg
+const REACQUIRE_CLEAR_M = 4;       // m — T-207: so viel näher muss der vordere Schenkel liegen, um zu wechseln
 // Strenge Abweichungs-Skala für die Wertung: volle Punkte bis FULL_DEV_M, 0 ab ZERO_DEV_M.
 const FULL_DEV_M = 1.5;
 const ZERO_DEV_M = 10;
@@ -329,6 +333,8 @@ export function useSearchRecorder(opts: {
   // der Referenzsegment-Auswahl (P0 Live-Cursor/Self-Crossing, siehe searchGeometry
   // projectForwardCandidates/pickContinuousProjection). null = kein Vorgänger.
   const prevFootRef = useRef<GeoLL | null>(null);
+  // T-207: seit dem letzten Fortschritt gegangene Strecke (m) — begrenzt den Wiedereinstieg auf einen anderen Schenkel.
+  const walkedSinceAdvanceRef = useRef(0);
   const breaksRef = useRef<Break[]>([]);
   const smoothRef = useRef<LatLng | null>(null);
   const prevFixRef = useRef<SearchFixPrev | null>(null);   // letzter AKZEPTIERTER Rohfix (für das Speed-Gate)
@@ -364,6 +370,9 @@ export function useSearchRecorder(opts: {
   const autoDwellIdsRef = useRef<Set<string>>(new Set());
   const dismissedDwellIdsRef = useRef<Set<string>>(new Set());
   const [activeObjectWait, setActiveObjectWait] = useState(false);
+  // T-203: Zeitpunkt (s seit Suchbeginn), zu dem ein Gegenstand in DIESER Sitzung bestätigt wurde —
+  // nur für den Wiederanlauf der virtuellen Hundeposition. Nicht persistiert, keine Wertung.
+  const [objectResolvedAtS, setObjectResolvedAtS] = useState<Record<number, number>>({});
   const watchRef = useRef<Location.LocationSubscription | null>(null);
   const startMsRef = useRef(0);
   const cursorMRef = useRef(0);      // aktueller Fortschritt entlang der Soll-Fährte (m)
@@ -444,7 +453,7 @@ export function useSearchRecorder(opts: {
     replayBoundaryRef.current = true;
     lastContinuityFixMsRef.current = null;
     smoothRef.current = null; replayEmaRef.current = null; endSmoothRef.current = null;
-    prevFixRef.current = null; prevFootRef.current = null; recentRejectedRef.current = [];
+    prevFixRef.current = null; prevFootRef.current = null; walkedSinceAdvanceRef.current = 0; recentRejectedRef.current = [];
     fusionHistoryRef.current = { prevAccepted: null, prevSpeedMps: null, prevCourseDeg: null };
     autoDwellRef.current.clear(); autoDwellStartRef.current.clear();
     lastReliableCursorMRef.current = null; lastReliableAtSecRef.current = null;
@@ -578,7 +587,7 @@ export function useSearchRecorder(opts: {
       pointsTimeRef.current = [];
       replayDenseRef.current = [];
       replayEmaRef.current = null;
-      prevFootRef.current = null;
+      prevFootRef.current = null; walkedSinceAdvanceRef.current = 0;
       distRef.current = 0;
     }
 
@@ -730,7 +739,11 @@ export function useSearchRecorder(opts: {
         else autoDwellStartRef.current.delete(i);
         if (next.acceptedNow) {
           foundRef.current.add(i); autoDwellIdsRef.current.add(key);
+          // T-206: Wiederanlauf der Pfote nur, wenn sie hier wirklich gehalten wurde (Status offen).
+          // Ein schon verpasster/unbeobachteter Gegenstand darf die Pfote nicht zurückziehen.
+          const heldHere = objectStatusesRef.current[i] === 'pending';
           objectStatusesRef.current[i] = 'auto_dwell_found';
+          if (heldHere) setObjectResolvedAtS(prev => ({ ...prev, [i]: (Date.now() - startMsRef.current) / 1000 }));
           useTrackingStore.getState().noteSearchAutoDwell(key);
           pushSnapshot();
         }
@@ -878,7 +891,24 @@ export function useSearchRecorder(opts: {
       const lookaheadM = widen ? arc.total : LOOKAHEAD_M;
       const cands = widen ? projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, lookaheadM, BACK_M) : localCandidates;
       const predicted = prevFoot ? predictContinuityFoot(prevFoot, prevAccepted, sm, laidPoints, arc.cum, cursorMRef.current) : null;
-      const chosen = pickContinuousProjection(cands, predicted);
+      let chosen = pickContinuousProjection(cands, predicted);
+      // T-207: Kontinuitätsfalle beim Abkürzen. Die Vorhersage startet immer am zuletzt gewählten
+      // Lotfuss. Kürzt der Hundeführer einen Winkel ab oder quert er an einer Haarnadel direkt zum
+      // Rückweg (der Hund läuft herum, die Leine zieht ihn quer), bleibt die Wahl am alten Schenkel
+      // hängen und der Fortschritt friert ein. Dann zählt ein Kandidat VORNE, wenn er
+      //  • nah genug zum Vorrücken ist (≤ ADVANCE_DEV_M) und
+      //  • der alte Schenkel zu weit weg ist (> ADVANCE_DEV_M) oder klar ferner (≥ REACQUIRE_CLEAR_M), und
+      //  • der Sprung zur Bewegung passt: ≤ 1,5 × gegangene Strecke + 2 × Hundeabstand + Spielraum.
+      // GPS-Rauschen zwischen zwei 4 m entfernten Schenkeln erreicht den Abstandsvorsprung selten.
+      if (prevAccepted) walkedSinceAdvanceRef.current += distM(prevAccepted, sm);
+      if (chosen && !widen && prevAccepted) {
+        const reachM = REACQUIRE_WALK_FACTOR * walkedSinceAdvanceRef.current + 2 * handlerDistanceM + REACQUIRE_SLACK_M;
+        const pool = reachM > LOOKAHEAD_M ? projectForwardCandidates(sm, laidPoints, arc.cum, cursorMRef.current, reachM, BACK_M) : cands;
+        const nearest = pool.reduce<typeof chosen | null>((best, c) => (
+          c.arcM > cursorMRef.current && c.arcM - cursorMRef.current <= reachM && (!best || c.offLineM < best.offLineM) ? c : best), null);
+        if (nearest && nearest.offLineM <= ADVANCE_DEV_M
+          && (chosen.offLineM > ADVANCE_DEV_M || chosen.offLineM - nearest.offLineM >= REACQUIRE_CLEAR_M)) chosen = nearest;
+      }
       const proj = chosen
         ? { devM: chosen.offLineM, atM: chosen.arcM }
         : projectForward(sm, laidPoints, arc.cum, cursorMRef.current, lookaheadM, BACK_M);
@@ -887,6 +917,7 @@ export function useSearchRecorder(opts: {
         if (beginsSection) unobservedProgressMRef.current += Math.max(0, proj.atM - maxCursorMRef.current);
         cursorMRef.current = proj.atM;
         if (proj.atM > maxCursorMRef.current) maxCursorMRef.current = proj.atM;
+        walkedSinceAdvanceRef.current = 0;
       }
       prevFootRef.current = chosen ? chosen.point : pointAtDistance(laidPoints, arc.cum, proj.atM);
     } else {
@@ -1105,6 +1136,9 @@ export function useSearchRecorder(opts: {
           onFixRef.current(sampleToLocationObject(s));
         },
         { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 },
+        // T-206: Absuche per Audio mit Handy in der Tasche — bei gesperrtem Bildschirm liefert iOS
+        // sonst keine Positionen, und die Sprachführung verstummt. Gilt, solange der Laufbildschirm offen ist.
+        { allowBackground: true },
       );
       if (!mounted) { handle.stop(); return; }   // Unmount während des Starts → kein Leak
       watchRef.current = { remove: handle.stop };
@@ -1223,7 +1257,7 @@ export function useSearchRecorder(opts: {
     // Kontinuität: Lotfusspunkt des Vorgängers wird im Fix-Handler gesetzt; beim
     // Fortsetzen wird er dort lazy am geseedeten Cursor abgeleitet (der letzte
     // wiederhergestellte Punkt ist der Vorgänger).
-    prevFootRef.current = null;
+    prevFootRef.current = null; walkedSinceAdvanceRef.current = 0;
     // Core-Motion-Fusion (Punkt 3/16): NUR während einer aktiven Absuche aktiv.
     // Fire-and-forget — ein Start-Fehler (Permission verweigert, kein Modul im
     // Build, Android) fällt lautlos auf fusionMode='gps_only' zurück, blockiert
@@ -1267,7 +1301,7 @@ export function useSearchRecorder(opts: {
       else if (rs.unobservedObjectIds?.includes(key)) objectStatusesRef.current[i] = 'unobserved';
     });
     if (rs?.endFired) objectStatusesRef.current = objectStatusesRef.current.map(statusAtConfirmedEnd);
-    setActiveObjectWait(false);
+    setActiveObjectWait(false); setObjectResolvedAtS({});
     startMsRef.current = resume ? resume.startedAtMs : Date.now();
     const diagnosticEnvironment = captureDiagnosticEnvironment();
     if (sessionIdRef.current) void recordSupportProvenance(sessionIdRef.current, 'search', !!resume, opts?.diagnosticAttemptKey, diagnosticEnvironment);
@@ -1374,7 +1408,10 @@ export function useSearchRecorder(opts: {
     });
     if (bestI >= 0) {
       foundRef.current.add(bestI);
+      const heldHere = objectStatusesRef.current[bestI] === 'pending';   // T-206: siehe Auto-Fund
       objectStatusesRef.current[bestI] = 'manual_found';
+      const resolvedIndex = bestI;
+      if (heldHere) setObjectResolvedAtS(prev => ({ ...prev, [resolvedIndex]: (Date.now() - startMsRef.current) / 1000 }));
       autoDwellRef.current.delete(bestI);
       autoDwellStartRef.current.delete(bestI);
       // Resolving this object must release its blocker even without another fix.
@@ -1408,7 +1445,12 @@ export function useSearchRecorder(opts: {
   // Vor START_LOCKED (Punkt 4): kein Hundabstand-Offset, kein Marker — nur die
   // Handlerposition selbst zählt, solange die Start-Assoziation nicht feststeht.
   const startLockedForDisplay = !hasTrack || searchStartState === 'START_LOCKED';
-  const dogProgressM = startLockedForDisplay ? estimateDogProgressM(snap.progressM, handlerDistanceM, arc.total) : snap.progressM;
+  // T-203: Die Pfote hält am nächsten offenen Gegenstand (Hund liegt), bis er gefunden oder verpasst ist.
+  const dogProgressM = startLockedForDisplay
+    ? dogProgressWithObjectHold({ handlerProgressM: snap.progressM, leadM: handlerDistanceM, trackTotalM: arc.total,
+      objects: laidObjects.map((o, i) => ({ arcM: o.atM, status: snap.objectStatuses[i], resolvedAtS: objectResolvedAtS[i] ?? null })),
+      nowS: elapsedS }).dogProgressM
+    : snap.progressM;
   const estimatedDogPosition = startLockedForDisplay ? pointAtDistance(laidPoints, arc.cum, dogProgressM) : null;
 
   // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)

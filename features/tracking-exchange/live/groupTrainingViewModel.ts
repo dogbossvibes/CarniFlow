@@ -5,6 +5,8 @@ export type GroupShareMinutes = typeof GROUP_SHARE_MINUTES[number];
 export interface GroupView {
   groupId: string; membershipId: string; title: string; status: 'active' | 'ended';
   canInvite: boolean; canLeave: boolean; canClose: boolean;
+  /** Gruppentraining starten (Inhaber:in/Organisator:in). Fehlt der Wert, bleibt der Knopf sichtbar. */
+  canStartSession?: boolean;
 }
 export interface InvitationView {
   invitationId: string; groupTitle: string;
