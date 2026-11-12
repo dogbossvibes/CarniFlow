@@ -704,6 +704,9 @@ export const deCH = {
   'report.emptyBody': 'Ändere den Filter, damit der Bericht Einheiten enthält.',
   'report.error': 'Der Bericht konnte nicht erstellt werden. Versuch es noch einmal.',
   'report.unavailable': 'Teilen ist auf diesem Gerät nicht verfügbar.',
+  'activeDog.title': 'Aktiver Hund',
+  'activeDog.hint': 'Gilt für Analyse und Fährten-Übersicht. Du kannst jederzeit wechseln.',
+  'activeDog.switchA11y': 'Aktiver Hund: {dog}. Wechseln',
 
   // Einführung beim ersten Start
   'onboarding.tagline': 'Training, Fährte und Gesundheit deines Hundes an einem Ort.',

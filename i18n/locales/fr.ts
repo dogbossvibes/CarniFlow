@@ -517,6 +517,9 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "report.emptyBody": "Modifie le filtre pour que le rapport contienne des séances.",
   "report.error": "Le rapport n'a pas pu être créé. Réessaie.",
   "report.unavailable": "Le partage n'est pas disponible sur cet appareil.",
+  "activeDog.title": "Chien actif",
+  "activeDog.hint": "S'applique à l'analyse et à l'aperçu des pistes. Tu peux changer à tout moment.",
+  "activeDog.switchA11y": "Chien actif : {dog}. Changer",
 
   // Einführung beim ersten Start
   "onboarding.tagline": "L'entraînement, le pistage et la santé de ton chien au même endroit.",
