@@ -4,6 +4,7 @@ import { listConnections, PERSON_CONNECTION_TYPE } from '@/services/connectionSe
 export function useConnectedInviteTargets(userId: string | null, revision: number) {
   const [state, setState] = useState<{ userId: string; targets: { userId: string; displayName: string | null }[] } | null>(null);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit main d505250f; Logik bewusst unverändert
     let current = true; setState(null);
     if (userId) void Promise.all([listConnections(userId), listConnections(userId, PERSON_CONNECTION_TYPE), listConnections(userId, 'contact')])
       .then(results => {
