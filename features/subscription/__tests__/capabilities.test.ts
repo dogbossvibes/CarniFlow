@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import {
   hasCapability, planToCapabilities, isTrainerPlan, planOfProduct, isPremiumPlan,
   ACTIVE_CAPABILITIES, BASE_CAPABILITIES, PREMIUM_CAPABILITIES, TRAINER_CAPABILITIES,
-  PRODUCT_IDS, FOUNDER_SLOT_LIMIT, NEWBIE_QUOTA, quotaLimit, quotaAllowsNew,
+  PRODUCT_IDS, PLAN_META, FOUNDER_SLOT_LIMIT, NEWBIE_QUOTA, quotaLimit, quotaAllowsNew,
   resolveEffectiveCapabilities,
   type SubscriptionPlan, type Capability,
 } from '@/features/subscription/plans';
@@ -220,5 +220,13 @@ describe('planOfProduct / isTrainerPlan', () => {
 describe('Founder-Limit', () => {
   it('FOUNDER_SLOT_LIMIT ist 11 (Client-Spiegel des Server-Limits)', () => {
     expect(FOUNDER_SLOT_LIMIT).toBe(11);
+  });
+});
+
+describe('Store-Preise ohne hardcodierten Fallback', () => {
+  // Preise kommen ausschliesslich aus App Store Connect / Play Console. Ein fester
+  // Betrag im Code veraltet bei jeder Preisänderung (früher "CHF 9.00/Mt.").
+  it.each(['founder_active', 'active', 'trainer'] as const)('%s zeigt ohne Store-Paket keinen Betrag', plan => {
+    expect(PLAN_META[plan].priceLabel).toBe('—');
   });
 });

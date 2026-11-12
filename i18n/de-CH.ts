@@ -2192,7 +2192,6 @@ export const deCH = {
   'premium.badgePro': 'Profi',
   'premium.feature7Days': '7 Tage kostenlos',
   'premium.featureActive': 'Alle Active-Funktionen',
-  'premium.featureThenActive': 'Danach Active CHF 9.00/Mt.',
   'premium.featureOneDog': '1 Hund',
   'premium.featureTwoTrainingsMonth': '2 Trainings pro Monat',
   'premium.featureTrainerConnect': 'Mit deinem Trainer verbinden',
