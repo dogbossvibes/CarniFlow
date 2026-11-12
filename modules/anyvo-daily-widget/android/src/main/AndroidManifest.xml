@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <activity android:name="expo.modules.anyvodailywidget.AnyvoDailyWidgetConfigureActivity" android:exported="true" android:theme="@style/AnyvoDailyWidgetConfigureTheme" android:label="@string/anyvo_daily_configure" />
+    <receiver android:name="expo.modules.anyvodailywidget.AnyvoDailyWidgetProvider" android:exported="false" android:label="@string/anyvo_daily_name">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="android.intent.action.LOCALE_CHANGED" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.DATE_CHANGED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/anyvo_daily_widget" />
+    </receiver>
+  </application>
+</manifest>

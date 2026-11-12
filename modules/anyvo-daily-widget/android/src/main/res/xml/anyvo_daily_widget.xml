@@ -1,0 +1,7 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+  android:minWidth="180dp" android:minHeight="180dp" android:minResizeWidth="140dp" android:minResizeHeight="120dp"
+  android:targetCellWidth="3" android:targetCellHeight="2" android:updatePeriodMillis="1800000"
+  android:initialLayout="@layout/anyvo_daily_compact" android:previewLayout="@layout/anyvo_daily_compact"
+  android:configure="expo.modules.anyvodailywidget.AnyvoDailyWidgetConfigureActivity"
+  android:widgetFeatures="reconfigurable|configuration_optional"
+  android:description="@string/anyvo_daily_description" android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen" />
