@@ -5,6 +5,8 @@ import Overview from '../index';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { FaehrtenHeader, StatTriple, TrackRow } from '@/features/tracking/components/FaehrtenChrome';
 import { trackOverlayColor } from '@/features/tracking/utils/trackOverlayColors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { __resetActiveDogForTests } from '@/stores/activeDog';
 
 const mockDeleteLocal = jest.fn(), mockDeleteRemote = jest.fn(), mockToast = jest.fn();
 const mockToastValue = { showToast: mockToast, toast: null };
@@ -32,6 +34,9 @@ const row = (dog = 'd') => ({ id: `s-${dog}`, dog_id: dog, status: 'completed', 
 const gps = { lay: [{ lat: 47, lng: 8 }, { lat: 47.001, lng: 8.001 }], markers: [] };
 const mount = async () => { await act(async () => { view = TestRenderer.create(<Overview />); }); };
 const texts = () => view.root.findAllByType(Text).flatMap((n: any) => n.props.children);
+// Der aktive Hund ist app-weit gespeichert: pro Test frisch, sonst wirkt ein
+// Hundewechsel aus einem Test in den nächsten hinein.
+beforeEach(async () => { __resetActiveDogForTests(); await AsyncStorage.clear(); });
 beforeEach(() => { jest.clearAllMocks(); mockSession.user.id = 'u'; mockDeleteLocal.mockReset().mockResolvedValue(undefined); mockDeleteRemote.mockReset().mockResolvedValue({ error: null }); mockHistory.mockResolvedValue([row(), row('other')]); mockPreview.mockResolvedValue({}); });
 afterEach(() => { if (view) act(() => view.unmount()); });
 it('shows an honest unavailable-GPS state and never substitutes a count-based line', async () => {

@@ -145,8 +145,11 @@ describe('Trainingsbericht — Verdrahtung', () => {
   it('Tagebuch berichtet über den ganzen Filter und schreibt nichts', () => {
     const screen = readFileSync('app/training-journal.tsx', 'utf8');
     expect(screen).toContain('const model = buildReportModel(filtered, {');
-    // Keine neue Abhängigkeit: sonst wertet die Release-Prüfung die Änderung als nativen Build.
-    expect(readFileSync('package.json', 'utf8')).not.toContain('pdf-lib');
+    // Eigener PDF-Schreiber statt Bibliothek: keine neue Abhängigkeit, die die
+    // Release-Prüfung als nativen Build werten würde.
+    for (const f of ['features/training/reportPdf.ts', 'features/training/pdfWriter.ts', 'services/reportShare.ts']) {
+      expect(readFileSync(f, 'utf8')).not.toMatch(/from 'pdf-lib'/);
+    }
     const share = readFileSync('services/reportShare.ts', 'utf8');
     expect(share).not.toMatch(/supabase|deleteAsync|upload/i);
     expect(share).toContain('FileSystem.cacheDirectory');

@@ -18,6 +18,7 @@ jest.mock('@/stores/homeScreenConfig', () => ({ useHomeScreenConfig: () => ({}),
 jest.mock('@/stores/liveBarScroll', () => ({ reportScroll: jest.fn() }));
 jest.mock('@/components/home/HomeDayGreeting', () => ({ HomeDayGreeting: 'HomeDayGreeting' }));
 jest.mock('@/components/dogs/DogCard', () => ({ DogCard: 'DogCard' }));
+jest.mock('@/components/dogs/ActiveDogSwitcher', () => ({ ActiveDogSwitcher: 'ActiveDogSwitcher' }));
 jest.mock('@/components/ui/AnimatedPressable', () => ({ AnimatedPressable: 'AnimatedPressable' }));
 jest.mock('@/components/training/UnitListCard', () => ({ UnitListCard: 'UnitListCard' }));
 jest.mock('@/components/training/SwipeableTrainingItem', () => ({ SwipeableTrainingItem: 'SwipeableTrainingItem' }));
