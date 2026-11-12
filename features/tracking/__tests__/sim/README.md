@@ -1,4 +1,4 @@
-# Fährten-Simulator (T-192) — Stufe 1: Legen, Stufe 2: Absuche
+# Fährten-Simulator (T-192, T-205) — Stufe 1: Legen, Stufe 2: Absuche, Stufe 3: Führung und Unterbrechungen
 
 Reiner Testcode. Nichts in diesem Ordner wird von der App importiert oder
 ausgeliefert, und nichts hier verändert die Fährten-/GPS-/Recorder-Logik.
@@ -20,7 +20,14 @@ sehen würde, schickt das Ergebnis durch die **echte Lege-Verarbeitung der App**
 | `scenario.ts`, `matrix.ts` | Einzelszenario, Matrixgruppen, Bericht. |
 | `searchTruth.ts` | Wahre Absuche: Hund (Pendeln, Überlaufen, Kreisen, Verweisen) und Hundeführer an der Leine. |
 | `searchMocks.ts`, `searchBridge.ts`, `searchRunner.tsx` | Betreibt den echten `useSearchRecorder` ohne Gerät und wertet mit `computeTrackAnalyticsV3` aus, verdrahtet wie `app/track/run.tsx`. |
-| `searchScenario.ts` | Legen mit Gegenständen → Liegezeit → Absuche → Bewertung. |
+| `searchScenario.ts` | Legen mit Gegenständen → Liegezeit → Absuche → Bewertung; Unterbrechungen, Antippen, Fährtenverlust; Bewertung der Führung (`scoreGuidance`). |
+| `searchBridge.ts` | Nachgebildete Sprachausgabe mit Sprechdauer (Annahme: 120 ms Anlauf, 70 ms je Zeichen) und SQLite-Ersatz für Suchpunkte. |
+
+Seit Stufe 3 (T-205) laufen in der Absuche zusätzlich die **echte Sprachführung** (`useTrackVoiceGuidance` mit Warteschlange),
+die **echte Ende-Erkennung** (`useTrackEndGuidance`) und die Ansagen «Suche gestartet», «Gegenstand erkannt» und Off-Track mit,
+verdrahtet wie `app/track/run.tsx`. Die Uhr ist Jests künstliche Zeit, Timer laufen in Simulationszeit. Store,
+Zwischenspeicher (AsyncStorage-Testersatz) und Suchpunkt-Puffer sind die echten Module: Ein App-Abbruch verwirft alles im
+Speicher, die Wiederaufnahme liest nur, was bis dahin tatsächlich gespeichert war (wie `resumeSearch` in `run.tsx`).
 
 ## Ausführen
 
@@ -32,7 +39,10 @@ npx jest features/tracking/__tests__/sim/faehrtenSim
 FAEHRTEN_SIM=full FAEHRTEN_SIM_OUT=/pfad/zum/ausgabeordner npx jest features/tracking/__tests__/sim/layMatrix
 ```
 
-- `FAEHRTEN_SIM`: `full` oder einzelne Gruppen, z. B. `winkel,geraet` (Legen: `winkel`, `geraet`, `varianten`, `pruefung`; Absuche: `suche`, `suchvarianten`).
+- `FAEHRTEN_SIM`: `full` oder einzelne Gruppen, z. B. `winkel,geraet` (Legen: `winkel`, `geraet`, `varianten`, `pruefung`;
+  Absuche: `suche`, `suchvarianten`, `formen`, `unterbrechungen`, `ablauf`, `android`, `ifh`). `ifh` läuft nicht mit `full`
+  (lange Fährten rechnen sehr lange) und nur ausdrücklich: `FAEHRTEN_SIM=ifh FAEHRTEN_SIM_SEEDS=1`.
+- Alle Such-Gruppen: `FAEHRTEN_SIM=suche,suchvarianten,formen,unterbrechungen,ablauf,android npx jest features/tracking/__tests__/sim/searchMatrix --maxWorkers=6`.
 - Such-Matrix: `FAEHRTEN_SIM=suche,suchvarianten npx jest features/tracking/__tests__/sim/searchMatrix` (Standard 6 Wiederholungen, ~7 min bei 8).
 - `FAEHRTEN_SIM_SEEDS`: Wiederholungen je Zelle (Standard 6).
 - `FAEHRTEN_SIM_TRACKS`: Prüfungsfährten der Gruppe `pruefung` (Standard `IGP-1,IGP-2,IGP-3`).
@@ -50,6 +60,12 @@ Gleicher Seed ergibt exakt denselben Lauf.
 - **Absuche:** Abgang erkannt, Fährtenende erreicht, automatische Gegenstands-Erkennung (verwiesene und nicht
   verwiesene Gegenstände), gemeldete Abweichung gegen die wahre Abweichung von Hund und Hundeführer,
   Punktzahlen, Abweichungs-Ereignisse, Abrisse.
+- **Führung (Stufe 3):** je Winkel/Gegenstand, wie weit der WAHRE Hund bei Sprechbeginn noch davor war
+  (rechtzeitig 3–15 m, knapp, zu spät, fehlt, zu früh); abgebrochene, verfallene, doppelte Ansagen und Ansagen
+  nicht vorhandener Winkel; Fehler und Sprünge der Pfote; Zeit auf dem falschen Schenkel; Pfote und Ansagen,
+  während der Hund am Gegenstand liegt; Fährtenende (angesagt, zu früh, doppelt); manuelles Antippen
+  (richtiger Gegenstand, Fehlzuordnung); Fährtenverlust des Hundes als Abriss erkannt; Wiederaufnahme nach
+  App-Abbruch (Suchpunkte wiederhergestellt, Funde verloren, Ansagen wiederholt).
 
 ## Herkunft der Zahlen
 
@@ -80,11 +96,16 @@ Genauigkeit. Das passt zum langsam wandernden Fehlermodell.
   herstellerspezifisches Verhalten zeigt nur das echte Handy.
 - **Hundemodell ist eine Stellschraube, keine Wahrheit.** Für Sport-Fährtenhunde gibt es keine Messstudien;
   die drei Hundetypen und die Leinenführung (Schleppkurve, Hundeführer geht am Gegenstand zum Hund) sind Annahmen.
-- **Nicht abgebildet in der Absuche:** manuelles Antippen eines Gegenstands, die Ende-Logik der App
-  (Gegenstand am Fährtenende zählt deshalb nicht in die Quote), Sprach-/Haptik-Führung, Pausen, Wiederaufnahme.
+- **Nicht abgebildet in der Absuche:** Haptik, Segment-Ansagen, Hörbarkeit der Ansage, Kartenanzeige.
+- **Sperrbildschirm/Anruf** sind als «keine Positionen in dieser Zeit» abgebildet: Die Absuche fordert keine
+  Hintergrund-Ortung an (`positionStream`: `allowBackground: false`), iOS liefert dann keine Positionen. Dass die App
+  in dieser Zeit tatsächlich angehalten wird, ist aus dem Code abgeleitet, nicht auf dem Gerät gemessen.
+- **Android** gebündelt (30 s) ist eine Annahme aus der Lege-Konfiguration; ob die Absuche auf Android im Hintergrund
+  so zustellt, ist nicht gemessen.
+- **App-Abbruch:** Die Wiederaufnahme folgt `resumeSearch` (run.tsx) ohne Dialog und ohne Transfer-Prüfung.
 - **Nicht an eigenen Daten geeicht.** Lange Fährten, Wald und Android fehlen in den
   vorhandenen Feldaufnahmen; die Modelle sind dort reine Literaturwerte.
 - **Winkelradius und Hosentaschen-Einfluss aufs GPS** sind Annahmen ohne Messdaten.
 - **Lange Fährten rechnen langsam**, weil die Winkelerkennung der App bei jedem
   neuen Punkt die gesamte Fährte neu auswertet (siehe Bericht „Rechenzeit“).
-  IFH-Fährten sind deshalb nicht in der Standardmatrix.
+  IFH-Fährten sind deshalb nicht in der Standardmatrix (eigene Gruppe `ifh`).
