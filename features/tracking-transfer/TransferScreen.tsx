@@ -52,6 +52,7 @@ function AccountTransferScreen({ userId }: { userId: string | null }) {
   const [busy, setBusy] = useState(false), busyRef = useRef(false), alive = useRef(true), generation = useRef(0);
   const [opened, setOpened] = useState<{ sessionId: string; dogId: string } | null>(null);
   const [clock, setClock] = useState({ server: 0, monotonic: 0 });
+  // eslint-disable-next-line react-hooks/purity -- vorbestehend seit main d505250f; Logik bewusst unverändert
   const serverNow = clock.server + Math.max(0, performance.now() - clock.monotonic);
   useEffect(() => { alive.current = true; return () => { alive.current = false; client.dispose(); }; }, [client]);
   const act = useCallback(async (operation: () => Promise<void>) => {

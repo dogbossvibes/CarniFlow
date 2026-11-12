@@ -31,6 +31,7 @@ export async function registerForPush(userId: string, opts?: { prompt?: boolean 
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
+        // eslint-disable-next-line import/namespace -- vorbestehend seit main d505250f; Logik bewusst unverändert
         name: 'Standard', importance: Notifications.AndroidImportance.DEFAULT,
       });
     }
