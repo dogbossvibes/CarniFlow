@@ -6,13 +6,25 @@ import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
 import { AnimatedPressable } from '@/components/ui/AnimatedPressable';
 import { HeroImage } from '@/components/training/HeroImage';
+import { UnitListCard } from '@/components/training/UnitListCard';
+import { useTrainingFeed } from '@/hooks/useTrainingFeed';
+import type { FeedItem } from '@/services/trainingFeed';
 
-// Training-Hub: fokussiert auf Timer + Fährten-Tool (+ nachträglich
-// dokumentieren). Der vollständige Verlauf (/unit/history) wurde app-weit
-// entfernt — Verlauf gibt es nur noch als Mini-Vorschau auf Home.
+// Training-Hub: Timer, Fährten-Tool (direkt unter dem Start, nicht mehr letzte
+// Zeile), nachträglich dokumentieren und der Verlauf: die drei jüngsten Einträge
+// als Vorschau, der vollständige Verlauf liegt im Trainingstagebuch
+// (/training-journal). Die Vorschau liest nur — kein Löschen von hier aus.
 export default function TrainingScreen() {
   const router = useRouter();
   const { t } = useT();
+  const { feed } = useTrainingFeed();
+  const recent = feed.slice(0, 3);
+
+  const openFeedItem = (item: FeedItem) => {
+    if      (item.source === 'unit')  router.push({ pathname: '/unit/detail', params: { id: item.id } });
+    else if (item.source === 'track') router.push(`/track/${item.id}` as never);
+    else                              router.push(`/training/${item.id}` as never);
+  };
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -41,6 +53,18 @@ export default function TrainingScreen() {
           </HeroImage>
         </AnimatedPressable>
 
+        {/* Fährten-Tool — eigener, hervorgehobener Einstieg direkt unter dem Start */}
+        <AnimatedPressable style={[s.faehrteCard, s.faehrteTop]} scale={0.98} onPress={() => router.push('/track' as never)}>
+          <View style={[s.actionIcon, { backgroundColor: `${C.success}1A` }]}>
+            <Ionicons name="navigate" size={20} color={C.success} />
+          </View>
+          <View style={s.flex}>
+            <Text style={s.docTitel}>{t('training.faehrteGps')}</Text>
+            <Text style={s.docSub}>{t('training.faehrteSub')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={C.muted} />
+        </AnimatedPressable>
+
         {/* Nachträglich dokumentieren */}
         <AnimatedPressable style={s.docBtn} scale={0.98} onPress={() => router.push('/unit/document')}>
           <Ionicons name="create-outline" size={20} color={C.accent} />
@@ -51,8 +75,8 @@ export default function TrainingScreen() {
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </AnimatedPressable>
 
-        {/* Trainingstagebuch */}
-        <AnimatedPressable style={[s.faehrteCard, { marginBottom: 12 }]} scale={0.98} onPress={() => router.push('/training-journal')}>
+        {/* Trainingstagebuch — vollständiger Verlauf */}
+        <AnimatedPressable style={s.faehrteCard} scale={0.98} onPress={() => router.push('/training-journal')}>
           <View style={[s.actionIcon, { backgroundColor: `${C.accent}1A` }]}>
             <Ionicons name="book-outline" size={20} color={C.accent} />
           </View>
@@ -63,17 +87,26 @@ export default function TrainingScreen() {
           <Ionicons name="chevron-forward" size={18} color={C.muted} />
         </AnimatedPressable>
 
-        {/* Fährten-Tool */}
-        <AnimatedPressable style={s.faehrteCard} scale={0.98} onPress={() => router.push('/track' as never)}>
-          <View style={[s.actionIcon, { backgroundColor: `${C.success}1A` }]}>
-            <Ionicons name="navigate" size={20} color={C.success} />
+        {/* Verlauf-Vorschau: die jüngsten Einträge, alles Weitere im Tagebuch */}
+        {recent.length > 0 && (
+          <View style={s.recent}>
+            <View style={s.recentHead}>
+              <Text style={s.recentTitle} accessibilityRole="header">{t('home.recentSessions')}</Text>
+              <TouchableOpacity
+                onPress={() => router.push('/training-journal')}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('calendar.viewAll')}
+              >
+                <Text style={s.recentLink}>{t('calendar.viewAll')}</Text>
+              </TouchableOpacity>
+            </View>
+            {recent.map(item => (
+              <UnitListCard key={`${item.source}-${item.id}`} unit={item} onPress={() => openFeedItem(item)} />
+            ))}
           </View>
-          <View style={s.flex}>
-            <Text style={s.docTitel}>{t('training.faehrteGps')}</Text>
-            <Text style={s.docSub}>{t('training.faehrteSub')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={C.muted} />
-        </AnimatedPressable>
+        )}
 
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -100,6 +133,11 @@ const s = StyleSheet.create({
 
   docBtn:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingVertical: 16, marginBottom: 12 },
   faehrteCard:{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingVertical: 16 },
+  faehrteTop:{ marginBottom: 12, borderColor: C.accentMid },
+  recent:     { marginTop: 24 },
+  recentHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  recentTitle:{ fontSize: 17, color: C.white, fontWeight: '800' },
+  recentLink: { fontSize: 13, color: C.accent, fontWeight: '700' },
   flex:      { flex: 1 },
   docTitel:  { fontSize: 15, color: C.white, fontWeight: '700' },
   docSub:    { fontSize: 12, color: C.muted, fontWeight: '500', marginTop: 2 },

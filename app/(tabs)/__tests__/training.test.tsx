@@ -31,6 +31,17 @@ jest.mock('@/components/training/HeroImage', () => {
   return { HeroImage: ({ children }: { children?: React.ReactNode }) => <View>{children}</View> };
 });
 
+let mockFeed: { id: string; source: string }[] = [];
+jest.mock('@/hooks/useTrainingFeed', () => ({ useTrainingFeed: () => ({ feed: mockFeed, loading: false, refresh: jest.fn() }) }));
+jest.mock('@/components/training/UnitListCard', () => {
+  const { Pressable: RNPressable, Text: RNText } = jest.requireActual('react-native');
+  return {
+    UnitListCard: ({ unit, onPress }: { unit: { id: string }; onPress?: () => void }) => (
+      <RNPressable testID="recentCard" onPress={onPress}><RNText>{`recent-${unit.id}`}</RNText></RNPressable>
+    ),
+  };
+});
+
 jest.mock('@/i18n', () => ({
   useT: () => ({ t: (key: string) => mockCurrentLabels[key] ?? key }),
 }));
@@ -73,7 +84,7 @@ function cardContaining(node: ReactTestRenderer, needle: string): CardInstance |
 }
 
 describe('Training-Tab — Trainingstagebuch-Karte', () => {
-  beforeEach(() => { mockPush.mockReset(); });
+  beforeEach(() => { mockPush.mockReset(); mockFeed = []; });
 
   it('zeigt die Karte sichtbar (DE)', () => {
     const node = render(deCH as unknown as Record<string, string>);
@@ -82,13 +93,20 @@ describe('Training-Tab — Trainingstagebuch-Karte', () => {
     expect(s).toContain(deCH['training.journalSub']);
   });
 
-  it('korrekte Position: zwischen "Training dokumentieren" und "Fährte (GPS)"', () => {
+  it('Reihenfolge: Fährte (GPS) direkt unter dem Start, dann dokumentieren, dann Tagebuch', () => {
     const node = render(deCH as unknown as Record<string, string>);
     const texts = pressableTexts(node);
+    const faehrte = texts.findIndex((t) => t.includes(deCH['training.faehrteGps']));
     const idx = texts.findIndex((t) => t.includes(deCH['training.journal']));
-    expect(idx).toBeGreaterThan(-1);
-    expect(texts[idx - 1]).toContain(deCH['training.document']);
-    expect(texts[idx + 1]).toContain(deCH['training.faehrteGps']);
+    expect(faehrte).toBe(1);
+    expect(texts[faehrte + 1]).toContain(deCH['training.document']);
+    expect(idx).toBe(faehrte + 2);
+  });
+
+  it('Fährte (GPS) öffnet /track', () => {
+    const node = render(deCH as unknown as Record<string, string>);
+    act(() => { cardContaining(node, deCH['training.faehrteGps'])?.props.onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith('/track');
   });
 
   it('Navigation öffnet /training-journal', () => {
@@ -110,5 +128,31 @@ describe('Training-Tab — Trainingstagebuch-Karte', () => {
     expect(s).toContain(labels['training.journalSub']);
     const rawKeys = s.filter((x) => /^[a-z]+\.(?:[a-zA-Z0-9]+\.?)+$/.test(x));
     expect(rawKeys).toEqual([]);
+  });
+
+  it('ohne Einträge gibt es keine Verlauf-Vorschau', () => {
+    const node = render(deCH as unknown as Record<string, string>);
+    expect(allStrings(node)).not.toContain(deCH['home.recentSessions']);
+  });
+
+  it('Verlauf-Vorschau zeigt höchstens drei Einträge und öffnet den richtigen Detailbildschirm', () => {
+    mockFeed = [
+      { id: 'a', source: 'track' }, { id: 'b', source: 'unit' },
+      { id: 'c', source: 'session' }, { id: 'd', source: 'unit' },
+    ];
+    const node = render(deCH as unknown as Record<string, string>);
+    const s = allStrings(node);
+    expect(s).toContain(deCH['home.recentSessions']);
+    expect(s.filter((x) => x.startsWith('recent-'))).toEqual(['recent-a', 'recent-b', 'recent-c']);
+    const recentCard = (id: string) =>
+      (node.root as unknown as { findAll: (p: (n: { props: { testID?: string; onPress?: () => void } }) => boolean) => CardInstance[] })
+        .findAll((n) => n.props.testID === 'recentCard' && typeof n.props.onPress === 'function')
+        .find((card) => textOf(card).includes(`recent-${id}`));
+    act(() => { recentCard('a')?.props.onPress?.(); });
+    expect(mockPush).toHaveBeenLastCalledWith('/track/a');
+    act(() => { recentCard('b')?.props.onPress?.(); });
+    expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/unit/detail', params: { id: 'b' } });
+    act(() => { recentCard('c')?.props.onPress?.(); });
+    expect(mockPush).toHaveBeenLastCalledWith('/training/c');
   });
 });
