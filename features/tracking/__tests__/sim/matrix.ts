@@ -5,15 +5,17 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { ANDROID_BATCH_30S, CARRY_LABEL, DEVICE_LABEL, ENV_LABEL, type DeviceClass, type Environment } from './profiles';
 import { runScenario, type Scenario, type ScenarioOutcome } from './scenario';
-import { EXAM_TRACKS, expectedKindFor, singleCornerTrack } from './truthTrack';
-import { clearLayCache, PRACTICE_TRACK, runSearchScenario, type SearchOutcome, type SearchScenario } from './searchScenario';
+import { EXAM_TRACKS, expectedKindFor, SHAPE_TRACKS, singleCornerTrack } from './truthTrack';
+import { classifyAnnouncement, clearLayCache, PRACTICE_TRACK, runSearchScenario, type SearchOutcome, type SearchScenario } from './searchScenario';
 import { DOGS } from './searchTruth';
 
 export type LayGroupName = 'winkel' | 'geraet' | 'varianten' | 'pruefung';
-export type SearchGroupName = 'suche' | 'suchvarianten';
+export type SearchGroupName = 'suche' | 'suchvarianten' | 'formen' | 'unterbrechungen' | 'ablauf' | 'android' | 'ifh';
 export type GroupName = LayGroupName | SearchGroupName;
 export const LAY_GROUPS: LayGroupName[] = ['winkel', 'geraet', 'varianten', 'pruefung'];
-export const SEARCH_GROUPS: SearchGroupName[] = ['suche', 'suchvarianten'];
+export const SEARCH_GROUPS: SearchGroupName[] = ['suche', 'suchvarianten', 'formen', 'unterbrechungen', 'ablauf', 'android', 'ifh'];
+/** Gruppen, die NICHT in FAEHRTEN_SIM=full laufen (zu langsam) — nur ausdrücklich, z. B. FAEHRTEN_SIM=ifh. */
+export const OPT_IN_GROUPS: GroupName[] = ['ifh'];
 export const GROUPS: GroupName[] = [...LAY_GROUPS, ...SEARCH_GROUPS];
 export const isSearchGroup = (g: GroupName): g is SearchGroupName => (SEARCH_GROUPS as GroupName[]).includes(g);
 
@@ -43,6 +45,16 @@ export interface SearchCell {
   appDeviationSumM: number; dogDeviationSumM: number; handlerDeviationSumM: number;
   recorderScoreSum: number; analysisScoreSum: number; analysisScoreN: number;
   deviationEvents: number; breaks: number;
+  // ── Führung (T-205)
+  voiceFeatures: number; voiceOnTime: number; voiceShort: number; voiceLate: number; voiceMissing: number; voiceEarly: number;
+  voiceDuplicate: number; spuriousAngleSpoken: number; interruptedSpoken: number; queueDropped: number;
+  pawErrSumM: number; pawErrMaxM: number; pawJumps: number; wrongLegShareSum: number; wrongLegMaxM: number;
+  lyingShareSum: number; lyingN: number; lyingAnnouncements: number;
+  endFired: number; endRemainingSumM: number; endEarly: number; endDuplicate: number; endObjectN: number; endObjectFound: number;
+  manualTaps: number; manualCorrect: number; manualMisattributed: number;
+  losses: number; lossesDetected: number; breaksOutsideLoss: number;
+  resumeRuns: number; resumePointsBefore: number; resumePointsRestored: number; resumeFoundLost: number;
+  resumeVoiceRepeated: number; resumeObjectDetectedRepeated: number; resumeEndRepeated: number; resumePendingMissing: number;
 }
 export interface SearchCase { table: string; row: string; col: string; scenario: SearchScenario }
 
@@ -154,6 +166,52 @@ export function buildSearchGroup(group: SearchGroupName, seeds: number): SearchC
     for (const dog of Object.values(DOGS)) for (const [device, env, label] of combos) for (const seed of seedList)
       cases.push({ table: 'Absuche — Hundetyp × Gerät/Umgebung (Übungsfährte 120 m, 10-m-Leine)', row: dog.name, col: label,
         scenario: { ...base, device, env, dog, seed } });
+  } else if (group === 'formen') {
+    const shapes: [string, SearchScenario['track']][] = [['Übungsfährte (Basis)', PRACTICE_TRACK], ...Object.entries(SHAPE_TRACKS)];
+    for (const [label, track] of shapes) for (const dog of Object.values(DOGS)) for (const seed of seedList)
+      cases.push({ table: 'Absuche — schwierige Fährtenformen × Hundetyp (Mittelklasse-Handy, offenes Feld, 10-m-Leine)', row: label, col: dog.name,
+        scenario: { ...base, track, device: 'single', env: 'open', dog, seed } });
+  } else if (group === 'unterbrechungen') {
+    const variants: [string, Partial<SearchScenario>][] = [
+      ['Basis (keine Unterbrechung)', {}],
+      ['Bildschirm 20 s gesperrt (keine Positionen)', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 20 }] }],
+      ['Bildschirm 60 s gesperrt (keine Positionen)', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 60 }] }],
+      ['Anruf 45 s', { interruptions: [{ kind: 'call', atFrac: 0.45, durationS: 45 }] }],
+      ['Pause 20 s, Hund läuft weiter', { interruptions: [{ kind: 'pause', atFrac: 0.45, durationS: 20 }] }],
+      ['App beendet, nach 30 s fortgesetzt', { interruptions: [{ kind: 'kill', atFrac: 0.45, durationS: 30 }] }],
+      ['App beendet, nach 5 s fortgesetzt', { interruptions: [{ kind: 'kill', atFrac: 0.6, durationS: 5 }] }],
+    ];
+    for (const [label, patch] of variants) for (const [device, name] of [['dual', 'Neueres Handy'], ['single', 'Mittelklasse']] as const) for (const seed of seedList)
+      cases.push({ table: 'Absuche — Unterbrechungen (ruhiger Sporthund, offenes Feld, iOS)', row: label, col: name,
+        scenario: { ...base, device, env: 'open', dog: DOGS.ruhig, ...patch, seed } });
+  } else if (group === 'ablauf') {
+    const variants: [string, Partial<SearchScenario>][] = [
+      ['Basis (nur automatische Erkennung)', {}],
+      ['Gegenstand angetippt, 2 s nach Ankunft beim Hund', { manualTap: { tapAfterS: 2 } }],
+      ['Gegenstand angetippt, erst nach 7 s', { manualTap: { tapAfterS: 7 } }],
+      ['Hund verliert die Fährte 1× (10 m seitlich)', { losses: [{ atM: 55, offsetM: 10, lengthM: 12 }] }],
+      ['Hund verliert die Fährte 2× (15 m seitlich)', { losses: [{ atM: 30, offsetM: 15, lengthM: 15 }, { atM: 95, offsetM: 15, lengthM: 12 }] }],
+      ['Hund verliert die Fährte kurz (5 m seitlich)', { losses: [{ atM: 55, offsetM: 5, lengthM: 8 }] }],
+    ];
+    for (const [label, patch] of variants) for (const dog of Object.values(DOGS)) for (const seed of seedList)
+      cases.push({ table: 'Absuche — Ablauf: Antippen, Fährtenverlust, Fährtenende (Mittelklasse-Handy, offenes Feld)', row: label, col: dog.name,
+        scenario: { ...base, device: 'single', env: 'open', dog, ...patch, seed } });
+  } else if (group === 'android') {
+    const variants: [string, Partial<SearchScenario>][] = [
+      ['Android, Bildschirm an (live)', {}],
+      ['Android, gebündelt 30 s', { searchDelivery: ANDROID_BATCH_30S }],
+      ['Android, gebündelt 30 s, Hosentasche', { searchDelivery: ANDROID_BATCH_30S, searchCarry: 'pocket' }],
+      ['Android, gebündelt 30 s, Spitzwinkel-Folge', { searchDelivery: ANDROID_BATCH_30S, track: SHAPE_TRACKS['Spitzwinkel-Folge'] }],
+      ['Android live, Kreuzung', { track: SHAPE_TRACKS.Kreuzung }],
+    ];
+    for (const [label, patch] of variants) for (const [device, name] of [['dual', 'Neueres Handy'], ['single', 'Mittelklasse']] as const) for (const seed of seedList)
+      cases.push({ table: 'Absuche — Android (ruhiger Sporthund, offenes Feld)', row: label, col: name,
+        scenario: { ...base, platform: 'android', device, env: 'open', dog: DOGS.ruhig, ...patch, seed } });
+  } else if (group === 'ifh') {
+    const few = seedList.slice(0, Math.max(1, Math.min(2, seedList.length)));
+    for (const name of ['IFH-1', 'IFH-2']) for (const [label, patch] of [['iOS', { platform: 'ios' }], ['Android, gebündelt 30 s', { platform: 'android', searchDelivery: ANDROID_BATCH_30S }]] as [string, Partial<SearchScenario>][]) for (const seed of few)
+      cases.push({ table: 'Absuche — lange Prüfungsfährten IFH (neueres Handy, offenes Feld, ruhiger Sporthund)', row: name, col: label,
+        scenario: { ...base, track: EXAM_TRACKS[name], device: 'dual', env: 'open', dog: DOGS.ruhig, ...patch, seed } });
   } else {
     const variants: [string, Partial<SearchScenario>][] = [
       ['Basis (10-m-Leine, App auf 10 m)', {}],
@@ -172,10 +230,17 @@ export function buildSearchGroup(group: SearchGroupName, seeds: number): SearchC
   return cases;
 }
 
-function emptySearchCell(table: string, row: string, col: string): SearchCell {
+export function emptySearchCell(table: string, row: string, col: string): SearchCell {
   return { table, row, col, runs: 0, startLocked: 0, endReached: 0, indicated: 0, foundIndicated: 0, analysisContactIndicated: 0,
     notIndicated: 0, foundNotIndicated: 0, layObjectErrSumM: 0, layObjectN: 0, appDeviationSumM: 0, dogDeviationSumM: 0,
-    handlerDeviationSumM: 0, recorderScoreSum: 0, analysisScoreSum: 0, analysisScoreN: 0, deviationEvents: 0, breaks: 0 };
+    handlerDeviationSumM: 0, recorderScoreSum: 0, analysisScoreSum: 0, analysisScoreN: 0, deviationEvents: 0, breaks: 0,
+    voiceFeatures: 0, voiceOnTime: 0, voiceShort: 0, voiceLate: 0, voiceMissing: 0, voiceEarly: 0,
+    voiceDuplicate: 0, spuriousAngleSpoken: 0, interruptedSpoken: 0, queueDropped: 0,
+    pawErrSumM: 0, pawErrMaxM: 0, pawJumps: 0, wrongLegShareSum: 0, wrongLegMaxM: 0,
+    lyingShareSum: 0, lyingN: 0, lyingAnnouncements: 0,
+    endFired: 0, endRemainingSumM: 0, endEarly: 0, endDuplicate: 0, endObjectN: 0, endObjectFound: 0,
+    manualTaps: 0, manualCorrect: 0, manualMisattributed: 0, losses: 0, lossesDetected: 0, breaksOutsideLoss: 0,
+    resumeRuns: 0, resumePointsBefore: 0, resumePointsRestored: 0, resumeFoundLost: 0, resumeVoiceRepeated: 0, resumeObjectDetectedRepeated: 0, resumeEndRepeated: 0, resumePendingMissing: 0 };
 }
 
 export function addSearchOutcome(cell: SearchCell, o: SearchOutcome): void {
@@ -185,7 +250,7 @@ export function addSearchOutcome(cell: SearchCell, o: SearchOutcome): void {
   if (s.progressPct >= 90) cell.endReached++;
   for (const obj of s.objects) {
     cell.layObjectErrSumM += obj.layErrM; cell.layObjectN++;
-    if (obj.atEnd) continue;   // Ende-Gegenstand läuft über die (nicht simulierte) Ende-Logik der App
+    if (obj.atEnd) { cell.endObjectN++; if (obj.appFound) cell.endObjectFound++; continue; }   // Ende-Gegenstand: eigene Ende-Logik
     if (obj.indicated) { cell.indicated++; if (obj.appFound) cell.foundIndicated++; if (obj.analysisStatus === 'likely_contact') cell.analysisContactIndicated++; }
     else { cell.notIndicated++; if (obj.appFound) cell.foundNotIndicated++; }
   }
@@ -193,6 +258,29 @@ export function addSearchOutcome(cell: SearchCell, o: SearchOutcome): void {
   cell.recorderScoreSum += s.recorderScore;
   if (s.analysisScore != null) { cell.analysisScoreSum += s.analysisScore; cell.analysisScoreN++; }
   cell.deviationEvents += s.deviationEvents; cell.breaks += s.breaks;
+  const g = s.guidance;
+  for (const f of g.features) {
+    if (f.spokenCount > 1) cell.voiceDuplicate++;
+    if (!f.reached && f.spokenAheadM == null) continue;   // nie erreicht und nicht angesagt: zählt nicht
+    cell.voiceFeatures++;
+    const c = classifyAnnouncement(f.spokenAheadM);
+    if (c === 'rechtzeitig') cell.voiceOnTime++; else if (c === 'knapp') cell.voiceShort++; else if (c === 'zu_spaet') cell.voiceLate++;
+    else if (c === 'zu_frueh') cell.voiceEarly++; else cell.voiceMissing++;
+  }
+  cell.spuriousAngleSpoken += g.spuriousAngleSpoken; cell.interruptedSpoken += g.interruptedSpoken; cell.queueDropped += g.queueDropped;
+  cell.pawErrSumM += g.pawErrMeanM; cell.pawErrMaxM = Math.max(cell.pawErrMaxM, g.pawErrMaxM); cell.pawJumps += g.pawJumps;
+  cell.wrongLegShareSum += g.wrongLegShare; cell.wrongLegMaxM = Math.max(cell.wrongLegMaxM, g.wrongLegMaxM);
+  if (g.lyingPawAheadShare != null) { cell.lyingShareSum += g.lyingPawAheadShare; cell.lyingN++; }
+  cell.lyingAnnouncements += g.lyingAnnouncements;
+  if (g.endFired) { cell.endFired++; cell.endRemainingSumM += g.endRemainingM ?? 0; if ((g.endRemainingM ?? 0) > 5) cell.endEarly++; }
+  if (g.endFiredCount > 1) cell.endDuplicate++;
+  cell.manualTaps += g.manualTaps; cell.manualCorrect += g.manualTapsCorrect; cell.manualMisattributed += g.manualMisattributed;
+  cell.losses += g.losses; cell.lossesDetected += g.lossesDetected; cell.breaksOutsideLoss += g.breaksOutsideLoss;
+  for (const r of g.resume) {
+    cell.resumeRuns++; cell.resumePointsBefore += r.pointsBefore; cell.resumePointsRestored += r.pointsRestored;
+    cell.resumeFoundLost += r.foundLost; cell.resumeVoiceRepeated += r.voiceRepeated; cell.resumeObjectDetectedRepeated += r.objectDetectedRepeated;
+    if (r.endRepeated) cell.resumeEndRepeated++; if (!r.pendingFound) cell.resumePendingMissing++;
+  }
 }
 
 export async function runSearchGroup(group: SearchGroupName, seeds: number): Promise<GroupResult> {
@@ -254,6 +342,28 @@ export function renderReport(results: GroupResult[]): string {
         c => `${num(c.recorderScoreSum / c.runs, 0)} · ${c.analysisScoreN ? num(c.analysisScoreSum / c.analysisScoreN, 0) : '–'} · ${num(c.deviationEvents / c.runs)} · ${num(c.breaks / c.runs)}`), '');
       out.push(renderTable(cells, 'Abgang erkannt · Fährtenende erreicht (≥ 90 % Fortschritt) · Lagefehler der Gegenstände beim Legen (m)',
         c => `${pct(c.startLocked, c.runs)} · ${pct(c.endReached, c.runs)} · ${c.layObjectN ? num(c.layObjectErrSumM / c.layObjectN) : '–'}`), '');
+      if (cells.some(c => c.voiceFeatures != null)) {
+        out.push('**Führung (T-205):** gemessen am WAHREN Hund. «Rechtzeitig» = der Hund ist bei Sprechbeginn 3–15 m vor dem Punkt, «knapp» = 0–3 m, «zu spät» = schon vorbei, «zu früh» = mehr als 15 m. Die Pfote ist die Hundeposition der App.', '');
+        out.push(renderTable(cells, 'Ansage je Winkel/Gegenstand: rechtzeitig · knapp · zu spät · fehlt · zu früh',
+          c => `${pct(c.voiceOnTime, c.voiceFeatures)} · ${pct(c.voiceShort, c.voiceFeatures)} · ${pct(c.voiceLate, c.voiceFeatures)} · ${pct(c.voiceMissing, c.voiceFeatures)} · ${pct(c.voiceEarly, c.voiceFeatures)}`), '');
+        out.push(renderTable(cells, 'Je Lauf: Ansagen abgebrochen · Ansagen verfallen · Punkte doppelt angesagt · Ansage eines Winkels, den es nicht gibt',
+          c => `${num(c.interruptedSpoken / c.runs)} · ${num(c.queueDropped / c.runs)} · ${num(c.voiceDuplicate / c.runs)} · ${num(c.spuriousAngleSpoken / c.runs)}`), '');
+        out.push(renderTable(cells, 'Pfote: mittlerer Fehler (m) · grösster Fehler (m) · Sprünge je Lauf · Zeitanteil auf falschem Schenkel · grösster Versatz (m)',
+          c => `${num(c.pawErrSumM / c.runs)} · ${num(c.pawErrMaxM, 0)} · ${num(c.pawJumps / c.runs)} · ${pct(c.wrongLegShareSum, c.runs)} · ${num(c.wrongLegMaxM, 0)}`), '');
+        out.push(renderTable(cells, 'Hund liegt am Gegenstand: Pfote steht > 3 m davor (Zeitanteil) · Ansagen eines Punkts dahinter je Lauf',
+          c => `${c.lyingN ? pct(c.lyingShareSum, c.lyingN) : '–'} · ${num(c.lyingAnnouncements / c.runs)}`), '');
+        out.push(renderTable(cells, 'Fährtenende: angesagt · dem Hund fehlten noch (m) · zu früh (> 5 m) · doppelt · Gegenstand am Ende als gefunden geführt',
+          c => `${pct(c.endFired, c.runs)} · ${c.endFired ? num(c.endRemainingSumM / c.endFired) : '–'} · ${pct(c.endEarly, c.runs)} · ${pct(c.endDuplicate, c.runs)} · ${pct(c.endObjectFound, c.endObjectN)}`), '');
+        if (cells.some(c => c.manualTaps > 0))
+          out.push(renderTable(cells, 'Manuell angetippt: richtiger Gegenstand gefunden · Fehlzuordnungen (Gegenstand ohne Antippen als «manuell gefunden»)',
+            c => c.manualTaps ? `${pct(c.manualCorrect, c.manualTaps)} · ${c.manualMisattributed}` : '–'), '');
+        if (cells.some(c => c.losses > 0))
+          out.push(renderTable(cells, 'Fährtenverlust des Hundes: als Abriss erkannt · Abrisse ausserhalb eines Verlusts je Lauf',
+            c => `${c.losses ? pct(c.lossesDetected, c.losses) : '–'} · ${num(c.breaksOutsideLoss / c.runs)}`), '');
+        if (cells.some(c => c.resumeRuns > 0))
+          out.push(renderTable(cells, 'Wiederaufnahme nach App-Abbruch (Summen über alle Läufe): Suchpunkte wiederhergestellt · Funde verloren · Winkel/Gegenstand erneut angesagt · «Gegenstand erkannt» erneut · Ende doppelt · Zwischenstand fehlte',
+            c => c.resumeRuns ? `${pct(c.resumePointsRestored, c.resumePointsBefore)} · ${c.resumeFoundLost} · ${c.resumeVoiceRepeated} · ${c.resumeObjectDetectedRepeated ?? 0} · ${c.resumeEndRepeated} · ${c.resumePendingMissing}` : '–'), '');
+      }
     }
   }
   return out.join('\n');
