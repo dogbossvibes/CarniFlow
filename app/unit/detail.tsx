@@ -27,6 +27,7 @@ import { queryClient } from '@/lib/queryClient';
 import { tapHaptic } from '@/lib/haptics';
 import type { TrainingUnit, AudioFile } from '@/types/trainingUnit';
 import { useT } from '@/i18n';
+import { levelOf } from '@/features/training/documentation/learningLevel';
 
 function DetailVideo({ uri }: { uri: string }) {
   const signed = useSignedUrl(uri);
@@ -203,7 +204,9 @@ export default function UnitDetailScreen() {
                 <Text style={s.exDisc}>{ex.discipline}</Text>
                 {ex.notes?.trim() ? <Text style={s.notesTxt}>{ex.notes}</Text> : null}
               </View>
-              {ex.rating != null && (
+              {levelOf(ex) ? (
+                <Text style={s.exLevel} accessibilityLabel={`${t('trainingLevel.label')}: ${t(`trainingLevel.${levelOf(ex)!}`)}`}>{t(`trainingLevel.${levelOf(ex)!}`)}</Text>
+              ) : ex.rating != null && (
                 <View style={s.exStars}>
                   <Ionicons name="star" size={12} color={C.star} />
                   <Text style={s.exRating}>{ex.rating}</Text>
@@ -365,6 +368,7 @@ const s = StyleSheet.create({
   exDisc:   { fontSize: 12, color: C.muted, fontWeight: '500', marginTop: 1 },
   exStars:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
   exRating: { fontSize: 12, color: C.star, fontWeight: '700' },
+  exLevel:  { fontSize: 12, color: C.white, fontWeight: '700' },
 
   notesBox: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
   notesTxt: { fontSize: 14, color: '#CFCFCF', lineHeight: 20 },

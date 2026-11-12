@@ -285,7 +285,7 @@ function DocumentForm() {
             setDogId(u.dog_id);
             setSelected((u.exercises ?? []).map((e, i) => ({
               key: e.id ?? `edit-${i}`, discipline: e.discipline, name: e.exercise_name,
-              rating: e.rating ?? null, notes: e.notes ?? null, performed: true, durationSec: e.duration_sec, exerciseKey: e.exercise_identity_id ?? undefined, disciplineKey: e.discipline_key,
+              rating: e.rating ?? null, ratingScale: e.rating_scale ?? null, notes: e.notes ?? null, performed: true, durationSec: e.duration_sec, exerciseKey: e.exercise_identity_id ?? undefined, disciplineKey: e.discipline_key,
             })));
             setDescription(u.notes ?? ''); setScore(u.score ?? 0);
             setDate(u.session_date ? new Date(`${u.session_date}T12:00:00`) : new Date());
@@ -296,6 +296,12 @@ function DocumentForm() {
             setShared(!!u.shared_with_trainer);
             setMetrics({ motivation: u.motivation ?? null, konzentration: u.konzentration ?? null, praezision: u.praezision ?? null,
               ausdauer: u.ausdauer ?? null, trieblage: u.trieblage ?? null, impulskontrolle: u.impulskontrolle ?? null });
+          } else {
+            // Entwürfe (auch solche von vor diesem Update) kennen die Lernstufen-
+            // Markierung nicht. Massgebend ist die gespeicherte Zeile: nur die
+            // Markierung nachtragen, die Eingaben des Entwurfs bleiben unverändert.
+            const scales = new Map((u.exercises ?? []).filter(e => !!e.id).map(e => [e.id!, e.rating_scale ?? null]));
+            setSelected(prev => prev.map(e => scales.has(e.key) ? { ...e, ratingScale: scales.get(e.key) } : e));
           }
         } catch { if (!cancelled) setDraftError(true); }
       }
@@ -736,6 +742,7 @@ function DocumentForm() {
                     accentColor={disciplineColor(e.discipline)}
                     isCustom={isCustomExercise(e.discipline, e.name)}
                     rating={e.rating}
+                    ratingScale={e.ratingScale}
                     notes={e.notes}
                     onRatingChange={r => setExerciseRating(i, r)}
                     onNotesChange={n => setExerciseNotes(i, n)}
@@ -757,7 +764,7 @@ function DocumentForm() {
                           disciplineKey: past.discipline_key ?? current.disciplineKey,
                         })),
                       }))) : []}
-                    historical={previous ? { date: previous.unit.session_date, rating: previous.exercise.rating,
+                    historical={previous ? { date: previous.unit.session_date, rating: previous.exercise.rating, ratingScale: previous.exercise.rating_scale,
                       notes: previous.exercise.notes, trainingNotes: previous.unit.notes, onOpen: () => openHistory(previous.unit) } : undefined}
                   />
                 ); })}

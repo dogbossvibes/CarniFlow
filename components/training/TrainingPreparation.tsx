@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { C } from '@/constants/colors';
 import { useT } from '@/i18n';
+import { levelOf } from '@/features/training/documentation/learningLevel';
 import type { TrainingUnit, TrainingExercise } from '@/types/trainingUnit';
 
 export function TrainingPreparation({ units, discipline, loading, error, limited, onRetry, onReuse, onOpen }: {
@@ -36,7 +37,7 @@ export function TrainingPreparation({ units, discipline, loading, error, limited
           {unit.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historySessionNote')}: {unit.notes}</Text> : null}
           {unit.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <TouchableOpacity key={exercise.id ?? i} style={s.button}
             accessibilityRole="button" onPress={() => onReuse(unit, [exercise])}>
-            <Text style={s.text}>＋ {exercise.exercise_name}{exercise.rating != null ? ` · ${exercise.rating}/5` : ''}</Text>
+            <Text style={s.text}>＋ {exercise.exercise_name}{levelOf(exercise) ? ` · ${t(`trainingLevel.${levelOf(exercise)!}`)}` : exercise.rating != null ? ` · ${exercise.rating}/5` : ''}</Text>
             {exercise.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historyExerciseNote')}: {exercise.notes}</Text> : null}
           </TouchableOpacity>)}
         </View>)}

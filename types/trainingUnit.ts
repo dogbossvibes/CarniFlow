@@ -47,6 +47,9 @@ export interface TrainingExercise {
   discipline:    string;        // Fährte | Unterordnung | Schutzdienst | <eigene>
   exercise_name: string;
   rating:        number | null;
+  // Additiv (T-184): 'lernstufe' = rating ist eine Lernstufe (1/2/4/5), sonst Sterne.
+  // Diese App-Linie liest das Feld nur; der Server bewahrt es beim Speichern.
+  rating_scale?: string | null;
   notes:         string | null;
   duration_sec:  number | null;
   seq_index:     number;
