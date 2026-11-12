@@ -50,11 +50,9 @@ describe('Generic person connection vs Trainer connection: isolated, correctly-s
   it('PERSON_CONNECTION_TYPE is a distinct value from trainer_client', () => {
     expect(connectionService).toMatch(/export const PERSON_CONNECTION_TYPE = 'health_contact';/);
   });
-  it('connectAnyvoPerson writes PERSON_CONNECTION_TYPE, never trainer_client, and refuses self-connection', () => {
-    const fn = connectionService.match(/export async function connectAnyvoPerson[\s\S]*?\n\}/)?.[0] ?? '';
-    expect(fn).toMatch(/connection_type: PERSON_CONNECTION_TYPE/);
-    expect(fn).not.toMatch(/'trainer_client'/);
-    expect(fn).toMatch(/ownerUserId === personId/);
+  it('the app no longer offers name search with instant connection (replaced by contact requests)', () => {
+    expect(connectionService).not.toMatch(/export async function (connectAnyvoPerson|searchAnyvoPeople)/);
+    expect(connectionService).not.toMatch(/from\('connections'\)\s*\.insert/);
   });
   it('Track Sharing (can_view_shared_track) still requires connection_type = \'trainer_client\' specifically — a generic connection never grants it', () => {
     expect(trackSharingMigration).toMatch(/c\.connection_type = 'trainer_client'/);
