@@ -48,23 +48,24 @@ const toLL = (xE: number, yN: number): LatLng => ({ latitude: yN / M_PER_DEG, lo
 // Gerade Fährte nach Norden, 100 m, 2-m-Raster (wie die gelegte Linie).
 const LINE: LatLng[] = [];
 for (let y = 0; y <= 100; y += 2) LINE.push(toLL(0, y));
-// Gegenstand bei 20 m (Stoff) und Dübel bei 70 m — mit stabilen Marker-IDs.
+// Gegenstand bei 20 m (Stoff) und Gummi bei 70 m — mit stabilen Marker-IDs.
 const OBJECTS: SearchObject[] = [
   { at: toLL(0, 20), index: 0, material: 'stoff', id: 'gegenstand-20' },
-  { at: toLL(0, 70), index: 1, material: 'duebel', id: 'gegenstand-70' },
+  { at: toLL(0, 70), index: 1, material: 'gummi', id: 'gegenstand-70' },
 ];
 
-function Harness({ onReady, objects }: { onReady: (s: SearchRecorder) => void; objects: SearchObject[] }) {
-  const s = useSearchRecorder({ laidPoints: LINE, laidObjects: objects, level: 'training', handlerDistanceM: 5 });
+function Harness({ onReady, objects, points = LINE }: { onReady: (s: SearchRecorder) => void; objects: SearchObject[]; points?: LatLng[] }) {
+  const s = useSearchRecorder({ laidPoints: points, laidObjects: objects, level: 'training', handlerDistanceM: 5 });
   onReady(s);
   return null;
 }
 let activeRenderer: ReactTestRenderer | null = null;
-function mount(objects: SearchObject[] = OBJECTS): { getRecorder: () => SearchRecorder } {
+function mount(objects: SearchObject[] = OBJECTS, points: LatLng[] = LINE): { getRecorder: () => SearchRecorder } {
   let latest!: SearchRecorder;
-  act(() => { activeRenderer = TestRenderer.create(<Harness objects={objects} onReady={(s) => { latest = s; }} />); });
+  act(() => { activeRenderer = TestRenderer.create(<Harness objects={objects} points={points} onReady={(s) => { latest = s; }} />); });
   return { getRecorder: () => latest };
 }
+const TEST_EPOCH_MS = 1_790_000_000_000;
 let simClockMs = 0;
 function feed(yNorthM: number, xEastM = 0.2, accuracy = 4) {
   if (!feedSample) throw new Error('positionSource callback not captured yet');
@@ -75,15 +76,32 @@ const flushMicrotasks = async () => { await act(async () => { await Promise.reso
 
 beforeEach(() => {
   feedSample = null; simClockMs = 0;
+  jest.spyOn(Date, 'now').mockImplementation(() => simClockMs || TEST_EPOCH_MS);
   storeCalls.progress = []; storeCalls.found = []; storeCalls.offTrack = [];
   storeState.searchRunState.offTrackState = 'on_track';
 });
-afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; });
+afterEach(() => { act(() => { activeRenderer?.unmount(); }); activeRenderer = null; jest.restoreAllMocks(); });
 
 // Handler läuft von yFrom bis yTo in 2-m-Schritten (MIN_SEGMENT 1,5 m → jeder Fix ein Linienpunkt).
 function walk(yFrom: number, yTo: number) { for (let y = yFrom; y <= yTo; y += 2) feed(y); }
 
 describe('useSearchRecorder — Search-Recovery-State', () => {
+  it('persists the exact existing score components without changing the final score', async () => {
+    const { getRecorder } = mount();
+    await flushMicrotasks();
+    act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+    walk(0, 40);
+    act(() => { getRecorder().markObject(); getRecorder().confirmEnd(); });
+    const beforeStop = getRecorder().score;
+    let result!: ReturnType<SearchRecorder['stop']>;
+    act(() => { result = getRecorder().stop(); });
+    expect(result.score).toBe(beforeStop);
+    const basis = result.objectScoreBasis!;
+    expect(basis).toMatchObject({ version: 1, maxTrackPoints: 79, maxObjectPoints: 21, totalObjects: 2 });
+    expect(result.score).toBe(Math.round(basis.trackPoints + result.foundObjects / result.totalObjects * basis.maxObjectPoints));
+    expect(result.objectStatuses).toEqual(['manual_found', 'missed']);
+  });
+
   it('1./2. frischer Start: Fortschritt 0; nach Lauf bis 40 m meldet der Recorder maxCursor ≈ 40 m (monoton) an den Store', async () => {
     const { getRecorder } = mount();
     await flushMicrotasks();
@@ -127,15 +145,17 @@ describe('useSearchRecorder — Search-Recovery-State', () => {
     expect(lastCount).toBe(10 + storeCalls.progress.length);
   });
 
-  it('Gegenbeweis: OHNE runState (Legacy-Puffer) bleibt der Cursor nach Resume bei 0 hängen, wenn der Handler bei 60 m steht', async () => {
+  it('Legacy-Puffer ohne Run-State: Referenz nach Resume wiederfinden, ohne unbekannte Strecke zu zählen', async () => {
     const { getRecorder } = mount();
     await flushMicrotasks();
     act(() => { getRecorder().start({ points: [toLL(0.2, 58), toLL(0.2, 60)], startedAtMs: 1 }); });
     feed(62); feed(64); feed(66);
-    expect(getRecorder().progressM).toBe(0);   // dokumentierte Legacy-Degradation (Fenster [−4, +20] um 0)
+    expect(getRecorder().progressM).toBeGreaterThan(60);
+    expect(getRecorder().distanceM).toBeLessThan(10);
+    expect(getRecorder().score).toBeLessThan(30);
   });
 
-  it('8./9. gefundener Gegenstand UND Dübel überleben Resume (stabile Marker-IDs); Fund-Distanz unverändert', async () => {
+  it('8./9. gefundener Gegenstand UND Gummi überleben Resume (stabile Marker-IDs); Fund-Distanz unverändert', async () => {
     const runState: SearchRunState = { ...freshSearchRunState(), maxCursorM: 75, foundObjectIds: ['gegenstand-20', 'gegenstand-70'] };
     const { getRecorder } = mount();
     await flushMicrotasks();
@@ -166,9 +186,10 @@ describe('useSearchRecorder — Search-Recovery-State', () => {
     await flushMicrotasks();
     act(() => { getRecorder().start({ points: [toLL(0.2, 50)], startedAtMs: 1, runState }); });
     expect(getRecorder().breaks).toHaveLength(1);
-    // Vor dem ersten akzeptierten Punkt: Abweichung = reiner Seed (20 m / 10 = 2,0 m).
-    feed(52);   // EMA-Nachlauf < MIN_SEGMENT → noch kein neuer Linienpunkt
-    expect(storeCalls.progress).toHaveLength(0);
+    // Resume starts at the fresh measurement without smoothing across the gap.
+    feed(52);
+    expect(storeCalls.progress).toHaveLength(1);
+    expect(getRecorder().points.at(-1)?.breakBefore).toBe(true);
     feed(54); feed(56); feed(58);
     const res = getRecorder().stop();
     expect(res.breaks).toHaveLength(1);
@@ -425,4 +446,130 @@ describe('useSearchRecorder — Search-Recovery-State', () => {
     // Gleiche Messung, unterschiedliche Semantik: Legacy bestraft die rohe 2-m-Abweichung, Version 1 nicht.
     expect(v1).toBeGreaterThan(v0);
   });
+});
+
+
+describe('Search continuity', () => {
+  it('a short pause starts a section without adding the unknown movement', async () => {
+    const { getRecorder } = mount([]);
+    await flushMicrotasks();
+    act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+    walk(0, 20);
+    const before = getRecorder().distanceM;
+    act(() => { getRecorder().setPaused(true); });
+    act(() => { getRecorder().setPaused(false); });
+    feed(60);
+    expect(getRecorder().points.at(-1)).toMatchObject({ breakBefore: true, latitude: 60 / M_PER_DEG });
+    expect(getRecorder().distanceM).toBeCloseTo(before, 5);
+    const result = getRecorder().stop();
+    expect(result.analyticsSamples.at(-1)?.breakBefore).toBe(true);
+    expect(result.replayPoints?.some(p => p.breakBefore)).toBe(true);
+  });
+
+  it('a fix delivery gap expires end evidence and excludes the bridge', async () => {
+    const { getRecorder } = mount([]);
+    await flushMicrotasks();
+    act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+    walk(0, 20);
+    const before = getRecorder().distanceM, epoch = getRecorder().continuityEpoch;
+    simClockMs += 10_000;
+    feed(60);
+    expect(getRecorder().continuityEpoch).toBeGreaterThan(epoch);
+    expect(getRecorder().distanceM).toBeCloseTo(before, 5);
+    expect(getRecorder().points.at(-1)?.breakBefore).toBe(true);
+  });
+
+  it('recovery retains sections, original times and measured distance', async () => {
+    const { getRecorder } = mount([]);
+    await flushMicrotasks();
+    const startMs = Date.now() - 10_000;
+    act(() => { getRecorder().start({ points: [toLL(0, 0), toLL(0, 10), { ...toLL(0, 50), breakBefore: true }, toLL(0, 60)],
+      pointsTimeSec: [0, 2, 7, 9], startedAtMs: startMs, runState: freshSearchRunState() }); });
+    expect(getRecorder().distanceM).toBeGreaterThan(19);
+    expect(getRecorder().distanceM).toBeLessThan(21);
+    feed(80);
+    const result = getRecorder().stop();
+    expect(result.distanceM).toBeLessThan(21);
+    expect(result.pointsTimeSec?.slice(0, 4)).toEqual([0, 2, 7, 9]);
+    expect(result.points.filter(p => p.breakBefore)).toHaveLength(2);
+  });
+});
+
+it('keeps an object inside an unobserved gap unknown across progress and end confirmation', async () => {
+  const objects = [{ at: toLL(0, 45), atM: 45, index: 0, material: 'holz', id: 'gap-object' },
+    { at: toLL(0, 95), atM: 95, index: 1, material: 'holz', id: 'end-object' }];
+  const { getRecorder } = mount(objects);
+  await flushMicrotasks();
+  act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+  walk(0, 20);
+  act(() => { getRecorder().setPaused(true); getRecorder().setPaused(false); });
+  feed(65);
+  expect(getRecorder().objectStatuses[0]).toBe('unobserved');
+  walk(67, 79);
+  act(() => { getRecorder().confirmEnd(); });
+  expect(getRecorder().objectStatuses[0]).toBe('unobserved');
+  expect(getRecorder().foundObjects).toBe(0);
+});
+
+
+describe('known reference object count', () => {
+  it('keeps a recorded reference with zero objects at zero through finish', async () => {
+    const { getRecorder } = mount([]);
+    await flushMicrotasks();
+    expect(getRecorder().totalObjects).toBe(0);
+    act(() => { getRecorder().start(undefined, { forceLocked: true }); });
+    walk(0, 20);
+    let result!: ReturnType<SearchRecorder['stop']>;
+    act(() => { result = getRecorder().stop(); });
+    expect(result.totalObjects).toBe(0);
+    expect(result.foundObjects).toBe(0);
+  });
+  it('preserves rulebook targets for a free search without a laid reference', async () => {
+    const { getRecorder } = mount([], []);
+    await flushMicrotasks();
+    expect(getRecorder().totalObjects).toBe(3);
+  });
+  it('preserves the actual nonzero count of the reference', async () => {
+    const { getRecorder } = mount(OBJECTS);
+    await flushMicrotasks();
+    expect(getRecorder().totalObjects).toBe(2);
+  });
+});
+
+it('excludes both jokers from resumed finds, penalties and object snapshots without shifting legacy keys', async () => {
+  const objects: SearchObject[] = [
+    { at: toLL(0, 10), index: 0, material: 'duebel' },
+    { at: toLL(0, 20), index: 1, material: 'gummi' },
+    { at: toLL(0, 70), index: 2, material: 'ball' },
+  ];
+  const { getRecorder } = mount(objects);
+  await flushMicrotasks();
+  const runState = { ...freshSearchRunState(), maxCursorM: 75, foundObjectIds: ['idx:0', 'idx:1', 'idx:2'] };
+  act(() => { getRecorder().start({ points: [toLL(0, 75)], startedAtMs: 1, runState }); });
+  expect(getRecorder().totalObjects).toBe(1);
+  expect(getRecorder().foundObjects).toBe(1);
+  walk(76, 100);
+  act(() => getRecorder().confirmEnd());
+  let result!: ReturnType<SearchRecorder['stop']>;
+  act(() => { result = getRecorder().stop(); });
+  expect(result.foundObjectIndices).toEqual([0]);
+  expect(result.objectStatuses).toHaveLength(1);
+  expect(result.objectScoreBasis?.totalObjects).toBe(1);
+  expect(storeCalls.found).toEqual([]);
+  expect(objects.map(o => o.material)).toEqual(['duebel', 'gummi', 'ball']);
+});
+
+it('a joker-only track has no object waiting phase or missed-object penalty', async () => {
+  const { getRecorder } = mount([{ at: toLL(0, 100), index: 0, material: 'ball' }, { at: toLL(0, 20), index: 1, material: 'duebel' }]);
+  await flushMicrotasks();
+  act(() => getRecorder().start(undefined, { forceLocked: true }));
+  walk(0, 100);
+  expect(getRecorder().totalObjects).toBe(0);
+  expect(getRecorder().foundObjects).toBe(0);
+  act(() => getRecorder().confirmEnd());
+  let result!: ReturnType<SearchRecorder['stop']>;
+  act(() => { result = getRecorder().stop(); });
+  expect(result.objectStatuses).toEqual([]);
+  expect(result.foundObjectIndices).toEqual([]);
+  expect(storeCalls.found).toEqual([]);
 });

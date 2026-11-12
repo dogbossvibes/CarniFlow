@@ -14,12 +14,29 @@
 // Klassen, keine Fenster, keine Fusion. Sie liest nur.
 
 import type { QaSearchDiagnostics } from '@/features/tracking/utils/qaSearchCapture';
+import type { BackgroundLayDiagnostics } from './backgroundLayDiagnostics';
+import { assertQaRecordingEvidence, type QaRecordingEvidence } from './qaRecordingEvidence';
+import { assertRecordingProvenance } from './diagnosticProvenance';
 import type {
   QaSessionCapture, QaCapturePoint, QaMarkerSource, QaDistanceScale, QaAutoDiagnostic, QaTurnFusion, QaImuOnlyEvent,
   QaCandidateMotion,
 } from '@/features/tracking/utils/qaSessionCapture';
 
 const M_PER_DEG = 111320;
+const REFERENCE_KINDS = ['rechts', 'links', 'spitz_rechts', 'spitz_links', 'unbekannt'] as const;
+
+function projectReferenceMarks(value: unknown): import('./qaSessionCapture').QaReferenceMark[] {
+  if (!Array.isArray(value) || value.length > 256) throw new Error('Ungültige QA-Referenzmarkierungen');
+  return value.map((item: unknown) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error('Ungültige QA-Referenzmarkierung');
+    const entry = item as Record<string, unknown>;
+    if (typeof entry.tMs !== 'number' || !Number.isFinite(entry.tMs) || Math.abs(entry.tMs) >= 1e8 ||
+        typeof entry.kind !== 'string' || !REFERENCE_KINDS.includes(entry.kind as typeof REFERENCE_KINDS[number])) {
+      throw new Error('Ungültige QA-Referenzmarkierung');
+    }
+    return { tMs: entry.tMs, kind: entry.kind as typeof REFERENCE_KINDS[number] };
+  });
+}
 
 /** Rohpunkt, wie ihn `local_track_points` liefert. */
 export interface RawLayPoint {
@@ -95,7 +112,7 @@ export interface QaTrackExport {
    * Bewusst getrennt von `schemaVersion`, damit bestehende v2.0-Leser
    * unverändert funktionieren.
    */
-  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  schemaMinor?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 15 | 16 | 17 | 18;
   /** Gehashte Session-ID — nicht auf die echte zurückführbar. */
   sessionId: string;
   pointType: 'lay';
@@ -114,6 +131,8 @@ export interface QaTrackExport {
   // ── v2: alles, was zur Reproduktion eines Feldlaufs fehlte ──────────────
   /** false = Session ohne QA-Mitschnitt (QA-Modus war aus oder Altbestand). */
   qaCaptureAvailable: boolean;
+  referenceMarks?: import('./qaSessionCapture').QaReferenceMark[];
+  referenceMarksTruncated?: boolean;
   /**
    * Je Pipeline EINE benannte Zahl. Nie wieder „die Distanz":
    *   rawPathM       ungeglättet, alle eingegangenen Fixe
@@ -136,6 +155,7 @@ export interface QaTrackExport {
     /** Punkte, die tatsächlich in der Datenbank gelandet sind. */
     persistedPoints: number;
   };
+  rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   rawFixes: QaCapturePoint[];
   detectorPoints: QaCapturePoint[];
   linePoints: QaCapturePoint[];
@@ -144,6 +164,7 @@ export interface QaTrackExport {
    * der Live-Entscheidung verwechseln (siehe candidateMotionEvidence).
    */
   autoDiagnostics: QaAutoDiagnostic[];
+  reconstructionScope?: QaSessionCapture['reconstructionScope'];
 
   // ── QA v2.1 ─────────────────────────────────────────────────────────────
   /**
@@ -155,7 +176,9 @@ export interface QaTrackExport {
    * `undefined`  = Mitschnitt stammt aus v2.0, Motion wurde nie erfasst.
    * Beides ist NICHT dasselbe wie „Motion sah keine Drehung".
    */
+  motionTimeline?: import('./qaSessionCapture').QaMotionTimeline;
   candidateMotionEvidence?: QaCandidateMotion[];
+  motionCaptureDiagnostics?: QaSessionCapture['motionCaptureDiagnostics'];
   /** true, wenn Core Motion während der Aufnahme überhaupt lief. */
   motionCaptureAvailable: boolean;
 
@@ -177,6 +200,10 @@ export interface QaTrackExport {
   startupMovementDiagnostics?: QaSessionCapture['startupMovementDiagnostics'];
   manualAngleGeometryDiagnostics?: QaSessionCapture['manualAngleGeometryDiagnostics'];
   voiceDiagnostics?: QaSessionCapture['voiceDiagnostics'];
+  /** v2.10: exact-session background counters plus recording-time QA identity/observations. */
+  backgroundLayDiagnostics?: BackgroundLayDiagnostics;
+  backgroundLayDiagnosticsStatus?: 'available' | 'missing' | 'read_failed';
+  recordingEvidence?: QaRecordingEvidence;
 }
 
 export function toMs(t: string | number | null | undefined): number {
@@ -269,13 +296,16 @@ export function buildQaTrackExport(
   }
   const accs = anon.map(p => p.accuracy).filter((a): a is number => a != null);
   const motion = capture?.candidateMotionEvidence;
-  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 = capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
+  const captureSchemaMinor: 0 | 1 | 2 | 5 | 6 | 7 | 11 | 15 | 16 | 17 = capture?.rawFixes?.some(p => p.receivedMs !== undefined || p.processedMs !== undefined) || capture?.detectorPoints?.some(p => p.receivedMs !== undefined || p.processedMs !== undefined) ? 17 : capture?.referenceMarks ? 16 : capture?.motionTimeline ? 15 : capture?.motionCaptureDiagnostics ? 11 : capture?.startupDiagnostics?.pedometerSubscriptionStartedTSec !== undefined
     || capture?.startupDiagnostics?.motionFirstCallbackTSec !== undefined ? 7
     : capture?.startupMovementDiagnostics
     || capture?.startupDiagnostics?.movementConfirmationSource !== undefined ? 6
     : capture?.startupDiagnostics || capture?.manualAngleGeometryDiagnostics || capture?.voiceDiagnostics ? 5
     : capture?.turnFusion ? 2 : capture?.captureVersion === 2 ? 1 : 0;
-  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 | 7 | 8 = !search ? 0
+  const searchSchemaMinor: 0 | 3 | 4 | 5 | 6 | 7 | 8 | 12 | 18 = !search ? 0
+    : search.recordingContext ? 18
+    // 12: Beobachtungsumfang des Ende-Ereignisses; unbekannte Anzahl bleibt null.
+    : search.end?.eventObservation !== undefined ? 12
     // 8: additive Roh-Suchfix-Felder (accuracyM/accepted je Fix in geometry.raw); ältere Captures bleiben bei ihrer Stufe.
     : search.geometry?.raw?.some(p => p.accuracyM !== undefined) ? 8
     : search.endConfirmationDiagnostics?.finalObjectGraceStartedTSec !== undefined ? 7
@@ -303,6 +333,7 @@ export function buildQaTrackExport(
     markers: anonymizeMarkers(markers, points[0], capture?.markers),
 
     qaCaptureAvailable: !!capture,
+    ...(capture?.referenceMarks !== undefined ? { referenceMarks: projectReferenceMarks(capture.referenceMarks), referenceMarksTruncated: capture.referenceMarksTruncated === undefined ? false : validateReferenceTruncated(capture.referenceMarksTruncated) } : {}),
     distances: {
       rawPathM: capture?.distances.rawPathM ?? null,
       detectorPathM: capture?.distances.detectorPathM ?? null,
@@ -318,11 +349,15 @@ export function buildQaTrackExport(
       linePoints: capture?.counts.linePoints ?? null,
       persistedPoints: anon.length,
     },
+    rawArchive: capture?.rawArchive,
     rawFixes: capture?.rawFixes ?? [],
     detectorPoints: capture?.detectorPoints ?? [],
     linePoints: capture?.linePoints ?? [],
     autoDiagnostics: capture?.autoDiagnostics ?? [],
+    reconstructionScope: capture?.reconstructionScope,
+    ...(capture?.motionTimeline ? { motionTimeline: capture.motionTimeline } : {}),
     candidateMotionEvidence: motion,
+    motionCaptureDiagnostics: capture?.motionCaptureDiagnostics,
     motionCaptureAvailable: !!motion && motion.length > 0,
     ...(capture?.turnFusion ? { turnFusion: capture.turnFusion } : {}),
     ...(capture?.imuOnlyEvents ? { imuOnlyEvents: capture.imuOnlyEvents } : {}),
@@ -366,7 +401,31 @@ export function serializeQaTrackExport(e: QaTrackExport): string {
  * Geokoordinaten noch absolute Zeitstempel enthält. Wird vor dem Teilen
  * aufgerufen — lieber gar kein Export als ein Standortleck.
  */
+function validateReferenceTruncated(value: unknown): boolean {
+  if (typeof value !== 'boolean') throw new Error('Ungültiger QA-Referenzstatus');
+  return value;
+}
+
 export function assertNoAbsoluteData(e: QaTrackExport): void {
+  if (e.referenceMarks !== undefined) {
+    projectReferenceMarks(e.referenceMarks);
+    for (const mark of e.referenceMarks) {
+      if (Object.keys(mark).sort().join(',') !== 'kind,tMs') throw new Error('Ungültige QA-Referenzfelder');
+    }
+  }
+  if (e.referenceMarksTruncated !== undefined) validateReferenceTruncated(e.referenceMarksTruncated);
+  if (e.recordingEvidence) assertQaRecordingEvidence(e.recordingEvidence);
+  if (e.backgroundLayDiagnostics) {
+    const visit = (value: unknown): void => {
+      if (typeof value === 'number' && (!Number.isFinite(value) || Math.abs(value) >= 1e8))
+        throw new Error('QA-Export enthält ungültige Hintergrund-Diagnosezeiten/Zähler.');
+      if (typeof value === 'string' && /\d{4}-\d{2}-\d{2}|@|[0-9a-f]{8}-[0-9a-f]{4}-/i.test(value))
+        throw new Error('QA-Export enthält unerlaubte Hintergrund-Diagnosedaten.');
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === 'object') Object.entries(value).forEach(([key, item]) => { visit(key); visit(item); });
+    };
+    visit(e.backgroundLayDiagnostics);
+  }
   const json = JSON.stringify(e);
   for (const forbidden of ['latitude', 'longitude', 'lat"', 'lng"']) {
     if (json.includes(forbidden)) throw new Error(`QA-Export enthält unerlaubtes Feld: ${forbidden}`);
@@ -378,17 +437,37 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
       if (Math.abs(p.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Zeitstempel.');
     }
   }
+  for (const p of [...e.rawFixes, ...e.detectorPoints, ...e.linePoints]) {
+    for (const value of [p.receivedMs, p.processedMs]) {
+      if (value != null && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) >= 1e8)) throw new Error('Ungültige relative GPS-Zeit.');
+    }
+    if (p.deliverySource !== undefined && !['foreground', 'background', 'unknown'].includes(p.deliverySource)) throw new Error('Ungültige GPS-Zustellquelle.');
+  }
   for (const d of e.autoDiagnostics) {
     if (d.tMs != null && Math.abs(d.tMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Zeitstempel.');
   }
   // QA v2.1: alle Motion-Zeiten sind relativ — weder Kandidatenzeit noch
   // Sample-Zeit darf je absolut werden.
   for (const m of e.candidateMotionEvidence ?? []) {
-    for (const v of [m.evaluatedAtMs, m.windowStartMs, m.windowEndMs, m.firstSampleAgeMs, m.lastSampleAgeMs]) {
-      if (v != null && Math.abs(v) >= 1e12) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
+    for (const v of [m.firstObservedMs, m.lastObservedMs, m.strongestObservedMs, m.evaluatedAtMs, m.windowStartMs, m.windowEndMs, m.firstSampleAgeMs, m.lastSampleAgeMs]) {
+      if (v != null && (!Number.isFinite(v) || Math.abs(v) >= 1e12)) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
     }
     for (const sm of m.samples) {
-      if (Math.abs(sm.dtMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
+      if (!Number.isFinite(sm.dtMs) || Math.abs(sm.dtMs) >= 1e12) throw new Error('QA-Export enthält einen absoluten Motion-Zeitstempel.');
+    }
+  }
+  if (e.motionTimeline) {
+    const timeline = e.motionTimeline;
+    if (timeline.version !== 1 || timeline.limit !== 4096 || timeline.timeBasis !== 'relative_to_first_recorded_fix'
+      || !Array.isArray(timeline.samples) || timeline.samples.length > timeline.limit
+      || !Number.isInteger(timeline.observed) || !Number.isInteger(timeline.omitted) || timeline.omitted < 0
+      || timeline.observed !== timeline.samples.length + timeline.omitted) throw new Error('Invalid motion timeline');
+    const allowed = ['tMs','receivedMs','headingDelta','rotationMagnitude','accelerationMagnitude','stepDelta','cadence','movementState'];
+    for (const sample of timeline.samples) {
+      if (Object.keys(sample).some(k => !allowed.includes(k))) throw new Error('Unexpected motion timeline field');
+      for (const value of [sample.tMs, sample.receivedMs, sample.headingDelta, sample.rotationMagnitude, sample.accelerationMagnitude, sample.stepDelta, sample.cadence]) {
+        if (value != null && (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) >= 1e8)) throw new Error('Invalid motion timeline value');
+      }
     }
   }
   for (const m of e.markers) {
@@ -402,6 +481,7 @@ export function assertNoAbsoluteData(e: QaTrackExport): void {
   // Meter. Absolute Unix-Sekunden wären ≥ 1e9.
   const sd = e.searchDiagnostics;
   if (sd) {
+    if (sd.recordingContext !== undefined) assertRecordingProvenance(sd.recordingContext);
     const secs: (number | null | undefined)[] = [
       sd.end.manualStopTSec, sd.end.eventFired?.tSec,
       ...sd.cursor.samples.map(c => c.tSec),

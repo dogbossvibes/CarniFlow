@@ -6,10 +6,10 @@
  *   • Zähler „Winkel gelegt" = corners_total (Lay-Marker), nicht Analytics-Ecken
  * Statisches Quell-Muster wie analyse-section.test.ts (Screen ist ohne schweren
  * Render-Harness nicht renderbar); Datenpfade werden zusätzlich mit den reinen
- * Funktionen (buildTrackDetailMap / pickDetailMarkers) durchgespielt.
+ * Funktionen (buildTrackDetailDisplay / pickDetailMarkers) durchgespielt.
  */
 import { readFileSync } from 'fs';
-import { buildTrackDetailMap } from '@/features/tracking/utils/trackDetailMap';
+import { buildTrackDetailDisplay } from '@/features/tracking/utils/trackDetailDisplay';
 import { pickDetailMarkers } from '@/features/tracking/utils/localTrackDetail';
 
 const source = () => readFileSync('app/track/[id].tsx', 'utf8');
@@ -65,9 +65,9 @@ describe('Analyse-Zustand — eine Quelle', () => {
 });
 
 describe('Fährtenverlauf — Marker-Datenquelle', () => {
-  it('Karte bekommt ausschliesslich gespeicherte Marker (data.markers → buildTrackDetailMap → TrackingMap)', () => {
+  it('Karte bekommt ausschliesslich gespeicherte Marker (data.markers → buildTrackDetailDisplay → TrackingMap)', () => {
     const src = source();
-    expect(src).toContain('const detail = buildTrackDetailMap(data);');
+    expect(src).toContain('const detail = buildTrackDetailDisplay(data, displaySupplement, authenticatedSession?.user.id);');
     expect(src).toContain('const markers: MapMarker[] = detail.markers.map(m => ({');
     expect(src).toContain('layPoints={map.lay} runPoints={map.run} markers={map.markers}');
     // Keine Marker aus analytics.corners (nur atM, keine Koordinate, nicht gespeichert).
@@ -86,23 +86,46 @@ describe('Fährtenverlauf — Marker-Datenquelle', () => {
   const points = [{ latitude: 47, longitude: 8, point_type: 'lay' }, { latitude: 47.0003, longitude: 8.0003, point_type: 'lay' }];
 
   it('Remote-Marker R + SR → beide Winkeltypen mit Koordinate an die Karte', () => {
-    const map = buildTrackDetailMap({ points, markers: pickDetailMarkers([R, SR], []), runs: [] });
+    const map = buildTrackDetailDisplay({ points, markers: pickDetailMarkers([R, SR], []), runs: [] }, null);
     expect(map.hasLay).toBe(true);
     expect(map.markers.map(m => [m.type, m.angleKind, m.lat != null && m.lng != null])).toEqual([
       ['winkel', 'rechts', true], ['winkel', 'spitz_rechts', true],
     ]);
   });
   it('Remote 0 + lokal R + SR (Fall qa-0ec8c4ca) → lokale Marker sichtbar', () => {
-    const map = buildTrackDetailMap({ points, markers: pickDetailMarkers([], [L1, L2]), runs: [] });
+    const map = buildTrackDetailDisplay({ points, markers: pickDetailMarkers([], [L1, L2]), runs: [] }, null);
+    expect(map.markers.map(m => m.angleKind)).toEqual(['rechts', 'spitz_rechts']);
+  });
+  it('lokale Linienergänzung erhält Remote-Marker und übernimmt keine zusätzlichen lokalen oder Analytics-Winkel', () => {
+    const identity = { id: 'track-1', owner_id: 'owner-1', dog_id: 'dog-1' };
+    const remote = { ...identity, points: points.slice(0, 1), markers: [R, SR], runs: [],
+      track_data: { run: { analytics: { corners: [{ side: 'links' }] } } } };
+    const local = { ...identity, points, markers: [{ ...L1, angle_kind: 'links' }], runs: [] };
+    const before = JSON.stringify({ remote, local });
+    const map = buildTrackDetailDisplay(remote, local, 'owner-1');
+    expect(map.lay).toHaveLength(2); // die lokale Ergänzung wurde tatsächlich benutzt
+    expect(map.markers.map(m => [m.id, m.angleKind, m.lat, m.lng])).toEqual([
+      [R.id, R.angle_kind, R.latitude, R.longitude],
+      [SR.id, SR.angle_kind, SR.latitude, SR.longitude],
+    ]);
+    expect(JSON.stringify({ remote, local })).toBe(before);
+  });
+  it('lokaler Marker-Fallback wird auch bei aktiver Linienergänzung genau einmal dargestellt', () => {
+    const identity = { id: 'track-1', owner_id: 'owner-1', dog_id: 'dog-1' };
+    const local = { ...identity, points, markers: [L1, L2], runs: [] };
+    const resolved = { ...identity, points: points.slice(0, 1), markers: pickDetailMarkers([], local.markers), runs: [] };
+    const map = buildTrackDetailDisplay(resolved, local, 'owner-1');
+    expect(map.lay).toHaveLength(2);
+    expect(map.markers.map(m => m.id)).toEqual([L1.id, L2.id]);
     expect(map.markers.map(m => m.angleKind)).toEqual(['rechts', 'spitz_rechts']);
   });
   it('keine erfundenen Winkel: nur gespeicherte angle_kinds, nichts aus Ground Truth (L/SL fehlen)', () => {
-    const map = buildTrackDetailMap({ points, markers: pickDetailMarkers([], [L1, L2]), runs: [] });
+    const map = buildTrackDetailDisplay({ points, markers: pickDetailMarkers([], [L1, L2]), runs: [] }, null);
     expect(map.markers).toHaveLength(2);
     expect(map.markers.map(m => m.angleKind)).not.toContain('links');
     expect(map.markers.map(m => m.angleKind)).not.toContain('spitz_links');
     // Analytics-Ecken (corners_total 3 / analytics.corners 2 in Production) sind KEINE Kartenmarker.
-    const remoteOnly = buildTrackDetailMap({ points, markers: [], runs: [], track_data: { run: { analytics: { corners: [{ side: 'rechts' }, { side: 'links' }] } } } });
+    const remoteOnly = buildTrackDetailDisplay({ points, markers: [], runs: [], track_data: { run: { analytics: { corners: [{ side: 'rechts' }, { side: 'links' }] } } } }, null);
     expect(remoteOnly.markers).toEqual([]);
   });
 });

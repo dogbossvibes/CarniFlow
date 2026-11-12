@@ -24,7 +24,7 @@ export function SmartFeedbackSection({ dogId }: { dogId?: string | null }) {
   const runCta = (cta?: InsightCta | null) => {
     if (!cta) return;
     if (cta.kind === 'similar') router.push({ pathname: '/analyse/smart-search', params: { q: cta.query } } as never);
-    else if (cta.kind === 'plan') router.push('/unit/start' as never);
+    else if (cta.kind === 'plan') router.push('/unit/document' as never);
   };
 
   return (

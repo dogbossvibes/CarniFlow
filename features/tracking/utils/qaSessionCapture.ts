@@ -1,3 +1,4 @@
+import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 // QA-Mitschnitt einer gelegten Fährte — ausschliesslich für Feldtest-Analysen.
 //
 // ANLASS (Realdaten Teil A/B): der QA-Export konnte einen Feldlauf nicht
@@ -34,8 +35,15 @@ export interface QaCapturePoint {
   y: number;
   accuracy: number | null;
   tMs: number;
+  /** JavaScript-Runtime-Eingang und Verarbeitung, relativ zum ersten Rohfix. */
+  receivedMs?: number | null;
+  timingDisposition?: import('./liveFixOrdering').LiveFixTimeDecision['disposition'];
+  processedMs?: number | null;
+  deliverySource?: 'foreground' | 'background' | 'unknown';
   /** Nur für Detektor-/Linienpunkte: kumulierte Weglänge DIESER Pipeline. */
   cumDistM?: number;
+  /** Explicit unobserved boundary; no diagnostic line may bridge it. */
+  breakBefore?: boolean;
 }
 
 export type QaMarkerSource = 'auto' | 'auto_split_apex' | 'manual' | 'stop_flush' | 'build40' | 'unknown';
@@ -77,7 +85,7 @@ export interface QaTurnFusion {
   apexIndex: number;
   atM: number;
   tMs: number | null;
-  source: 'gps' | 'gps_split_apex';
+  source: 'gps' | 'gps_split_apex' | 'gps_long_baseline';
   direction: 'links' | 'rechts';
   directionSource?: 'gps' | 'motion_override_low_geometry';
   motionAssociationSource?: 'live_cached' | 'accepted_live_turn' | 'current_ring' | 'nearest_episode' | 'none';
@@ -175,7 +183,24 @@ export interface QaMotionSample {
  *                       Der finish-Sweep in `autoDiagnostics` bleibt getrennt
  *                       und ist als Rekonstruktion gekennzeichnet.
  */
+export interface QaMotionTimeline {
+  version: 1; limit: number; observed: number; omitted: number;
+  timeBasis: 'relative_to_first_recorded_fix';
+  samples: (Omit<QaMotionSample, 'dtMs'> & { tMs: number; receivedMs: number })[];
+}
+
 export interface QaCandidateMotion {
+  firstObservedMs?: number | null;
+  lastObservedMs?: number | null;
+  strongestObservedMs?: number | null;
+  /** Latest geometry verdict, independent of the retained strongest Motion window. */
+  geometryAtLastEvaluation?: {
+    rejectReason: import('./shortLegCornerDetection').ShortLegRejectReason | null;
+    headingMeasured: boolean;
+    accepted: boolean;
+  };
+  /** True when this diagnostic sample context was thinned to its explicit limit. */
+  contextSamplesTruncated?: boolean;
   // ── Zuordnung ────────────────────────────────────────────────────────────
   apexIndex: number;
   /** ms relativ zum Aufnahmebeginn — der Zeitpunkt, für den ausgewertet wurde. */
@@ -223,7 +248,24 @@ export interface QaCandidateMotion {
  *  nachrechenbar sind. */
 export const QA_MOTION_CONTEXT_MS = 2000;
 
+export interface QaMotionCaptureDiagnostics {
+  candidateLimit: number;
+  samplesPerCandidateLimit: number;
+  contextHalfWindowMs: number;
+  candidateRetention: 'latest_apex_indices';
+  sampleRetention: 'bounded_observed_context';
+  evaluatedCandidateCount: number;
+  omittedCandidateCount: number;
+  truncated: boolean;
+}
+
+export type QaReferenceKind = 'rechts' | 'links' | 'spitz_rechts' | 'spitz_links' | 'unbekannt';
+export interface QaReferenceMark { tMs: number; kind: QaReferenceKind }
+
 export interface QaSessionCapture {
+  rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
+  referenceMarks?: QaReferenceMark[];
+  referenceMarksTruncated?: boolean;
   /** 1 = Schema v2.0 (ohne Motion), 2 = v2.1 (mit candidateMotionEvidence). */
   captureVersion: 1 | 2;
   sessionLocalId: string;
@@ -248,8 +290,12 @@ export interface QaSessionCapture {
   markers: QaMarkerMeta[];
   /** FINISH RECONSTRUCTED — Neuberechnung beim Stop, OHNE Motion. */
   autoDiagnostics: QaAutoDiagnostic[];
+  /** Finish reconstruction covers only this section, unlike retained live Motion rows. */
+  reconstructionScope?: 'current_detector_section';
   /** LIVE RECORDED + DERIVED — QA v2.1. Fehlt bei captureVersion 1. */
+  motionTimeline?: QaMotionTimeline;
   candidateMotionEvidence?: QaCandidateMotion[];
+  motionCaptureDiagnostics?: QaMotionCaptureDiagnostics;
   /** QA v2.2 — Turn-Fusion je Ecke (FINISH RECONSTRUCTED, mit Motion, falls sie lief). */
   turnFusion?: QaTurnFusion[];
   /** QA v2.2 — IMU-only-Ereignisse (nie persistiert). */
@@ -285,7 +331,7 @@ export interface QaSessionCapture {
     truncated: boolean;
   };
   manualAngleGeometryDiagnostics?: {
-    markers: { manualMarkerType: 'ow' | 'bw' | 'gw'; geometryDirection: 'links' | 'rechts' | 'unresolved';
+    markers: { manualMarkerType: 'ow' | 'bw' | 'gw' | 'abriss'; geometryDirection: 'links' | 'rechts' | 'unresolved';
       geometrySharpness: 'normal' | 'sharp' | 'unresolved'; geometryQuality: number | null;
       confidence: number | null; motionDirection: 'links' | 'rechts' | null;
       directionAgrees: boolean | null; classificationSource: string | null }[];
@@ -297,16 +343,21 @@ export interface QaSessionCapture {
 const keyFor = (sessionLocalId: string) => `${KEY_PREFIX}${sessionLocalId}`;
 
 /** Mitschnitt ablegen und den Index auf die jüngsten Einträge begrenzen. */
-export async function saveQaSessionCapture(capture: QaSessionCapture): Promise<void> {
+export async function saveQaSessionCapture(capture: QaSessionCapture, accessToken = diagnosticsAccessToken()): Promise<void> {
+  if (!accessToken || accessToken !== diagnosticsAccessToken()) return;
   try {
     await AsyncStorage.setItem(keyFor(capture.sessionLocalId), JSON.stringify(capture));
     const raw = await AsyncStorage.getItem(INDEX_KEY);
+    if (accessToken !== diagnosticsAccessToken()) return;
     const ids: string[] = raw ? JSON.parse(raw) : [];
     const next = [capture.sessionLocalId, ...ids.filter(id => id !== capture.sessionLocalId)];
     const keep = next.slice(0, QA_CAPTURE_RETENTION);
     const drop = next.slice(QA_CAPTURE_RETENTION);
     await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(keep));
-    for (const id of drop) await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
+    for (const id of drop) {
+      if (accessToken !== diagnosticsAccessToken()) return;
+      await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
+    }
   } catch {
     // QA-Mitschnitt ist best-effort — ein Fehler darf den Abschluss der
     // Fährte niemals beeinträchtigen.
@@ -314,9 +365,11 @@ export async function saveQaSessionCapture(capture: QaSessionCapture): Promise<v
 }
 
 export async function loadQaSessionCapture(sessionLocalId: string): Promise<QaSessionCapture | null> {
+  const accessToken = diagnosticsAccessToken();
+  if (!accessToken) return null;
   try {
     const raw = await AsyncStorage.getItem(keyFor(sessionLocalId));
-    if (!raw) return null;
+    if (!raw || accessToken !== diagnosticsAccessToken()) return null;
     const parsed = JSON.parse(raw) as QaSessionCapture;
     // v2.0-Mitschnitte (captureVersion 1) bleiben lesbar.
     return parsed?.captureVersion === 1 || parsed?.captureVersion === 2 ? parsed : null;
@@ -326,19 +379,35 @@ export async function loadQaSessionCapture(sessionLocalId: string): Promise<QaSe
 }
 
 export async function listQaSessionCaptureIds(): Promise<string[]> {
+  const accessToken = diagnosticsAccessToken();
+  if (!accessToken) return [];
   try {
     const raw = await AsyncStorage.getItem(INDEX_KEY);
-    return raw ? (JSON.parse(raw) as string[]) : [];
+    return raw && accessToken === diagnosticsAccessToken() ? (JSON.parse(raw) as string[]) : [];
   } catch {
     return [];
   }
 }
 
 export async function clearQaSessionCaptures(): Promise<void> {
+  const accessToken = diagnosticsAccessToken();
+  if (!accessToken) return;
   try {
     const ids = await listQaSessionCaptureIds();
-    for (const id of ids) await AsyncStorage.removeItem(keyFor(id)).catch(() => {});
-    await AsyncStorage.removeItem(INDEX_KEY);
+    // Lazy load avoids a diagnostic-store/client cycle.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { beginSupportProvenanceDeletion } = require('./supportProvenanceStore') as typeof import('./supportProvenanceStore');
+    const metadata = beginSupportProvenanceDeletion(ids);
+    try {
+      for (const id of ids) {
+        if (accessToken !== diagnosticsAccessToken()) return;
+        await AsyncStorage.removeItem(keyFor(id));
+      }
+      // Keep the exact retry identities until captures AND metadata are removed.
+      // In particular, an intent-write failure must remain retryable after restart.
+      if (accessToken !== diagnosticsAccessToken() || !await metadata.commit()) return;
+      if (accessToken === diagnosticsAccessToken()) await AsyncStorage.removeItem(INDEX_KEY);
+    } finally { metadata.cancel(); }
   } catch { /* best-effort */ }
 }
 

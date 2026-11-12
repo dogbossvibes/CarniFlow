@@ -17,15 +17,19 @@ jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
-let mockBeforeRemove: ((e: unknown) => void) | null = null;
-const mockDispatch = jest.fn();
+let mockPreventCallback: ((opts: { data: { action: unknown }; repeat: () => void }) => void) | null = null;
+let mockPreventCondition: boolean | null = null;
+const mockRepeat = jest.fn();
+const mockDisablePrevention = jest.fn();
+const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'sess-A', dogId: 'dog-A' }),
-  useRouter: () => ({ replace: jest.fn(), push: jest.fn(), back: jest.fn(), canGoBack: () => true }),
-  useNavigation: () => ({
-    addListener: (name: string, fn: (e: unknown) => void) => { if (name === 'beforeRemove') mockBeforeRemove = fn; return () => {}; },
-    dispatch: (...a: unknown[]) => mockDispatch(...a),
-  }),
+  useRouter: () => ({ replace: (...a: unknown[]) => mockReplace(...a), push: jest.fn(), back: jest.fn(), canGoBack: () => true }),
+  usePreventRemove: (condition: boolean, cb: (opts: { data: { action: unknown }; repeat: () => void }) => void) => {
+    mockPreventCondition = condition;
+    mockPreventCallback = cb;
+    return mockDisablePrevention;
+  },
 }));
 const mockEndNotification = jest.fn(async () => undefined);
 jest.mock('@/features/tracking/native/liegezeitNotification', () => ({
@@ -65,9 +69,9 @@ let renderer: Rendered = null;
 const lastAlert = () => alertSpy.mock.calls[alertSpy.mock.calls.length - 1] as [string, string, Btn[]];
 const pressAlert = (title: string) => act(() => { lastAlert()[2].find(b => b.text === title)!.onPress!(); });
 const leave = () => {
-  const e = { preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } };
-  act(() => { mockBeforeRemove!(e); });
-  return e;
+  const action = { type: 'GO_BACK' };
+  act(() => { mockPreventCallback!({ data: { action }, repeat: mockRepeat }); });
+  return action;
 };
 const byId = (id: string) => renderer.root.findAll((n: Rendered) => n.props.testID === id)[0];
 const dialogOpen = () => !!byId('resting-leave-dialog');
@@ -100,8 +104,9 @@ const expectUntouched = async (pending: PendingTrack) => {
 };
 
 beforeEach(async () => {
-  mockBeforeRemove = null;
-  [mockDispatch, mockEndNotification, mockRecordCancelled].forEach(m => m.mockClear());
+  mockPreventCallback = null;
+  mockPreventCondition = null;
+  [mockRepeat, mockDisablePrevention, mockReplace, mockEndNotification, mockRecordCancelled].forEach(m => m.mockClear());
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   useTrackingStore.setState({ dogId: 'dog-A', currentSessionId: 'sess-A', sessionStatus: 'resting', trackPoints: [{ lat: 47, lng: 8, t: 1 } as never], layStartedAt: Date.now() - 60_000, isRecording: false } as never);
   useActiveFaehrten.setState({ byDog: {}, hydrated: true });
@@ -113,8 +118,8 @@ afterEach(() => { act(() => { renderer?.unmount(); }); renderer = null; jest.res
 
 describe('Liegezeit verlassen', () => {
   it('1–5. Dialog: Im Hintergrund weiterlaufen · Zum endgültigen Abbrechen gedrückt halten · Zurück (kein nativer Alert)', () => {
-    const e = leave();
-    expect(e.preventDefault).toHaveBeenCalled();
+    leave();
+    expect(mockPreventCondition).toBe(true);
     expect(alertSpy).not.toHaveBeenCalled();
     expect(dialogOpen()).toBe(true);
     const t = dialogTexts();
@@ -127,9 +132,10 @@ describe('Liegezeit verlassen', () => {
 
   it('6. „Im Hintergrund weiterlaufen" nutzt den bisherigen „Weiterlaufen lassen"-Handler (nur verlassen, keine Seiteneffekte)', () => {
     const src = fs.readFileSync('app/track/liegen.tsx', 'utf8');
-    const body = src.match(/const keepRunningInBackground = \(action: unknown\) => \{([\s\S]*?)\n  \};/)![1];
-    expect(body).toContain('allowLeaveRef.current = true;');
-    expect(body).toContain('navigation.dispatch(action);');
+    const body = src.match(/const keepRunningInBackground = \(repeat: \(\) => void\) => \{([\s\S]*?)\n  \};/)![1];
+    expect(body).toContain('setAllowLeave(true);');
+    expect(body).toContain('repeat();');
+    expect(body).not.toContain('navigation.dispatch');
     expect(body).not.toMatch(/endLiegezeitNotification|recordTrackCancelled|setSessionStatus|remove\(|writePending|clearPending/);
     expect(src).not.toContain('leaveEndLyingTime');
     expect(src).not.toContain('endLyingTime');
@@ -141,8 +147,7 @@ describe('Liegezeit verlassen', () => {
     const layStartedAt = useTrackingStore.getState().layStartedAt;
     leave();
     tap('resting-leave-background');
-    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
-    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockRepeat).toHaveBeenCalledTimes(1);
     expect(mockEndNotification).not.toHaveBeenCalled();                       // Benachrichtigung/Live Activity läuft weiter
     expect(useTrackingStore.getState().layStartedAt).toBe(layStartedAt);     // Liegezeit läuft weiter (Start unverändert)
     expect(JSON.stringify(useActiveFaehrten.getState().byDog)).toBe(regBefore);
@@ -150,12 +155,19 @@ describe('Liegezeit verlassen', () => {
     expect(dialogOpen()).toBe(false);
   });
 
+  it('6b. „Absuche starten" (Wiederaufnehmen) deaktiviert die SDK-58-Sperre vor der Navigation', async () => {
+    await act(async () => { byId('resting-start-search').props.onPress(); await Promise.resolve(); });
+    expect(mockDisablePrevention).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/track/run?id=sess-A&dogId=dog-A');
+    expect(mockRepeat).not.toHaveBeenCalled();
+  });
+
   it('8. „Zurück" schliesst nur den Dialog: auf dem Liegezeit-Screen bleiben, nichts geschrieben', async () => {
     const pending = await writePending();
     leave();
     tap('resting-leave-back');
     expect(dialogOpen()).toBe(false);
-    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockRepeat).not.toHaveBeenCalled();
     expect(mockEndNotification).not.toHaveBeenCalled();
     expect(byId('resting-identity-missing')).toBeUndefined();
     await expectUntouched(pending);
@@ -165,7 +177,7 @@ describe('Liegezeit verlassen', () => {
     const pending = await writePending();
     leave();
     holdAbort(150);
-    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockRepeat).not.toHaveBeenCalled();
     expect(mockEndNotification).not.toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
     expect(dialogOpen()).toBe(true);
@@ -176,7 +188,7 @@ describe('Liegezeit verlassen', () => {
     const pending = await writePending();
     leave();
     holdAbort(HOLD_TO_ABORT_MS - 10);
-    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockRepeat).not.toHaveBeenCalled();
     await expectUntouched(pending);
   });
 
@@ -188,8 +200,7 @@ describe('Liegezeit verlassen', () => {
     expect(useTrackingStore.getState().sessionStatus).toBe('cancelled');
     expect(useActiveFaehrten.getState().get('dog-A')).toBeNull();
     expect(mockEndNotification).toHaveBeenCalledTimes(1);
-    expect(mockDispatch).toHaveBeenCalledTimes(1);
-    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    expect(mockRepeat).toHaveBeenCalledTimes(1);
     expect(alertSpy).not.toHaveBeenCalled();                                  // Hold IST die Bestätigung
     expect(dialogOpen()).toBe(false);
   });
@@ -198,7 +209,7 @@ describe('Liegezeit verlassen', () => {
     leave();
     holdAbort(3000);
     expect(mockRecordCancelled).toHaveBeenCalledTimes(1);
-    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockRepeat).toHaveBeenCalledTimes(1);
   });
 
   it('K. Bedienungshilfen: „Aktivieren" bricht nicht direkt ab, sondern zeigt die ausdrückliche Bestätigung; „Nein" ändert nichts', async () => {
@@ -211,7 +222,7 @@ describe('Liegezeit verlassen', () => {
     expect(msg).toContain('kann danach aber nicht mehr fortgesetzt oder abgesucht werden.');
     expect(buttons.map(b => b.text)).toEqual(['Nein', 'Endgültig abbrechen']);
     expect(buttons.find(b => b.text === 'Nein')!.onPress).toBeUndefined();   // reines Schliessen
-    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockRepeat).not.toHaveBeenCalled();
     await expectUntouched(pending);
   });
 
@@ -223,7 +234,7 @@ describe('Liegezeit verlassen', () => {
     expect(useTrackingStore.getState().sessionStatus).toBe('cancelled');
     expect(useActiveFaehrten.getState().get('dog-A')).toBeNull();
     expect(mockRecordCancelled).toHaveBeenCalledWith('sess-A', 'dog-A', 'resting_abort');
-    expect(mockDispatch).toHaveBeenCalledWith({ type: 'GO_BACK' });
+    expect(mockRepeat).toHaveBeenCalledTimes(1);
   });
 
   it('Navigation/Unmount während des Haltens → kein verzögerter Abbruch', () => {
@@ -236,7 +247,7 @@ describe('Liegezeit verlassen', () => {
       act(() => { jest.advanceTimersByTime(5000); });
     } finally { jest.useRealTimers(); }
     expect(mockRecordCancelled).not.toHaveBeenCalled();
-    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockRepeat).not.toHaveBeenCalled();
     expect(useTrackingStore.getState().sessionStatus).toBe('resting');
   });
 });

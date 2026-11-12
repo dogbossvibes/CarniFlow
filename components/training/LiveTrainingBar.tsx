@@ -49,6 +49,7 @@ export function LiveTrainingBar() {
   const minimized = useBarMinimized();
   const fabBottom = useFabBottom();
 
+  // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);

@@ -9,7 +9,7 @@ export interface Connection {
   connected_user_id: string;
   status:            ConnectionStatus;
   created_by:        ConnectionSide;
-  connection_type:   string;       // aktuell nur 'trainer_client'
+  connection_type:   string;       // 'trainer_client' | 'health_contact' | 'contact'
   connection_name:   string | null;
 }
 
@@ -31,11 +31,13 @@ export interface ConnectionPermissions {
   view_appointments:  boolean;
   view_health:        boolean;
   view_private_notes: boolean;
+  // Nur für Kontakte relevant (20261111220000): nicht gesundheitsbezogene Dokumente.
+  view_documents?:    boolean;
 }
 
 export type PermissionKey =
   | 'view_trainings' | 'view_statistics' | 'view_videos' | 'view_dogs'
-  | 'view_appointments' | 'view_health' | 'view_private_notes';
+  | 'view_appointments' | 'view_health' | 'view_private_notes' | 'view_documents';
 
 export interface ConnectionInvite {
   id:         string;

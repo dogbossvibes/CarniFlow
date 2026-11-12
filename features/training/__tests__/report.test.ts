@@ -146,7 +146,11 @@ describe('Trainingsbericht — Verdrahtung', () => {
     const screen = readFileSync('app/training-journal.tsx', 'utf8');
     expect(screen).toContain('const model = buildReportModel(filtered, {');
     // Keine neue Abhängigkeit: sonst wertet die Release-Prüfung die Änderung als nativen Build.
-    expect(readFileSync('package.json', 'utf8')).not.toContain('pdf-lib');
+    // pdf-lib ist auf der iOS-60-Linie bereits vorhanden (Fährtenbericht); der
+    // Trainingsbericht nutzt es trotzdem nicht, sondern den eigenen Writer.
+    for (const file of ['features/training/report.ts', 'features/training/reportPdf.ts', 'features/training/pdfWriter.ts', 'services/reportShare.ts']) {
+      expect(readFileSync(file, 'utf8')).not.toContain('pdf-lib');
+    }
     const share = readFileSync('services/reportShare.ts', 'utf8');
     expect(share).not.toMatch(/supabase|deleteAsync|upload/i);
     expect(share).toContain('FileSystem.cacheDirectory');

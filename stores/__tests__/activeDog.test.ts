@@ -69,13 +69,13 @@ describe('Aktiver Hund — Speicher', () => {
 describe('Aktiver Hund — Verdrahtung', () => {
   const src = (p: string) => readFileSync(p, 'utf8');
 
-  it('Analyse und Fährten-Übersicht nutzen dieselbe Auswahl statt eigenem Zustand', () => {
+  // Die Fährten-Übersicht ist seit der Zusammenführung mit der iOS-60-Linie die
+  // Production-Fassung mit eigener Hundewahl; der aktive Hund wird dort in einem
+  // eigenen PR nachgezogen.
+  it('Analyse nutzt die gemeinsame Auswahl statt eigenem Zustand', () => {
     const analyse = src('app/(tabs)/analytics.tsx');
     expect(analyse).toContain('const { activeDog: selectedDog, setActiveDog } = useActiveDog(dogs);');
     expect(analyse).not.toContain('dogIdx');
-    const track = src('app/track/index.tsx');
-    expect(track).toContain('const { activeDog, setActiveDog } = useActiveDog(dogs);');
-    expect(track).toContain('onDog={setActiveDog}');
   });
 
   it('der Speicher schreibt keine Kundendaten (nur AsyncStorage)', () => {

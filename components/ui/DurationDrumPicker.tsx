@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
+  View, Text, StyleSheet, ScrollView, type ScrollViewInstance,
 } from 'react-native';
 
 const STEPS = [5, 10, 15, 20, 25, 30, 35, 40];
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function DurationDrumPicker({ value, onChange }: Props) {
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const currentIdx = useRef(
     Math.max(0, STEPS.indexOf(value) === -1 ? 3 : STEPS.indexOf(value))
   );
@@ -53,6 +53,7 @@ export function DurationDrumPicker({ value, onChange }: Props) {
           });
         }}
       >
+        {/* eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert */}
         {STEPS.map(v => (
           <View key={v} style={S.item}>
             <Text style={[

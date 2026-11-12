@@ -9,10 +9,10 @@ import { useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/hooks/useSession';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { queryClient } from '@/lib/queryClient';
-import { getPackages, restorePurchases, restorePlanFromResult, getManagementURL, type PurchasePackage } from '@/lib/purchases';
+import { getPackages, restorePurchases, restorePlanFromResult, getManagementURL, isPurchaseAccountCurrent, type PurchasePackage } from '@/lib/purchases';
 import { getPlanSubscription, getFounderSlots, activatePlan } from '@/services/subscriptionService';
 import { newbieQuotaStatus } from '@/services/quotaService';
-import { PLAN_META, matchesStoreProduct, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
+import { PLAN_META, FOUNDER_SLOT_LIMIT, canSwitchPlanInApp, type SubscriptionPlan } from '@/features/subscription/plans';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -78,7 +78,7 @@ export default function MembershipScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useSession();
   const uid = session?.user.id;
-  const { hasLifetimeAccess } = useCapabilities();
+  const { hasLifetimeAccess, hasActiveLifetimeAccess, isTrainerModule } = useCapabilities();
 
   const [dbPlan, setDbPlan] = useState<SubscriptionPlan | null>(null);
   const [packages, setPackages] = useState<PurchasePackage[]>([]);
@@ -97,10 +97,12 @@ export default function MembershipScreen() {
   // Sichtbarer Plan: Store-Plan aus der DB hat Vorrang; sonst intern dauerhaft
   // freigeschaltet (Sonderrecht) → neutral 'permanent'; sonst Newbie/Kostenlos.
   const visiblePlan: VisiblePlan =
-    dbPlan === 'active' || dbPlan === 'founder_active' || dbPlan === 'trainer' ? dbPlan
+    hasActiveLifetimeAccess && !hasLifetimeAccess ? (isTrainerModule ? 'trainer' : 'active')
+    : dbPlan === 'active' || dbPlan === 'founder_active' || dbPlan === 'trainer' ? dbPlan
     : hasLifetimeAccess ? 'permanent'   // NUR internes Sonderrecht/Lifetime, NICHT allein isPro
     : 'newbie';
   const isNewbie = visiblePlan === 'newbie';
+  const isPermanentActive = hasActiveLifetimeAccess && !hasLifetimeAccess && !isTrainerModule;
 
   // Offerings/Slots/Plan defensiv laden — getPackages() wirft nie, liefert [] bei Fehler.
   const loadPlanState = useCallback(async () => {
@@ -128,26 +130,29 @@ export default function MembershipScreen() {
 
   const priceFor = (plan: SubscriptionPlan): string => {
     const pid = PLAN_META[plan].productId;
-    const pkg = pid ? packages.find(p => matchesStoreProduct(p.productId, pid)) : null;
+    const pkg = pid ? packages.find(p => p.productId === pid) : null;
     return pkg?.priceString ?? PLAN_META[plan].priceLabel;   // '—' neutraler Fallback, nie erfundener Preis
   };
 
   const founderAvailable = slots.remaining > 0 || visiblePlan === 'founder_active';
 
   const handleRestore = async () => {
+    if (!uid) { Alert.alert(t('common.notice'), t('premium.loginRequired')); return; }
     setBusy(true);
-    const res = await restorePurchases();
-    setBusy(false);
-    const restored = restorePlanFromResult(res, dbPlan);
-    if (restored && uid) {
-      await activatePlan({ userId: uid, plan: restored, periodEndsAt: res.expiration });
+    try {
+      const res = await restorePurchases(uid);
+      if (!res.ok) { Alert.alert(t('common.notice'), t(res.error?.startsWith('IAP_ACCOUNT_') ? 'premium.accountChanged' : 'premium.activationFailed')); return; }
+      const plan = restorePlanFromResult(res, dbPlan);
+      if (!plan) { Alert.alert(t('premium.noneFound'), t('premium.noneFoundBody')); return; }
+      const activation = await activatePlan({ userId: uid, plan, periodEndsAt: res.expiration });
+      if (activation.error) { Alert.alert(t('common.notice'), t(activation.pending ? 'premium.syncPending' : 'premium.activationFailed')); return; }
+      if (!isPurchaseAccountCurrent(uid)) { Alert.alert(t('common.notice'), t('premium.accountChanged')); return; }
       queryClient.invalidateQueries({ queryKey: ['capabilities'] });
       queryClient.invalidateQueries({ queryKey: ['userAccess'] });
       Alert.alert(t('premium.restored'), t('premium.restoredBody'));
-      const sub = await getPlanSubscription(uid); setDbPlan(sub?.plan ?? null);
-    } else {
-      Alert.alert(t('premium.noneFound'), res.error ?? t('premium.noneFoundBody'));
-    }
+      await loadPlanState();
+    } catch { Alert.alert(t('common.notice'), t('premium.activationFailed')); }
+    finally { setBusy(false); }
   };
 
   // „Abo verwalten" → bevorzugt die RevenueCat-Management-URL (korrekte Store-Abo-
@@ -205,7 +210,7 @@ export default function MembershipScreen() {
             </View>
           </View>
           <Text style={s.heroPlan}>{t(PLAN_NAME_KEY[visiblePlan])}</Text>
-          <Text style={s.heroStatus}>{isNewbie ? t('membership.freeHint') : t('membership.activeHint')}</Text>
+          <Text style={s.heroStatus}>{isPermanentActive ? t('membership.permanentAccess') : isNewbie ? t('membership.freeHint') : t('membership.activeHint')}</Text>
         </View>
 
         {/* NEWBIE: Nutzung diesen Monat (bestehende Quota-Status-RPC) */}
@@ -269,6 +274,11 @@ export default function MembershipScreen() {
             <TouchableOpacity style={s.ctaPrimary} onPress={goUpgrade} activeOpacity={0.9}>
               <Ionicons name="star" size={16} color={C.accentText} />
               <Text style={s.ctaPrimaryTxt}>{t('membership.upgradeActive')}</Text>
+            </TouchableOpacity>
+          ) : isPermanentActive ? (
+            <TouchableOpacity style={s.ctaSecondary} onPress={goUpgrade} activeOpacity={0.85}>
+              <Ionicons name="star" size={16} color={C.white} />
+              <Text style={s.ctaSecondaryTxt}>{t('premium.choosePlan', { plan: PLAN_META.trainer.name })}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={s.ctaSecondary} onPress={handleManage} activeOpacity={0.85}>
@@ -335,7 +345,7 @@ const s = StyleSheet.create({
   eyebrow:   { fontSize: 9, color: C.accent, fontWeight: '800', letterSpacing: 2, marginBottom: 2 },
   title:     { fontSize: 24, color: C.white, fontWeight: '900', letterSpacing: -0.5 },
   subtitle:  { fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 16 },
-  logo:      { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: C.border },
+  logo:      { width: 40, height: 40 },
   content:   { paddingHorizontal: 20, paddingTop: 8 },
 
   hero:      { borderRadius: 24, borderWidth: 1, borderColor: C.accentMid, backgroundColor: C.accentDim, padding: 20, marginBottom: 14 },

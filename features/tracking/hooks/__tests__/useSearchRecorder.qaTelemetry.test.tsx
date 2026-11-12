@@ -1,3 +1,4 @@
+
 /**
  * QA-Search-Telemetrie auf Recorder-Ebene (nur Beobachtung).
  *
@@ -15,7 +16,17 @@ import * as path from 'path';
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { useSearchRecorder, type SearchRecorder, type LatLng, type SearchResult } from '@/features/tracking/hooks/useSearchRecorder';
 import { SEARCH_QA_LIMITS } from '@/features/tracking/utils/qaSearchCapture';
+import { loadQaRecordingEvidence } from '@/features/tracking/utils/qaRecordingEvidenceStore';
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
+let mockEvidenceToken = 0;
+jest.mock('expo-crypto', () => ({ randomUUID: () => `qa-parity-segment-${++mockEvidenceToken}` }));
 jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -47,7 +58,7 @@ jest.mock('@/features/tracking/store/searchPersist', () => ({
 }));
 // QA-Schalter (mock-präfixiert für jest.mock-Factory).
 let mockQaOn = true;
-jest.mock('@/features/tracking/utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQaOn }));
+jest.mock('@/features/tracking/utils/qaDiagnosticsMode', () => ({ isQaDiagnosticsEnabled: () => mockQaOn, subscribeQaDiagnostics: () => () => {} }));
 // Support-Capture für normale Kunden (Standard AN, wie in Produktion).
 let mockSupportOn = true;
 jest.mock('@/features/tracking/utils/supportDiagnostics', () => ({
@@ -64,7 +75,7 @@ for (let y = 2; y <= 12; y += 2) LAID.push(ll(12, y));
 const OBJECTS = [{ at: ll(12, 6), index: 0, material: 'stoff', id: 'obj-1' }];
 
 function Harness({ onReady, line }: { onReady: (s: SearchRecorder) => void; line: LatLng[] }) {
-  const s = useSearchRecorder({ laidPoints: line, laidObjects: OBJECTS as any, level: 'training', handlerDistanceM: 1 });
+  const s = useSearchRecorder({ laidPoints: line, laidObjects: OBJECTS as any, level: 'training', handlerDistanceM: 1, sessionId: 'qa-parity-session' });
   onReady(s);
   return null;
 }
@@ -122,6 +133,8 @@ describe('QA-Telemetrie: Inhalt', () => {
     expect(q.objectApproach[0].minHandlerDistM as number).toBeLessThan(4);
     expect(q.minDistToEndM).not.toBeNull();
     expect(q.resumed).toBe(false);
+    expect(q.recordingContext?.segments[0].source).toBe('recording_start');
+    expect(q.recordingContext?.partial).toBe(false);
     expect(q.truncated).toEqual({ raw: false, cursor: false });
   });
 
@@ -135,6 +148,8 @@ describe('QA-Telemetrie: Inhalt', () => {
   it('Resume: Telemetrie ist als resumed markiert', async () => {
     const { res } = await runScenario(LAID, fixesL(), undefined, true);
     expect(res.qa?.resumed).toBe(true);
+    expect(res.qa?.recordingContext?.segments[0].source).toBe('recording_resume');
+    expect(res.qa?.recordingContext?.partial).toBe(true);
     expect(res.replayPoints).toBeUndefined();   // Legacy-Replay auf run_points
   });
 });
@@ -170,7 +185,12 @@ describe('Cursor / Score / Search-Distanz / Analytics durch QA unverändert', ()
   };
   it('synthetischer L-Turn mit Objekt: QA an ≡ QA aus', async () => {
     mockQaOn = true;  const on = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4));
+    const evidence = await loadQaRecordingEvidence('qa-parity-session');
+    expect(evidence.search.at(-1)?.closed).toBe(true);
+    expect(evidence.search.at(-1)?.events.some(e => e.name === 'firstFix')).toBe(true);
+    const segments = evidence.search.length;
     mockQaOn = false; mockSupportOn = false; const off = await runScenario(LAID, fixesL(), i => (i === 4 ? 80 : 4));
+    expect((await loadQaRecordingEvidence('qa-parity-session')).search.length).toBe(segments);
     expect(on.res.qa).toBeDefined(); expect(off.res.qa).toBeUndefined();
     same(on, off);
   });
@@ -190,7 +210,7 @@ describe('Cursor / Score / Search-Distanz / Analytics durch QA unverändert', ()
   it('QA-Ref wird von Cursor/Distanz/Score-Code nie gelesen (nur Schreiben + stop)', () => {
     const src = fs.readFileSync('features/tracking/hooks/useSearchRecorder.ts', 'utf8');
     const uses = src.split('\n').filter(l => l.includes('qaTelRef') || l.includes('qaLastCursorSampleSecRef'));
-    for (const l of uses) expect(l).toMatch(/useRef|qaTelRef\.current\)? *(\?|&&|\{|\.raw|\.filtered|=)|const tel = qaTelRef|qaTelRef\.current = |\.\.\.qaTelRef|qaLastCursorSampleSecRef\.current|const qaTel = qaTelRef|qaTelRef\.current\s*$|qaTelRef\.current \?|if \(qaTelRef|objectDwellCandidates/);
+    for (const l of uses) expect(l).toMatch(/useRef|qaTelRef\.current\)? *(\?|&&|\{|\.raw|\.filtered|=)|const tel = qaTelRef|qaTelRef\.current = |\.\.\.qaTelRef|qaLastCursorSampleSecRef\.current|const qaTel = qaTelRef|qaTelRef\.current\s*$|qaTelRef\.current \?|if \(qaTelRef|objectDwellCandidates|qaTelRef\.current\.captureLevel/);
     expect(src).not.toMatch(/(maxCursorMRef|cursorMRef|distRef|devSumRef|foundRef)\.current\s*(=|\+=)[^;]*qaTelRef/);
   });
 });
@@ -266,11 +286,20 @@ describe('Support-Capture (normale Kunden, kein QA-Schalter)', () => {
     prod(qa, sup);
   });
 
-  it('Einbahnstrasse: der Recorder liest `captureLevel` nie (nur Anlegen); Support-Modul importiert kein Tracking', () => {
+  it('captureLevel steuert nur Diagnoseumfang; Support-Modul importiert kein Tracking', () => {
     const rec = fs.readFileSync('features/tracking/hooks/useSearchRecorder.ts', 'utf8');
-    expect(rec.match(/captureLevel/g)).toHaveLength(1);                      // genau die Zuweisung beim Anlegen
+    expect(rec.match(/captureLevel/g)).toHaveLength(3);                      // Anlage plus ausschließlich diagnostischer Rückfall bei Entzug
     const sup = fs.readFileSync('features/tracking/utils/supportDiagnostics.ts', 'utf8');
     const imports = sup.split('\n').filter(l => l.startsWith('import '));
     for (const l of imports) expect(l).not.toMatch(/useSearchRecorder|searchFix|trackFusionEngine|turnFusion|shortLeg|guidance|replay|voice|cursor/i);
   });
+});
+
+it('records a late search fix as diagnostic evidence without applying it to live geometry', async () => {
+  const fixes = [{ x: 0, y: 0, t: T0 }, { x: 2, y: 0, t: T0 + 2000 },
+    { x: 1, y: 0, t: T0 + 1000 }, { x: 4, y: 0, t: T0 + 3000 }];
+  const { res } = await runScenario(LAID, fixes);
+  expect(res.qa?.raw).toHaveLength(4);
+  expect(res.qa?.raw[2]).toMatchObject({ t: T0 + 1000, accepted: false, reason: 'time_late' });
+  expect(res.qa?.filtered).toHaveLength(3);
 });

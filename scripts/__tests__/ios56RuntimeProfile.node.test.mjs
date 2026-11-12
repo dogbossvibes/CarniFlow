@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { resolveReleaseRuntime, evaluateNativeBaseBuild, resolveProductionBuildProfile } from '../update-production.mjs';
+const appJson={expo:{version:'1.0.4',runtimeVersion:{policy:'appVersion'},ios:{version:'1.0.5',buildNumber:'56',runtimeVersion:'1.0.5-map49-v1'}}};
+const easJson={build:{production:{channel:'production',environment:'production',distribution:'store'},'ios49-map-repair':{extends:'production',ios:{simulator:false}}}};
+const nativeConfig={appJson,easJson};
+const build={id:'fixture-build',status:'FINISHED',platform:'ios',runtimeVersion:'1.0.5-map49-v1',appVersion:'1.0.4',appBuildVersion:'56',channel:'production',buildProfile:'ios49-map-repair',gitCommitHash:'e'.repeat(40)};
+const evaluate=(changes={},config=nativeConfig,releaseAppVersion='1.0.5')=>evaluateNativeBaseBuild({build:{...build,...changes},buildId:'fixture-build',platform:'ios',runtime:build.runtimeVersion,nativeConfig:config,releaseAppVersion});
+test('runtime uses explicit target override, never global or other platform',()=>{assert.equal(resolveReleaseRuntime(appJson,'ios'),'1.0.5-map49-v1');assert.equal(resolveReleaseRuntime(appJson,'android'),'1.0.4');assert.equal(resolveReleaseRuntime(appJson),null);});
+test('invalid override fails closed',()=>assert.equal(resolveReleaseRuntime({expo:{...appJson.expo,ios:{runtimeVersion:null}}},'ios'),null));
+test('supports native iOS profile only with immutable config and exact collector evidence',()=>assert.deepEqual(evaluate(),[]));
+test('normal actual platform appVersion also works',()=>assert.deepEqual(evaluate({appVersion:'1.0.5'}),[]));
+for(const changes of [{appVersion:'9.9.9'},{appBuildVersion:'55'},{runtimeVersion:'1.0.4'},{platform:'android'},{status:'CANCELED'},{gitCommitHash:null},{channel:'preview'},{buildProfile:'missing'}])test('rejects mismatch '+JSON.stringify(changes),()=>assert.ok(evaluate(changes).length));
+test('requires build-source evidence, cannot trust runtime equality alone',()=>assert.ok(evaluate({},null).length));
+test('requires matching release platform appVersion',()=>assert.ok(evaluate({},nativeConfig,'1.0.4').length));
+test('production profile inheritance rejects cycles',()=>assert.equal(resolveProductionBuildProfile({build:{production:{extends:'ios49-map-repair'},'ios49-map-repair':{extends:'production'}}},'ios49-map-repair','ios'),null));
+for(const override of [{distribution:'internal'},{environment:'preview'},{channel:'preview'},{ios:{simulator:true}},{developmentClient:true}])test('rejects profile '+JSON.stringify(override),()=>{const config={appJson,easJson:{build:{...easJson.build,'ios49-map-repair':{extends:'production',...override}}}};assert.ok(evaluate({},config).length);});

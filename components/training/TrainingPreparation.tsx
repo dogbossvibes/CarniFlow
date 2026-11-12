@@ -1,0 +1,65 @@
+import { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { C } from '@/constants/colors';
+import { useT } from '@/i18n';
+import type { TrainingUnit, TrainingExercise } from '@/types/trainingUnit';
+import { legacyStars, levelOf } from '@/features/training/documentation/learningLevel';
+
+export function TrainingPreparation({ units, discipline, loading, error, limited, onRetry, onReuse, onOpen }: {
+  units: TrainingUnit[]; discipline: string; loading: boolean; error: boolean; limited: boolean;
+  onRetry: () => void; onReuse: (unit: TrainingUnit, exercises: TrainingExercise[]) => void; onOpen: (unit: TrainingUnit) => void;
+}) {
+  const { t } = useT();
+  const [expanded, setExpanded] = useState(false);
+  const [count, setCount] = useState(5);
+  const last = units[0];
+  // Lernstufe nur bei ausdrücklicher Markierung; alte Sterne als „alte Bewertung“.
+  const ratingText = (exercise: TrainingExercise) => {
+    const level = levelOf(exercise);
+    if (level) return ` · ${t(`trainingLevel.${level}`)}`;
+    const stars = legacyStars(exercise);
+    return stars != null ? ` · ${t('trainingLevel.legacy', { value: stars })}` : '';
+  };
+  return <View style={s.card}>
+    <Text style={s.title} accessibilityRole="header">{t('trainingLevel.lastTimeTitle')}</Text>
+    {loading && <Text style={s.text}>{t('common.loading')}</Text>}
+    {error && <TouchableOpacity onPress={onRetry} style={s.button} accessibilityRole="button"><Text style={s.text}>{t('trainingDoc.historyError')}</Text></TouchableOpacity>}
+    {!last ? (!loading && !error ? <Text style={s.text}>{t(limited ? 'trainingDoc.limited' : 'trainingDoc.noHistory')}</Text> : null) : <>
+        <TouchableOpacity onPress={() => onOpen(last)} style={s.button} accessibilityRole="button">
+          <Text style={s.text}>{last.session_date} · {discipline}</Text>
+        </TouchableOpacity>
+        {last.notes?.trim() ? <Text style={s.text} numberOfLines={expanded ? undefined : 3}>{t('trainingDoc.historySessionNote')}: {last.notes}</Text> : null}
+        {last.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <View key={exercise.id ?? i}>
+          <Text style={s.exercise}>{exercise.exercise_name}{ratingText(exercise)}</Text>
+          {exercise.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historyExerciseNote')}: {exercise.notes}</Text> : null}
+        </View>)}
+        <TouchableOpacity style={s.button} onPress={() => onReuse(last, last.exercises?.filter(e => e.discipline === discipline) ?? [])} accessibilityRole="button">
+          <Text style={s.action}>{t('trainingDoc.buildOn')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setExpanded(v => !v)} style={s.button} accessibilityRole="button" accessibilityState={{ expanded }}>
+          <Text style={s.action}>{t('trainingDoc.selectPast')}</Text>
+        </TouchableOpacity>
+        {expanded && units.slice(0, count).map(unit => <View key={unit.id}>
+          <TouchableOpacity onPress={() => onOpen(unit)} style={s.button} accessibilityRole="button"><Text style={s.text}>{unit.session_date}</Text></TouchableOpacity>
+          {unit.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historySessionNote')}: {unit.notes}</Text> : null}
+          {unit.exercises?.filter(e => e.discipline === discipline).map((exercise, i) => <TouchableOpacity key={exercise.id ?? i} style={s.button}
+            accessibilityRole="button" onPress={() => onReuse(unit, [exercise])}>
+            <Text style={s.text}>＋ {exercise.exercise_name}{ratingText(exercise)}</Text>
+            {exercise.notes?.trim() ? <Text style={s.text}>{t('trainingDoc.historyExerciseNote')}: {exercise.notes}</Text> : null}
+          </TouchableOpacity>)}
+        </View>)}
+        {expanded && count < units.length && <TouchableOpacity style={s.button} onPress={() => setCount(v => v + 5)} accessibilityRole="button">
+          <Text style={s.action}>{t('trainingDoc.more')}</Text>
+        </TouchableOpacity>}
+      </>}
+    {limited && <Text style={s.text}>{t('trainingDoc.limited')}</Text>}
+  </View>;
+}
+const s = StyleSheet.create({
+  card: { backgroundColor: C.card, borderColor: C.border, borderWidth: 1, borderRadius: 16, padding: 14, gap: 8 },
+  title: { fontSize: 16, fontWeight: '700', color: C.white },
+  text: { fontSize: 13, color: C.textMuted },
+  exercise: { fontSize: 15, color: C.white, fontWeight: '600' },
+  action: { fontSize: 14, color: C.accent, fontWeight: '600' },
+  button: { minHeight: 44, justifyContent: 'center' },
+});

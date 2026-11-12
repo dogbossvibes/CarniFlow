@@ -1,10 +1,12 @@
+import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot } from '@/lib/diagnosticsAccessState';
+import { loadQaPreferences } from '@/features/tracking/utils/qaPreferences';
 // Build-43-Feldtest-Audit: QA-A/B-Schalter LEGACY/PRECISION. Beweist, dass
 // LEGACY tatsächlich AnyvoPrecisionLocation/positionStream komplett umgeht
 // und exakt den alten expo-location-Pfad (Build 40, 82bd17c) nimmt — mit
 // denselben Optionen ({accuracy: BestForNavigation, distanceInterval: 0}) —
 // während PRECISION (Default) weiterhin über positionStream läuft.
 import { setLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
-import { startPositionSource } from '@/features/tracking/utils/positionSource';
+import { startPositionSource as startActualPositionSource } from '@/features/tracking/utils/positionSource';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -28,11 +30,30 @@ jest.mock('@/features/tracking/native/precisionLocationClient', () => ({
   },
 }));
 
+const handles: Awaited<ReturnType<typeof startActualPositionSource>>[] = [];
+async function startPositionSource(...args: Parameters<typeof startActualPositionSource>) {
+  const handle = await startActualPositionSource(...args);
+  handles.push(handle);
+  return handle;
+}
+afterEach(() => { handles.splice(0).forEach(handle => handle.stop()); setDiagnosticsSession(null); });
+
 describe('positionSource — LEGACY/PRECISION-QA-Schalter', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    setDiagnosticsSession('owner');
+    resolveDiagnosticsAccess('owner', getDiagnosticsAccessSnapshot().generation, true);
+    await loadQaPreferences();
     mockWatchPositionAsync.mockClear();
     mockStartPositionStream.mockClear();
     setLocationSourceMode('precision');
+  });
+
+  it('denies an unauthorised legacy override and uses the ordinary precision source', async () => {
+    setDiagnosticsSession(null);
+    setLocationSourceMode('legacy');
+    await startPositionSource(() => {}, {});
+    expect(mockStartPositionStream).toHaveBeenCalledTimes(1);
+    expect(mockWatchPositionAsync).not.toHaveBeenCalled();
   });
 
   it('PRECISION (Default): startPositionStream läuft, watchPositionAsync wird NICHT direkt aufgerufen', async () => {

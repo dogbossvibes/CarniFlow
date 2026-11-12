@@ -23,6 +23,8 @@ export function useTrainingFeed(dogId?: string) {
         getTrainingSessions(uid!, dogId),
         getUserTrackSessions(uid!),
       ]);
+      const failure = u.error || s.error || t.error;
+      if (failure) throw (failure instanceof Error ? failure : new Error(String(failure)));
       const units    = (u.data as TrainingUnit[])    ?? [];
       const sessions = (s.data as TrainingSession[]) ?? [];
       // Aktive Fährten aus training_sessions(type='track'), abgeschlossen + ggf. nach Hund.
@@ -32,7 +34,9 @@ export function useTrainingFeed(dogId?: string) {
   });
 
   return {
+    ownerId: uid,
     feed:    query.data ?? [],
+    error: query.error,
     loading: uid ? query.isPending : false,
     refresh: query.refetch,
   };

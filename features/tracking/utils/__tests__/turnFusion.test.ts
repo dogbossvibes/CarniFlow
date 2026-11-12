@@ -17,7 +17,7 @@ import {
   computeTurnEvidence, MotionEvidenceBuffer, type MotionWindowSample, type TurnEvidence,
 } from '@/features/tracking/utils/motionTurnEvidence';
 import {
-  fuseTurns, associateLiveTurn, RESCUE_CONFIDENCE_FACTOR,
+  fuseTurns, associateLiveTurn, nearestCompatibleTurnEvidence, RESCUE_CONFIDENCE_FACTOR,
 } from '@/features/tracking/utils/turnFusion';
 import { capturedDetectorBuffer } from './helpers/realSessionFixture';
 import { evaluateStopFlush } from '@/features/tracking/utils/stopFlushCorner';
@@ -372,6 +372,22 @@ describe('Tail-Safety bei Ende und Stop', () => {
     expect(r.turns).toEqual([]);
     expect(r.imuOnly.every(e => e.persisted === false)).toBe(true);
     expect(evaluateStopFlush(straight, -Infinity).corner).toBeNull();
+  });
+
+  it.each([-135, -90, 90, 135])('phone yaw %s° while walking cannot create a corner on a straight GPS path', (degrees) => {
+    const samples = simulate(35, { yawRateDps: s => pulse(s, 12, 13.2, degrees),
+      offAxisRadS: ZERO, stepRate: WALK }, HAND, 9);
+    const buffer = new MotionEvidenceBuffer(1e9);
+    samples.forEach(sample => buffer.push(sample));
+    const result = fuseTurns(straight, {
+      motionSamples: samples,
+      turnEvidenceAt: t => t == null ? null : buffer.evidenceForTrailing(t),
+      turnEvidenceForDirection: (t, direction) => t == null ? null
+        : nearestCompatibleTurnEvidence(t, direction, at => at == null ? null : buffer.evidenceFor(at)),
+    });
+    expect(result.imuOnly.length).toBeGreaterThan(0);
+    expect(result.corners).toEqual([]);
+    expect(result.imuOnly.every(event => !event.persisted)).toBe(true);
   });
 
   it('gerade Strecke, Ende, GPS-Drift: weder Fusion noch Stop-Flush erzeugen eine Ecke', () => {

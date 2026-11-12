@@ -5,6 +5,7 @@ export interface UserCapabilities {
   pro_member:     boolean;
   trainer_module: boolean;
   hasLifetimeAccess?: boolean;
+  hasActiveLifetimeAccess?: boolean;
   entitlements?: UserEntitlement[];
   updated_at?:    string;
 }

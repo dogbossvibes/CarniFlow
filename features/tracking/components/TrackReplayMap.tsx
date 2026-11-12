@@ -1,3 +1,4 @@
+import { splitContinuousPoints } from '@/features/tracking/utils/trackContinuity';
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,6 +38,7 @@ import type { ReplayGeometryPoint } from '@/features/tracking/engine/trackReplay
 // eindeutig blau, wo ein Heatmap-Teil selbst mint ist. Keine neue Farbe.
 
 interface Props {
+  layColor?: string;
   layPoints: LatLng[];
   markers: MapMarker[];
   heatmapParts: HeatmapPart[];
@@ -54,31 +56,23 @@ interface Props {
 export const SEARCH_ROUTE_FULL_STROKE = C.trackBlue + '73';
 export const SEARCH_ROUTE_PLAYED_STROKE = C.trackBlue;
 
-export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition, runPoints = [], playedPoints = [], startAnchor, endPoint, onMarkerPress }: Props) {
+export function TrackReplayMap({ layPoints, layColor = C.trackPrimary, markers, heatmapParts, puckPosition, runPoints = [], playedPoints = [], startAnchor, endPoint, onMarkerPress }: Props) {
   const mapRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   const fitDoneRef = useRef(false);
   const { t } = useT();
 
-  const layCoords = useMemo(
-    () => removeGpsJitter(layPoints).map(p => ({ latitude: p.lat, longitude: p.lng })),
+  const layParts = useMemo(
+    () => splitContinuousPoints(layPoints).map(part => removeGpsJitter(part).map(p => ({ latitude: p.lat, longitude: p.lng }))),
     [layPoints],
   );
+  const layCoords = useMemo(() => layParts.flat(), [layParts]);
   const markerList = useMemo(() => markers.filter(m => m.lat != null && m.lng != null), [markers]);
   const objectNo = useMemo(() => objectNumbers(markerList), [markerList]);
 
-  const runCoords = useMemo(
-    () => runPoints.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
-    [runPoints],
-  );
-  const playedCoords = useMemo(
-    () => playedPoints.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
-    [playedPoints],
-  );
-  // Bei 0 s liefert replayTraveledPoints [Startpunkt, Puck=Startpunkt] — eine
-  // Linie ohne Ausdehnung wird nicht gezeichnet (abgespielt = nur Start).
-  const hasPlayedLine = playedCoords.length > 1
-    && playedCoords.some(c => c.latitude !== playedCoords[0].latitude || c.longitude !== playedCoords[0].longitude);
+  const runParts = useMemo(() => splitContinuousPoints(runPoints), [runPoints]);
+  const playedParts = useMemo(() => splitContinuousPoints(playedPoints), [playedPoints]);
+  const runCoords = runPoints;
 
   const fitCoords = useMemo(() => {
     const heatCoords = heatmapParts.flatMap(p => p.coordinates);
@@ -99,7 +93,7 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <MapView
+      <MapView showsScale={false}
         ref={mapRef}
         provider={RNMaps.PROVIDER_DEFAULT}
         style={StyleSheet.absoluteFill}
@@ -120,27 +114,27 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
         initialRegion={{ latitude: initial.lat, longitude: initial.lng, latitudeDelta: 0.0025, longitudeDelta: 0.0025 }}
       >
         {/* 1 Referenz — immer komplett, nie nach Replay-Zeit abgeschnitten. */}
-        {layCoords.length > 1 && (
-          <Polyline coordinates={layCoords} strokeColor={laidTrackStroke('normal', C.trackPrimary).strokeColor} strokeWidth={4} lineCap="round" lineJoin="round" zIndex={1} />
-        )}
+        {layParts.filter(part => part.length > 1).map((part, index) => (
+          <Polyline key={`lay-${index}`} coordinates={part} strokeColor={laidTrackStroke('normal', layColor).strokeColor} strokeWidth={4} lineCap="round" lineJoin="round" zIndex={1} />
+        ))}
 
         {/* 2 volle Absuche-Route — dezenter blauer Unterbau, immer komplett. */}
-        {runCoords.length > 1 && (
-          <Polyline coordinates={runCoords} strokeColor={SEARCH_ROUTE_FULL_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={2} />
-        )}
+        {runParts.filter(part => part.length > 1).map((part, index) => (
+          <Polyline key={`run-${index}`} coordinates={part} strokeColor={SEARCH_ROUTE_FULL_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={2} />
+        ))}
 
         {/* 3 bereits abgespielter Teil — kräftig blau, wächst mit der Zeit. */}
-        {hasPlayedLine && (
-          <Polyline coordinates={playedCoords} strokeColor={SEARCH_ROUTE_PLAYED_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={3} />
-        )}
+        {playedParts.filter(part => part.length > 1).map((part, index) => (
+          <Polyline key={`played-${index}`} coordinates={part} strokeColor={SEARCH_ROUTE_PLAYED_STROKE} strokeWidth={8} lineCap="round" lineJoin="round" zIndex={3} />
+        ))}
 
         {/* 4 Heatmap-eingefärbte Ist-Suchspur — vorab memoiziert übergeben,
             ändert sich NICHT während des Replays. Schmaler als die blaue
             Einfassung, damit die Analysefarbe sichtbar bleibt UND die Spur
             eindeutig als Absuche erkennbar ist. */}
-        {heatmapParts.map(part => (
+        {heatmapParts.map((part, index) => (
           <Polyline
-            key={part.segmentId}
+            key={`${part.segmentId}-${index}`}
             coordinates={part.coordinates.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
             strokeColor={part.color}
             strokeWidth={4}
@@ -152,7 +146,7 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
 
         {startAnchor && (
           <Marker coordinate={{ latitude: startAnchor.lat, longitude: startAnchor.lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-            <View style={s.startFlag}><Ionicons name="flag" size={12} color="#04110F" /></View>
+            <View style={[s.startFlag, { backgroundColor: layColor }]}><Ionicons name="flag" size={12} color="#04110F" /></View>
           </Marker>
         )}
         {endPoint && (
@@ -173,6 +167,7 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
             return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="angle" label={label} acute={acute} onPress={onPress} />;
           }
           if (m.type === 'gegenstand') {
+            if (m.material === 'ball') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="ball" onPress={onPress} />;
             if (m.material === 'duebel') return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="cylinder" onPress={onPress} />;
             return <PinMarker key={key} Marker={Marker} lat={lat} lng={lng} kind="object" label={`G${m.objectIndex ?? objectNo.get(i) ?? ''}`} onPress={onPress} />;
           }
@@ -190,7 +185,7 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
 
       {/* Legende Referenz vs. Absuche — dieselben Tokens wie die Polylines. */}
       <View style={s.legend} pointerEvents="none">
-        <View style={s.legendItem}><View style={[s.legendLine, { backgroundColor: C.trackPrimary }]} /><Text style={s.legendTxt}>{t('track.replay.legendReference')}</Text></View>
+        <View style={s.legendItem}><View style={[s.legendLine, { backgroundColor: layColor }]} /><Text style={s.legendTxt}>{t('track.replay.legendReference')}</Text></View>
         <View style={s.legendItem}><View style={[s.legendLine, { backgroundColor: C.trackBlue }]} /><Text style={s.legendTxt}>{t('track.replay.legendSearch')}</Text></View>
       </View>
     </View>
@@ -198,7 +193,7 @@ export function TrackReplayMap({ layPoints, markers, heatmapParts, puckPosition,
 }
 
 const s = StyleSheet.create({
-  fallback:    { ...StyleSheet.absoluteFillObject, backgroundColor: C.trackSurface, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  fallback:    { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.trackSurface, alignItems: 'center', justifyContent: 'center', gap: 10 },
   fallbackTxt: { fontSize: 13, color: C.trackTextMut },
   legend:      { position: 'absolute', left: 12, bottom: 10, flexDirection: 'row', gap: 12, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: 'rgba(4,17,15,0.62)' },
   legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 6 },

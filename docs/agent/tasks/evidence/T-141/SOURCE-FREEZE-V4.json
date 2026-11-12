@@ -1,0 +1,144 @@
+{
+  "task": "T-141",
+  "worktree": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-training-entry-ux-20261029",
+  "branch": "fix/training-entry-ux-20261029",
+  "head": "d65997d06592af2b213f442651f3700ce3b9bc51",
+  "status": "uncommitted-source-review",
+  "deviceTests": "DEFERRED",
+  "files": [
+    {
+      "path": "app/add-dog.tsx",
+      "sha256": "7a3a752987ba9122bba96a8d57e5a7f1f2d14be0a6631d199c0c0eae8cce1262"
+    },
+    {
+      "path": "app/dog-backpack/[id].tsx",
+      "sha256": "e06b9a6d5cade27a87d73d02eeb87ccb4ec94188eeb7d515128bcfdf27cbc2e3"
+    },
+    {
+      "path": "app/dog-command/edit.tsx",
+      "sha256": "a45b7a3a3d811e692965355af9811057775ca74a876090d2b21608a73e5a28f7"
+    },
+    {
+      "path": "app/dog-document/[id].tsx",
+      "sha256": "6ed4189839b6da0691cddfde136aaa460a97eccc83ecdbff6d1cc1c5d5df6c08"
+    },
+    {
+      "path": "app/dog-goal/[id].tsx",
+      "sha256": "e5615d1222cf4579a5eb840d810c0c2ecd5565f60eb3a13ab8f2f7b0f4767fd1"
+    },
+    {
+      "path": "app/dog-health-record/[id].tsx",
+      "sha256": "97b0666c015e6c64632170a206137b09e002909cb9c1f5affa903c221b4412be"
+    },
+    {
+      "path": "app/dog-health/[id].tsx",
+      "sha256": "11a1329a460029c573d89c5353868e75d02913790de5d38db8d5b032dde8d9b6"
+    },
+    {
+      "path": "app/dog-heat-new.tsx",
+      "sha256": "3760d9b7721c92699221382bba2f892c7cd1feec6274964b931244cdbee290c6"
+    },
+    {
+      "path": "app/dog-heat/[id].tsx",
+      "sha256": "cba39fe0b0886ca652df8b91443aa93849e3b9e971e18c129a5eb27d6723a491"
+    },
+    {
+      "path": "app/edit-dog.tsx",
+      "sha256": "495809b3874ed626d413f3b4d00c8b3aec6e3d64400f7d0b5fb961a21f210a55"
+    },
+    {
+      "path": "app/edit-profile.tsx",
+      "sha256": "5e8d7a3e53616260b9fa0ca6034196a9ef47e6b2f6539ae0ed21513e2bbbfb39"
+    },
+    {
+      "path": "app/trainer/edit.tsx",
+      "sha256": "638b7c647e38efd82eb3b4306a94612118b3e31eea4c49d92f614c0c2a83d1f3"
+    },
+    {
+      "path": "app/trainer/index.tsx",
+      "sha256": "08055422bf7ce0fd6f191fcde9daad014d29199133bf460b65ebf0fc08ad9a34"
+    },
+    {
+      "path": "app/trainer/plan-neu.tsx",
+      "sha256": "8cfe1ee95937daba773dc2f72e7a96b6b5ade4dd28ff1ed6a683c535d204f031"
+    },
+    {
+      "path": "app/trainer/registrieren.tsx",
+      "sha256": "3977ea7272c25d56807500c050b6ee93e4c0efb7bc6cc29e71f1af84aaa78ca8"
+    },
+    {
+      "path": "app/training-journal.tsx",
+      "sha256": "d8c26fe3252a43c569cf76adbd1cea19b2c75177ba2e729000000c6f5b7b35fb"
+    },
+    {
+      "path": "app/training/[id].tsx",
+      "sha256": "bee533d2cdb6c11711ebd7b9782b53ffbfecdaf1119f84eebe1b4d2f95a9df9e"
+    },
+    {
+      "path": "app/umfrage/index.tsx",
+      "sha256": "0d7299ca657ac7c3792abd827316e1d445c8218596b0d0d2f45bc53e2bf97ecc"
+    },
+    {
+      "path": "app/unit/__tests__/document.test.tsx",
+      "sha256": "75d369495cf06b64499dbef95a204e72cf07a6cb4a7bbc3afbd80204b4cd58f8"
+    },
+    {
+      "path": "app/unit/detail.tsx",
+      "sha256": "99c623874b0e80b09db7f7bebfb1b46f928269518117b2ec4b10735bf1a6c96f"
+    },
+    {
+      "path": "app/unit/document.tsx",
+      "sha256": "eada19a4ac92edf0387d2df9b495d204d69a244dbb305ca01894c81afa19fe12"
+    },
+    {
+      "path": "app/unit/new-category.tsx",
+      "sha256": "75c5c49427fa1f400019323f9c1eee59ca1fa09c07be5179b6eac1ee54a498ba"
+    },
+    {
+      "path": "app/unit/summary.tsx",
+      "sha256": "12780c37157bd060847a00bc2ec849701428d2d9dfe6b5cda654250ddd67f60b"
+    },
+    {
+      "path": "components/calendar/CreateEventModal.tsx",
+      "sha256": "fb2721a24801001313cd4eb02aaf7496aa2fb9d44e17ad4f770af1ce20f4c6db"
+    },
+    {
+      "path": "components/calendar/RescheduleModal.tsx",
+      "sha256": "2265b42f193d660d0b974994c277dab5eb6e3fb96687394ec49f88fb31735844"
+    },
+    {
+      "path": "components/dogs/heat/HeatJournalScreen.tsx",
+      "sha256": "cd40707bf24e61f61910e57bbff3c0afff2abfc91a5f58ff3386b0c50a33e8d6"
+    },
+    {
+      "path": "components/training/CustomExerciseSheet.tsx",
+      "sha256": "d1d18309be4a8f2718ff647e9f4ee3daabe5c83fa9b7dd2315203b4d894c84a2"
+    },
+    {
+      "path": "components/training/MetricsInput.tsx",
+      "sha256": "b950daa051d64fe98811fdb039004e0ab9de6f9fcce8cecb02d948e510ee1855"
+    },
+    {
+      "path": "components/training/__tests__/MetricsInput.test.tsx",
+      "sha256": "82421df0ec1e1a60362cae44b307b433788f94b7f379de2d21d01159dabe77b8"
+    },
+    {
+      "path": "components/ui/KeyboardAwareScrollView.tsx",
+      "sha256": "28736ec655a718168cb48ff2a8233fe329090e5c5c5aff7750ed07db05b2dac2"
+    },
+    {
+      "path": "components/ui/__tests__/KeyboardAwareScrollView.test.tsx",
+      "sha256": "3a8795fe78d278a8e66563bd3ca6dbe6ce69ae4b1a5cda8833ee3b2211157ca2"
+    }
+  ],
+  "version": 4,
+  "supersedes": "SOURCE-FREEZE-V3.json",
+  "notes": [
+    "Manual drag opts out until next input focus; late keyboard/layout cannot resume scrolling",
+    "Effective viewport intersects keyboard only where input overlaps horizontally; never double-subtract keyboard",
+    "Retains keyboardDidChangeFrame geometry because RN0.81 metrics caches show/hide only",
+    "Fully visible fields below floating keyboards do not move",
+    "New tests use existing minimal react-test-renderer types without changing ambient declarations",
+    "Only V3-to-V4 change: test Keyboard.addListener mock returns the actual typed subscription instead of casting a partial object"
+  ]
+}

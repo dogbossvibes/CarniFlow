@@ -26,7 +26,7 @@ export function isHandlerDistance(v: unknown): v is SearchHandlerDistanceM {
 }
 
 // Koordinatenform der gelegten Fährte (deckt sich mit useSearchRecorder.LatLng).
-export interface LL { latitude: number; longitude: number }
+export interface LL { latitude: number; longitude: number; breakBefore?: boolean }
 
 // Haversine (m) — exakt dieselbe Formel wie `distM` in useSearchRecorder.ts,
 // damit die hier gebaute Bogenlänge numerisch identisch zu der ist, gegen die
@@ -46,7 +46,7 @@ export function haversineM(a: LL, b: LL): number {
 // (kanonische Eventpositionen, canonicalArc.ts) nutzen dieselbe Funktion.
 export function buildArc(line: LL[]): { cum: number[]; total: number } {
   const cum: number[] = [0];
-  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + haversineM(line[i - 1], line[i]));
+  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + (line[i].breakBefore ? 0 : haversineM(line[i - 1], line[i])));
   return { cum, total: cum.length ? cum[cum.length - 1] : 0 };
 }
 
@@ -93,6 +93,7 @@ export function projectForward(
   const X = (q: LL) => ({ x: (q.longitude - p.longitude) * mPerLng, y: (q.latitude - p.latitude) * mPerLat });
   let best = Infinity, bestAt = fromM;
   for (let i = 1; i < line.length; i++) {
+    if (line[i].breakBefore) continue;
     const segLo = cum[i - 1], segHi = cum[i];
     if (segHi < lo || segLo > hi) continue;          // Segment ausserhalb des Fensters
     const a = X(line[i - 1]), b = X(line[i]);
@@ -130,6 +131,7 @@ export function projectOntoSegments(p: LL, line: readonly LL[], cum: readonly nu
   const mPerLng = 111320 * Math.cos((p.latitude * Math.PI) / 180);
   const X = (q: LL) => ({ x: (q.longitude - p.longitude) * mPerLng, y: (q.latitude - p.latitude) * mPerLat });
   for (let i = 1; i < line.length; i++) {
+    if (line[i].breakBefore) continue;
     const a = X(line[i - 1]), b = X(line[i]);
     const dx = b.x - a.x, dy = b.y - a.y;
     const len2 = dx * dx + dy * dy;

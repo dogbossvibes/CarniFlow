@@ -1,0 +1,145 @@
+import { DatabaseSync } from 'node:sqlite';
+import { MIGRATIONS } from '../migrations';
+jest.mock('@react-native-async-storage/async-storage', () => jest.requireActual('@react-native-async-storage/async-storage/jest/async-storage-mock'));
+jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.6', nativeBuildVersion: '57' }));
+jest.mock('expo-device', () => ({ modelName: 'Synthetic Phone', osVersion: '26.0' }));
+jest.mock('expo-updates', () => ({ isEnabled: false }));
+
+let mockDb: DatabaseSync;
+let mockWipeFails = false;
+jest.mock('@/features/tracking/storage/gpsCapture', () => ({ wipeGpsCaptures: jest.fn(async () => {}), deleteGpsCaptures: jest.fn(async () => {}) }));
+
+jest.mock('expo-sqlite', () => ({ openDatabaseAsync: async () => ({
+  execAsync: async (sql: string) => { if (mockWipeFails && sql.startsWith('delete from')) throw new Error('synthetic wipe failure'); return mockDb.exec(sql); },
+  getAllAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).all(...args),
+  getFirstAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).get(...args),
+  runAsync: async (sql: string, ...args: any[]) => mockDb.prepare(sql).run(...args),
+  withTransactionAsync: async (action: () => Promise<void>) => {
+    mockDb.exec('BEGIN');
+    try { await action(); mockDb.exec('COMMIT'); } catch (error) { mockDb.exec('ROLLBACK'); throw error; }
+  },
+}) }));
+
+beforeEach(() => { jest.resetModules(); mockWipeFails = false; mockDb = new DatabaseSync(':memory:'); });
+afterEach(() => mockDb.close());
+
+function installed(version: number) {
+  mockDb.exec('PRAGMA foreign_keys=ON; create table local_schema_migrations(version integer primary key, applied_at text)');
+  for (const migration of MIGRATIONS.filter(m => m.version <= version)) {
+    mockDb.exec(migration.sql);
+    mockDb.prepare('insert into local_schema_migrations(version) values (?)').run(migration.version);
+  }
+  if (version < 1) return;
+  mockDb.exec(`insert into local_training_sessions(local_id,user_id,payload_json) values ('parent','owner','{"original":true}');`);
+  if (version >= 5) mockDb.exec(`insert into sync_queue(id,entity_type,entity_local_id,operation,status) values ('pending','training_session','parent','update','pending');`);
+  if (version >= 7) mockDb.exec(`insert into local_track_transfer_sync
+    (session_id,receipt_id,user_id,receipt_json,revision,base_patch_json,pending_json)
+    values ('parent','receipt','owner','{"receipt":true}',3,'{}','{"notes":"offline"}');`);
+  if (version >= 9) mockDb.exec(`insert into track_object_review_cache values ('owner','run','parent','dog',0,'{}','now');
+    insert into track_object_review_outbox(operation_id,owner_id,run_id,session_id,dog_id,request_json,state,created_at)
+    values ('operation','owner','run','parent','dog','{}','pending','now');`);
+  if (version >= 10) mockDb.exec(`insert into local_track_plans values ('owner','plan-existing',1,1,'{"original":true}');`);
+  if (version >= 11) mockDb.exec(`insert into local_distraction_parents values ('owner','parent','{"original":true}');`);
+  if (version >= 12) mockDb.exec(`
+    insert into local_track_exchange values ('owner','task-existing','outgoing','parent','{"offer":true}',123);
+    insert into local_track_exchange_receipts values ('owner','task-existing','contribution','{"receipt":true}','child',123);
+    insert into local_track_group_tasks values ('owner','server-task','task-existing','original-digest');
+  `);
+  if (version >= 8) mockDb.exec(`insert into local_track_distractions
+    (id,owner_id,parent_session_id,revision,updated_at,payload_json)
+    values ('child','owner','parent',2,123,'{"draft":true}');`);
+}
+
+it.each([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])('upgrades schema %s without losing pending transfers, drafts or original data', async version => {
+  installed(version);
+  const before = mockDb.prepare("select name from sqlite_master where type='table' and name!='local_schema_migrations'").all()
+    .map(row => String(row.name));
+  const snapshots = new Map(before.map(table => [table, mockDb.prepare(`select * from ${table}`).all()]));
+  const { getLocalDb } = jest.requireActual<typeof import('../client')>('../client');
+  await getLocalDb();
+  expect(mockDb.prepare('select version from local_schema_migrations order by version').all().map(row => row.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  for (const [table, rows] of snapshots) {
+    const after = mockDb.prepare(`select * from ${table}`).all();
+    expect(after).toHaveLength(rows.length);
+    rows.forEach((row, index) => expect(after[index]).toMatchObject(row)); // additive columns are allowed
+  }
+  expect(mockDb.prepare('select count(*) as n from track_object_review_cache').get()?.n).toBe(version >= 9 ? 1 : 0);
+  expect(mockDb.prepare('select count(*) as n from track_object_review_outbox').get()?.n).toBe(version >= 9 ? 1 : 0);
+  await getLocalDb();
+  expect(mockDb.prepare('select count(*) as n from local_schema_migrations').get()?.n).toBe(12);
+});
+
+it('includes correction cache and pending edits when explicitly clearing the local database', async () => {
+  installed(8);
+  mockDb.exec(MIGRATIONS.find(m=>m.version===9)!.sql);
+  mockDb.prepare('insert into local_schema_migrations(version) values (?)').run(9);
+  mockDb.exec(`insert into track_object_review_cache values ('owner','run','parent','dog',0,'{}','now');
+    insert into track_object_review_outbox(operation_id,owner_id,run_id,session_id,dog_id,request_json,state,created_at)
+    values ('operation','owner','run','parent','dog','{}','pending','now');`);
+  const { wipeLocalData } = jest.requireActual<typeof import('../client')>('../client');
+  const { getLocalDb } = jest.requireActual<typeof import('../client')>('../client');
+  await getLocalDb();
+  mockDb.exec(`insert into local_track_plans values ('owner','plan',1,1,'{}');`);
+  mockDb.exec(`insert into local_distraction_parents values ('owner','parent','{}');`);
+  mockDb.exec(`
+    insert into local_track_exchange values ('owner','task','incoming','parent','{"offer":true}',123);
+    insert into local_track_exchange_receipts values ('owner','task','contribution','{"receipt":true}','child',123);
+    insert into local_track_group_tasks values ('owner','server-task','task','original-digest');
+  `);
+  await wipeLocalData();
+  for (const table of ['local_track_group_tasks', 'local_track_exchange_receipts', 'local_track_exchange', 'local_distraction_parents', 'local_track_plans', 'track_object_review_cache', 'track_object_review_outbox', 'local_track_transfer_sync', 'local_track_distractions', 'local_training_sessions', 'sync_queue']) {
+    expect(mockDb.prepare(`select count(*) as n from ${table}`).get()?.n).toBe(0);
+  }
+  expect(mockDb.prepare('select count(*) as n from local_schema_migrations').get()?.n).toBe(12);
+});
+
+// Actual existing wipe adapter + real migrated in-memory SQLite; no customer DB.
+it.each(['none', 'sql', 'metadata'])('ties new metadata cleanup to explicit local-wipe success, fault=%s', async fault => {
+  const failed = fault === 'sql';
+  installed(12);
+  const { getLocalDb, wipeLocalData } = jest.requireActual<typeof import('../client')>('../client');
+  await getLocalDb();
+  const access = jest.requireActual<typeof import('@/lib/diagnosticsAccessState')>('@/lib/diagnosticsAccessState');
+  const store = jest.requireActual<typeof import('@/features/tracking/utils/supportProvenanceStore')>('@/features/tracking/utils/supportProvenanceStore');
+  const storage = jest.requireMock('@react-native-async-storage/async-storage');
+  access.setDiagnosticsSession('owner');
+  await store.recordSupportProvenance('parent', 'lay', false);
+  const metadataKey = 'anyvo.support.provenance.v2::' + JSON.stringify(['owner', 'parent']);
+  const metadataBefore = await storage.getItem(metadataKey);
+  expect(metadataBefore).not.toBeNull();
+  await storage.setItem('existing-unrelated-key', 'unchanged');
+  mockWipeFails = failed;
+  if (fault === 'metadata') storage.multiRemove.mockRejectedValueOnce(new Error('synthetic metadata cleanup failure'));
+  if (failed) await expect(wipeLocalData()).rejects.toThrow('synthetic wipe failure');
+  else await wipeLocalData();
+  expect(await storage.getItem(metadataKey)).toBe(failed || fault === 'metadata' ? metadataBefore : null);
+  expect((await store.loadSupportRecordingProvenance('parent')).lay.availability).toBe(failed ? 'available' : 'unknown');
+  expect(mockDb.prepare('select count(*) as n from local_training_sessions').get()?.n).toBe(failed ? 1 : 0);
+  expect(await storage.getItem('existing-unrelated-key')).toBe('unchanged');
+  access.setDiagnosticsSession(null);
+});
+
+
+it('preserves readable metadata after overlapping real parent-delete and wipe failures', async () => {
+  installed(12);
+  const client = jest.requireActual<typeof import('../client')>('../client'); await client.getLocalDb();
+  const access = jest.requireActual<typeof import('@/lib/diagnosticsAccessState')>('@/lib/diagnosticsAccessState');
+  const gps = jest.requireActual<typeof import('@/features/tracking/storage/gpsCaptureScope')>('@/features/tracking/storage/gpsCaptureScope');
+  const store = jest.requireActual<typeof import('@/features/tracking/utils/supportProvenanceStore')>('@/features/tracking/utils/supportProvenanceStore');
+  const repo = jest.requireActual<typeof import('@/features/training/repositories/localTrainingRepository')>('@/features/training/repositories/localTrainingRepository');
+  const raw = jest.requireMock('@/features/tracking/storage/gpsCapture');
+  access.setDiagnosticsSession('owner'); gps.setGpsCaptureAccount('owner');
+  await store.recordSupportProvenance('parent', 'lay', false);
+  let rejectDelete!: (e: Error) => void; let entered = false;
+  raw.deleteGpsCaptures.mockImplementationOnce(() => { entered = true; return new Promise((_ok, fail) => { rejectDelete = fail; }); });
+  const deleting = expect(repo.markTrainingAsDeleted('parent')).rejects.toThrow('synthetic raw failure');
+  for (let i = 0; i < 60 && !entered; i++) await Promise.resolve();
+  expect(entered).toBe(true);
+  mockWipeFails = true;
+  await expect(client.wipeLocalData()).rejects.toThrow('synthetic wipe failure');
+  rejectDelete(new Error('synthetic raw failure')); await deleting;
+  expect(mockDb.prepare('select deleted_at,payload_json from local_training_sessions where local_id=?').get('parent'))
+    .toMatchObject({ deleted_at: null, payload_json: '{"original":true}' });
+  expect((await store.loadSupportRecordingProvenance('parent')).lay.availability).toBe('available');
+  access.setDiagnosticsSession(null); gps.setGpsCaptureAccount(null);
+});

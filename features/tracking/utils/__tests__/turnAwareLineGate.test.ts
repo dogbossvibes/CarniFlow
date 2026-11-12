@@ -73,7 +73,7 @@ describe('Kontrakt', () => {
     expect(src).toContain("getTrackingEngineMode() === 'build40' ? MIN_STEP_M : lineGateStepM(detectPointsRef.current, lastCornerAtRef.current)");
     expect(src).toContain("getTrackingEngineMode() === 'build40' ? EMA_ALPHA : lineEmaAlpha(lineTurnZoneRef.current)");
     // Die Diagnose zählt den Gate-Ausschluss, bevor derselbe unveränderte Return greift.
-    expect(src).toMatch(/if \(last && step < gateM\) \{\s+void recordBackgroundLayEvent\([^\n]+\);\s+return;\s+\}/);
+    expect(src).toMatch(/if \(last && !beginsSection && step < gateM\) \{\s+void recordBackgroundLayEvent\([^\n]+\);\s+return;\s+\}/);
     expect(src).toContain('MIN_STEP_M     = 2.0');
     // Der Detektor-Puffer (0,5-m-Gate) und sein EMA sind unberührt.
     expect(DETECTOR_INPUT.minStepM).toBe(0.5);

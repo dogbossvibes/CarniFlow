@@ -20,7 +20,7 @@ function VideoCell({ uri, onRemove }: { uri: string; onRemove: () => void }) {
   useEffect(() => { if (signed) player.replace(signed); }, [signed, player]);
   return (
     <View style={s.cell}>
-      <VideoView player={player} style={s.video} contentFit="cover" nativeControls allowsFullscreen />
+      <VideoView player={player} style={s.video} contentFit="cover" nativeControls />
       <TouchableOpacity style={s.remove} onPress={onRemove} activeOpacity={0.8} hitSlop={8}>
         <Ionicons name="close" size={14} color="#fff" />
       </TouchableOpacity>

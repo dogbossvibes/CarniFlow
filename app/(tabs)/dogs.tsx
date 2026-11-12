@@ -1,3 +1,4 @@
+import { resolveTrackOverlayColorKey, trackOverlayColor, trackOverlayColorNameKey } from '@/features/tracking/utils/trackOverlayColors';
 import { DogCompactCard } from "@/components/dogs/DogCompactCard";
 import { dogToIdentity } from "@/components/dogs/types";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
@@ -11,9 +12,11 @@ import { quotaAllowsNew } from "@/features/subscription/plans";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { SharedDogsInbox } from "@/components/dogs/SharedDogsInbox";
 import {
     ActivityIndicator,
+    TouchableOpacity,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -21,9 +24,12 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDogTrainingSummary } from '@/hooks/useDogTrainingSummary';
+import { lastTrainingText } from '@/features/training/continue/labels';
 
 export default function HundeScreen() {
   const router = useRouter();
+  const [section, setSection] = useState<"owned" | "shared">("owned");
   const { t } = useT();
   const { dogs, loading, error, refresh } = useDogs();
   const { isPro, loading: capLoading } = useCapabilities();
@@ -65,7 +71,10 @@ export default function HundeScreen() {
         </AnimatedPressable>
       </View>
 
-      {loading ? (
+      <View style={s.segments}>
+        {(['owned', 'shared'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="tab" accessibilityState={{ selected: section === value }} style={[s.segment, section === value && s.segmentActive]} onPress={() => setSection(value)}><Text style={[s.segmentText, section === value && s.segmentTextActive]}>{t(value === 'owned' ? 'sharing.myDogs' : 'sharing.withMe')}</Text></TouchableOpacity>)}
+      </View>
+      {section === 'shared' ? <SharedDogsInbox /> : loading ? (
         <View style={s.mitte}>
           <ActivityIndicator size="large" color={C.accent} />
         </View>
@@ -98,12 +107,15 @@ export default function HundeScreen() {
           {dogs.length > 0 ? (
             <View style={s.liste}>
               {dogs.map((hund) => (
-                <DogCompactCard
+                <DogCardWithLastTraining
                   key={hund.id}
+                  dogId={hund.id}
                   identity={dogToIdentity(hund)}
-                  lastTrainingLabel={null}
+                  trackColor={trackOverlayColor(resolveTrackOverlayColorKey(hund.id, hund.track_overlay_color_key))}
+                  trackColorLabel={`${t('dog.trackColor.title')}: ${t(trackOverlayColorNameKey(resolveTrackOverlayColorKey(hund.id, hund.track_overlay_color_key)))}`}
                   onOpen={() => router.push(`/dog/${hund.id}` as never)}
-                  onTraining={() => router.push({ pathname: '/unit/timer', params: { dogId: hund.id, dogName: hund.name, source: 'dog_quickstart' } })}
+                  onTrainingFor={(discipline?: string) => router.push({ pathname: '/unit/document', params: { dogId: hund.id, ...(discipline ? { discipline } : {}) } })}
+                  onTrainingPage={() => router.push({ pathname: '/unit/progress', params: { dogId: hund.id } })}
                   onFaehrte={() => router.push(`/track/legen?dogId=${hund.id}` as never)}
                   onStats={() => router.push(`/dog/${hund.id}` as never)}
                 />
@@ -141,6 +153,11 @@ export default function HundeScreen() {
 }
 
 const s = StyleSheet.create({
+  segments: { flexDirection: 'row', marginHorizontal: 20, marginBottom: 16, padding: 5, borderRadius: 18, backgroundColor: C.card, gap: 6 },
+  segment: { flex: 1, minHeight: 48, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  segmentActive: { backgroundColor: C.accent },
+  segmentText: { color: C.muted, fontWeight: '700', textAlign: 'center' },
+  segmentTextActive: { color: C.accentText },
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { flex: 1 },
 
@@ -267,3 +284,13 @@ const s = StyleSheet.create({
   },
   leerBtnText: { fontSize: 15, color: C.accentText, fontWeight: "800" },
 });
+
+// T-184 Etappe 2: Hundekarte zeigt das letzte Training und den offenen Hinweis
+// (nur lesend). Ladefehler lassen die Karte unverändert.
+function DogCardWithLastTraining({ dogId, onTrainingFor, ...props }: Omit<React.ComponentProps<typeof DogCompactCard>, 'lastTrainingLabel' | 'openHintLabel' | 'onTraining'> & { dogId: string; onTrainingFor: (discipline?: string) => void }) {
+  const { t } = useT();
+  const { data } = useDogTrainingSummary(dogId);
+  return <DogCompactCard {...props} onTraining={() => onTrainingFor(data?.last?.disciplines[0])}
+    lastTrainingLabel={data?.last ? lastTrainingText(t, data.last.daysAgo, data.last.disciplines) : null}
+    openHintLabel={data?.openHint ? t('continueTraining.openHint', { text: data.openHint.text }) : null} />;
+}

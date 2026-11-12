@@ -1,3 +1,4 @@
+import { isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
 // Welchen Zustand hat die automatische Analyse (Track Score 2.0) einer Fährte?
 //
 // REIN LESEND: diese Datei berechnet nichts, speichert nichts und verändert
@@ -15,6 +16,12 @@
 // Bisher sahen beide identisch aus, nämlich gar nicht.
 
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
+
+/** Persisted partial analyses keep their metrics but have no overall score. */
+export type AvailableTrackAnalytics = Omit<TrackAnalytics, 'trackScore'> & {
+  trackScore: number | null;
+  continuity?: { version: number; hasGaps: boolean };
+};
 
 /** Nur die Felder, die für die Entscheidung gebraucht werden. */
 export interface TrackAnalysisSource {
@@ -60,13 +67,14 @@ const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFin
  * oder gar nicht rendern, während der Zustand „available" meldet. Keine
  * Versionshürde: v1 und v2 gelten gleichermassen, solange sie vollständig sind.
  */
-export function isUsableTrackAnalytics(a: unknown): a is TrackAnalytics {
+export function isUsableTrackAnalytics(a: unknown): a is AvailableTrackAnalytics {
   if (!a || typeof a !== 'object') return false;
   const x = a as Record<string, unknown>;
   const dev = x.deviation as Record<string, unknown> | undefined;
   const pace = x.pace as Record<string, unknown> | undefined;
   const reacq = x.reacquisition as Record<string, unknown> | undefined;
-  return isNum(x.trackScore)
+  const continuity = x.continuity as Record<string, unknown> | undefined;
+  return (isNum(x.trackScore) || (x.trackScore === null && continuity?.version === 1 && continuity.hasGaps === true))
     && typeof x.analysisConfidenceBand === 'string'
     && !!dev && isNum(dev.meanM)
     && !!pace && isNum(pace.avgMps)
@@ -98,7 +106,7 @@ export function hasSearchGeometry(data: TrackAnalysisSource | null | undefined):
 export interface TrackAnalysisAvailability {
   state: TrackAnalysisState;
   /** Nur bei state === 'available' gesetzt — dieselbe Referenz wie track_data.run.analytics. */
-  analytics: TrackAnalytics | null;
+  analytics: AvailableTrackAnalytics | null;
   hasSearchGeometry: boolean;
   /**
    * Gelber Hinweis „Automatische Auswertung nicht verfügbar — keine verwertbare
@@ -117,7 +125,9 @@ export interface TrackAnalysisAvailability {
 export function trackAnalysisAvailability(data: TrackAnalysisSource | null | undefined): TrackAnalysisAvailability {
   const raw = data?.track_data?.run?.analytics;
   const state = trackAnalysisState(data, raw);
-  const analytics = state === 'available' ? (raw as TrackAnalytics) : null;
+  const original = state === 'available' ? (raw as AvailableTrackAnalytics) : null;
+  const analytics = original?.objects.some(o => isTrainingJoker(o.material))
+    ? { ...original, objects: original.objects.filter(o => !isTrainingJoker(o.material)), trackScore: null } : original;
   const geometry = hasSearchGeometry(data);
   return {
     state, analytics, hasSearchGeometry: geometry,

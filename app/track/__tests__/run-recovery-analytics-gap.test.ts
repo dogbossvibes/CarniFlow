@@ -21,23 +21,36 @@ describe('Recovery-Kurzpfad (endSearch) — Analytics-Lücke dokumentiert (Punkt
     expect(endSearchBody).not.toMatch(/analytics:\s*computeTrackAnalytics/);
     // Die bereits VOR dieser Nachbesserung bestehende Einschränkung bleibt
     // unverändert sichtbar — score/deviationAvgM/foundObjects/breaks sind
-    // hart auf 0/leer gesetzt (kein Reconstruct aus rohen Punkten).
-    expect(endSearchBody).toContain('score: 0, deviationAvgM: 0, foundObjects: 0, totalObjects: 0');
+    // durch Continuity korrigiert: unbekannter Score bleibt null; belegte Daten erhalten.
+    expect(endSearchBody).toContain('score: null');
+    expect(endSearchBody).toContain('breaks: runState.breaks');
   });
 
-  it('die Einschränkung ist im Code klar dokumentiert (BEKANNTE EINSCHRÄNKUNG)', () => {
+  it('the unavailable recovery score is documented without invented analytics)', () => {
     const src = source();
-    expect(src).toContain('BEKANNTE EINSCHRÄNKUNG (Punkt 8 der Nachbesserung');
+    expect(src).toContain('Recovery has no complete per-fix analytics history');
   });
 
   it('handleFinish (der normale Abschluss-Pfad, MIT laufendem Recorder) erzeugt Analytics weiterhin', () => {
     const src = source();
     const handleFinishStart = src.indexOf('const handleFinish = async');
     expect(handleFinishStart).toBeGreaterThan(-1);
-    const handleFinishBody = src.slice(handleFinishStart, handleFinishStart + 7000);
+    const handleFinishBody = src.slice(handleFinishStart, src.indexOf('// 2) Remote-Transport', handleFinishStart));
     // Version 3 erweitert denselben v1/v2-Kern; Recovery-Kurzpfad bleibt unverändert.
     expect(handleFinishBody).toContain('computeTrackAnalyticsV3');
     expect(handleFinishBody).toMatch(/analytics,/);
     expect(handleFinishBody).toMatch(/pointsTimeSec:\s*res\.pointsTimeSec/);
   });
+});
+
+
+it('awaits successful point persistence before either finalization path', () => {
+  const src = source();
+  for (const [start, end] of [['const endSearch = async', 'const discardSearch'], ['const handleFinish = async', '// 2) Remote-Transport']]) {
+    const body = src.slice(src.indexOf(start), src.indexOf(end, src.indexOf(start)));
+    const gate = body.indexOf('if (!(await flushSearchPoints(');
+    expect(gate).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(body.indexOf('await finalizeLocalTrackRun('));
+    expect(body.slice(gate, body.indexOf('await finalizeLocalTrackRun('))).toContain('return;');
+  }
 });

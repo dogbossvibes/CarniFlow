@@ -1,4 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { scoredObjectSummary } from '@/features/tracking/utils/scoredObjectProjection';
+import { isScoredObject, isTrainingJoker } from '@/features/tracking/utils/objectMarkers';
+import { TrackAngleList } from '@/features/tracking/components/TrackAngleList';
+import { useDistractionOverlays } from '@/features/tracking-distractions/useDistractions';
+import { DistractionEntry } from '@/features/tracking-distractions/DistractionEntry';
+import { useTranslation } from 'react-i18next';
+import { transferErrorKey } from '@/features/tracking-transfer/i18n';
+import { ensureOwnTransferLocal } from '@/features/tracking-transfer/runtime';
+import { parseTransferReceipt } from '@/features/tracking-transfer/importPlan';
+import { useSession } from '@/hooks/useSession';
+import { ExchangeEntry } from '@/features/tracking-exchange/ExchangeEntry';
+import { TrackObjectCorrections } from '@/features/tracking/components/TrackObjectCorrections';
+import { useTrackObjectReview } from '@/features/tracking/hooks/useTrackObjectReview';
+import { reviewCounts } from '@/features/tracking/services/objectReview/model';
+import { TrackExportActions } from '@/features/tracking/components/TrackExportActions';
+import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet,
   Text, TextInput, View,
@@ -10,7 +26,7 @@ import { C } from '@/constants/colors';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
 import { TrackingMap, type MapMarker } from '@/features/tracking/components/TrackingMap';
 import { MarkerDetailSheet, type TrackDetailSelection } from '@/features/tracking/components/MarkerDetailSheet';
-import { buildTrackDetailMap } from '@/features/tracking/utils/trackDetailMap';
+import { buildTrackDetailDisplay } from '@/features/tracking/utils/trackDetailDisplay';
 import { TrackSketch } from '@/features/tracking/components/TrackSketch';
 import { TrackScoreRing } from '@/features/tracking/components/TrackScoreRing';
 import { LegBars, type LegRow } from '@/features/tracking/components/LegBars';
@@ -22,9 +38,7 @@ import { createEmbeddingForTrackSummary } from '@/features/ai/services/trainingE
 import { SmartFeedbackSection } from '@/features/ai/components/SmartFeedbackSection';
 import { CustomerTrackDiagnosisCard } from '@/features/tracking/components/CustomerTrackDiagnosisCard';
 import { useTrackingStore } from '@/features/tracking/store/trackingStore';
-import { retryFailedSyncForSession, syncNow } from '@/features/sync/services/syncEngine';
-import { enqueueSyncOperation } from '@/features/sync/repositories/syncQueueRepository';
-import { dismissLocalAutoDwellDetection } from '@/features/training/repositories/localTrainingRepository';
+import { retryFailedSyncForSession } from '@/features/sync/services/syncEngine';
 import { trackAnalysisAvailability, hasSearchGeometry, analysisQaFacts } from '@/features/tracking/utils/trackAnalysisState';
 import { isOpenStatus } from '@/features/tracking/store/activeFaehrtenModel';
 import { TrackResumeCta } from '@/features/tracking/components/TrackResumeCta';
@@ -42,7 +56,7 @@ import {
 import type { TrackAnalytics } from '@/features/tracking/engine/trackAnalytics';
 import { isTrackAnalyticsV3, type TrackAnalyticsV3 } from '@/features/tracking/engine/trackAnalyticsV3';
 import { isTrackReplayEligible } from '@/features/tracking/utils/trackReplayData';
-import { formatApproxDeviationM } from '@/features/tracking/utils/formatDeviation';
+import { formatApproxDeviationM, formatDeviationUncertaintyM } from '@/features/tracking/utils/formatDeviation';
 import { useT, type TranslationKey } from '@/i18n';
 import {
   addTrackFeedback, deleteTrackFeedback, getTrackShare, listAcceptedTrainers, listTrackFeedback,
@@ -62,7 +76,7 @@ const CONFIDENCE_BAND_LABEL: Record<TrackAnalytics['analysisConfidenceBand'], Tr
 
 const MATERIAL_LABEL_KEYS: Record<string, TranslationKey> = {
   leder: 'track.materialLeather', holz: 'track.materialWood', filz: 'track.materialFelt',
-  stoff: 'track.materialFabric', plastik: 'track.materialPlastic', duebel: 'track.materialDowel',
+  stoff: 'track.materialFabric', plastik: 'track.materialPlastic', duebel: 'track.materialDowel', ball: 'track.materialBall', gummi: 'track.materialRubber',
   metall: 'track.materialMetal', teppich: 'track.materialCarpet', diverses: 'track.materialOther',
 };
 const CORNER_INTERPRETATION_KEYS: Record<TrackAnalyticsV3['corners'][number]['interpretation'], TranslationKey> = {
@@ -74,30 +88,29 @@ const CORNER_INTERPRETATION_KEYS: Record<TrackAnalyticsV3['corners'][number]['in
 export default function TrackAuswertungScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const distractionTracks = useDistractionOverlays(typeof id === 'string' ? id : undefined);
+  const { session: authenticatedSession } = useSession();
   const insets = useSafeAreaInsets();
   const { t } = useT();
+  const { t: transferT } = useTranslation('trackTransfer');
+  const authGeneration = useRef(0);
+  const [authEpoch, setAuthEpoch] = useState(0);
+  useEffect(() => { const { data: auth } = supabase.auth.onAuthStateChange(event => {
+    // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
+    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { authGeneration.current++; setData(null); setNotes(''); setLegs([]); setAuthEpoch(n => n + 1); }
+  }); return () => auth.subscription.unsubscribe(); }, []);
   const [data, setData] = useState<any | null>(null);
+  const [displaySupplement, setDisplaySupplement] = useState<unknown>(null);
+  const { color: layColor } = useDogTrackColor(data?.dog_id);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [legs, setLegs]   = useState<LegRow[]>([]);
   const [notes, setNotes] = useState('');
   const [isLocalOnly, setIsLocalOnly] = useState(false);
-  const [removingAutoId, setRemovingAutoId] = useState<string | null>(null);
-  const removeAutoDetection = useCallback(async (objectId: string) => {
-    if (!id || removingAutoId) return;
-    setRemovingAutoId(objectId);
-    try {
-      const saved = await dismissLocalAutoDwellDetection(String(id), objectId);
-      if (!saved) throw new Error('local run unavailable');
-      setData((previous: any) => ({ ...previous, track_data: { ...previous.track_data,
-        run: { ...previous.track_data?.run, object_detections: (previous.track_data?.run?.object_detections ?? [])
-          .map((d: any) => d.id === objectId && d.source === 'auto_dwell' ? { ...d, user_override: true } : d) } } }));
-      await enqueueSyncOperation({ entityType: 'training_session', entityLocalId: String(id), operation: 'create', priority: 1 });
-      void syncNow().catch(() => {});
-    } catch { Alert.alert(t('track.autoDetected'), t('track.autoRemoveFailed')); }
-    finally { setRemovingAutoId(null); }
-  }, [id, removingAutoId, t]);
+  const detailRunId = data?.runs?.[0]?.id ?? data?.track_data?.run?.run_id;
+  const objectReview = useTrackObjectReview({ sessionId: data?.id === id ? id : undefined,
+    ownerId: data?.owner_id, dogId: data?.dog_id, runId: detailRunId, localRun: data?.track_data?.run });
 
   useEffect(() => {
     // Flow abgeschlossen → Store leeren. NICHT, wenn der Store noch eine offene
@@ -107,18 +120,34 @@ export default function TrackAuswertungScreen() {
     const holdsOpenTrack = isOpenStatus(st.sessionStatus) && (st.trackPoints.length > 0 || st.isRecording);
     if (!holdsOpenTrack) st.reset();
     if (!id) return;
+    let alive = true;
+    const loadEpoch = authGeneration.current;
+    const userId = authenticatedSession?.user.id;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
+    setData(null); setDisplaySupplement(null); setNotes(''); setLegs([]); setLoading(true);
     (async () => {
       const r = await getTrackSessionById(id);
       // Fällt remote nichts zurück (noch nicht synchronisiert / offline) → lokal (SQLite)
       // zusammenbauen, damit die Auswertung nie mit „nicht gefunden" abbricht.
       let d = r.data;
       let localOnly = false;
+      // Own offline edits remain authoritative on this device until their revisioned save succeeds.
+      if (d?.track_data?.trackTransferReceipt) {
+        let ownLocal = await getLocalTrackDetail(id, userId).catch(() => null);
+        if (!ownLocal && alive && loadEpoch === authGeneration.current) {
+          const restored = await ensureOwnTransferLocal(id);
+          if (restored.error) throw new Error(restored.error);
+          ownLocal = await getLocalTrackDetail(id, userId).catch(() => null);
+        }
+        if (!ownLocal) throw new Error('TRANSFER_UNAVAILABLE');
+        d = ownLocal; localOnly = true;
+      }
       if (!d) {
-        d = await getLocalTrackDetail(id).catch(() => null); localOnly = !!d;
+        d = await getLocalTrackDetail(id, userId).catch(() => null); localOnly = !!d;
       } else if (!(d.runs?.length)) {
         // Remote-Session vorhanden, aber der Absuche-Run (track_runs) ist noch nicht
         // synchronisiert → lokale Run-Daten ergänzen, damit Score/Spur nicht fehlen.
-        const sup = await getLocalRunSupplement(id).catch(() => null);
+        const sup = await getLocalRunSupplement(id, userId).catch(() => null);
         if (sup?.runs?.length) {
           d = {
             ...d, runs: sup.runs,
@@ -133,11 +162,21 @@ export default function TrackAuswertungScreen() {
       // (Production-Befund: Marker-Sync scheiterte am DB-Contract → remote 0 Marker,
       // obwohl die Winkel lokal vorliegen). Keine Duplikate (pickDetailMarkers).
       if (d && !localOnly && !(d.markers?.length)) {
-        const local = await getLocalTrackDetail(id).catch(() => null);
+        const local = await getLocalTrackDetail(id, userId).catch(() => null);
         const picked = pickDetailMarkers(d.markers ?? [], local?.markers ?? []);
         if (picked.length > 0) d = { ...d, markers: picked };
       }
+      const localDisplay = d && !localOnly && userId && d.owner_id === userId
+        ? await getLocalTrackDetail(id, userId, { ownedOnly: true }).catch(() => null) : null;
+      if (!alive || loadEpoch !== authGeneration.current) return;
+      if (d?.track_data && Object.hasOwn(d.track_data, 'trackTransferReceipt')) {
+        try {
+          const receipt = parseTransferReceipt(d.track_data.trackTransferReceipt);
+          if (!userId || receipt.recipientUserId !== userId || receipt.ownSessionId !== id || receipt.recipientDogId !== d.dog_id) d = null;
+        } catch { d = null; }
+      }
       setData(d);
+      setDisplaySupplement(localDisplay);
       setIsLocalOnly(localOnly);
       // Track-Open = Retry-Anlass: ist die lokale Session nicht 'synced', werden
       // fehlgeschlagene Queue-Items erneut versucht (nicht blockierend, egal von
@@ -160,8 +199,9 @@ export default function TrackAuswertungScreen() {
         if (d.dog_id && reg?.sessionId === String(id) && searched) useActiveFaehrten.getState().remove(d.dog_id);
       }
       setLoading(false);
-    })();
-  }, [id]);
+    })().catch(() => { if (alive && loadEpoch === authGeneration.current) { setData(null); setLoading(false); } });
+    return () => { alive = false; };
+  }, [id, authenticatedSession?.user.id, authEpoch]);
 
   const score = useMemo(() => overallScore(legs), [legs]);
   const verdict = scoreVerdict(score);
@@ -171,20 +211,10 @@ export default function TrackAuswertungScreen() {
 
   const map = useMemo(() => {
     if (!data) return null;
-    // Logbuch-Kartenmodell ausschließlich aus gespeicherten Daten (keine Winkel-/
-    // Marker-Neuberechnung); reine Funktion buildTrackDetailMap.
-    const detail = buildTrackDetailMap(data);
-    let manualAngleOrdinal = 0;
-    const manualGeometry = (data.track_data?.manualAngleGeometry ?? []) as { geometryDirection: MapMarker['geometryDirection']; geometrySharpness: MapMarker['geometrySharpness'] }[];
-    const markers: MapMarker[] = detail.markers.map(m => ({
-      id: m.id, type: m.type, lat: m.lat, lng: m.lng,
-      angleKind: m.angleKind, material: m.material,
-      distanceFromStart: m.distanceFromStart, note: m.note,
-      objectIndex: m.objectIndex, legIndex: m.legIndex,
-      ...(['ow', 'bw', 'gw'].includes(m.angleKind ?? '')
-        ? { geometryDirection: manualGeometry[manualAngleOrdinal]?.geometryDirection,
-            geometrySharpness: manualGeometry[manualAngleOrdinal++]?.geometrySharpness } : {}),
-    }));
+    // Gespeicherte Geometrie und Markertypen bleiben erhalten; die angezeigten
+    // Meter liegen auf derselben Referenzlinie wie bei der Absuche.
+    const detail = buildTrackDetailDisplay(data, displaySupplement, authenticatedSession?.user.id);
+    const markers: MapMarker[] = detail.markers.map(m => ({ ...m }));
     const segments = coerceTrackSegments(data.track_data?.segments);
     const fitPoints = [
       ...detail.lay,
@@ -196,9 +226,9 @@ export default function TrackAuswertungScreen() {
     return {
       lay: detail.lay, run: detail.run, markers, segments, fitPoints,
       start: detail.start, end: detail.end, totalDistanceM: detail.totalDistanceM,
-      hasGps: detail.hasLay,
+      hasGps: detail.lay.length > 1 || detail.run.length > 1,
     };
-  }, [data]);
+  }, [data, displaySupplement, authenticatedSession?.user.id]);
   // Punkt 14: rein additiv — `undefined` bei Fährten ohne Analyse (ältere
   // Sessions, Freilauf ohne Soll-Fährte, Recovery-Kurzpfad). Dieselbe
   // track_data.run-Quelle wie das bestehende segmentAnalysis oben (lokal via
@@ -263,6 +293,7 @@ export default function TrackAuswertungScreen() {
     } else setFeedback([]);
   }, [id]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   useEffect(() => { void refreshSharing(); }, [refreshSharing]);
 
   const openSharePicker = async () => {
@@ -300,7 +331,7 @@ export default function TrackAuswertungScreen() {
     setSaving(true);
     // Lokal-only Fährte: Auswertung lokal speichern + zur Re-Sync einreihen (kein
     // Remote-Direktschreiben ohne Remote-Zeile, kein AI-Embedding ohne Remote-Session).
-    if (isLocalOnly) {
+    if (isLocalOnly && !data?.track_data?.trackTransferReceipt) {
       await saveLocalTrackEvaluation(id, { score, notes: notes.trim() || null, legs }).catch(() => {});
       setSaving(false);
       router.replace('/track' as never);
@@ -308,6 +339,7 @@ export default function TrackAuswertungScreen() {
     }
     const { error } = await saveTrackEvaluation(id, { legs, rating: score, notes: notes.trim() || null });
     setSaving(false);
+    if (error) Alert.alert(transferT('title'), transferT(transferErrorKey(new Error(error))));
     if (!error) {
       // Semantik-Embedding (non-blocking) — darf das Speichern nicht aufhalten.
       const surf = data.surface_types?.[0] ?? 'Fährte';
@@ -330,8 +362,11 @@ export default function TrackAuswertungScreen() {
   const dogName = data.dog?.name ?? 'Fährte';
   const surface = data.surface_types?.[0] ?? 'Fährte';
   const corners = data.corners_total ?? 0;
-  const aFound = data.articles_found ?? 0;
-  const aTotal = data.articles_total ?? 0;
+  const reviewed = objectReview.review && objectReview.review.revision > 0 ? objectReview.review : null;
+  const correctedCounts = reviewed ? reviewCounts(reviewed) : null;
+  const recordedCounts = scoredObjectSummary(data);
+  const aFound = correctedCounts ? (correctedCounts.completeFound ?? '—') : recordedCounts.found ?? '—';
+  const aTotal = correctedCounts ? correctedCounts.total : recordedCounts.total ?? 0;
 
   // Bedingungen (echtes Wetter zur Startposition + Untergrund/Beschaffenheit).
   const weatherCond: string | null = data.weather_condition ?? data.wetter ?? null;
@@ -349,7 +384,7 @@ export default function TrackAuswertungScreen() {
   const hasConditions = condStats.length > 0 || condTags.length > 0;
 
   const highlights: { icon: IconName; value: string; label: string }[] = [
-    { icon: 'flag',          value: `${aFound}/${aTotal}`, label: 'Gegenstände' },
+    { icon: 'flag',          value: `${aFound}/${aTotal}`, label: reviewed ? t('track.review.exportLabel') : 'Gegenstände' },
     // corners_total = Anzahl der beim LEGEN gespeicherten Winkel-Marker (alle
     // angle_kinds inkl. Absatz/Abriss; useTrackRecorder Summary). NICHT die
     // automatisch analysierten Ecken (analytics.corners, ohne Absatz/Abriss)
@@ -366,7 +401,7 @@ export default function TrackAuswertungScreen() {
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Recovery-Karte direkt unter dem Header: offene Fährte fortsetzen oder „Ohne App
               abgeschlossen". Ohne Karte zeigt der QA-Diagnosemodus den konkreten Grund. */}
-          <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />
+          <TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />
 
           {/* Hero — links Ring (nur Zahl + /100), Beschriftung „Manuelle
               Bewertung" UNTER dem Ring (ausserhalb der Kreisgrafik), rechts die
@@ -387,6 +422,13 @@ export default function TrackAuswertungScreen() {
               </View>
             </View>
           </View>
+
+          {[...(map?.lay ?? []), ...(map?.run ?? [])].some(p => p.breakBefore) && (
+            <View style={s.card}><Text style={{ color: C.trackTextMut }}>{t('track.continuityNotice')}</Text></View>
+          )}
+
+          {data.owner_id === authenticatedSession?.user.id && <DistractionEntry parentId={String(id)} />}
+          {data.status === 'completed' && <ExchangeEntry sourceId={String(id)} />}
 
           {data.status === 'completed' && (
             <View style={[s.card, s.shareCard]}>
@@ -524,7 +566,7 @@ export default function TrackAuswertungScreen() {
               <View style={[s.card, { padding: 16, marginBottom: 16 }]}>
                 <View style={s.analyseHeaderRow}>
                   <View>
-                    <Text style={s.analyseScoreVal}>{analytics.trackScore}<Text style={s.analyseScoreMax}>/100</Text></Text>
+                    <Text style={s.analyseScoreVal}>{analytics.trackScore ?? '—'}{analytics.trackScore != null && <Text style={s.analyseScoreMax}>/100</Text>}</Text>
                     <Text style={s.analyseScoreLabel}>{t('track.analysisScoreTitle')}</Text>
                   </View>
                   <View style={[s.confidencePill, analytics.analysisConfidenceBand === 'unreliable' && s.confidencePillWarn]}>
@@ -632,6 +674,9 @@ export default function TrackAuswertungScreen() {
                 {analyseExpanded && (
                   <View style={{ marginTop: 10, gap: 10 }}>
                     {analyticsV3 && <Text style={s.analyseDetailLabel}>{t('track.analysisTechnical')} · {t('track.analysisLineDeviation')}: {formatApproxDeviationM(analytics.deviation.meanM)} · Median {formatApproxDeviationM(analytics.deviation.medianM)} · P95 {formatApproxDeviationM(analytics.deviation.p95M)}</Text>}
+                    {analyticsV3?.deviationUncertaintyM != null && (
+                      <Text style={s.analyseHintText}>{t('track.analysisDeviationUncertainty')}: {formatDeviationUncertaintyM(analyticsV3.deviationUncertaintyM)} · {t('track.analysisDeviationUncertaintyHint')}</Text>
+                    )}
                     {analyticsV3?.deviationEvents.map(event => (
                       <View key={event.id} style={s.analyseDetailRow}>
                         <Text style={s.analyseDetailLabel}>{t('track.analysisDeviationEvents')} · {event.startAlongTrackM.toFixed(0)} m</Text>
@@ -697,8 +742,11 @@ export default function TrackAuswertungScreen() {
             <View style={StyleSheet.absoluteFill}>
               {map?.hasGps ? (
                 <TrackingMap
+                  comparison
+                  distractionTracks={distractionTracks}
+                  layColor={layColor}
                   layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
-                  startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
+                  startAnchor={map.start} endPoint={map.end} endTotalDistanceM={map.totalDistanceM} fitToPoints={map.fitPoints}
                   onStartPress={() => setDetailSel({ kind: 'start' })}
                   onMarkerPress={(m) => setDetailSel({ kind: 'marker', marker: m })}
                   onEndPress={() => setDetailSel({ kind: 'end', totalDistanceM: map.totalDistanceM })}
@@ -706,24 +754,25 @@ export default function TrackAuswertungScreen() {
                   currentPosition={null} follow={false} mapType="hybrid"
                 />
               ) : (
-                <TrackSketch legs={corners} objects={aTotal} w={320} h={190} progress={1} />
+                <TrackSketch accent={layColor} points={map?.lay} legs={corners} objects={aTotal} w={320} h={190} progress={1} />
               )}
             </View>
             <View style={s.legend}>
-              <Legend color={C.trackPrimary} label="Fährte" />
+              <Legend color={layColor} label="Fährte" />
               <Legend color="#fff" label="Gegenstand" square />
               <Legend color={C.trackWarning} label="Korrektur" />
             </View>
           </View>
 
-          {!!map?.markers.some(marker => marker.type === 'gegenstand') && (
+          <TrackAngleList markers={map?.markers ?? []} onSelect={marker => setDetailSel({ kind: 'marker', marker })} />
+
+          {!!map?.markers.some(isScoredObject) && (
             <>
               <SectionLabel>{t('track.analysisObjects')}</SectionLabel>
               <View style={[s.card, { padding: 16, marginBottom: 16, gap: 10 }]}>
-                {map.markers.filter(marker => marker.type === 'gegenstand').map((marker, index) => {
+                {map.markers.filter(isScoredObject).map((marker, index) => {
                   const material = marker.material && MATERIAL_LABEL_KEYS[marker.material] ? t(MATERIAL_LABEL_KEYS[marker.material]) : t('track.analysisMaterialUnknown');
-                  const label = marker.material === 'duebel' ? material : `G${marker.objectIndex ?? index + 1}`;
-                  const autoDetection = (data?.track_data?.run?.object_detections ?? []).find((d: any) => d.id === marker.id && d.source === 'auto_dwell' && !d.user_override);
+                  const label = isTrainingJoker(marker.material) ? `${material} · ${t('track.jokers')}` : `G${marker.objectIndex ?? index + 1}`;
                   return (
                     <View key={marker.id ?? index}><Pressable style={s.objectLogRow} onPress={() => setDetailSel({ kind: 'marker', marker })}>
                       <Text style={s.objectLogTitle}>{label} · {material}</Text>
@@ -733,17 +782,14 @@ export default function TrackAuswertungScreen() {
                       </Text>
                       <Ionicons name="chevron-forward" size={15} color={C.trackTextMut} />
                     </Pressable>
-                    {!!autoDetection && <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 }}>
-                      <Text style={s.objectLogMeta}>{t('track.autoDetected')}</Text>
-                      <Pressable disabled={removingAutoId === marker.id} onPress={() => void removeAutoDetection(marker.id!)}>
-                        <Text style={s.objectLogMeta}>{t('track.autoRemove')}</Text>
-                      </Pressable>
-                    </View>}</View>
+                    </View>
                   );
                 })}
               </View>
             </>
           )}
+
+          <TrackObjectCorrections controller={objectReview} />
 
           {segmentAnalysis.count > 0 && (
             <>
@@ -789,6 +835,7 @@ export default function TrackAuswertungScreen() {
           </View>
 
           <View style={{ height: 18 }} />
+          <TrackExportActions data={{ ...data, notes, objectReview: reviewed }} />
           <SmartFeedbackSection dogId={data.dog_id} />
 
           {shares.some(share => !share.revoked_at) && (
@@ -887,11 +934,18 @@ export default function TrackAuswertungScreen() {
               <View style={s.fullscreenHeaderButton} />
             </View>
           </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, padding: 12 }}>
+            <Legend color={layColor} label="Gelegte Fährte" />
+            <Legend color={C.trackBlue} label="Gelaufene Absuche" />
+          </View>
           <View style={s.fullscreenMap}>
             {map?.hasGps && (
               <TrackingMap
+                  comparison
+                  distractionTracks={distractionTracks}
+                  layColor={layColor}
                 layPoints={map.lay} runPoints={map.run} markers={map.markers} segments={map.segments}
-                startAnchor={map.start} endPoint={map.end} fitToPoints={map.fitPoints}
+                startAnchor={map.start} endPoint={map.end} endTotalDistanceM={map.totalDistanceM} fitToPoints={map.fitPoints}
                 fitToTrackToken={fullscreenFitToken}
                 onStartPress={() => setFullscreenSel({ kind: 'start' })}
                 onMarkerPress={(m) => setFullscreenSel({ kind: 'marker', marker: m })}
@@ -1005,7 +1059,7 @@ const s = StyleSheet.create({
   feedbackInput: { minHeight: 54, color: C.trackText, fontSize: 14, lineHeight: 20, textAlignVertical: 'top', borderWidth: 1, borderColor: C.trackBorder, borderRadius: 12, padding: 10 },
   shareSheet: { backgroundColor: C.trackCard, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12, borderWidth: 1, borderColor: C.trackBorder },
   sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
-  sheetBackdrop: { ...StyleSheet.absoluteFillObject },
+  sheetBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   shareSheetTitle: { color: C.trackText, fontSize: 20, fontWeight: '900' },
   trainerOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
   trainerOptionText: { flex: 1, color: C.trackText, fontSize: 14, fontWeight: '700' },

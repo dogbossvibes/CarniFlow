@@ -40,26 +40,29 @@ import {
 } from '@/features/tracking/services/qaTrackExportService';
 import { useQaLaySessions } from '@/features/tracking/hooks/useQaLaySessions';
 import { FIELD_TEST_PROFILES, getFieldTestProfile } from '@/features/tracking/utils/fieldTestProfiles';
+import { SupportDiagnosticsRow } from '@/features/tracking/components/SupportDiagnosticsRow';
 import { trackingEngineDisplayLabel, trackingLocationDiagnosticDisplay } from '@/features/tracking/utils/trackingDiagnosticDisplay';
 import type { MotionStatus } from '@/modules/anyvo-motion';
 import { buildOtaIdentity } from '@/features/tracking/utils/buildOtaIdentity';
+import { PositionQualityDiagnostics } from '@/features/tracking/components/PositionQualityDiagnostics';
+import { ShellyDiagnosticsPanel } from '@/features/tracking/components/ShellyDiagnosticsPanel';
 
 // Test-/Diagnose-Screen für anyvo-precision-location (Phase 1–3) UND den
 // QA-Golden-Reference-A/B-Schalter (ENGINE=BUILD40/CURRENT, SOURCE=EXPO/
 // PRECISION).
-// Öffnen: Profil → „Entwickler & Diagnose" → „Fährten-Diagnose" (nur interne Tester), oder Deep-Link
+// Öffnen: Profil → „Entwickler & Diagnose" → „Fährten-Diagnose" (nur persönlich freigeschaltete Accounts), oder Deep-Link
 // anyvo://dev/precision-location-test
 //
 // Bewusst NICHT hinter `__DEV__` (Feldtests laufen auf echten Store-/TestFlight-
 // Builds, wo `__DEV__` false ist), sondern hinter dem Route-Gate unten: nur
-// interne Tester (profiles.is_internal_tester) sehen den Profil-Eintrag UND
+// persönlich freigeschaltete Accounts sehen den Profil-Eintrag UND
 // dürfen die Route öffnen. Der Screen ist rein lesend/umschaltend für QA und
 // verändert KEINE Trackinglogik.
 const IS_ANDROID = Platform.OS === 'android';
 const IS_IOS = Platform.OS === 'ios';
 
 // Route-Gate: dieselbe Authority wie der Profil-Eintrag (DiagnosticsRouteGate →
-// useDiagnosticsAccess → profiles.is_internal_tester, serverseitig geschützt).
+// useDiagnosticsAccess → can_use_internal_tracking_diagnostics, serverseitig geschützt).
 // Ein Deep-Link (anyvo://dev/precision-location-test) reicht damit nicht.
 export default function PrecisionLocationTestScreen() {
   return (
@@ -103,11 +106,13 @@ function PrecisionLocationTestContent() {
   // Screen neu aus SQLite — nie eine veraltete „Letzte gelegte Fährte".
   const { sessions: qaSessions } = useQaLaySessions(session?.user?.id, 5);
   const qaSessionsRef = useRef(qaSessions);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   qaSessionsRef.current = qaSessions;
   // Sichtbar ausgewählte Zeile (localId). Nach jedem Refresh abgeglichen: ist die
   // Session nicht mehr in der neuen Liste, wird die Auswahl zurückgesetzt (kein
   // stiller Export einer anderen Session); ist sie noch da, bleibt sie erhalten.
   const [qaSelected, setQaSelected] = useState<string | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { setQaSelected(prev => reconcileQaSelection(prev, qaSessions)); }, [qaSessions]);
   const [qaBusy, setQaBusy] = useState<string | null>(null);
   const [qaResult, setQaResult] = useState<string | null>(null);
@@ -115,8 +120,8 @@ function PrecisionLocationTestContent() {
   const fieldTestProfile = getFieldTestProfile(fieldTestProfileId);
 
   useEffect(() => {
-    // Die persistierten Werte werden inzwischen bereits beim App-Start geladen
-    // (app/_layout.tsx → hydrateQaModes). Der Aufruf hier ist nur noch die
+    // Accountgebundene Werte werden nach der Serverfreigabe geladen
+    // (DiagnosticsAccessSync → hydrateQaModes). Der Aufruf hier ist die
     // Absicherung, dass der Screen nie einen veralteten Default anzeigt.
     void hydrateQaModes().then(() => {
       setSourceMode(getLocationSourceMode());
@@ -128,6 +133,7 @@ function PrecisionLocationTestContent() {
   // Verfügbarkeit des nativen Motion-Moduls — genau die vorhandene Prüfung,
   // keine neue API. Ein Feldtest darf nicht still ohne Motion-Daten laufen.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     setMotionModule(motionClient.isModuleAvailable());
     setMotionAvailable(motionClient.isAvailable());
     motionClient.getStatus().then(setMotionStatus).catch(() => setMotionStatus(null));
@@ -161,13 +167,13 @@ function PrecisionLocationTestContent() {
 
   const chooseSourceMode = (mode: LocationSourceMode) => {
     setLocationSourceMode(mode);
-    setSourceMode(mode);
+    setSourceMode(getLocationSourceMode());
   };
   const chooseEngineMode = (mode: TrackingEngineMode) => {
     setTrackingEngineMode(mode);
-    setEngineMode(mode);
+    setEngineMode(getTrackingEngineMode());
   };
-  const toggleQa = () => { const next = !qaOn; setQaDiagnosticsEnabled(next); setQaOn(next); };
+  const toggleQa = () => { const next = !qaOn; setQaDiagnosticsEnabled(next); setQaOn(isQaDiagnosticsEnabled()); };
 
   // Läuft gerade ein GPS-Warmup im Lege-Recorder? Dann ist die Quelle für
   // diesen Stream festgeschrieben — bewusst kein Hot-Swap einer laufenden
@@ -195,6 +201,7 @@ function PrecisionLocationTestContent() {
 
   useEffect(() => {
     getProviderStatus().then(setStatus).catch(() => {});
+    // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     return () => { void stopAll(); };
   }, []);
 
@@ -239,6 +246,7 @@ function PrecisionLocationTestContent() {
   };
 
   const secsAgo = (t: number | null | undefined) =>
+    // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     (t == null ? '–' : `${Math.max(0, Math.round((Date.now() - t) / 1000))}s her`);
 
   return (
@@ -424,6 +432,9 @@ function PrecisionLocationTestContent() {
           </Section>
         )}
 
+        <PositionQualityDiagnostics />
+        <ShellyDiagnosticsPanel />
+
         <Section title={`Separater Modultest · ${count} Updates`}>
           {last ? (
             <>
@@ -449,10 +460,10 @@ function PrecisionLocationTestContent() {
 
         <Section title="Fährten-QA Export">
           <Text style={s.note}>
-            Exportiert die GELEGTE Spur einer Fährte (nur point_type lay,
-            keine Absuche) als anonymisiertes JSON: erster Punkt wird (0,0),
-            alles Weitere lokale x/y-Meter, Zeitstempel relativ. Keine
-            Koordinaten, keine Konto-, Hunde- oder Standortdaten.
+            Für TrackLab „Diagnosedaten teilen“ verwenden. Enthalten sind die gespeicherte
+            gelegte Linie und je nach Verfügbarkeit Absuche und zusätzliche Diagnosen.
+            Positionen und Zeiten sind relativ; persönliche IDs und absolute Standorte
+            werden nicht exportiert. „QA-JSON“ ist der separate interne Diagnoseexport.
           </Text>
           {qaSessions.length === 0 ? (
             <Text style={s.note}>Keine gelegte Fährte mit Punkten gefunden.</Text>
@@ -463,6 +474,7 @@ function PrecisionLocationTestContent() {
                   label={i === 0 ? 'Letzte gelegte Fährte' : `Fährte ${i + 1}`}
                   value={formatQaSessionRow(q)}
                 />
+                <SupportDiagnosticsRow sessionLocalId={q.localId} detail={null} />
                 <View style={s.abRow}>
                   <TouchableOpacity
                     style={[s.abBtn, s.abBtnActive]}
@@ -471,7 +483,7 @@ function PrecisionLocationTestContent() {
                     activeOpacity={0.85}
                   >
                     <Text style={[s.abBtnTxt, s.abBtnTxtActive]}>
-                      {qaBusy === q.localId ? '…' : 'JSON teilen'}
+                      {qaBusy === q.localId ? '…' : 'QA-JSON teilen'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity

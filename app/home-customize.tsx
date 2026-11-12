@@ -1,3 +1,4 @@
+import { useGreetingSound } from '@/features/home/useGreetingSound';
 import { C } from '@/constants/colors';
 import { useSession } from '@/hooks/useSession';
 import {
@@ -89,6 +90,7 @@ export default function HomeCustomizeScreen() {
   const router = useRouter();
   const { t } = useT();
   const { user } = useSession();
+  const greetingSound = useGreetingSound(user?.id);
   const { dogs } = useDogs();
   const config = useHomeScreenConfig(user?.id);
   const [quickPickerOpen, setQuickPickerOpen] = useState(false);
@@ -174,6 +176,20 @@ export default function HomeCustomizeScreen() {
         {/* ── LIVE-VORSCHAU ── */}
         <Text style={s.sectionLabel}>{t('home.preview')}</Text>
         <HomePreview config={config} />
+
+        <Text style={s.sectionLabel}>{t('greeting.settingsTitle')}</Text>
+        <View style={s.karte}>
+          <View style={s.zeile}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.zeileLabel}>{t('greeting.soundLabel')}</Text>
+              <Text style={s.zeileSub}>{t('greeting.soundHint')}</Text>
+            </View>
+            <Switch value={greetingSound.enabled} disabled={!greetingSound.ready}
+              accessibilityLabel={t('greeting.soundLabel')}
+              onValueChange={value => { void greetingSound.setEnabled(value).then(ok => { if (!ok) Alert.alert(t('common.error'), t('greeting.soundSaveError')); }); }}
+              trackColor={{ false: C.cardAlt, true: C.accent }} thumbColor={C.white} />
+          </View>
+        </View>
 
         {/* ── LAYOUT ── */}
         <Text style={s.sectionLabel}>{t('home.layout')}</Text>

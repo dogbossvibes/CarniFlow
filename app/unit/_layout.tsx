@@ -18,6 +18,7 @@ export default function UnitLayout() {
       <Stack.Screen name="new-category" />
       <Stack.Screen name="stats" />
       <Stack.Screen name="document" />
+      <Stack.Screen name="progress" />
     </Stack>
   );
 }

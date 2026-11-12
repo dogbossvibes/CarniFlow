@@ -1,13 +1,18 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
+import { SpecialAnglePicker } from '@/features/tracking/components/SpecialAnglePicker';
+import { countLaidCorners, projectAngleMarkers, type SpecialGeometry } from '@/features/tracking/utils/specialAngleGeometry';
+import { mapBottomOverlayLayout } from '@/features/tracking/utils/mapScaleBar';
+import { loadLayRecovery } from '@/features/tracking/services/trackRecoveryService';
+import { useDogTrackColor } from '@/features/tracking/hooks/useDogTrackColor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Platform, Pressable, ScrollView, Text, TextInput, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticTap, hapticSuccess, hapticMarker, hapticAngle, hapticWarning } from '@/features/tracking/utils/haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { usePreventRemove } from '@react-navigation/native';
+import { useFocusEffect, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { requestVoice, resetVoiceEvents } from '@/features/tracking/utils/voiceEvents';
-import { FT } from '@/constants/colors';
+import { C, FT } from '@/constants/colors';
 import { useT, type TranslationKey } from '@/i18n';
 import { getGpsQuality } from '@/features/tracking/utils/gpsFilter';
 import { useSession } from '@/hooks/useSession';
@@ -35,8 +40,12 @@ import { fetchCurrentWeather, type CurrentWeather } from '@/services/weatherServ
 import { angleEvent, objectEvent, trackEventLabelKey, type TrackEvent } from '@/features/tracking/utils/trackEventVoice';
 import { getSpeechLocale } from '@/i18n';
 import { metersToSteps } from '@/features/tracking/utils/steps';
+import { ExamTemplateBanner, ExamTemplateChooser, WindRelationPill } from '@/features/tracking/components/ExamTemplateGuide';
+import { compassLabel, walkBearingDeg, windRelation, WIND_RELATION_MIN_SPEED_KMH } from '@/features/tracking/utils/windRelation';
+import { examLayGuidance, examTemplateById, type ExamTemplateId } from '@/features/tracking/utils/examTemplates';
 import { PrecisionDebugPanel } from '@/features/tracking/components/PrecisionDebugPanel';
 import { QaModeBadge } from '@/features/tracking/components/QaModeBadge';
+import { QaReferenceMarker } from '@/features/tracking/components/QaReferenceMarker';
 import type { GpsStats } from '@/features/tracking/engine/types';
 import { useToast } from '@/components/ui/Toast';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
@@ -63,8 +72,10 @@ const NO_REFERENCE_OVERLAYS: TrackReferenceOverlay[] = [];
 type MatIcon = React.ComponentProps<typeof Ionicons>['name'];
 // Gegenstand-Materialien (Reihenfolge wie im Sheet).
 const GEGENSTAND_MATERIALS: { material: MarkerMaterial; icon: MatIcon; label: string }[] = [
+  { material: 'ball', icon: 'tennisball-outline', label: 'Ball · Joker' },
+  { material: 'gummi', icon: 'ellipse-outline', label: 'Gummi' },
   { material: 'holz',     icon: 'leaf-outline',        label: 'Holz' },
-  { material: 'duebel',   icon: 'git-commit-outline',  label: 'Dübel' },
+  { material: 'duebel',   icon: 'git-commit-outline',  label: 'Dübel · Joker' },
   { material: 'stoff',    icon: 'shirt-outline',       label: 'Stoff' },
   { material: 'filz',     icon: 'layers-outline',      label: 'Filz' },
   { material: 'leder',    icon: 'bag-outline',         label: 'Leder' },
@@ -134,6 +145,7 @@ function localizedSegmentLabel(type: TrackSegmentType, t: (key: TranslationKey) 
 
 // Blinkender LIVE-Punkt (anyvoRec).
 function RecDot() {
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const op = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -157,19 +169,22 @@ export default function LegenScreen() {
   useKeepAwake();   // Display während des Legens anlassen (Bildschirm nicht sperren)
   const params = useLocalSearchParams<{ dogId?: string; id?: string }>();
   const { session } = useSession();
-  const { dogs } = useDogs();
+  const { dogs, refresh: refreshDogs } = useDogs();
+  useFocusEffect(useCallback(() => { void refreshDogs(); }, [refreshDogs]));
   const { isPro } = useCapabilities();
   const { showToast, toast } = useToast();
 
   const [phase, setPhase] = useState<'warmup' | 'recording'>('warmup');
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const phaseRef = useRef(phase); phaseRef.current = phase;   // Stale-Closure-Schutz für Trigger
   const [view, setView] = useState<'map' | 'sketch'>('map');
   const [surface, setSurface] = useState<string>('Acker');         // Untergrund
   const [condition, setCondition] = useState<string | null>(null); // Beschaffenheit
   const [weather, setWeather] = useState<CurrentWeather | null>(null);  // echtes Wetter (Open-Meteo)
+  // Prüfungsvorlage (T-200): reine Führungshilfe beim Legen, nicht gespeichert.
+  const [examTemplateId, setExamTemplateId] = useState<ExamTemplateId | null>(null);
   const [weatherState, setWeatherState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const weatherFetchedRef = useRef(false);
-  const [lastAngle, setLastAngle] = useState<AngleKind | null>(null);
   const [gsPicker, setGsPicker] = useState(false);   // Gegenstand-Schnellauswahl (Inline, kein Sheet)
   const [winkelSheet, setWinkelSheet] = useState(false);       // Winkeltyp wählen (GW/OW/BW/Abriss)
   const [segmentSheet, setSegmentSheet] = useState(false);
@@ -188,6 +203,8 @@ export default function LegenScreen() {
   const sessionIdRef = useRef<string | null>(null);
   const stoppingRef = useRef(false);   // Doppelklick-Guard für „Stoppen"
   const [pocketLock, setPocketLock] = useState(false);
+  const [mapMetricsHeight, setMapMetricsHeight] = useState(64);
+  const mapOverlayLayout = mapBottomOverlayLayout(mapMetricsHeight, 0, false);
   const [pendingExit, setPendingExit] = useState<{ href: string } | { back: true } | null>(null);
 
   // Automatisch erkannter Winkel (rechts/links/spitz) → Haptik + Hinweis.
@@ -197,6 +214,7 @@ export default function LegenScreen() {
   // zentral zugeordneten Begriff (trackEventVoice.ts) — identisch zur Absuche.
   const layVoice = useLayVoiceSetting();   // Sprachausgabe beim Legen (Default AUS)
   const layVoiceRef = useRef(false);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   layVoiceRef.current = layVoice.enabled;
   const announceEvent = useCallback((event: TrackEvent, mode: 'detected' | 'set') => {
     const label = t(trackEventLabelKey(event));
@@ -207,14 +225,13 @@ export default function LegenScreen() {
   }, [showToast, t]);
 
   const onAngle = useCallback((kind: AngleKind) => {
-    setLastAngle(kind);
     // Automatisch erkannt → gedrosselt: Abriss als Warnung, sonst Winkel-Impuls.
     if (kind === 'abriss') hapticWarning(); else hapticAngle();
     announceEvent(angleEvent(kind), 'detected');
   }, [announceEvent]);
 
   const { autoDetect, setAutoDetect } = useAutoDetectSetting();
-  const { stepLengthM } = useStepLengthSetting();   // optionale persönliche Schrittlänge (Default 0,75 m)
+  const { stepLengthM } = useStepLengthSetting({ freezeWhileMounted: true });   // optionale persönliche Schrittlänge (Default 0,75 m)
   const { enabled: volumeKeyArticle } = useVolumeKeyArticleSetting();
   const rec = useTrackRecorder({ onAngle, autoDetect });
 
@@ -246,7 +263,7 @@ export default function LegenScreen() {
 
   // Manuell einen Fachwinkel (GW/OW/BW) ODER Abriss an der aktuellen Position setzen.
   // Nutzt dieselbe currentPosition/positionSource wie die Aufnahme (keine extra GPS-Abfrage).
-  const placeWinkel = useCallback((angleKind: AngleKind) => {
+  const placeWinkel = useCallback((angleKind: AngleKind, geometry?: SpecialGeometry) => {
     if (phaseRef.current !== 'recording') return;
     const st = useTrackingStore.getState();
     // Fachliche Annahme ZUERST: ohne Startanker UND ohne valide aktuelle Position
@@ -254,7 +271,7 @@ export default function LegenScreen() {
     if (!st.startAnchor || !st.currentPosition) { showToast(t('toast.startPointWait')); return; }
     // addMarker fügt den Marker (mit currentPosition) SYNCHRON in den Store ein
     // (commitMarker → s.addMarker vor dem ersten await) → Karte reagiert sofort.
-    void rec.addMarker('winkel', { angleKind });
+    void rec.addMarker('winkel', { angleKind, ...geometry });
     if (angleKind === 'abriss') hapticWarning(); else hapticAngle();   // Feedback nach der Annahme
     announceEvent(angleEvent(angleKind), 'set');
     setWinkelSheet(false);
@@ -370,6 +387,7 @@ export default function LegenScreen() {
   // Die Store-Session zählt nur, wenn sie zum gewählten Hund gehört — sonst würde
   // eine noch geladene Fährte eines anderen Hundes fälschlich ausgeblendet.
   // Default AN, kontextuell (kein globales Setting). Lädt nie pro GPS-Fix.
+  const { color: layColor } = useDogTrackColor(activeDog?.id ?? params.dogId ?? storeDogId);
   const referenceOverlays = useActiveTrackOverlays({
     userId:           session?.user?.id ?? null,
     currentUserDogs:  dogs,
@@ -410,12 +428,20 @@ export default function LegenScreen() {
     if (beganRef.current) return;
     beganRef.current = true;
     resetVoiceEvents();
+    const requestedSessionId = typeof params.id === 'string' ? params.id : null;
+    const resumed = requestedSessionId ? await loadLayRecovery({ sessionId: requestedSessionId,
+      dogId: activeDog?.id, userId: session?.user?.id }).catch(() => null) : null;
+    if (requestedSessionId && !resumed) {
+      beganRef.current = false;
+      Alert.alert(t('common.error'), t('track.continuation.resumeFailed'));
+      return;
+    }
 
     // NEWBIE-Quota: max. 1 neue Fährte/Kalendermonat. Claim VOR dem Recorder-Start.
     // Idempotent auf trackClaimRef → ein Retry nach Fehler (beganRef zurückgesetzt)
     // verbraucht KEIN zweites Kontingent; der erlaubte Start darf die Fährte komplett
     // abschließen (kein zweiter Check im weiteren Verlauf). Premium überspringt.
-    if (!isPro) {
+    if (!resumed && !isPro) {
       if (!trackClaimRef.current) trackClaimRef.current = Crypto.randomUUID();
       const block = quotaBlock((await claimNewbieQuota('track', trackClaimRef.current)).status);
       if (block) {
@@ -429,10 +455,11 @@ export default function LegenScreen() {
     // Führende Session-ID SOFORT (kein Warten auf Supabase, kein getUser). Dieselbe UUID
     // wird später deterministisch als training_sessions.id verwendet (idempotenter Sync).
     const uid = session?.user?.id;
-    const clientUuid = Crypto.randomUUID();
+    const clientUuid = requestedSessionId ?? Crypto.randomUUID();
     sessionIdRef.current = null;   // Remote-ID erst nach erfolgreichem Insert (unten)
     const r = await rec.beginRecording({
       localId: clientUuid,
+      resume: resumed ?? undefined,
       ownerId: uid,
       dogId:   activeDog?.id ?? null,
       onSessionStarted: () => {
@@ -448,7 +475,7 @@ export default function LegenScreen() {
             ? { temperature: weather.temperature, windSpeed: weather.windSpeed, humidity: weather.humidity, condition: weather.weatherCondition }
             : null;
           useActiveFaehrten.getState().upsert(activeDog.id, {
-            status: 'laying', sessionId: clientUuid, startedAt: Date.now(),
+            status: 'laying', sessionId: clientUuid, startedAt: resumed ? Date.parse(resumed.startedAt) : Date.now(),
             gpsAccuracy: useTrackingStore.getState().gpsAccuracy, weather: snap,
           });
         }
@@ -465,7 +492,7 @@ export default function LegenScreen() {
       },
     });   // UI/Timer wurden per Callback gestartet; lokale Session ist jetzt angelegt
     if (r.error) { beganRef.current = false; showToast(r.error === 'gps_not_ready' ? t('track.gpsPreparing') : r.error); return; }
-  }, [session, activeDog, rec, showToast, t, surface, condition, weather, currentPosition, isPro, router]);
+  }, [session, activeDog, rec, showToast, t, surface, condition, weather, currentPosition, isPro, router, params.id]);
 
   // Aufnahme erst starten, NACHDEM der Disclosure-Dialog geschlossen ist:
   // „Weiter" setzt startAfterClose + schliesst den Dialog (showBgDisclosure=false).
@@ -474,6 +501,7 @@ export default function LegenScreen() {
   // Die optionale Hintergrundberechtigung blockiert den Recorder nicht.
   useEffect(() => {
     if (startAfterClose && !showBgDisclosure) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       setStartAfterClose(false);
       void begin();
     }
@@ -504,9 +532,20 @@ export default function LegenScreen() {
     return () => clearInterval(iv);
   }, [phase, activeDog]);
 
-  const mapMarkers: MapMarker[] = markers.map(mk => ({ id: mk.id, type: mk.type, lat: mk.lat, lng: mk.lng, angleKind: mk.angleKind, material: mk.material }));
-  const gegenstaende = markers.filter(mk => mk.type === 'gegenstand').length;
-  const winkel = markers.filter(mk => mk.type === 'winkel').length;
+  const mapMarkers: MapMarker[] = projectAngleMarkers(markers).map(mk => ({ ...mk }));
+  const gegenstaende = markers.filter(isScoredObject).length;
+  const winkel = countLaidCorners(markers);
+  // Wind zur Laufrichtung (T-201): nur bei spürbarem Wind und sobald einige Meter gelegt sind.
+  const windRel = weather && weather.windSpeed >= WIND_RELATION_MIN_SPEED_KMH
+    ? windRelation(weather.windDirection, walkBearingDeg(trackPoints)) : null;
+  const examTemplate = examTemplateById(examTemplateId);
+  const examGuidance = examTemplate ? examLayGuidance(examTemplate, {
+    currentStep,
+    cornerSteps: projectAngleMarkers(markers)
+      .filter(m => m.type === 'winkel' && m.angleKind !== 'abriss' && m.angleKind !== 'absatz')
+      .map(m => metersToSteps(m.distance_from_start ?? 0, stepLengthM)),
+    articleSteps: markers.filter(isScoredObject).map(m => metersToSteps(m.distance_from_start ?? 0, stepLengthM)),
+  }) : null;
   // Echte Positionen für die Skizze (deckt sich mit der Aufnahme).
   const angleMarkers = markers.filter(mk => mk.type === 'winkel' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
   const objectMarkers = markers.filter(mk => mk.type === 'gegenstand' && mk.lat != null && mk.lng != null).map(mk => ({ lat: mk.lat as number, lng: mk.lng as number }));
@@ -599,8 +638,8 @@ export default function LegenScreen() {
       useActiveFaehrten.getState().upsert(activeDog.id, {
         status: 'resting', sessionId: id, layStartedAt: Date.now(),
         distanceMeters: Math.round(distanceMeters),
-        winkelCount: finalMarkers.filter(m => m.type === 'winkel').length,
-        objektCount: finalMarkers.filter(m => m.type === 'gegenstand').length,
+        winkelCount: countLaidCorners(finalMarkers),
+        objektCount: finalMarkers.filter(isScoredObject).length,
       });
     }
     const dq = activeDog ? `&dogId=${activeDog.id}` : '';
@@ -647,6 +686,7 @@ export default function LegenScreen() {
 
   useEffect(() => {
     if (!pendingExit || phase === 'recording') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     setPendingExit(null);
     if ('href' in pendingExit) router.replace(pendingExit.href as never);
     else if (router.canGoBack()) router.back();
@@ -731,6 +771,13 @@ export default function LegenScreen() {
         {/* QA-Diagnose: tatsächlich aktive Engine/Source. Rendert ausserhalb des
             QA-Modus nichts — auch keinen Abstand. */}
         <QaModeBadge />
+        {phase === 'recording' && <QaReferenceMarker hidden={pocketLock} paused={isPaused} mark={rec.markQaReference} label={rec.labelQaReference} />}
+
+        {phase === 'recording' && !!dbg?.rawArchiveError && (
+          <View className="mx-[14px] mb-2 px-3 py-2 rounded-xl bg-white/5" accessibilityLiveRegion="polite">
+            <Text className="text-ft-warn text-[12px]">{t('track.rawArchiveIncomplete')}</Text>
+          </View>
+        )}
 
         {/* Karte / Skizze */}
         <View className="flex-1 mx-[14px] rounded-[24px] overflow-hidden border border-ft-line bg-[#08100e]">
@@ -747,6 +794,7 @@ export default function LegenScreen() {
           )}
           {view === 'map' ? (
             <TrackingMap
+                  layColor={layColor}
               layPoints={trackPoints}
               referenceOverlays={showReferenceTracks ? referenceOverlays : NO_REFERENCE_OVERLAYS}
               markers={mapMarkers}
@@ -763,7 +811,7 @@ export default function LegenScreen() {
             />
           ) : (
             <View className="flex-1 bg-[#08100e]">
-              <TrackSketch points={trackPoints} angleMarkers={angleMarkers} objectMarkers={objectMarkers} legs={winkel} objects={gegenstaende} w={340} h={520} progress={1} />
+              <TrackSketch accent={layColor} points={trackPoints} angleMarkers={angleMarkers} objectMarkers={objectMarkers} legs={winkel} objects={gegenstaende} w={340} h={520} progress={1} />
             </View>
           )}
 
@@ -794,7 +842,7 @@ export default function LegenScreen() {
           )}
 
           {/* Metrik-Leiste (unten) */}
-          <View className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
+          <View onLayout={e => setMapMetricsHeight(e.nativeEvent.layout.height)} className="absolute left-[14px] right-[14px] bottom-[14px] flex-row rounded-[18px] py-3 px-2 bg-ft-glass border border-ft-glass-line">
             {metrics.map((mm, i) => (
               <View key={i} className={`flex-1 items-center ${i > 0 ? 'border-l border-ft-line' : ''}`}>
                 <Text className={`text-[15px] font-black ${mm.warn ? 'text-ft-warn' : 'text-ft-text'}`} style={{ fontVariant: ['tabular-nums'] }} numberOfLines={1}>{mm.value}</Text>
@@ -817,8 +865,15 @@ export default function LegenScreen() {
             </View>
           )}
 
+          {phase === 'recording' && !startLockActive && ((examTemplate && examGuidance) || (windRel && weather)) && (
+            <View className="absolute top-[64px] left-0 right-0 items-center px-4 gap-1.5" pointerEvents="none">
+              {examTemplate && examGuidance && <ExamTemplateBanner template={examTemplate} guidance={examGuidance} t={t} />}
+              {windRel && weather && <WindRelationPill relation={windRel} speedKmh={weather.windSpeed} t={t} />}
+            </View>
+          )}
+
           {phase === 'recording' && activeSegment && (
-            <View className="absolute left-[14px] right-[14px] bottom-[88px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
+            <View style={{ bottom: mapOverlayLayout.contentBottom }} className="absolute left-[14px] right-[14px] rounded-[18px] p-3 bg-ft-glass border border-ft-glass-line">
               <View className="flex-row items-center justify-between gap-3">
                 <View className="flex-1">
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.2px] uppercase">{t('track.segmentActive')}</Text>
@@ -966,6 +1021,8 @@ export default function LegenScreen() {
                   </View>
                   <Text className="text-[11px] text-ft-faint self-start mb-1">{t('track.layVoiceToggleSub')}</Text>
 
+                  <ExamTemplateChooser selected={examTemplate} onSelect={setExamTemplateId} t={t} />
+
                   {/* Wetter — echt & automatisch zur GPS-Position (Open-Meteo), nicht eingetippt */}
                   <Text className="text-[10px] text-ft-faint font-bold tracking-[1.6px] uppercase self-start">{t('track.weather')}</Text>
                   <View className="self-stretch rounded-[14px] px-4 py-3 bg-white/5 border border-ft-line">
@@ -982,7 +1039,7 @@ export default function LegenScreen() {
                         </View>
                         <View className="flex-row flex-wrap gap-x-4 gap-y-0.5">
                           <Text className="text-[13px] font-semibold text-ft-muted">🌡️ {weather.temperature.toFixed(1)} °C</Text>
-                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h</Text>
+                          <Text className="text-[13px] font-semibold text-ft-muted">💨 {weather.windSpeed.toFixed(0)} km/h{compassLabel(weather.windDirection) ? ` ${t('track.wind.from')} ${compassLabel(weather.windDirection)}` : ''}</Text>
                           <Text className="text-[13px] font-semibold text-ft-muted">💧 {weather.humidity.toFixed(0)} %</Text>
                         </View>
                       </>
@@ -1004,7 +1061,7 @@ export default function LegenScreen() {
                   >
                     <Ionicons name="play" size={16} color={canStart ? FT.accText : FT.muted} />
                     <Text className={`text-[14px] font-extrabold ${canStart ? 'text-ft-acc-text' : 'text-ft-muted'}`}>
-                      {canStart ? t('track.lay') : t('track.waitingGps')}
+                      {canStart ? t(params.id ? 'track.continuation.resume' : 'track.lay') : t('track.waitingGps')}
                     </Text>
                   </Pressable>
                 </View>
@@ -1033,6 +1090,7 @@ export default function LegenScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}
               >
+                <Text style={{ width: '100%', color: C.trackTextSec, padding: 6 }}>{t('track.jokerHint')}</Text>
                 {GEGENSTAND_MATERIALS.map(m => (
                   <Pressable
                     key={m.material}
@@ -1048,7 +1106,7 @@ export default function LegenScreen() {
                     ) : (
                       <Ionicons name={m.icon} size={20} color={FT.acc} />
                     )}
-                    <Text numberOfLines={1} className="text-[10px] font-extrabold text-ft-text">{m.label}</Text>
+                    <Text numberOfLines={1} className="text-[10px] font-extrabold text-ft-text">{m.material === 'ball' ? `${t('track.materialBall')} · ${t('track.jokers')}` : m.material === 'gummi' ? t('track.materialRubber') : m.label}</Text>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -1057,7 +1115,7 @@ export default function LegenScreen() {
         )}
 
         {/* Winkel-Schnellwahl: Inline-Popover direkt über dem Winkel-Button — KEIN
-            BottomSheet. Tap auf GW/OW/BW/Abriss setzt sofort + schliesst; Tap
+            BottomSheet. Fachtyp und Richtung wählen; erst die Bestätigung setzt den Marker. Tap
             außerhalb (Backdrop) schliesst ohne Marker. */}
         {winkelSheet && phase === 'recording' && (
           <>
@@ -1076,24 +1134,7 @@ export default function LegenScreen() {
                 maxHeight: quickPickerLayout.maxHeight,
               }}
             >
-              <View className="flex-row gap-2">
-                {([
-                  { kind: 'gw',     short: 'GW',     icon: 'square-outline'   },
-                  { kind: 'ow',     short: 'OW',     icon: 'triangle-outline' },
-                  { kind: 'bw',     short: 'BW',     icon: 'ellipse-outline'  },
-                  { kind: 'abriss', short: 'Abriss', icon: 'close'            },
-                ] as const).map(o => (
-                  <Pressable
-                    key={o.kind}
-                    accessibilityLabel={t('track.setAngle', { label: t(trackEventLabelKey(angleEvent(o.kind))) })}
-                    onPress={() => placeWinkel(o.kind)}
-                    className="flex-1 h-[64px] rounded-[16px] items-center justify-center gap-[3px] bg-ft-glass border border-ft-glass-line"
-                  >
-                    <Ionicons name={o.icon} size={22} color={o.kind === 'abriss' ? FT.warn : FT.acc} />
-                    <Text numberOfLines={1} className="text-[10.5px] font-extrabold text-ft-text">{o.short}</Text>
-                  </Pressable>
-                ))}
-              </View>
+              <SpecialAnglePicker onSelect={placeWinkel} />
             </View>
           </>
         )}
@@ -1154,7 +1195,8 @@ export default function LegenScreen() {
         label={t('track.stopLaying')}
       />
 
-      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')}>
+      <AnyvoBottomSheet visible={segmentSheet} onClose={() => setSegmentSheet(false)} title={t('track.segmentStart')} keyboardAware closeButton>
+        <ScrollView style={{ flexShrink: 1 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         <View className="gap-4 pb-2">
           <View className="flex-row flex-wrap gap-[10px]">
             {TRACK_SEGMENT_TYPES.map(type => {
@@ -1208,6 +1250,7 @@ export default function LegenScreen() {
             <Text className="text-[14px] font-black text-ft-acc-text">{t('track.segmentStartNow')}</Text>
           </Pressable>
         </View>
+        </ScrollView>
       </AnyvoBottomSheet>
 
       {/* Play-Pflicht: Hintergrundstandort-Disclosure VOR der ersten Location-

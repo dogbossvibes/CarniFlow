@@ -1,3 +1,4 @@
+
 // QA-Mitschnitt: Ablage, Aufbewahrung und die Verdrahtung im Recorder.
 //
 // Der Mitschnitt ist die Quelle für alles, was Schema v2 zusätzlich liefert.
@@ -11,6 +12,13 @@ import {
   clearQaSessionCaptures, pathLength, QA_CAPTURE_RETENTION,
   type QaSessionCapture,
 } from '@/features/tracking/utils/qaSessionCapture';
+jest.mock('@/lib/diagnosticsAccessState', () => ({
+  diagnosticsAccessToken: () => 'authorized-fixture',
+  getDiagnosticsAccessSnapshot: () => ({ userId: 'user-1', generation: 1, allowed: true }),
+  hasDiagnosticsAccess: () => true,
+  subscribeDiagnosticsAccess: () => () => {},
+  assertDiagnosticsAccess: () => {},
+}));
 
 // `jest.mock` wird über die Importe gehoben, greift also trotz dieser
 // Reihenfolge. Die Factory selbst fasst `mockStore` nicht an — das tun erst
@@ -20,6 +28,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: async (k: string) => mockStore.get(k) ?? null,
   setItem: async (k: string, v: string) => { mockStore.set(k, v); },
   removeItem: async (k: string) => { mockStore.delete(k); },
+  getAllKeys: async () => [...mockStore.keys()],
+  multiRemove: async (keys: string[]) => { keys.forEach(k => mockStore.delete(k)); },
 }));
 
 function capture(id: string): QaSessionCapture {
@@ -44,6 +54,19 @@ describe('Ablage', () => {
     const c = capture('ts_1');
     await saveQaSessionCapture(c);
     expect(await loadQaSessionCapture('ts_1')).toEqual(c);
+  });
+
+  it('bewahrt die chronologische Sensordiagnose samt Empfangszeiten und Lücken', async () => {
+    const c = capture('timeline');
+    c.motionTimeline = { version: 1, limit: 4096, observed: 3, omitted: 1,
+      timeBasis: 'relative_to_first_recorded_fix', samples: [
+        { tMs: 900, receivedMs: 1000, headingDelta: 12, rotationMagnitude: 12, accelerationMagnitude: 0.1, stepDelta: 1, cadence: null, movementState: 'walking' },
+        { tMs: 800, receivedMs: 1100, headingDelta: -4, rotationMagnitude: 4, accelerationMagnitude: 0.1, stepDelta: 1, cadence: null, movementState: 'walking' },
+      ] };
+    await saveQaSessionCapture(c);
+    expect((await loadQaSessionCapture('timeline'))?.motionTimeline).toEqual(c.motionTimeline);
+    await clearQaSessionCaptures();
+    expect(await loadQaSessionCapture('timeline')).toBeNull();
   });
 
   it('liegt in einem eigenen QA-Bereich, nicht in der Fährtenhistorie', async () => {
@@ -108,7 +131,7 @@ describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
     // dort steht eine eigene `mk_…`. Wird die falsche notiert, lässt sich der
     // Export nie wieder mit der Herkunft zusammenführen.
     expect(src).toContain('const dbId = await createLocalTrackMarker(');
-    expect(src).toContain('if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qa.apexIndex);');
+    expect(src).toContain('if (qa) qaNoteMarker(dbId, qa.source, qa.scale, qaApexIndex, qaContext);');
     expect(src).not.toMatch(/qaNoteMarker\(`angle-/);
     expect(src).not.toMatch(/qaNoteMarker\(`\$\{type\}-/);
   });
@@ -129,7 +152,7 @@ describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
     expect(src).toContain('if (!qaRef.current) return;');
     // Und geschrieben, bevor die Puffer geleert werden.
     const write = src.indexOf('saveQaSessionCapture(');
-    const stop = src.indexOf('stopAll();', write);
+    const stop = src.indexOf('stopAll(false);', write);
     expect(write).toBeGreaterThan(-1);
     expect(stop).toBeGreaterThan(write);
   });
@@ -137,4 +160,23 @@ describe('Marker-Herkunft hängt an der Datenbank-ID', () => {
   it('ein Fehler im Mitschnitt darf den Abschluss der Fährte nie blockieren', () => {
     expect(src).toContain('void saveQaSessionCapture(');
   });
+});
+
+
+it('refuses a capture whose supplied creation token is no longer current', async () => {
+  mockStore.clear();
+  await saveQaSessionCapture(capture('old-generation'), 'old-generation-token');
+  expect(mockStore.size).toBe(0);
+});
+
+it('preserves optional relative GPS delivery timing across diagnostic storage', async () => {
+  const c = capture('gps-delivery');
+  c.rawFixes[0].receivedMs = 220;
+  c.rawFixes[0].processedMs = 250;
+  c.rawFixes[0].deliverySource = 'background';
+  c.detectorPoints[0].receivedMs = 220;
+  c.detectorPoints[0].processedMs = 250;
+  c.detectorPoints[0].deliverySource = 'background';
+  await saveQaSessionCapture(c);
+  expect(await loadQaSessionCapture('gps-delivery')).toEqual(c);
 });

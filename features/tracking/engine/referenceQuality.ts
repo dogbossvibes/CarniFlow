@@ -61,6 +61,7 @@ export const REFERENCE_QUALITY_THRESHOLDS = Object.freeze({
 export interface ReferenceLinePoint {
   latitude: number;
   longitude: number;
+  breakBefore?: boolean;
   accuracy: number | null;
 }
 
@@ -117,7 +118,7 @@ export function computeReferenceQuality(input: ReferenceQualityInput): Reference
   const mPerLng = M_PER_DEG * Math.cos((lat0 * Math.PI) / 180);
   const xy = line.map(p => [(p.longitude - line[0].longitude) * mPerLng, (p.latitude - lat0) * M_PER_DEG] as const);
   const cum: number[] = [0];
-  for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+  for (let i = 1; i < xy.length; i++) cum.push(cum[i - 1] + (line[i].breakBefore ? 0 : Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1])));
 
   const accs = line.map(p => p.accuracy).filter((a): a is number => a != null && Number.isFinite(a));
   const medianAccuracyM = median(accs);
@@ -128,6 +129,7 @@ export function computeReferenceQuality(input: ReferenceQualityInput): Reference
   // obwohl dort geradeaus gestartet wurde).
   const unmarkedSharpTurns: UnmarkedSharpTurn[] = [];
   for (let i = 2; i < xy.length - 1; i++) {
+    if (line[i].breakBefore || line[i + 1].breakBefore) continue;
     const a = xy[i - 1], b = xy[i], c = xy[i + 1];
     if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.5 || Math.hypot(c[0] - b[0], c[1] - b[1]) < 0.5) continue;
     let d = (Math.atan2(c[0] - b[0], c[1] - b[1]) - Math.atan2(b[0] - a[0], b[1] - a[1])) * 180 / Math.PI;

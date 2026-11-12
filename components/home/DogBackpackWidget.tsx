@@ -23,6 +23,7 @@ export function DogBackpackWidget({ userId, dogId, dogName, layout, onOpen, onCo
   useEffect(() => {
     let alive = true;
     if (!userId || !dogId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setItems([]);
       return () => { alive = false; };
     }

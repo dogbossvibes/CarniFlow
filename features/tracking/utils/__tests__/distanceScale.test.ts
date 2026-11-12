@@ -193,3 +193,24 @@ describe('Nächster Gegenstand (entlang der Fährte)', () => {
     expect(nextObjectDistance([objs[2], objs[0], objs[1]], 25)).toEqual({ index: 2, distanceM: 25 });
   });
 });
+
+describe('section-aware tick geometry', () => {
+  it('excludes a large unknown gap from both distance and tangent', () => {
+    const line = [at(0, 0), at(0, 4), { ...at(100, 100), breakBefore: true }, at(100, 104)];
+    const { ticks, totalM } = buildDistanceTicks(line);
+    expect(totalM).toBeCloseTo(8, 4);
+    expect(ticks.map(t => t.m)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(ticks.every(t => Math.abs(t.normal!.north) < 0.001)).toBe(true);
+    expect(haversineM(ticks[4].at, at(100, 101))).toBeLessThan(0.01);
+  });
+  it('retains fractional measured distance across gaps without duplicate labels', () => {
+    const line = [at(0, 0), at(0, 4.6), { ...at(100, 100), breakBefore: true }, at(100, 104.6)];
+    const result = buildDistanceTicks(line);
+    expect(result.totalM).toBeCloseTo(9.2, 3);
+    expect(result.ticks.map(t => t.m)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(haversineM(result.ticks[4].at, at(100, 100.4))).toBeLessThan(0.01);
+  });
+  it('does not turn isolated fixes into a measured path', () => {
+    expect(buildDistanceTicks([at(0, 0), { ...at(100, 100), breakBefore: true }])).toEqual({ totalM: 0, ticks: [] });
+  });
+});

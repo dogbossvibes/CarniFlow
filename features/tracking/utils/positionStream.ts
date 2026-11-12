@@ -2,9 +2,10 @@ import * as Location from 'expo-location';
 import { isExternalMode, subscribeRecorder, getRecordedPoints, resetRecorder } from '@/lib/trackRecorder';
 import { precisionLocationClient as client } from '@/features/tracking/native/precisionLocationClient';
 import type { GpsSample } from '@/features/tracking/utils/gpsFilter';
+import { normalizeFixQuality, type LocationFixQuality } from './locationFixQuality';
 
 // Reichere Probe inkl. der Felder, die nur Telefon-GPS liefert.
-export interface StreamSample extends GpsSample {
+export interface StreamSample extends GpsSample, LocationFixQuality {
   altitude?: number | null;
   speed?:    number | null;
   course?:   number | null;   // Bewegungsrichtung (Telefon-GPS)
@@ -36,22 +37,35 @@ export async function startPositionStream(
   }
 
   // Native Precision-Engine (Telefon-GPS) — fällt intern auf expo-location zurück.
-  const sub = client.onLocation(loc => onSample({
-    lat: loc.latitude,
-    lng: loc.longitude,
-    accuracy: loc.accuracy ?? null,
-    t: loc.timestamp || Date.now(),
-    altitude: loc.altitude ?? null,
-    speed: loc.speed ?? null,
-    course: loc.heading ?? loc.bearing ?? null,
-    provider: loc.provider ?? null,
-    source: client.isNativeAvailable() ? 'native' : 'expo',
-  }));
-  await client.start({
-    intervalMs: opts.timeInterval ?? 1000,
-    mode: 'tracking_dog_sport',   // BestForNavigation, kein Auto-Pause
-    enableHeading: false,         // Heading läuft separat über watchHeadingAsync
-    allowBackground: false,
+  let active = true;
+  const sub = client.onLocation(loc => {
+    if (!active) return;
+    onSample({
+      lat: loc.latitude,
+      lng: loc.longitude,
+      accuracy: loc.accuracy ?? null,
+      t: loc.timestamp || Date.now(),
+      altitude: loc.altitude ?? null,
+      ...normalizeFixQuality({ altitudeAccuracy: loc.altitudeAccuracy,
+        speedAccuracy: loc.speedAccuracy, courseAccuracy: loc.headingAccuracy }),
+      speed: loc.speed ?? null,
+      course: loc.heading ?? loc.bearing ?? null,
+      provider: loc.provider ?? null,
+      source: client.isNativeAvailable() ? 'native' : 'expo',
+    });
   });
-  return () => { sub.remove(); void client.stop(); };
+  try {
+    await client.start({
+      intervalMs: opts.timeInterval ?? 1000,
+      mode: 'tracking_dog_sport',   // BestForNavigation, kein Auto-Pause
+      enableHeading: false,         // Heading läuft separat über watchHeadingAsync
+      allowBackground: false,
+      enableGnssStatusAndroid: true, // diagnostics only; never enables raw measurements
+    });
+  } catch (error) {
+    active = false;
+    sub.remove(); // failed native startup must not leak into the Expo fallback
+    throw error;
+  }
+  return () => { active = false; sub.remove(); void client.stop(); };
 }

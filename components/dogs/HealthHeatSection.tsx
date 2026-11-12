@@ -1,3 +1,7 @@
+import { HeatForecast } from './heat/HeatForecast';
+import { heatUxCopy } from '@/features/dogs/heatUxCopy';
+import { recordedActiveCycle } from '@/features/dogs/heatJournal';
+import { toISODate } from '@/features/dogs/dateInput';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AnyvoButton } from '@/components/ui/AnyvoButton';
@@ -27,8 +31,8 @@ import { currentHeatPhase } from '@/features/dogs/heatCalendar';
 // the same responsibility split already used by DogHubScreen.tsx (isFemale
 // computed once, passed down).
 
-const PINK = '#F472B6';
-const PINK_DIM = 'rgba(244,114,182,0.14)';
+const PINK = C.trackPrimary;
+const PINK_DIM = 'rgba(39,216,178,0.12)';
 
 function fmtMonthYear(iso: string): string {
   const d = fmtDate(iso); // "12. Sept. 2026" — Monat+Jahr reicht für die Prognose-Aussage
@@ -43,70 +47,20 @@ function fmtRange(start: string, end: string | null): string {
 // ── Kompakte Übersichtskarte (Gesundheitsakte → Übersicht) ─────────────────
 
 export function HealthHeatCard({
-  cycles, prediction, onPress, onAdd,
+  cycles, onPress, onAdd,
 }: {
   cycles: HeatCycle[];
   prediction: HeatPrediction | null;
   onPress: () => void;
   onAdd: () => void;
 }) {
-  const { t } = useT();
-
-  if (cycles.length === 0) {
-    return (
-      <TouchableOpacity testID="health-heat-card" style={hs.emptyCard} onPress={onAdd} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('heat.addFirst')}>
-        <View style={hs.emptyIcon}><Ionicons name="heart-outline" size={22} color={PINK} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={hs.eyebrow}>{t('heat.title').toUpperCase()}</Text>
-          <Text style={hs.emptyTitle}>{t('heat.emptyTitle')}</Text>
-        </View>
-        <Ionicons name="add-circle" size={26} color={PINK} />
-      </TouchableOpacity>
-    );
-  }
-
-  const active = cycles.find(isActiveCycle) ?? null;
-  const last = active ?? [...cycles].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
-  const lastDuration = durationDays(last.startDate, last.endDate);
-  const today = new Date();
-  const sinceLast = last.endDate ? Math.max(0, Math.round((today.getTime() - new Date(last.endDate).getTime()) / 86400000)) : null;
-  const hasForecast = prediction && !prediction.estimate;
-
-  return (
-    <TouchableOpacity testID="health-heat-card" style={hs.card} onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`${t('heat.title')}. ${active ? t('heat.active') : fmtRange(last.startDate, last.endDate)}`}>
-      <View style={hs.cardHead}>
-        <View style={hs.icon}><Ionicons name="heart" size={20} color={PINK} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={hs.eyebrow}>{t('heat.title').toUpperCase()}</Text>
-          {active ? (
-            <View style={hs.statusRow}>
-              <View style={hs.statusDot} />
-              <Text style={hs.statusTxt}>{t('heat.active')} · {t('heat.cycleDay')} {heatCycleDay(active.startDate)}</Text>
-            </View>
-          ) : (
-            <Text style={hs.rangeTxt}>{fmtRange(last.startDate, last.endDate)}</Text>
-          )}
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={C.trackTextMut} />
-      </View>
-
-      <View style={hs.metaRow}>
-        {lastDuration != null ? <MetaChip label={`${lastDuration} ${t('heat.days')}`} /> : null}
-        {!active && sinceLast != null ? <MetaChip label={`${sinceLast} Tage seit letzter Läufigkeit`} /> : null}
-      </View>
-
-      <View style={hs.forecastRow}>
-        <Ionicons name="calendar-outline" size={15} color={C.trackTextMut} />
-        <Text style={hs.forecastTxt}>
-          {hasForecast ? `Nächster Zeitraum: voraussichtlich ${fmtMonthYear(prediction!.nextDate)}` : 'Noch keine Prognose verfügbar'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function MetaChip({ label }: { label: string }) {
-  return <View style={hs.chip}><Text style={hs.chipTxt}>{label}</Text></View>;
+  const { locale } = useT();
+  const copy = heatUxCopy(locale);
+  const active = recordedActiveCycle(cycles, toISODate(new Date()));
+  return <TouchableOpacity testID="health-heat-card" style={hs.card} onPress={cycles.length ? onPress : onAdd} accessibilityRole="button" accessibilityLabel={copy.title}>
+    <HeatForecast cycles={cycles} compact />
+    <View style={hs.cardHead}><View style={hs.icon}><Ionicons name="heart-outline" size={22} color={C.trackPrimary} /></View><View style={{ flex: 1 }}><Text style={hs.emptyTitle}>{copy.title}</Text><Text style={hs.rangeTxt}>{active ? `${copy.day} ${heatCycleDay(active.startDate)} · ${copy.recorded}` : cycles.length ? copy.inactive : copy.empty}</Text></View><Ionicons name="chevron-forward" size={20} color={C.trackTextSec} /></View>
+  </TouchableOpacity>;
 }
 
 // ── Reichhaltige Läufigkeit-Ansicht (öffnet in einem AnyvoBottomSheet) ──────
@@ -260,8 +214,8 @@ const hs = StyleSheet.create({
   hero: { borderRadius: 20, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, padding: 16, gap: 8 },
   heroEyebrow: { color: PINK, fontSize: 11, fontWeight: '900', letterSpacing: 1.2 },
   heroBig: { color: C.trackText, fontSize: 21, fontWeight: '900' },
-  heroFacts: { flexDirection: 'row', gap: 20, marginTop: 4 },
-  heroFact: { gap: 2 },
+  heroFacts: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, marginTop: 4 },
+  heroFact: { gap: 2, flexShrink: 1, maxWidth: '100%' },
   heroFactValue: { color: C.trackText, fontSize: 15, fontWeight: '800' },
   heroFactLabel: { color: C.trackTextMut, fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
   heroForecast: { color: C.trackTextSec, fontSize: 12.5, fontWeight: '600', marginTop: 4 },
@@ -274,13 +228,13 @@ const hs = StyleSheet.create({
 
   historyCard: { borderRadius: 18, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, padding: 14, gap: 6 },
   historyMonth: { color: PINK, fontSize: 10.5, fontWeight: '900', letterSpacing: 1 },
-  historyTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  historyTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   historyRange: { color: C.trackText, fontSize: 16, fontWeight: '800', flexShrink: 1 },
   activeChip: { borderRadius: 8, backgroundColor: PINK_DIM, paddingHorizontal: 8, paddingVertical: 3 },
   activeChipTxt: { color: PINK, fontSize: 10.5, fontWeight: '900' },
   historyDuration: { color: C.trackTextSec, fontSize: 13, fontWeight: '700' },
   historyFacts: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 4 },
-  historyFact: { gap: 2, minWidth: 84 },
+  historyFact: { gap: 2, minWidth: 84, flexShrink: 1, maxWidth: '100%' },
   historyFactLabel: { color: C.trackTextMut, fontSize: 9.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6 },
   historyFactValue: { color: C.trackText, fontSize: 13, fontWeight: '700' },
 });

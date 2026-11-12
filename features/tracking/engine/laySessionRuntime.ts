@@ -1,6 +1,7 @@
+import { GPS_FUTURE_TOLERANCE_MS } from '../utils/liveFixOrdering';
 import type * as Location from 'expo-location';
 import { useActiveFaehrten } from '@/features/tracking/store/activeFaehrten';
-import type { LayFixResult } from '@/features/tracking/engine/layProcessingSession';
+import type { LayFixResult, QaFixDelivery } from '@/features/tracking/engine/layProcessingSession';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Lay-Session-Runtime (React-unabhängig): fachliche Verarbeitungs-Ownership
@@ -31,10 +32,10 @@ export type LayDropReason =
   | 'no_bound_session' | 'unknown_session' | 'dog_mismatch' | 'registry_mismatch' | 'not_laying'
   | 'session_not_active' | 'session_finalized' | 'fix_before_session_start';
 
-export type LayDeliveryOutcome =
+export type LayDeliveryOutcome = { archivePersisted?: boolean } & (
   | { kind: 'processed'; sessionId: string; source: LayDeliverySource; result: LayFixResult; persisted: boolean | null }
   | { kind: 'persist_failed'; sessionId: string; source: LayDeliverySource; result: LayFixResult }
-  | { kind: 'dropped'; sessionId: string | null; source: LayDeliverySource; reason: LayDropReason };
+  | { kind: 'dropped'; sessionId: string | null; source: LayDeliverySource; reason: LayDropReason });
 
 /** Was der Owner (Hook) beim Start einer Lay-Aufnahme registriert. */
 export interface LaySessionRegistration {
@@ -43,7 +44,9 @@ export interface LaySessionRegistration {
   /** ms: Beginn der Aufnahme. Ältere Hintergrund-Fixes gehören nicht zu dieser Session. */
   startedAtMs: number;
   /** Der gemeinsame Lay-Processor dieser Session (Phase 1, unverändert). */
-  processFix: (loc: Location.LocationObject) => LayFixResult;
+  processFix: (loc: Location.LocationObject, delivery?: QaFixDelivery) => LayFixResult;
+  /** Separater Rohmitschnitt vor Dedup/Filtern; darf keine Geometrie verändern. */
+  observeFix?: (loc: Location.LocationObject, delivery: QaFixDelivery) => Promise<boolean>;
   /** Dauerhafte Persistenz der gepufferten Linienpunkte; true = geschrieben (oder nichts offen). */
   persist: () => Promise<boolean>;
 }
@@ -136,15 +139,16 @@ function noteSeen(e: Entry, ts: number, source: LayDeliverySource): void {
   }
 }
 
-function run(e: Entry, loc: Location.LocationObject, source: LayDeliverySource): LayDeliveryOutcome | Promise<LayDeliveryOutcome> {
+function run(e: Entry, loc: Location.LocationObject, source: LayDeliverySource, receivedAtMs: number, positionSource?: QaFixDelivery['positionSource']): LayDeliveryOutcome | Promise<LayDeliveryOutcome> {
   const drop = (reason: LayDropReason): LayDeliveryOutcome => ({ kind: 'dropped', sessionId: e.sessionId, source, reason });
   if (e.status === 'finalizing' || e.status === 'finalized') return drop('session_finalized');
   if (e.status !== 'active') return drop('session_not_active');
+  const delivery: QaFixDelivery = { source, receivedAtMs, ...(positionSource ? { positionSource } : {}) };
   const ts = loc.timestamp;
   const seen = e.seen.get(ts);
   if (seen && (seen.has('background') || source === 'background')) return drop('duplicate');
-  noteSeen(e, ts, source);
-  const result = e.processFix(loc);
+  if (Number.isFinite(ts) && ts <= receivedAtMs + GPS_FUTURE_TOLERANCE_MS) noteSeen(e, ts, source);
+  const result = e.processFix(loc, delivery);
   const needsPersist = result.outcome === 'accepted' || result.anchorReleased;
   if (source === 'foreground' || !needsPersist) {
     return { kind: 'processed', sessionId: e.sessionId, source, result, persisted: null };
@@ -158,10 +162,31 @@ function run(e: Entry, loc: Location.LocationObject, source: LayDeliverySource):
 }
 
 /** Einen Fix einer bekannten Session zustellen (Vordergrund oder bereits validierter Hintergrund). */
-export function deliverLayFix(sessionId: string, loc: Location.LocationObject, source: LayDeliverySource): Promise<LayDeliveryOutcome> {
+export function deliverLayFix(sessionId: string, loc: Location.LocationObject, source: LayDeliverySource, receivedAtMs = Date.now(), positionSource?: QaFixDelivery['positionSource']): Promise<LayDeliveryOutcome> {
   const e = sessions.get(sessionId);
   if (!e) return Promise.resolve({ kind: 'dropped', sessionId, source, reason: 'unknown_session' });
-  return enqueue(e, () => run(e, loc, source));
+  return prepareEntryFix(e, loc, source, receivedAtMs, positionSource)();
+}
+
+function prepareEntryFix(e: Entry, loc: Location.LocationObject, source: LayDeliverySource, receivedAtMs: number, positionSource?: QaFixDelivery['positionSource']): () => Promise<LayDeliveryOutcome> {
+  // Queue erhält eine eigene Kopie, falls der native Aufrufer sein Objekt wiederverwendet.
+  const copy = { ...loc, coords: { ...loc.coords } };
+  let capture: Promise<boolean> | undefined;
+  // Zulassung und Rohmitschnitt erfolgen am Eingang, bevor Geometrie/Persistenz
+  // warten können. Finalize darf wartende Geometrie verwerfen, aber keine bereits
+  // zugestellten Originale verlieren oder vor deren Archivierung versiegeln.
+  if (e.status === 'active' && e.observeFix) {
+    const delivery: QaFixDelivery = { source, receivedAtMs, ...(positionSource ? { positionSource } : {}) };
+    try { capture = e.observeFix(copy, delivery).catch(() => false); }
+    catch { capture = Promise.resolve(false); }
+  }
+  return () => {
+    const processing = enqueue(e, () => run(e, copy, source, receivedAtMs, positionSource));
+    // Nur die Hintergrund-Task wartet auf das Archiv, nicht die Geometriequeue
+    // oder deren Finalisierung. Der Archiv-Owner schliesst seine eigene Queue.
+    return processing.then(async outcome => source === 'background' && capture
+      ? { ...outcome, archivePersisted: await capture } : outcome);
+  };
 }
 
 /** Eindeutige Zuordnung eines Hintergrund-Fixes — sonst Grund für fail closed. */
@@ -188,13 +213,24 @@ export function resolveBackgroundLaySession(loc: Location.LocationObject): { ses
  * Processor schicken und erst zurückkehren, wenn notwendige Writes fertig sind.
  */
 export async function deliverBackgroundLocations(locations: readonly Location.LocationObject[]): Promise<LayDeliveryOutcome[]> {
-  const out: LayDeliveryOutcome[] = [];
-  for (const loc of locations) {
+  const receivedAtMs = Date.now(); // JS entry for this batch, not native GNSS receipt.
+  // Bind the complete batch before processing can synchronously change the
+  // active session. Keep the actual entry, not just its re-registerable ID.
+  const assigned = locations.map(loc => {
     const target = resolveBackgroundLaySession(loc);
-    if ('reason' in target) { out.push({ kind: 'dropped', sessionId: target.sessionId, source: 'background', reason: target.reason }); continue; }
-    out.push(await deliverLayFix(target.sessionId, loc, 'background'));
-  }
-  return out;
+    return { loc: { ...loc, coords: { ...loc.coords } }, target,
+      entry: 'reason' in target ? undefined : sessions.get(target.sessionId) };
+  });
+  // Archive the entire admitted batch before any synchronous processor callback
+  // can finalize the session. Geometry still follows the existing e.tail queue.
+  const dispatch = assigned.map(({ loc, target, entry }) => {
+    if ('reason' in target) return () => Promise.resolve({ kind: 'dropped', sessionId: target.sessionId,
+      source: 'background', reason: target.reason } as LayDeliveryOutcome);
+    if (!entry) return () => Promise.resolve({ kind: 'dropped', sessionId: target.sessionId,
+      source: 'background', reason: 'unknown_session' } as LayDeliveryOutcome);
+    return prepareEntryFix(entry, loc, 'background', receivedAtMs, 'expo');
+  });
+  return Promise.all(dispatch.map(deliver => deliver()));
 }
 
 /** Nur für Tests: Runtime-Zustand leeren. */

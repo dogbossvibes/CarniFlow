@@ -38,9 +38,9 @@ describe('Profil — Entwickler & Diagnose', () => {
       expect(src).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     }
   });
-  it('8. Authority = profiles.is_internal_tester (Trigger-geschützt); profiles.role ist KEIN Gate', () => {
-    expect(hook).toContain("import { useProfile } from '@/hooks/useProfile';");
-    expect(hook).toContain('internalTesterStatusFromProfile(profile)');
+  it('8. Authority = dedicated capability, no tester or profile-role fallback', () => {
+    expect(hook).toContain("from '@/lib/diagnosticsAccessState'");
+    expect(hook).not.toContain('internalTesterStatusFromProfile');
     expect(hook).not.toMatch(/\.role\b|__DEV__|@gmail|process\.env/);
     expect(gate).not.toMatch(/\.role\b|__DEV__/);
     expect(profile).not.toMatch(/role === 'admin'/);
@@ -51,10 +51,10 @@ describe('Profil — Entwickler & Diagnose', () => {
     expect(gate).toContain("if (!loading && !allowed) router.replace('/(tabs)/profile' as never);");
     expect(gate).toContain('if (!allowed) return <View');
   });
-  it('Route-Gate und Profil-Gate: dieselbe zentrale Regel (useDiagnosticsAccess), explizite Allowlist', () => {
+  it('Route-Gate und Profil-Gate: dieselbe zentrale Regel (useDiagnosticsAccess), separate Authority', () => {
     expect(profile).toContain("from \"@/hooks/useDiagnosticsAccess\"");
     expect(gate).toContain("from '@/hooks/useDiagnosticsAccess'");
-    expect(hook).toContain("export const DIAGNOSTICS_TESTER_LEVELS: readonly TesterLevel[] = ['developer', 'qa', 'admin'];");
+    expect(hook).toContain('hasDiagnosticsAccess()');
     expect(hook).not.toMatch(/level !== 'trainer'/);
   });
   it('i18n: neuer Abschnittstitel in allen 5 Sprachen', () => {

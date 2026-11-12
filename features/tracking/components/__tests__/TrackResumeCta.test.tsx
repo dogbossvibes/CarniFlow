@@ -116,17 +116,20 @@ describe('TrackResumeCta', () => {
     expect(texts(r)).toContain('nicht in ANYVO beendet');
   });
 
-  it('nicht fortsetzbar: normal nichts sichtbar; im QA-Diagnosemodus der konkrete Reason', async () => {
-    mockEvaluate.mockResolvedValue({ ok: false, reason: 'search_completed' });
-    let r = await mount();
-    expect(r.toJSON()).toBeNull();
-    expect(mockVisible).toHaveBeenLastCalledWith(false);
-    act(() => { r.unmount(); }); renderer = null;
-    mockQa = true;
-    r = await mount();
-    expect(byId(r, 'track-recovery-reason')).toBeDefined();
-    expect(texts(r)).toContain('Recovery: search_completed');
-    expect(byId(r, 'track-resume-cta')).toBeUndefined();
+  describe.each([false, true])('Diagnosemodus %s', qa => {
+    it.each(['search_completed', 'unknown_session', 'completed_without_app', 'no_geometry', 'other_active', 'wrong_user'])(
+      '%s: keine technische Statuszeile und keine vorgetäuschte Wiederaufnahme', async reason => {
+        mockQa = qa;
+        mockEvaluate.mockResolvedValue({ ok: false, reason });
+        const r = await mount();
+        expect(r.toJSON()).toBeNull();
+        expect(mockVisible).toHaveBeenLastCalledWith(false);
+        expect(mockApply).not.toHaveBeenCalled();
+        expect(mockComplete).not.toHaveBeenCalled();
+        expect(mockDiscard).not.toHaveBeenCalled();
+        expect(mockReopen).not.toHaveBeenCalled();
+      },
+    );
   });
 
   it('recovery searching → „Absuche fortsetzen" + „Ohne App abgeschlossen"', async () => {
@@ -299,4 +302,54 @@ describe('TrackResumeCta', () => {
       expect(byId(r, 'track-resume-cta')).toBeDefined();
     });
   });
+});
+
+
+describe('Recovery-Async-Isolation', () => {
+  it('Doppeltippen startet nur einen Recovery-Auftrag', async () => {
+    mockEvaluate.mockResolvedValue({ ok: true });
+    let finish!: (value: unknown) => void;
+    mockApply.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const r = await mount(); const press = byId(r, 'track-resume-cta').props.onPress;
+    let pending: Promise<void>;
+    act(() => { pending = press(); void press(); });
+    expect(mockApply).toHaveBeenCalledTimes(1);
+    await act(async () => { finish({ ok: true, target: '/t' }); await pending; });
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+  it('nach Unmount wird keine alte Recovery-Navigation ausgelöst', async () => {
+    mockEvaluate.mockResolvedValue({ ok: true });
+    let finish!: (value: unknown) => void;
+    mockApply.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const r = await mount(); let pending: Promise<void>;
+    act(() => { pending = byId(r, 'track-resume-cta').props.onPress(); });
+    act(() => { r.unmount(); renderer = null; });
+    await act(async () => { finish({ ok: true, target: '/t' }); await pending; });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+  it('Speicherfehler werden angezeigt; Fortsetzen bleibt erneut möglich', async () => {
+    mockEvaluate.mockResolvedValue({ ok: true }); mockApply.mockRejectedValue(new Error('storage unavailable'));
+    const r = await mount(); await act(async () => { await byId(r, 'track-resume-cta').props.onPress(); });
+    expect(alertSpy).toHaveBeenCalled(); expect(mockPush).not.toHaveBeenCalled();
+    expect(byId(r, 'track-resume-cta').props.disabled).toBe(false);
+  });
+});
+
+
+it('ein alter Bestätigungsdialog schreibt nach Verlassen des Hundeprofils nichts', async () => {
+  mockEvaluate.mockResolvedValue({ ok: true });
+  const r = await mount(); act(() => byId(r, 'track-complete-without-app').props.onPress());
+  const confirm = alertSpy.mock.calls[0][2][1].onPress;
+  act(() => { r.unmount(); renderer = null; });
+  await act(async () => { confirm(); });
+  expect(mockComplete).not.toHaveBeenCalled();
+});
+
+
+it('im Hundeprofil erklärt fehlende Geometrie die nicht verfügbare Wiederaufnahme', async () => {
+  mockEvaluate.mockResolvedValue({ ok: false, reason: 'no_geometry' });
+  await act(async () => { renderer = TestRenderer.create(<TrackResumeCta sessionId="sess-A" dogId="dog-A" userId="user-1" hasRemoteSearchRun={false} showUnavailable />); });
+  expect(byId(renderer, 'track-recovery-unavailable')).toBeDefined();
+  expect(byId(renderer, 'track-resume-cta')).toBeUndefined();
+  expect(texts(renderer)).toContain('Ihre vorhandenen Daten bleiben erhalten.');
 });

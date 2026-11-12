@@ -1,0 +1,87 @@
+{
+  "offer": {
+    "version": 1,
+    "transfer": {
+      "status": "pending",
+      "transferId": "22222222-2222-4000-8000-000000000117",
+      "createdAtMs": 1791725614218,
+      "expiresAtMs": 1791812014218,
+      "senderUserId": "22222222-2222-4000-8000-000000000001",
+      "recipientUserId": "22222222-2222-4000-8000-000000000002",
+      "referenceDigest": "18e5a129e85b56884f62ede0e7ecbbe2e38d517dc8120bc56840a72589380e24",
+      "sourceTrainingId": "22222222-2222-4000-8000-000000000020"
+    },
+    "serverNowMs": 1791725614219
+  },
+  "accept": {
+    "quota": {
+      "used": 1,
+      "limit": 1,
+      "success": true
+    },
+    "receipt": {
+      "version": 1,
+      "ownRunId": "22222222-2222-4000-8000-000000000120",
+      "receiptId": "22222222-2222-4000-8000-000000000118",
+      "transferId": "22222222-2222-4000-8000-000000000117",
+      "acceptedAtMs": 1791725614233,
+      "ownSessionId": "22222222-2222-4000-8000-000000000119",
+      "recipientDogId": "22222222-2222-4000-8000-000000000012",
+      "recipientUserId": "22222222-2222-4000-8000-000000000002",
+      "referenceDigest": "18e5a129e85b56884f62ede0e7ecbbe2e38d517dc8120bc56840a72589380e24"
+    },
+    "version": 1,
+    "reference": {
+      "points": [
+        {
+          "t": 1000,
+          "lat": 1,
+          "lng": 2,
+          "speed": null,
+          "heading": null,
+          "accuracy": 3,
+          "altitude": null,
+          "breakBefore": false,
+          "measuredDistanceM": 0
+        },
+        {
+          "t": 2000,
+          "lat": 1.0001,
+          "lng": 2,
+          "speed": null,
+          "heading": null,
+          "accuracy": 3,
+          "altitude": null,
+          "breakBefore": true,
+          "measuredDistanceM": 12
+        }
+      ],
+      "markers": [
+        {
+          "t": 1200,
+          "id": "original-marker",
+          "lat": 1,
+          "lng": 2,
+          "type": "gegenstand",
+          "accuracy": 3,
+          "material": "holz",
+          "angleKind": null,
+          "distanceFromStartM": 2
+        }
+      ],
+      "version": 1,
+      "segments": [],
+      "distanceM": 12,
+      "startedAtMs": 1000,
+      "finishedAtMs": 2000,
+      "durationSeconds": 1,
+      "manualAngleGeometry": null
+    },
+    "serverNowMs": 1791725614234,
+    "referenceDigest": "18e5a129e85b56884f62ede0e7ecbbe2e38d517dc8120bc56840a72589380e24"
+  },
+  "evidence": {
+    "source": "05 local PostgreSQL17.10 synthetic responses, not HTTP",
+    "sha256": "5b90b82c5e2fc3670dd41b397969b5a0dc5c8751070bf023e96d64e6446d1d66"
+  }
+}

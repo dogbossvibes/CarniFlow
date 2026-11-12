@@ -1,0 +1,182 @@
+[
+  {
+    "key": {
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "sessionId": "00000000-0000-4000-8000-000000000020",
+      "runId": "00000000-0000-4000-8000-000000000030",
+      "dogId": "00000000-0000-4000-8000-000000000010"
+    },
+    "response": {
+      "audit": [],
+      "dogId": "00000000-0000-4000-8000-000000000010",
+      "runId": "00000000-0000-4000-8000-000000000030",
+      "source": "recording_snapshot",
+      "hasGaps": false,
+      "objects": [
+        {
+          "index": 0,
+          "material": "duebel",
+          "objectId": "local-object-a",
+          "recordedStatus": "missed",
+          "effectiveStatus": "not_found"
+        },
+        {
+          "index": 1,
+          "material": null,
+          "objectId": "local-object-b",
+          "recordedStatus": "manual_found",
+          "effectiveStatus": "found"
+        }
+      ],
+      "version": 1,
+      "outcomes": {
+        "local-object-a": "not_found",
+        "local-object-b": "found"
+      },
+      "revision": 0,
+      "sessionId": "00000000-0000-4000-8000-000000000020",
+      "scoreBasis": {
+        "version": 1,
+        "trackPoints": 64.25,
+        "totalObjects": 2,
+        "maxTrackPoints": 80,
+        "maxObjectPoints": 20
+      },
+      "totalScore": 74,
+      "articlesFound": 1,
+      "auditTruncated": false
+    }
+  },
+  {
+    "key": {
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "sessionId": "00000000-0000-4000-8000-000000000020",
+      "runId": "00000000-0000-4000-8000-000000000030",
+      "dogId": "00000000-0000-4000-8000-000000000010"
+    },
+    "response": {
+      "audit": [
+        {
+          "actorId": "00000000-0000-4000-8000-000000000001",
+          "changes": [
+            {
+              "status": "found",
+              "objectId": "local-object-a"
+            },
+            {
+              "status": "not_found",
+              "objectId": "local-object-b"
+            }
+          ],
+          "revision": 1,
+          "createdAt": "2026-10-09T07:55:58.386266+02:00",
+          "operationId": "00000000-0000-4000-8000-000000001000",
+          "afterOutcomes": {
+            "local-object-a": "found",
+            "local-object-b": "not_found"
+          },
+          "beforeOutcomes": {
+            "local-object-a": "not_found",
+            "local-object-b": "found"
+          },
+          "expectedRevision": 0
+        },
+        {
+          "actorId": "00000000-0000-4000-8000-000000000001",
+          "changes": [
+            {
+              "status": "unobserved",
+              "objectId": "local-object-a"
+            }
+          ],
+          "revision": 2,
+          "createdAt": "2026-10-09T07:55:58.393596+02:00",
+          "operationId": "00000000-0000-4000-8000-000000001200",
+          "afterOutcomes": {
+            "local-object-a": "unobserved",
+            "local-object-b": "not_found"
+          },
+          "beforeOutcomes": {
+            "local-object-a": "found",
+            "local-object-b": "not_found"
+          },
+          "expectedRevision": 1
+        }
+      ],
+      "dogId": "00000000-0000-4000-8000-000000000010",
+      "runId": "00000000-0000-4000-8000-000000000030",
+      "source": "recording_snapshot",
+      "hasGaps": false,
+      "objects": [
+        {
+          "index": 0,
+          "material": "duebel",
+          "objectId": "local-object-a",
+          "recordedStatus": "missed",
+          "effectiveStatus": "unobserved"
+        },
+        {
+          "index": 1,
+          "material": null,
+          "objectId": "local-object-b",
+          "recordedStatus": "manual_found",
+          "effectiveStatus": "not_found"
+        }
+      ],
+      "version": 1,
+      "outcomes": {
+        "local-object-a": "unobserved",
+        "local-object-b": "not_found"
+      },
+      "replayed": false,
+      "revision": 2,
+      "sessionId": "00000000-0000-4000-8000-000000000020",
+      "scoreBasis": {
+        "version": 1,
+        "trackPoints": 64.25,
+        "totalObjects": 2,
+        "maxTrackPoints": 80,
+        "maxObjectPoints": 20
+      },
+      "totalScore": null,
+      "operationId": "00000000-0000-4000-8000-000000001200",
+      "articlesFound": null,
+      "auditTruncated": false,
+      "appliedRevision": 2
+    }
+  },
+  {
+    "key": {
+      "ownerId": "00000000-0000-4000-8000-000000000001",
+      "sessionId": "00000000-0000-4000-8000-000000000236",
+      "runId": "00000000-0000-4000-8000-000000000336",
+      "dogId": "00000000-0000-4000-8000-000000000010"
+    },
+    "response": {
+      "audit": [],
+      "dogId": "00000000-0000-4000-8000-000000000010",
+      "runId": "00000000-0000-4000-8000-000000000336",
+      "source": "legacy_markers",
+      "hasGaps": null,
+      "objects": [
+        {
+          "index": 0,
+          "material": "duebel",
+          "objectId": "00000000-0000-4000-8000-000000000550",
+          "recordedStatus": "unknown",
+          "effectiveStatus": "unknown"
+        }
+      ],
+      "version": 1,
+      "outcomes": {
+        "00000000-0000-4000-8000-000000000550": "unknown"
+      },
+      "revision": 0,
+      "sessionId": "00000000-0000-4000-8000-000000000236",
+      "scoreBasis": null,
+      "totalScore": null,
+      "articlesFound": null,
+      "auditTruncated": false
+    }
+  }
+]

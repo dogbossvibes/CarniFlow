@@ -33,7 +33,7 @@ export interface SearchSegmentAnnounced {
 export interface SearchRunState {
   /** PERSIST (P0): monotoner Referenzfortschritt entlang laidPoints (= maxCursorMRef). Ohne handlerDistance. */
   maxCursorM: number;
-  /** PERSIST: rohe Abweichungssumme/-zahl → deviationAvgM bleibt run-bezogen (Messwert, nicht Score). */
+  /** PERSIST: Abweichungs-Summe/-Zähler → deviationAvgM/Score bleiben run-bezogen (nicht rekonstruierbar). */
   devSumM: number;
   devCount: number;
   /** Accuracy-/Fusion-reliable score samples. Versioned so legacy recovery keeps its old score semantics. */
@@ -41,6 +41,8 @@ export interface SearchRunState {
   reliableDeviationExcessSumM: number;
   reliableDeviationCount: number;
   reliableCursorM: number;
+  unobservedProgressM?: number;
+  unobservedObjectIds?: string[];
   /** PERSIST: gefundene Gegenstände/Dübel als stabile Marker-IDs (foundRef). */
   foundObjectIds: string[];
   autoDwellObjectIds: string[];
@@ -61,8 +63,10 @@ export interface SearchRunState {
 
 export function freshSearchRunState(): SearchRunState {
   return {
-    maxCursorM: 0, devSumM: 0, devCount: 0, scoreQualityVersion: 1,
+    maxCursorM: 0, devSumM: 0, devCount: 0,
+    scoreQualityVersion: 1,
     reliableDeviationExcessSumM: 0, reliableDeviationCount: 0, reliableCursorM: 0,
+    unobservedProgressM: 0,
     foundObjectIds: [], autoDwellObjectIds: [], dismissedAutoDwellIds: [], voiceFiredIds: [], hapticFiredIds: [],
     endFired: false, segmentAnnouncements: {}, breaks: [], offTrackState: 'on_track',
   };
@@ -114,6 +118,8 @@ export function sanitizeSearchRunState(raw: unknown): SearchRunState {
     reliableDeviationExcessSumM: Math.max(0, num(r.reliableDeviationExcessSumM, 0)),
     reliableDeviationCount: Math.max(0, Math.floor(num(r.reliableDeviationCount, 0))),
     reliableCursorM: Math.max(0, num(r.reliableCursorM, 0)),
+    ...(r.unobservedProgressM != null ? { unobservedProgressM: Math.max(0, num(r.unobservedProgressM, 0)) } : {}),
+    ...(r.unobservedObjectIds != null ? { unobservedObjectIds: strList(r.unobservedObjectIds) } : {}),
     foundObjectIds: strList(r.foundObjectIds),
     autoDwellObjectIds: strList(r.autoDwellObjectIds),
     dismissedAutoDwellIds: strList(r.dismissedAutoDwellIds),
@@ -127,6 +133,6 @@ export function sanitizeSearchRunState(raw: unknown): SearchRunState {
 }
 
 /** Stabile Identität eines Suchobjekts: Marker-ID, sonst (nur ohne ID) der Index. */
-export function searchObjectKey(obj: { id?: string | null }, index: number): string {
-  return obj.id ?? `idx:${index}`;
+export function searchObjectKey(obj: { id?: string | null; recoveryIndex?: number }, index: number): string {
+  return obj.id ?? `idx:${obj.recoveryIndex ?? index}`;
 }
