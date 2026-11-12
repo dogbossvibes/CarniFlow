@@ -83,3 +83,27 @@ describe('Übungs-Matrix (T-184 Etappe 3)', () => {
     expect(buildMatrix([unit('s', '2026-10-01', [], { source: 'session' })], 'Unterordnung', today).trainings).toEqual([]);
   });
 });
+
+describe('Allgemeines Training in der Matrix (T-184)', () => {
+  const general = (patch: Partial<Ex> = {}) => ex({ exercise_name: 'Allgemeines Training', exercise_identity_id: 'allg', ...patch });
+  test('keine Zeile und keine leere Spalte, aber in „Alle Trainings“ und als Sparte sichtbar', () => {
+    const m = buildMatrix([
+      unit('a', '2026-11-01', [lvl(4)]),
+      unit('nur-allg', '2026-11-03', [general()]),
+      unit('b', '2026-11-05', [lvl(5), general({ seq_index: 1 })]),
+    ], 'Unterordnung', today);
+    expect(m.rows.map(r => r.name)).toEqual(['Sitz']);
+    expect(m.columns.map(c => c.unitId)).toEqual(['a', 'b']);
+    expect(m.trainings.map(t => t.id)).toEqual(['b', 'nur-allg', 'a']);
+    expect(m.trainings.find(t => t.id === 'nur-allg')!.names).toEqual(['Allgemeines Training']);
+    expect(m.disciplines).toEqual(['Unterordnung']);
+    // Trend der echten Übung über das reine Allgemein-Training hinweg: 4 → 5, kein Rückschritt.
+    expect(m.rows[0].cells).toEqual([{ kind: 'level', level: 'festigen', down: false }, { kind: 'level', level: 'sitzt', down: false }]);
+  });
+  test('kein Rückfall-Hinweis für Allgemeines Training', () => {
+    const m = buildMatrix([unit('a', '2026-10-01', [general({ rating: 4, rating_scale: 'lernstufe' })]),
+      unit('b', '2026-10-10', [general({ rating: 2, rating_scale: 'lernstufe' })])], null, today);
+    expect(m.fallback).toBeNull();
+    expect(m.rows).toEqual([]);
+  });
+});

@@ -101,6 +101,8 @@ export const deCH = {
   "trainingFlow.trainedToday": "Heute trainiert",
   "trainingFlow.addExercise": "Weitere Übung auswählen",
   "trainingFlow.chooseExercise": "Übung auswählen",
+  "trainingFlow.generalTraining": "Allgemeines Training",
+  "trainingFlow.chooseExerciseToSave": "Wähle mindestens eine Übung, um zu speichern",
   "trainingFlow.optionalDetails": "Dauer, Datum & weitere Angaben · optional",
   "trainingFlow.nextHelp": "Deine Hinweise erscheinen beim nächsten Training mit diesem Hund in der jeweiligen Sparte wieder. Offen bleibt offen, bis du es bewusst erledigst.",
   "trainingFlow.observed": "Heute beobachtet",

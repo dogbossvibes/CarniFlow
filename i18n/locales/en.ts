@@ -98,6 +98,8 @@ export const en: Record<TranslationKey, string> & Record<string, string> = {
   "trainingFlow.trainedToday": "Trained today",
   "trainingFlow.addExercise": "Choose another exercise",
   "trainingFlow.chooseExercise": "Choose an exercise",
+  "trainingFlow.generalTraining": "General training",
+  "trainingFlow.chooseExerciseToSave": "Choose at least one exercise to save",
   "trainingFlow.optionalDetails": "Duration, date & more · optional",
   "trainingFlow.nextHelp": "Your reminders appear next time you train this dog in the relevant discipline. They stay open until you explicitly complete them.",
   "trainingFlow.observed": "Observed today",

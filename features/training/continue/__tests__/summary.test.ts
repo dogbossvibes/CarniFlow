@@ -97,3 +97,11 @@ describe('Randfälle aus dem Review (T-184 Etappe 2)', () => {
     expect(summarizeTraining([], [a, b, other], today).openHint?.text).toBe('B');
   });
 });
+
+describe('Allgemeines Training als letztes Training (T-184)', () => {
+  test('ein Training nur mit „Allgemeines Training“ erscheint als letztes Training mit Sparte', () => {
+    const s = summarizeTraining([unit('alt', '2026-11-01', [{ exercise_name: 'Sitz' }]), unit('nur-allg', '2026-11-08', [{ exercise_name: 'Allgemeines Training' }])], [], today);
+    expect(s.last).toMatchObject({ id: 'nur-allg', disciplines: ['Unterordnung'] });
+    expect(s.last!.exercises.map(e => e.name)).toEqual(['Allgemeines Training']);
+  });
+});
