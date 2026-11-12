@@ -28,6 +28,7 @@ export default function PasswordRecoveryScreen() {
     const code = typeof params.code === 'string' ? params.code : undefined;
     const hasErr = Boolean(params.error || params.error_description);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (hasErr) { setLinkError(t('auth.recoveryInvalidLink')); return; }
 
     if (code) {

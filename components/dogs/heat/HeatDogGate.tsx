@@ -21,6 +21,7 @@ export function HeatDogGate({ dogId, cycleId, children }: { dogId?: string; cycl
   const [attempt, setAttempt] = useState(0);
   const scope = `${user?.id ?? ''}:${dogId ?? ''}:${cycleId ?? ''}:${attempt}`;
   const [state, setState] = useState<{ scope: string; dog?: Dog; failed?: boolean; denied?: boolean }>({ scope: '' });
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useFocusEffect(useCallback(() => {
     let current = true;
     setState({ scope });

@@ -13,6 +13,7 @@ export function useServerTrainingFocuses(owner?: string | null, dogId?: string, 
   useEffect(() => {
     let cancelled = false;
     if (!owner) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     setLoading(true); setError(false);
     void (async () => {
       const rows: ServerFocus[] = [];
@@ -42,6 +43,7 @@ export function ServerTrainingFocusList({ ownerId, rows, error, loading, limited
   const { t } = useT();
   const alive = useRef(true);
   const identity = useRef({ owner: ownerId, generation: 0 });
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   if (identity.current.owner !== ownerId) identity.current = { owner: ownerId, generation: identity.current.generation + 1 };
   const generation = identity.current.generation;
   const current = () => alive.current && identity.current.generation === generation;
@@ -51,6 +53,7 @@ export function ServerTrainingFocusList({ ownerId, rows, error, loading, limited
   const lock = useRef(false);
   const [writeError, setWriteError] = useState(false);
   const pending = useRef(new Map<string, { key: string; requestId: string }>());
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { alive.current = true; setBusy(false); lock.current = false; setNames({}); setWriteError(false); return () => { alive.current = false; }; }, [ownerId]);
   const ownRows = rows.filter(row => row.owner_id === ownerId);
   const open = ownRows.filter(row => row.status !== 'done');

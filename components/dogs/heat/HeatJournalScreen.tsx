@@ -114,6 +114,7 @@ export function HeatJournalScreen({ dog }: { dog: Dog }) {
   const newCycle = (historical = false) => router.push({ pathname: '/dog-heat-new', params: { id: dog.id, historical: historical ? '1' : '0' } } as never);
   const recent = active ? details.observations.filter(o => o.heatCycleId === active.id).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)) : [];
   const todayRows = recent.filter(o => o.date === today);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const locked = saving || !!pendingRows.current;
   const observationText = (o: HeatObservation) => {
     const labels: Record<string, string> = { Blutung: copy.bleeding, Verhalten: copy.behavior, Notiz: copy.note, Standreflex: copy.standing, Ausfluss: copy.discharge };

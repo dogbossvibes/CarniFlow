@@ -154,6 +154,10 @@ export function createHarness(opts: { appVersion?: string; appJson?: unknown; ea
   const repo = join(dir, 'repo');
   mkdirSync(join(repo, 'scripts'), { recursive: true });
   for (const f of ['scripts/update-production.mjs', 'scripts/guard-prod-supabase.mjs', 'scripts/release-quality-evidence.mjs', 'package.json', 'app.json']) copyFileSync(f, join(repo, f));
+  // OTA-Abdeckung ist separat in otaCoverage.node.test.mjs getestet; hier steuerbarer Stub.
+  // Fixture-only module, never copied back to an application/release checkout.
+  writeFileSync(join(repo, 'scripts/check-ota-coverage.mjs'),
+    "export function main() { console.log('STUB OTA-Abdeckung'); return Number(process.env.FAKE_OTA_COVERAGE_EXIT ?? 0); }\n");
   if (opts.easJson !== undefined) writeFileSync(join(repo, 'eas.json'), JSON.stringify(opts.easJson, null, 2));
   if (opts.appJson !== undefined) writeFileSync(join(repo, 'app.json'), JSON.stringify(opts.appJson, null, 2));
   else {

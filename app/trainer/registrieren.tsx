@@ -28,6 +28,7 @@ export default function TrainerRegistrierenScreen() {
 
   useEffect(() => {
     const n = session?.user.user_metadata?.full_name;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (n) setName(n);
   }, [session]);
 

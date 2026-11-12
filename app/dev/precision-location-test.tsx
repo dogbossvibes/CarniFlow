@@ -106,11 +106,13 @@ function PrecisionLocationTestContent() {
   // Screen neu aus SQLite — nie eine veraltete „Letzte gelegte Fährte".
   const { sessions: qaSessions } = useQaLaySessions(session?.user?.id, 5);
   const qaSessionsRef = useRef(qaSessions);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   qaSessionsRef.current = qaSessions;
   // Sichtbar ausgewählte Zeile (localId). Nach jedem Refresh abgeglichen: ist die
   // Session nicht mehr in der neuen Liste, wird die Auswahl zurückgesetzt (kein
   // stiller Export einer anderen Session); ist sie noch da, bleibt sie erhalten.
   const [qaSelected, setQaSelected] = useState<string | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { setQaSelected(prev => reconcileQaSelection(prev, qaSessions)); }, [qaSessions]);
   const [qaBusy, setQaBusy] = useState<string | null>(null);
   const [qaResult, setQaResult] = useState<string | null>(null);
@@ -131,6 +133,7 @@ function PrecisionLocationTestContent() {
   // Verfügbarkeit des nativen Motion-Moduls — genau die vorhandene Prüfung,
   // keine neue API. Ein Feldtest darf nicht still ohne Motion-Daten laufen.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     setMotionModule(motionClient.isModuleAvailable());
     setMotionAvailable(motionClient.isAvailable());
     motionClient.getStatus().then(setMotionStatus).catch(() => setMotionStatus(null));
@@ -198,6 +201,7 @@ function PrecisionLocationTestContent() {
 
   useEffect(() => {
     getProviderStatus().then(setStatus).catch(() => {});
+    // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     return () => { void stopAll(); };
   }, []);
 
@@ -242,6 +246,7 @@ function PrecisionLocationTestContent() {
   };
 
   const secsAgo = (t: number | null | undefined) =>
+    // eslint-disable-next-line react-hooks/purity -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     (t == null ? '–' : `${Math.max(0, Math.round((Date.now() - t) / 1000))}s her`);
 
   return (

@@ -1,4 +1,8 @@
 -- LOCAL ONLY: local Docker Unix socket. All fixtures roll back.
+-- NOTE: the search assertions below describe the state BEFORE
+-- 20261111230000_person_search_professionals_only.sql. After that migration
+-- search_anyvo_people only returns professional profiles; see
+-- contact_requests_cases.sql for the current expectations.
 -- Verifies 20260928080000_generic_person_lookup.sql (search_anyvo_people,
 -- widened get_profile_display_names) and 20260928090000_trainer_profiles_
 -- entitlement.sql (server-side TRAINER capability enforcement on creation).

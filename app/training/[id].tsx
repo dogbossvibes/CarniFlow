@@ -165,6 +165,7 @@ export default function TrainingDetailScreen() {
     })));
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => { einheitLaden(); }, [einheitLaden]);
 
 

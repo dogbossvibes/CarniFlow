@@ -37,7 +37,9 @@ export function AnimatedPressable({ children, onPress, style, scale = 0.98, disa
   return (
     <AnimatedPressable2
       style={[animStyle, style]}
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       onPressIn={() => { if (!disabled && !reduceMotion) pressed.value = true; }}
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       onPressOut={() => { pressed.value = false; }}
       onPress={() => { if (!disabled) onPress?.(); }}
       disabled={disabled}

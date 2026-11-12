@@ -78,6 +78,8 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        {/* Einführung beim ersten Start — Einstieg nur über das Gate im Tab-Layout. */}
+        <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
         <Stack.Screen name="auth/callback" />
         <Stack.Screen name="auth/recovery" />
         <Stack.Screen name="dog/[id]" />

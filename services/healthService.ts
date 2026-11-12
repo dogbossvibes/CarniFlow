@@ -92,11 +92,19 @@ export async function loadHealthAccessGrants(dogId: string): Promise<{ data: Hea
 export async function loadHealthGrantConnections(): Promise<{ data: HealthGrantConnection[]; error: { message: string } | null }> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: [], error: { message: 'Nicht eingeloggt' } };
-  const [trainers, people] = await Promise.all([
+  // 'contact' = angenommene Kontaktanfrage (20261111220000). Bestehende
+  // health_contact-Verbindungen aus der früheren Personensuche bleiben gültig.
+  const [trainers, people, contacts] = await Promise.all([
     listConnections(user.id, 'trainer_client'),
     listConnections(user.id, PERSON_CONNECTION_TYPE),
+    listConnections(user.id, 'contact'),
   ]);
-  const result = [...trainers, ...people];
+  const seen = new Set<string>();
+  const result = [...contacts, ...trainers, ...people].filter(connection => {
+    if (connection.myRole !== 'owner' || connection.status !== 'accepted') return true;
+    if (seen.has(connection.counterpartId)) return false;
+    seen.add(connection.counterpartId); return true;
+  });
   return { data: result.filter(connection => connection.myRole === 'owner' && connection.status === 'accepted').map(connection => ({ ...connection, eligible: true })), error: null };
 }
 

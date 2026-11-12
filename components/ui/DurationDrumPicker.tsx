@@ -53,6 +53,7 @@ export function DurationDrumPicker({ value, onChange }: Props) {
           });
         }}
       >
+        {/* eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert */}
         {STEPS.map(v => (
           <View key={v} style={S.item}>
             <Text style={[

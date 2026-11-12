@@ -206,15 +206,17 @@ describe('Verschärft: argv, Dry-Run == echte Ausführung, npm-Script', () => {
   });
 });
 
-describe('Agentenregeln (AGENTS.md = CLAUDE.md)', () => {
+describe('Agentenregeln (AGENTS.md, von CLAUDE.md importiert)', () => {
   const section = (f: string) => {
     const s = readFileSync(f, 'utf8');
     const i = s.indexOf('## ANYVO Production OTA — zwingende Regel');
     expect(i).toBeGreaterThanOrEqual(0);
     return s.slice(i);
   };
-  it('beide Dateien enthalten dieselbe Regel', () => {
-    expect(section('CLAUDE.md')).toBe(section('AGENTS.md'));
+  it('CLAUDE.md importiert AGENTS.md und dupliziert die Regel nicht', () => {
+    const claude = readFileSync('CLAUDE.md', 'utf8');
+    expect(claude.split('\n')[0]).toBe('@AGENTS.md');
+    expect(claude).not.toContain('## ANYVO Production OTA — zwingende Regel');
   });
   it('die Regel nennt Pflichtargumente, Verbotsmuster, Preflight, Verifikation, Android und Priorität', () => {
     const s = section('AGENTS.md');
@@ -228,7 +230,11 @@ describe('Agentenregeln (AGENTS.md = CLAUDE.md)', () => {
   });
   it('bestehende Regeln blieben erhalten', () => {
     const a = readFileSync('AGENTS.md', 'utf8');
-    expect(a).toContain('# Agent Handoff Protocol (Claude Code ↔ Codex)');
+    expect(a).toMatch(/^# ANYVO – Arbeitsregeln\b/m);
+    expect(a).toContain('## Kundendatenerhalt (direkte Nutzeranforderung 2026-10-08)');
+    expect(a).toContain('## OTA-Freigabe ab 2026-11-09 (direkter Nutzerauftrag)');
+    expect(a).toContain('## Release-Karte nach jeder Production-OTA (direkter Nutzerauftrag 2026-11-09)');
+    expect(a).toContain('publish an OTA, start a build, or release to a store without explicit user permission');
     expect(a).toContain('## NEVER');
     expect(readFileSync('CLAUDE.md', 'utf8')).toContain('@AGENTS.md');
   });

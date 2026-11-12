@@ -1,0 +1,246 @@
+{
+  "name": "production",
+  "id": "019fbf76-0447-75a5-9314-db0542799957",
+  "currentPage": [
+    {
+      "branch": "production",
+      "message": "\"Gewichtsjournal: Verlauf und Messungen übersichtlich bearbeiten\" (9 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-gnss-v1",
+      "isRollBackToEmbedded": false,
+      "group": "a32df3fd-23a2-4415-b3c1-f8091e24b5d5",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Gewichtsjournal: Verlauf und Messungen übersichtlich bearbeiten\" (9 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-greeting-v1",
+      "isRollBackToEmbedded": false,
+      "group": "44aa5717-7708-455b-84d8-781b8e20b3b1",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Gewichtsjournal: Verlauf und Messungen übersichtlich bearbeiten\" (9 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.6-map49-v1",
+      "isRollBackToEmbedded": false,
+      "group": "fb22d170-2dd9-43eb-b63d-f96d4924fe0e",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"QA-Diagnose: Sollwinkel-Zeitmarkierungen für Feldtests\" (10 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-gnss-v1",
+      "isRollBackToEmbedded": false,
+      "group": "5a89cf23-925b-450d-a2ea-e68f594bc848",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"QA-Diagnose: Sollwinkel-Zeitmarkierungen für Feldtests\" (10 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-greeting-v1",
+      "isRollBackToEmbedded": false,
+      "group": "6f50426f-4533-4e9f-8999-5214e55e710f",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"QA-Diagnose: Sollwinkel-Zeitmarkierungen für Feldtests\" (10 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.6-map49-v1",
+      "isRollBackToEmbedded": false,
+      "group": "b611ea8b-6644-45d8-9311-aba7a4972933",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtenkarte: Lege- und Suchspur klarer unterscheiden; Gegenstände und Termine erhalten\" (19 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-gnss-v1",
+      "isRollBackToEmbedded": false,
+      "group": "dd38f420-0432-4955-9e6a-ce0df2f4c6b3",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtenkarte: Lege- und Suchspur klarer unterscheiden; Gegenstände und Termine erhalten\" (19 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-greeting-v1",
+      "isRollBackToEmbedded": false,
+      "group": "283b31ad-749d-4f74-99b1-13f87ced600f",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtenkarte: Lege- und Suchspur klarer unterscheiden; Gegenstände und Termine erhalten\" (19 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.6-map49-v1",
+      "isRollBackToEmbedded": false,
+      "group": "9c0bee04-9845-438c-9f22-82d10cf3d21e",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Kalender: eigene Termine sicher löschen; bestehende Fährten und Daten erhalten\" (20 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-gnss-v1",
+      "isRollBackToEmbedded": false,
+      "group": "006c2319-cc8f-42e1-a842-34c5baad6bd7",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Kalender: eigene Termine sicher löschen; bestehende Fährten und Daten erhalten\" (20 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-greeting-v1",
+      "isRollBackToEmbedded": false,
+      "group": "4d3845d7-8ca1-409c-9637-923da370b988",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Kalender: eigene Termine sicher löschen; bestehende Fährten und Daten erhalten\" (20 hours ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.6-map49-v1",
+      "isRollBackToEmbedded": false,
+      "group": "f05c8500-ca99-40dd-9a14-8fea215b4c58",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtenkarte: weit auseinanderliegende Marker nicht zu einer Kette zusammenfassen\" (2 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-gnss-v1",
+      "isRollBackToEmbedded": false,
+      "group": "240ffb13-3dc9-4a26-8b91-48d14faaccaf",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtenkarte: weit auseinanderliegende Marker nicht zu einer Kette zusammenfassen\" (2 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-greeting-v1",
+      "isRollBackToEmbedded": false,
+      "group": "0cfdf5fb-9e98-43a6-89bd-cfed427e6ce6",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtenkarte: weit auseinanderliegende Marker nicht zu einer Kette zusammenfassen\" (2 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.6-map49-v1",
+      "isRollBackToEmbedded": false,
+      "group": "b61c60b0-476d-40e7-a9c7-9f8c179e51a2",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Trainingseingaben: Tastaturfokus sichtbar halten und Bewertungen klar beschriften\" (2 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.6-map49-v1",
+      "isRollBackToEmbedded": false,
+      "group": "d13feea0-3733-4967-bde5-194a13d06ded",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtendiagnose: persönlichen Zugriff nach Verbindungsfehler zuverlässig erneut prüfen\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-motion-v4",
+      "isRollBackToEmbedded": false,
+      "group": "838e8cc5-7910-41dc-9d89-15a37be934bc",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Hundedashboard: Hinweise und Termine direkt öffnen; eigene Termine explizit abschließen oder absagen\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-gnss-v1",
+      "isRollBackToEmbedded": false,
+      "group": "12520579-2390-49d6-b1a8-abfc3dc11161",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Hundedashboard: Hinweise und Termine direkt öffnen; eigene Termine explizit abschließen oder absagen\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-greeting-v1",
+      "isRollBackToEmbedded": false,
+      "group": "f43a7b44-9257-40ab-9561-a4ec23b63fa7",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Hundedashboard: Hinweise und Termine direkt öffnen; eigene Termine explizit abschließen oder absagen\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-map49-v1",
+      "isRollBackToEmbedded": false,
+      "group": "1c2f0660-c5a2-430b-984d-be730c4a8bad",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Hundedashboard: Hinweise und Termine direkt öffnen; eigene Termine explizit abschließen oder absagen\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-motion-v4",
+      "isRollBackToEmbedded": false,
+      "group": "87dd058e-4dc0-458f-b5cd-b625eecd4d4e",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Tracking und LiveShare erhalten\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5",
+      "isRollBackToEmbedded": false,
+      "group": "7fc759b6-7988-4e6e-b6c3-f7bcaef27156",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Tracking und LiveShare erhalten\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.4",
+      "isRollBackToEmbedded": false,
+      "group": "5e7d6935-39ef-435c-a012-60cdd774ea07",
+      "platforms": "android"
+    },
+    {
+      "branch": "production",
+      "message": "\"Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Tracking und LiveShare erhalten\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-motion-v2",
+      "isRollBackToEmbedded": false,
+      "group": "76827060-84b1-424d-bee0-90ad702ec593",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Tracking und LiveShare erhalten\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-motion-v3",
+      "isRollBackToEmbedded": false,
+      "group": "4ba7de8e-7079-4412-a6d0-dd46a4d184e1",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Tracking und LiveShare erhalten\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5",
+      "isRollBackToEmbedded": false,
+      "group": "ec80870a-15ee-4868-8d40-69093a8858cb",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Tracking und LiveShare erhalten\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.4",
+      "isRollBackToEmbedded": false,
+      "group": "ffd8bae7-9a0c-4f7e-9cbf-a721f6a90de1",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtenansicht: Gegenstände und beide Spuren; begrenzte persönliche Bewegungsdiagnose\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-motion-v4",
+      "isRollBackToEmbedded": false,
+      "group": "20a40a68-c5c9-4c7c-9c47-cdad59c1d275",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Fährtenansicht: Gegenstände und beide Spuren; begrenzte persönliche Bewegungsdiagnose\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-map49-v1",
+      "isRollBackToEmbedded": false,
+      "group": "4982eda1-2d39-471e-a80b-36c6c03b8ccd",
+      "platforms": "ios"
+    },
+    {
+      "branch": "production",
+      "message": "\"Trainingserfassung: Tastatur und Scrollende erreichbar; Daten, Tracking und LiveShare erhalten\" (3 days ago by dog.boss.vibes)",
+      "runtimeVersion": "1.0.5-gnss-v1",
+      "isRollBackToEmbedded": false,
+      "group": "bdb44069-3265-4923-bbdd-716d48720c35",
+      "platforms": "android"
+    }
+  ]
+}

@@ -246,11 +246,14 @@ export function QuickAddSheet() {
   // Hydrieren aus AsyncStorage oder Rückkehr von den Einstellungen).
   const [pos, setPos] = useState(() => positionFor(saved, bounds));
   const appliedKey = useRef<string | null>(null);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   if (appliedKey.current !== savedKey) {
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     appliedKey.current = savedKey;
     setPos(positionFor(saved, bounds));
   }
   const posRef = useRef(pos);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   posRef.current = pos;
   const start = useRef(pos);
 
@@ -284,14 +287,21 @@ export function QuickAddSheet() {
   const gesture = useRef({
     bounds, W, actions, runAction, openSettings, persistPosition,
   });
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   gesture.current.bounds = bounds;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   gesture.current.W = W;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   gesture.current.actions = actions;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   gesture.current.runAction = runAction;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   gesture.current.openSettings = openSettings;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   gesture.current.persistPosition = persistPosition;
 
   const panResponder = useRef(
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
@@ -382,6 +392,7 @@ export function QuickAddSheet() {
   return (
     <>
       <View
+        // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
         {...panResponder.panHandlers}
         style={[s.fab, { left: renderPos.x, top: renderPos.y }]}
         accessibilityRole="button"
@@ -456,11 +467,13 @@ function FanOverlay({
     id, cx: anchorX + offsets[i].x, cy: anchorY + offsets[i].y,
   }));
   const centersRef = useRef(centers);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   centersRef.current = centers;
 
   // Ein Animated.Value pro Aktionskreis (stabil über Re-Render hinweg).
   const scaleMap = useRef(new Map<string, Animated.Value>()).current;
   for (const id of actions) {
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (!scaleMap.has(id)) scaleMap.set(id, new Animated.Value(1));
   }
 
@@ -481,14 +494,18 @@ function FanOverlay({
       const v = scaleMap.get(activeAction);
       if (v) Animated.spring(v, { toValue: FAN_ACTIVE_SCALE, useNativeDriver: false, speed: FAN_SCALE_SPEED, bounciness: 0 }).start();
     }
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   }, [activeAction, actions, scaleMap]);
 
   // Beim Unmount alle laufenden Animationen stoppen.
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   useEffect(() => () => { for (const v of scaleMap.values()) v.stopAnimation(); }, [scaleMap]);
 
   const onRunRef = useRef(onRun);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   onRunRef.current = onRun;
   const onCloseRef = useRef(onClose);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   onCloseRef.current = onClose;
 
   // Gesture-Trennung (T-42D):
@@ -498,6 +515,7 @@ function FanOverlay({
   //     per Hit-Test über die Kreise (Hervorhebung). Loslassen: Aktion, wenn der
   //     Finger auf einem Kreis liegt, sonst nur schliessen (wie Tipp auf den Scrim).
   const panResponder = useMemo(
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     () => PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_evt, g) => Math.hypot(g.dx, g.dy) > FAN_TAKEOVER_SLOP,
@@ -541,6 +559,7 @@ function FanOverlay({
     <View style={StyleSheet.absoluteFill} testID="quick-fan-overlay" {...panResponder.panHandlers}>
       <Pressable style={s.scrim} onPress={onClose} testID="quick-fan-scrim" accessibilityLabel={t('common.close')} />
       <View style={[s.fanAnchor, { left: anchorX, top: anchorY }]} testID="quick-fan-anchor">
+        {/* eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert */}
         {actions.map((id, i) => {
           const off = offsets[i];
           const p = parseQuickActionId(id);

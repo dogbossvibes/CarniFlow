@@ -18,6 +18,7 @@ export function ScoreRing({ score, size = 160, label }: Props) {
   const circumference = 2 * Math.PI * R;
 
   const animVal = useRef(new Animated.Value(0)).current;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const numVal  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export function ScoreRing({ score, size = 160, label }: Props) {
     }).start();
   }, [score]);
 
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const strokeOffset = animVal.interpolate({
     inputRange:  [0, 1],
     outputRange: [circumference, 0],

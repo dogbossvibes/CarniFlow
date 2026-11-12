@@ -1,4 +1,5 @@
-/** iOS-OTA-Vertrag gegen die unabhängig geprüfte Build-57-IPA.
+/** iOS-OTA-Vertrag gegen die geprüfte Build-60-IPA (main = iOS-60-Linie).
+ * Die Build-57-Werte bleiben als Fixture für die eigene Release-Linie erhalten.
  * Die globale Version ist kein Ersatz für plattformspezifische Expo-Werte.
  * Historische Build-49-Erwartungen gehören nicht zum aktuellen Release-Vertrag.
  */
@@ -8,10 +9,10 @@ import { getBuildNumber, getVersion } from '@expo/config-plugins/build/ios/Versi
 
 const app = JSON.parse(readFileSync('app.json', 'utf8')).expo;
 const eas = JSON.parse(readFileSync('eas.json', 'utf8'));
-const binary = JSON.parse(readFileSync('scripts/__tests__/fixtures/ios-build57-contract.json', 'utf8'));
+const binary = JSON.parse(readFileSync('scripts/__tests__/fixtures/ios-build60-contract.json', 'utf8'));
 
 describe('Production-Native-Vertrag', () => {
-  it('aufgelöste iOS-Version, Runtime und Build passen zur geprüften Build-57-IPA', async () => {
+  it('aufgelöste iOS-Version, Runtime und Build passen zur geprüften Build-60-IPA', async () => {
     expect(getVersion(app)).toBe(binary.version);
     expect(getAppVersion(app, 'ios')).toBe(binary.version);
     expect(await getRuntimeVersionAsync(process.cwd(), app, 'ios')).toBe(binary.runtimeVersion);

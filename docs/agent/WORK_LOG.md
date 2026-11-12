@@ -3,6 +3,15 @@
 > Kurzer chronologischer Verlauf. **Keine** vollständigen Chatprotokolle.
 > Neueste Einträge oben. Agenten pflegen diesen Log manuell (nicht halluzinieren).
 
+## 2026-10-07 — Codex (T-63 Android subscription publication)
+
+- User authorized publication and clean shared-file management. Relevant Play Store, internal iOS and integration chats were read; foreign work preserved.
+- Canonical main feature `3979246`, approval-test repair `c302bce`. Main-based Android runtime snapshot retained the complete active Android product baseline.
+- Published Android runtime 1.0.3, production channel/branch/environment, release `e88371dc49233853162e87d8114c9f9d38a112d9`; group `168ae23f-676f-455c-8f15-bb475910d83e`, update `01a117b7-e024-7a59-9d60-ade29e2b6b01`. Guard and post-check PASS; iOS latest group unchanged.
+- Verified all 326 suites/3968 distinct tests across full run and repaired-suite rerun; tsc PASS, lint 0 errors; production export and final bundle keys/backend/commit verified.
+- Central status, task ledger (next T-64), manual handoff and T-63 report updated. Device purchase QA remains OPEN.
+- No Git push, new native build, store submission or database change. Four unrelated integration candidates remain separate; their older FF plan must preserve T-63.
+
 ## 2026-08-17 — Codex (T-57 Real-Device-QA releaseverifiziert)
 
 T-57 bleibt der unveränderte Produktcode-Commit **`0e7aaba fix(trainer): keep connect sheet above keyboard`**.

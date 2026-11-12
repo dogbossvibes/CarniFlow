@@ -1,0 +1,338 @@
+[
+  {
+    "branch": "codex/t115-qa-archive-20261101",
+    "sha": "90de7cb1d504c7a90fd12c64ef3400c43969ac0a",
+    "main_only_commits": 12,
+    "candidate_only_commits": 66,
+    "on_github": true,
+    "exact_github_branches": [
+      "codex/t115-qa-archive-20261101"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/canisflow-worktrees/anyvo-t115-qa-archive-20261101",
+        "branch": "codex/t115-qa-archive-20261101",
+        "sha": "90de7cb1d504c7a90fd12c64ef3400c43969ac0a",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "feat/shared-recipient-ui-20261101",
+    "sha": "9325758ef5d31b5207fc23428c939d58fd9185ce",
+    "main_only_commits": 12,
+    "candidate_only_commits": 65,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-9325758ef5d3"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-ui-20261101",
+        "branch": "feat/shared-recipient-ui-20261101",
+        "sha": "9325758ef5d31b5207fc23428c939d58fd9185ce",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "feat/shared-recipient-android49-20261101",
+    "sha": "ef67627ecef96004271ec740e00b52f25b307182",
+    "main_only_commits": 10,
+    "candidate_only_commits": 77,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-ef67627ecef9"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-android49-20261101",
+        "branch": "feat/shared-recipient-android49-20261101",
+        "sha": "ef67627ecef96004271ec740e00b52f25b307182",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "feat/shared-recipient-android50-20261101",
+    "sha": "2c8c102e39e404dd99f055006b445808303ca4f3",
+    "main_only_commits": 10,
+    "candidate_only_commits": 78,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-2c8c102e39e4"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-shared-recipient-android50-20261101",
+        "branch": "feat/shared-recipient-android50-20261101",
+        "sha": "2c8c102e39e404dd99f055006b445808303ca4f3",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "feat/weight-journal-20261101",
+    "sha": "4a13945539c6bc60f623bb8888f3abc3dd95fdec",
+    "main_only_commits": 12,
+    "candidate_only_commits": 64,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-4a13945539c6"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-weight-journal-20261101",
+        "branch": "feat/weight-journal-20261101",
+        "sha": "4a13945539c6bc60f623bb8888f3abc3dd95fdec",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "release/weight-journal-android49-20261101",
+    "sha": "32510f7a03ca49eef6440b1d28f584b6dd09f446",
+    "main_only_commits": 10,
+    "candidate_only_commits": 76,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-32510f7a03ca"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/canisflow-worktrees/anyvo-weight-journal-android49-20261101",
+        "branch": "release/weight-journal-android49-20261101",
+        "sha": "32510f7a03ca49eef6440b1d28f584b6dd09f446",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "release/weight-journal-android50-20261101",
+    "sha": "b27f76192a9d24e85827a194f471af9a475c70e5",
+    "main_only_commits": 10,
+    "candidate_only_commits": 77,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-b27f76192a9d"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/canisflow-worktrees/anyvo-weight-journal-android50-20261101",
+        "branch": "release/weight-journal-android50-20261101",
+        "sha": "b27f76192a9d24e85827a194f471af9a475c70e5",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "release/time-mark-ios57-20261101",
+    "sha": "2687e04ccb885131119ffb9bebf3af36e1f21cb3",
+    "main_only_commits": 12,
+    "candidate_only_commits": 63,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-2687e04ccb88"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/canisflow-worktrees/anyvo-time-mark-ios57-20261101",
+        "branch": "release/time-mark-ios57-20261101",
+        "sha": "2687e04ccb885131119ffb9bebf3af36e1f21cb3",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "release/time-mark-android49-20261101",
+    "sha": "b32254408ea88ec76277b58700a3eb0217a390a1",
+    "main_only_commits": 10,
+    "candidate_only_commits": 75,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-b32254408ea8"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/canisflow-worktrees/anyvo-time-mark-android49-20261101",
+        "branch": "release/time-mark-android49-20261101",
+        "sha": "b32254408ea88ec76277b58700a3eb0217a390a1",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "release/time-mark-android50-20261101",
+    "sha": "0d4d3de622125b078d5f69a96d679c969cb65713",
+    "main_only_commits": 10,
+    "candidate_only_commits": 76,
+    "on_github": true,
+    "exact_github_branches": [
+      "release/source-0d4d3de62212"
+    ],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/canisflow-worktrees/anyvo-time-mark-android50-20261101",
+        "branch": "release/time-mark-android50-20261101",
+        "sha": "0d4d3de622125b078d5f69a96d679c969cb65713",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "fix/ios57-map-render-20261030",
+    "sha": "439525f7df062296d5d1c4dac0fd0eefb1bb136e",
+    "main_only_commits": 12,
+    "candidate_only_commits": 63,
+    "on_github": false,
+    "exact_github_branches": [],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/.codex/.chatgpt-projects/g-p-6a5d2be17420819195ad86f465dbea47/anyvo-ios57-map-render-20261030",
+        "branch": "fix/ios57-map-render-20261030",
+        "sha": "439525f7df062296d5d1c4dac0fd0eefb1bb136e",
+        "on_github": false,
+        "in_remote_main": false,
+        "status": "clean",
+        "entry_count": 0,
+        "entries": []
+      }
+    ]
+  },
+  {
+    "branch": "main",
+    "sha": "1a574212f6b7c1827bc03048f2eb5b5d662cd7a1",
+    "main_only_commits": 3,
+    "candidate_only_commits": 7,
+    "on_github": true,
+    "exact_github_branches": [],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/canisflow-worktrees/anyvo-main",
+        "branch": "main",
+        "sha": "1a574212f6b7c1827bc03048f2eb5b5d662cd7a1",
+        "on_github": true,
+        "in_remote_main": false,
+        "status": "dirty",
+        "entry_count": 24,
+        "entries": [
+          "M AGENTS.md",
+          " M docs/agent/ACTIVE_WORK.md",
+          " M docs/agent/ANYVO_MASTER_STATUS.md",
+          " M docs/agent/DECISIONS.md",
+          " M docs/agent/PLATFORM_STATUS.md",
+          " M docs/agent/README.md",
+          " M docs/agent/tasks/_TEMPLATE.md",
+          " M package.json",
+          " M scripts/__tests__/otaReleaseHarness.ts",
+          " M scripts/__tests__/updateProductionInitialRuntime.test.ts",
+          " M scripts/__tests__/updateProductionRaceGuard.test.ts",
+          " M scripts/agent-worktree.mjs",
+          " M scripts/check-native-changes.mjs",
+          " M scripts/preflight.mjs",
+          " M scripts/update-production.mjs",
+          "?? docs/agent/tasks/T-69.md",
+          "?? docs/agent/tasks/TRACKING-DIAGNOSTICS-AUDIT-2026-10-08.md",
+          "?? scripts/__tests__/developmentProcess.node.test.mjs",
+          "?? scripts/__tests__/releaseQualityEvidence.test.ts",
+          "?? scripts/__tests__/updateProductionNativeProfile.test.ts",
+          "?? scripts/__tests__/updateProductionPlatformRuntime.test.ts",
+          "?? scripts/development-snapshot.mjs",
+          "?? scripts/release-quality-evidence.mjs",
+          "?? scripts/task-registry.mjs"
+        ]
+      }
+    ]
+  },
+  {
+    "branch": "feat/track-module-rewrite",
+    "sha": "67d400610469e48c6e94b467167fc74a5d642b48",
+    "main_only_commits": 181,
+    "candidate_only_commits": 30,
+    "on_github": false,
+    "exact_github_branches": [],
+    "worktrees": [
+      {
+        "path": "/Users/moyo/canisflow/canisflow",
+        "branch": "feat/track-module-rewrite",
+        "sha": "67d400610469e48c6e94b467167fc74a5d642b48",
+        "on_github": false,
+        "in_remote_main": false,
+        "status": "dirty",
+        "entry_count": 30,
+        "entries": [
+          "M .gitignore",
+          " M AGENTS.md",
+          " M CLAUDE.md",
+          " M docs/agent/README.md",
+          " M docs/agent/SESSION_HANDOFF.md",
+          " M legal-web/assets/site.css",
+          " M legal-web/funktionen.html",
+          " M legal-web/funktionen/index.html",
+          " M legal-web/index.html",
+          "?? .agents/",
+          "?? .claude/skills/",
+          "?? CODEX_HANDOFF_2026-09-14.md",
+          "?? _bmad/",
+          "?? app/event/",
+          "?? assets/images/SKADIANYVOLOW.jpg",
+          "?? assets/images/anyvofaehrte.jpg",
+          "?? assets/images/fahertenanyvo.jpg",
+          "?? docs/agent/BMAD.md",
+          "?? docs/agent/status/",
+          "?? legal-web/assets/images/anyvofaehrte.jpg",
+          "?? legal-web/assets/screenshots/appstore-ios-01-all-in-one.png",
+          "?? legal-web/assets/screenshots/appstore-ios-02-hundprofil.png",
+          "?? legal-web/assets/screenshots/appstore-ios-03-gesundheit.png",
+          "?? legal-web/assets/screenshots/appstore-ios-04-laeufigkeit.png",
+          "?? legal-web/assets/screenshots/appstore-ios-05-faehrtenkarte.png",
+          "?? legal-web/assets/screenshots/appstore-ios-06-faehrte-legen.png",
+          "?? legal-web/assets/screenshots/appstore-ios-07-schnellstart.png",
+          "?? legal-web/assets/screenshots/appstore-ios-08-training.png",
+          "?? legal-web/assets/screenshots/appstore-ios-09-medien.png",
+          "?? legal-web/assets/screenshots/appstore-ios-10-meine-hunde.png"
+        ]
+      }
+    ]
+  }
+]

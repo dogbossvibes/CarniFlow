@@ -1,5 +1,4 @@
 import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
-import { TransferContactSearch } from './TransferContactSearch';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -119,8 +118,8 @@ function AccountTransferScreen({ userId }: { userId: string | null }) {
         <Button label={t('sync')} onPress={() => router.push('/sync' as never)} />
         <Text style={styles.heading}>{t('choosePerson')}</Text>
         {!contacts.length && <><Text style={styles.muted}>{t('emptyContacts')}</Text></>}
-        {userId && <TransferContactSearch userId={userId} epoch={client.epoch} disabled={busy}
-          onConnected={id => { setPersonId(id); setRevision(n => n + 1); }} />}
+        <Text style={styles.muted}>{t('connectionInfo')}</Text>
+        <Button label={t('addContact')} disabled={busy} onPress={() => router.push('/contacts/add' as never)} />
         {contacts.map(c => <Button key={c.userId} label={contactName(c.userId)} selected={personId === c.userId} disabled={busy} onPress={() => setPersonId(c.userId)} />)}
         <Text style={styles.muted}>{t('consent')}</Text><Button label={t('send')} disabled={busy || !sourceId || !personId || !userId || !contacts.some(c => c.userId === personId)} onPress={send} />
       </View>}

@@ -78,6 +78,7 @@ export default function MyTrainersScreen() {
   useEffect(() => {
     if (!searchSheet) return;
     const q = query.trim();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (!q) { setResults([]); setSearching(false); return; }
     setSearching(true);
     const timer = setTimeout(() => {

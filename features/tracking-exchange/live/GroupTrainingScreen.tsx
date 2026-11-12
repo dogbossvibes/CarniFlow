@@ -2,7 +2,7 @@ import { isLiveShareReleaseReady } from './releaseGate';
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useIsFocused, useRouter } from 'expo-router';
+import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { useTranslation } from 'react-i18next';
 import { useSession } from '@/hooks/useSession';
@@ -15,7 +15,7 @@ import { useTrainingGroups } from './useTrainingGroups';
 import { useGroupLivePositions } from './useGroupLivePositions';
 import { useConnectedInviteTargets } from '@/features/training-groups/useConnectedInviteTargets';
 import type { GroupErrorCode } from '../groups/groupRpc';
-import { parseGroup, parseSession } from '../groups/groupModels';
+import { canManageGroup, parseGroup, parseSession } from '../groups/groupModels';
 import { GroupPositionsMap } from './components/GroupPositionsMap';
 import './integrationI18n';
 
@@ -38,13 +38,23 @@ export default function GroupTrainingScreen() {
   const live = useGroupLiveShare();
   const groups = useTrainingGroups(userId, live.client);
   const { data, act } = groups;
+  // Aus der Gruppenübersicht geöffnet: diese Gruppe vorauswählen (einmal pro Aufruf).
+  const { groupId: requestedGroupId } = useLocalSearchParams<{ groupId?: string }>();
+  const [preselected, setPreselected] = useState<string | null>(null);
+  const { chooseGroup } = groups;
+  useEffect(() => {
+    if (typeof requestedGroupId !== 'string' || preselected === requestedGroupId) return;
+    if (!data.groups.some(g => g.groupId === requestedGroupId)) return;
+    setPreselected(requestedGroupId);
+    if (data.groupId !== requestedGroupId) chooseGroup(requestedGroupId);
+  }, [chooseGroup, data.groupId, data.groups, preselected, requestedGroupId]);
   const [contactsRevision, setContactsRevision] = useState(0);
   const contacts = useConnectedInviteTargets(userId, contactsRevision);
   const [now, setNow] = useState(() => performance.now());
   useEffect(() => { const timer = setInterval(() => setNow(performance.now()), 1000); return () => clearInterval(timer); }, []);
   const serverNow = data.serverNowMs + Math.max(0, now - data.verifiedAt);
   const selectedGroupData = data.groups.find(g => g.groupId === data.groupId) ?? null;
-  const groupViews: GroupView[] = data.groups.map(g => ({ ...g, membershipId: g.members.find(m => m.userId === userId)!.membershipId, canInvite: g.status === 'active' && g.ownerUserId === userId,
+  const groupViews: GroupView[] = data.groups.map(g => ({ ...g, membershipId: g.members.find(m => m.userId === userId)!.membershipId, canInvite: canManageGroup(g, userId), canStartSession: canManageGroup(g, userId),
     canLeave: g.status === 'active' && g.ownerUserId !== userId, canClose: g.status === 'active' && g.ownerUserId === userId }));
   const selectedGroup = groupViews.find(g => g.groupId === data.groupId) ?? null;
   const joined = data.session?.participants.find(p => p.userId === userId) ?? null;
@@ -53,7 +63,7 @@ export default function GroupTrainingScreen() {
     const active = s.status === 'active' && s.expiresAtMs > serverNow;
     return { ...s, status: active ? 'active' : 'ended', expiresLabel: active ? label(s.expiresAtMs) : t('expired'),
       canJoin: active && !(s.sessionId === data.sessionId && joined),
-      canEnd: active && (s.ownerUserId === userId || selectedGroupData?.ownerUserId === userId) };
+      canEnd: active && (s.ownerUserId === userId || (!!selectedGroupData && canManageGroup(selectedGroupData, userId))) };
   });
   const selectedSession = sessionViews.find(s => s.sessionId === data.sessionId) ?? null;
   const activeSession = selectedSession?.status === 'active' && joined ? data.session : null;

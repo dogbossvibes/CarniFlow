@@ -16,6 +16,8 @@ import type { FeedItem } from '@/services/trainingFeed';
 import { deleteFeedItem } from '@/services/deleteTraining';
 import { AnyvoSwipeRow, type AnyvoSwipeAction } from '@/components/ui/AnyvoSwipeRow';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
+import { buildReportModel } from '@/features/training/report';
+import { shareTrainingReport } from '@/services/reportShare';
 import {
   filterFeed, groupFeed, summarize, paginate, hasMore, disciplinesOf,
   itemDiscipline, itemDogName, itemHasMedia, itemNotePreview,
@@ -166,6 +168,53 @@ export default function TrainingJournalScreen() {
     ]);
   }, [t, refresh]);
 
+  // PDF-Bericht: genau die aktuell gefilterten Einträge (alle, nicht nur die
+  // geladene Seite). Nur Lesen + Teilen-Fenster des Systems — keine Datenänderung.
+  const [reportBusy, setReportBusy] = useState(false);
+  const createReport = useCallback(async (includeNotes: boolean) => {
+    if (reportBusy) return;
+    setReportBusy(true);
+    try {
+      const dog = dogFilter ? dogs.find(d => d.id === dogFilter)?.name ?? null : null;
+      const today = new Date();
+      const todayLabel = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+      const model = buildReportModel(filtered, {
+        includeNotes,
+        withDogName: !dog,
+        labels: {
+          title: dog ? t('report.titleDog', { dog }) : t('report.title'),
+          colDate: t('report.colDate'),
+          colDiscipline: t('report.colDiscipline'),
+          colDuration: t('report.colDuration'),
+          colRating: t('report.colRating'),
+          colContent: t('report.colContent'),
+          statTrainings: t('journal.statTrainings'),
+          statTime: t('journal.statTime'),
+          statDisciplines: t('journal.statDisciplines'),
+          statAvgRating: t('report.avgRating'),
+          minutes: (min) => t('journal.minutesShort', { count: min }),
+          footerCreated: t('report.footer', { date: todayLabel }),
+          page: (n, total) => t('report.page', { n, total }),
+        },
+      });
+      const result = await shareTrainingReport(model, `ANYVO-${dog ?? 'Trainingsbericht'}-${today.toISOString().slice(0, 10)}`);
+      if (result === 'unavailable') Alert.alert(t('report.unavailable'));
+    } catch {
+      Alert.alert(t('report.error'));
+    } finally {
+      setReportBusy(false);
+    }
+  }, [reportBusy, dogFilter, dogs, filtered, t]);
+
+  const askReport = useCallback(() => {
+    if (filtered.length === 0) { Alert.alert(t('report.emptyTitle'), t('report.emptyBody')); return; }
+    Alert.alert(t('report.askTitle'), t('report.askBody', { count: filtered.length }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('report.withoutNotes'), onPress: () => { void createReport(false); } },
+      { text: t('report.withNotes'), onPress: () => { void createReport(true); } },
+    ]);
+  }, [filtered.length, t, createReport]);
+
   const groupLabel = (g: JournalGroup): string => {
     if (g.kind === 'today')     return t('journal.group.today');
     if (g.kind === 'yesterday') return t('journal.group.yesterday');
@@ -189,6 +238,12 @@ export default function TrainingJournalScreen() {
             <Ionicons name="chevron-back" size={20} color={C.trackText} />
           </TouchableOpacity>
           <Text style={s.barTitle} numberOfLines={1}>{t('journal.title')}</Text>
+          <TouchableOpacity style={[s.iconBtn, s.reportBtn]} onPress={askReport} disabled={reportBusy} hitSlop={8}
+            accessibilityRole="button" accessibilityLabel={t('report.buttonA11y')} accessibilityState={{ busy: reportBusy }}>
+            {reportBusy
+              ? <ActivityIndicator size="small" color={C.trackPrimary} />
+              : <Ionicons name="document-text-outline" size={18} color={C.trackPrimary} />}
+          </TouchableOpacity>
           <TouchableOpacity style={s.iconBtn} onPress={() => router.push('/analyse/insights' as never)} hitSlop={8}
             accessibilityRole="button" accessibilityLabel={t('journal.openAnalysis')}>
             <Ionicons name="sparkles-outline" size={17} color={C.trackPrimary} />
@@ -538,6 +593,7 @@ const s = StyleSheet.create({
   root:      { flex: 1, backgroundColor: C.trackBg },
   bar:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 12 },
   iconBtn:   { width: 38, height: 38, borderRadius: 12, borderWidth: 1, borderColor: C.trackBorder, backgroundColor: C.trackCard, alignItems: 'center', justifyContent: 'center' },
+  reportBtn: { marginRight: 8 },
   barTitle:  { flex: 1, fontSize: 16, color: C.trackText, fontWeight: '800', textAlign: 'center' },
   scroll:    { paddingHorizontal: 16, paddingBottom: 16, gap: 10, width: '100%', maxWidth: 720, alignSelf: 'center' },
   subtitle:  { fontSize: 13, color: C.trackTextSec, fontWeight: '500', marginTop: 2 },

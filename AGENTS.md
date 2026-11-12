@@ -2,47 +2,106 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
-## ANYVO project status
+# ANYVO – Arbeitsregeln (Kurzfassung, Stand 2026-11-10)
 
-Before substantial ANYVO work, read:
+Ziel: schnell, klar und sicher arbeiten. Kleine, klare Aufgaben direkt umsetzen,
+ohne Planungsdokumente, Rollenwechsel oder wiederholte Vollprüfungen.
 
-`docs/agent/ANYVO_MASTER_STATUS.md`
+## Keine OTA vergessen (direkter Nutzerauftrag 2026-11-09)
 
-It is the canonical source for current production baseline, completed work,
-active work and open work.
+Vor jedem **neuen nativen Build** und vor der **ersten OTA auf einer neuen
+Runtime** prüfen, ob alle früheren Production-OTAs (alle Runtimes) im Kandidaten
+enthalten sind: `npm run release:check:ota-coverage` (bzw.
+`node scripts/check-ota-coverage.mjs --live --candidate <ref> --platform <ios|android>`).
+`build:prod:*` und `update-production.mjs --initial-runtime-release` erzwingen das;
+Builds mit eigenen Profilen direkt über `eas build` müssen die Prüfung vorher
+ausdrücklich laufen lassen. Fehlende OTAs nachziehen oder in
+`docs/agent/ota-coverage-exceptions.json` mit Begründung, `decidedBy` und Datum
+ausnehmen (z. B. alte Fährtenlogik, durch Build-58-Basis ersetzt). Verzeichnis
+aller OTAs: `docs/agent/ota-ledger.json` (`npm run release:refresh:ota-ledger`).
+Normale OTAs derselben Runtime sichert weiterhin der Ancestry-Guard des Wrappers.
 
-Detailed task files under `docs/agent/tasks` are historical/technical sources
-and must not override the current master status.
+## Ordner und Rollen
 
-Do not update the master status unless the task explicitly includes a verified
-status change.
+- **Einziger Arbeitsordner:** `/Users/moyo/canisflow/canisflow` (Branch `main`).
+  Der äussere Ordner `/Users/moyo/canisflow` ist ein separates Expo-Starterprojekt.
+- **MASTER** = Claude-Code-Sitzung in diesem Ordner mit Worktree-Häkchen **aus**.
+  Einziger Writer für `docs/agent/ANYVO_MASTER_STATUS.md` und `docs/agent/ACTIVE_WORK.md`,
+  einziger Publisher für Production-OTAs, pflegt das GitHub-Projekt
+  „ANYVO – Produkt & Entwicklung“ und die Release-Karten. Arbeitet nur auf Anfrage:
+  kein Heartbeat, keine Prüfschleifen ohne neuen Anlass.
+- **Aufgaben-Sitzung** = Claude Code in diesem Ordner mit Worktree-Häkchen **an**
+  (eigener Worktree unter `.claude/worktrees/`) oder Cloud-Sitzung.
+  1 Aufgabe = 1 Branch = 1 PR. Ergebnis/Blocker im Issue oder PR melden.
+  Keine OTA, kein Schreiben in MASTER_STATUS/ACTIVE_WORK.
+- **Claude-Chat im Projekt ANYVO mit Werkzeugen** (Mac-Verbindung und/oder angebundenes
+  Repo) gilt als Aufgaben-Sitzung:
+  - Über GitHub (Cloud-Klon): Ein Änderungsauftrag der Nutzerin ist die Einzelfreigabe,
+    ab frischem `origin/main` einen eigenen Task-Branch anzulegen, nach den Pflichtprüfungen
+    zu committen, zu pushen und einen PR gegen `main` zu öffnen. Merge entscheidet die Nutzerin.
+  - Über die Mac-Verbindung: nur im freigegebenen Ordner lesen und ändern; ohne gesonderte
+    Freigabe kein Commit/Push; fremde lokale Änderungen und Worktrees bleiben unangetastet.
+  - Der PR nennt ausgeführte Prüfungen und Grenzen offen (z. B. keine Geräteprüfung).
+- **Claude-Chat ohne Werkzeuge:** Planung, Entscheidungen, Issue-Texte, Reviews eingefügter
+  Diffs, Anleitungen. Keine Git-, OTA- oder DB-Aktionen; nichts als erledigt melden, was nicht
+  nachweislich im Repo/Board steht.
+- Frühere ChatGPT/Codex-Rollen (MASTER-Chat, Fachchats, Publisher „01“, Heartbeat) sind
+  beendet; ihre Freigaben gelten nicht weiter.
+- Bei unklarer Zuständigkeit Schreibaktion stoppen und die Nutzerin fragen; read-only
+  Prüfungen dürfen weiterlaufen.
 
-Do not publish a Production OTA from a branch that does not contain the
-documented current Production baseline.
+## Start einer Sitzung
 
-# Agent Handoff Protocol (Claude Code ↔ Codex)
+1. Branch, HEAD und `git status --short` prüfen. Fremde/ungesicherte Änderungen bewahren
+   und nie als eigene ansehen.
+2. **Aufgaben-Sitzung:** Auftrag/Issue lesen, betroffenen Code prüfen, umsetzen.
+   `ANYVO_MASTER_STATUS.md` nur lesen, wenn die Aufgabe Release, Production-Stand,
+   Runtime-Ziele oder den Projektstatus betrifft.
+3. **MASTER:** `ANYVO_MASTER_STATUS.md` und `ACTIVE_WORK.md` lesen. Status nur bei
+   nachweislich geprüfter Änderung aktualisieren.
+4. Historische Hintergrunddateien (nicht der aktuelle Stand, keine Task-ID-Vergabe daraus):
+   `docs/agent/README.md`, `CURRENT_STATE.md`, `SESSION_HANDOFF.md`, `TASKS.md`,
+   `WORKTREES.md`, `WORK_LOG.md`, `docs/agent/tasks/`. Nur bei konkretem Bedarf lesen.
 
-This repository is the shared source of truth for both agents. Full guide:
-`docs/agent/README.md`.
-
-## On start (Codex MUST do this, in order)
-1. Read `docs/agent/CURRENT_STATE.md`.
-2. Read `docs/agent/SESSION_HANDOFF.md`.
-3. Read `docs/agent/TASKS.md` — the active task IDs, their status, and the **next TASK-ID**.
-4. Skim relevant entries in `docs/agent/DECISIONS.md`.
-5. Run `git status --short`.
-6. Check the current branch (`git branch --show-current`).
-7. Compare the repository state against the handoff: does the branch match? Do the
-   listed changed files actually exist? Are there additional local changes? Is the
-   handoff possibly stale (`npm run agent:status`)?
-
-Codex must **never** assume that uncommitted changes were made by itself.
-
-## Priority rule (on any conflict)
+Priority rule (on any conflict):
 ```
-Repository state > Git state > Handoff documentation > Agent assumptions
+Repository/Git facts > current canonical MASTER_STATUS/ACTIVE_WORK > historical handoff/task files > agent assumptions
 ```
-The actual repository state always wins over handoff documentation.
+
+## Arbeitsweise
+
+- Kleine, klare Aufgaben direkt umsetzen. BMAD (`docs/agent/BMAD.md`) nur auf ausdrücklichen
+  Wunsch der Nutzerin oder bei grossen bzw. unklaren Funktionen. Risiko trotzdem beachten:
+  Änderungen an Auth, Berechtigungen, Kundendaten, Persistenz, Abo oder Tracking brauchen
+  vertiefte Prüfung und Regressionstests.
+- Sichtbare UI-Änderungen: zuerst ein Mockup zeigen.
+- Keine parallelen Agenten, Subagenten oder Party Mode ohne ausdrücklichen Wunsch.
+- Funktionierendes Tracking/GPS bewahren; Feldbelege und Kontinuität prüfen, bevor
+  Trackinglogik ersetzt wird.
+- Prüfen bei Produktcode: relevante Tests, TypeScript, ESLint, `git diff --check`
+  (begründete Einschränkungen offen nennen). Nur tatsächlich ausgeführte Prüfungen melden.
+- Abschluss: Ergebnis, ausgeführte Prüfungen, offene Gerätetests. Pro PR genau eine Handlung
+  nennen: «Mergen», «auf dem Gerät testen, dann mergen» oder «Schliessen».
+
+## Git, PRs und Merge
+
+- **Task-Branch sichern** (Nutzerfreigabe 2026-11-05): Nach relevanten Tests, TypeScript,
+  ESLint, Diff-/Secret-Prüfung dürfen abgeschlossene Aufgaben auf dem **eigenen** Task-Branch
+  committet und gepusht werden (`npm run agent:github:push`, Ablauf und STOP-Bedingungen:
+  `docs/agent/GITHUB_AUTOSYNC.md`). Kein Upload fremder WIP-Dateien; bei unsauberem Worktree
+  STOP. Nicht erlaubt: Commit/Push auf `main`, Release-/Backup-/Integrationsbranches, Merge,
+  OTA, Build, Store-Release, Live-DB- oder Kundendatenaktion.
+- **Doku-PRs selbst mergen** (Nutzerfreigabe 2026-11-09): Reiner Doku-PR = ausschliesslich
+  `*.md`-Dateien unter `docs/` (nicht `docs/agent/release-policy.json` oder andere
+  Nicht-Markdown-Dateien), Basis `main`, alle Checks grün. Merge nur mit
+  `gh pr merge <Nr> --squash --delete-branch --match-head-commit <voller SHA>`; kein `--admin`,
+  kein Umgehen von Branch-Schutz. Lokal erzwungen durch `~/.claude/hooks/anyvo-release-guard.py`.
+- **Alle anderen PRs** (Code, Skripte, `package.json`, `AGENTS.md`, `CLAUDE.md`, Konfiguration,
+  Release) mergt nur die Nutzerin.
+- **PR-Ordnung** (Nutzerfreigabe 2026-11-10): Jeder PR wird zeitnah gemergt oder geschlossen,
+  «bewusst offen lassen» gibt es nicht. Claude darf nachweislich überholte PRs selbst
+  schliessen (nicht mergen), mit Kommentar zu Grund und Wiedereröffnung; Branches dabei nicht
+  löschen. Bei Unklarheit nicht schliessen, sondern fragen.
 
 ## NEVER
 - overwrite unrelated uncommitted changes
@@ -50,54 +109,94 @@ The actual repository state always wins over handoff documentation.
 - `git reset`
 - `git checkout` modified files
 - `git clean`
-- push without explicit user permission
-- commit without explicit user permission
-- run destructive SQL
-- alter production Supabase schema without explicit user permission
+- push, merge, or commit without explicit user permission (exceptions: own task branch per
+  "Git, PRs und Merge" above; docs-only PR merges; closing stale PRs)
+- publish an OTA, start a build, or release to a store without explicit user permission
+- run destructive SQL or write to Production Supabase/DB without explicit user permission
+- publish a Production OTA from a branch that does not contain the documented current
+  Production baseline
 
-## ALWAYS
-- inspect `git status` before editing
-- preserve unrelated work
-- verify relevant tests
-- document remaining issues
-- update the handoff before stopping when appropriate
+## Kundendatenerhalt (direkte Nutzeranforderung 2026-10-08)
 
-## When handing off to Claude
-1. Update the **manual** sections of `docs/agent/SESSION_HANDOFF.md`
-   (Current task, Goal, Work completed, Tests, Known issues, Important context,
-   Do not touch, Next recommended step, Relevant files, Open questions).
-2. Run `npm run agent:handoff -- --agent=codex`.
-3. Run `git status --short`.
-4. Do **not** commit or push. Then stop.
+Präzisierung direkter Nutzerauftrag 2026-10-29 (Werkstatt Originalturn
+01a1855d-7fd5-74f2-8af6-e147ef2b1621): Niemals bestehende Kundendaten entfernen.
+Geschützt sind alle Kunden-/Hundedaten: Trainingserfassung/-dokumentation,
+Übungen/Bewertungen/Notizen, Fährten samt Geometrie/Markern/Gegenständen/Absuche/
+Verlauf, Gesundheitsakte/Medikamente sowie sämtliche Termine, Dokumente, Medien,
+Einträge und Verknüpfungen. Auch Altformate, Offline-/unsynchronisierte Einträge
+und Entwürfe erhalten. Keine Teil-/Volllöschung, destruktives Überschreiben,
+verlustbehaftete Migration oder Cache-/Storage-/Datenresets mit Verlust
+ungesicherter Einträge; keine Neuinstallation als Reparaturmaßnahme.
+Anzeige-/Filter-/Syncfehler nicht ungeprüft als Datenlöschung darstellen.
+Datenwirkung jeder Änderung/Integration/Update/Migration prüfen und vorhandene
+Persistenz-/Altformat-/Update-/Offline-/Sync-/Abbruch-/Recovery-Nachweise
+risikogerecht nutzen, keine redundanten Volltests ohne neuen Anlass.
+Bei ungeklärtem Datenverlustrisiko betroffene Änderung/Veröffentlichung STOP;
+Ursache und sichere Lösung melden. Keine absolute Verlustfreiheitsgarantie.
+Keine persönlichen Daten/Secrets in GitHub, Logs, Fixtures oder Übergaben.
+Keine produktiven Lösch-/Resetaktionen zu Testzwecken. Dieser Schutzauftrag
+ist keine Freigabe für Live-Korrektur, DB-Operation, persönlichen Datenexport,
+Restore oder Migration; bestehende Schutzmechanismen bewahren.
 
-The handoff script only rewrites the `AUTO-GENERATED` block of `SESSION_HANDOFF.md`;
-manual sections are never touched.
 
-# Parallel work with Git worktrees
+Bestehende Kundendaten müssen bei Fehlerkorrekturen erhalten bleiben. Keine
+Datenlöschung, destruktives Überschreiben oder Resets als Bugfix; Neuinstallation
+und Löschen lokaler Daten sind keine Standardlösung. Bestehende Einträge,
+Datumswerte, Verläufe und ältere Datenformate weiterhin unterstützen. Insbesondere
+bei Medikamentenfixes vorhandene Einträge laden/bearbeiten/speichern, Abbrechen
+und Upgrade-Pfade soweit tatsächlich prüfbar testen; keine automatische
+historische Datenkorrektur ohne gesonderten Auftrag.
 
-For running several independent tasks at the same time, ANYVO uses Git worktrees.
-Full guide: `docs/agent/WORKTREES.md`.
+Bei notwendiger Migration zuerst Sicherung, Wiederherstellbarkeit,
+Rückwärtskompatibilität und bestehende Freigaben prüfen. Bei ungeklärtem
+Datenverlustrisiko vor Integration/Veröffentlichung STOP. Diese Regel autorisiert
+keine Migration, Live-DB-Schreibaktion, Wiederherstellung oder neue Veröffentlichung.
+Nur ausgeführte Prüfungen melden; verbleibende Risiken/Geräteabnahmen offen
+kennzeichnen, keine absolute Sicherheitsgarantie behaupten.
 
-Core rule:
-```
-1 task = 1 Task-ID (T-XX) = 1 branch = 1 worktree = 1 responsible Primary Agent
-```
+## OTA-Freigabe ab 2026-11-09 (direkter Nutzerauftrag)
 
-- Worktrees are sibling folders: `../anyvo-<slug>`. Multiple Primary Agents may work
-  in parallel, but **never in the same working tree**.
-- Each task keeps its own report in `docs/agent/tasks/<TASK-ID>.md`
-  (template: `docs/agent/tasks/_TEMPLATE.md`). The **global** files (`TASKS.md`,
-  `SESSION_HANDOFF.md`, `CURRENT_STATE.md`, `WORK_LOG.md`) are updated **only at
-  integration** by the responsible integration agent — not by parallel tasks.
-- Helper: `npm run agent:wt:create|list|finish|remove`. `remove` refuses to delete a
-  **dirty** worktree and never uses `--force`.
-- Tool-neutral roles: Primary Agent, Implementation Agent, Review Agent, QA Agent,
-  Subagent. OpenCode is the default Primary Agent (`.opencode/`); OpenAI Codex reads
-  this `AGENTS.md` natively for review/QA. Claude Code is **legacy** and not required.
+Die fortlaufende OTA-Freigabe vom 2026-10-09 galt dem Codex-MASTER und ist beendet.
+Der Claude-MASTER veröffentlicht eine Production-OTA nur nach ausdrücklicher Freigabe
+der Nutzerin **für die konkrete Charge** (Inhalt und Ziele genannt). Vollständige
+sinnvolle Checks, saubere Release-Quelle, frischer Production-/Runtime-/Ancestry-/
+Native-/DB-Preflight und tatsächliche Bundle-/Asset-/Live-/Manifest-CDN-Nachkontrolle
+bleiben Pflicht. Bereits veröffentlichte Pakete nicht erneut ausliefern. STOP bei
+ungeklärter Quelle, fehlendem Check, Runtime-Inkompatibilität, Datenverlustrisiko oder
+automatischer Ablehnung; keine Umgehung. Die Freigabe umfasst nicht Push auf main,
+Merge, native Builds, Store-Release, Live-DB-Write oder Restore.
 
-The NEVER/ALWAYS rules above apply unchanged in every worktree. In addition, a parallel
-agent must never delete or reset another worktree's or the main tree's uncommitted work,
-never clean/reset foreign changes, and never push or merge without explicit approval.
+## Release-Karte nach jeder Production-OTA (direkter Nutzerauftrag 2026-11-09)
+
+Übersicht über OTA-Stände führt das GitHub-Projekt „ANYVO – Produkt & Entwicklung“
+(https://github.com/users/dogbossvibes/projects/1, Projekt-ID `PVT_kwHOEQw4F84BqlcJ`).
+Nach jeder Production-OTA, deren Nachkontrolle laut Wrapper bestanden ist, legt der
+Publisher (Claude-MASTER) oder der berichtende Agent genau **eine** Release-Karte pro Charge an:
+
+1. Issue in `dogbossvibes/CarniFlow` mit Vorlage `.github/ISSUE_TEMPLATE/ota-release-card.md`,
+   Titel `OTA JJJJ-MM-TT · <Inhalt> (<Ziele>)`. Alle Ziele derselben Charge in eine Karte.
+2. Je Ziel eine Tabellenzeile mit Runtime, Source-Commit, Update Group ID, Platform Update ID
+   und Status – ausschliesslich aus der tatsächlichen Wrapper-/EAS-Nachkontrolle, nie aus
+   Erinnerung, MASTER_STATUS oder einem früheren Preflight.
+3. „Enthalten“ und „Nicht enthalten“ (Tasks/Scopes) ausdrücklich nennen, ebenso den
+   vorherigen Production-Stand je Ziel.
+4. Board-Felder setzen: Bereich = Release, Ziel, Task, Testweg.
+   Status: Testweg „Nachher“ → „Live – Nachkontrolle offen“; Testweg „Vorher“ mit
+   belegtem Gerätetest → „Veröffentlicht“. Nach erfolgter Gerätenachkontrolle Karte
+   ergänzen und auf „Veröffentlicht“ setzen.
+5. Testweg nach Risiko: Daten, Tracking/GPS, Abo/Bezahlung, Migrationen und grosse
+   Umbauten → „Vorher“ (Gerätetest vor der Production-OTA); kleine risikoarme
+   Änderungen (Texte, Layout, kleine UI-Fixes) → „Nachher“.
+6. Das Repo ist öffentlich: keine Kunden-, Personen- oder Zugangsdaten, keine Secrets.
+7. MASTER_STATUS verweist auf die Karte (Issue-Nummer) statt den Release ausführlich
+   zu beschreiben.
+
+Ohne Zugriff auf GitHub Projects (z. B. Cloud-Sitzung ohne GraphQL/Browser) die Karte
+trotzdem als Issue anlegen – sie gelangt automatisch ins Board (Status Backlog) – und im
+Bericht offen melden, dass Board-Felder/Status noch zu setzen sind; nicht als erledigt
+melden. Diese Regel erlaubt nur Issue- und Board-Pflege. Sie erweitert keine Freigabe für
+OTA, Push, Merge, Build, Store-Release oder DB-Aktionen; die Production-OTA-Regel unten
+bleibt unverändert vorrangig.
 
 ## ANYVO Production OTA — zwingende Regel
 

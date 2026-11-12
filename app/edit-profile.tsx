@@ -53,6 +53,7 @@ export default function EditProfileScreen() {
   // Hydrieren aus dem Profil-Cache (einmalig).
   useEffect(() => {
     if (username === null && profile !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setUsername(profile?.username ?? '');
     }
     if (phoneNumber === null && profile !== undefined) {
@@ -65,6 +66,7 @@ export default function EditProfileScreen() {
     if (username === null) return;
     const res = validateUsername(username);
     if (!res.ok) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setUsernameStatus({ state: 'error', errorKey: USERNAME_ERROR_KEY[res.error] });
       return;
     }

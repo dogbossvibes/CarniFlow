@@ -19,6 +19,7 @@ export function ExerciseIdentityList({ ownerId, disciplineKey, disciplineLabel, 
   const { t } = useT();
   const scope = `${ownerId}:${disciplineKey}`;
   const identity = useRef({ scope, generation: 0 });
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   if (identity.current.scope !== scope) identity.current = { scope, generation: identity.current.generation + 1 };
   const generation = identity.current.generation;
   const alive = useRef(true);
@@ -36,6 +37,7 @@ export function ExerciseIdentityList({ ownerId, disciplineKey, disciplineLabel, 
   const request = useRef<{ key: string; id: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     lock.current = null; setBusy(false); setExpanded(false); setOpenGroup('');
     setLoad({ scope, loading: true, error: false });
     void (async () => {

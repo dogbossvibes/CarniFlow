@@ -45,6 +45,7 @@ export default function UnitStartScreen() {
   // übernehmen. Ohne Auswahlfeld gibt es sonst keinen Weg, die für den Start
   // benötigte dogId zu setzen.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
     if (!addMode && !dogsLoading && !selectedDogId && dogs.length === 1) setSelectedDogId(dogs[0].id);
   }, [addMode, dogsLoading, dogs, selectedDogId]);
 

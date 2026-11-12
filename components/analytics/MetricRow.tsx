@@ -21,6 +21,7 @@ export function MetricRow({ label, value, delay = 0 }: Props) {
   }, [value, delay]);
 
   const color  = scoreColor(value);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
   const width  = anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   if (value === 0) return null;

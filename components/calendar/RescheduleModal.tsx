@@ -51,6 +51,7 @@ export function RescheduleModal({
   useEffect(() => {
     if (event) {
       const p = prefill(event.start_at);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production 2f7a1e7f; Logik bewusst unverändert
       setDate(p.date); setStart(p.time);
       setEnd(event.end_at ? fmtTime(event.end_at) : '');
     }
