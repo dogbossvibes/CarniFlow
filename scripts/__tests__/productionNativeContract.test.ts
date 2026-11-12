@@ -21,6 +21,15 @@ describe('Production-Native-Vertrag', () => {
     expect(eas.cli.appVersionSource).toBe('local');
     expect(eas.build.production.autoIncrement).toBe(false);
   });
+  it('Android: eigene SDK-58-Runtime, versionCode über allen vergebenen Play-Builds', async () => {
+    // Play-Produktion ist 49, 50 ist für ein früheres AAB vergeben. Android darf nie die
+    // iOS-Runtime oder die appVersion-Policy erben: alte Android-Runtimes sind SDK 54.
+    expect(await getRuntimeVersionAsync(process.cwd(), app, 'android')).toBe('1.0.8-sdk58-android-v1');
+    expect(await getRuntimeVersionAsync(process.cwd(), app, 'android')).not.toBe(binary.runtimeVersion);
+    expect(app.android.versionCode).toBeGreaterThanOrEqual(51);
+    expect(app.android.package).toBe('com.anyvo.app');
+    expect(eas.build.production.android.buildType).toBe('app-bundle');
+  });
   it('Production-Identität: com.anyvo.app, Schema anyvo, Channel/Environment production', () => {
     expect(app.ios.bundleIdentifier).toBe('com.anyvo.app');
     expect(app.scheme).toBe('anyvo');
