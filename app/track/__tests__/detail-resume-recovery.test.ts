@@ -24,7 +24,8 @@ describe('Track-Detail: Lifecycle schützt liegende Fährten', () => {
   it('Recovery-Karte direkt unter dem Header; gesperrt nur durch einen FINALEN Suchlauf', () => {
     expect(detail).toContain('const canOfferResume = !hasFinalSearchRun(data);');
     expect(detail).toContain('<TrackResumeCta sessionId={String(id)} dogId={data.dog_id} userId={authenticatedSession?.user.id} hasRemoteSearchRun={!canOfferResume} onVisibleChange={setRecoveryCardVisible} />');
-    const scroll = detail.indexOf('<ScrollView contentContainerStyle={s.content}');
+    // Scroll-Container ist TrackEvaluationLayout (Footer über der Android-Systemleiste).
+    const scroll = detail.search(/<(?:ScrollView|TrackEvaluationLayout)\s+contentContainerStyle=\{s\.content\}/);
     const card = detail.indexOf('<TrackResumeCta ');
     const hero = detail.indexOf('<View style={[s.card, s.cardGlow, s.hero]}>');
     expect(scroll).toBeGreaterThan(-1);
