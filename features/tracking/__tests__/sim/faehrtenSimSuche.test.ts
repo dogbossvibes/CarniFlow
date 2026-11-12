@@ -108,6 +108,28 @@ describe('Lauf durch den echten Such-Recorder', () => {
     expect(o.score.progressPct).toBeGreaterThan(90);
   }, 120000);
 
+  test('Regression T-208: GPS-Drift vom Hinweg zum parallelen Rückweg setzt den Fortschritt nicht nach vorn', async () => {
+    // Parallele Schenkel 8 m: Hinweg 0–40 m, Rückweg 48–88 m. Ab 30 m auf dem Hinweg driften die Messungen
+    // über ~7 s bis 6 m seitlich (also 2 m vom Rückweg) und zurück. Vor T-208 sprang der Fortschritt
+    // dabei endgültig auf ~52 m (Rückweg).
+    let driftMs = 0;
+    const o = await runSearchScenario({ track: SHAPE_TRACKS['Parallele Schenkel 8 m'], device: 'single', env: 'open', platform: 'ios', dog: DOGS.ruhig, seed: 1,
+      fixTransform: (fixes, lay) => {
+        const { x, y, s } = lay.truth.path;
+        const at = (m: number) => { const i = s.findIndex(v => v >= m); return { x: x[i], y: y[i] }; };
+        const out = at(30), back = at(58);
+        const i = fixes.reduce((best, f, k) => (Math.hypot(f.x - out.x, f.y - out.y) < Math.hypot(fixes[best].x - out.x, fixes[best].y - out.y) ? k : best), 0);
+        driftMs = fixes[i].tMs;
+        // Anstieg über 2 Messungen, 3 Messungen auf voller Drift, Abklingen über 2 Messungen.
+        const w = (k: number) => { const d = k - i; if (d < 0) return 0; if (d < 2) return (d + 1) / 3; if (d < 5) return 1; if (d < 7) return (7 - d) / 3; return 0; };
+        return fixes.map((f, k) => { const a = 0.75 * w(k); return a ? { ...f, x: f.x + a * (back.x - out.x), y: f.y + a * (back.y - out.y) } : f; });
+      } });
+    const after = o.search.trace.filter(t => t.tMs >= driftMs && t.tMs <= driftMs + 12000);
+    expect(after.length).toBeGreaterThan(0);
+    expect(Math.max(...after.map(t => t.appHandlerM))).toBeLessThan(45);
+    expect(o.score.progressPct).toBeGreaterThan(85);
+  }, 120000);
+
   test('Such-Matrix lässt sich aufbauen', () => {
     for (const g of SEARCH_GROUPS) expect(buildSearchGroup(g, 2).length).toBeGreaterThan(0);
   });
