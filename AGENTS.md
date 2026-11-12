@@ -180,7 +180,8 @@ Publisher (Claude-MASTER) oder der berichtende Agent genau **eine** Release-Kart
    Erinnerung, MASTER_STATUS oder einem früheren Preflight.
 3. „Enthalten“ und „Nicht enthalten“ (Tasks/Scopes) ausdrücklich nennen, ebenso den
    vorherigen Production-Stand je Ziel.
-4. Board-Felder setzen: Bereich = Release, Ziel, Task, Testweg.
+4. Board-Felder setzen: Bereich = Release, Release-Ziel (Einzelauswahl, bei mehreren Zielen
+   Kombi-Wert wie «iOS 57 + iOS 60»), Task, Testweg.
    Status: Testweg „Nachher“ → „Live – Nachkontrolle offen“; Testweg „Vorher“ mit
    belegtem Gerätetest → „Veröffentlicht“. Nach erfolgter Gerätenachkontrolle Karte
    ergänzen und auf „Veröffentlicht“ setzen.
