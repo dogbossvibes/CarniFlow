@@ -198,18 +198,20 @@ export function buildSearchGroup(group: SearchGroupName, seeds: number): SearchC
         scenario: { ...base, device: 'single', env: 'open', dog, ...patch, seed } });
   } else if (group === 'android') {
     const variants: [string, Partial<SearchScenario>][] = [
-      ['Android, Bildschirm an (live)', {}],
-      ['Android, gebündelt 30 s', { searchDelivery: ANDROID_BATCH_30S }],
-      ['Android, gebündelt 30 s, Hosentasche', { searchDelivery: ANDROID_BATCH_30S, searchCarry: 'pocket' }],
-      ['Android, gebündelt 30 s, Spitzwinkel-Folge', { searchDelivery: ANDROID_BATCH_30S, track: SHAPE_TRACKS['Spitzwinkel-Folge'] }],
-      ['Android live, Kreuzung', { track: SHAPE_TRACKS.Kreuzung }],
+      // Die Absuche nutzt auf Android das GPS direkt im Sekundentakt (keine Bündelung, T-207-Befund).
+      ['Android, Bildschirm an', {}],
+      ['Android, Bildschirm 20 s aus', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 20 }] }],
+      ['Android, Bildschirm 60 s aus', { interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 60 }] }],
+      ['Android, Hosentasche (Bildschirm an)', { searchCarry: 'pocket' }],
+      ['Android, Spitzwinkel-Folge', { track: SHAPE_TRACKS['Spitzwinkel-Folge'] }],
+      ['Android, Kreuzung', { track: SHAPE_TRACKS.Kreuzung }],
     ];
     for (const [label, patch] of variants) for (const [device, name] of [['dual', 'Neueres Handy'], ['single', 'Mittelklasse']] as const) for (const seed of seedList)
       cases.push({ table: 'Absuche — Android (ruhiger Sporthund, offenes Feld)', row: label, col: name,
         scenario: { ...base, platform: 'android', device, env: 'open', dog: DOGS.ruhig, ...patch, seed } });
   } else if (group === 'ifh') {
     const few = seedList.slice(0, Math.max(1, Math.min(2, seedList.length)));
-    for (const name of ['IFH-1', 'IFH-2']) for (const [label, patch] of [['iOS', { platform: 'ios' }], ['Android, gebündelt 30 s', { platform: 'android', searchDelivery: ANDROID_BATCH_30S }]] as [string, Partial<SearchScenario>][]) for (const seed of few)
+    for (const name of ['IFH-1', 'IFH-2']) for (const [label, patch] of [['iOS', { platform: 'ios' }], ['Android', { platform: 'android' }]] as [string, Partial<SearchScenario>][]) for (const seed of few)
       cases.push({ table: 'Absuche — lange Prüfungsfährten IFH (neueres Handy, offenes Feld, ruhiger Sporthund)', row: name, col: label,
         scenario: { ...base, track: EXAM_TRACKS[name], device: 'dual', env: 'open', dog: DOGS.ruhig, ...patch, seed } });
   } else {
@@ -221,7 +223,7 @@ export function buildSearchGroup(group: SearchGroupName, seeds: number): SearchC
       ['Gegenstand beim Legen mit 3 s Halt abgelegt', { layWalk: { articleStopS: 3 }, tapDelayS: 1.5 }],
       ['Handy bei der Absuche in der Hosentasche', { searchCarry: 'pocket' }],
       ['Absuche ohne Bewegungssensor', { searchMotion: false }],
-      ['Android, Absuche im Hintergrund gebündelt (30 s)', { platform: 'android', searchDelivery: ANDROID_BATCH_30S }],
+      ['Android, Bildschirm 60 s aus', { platform: 'android', interruptions: [{ kind: 'lock', atFrac: 0.45, durationS: 60 }] }],
     ];
     for (const [label, patch] of variants) for (const [device, name] of [['dual', 'Neueres Handy'], ['single', 'Mittelklasse']] as const) for (const seed of seedList)
       cases.push({ table: 'Absuche — Varianten (ruhiger Sporthund, offenes Feld)', row: label, col: name,

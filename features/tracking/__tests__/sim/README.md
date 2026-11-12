@@ -100,8 +100,9 @@ Genauigkeit. Das passt zum langsam wandernden Fehlermodell.
 - **Sperrbildschirm/Anruf** sind als «keine Positionen in dieser Zeit» abgebildet: Die Absuche fordert keine
   Hintergrund-Ortung an (`positionStream`: `allowBackground: false`), iOS liefert dann keine Positionen. Dass die App
   in dieser Zeit tatsächlich angehalten wird, ist aus dem Code abgeleitet, nicht auf dem Gerät gemessen.
-- **Android** gebündelt (30 s) ist eine Annahme aus der Lege-Konfiguration; ob die Absuche auf Android im Hintergrund
-  so zustellt, ist nicht gemessen.
+- **Android (korrigiert in T-207):** Die Absuche nutzt auf Android das GPS direkt im Sekundentakt (kein Bündeln,
+  `AnyvoPrecisionLocationModule.kt`). Die Hintergrund-Option wirkt nur auf iOS, und die Absuche hat auf Android keinen
+  Vordergrund-Dienst → bei ausgeschaltetem Bildschirm bildet der Simulator keine Positionen ab (aus dem Code abgeleitet).
 - **App-Abbruch:** Die Wiederaufnahme folgt `resumeSearch` (run.tsx) ohne Dialog und ohne Transfer-Prüfung.
 - **Nicht an eigenen Daten geeicht.** Lange Fährten, Wald und Android fehlen in den
   vorhandenen Feldaufnahmen; die Modelle sind dort reine Literaturwerte.

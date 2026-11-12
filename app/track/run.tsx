@@ -751,6 +751,8 @@ export default function TrackRunScreen() {
   // der gelegten Fährte). DogLead bleibt nur eine Projektion. Beendet die
   // Absuche NICHT — nur Anzeige/Voice/Haptik; der Nutzer beendet weiterhin selbst.
   const endPoint = snapData.laidPoints.length ? snapData.laidPoints[snapData.laidPoints.length - 1] : null;
+  // T-207: Genauigkeit des gelegten Endpunkts für den Ende-Radius.
+  const endPointAccuracyM = snapData.laidAccuracies.length ? snapData.laidAccuracies[snapData.laidAccuracies.length - 1] ?? null : null;
   const finalObjectIndex = snapData.laidObjects.length - 1;
   const finalObject = finalObjectIndex >= 0 ? snapData.laidObjects[finalObjectIndex] : null;
   const finalObjectPendingNearEnd = !!(finalObject && endPoint && s.objectStatuses[finalObjectIndex] === 'pending'
@@ -801,6 +803,7 @@ export default function TrackRunScreen() {
     trackLengthM: s.trackLengthM,
     estimatedDogPosition: s.estimatedDogPosition,
     endPoint,
+    endPointAccuracyM,
     openMandatoryObjects,
     activeObjectWait: s.activeObjectWait,
     finalObjectPendingNearEnd,
@@ -819,13 +822,13 @@ export default function TrackRunScreen() {
       endQaHistoryRef.current = advanceEndFixHistory(endQaHistoryRef.current, {
         tMs: s.endHandlerFix.tMs, distanceToEndM: handlerDistanceToEndM,
         accuracyM: s.endHandlerFix.accuracyM, lastSegmentReached,
-        handlerProgressRatio: s.trackLengthM > 0 ? s.progressM / s.trackLengthM : 0,
+        handlerProgressRatio: s.trackLengthM > 0 ? s.progressM / s.trackLengthM : 0, endPointAccuracyM,
       });
     const history = endQaHistoryRef.current;
     const blockerReason = trackEndBlocker({ dogProgressM: s.dogProgressM, handlerProgressM: s.progressM,
       handlerDistanceToEndM, geomDistanceM: dogDistanceToEndM, trackLengthM: s.trackLengthM,
       openMandatoryObjects, activeObjectWait: s.activeObjectWait, searchActive: searchGuidanceActive,
-      accuracyM: s.endHandlerFix?.accuracyM ?? null, lastSegmentReached,
+      accuracyM: s.endHandlerFix?.accuracyM ?? null, endPointAccuracyM, lastSegmentReached,
       finalObjectGraceActive: finalObjectGraceQaRef.current.startedAtMs != null
         && finalObjectGraceQaRef.current.endedAtMs == null
         && finalObjectGraceQaRef.current.reason !== 'active_dwell',
@@ -837,7 +840,7 @@ export default function TrackRunScreen() {
         : Math.max(0, (history.firstInsideMs - searchStartMsRef.current) / 1000),
       stableFixCount: history.insideCount, requiredStableFixCount: 2,
       handlerDistanceM: handlerDistanceToEndM,
-      effectiveEndRadiusM: endRadiusM(s.endHandlerFix?.accuracyM ?? null),
+      effectiveEndRadiusM: endRadiusM(s.endHandlerFix?.accuracyM ?? null, endPointAccuracyM),
       lastSegmentReached, activeObjectWait: s.activeObjectWait,
       approachHistorySampleCount: history.approachSampleCount,
       approachHistoryStartDistanceM: history.approachStartDistanceM,

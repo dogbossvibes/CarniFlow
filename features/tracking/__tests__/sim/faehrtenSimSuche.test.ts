@@ -102,6 +102,12 @@ describe('Lauf durch den echten Such-Recorder', () => {
     expect(Math.hypot(end.x - lay.path.x[last], end.y - lay.path.y[last])).toBeLessThan(2);
   });
 
+  test('Regression T-207: nach dem abgekürzten Winkel bleibt der Fortschritt nicht am alten Schenkel hängen', async () => {
+    // Dieser Lauf blieb vor T-207 nach dem ersten Winkel bei 28 % stehen (Kontinuitätsfalle).
+    const o = await runSearchScenario({ track: SHAPE_TRACKS.Kreuzung, device: 'single', env: 'open', platform: 'ios', dog: DOGS.ruhig, seed: 4 });
+    expect(o.score.progressPct).toBeGreaterThan(90);
+  }, 120000);
+
   test('Such-Matrix lässt sich aufbauen', () => {
     for (const g of SEARCH_GROUPS) expect(buildSearchGroup(g, 2).length).toBeGreaterThan(0);
   });
