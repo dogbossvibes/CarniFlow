@@ -2365,7 +2365,6 @@ export const it: Record<TranslationKey, string> & Record<string, string> = {
   "premium.startFree": "Inizia gratis",
   "premium.feature7Days": "7 giorni gratuiti",
   "premium.featureActive": "Tutte le funzioni Active",
-  "premium.featureThenActive": "Poi Active CHF 9.00/mese",
   "updates.whatsNewTitle": "Novità in ANYVO",
   "updates.whatsNewTrackingStart": "La registrazione parte prima mentre il GPS stabilizza l'inizio della traccia.",
   "updates.whatsNewTrackingGuidance": "Indicazioni vocali più chiare alla partenza, agli oggetti e all'arrivo.",
