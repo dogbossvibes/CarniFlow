@@ -37,6 +37,9 @@ export function createTrainingGroupService(client: Client, userId: string) {
           const session = parseSession(data.session);
           if (session.sessionId !== requestData.sessionId || !session.participants.some(p => p.userId === userId
             && p.dogId === requestData.dogId && p.participationId === (action === 'open' ? requestData.sessionId : requestData.participationId))) throw new GroupApiError('GROUP_INVALID_RESPONSE');
+        } else if (action === 'remove_member') {
+          if (data.groupId !== requestData.groupId || data.memberUserId !== requestData.memberUserId
+            || data.membershipId !== requestData.membershipId || data.removed !== true) throw new GroupApiError('GROUP_INVALID_RESPONSE');
         } else {
           const identifier = groupAction ? 'groupId' : 'sessionId';
           const ack = action === 'leave' ? 'left' : 'ended';
@@ -83,6 +86,7 @@ export function createTrainingGroupService(client: Client, userId: string) {
     accept: (invitationId: string, displayName: string) => mutation('training_group_v1', 'accept', { invitationId, displayName: displayName.trim() }),
     leave: (groupId: string, membershipId: string) => mutation('training_group_v1', 'leave', { groupId, membershipId }),
     close: (groupId: string) => mutation('training_group_v1', 'close', { groupId }),
+    removeMember: (groupId: string, memberUserId: string, membershipId: string) => mutation('training_group_v1', 'remove_member', { groupId, memberUserId, membershipId }),
     open: (groupId: string, title: string, dogId: string, ttlSeconds: number) => mutation('training_group_session_v1', 'open', { groupId, title: title.trim(), dogId, ttlSeconds }, 'sessionId'),
     join: (sessionId: string, dogId: string) => mutation('training_group_session_v1', 'join', { sessionId, dogId }, 'participationId'),
     leaveSession: (sessionId: string, participationId: string) => mutation('training_group_session_v1', 'leave', { sessionId, participationId }),
