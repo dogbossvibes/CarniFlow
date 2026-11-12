@@ -1,3 +1,4 @@
+import * as access from '@/lib/diagnosticsAccessState';
 import { assertSupportPrivacy } from '../supportDiagnostics';
 import {
   activeBackgroundLaySessionId, beginBackgroundLayDiagnostics, endBackgroundLayDiagnostics,
@@ -51,4 +52,61 @@ it('exports relative times and reason codes without coordinates, IDs, or absolut
   expect(d?.timesMs.taskStartFailure).toBeGreaterThanOrEqual(0);
   expect(JSON.stringify(d)).not.toMatch(/latitude|longitude|session-a|dogId|2026-/);
   expect(() => assertSupportPrivacy({ backgroundLayDiagnostics: d })).not.toThrow();
+});
+
+it('preserves repeated lifecycle/permission transitions in order and marks a bounded timeline', async () => {
+  const now = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+  try {
+    await beginBackgroundLayDiagnostics('cycles');
+    const sequence = ['background', 'resume', 'background', 'resume'] as const;
+    for (const [i, event] of sequence.entries()) {
+      now.mockReturnValue(1_700_000_001_000 + i * 1000);
+      await recordBackgroundLayEvent('cycles', event);
+    }
+    expect((await loadBackgroundLayDiagnostics('cycles'))?.timeline).toBeUndefined();
+    let diag = await loadBackgroundLayDiagnostics('cycles', { includeTimeline: true });
+    expect(diag?.timeline?.events.map(e => e.name)).toEqual(sequence);
+    expect(diag?.timeline?.events.map(e => e.tMs)).toEqual([1000, 2000, 3000, 4000]);
+    expect(diag?.counts.resume).toBe(2);
+    for (let i = 0; i < 130; i++) await recordBackgroundLayEvent('cycles', 'inactive');
+    diag = await loadBackgroundLayDiagnostics('cycles', { includeTimeline: true });
+    expect(diag?.timeline).toMatchObject({ totalEvents: 134, truncated: true });
+    expect(diag?.timeline?.events).toHaveLength(128);
+    expect(() => assertSupportPrivacy(diag)).not.toThrow();
+  } finally { now.mockRestore(); }
+});
+
+it('separates runtime drops from GPS rejects, scopes the session and allowlists unknown reasons', async () => {
+  access.setDiagnosticsSession('qa');
+  access.resolveDiagnosticsAccess('qa', access.getDiagnosticsAccessSnapshot().generation, true);
+  try {
+    await beginBackgroundLayDiagnostics('a'); await beginBackgroundLayDiagnostics('b');
+    await recordBackgroundLayEvent('a', 'onFixRejected', 2, 'accuracy');
+    await recordBackgroundLayEvent('a', 'backgroundSessionMismatch', 1, 'fix_before_session_start');
+    await recordBackgroundLayEvent('a', 'backgroundSessionMismatch', 2, 'dog_mismatch');
+    await recordBackgroundLayEvent('a', 'backgroundSessionMismatch', 1, 'private-session-id');
+    await recordBackgroundLayEvent('a', 'backgroundDuplicateDropped', 3);
+    await recordBackgroundLayEvent('a', 'backgroundFinalizedSessionDropped', 1);
+    await recordBackgroundLayEvent('b', 'backgroundSessionMismatch', 7, 'registry_mismatch');
+    expect((await loadBackgroundLayDiagnostics('a'))?.runtimeDropReasons).toBeUndefined();
+    const diag = await loadBackgroundLayDiagnostics('a', { includeRuntimeDropReasons: true });
+    expect(diag?.rejectReasons).toEqual({ accuracy: 2 });
+    expect(diag?.runtimeDropReasons).toEqual({ fix_before_session_start: 1, dog_mismatch: 2, unknown: 1, duplicate: 3, session_finalized: 1 });
+    expect(JSON.stringify(diag?.runtimeDropReasons)).not.toContain('private-session-id');
+    expect(diag?.counts.backgroundSessionMismatch).toBe(4);
+    expect(() => assertSupportPrivacy(diag)).not.toThrow();
+    access.revokeDiagnosticsAccess();
+    expect((await loadBackgroundLayDiagnostics('a', { includeRuntimeDropReasons: true }))?.runtimeDropReasons).toBeUndefined();
+  } finally { access.revokeDiagnosticsAccess(); access.setDiagnosticsSession(null); }
+});
+
+it('rechecks personal QA authority after async storage access', async () => {
+  access.setDiagnosticsSession('qa');
+  access.resolveDiagnosticsAccess('qa', access.getDiagnosticsAccessSnapshot().generation, true);
+  await beginBackgroundLayDiagnostics('a');
+  await recordBackgroundLayEvent('a', 'backgroundSessionMismatch', 1, 'dog_mismatch');
+  const pending = loadBackgroundLayDiagnostics('a', { includeRuntimeDropReasons: true });
+  access.setDiagnosticsSession('other');
+  expect((await pending)?.runtimeDropReasons).toBeUndefined();
+  access.revokeDiagnosticsAccess(); access.setDiagnosticsSession(null);
 });

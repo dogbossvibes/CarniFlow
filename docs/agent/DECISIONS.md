@@ -267,3 +267,18 @@ Status: accepted
 - Neue getrennteFeaturearbeit durch02; aktuelleOTA-Kandidaten und05-Android-Diagnoseadapter nicht nachträglich verändern. AktiveAndroidRuntime1.0.3 besitzt ältereInlineLay-/BackgroundPipeline als aktuelleriOSStand; nicht pauschal iOS-LayPipeline übertragen. Finaler Paritäts-/Native-/DB-/Release-Preflight bleibt nötig.
 - DirektePriorität ausNutzerauftrag `01a11c92-0c74-7d41-8dfb-0f1672dc3cbb`: Continuity → Gegenstandskorrekturen → GPS-/Shelly-Praxis → Planer/Verleitungen → Watch/gemeinsamesTraining. DTW zuerst Nutzenvergleich gegenüber bestehenderANYVO-Auswertung, kein weitererScore beschlossen. Umsetzung beauftragt; zukünftigeCommits/Integrationen/OTA/nativeBuild/Store/DB-Writes daraus nicht pauschal freigeben.
 - Hardwarestand ausderselben direktenAntwort: Apple-Watch-Testperson plusSimulator verfügbar lautNutzer, WearOS nurSimulator. Shelly-Modell und externerGNSS-Empfänger nicht angegeben; kein vorhandenerPraxisnachweis. Uhr-App-/Signierungs-/Storevorbereitung eigener spätererNativeScope, kein Handy-OTA-Nachweis oder neueBuild-/Storefreigabe.
+## 2026-11-09 — Winkelkürzel wieder «90 R» / «90 L» (GitHub-Issue #33) · accepted
+
+- **Normale Winkel tragen auf allen Karten wieder das Kürzel «90 L» / «90 R»; Spitzwinkel bleiben «SL» / «SR».**
+  Warum: Produktentscheidung Sandra (2026-11-09) für die gewohnte Fährtenschreibweise. Die ios60-Linie hatte die «90»
+  entfernt, weil die richtungsbasierte Erkennung keine exakten 90° belegt. Das Kürzel ist eine reine Anzeige
+  (`ANGLE_SHORT` in `features/tracking/utils/angleClassify.ts`) und gilt überall, wo es verwendet wird (Absuche, Legen,
+  Logbuch, Replay). Winkelerkennung, gespeicherte Geometrie (`geometryDirection`/`geometrySharpness`), Sprachansagen und
+  Haptik bleiben unverändert; Sonderkürzel (GW/OW/BW/Abriss, `specialAngleBadge`) ebenfalls. Form, Farbe, Grösse und
+  Schrift der Badges sind unverändert.
+
+- **Absuche-Karte: Blickrichtung aus der gelegten Fährte, nicht aus GPS-Positionsdifferenzen.**
+  Warum: Bei ±5–20 m GPS-Streuung ist eine Richtung aus 3-m-Schritten vor allem Rauschen. Die Kamera peilt die
+  Soll-Fährte am Fortschritt des Hundeführers und dreht erst einige Meter nach einem Winkel; nur bei `off_track` fällt
+  sie auf die Positionsfolge (Mindestschritt 9 m) zurück. Reine Darstellung (`features/tracking/utils/searchMapView.ts`),
+  Datenrichtung Tracking-State → Karte; Recorder, Fortschritt, Off-Track-Logik, Voice/Haptik bleiben unberührt.

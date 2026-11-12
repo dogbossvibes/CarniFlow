@@ -56,16 +56,12 @@ describe('track quick picker layout', () => {
     expect(src).not.toContain('backgroundColor: FT.glass');
   });
 
-  it('keeps GS scrollable and Winkel options unchanged inside the shared panel', () => {
+  it('keeps GS scrollable and the dedicated tested Winkel picker inside the shared panel', () => {
     const src = layingSource();
 
     expect(src).toContain('{GEGENSTAND_MATERIALS.map');
     expect(src).toContain('<ScrollView');
-    expect(src).toContain("{ kind: 'gw',     short: 'GW',     icon: 'square-outline'   }");
-    expect(src).toContain("{ kind: 'ow',     short: 'OW',     icon: 'triangle-outline' }");
-    expect(src).toContain("{ kind: 'bw',     short: 'BW',     icon: 'ellipse-outline'  }");
-    expect(src).toContain("{ kind: 'abriss', short: 'Abriss', icon: 'close'            }");
+    expect(src).toContain('<SpecialAnglePicker onSelect={placeWinkel} />');
     expect(src).toContain('onPress={() => placeGegenstand(m.material)}');
-    expect(src).toContain('onPress={() => placeWinkel(o.kind)}');
   });
 });

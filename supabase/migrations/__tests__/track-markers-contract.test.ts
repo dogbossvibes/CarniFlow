@@ -1,23 +1,29 @@
 /**
- * track_markers-Contract: die Check-Constraints müssen EXAKT die TypeScript-
- * Unions AngleKind / MarkerMaterial abbilden (features/tracking/store/
- * trackingStore.ts) — keine erfundenen, keine fehlenden Werte. NULL bleibt
- * erlaubt.
+ * track_markers-Contract: historische Migrationen und der später geprüfte
+ * Operations-Override bleiben getrennt. Der heutige Materialvertrag muss die
+ * TypeScript-Union vollständig enthalten; NULL bleibt erlaubt.
  *
  * Jeder Constraint kann über mehrere additive Migrationen neu gesetzt worden
  * sein (drop constraint if exists + add constraint, nie ALTER). Die zuletzt
  * (per Dateiname/Timestamp) geschriebene Version ist die aktuell gültige.
- * Dieser Test hält KEINE eigene, unabhängige Werteliste mehr — genau das war
- * die Ursache der 'filz'-Lücke (TypeScript erweitert am 15.09.2026 in
- * 7ead9de, aber 20260913220000 vom 13.09.2026 konnte das nicht mehr
- * enthalten, und ein hartcodiertes Test-Array hätte dieselbe Lücke haben
- * können). Stattdessen: TS-Union gegen die zuletzt maßgebliche SQL-Migration,
- * direkt.
+ * Der feste Neuner-Vertrag gilt nur für die historische filz-Migration.
+ * Die heutige TypeScript-Union wird direkt mit dem bytegenau gepinnten,
+ * geprüften Operations-CHECK verglichen, damit neue Materialien nicht durch
+ * ein nachgepflegtes unabhängiges Array oder bloßes Filtern verschwinden.
  */
 import { readdirSync, readFileSync } from 'fs';
+import { createHash } from 'node:crypto';
+import { join } from 'path';
 
 const MIGRATIONS_DIR = 'supabase/migrations';
 const store = readFileSync('features/tracking/store/trackingStore.ts', 'utf8');
+// Historical migrations remain a nine-material contract. The reviewed and
+// deployed 2026-10-18 operation adds ball/gummi without rewriting history.
+// Source: marker-materials-05-20261018-r4/candidate.sql
+// Full-source SHA256: 50a39528f0867bd2df23014e1c046ccf9f570732c3e90f005e1c0a8a47b6dc58.
+// Fixture is EXACTLY lines17–18, not an executable migration or live DB query.
+const historicMaterials = ['stoff', 'filz', 'holz', 'duebel', 'leder', 'plastik', 'metall', 'teppich', 'diverses'];
+const operationsDDL = readFileSync(join(__dirname, 'fixtures/marker-materials-operations-20261018.sql.txt'), 'utf8');
 
 function unionMembers(typeName: string): string[] {
   const m = store.match(new RegExp(`export type ${typeName} =([\\s\\S]*?);`));
@@ -51,11 +57,22 @@ describe('track_markers Check-Constraints = Client-Contract', () => {
     expect([...values].sort()).toEqual([...ts].sort());
   });
 
-  it('material: SQL constraint (latest-defining migration) matches MarkerMaterial exactly', () => {
-    const ts = unionMembers('MarkerMaterial');
+  it('material: latest historical migration preserves its exact nine-material contract', () => {
     const { values, file } = latestConstraintSource('track_markers_material_check');
     expect(file).toBe('20260926090000_track_markers_material_filz.sql');
-    expect([...values].sort()).toEqual([...ts].sort());
+    expect([...values].sort()).toEqual([...historicMaterials].sort());
+  });
+
+  it('material: reviewed deployed operation matches every current MarkerMaterial including ball/gummi', () => {
+    expect(createHash('sha256').update(operationsDDL).digest('hex'))
+      .toBe('66b00a81a65efcbc1e3923e8b586d10635830362fd16ed4b5c2234cd369ab3fe');
+    const list = operationsDDL.match(/array\[([\s\S]*?)\]::text\[\]/);
+    expect(list).not.toBeNull();
+    const values = Array.from(list![1].matchAll(/'([a-z_]+)'/g)).map(value => value[1]);
+    expect([...values].sort()).toEqual([...unionMembers('MarkerMaterial')].sort());
+    expect(values).toEqual(expect.arrayContaining(['ball', 'gummi', 'filz']));
+    expect(operationsDDL).toContain('check(material is null or material=any(');
+    expect(operationsDDL).not.toMatch(/\bupdate\b|\bdelete\b|\binsert\b/i);
   });
 
   it('material: filz is present in both the TypeScript contract and the live SQL contract', () => {

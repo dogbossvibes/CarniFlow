@@ -108,12 +108,13 @@ describe('Verdrahtung im Recorder', () => {
     expect(rec).not.toContain('detectShortLegCorners(');   // der Recorder ruft den Regelpfad nicht mehr direkt
   });
   it('der Mitschnitt schreibt turnFusion und imuOnlyEvents', () => {
-    expect(rec).toContain('turnFusion: associatedTurns.map(t => toQaTurnFusion(t, originMs))');
+    expect(rec).toContain('turnFusion: associatedTurns.map(t => ({ ...toQaTurnFusion(t, originMs), apexIndex: detectorIndexOffset + t.apexIndex }))');
     expect(rec).toContain('imuOnlyEvents: sweep.imuOnly.map(e => toQaImuOnlyEvent(e, originMs))');
   });
   it('gepaarte Ecken tragen ihre eigene Marker-Herkunft und dürfen keine Doppelmarkierung erzeugen', () => {
     expect(rec).toContain("'auto_split_apex' : 'auto'");
-    expect(rec).toContain('lastCornerRescuedRef.current && c.atM - lastCornerAtRef.current < CORNER_GAP_M');
+    expect(rec).toContain('if (c.atM - lastCornerAtRef.current < CORNER_GAP_M) continue;');
+    expect(rec).not.toContain('lastCornerRescuedRef.current && c.atM - lastCornerAtRef.current');
   });
   it('Stop-Flush bleibt unverändert der Regelpfad (kein Rescue am Puffer-Ende)', () => {
     const flush = fs.readFileSync('features/tracking/utils/stopFlushCorner.ts', 'utf8');

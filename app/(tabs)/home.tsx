@@ -1,3 +1,4 @@
+import { HomeDayGreeting } from "@/components/home/HomeDayGreeting";
 import { DogCard } from "@/components/dogs/DogCard";
 import { AnimatedPressable } from "@/components/ui/AnimatedPressable";
 import { Glass, isGlass } from "@/components/ui/Glass";
@@ -5,7 +6,7 @@ import { UnitListCard } from "@/components/training/UnitListCard";
 import { SwipeableTrainingItem } from "@/components/training/SwipeableTrainingItem";
 import { ActiveTrialGate } from "@/components/subscription/ActiveTrialGate";
 import { C } from "@/constants/colors";
-import { useT, type TranslationKey } from "@/i18n";
+import { useT } from "@/i18n";
 import { useDogs } from "@/hooks/useDogs";
 import { useSession } from "@/hooks/useSession";
 import { useProfile } from "@/hooks/useProfile";
@@ -55,13 +56,6 @@ function berechneSerie(sessions: { session_date: string }[]): string {
   return String(serie);
 }
 
-function begruessungKey(): TranslationKey {
-  const h = new Date().getHours();
-  if (h < 12) return "greeting.morning";
-  if (h < 18) return "greeting.day";
-  return "greeting.evening";
-}
-
 function heutigenWochentag(): number {
   const d = new Date().getDay();
   return d === 0 ? 6 : d - 1;
@@ -83,7 +77,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { t } = useT();
   const { user } = useSession();
-  const { profile: homeProfile } = useProfile();
+  const { profile: homeProfile, loading: profileLoading } = useProfile();
   const { dogs, loading: hundeLoading, refresh: refreshDogs } = useDogs();
   const { feed, loading: feedLoading, refresh: refreshFeed } = useTrainingFeed();
   const { onDelete: deleteItem, toast } = useFeedDelete();
@@ -102,9 +96,6 @@ export default function HomeScreen() {
     else                              router.push(`/training/${item.id}` as never);
   };
 
-  const anzeigeName =
-    user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "du";
-  const vorname = anzeigeName.split(" ")[0];
   const heuteIdx = heutigenWochentag();
   const letzteHunde = dogs.slice(0, 3);
   // Vereinheitlichte Zeitleiste (alt + neu) als Aktivitätsbasis.
@@ -295,19 +286,11 @@ export default function HomeScreen() {
             pointerEvents="none"
           />
 
-          {/* ── SLOGAN ── */}
-          <View style={s.slogan} pointerEvents="none">
-            <Text style={s.sloganZeile}>TRAIN.</Text>
-            <Text style={[s.sloganZeile, s.sloganGrau]}>ANALYZE.</Text>
-            <Text style={[s.sloganZeile, s.sloganGold]}>IMPROVE.</Text>
-          </View>
-
           <View style={s.heroKopf}>
-            <View>
-              <Text style={s.heroBegruessung}>{t(begruessungKey())}</Text>
-              <Text style={s.heroName}>{vorname}</Text>
-              {homeProfile?.username ? <Text style={s.heroUsername}>@{homeProfile.username}</Text> : null}
-            </View>
+            <HomeDayGreeting key={user?.id ?? 'signed-out'} ownerId={user?.id}
+              ready={!profileLoading}
+              name={homeProfile?.id === user?.id ? homeProfile?.full_name ?? user?.user_metadata?.full_name : user?.user_metadata?.full_name}
+              username={homeProfile?.id === user?.id ? homeProfile?.username : null} />
             {/* Dezenter Anpassen-Button + Hilfe (Coachmark „home") */}
             <View style={s.heroBtnReihe}>
               <HelpButton topicId="home" autoShow tint={C.white} style={s.heroIconBtn} />
@@ -322,6 +305,13 @@ export default function HomeScreen() {
                 <Ionicons name="options-outline" size={20} color={C.white} />
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* ── SLOGAN ── */}
+          <View style={s.slogan} pointerEvents="none">
+            <Text style={s.sloganZeile}>TRAIN.</Text>
+            <Text style={[s.sloganZeile, s.sloganGrau]}>ANALYZE.</Text>
+            <Text style={[s.sloganZeile, s.sloganGold]}>IMPROVE.</Text>
           </View>
 
           <View style={s.heroStats}>
@@ -356,7 +346,7 @@ export default function HomeScreen() {
         <OfflineBanner />
 
         {/* ── LÄUFIGKEIT IM BLICK (kontextueller Hinweis, immer sichtbar) ── */}
-        <HomeHeatCard onOpen={(dogId) => router.push(`/dog/${dogId}` as never)} />
+        <HomeHeatCard onOpen={(dogId) => router.push(`/dog-heat-overview/${dogId}` as never)} />
 
         {/* ── KONFIGURIERBARE WIDGETS (Reihenfolge/Sichtbarkeit aus der Config) ── */}
         {visibleWidgets(config).map(renderWidget)}
@@ -411,18 +401,19 @@ const s = StyleSheet.create({
   },
 
   hero: {
-    height: 380,
+    minHeight: 380,
     marginBottom: 20,
     justifyContent: "space-between",
     overflow: "hidden",
   },
-  heroImg: { ...StyleSheet.absoluteFillObject },
+  heroImg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
 
   slogan: {
-    position: "absolute",
-    bottom: 80,
-    left: 20,
-    zIndex: 10,
+    // Normal flow reserves space for scaled text before the statistics.
+    marginTop: "auto",
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   sloganZeile: {
     fontSize: 24,
@@ -451,26 +442,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 16,
-  },
-  heroBegruessung: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.6)",
-    fontWeight: "600",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
-  heroName: {
-    fontSize: 28,
-    color: C.white,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-  },
-  heroUsername: {
-    fontSize: 13,
-    color: C.accent,
-    fontWeight: "700",
-    marginTop: 2,
   },
   heroBtnReihe: { flexDirection: "row", alignItems: "center", gap: 6 },
   heroIconBtn: {
@@ -534,7 +505,7 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   cardGlass: { backgroundColor: "transparent", overflow: "hidden" },
-  glassBg:   { ...StyleSheet.absoluteFillObject },
+  glassBg:   { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   wocheLabel: {
     fontSize: 9,
     color: C.muted,

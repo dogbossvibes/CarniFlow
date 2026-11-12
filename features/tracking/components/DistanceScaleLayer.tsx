@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import {
   distanceScaleRender, regionBounds, type DistanceTickSet, type TickClass,
@@ -7,16 +7,16 @@ import type { LL } from '@/features/tracking/utils/searchGeometry';
 
 // Fährten-Maßstab auf der Karte: kurze Querstriche entlang der Referenzfährte
 // (1/5/10 m, adaptiv nach Zoom) und dezente 10-m-Zahlen. Reine Darstellung.
-// Bewusst zurückhaltend: dunkle „Kerben" quer über die Mint-Linie statt einer
-// Punkte-Perlenkette — die Linie bleibt primär, Suchlinie/Winkel/Gegenstände/
-// Hund bleiben dominant. Nur Polyline + Marker (react-native-maps, iOS + Android).
+// Helle Querstriche mit dunkler Kontur bleiben auf Luftbild und heller Karte lesbar.
+// Winkel/Gegenstände/Hund behalten ihre eigenen Marker. Nur Polyline + Marker (react-native-maps, iOS + Android).
 export const DISTANCE_TICK_STROKE: Record<TickClass, { strokeColor: string; strokeWidth: number }> = {
-  one:  { strokeColor: 'rgba(4,17,15,0.55)', strokeWidth: 1 },
-  five: { strokeColor: 'rgba(4,17,15,0.7)',  strokeWidth: 1.5 },
-  ten:  { strokeColor: 'rgba(4,17,15,0.85)', strokeWidth: 2 },
+  one:  { strokeColor: 'rgba(255,255,255,0.8)', strokeWidth: 1.5 },
+  five: { strokeColor: 'rgba(255,255,255,0.9)',  strokeWidth: 2 },
+  ten:  { strokeColor: '#FFFFFF', strokeWidth: 2.5 },
 };
 /** Über der gelegten Linie (zIndex 2/3), unter Markern. */
-export const DISTANCE_TICK_Z = 4;
+export const DISTANCE_TICK_Z = 5;
+export const DISTANCE_TICK_HALO = 'rgba(4,17,15,0.9)';
 
 export interface ScaleRegion { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }
 
@@ -51,8 +51,10 @@ export const DistanceScaleLayer = memo(function DistanceScaleLayer({ Polyline, M
       {render.segments.map(seg => {
         const st = DISTANCE_TICK_STROKE[seg.cls];
         return (
+          <Fragment key={seg.key}>
+          <Polyline coordinates={seg.coordinates} strokeColor={DISTANCE_TICK_HALO}
+            strokeWidth={st.strokeWidth + 2} lineCap="butt" zIndex={DISTANCE_TICK_Z - 1} tappable={false} />
           <Polyline
-            key={seg.key}
             coordinates={seg.coordinates}
             strokeColor={st.strokeColor}
             strokeWidth={st.strokeWidth}
@@ -60,6 +62,7 @@ export const DistanceScaleLayer = memo(function DistanceScaleLayer({ Polyline, M
             zIndex={DISTANCE_TICK_Z}
             tappable={false}
           />
+          </Fragment>
         );
       })}
       {render.labels.map(l => (
@@ -72,7 +75,7 @@ export const DistanceScaleLayer = memo(function DistanceScaleLayer({ Polyline, M
 const s = StyleSheet.create({
   label: {
     paddingHorizontal: 4, paddingVertical: 1, borderRadius: 6,
-    backgroundColor: 'rgba(4,17,15,0.72)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(4,17,15,0.9)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.25)',
   },
-  labelTxt: { color: 'rgba(255,255,255,0.92)', fontSize: 9.5, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  labelTxt: { color: 'rgba(255,255,255,0.92)', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
 });

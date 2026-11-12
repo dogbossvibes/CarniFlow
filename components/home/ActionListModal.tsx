@@ -83,7 +83,7 @@ export function ActionListModal({
 
 const s = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  scrim: { ...StyleSheet.absoluteFillObject },
+  scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   sheet: {
     backgroundColor: C.card,
     borderTopLeftRadius: 22,

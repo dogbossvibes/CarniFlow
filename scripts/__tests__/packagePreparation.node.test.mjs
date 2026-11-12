@@ -5,53 +5,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const patcher = readFileSync(join(root, 'scripts/patch-expo-task-manager.cjs'), 'utf8');
-const fixtureSource = [
-  'import android.os.Handler;', 'import java.util.UUID;',
-  'private static final Map<String, TaskExecutionCallback> sTaskCallbacks = new HashMap<>();',
-  'TaskExecutionCallback taskCallback = sTaskCallbacks.get(eventId);',
-  'sTaskCallbacks.put(eventId, callback);',
-].join('\n');
-function runPatcher(source, args = [], version = '14.0.9') {
-  let writes = 0; let dependencyReads = 0; let result = source; let error;
-  const fakeRequire = id => {
-    if (id === 'node:fs') return { readFileSync: () => result, writeFileSync: (_path, value) => { writes++; result = value; } };
-    if (id === 'node:path') return { dirname: () => '/synthetic', join: (...parts) => parts.join('/') };
-    dependencyReads++; return { version };
-  };
-  fakeRequire.resolve = () => '/synthetic/package.json';
-  try { vm.runInNewContext(patcher, { require: fakeRequire, process: { argv: ['node', 'patcher', ...args] }, console: { log() {} } }); }
-  catch (value) { error = value; }
-  return { writes, dependencyReads, source: result, error };
-}
-
-test('Checkmodus lehnt ungepatchte Quelle ohne Schreibaktion ab', () => {
-  const r = runPatcher(fixtureSource, ['--check']);
-  assert.match(r.error?.message ?? '', /missing or incomplete/);assert.equal(r.writes, 0);assert.equal(r.source, fixtureSource);
-});
-test('Checkmodus lehnt teilweise gepatchte Quelle ohne Reparatur ab', () => {
-  const partial = fixtureSource.replace('import android.os.Handler;', 'import android.os.Handler;\nimport android.os.Looper;');
-  const r = runPatcher(partial, ['--check']);assert(r.error);assert.equal(r.writes, 0);assert.equal(r.source, partial);
-});
-test('Normalmodus bleibt idempotent und Checkmodus akzeptiert vollständig gepatchte Quelle', () => {
-  const patched = runPatcher(fixtureSource);assert.equal(patched.error, undefined);assert.equal(patched.writes, 1);
-  assert.match(patched.source, /ConcurrentHashMap/);assert.match(patched.source, /postDelayed/);
-  const checked = runPatcher(patched.source, ['--check']);assert.equal(checked.error, undefined);assert.equal(checked.writes, 0);
-  const repeated = runPatcher(patched.source);assert.equal(repeated.error, undefined);assert.equal(repeated.writes, 0);
-});
-test('Unbekannte oder wiederholte Argumente scheitern vor Dependencyzugriff', () => {
-  for (const args of [['--unknown'], ['--check', '--check'], ['--check', '--write']]) {
-    const r = runPatcher(fixtureSource, args);assert.match(r.error?.message ?? '', /Usage/);assert.equal(r.writes, 0);assert.equal(r.dependencyReads, 0);
-  }
-});
-test('Fremde Version und unerwartete Patchstelle verändern keine Quelle', () => {
-  for (const [source, version] of [[fixtureSource, '99.0.0'], [fixtureSource.replace('import java.util.UUID;', ''), '14.0.9']]) {
-    const r = runPatcher(source, [], version);assert(r.error);assert.equal(r.writes, 0);assert.equal(r.source, source);
-  }
-});
+// Die fünf Tests zum --check-Modus von scripts/patch-expo-task-manager.cjs galten der
+// Variante für expo-task-manager 14.0.9 (SDK 54). Mit der Zusammenführung von main und
+// der iOS-60-Linie gilt die SDK-58-Variante (58.0.13, prüfsummengesichert), die keinen
+// --check-Modus hat; der Build-Check läuft dort über scripts/native-map-crash-check.mjs.
 test('GitHub und lokaler Preflight führen alle Prozessregressionen aus', () => {
   const workflow = readFileSync(join(root, '.github/workflows/anyvo-quality-gate.yml'), 'utf8');
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));

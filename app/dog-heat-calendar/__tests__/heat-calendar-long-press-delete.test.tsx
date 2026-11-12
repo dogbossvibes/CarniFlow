@@ -84,7 +84,7 @@ function findHistoryRows(node: ReactTestRenderer) {
 
 beforeEach(() => {
   mockPush.mockReset();
-  mockGetDogById.mockReset().mockResolvedValue({ data: { id: 'dog-1', owner_id: 'owner-1' }, error: null });
+  mockGetDogById.mockReset().mockResolvedValue({ data: { id: 'dog-1', gender: 'female', owner_id: 'owner-1' }, error: null });
   mockDeleteHeatCycle.mockReset().mockResolvedValue({ data: null, error: null });
   mockGetHeatCycleDetails.mockReset().mockResolvedValue({ cycles: [CYCLE_NEW, CYCLE_OLD], phases: [], observations: [] });
 });
@@ -196,14 +196,14 @@ describe('Läufigkeit Verlauf (Historie): long-press delete', () => {
 
 describe('Läufigkeit Verlauf (Historie): ownership gating', () => {
   it('a non-owner (connected/accepted trainer, read-only per dog_heat_cycles RLS) never sees a long-press delete action', async () => {
-    mockGetDogById.mockResolvedValue({ data: { id: 'dog-1', owner_id: 'someone-else' }, error: null });
+    mockGetDogById.mockResolvedValue({ data: { id: 'dog-1', gender: 'female', owner_id: 'someone-else' }, error: null });
     const node = render();
     await flush();
     expect(findHistoryRows(node)).toHaveLength(0);
   });
 
   it('a non-owner can still tap a history card normally to view it', async () => {
-    mockGetDogById.mockResolvedValue({ data: { id: 'dog-1', owner_id: 'someone-else' }, error: null });
+    mockGetDogById.mockResolvedValue({ data: { id: 'dog-1', gender: 'female', owner_id: 'someone-else' }, error: null });
     const node = render();
     await flush();
     const cards = (node.root as unknown as { findAllByType: (t: unknown) => { props: { onPress?: () => void } }[] })

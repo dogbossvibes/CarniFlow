@@ -103,8 +103,8 @@ function KeyboardAwareSheet({ backdrop, sheet }: { backdrop: React.ReactNode; sh
 // or mutate data. Backdrop-tap dismissal is left completely unchanged and
 // still works everywhere it already did, as a secondary method.
 export function AnyvoBottomSheet({
-  visible, onClose, title, children, keyboardAware = false, closeButton = false,
-}: { visible: boolean; onClose: () => void; title?: string; children: React.ReactNode; keyboardAware?: boolean; closeButton?: boolean }) {
+  visible, onClose, title, children, keyboardAware = false, closeButton = false, onDismiss,
+}: { visible: boolean; onClose: () => void; title?: string; children: React.ReactNode; keyboardAware?: boolean; closeButton?: boolean; onDismiss?: () => void }) {
   const backdrop = (
     <TouchableWithoutFeedback onPress={onClose}>
       <View style={s.backdrop} />
@@ -136,14 +136,14 @@ export function AnyvoBottomSheet({
     </View>
   );
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={onDismiss}>
       {keyboardAware ? <KeyboardAwareSheet backdrop={backdrop} sheet={sheet} /> : <>{backdrop}{sheet}</>}
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.62)' },
   sheet:    { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.trackSurface, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: C.trackBorder, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   keyboardRoot: { flex: 1 },
   keyboardAnchor: { flex: 1, justifyContent: 'flex-end' },

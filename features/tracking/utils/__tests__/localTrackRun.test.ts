@@ -48,3 +48,37 @@ describe('buildRunResultPayload — analytics (Punkt 10/12/13, additiv)', () => 
     expect(p.analytics).toBe(analytics);
   });
 });
+
+
+describe('partial observation has no overall score', () => {
+  it.each(['search', 'reference'])('preserves metrics but clears both scores for a gap in the %s', kind => {
+    const analytics = { analyticsVersion: 1 as const, trackScore: 77, deviation: { meanM: 2 } } as any;
+    const result = { ...base.result, points: base.result.points.map((p, i) => ({ ...p, ...(kind === 'search' && i === 1 ? { breakBefore: true } : {}) })) };
+    const payload = buildRunResultPayload({ ...base, result, analytics, referenceHasGaps: kind === 'reference' });
+    expect(payload.score).toBeNull();
+    expect(payload.analytics).toMatchObject({ trackScore: null, deviation: { meanM: 2 }, continuity: { version: 1, hasGaps: true } });
+    expect(payload.continuity).toEqual({ version: 1, hasGaps: true, searchHasGaps: kind === 'search', referenceHasGaps: kind === 'reference' });
+    expect(analytics.trackScore).toBe(77);
+  });
+});
+
+
+describe('immutable object review baseline', () => {
+  it('adds a complete per-object snapshot without changing legacy fields or sensor analytics', () => {
+    const original = buildRunResultPayload(base);
+    const snapshotInput = { objects: [{ id: 'a', index: 0 }, { id: 'b', index: 1 }, { id: 'c', index: 2 }],
+      statuses: ['manual_found', 'auto_dwell_found', 'missed'] as const,
+      foundObjects: 2, totalObjects: 3 };
+    const result = buildRunResultPayload({ ...base, objectSnapshotInput: { ...snapshotInput, statuses: [...snapshotInput.statuses] } });
+    const { object_snapshot, ...unchanged } = result;
+    expect(unchanged).toEqual(original);
+    expect(object_snapshot).toMatchObject({ version: 1, scoreBasis: null, objects: [
+      { id: 'a', recordedStatus: 'manual_found' }, { id: 'b', recordedStatus: 'auto_dwell_found' }, { id: 'c', recordedStatus: 'missed' },
+    ] });
+  });
+  it('leaves legacy snapshots byte-for-byte equivalent when identities are missing', () => {
+    expect(buildRunResultPayload({ ...base, objectSnapshotInput: {
+      objects: [], statuses: [],
+    } })).toEqual(buildRunResultPayload(base));
+  });
+});

@@ -2,8 +2,8 @@
 // Persönliche Schrittlängen-Kalibrierung — REINE, testbare Logik (kein React/GPS).
 //
 // Der Nutzer geht CALIBRATION_STEPS echte Fährtenschritte (zählt selbst — ANYVO
-// hat KEINEN Pedometer), ANYVO misst die zurückgelegte Distanz entlang der Gehlinie
-// (kumulierte Haversine, Runtime-only) und leitet ab:
+// hat KEINEN Pedometer), ANYVO schätzt die Distanz auf einer geraden Gehstrecke
+// (gerade Strecke zwischen stabilisierten GPS-Endpunkten, Runtime-only) und leitet ab:
 //     stepLengthM = measuredDistanceM / CALIBRATION_STEPS
 // Ergebnis wird NICHT vor dem Speichern gerundet; die Anzeige darf runden.
 // ──────────────────────────────────────────────────────────────────────────

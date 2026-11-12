@@ -630,7 +630,7 @@ const s = StyleSheet.create({
     right:    18,
   },
   scrim: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.42)',
   },
   fanAnchor: {

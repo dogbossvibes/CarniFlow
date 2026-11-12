@@ -1,0 +1,15 @@
+import { importTrackFile,readTrackFile,shareTrackFile } from '../files';
+import * as FS from 'expo-file-system/legacy';
+import * as Picker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
+import { offer } from './fixture';
+jest.mock('expo-file-system/legacy',()=>({cacheDirectory:'file:///cache/',readDirectoryAsync:jest.fn(async()=>[]),getInfoAsync:jest.fn(),readAsStringAsync:jest.fn(),writeAsStringAsync:jest.fn(),makeDirectoryAsync:jest.fn(),deleteAsync:jest.fn(async()=>{})}));
+jest.mock('expo-document-picker',()=>({getDocumentAsync:jest.fn()}));
+jest.mock('expo-sharing',()=>({isAvailableAsync:jest.fn(async()=>true),shareAsync:jest.fn(async()=>{})}));
+jest.mock('expo-crypto',()=>({randomUUID:()=> 'random',CryptoDigestAlgorithm:{SHA256:'SHA256'},digestStringAsync:async()=> 'a'.repeat(64)}));
+beforeEach(()=>{jest.clearAllMocks();(FS.getInfoAsync as jest.Mock).mockResolvedValue({exists:true,isDirectory:false,size:1000});(FS.readAsStringAsync as jest.Mock).mockResolvedValue(JSON.stringify(offer()));});
+it.each(['https://host/file.anyvo-track','file:///private/a.anyvo-track','file:///cache/../secret','file:///cache/a?x=1'])('refuses arbitrary input URI %s without reading',async uri=>{await expect(readTrackFile(uri,()=>{})).rejects.toThrow('INVALID');expect(FS.readAsStringAsync).not.toHaveBeenCalled();});
+it('checks size before allocation and rejects unknown size',async()=>{for(const size of [undefined,5000000]){(FS.getInfoAsync as jest.Mock).mockResolvedValue({exists:true,isDirectory:false,size});await expect(readTrackFile('file:///cache/a',()=>{})).rejects.toThrow('TOO_LARGE');}expect(FS.readAsStringAsync).not.toHaveBeenCalled();});
+it('picker cancel is inert and imported cache copy is deleted after validation',async()=>{(Picker.getDocumentAsync as jest.Mock).mockResolvedValueOnce({canceled:true});expect(await importTrackFile(()=>{})).toBeNull();(Picker.getDocumentAsync as jest.Mock).mockResolvedValueOnce({canceled:false,assets:[{name:'a.anyvo-track',uri:'file:///cache/a'}]});expect(await importTrackFile(()=>{})).toEqual(offer());expect(FS.deleteAsync).toHaveBeenCalledWith('file:///cache/a',{idempotent:true});});
+it('exports validated payload and retains its URI for delayed Android recipient access',async()=>{await expect(shareTrackFile(offer(),()=>{})).resolves.toBeUndefined();expect(Sharing.shareAsync).toHaveBeenCalledWith(expect.stringMatching(/\.anyvo-track$/),expect.objectContaining({mimeType:'application/vnd.anyvo.track+json'}));expect(FS.deleteAsync).not.toHaveBeenCalled();});
+it('account change after async reading prevents import',async()=>{let checks=0;await expect(readTrackFile('file:///cache/a',()=>{if(++checks===3)throw new Error('ACCOUNT_CHANGED');})).rejects.toThrow('ACCOUNT_CHANGED');});

@@ -8,7 +8,7 @@
 
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
-import type { EventSubscription } from 'expo-modules-core';
+import type { EventSubscription } from 'expo';
 
 import Native from './src/AnyvoPrecisionLocationModule';
 import type {
@@ -49,6 +49,7 @@ function fromExpo(loc: Location.LocationObject): PrecisionLocation {
     latitude: c.latitude, longitude: c.longitude,
     accuracy: c.accuracy ?? null, altitude: c.altitude ?? null,
     speed: c.speed ?? null, bearing: c.heading ?? null,
+    altitudeAccuracy: c.altitudeAccuracy ?? null,
     timestamp: loc.timestamp ?? Date.now(),
     provider: 'expo-location', source: 'expo-location',
   };

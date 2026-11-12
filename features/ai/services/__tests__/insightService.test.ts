@@ -4,6 +4,9 @@ jest.mock('@/lib/supabase', () => ({ supabase: {} }));
 
 import { generateLocalInsights, getRecommendations, type CoachDataset } from '@/features/ai/services/insightService';
 
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
+
 const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 const DOGS = [{ id: 'd1', name: 'Rex' }];
 

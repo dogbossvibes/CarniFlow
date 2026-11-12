@@ -73,3 +73,10 @@ describe('analysisQaFacts', () => {
     expect(analysisQaFacts({})).toContain('kein run-Objekt');
   });
 });
+
+
+it('keeps observed metrics available with an explicitly partial analysis and no overall score', () => {
+  const partial = full({ trackScore: null, continuity: { version: 1, hasGaps: true } });
+  expect(trackAnalysisState({ track_data: { run: { analytics: partial } } }, partial)).toBe('available');
+  expect(trackAnalysisState({ runs: [{}] }, full({ trackScore: null }))).toBe('unavailable');
+});

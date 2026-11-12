@@ -1,3 +1,4 @@
+import { DogTrackingPanel } from '@/features/tracking/components/DogTrackingPanel';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -245,6 +246,7 @@ export default function DogHubRoute() {
       actions={actions}
       aiUnlocked={isPremium}
       heat={{
+        onOpenOverview: () => router.push(`/dog-heat-overview/${id}` as never),
         cycles: heatCycles,
         prediction: heatPrediction,
         onAdd: () => router.push({ pathname: '/dog-heat-new', params: { id } } as never),
@@ -279,8 +281,10 @@ export default function DogHubRoute() {
       }}
       appointments={{
         items: appointments,
-        onOpenCalendar: () => router.push('/plaene' as never),
+        onOpenCalendar: () => router.push('/training-hub' as never),
+        onOpenAppointment: appointment => router.push({ pathname: '/training-hub', params: { eventId: appointment.id } } as never),
       }}
+      trackingPanel={dog?.owner_id === userId ? <DogTrackingPanel key={`${userId}:${id}`} userId={userId} dogId={id} dogName={dog?.name ?? ''} lastTrackId={lastFaehrteId} /> : undefined}
       activeFaehrte={activeFaehrte}
       onOpenFaehrte={activeFaehrte ? () => router.push(reopenTarget(activeFaehrte) as never) : undefined}
       lastFaehrteId={lastFaehrteId}

@@ -1,3 +1,4 @@
+import { HeatDogGate } from '@/components/dogs/heat/HeatDogGate';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +45,11 @@ const moveMonth = (cursor: { year: number; month: number }, offset: number) => {
 };
 
 export default function DogHeatCalendarScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <HeatDogGate dogId={id}>{dog => <DogHeatCalendarScreenContent resolvedDog={dog} />}</HeatDogGate>;
+}
+
+function DogHeatCalendarScreenContent({ resolvedDog }: { resolvedDog: import('@/types').Dog }) {
   const router = useRouter();
   const { id: dogId } = useLocalSearchParams<{ id: string }>();
   const { isPro, loading: capabilityLoading } = useCapabilities();
@@ -68,7 +74,7 @@ export default function DogHeatCalendarScreen() {
   // determined explicitly — HeatCycle itself carries no owner_id in its
   // mapped TS shape — so "Löschen" is only ever offered when it actually is
   // this user's own dog, matching backend/RLS delete authority exactly.
-  const [isOwner, setIsOwner] = useState(false);
+  const [isOwner, setIsOwner] = useState(resolvedDog.owner_id === user?.id);
 
   useEffect(() => {
     if (!capabilityLoading && !isPro) router.replace('/premium' as never);
@@ -173,7 +179,7 @@ export default function DogHeatCalendarScreen() {
             <Text style={s.barTitle}>Läufigkeitskalender</Text>
             <Text style={s.barSubtitle}>Verlauf & Phasen</Text>
           </View>
-          <TouchableOpacity style={s.iconBtn} onPress={() => router.push({ pathname: '/dog-heat-new', params: { id: dogId } } as never)} hitSlop={8} accessibilityLabel="Läufigkeit hinzufügen">
+          <TouchableOpacity disabled={!isOwner} accessibilityState={{ disabled: !isOwner }} style={s.iconBtn} onPress={() => router.push({ pathname: '/dog-heat-new', params: { id: dogId } } as never)} hitSlop={8} accessibilityLabel="Läufigkeit hinzufügen">
             <Ionicons name="add" size={20} color={C.trackText} />
           </TouchableOpacity>
         </View>

@@ -111,7 +111,7 @@ describe('UnitStartScreen single-dog selection', () => {
 
     expect(strings(node)).toContain('Malu');
     expect(mockCreateTrainingUnit).toHaveBeenCalledWith('owner-1', 'dog-1');
-    expect(mockStartUnit).toHaveBeenCalledWith({ unitId: 'unit-1', dogId: 'dog-1', dogName: 'Malu' });
+    expect(mockStartUnit).toHaveBeenCalledWith(expect.objectContaining({ unitId: 'unit-1', dogId: 'dog-1', dogName: 'Malu', ownerId: 'owner-1', sourceFingerprint: expect.any(String) }));
     expect(mockReplace).toHaveBeenCalledWith('/unit/live');
   });
 

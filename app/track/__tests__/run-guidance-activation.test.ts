@@ -27,6 +27,8 @@ describe('zentraler Guard', () => {
     expect(block('const voiceRecovery = useMemo', 'const hapticRecovery')).toContain('enabled: searchGuidanceActive,');
     expect(run).toContain('useTrackHapticGuidance(s.dogProgressM, guidanceAngles, guidanceObjects, searchGuidanceActive, hapticRecovery);');
     expect(block('const trackEndState = useTrackEndGuidance', 'const trackEndReached')).toContain('recording: searchGuidanceActive,');
+    for (const field of ['paused: s.paused,', 'sessionId: effectiveId,', 'runId: runIdRef.current,'])
+      expect(block('const trackEndState = useTrackEndGuidance', 'const trackEndReached')).toContain(field);
     expect(run).toContain('if (!voiceOn || !searchGuidanceActive || snapData.segments.length === 0) return;');
     const off = block('const fb = offTrackTransitionFeedback', 'const offBanner');
     expect(run).toMatch(/if \(!searchGuidanceActive\) return;\s*const fb = offTrackTransitionFeedback\(prevOffTrackRef\.current, s\.offTrackState\);\s*prevOffTrackRef\.current = s\.offTrackState;/);
@@ -61,7 +63,7 @@ describe('Hooks: disabled verbraucht nichts', () => {
     expect(voice.indexOf('if (!enabled ||')).toBeLessThan(voice.indexOf('stepGuidanceEngine(candidates'));
     expect(haptic).toContain('if (!enabled || dogProgressM == null || !Haptics) return;');
     expect(haptic.indexOf('if (!enabled ||')).toBeLessThan(haptic.indexOf('firedRef.current.add(bestId)'));
-    expect(end).toContain('if (!input.recording || input.dogProgressM == null) return;');
+    expect(end).toContain('if (!input.recording || input.paused || input.dogProgressM == null) return;');
     expect(end.indexOf('if (!input.recording ||')).toBeLessThan(end.indexOf('stepTrackEnd('));
   });
   it('Off-Track wird vom Recorder erst ab recording bewertet (kein Feedback vor Search-Start möglich)', () => {
@@ -81,7 +83,8 @@ describe('Pins: Canonical Reference + Search Recovery State unverändert', () =>
     const resume = block('const resumeSearch', 'const endSearch');
     expect(resume).toContain('prevOffTrackRef.current = runState.offTrackState;');
     expect(resume).toContain('segmentAnnouncementRef.current = { ...runState.segmentAnnouncements };');
-    expect(resume).toMatch(/runState \}\)/);
+    // Recovery payload stays in the first argument; the second is diagnostic-only.
+    expect(resume).toMatch(/runState \},\s*\{ diagnosticAttemptKey: runIdRef\.current \?\? undefined \}\)/);
     for (const s of ['initialAnnouncedIds: snapData.recovery?.voiceFiredIds', 'initialFiredIds: snapData.recovery?.hapticFiredIds',
       'initialFired: snapData.recovery?.endFired ?? false', 'noteSearchVoiceFired(id)', 'noteSearchHapticFired(id)', 'noteSearchEndFired()',
       'setSearchSegmentAnnouncements(result.state)']) expect(run).toContain(s);
@@ -97,5 +100,24 @@ describe('Pins: Canonical Reference + Search Recovery State unverändert', () =>
     expect(haptic).toContain('const OBJECT_AHEAD_M = 4;');
     expect(rec).toContain('stepObjectDwell(previous, {');
     expect(rec).toContain('const LOOKAHEAD_M = 20;');
+  });
+});
+
+
+describe('Support-Ende-Ereignis unabhängig vom QA-Modus', () => {
+  it('beobachtet den echten onFired-Callback einmal und verwendet denselben Wert im Export', () => {
+    const callback = block('const noteEndFired =', 'const openMandatoryObjects');
+    expect(callback).toContain('noteSearchEndFired()');
+    expect(callback).toContain('sLatestRef.current.confirmEnd()');
+    expect(callback).toContain('if (!endEventRef.current)');
+    expect(callback).not.toContain('isQaDiagnosticsEnabled');
+    expect(callback).not.toContain('captureLevel');
+    expect(block('const beginSearchNow', 'const handleManualStart')).toContain("endEventObservationRef.current = 'complete'");
+    expect(block('const beginSearchNow', 'const handleManualStart')).toContain('endEventRef.current = null');
+    expect(block('const resumeSearch', 'const endSearch')).toContain("endEventObservationRef.current = 'partial'");
+    expect(block('const resumeSearch', 'const endSearch')).toContain('endEventRef.current = null');
+    expect(block('const trackEndState =', 'const trackEndReached')).toContain('onFired: noteEndFired');
+    expect(run).toContain("eventObservation: endEventObservationRef.current, fired: endEventRef.current");
+    expect(run).toContain("saveQaSearchCapture(sessId, toSupportCapture(diag), 'support')");
   });
 });

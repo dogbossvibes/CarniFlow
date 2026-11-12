@@ -1,0 +1,266 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:anyvo:diagnostic-provenance:1",
+  "title": "ANYVO optional support export provenance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "recording",
+    "exporter"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "recording": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lay",
+        "search"
+      ],
+      "properties": {
+        "lay": {
+          "$ref": "#/definitions/phase"
+        },
+        "search": {
+          "$ref": "#/definitions/phase"
+        }
+      }
+    },
+    "exporter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "environment"
+      ],
+      "properties": {
+        "source": {
+          "const": "runtime_at_export"
+        },
+        "environment": {
+          "$ref": "#/definitions/environment"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "label": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(?!.*(?:\\d{4}-\\d{2}-\\d{2}|@|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}))[A-Za-z0-9 ._()+-]{1,80}$"
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "appVersion",
+        "nativeBuildVersion",
+        "osVersion",
+        "deviceModel",
+        "runtimeVersion",
+        "launch",
+        "otaUpdateId"
+      ],
+      "properties": {
+        "platform": {
+          "enum": [
+            "ios",
+            "android",
+            "web",
+            "unknown"
+          ]
+        },
+        "appVersion": {
+          "$ref": "#/definitions/label"
+        },
+        "nativeBuildVersion": {
+          "$ref": "#/definitions/label"
+        },
+        "osVersion": {
+          "$ref": "#/definitions/label"
+        },
+        "deviceModel": {
+          "$ref": "#/definitions/label"
+        },
+        "runtimeVersion": {
+          "$ref": "#/definitions/label"
+        },
+        "launch": {
+          "enum": [
+            "ota",
+            "embedded",
+            "emergency",
+            "updates_disabled",
+            "unknown"
+          ]
+        },
+        "otaUpdateId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "otaUpdateId": {
+                "type": "string"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "launch": {
+                "const": "ota"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "environment"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "recording_start",
+            "recording_resume"
+          ]
+        },
+        "environment": {
+          "$ref": "#/definitions/environment"
+        }
+      }
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "availability",
+        "scope",
+        "partial",
+        "omittedSegments",
+        "segments"
+      ],
+      "properties": {
+        "availability": {
+          "enum": [
+            "available",
+            "unknown",
+            "read_failed"
+          ]
+        },
+        "scope": {
+          "const": "phase_history"
+        },
+        "partial": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "omittedSegments": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 99999999
+        },
+        "segments": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/definitions/segment"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "const": "available"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "partial": {
+                "type": "boolean"
+              },
+              "segments": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "partial": {
+                "type": "null"
+              },
+              "omittedSegments": {
+                "const": 0
+              },
+              "segments": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "omittedSegments": {
+                "minimum": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "partial": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "segments": {
+                "minItems": 1,
+                "items": [
+                  {
+                    "properties": {
+                      "source": {
+                        "const": "recording_resume"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "partial": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

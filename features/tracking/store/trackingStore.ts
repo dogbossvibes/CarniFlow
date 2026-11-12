@@ -1,3 +1,6 @@
+import { isScoredObject } from '@/features/tracking/utils/objectMarkers';
+import { attachSpecialGeometry } from '../utils/specialAngleGeometry';
+import type { TrackTransferReceipt } from '@/features/tracking-transfer/importPlan';
 import { create } from 'zustand';
 import { calculateDistance, getGpsQuality, type GpsQuality, type LatLng } from '@/features/tracking/utils/gpsFilter';
 import { schedulePersist, writePendingNow, clearPending, type PendingTrack } from '@/features/tracking/store/trackPersist';
@@ -11,7 +14,7 @@ import {
 import type { OffTrackState } from '@/features/tracking/utils/offTrack';
 
 export type MarkerType = 'gegenstand' | 'winkel' | 'verleitung' | 'sprachmarker';
-export type MarkerMaterial = 'stoff' | 'filz' | 'holz' | 'duebel' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
+export type MarkerMaterial = 'stoff' | 'filz' | 'holz' | 'duebel' | 'ball' | 'gummi' | 'leder' | 'plastik' | 'metall' | 'teppich' | 'diverses';
 // Winkel-/Figur-Typen einer Fährte. Schärfe (rechtwinklig/spitz) und Richtung
 // (links/rechts) sind getrennt: ein Spitzwinkel ist immer AUCH nach links oder
 // rechts. 'spitz' (ohne Richtung) bleibt nur für Altdaten erhalten.
@@ -33,6 +36,7 @@ export type TrackSaveState = 'idle' | 'saving' | 'saved' | 'error';
 export type SessionStatus = 'laying' | 'laid' | 'resting' | 'searching' | 'completed' | 'cancelled';
 
 export interface TrackPointSample extends LatLng {
+  measuredDistanceM?: number;
   accuracy?: number | null;
   altitude?: number | null;
   speed?:    number | null;
@@ -62,6 +66,9 @@ export interface MarkerSample {
   audio_url:         string | null;
   found:             boolean;
   t:                 number;
+  geometryDirection?: 'links' | 'rechts' | 'unresolved';
+  geometrySharpness?: 'normal' | 'sharp' | 'unresolved';
+  geometrySource?: 'manual' | 'gps';
   // Auto-Winkel-Confidence (nur zur Laufzeit; NICHT in der DB — Persistenz s. u.):
   // die track_markers-Tabelle hat keine Spalte dafür; DB-Persistenz wäre eine
   // Migration und ist bewusst als Folgepunkt offen. Historische Marker ohne diese
@@ -71,6 +78,7 @@ export interface MarkerSample {
 }
 
 interface TrackingState {
+  annotateAngleGeometry: (entries: unknown) => void;
   currentSessionId:    string | null;
   dogId:               string | null;   // Besitzer der aktiven Fährte (bestehende dogs.id) — Schlüssel des Puffers
   isRecording:         boolean;
@@ -89,6 +97,7 @@ interface TrackingState {
   segments:            TrackSegment[];
   runPoints:           TrackPointSample[];         // Legacy (useTrackRun) — NICHT vom aktiven Absuche-Pfad genutzt
   searchTrackPoints:   TrackPointSample[];         // aktive Absuche-Spur (P1) — getrennt von der gelegten `trackPoints`
+  transferReceipt: TrackTransferReceipt | null;
   searchRunId:         string | null;              // track_runs.id der aktiven Absuche (P2 Recovery/Finalisierung)
   sessionStatus:       SessionStatus;              // Session-Lebenszyklus (P2)
   searchHandlerDistanceM: SearchHandlerDistanceM;  // Absuche: gewählter Abstand Hundeführer↔Hund (5/10 m)
@@ -139,7 +148,7 @@ interface TrackingState {
   clearSearchSession: () => void;                  // Suchversuch verworfen: Such-Felder zurück, Fährte wieder 'resting' (Lay-Daten bleiben)
   restoreSearchSession: (p: PendingTrack) => void; // Recovery: Absuche-Metadaten + Punkte aus dem Puffer zurückspielen (P2)
   // ── Search-Recovery-State (gehört zur aktiven searchRunId) ──
-  noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; reliableDeviationExcessSumM?: number; reliableDeviationCount?: number; reliableCursorM?: number; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
+  noteSearchRunProgress: (p: { maxCursorM: number; devSumM: number; devCount: number; reliableDeviationExcessSumM?: number; reliableDeviationCount?: number; reliableCursorM?: number; unobservedProgressM?: number; unobservedObjectIds?: string[]; breaks: SearchRunBreak[] }) => void;  // Hotpath: entprellt
   noteSearchObjectFound: (objectKey: string) => void;      // sofort persistiert
   noteSearchAutoDwell: (objectKey: string) => void;
   dismissSearchAutoDwell: (objectKey: string) => void;
@@ -158,6 +167,7 @@ interface TrackingState {
   setStartLockActive: (on: boolean) => void;
   setStartDriftRejectedCount: (n: number) => void;
   setSaveState: (s: TrackSaveState) => void;
+  restoreLayRecording: (p: PendingTrack) => void;
   restorePending: (p: PendingTrack) => void;   // gelegte Fährte nach App-Kill in der Liegezeit wiederherstellen
   setMapFollowMode: (on: boolean) => void;
   setMapOrientationMode: (m: OrientationMode) => void;
@@ -183,6 +193,7 @@ const INITIAL = {
   segments:              [] as TrackSegment[],
   runPoints:             [] as TrackPointSample[],
   searchTrackPoints:     [] as TrackPointSample[],
+  transferReceipt:       null as TrackTransferReceipt | null,
   searchRunId:           null as string | null,
   sessionStatus:         'laid' as SessionStatus,   // neutraler Default (nicht 'searching' → keine Recovery)
   searchHandlerDistanceM: DEFAULT_HANDLER_DISTANCE_M as SearchHandlerDistanceM,   // Fallback 5 m
@@ -209,6 +220,7 @@ const INITIAL = {
 // autoritativ, `searchPoints` hier ist ein Fallback für die Wiederherstellung.
 function snapshot(s: TrackingState): PendingTrack {
   return {
+    transferReceipt: s.transferReceipt,
     sessionId: s.currentSessionId, dogId: s.dogId, trackPoints: s.trackPoints, markers: s.markers,
     segments: s.segments, runPoints: s.runPoints, distanceMeters: s.distanceMeters, durationSeconds: s.durationSeconds,
     layFinishedAt: s.layFinishedAt, startAnchor: s.startAnchor, savedAt: Date.now(),
@@ -247,7 +259,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   addTrackPoint: (p, opts) => {
     const { trackPoints, distanceMeters } = get();
     const last = trackPoints[trackPoints.length - 1];
-    const add  = last && !opts?.skipDistance ? calculateDistance(last, p) : 0;
+    const add  = last && !p.breakBefore && !opts?.skipDistance ? calculateDistance(last, p) : 0;
     set({
       trackPoints:     [...trackPoints, p],
       distanceMeters:  distanceMeters + add,
@@ -263,6 +275,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   setGpsStats: (stats) => set({ gpsStats: stats }),
   setMotionStatus: (st) => set({ motionStatus: st }),
 
+  annotateAngleGeometry: (entries) => { set(s => ({ markers: attachSpecialGeometry(s.markers, entries) })); persist(get); },
   addMarker: (m) => { set(s => ({ markers: [...s.markers, m] })); persist(get); },
   addSegment: (segment) => { set(s => ({ segments: [...s.segments, segment] })); persistNow(get); },
   updateSegment: (id, patch) => {
@@ -312,6 +325,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // Recovery (P2): Absuche-Metadaten + Punkte aus dem Puffer in den Store spielen
   // (nach App-Kill). Legacy-sicher (Felder optional). Setzt NICHT auf Aufnahme.
   restoreSearchSession: (p) => set({
+    transferReceipt: p.transferReceipt ?? null,
     currentSessionId: p.sessionId,
     isPaused:         p.paused ?? false,   // Recovery: Pausezustand wiederherstellen (kein Auto-Recording)
     dogId:            p.dogId ?? null,
@@ -342,6 +356,8 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
       reliableDeviationExcessSumM: p.reliableDeviationExcessSumM ?? s.searchRunState.reliableDeviationExcessSumM,
       reliableDeviationCount: p.reliableDeviationCount ?? s.searchRunState.reliableDeviationCount,
       reliableCursorM: Math.max(s.searchRunState.reliableCursorM, p.reliableCursorM ?? s.searchRunState.reliableCursorM),
+      unobservedProgressM: Math.max(s.searchRunState.unobservedProgressM ?? 0, p.unobservedProgressM ?? 0),
+      ...(p.unobservedObjectIds ? { unobservedObjectIds: p.unobservedObjectIds } : {}),
       breaks: p.breaks,
     } }));
     persist(get);
@@ -393,7 +409,7 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
 
   markArticleFound: (markerId) => set(s => ({
     markers: s.markers.map(m => m.id === markerId ? { ...m, found: true } : m),
-    articlesFound: s.markers.filter(m => m.found || m.id === markerId).filter(m => m.type === 'gegenstand').length,
+    articlesFound: s.markers.filter(m => m.found || m.id === markerId).filter(isScoredObject).length,
   })),
 
   setCurrentPosition: (pos, accuracy) => set({ currentPosition: pos, gpsAccuracy: accuracy ?? null, gpsQuality: accuracy != null ? getGpsQuality(accuracy) : get().gpsQuality }),
@@ -410,7 +426,15 @@ export const useTrackingStore = create<TrackingState>((set, get) => ({
   // Nach App-Kill in der Liegezeit: gelegte Fährte aus dem Offline-Puffer zurück in
   // den Store spielen, damit die Absuche sie snapshotten kann. Setzt NICHT auf
   // Aufnahme — nur die gelegten Daten + Liegezeit-Start.
+  restoreLayRecording: (p) => {
+    const { currentPosition, heading, gpsAccuracy, gpsQuality } = get();
+    set({ ...INITIAL, currentPosition, heading, gpsAccuracy, gpsQuality });
+    get().restorePending(p);
+    set({ isRecording: true, isPaused: false, sessionStatus: 'laying', startLockActive: false });
+    persistNow(get);
+  },
   restorePending: (p) => set({
+    transferReceipt: p.transferReceipt ?? null,
     currentSessionId: p.sessionId,
     isPaused:         p.paused ?? false,   // Recovery: Pausezustand wiederherstellen (kein Auto-Recording)
     dogId:            p.dogId ?? null,

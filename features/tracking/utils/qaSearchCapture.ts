@@ -1,3 +1,4 @@
+import { diagnosticsAccessToken } from '@/lib/diagnosticsAccessState';
 // ──────────────────────────────────────────────────────────────────────────
 // QA-Mitschnitt der ABSUCHE (QA-Export schemaMinor 3, `searchDiagnostics`).
 //
@@ -65,7 +66,7 @@ export interface QaEndEligibilitySample {
 }
 
 // ── Recorder-Telemetrie (nur im Speicher, absolute Werte) ────────────────
-export interface SearchQaRawFix { lat: number; lng: number; accuracy: number | null; t: number; accepted: boolean; reason: string | null }
+export interface SearchQaRawFix { lat: number; lng: number; accuracy: number | null; t: number; receivedAtMs?: number; accepted: boolean; reason: string | null }
 export interface SearchQaPoint { lat: number; lng: number; tSec: number }
 export interface SearchQaCursorSample {
   tSec: number;
@@ -77,6 +78,9 @@ export interface SearchQaCursorSample {
 }
 export interface SearchQaObjectApproach { index: number; minHandlerDistM: number | null; progressAtClosestM: number | null }
 export interface SearchQaTelemetry {
+  /** Coordinate-free identity of this actual observed segment, captured at start. */
+  recordingContext?: import('./diagnosticProvenance').RecordingProvenance;
+  rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   /**
    * 'qa' = interner QA-Modus (Vollumfang). 'support' = Minimal-Capture für normale Kunden
    * (nur Beobachtung: kein Dwell-Mitschnitt, keine UX-Diagnosen). Fehlt = 'qa' (Altbestand).
@@ -122,7 +126,7 @@ export interface QaRelPoint { x: number; y: number; tSec: number }
  * (Meter, rein diagnostisch) + das Ergebnis von evaluateSearchFix. `accepted: true` markiert die akzeptierten
  * Fixes — es gibt bewusst keinen zweiten Strom. `rejectReason` nur bei abgelehnten Fixes.
  */
-export interface QaRawSearchPoint extends QaRelPoint { accuracyM: number | null; accepted: boolean; rejectReason?: string }
+export interface QaRawSearchPoint extends QaRelPoint { receivedTSec?: number | null; accuracyM: number | null; accepted: boolean; rejectReason?: string }
 export interface QaGapStats { max: number | null; mean: number | null; p95: number | null }
 
 export interface QaSearchStreamStats {
@@ -155,6 +159,9 @@ export interface QaSearchTurnParity {
 }
 
 export interface QaSearchDiagnostics {
+  /** Internal capture context; projected only into the validated support provenance block. */
+  recordingContext?: import('./diagnosticProvenance').RecordingProvenance;
+  rawArchive?: import('../storage/gpsCapture').GpsCaptureSnapshot | null;
   /** QA v2.5: additive UX diagnostics. */
   voiceDiagnostics?: { events: VoiceDiagnostic[]; truncated: boolean };
   startApproachDiagnostics?: QaStartApproachDiagnostics;
@@ -211,9 +218,12 @@ export interface QaSearchDiagnostics {
     referencePosition: { x: number; y: number } | null;
     minSearchDistToEndM: number | null;
     progressAtMinEndDistM: number | null;
-    /** Zeitpunkt (s seit Suchstart), Fortschritt und Search-Distanz beim Ende-Ereignis; null = nicht ausgelöst. */
+    /** Beobachtungsumfang; fehlend bei Altbestand. Resume deckt nur den aktuellen Abschnitt ab. */
+    eventObservation?: 'complete' | 'partial' | 'unknown';
+    /** Zeitpunkt (s seit Suchstart), Fortschritt und Search-Distanz; null = kein Ereignis beobachtet. */
     eventFired: { tSec: number; progressM: number; searchDistanceM: number } | null;
-    eventCount: number;
+    /** null = nicht bestimmbar; 0 nur bei vollständiger Beobachtung ohne Ereignis. */
+    eventCount: number | null;
     hapticFired: boolean | null;
     voiceFired: boolean | null;
     manualStopTSec: number;
@@ -228,6 +238,16 @@ export interface QaSearchDiagnostics {
   /** Immer 'display_only': replay_points ändert keine Metrik. */
   replayRole: 'display_only';
   truncated: { raw: boolean; cursor: boolean };
+}
+
+/** Altbestand darf ein fehlendes QA-Ereignis nicht als bewiesenes Ausbleiben ausweisen. */
+export function normalizeSearchEndDiagnostics(end: QaSearchDiagnostics['end']): QaSearchDiagnostics['end'] {
+  const eventObservation = end.eventObservation ?? 'unknown';
+  return {
+    ...end,
+    eventObservation,
+    eventCount: end.eventFired ? 1 : eventObservation === 'complete' ? 0 : null,
+  };
 }
 
 // ── Geometrie-Hilfen ─────────────────────────────────────────────────────
@@ -300,7 +320,8 @@ export interface BuildSearchDiagnosticsInput {
   objects: { index: number; at: { latitude: number; longitude: number }; atM: number | null; found: boolean | null;
     status?: ReferenceObjectStatus; legIndex: number | null }[];
   cornerAtM: readonly number[];
-  end: { fired: { tSec: number; progressM: number; searchDistanceM: number } | null; hapticFired: boolean | null; voiceFired: boolean | null };
+  end: { fired: { tSec: number; progressM: number; searchDistanceM: number } | null; hapticFired: boolean | null; voiceFired: boolean | null;
+    eventObservation?: QaSearchDiagnostics['end']['eventObservation'] };
   manualStopTSec: number;
 }
 
@@ -382,6 +403,8 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
       replayUnfillableGaps: tel.replayUnfillableGaps.slice(0, 100),
       replayUnfillableGapsTruncated: tel.replayUnfillableGaps.length > 100 } : {}),
     partial: input.resumed || tel.resumed,
+    rawArchive: tel.rawArchive,
+    ...(tel.recordingContext ? { recordingContext: tel.recordingContext } : {}),
     rawSearchPointCount: tel.raw.length,
     acceptedSearchPointCount: tel.raw.filter(r => r.accepted).length,
     rejectedSearchPointCount: tel.raw.filter(r => !r.accepted).length,
@@ -407,6 +430,7 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
         x: round(p.x, 3), y: round(p.y, 3), tSec: round(p.tSec ?? 0, 1),
         accuracyM: p.meta.accuracy == null ? null : round(p.meta.accuracy, 2),
         accepted: p.meta.accepted,
+        ...(p.meta.receivedAtMs === undefined ? {} : { receivedTSec: Number.isFinite(p.meta.receivedAtMs) ? round((p.meta.receivedAtMs - tel.startedAtMs) / 1000, 3) : null }),
         ...(p.meta.accepted || !p.meta.reason ? {} : { rejectReason: p.meta.reason }),
       })),
       filtered: thin(filteredXY, SEARCH_QA_LIMITS.maxExportedPoints).map(p => ({ x: round(p.x, 3), y: round(p.y, 3), tSec: round(p.tSec ?? 0, 1) })),
@@ -428,15 +452,16 @@ export function buildSearchDiagnostics(input: BuildSearchDiagnosticsInput): QaSe
       truncated: tel.truncated.cursor,
     },
     objects,
-    end: {
+    end: normalizeSearchEndDiagnostics({
       referencePosition: endRel ? { x: round(endRel.x, 3), y: round(endRel.y, 3) } : null,
       minSearchDistToEndM: tel.minDistToEndM == null ? null : round(tel.minDistToEndM),
       progressAtMinEndDistM: tel.progressAtMinEndM == null ? null : round(tel.progressAtMinEndM),
       eventFired: input.end.fired ? { tSec: round(input.end.fired.tSec, 1), progressM: round(input.end.fired.progressM), searchDistanceM: round(input.end.fired.searchDistanceM) } : null,
-      eventCount: input.end.fired ? 1 : 0,
+      eventObservation: input.end.eventObservation === 'complete' && input.resumed ? 'partial' : input.end.eventObservation,
+      eventCount: null,
       hapticFired: input.end.hapticFired, voiceFired: input.end.voiceFired,
       manualStopTSec: round(input.manualStopTSec, 1),
-    },
+    }),
     parity: {
       toleranceM: tol, turnCount: turns.length,
       turnPreservedCountRun: preservedRun, turnPreservedCountReplay: preservedReplay, turns,
@@ -470,7 +495,7 @@ export function summarizeSearchDiagnostics(d: QaSearchDiagnostics) {
       finalNormalizedProgress: d.cursor.samples.at(-1)?.normalizedProgress ?? null,
     },
     objects: { referenceCount: d.objects.length, items: d.objects },
-    end: d.end,
+    end: normalizeSearchEndDiagnostics(d.end),
   };
 }
 
@@ -488,21 +513,29 @@ export const QA_SEARCH_RETENTION = 5;
 const keyFor = (id: string, kind: SearchCaptureKind) => `${NAMESPACE[kind].prefix}${id}`;
 
 export async function saveQaSearchCapture(sessionLocalId: string, d: QaSearchDiagnostics, kind: SearchCaptureKind = 'qa'): Promise<void> {
+  const accessToken = diagnosticsAccessToken();
+  if (kind === 'qa' && !accessToken) return;
   try {
     const { index } = NAMESPACE[kind];
     await AsyncStorage.setItem(keyFor(sessionLocalId, kind), JSON.stringify(d));
     const raw = await AsyncStorage.getItem(index);
+    if (kind === 'qa' && accessToken !== diagnosticsAccessToken()) return;
     const ids: string[] = raw ? JSON.parse(raw) : [];
     const next = [sessionLocalId, ...ids.filter(id => id !== sessionLocalId)];
     await AsyncStorage.setItem(index, JSON.stringify(next.slice(0, QA_SEARCH_RETENTION)));
-    for (const id of next.slice(QA_SEARCH_RETENTION)) await AsyncStorage.removeItem(keyFor(id, kind)).catch(() => {});
+    for (const id of next.slice(QA_SEARCH_RETENTION)) {
+      if (kind === 'qa' && accessToken !== diagnosticsAccessToken()) return;
+      await AsyncStorage.removeItem(keyFor(id, kind)).catch(() => {});
+    }
   } catch { /* best-effort: Diagnose darf die Absuche nie beeinträchtigen */ }
 }
 
 export async function loadQaSearchCapture(sessionLocalId: string, kind: SearchCaptureKind = 'qa'): Promise<QaSearchDiagnostics | null> {
+  const accessToken = diagnosticsAccessToken();
+  if (kind === 'qa' && !accessToken) return null;
   try {
     const raw = await AsyncStorage.getItem(keyFor(sessionLocalId, kind));
-    if (!raw) return null;
+    if (!raw || kind === 'qa' && accessToken !== diagnosticsAccessToken()) return null;
     const p = JSON.parse(raw) as QaSearchDiagnostics;
     return p && typeof p.rawSearchPointCount === 'number' ? p : null;
   } catch { return null; }
@@ -510,9 +543,11 @@ export async function loadQaSearchCapture(sessionLocalId: string, kind: SearchCa
 
 /** Leichte Verfügbarkeitsprüfung über den Index (lädt NICHT das ganze Payload). */
 export async function hasQaSearchCapture(sessionLocalId: string, kind: SearchCaptureKind = 'qa'): Promise<boolean> {
+  const accessToken = diagnosticsAccessToken();
+  if (kind === 'qa' && !accessToken) return false;
   try {
     const raw = await AsyncStorage.getItem(NAMESPACE[kind].index);
     const ids: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(ids) && ids.includes(sessionLocalId);
+    return (kind !== 'qa' || accessToken === diagnosticsAccessToken()) && Array.isArray(ids) && ids.includes(sessionLocalId);
   } catch { return false; }
 }

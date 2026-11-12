@@ -1,3 +1,5 @@
+import { setDiagnosticsSession, resolveDiagnosticsAccess, getDiagnosticsAccessSnapshot, revokeDiagnosticsAccess } from '@/lib/diagnosticsAccessState';
+
 // Support-Diagnose für normale Kunden: Format, Privacy, Persistenz/Retention, Share.
 // Datenfluss nur Production → Diagnose; die Recorder-Identität (Capture an ≡ aus) prüft
 // hooks/__tests__/useSearchRecorder.qaTelemetry.test.tsx.
@@ -16,6 +18,7 @@ import { buildExportForSession } from '@/features/tracking/services/qaTrackExpor
 import { shareSupportDiagnostics, hasSupportDiagnostics, buildSupportExportForSession, buildPersistedExportForSession } from '@/features/tracking/services/supportDiagnosticsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { beginBackgroundLayDiagnostics, recordBackgroundLayEvent } from '@/features/tracking/utils/backgroundLayDiagnostics';
+jest.mock('@/services/diagnosticsAccessService', () => ({ refreshDiagnosticsAccess: jest.fn(async () => {}) }));
 let mockDiagnosticId = 0;
 jest.mock('expo-crypto', () => ({ randomUUID: () => `diag-${++mockDiagnosticId}` }));
 
@@ -36,7 +39,7 @@ jest.mock('@/features/tracking/repositories/localTrackRepository', () => ({
   getTrackMarkersBySession: jest.fn(async () => mockMarkers),
 }));
 jest.mock('@/features/training/repositories/localTrainingRepository', () => ({
-  getLocalTrainingSessions: jest.fn(async () => []), getLocalTrainingSessionById: jest.fn(async () => null),
+  getLocalTrainingSessions: jest.fn(async () => []), getLocalTrainingSessionById: jest.fn(async (id: string) => id === 'qa-legacy' ? { user_id: 'owner' } : null),
 }));
 
 // Native Share-Sheet + Datei (Cache-Verzeichnis).
@@ -44,9 +47,10 @@ const mockShareAsync = jest.fn(async () => undefined);
 const mockIsAvailableAsync = jest.fn(async () => true);
 jest.mock('expo-sharing', () => ({ isAvailableAsync: () => mockIsAvailableAsync(), shareAsync: (...a: unknown[]) => (mockShareAsync as any)(...a) }));
 const mockWritten: Record<string, string> = {};
+const mockWriteFile = jest.fn(async (uri: string, content: string) => { mockWritten[uri] = content; });
 jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/', documentDirectory: 'file:///docs/',
-  writeAsStringAsync: async (uri: string, content: string) => { mockWritten[uri] = content; },
+  writeAsStringAsync: (uri: string, content: string) => mockWriteFile(uri, content),
 }));
 
 const FIXDIR = path.join(__dirname, 'fixtures', 'fieldV62');
@@ -66,15 +70,19 @@ function diagFromField(name: 'F1' | 'F2', accuracy = 4.37): QaSearchDiagnostics 
   };
   return buildSearchDiagnostics({
     origin: ll(0, 0), telemetry: tel, resumed: false, analyticsSampleCount: 0, laid: { total: 27, end: null }, objects: [], cornerAtM: [],
-    end: { fired: null, hapticFired: null, voiceFired: null }, manualStopTSec: 50,
+    end: { eventObservation: 'complete', fired: null, hapticFired: null, voiceFired: null }, manualStopTSec: 50,
     run: { points: g.run.map(toLL), pointsTimeSec: g.run.map((p: any) => p.tSec) },
     replay: { points: g.replay.map(toLL), timeSec: g.replay.map((p: any) => p.tSec) },
   });
 }
 
+const grantQa = () => { setDiagnosticsSession('owner'); resolveDiagnosticsAccess('owner', getDiagnosticsAccessSnapshot().generation, true); };
+afterEach(() => revokeDiagnosticsAccess());
 beforeEach(async () => {
+  setDiagnosticsSession(null);
   await AsyncStorage.clear();
   for (const k of Object.keys(mockWritten)) delete mockWritten[k];
+  mockWriteFile.mockClear();
   mockShareAsync.mockClear(); mockIsAvailableAsync.mockClear(); mockIsAvailableAsync.mockImplementation(async () => true);
 });
 
@@ -115,7 +123,7 @@ describe('Format', () => {
     const exp = buildSupportExport(mockLay, mockMarkers, diagFromField('F2'));
     expect(exp.exportType).toBe('support');
     expect(exp.schemaVersion).toBe(2);
-    expect(exp.schemaMinor).toBe(8);
+    expect(exp.schemaMinor).toBe(12);
     expect(exp.points[0]).toMatchObject({ x: 0, y: 0, tMs: 0 });
     expect(Math.max(...exp.points.map(p => Math.abs(p.x) + Math.abs(p.y)))).toBeLessThan(100);
   });
@@ -157,6 +165,7 @@ describe('Persistenz und Retention', () => {
   });
   it('Retention: letzte 5 bleiben (FIFO); QA-Namespace und fremde Daten werden nicht berührt', async () => {
     await AsyncStorage.setItem('anyvo.unrelated', 'keep-me');
+    grantQa();
     await saveQaSearchCapture('qa-a', diagFromField('F1'), 'qa');
     await saveQaSearchCapture('qa-b', diagFromField('F1'), 'qa');
     for (let i = 1; i <= 7; i++) await saveQaSearchCapture(`s${i}`, diagFromField('F1'), 'support');
@@ -171,6 +180,7 @@ describe('Persistenz und Retention', () => {
   it('Namespaces sind getrennt: Support-Eintrag erscheint nicht im QA-Speicher und umgekehrt', async () => {
     await saveQaSearchCapture('only-support', diagFromField('F1'), 'support');
     expect(await hasQaSearchCapture('only-support', 'qa')).toBe(false);
+    grantQa();
     await saveQaSearchCapture('only-qa', diagFromField('F1'));
     expect(await hasQaSearchCapture('only-qa', 'support')).toBe(false);
   });
@@ -183,10 +193,13 @@ describe('Persistenz und Retention', () => {
     expect(await hasQaSearchCapture('after', 'support')).toBe(true);
   });
   it('internes QA bleibt unverändert: ohne Namespace-Argument gelten die bisherigen QA-Schlüssel', async () => {
+    grantQa();
     await saveQaSearchCapture('qa-legacy', diagFromField('F1'));
     expect(await AsyncStorage.getItem('anyvo.qa.searchCapture.qa-legacy')).not.toBeNull();
     expect(await AsyncStorage.getItem('anyvo.qa.searchCapture.index')).toContain('qa-legacy');
-    expect((await buildExportForSession('qa-legacy')).sessionId).toBeTruthy();   // bestehender interner Export weiter möglich
+    const exported = await buildExportForSession('qa-legacy');
+    expect(exported.sessionId).toBeTruthy();   // bestehender interner Export weiter möglich
+    expect(exported.schemaMinor).toBe(12);     // Recording-Evidence darf die neue Version nicht absenken
   });
 });
 
@@ -200,9 +213,13 @@ describe('Teilen', () => {
     await recordBackgroundLayEvent('sess-diag', 'handlerMissing');
     await saveQaSearchCapture('sess-diag', toSupportCapture(diagFromField('F1')), 'support');
     const exported = await buildSupportExportForSession('sess-diag');
-    expect(exported?.schemaMinor).toBe(9);
+    expect(exported?.schemaMinor).toBe(18);
+    expect(exported?.provenance?.schemaVersion).toBe(1);
     expect(exported?.backgroundLayDiagnostics?.counts.taskCallback).toBe(1);
     expect(exported?.backgroundLayDiagnostics?.counts.handlerMissing).toBe(1);
+    expect(exported?.backgroundLayDiagnostics?.timeline).toBeUndefined();
+    expect(exported).not.toHaveProperty('recordingEvidence');
+    expect(() => assertSupportPrivacy({ recordingEvidence: { launch: 'embedded' } })).toThrow();
     expect(() => assertSupportPrivacy(exported)).not.toThrow();
     expect(JSON.stringify(exported?.backgroundLayDiagnostics)).not.toMatch(/latitude|longitude|sess-diag/);
   });
@@ -290,4 +307,55 @@ describe('Verdrahtung (Source)', () => {
     expect(de).toContain("'track.customerDiagnosis.shareSubtitle': 'Technische Fährtendaten für Support und Fehleranalyse teilen.'");
     expect(de).toContain("'track.customerDiagnosis.unavailable': 'Für diese ältere Fährte liegen keine vollständigen Diagnosedaten vor.'");
   });
+});
+
+
+describe('Ende-Ereignis im Kundenexport', () => {
+  it('erhält ein tatsächlich beobachtetes Ende ohne internen QA-Mitschnitt bis nach Persistenz/Export', async () => {
+    // beforeEach entzieht den QA-Zugriff; nur der normale Support-Namespace ist erlaubt.
+    const d = diagFromField('F1');
+    d.end = { ...d.end, eventObservation: 'complete',
+      eventFired: { tSec: 487.4, progressM: 48.94, searchDistanceM: 50 },
+      eventCount: 1, hapticFired: true, voiceFired: false };
+    await saveQaSearchCapture('support-end', toSupportCapture(d), 'support');
+    const exported = await buildSupportExportForSession('support-end');
+    expect(exported?.qaCaptureAvailable).toBe(false);
+    expect(exported?.searchDiagnostics?.end).toEqual(d.end);
+    expect(exported?.schemaMinor).toBe(18);
+    expect(exported?.provenance?.schemaVersion).toBe(1);
+    expect(() => assertSupportPrivacy(exported)).not.toThrow();
+  });
+
+  it('normalisiert alte fehlende QA-Ereignisse beim erneuten Export zu unbekannt, ohne gespeicherte Daten umzuschreiben', async () => {
+    const legacy = diagFromField('F1');
+    delete legacy.end.eventObservation;
+    legacy.end.eventCount = 0;
+    const serialized = JSON.stringify(legacy);
+    await AsyncStorage.setItem('anyvo.support.searchCapture.legacy-end', serialized);
+    const exported = await buildSupportExportForSession('legacy-end');
+    expect(exported?.searchDiagnostics?.end).toMatchObject({
+      eventObservation: 'unknown', eventFired: null, eventCount: null,
+    });
+    expect(await AsyncStorage.getItem('anyvo.support.searchCapture.legacy-end')).toBe(serialized);
+    expect(buildSupportExport(mockLay, mockMarkers, legacy).searchDiagnostics?.end.eventCount).toBeNull();
+    expect(JSON.stringify(legacy)).toBe(serialized);
+  });
+
+  it('erfindet bei unvollständiger Resume-Beobachtung kein ausgebliebenes Ereignis', () => {
+    const d = diagFromField('F2');
+    d.end.eventObservation = 'partial';
+    const exported = buildSupportExport(mockLay, mockMarkers, d);
+    expect(exported.searchDiagnostics?.end).toMatchObject({ eventObservation: 'partial', eventCount: null });
+    expect(d.end.eventCount).toBe(0);
+  });
+});
+
+
+it('file write failure does not open the native sheet, releases the lock and allows an offline retry', async () => {
+  await saveQaSearchCapture('write-failure', toSupportCapture(diagFromField('F1')), 'support');
+  mockWriteFile.mockRejectedValueOnce(new Error('disk full'));
+  expect(await shareSupportDiagnostics('write-failure')).toEqual({ ok: false, reason: 'failed' });
+  expect(mockShareAsync).not.toHaveBeenCalled();
+  expect(await shareSupportDiagnostics('write-failure')).toMatchObject({ ok: true });
+  expect(mockShareAsync).toHaveBeenCalledTimes(1);
 });

@@ -5,7 +5,7 @@ const mockWithTx = jest.fn(async (fn: () => Promise<void>) => { await fn(); });
 jest.mock('@/lib/localDb/client', () => ({ getLocalDb: async () => ({ runAsync: mockRunAsync, withTransactionAsync: mockWithTx }) }));
 jest.mock('@/lib/localDb/ids', () => ({ newLocalId: () => 'pt-x', nowIso: () => '2026-07-14T00:00:00.000Z' }));
 
-import { createLocalSearchPointsBatch, deleteSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
+import { createLocalTrackMarker, createLocalTrackPointsBatch, createLocalSearchPointsBatch, deleteSearchPointsBySession } from '@/features/tracking/repositories/localTrackRepository';
 
 const runAsync = mockRunAsync;
 beforeEach(() => { mockRunAsync.mockClear(); mockWithTx.mockClear(); });
@@ -28,4 +28,21 @@ describe('localTrackRepository — Absuche (P2)', () => {
     expect(sql).toContain("point_type='search'");
     expect(runAsync.mock.calls[0][1]).toBe('sess1');
   });
+});
+
+
+it.each([createLocalTrackPointsBatch, createLocalSearchPointsBatch])('stores the same boundary metadata with a complete SQL binding list', async write => {
+  await write('s', [{ latitude: 47, longitude: 8, timestamp: '2026-10-08T10:00:00.000Z', breakBefore: true }]);
+  const [sql, ...bindings] = mockRunAsync.mock.calls[0];
+  expect((sql as string).match(/\?/g)).toHaveLength(bindings.length);
+  expect(bindings.at(-1)).toBe('{"breakBefore":true}');
+});
+
+it('persists canonical lay distance and stable marker origin with complete SQL bindings', async () => {
+  await createLocalTrackPointsBatch('s', [{ latitude: 47, longitude: 8, breakBefore: true, measuredDistanceM: 12 }]);
+  await createLocalTrackMarker('s', { marker_type: 'gegenstand', sourceMarkerId: 'client-marker', recordedAtMs: 123 });
+  for (const [sql, ...args] of mockRunAsync.mock.calls) expect((sql.match(/\?/g) ?? []).length).toBe(args.length);
+  expect(JSON.parse(mockRunAsync.mock.calls[0].at(-1))).toEqual({ breakBefore: true, measuredDistanceM: 12 });
+  expect(mockRunAsync.mock.calls[1]).toContain(new Date(123).toISOString());
+  expect(JSON.parse(mockRunAsync.mock.calls[1].at(-1))).toEqual({ sourceMarkerId: 'client-marker', recordedAtMs: 123 });
 });

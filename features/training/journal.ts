@@ -48,7 +48,7 @@ export function filterFeed(items: FeedItem[], filter: JournalFilter = {}, now: D
 
   return items.filter(it => {
     if (dogId && it.dog_id !== dogId) return false;
-    if (discipline && itemDiscipline(it) !== discipline) return false;
+    if (discipline && !disciplinesOf([it]).includes(discipline)) return false;
 
     if (period !== 'all') {
       const diff = dayDiff(parseDay(it.session_date), today);   // 0 = heute, positiv = Vergangenheit
@@ -60,6 +60,7 @@ export function filterFeed(items: FeedItem[], filter: JournalFilter = {}, now: D
     if (q) {
       const hay = [
         itemDogName(it), itemDiscipline(it), itemTitle(it), itemNotePreview(it),
+        ...(it.exercises ?? []).flatMap(e => [e.discipline, e.exercise_name, e.notes]),
       ].filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
@@ -69,7 +70,10 @@ export function filterFeed(items: FeedItem[], filter: JournalFilter = {}, now: D
 
 // ── Distinct-Listen für Filter-Chips ─────────────────────────────────────────
 export function disciplinesOf(items: FeedItem[]): string[] {
-  return Array.from(new Set(items.map(itemDiscipline))).sort((a, b) => a.localeCompare(b));
+  return Array.from(new Set(items.flatMap(it => {
+    const labels = (it.exercises ?? []).map(e => e.discipline?.trim()).filter((label): label is string => !!label);
+    return labels.length ? labels : [itemDiscipline(it)];
+  }))).sort((a, b) => a.localeCompare(b));
 }
 
 // ── Zusammenfassung „Dieses Jahr" (nur verlässlich Berechenbares) ────────────
@@ -87,7 +91,7 @@ export function summarize(items: FeedItem[], year: number): JournalSummary {
     trainings:       inYear.length,
     totalMinutes:    Math.round(totalSec / 60),
     dogCount:        new Set(inYear.map(it => it.dog_id).filter(Boolean)).size,
-    disciplineCount: new Set(inYear.map(itemDiscipline)).size,
+    disciplineCount: disciplinesOf(inYear).length,
   };
 }
 

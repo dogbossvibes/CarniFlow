@@ -61,7 +61,7 @@ export function TrackScoreRing({
 }
 
 const s = StyleSheet.create({
-  center: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  center: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   value:  { color: C.trackText, fontWeight: '900', letterSpacing: -1, lineHeight: undefined },
   max:    { fontSize: 11, color: C.trackTextMut, fontWeight: '700', marginTop: -2 },
   label:  { fontSize: 10, color: C.trackTextSec, fontWeight: '700', letterSpacing: 1.4, marginTop: 5, textTransform: 'uppercase' },

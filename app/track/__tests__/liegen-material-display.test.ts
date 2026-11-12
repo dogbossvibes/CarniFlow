@@ -18,9 +18,9 @@ const liegen = readFileSync('app/track/liegen.tsx', 'utf8');
 const legen = readFileSync('app/track/legen.tsx', 'utf8');
 const store = readFileSync('features/tracking/store/trackingStore.ts', 'utf8');
 
-const ALL_MATERIALS = ['stoff', 'filz', 'holz', 'duebel', 'leder', 'plastik', 'metall', 'teppich', 'diverses'];
+const ALL_MATERIALS = ['stoff', 'filz', 'holz', 'duebel', 'ball', 'gummi', 'leder', 'plastik', 'metall', 'teppich', 'diverses'];
 const LABEL: Record<string, string> = {
-  holz: 'Holz', duebel: 'Dübel', stoff: 'Stoff', filz: 'Filz', leder: 'Leder',
+  holz: 'Holz', duebel: 'Dübel · Joker', ball: 'Ball · Joker', gummi: 'Gummi', stoff: 'Stoff', filz: 'Filz', leder: 'Leder',
   plastik: 'Plastik', metall: 'Metall', teppich: 'Teppich', diverses: 'Divers',
 };
 
@@ -33,7 +33,7 @@ function materialLabelSwitchBody(): string {
 describe('Liegezeit materialLabel(): every MarkerMaterial value, filz included', () => {
   const body = materialLabelSwitchBody();
 
-  it('MarkerMaterial (trackingStore.ts) and the Liegezeit label switch cover exactly the same 9 materials', () => {
+  it('MarkerMaterial (trackingStore.ts) and the Liegezeit label switch cover exactly the same 11 materials', () => {
     const tsUnion = Array.from(store.match(/export type MarkerMaterial =([\s\S]*?);/)![1].matchAll(/'([a-z_]+)'/g)).map(x => x[1]);
     expect([...tsUnion].sort()).toEqual([...ALL_MATERIALS].sort());
     for (const material of ALL_MATERIALS) {

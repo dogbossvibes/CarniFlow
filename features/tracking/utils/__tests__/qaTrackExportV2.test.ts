@@ -403,3 +403,27 @@ function v1Like(): QaTrackExportV1 {
     rawFixes: _r, detectorPoints: _dp, linePoints: _lp, autoDiagnostics: _ad, ...rest } = WITHOUT;
   return { ...rest, schemaVersion: 1 };
 }
+
+
+it('exports relative QA reference marks, with explicit schema and truncation', () => {
+  const capture = { ...makeCapture(), referenceMarks: [{ tMs: 3123, kind: 'spitz_links' as const }], referenceMarksTruncated: true };
+  const result = buildQaTrackExport('ts_local_1', POINTS, MARKERS, capture);
+  expect(result.schemaMinor).toBe(16);
+  expect(result.referenceMarks).toEqual(capture.referenceMarks);
+  expect(result.referenceMarksTruncated).toBe(true);
+  expect(() => serializeQaTrackExport(result)).not.toThrow();
+  expect(() => assertNoAbsoluteData({ ...result, referenceMarks: [{ tMs: T0_MS, kind: 'links' }] })).toThrow();
+});
+
+
+it('projects reference marks to approved fields and rejects malformed or excessive exports', () => {
+  const capture = { ...makeCapture(), referenceMarks: [{ tMs: 1000, kind: 'rechts', wallClockMs: T0_MS, accountLabel: 'secret' }] } as unknown as QaSessionCapture;
+  const result = buildQaTrackExport('ts_local_1', POINTS, MARKERS, capture);
+  expect(result.referenceMarks).toEqual([{ tMs: 1000, kind: 'rechts' }]);
+  expect(serializeQaTrackExport(result)).not.toContain('secret');
+  expect(() => assertNoAbsoluteData({ ...result, referenceMarks: capture.referenceMarks })).toThrow();
+  expect(() => buildQaTrackExport('id', POINTS, MARKERS, { ...makeCapture(), referenceMarks: Array(257).fill({ tMs: 1, kind: 'rechts' }) })).toThrow();
+  expect(() => assertNoAbsoluteData({ ...result, referenceMarks: Array(257).fill({ tMs: 1, kind: 'rechts' }) })).toThrow();
+  expect(() => buildQaTrackExport('id', POINTS, MARKERS, { ...makeCapture(), referenceMarks: 'invalid' as never })).toThrow();
+  expect(() => buildQaTrackExport('id', POINTS, MARKERS, { ...makeCapture(), referenceMarks: [], referenceMarksTruncated: 'yes' as never })).toThrow();
+});

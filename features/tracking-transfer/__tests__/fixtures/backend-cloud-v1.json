@@ -1,0 +1,253 @@
+{
+  "accept": {
+    "quota": {
+      "used": 1,
+      "limit": 1,
+      "success": true
+    },
+    "ownCopy": {
+      "run": null,
+      "version": 1,
+      "metadata": {
+        "notes": null,
+        "title": null,
+        "rating": null,
+        "lyingTimeMinutes": null
+      },
+      "pointIds": [
+        "b5a7d9d1-03b5-4324-ad09-0462a8816dbf",
+        "90780371-ae79-4078-9447-681307a355a1"
+      ],
+      "revision": 1,
+      "markerIds": [
+        "fc8db15f-b64c-4d41-9485-43711659dfbf"
+      ],
+      "reference": {
+        "points": [
+          {
+            "t": 1000,
+            "lat": 1,
+            "lng": 2,
+            "speed": null,
+            "heading": null,
+            "accuracy": 3,
+            "altitude": null,
+            "breakBefore": false,
+            "measuredDistanceM": 0
+          },
+          {
+            "t": 2000,
+            "lat": 1.0001,
+            "lng": 2,
+            "speed": null,
+            "heading": null,
+            "accuracy": 3,
+            "altitude": null,
+            "breakBefore": true,
+            "measuredDistanceM": 12
+          }
+        ],
+        "markers": [
+          {
+            "t": 1200,
+            "id": "original-marker",
+            "lat": 1,
+            "lng": 2,
+            "type": "gegenstand",
+            "accuracy": 3,
+            "material": "holz",
+            "angleKind": null,
+            "distanceFromStartM": 2
+          }
+        ],
+        "version": 1,
+        "segments": [],
+        "distanceM": 12,
+        "startedAtMs": 1000,
+        "finishedAtMs": 2000,
+        "durationSeconds": 1,
+        "manualAngleGeometry": null
+      },
+      "evaluation": null,
+      "createdAtMs": 1791736505578
+    },
+    "receipt": {
+      "version": 1,
+      "ownRunId": "33333333-3333-4000-8000-000000000104",
+      "receiptId": "33333333-3333-4000-8000-000000000102",
+      "transferId": "33333333-3333-4000-8000-000000000101",
+      "acceptedAtMs": 1791736505577,
+      "ownSessionId": "33333333-3333-4000-8000-000000000103",
+      "recipientDogId": "33333333-3333-4000-8000-000000000012",
+      "recipientUserId": "33333333-3333-4000-8000-000000000002",
+      "referenceDigest": "18e5a129e85b56884f62ede0e7ecbbe2e38d517dc8120bc56840a72589380e24"
+    },
+    "version": 1,
+    "serverNowMs": 1791736505580
+  },
+  "save": {
+    "deleted": false,
+    "version": 1,
+    "receiptId": "33333333-3333-4000-8000-000000000102",
+    "operationId": "33333333-3333-4000-8000-000000000110",
+    "serverNowMs": 1791736505600,
+    "appliedRevision": 2,
+    "currentRevision": 2
+  },
+  "restore": {
+    "quota": {
+      "used": 1,
+      "limit": 1,
+      "success": true
+    },
+    "ownCopy": {
+      "run": {
+        "score": 80,
+        "breaks": 0,
+        "run_id": "33333333-3333-4000-8000-000000000104",
+        "ended_at": "2026-10-11T12:00:05.000Z",
+        "analytics": {
+          "version": 1,
+          "trackScore": 80
+        },
+        "run_points": [
+          {
+            "t": 0,
+            "lat": 1,
+            "lng": 2
+          },
+          {
+            "t": 5,
+            "lat": 1.01,
+            "lng": 2,
+            "breakBefore": true
+          }
+        ],
+        "session_id": "33333333-3333-4000-8000-000000000103",
+        "started_at": "2026-10-11T12:00:00.000Z",
+        "total_objects": 1,
+        "articles_found": 1,
+        "distance_meters": 12,
+        "duration_seconds": 5,
+        "average_deviation_meters": 1,
+        "search_handler_distance_m": null
+      },
+      "version": 1,
+      "metadata": {
+        "notes": "Eigene Notiz",
+        "title": "Eigene Kopie",
+        "rating": 4,
+        "lyingTimeMinutes": 30
+      },
+      "pointIds": [
+        "b5a7d9d1-03b5-4324-ad09-0462a8816dbf",
+        "90780371-ae79-4078-9447-681307a355a1"
+      ],
+      "revision": 2,
+      "markerIds": [
+        "fc8db15f-b64c-4d41-9485-43711659dfbf"
+      ],
+      "reference": {
+        "points": [
+          {
+            "t": 1000,
+            "lat": 1,
+            "lng": 2,
+            "speed": null,
+            "heading": null,
+            "accuracy": 3,
+            "altitude": null,
+            "breakBefore": false,
+            "measuredDistanceM": 0
+          },
+          {
+            "t": 2000,
+            "lat": 1.0001,
+            "lng": 2,
+            "speed": null,
+            "heading": null,
+            "accuracy": 3,
+            "altitude": null,
+            "breakBefore": true,
+            "measuredDistanceM": 12
+          }
+        ],
+        "markers": [
+          {
+            "t": 1200,
+            "id": "original-marker",
+            "lat": 1,
+            "lng": 2,
+            "type": "gegenstand",
+            "accuracy": 3,
+            "material": "holz",
+            "angleKind": null,
+            "distanceFromStartM": 2
+          }
+        ],
+        "version": 1,
+        "segments": [],
+        "distanceM": 12,
+        "startedAtMs": 1000,
+        "finishedAtMs": 2000,
+        "durationSeconds": 1,
+        "manualAngleGeometry": null
+      },
+      "evaluation": {
+        "legs": [
+          {
+            "max": 10,
+            "name": "Schenkel1",
+            "score": 8
+          }
+        ],
+        "score": 80,
+        "evaluatedAt": "2026-10-11T12:00:06.000Z"
+      },
+      "createdAtMs": 1791736505578
+    },
+    "receipt": {
+      "version": 1,
+      "ownRunId": "33333333-3333-4000-8000-000000000104",
+      "receiptId": "33333333-3333-4000-8000-000000000102",
+      "transferId": "33333333-3333-4000-8000-000000000101",
+      "acceptedAtMs": 1791736505577,
+      "ownSessionId": "33333333-3333-4000-8000-000000000103",
+      "recipientDogId": "33333333-3333-4000-8000-000000000012",
+      "recipientUserId": "33333333-3333-4000-8000-000000000002",
+      "referenceDigest": "18e5a129e85b56884f62ede0e7ecbbe2e38d517dc8120bc56840a72589380e24"
+    },
+    "version": 1,
+    "serverNowMs": 1791736505602
+  },
+  "listOwn": {
+    "owned": [
+      {
+        "deleted": false,
+        "receipt": {
+          "version": 1,
+          "ownRunId": "33333333-3333-4000-8000-000000000104",
+          "receiptId": "33333333-3333-4000-8000-000000000102",
+          "transferId": "33333333-3333-4000-8000-000000000101",
+          "acceptedAtMs": 1791736505577,
+          "ownSessionId": "33333333-3333-4000-8000-000000000103",
+          "recipientDogId": "33333333-3333-4000-8000-000000000012",
+          "recipientUserId": "33333333-3333-4000-8000-000000000002",
+          "referenceDigest": "18e5a129e85b56884f62ede0e7ecbbe2e38d517dc8120bc56840a72589380e24"
+        },
+        "revision": 3
+      }
+    ],
+    "version": 1,
+    "serverNowMs": 1791736505632
+  },
+  "delete": {
+    "deleted": true,
+    "version": 1,
+    "receiptId": "33333333-3333-4000-8000-000000000102",
+    "operationId": "33333333-3333-4000-8000-000000000120",
+    "serverNowMs": 1791736505633,
+    "appliedRevision": 4,
+    "currentRevision": 4
+  }
+}

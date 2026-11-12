@@ -1,10 +1,11 @@
+import { readContinuityPoint } from '../utils/trackContinuity';
 import type { PendingTrack } from '@/features/tracking/store/trackPersist';
 import type { SessionStatus } from '@/features/tracking/store/trackingStore';
 import { type ActiveFaehrtenMap, isValidEntry } from '@/features/tracking/store/activeFaehrtenModel';
 import { durableLifecycle, hasValidLayGeometry, isOpenPending } from '@/features/tracking/store/trackRecovery';
 import type { LocalTrackPoint, LocalTrainingSession } from '@/features/sync/types/sync';
 import type { LatLng } from '@/features/tracking/utils/gpsFilter';
-import { resolveTrackOverlayColorKey, type TrackOverlayColorKey } from '@/features/tracking/utils/trackOverlayColors';
+import { resolveTrackOverlayColorKey, type TrackOverlayColorValue } from '@/features/tracking/utils/trackOverlayColors';
 
 // ──────────────────────────────────────────────────────────────────────────
 // Referenz-Fährten beim Legen — REINE, testbare Logik (kein React/Expo/Native).
@@ -30,7 +31,7 @@ export interface TrackReferenceOverlay {
   sessionId: string;
   dogName:   string;
   /** Fährtenfarbe DIESES Hundes (aus seiner dogId aufgelöst, nie vom aktuellen Hund). */
-  colorKey:  TrackOverlayColorKey;
+  colorKey:  TrackOverlayColorValue;
   status:    TrackReferenceStatus;
   points:    LatLng[];
 }
@@ -40,7 +41,7 @@ export interface TrackReferenceCandidate {
   dogId:     string;
   sessionId: string;
   dogName:   string;
-  colorKey:  TrackOverlayColorKey;
+  colorKey:  TrackOverlayColorValue;
   status:    TrackReferenceStatus;
   /** Sortierbasis (Beginn des Legens) — stabile Reihenfolge, unabhängig von updatedAt. */
   order:     number;
@@ -122,7 +123,7 @@ export interface TrackReferenceSources {
   /** Lokale Session-Zeile (SQLite). */
   session:   Pick<LocalTrainingSession, 'local_id' | 'user_id' | 'dog_id' | 'type' | 'deleted_at' | 'status' | 'payload_json'> | null;
   /** Gelegte Punkte aus SQLite (nur geladen, wenn der Pending-Puffer nichts liefert). */
-  layPoints: readonly Pick<LocalTrackPoint, 'latitude' | 'longitude'>[] | null;
+  layPoints: readonly (Pick<LocalTrackPoint, 'latitude' | 'longitude'> & Partial<Pick<LocalTrackPoint, 'payload_json'>>)[] | null;
 }
 
 function hasFinalSearchRun(payloadJson: string | null | undefined): boolean {
@@ -184,10 +185,10 @@ export function resolveReferenceOverlay(
   if (isSessionBlocked(src.session, c.dogId, userId)) return null;
   let points: LatLng[] | null = null;
   if (pendingMatches(src.pending, c)) {
-    points = src.pending.trackPoints.map(p => ({ lat: p.lat, lng: p.lng }));
+    points = src.pending.trackPoints.map(p => ({ lat: p.lat, lng: p.lng, ...(p.breakBefore ? { breakBefore: true } : {}) }));
   } else if (src.session && src.layPoints) {
     // SQLite nur mit bekannter, zugehöriger Session-Zeile (Sperren oben geprüft).
-    points = src.layPoints.map(p => ({ lat: p.latitude, lng: p.longitude }));
+    points = src.layPoints.map(p => ({ lat: p.latitude, lng: p.longitude, ...readContinuityPoint(p.payload_json) }));
   }
   if (!points || !hasValidLayGeometry(points)) return null;
   return { dogId: c.dogId, sessionId: c.sessionId, dogName: c.dogName, colorKey: c.colorKey, status: c.status, points };

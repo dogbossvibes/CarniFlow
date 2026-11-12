@@ -32,6 +32,7 @@ export function useFeedDelete(dogId?: string) {
     showToast('Training gelöscht');
     // Alle Feed-Consumer (Dashboard, Stats, andere Hunde-Filter) synchronisieren.
     qc.invalidateQueries({ queryKey: ['trainingFeed'] });
+    qc.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
   }, [qc, uid, dogId, showToast]);
 
   return { onDelete, toast };

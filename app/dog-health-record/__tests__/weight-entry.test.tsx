@@ -31,19 +31,25 @@ import 'react-native-gesture-handler/jestSetup';
 // Done action only dismisses the keyboard — never state, never save.
 import TestRenderer, { act, type ReactTestRenderer } from 'react-test-renderer';
 import { readFileSync } from 'fs';
-import { Alert, InputAccessoryView, Keyboard, Platform, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
+import { Alert, InputAccessoryView, Keyboard, Platform, RefreshControl, ScrollView, Switch, Text, TextInput, TouchableOpacity } from 'react-native';
 import DogHealthRecordRoute from '@/app/dog-health-record/[id]';
+import DogWeightRoute from '@/app/dog-weight/[id]';
 import { AnyvoBottomSheet } from '@/components/ui/AnyvoBottomSheet';
+import { DateField } from '@/components/ui/DateField';
 import { AnyvoChip } from '@/components/ui/AnyvoChip';
 import type { Dog } from '@/types';
 // Real implementations (not the CRUD-only-mocked parts) — used to compute
 // EXPECTED values in the Läufigkeit-integration tests below, so assertions
 // verify "the UI shows what the real, existing calculation produces" rather
 // than a hand-derived number that could silently drift from the actual formula.
-import { durationDays as realDurationDays, fmtDate as realFmtDate, getHeatHistoryStats as realGetHeatHistoryStats, type HeatCycle } from '@/features/dogs/heatCycles';
+import { type HeatCycle } from '@/features/dogs/heatCycles';
 import type { HealthOverviewData } from '@/services/healthService';
 
+// Owner-screen regression fixture: access-gate behavior is covered independently in HealthRouteGate.test.tsx.
+jest.mock('@/components/dogs/HealthRouteGate', () => ({ HealthRouteGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
+
 const mockLoadHealthOverview = jest.fn();
+const mockRetryHealthReminder = jest.fn();
 // Läufigkeit-in-Gesundheitsakte-Integration (29.09.2026): captured so tests
 // can assert exact navigation targets (openHeatCycle/openHeatQuickAction).
 const mockPush = jest.fn();
@@ -119,11 +125,13 @@ jest.mock('@/lib/session-context', () => ({ useSession: () => ({ user: { id: 'ow
 // a test. Not what these tests are about; stub it out.
 jest.mock('@/components/ui/Toast', () => ({ useToast: () => ({ showToast: jest.fn(), toast: null }) }));
 jest.mock('@/hooks/useProfile', () => ({ useProfile: () => ({ profile: mockProfile }) }));
-jest.mock('@/i18n', () => ({ useT: () => ({ t: (key: string) => key }) }));
+jest.mock('@/i18n', () => ({ getLocale: () => 'de', useT: () => ({ t: (key: string, params?: Record<string, unknown>) => { if (!key.startsWith('health.ux') && !key.startsWith('weightJournal.')) return key; let value = jest.requireActual('@/i18n/de-CH').deCH[key] ?? key; for (const [name, replacement] of Object.entries(params ?? {})) value = value.replace(`{${name}}`, String(replacement)); return value; } }), translate: (key: string, params?: Record<string, unknown>) => { let value = jest.requireActual('@/i18n/de-CH').deCH[key] ?? key; for (const [name, replacement] of Object.entries(params ?? {})) value = value.replace(`{${name}}`, String(replacement)); return value; } }));
 jest.mock('@/services/dogs', () => ({ getDogById: (...a: unknown[]) => mockGetDogById(...a) }));
 jest.mock('@/services/dogHub', () => ({ deleteDogDocument: jest.fn(), getDogDocumentUrl: jest.fn() }));
 jest.mock('@/services/healthService', () => ({
+  HEALTH_SECTION_LIMIT: 120,
   loadHealthOverview: (...a: unknown[]) => mockLoadHealthOverview(...a),
+  retryHealthReminder: (...a: unknown[]) => mockRetryHealthReminder(...a),
   createWeightEntry: (...a: unknown[]) => mockCreateWeightEntry(...a),
   updateWeightEntry: (...a: unknown[]) => mockUpdateWeightEntry(...a),
   deleteWeightEntry: (...a: unknown[]) => mockDeleteWeightEntry(...a), createVaccination: (...a: unknown[]) => mockCreateVaccination(...a), updateVaccination: (...a: unknown[]) => mockUpdateVaccination(...a), deleteVaccination: (...a: unknown[]) => mockDeleteVaccination(...a),
@@ -178,6 +186,7 @@ function openWeightSheet(node: ReactTestRenderer) {
 }
 
 function openQuickAction(node: ReactTestRenderer, labelKey: string) {
+  if (!findByText(node, labelKey)) { act(() => { findByText(node, 'Weiteren Eintrag hinzufügen').props.onPress(); }); }
   act(() => { findByText(node, labelKey).props.onPress(); });
 }
 
@@ -196,7 +205,7 @@ function strings(node: ReactTestRenderer): string[] {
 
 function allInputs(node: ReactTestRenderer) {
   return (node.root as unknown as {
-    findAllByType: (t: unknown) => { props: { value?: string; placeholder?: string; onChangeText: (v: string) => void } }[];
+    findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; value?: string; placeholder?: string; onChangeText: (v: string) => void } }[];
   }).findAllByType(TextInput);
 }
 
@@ -216,6 +225,125 @@ beforeEach(() => {
   mockGetHeatCycleDetails.mockReset().mockResolvedValue({ cycles: [], phases: [], observations: [] });
   mockDeleteHeatCycle.mockReset().mockResolvedValue({ error: null });
   mockPush.mockReset();
+});
+
+describe('T174 health save and medication request races', () => {
+  let node: ReactTestRenderer;
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [MEDICATION_ROW, { ...MEDICATION_ROW, id: 'med-2', name: 'Cortison' }] });
+    mockCreateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'entry-1' }, error: null, reminderSync: 'not_required' });
+  });
+  afterEach(() => { act(() => node?.unmount()); });
+
+  it('T174 saves one weight entry for two presses before the next render', async () => {
+    node = render(); await flush(); openWeightSheet(node);
+    act(() => weightInput(node).props.onChangeText('24,5'));
+    const press = findByText(node, 'Speichern').props.onPress;
+    await act(async () => { await Promise.all([press(), press()]); });
+    expect(mockCreateWeightEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it('T174 saves one administration for two presses before the next render', async () => {
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => findByText(node, 'Gabe dokumentieren').props.onPress());
+    const press = findByText(node, 'Speichern').props.onPress;
+    await act(async () => { await Promise.all([press(), press()]); });
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(1);
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledWith('dog-1', 'med-1', expect.anything());
+  });
+
+  it('T174 ignores a late administration response from a previously opened medication', async () => {
+    let finish!: (value: unknown) => void;
+    mockLoadMedicationAdministrations.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValue({ data: [{ ...administrationRow({ id: 'admin-b', administered_at: '2026-10-01T08:00:00Z', note: 'ONLY_MEDICATION_B' }), medication_id: 'med-2' }], error: null });
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => node.root.findAllByType(AnyvoBottomSheet).find(sheet => sheet.props.visible && sheet.props.title === 'Rimadyl')!.props.onClose());
+    act(() => findByText(node, 'Cortison').props.onPress()); await flush();
+    expect(strings(node)).toContain('ONLY_MEDICATION_B');
+    await act(async () => { finish({ data: [administrationRow({ id: 'admin-a', administered_at: '2026-09-01T08:00:00Z', note: 'ONLY_MEDICATION_A' })], error: null }); });
+    expect(strings(node)).toContain('ONLY_MEDICATION_B');
+    expect(strings(node)).not.toContain('ONLY_MEDICATION_A');
+    expect(mockCreateMedicationAdministration).not.toHaveBeenCalled();
+    expect(mockUpdateMedicationAdministration).not.toHaveBeenCalled();
+  });
+
+  it('T174 distinguishes a failed administration read from a truly empty history and offers retry', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValueOnce({ data: [], error: { message: 'offline' } });
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    expect(strings(node)).not.toContain('Noch keine Gaben dokumentiert.');
+    expect(strings(node)).toContain('Gesundheitsdaten konnten nicht geladen werden.');
+    expect(findByText(node, 'Erneut versuchen')).toBeTruthy();
+    mockLoadMedicationAdministrations.mockResolvedValue({ data: [administrationRow({ id: 'admin-retry', administered_at: '2026-10-01T08:00:00Z', note: 'RETRY_RESULT' })], error: null });
+    await act(async () => { await findByText(node, 'Erneut versuchen').props.onPress(); });
+    expect(strings(node)).toContain('RETRY_RESULT');
+    expect(strings(node)).not.toContain('Gesundheitsdaten konnten nicht geladen werden.');
+  });
+
+  it('T174 unlocks a failed weight save for retry while retaining the entered value', async () => {
+    mockCreateWeightEntry.mockRejectedValueOnce(new Error('offline'));
+    node = render(); await flush(); openWeightSheet(node);
+    act(() => weightInput(node).props.onChangeText('24,5'));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(weightInput(node).props.value).toBe('24,5');
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateWeightEntry).toHaveBeenCalledTimes(2);
+    expect(mockCreateWeightEntry).toHaveBeenLastCalledWith('dog-1', expect.objectContaining({ weight_kg: 24.5 }));
+  });
+
+  it('T174 unlocks a failed administration save for retry without touching the parent medication', async () => {
+    mockCreateMedicationAdministration.mockRejectedValueOnce(new Error('offline'));
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => findByText(node, 'Gabe dokumentieren').props.onPress());
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(node.root.findAllByType(AnyvoBottomSheet).some(s => s.props.visible && s.props.title === 'Gabe dokumentieren')).toBe(true);
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(2);
+    expect(mockUpdateMedication).not.toHaveBeenCalled();
+    expect(mockCreateMedication).not.toHaveBeenCalled();
+  });
+
+  it('T174 keeps the last loaded history if the refresh after a committed save rejects, then retries only the read', async () => {
+    mockLoadMedicationAdministrations.mockResolvedValue({ data: [administrationRow({ id: 'known', administered_at: '2026-10-01T08:00:00Z', note: 'LAST_KNOWN_HISTORY' })], error: null });
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    mockLoadMedicationAdministrations.mockRejectedValueOnce(new Error('offline'));
+    act(() => findByText(node, 'Gabe dokumentieren').props.onPress());
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(strings(node)).toContain('LAST_KNOWN_HISTORY');
+    expect(strings(node)).toContain('Gesundheitsdaten konnten nicht geladen werden.');
+    expect(strings(node)).not.toContain('Noch keine Gaben dokumentiert.');
+    await act(async () => { await findByText(node, 'Erneut versuchen').props.onPress(); });
+    expect(mockCreateMedicationAdministration).toHaveBeenCalledTimes(1);
+    expect(strings(node)).not.toContain('Gesundheitsdaten konnten nicht geladen werden.');
+  });
+
+  it('T174 still shows a genuinely empty history as empty without a failure notice', async () => {
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    expect(strings(node)).toContain('Noch keine Gaben dokumentiert.');
+    expect(strings(node)).not.toContain('Gesundheitsdaten konnten nicht geladen werden.');
+  });
+
+  it('T174 rejects an earlier response even after reopening the same medication via another one', async () => {
+    let finish!: (value: unknown) => void;
+    mockLoadMedicationAdministrations.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: [administrationRow({ id: 'current-a', administered_at: '2026-10-01T08:00:00Z', note: 'CURRENT_A' })], error: null });
+    node = render(); await flush(); switchToVerlauf(node);
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => node.root.findAllByType(AnyvoBottomSheet).find(s => s.props.visible)!.props.onClose());
+    act(() => findByText(node, 'Cortison').props.onPress()); await flush();
+    act(() => node.root.findAllByType(AnyvoBottomSheet).find(s => s.props.visible)!.props.onClose());
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    await act(async () => { finish({ data: [administrationRow({ id: 'outdated-a', administered_at: '2026-09-01T08:00:00Z', note: 'OUTDATED_A' })], error: null }); });
+    expect(strings(node)).toContain('CURRENT_A');
+    expect(strings(node)).not.toContain('OUTDATED_A');
+  });
 });
 
 describe('Digital Health Record: "Gewicht erfassen" weight entry', () => {
@@ -1577,30 +1705,10 @@ function findByAccessibilityLabelPrefix(node: ReactTestRenderer, prefix: string)
   return (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress?: () => void } }[] })
     .findAllByType(TouchableOpacity).find((c) => typeof c.props.accessibilityLabel === 'string' && c.props.accessibilityLabel.startsWith(prefix));
 }
-function findAllByAccessibilityLabelIncluding(node: ReactTestRenderer, substr: string) {
-  return (node.root as unknown as { findAllByType: (t: unknown) => { props: { accessibilityLabel?: string; onPress?: () => void; onLongPress?: () => void; testID?: string } }[] })
-    .findAllByType(TouchableOpacity).filter((c) => typeof c.props.accessibilityLabel === 'string' && c.props.accessibilityLabel.includes(substr));
-}
-// The HealthHeatCard's own accessibilityLabel also includes the most recent
-// cycle's formatted date range (see its own accessibilityLabel), so a bare
-// date-substring search can match the CARD itself, not just a Verlauf-
-// history row inside the opened sheet. Excludes the card explicitly by its
-// testID so these always resolve to the intended history row.
-function findHistoryRow(node: ReactTestRenderer, substr: string) {
-  return findAllByAccessibilityLabelIncluding(node, substr).find((r) => r.props.testID !== 'health-heat-card');
-}
 function findHeatCard(node: ReactTestRenderer) {
   return (node.root as unknown as { findAllByProps: (p: object) => { props: { onPress?: () => void } }[] })
     .findAllByProps({ testID: 'health-heat-card' })[0];
 }
-// Only valid when cycles are non-empty — the populated card's onPress opens
-// the Läufigkeit-Bereich sheet. The EMPTY-state card's onPress is `onAdd`
-// (navigates straight to /dog-heat-new instead), by design — see the
-// "Leerzustand" tests below, which exercise that path directly.
-function openHeatSheet(node: ReactTestRenderer) {
-  act(() => { findHeatCard(node)!.props.onPress?.(); });
-}
-
 describe('Digital Health Record — Läufigkeit: Gender-Gating', () => {
   it('Hündin → Läufigkeitskarte und Quick Action sichtbar', async () => {
     mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
@@ -1608,8 +1716,10 @@ describe('Digital Health Record — Läufigkeit: Gender-Gating', () => {
     mockGetHeatCycleDetails.mockResolvedValue({ cycles: [], phases: [], observations: [] });
     const node = render();
     await flush();
+    expect(findByText(node, 'health.recordHeat')).toBeFalsy(); // Less frequent actions are collapsed.
+    act(() => { findByText(node, 'Weiteren Eintrag hinzufügen').props.onPress(); });
     expect(findByText(node, 'health.recordHeat')).toBeTruthy(); // Quick Action
-    expect(findByAccessibilityLabelPrefix(node, 'heat.addFirst') ?? findByAccessibilityLabelPrefix(node, 'heat.title')).toBeTruthy(); // Karte (leer oder befüllt)
+    expect(findHeatCard(node)).toBeTruthy(); // Karte (leer oder befüllt)
   });
 
   it('Rüde → keine Läufigkeitskarte, keine Quick Action, kein Verlauf-Filter', async () => {
@@ -1633,245 +1743,33 @@ describe('Digital Health Record — Läufigkeit: Gender-Gating', () => {
   });
 });
 
-describe('Digital Health Record — Läufigkeit: Leerzustand', () => {
+describe('Digital Health Record — Läufigkeit: neuer eigenständiger Überblick', () => {
   beforeEach(() => {
     mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
     mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [], phases: [], observations: [] });
   });
-
-  it('keine Daten → korrekter Leerzustand auf der Karte', async () => {
-    const node = render();
-    await flush();
-    expect(strings(node)).toContain('heat.emptyTitle');
-  });
-
-  it('Tippen auf die leere Karte navigiert direkt zur bestehenden Erfassen-Route (kein Zwischenschritt über ein leeres Sheet nötig)', async () => {
-    const node = render();
-    await flush();
-    act(() => { findHeatCard(node)!.props.onPress?.(); });
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/dog-heat-new', params: { id: 'dog-1' } });
-  });
-
-  it('die dedizierte Läufigkeit-Bereichsansicht selbst zeigt denselben Leerzustand (Text/CTA), falls sie ohne Zyklen erreicht wird', () => {
-    // Direkter Komponententest von HealthHeatSheetContent — deckt den
-    // Leerzustand-Zweig ab, unabhängig davon, über welchen Weg er in der
-    // echten App je erreicht wird.
-    const { HealthHeatSheetContent } = require('@/components/dogs/HealthHeatSection');
-    let node!: ReactTestRenderer;
-    act(() => {
-      node = TestRenderer.create(
-        <HealthHeatSheetContent cycles={[]} phases={[]} observations={[]} prediction={null} stats={realGetHeatHistoryStats([])} isOwner onOpenCycle={() => {}} onDeleteCycle={() => {}} onAdd={() => {}} />,
-      );
-    });
-    expect(strings(node)).toContain('heat.emptyTitle');
-    expect(strings(node)).toContain('heat.emptyDesc');
-    expect(strings(node)).toContain('heat.addFirst');
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: eine abgeschlossene Läufigkeit', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('die Karte zeigt Zeitraum und Dauer der letzten Läufigkeit', async () => {
-    const node = render();
-    await flush();
-    const duration = realDurationDays(CYCLE_OLD.startDate, CYCLE_OLD.endDate);
-    // heat.days is rendered via t('heat.days'), which the i18n mock resolves
-    // to the raw key — matches the actual mocked-render output exactly.
-    expect(strings(node).some((t) => t.includes(`${duration} heat.days`))).toBe(true);
-  });
-
-  it('bei nur einer Läufigkeit: keine Prognose ("Noch keine Prognose verfügbar")', async () => {
-    const node = render();
-    await flush();
-    expect(strings(node)).toContain('Noch keine Prognose verfügbar');
-  });
-
-  it('bei nur einer Läufigkeit: kein Fake-Ø-Abstand in der Statistik', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const stats = realGetHeatHistoryStats([CYCLE_OLD]);
-    expect(stats.averageGapDays).toBeNull();
-    expect(strings(node).some((t) => t.includes('Ø Abstand'))).toBe(false);
-    expect(strings(node).some((t) => t === '1')).toBe(true); // Anzahl-Kachel
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: mehrere Läufigkeiten', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_NEW, CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('Verlauf ist chronologisch korrekt sortiert (neueste zuerst)', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const rendered = strings(node);
-    const idxNew = rendered.findIndex((t) => t.includes(realFmtDate(CYCLE_NEW.startDate) ?? ''));
-    const idxOld = rendered.findIndex((t) => t.includes(realFmtDate(CYCLE_OLD.startDate) ?? ''));
-    expect(idxNew).toBeGreaterThan(-1);
-    expect(idxOld).toBeGreaterThan(idxNew);
-  });
-
-  it('durchschnittliche Dauer wird korrekt aus den abgeschlossenen Zyklen berechnet', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const stats = realGetHeatHistoryStats([CYCLE_NEW, CYCLE_OLD]);
-    expect(stats.averageDays).not.toBeNull();
-    expect(strings(node).some((t) => t.includes(`${stats.averageDays} Tage`))).toBe(true);
-  });
-
-  it('durchschnittlicher Abstand wird korrekt aus den Start-zu-Start-Differenzen berechnet', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const stats = realGetHeatHistoryStats([CYCLE_NEW, CYCLE_OLD]);
-    expect(stats.averageGapDays).not.toBeNull();
-    expect(strings(node).some((t) => t.includes('Ø Abstand'))).toBe(true);
-  });
-
-  it('Anzahl dokumentierter Läufigkeiten ist korrekt', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    expect(strings(node)).toContain('2');
-    expect(strings(node)).toContain('Läufigkeiten');
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: offene/aktive Läufigkeit', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_ACTIVE, CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('die aktive Läufigkeit wird im Status-Hero als "aktuell" hervorgehoben, ohne erfundenes Enddatum', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const rendered = strings(node);
-    // Matches the established Health-screen eyebrow convention (t(key).toUpperCase()) already used elsewhere in this file.
-    expect(rendered).toContain('HEAT.CURRENTCYCLE');
-    expect(rendered).toContain('heat.active');
-    expect(rendered.some((t) => t.includes('31.12.2026') || t.includes('undefined'))).toBe(false); // kein Fake-Enddatum
-  });
-
-  it('die Karte auf der Übersicht zeigt ebenfalls den aktiven Status', async () => {
-    const node = render();
-    await flush();
-    expect(strings(node)).toContain('heat.active');
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: Tap öffnet korrekten Cycle (bestehende Detailansicht)', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_NEW, CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('Tap auf eine Verlaufskarte im Läufigkeit-Bereich navigiert zu /dog-heat/[exact id]', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findHistoryRow(node, realFmtDate(CYCLE_NEW.startDate) ?? '__nomatch__');
-    act(() => { row!.props.onPress?.(); });
-    expect(mockPush).toHaveBeenCalledWith('/dog-heat/cyc-new');
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: Long-Press nutzt vorhandenen Delete-Flow', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_OLD], phases: [], observations: [] });
-  });
-
-  it('Long Press löscht NICHT direkt — erst nach Bestätigung', async () => {
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findAllByAccessibilityLabelIncluding(node, 'lange drücken zum Löschen')[0];
-    act(() => { row!.props.onLongPress?.(); });
+  it.each([[], [CYCLE_OLD], [CYCLE_NEW, CYCLE_OLD], [CYCLE_ACTIVE]].map(cycles => ({ cycles })))('öffnet für jeden Datenstand die neue Übersicht und bewahrt die Datensätze', async ({ cycles }) => {
+    const before = JSON.stringify(cycles);
+    mockGetHeatCycleDetails.mockResolvedValue({ cycles, phases: [], observations: [] });
+    const node = render(); await flush();
+    act(() => { findHeatCard(node).props.onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith('/dog-heat-overview/dog-1');
+    expect(JSON.stringify(cycles)).toBe(before);
     expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
   });
-
-  it('Bestätigung löscht exakt den gewählten Cycle über die bestehende deleteHeatCycle-Funktion', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => { buttons?.find((b) => b.style === 'destructive')?.onPress?.(); });
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findAllByAccessibilityLabelIncluding(node, 'lange drücken zum Löschen')[0];
-    act(() => { row!.props.onLongPress?.(); });
-    await flush();
-    expect(mockDeleteHeatCycle).toHaveBeenCalledWith('cyc-old');
-    alertSpy.mockRestore();
-  });
-
-  it('Abbrechen löscht nicht', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => { buttons?.find((b) => b.style === 'cancel')?.onPress?.(); });
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findAllByAccessibilityLabelIncluding(node, 'lange drücken zum Löschen')[0];
-    act(() => { row!.props.onLongPress?.(); });
-    await flush();
-    expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
-    alertSpy.mockRestore();
-  });
-
-  it('Nicht-Owner bekommt keine Delete-Aktion (kein onLongPress auf der Verlaufskarte)', async () => {
-    mockGetDogById.mockResolvedValue({ data: { ...DOG_FEMALE, owner_id: 'someone-else' }, error: null });
-    const node = render();
-    await flush();
-    openHeatSheet(node);
-    await flush();
-    const row = findHistoryRow(node, realFmtDate(CYCLE_OLD.startDate) ?? '__nomatch__');
-    expect(row?.props.onLongPress).toBeUndefined();
-  });
-});
-
-describe('Digital Health Record — Läufigkeit: Quick Action', () => {
-  beforeEach(() => {
-    mockGetDogById.mockReset().mockResolvedValue({ data: DOG_FEMALE, error: null });
-    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
-  });
-
-  it('ohne aktive Läufigkeit navigiert die Quick Action zu /dog-heat-new', async () => {
-    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_OLD], phases: [], observations: [] });
-    const node = render();
-    await flush();
-    act(() => { findByText(node, 'health.recordHeat').props.onPress(); });
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/dog-heat-new', params: { id: 'dog-1' } });
-  });
-
-  it('bei bereits aktiver Läufigkeit öffnet die Quick Action stattdessen deren Detailansicht — kein zweiter Zyklus', async () => {
+  it('zeigt den tatsächlich erfassten aktiven Tag', async () => {
     mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_ACTIVE], phases: [], observations: [] });
-    const node = render();
-    await flush();
-    act(() => { findByText(node, 'health.recordHeat').props.onPress(); });
-    expect(mockPush).toHaveBeenCalledWith('/dog-heat/cyc-active');
-    expect(mockPush).not.toHaveBeenCalledWith(expect.objectContaining({ pathname: '/dog-heat-new' }));
+    const node = render(); await flush();
+    expect(strings(node).some(value => value.includes('Tag 1'))).toBe(true);
+  });
+  it('bietet bei leerem Verlauf einen verständlichen Einstieg', async () => {
+    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [], phases: [], observations: [] });
+    const node = render(); await flush(); expect(strings(node)).toContain('Keine Läufigkeit erfasst');
+  });
+  it('führt auch über die Quick Action zur Übersicht statt einen zweiten Zyklus zu erzeugen', async () => {
+    mockGetHeatCycleDetails.mockResolvedValue({ cycles: [CYCLE_ACTIVE], phases: [], observations: [] });
+    const node = render(); await flush(); openQuickAction(node, 'health.recordHeat');
+    expect(mockPush).toHaveBeenCalledWith('/dog-heat-overview/dog-1');
   });
 });
 
@@ -1975,4 +1873,287 @@ describe('Digital Health Record — Läufigkeit: Regression (bestehende Health-F
       .findAllByType(TouchableOpacity).find((c) => c.props.accessibilityLabel === 'Tollwut löschen');
     expect(del).toBeTruthy();
   });
+});
+
+
+describe('Health UX priorities: overview and reliable status', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+    mockRetryHealthReminder.mockReset().mockResolvedValue('synced');
+  });
+  it('shows frequent actions first and exposes the remaining actions on demand', async () => {
+    const node = render(); await flush();
+    expect(findByText(node, 'health.recordWeight')).toBeTruthy();
+    expect(findByText(node, 'health.recordMedication')).toBeTruthy();
+    expect(findByText(node, 'health.recordVaccination')).toBeFalsy();
+    act(() => { findByText(node, 'Weiteren Eintrag hinzufügen').props.onPress(); });
+    expect(findByText(node, 'health.recordVaccination')).toBeTruthy();
+    node.unmount();
+  });
+  it('flags a failed section and retries without claiming complete health data', async () => {
+    mockLoadHealthOverview.mockResolvedValueOnce({ ...EMPTY_OVERVIEW, sectionErrors: { vaccinations: 'offline' } }).mockResolvedValue(EMPTY_OVERVIEW);
+    const node = render(); await flush();
+    expect(strings(node)).toContain('health.recordPartialLoad');
+    expect(strings(node)).toContain('Daten teilweise geladen');
+    await act(async () => { await findByText(node, 'Erneut laden').props.onPress(); });
+    expect(mockLoadHealthOverview).toHaveBeenCalledTimes(2);
+    expect(strings(node)).not.toContain('health.recordPartialLoad');
+    node.unmount();
+  });
+  it('opens the recent entry directly instead of requiring a timeline detour', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, vaccinations: [VACCINATION_ROW] });
+    const node = render(); await flush();
+    act(() => { findByText(node, 'Tollwut').props.onPress(); });
+    expect(strings(node)).toContain('Chargennummer');
+    expect(strings(node)).toContain('LOT-2026-A1');
+    node.unmount();
+  });
+  it('retries only the failed calendar side effect of an already saved medication', async () => {
+    mockCreateMedication.mockResolvedValue({ data: { id: 'saved-med' }, error: null, reminderSync: 'failed' });
+    const node = render(); await flush(); openQuickAction(node, 'health.recordMedication');
+    const input = allInputs(node)[0];
+    act(() => { input.props.onChangeText('Test medication'); });
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    const retryLabel = jest.requireActual('@/i18n/de-CH').deCH['health.uxReminderRetry'];
+    await act(async () => { await findByText(node, retryLabel).props.onPress(); });
+    expect(mockCreateMedication).toHaveBeenCalledTimes(1);
+    expect(mockRetryHealthReminder).toHaveBeenCalledWith({ kind: 'medication', dogId: 'dog-1', id: 'saved-med' });
+    node.unmount();
+  });
+});
+
+
+describe('T-66 review regressions', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+  });
+  it('preserves loaded heat cycles and shows partial status after a resolved service error rejects the aggregate read', async () => {
+    mockGetDogById.mockResolvedValue({ data: DOG_FEMALE, error: null });
+    mockGetHeatCycleDetails.mockResolvedValueOnce({ cycles: [CYCLE_ACTIVE], phases: [], observations: [] }).mockRejectedValueOnce({ message: 'offline' });
+    const node = render(); await flush();
+    expect(findHeatCard(node)).toBeTruthy();
+    await act(async () => { await node.root.findByType(RefreshControl).props.onRefresh(); });
+    expect(strings(node)).toContain('health.recordPartialLoad');
+    expect(findHeatCard(node)).toBeTruthy();
+    expect(findByAccessibilityLabelPrefix(node, 'Beginn eintragen')).toBeFalsy();
+    node.unmount();
+  });
+  it('labels the medication active switch and the separate dose-unit input', async () => {
+    const node = render(); await flush(); openQuickAction(node, 'health.recordMedication');
+    expect(node.root.findByType(Switch).props.accessibilityLabel).toBe('Medikament aktiv');
+    node.unmount();
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [MEDICATION_ROW] });
+    const detail = render(); await flush();
+    act(() => { findByText(detail, 'Rimadyl').props.onPress(); }); await flush();
+    act(() => { findByText(detail, 'Gabe dokumentieren').props.onPress(); });
+    expect(allInputs(detail).some(input => input.props.accessibilityLabel === 'Einheit')).toBe(true);
+    detail.unmount();
+  });
+  it('warns about truncated data and preserves that warning if the same section fails on refresh', async () => {
+    mockLoadHealthOverview.mockResolvedValueOnce({ ...EMPTY_OVERVIEW, sectionLimits: { vaccinations: true } }).mockResolvedValueOnce({ ...EMPTY_OVERVIEW, sectionErrors: { vaccinations: 'offline' } });
+    const node = render(); await flush();
+    expect(strings(node)).toContain('Datenumfang begrenzt');
+    expect(strings(node).some(value => value.includes('bis zu 120 Einträge'))).toBe(true);
+    expect(strings(node)).toContain('Keine Fälligkeiten in den geladenen Daten');
+    await act(async () => { await node.root.findByType(RefreshControl).props.onRefresh(); });
+    expect(strings(node)).toContain('health.recordPartialLoad');
+    expect(strings(node).some(value => value.includes('bis zu 120 Einträge'))).toBe(true);
+    node.unmount();
+  });
+});
+
+
+function medicationDateFields(node: ReactTestRenderer) {
+  return (node.root as unknown as { findAllByType: (type: unknown) => { props: React.ComponentProps<typeof DateField> }[] }).findAllByType(DateField);
+}
+function visibleHealthSheet(node: ReactTestRenderer) {
+  return (node.root as unknown as { findAllByType: (type: unknown) => { props: React.ComponentProps<typeof AnyvoBottomSheet> }[] }).findAllByType(AnyvoBottomSheet).find(sheet => sheet.props.visible)!;
+}
+
+describe('Medication date picker regression', () => {
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue(EMPTY_OVERVIEW);
+  });
+  it('saves selected start/end calendar dates and keeps the end constraint', async () => {
+    const node = render(); await flush(); openQuickAction(node, 'health.recordMedication');
+    act(() => allInputs(node)[0].props.onChangeText('Test medication'));
+    let fields = medicationDateFields(node);
+    expect(fields).toHaveLength(2);
+    expect(fields.every(field => field.props.stabilizeIOSBounds)).toBe(true);
+    const start = new Date(2026, 9, 8), end = new Date(2026, 10, 2);
+    act(() => fields[0].props.onChange(start));
+    fields = medicationDateFields(node);
+    expect(fields[1].props.minimumDate).toEqual(start);
+    act(() => fields[1].props.onChange(end));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateMedication).toHaveBeenCalledWith('dog-1', expect.objectContaining({ starts_on: '2026-10-08', ends_on: '2026-11-02' }));
+    act(() => node.unmount());
+  });
+  it('opens existing medication dates at local midnight and saves without shifting a day', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, medications: [{ ...MEDICATION_ROW, ends_on: '2026-10-30' }] });
+    const node = render(); await flush();
+    act(() => findByText(node, 'Rimadyl').props.onPress()); await flush();
+    act(() => findByText(node, 'Bearbeiten').props.onPress());
+    const fields = medicationDateFields(node);
+    expect(fields[0].props.value).toEqual(new Date(2026, 8, 20));
+    expect(fields[1].props.value).toEqual(new Date(2026, 9, 30));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockUpdateMedication).toHaveBeenCalledWith('med-1', expect.objectContaining({ starts_on: '2026-09-20', ends_on: '2026-10-30' }));
+    act(() => node.unmount());
+  });
+  it('clears an optional end date and discards unsaved dates when the sheet closes', async () => {
+    const node = render(); await flush(); openQuickAction(node, 'health.recordMedication');
+    act(() => medicationDateFields(node)[1].props.onChange(new Date(2026, 10, 2)));
+    act(() => medicationDateFields(node)[1].props.onClear!());
+    expect(medicationDateFields(node)[1].props.value).toBeNull();
+    act(() => visibleHealthSheet(node).props.onClose());
+    expect(mockCreateMedication).not.toHaveBeenCalled();
+    expect(mockUpdateMedication).not.toHaveBeenCalled();
+    openQuickAction(node, 'health.recordMedication');
+    expect(medicationDateFields(node)[1].props.value).toBeNull();
+    act(() => node.unmount());
+  });
+});
+
+
+describe('Heat overview navigation with long history', () => {
+  it('opens the full screen repeatedly without mutating or deleting the history', async () => {
+    const cycles = Array.from({ length: 40 }, (_, i) => ({ ...CYCLE_OLD, id: `old-${i}` }));
+    const original = JSON.stringify(cycles);
+    mockGetDogById.mockResolvedValue({ data: DOG_FEMALE, error: null });
+    mockGetHeatCycleDetails.mockResolvedValue({ cycles, phases: [], observations: [] });
+    const node = render(); await flush();
+    for (let i = 0; i < 3; i++) act(() => { findHeatCard(node).props.onPress?.(); });
+    expect(mockPush).toHaveBeenCalledWith('/dog-heat-overview/dog-1');
+    expect(JSON.stringify(cycles)).toBe(original); expect(mockDeleteHeatCycle).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+});
+
+
+describe('Weight journal: existing record integration and data preservation', () => {
+  const entries = [
+    { id: 'old', dog_id: 'dog-1', entry_date: '2026-10-01', weight_kg: 31.6, note: 'Alte Notiz', load_level: 'mittel' as const, is_rest_day: false, is_intense: true, created_at: '2026-10-01T08:00:00Z' },
+    { id: 'recent', dog_id: 'dog-1', entry_date: '2026-10-15', weight_kg: 31.6, note: 'Gleiche Waage', load_level: 'hoch' as const, is_rest_day: false, is_intense: true, created_at: '2026-10-15T08:00:00Z' },
+  ];
+  beforeEach(() => {
+    mockGetDogById.mockReset().mockResolvedValue({ data: DOG, error: null });
+    mockLoadHealthOverview.mockReset().mockResolvedValue({ ...EMPTY_OVERVIEW, entries });
+    mockCreateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'new' }, error: null, reminderSync: 'not_required' });
+    mockUpdateWeightEntry.mockReset().mockResolvedValue({ data: { id: 'recent' }, error: null, reminderSync: 'not_required' });
+    mockDeleteWeightEntry.mockReset();
+  });
+  async function journal() {
+    let node!: ReactTestRenderer;
+    act(() => { node = TestRenderer.create(<DogWeightRoute />); });
+    await flush();
+    return node;
+  }
+  function measurementButton(node: ReactTestRenderer, day: string) {
+    return node.root.findAll(n => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function' && String(n.props.accessibilityLabel).startsWith('Messung vom') && String(n.props.accessibilityLabel).includes(day))[0];
+  }
+  it('opens a separate native-navigation weight screen from the health summary', async () => {
+    const node = render(); await flush();
+    act(() => { findByText(node, 'Gewichtsverlauf ansehen').props.onPress(); });
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/dog-weight/[id]', params: { id: 'dog-1' } });
+    act(() => node.unmount());
+  });
+  it('opens the exact saved record directly and updates only weight/date/note through the existing service', async () => {
+    const node = await journal();
+    expect(measurementButton(node, '1. Oktober')).toBeTruthy();
+    act(() => measurementButton(node, '15. Oktober').props.onPress());
+    expect(weightInput(node).props.value).toBe('31.6');
+    expect(allInputs(node).some(input => input.props.value === 'Gleiche Waage')).toBe(true);
+    const selectedDate = node.root.findAll(field => field.props.value instanceof Date && typeof field.props.onChange === 'function')[0].props.value;
+    expect([selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()]).toEqual([2026, 9, 15]);
+    act(() => weightInput(node).props.onChangeText('31,8'));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockUpdateWeightEntry).toHaveBeenCalledWith('recent', { entry_date: '2026-10-15', weight_kg: 31.8, note: 'Gleiche Waage' });
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled(); expect(mockDeleteWeightEntry).not.toHaveBeenCalled();
+    expect(entries[0].note).toBe('Alte Notiz'); expect(entries[1].load_level).toBe('hoch'); expect(entries[1].is_intense).toBe(true);
+    act(() => node.unmount());
+  });
+  it('cancel leaves saved records intact, and a fresh add cannot reuse the previous edit id', async () => {
+    const node = await journal();
+    act(() => measurementButton(node, '15. Oktober').props.onPress());
+    act(() => weightInput(node).props.onChangeText('40'));
+    act(() => node.root.findAll(sheet => sheet.props.visible && typeof sheet.props.onClose === 'function')[0].props.onClose());
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled(); expect(measurementButton(node, '1. Oktober')).toBeTruthy();
+    act(() => findByText(node, 'Gewicht eintragen').props.onPress());
+    act(() => weightInput(node).props.onChangeText('31.6'));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockCreateWeightEntry).toHaveBeenCalledWith('dog-1', expect.objectContaining({ weight_kg: 31.6 }));
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+  it('keeps the editor, old records, input date and note after an offline save failure, then retries the same id', async () => {
+    mockUpdateWeightEntry.mockResolvedValueOnce({ data: null, error: new Error('offline') });
+    const node = await journal();
+    act(() => measurementButton(node, '15. Oktober').props.onPress());
+    act(() => weightInput(node).props.onChangeText('31,9'));
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(weightInput(node).props.value).toBe('31,9');
+    expect(node.root.findAll(sheet => sheet.props.visible && typeof sheet.props.onClose === 'function').length > 0).toBe(true);
+    expect(allInputs(node).some(input => input.props.value === 'Gleiche Waage')).toBe(true);
+    await act(async () => { await findByText(node, 'Speichern').props.onPress(); });
+    expect(mockUpdateWeightEntry).toHaveBeenNthCalledWith(2, 'recent', { entry_date: '2026-10-15', weight_kg: 31.9, note: 'Gleiche Waage' });
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled(); expect(mockDeleteWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+  it('preserves loaded measurement history if refresh fails while an editor is open', async () => {
+    const node = await journal();
+    act(() => measurementButton(node, '15. Oktober').props.onPress());
+    act(() => weightInput(node).props.onChangeText('32,1'));
+    mockLoadHealthOverview.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => { await node.root.findAll(control => typeof control.props.onRefresh === 'function')[0].props.onRefresh(); });
+    expect(weightInput(node).props.value).toBe('32,1');
+    expect(measurementButton(node, '1. Oktober')).toBeTruthy();
+    expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+  it('does not offer add/edit controls or notes to non-owners', async () => {
+    mockGetDogById.mockResolvedValue({ data: { ...DOG, owner_id: 'another-owner' }, error: null });
+    const node = await journal();
+    expect(measurementButton(node, '15. Oktober')).toBeUndefined();
+    expect(findByText(node, 'Gewicht eintragen')).toBeUndefined();
+    expect(strings(node)).not.toContain('Gleiche Waage');
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled(); expect(mockUpdateWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+  it('keeps the profile weight separate from actual measurements', async () => {
+    mockGetDogById.mockResolvedValue({ data: { ...DOG, weight_kg: 31.6 }, error: null });
+    mockLoadHealthOverview.mockResolvedValue(EMPTY_OVERVIEW);
+    const node = await journal();
+    expect(strings(node)).toContain('Aus dem Hundeprofil · noch keine Messung');
+    expect(measurementButton(node, 'Oktober')).toBeUndefined();
+    act(() => node.unmount());
+  });
+  it('filters only chart points and keeps both measurements and selected-tab accessibility state', async () => {
+    const node = await journal();
+    const tabs = node.root.findAll(n => n.props.accessibilityRole === 'tab' && typeof n.props.onPress === 'function');
+    const all = tabs.find(tab => tab.props.accessibilityLabel === 'journal.period.all')!;
+    act(() => all.props.onPress());
+    expect(all.props.accessibilityState.selected).toBe(true);
+    expect(measurementButton(node, '1. Oktober')).toBeTruthy(); expect(measurementButton(node, '15. Oktober')).toBeTruthy();
+    act(() => node.unmount());
+  });
+  it('reveals every loaded historical measurement without changing records when the chart period changes', async () => {
+    mockLoadHealthOverview.mockResolvedValue({ ...EMPTY_OVERVIEW, entries: [
+      { ...entries[0], id: 'historic-2024', entry_date: '2024-01-01' },
+      { ...entries[0], id: 'historic-2025', entry_date: '2025-01-01' },
+      ...entries,
+    ] });
+    const node = await journal();
+    expect(measurementButton(node, '1. Januar 2024')).toBeUndefined();
+    act(() => findByText(node, 'Alle anzeigen (4)').props.onPress());
+    expect(measurementButton(node, '1. Januar 2024')).toBeTruthy();
+    act(() => node.root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === '1 Monat')[0].props.onPress());
+    expect(measurementButton(node, '1. Januar 2024')).toBeTruthy();
+    expect(mockCreateWeightEntry).not.toHaveBeenCalled(); expect(mockUpdateWeightEntry).not.toHaveBeenCalled(); expect(mockDeleteWeightEntry).not.toHaveBeenCalled();
+    act(() => node.unmount());
+  });
+
 });

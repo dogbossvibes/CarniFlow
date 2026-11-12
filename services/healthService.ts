@@ -10,6 +10,7 @@ export type HealthConditionRow = HealthCondition;
 export type HealthMedicationRow = HealthMedication;
 export type HealthVaccinationRow = HealthVaccination;
 export type HealthMedicationAdministrationRow = HealthMedicationAdministration;
+export const HEALTH_SECTION_LIMIT = 120;
 export type HealthSection = 'entries' | 'vaccinations' | 'medications' | 'conditions' | 'parasites' | 'vetVisits' | 'documents';
 export type ReminderSyncStatus = 'synced' | 'not_required' | 'failed';
 export interface HealthMutationResult<T> { data: T | null; error: { message: string } | null; reminderSync: ReminderSyncStatus; }
@@ -47,6 +48,7 @@ export interface HealthOverviewData {
   vetVisits: DogVetRow[];
   documents: DogDocumentRow[];
   sectionErrors?: Partial<Record<HealthSection, string>>;
+  sectionLimits?: Partial<Record<HealthSection, boolean>>;
 }
 
 async function ownerId(): Promise<string> {
@@ -55,24 +57,26 @@ async function ownerId(): Promise<string> {
   return user.id;
 }
 
-async function readOptional<T>(query: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<{ data: T; error?: string }> {
+async function readOptional<T>(query: PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<{ data: T[]; error?: string; limited: boolean }> {
   const { data, error } = await query;
-  return { data: data ?? ([] as T), ...(error ? { error: error.message } : {}) };
+  const rows = data ?? [];
+  return { data: rows.slice(0, HEALTH_SECTION_LIMIT), limited: !error && rows.length > HEALTH_SECTION_LIMIT, ...(error ? { error: error.message } : {}) };
 }
 
 export async function loadHealthOverview(dogId: string): Promise<HealthOverviewData> {
   const [entries, vaccinations, medications, conditions, parasites, vetVisits, documents] = await Promise.all([
-    readOptional<DogHealthEntryRow[]>(supabase.from('dog_health_entries').select('*').eq('dog_id', dogId).order('entry_date', { ascending: false }).order('created_at', { ascending: false }).limit(120)),
-    readOptional<HealthVaccinationRow[]>(supabase.from('dog_health_vaccinations').select('*').eq('dog_id', dogId).order('administered_on', { ascending: false }).limit(120)),
-    readOptional<HealthMedicationRow[]>(supabase.from('dog_health_medications').select('*').eq('dog_id', dogId).order('starts_on', { ascending: false }).limit(120)),
-    readOptional<HealthConditionRow[]>(supabase.from('dog_health_conditions').select('*').eq('dog_id', dogId).order('started_on', { ascending: false }).limit(120)),
-    readOptional<DogDewormingEntryRow[]>(supabase.from('dog_deworming_entries').select('*').eq('dog_id', dogId).order('treatment_date', { ascending: false }).limit(120)),
-    readOptional<DogVetRow[]>(supabase.from('dog_vet_appointments').select('*').eq('dog_id', dogId).order('appointment_at', { ascending: false }).limit(120)),
-    readOptional<DogDocumentRow[]>(supabase.from('dog_documents').select('*').eq('dog_id', dogId).order('created_at', { ascending: false }).limit(120)),
+    readOptional<DogHealthEntryRow>(supabase.from('dog_health_entries').select('*').eq('dog_id', dogId).order('entry_date', { ascending: false }).order('created_at', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
+    readOptional<HealthVaccinationRow>(supabase.from('dog_health_vaccinations').select('*').eq('dog_id', dogId).order('administered_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
+    readOptional<HealthMedicationRow>(supabase.from('dog_health_medications').select('*').eq('dog_id', dogId).order('starts_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
+    readOptional<HealthConditionRow>(supabase.from('dog_health_conditions').select('*').eq('dog_id', dogId).order('started_on', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
+    readOptional<DogDewormingEntryRow>(supabase.from('dog_deworming_entries').select('*').eq('dog_id', dogId).order('treatment_date', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
+    readOptional<DogVetRow>(supabase.from('dog_vet_appointments').select('*').eq('dog_id', dogId).order('appointment_at', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
+    readOptional<DogDocumentRow>(supabase.from('dog_documents').select('*').eq('dog_id', dogId).order('created_at', { ascending: false }).limit(HEALTH_SECTION_LIMIT + 1)),
   ]);
   const sectionErrors: HealthOverviewData['sectionErrors'] = {};
-  ([['entries', entries], ['vaccinations', vaccinations], ['medications', medications], ['conditions', conditions], ['parasites', parasites], ['vetVisits', vetVisits], ['documents', documents]] as const).forEach(([key, result]) => { if (result.error) sectionErrors[key] = result.error; });
-  return { entries: entries.data, vaccinations: vaccinations.data, medications: medications.data, conditions: conditions.data, parasites: parasites.data, vetVisits: vetVisits.data, documents: documents.data.filter(isHealthDocument), sectionErrors };
+  const sectionLimits: HealthOverviewData['sectionLimits'] = {};
+  ([['entries', entries], ['vaccinations', vaccinations], ['medications', medications], ['conditions', conditions], ['parasites', parasites], ['vetVisits', vetVisits], ['documents', documents]] as const).forEach(([key, result]) => { if (result.error) sectionErrors[key] = result.error; if (result.limited) sectionLimits[key] = true; });
+  return { entries: entries.data, vaccinations: vaccinations.data, medications: medications.data, conditions: conditions.data, parasites: parasites.data, vetVisits: vetVisits.data, documents: documents.data.filter(isHealthDocument), sectionErrors, sectionLimits };
 }
 
 export async function loadHealthAccessGrants(dogId: string): Promise<{ data: HealthAccessGrantRow[]; error: { message: string } | null }> {
@@ -138,7 +142,7 @@ export async function createVaccination(dogId: string, input: Omit<HealthVaccina
 export async function createMedication(dogId: string, input: Omit<HealthMedication, 'id' | 'owner_id' | 'dog_id' | 'created_at' | 'updated_at'>) {
   const owner_id = await ownerId();
   const result = await supabase.from('dog_health_medications').insert({ owner_id, dog_id: dogId, ...input }).select().single();
-  return withReminder(result, () => syncHealthReminder(owner_id, dogId, 'health_medication', result.data?.id, result.data?.starts_on, result.data ? `Medikament · ${result.data.name}` : 'Medikament'));
+  return withReminder(result, () => syncHealthReminder(owner_id, dogId, 'health_medication', result.data?.id, result.data?.is_active ? result.data.starts_on : null, result.data ? `Medikament · ${result.data.name}` : 'Medikament'));
 }
 
 export async function createCondition(dogId: string, input: Omit<HealthCondition, 'id' | 'owner_id' | 'dog_id' | 'created_at' | 'updated_at'>) {
@@ -156,7 +160,7 @@ export async function createParasiteTreatment(dogId: string, input: { treatment_
 export async function createVetVisit(dogId: string, input: { appointment_at: string; clinic_name: string | null; reason: string | null; note: string | null }) {
   const owner_id = await ownerId();
   const result = await supabase.from('dog_vet_appointments').insert({ owner_id, dog_id: dogId, status: 'scheduled', ...input }).select().single();
-  return withReminder(result, () => syncHealthReminder(owner_id, dogId, 'health_vet_visit', result.data?.id, result.data?.appointment_at, result.data ? `Tierarzt · ${result.data.reason || 'Termin'}` : 'Tierarzttermin'));
+  return withReminder(result, () => syncHealthReminder(owner_id, dogId, 'health_vet_visit', result.data?.id, vetReminderDate(result.data), result.data ? `Tierarzt · ${result.data.reason || 'Termin'}` : 'Tierarzttermin'));
 }
 
 export async function createWeightEntry(dogId: string, input: { entry_date: string; weight_kg: number; note: string | null }) {
@@ -173,7 +177,7 @@ export async function updateVaccination(id: string, input: Partial<Omit<HealthVa
 export async function updateMedication(id: string, input: Partial<Omit<HealthMedication, 'id' | 'owner_id' | 'dog_id' | 'created_at' | 'updated_at'>>) {
   const current = await supabase.from('dog_health_medications').select('owner_id,dog_id').eq('id', id).single();
   const result = await supabase.from('dog_health_medications').update({ ...input, updated_at: new Date().toISOString() }).eq('id', id).select().single();
-  return withReminder(result, () => syncHealthReminder(current.data?.owner_id, current.data?.dog_id, 'health_medication', result.data?.id, result.data?.starts_on, result.data ? `Medikament · ${result.data.name}` : 'Medikament'));
+  return withReminder(result, () => syncHealthReminder(current.data?.owner_id, current.data?.dog_id, 'health_medication', result.data?.id, result.data?.is_active ? result.data.starts_on : null, result.data ? `Medikament · ${result.data.name}` : 'Medikament'));
 }
 export async function updateCondition(id: string, input: Partial<Omit<HealthCondition, 'id' | 'owner_id' | 'dog_id' | 'created_at' | 'updated_at'>>) { const result = await supabase.from('dog_health_conditions').update({ ...input, updated_at: new Date().toISOString() }).eq('id', id).select().single(); return withReminder(result, async () => 'not_required'); }
 export async function updateParasiteTreatment(id: string, input: Partial<{ treatment_date: string; product: string | null; next_due_date: string | null; treatment_type: string; note: string | null }>) {
@@ -184,7 +188,7 @@ export async function updateParasiteTreatment(id: string, input: Partial<{ treat
 export async function updateVetVisit(id: string, input: Partial<{ appointment_at: string; clinic_name: string | null; reason: string | null; diagnosis: string | null; treatment: string | null; note: string | null; status: string }>) {
   const current = await supabase.from('dog_vet_appointments').select('owner_id,dog_id').eq('id', id).single();
   const result = await supabase.from('dog_vet_appointments').update(input).eq('id', id).select().single();
-  return withReminder(result, () => syncHealthReminder(current.data?.owner_id, current.data?.dog_id, 'health_vet_visit', result.data?.id, result.data?.appointment_at, result.data ? `Tierarzt · ${result.data.reason || 'Termin'}` : 'Tierarzttermin'));
+  return withReminder(result, () => syncHealthReminder(current.data?.owner_id, current.data?.dog_id, 'health_vet_visit', result.data?.id, vetReminderDate(result.data), result.data ? `Tierarzt · ${result.data.reason || 'Termin'}` : 'Tierarzttermin'));
 }
 export async function updateWeightEntry(id: string, input: Partial<{ entry_date: string; weight_kg: number; note: string | null }>) { const result = await supabase.from('dog_health_entries').update(input).eq('id', id).select().single(); return withReminder(result, async () => 'not_required'); }
 
@@ -234,7 +238,8 @@ async function deleteHealthRow(table: string, id: string, source_type?: Reminder
 
 async function withReminder<T extends HealthRowResult>(result: { data: T | null; error: { message: string } | null }, sync: () => Promise<ReminderSyncStatus>): Promise<HealthMutationResult<T>> {
   if (result.error || !result.data) return { data: result.data, error: result.error, reminderSync: 'not_required' };
-  return { data: result.data, error: null, reminderSync: await sync() };
+  try { return { data: result.data, error: null, reminderSync: await sync() }; }
+  catch { return { data: result.data, error: null, reminderSync: 'failed' as const }; }
 }
 
 async function syncHealthReminder(owner_id: string | undefined, dog_id: string | undefined, source_type: ReminderSource, source_id: string | undefined, start_at: string | null | undefined, title: string): Promise<ReminderSyncStatus> {
@@ -264,4 +269,25 @@ async function removeHealthReminder(owner_id: string, source_type: ReminderSourc
   return removed.error ? 'failed' : 'synced';
 }
 
+function vetReminderDate(row: { status?: string | null; appointment_at?: string | null } | null | undefined): string | null | undefined {
+  return row?.status === 'completed' || row?.status === 'cancelled' ? null : row?.appointment_at;
+}
+
 function parasiteTitle(type: string | null, product: string | null): string { return product || (type === 'flea_tick' ? 'Parasitenprophylaxe' : type === 'heartworm' ? 'Herzwurmbehandlung' : 'Entwurmung'); }
+
+
+// Retry only the calendar side effect of an already saved entry. Never insert
+// another health record. Always reread the current owned row after edits/deletes.
+export interface HealthReminderReference { dogId: string; id: string; kind: 'vaccination' | 'parasite' | 'medication' | 'vet'; }
+export async function retryHealthReminder(reference: HealthReminderReference): Promise<ReminderSyncStatus> {
+  try {
+    const owner = await ownerId();
+    const table = reference.kind === 'vaccination' ? 'dog_health_vaccinations' : reference.kind === 'parasite' ? 'dog_deworming_entries' : reference.kind === 'medication' ? 'dog_health_medications' : 'dog_vet_appointments';
+    const { data, error } = await supabase.from(table).select('*').eq('id', reference.id).eq('dog_id', reference.dogId).eq('owner_id', owner).maybeSingle();
+    if (error || !data) return 'failed';
+    const source: ReminderSource = reference.kind === 'vaccination' ? 'health_vaccination' : reference.kind === 'parasite' ? 'health_parasite_treatment' : reference.kind === 'medication' ? 'health_medication' : 'health_vet_visit';
+    const date = reference.kind === 'vaccination' ? data.next_due_on : reference.kind === 'parasite' ? data.next_due_date : reference.kind === 'medication' ? (data.is_active ? data.starts_on : null) : vetReminderDate(data);
+    const title = reference.kind === 'vaccination' ? `Impfung · ${data.vaccine_name || data.vaccine_type}` : reference.kind === 'parasite' ? parasiteTitle(data.treatment_type, data.product) : reference.kind === 'medication' ? `Medikament · ${data.name}` : `Tierarzt · ${data.reason || 'Termin'}`;
+    return await syncHealthReminder(owner, reference.dogId, source, reference.id, date, title);
+  } catch { return 'failed'; }
+}

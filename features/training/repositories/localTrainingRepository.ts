@@ -107,6 +107,7 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
   gpsQualityAverage?: number | null;
   segments?: unknown;
   manualAngleGeometry?: unknown;
+  layContinuity?: unknown;
   status?: string;
 }): Promise<void> {
   const db = await getLocalDb();
@@ -116,6 +117,7 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
     cornersTotal:      input.cornersTotal ?? null,
     gpsQualityAverage: input.gpsQualityAverage ?? null,
     segments:          input.segments ?? null,
+    ...(input.layContinuity ? { layContinuity: input.layContinuity } : {}),
     ...(input.manualAngleGeometry ? { manualAngleGeometry: input.manualAngleGeometry } : {}),
   });
   // Ein inzwischen gesetzter lokaler Lifecycle-Marker (Abbruch / „Ohne App abgeschlossen")
@@ -132,13 +134,21 @@ export async function finalizeLocalTrainingSession(localId: string, input: {
 // Absuche-/Run-Ergebnis lokal dauerhaft in payload_json.run ablegen (durabler Erfolg,
 // unabhängig vom Remote-Save). Read-merge-write: die bestehende Lay-Summary
 // (payload_json vom Legen-Finalize) bleibt erhalten. Kein Schema-Change.
-export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<string, unknown>): Promise<void> {
+export async function finalizeLocalTrackRun(sessionLocalId: string, run: Record<string, unknown>, assertScope?: () => void): Promise<void> {
   const db = await getLocalDb();
   const row = await db.getFirstAsync<{ payload_json: string | null }>(
     `select payload_json from local_training_sessions where local_id=?`, sessionLocalId,
   );
+  assertScope?.();
   let payload: Record<string, unknown> = {};
   if (row?.payload_json) { try { payload = JSON.parse(row.payload_json) ?? {}; } catch { payload = {}; } }
+  if (payload.trackTransferReceipt != null) {
+    await db.runAsync(
+      `update local_training_sessions set payload_json=json_set(payload_json, '$.run', json(?)), updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
+      JSON.stringify(run), nowIso(), sessionLocalId,
+    );
+    return;
+  }
   payload.run = run;
   // Eine bereits synchronisierte Session hat mit dem neuen Run frische lokale Daten →
   // zurück auf 'pending', damit RUN-SAVE2 sie erneut hochlädt (erst nach Run + Punkten
@@ -206,6 +216,14 @@ export async function dismissLocalAutoDwellDetection(sessionLocalId: string, obj
   const detection = run.object_detections.find((d: any) => d?.id === objectId && d?.source === 'auto_dwell');
   if (!detection) return false;
   detection.user_override = true;
+  if (payload.trackTransferReceipt) {
+    const index = run.object_detections.indexOf(detection);
+    const result = await db.runAsync(
+      `update local_training_sessions set payload_json=json_set(payload_json, ?, json('true')), updated_at=?, sync_status='pending' where local_id=? and json_extract(payload_json, ?) = ?`,
+      `$.run.object_detections[${index}].user_override`, nowIso(), sessionLocalId, `$.run.object_detections[${index}].id`, objectId,
+    );
+    return (result?.changes ?? 0) > 0;
+  }
   await db.runAsync(
     `update local_training_sessions set payload_json=?, updated_at=?, sync_status=case when sync_status='synced' then 'pending' else sync_status end where local_id=?`,
     JSON.stringify(payload), nowIso(), sessionLocalId,
@@ -234,8 +252,40 @@ export async function updateLocalTrackEvaluation(localId: string, input: {
 }
 
 export async function markTrainingAsDeleted(localId: string): Promise<void> {
-  const db = await getLocalDb();
-  await db.runAsync(`update local_training_sessions set deleted_at=?, sync_status='deleted_pending', updated_at=? where local_id=?`, nowIso(), nowIso(), localId);
+  // Fence only the new diagnostic sidecar; source training/GPS deletion stays unchanged.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { beginSupportProvenanceDeletion } = require('@/features/tracking/utils/supportProvenanceStore') as typeof import('@/features/tracking/utils/supportProvenanceStore');
+  const provenance = beginSupportProvenanceDeletion([localId]);
+  try {
+    // Capture identity before any async work, including opening the primary DB.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { gpsCaptureScope } = require('@/features/tracking/storage/gpsCaptureScope') as typeof import('@/features/tracking/storage/gpsCaptureScope');
+    const scope = gpsCaptureScope();
+    const check = () => {
+      const current = gpsCaptureScope();
+      if (current.userId !== scope.userId || current.epoch !== scope.epoch) throw new Error('RAW_ACCOUNT_CHANGED');
+    };
+    const db = await getLocalDb();
+    check();
+    const parent = await db.getFirstAsync<{ user_id: string | null; remote_id: string | null }>(
+      'select user_id,remote_id from local_training_sessions where local_id=?', localId);
+    check();
+    if (!parent) return;
+    if (parent.user_id) {
+      if (scope.userId !== parent.user_id) throw new Error('RAW_ACCOUNT_CHANGED');
+      // Keep the parent visible and retryable if cleanup fails. Raw tombstones are
+      // idempotent; a later primary-write failure can safely retry this same action.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { deleteGpsCaptures } = require('@/features/tracking/storage/gpsCapture') as typeof import('@/features/tracking/storage/gpsCapture');
+      await deleteGpsCaptures(localId);
+      check();
+      if (parent.remote_id && parent.remote_id !== localId) await deleteGpsCaptures(parent.remote_id);
+      check();
+    }
+    await db.runAsync(`update local_training_sessions set deleted_at=?, sync_status='deleted_pending', updated_at=? where local_id=? and user_id is ?`, nowIso(), nowIso(), localId, parent.user_id);
+    check();
+    await provenance.commit();
+  } finally { provenance.cancel(); }
 }
 
 export async function getLocalTrainingSessions(userId: string, opts: { type?: string; dogId?: string } = {}): Promise<LocalTrainingSession[]> {
