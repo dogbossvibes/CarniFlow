@@ -261,3 +261,19 @@ export const EXAM_TRACKS: Record<string, TrackSpec> = {
     articlesAtM: [110, 350, 600, 850, 1200, 1400, 1790].map(paces),
   },
 };
+
+/**
+ * Schwierige Fährtenformen für die Absuche (T-205). Frei gewählte Übungsfährten, keine Prüfungsvorlage.
+ * Fortschritt und Ansagen der App hängen daran, dass die Absuche den richtigen Schenkel erkennt.
+ */
+export const SHAPE_TRACKS: Record<string, TrackSpec> = {
+  // Schenkel 4 läuft quer über Schenkel 1 (Kreuzung 15 m nach dem Abgang).
+  Kreuzung: { name: 'kreuzung', parts: [{ leg: 40 }, { turn: -90 }, { leg: 25 }, { turn: -90 }, { leg: 25 }, { turn: -90 }, { leg: 45 }], articlesAtM: [12, 78, 135] },
+  // Hin- und Rückweg nebeneinander (Haarnadel), Abstand 4 m bzw. 8 m.
+  'Parallele Schenkel 4 m': { name: 'parallel4', parts: [{ leg: 40 }, { turn: -90 }, { leg: 4 }, { turn: -90 }, { leg: 40 }, { turn: 90 }, { leg: 25 }], articlesAtM: [20, 64, 109] },
+  'Parallele Schenkel 8 m': { name: 'parallel8', parts: [{ leg: 40 }, { turn: -90 }, { leg: 8 }, { turn: -90 }, { leg: 40 }, { turn: 90 }, { leg: 25 }], articlesAtM: [20, 68, 113] },
+  // Drei Spitzwinkel (Innenwinkel 45°) mit nur 15 m dazwischen.
+  'Spitzwinkel-Folge': { name: 'spitzfolge', parts: [{ leg: 30 }, { turn: -135 }, { leg: 15 }, { turn: 135 }, { leg: 15 }, { turn: -135 }, { leg: 30 }], articlesAtM: [15, 75, 90] },
+  // Gegenstände genau in den beiden Winkeln.
+  'Gegenstand im Winkel': { name: 'gegenstand_im_winkel', parts: [{ leg: 40 }, { turn: -90 }, { leg: 40 }, { turn: 90 }, { leg: 40 }], articlesAtM: [40, 80, 120] },
+};

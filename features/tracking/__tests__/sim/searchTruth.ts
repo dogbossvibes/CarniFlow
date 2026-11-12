@@ -42,14 +42,29 @@ export interface HandlerSpec {
 }
 export const DEFAULT_HANDLER: HandlerSpec = { lineM: 10, pickupS: 8, approachSpeedMps: 1.0, preStandS: 5 };
 
-export interface SearchArticleTruth { index: number; atM: number; x: number; y: number; indicated: boolean; arrivedTS: number | null; leftTS: number | null }
+export interface SearchArticleTruth {
+  index: number; atM: number; x: number; y: number; indicated: boolean; arrivedTS: number | null; leftTS: number | null;
+  /** Hundeführer ist beim liegenden Hund angekommen (Aufnehmen beginnt) — Zeitpunkt für manuelles Antippen. */
+  pickupStartTS: number | null;
+}
+
+/** Der Hund verliert die Fährte: weicht seitlich ab, sucht und findet weiter vorne wieder hinein (T-205). */
+export interface TrackLoss { atM: number; offsetM: number; lengthM: number }
+
+export interface SearchTruthOptions {
+  losses?: readonly TrackLoss[];
+  /** Am Fährtenende geht der Hundeführer zum Hund (Standard seit T-205). */
+  walkToDogAtEnd?: boolean;
+}
 
 export interface SearchTruth {
   dog: DogSpec;
   handler: HandlerSpec;
   /** Weg des Hundeführers (= Weg des Handys). */
   handlerTimeline: Timeline;
-  dogSamples: { tS: number; x: number; y: number; progressM: number; lateralM: number }[];
+  dogSamples: { tS: number; x: number; y: number; progressM: number; lateralM: number; lost: boolean }[];
+  /** Zeitfenster (s), in denen der Hund die Fährte verloren hatte. */
+  lossWindowsS: { fromS: number; toS: number }[];
   articles: SearchArticleTruth[];
   /** Überlaufen je Winkel (m). */
   overshootsM: number[];
@@ -61,10 +76,10 @@ export interface SearchTruth {
 
 const RAD = Math.PI / 180;
 
-interface PathPoint { x: number; y: number; progressM: number }
+interface PathPoint { x: number; y: number; progressM: number; lost?: boolean }
 
 /** Der Weg der Hundenase: Fährte + Pendeln, mit Überlaufen/Kreisen an den Winkeln. */
-function buildDogPath(lay: TruthTrack, dog: DogSpec, rng: Rng): { points: PathPoint[]; overshootsM: number[] } {
+function buildDogPath(lay: TruthTrack, dog: DogSpec, rng: Rng, losses: readonly TrackLoss[] = []): { points: PathPoint[]; overshootsM: number[] } {
   const { path } = lay;
   const ds = path.s[1] - path.s[0];
   const at = (s: number) => {
@@ -83,7 +98,31 @@ function buildDogPath(lay: TruthTrack, dog: DogSpec, rng: Rng): { points: PathPo
   const points: PathPoint[] = [];
   let s = 0;
   let di = 0;
+  const pendingLosses = [...losses].sort((a, b) => a.atM - b.atM);
   while (s <= lay.lengthM) {
+    const loss = pendingLosses[0];
+    if (loss && s >= loss.atM) {
+      // Abweichen schräg nach aussen, ein Suchkreis, dann weiter vorne zurück auf die Fährte.
+      pendingLosses.shift();
+      const from = points[points.length - 1] ?? { x: 0, y: 0, progressM: 0 };
+      const base = at(Math.min(lay.lengthM, loss.atM + loss.lengthM / 2));
+      const h = base.headingDeg * RAD;
+      const ox = base.x + Math.sin(h) * loss.offsetM, oy = base.y - Math.cos(h) * loss.offsetM;   // rechts der Fährte
+      const line = (ax: number, ay: number, bx: number, by: number, p0: number, p1: number, lost: boolean) => {
+        const len = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.round(len / ds));
+        for (let i = 1; i <= n; i++) points.push({ x: ax + ((bx - ax) * i) / n, y: ay + ((by - ay) * i) / n, progressM: p0 + ((p1 - p0) * i) / n, lost });
+      };
+      line(from.x, from.y, ox, oy, from.progressM, loss.atM, true);
+      const r = 3, n = Math.max(8, Math.round((2 * Math.PI * r) / ds));
+      let cx = ox, cy = oy;
+      for (let i = 1; i <= n; i++) { const a = h + (2 * Math.PI * i) / n; cx = ox + Math.cos(a) * r - Math.cos(h) * r; cy = oy + Math.sin(a) * r - Math.sin(h) * r; points.push({ x: cx, y: cy, progressM: loss.atM, lost: true }); }
+      const rejoinS = Math.min(lay.lengthM, loss.atM + loss.lengthM);
+      const back = at(rejoinS);
+      line(cx, cy, back.x, back.y, loss.atM, loss.atM, true);
+      s = rejoinS + ds;
+      while (detours[di] && detours[di].corner.sM < s) di++;
+      continue;
+    }
     const d = detours[di];
     if (d && d.overshoot >= 0.5 && s >= d.corner.sM - 1) {
       // Geradeaus über den Winkel hinaus, optional ein Suchkreis, dann zurück auf den neuen Schenkel.
@@ -127,6 +166,16 @@ function buildDogPath(lay: TruthTrack, dog: DogSpec, rng: Rng): { points: PathPo
   return { points, overshootsM: detours.map(d => (d.overshoot >= 0.5 ? d.overshoot : 0)) };
 }
 
+/** Wahrer Fortschritt (m) eines Punkts entlang der Fährte, gesucht nur im Fenster [fromM, toM]. */
+export function progressOnTrack(lay: TruthTrack, x: number, y: number, fromM: number, toM: number): { progressM: number; distM: number } {
+  const { path } = lay;
+  const ds = path.s[1] - path.s[0];
+  const lo = Math.max(0, Math.floor(fromM / ds)), hi = Math.min(path.x.length - 1, Math.ceil(toM / ds));
+  let best = Infinity, bestI = lo;
+  for (let i = lo; i <= hi; i++) { const d = (path.x[i] - x) ** 2 + (path.y[i] - y) ** 2; if (d < best) { best = d; bestI = i; } }
+  return { progressM: path.s[bestI] ?? 0, distM: Math.sqrt(best) };
+}
+
 /** Seitlicher Abstand eines Punkts zur wahren Fährte, gesucht um den erwarteten Fortschritt. */
 function lateralToTrack(lay: TruthTrack, x: number, y: number, progressM: number): number {
   const { path } = lay;
@@ -140,11 +189,12 @@ function lateralToTrack(lay: TruthTrack, x: number, y: number, progressM: number
   return Math.sqrt(best);
 }
 
-export function buildSearchTruth(lay: TruthTrack, dog: DogSpec, handler: HandlerSpec, rng: Rng): SearchTruth {
-  const { points, overshootsM } = buildDogPath(lay, dog, rng);
+export function buildSearchTruth(lay: TruthTrack, dog: DogSpec, handler: HandlerSpec, rng: Rng, opts: SearchTruthOptions = {}): SearchTruth {
+  const { points, overshootsM } = buildDogPath(lay, dog, rng, opts.losses);
+  const walkToDogAtEnd = opts.walkToDogAtEnd ?? true;
   const dt = TRUTH_DT_S;
   const articles: SearchArticleTruth[] = lay.articles.map(a => ({
-    index: a.index, atM: a.atM, x: a.x, y: a.y, indicated: rng() < dog.indicateProb, arrivedTS: null, leftTS: null,
+    index: a.index, atM: a.atM, x: a.x, y: a.y, indicated: rng() < dog.indicateProb, arrivedTS: null, leftTS: null, pickupStartTS: null,
   }));
   // Punktindex, an dem die Hundenase den jeweiligen Gegenstand erreicht.
   const articleIndex = articles.map(a => {
@@ -165,7 +215,7 @@ export function buildSearchTruth(lay: TruthTrack, dog: DogSpec, handler: Handler
   const record = () => {
     const p = points[idx];
     handlerRaw.push({ tS: t, x: hx, y: hy });
-    dogSamples.push({ tS: t, x: p.x, y: p.y, progressM: p.progressM, lateralM: lateralToTrack(lay, p.x, p.y, p.progressM) });
+    dogSamples.push({ tS: t, x: p.x, y: p.y, progressM: p.progressM, lateralM: lateralToTrack(lay, p.x, p.y, p.progressM), lost: !!p.lost });
   };
   let guard = 0;
   while (phase !== 'done' && guard++ < 4_000_000) {
@@ -188,7 +238,8 @@ export function buildSearchTruth(lay: TruthTrack, dog: DogSpec, handler: Handler
           nextArticle++;
         }
       }
-      if (phase === 'track' && idx >= points.length - 1) { phase = 'pickup'; phaseLeft = 3; }
+      // Fährtenende: der Hundeführer geht zum Hund (sonst bliebe er eine Leinenlänge vor dem Endpunkt stehen).
+      if (phase === 'track' && idx >= points.length - 1) { if (walkToDogAtEnd) phase = 'approach'; else { phase = 'pickup'; phaseLeft = 3; } }
       // Gespannte Leine: der Hundeführer wird hinterhergezogen (Schleppkurve).
       const q = points[idx];
       const dist = Math.hypot(hx - q.x, hy - q.y);
@@ -196,7 +247,11 @@ export function buildSearchTruth(lay: TruthTrack, dog: DogSpec, handler: Handler
     } else if (phase === 'approach') {
       // Hund liegt am Gegenstand, der Hundeführer geht zu ihm.
       const dist = Math.hypot(hx - p.x, hy - p.y);
-      if (dist <= 1.02) { phase = 'pickup'; phaseLeft = handler.pickupS; }   // Toleranz: sonst bleibt der Abstand durch Rundung knapp über 1 m hängen
+      if (dist <= 1.02) {
+        phase = 'pickup'; phaseLeft = handler.pickupS;
+        const art = articles[nextArticle];
+        if (art && art.arrivedTS != null && art.pickupStartTS == null) art.pickupStartTS = t;
+      }   // Toleranz: sonst bleibt der Abstand durch Rundung knapp über 1 m hängen
       else { const step = Math.min(dist - 1, handler.approachSpeedMps * dt); hx += ((p.x - hx) * step) / dist; hy += ((p.y - hy) * step) / dist; }
     } else if (phase === 'pickup') {
       phaseLeft -= dt;
@@ -232,8 +287,14 @@ export function buildSearchTruth(lay: TruthTrack, dog: DogSpec, handler: Handler
   const dogLat = tracking.map(d => d.lateralM);
   const handlerLat = tracking.map((d, i) => lateralToTrack(lay, handlerRaw[i * 4].x, handlerRaw[i * 4].y, Math.max(0, d.progressM - handler.lineM)));
   const mean = (a: number[]) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
+  const lossWindowsS: { fromS: number; toS: number }[] = [];
+  dogSamples.forEach((d, i) => {
+    if (!d.lost) return;
+    const last = lossWindowsS[lossWindowsS.length - 1];
+    if (last && i > 0 && dogSamples[i - 1].lost) last.toS = d.tS; else lossWindowsS.push({ fromS: d.tS, toS: d.tS });
+  });
   return {
-    dog, handler, handlerTimeline: { dtS: dt, durationS: t, samples }, dogSamples, articles, overshootsM,
+    dog, handler, handlerTimeline: { dtS: dt, durationS: t, samples }, dogSamples, articles, overshootsM, lossWindowsS,
     dogMeanLateralM: mean(dogLat), dogMaxLateralM: Math.max(0, ...dogLat),
     handlerMeanLateralM: mean(handlerLat), handlerMaxLateralM: Math.max(0, ...handlerLat),
     durationS: t,

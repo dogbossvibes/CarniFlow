@@ -1,6 +1,6 @@
 import { pinQaTrackingModes, loadQaPreferences } from './qaPreferences';
 import * as Location from 'expo-location';
-import { startPositionStream, type StreamSample } from '@/features/tracking/utils/positionStream';
+import { startPositionStream, type PositionStreamExtras, type StreamSample } from '@/features/tracking/utils/positionStream';
 import { precisionLocationClient as client } from '@/features/tracking/native/precisionLocationClient';
 import { getLocationSourceMode } from '@/features/tracking/utils/locationSourceMode';
 import { normalizeFixQuality, type LocationFixQuality } from './locationFixQuality';
@@ -112,16 +112,17 @@ async function startLegacyExpoLocation(
 export async function startPositionSource(
   onSample: (s: PositionSourceSample) => void,
   opts: Location.LocationOptions,
+  extras: PositionStreamExtras = {},
 ): Promise<PositionSourceHandle> {
   await loadQaPreferences();
   const release = pinQaTrackingModes();
   try {
-    const handle = await startPositionSourcePinned(onSample, opts);
+    const handle = await startPositionSourcePinned(onSample, opts, extras);
     return { ...handle, stop: () => { try { handle.stop(); } finally { release(); } } };
   } catch (error) { release(); throw error; }
 }
 
-async function startPositionSourcePinned(onSample: (s: PositionSourceSample) => void, opts: Location.LocationOptions): Promise<PositionSourceHandle> {
+async function startPositionSourcePinned(onSample: (s: PositionSourceSample) => void, opts: Location.LocationOptions, extras: PositionStreamExtras): Promise<PositionSourceHandle> {
   const info = baseInfo();
   const diagnosticId = beginPositionDiagnostics();
   let stopped = false;
@@ -171,7 +172,7 @@ async function startPositionSourcePinned(onSample: (s: PositionSourceSample) => 
       try { gnssSub = client.onGnssStatus(s => recordGnssDiagnostics(diagnosticId, s)); }
       catch { /* older binaries may lack diagnostics; retain the native position path */ }
     }
-    const stop = await startPositionStream((s) => emit(s, info.source), opts);
+    const stop = await startPositionStream((s) => emit(s, info.source), opts, extras);
     return finishHandle(stop, info);
   } catch (e) {
     // 2) Harte Sicherung: schlägt der native Start fehl (z. B. Modul vorhanden,
