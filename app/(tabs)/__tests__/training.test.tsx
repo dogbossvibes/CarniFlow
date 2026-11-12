@@ -13,6 +13,8 @@ let mockCurrentLabels: Record<string, string> = {};
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: 'Ionicons' }));
+// T-184 Etappe 2: Abschnitt „Weitermachen“ hat eigene Tests.
+jest.mock('@/components/training/ContinueTrainingSection', () => ({ ContinueTrainingSection: () => null }));
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = jest.requireActual('react-native');

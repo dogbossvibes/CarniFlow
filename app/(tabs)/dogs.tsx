@@ -24,6 +24,8 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDogTrainingSummary } from '@/hooks/useDogTrainingSummary';
+import { lastTrainingText } from '@/features/training/continue/labels';
 
 export default function HundeScreen() {
   const router = useRouter();
@@ -105,14 +107,15 @@ export default function HundeScreen() {
           {dogs.length > 0 ? (
             <View style={s.liste}>
               {dogs.map((hund) => (
-                <DogCompactCard
+                <DogCardWithLastTraining
                   key={hund.id}
+                  dogId={hund.id}
                   identity={dogToIdentity(hund)}
                   trackColor={trackOverlayColor(resolveTrackOverlayColorKey(hund.id, hund.track_overlay_color_key))}
                   trackColorLabel={`${t('dog.trackColor.title')}: ${t(trackOverlayColorNameKey(resolveTrackOverlayColorKey(hund.id, hund.track_overlay_color_key)))}`}
-                  lastTrainingLabel={null}
                   onOpen={() => router.push(`/dog/${hund.id}` as never)}
-                  onTraining={() => router.push({ pathname: '/unit/document', params: { dogId: hund.id } })}
+                  onTrainingFor={(discipline?: string) => router.push({ pathname: '/unit/document', params: { dogId: hund.id, ...(discipline ? { discipline } : {}) } })}
+                  onTrainingPage={() => router.push({ pathname: '/unit/progress', params: { dogId: hund.id } })}
                   onFaehrte={() => router.push(`/track/legen?dogId=${hund.id}` as never)}
                   onStats={() => router.push(`/dog/${hund.id}` as never)}
                 />
@@ -281,3 +284,13 @@ const s = StyleSheet.create({
   },
   leerBtnText: { fontSize: 15, color: C.accentText, fontWeight: "800" },
 });
+
+// T-184 Etappe 2: Hundekarte zeigt das letzte Training und den offenen Hinweis
+// (nur lesend). Ladefehler lassen die Karte unverändert.
+function DogCardWithLastTraining({ dogId, onTrainingFor, ...props }: Omit<React.ComponentProps<typeof DogCompactCard>, 'lastTrainingLabel' | 'openHintLabel' | 'onTraining'> & { dogId: string; onTrainingFor: (discipline?: string) => void }) {
+  const { t } = useT();
+  const { data } = useDogTrainingSummary(dogId);
+  return <DogCompactCard {...props} onTraining={() => onTrainingFor(data?.last?.disciplines[0])}
+    lastTrainingLabel={data?.last ? lastTrainingText(t, data.last.daysAgo, data.last.disciplines) : null}
+    openHintLabel={data?.openHint ? t('continueTraining.openHint', { text: data.openHint.text }) : null} />;
+}

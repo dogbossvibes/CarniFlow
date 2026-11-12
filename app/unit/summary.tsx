@@ -124,6 +124,7 @@ function SummaryForm() {
     successHaptic();
     if (resetUnit(session.user.id) === false) return;
     queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
+    queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
     router.replace('/(tabs)/home');
     } catch {
       if (alive.current) Alert.alert(t('common.error'), t('training.saveError'));

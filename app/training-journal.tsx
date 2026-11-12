@@ -298,7 +298,7 @@ export default function TrainingJournalScreen() {
               title={t('journal.emptyTitle')}
               text={t('journal.emptyText')}
               ctaLabel={t('journal.emptyCta')}
-              onCta={() => router.push('/unit/start' as never)}
+              onCta={() => router.push('/unit/document' as never)}
             />
           ) : filtered.length === 0 ? (
             <EmptyState

@@ -27,6 +27,7 @@ import { queryClient } from '@/lib/queryClient';
 import { tapHaptic } from '@/lib/haptics';
 import type { TrainingUnit, AudioFile } from '@/types/trainingUnit';
 import { useT } from '@/i18n';
+import { ratingDisplay } from '@/features/training/documentation/learningLevel';
 
 function DetailVideo({ uri }: { uri: string }) {
   const signed = useSignedUrl(uri);
@@ -34,6 +35,9 @@ function DetailVideo({ uri }: { uri: string }) {
   useEffect(() => { if (signed) player.replace(signed); }, [signed, player]);
   return <VideoView player={player} style={s.video} contentFit="cover" nativeControls />;
 }
+
+// Eindeutiger Cache-Pfad pro Abspielvorgang (Zeitstempel ausserhalb der Komponente).
+const memoCachePath = (idx: number) => FileSystem.cacheDirectory + `memo_${idx}_${Date.now()}.mp4`;
 
 // Read-only Audio-Wiedergabe. Datei wird lokal geladen (Supabase-CDN ohne
 // Range-Support), dann via expo-audio abgespielt — gleiches Muster wie AudioRecorder.
@@ -44,10 +48,16 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
   const localRef = useRef<string | null>(null);
 
+  // Wiedergabe-Ende: Anzeige direkt beim Rendern zurücksetzen (React-Muster
+  // „State bei geänderter Eingabe anpassen“), die Datei-Aufräumarbeit bleibt im Effekt.
+  const [seenFinish, setSeenFinish] = useState(status.didJustFinish);
+  if (seenFinish !== status.didJustFinish) {
+    setSeenFinish(status.didJustFinish);
+    if (status.didJustFinish) setPlayingIdx(null);
+  }
   useEffect(() => {
-    if (status.didJustFinish) {
-      setPlayingIdx(null);
-      if (localRef.current) { FileSystem.deleteAsync(localRef.current, { idempotent: true }); localRef.current = null; }
+    if (status.didJustFinish && localRef.current) {
+      FileSystem.deleteAsync(localRef.current, { idempotent: true }); localRef.current = null;
     }
   }, [status.didJustFinish]);
 
@@ -58,7 +68,7 @@ function AudioMemos({ files }: { files: AudioFile[] }) {
       if (playingIdx === idx) { setPlayingIdx(null); return; }
       setPlayingIdx(idx);
       await setAppAudioModeAsync({ playsInSilentMode: true, allowsRecording: false });
-      const localUri = FileSystem.cacheDirectory + `memo_${idx}_${Date.now()}.mp4`;
+      const localUri = memoCachePath(idx);
       const result   = await FileSystem.downloadAsync(await signMediaUrl(files[idx].url), localUri);
       if (result.status !== 200) throw new Error('Download fehlgeschlagen');
       localRef.current = result.uri;
@@ -129,6 +139,7 @@ export default function UnitDetailScreen() {
           const { error } = await deleteTrainingUnit(id);
           if (error) { Alert.alert(t('common.error'), error.message); return; }
           queryClient.invalidateQueries({ queryKey: ['trainingFeed'] });
+          queryClient.invalidateQueries({ queryKey: ['dogTrainingSummary'] });
           router.back();
         },
       },
@@ -203,12 +214,18 @@ export default function UnitDetailScreen() {
                 <Text style={s.exDisc}>{ex.discipline}</Text>
                 {ex.notes?.trim() ? <Text style={s.notesTxt}>{ex.notes}</Text> : null}
               </View>
-              {ex.rating != null && (
-                <View style={s.exStars}>
-                  <Ionicons name="star" size={12} color={C.star} />
-                  <Text style={s.exRating}>{ex.rating}</Text>
-                </View>
-              )}
+              {(() => {
+                // T-184: Lernstufe nur mit rating_scale; alte Bewertungen bleiben Sterne.
+                const shown = ratingDisplay(ex);
+                if (shown?.kind === 'level') return <Text style={s.exRating}>{t(`trainingLevel.${shown.level}`)}</Text>;
+                if (shown?.kind === 'legacy') return (
+                  <View style={s.exStars}>
+                    <Ionicons name="star" size={12} color={C.star} />
+                    <Text style={s.exRating}>{shown.stars}</Text>
+                  </View>
+                );
+                return null;
+              })()}
             </View>
           ))}
 

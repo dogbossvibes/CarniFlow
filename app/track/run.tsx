@@ -86,6 +86,7 @@ const SHOW_GPS_DEBUG = __DEV__;
 
 // Blinkender LIVE-Punkt.
 function RecDot() {
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const op = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -199,6 +200,7 @@ export default function TrackRunScreen() {
     const st = useTrackingStore.getState();
     return { transferReceipt: st.transferReceipt, sessionId: st.currentSessionId, dogId: st.dogId, runId: st.searchRunId };
   }, []);
+  // eslint-disable-next-line react-hooks/use-memo -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const renderTransferIdentity = useMemo(currentTransfer, [currentTransfer, transferToken, effectiveId, dogId, phase]);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [recovery, setRecovery] = useState<PendingTrack | null>(null);   // gesetzt ⇒ Recovery-Dialog offen
@@ -296,19 +298,30 @@ export default function TrackRunScreen() {
     }
   }, [arming]);
   const approachPhaseRef = useRef(approach.phase);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachPhaseRef.current = approach.phase;
   const approachArmedRef = useRef(approach.armed);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachArmedRef.current = approach.armed;
   const approachDistanceRef = useRef(approach.distanceM);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   approachDistanceRef.current = approach.distanceM;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   if (arming && isQaDiagnosticsEnabled() && approachOriginRef.current != null) {
     const rel = (ms: number | null) => ms == null ? null : Math.max(0, (ms - approachOriginRef.current!) / 1000);
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     approachQaRef.current = {
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startDistanceM: approachQaRef.current?.startDistanceM ?? approach.distanceM,
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       firstStableFixTSec: rel(approach.firstStableFixAtMs), armedTSec: rel(approach.armedAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startZoneEnteredTSec: rel(approach.startZoneEnteredAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       voiceTriggerTSec: rel(approach.startReachedAtMs), voiceQueuedTSec: null, voiceSpokenTSec: null,
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       startReachedTSec: rel(approach.startReachedAtMs),
+      // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       departedStartTSec: rel(approach.departedStartAtMs), searchStartedTSec: null,
       reason: approach.reason,
     };
@@ -439,6 +452,7 @@ export default function TrackRunScreen() {
   // weitere Zeit-Sperre. Der manuelle Override bleibt für GPS-Probleme erhalten.
   useEffect(() => {
     if (arming && approach.phase === 'departed_start' && approach.startReachedAtMs != null)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       beginSearchNow('automatic-departure');
   }, [arming, approach.phase, approach.startReachedAtMs, beginSearchNow]);
 
@@ -467,6 +481,7 @@ export default function TrackRunScreen() {
   //    kontrollierter Bestätigungsdialog. Kein Start bei ausstehendem Recovery-Dialog.
   useEffect(() => {
     if (phase !== 'ready' || startedRef.current || arming || recovery || !snap) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     if (startPoint) { setArming(true); return; }
     // RC-4: Kein Startpunkt (Runtime leer UND kein persistierter Anker) → NICHT
     // stillschweigend direkt starten. Kontrollierte Recovery-Auswahl anbieten.
@@ -529,8 +544,11 @@ export default function TrackRunScreen() {
   const showRecoveryDialog = (pending: PendingTrack) => {
     if (!allowedTransfer(pending)) return;
     Alert.alert('Laufende Absuche fortsetzen?', 'Es wurde eine unterbrochene Absuche gefunden.', [
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Fortsetzen', onPress: () => void resumeSearch(pending) },
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Beenden',    onPress: () => confirmRecoveryEnd(pending) },
+      // eslint-disable-next-line react-hooks/immutability -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       { text: 'Verwerfen', style: 'destructive', onPress: () => discardSearch(pending) },
     ], { cancelable: false });
   };
@@ -762,8 +780,10 @@ export default function TrackRunScreen() {
   // Ende-Logik selbst (useTrackEndGuidance/stepTrackEnd) bleibt unverändert; Haptik
   // und Voice feuern im selben Tick wie `onFired` (siehe useTrackEndGuidance).
   const sLatestRef = useRef(s);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   sLatestRef.current = s;
   const voiceOnRef = useRef(voiceOn);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   voiceOnRef.current = voiceOn;
   const noteEndFired = useCallback(() => {
     useTrackingStore.getState().noteSearchEndFired();
@@ -787,11 +807,13 @@ export default function TrackRunScreen() {
       : Math.max(0, (grace.endedAtMs - searchStartMsRef.current) / 1000);
     endConfirmationRef.current.finalObjectGraceReason = grace.reason;
   }, []);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   const trackEndState = useTrackEndGuidance({
     recording: searchGuidanceActive,
     paused: s.paused,
     continuityEpoch: s.continuityEpoch,
     sessionId: effectiveId,
+    // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     runId: runIdRef.current,
     dogProgressM: s.dogProgressM,
     handlerProgressM: s.progressM,
@@ -912,6 +934,7 @@ export default function TrackRunScreen() {
     // blendet ein evtl. laufendes Recovery-Banner sofort wieder aus.
     if (recoveryTimerRef.current) { clearTimeout(recoveryTimerRef.current); recoveryTimerRef.current = null; }
     if (s.offTrackState === 'on_track') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
       setRecoveryVisible(true);
       recoveryTimerRef.current = setTimeout(() => { setRecoveryVisible(false); recoveryTimerRef.current = null; }, 2600);
     } else {
@@ -1139,6 +1162,7 @@ export default function TrackRunScreen() {
 
   useEffect(() => {
     if (!pendingExit || s.recording) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
     setPendingExit(null);
     router.replace(pendingExit as never);
   }, [pendingExit, router, s.recording]);

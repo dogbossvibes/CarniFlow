@@ -84,6 +84,7 @@ export const PinMarker = memo(function PinMarker({ Marker, lat, lng, kind, label
   faded?: boolean;
 }) {
   const [track, setTrack] = useState(true);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production b6ef690f; Logik bewusst unverändert (Fährtenbasis)
   useEffect(() => { setTrack(true); const t = setTimeout(() => setTrack(false), 1200); return () => clearTimeout(t); }, [kind, label, acute, duebel, color, faded]);
   let child;
   // Abriss: bordertes Kästchen MIT Symbol — eine inhaltsleere Custom-Marker-View

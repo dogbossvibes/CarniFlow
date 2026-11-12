@@ -33,7 +33,7 @@ export default function CoachScreen() {
 
   const runCta = (cta?: InsightCta | null) => {
     if (!cta) return;
-    if (cta.kind === 'plan')        router.push('/unit/start' as never);
+    if (cta.kind === 'plan')        router.push('/unit/document' as never);
     else if (cta.kind === 'open')   router.push((cta.source === 'track' ? `/track/${cta.id}` : { pathname: '/unit/detail', params: { id: cta.id } }) as never);
     else if (cta.kind === 'similar') router.push({ pathname: '/analyse/smart-search', params: { q: cta.query } } as never);
   };
@@ -63,7 +63,7 @@ export default function CoachScreen() {
         {isLoading ? (
           <ActivityIndicator color={C.accent} style={{ marginTop: 30 }} />
         ) : nothing ? (
-          <EmptyCoachState onStart={() => router.push('/unit/start' as never)} />
+          <EmptyCoachState onStart={() => router.push('/unit/document' as never)} />
         ) : (
           <>
             {top.length > 0 && (

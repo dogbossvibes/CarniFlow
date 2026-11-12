@@ -85,14 +85,18 @@ let current: Recorder;
 let clockMs = 1_000_000;
 let appStateListener: ((next: AppStateStatus) => void) | null = null;
 const lat = (m: number) => m / 111_320;
-function Harness() { current = useTrackRecorder({ autoDetect: false }); return null; }
+const setCurrent = (recorder: Recorder) => { current = recorder; };
+function Harness({ onRecorder }: { onRecorder: (recorder: Recorder) => void }) {
+  onRecorder(useTrackRecorder({ autoDetect: false }));
+  return null;
+}
 const settle = async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); };
 function feed(afterMs: number, accuracy: number, northM: number) {
   clockMs = 1_000_000 + afterMs;
   act(() => { feedFix?.({ lat: lat(northM), lng: 0, accuracy, speed: 1, t: clockMs }); });
 }
 async function startRecording() {
-  await act(async () => { renderer = TestRenderer.create(<Harness />); });
+  await act(async () => { renderer = TestRenderer.create(<Harness onRecorder={setCurrent} />); });
   await act(async () => { await current.startWarmup(); });
   feed(0, 5, 0);
   await act(async () => {
