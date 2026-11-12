@@ -64,6 +64,7 @@ export interface AnalyticsState {
   latestAnalysis:  TrainingAnalysis | null;
   trend7:          TrendSummary;
   trend30:         TrendSummary;
+  trend90:         TrendSummary;
   trendPoints:     TrendPoint[];
   recommendations: TrainingRecommendation[];
   loading:         boolean;
