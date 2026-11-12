@@ -5,6 +5,9 @@ export type PlannedExercise = {
   discipline: string;
   name: string;
   rating: number | null;
+  // Nur gelesen: markiert eine aus der neuen Trainingsdoku stammende Lernstufe.
+  // Wird nie an den Server gesendet; dieser behält die Markierung der Zeile.
+  ratingScale?: string | null;
   notes: string | null;
   performed: boolean;
   durationSec?: number | null;
