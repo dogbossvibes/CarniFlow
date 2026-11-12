@@ -1,5 +1,19 @@
 # ANYVO – Active Work
 
+## Stand nach OTA #87 – 2026-11-12 (Abend)
+
+**Erledigt:** Gerätetest #81 bestanden, Karte auf Veröffentlicht. PR #67 gemergt. iOS-60-OTA aus
+main (Karte #87) live; DB-Preflight der Nutzerin: Kontakte-, Personensuche- und Gruppen-Migrationen
+in Production vorhanden. Board-Feld «Release-Ziel» eingerichtet, altes «Ziel» gelöscht.
+
+**Offen:**
+- **Gerätetest #87** auf Build 60: Kontakt hinzufügen (Code/QR), Anfrage annehmen, Freigaben,
+  Blockieren; Gruppe per Code beitreten, Beitrittsanfrage; Einführung beim ersten Start; aktiver Hund;
+  PDF-Bericht teilen; Fährten kurz gegenprüfen.
+- **main hinter Production:** `e253a552`, `96e7f661`, `2e0e2d10` fehlen in main.
+- **PR #84** (AGENTS.md, Release-Ziel): Merge durch die Nutzerin.
+- Unverändert offen aus dem Abschnitt darunter: PR #68, PR #76, Git-Schlüsselbund, Android-Absuche.
+
 ## Stand nach den iOS-60-OTAs #77, #79, #81 – 2026-11-12
 
 **Erledigt:** Drei iOS-60-OTAs live (Karten #77, #79, #81), Release-Quellen auf GitHub gesichert,
