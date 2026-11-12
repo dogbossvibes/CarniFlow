@@ -94,6 +94,19 @@ Auf iOS liefen diese Funktionen nur auf TestFlight; auf Android sind sie im Stor
 - **`modules/anyvo-daily-widget`**: Android-Startbildschirm-Widget „Heute“ (`app/widgets/today.tsx`, `features/widgets/*`). Fehlt komplett. Ohne Nachziehen verschwindet das Widget bei Nutzer:innen, die es eingerichtet haben. **Nutzerentscheid 2026-11-12: nachziehen**; damit auch die Widget-Aktualisierung aus `4d3845d7`.
 - **`modules/anyvo-greeting-audio`**: Android-eigene Wiedergabe des Begrüssungstons. Build 60 spielt den Ton über `features/home/useGreetingSound.ts`; ob das auf Android gleich funktioniert (Audiofokus, Lautlos), auf dem Gerät prüfen.
 
+## Prüfergebnis Abschnitt 3 (2026-11-12)
+
+Gleiche Methode wie bei Abschnitt 2 (hinzugefügte Zeilen der OTA im Kandidaten gesucht, datenkritische Reste von Hand angesehen). Nur lesend, keine Geräteprüfung. **Alle fünf sind inhaltlich enthalten – Empfehlung: ausnehmen mit Begründung „inhaltlich in Build-60-Basis enthalten“.**
+
+| Gruppe(n) | OTA | Zeilen | Befund |
+|---|---|---|---|
+| `ee582684` | Health, report export, Shelly help and permanent ACTIVE access | 1625/1674 | Gesundheitsakte, Fährtenbericht (PDF/GPX/JSON über `TrackExportActions`, in der Auswertung eingebunden), dauerhafter ACTIVE-Zugang vorhanden; Gesundheitsakte seither umgebaut |
+| `b486ae49`, `3060767c` | Durable tracking writes, medication dates, sync and export | 218/238 | `createBufferedPointWriter`, `layRecorderOwnership`, `backgroundTransitionQueue`, `flushSearchPoints`, `finalizeLocalTrackRun` vorhanden. Die Hintergrund-Ortung speichert Punkte in Build 60 unabhängig vom Bildschirm (awaited Persistenz im Task selbst, Build-58-Fährtenbasis) statt über den früheren Handler. Medikamenten-Datumsfeld (`DateField`, `stabilizeIOSBounds`) vorhanden |
+| `d7c6f457`, `5af04065` | Tracking badges, object counts, history preview | 16/17 | vorhanden; es fehlt nur ein Kommentar in `TrackingMap` |
+| `1d64e5ed`, `f5575fc8` | Preserve Android original object snapshot | 46/50 | Original-Gegenstandsstand (`objectSnapshotInput`, `objectScoreBasis`) und `trackObjectReview` vorhanden, Bewertungsbasis leicht anders aufgebaut |
+
+Kundendaten: Fährtenspeicherung, Gegenstände und Medikamentendaten sind der Kern dieser OTAs. Im Upgrade-Test von Build 49 gezielt prüfen: Fährte legen und absuchen mit Bildschirm aus, App während der Aufnahme beenden und fortsetzen, bestehende Medikamenteneinträge öffnen/bearbeiten/speichern.
+
 ## 1. Bestätigt fehlend – Android-eigene Änderungen (inhaltlich geprüft) (2)
 
 Im Kandidaten fehlt der Code nachweislich. Empfehlung: **nachziehen**, vor dem nativen Android-Build.
