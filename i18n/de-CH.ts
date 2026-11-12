@@ -932,6 +932,9 @@ export const deCH = {
   "greeting.soundLabel": "Begrüssungston",
   "greeting.soundHint": "Optional beim ersten Öffnen nach einem App-Neustart. Aufnahmen und Ansagen haben Vorrang.",
   "greeting.soundSaveError": "Die Toneinstellung konnte nicht gespeichert werden.",
+  'activeDog.title': 'Aktiver Hund',
+  'activeDog.hint': 'Gilt für Analyse und Fährten-Übersicht. Du kannst jederzeit wechseln.',
+  'activeDog.switchA11y': 'Aktiver Hund: {dog}. Wechseln',
 
   // Einführung beim ersten Start
   'onboarding.tagline': 'Training, Fährte und Gesundheit deines Hundes an einem Ort.',

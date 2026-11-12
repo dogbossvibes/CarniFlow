@@ -910,6 +910,9 @@ export const gswCH: Partial<Record<TranslationKey, string>> = {
   "greeting.soundLabel": "Begrüessigston",
   "greeting.soundHint": "Optional bim erschte Öffne nach eme App-Neustart. Ufnahme und Aasage händ Vorrang.",
   "greeting.soundSaveError": "D Toneistellig het nöd chönne gspeicheret werde.",
+  'activeDog.title': 'Aktive Hund',
+  'activeDog.hint': 'Gilt für d Analyse und d Fährte-Übersicht. Du chasch jederziit wächsle.',
+  'activeDog.switchA11y': 'Aktive Hund: {dog}. Wächsle',
 
   // Einführung beim ersten Start
   'onboarding.tagline': 'Training, Fährte und Gsundheit vo dim Hund a eim Ort.',

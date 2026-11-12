@@ -715,6 +715,9 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "greeting.soundLabel": "Son de bienvenue",
   "greeting.soundHint": "Facultatif lors de la première ouverture après le redémarrage de l’application. Les enregistrements et annonces sont prioritaires.",
   "greeting.soundSaveError": "Le réglage du son n’a pas pu être enregistré.",
+  "activeDog.title": "Chien actif",
+  "activeDog.hint": "S'applique à l'analyse et à l'aperçu des pistes. Tu peux changer à tout moment.",
+  "activeDog.switchA11y": "Chien actif : {dog}. Changer",
 
   // Einführung beim ersten Start
   "onboarding.tagline": "L'entraînement, le pistage et la santé de ton chien au même endroit.",
