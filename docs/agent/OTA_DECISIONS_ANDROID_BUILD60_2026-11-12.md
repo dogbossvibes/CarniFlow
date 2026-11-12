@@ -30,6 +30,15 @@ Schritt 1 der Android-Angleichung an iOS Build 60 (nur lesend, nichts ausgenomme
 - **RevenueCat**: `eas.json` setzt nur `EXPO_PUBLIC_REVENUECAT_IOS_KEY`; `lib/purchases.ts` liest auch `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`. In der EAS-Production-Umgebung prüfen.
 - Die iOS-Prüfung gegen denselben Kandidaten zeigt ebenfalls offene Zeilen (u. a. „Abo: erneuter Kauf …“, „App-Start: Startlogo …“), siehe Abschnitte 2 und 4.
 
+## Entscheid und Stand (2026-11-12)
+
+Die Nutzerin hat am 2026-11-12 alle Empfehlungen dieser Liste bestätigt. Die Ausnahmen stehen in `docs/agent/ota-coverage-exceptions.json` (52 Gruppen einzeln begründet, dazu je ein Sammeleintrag für die Android-Runtimes `1.0.1`, `1.0.3`, `1.0.4`, auf `platform: android` beschränkt). Die Kästchen in den Tabellen unten sind damit erledigt und bleiben nur als Verlauf stehen.
+
+- **Nachgezogen (PRs, vor dem Build mergen):** #89 Abo-Preis-Fallback, #91 Auswertungs-Footer, #92 Widget «Heute», #93 `versionCode` 51 und Android-Runtime.
+- **Ausgenommen:** alle übrigen Zeilen, Begründung je Gruppe in der Ausnahmedatei.
+- **Auf dem Android-Gerät prüfen:** Startlogo (`17aabc80`), Sammelmarker (`e9cde79c`), Lege-/Suchspur (`283b31ad`), Begrüssungston.
+- **Prüfung:** `node scripts/check-ota-coverage.mjs --platform android --candidate <main + diese Änderung>` → 158 geprüft, 31 enthalten, 127 ausgenommen, **0 offen** (ohne `--live`; vor dem Build mit `--live` wiederholen). iOS-Ergebnis unverändert.
+
 ## Prüfergebnis Abschnitt 2 (2026-11-12)
 
 Methode: Für jede OTA die hinzugefügten Zeilen (Diff gegen ihre Basis) und die neu eingeführten Bezeichner/Texte im Kandidaten gesucht, Rest von Hand angesehen. Nur lesend, keine Geräteprüfung. „Zeilen“ = gefundene/hinzugefügte Zeilen ab 25 Zeichen.
