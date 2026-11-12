@@ -68,8 +68,11 @@ export function useTrackEndGuidance(input: {
   const lastObservedFixMsRef = useRef(-Infinity);
   const continuityCutoffMsRef = useRef(-Infinity);
   const [graceClock, setGraceClock] = useState(0);
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production e253a552; Ende-Erkennung bewusst unverändert (GPS-Kontinuität)
   latestInputRef.current = input;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production e253a552; Ende-Erkennung bewusst unverändert (GPS-Kontinuität)
   onFiredRef.current = input.onFired;
+  // eslint-disable-next-line react-hooks/refs -- vorbestehend seit Production e253a552; Ende-Erkennung bewusst unverändert (GPS-Kontinuität)
   onGraceChangeRef.current = input.onFinalObjectGraceChange;
 
   useEffect(() => {
@@ -83,6 +86,7 @@ export function useTrackEndGuidance(input: {
     generationRef.current++;
     lastObservedFixMsRef.current = -Infinity; continuityCutoffMsRef.current = -Infinity;
     stateRef.current = 'unseen'; endFixHistoryRef.current = INITIAL_END_FIX_HISTORY;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vorbestehend seit Production e253a552; Ende-Erkennung bewusst unverändert
     finalObjectGraceRef.current = INITIAL_FINAL_OBJECT_END_GRACE; setEndState('unseen');
   }, [input.recording, input.sessionId, input.runId, input.endPoint?.latitude, input.endPoint?.longitude]);
 
