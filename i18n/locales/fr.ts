@@ -86,6 +86,8 @@ export const fr: Partial<Record<TranslationKey, string>> & Record<string, string
   "analyse.running":     "Smart Analyse en cours …",
   "analyse.emptyTitle":  "Accumule des entraînements et découvre des tendances",
   "analyse.emptyText":   "Anyvo analyse tes entraînements à partir de tes données – sans que tu aies à tout évaluer manuellement.",
+  "analyse.emptyTitleDog": "Pas encore d'analyse pour {dog}",
+  "analyse.emptyHint": "Saisis un entraînement avec une évaluation. Le score, la tendance et les points forts s'afficheront ensuite ici.",
   "analyse.capture":     "Enregistrer un entraînement",
   "analyse.cardTitle":   "Smart Analyse",
 
