@@ -115,6 +115,7 @@
     "jest-expo": "~58.0.14",
     "nativewind": "^4.2.4",
     "pdf-lib": "1.17.1",
+    "qrcode-generator": "2.0.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-i18next": "^17.0.9",

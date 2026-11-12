@@ -5,7 +5,7 @@ export function useConnectedInviteTargets(userId: string | null, revision: numbe
   const [state, setState] = useState<{ userId: string; targets: { userId: string; displayName: string | null }[] } | null>(null);
   useEffect(() => {
     let current = true; setState(null);
-    if (userId) void Promise.all([listConnections(userId), listConnections(userId, PERSON_CONNECTION_TYPE)])
+    if (userId) void Promise.all([listConnections(userId), listConnections(userId, PERSON_CONNECTION_TYPE), listConnections(userId, 'contact')])
       .then(results => {
         if (!current) return;
         const targets = new Map<string, { userId: string; displayName: string | null }>();

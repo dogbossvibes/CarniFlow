@@ -483,6 +483,12 @@ export default function ProfilScreen() {
           />
           <View style={s.trenner} />
           <EinstellungZeile
+            icon="people-outline"
+            label={t('contacts.profileRow')}
+            onPress={() => router.push('/contacts' as never)}
+          />
+          <View style={s.trenner} />
+          <EinstellungZeile
             icon="language-outline"
             label={t('profile.language')}
             wert={spracheLabel}
